@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#pragma once
+#pragma warning(disable:4275)
 #ifndef ZORBA_ZORBA_EXCEPTION_API_H
 #define ZORBA_ZORBA_EXCEPTION_API_H
 

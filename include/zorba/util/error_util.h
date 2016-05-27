@@ -15,6 +15,7 @@
  */
 
 #pragma once
+#pragma warning(disable:4275)
 #ifndef ZORBA_API_ERROR_UTIL_H
 #define ZORBA_API_ERROR_UTIL_H
 
