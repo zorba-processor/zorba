@@ -361,6 +361,10 @@ IF (NOT ZORBA_SUPPRESS_SWIG)
     #
     FIND_PACKAGE (PHP5)
 
+    # Disable PHP5 by default until errors are fixed
+    SET(ZORBA_SUPPRESS_PHP 1)
+    MESSAGE (STATUS "Disable PHP5 by default until errors are fixed")
+
     #
     # Python
     #
