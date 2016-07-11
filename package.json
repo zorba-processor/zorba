@@ -1,0 +1,22 @@
+{
+  "name": "zorba",
+  "version": "0.1.3",
+  "main": "./build/Release/zorba",
+  "description": "ZORBA - Modern Query Processor",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hybridum/zorba-node.git"
+  },
+  "author": "Rodolfo Ochoa <rodolfo.ochoa@gmail.com>",
+  "license": "Apache 2.0",
+  "readmeFilename": "README.md",
+  "keywords": [
+    "XQuery",
+    "JSONiq",
+    "processor",
+    "zorba"
+  ]
+}
