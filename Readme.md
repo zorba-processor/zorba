@@ -1,4 +1,4 @@
-#Zorba - NoSQL Query Processor
+#Zorba - The NoSQL  Processor
 [![Circle CI](https://circleci.com/gh/28msec/zorba.svg?style=svg)](https://circleci.com/gh/28msec/zorba) 
 
 http://zorba.io/
