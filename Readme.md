@@ -22,5 +22,5 @@ docker run -v /home/fcavalieri/myqueries:/queries zorba -q foo.xq -f
 http://zorba.io/documentation/latest
 
 ##Support
-If you want to be informed about new code releases, bug fixes and general news and information about the Zorba XQuery Processor, subscribe to the Zorba Users mailing list [zorba-users@googlegroups.com](mailto:zorba-io-users@googlegroups.com)
+If you want to be informed about new code releases, bug fixes and general news and information about the Zorba NoSQL Processor, subscribe to the Zorba Users mailing list [zorba-io-users@googlegroups.com](mailto:zorba-io-users@googlegroups.com)
 
