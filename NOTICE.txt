@@ -10,13 +10,13 @@ Please do not modify this file directly.)
 
 Apache 2
 
-      Copyright 2006-2011 The FLWOR Foundation
+      Copyright 2006-2016 zorba.io
 
       See LICENSE.txt for license information.
 
       ------------------------
       This product includes software developed at
-      The FLWOR Foundation (http://www.flworfound.org/).
+      zorba.io (http://www.zorba.io/).
 
       ------------------------
       Portions of this software were developed at the Systems
@@ -431,7 +431,7 @@ Copyright: 2001 Andrei Alexandrescu
 
 test/fots_driver
 
-Copyright: 2012 The FLWOR Foundation
+Copyright: 2006-2016 zorba.io
 
 
        The code in this directory was initially based on the structure

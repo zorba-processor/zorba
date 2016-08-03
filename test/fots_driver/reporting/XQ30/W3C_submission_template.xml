@@ -2,13 +2,13 @@
   <submission anonymous="false">
     <created  by="Sorin Nasoi"
       email="sorin.marian.nasoi_at_gmail.com"
-      organization="FLWOR Foundation"
+      organization="zorba.io"
       on="2013-05-08"/>
     <test-run test-suite-version="CVS"
       date-run="2013-05-17"/>
     <notes/>
   </submission>
-  <product  vendor="FLWOR Foundation"
+  <product  vendor="zorba.io"
     name="Zorba"
     version="2.9"
     released="true"

@@ -14,13 +14,13 @@ else
          anonymous-result-column="false">
   
       <organization
-        name='FLWOR Foundation'
-        website="http://zorba-xquery.com/"
+        name='zorba.io'
+        website="http://zorba.io/"
         anonymous="false" />
     
       <submittor
         name="Zorba Team"
-        email="contact@zorba-xquery.com" />
+        email="contact@zorba.io" />
       
       <description>
         <p>Zorba is a general purpose XQuery processor implementing in C++

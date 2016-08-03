@@ -1,4 +1,4 @@
-# Copyright 2006-2008 The FLWOR Foundation.
+# Copyright 2006-2016 zorba.io
 # 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -57,7 +57,7 @@ SET(SRCS
 ZORBA_GENERATE_EXE("zorbacmd" "${SRCS}" "" "zorba" "bin")
 
 IF(UNIX)
-  ADD_CUSTOM_TARGET(zorbacmd_man help2man -N -s1 -n Zorba -S "FLWOR Foundation" ./zorba > "${PROJECT_BINARY_DIR}/doc/zorba.1")
+  ADD_CUSTOM_TARGET(zorbacmd_man help2man -N -s1 -n Zorba -S "zorba.io" ./zorba > "${PROJECT_BINARY_DIR}/doc/zorba.1")
   ADD_DEPENDENCIES(zorbacmd_man zorbacmd)
 ENDIF(UNIX)
 

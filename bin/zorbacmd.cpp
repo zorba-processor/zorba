@@ -1,5 +1,5 @@
 /*
- * Copyright 2006-2008 The FLWOR Foundation.
+ * Copyright 2006-2016 zorba.io
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -70,7 +70,7 @@ static void set_paths_on_sctx( StaticContext_t& );
 ///////////////////////////////////////////////////////////////////////////////
 
 static const char copyright[] =
-  "Copyright 2006-2014 The FLWOR Foundation.\n"
+  "Copyright 2006-2016 zorba.io\n"
   "License: Apache License 2.0: <http://www.apache.org/licenses/LICENSE-2.0>";
 
 #ifndef ZORBA_NO_FULL_TEXT

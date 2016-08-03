@@ -1,7 +1,7 @@
 <fn:analyze-string-result xmlns:fn="http://www.w3.org/2005/xpath-functions"><fn:non-match>&lt;html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en"&gt;
 &lt;head&gt;
     &lt;meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/&gt;
-    &lt;meta name="copyright" content="The FLWOR Foundation"/&gt;
+    &lt;meta name="copyright" content="zorba.io"/&gt;
     </fn:non-match><fn:match><fn:group nr="1">&lt;</fn:group><fn:group nr="2"><fn:group nr="3"><fn:group nr="4">link</fn:group> rel="shortcut icon" href</fn:group><fn:group nr="5"/><fn:group nr="6"/></fn:group>=<fn:group nr="7">"</fn:group><fn:group nr="8">../favicon.ico</fn:group>"</fn:match><fn:non-match>/&gt;
     </fn:non-match><fn:match><fn:group nr="1">&lt;</fn:group><fn:group nr="2"><fn:group nr="3"><fn:group nr="4">link</fn:group> type="text/css" href</fn:group><fn:group nr="5"/><fn:group nr="6"/></fn:group>=<fn:group nr="7">"</fn:group><fn:group nr="8">../css/reset.css</fn:group>"</fn:match><fn:non-match> rel="stylesheet"/&gt;
     </fn:non-match><fn:match><fn:group nr="1">&lt;</fn:group><fn:group nr="2"><fn:group nr="3"><fn:group nr="4">link</fn:group> type="text/css" href</fn:group><fn:group nr="5"/><fn:group nr="6"/></fn:group>=<fn:group nr="7">"</fn:group><fn:group nr="8">../css/style.css</fn:group>"</fn:match><fn:non-match> rel="stylesheet"/&gt;

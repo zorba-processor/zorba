@@ -3,13 +3,13 @@
   <master-license>
     <license>Apache 2</license>
     <text>
-      Copyright 2006-2011 The FLWOR Foundation
+      Copyright 2006-2016 zorba.io
 
       See LICENSE.txt for license information.
 
       ------------------------
       This product includes software developed at
-      The FLWOR Foundation (http://www.flworfound.org/).
+      zorba.io (http://www.zorba.io/).
 
       ------------------------
       Portions of this software were developed at the Systems
@@ -395,7 +395,7 @@
   </foreign-files>
   <foreign-files>
     <file>test/fots_driver</file>
-    <copyright>2012 The FLWOR Foundation</copyright>
+    <copyright>2006-2016 zorba.io</copyright>
     <foreign-notice>
        The code in this directory was initially based on the structure
        and some code of the fots-basex project by Leo Woerteler. At

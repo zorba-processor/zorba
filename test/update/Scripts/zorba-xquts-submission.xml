@@ -1,6 +1,6 @@
 <test-suite-result xmlns="http://www.w3.org/2005/02/query-test-XQTSResult">
   <implementation name="Zorba" version="2.1 'Basileia'" anonymous-result-column="false">
-    <organization name="FLWOR Foundation" website="http://zorba-xquery.com/" anonymous="false"/>
+    <organization name="zorba.io" website="http://zorba.io/" anonymous="false"/>
     <submittor name="Zorba Team" email="contact@zorba-xquery.com"/>
     <description>
       <p>Zorba is a general purpose XQuery processor implementing in C++

@@ -3286,7 +3286,7 @@ static yyconst flex_int16_t yy_rule_linenum[349] =
 #line 2 "/home/federico/zorba/build/src/compiler/parser/xquery_scanner.l"
 #define XQUERY_SCANNER
 /*
- * Copyright 2006-2008 The FLWOR Foundation.
+ * Copyright 2006-2016 zorba.io
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
