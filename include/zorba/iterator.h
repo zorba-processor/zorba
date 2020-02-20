@@ -18,6 +18,7 @@
 
 // standard
 #include <cassert>
+#include <type_traits>
 
 // Zorba
 #include <zorba/api_shared_types.h>

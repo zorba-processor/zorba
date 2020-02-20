@@ -921,7 +921,7 @@ compare(const StringType1 &s1, const StringType2 &s2,
   unicode::to_string(s1, &us1);
   unicode::to_string(s2, &us2);
 
-  return static_cast<Collator*>( collation->getCollator() )->compare(us1, us2);
+  return static_cast<icu::Collator*>( collation->getCollator() )->compare(us1, us2);
 #else
   return s1.compare(s2);
 #endif /* ZORBA_NO_ICU */
@@ -954,13 +954,13 @@ hash(const StringType& s, const XQPCollator* collation = NULL)
   }
 
 #ifndef ZORBA_NO_ICU
-  CollationKey collKey;
+  icu::CollationKey collKey;
   UErrorCode status = U_ZERO_ERROR;
 
   unicode::string uni_s;
   unicode::to_string(s, &uni_s);
 
-  static_cast<Collator*>(collation->getCollator())->
+  static_cast<icu::Collator*>(collation->getCollator())->
   getCollationKey(uni_s, collKey, status);
 
   if(U_FAILURE(status))

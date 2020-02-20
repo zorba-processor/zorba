@@ -64,7 +64,7 @@ std::vector<std::string> std_string_tokenize(
 
 XQPCollator::XQPCollator(void* aCollator, const std::string& aCollationURI, bool doMemCmp)
   :
-  theCollator((Collator*)aCollator),
+  theCollator((icu::Collator*)aCollator),
   uri(aCollationURI),
   theDoMemCmp(doMemCmp)
 {
@@ -73,7 +73,7 @@ XQPCollator::XQPCollator(void* aCollator, const std::string& aCollationURI, bool
 
 XQPCollator::~XQPCollator()
 {
-  delete (Collator*)theCollator;
+  delete (icu::Collator*)theCollator;
 }
 
 const std::string& XQPCollator::getURI() const
@@ -113,17 +113,17 @@ CollationFactory::createCollator(const std::string& aCollationURI)
     return 0;
   }
   
-  Collator* lCollator;
+  icu::Collator* lCollator;
 
 #ifndef ZORBA_NO_ICU
   UErrorCode lError = U_ZERO_ERROR;
   if (lTokens.size() == 2) 
   {
-    lCollator = Collator::createInstance(Locale(lTokens[1].c_str()), lError);
+    lCollator = icu::Collator::createInstance(icu::Locale(lTokens[1].c_str()), lError);
   }
   else 
   {
-    lCollator = Collator::createInstance(Locale(lTokens[1].c_str(),
+    lCollator = icu::Collator::createInstance(icu::Locale(lTokens[1].c_str(),
                                                 lTokens[2].c_str()),
                                          lError);
   }
@@ -140,31 +140,31 @@ CollationFactory::createCollator(const std::string& aCollationURI)
   if (lTokens[0].compare("PRIMARY") == 0) 
   {
 #ifndef ZORBA_NO_ICU
-    lCollator->setStrength(Collator::PRIMARY);
+    lCollator->setStrength(icu::Collator::PRIMARY);
 #endif /* ZORBA_NO_ICU */
   }
   else if (lTokens[0].compare("SECONDARY") == 0) 
   {
 #ifndef ZORBA_NO_ICU
-    lCollator->setStrength(Collator::SECONDARY);
+    lCollator->setStrength(icu::Collator::SECONDARY);
 #endif /* ZORBA_NO_ICU */
   }
   else if (lTokens[0].compare("TERTIARY") == 0) 
   {
 #ifndef ZORBA_NO_ICU
-    lCollator->setStrength(Collator::TERTIARY);
+    lCollator->setStrength(icu::Collator::TERTIARY);
 #endif /* ZORBA_NO_ICU */
   }
   else if (lTokens[0].compare("QUATERNARY") == 0) 
   {
 #ifndef ZORBA_NO_ICU
-    lCollator->setStrength(Collator::QUATERNARY);
+    lCollator->setStrength(icu::Collator::QUATERNARY);
 #endif /* ZORBA_NO_ICU */
   }
   else if (lTokens[0].compare("IDENTICAL") == 0) 
   {
 #ifndef ZORBA_NO_ICU
-    lCollator->setStrength(Collator::IDENTICAL);
+    lCollator->setStrength(icu::Collator::IDENTICAL);
 #endif /* ZORBA_NO_ICU */
   }
   else
@@ -179,16 +179,16 @@ CollationFactory::createCollator(const std::string& aCollationURI)
 XQPCollator*
 CollationFactory::createCollator()
 {
-  Collator* lCollator;
+  icu::Collator* lCollator;
 #ifndef ZORBA_NO_ICU
   UErrorCode lError = U_ZERO_ERROR;
-  lCollator = Collator::createInstance(Locale("en", "US"), lError); 
+  lCollator = icu::Collator::createInstance(icu::Locale("en", "US"), lError); 
   if( U_FAILURE(lError) ) {
     assert(false);
   }
-  lCollator->setStrength(Collator::IDENTICAL);
+  lCollator->setStrength(icu::Collator::IDENTICAL);
 #else
-  lCollator = new Collator;
+  lCollator = new icu::Collator;
 #endif /* ZORBA_NO_ICU */
   return new XQPCollator(lCollator, (std::string)"");
 }

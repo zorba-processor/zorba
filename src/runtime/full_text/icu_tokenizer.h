@@ -52,7 +52,7 @@ public:
                         Callback&, Item const* );
 
 private:
-  typedef std::unique_ptr<RuleBasedBreakIterator> rbbi_ptr;
+  typedef std::unique_ptr<icu::RuleBasedBreakIterator> rbbi_ptr;
 
   locale::iso639_1::type const lang_;
   rbbi_ptr word_it_;
