@@ -26,7 +26,7 @@
 # include <clocale>
 # include <cstdlib>                     /* for getenv(3) */
 # include <langinfo.h>                  /* for nl_langinfo(3) */
-# include <xlocale.h>                   /* for newlocale(3) */
+# include <locale.h>                   /* for newlocale(3) */
 #endif /* WIN32 */
 
 // Zorba
