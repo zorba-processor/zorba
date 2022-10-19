@@ -2244,7 +2244,7 @@ bool normalize( string const &in, normalization::type n, string *out ) {
     default                 : icu_mode = UNORM_NONE; break;
   }
   Normalizer::normalize( in, icu_mode, 0, *out, status );
-  return U_SUCCESS( status ) == TRUE;
+  return U_SUCCESS( status );
 }
 
 bool strip_diacritics( string const &in, string *out ) {
@@ -2266,7 +2266,7 @@ bool to_char( char const *in, char_type *out ) {
     u_strFromUTF8WithSub(
       out, 1, nullptr, in, utf8::char_length( *in ), SubChar, nullptr, &status
     );
-    return U_SUCCESS( status ) == TRUE;
+    return U_SUCCESS( status );
   }
   catch ( utf8::invalid_byte const& ) {
     return false;
@@ -2312,7 +2312,7 @@ bool to_string( char const *in, size_type in_len, string *out ) {
   UErrorCode status = U_ZERO_ERROR;
   u_strFromUTF8( buf, in_len + 1, &buf_len, in, in_len, &status );
   out->releaseBuffer( buf_len );
-  return U_SUCCESS( status ) == TRUE;
+  return U_SUCCESS( status );
 }
 
 bool to_string( wchar_t const *in, size_type in_len, string *out ) {
@@ -2321,7 +2321,7 @@ bool to_string( wchar_t const *in, size_type in_len, string *out ) {
   size_type buf_len;
   u_strFromWCS( buf, in_len + 1, &buf_len, in, in_len, &status );
   out->releaseBuffer( buf_len );
-  return U_SUCCESS( status ) == TRUE;
+  return U_SUCCESS( status );
 }
 
 #endif /* ZORBA_NO_ICU */

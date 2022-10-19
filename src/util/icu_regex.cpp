@@ -759,7 +759,7 @@ bool regex::replace_all( string const &in, string const &replacement,
   matcher_->reset( in );
   UErrorCode status = U_ZERO_ERROR;
   *out = matcher_->replaceAll( replacement, status );
-  return U_SUCCESS( status ) == TRUE;
+  return U_SUCCESS( status );
 }
 
 bool regex::replace_all( char const *in, char const *replacement,
