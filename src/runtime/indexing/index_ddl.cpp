@@ -1293,35 +1293,24 @@ store::IndexCondition_t ProbeIndexRangeValueIterator::createCondition(
     if (state->theIndexDecl->isGeneral() &&
         (state->theIndexDecl->getKeyTypes())[keyNo] == NULL)
     {
-      store::SchemaTypeCode leftType;
-      store::SchemaTypeCode rightType;
-
-      if (tempLeft != NULL)
+      if (tempLeft != NULL && tempRight != NULL)
       {
-        leftType = tempLeft->getTypeCode();
-          
+        store::SchemaTypeCode leftType = tempLeft->getTypeCode();
         if (leftType == store::XS_UNTYPED_ATOMIC)
         {
           zstring str = tempLeft->getStringValue();
           GENV_ITEMFACTORY->createString(tempLeft, str);
           leftType = store::XS_STRING;
         }
-      }
-        
-      if (tempRight != NULL)
-      {
-        rightType = tempRight->getTypeCode();
-          
+
+        store::SchemaTypeCode rightType = tempRight->getTypeCode();
         if (rightType == store::XS_UNTYPED_ATOMIC)
         {
           zstring str = tempRight->getStringValue();
           GENV_ITEMFACTORY->createString(tempRight, str);
           rightType = store::XS_STRING;
         }
-      }
-        
-      if (tempLeft != NULL && tempRight != NULL)
-      {
+
         if (!TypeOps::is_subtype(leftType, rightType) &&
             !TypeOps::is_subtype(rightType, leftType))
         {
