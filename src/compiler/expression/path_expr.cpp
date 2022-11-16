@@ -256,8 +256,7 @@ bool match_expr::matches(const match_expr* other) const
     if (theDocTestKind == match_xs_elem_test)
       goto schema_test;
 
-    // else fall through
-  }
+  } [[fallthrough]];
   case match_elem_test:
   case match_attr_test:
   {

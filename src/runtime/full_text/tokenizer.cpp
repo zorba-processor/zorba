@@ -72,7 +72,7 @@ void Tokenizer::tokenize_node_impl( Item const &item, iso639_1::type lang,
             break;
           t_raw = t_ptr.get();
         }
-        // no break;
+        [[fallthrough]];
 
       case store::StoreConsts::documentNode:
         i = item.getChildren();
@@ -87,6 +87,7 @@ void Tokenizer::tokenize_node_impl( Item const &item, iso639_1::type lang,
       case store::StoreConsts::piNode:
         if ( !tokenize_acp )
           break;
+	[[fallthrough]];
       case store::StoreConsts::textNode: {
         String const s( item.getStringValue() );
         tokenize_string( s.data(), s.size(), lang, false, callback, &item );

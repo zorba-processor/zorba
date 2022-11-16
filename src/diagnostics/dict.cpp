@@ -39,7 +39,10 @@ namespace dict {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-struct less_entry : binary_function<entry const&,entry const&,bool> {
+struct less_entry {
+  using first_argument_type = entry const&;
+  using second_argument_type = entry const&;
+  using result_type = bool;
   less_entry() { }
   result_type operator()( first_argument_type i, second_argument_type j ) {
     return ::strcmp( i.key, j.key ) < 0;

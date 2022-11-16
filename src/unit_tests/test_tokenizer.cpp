@@ -42,9 +42,11 @@ static bool destroy_called;
 
 namespace std {
 
-template<> struct less<char const*> :
-  std::binary_function<char const*,char const*,bool>
+template<> struct less<char const*>
 {
+  using first_argument_type = char const*;
+  using second_argument_type = char const*;
+  using result_type = bool;
   less() { }
 
   result_type
@@ -287,7 +289,7 @@ void TestTokenizer::tokenize_string( char const *s, size_type s_len,
             default:
               continue;
           }
-          // no break;
+          [[fallthrough]];
         case '!':
         case '?':
           ++state().sent;

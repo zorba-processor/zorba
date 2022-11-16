@@ -31,7 +31,10 @@ class XQPCollator;
 
 ///////////////////////////////////////////////////////////////////////////////
 
-struct Item_value_equal : std::binary_function<store::Item*,store::Item*,bool> {
+struct Item_value_equal {
+  using first_argument_type = store::Item*;
+  using second_argument_type = store::Item*;
+  using result_type = bool;
   Item_value_equal( TypeManager const *tm, long tz, XQPCollator *coll,
                     QueryLoc const &loc ) :
     tm_( tm ),

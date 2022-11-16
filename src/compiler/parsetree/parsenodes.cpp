@@ -68,8 +68,10 @@ std::ostringstream __oss;
     ACCEPT( *i );
 
 #define DECLARE_VISITOR_FUNCTOR( name, type, body)                      \
-  class name : public std::unary_function<rchandle<parsenode>, void>    \
+  class name								\
   {                                                                     \
+    using argument_type = rchandle<parsenode>;				\
+    using result_type = void;						\
     parsenode_visitor &v;                                               \
   public:                                                               \
     name (parsenode_visitor &v_) : v (v_) {}                            \

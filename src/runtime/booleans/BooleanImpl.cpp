@@ -1117,7 +1117,7 @@ bool TypedValueCompareIterator<ATC>::nextImpl(
     {
     case CompareConsts::VALUE_NOT_EQUAL:
       neq = true;
-
+      [[fallthrough]];
     case CompareConsts::VALUE_EQUAL:
     {
       bRes = lItem0->equals(lItem1, theTimezone, theCollation);

@@ -111,7 +111,7 @@ ft_stop_words_set::construct( ftstop_word_option const &option,
     case ft_stop_words_mode::with_default:
       if ( (word_set = get_default_word_set_for( lang )) )
         break;
-      // no break;
+      [[fallthrough]];
     case ft_stop_words_mode::without:
       return ptr();
   }

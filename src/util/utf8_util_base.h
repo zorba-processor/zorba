@@ -392,17 +392,14 @@ storage_type const* validate( storage_type const *s, size_type s_len );
  * byte sequence.
  */
 template<class OctetIterator>
-class iterator :
-  public std::iterator<std::bidirectional_iterator_tag,unicode::code_point>
+class iterator
 {
-  typedef std::iterator<std::bidirectional_iterator_tag,unicode::code_point>
-          base_type;
 public:
-  typedef base_type::iterator_category iterator_category;
-  typedef base_type::difference_type difference_type;
-  typedef base_type::value_type value_type;
-  typedef base_type::pointer pointer;
-  typedef base_type::value_type reference;
+  using iterator_category = std::bidirectional_iterator_tag;
+  using value_type = unicode::code_point;
+  using difference_type = unicode::code_point;
+  using pointer = const unicode::code_point*;
+  using reference = const unicode::code_point&;
 
   iterator() {
   }

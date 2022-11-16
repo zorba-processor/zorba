@@ -293,7 +293,6 @@ struct destroy_delete {
 
 ////////// less<char const*> ///////////////////////////////////////////////////
 
-// This declaration exists only to declare that less is a template class.
 template<typename T> struct less {
 };
 
@@ -305,9 +304,11 @@ template<typename T> struct less {
  * See also: Bjarne Stroustrup. "The C++ Programming Language, 3rd ed."
  * Addison-Wesley, Reading, MA, 1997.  p. 468.
  */
-template<> struct less<char const*> :
-  std::binary_function<char const*,char const*,bool>
+template<> struct less<char const*>
 {
+  using result_type = bool;
+  using first_argument_type = char const*;
+  using second_argument_type = char const*;
   less() { }
   // This default constructor doesn't need to be defined, but g++ complains if
   // it isn't and you try to define a "const less" object.

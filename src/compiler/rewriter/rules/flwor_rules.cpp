@@ -932,7 +932,7 @@ bool EliminateUnusedLetVars::safe_to_fold_var_rec(
   case trycatch_expr_kind:
   {
     unsafe = true;
-  }
+  } [[fallthrough]];
   default:
   {
     if (node->is_sequential())

@@ -114,7 +114,7 @@ static void wildcard_to_icu_pattern( zstring const &ws_pat, zstring *icu_pat ) {
       case '|':
       case '}':
         *icu_pat += '\\';
-        // no break;
+        [[fallthrough]];
       default:
         *icu_pat += *ws_c;
         break;

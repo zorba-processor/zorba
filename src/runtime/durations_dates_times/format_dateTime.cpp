@@ -254,7 +254,7 @@ static void append_fractional_seconds( int n, modifier const &mod,
         break;
       }
       n = (int)( n * 1000.0 / DateTime::FRAC_SECONDS_UPPER_LIMIT );
-      // no break;
+      [[fallthrough]];
     default:
       append_number( n, mod, dest );
   }
@@ -317,8 +317,8 @@ static void append_month( unsigned mon, modifier const &mod, zstring *dest ) {
       }
       mod_copy.first.type = modifier::arabic;
       mod_copy.first.format.clear();
-      // no break;
     }
+    [[fallthrough]];
     default:
       int const new_mon = calendar::convert_mon_to( mon, mod.cal );
       if ( mod.cal_is_fallback || new_mon == -1 ) {
@@ -411,7 +411,7 @@ static void append_timezone( char component, TimeZone const &tz,
 fallback:
       format = "01:01";
       has_grouping_separators = true;
-      // no break;
+      [[fallthrough]];
 
     default:
       if ( component == 'z' ) {
@@ -560,8 +560,8 @@ static void append_weekday( unsigned mday, unsigned mon, unsigned year,
       }
       mod_copy.first.type = modifier::arabic;
       mod_copy.first.format.clear();
-      // no break;
     }
+    [[fallthrough]];
     default: {
       int const new_wday = calendar::convert_wday_to( wday, mod.cal );
       if ( mod.cal_is_fallback || new_wday == -1 ) {

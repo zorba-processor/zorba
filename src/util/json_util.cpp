@@ -88,7 +88,7 @@ ostream& serialize( ostream &os, char const *s ) {
           i = 0;
         }
         os << '\\';
-        // no break;
+        [[fallthrough]];
       default: {
         if (i + 6 >= length) { // 6 is max length of ec
           os.rdbuf()->sputn(buffer, i);

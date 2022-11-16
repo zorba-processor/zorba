@@ -411,7 +411,7 @@ expr* FoldConst::apply(RewriterContext& rCtx, expr* node, bool& modified)
     if (fo->get_func()->getKind() == FunctionConsts::OP_CONCATENATE_N &&
         fo->num_args() == 0)
       break;
-  }
+  } [[fallthrough]];
 
   default:
   {

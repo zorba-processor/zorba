@@ -637,6 +637,7 @@ SequenceType::Kind SequenceType::getKind() const
       ZORBA_ASSERT(false);
     }
   }
+  [[fallthrough]];
   case XQType::UNTYPED_KIND:
   case XQType::ANY_TYPE_KIND:
   case XQType::ANY_SIMPLE_TYPE_KIND:
@@ -749,6 +750,7 @@ SequenceType SequenceType::getContentType() const
       return Unmarshaller::createSequenceType(contentType);
     }
   }
+  [[fallthrough]];
   default:
   {
     return Unmarshaller::createSequenceType(NULL);
@@ -776,6 +778,7 @@ String SequenceType::getContentTypeUri() const
         return Unmarshaller::newString(contentType->getQName()->getNamespace());
     }
   }
+  [[fallthrough]];
   default:
   {
     return String("");
@@ -803,6 +806,7 @@ String SequenceType::getContentTypeLocalName() const
         return Unmarshaller::newString(contentType->getQName()->getLocalName());
     }
   }
+  [[fallthrough]];
   default:
   {
     return String("");

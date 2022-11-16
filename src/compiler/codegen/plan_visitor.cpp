@@ -799,8 +799,7 @@ void general_var_codegen(const var_expr& var)
   case var_expr::wincond_in_pos_var:
   {
     isForVar = true;
-    // fall through
-  }
+  } [[fallthrough]];
 
   case var_expr::let_var:
   case var_expr::win_var:

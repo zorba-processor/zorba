@@ -61,9 +61,13 @@ using internal::ztd::less;
  * @tparam DerivedType The type of the class deriving from this.
  */
 template<class ContainerType,class DerivedType>
-class back_insert_iterator_base :
-  public std::iterator<std::output_iterator_tag,void,void,void,void> {
+class back_insert_iterator_base {
 public:
+  using iterator_category = std::output_iterator_tag;
+  using value_type = void;
+  using difference_type = void;
+  using pointer = void;
+  using reference = void;
   typedef ContainerType container_type;
 
   DerivedType& operator*() {
@@ -95,7 +99,10 @@ protected:
  * Copy of std::equal_to in this namespace so we can specialize it below.
  */
 template<typename T>
-struct equal_to : std::binary_function<T,T,bool> {
+struct equal_to {
+  using result_type = bool;
+  using first_argument_type = T;
+  using second_argument_type = T;
   bool operator()( T const &a, T const &b ) const {
     return a == b;
   }
@@ -105,9 +112,11 @@ struct equal_to : std::binary_function<T,T,bool> {
  * Specialization of ztd::equal_to for C strings.
  */
 template<>
-struct equal_to<char const*> :
-  std::binary_function<char const*,char const*,bool>
+struct equal_to<char const*>
 {
+  using result_type = bool;
+  using first_argument_type = char const*;
+  using second_argument_type = char const*;
   bool operator()( char const *s1, char const *s2 ) const {
     return std::strcmp( s1, s2 ) == 0;
   }
@@ -118,7 +127,7 @@ struct equal_to<char const*> :
  * See: http://www.sgi.com/tech/stl/identity.html
  */
 template<typename T>
-struct identity : std::unary_function<T,T> {
+struct identity {
   T const& operator()( T const &a ) const {
     return a;
   }
@@ -129,7 +138,7 @@ struct identity : std::unary_function<T,T> {
  * See: http://www.sgi.com/tech/stl/select1st.html
  */
 template<typename PairType>
-struct select1st : std::unary_function<PairType,typename PairType::first_type> {
+struct select1st {
   typename PairType::first_type const& operator()( PairType const &a ) const {
     return a.first;
   }

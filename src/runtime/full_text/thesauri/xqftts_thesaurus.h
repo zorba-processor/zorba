@@ -18,7 +18,6 @@
 #define ZORBA_FULL_TEXT_XQFTTS_THESAURUS_H
 
 #include <deque>
-#include <functional>                   /* for binary_function */
 #include <map>
 #include <set>
 #include <utility>                      /* for pair */
@@ -96,7 +95,10 @@ private:
      * FYI: We need to define a comparator class because \c operator&lt; (and
      * operators in general) can't be overloaded for pointers.
      */
-    struct less : std::binary_function<synonym const*,synonym const*,bool> {
+    struct less {
+      using first_argument_type = synonym const*;
+      using second_argument_type = synonym const*;
+      using result_type = bool;
       result_type operator()( first_argument_type i,
                               second_argument_type j ) const {
         return i->term < j->term;

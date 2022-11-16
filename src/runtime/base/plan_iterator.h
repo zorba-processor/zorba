@@ -82,9 +82,11 @@
     return false;                                                       \
   case __LINE__:                                                        \
     stateObject->setDuffsLine(__LINE__ + 1);                            \
+    [[fallthrough]];							\
   case __LINE__ + 1:                                                    \
     ZORBA_ASSERT (false && "nextImpl() called past iterator end");      \
     return false;                                                       \
+    [[fallthrough]];							\
   default:                                                              \
     return false;                                                       \
   } while (0);                                                          \

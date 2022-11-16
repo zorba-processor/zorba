@@ -71,9 +71,13 @@ public:
   class const_iterator;
   friend class const_iterator;
 
-  class const_iterator :
-    public std::iterator<std::random_access_iterator_tag,value_type> {
+  class const_iterator {
   public:
+    using iterator_category = std::random_access_iterator_tag;
+    using value_type = char const*;
+    using difference_type = std::ptrdiff_t;
+    using pointer = value_type*;
+    using reference = value_type&;
     const_iterator() : seg_( nullptr ), i_( 0 ) {
     }
 

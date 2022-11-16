@@ -604,11 +604,11 @@ bool TreatIterator::countImpl( store::Item_t &result, PlanState &planState) cons
     case SequenceType::QUANT_QUESTION:
       if ( count <= numeric_consts<xs_integer>::one() )
         break;
-      // no break;
+      [[fallthrough]];
     case SequenceType::QUANT_ONE:
       if ( count > numeric_consts<xs_integer>::one() )
         raiseError("sequence of more than one item");
-      // no break;
+      [[fallthrough]];
     case SequenceType::QUANT_PLUS:
       if ( count == numeric_consts<xs_integer>::zero() )
         raiseError("empty-sequence()");

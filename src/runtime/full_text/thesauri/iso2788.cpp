@@ -38,9 +38,11 @@ struct rel_table_entry {
   char const *name;
 };
 
-struct less_rel_table_entry :
-  binary_function<rel_table_entry const&,rel_table_entry const&,bool>
+struct less_rel_table_entry
 {
+  using first_argument_type = rel_table_entry const&;
+  using second_argument_type = rel_table_entry const&;
+  using result_type = bool;
   less_rel_table_entry() { }
   result_type operator()( first_argument_type i, second_argument_type j ) {
     return ::strcmp( i.name, j.name ) < 0;

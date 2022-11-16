@@ -75,7 +75,7 @@ static void parse( parse_type parse_what, zstring const &buf,
       case parse_dateTime:
         if ( !(set_mday && set_mon && set_year) )
           break;
-        // no break;
+        [[fallthrough]];
       case parse_time:
         if ( !(set_fields & time::set_hour) )
           break;

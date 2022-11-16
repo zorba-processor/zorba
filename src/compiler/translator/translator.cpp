@@ -12279,8 +12279,7 @@ expr* generate_fn_body(
     if (arguments[0]->get_return_type()->max_card() <= 1)
       f = BUILTIN_FUNC(OP_ZORBA_SINGLE_OBJECT_LOOKUP_2);
 
-    // fall through
-  }
+  } [[fallthrough]];
   case FunctionConsts::OP_ZORBA_SINGLE_OBJECT_LOOKUP_2:
   {
     arguments[1] = 
@@ -12293,8 +12292,7 @@ expr* generate_fn_body(
     if (arguments[0]->get_return_type()->max_card() <= 1)
       f = BUILTIN_FUNC(OP_ZORBA_SINGLE_ARRAY_LOOKUP_2);
 
-    // fall through
-  }
+  } [[fallthrough]];
   case FunctionConsts::OP_ZORBA_SINGLE_ARRAY_LOOKUP_2:
   {
     arguments[1] =

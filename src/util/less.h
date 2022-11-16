@@ -44,9 +44,11 @@ namespace std {
  * See also: Bjarne Stroustrup. "The C++ Programming Language, 3rd ed."
  * Addison-Wesley, Reading, MA, 1997.  p. 468.
  */
-template<> struct less<char const*> :
-  std::binary_function<char const*, char const*, bool>
+template<> struct less<char const*>
 {
+  typedef char const* first_argument_type;
+  typedef char const* second_argument_type;
+  typedef bool result_type;
   less() { }
   // This default constructor doesn't need to be defined, but g++ complains if
   // it isn't and you try to define a "const less" object.

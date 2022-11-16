@@ -533,7 +533,7 @@ thesaurus::lookup( zstring const &phrase, zstring const &relationship,
       )
     );
   }
-  return std::move( result );
+  return result;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -550,7 +550,7 @@ bool provider::getThesaurus( iso639_1::type lang,
   switch ( lang ) {
     case iso639_1::unknown:
       lang = iso639_1::en;
-      // no break;
+      [[fallthrough]];
     case iso639_1::en:
       file_path = path_;
       append_wordnet_file( file_path, lang );

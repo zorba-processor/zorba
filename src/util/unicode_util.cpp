@@ -2122,9 +2122,11 @@ enum case_type {
   upper, lower
 };
 
-struct less_case_table_entry :
-  binary_function<case_table_entry const&,case_table_entry const&,bool>
+struct less_case_table_entry
 {
+  using first_argument_type = case_table_entry const&;
+  using second_argument_type = case_table_entry const&;
+  using result_type = bool;
   less_case_table_entry() { }
   result_type operator()( first_argument_type i, second_argument_type j ) {
     return i[0] < j[0];

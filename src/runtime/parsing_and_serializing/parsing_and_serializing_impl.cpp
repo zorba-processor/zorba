@@ -52,7 +52,6 @@ bool FnParseXmlIterator::nextImpl(store::Item_t& result, PlanState& planState) c
   store::Store& lStore = GENV.getStore();
   zstring docString;
   zstring baseUri;
-  URI lValidatedBaseUri;
   zstring docUri;
   std::unique_ptr<std::istringstream> iss;
   std::istream* is;

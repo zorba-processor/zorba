@@ -38,14 +38,12 @@ namespace zorba {
 ********************************************************************************/
 bool NodePositionIterator::nextImpl(store::Item_t& result, PlanState& planState) const
 {
-  bool valid;
   store::Item_t inNode;
 
   PlanIteratorState* state;
   DEFAULT_STACK_INIT(PlanIteratorState, state, planState);
 
-  valid = consumeNext(inNode, theChildren[0], planState);
-  assert(valid);
+  assert(consumeNext(inNode, theChildren[0], planState));
 
   STACK_PUSH(GENV_STORE.getStructuralInformation(result, inNode), state);
   STACK_END(state);

@@ -1229,7 +1229,7 @@ bool flwor_expr::is_single_for(csize& pos) const
         discardable = false;
         break;
       }
-    }
+    } [[fallthrough]];
     default:
       return false;
     }

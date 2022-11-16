@@ -82,7 +82,7 @@ ThesaurusWrapper::lookup( zstring const &phrase, zstring const &relationship,
   iterator::ptr result(
     api_iter.get() ? new iterator_wrapper( std::move( api_iter ) ) : nullptr
   );
-  return std::move( result );
+  return result;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

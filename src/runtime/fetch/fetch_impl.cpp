@@ -96,7 +96,7 @@ getFetchResource(
 
     lRes.release();
 
-    return std::move(lStreamRes);
+    return lStreamRes;
 
   } catch (ZorbaException const& e) {
     throw XQUERY_EXCEPTION(

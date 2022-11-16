@@ -77,7 +77,7 @@ bool csv_parser::next_value( zstring *value, bool *eol, bool *quoted ) const {
         case '\r':
           if ( peek( *is_, c ) && c == '\n' )
             is_->get();
-          // no break;
+          [[fallthrough]];
         case '\n':
           *eol = true;
           goto return_true;
