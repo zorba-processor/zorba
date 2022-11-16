@@ -32,7 +32,7 @@ namespace zorba {
  * @param file The C++ source-code file name where the condition failed.
  * @param line The C++ source-code line number where the condition failed.
  */
-void fatal( char const *condition, char const *file, int line,
+[[noreturn]] void fatal( char const *condition, char const *file, int line,
             char const *msg );
 
 #define ZORBA_FATAL(COND,MSG)                                 \
@@ -40,7 +40,6 @@ void fatal( char const *condition, char const *file, int line,
     if ( !(COND) ) {                                          \
       std::string const msg( BUILD_STRING( MSG ) );           \
       zorba::fatal( #COND, __FILE__, __LINE__, msg.c_str() ); \
-      throw 0; /* never gets here but suppresses warning */   \
     }                                                         \
   } while (0)
 

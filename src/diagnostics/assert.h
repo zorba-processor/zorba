@@ -36,7 +36,7 @@ namespace zorba {
  * @param msg An optional message that is output if the assertion fails.
  * @throws ZXQP0002_ASSERT_FAILED
  */
-void assertion_failed( char const *condition,
+[[noreturn]] void assertion_failed( char const *condition,
                        char const *file, 
                        int line, 
                        char const *msg = nullptr );
@@ -50,7 +50,6 @@ void assertion_failed( char const *condition,
   do {                                                      \
     if ( !(COND) ) {                                        \
       zorba::assertion_failed( #COND, __FILE__, __LINE__ ); \
-      throw 0; /* never gets here but suppresses warning */ \
     }                                                       \
   } while (0)
 
