@@ -48,7 +48,15 @@ inline void assign( Zorba_opaque_char_ptr &ptr, char const *value ) {
 
 static void copy_from_to( Zorba_SerializerOptions const *from,
                           Zorba_SerializerOptions *to ) {
-  ::memcpy( to, from, sizeof( Zorba_SerializerOptions ) );
+  to->ser_method = from->ser_method;
+  to->byte_order_mark = from->byte_order_mark;
+  to->escape_uri_attributes = from->escape_uri_attributes;
+  to->include_content_type = from->include_content_type;
+  to->indent = from->indent;
+  to->normalization_form = from->normalization_form;
+  to->omit_xml_declaration = from->omit_xml_declaration;
+  to->standalone = from->standalone;
+  to->undeclare_prefixes = from->undeclare_prefixes;
   if ( from->encoding.ptr )
     to->encoding.ptr = ztd::new_strdup( from->encoding.ptr );
   if ( from->media_type.ptr )
@@ -63,6 +71,8 @@ static void copy_from_to( Zorba_SerializerOptions const *from,
     to->item_separator.ptr = ztd::new_strdup( from->item_separator.ptr );
   if ( from->version.ptr )
     to->version.ptr = ztd::new_strdup( from->version.ptr );
+  to->jsoniq_multiple_items = from->jsoniq_multiple_items;
+  to->jsoniq_xdm_method = from->jsoniq_xdm_method;
 }
 
 static void null_ptrs( Zorba_SerializerOptions_t *opts ) {
