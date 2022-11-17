@@ -1896,11 +1896,11 @@ void InternalNode::unregisterReferencesToDeletedSubtree()
 {
   std::for_each(
       childrenBegin(), childrenEnd(),
-      std::mem_fun(&XmlNode::unregisterReferencesToDeletedSubtree));
+      std::mem_fn(&XmlNode::unregisterReferencesToDeletedSubtree));
 
   std::for_each(
       attrsBegin(), attrsEnd(),
-      std::mem_fun(&XmlNode::unregisterReferencesToDeletedSubtree));
+      std::mem_fn(&XmlNode::unregisterReferencesToDeletedSubtree));
 
   XmlNode::unregisterReferencesToDeletedSubtree();
 }
