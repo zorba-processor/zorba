@@ -94,7 +94,9 @@ size_t hash_c_str( char const *s, size_t init = Hash_Init );
  * @tparam T The type to hash.
  */
 template<typename T>
-struct hash : std::unary_function<T,size_t> {
+struct hash {
+  using argument_type = T;
+  using result_type = size_t;
   hash() { }
   size_t operator()( T ) const; // not defined
 };
@@ -191,9 +193,10 @@ struct hash< unique_ptr<T,D> > :
 
 /** Specialization for \c rstring. */
 template<class RepType>
-struct hash< zorba::rstring<RepType> > :
-  unary_function<zorba::rstring<RepType> const&,size_t>
+struct hash< zorba::rstring<RepType> >
 {
+  using argument_type = zorba::rstring<RepType> const&;
+  using result_type = size_t;
   size_t operator()( zorba::rstring<RepType> const &s ) const {
     return zorba::ztd::hash_bytes( s.data(), s.size() );
   }

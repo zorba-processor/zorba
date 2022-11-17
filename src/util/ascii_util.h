@@ -602,8 +602,10 @@ to_upper( InputStringType const &in, OutputStringType *out ) {
  * A unary_function to convert a (presumed) lower-case string to title-case
  * "Like This."
  */
-class to_title : public std::unary_function<char,char> {
+class to_title {
 public:
+  using result_type = char;
+  using argument_type = char;
   to_title() : capitalize_( true ) { }
 
   result_type operator()( argument_type c ) {
