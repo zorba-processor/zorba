@@ -844,7 +844,10 @@ bool IndexJoinRule::findIndexPos(PredicateInfo& predInfo, csize boundVarId)
       found = boundFlwor->get_var_pos(boundVar, boundVarPos);
       ZORBA_ASSERT(found);
     }
-    
+
+    // eliminate uninitialized variable warning
+    // should trip the assertion below if there is actually a problem
+    boundStackPos = numStackedExprs;
     for (csize i = 0; i < numStackedExprs; ++i)
     {
       if (theVarDefExprs[i] == boundExpr)
