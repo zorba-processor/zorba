@@ -18,6 +18,7 @@
 #include "runtime/parsing_and_serializing/parse_fragment.h"
 
 #include <iostream>
+#include <optional>
 
 #include "zorbatypes/URI.h"
 #include "context/static_context.h"
@@ -57,7 +58,7 @@ store::Item_t getFirstAttribute(store::Item_t node)
 
 void processOptions(store::Item_t item, store::LoadProperties& props, static_context* theSctx, const QueryLoc& loc)
 {
-  URI lValidatedBaseUri;
+  std::optional<URI> lValidatedBaseUri;
   store::Item_t child, tempItem;
 
   if (item.getp() == NULL)
@@ -110,10 +111,10 @@ void processOptions(store::Item_t item, store::LoadProperties& props, static_con
         );
       }
 
-      if (!lValidatedBaseUri.is_absolute()) {
+      if (!lValidatedBaseUri->is_absolute()) {
         throw XQUERY_EXCEPTION(
           err::FODC0007,
-          ERROR_PARAMS( lValidatedBaseUri.toString() ),
+          ERROR_PARAMS( lValidatedBaseUri->toString() ),
           ERROR_LOC( loc )
         );
       }
