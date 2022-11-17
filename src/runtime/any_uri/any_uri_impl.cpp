@@ -16,6 +16,7 @@
 #include "stdafx.h"
 
 #include <iostream>
+#include <optional>
 
 #include "zorbatypes/URI.h"
 
@@ -40,8 +41,8 @@ ResolveUriIterator::nextImpl(store::Item_t& result, PlanState& planState) const
   zstring strRelative;
   zstring strBase;
   zstring strResult;
-  URI baseURI;
-  URI resolvedURI;
+  std::optional<URI> baseURI;
+  std::optional<URI> resolvedURI;
 
   PlanIteratorState *state;
   DEFAULT_STACK_INIT(PlanIteratorState, state, planState);
@@ -59,7 +60,7 @@ ResolveUriIterator::nextImpl(store::Item_t& result, PlanState& planState) const
     {
     }
 
-    if (resolvedURI.is_absolute()) 
+    if (resolvedURI->is_absolute()) 
     {
       strResult = strRelative;
     }
@@ -100,8 +101,8 @@ ResolveUriIterator::nextImpl(store::Item_t& result, PlanState& planState) const
 
       try 
       {
-        resolvedURI = URI(baseURI, strRelative, true); // resolve with baseURI or return strRelative if it's a valid absolute URI
-        strResult = resolvedURI.toString();
+        resolvedURI = URI(*baseURI, strRelative, true); // resolve with baseURI or return strRelative if it's a valid absolute URI
+        strResult = resolvedURI->toString();
       }
       catch (ZorbaException const& e) 
       {
