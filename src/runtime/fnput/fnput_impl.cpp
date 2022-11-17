@@ -13,6 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#include <optional>
+
 #include "stdafx.h"
 
 #include "common/shared_types.h"
@@ -42,7 +44,7 @@ bool FnPutIterator::nextImpl(store::Item_t& result, PlanState& planState) const
   store::Item_t uriItem;
   zstring uriString;
   zstring resolvedUriString;
-  URI lTargetUri;
+  std::optional<URI> lTargetUri;
   store::Item_t resolvedUriItem;
   std::unique_ptr<store::PUL> pul;
 
