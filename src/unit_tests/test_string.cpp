@@ -91,10 +91,9 @@ static bool assert_true( char const *expr, int line, bool result ) {
 
 inline char* new_c_string( char const *s ) 
 {
-  char * p = static_cast<char*>(::operator new(::strlen( s ) + 1));
-  return ::strcpy( p, s );
-
-    //return ::strcpy( new char[ ::strlen( s ) + 1 ], s );
+  // ptr_rep takes ownership and frees the buffer with delete[], so it must
+  // be allocated with new[].
+  return ::strcpy( new char[ ::strlen( s ) + 1 ], s );
 }
 
 /**
