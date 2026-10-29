@@ -108,8 +108,6 @@ SleepModule::~SleepModule()
 void
 SleepModule::destroy()
 {
-  if (!dynamic_cast<SleepModule*>(this))
-    return;
   delete this;
 }
 
