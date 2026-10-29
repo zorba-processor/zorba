@@ -46,6 +46,10 @@ protected:
 
   FuncMap_t theFunctions;
 public:
+  virtual ~UtilTestsModule();
+
+  virtual void destroy();
+
   virtual zorba::String
   getURI() const { return "http://zorba.io/modules/util-tests"; }
 
