@@ -82,9 +82,13 @@ unicode::code_point next_char( OctetIterator &i ) {
     cp = unicode::code_point( 0 );
     switch ( len ) {
       case 6: cp |= ((*i & m   ) << 30); ++i; m = 0x3F;
+      [[fallthrough]];
       case 5: cp |= ((*i & m   ) << 24); ++i; m = 0x3F;
+      [[fallthrough]];
       case 4: cp |= ((*i & m   ) << 18); ++i; m = 0x3F;
+      [[fallthrough]];
       case 3: cp |= ((*i & m   ) << 12); ++i; m = 0x3F;
+      [[fallthrough]];
       case 2: cp |= ((*i & m   ) <<  6); ++i;
               cp |=  (*i & 0x3F)       ; ++i;
               break;

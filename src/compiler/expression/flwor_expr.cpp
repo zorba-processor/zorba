@@ -1229,6 +1229,9 @@ bool flwor_expr::is_single_for(csize& pos) const
         discardable = false;
         break;
       }
+      // FIXME: a discardable let clause falls through to "return false"
+      // (suspected missing break; behavior intentionally left unchanged)
+      [[fallthrough]];
     }
     default:
       return false;

@@ -112,7 +112,7 @@ int TimeZone::parse( char const *s, size_t s_len, TimeZone *tz ) {
     switch ( *s ) {
       case '-':
         negative = true;
-        // no break;
+        [[fallthrough]];
       case '+':
         try {
           if ( !ascii::is_digit( *++s ) )

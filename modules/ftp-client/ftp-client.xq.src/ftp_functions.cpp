@@ -706,13 +706,13 @@ bool list_iterator::next( Item &result ) {
       switch ( ftp_file.mtimetype ) {
         case FTPPARSE_MTIME_REMOTEDAY:
           tm->tm_hour = tm->tm_min = 0;
-          // no break;
+          [[fallthrough]];
         case FTPPARSE_MTIME_REMOTEMINUTE:
           tm->tm_sec = 0;
 #ifndef WIN32
           tm->tm_gmtoff = 0;
 #endif
-          // no break;
+          [[fallthrough]];
         case FTPPARSE_MTIME_LOCAL: {
           Item const mtime_value (
             factory_->createDateTime(

@@ -409,7 +409,7 @@ zstring FloatImpl<F>::toString( bool no_scientific_format ) const {
     switch ( *e ) {
       case '-':
         ++dest;
-        // no break;
+        [[fallthrough]];
       case '+':
         ++e;
     }

@@ -246,7 +246,7 @@ void parameters::substitute( value_type *s ) const {
           case '\\':
             if ( pos + 1 < s->size() )
               c = s->at( ++pos );
-            // no break;
+            [[fallthrough]];
           default:
             replacement += c;
         }
@@ -302,7 +302,7 @@ void parameters::substitute( value_type *s ) const {
             s->replace( dollar_pos, 2, param );
             pos = dollar_pos + param.length();
           } // if ( to_index( c ) ...
-          // no break;
+          [[fallthrough]];
         default:
           dollar_pos = value_type::npos;
       } // switch
@@ -355,7 +355,7 @@ bool parameters::then_else( bool expr, value_type const &s,
           case '\\':
             if ( *pos + 1 < s.size() )
               c = s[ ++*pos ];
-            // no break;
+            [[fallthrough]];
           default:
             if ( expr )
               *replacement += c;

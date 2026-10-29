@@ -217,7 +217,7 @@ void convert_xquery_re( zstring const &xq_re, zstring *icu_re,
             );
           }
           in_backref = true;
-          // no break;
+          [[fallthrough]];
 
         ////////// Single Character Escapes ///////////////////////////////////
 

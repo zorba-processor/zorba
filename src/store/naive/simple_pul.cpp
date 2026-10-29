@@ -1879,6 +1879,9 @@ void PULImpl::mergeSimpleUpdateLists(
           ERROR_PARAMS(myUpd->getName()->getStringValue()));
         }
       }
+      // FIXME: suspected missing break: falls into UP_PUT and reinterprets
+      // myList[j] as UpdPut (behavior intentionally left unchanged)
+      [[fallthrough]];
     }
     case store::UpdateConsts::UP_PUT:
     {

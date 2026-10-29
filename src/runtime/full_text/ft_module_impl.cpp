@@ -713,7 +713,7 @@ bool TokenizeNodesIterator::nextImpl( store::Item_t &result,
             tokenizer.release();
             add_sentinel = true;
           }
-          // no break;
+          [[fallthrough]];
         case store::StoreConsts::documentNode: {
           list<store::Item_t>::iterator pos = state->includes_.begin();
           store::Iterator_t i = inc->getChildren();

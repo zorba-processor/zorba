@@ -748,6 +748,7 @@ SequenceType SequenceType::getContentType() const
 
       return Unmarshaller::createSequenceType(contentType);
     }
+    [[fallthrough]];
   }
   default:
   {
@@ -775,6 +776,7 @@ String SequenceType::getContentTypeUri() const
       if (contentType != NULL)
         return Unmarshaller::newString(contentType->getQName()->getNamespace());
     }
+    [[fallthrough]];
   }
   default:
   {
@@ -802,6 +804,7 @@ String SequenceType::getContentTypeLocalName() const
       if (contentType != NULL)
         return Unmarshaller::newString(contentType->getQName()->getLocalName());
     }
+    [[fallthrough]];
   }
   default:
   {

@@ -159,6 +159,7 @@ bool loader::next( store::Item_t *result ) {
             stripped_top_level_array_ = false;
             continue;
           }
+          [[fallthrough]];
         case '}': {
           stack_element top( stack_.top() );
           stack_.pop();
