@@ -1,0 +1,5 @@
+.git
+build
+.ccache
+.superpowers
+**/.DS_Store
