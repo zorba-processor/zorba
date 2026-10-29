@@ -12,6 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+cmake_minimum_required(VERSION 3.20)
+
+SET(CMAKE_CXX_STANDARD 23 CACHE STRING "C++ standard")
+SET(CMAKE_CXX_STANDARD_REQUIRED ON)
+SET(CMAKE_CXX_EXTENSIONS OFF)
+
 PROJECT(zorba)
 ENABLE_TESTING()
 INCLUDE(CTest)
@@ -31,16 +37,6 @@ SET(CMAKE_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
 
 INCLUDE(${CMAKE_SOURCE_DIR}/cmake_modules/CMakeCompareVersionStrings.cmake)
 
-cmake_minimum_required(VERSION 2.6.4)
-IF(COMMAND cmake_policy)
-  cmake_policy(SET CMP0003 NEW)
-  cmake_policy(SET CMP0002 OLD)
-  # We want CMake to correctly count empty list elements.
-  cmake_policy(SET CMP0007 NEW)
-  IF(CMAKE_VERSION VERSION_GREATER 3.0.0 OR CMAKE_VERSION VERSION_EQUAL 3.0.0)
-    cmake_policy(SET CMP0026 OLD)
-  ENDIF(CMAKE_VERSION VERSION_GREATER 3.0.0 OR CMAKE_VERSION VERSION_EQUAL 3.0.0)  
-ENDIF(COMMAND cmake_policy)
 
 IF("${CMAKE_SYSTEM_NAME}" MATCHES "Linux")
   SET(LINUX "${CMAKE_SYSTEM}")
@@ -506,21 +502,20 @@ ADD_DEFINITIONS(${DEFINITIONS})
 # find all dylib files (i.e. transitive closure of the library files
 # that are linked)
 IF(APPLE)
-  EXECUTE_PROCESS(
-    COMMAND ${CMAKE_SOURCE_DIR}/scripts/find_macosx_libraries.sh ${ICU_LIBRARIES}
-    OUTPUT_VARIABLE Zorba_ICUUC)
-  EXECUTE_PROCESS(
-    COMMAND ${CMAKE_SOURCE_DIR}/scripts/find_macosx_libraries.sh ${ICU_I18N_LIBRARIES}
-    OUTPUT_VARIABLE Zorba_ICUI18N)
-  EXECUTE_PROCESS(
-    COMMAND ${CMAKE_SOURCE_DIR}/scripts/find_macosx_libraries.sh ${ICU_DATA_LIBRARIES}
-    OUTPUT_VARIABLE Zorba_ICU_DATA)
-  EXECUTE_PROCESS(
-    COMMAND ${CMAKE_SOURCE_DIR}/scripts/find_macosx_libraries.sh ${XERCESC_LIBRARY}
-    OUTPUT_VARIABLE Zorba_XERCESC)
-  EXECUTE_PROCESS(
-    COMMAND ${CMAKE_SOURCE_DIR}/scripts/find_macosx_libraries.sh ${LIBXML2_LIBRARIES}
-    OUTPUT_VARIABLE Zorba_XML2)
+  # Each variable is set to ";<resolved path>" (empty if the library is unset).
+  MACRO(ZORBA_REALPATH_LIB var lib)
+    SET(${var})
+    IF (NOT "${lib}" STREQUAL "")
+      LIST(GET lib 0 _first_lib)
+      GET_FILENAME_COMPONENT(_real_lib "${_first_lib}" REALPATH)
+      SET(${var} ";${_real_lib}")
+    ENDIF ()
+  ENDMACRO(ZORBA_REALPATH_LIB)
+  ZORBA_REALPATH_LIB(Zorba_ICUUC "${ICU_LIBRARIES}")
+  ZORBA_REALPATH_LIB(Zorba_ICUI18N "${ICU_I18N_LIBRARIES}")
+  ZORBA_REALPATH_LIB(Zorba_ICU_DATA "${ICU_DATA_LIBRARIES}")
+  ZORBA_REALPATH_LIB(Zorba_XERCESC "${XERCESC_LIBRARY}")
+  ZORBA_REALPATH_LIB(Zorba_XML2 "${LIBXML2_LIBRARIES}")
 ENDIF(APPLE)
 
 
@@ -538,21 +533,6 @@ ELSE (WIN32)
 ENDIF (WIN32)
 
 ################################################################################
-
-# C++11 TR1 header location & namespace
-CHECK_CXX_SOURCE_COMPILES("
-  #include <tr1/type_traits>
-  int main() { }" ZORBA_TR1_IN_TR1_SUBDIRECTORY)
-CHECK_CXX_SOURCE_COMPILES("
-  #include <type_traits>
-  int main() { std::tr1::is_convertible<int,int> x; }" ZORBA_TR1_1)
-CHECK_CXX_SOURCE_COMPILES("
-  #include <tr1/type_traits>
-  int main() { std::tr1::is_convertible<int,int> x; }" ZORBA_TR1_2)
-
-IF (ZORBA_TR1_1 OR ZORBA_TR1_2)
-  SET (ZORBA_TR1_NS_IS_STD_TR1 1)
-ENDIF (ZORBA_TR1_1 OR ZORBA_TR1_2)
 
 # C++11 langauge features
 CHECK_CXX_SOURCE_COMPILES("

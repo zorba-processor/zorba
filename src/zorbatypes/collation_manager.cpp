@@ -19,6 +19,7 @@
 
 #ifndef ZORBA_NO_ICU
 # include <unicode/coll.h>
+U_NAMESPACE_USE
 #endif /* ZORBA_NO_ICU */
 
 #include <vector>

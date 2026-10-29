@@ -1,6 +1,6 @@
 xquery version "3.0";
 
-module namespace def = "http://www.28msec.com/blub/default";
+module namespace def = "http://test.example.com/blub/default";
 
 import module namespace ddl = "http://zorba.io/modules/store/static/collections/ddl";
 import module namespace dml = "http://zorba.io/modules/store/static/collections/dml";

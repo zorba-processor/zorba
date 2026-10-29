@@ -17,7 +17,11 @@
 #ifndef ZORBA_RUNTIME_PARSING_AND_SERIALIZING_FRAGMENT_ISTREAM_H
 #define ZORBA_RUNTIME_PARSING_AND_SERIALIZING_FRAGMENT_ISTREAM_H
 
+#include <deque>
 #include <iostream>
+#include <string>
+#include <utility>
+#include <vector>
 #include <libxml/parser.h>
 #include <store/api/iterator.h>
 
@@ -27,6 +31,38 @@ namespace zorba {
  * A class to hold an input stream for the parse-xml:parse() function
  * Author: Nicolae Brinza
  */
+/**
+ * A SAX event recorded by the fragment parser, to be replayed into a loader.
+ * Strings are owned copies; libxml2's buffers do not outlive the callback.
+ */
+struct FragmentEvent
+{
+  enum kind_type {
+    START_ELEMENT,
+    END_ELEMENT,
+    CHARACTERS,
+    CDATA,
+    COMMENT,
+    PI
+  };
+
+  struct attribute
+  {
+    std::string localname, prefix, uri, value;
+    bool has_prefix, has_uri;
+  };
+
+  kind_type kind;
+  std::string name;                     // localname, or PI target
+  std::string prefix, uri;
+  bool has_prefix, has_uri;
+  std::string text;                     // characters, comment, or PI data
+  std::vector<std::pair<std::string,std::string> > namespaces;
+  std::vector<bool> ns_has_prefix;
+  std::vector<attribute> attributes;
+  int nb_defaulted;
+};
+
 class FragmentIStream : public std::istream
 {
 public:
@@ -55,6 +91,14 @@ public:
   bool reached_eof;
   unsigned int parsed_nodes_count;
   store::Iterator_t children;
+  // Events parsed but not yet replayed into a loader.
+  std::deque<FragmentEvent> events;
+  bool parser_started;
+  bool parser_done;
+  int parse_depth;                  // element depth as seen by libxml2, wrapper included
+  void* current_loader;             // the FragmentXmlLoader replaying events
+  std::vector<std::vector<std::pair<std::string,std::string> > > ns_scopes;
+
   bool only_one_doc_node;           // If set to true, all parsed fragments will be added to one
                                     // single document node, instead of having one for each fragment.
   
@@ -75,13 +119,17 @@ public:
     reached_eof(false),
     parsed_nodes_count(0),
     children(NULL),
+    parser_started(false),
+    parser_done(false),
+    parse_depth(0),
+    current_loader(NULL),
     only_one_doc_node(false)
   {
   };
 
   bool stream_is_consumed()
   {
-    return reached_eof && current_offset >= bytes_in_buffer;
+    return parser_done && events.empty();
   }
   
   StreamReleaser getStreamReleaser()
@@ -110,7 +158,9 @@ public:
 
     if (ctxt)
     {
-      xmlCtxtReset(ctxt);
+      if (ctxt->myDoc)
+        xmlFreeDoc(ctxt->myDoc);
+      ctxt->myDoc = NULL;
       xmlFreeParserCtxt(ctxt);
     }
 
@@ -126,6 +176,12 @@ public:
     reached_eof = false;
     parsed_nodes_count = 0;
     children = NULL;
+    events.clear();
+    parser_started = false;
+    parser_done = false;
+    parse_depth = 0;
+    current_loader = NULL;
+    ns_scopes.clear();
     only_one_doc_node = false;
   }
   

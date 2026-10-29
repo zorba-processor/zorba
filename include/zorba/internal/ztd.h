@@ -17,6 +17,7 @@
 #ifndef ZORBA_INTERNAL_ZTD_H
 #define ZORBA_INTERNAL_ZTD_H
 
+#include <concepts>
 #include <cstring>
 #include <functional>
 #include <sstream>
@@ -32,6 +33,30 @@
 namespace zorba {
 namespace internal {
 namespace ztd {
+
+/**
+ * \internal
+ * Replacement for \c std::unary_function, removed in C++17: provides the
+ * same member typedefs for function objects.
+ */
+template<typename Arg,typename Result>
+struct unary_function {
+  typedef Arg argument_type;
+  typedef Result result_type;
+};
+
+/**
+ * \internal
+ * Replacement for \c std::binary_function, removed in C++17: provides the
+ * same member typedefs for function objects.
+ */
+template<typename Arg1,typename Arg2,typename Result>
+struct binary_function {
+  typedef Arg1 first_argument_type;
+  typedef Arg2 second_argument_type;
+  typedef Result result_type;
+};
+
 
 ////////// tr1 ////////////////////////////////////////////////////////////////
 
@@ -136,15 +161,17 @@ namespace has_insertion_operator_impl {
    */
   template<typename T>
   class has_insertion_operator {
-    static std::ostream &s;
-    static T const &t;
   public:
     /**
      * This is \c true only when the type \c T has a global
      * \c operator&lt;&lt;() declared for it.
+     * A deleted overload (e.g., for \c char16_t* since C++20) yields
+     * \c false rather than a hard error.
      * \hideinitializer
      */
-    static bool const value = sizeof( defined( s << t ) ) == sizeof( yes );
+    static bool const value = requires( std::ostream &s, T const &t ) {
+      { s << t } -> std::same_as<std::ostream&>;
+    };
   };
 } // namespace has_insertion_operator_impl
 
@@ -306,7 +333,7 @@ template<typename T> struct less {
  * Addison-Wesley, Reading, MA, 1997.  p. 468.
  */
 template<> struct less<char const*> :
-  std::binary_function<char const*,char const*,bool>
+  zorba::internal::ztd::binary_function<char const*,char const*,bool>
 {
   less() { }
   // This default constructor doesn't need to be defined, but g++ complains if

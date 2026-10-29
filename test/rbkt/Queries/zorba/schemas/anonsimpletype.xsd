@@ -14,7 +14,7 @@
     					<xs:enumeration value="anonymous"></xs:enumeration>
     					<xs:enumeration value="free"></xs:enumeration>
     					<xs:enumeration value="full"></xs:enumeration>
-    					<xs:enumeration value="28msec"></xs:enumeration>
+    					<xs:enumeration value="zorba"></xs:enumeration>
     					<xs:enumeration value="admin"></xs:enumeration>
     				</xs:restriction>
     			</xs:simpleType>

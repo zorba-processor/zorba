@@ -1,4 +1,4 @@
-declare namespace http = "http://www.28msec.com/modules/http";
+declare namespace http = "http://test.example.com/modules/http";
 
 declare namespace ann = "http://zorba.io/annotations";
 

@@ -1,5 +1,5 @@
 
-module namespace coll = "http://www.28msec.com/rbkt/collections";
+module namespace coll = "http://test.example.com/rbkt/collections";
 
 declare variable $coll:data := xs:QName("coll:data");
 

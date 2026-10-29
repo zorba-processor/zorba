@@ -1,7 +1,7 @@
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
-  targetNamespace="http://www.28msec.com/project1/schemas/simple" 
-            xmlns:ext="http://www.28msec.com/project1/schemas/simple" 
-            xmlns:simple="http://www.28msec.com/project1/schemas/simple"
+  targetNamespace="http://test.example.com/project1/schemas/simple" 
+            xmlns:ext="http://test.example.com/project1/schemas/simple" 
+            xmlns:simple="http://test.example.com/project1/schemas/simple"
   elementFormDefault="qualified">
 
   <xs:include schemaLocation="incl-base.xsd"/>

@@ -49,7 +49,9 @@ IF(NOT FLEX_EXECUTABLE)
     # with the flex binary we're actually using.
     GET_FILENAME_COMPONENT(_flex_path "${FLEX_EXECUTABLE}" PATH)
     GET_FILENAME_COMPONENT(_flex_hint "${_flex_path}/../include" ABSOLUTE)
-    FIND_PATH(FLEX_INCLUDE_DIR FlexLexer.h HINTS "${_flex_hint}")
+    # On macOS the header lives in the SDK, not under /usr/include.
+    FIND_PATH(FLEX_INCLUDE_DIR FlexLexer.h
+      HINTS "${_flex_hint}" "${CMAKE_OSX_SYSROOT}/usr/include")
 
   ELSE (FLEX_EXECUTABLE)
     SET (FLEX_MAJOR_VERSION "0")

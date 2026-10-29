@@ -1,4 +1,4 @@
-declare namespace a="http://railroad.my28msec.com/lib/cst-to-ast";
+declare namespace a="http://railroad.example.com/lib/cst-to-ast";
 declare namespace g="http://www.w3.org/2001/03/XPath/grammar";
 
 declare function a:ast($nodes)

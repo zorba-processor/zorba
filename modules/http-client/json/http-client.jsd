@@ -1,7 +1,7 @@
 {
   "$namespace": "http://zorba.io/modules/http-client",
   "$about": "This JSound schema defines the types of requests and
-             responses used in the http://28.io/http-client module",
+             responses used in the http://zorba.io/modules/http-client module",
   "$types": 
   [
     {

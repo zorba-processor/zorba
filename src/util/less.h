@@ -32,6 +32,7 @@
 #define pjl_less_H
 
 // standard
+#include <zorba/internal/ztd.h>
 #include <cstring>
 #include <functional>
 
@@ -45,7 +46,7 @@ namespace std {
  * Addison-Wesley, Reading, MA, 1997.  p. 468.
  */
 template<> struct less<char const*> :
-  std::binary_function<char const*, char const*, bool>
+  ::zorba::internal::ztd::binary_function<char const*, char const*, bool>
 {
   less() { }
   // This default constructor doesn't need to be defined, but g++ complains if

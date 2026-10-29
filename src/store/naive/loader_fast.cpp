@@ -100,7 +100,7 @@ XmlLoader::~XmlLoader()
 /*******************************************************************************
 
 ********************************************************************************/
-void XmlLoader::error(void* ctx, xmlErrorPtr error)
+void XmlLoader::error(void* ctx, ZORBA_XML_ERROR_PTR error)
 {
   if ( error->level == XML_ERR_NONE )
     return;

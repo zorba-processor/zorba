@@ -8,7 +8,7 @@ import module namespace iddl =
   "http://zorba.io/modules/store/static/indexes/ddl";
 
 import module namespace ca = 
-'http://www.28msec.com/benchmark/lib/custacc' at 'match_veq_11.xqlib';
+'http://test.example.com/benchmark/lib/custacc' at 'match_veq_11.xqlib';
 
 
 ddl:create(xs:QName("ca:custaccs"));

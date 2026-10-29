@@ -1,0 +1,34 @@
+module namespace cd = "http://zorba-tests.example.org/colldecls";
+
+import module namespace functx = "http://www.functx.com";
+import module namespace ma = "http://zorba-tests.example.org/modules/alpha";
+import module namespace mb = "http://zorba-tests.example.org/modules/beta";
+import module namespace ddl = "http://zorba.io/modules/store/static/collections/ddl";
+import module namespace dml = "http://zorba.io/modules/store/static/collections/dml";
+import module namespace idml = "http://zorba.io/modules/store/static/indexes/dml";
+
+(:~ An ordered collection of typed items. :)
+declare %an:ordered collection cd:orders as element(order)*;
+
+(:~ An ordered collection without a type. :)
+declare %an:ordered collection cd:log;
+
+(:~ An unordered collection of typed items. :)
+declare collection cd:items as element(item)*;
+
+(:~ An unordered collection without a type. :)
+declare collection cd:misc;
+
+declare variable $cd:orders as xs:QName := xs:QName("cd:orders");
+
+(:~ A unique automatic index on the customer of each order. :)
+declare %an:automatic %an:unique %an:value-equality index cd:by-customer
+  on nodes dml:collection(xs:QName("cd:orders"))
+  by xs:string(@customer) as xs:string;
+
+(:~ A manually maintained index on the same key. :)
+declare index cd:by-customer-manual
+  on nodes dml:collection(xs:QName("cd:orders"))
+  by xs:string(@customer) as xs:string;
+
+declare variable $cd:by-customer as xs:QName := xs:QName("cd:by-customer");

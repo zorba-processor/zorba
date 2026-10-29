@@ -7,7 +7,7 @@ declare namespace http = "http://expath.org/ns/http-client";
 variable $req :=
 {
   "method": "POST", 
-  "href": "http://zorbatest.28.io:8080/http-test-data/request.php",
+  "href": "http://$HTTP_TEST_SERVER/http-test-data/request.php",
   "headers": {"foo": "bar"},
   "multipart": {
     "media-type": "multipart/mixed",    

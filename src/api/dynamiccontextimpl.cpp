@@ -299,7 +299,7 @@ public:
 
 private:
   store::Iterator_t source_;
-  std::auto_ptr<AtomicItemHandleHashSet> map_;
+  std::unique_ptr<AtomicItemHandleHashSet> map_;
   bool hasNaN;
 };
 

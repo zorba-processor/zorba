@@ -20,6 +20,7 @@
 // standard
 #include <algorithm>
 #include <iterator>
+#include <memory>
 #include <sys/types.h>
 #include <utility>                      /* for pair */
 
@@ -65,10 +66,11 @@ public:
   typedef std::size_t size_type;
   typedef std::ptrdiff_t difference_type;
 
-  typedef typename allocator_type::pointer pointer;
-  typedef typename allocator_type::const_pointer const_pointer;
-  typedef typename allocator_type::reference reference;
-  typedef typename allocator_type::const_reference const_reference;
+  typedef typename std::allocator_traits<allocator_type>::pointer pointer;
+  typedef typename std::allocator_traits<allocator_type>::const_pointer
+    const_pointer;
+  typedef value_type& reference;
+  typedef value_type const& const_reference;
 
   /**
    * Constructs a %hashtable_base.
@@ -578,11 +580,12 @@ protected:
   std::pair<iterator,bool> insert( size_type bkt, value_type const &value );
 
 private:
-  typedef typename allocator_type::template rebind<node*>::other
-    bucket_alloc_type;
+  typedef typename std::allocator_traits<allocator_type>::template
+    rebind_alloc<node*> bucket_alloc_type;
 
-  typedef typename allocator_type::template rebind<node>::other
-    node_alloc_type;
+  typedef typename std::allocator_traits<allocator_type>::template
+    rebind_alloc<node> node_alloc_type;
+  typedef std::allocator_traits<node_alloc_type> node_alloc_traits;
 
   typedef typename hasher::result_type hash_code_type;
 

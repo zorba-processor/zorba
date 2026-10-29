@@ -123,7 +123,7 @@ ZORBA_GENERATE_EXE(UnitTests "${UnitTests}" "" "" "")
 
 # remove the test driver source file
 SET (TestsToRun ${UnitTests})
-REMOVE (TestsToRun UnitTests.cpp)
+LIST (FILTER TestsToRun EXCLUDE REGEX "(^|/)UnitTests\\.cpp$")
 
 MESSAGE(STATUS "Adding unit tests for CTest")
 

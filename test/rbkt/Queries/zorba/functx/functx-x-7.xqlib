@@ -1,12 +1,12 @@
-module namespace def = "http://www.28msec.com/compile-time/functx-x-7";
+module namespace def = "http://test.example.com/compile-time/functx-x-7";
 
-import module namespace functx1 = "http://www.28msec.com/compile-time/lib/functx1" at "functx1.xqlib";
-import module namespace functx2 = "http://www.28msec.com/compile-time/lib/functx2" at "functx2.xqlib";
-import module namespace functx3 = "http://www.28msec.com/compile-time/lib/functx3" at "functx3.xqlib";
-import module namespace functx4 = "http://www.28msec.com/compile-time/lib/functx4" at "functx4.xqlib";
-import module namespace functx5 = "http://www.28msec.com/compile-time/lib/functx5" at "functx5.xqlib";
-import module namespace functx6 = "http://www.28msec.com/compile-time/lib/functx6" at "functx6.xqlib";
-import module namespace functx7 = "http://www.28msec.com/compile-time/lib/functx7" at "functx7.xqlib";
+import module namespace functx1 = "http://test.example.com/compile-time/lib/functx1" at "functx1.xqlib";
+import module namespace functx2 = "http://test.example.com/compile-time/lib/functx2" at "functx2.xqlib";
+import module namespace functx3 = "http://test.example.com/compile-time/lib/functx3" at "functx3.xqlib";
+import module namespace functx4 = "http://test.example.com/compile-time/lib/functx4" at "functx4.xqlib";
+import module namespace functx5 = "http://test.example.com/compile-time/lib/functx5" at "functx5.xqlib";
+import module namespace functx6 = "http://test.example.com/compile-time/lib/functx6" at "functx6.xqlib";
+import module namespace functx7 = "http://test.example.com/compile-time/lib/functx7" at "functx7.xqlib";
 
 declare namespace ann = "http://zorba.io/annotations";
 

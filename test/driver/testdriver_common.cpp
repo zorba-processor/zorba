@@ -14,7 +14,10 @@
  * limitations under the License.
  */
 
+#include <cstdlib>
+#include <fstream>
 #include <iostream>
+#include <iterator>
 
 #include <zorba/diagnostic_list.h>
 #include <zorba/iterator.h>
@@ -63,6 +66,39 @@ DriverContext::DriverContext(zorba::Zorba* zorba)
 /*******************************************************************************
 
 ********************************************************************************/
+std::string http_test_server()
+{
+  char const *const env = std::getenv("ZORBA_HTTP_TEST_SERVER");
+  return env && *env ? env : zorba::HTTP_TEST_SERVER_DEFAULT;
+}
+
+
+void expand_http_test_server(std::string& s)
+{
+  if (s.find("$HTTP_TEST_SERVER") != std::string::npos)
+    zorba::ascii::replace_all(s, "$HTTP_TEST_SERVER", http_test_server());
+}
+
+
+std::string expand_ref_file(const std::string& ref, const std::string& tmp)
+{
+  std::ifstream in(ref.c_str(), std::ios_base::binary);
+  if (!in)
+    return ref;
+  std::string content((std::istreambuf_iterator<char>(in)),
+                      std::istreambuf_iterator<char>());
+  if (content.find("$HTTP_TEST_SERVER") == std::string::npos)
+    return ref;
+  expand_http_test_server(content);
+  std::ofstream out(tmp.c_str(), std::ios_base::binary);
+  out << content;
+  return tmp;
+}
+
+
+/*******************************************************************************
+
+********************************************************************************/
 void slurp_file (
     const char* fname,
     std::string& result,
@@ -98,6 +134,8 @@ void slurp_file (
                            "w3c_testsuite/Queries");
 #endif
   }
+
+  expand_http_test_server(sstr);
 
   if(sstr.find("$RBKT_BIN_DIR",0) != std::string::npos)
   {

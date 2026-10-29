@@ -1,0 +1,71 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": { "major": 3, "minor": 21, "patch": 0 },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "ZORBA_SUPPRESS_SWIG": "ON",
+        "CMAKE_DISABLE_FIND_PACKAGE_Java": "ON",
+        "CMAKE_DISABLE_FIND_PACKAGE_JNI": "ON"
+      }
+    },
+    {
+      "name": "core-release",
+      "displayName": "Core (no XML Schema, no unit tests), Release",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "ZORBA_NO_XMLSCHEMA": "ON",
+        "CMAKE_DISABLE_FIND_PACKAGE_XercesC": "ON",
+        "ZORBA_WITH_UNIT_TESTS": "OFF"
+      }
+    },
+    {
+      "name": "full-release",
+      "displayName": "Full (XML Schema via Xerces-C), Release",
+      "inherits": "base",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+    },
+    {
+      "name": "full-debug",
+      "displayName": "Full (XML Schema via Xerces-C), Debug",
+      "inherits": "base",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" }
+    }
+  ],
+  "buildPresets": [
+    { "name": "core-release", "configurePreset": "core-release" },
+    { "name": "full-release", "configurePreset": "full-release" },
+    { "name": "full-debug", "configurePreset": "full-debug" }
+  ],
+  "testPresets": [
+    {
+      "name": "full-release",
+      "displayName": "All tests (needs the HTTP test server, see test/http-test-data/README.txt)",
+      "configurePreset": "full-release",
+      "output": { "outputOnFailure": true },
+      "execution": { "timeout": 120 }
+    },
+    {
+      "name": "full-release-offline",
+      "displayName": "All tests except those that need the HTTP test server",
+      "inherits": "full-release",
+      "filter": {
+        "exclude": {
+          "name": "http-client|test/api/validate$|userdefined_uri_resolution|uri_resolvers|streaming-udf|store/example_[13]$|uris/disable-http-3|update/zorba/store/sc1"
+        }
+      }
+    },
+    {
+      "name": "full-debug",
+      "configurePreset": "full-debug",
+      "output": { "outputOnFailure": true },
+      "execution": { "timeout": 300 }
+    }
+  ]
+}

@@ -98,8 +98,13 @@ static void append_env_var(
     const char* env_var_name,
     std::vector<zstring>& pathsVector)
 {
-  char* dll_path = getenv(env_var_name);
-  char* str_env = std::strtok(dll_path, ";");
+  char const *const env_value = getenv(env_var_name);
+  if (!env_value)
+    return;
+  // Tokenize a copy: strtok must not modify the process environment.
+  std::string dll_path(env_value);
+  char* save_ptr = NULL;
+  char* str_env = strtok_r(&dll_path[0], ";", &save_ptr);
   while (str_env !=NULL)
   {
     zstring zorba_env_dir(str_env);
@@ -108,7 +113,7 @@ static void append_env_var(
       zorba_env_dir.append("/");
     }
     pathsVector.push_back(zorba_env_dir);
-    str_env = std::strtok(NULL, ";");
+    str_env = strtok_r(NULL, ";", &save_ptr);
   }
 }
 #endif

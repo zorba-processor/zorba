@@ -60,6 +60,24 @@ ENDIF (EXISTS ${APITEST_SPEC})
 GET_FILENAME_COMPONENT (APITEST_OUT_DIRPATH ${APITEST_RESULT_FILEPATH} PATH)    
 FILE (MAKE_DIRECTORY ${APITEST_OUT_DIRPATH})
 
+# Expand $HTTP_TEST_SERVER (see test/http-test-data/README.txt) in the query
+# and the expected result.
+IF (DEFINED ENV{ZORBA_HTTP_TEST_SERVER} AND NOT "$ENV{ZORBA_HTTP_TEST_SERVER}" STREQUAL "")
+  SET (ZORBA_HTTP_TEST_SERVER "$ENV{ZORBA_HTTP_TEST_SERVER}")
+ENDIF ()
+FOREACH (_var APITEST_QUERY APITEST_EXPECTED_FILEPATH)
+  IF (EXISTS "${${_var}}")
+    FILE (READ "${${_var}}" _content)
+    IF (_content MATCHES "\\$HTTP_TEST_SERVER")
+      STRING (REPLACE "$HTTP_TEST_SERVER" "${ZORBA_HTTP_TEST_SERVER}" _content "${_content}")
+      GET_FILENAME_COMPONENT (_name "${${_var}}" NAME)
+      SET (_expanded "${APITEST_OUT_DIRPATH}/expanded-${_name}")
+      FILE (WRITE "${_expanded}" "${_content}")
+      SET (${_var} "${_expanded}")
+    ENDIF ()
+  ENDIF ()
+ENDFOREACH ()
+
 FILE (TO_NATIVE_PATH ${ZORBA_EXE} NATIVE_ZORBA_EXE)
 
 SET (APITEST_COMMAND "${NATIVE_ZORBA_EXE} --profile ${FORMAT} --no-tree-ids --no-serializer ${APITEST_ARGS} ${APITEST_QUERY}")

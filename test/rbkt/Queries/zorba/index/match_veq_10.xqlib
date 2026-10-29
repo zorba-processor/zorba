@@ -1,4 +1,4 @@
-module namespace db28 = "http://28.io/collections";
+module namespace db28 = "http://zorba-tests.example.org/collections";
 
 import module namespace db = 
   "http://zorba.io/modules/store/static/collections/dml";

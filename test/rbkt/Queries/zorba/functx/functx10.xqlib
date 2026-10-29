@@ -26,7 +26,7 @@
  : @version 1.0
  : @see     http://www.xqueryfunctions.com
  :) 
-module namespace  functx = "http://www.28msec.com/compile-time/lib/functx10";
+module namespace  functx = "http://test.example.com/compile-time/lib/functx10";
  
 (:~
  : Adds attributes to XML elements 

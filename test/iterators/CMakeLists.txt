@@ -44,6 +44,7 @@ FOREACH (TESTFILE ${PROFILE_TEST_FILES})
     -D "CMAKE_ZORBA_BINARY_DIR=${CMAKE_BINARY_DIR}"
     -D "ZORBA_EXE=${ZORBA_EXE}"
     -D "CMAKE_ZORBA_SOURCE_DIR=${CMAKE_SOURCE_DIR}"
+    -D "ZORBA_HTTP_TEST_SERVER=${ZORBA_HTTP_TEST_SERVER}"
     -P "${CMAKE_CURRENT_SOURCE_DIR}/profilescript.cmake")
      
   SET_TESTS_PROPERTIES("iterators/${TESTFILE}" 
@@ -53,9 +54,6 @@ ENDFOREACH(TESTFILE)
 ##
 ## LibXML2 failures
 ##
-EXPECTED_FAILURE (iterators/zorba/flwor/flwor24.plan.xml libxml2)
-EXPECTED_FAILURE (iterators/zorba/flwor/flwor25.plan.xml libxml2)
-EXPECTED_FAILURE (iterators/zorba/flwor/flwor27.plan.xml libxml2)
 
 
 # vim:set et sw=2 ts=2:

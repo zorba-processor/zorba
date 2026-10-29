@@ -14,7 +14,7 @@
  : limitations under the License.
 :)
 
-module namespace guestbook = "http://www.28msec.com/templates/guestbook/guestbook";
+module namespace guestbook = "http://test.example.com/templates/guestbook/guestbook";
 
 import module namespace ddl = "http://zorba.io/modules/store/static/collections/ddl";
 import module namespace dml = "http://zorba.io/modules/store/static/collections/dml";

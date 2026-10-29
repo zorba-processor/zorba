@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
   ******************************************************
-  28msec schema for representing an XDM instance as XML.
+  Zorba schema for representing an XDM instance as XML.
   ******************************************************
 -->
 <xs:schema

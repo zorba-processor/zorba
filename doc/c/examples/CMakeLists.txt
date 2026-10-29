@@ -36,7 +36,7 @@ ZORBA_GENERATE_EXE(cexamples "${cexamples}" "" "" "")
 
 # remove the test driver source file
 SET (TestsToRun ${cexamples})
-REMOVE (TestsToRun cexamples.c)
+LIST (FILTER TestsToRun EXCLUDE REGEX "(^|/)cexamples\\.c$")
 
 STRING (LENGTH "${CMAKE_SOURCE_DIR}/" SOURCE_DIR_LENGTH)
 

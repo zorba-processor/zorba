@@ -31,7 +31,7 @@ IF (RUBY_LIBRARY AND RUBY_INCLUDE_PATH)
     SWIG_LINK_LIBRARIES(zorba_api zorba_simplestore ${RUBY_LIBRARY})
     # Necessary because UseSWIG.cmake uses ADD_LIBRARY(..MODULE..), which
     # apparently doesn't allow CMake's RPATH-rewriting magic to work.
-    GET_TARGET_PROPERTY(_rpath zorba_simplestore LOCATION)
+    ZORBA_TARGET_LOCATION(_rpath zorba_simplestore)
     GET_FILENAME_COMPONENT(_rpath "${_rpath}" PATH)
     IF (APPLE)
       SET_TARGET_PROPERTIES(zorba_api PROPERTIES

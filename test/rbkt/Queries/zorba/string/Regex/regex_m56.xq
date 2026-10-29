@@ -1,1 +1,1 @@
-fn:matches( "a@28.io", "^[^@]+@[^\.]+\.[a-z]+$" )
+fn:matches( "a@example.io", "^[^@]+@[^\.]+\.[a-z]+$" )

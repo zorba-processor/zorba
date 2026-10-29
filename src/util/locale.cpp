@@ -26,7 +26,7 @@
 # include <clocale>
 # include <cstdlib>                     /* for getenv(3) */
 # include <langinfo.h>                  /* for nl_langinfo(3) */
-# include <xlocale.h>                   /* for newlocale(3) */
+# include <locale.h>                    /* for newlocale(3) */
 #endif /* WIN32 */
 
 // Zorba
@@ -273,7 +273,8 @@ static zstring get_locale_info( nl_item item, iso639_1::type lang,
     if ( !country )
       country = iso3166_1::get_default( lang );
     if ( locale_t const loc = get_unix_locale_t( lang, country ) ) {
-      char const *const info = nl_langinfo_l( item, loc );
+      // Copy before freelocale(3): the result points into loc's data.
+      zstring const info( nl_langinfo_l( item, loc ) );
       ::freelocale( loc );
       return info;
     }

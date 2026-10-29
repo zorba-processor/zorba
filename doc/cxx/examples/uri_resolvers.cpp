@@ -24,6 +24,16 @@
 #include <zorba/uri_resolvers.h>
 #include <zorba/zorba_exception.h>
 #include <zorba/internal/unique_ptr.h>
+#include <cstdlib>
+#include <string>
+
+// host:port of the HTTP test server (see test/http-test-data).
+static std::string http_test_server_url(char const *path)
+{
+  char const *const env = std::getenv("ZORBA_HTTP_TEST_SERVER");
+  return std::string("http://")
+    + (env && *env ? env : ZORBA_HTTP_TEST_SERVER_DEFAULT) + path;
+}
 
 using namespace zorba;
 
@@ -42,7 +52,7 @@ class MySchemaURIMapper: public URIMapper
       return;
     }
     if(aUri == "http://zorba.io/helloworld") {
-      oUris.push_back("http://zorbatest.28.io:8080/tutorial/helloworld.xsd");
+      oUris.push_back(http_test_server_url("/tutorial/helloworld.xsd"));
     }
   }
 };

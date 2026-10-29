@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#include <zorba/internal/ztd.h>
 #include "stdafx.h"
 
 // standard
@@ -39,7 +40,7 @@ namespace dict {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-struct less_entry : binary_function<entry const&,entry const&,bool> {
+struct less_entry : ::zorba::internal::ztd::binary_function<entry const&,entry const&,bool> {
   less_entry() { }
   result_type operator()( first_argument_type i, second_argument_type j ) {
     return ::strcmp( i.key, j.key ) < 0;

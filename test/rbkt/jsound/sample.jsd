@@ -1,5 +1,5 @@
 {
-  "$namespace" : "http://zorba-tests.28.io/jsound-schema",
+  "$namespace" : "http://zorba-tests.example.org/jsound-schema",
   "$types" : [
     {
       "$kind" : "array",

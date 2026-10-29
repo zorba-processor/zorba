@@ -1,3 +1,3 @@
-import module namespace d = "http://www.28msec.com/test" at "test4.xqlib";
+import module namespace d = "http://test.example.com/test" at "test4.xqlib";
 
 d:foo()

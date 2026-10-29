@@ -1,10 +1,10 @@
 xquery version "3.0";
 
-module namespace modB = "http://zorba-tests.28.io/modules/B";
+module namespace modB = "http://zorba-tests.example.org/modules/B";
 
 (: This module exists only to import a specific version of the "ver" module. :)
 
-import module namespace vm = "http://zorba-tests.28.io/modules/ver#2.0";
+import module namespace vm = "http://zorba-tests.example.org/modules/ver#2.0";
 
 declare namespace ver = "http://zorba.io/options/versioning";
 declare option ver:module-version "1.0";

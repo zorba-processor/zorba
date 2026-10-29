@@ -22,7 +22,7 @@ import module namespace tims="http://www.example.com/timings" at "timings.xq";
 import module namespace sys ="http://www.zorba-xquery.com/modules/system";
 import module namespace http="http://expath.org/ns/http-client";
 
-declare namespace pdash = "http://www.28msec.com/pdash";
+declare namespace pdash = "http://test.example.com/pdash";
 declare namespace ann = "http://zorba.io/annotations";
 declare namespace err = "http://www.w3.org/2005/xqt-errors";
 
@@ -31,7 +31,7 @@ declare %ann:sequential
 function local:getPlatform()
 {    
     <pdash:platform site-osname="Ubuntu" os-version="11.04" os-platform="Linux" 
-        hostname="28msec.dyndns.org" is-64bits="true" vendor-id="Cezar" 
+        hostname="example-host" is-64bits="true" vendor-id="Cezar" 
         vendor-label="santacruz" 
         number-of-logical-cpu="{xs:int(8)}" number-of-physical-cpu="1" 
         total-virtual-memory="12389692000" total-physical-memory="0" 
@@ -402,7 +402,7 @@ function local:submitMessage($msg)
 {   
     fn:trace(fn:serialize($msg), "  - submitMessage");
     
-    variable $url:="http://pdash-zorba.my28msec.com/api/submissions";
+    variable $url:="http://localhost/api/submissions";
     
     fn:trace(fn:serialize(
         http:send-request( 

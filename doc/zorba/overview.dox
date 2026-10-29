@@ -109,7 +109,7 @@ that allows the declaration of collections,
 indexes,
 and integrity constraints.
 The other one is a
-<a href="/pages/latest/zorba/scripting_spec">XQuery Scripting Extension</a>
+XQuery Scripting Extension
 that allows side-effecting operations,
 assignable variables,
 and other similar procedural extensions to XQuery.

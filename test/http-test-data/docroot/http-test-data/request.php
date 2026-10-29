@@ -2,10 +2,10 @@
 
 function emitMultipart($contentType)
 {
-  list ($type, $boundary) = split("; ", $contentType);
+  list ($type, $boundary) = explode("; ", $contentType);
   $type = trim($type);
   $boundary = trim($boundary);
-  list ($tmp, $boundary) = split("=", $boundary);
+  list ($tmp, $boundary) = explode("=", $boundary);
   $boundary = trim($boundary);
   $d = fopen("php://input", "r");
 ?>
@@ -30,7 +30,7 @@ function emitMultipart($contentType)
         $finish = true;
         break;
       }
-      list($key, $value) = split(":", $line);
+      list($key, $value) = explode(":", $line);
       $key = trim($key);
       $value = trim($value);
       $value = str_replace("\"", "&#34;", $value);

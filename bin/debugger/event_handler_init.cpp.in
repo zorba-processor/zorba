@@ -26,7 +26,7 @@ namespace zorba { namespace debugclient {
 #else
     "C:/Program Files/Zorba XQuery Processor @ZORBA_MAJOR_NUMBER@.@ZORBA_MINOR_NUMBER@.@ZORBA_PATCH_NUMBER@/bin/";
 #endif
-    std::auto_ptr<std::ifstream> stream(new std::ifstream(build_dir));
+    std::unique_ptr<std::ifstream> stream(new std::ifstream(build_dir));
     if (stream->good()) {
       return stream.release();
     }

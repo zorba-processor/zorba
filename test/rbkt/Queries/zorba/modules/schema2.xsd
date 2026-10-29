@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
-           xmlns:http="http://www.28msec.com/modules/http" 
-           targetNamespace="http://www.28msec.com/modules/http"    
+           xmlns:http="http://test.example.com/modules/http" 
+           targetNamespace="http://test.example.com/modules/http"    
            elementFormDefault="qualified" >
 
   <xs:simpleType name="cookieString">

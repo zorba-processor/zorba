@@ -115,7 +115,7 @@ void EvalIteratorState::addQueryProfile(bool aTrackProfilingTime)
 
   {
     EvalProfile& lProfile = theEvalProfiles[theEvalProfiles.size()-1];
-    std::auto_ptr<ProfilingTimeWrapper> lPTWrapper;
+    std::unique_ptr<ProfilingTimeWrapper> lPTWrapper;
     if (aTrackProfilingTime)
       lPTWrapper.reset(new ProfilingTimeWrapper(*this));
 

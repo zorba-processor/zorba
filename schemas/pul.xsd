@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
   ************************************************************
-  28msec schema for representing a Pending Update List as XML.
+  Zorba schema for representing a Pending Update List as XML.
   ************************************************************
 -->
 <xs:schema

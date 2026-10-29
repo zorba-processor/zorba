@@ -68,7 +68,7 @@ std::ostringstream __oss;
     ACCEPT( *i );
 
 #define DECLARE_VISITOR_FUNCTOR( name, type, body)                      \
-  class name : public std::unary_function<rchandle<parsenode>, void>    \
+  class name : public zorba::internal::ztd::unary_function<rchandle<parsenode>, void>    \
   {                                                                     \
     parsenode_visitor &v;                                               \
   public:                                                               \

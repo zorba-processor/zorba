@@ -1,64 +1,22 @@
-This directory contains files that should be hosted on an http server
-to support testing of the core and non-core http-client modules of
-Zorba.  They are replicated here for reference and as backup.
+This directory contains the files served by the HTTP test server used by
+the http-client tests (and a few schema/URI-resolution tests).
 
-The following is the Apache 2.4 configuration block for the server where
-these files are currently hosted, zorbatest.28.io:8080 :
+Tests refer to the server as $HTTP_TEST_SERVER (host:port). The test
+drivers replace it with the ZORBA_HTTP_TEST_SERVER environment variable,
+or with the ZORBA_HTTP_TEST_SERVER CMake setting (default localhost:8080).
 
-AddDefaultCharset UTF-8
-Listen 8080
-<VirtualHost *:8080>
-    ServerName zorbatest.28.io
-    DocumentRoot /var/www/docroot
-    TraceEnable On
-    
-    <Directory /var/www/docroot>
-        Require all granted        
-    </Directory>
-    
-    <Directory /var/www/docroot/http-test-data/basic-auth>
-        AuthType Basic
-        AuthName "Password Required"
-        AuthBasicProvider file
-        AuthUserFile /var/www/conf/http-test-data.htpasswd
-        Require valid-user
-    </Directory>
-    
-    <Directory /var/www/docroot/cgi-bin>
-        Require all granted        
-    </Directory>
-    
-    ScriptAlias /cgi-bin/ /var/www/cgi-bin/
-</VirtualHost>
+The server needs:
+  - docroot/ as the document root, with PHP enabled for *.php;
+  - cgi-bin/ mapped to /cgi-bin/ and executable as CGI (Bourne shell);
+  - HTTP basic authentication on /http-test-data/basic-auth for user
+    "zorba" with password "blub";
+  - TRACE enabled.
 
-For Apache 2.2 the following configuration can be used:
+docker/http-test-server builds such a server (Apache 2.4 + PHP 8.3):
 
-AddDefaultCharset UTF-8
-Listen 8080
-<VirtualHost *:8080>
-    ServerName zorbatest.28.io
-    DocumentRoot /var/www/docroot
-    TraceEnable On
-    
-    <Directory /var/www/docroot/http-test-data/basic-auth>
-        AuthType Basic
-        AuthName "Password Required"
-        AuthBasicProvider file
-        AuthUserFile /var/www/conf/http-test-data.htpasswd
-        Require valid-user
-    </Directory>
-    
-    ScriptAlias /cgi-bin/ /var/www/cgi-bin/
-</VirtualHost>
+  docker build -t zorba-http-test -f docker/http-test-server/Dockerfile .
+  docker run -d -p 8080:8080 zorba-http-test
+  ctest -R http-client
 
-
-The named http-test-data.htpasswd file should allow access to a single
-user "zorba" with the password "blub".
-
-In addition, PHP should be configured and associated with files ending
-in .php, and the server should be able to execute bourne shell scripts
-in the /cgi-bin directory as CGI scripts.
-
-Finally, note that all tests explicitly name zorbatest.28.io:8080
-and some test results also include that name. So hosting these tests
-anywhere else is unlikely to work.
+docker/test-with-http-server.sh runs the whole suite in a builder image
+against that server.

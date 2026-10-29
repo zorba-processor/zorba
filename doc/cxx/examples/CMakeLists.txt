@@ -38,6 +38,8 @@ IF(ZORBA_WITH_DEBUGGER)
 #  LIST(APPEND API_EXAMPLES debugger.cpp)
 ENDIF(ZORBA_WITH_DEBUGGER)
 
+ADD_DEFINITIONS(-DZORBA_HTTP_TEST_SERVER_DEFAULT="${ZORBA_HTTP_TEST_SERVER}")
+
 CREATE_TEST_SOURCELIST(
   examples
   examples.cpp
@@ -49,7 +51,7 @@ ZORBA_GENERATE_EXE(examples "${examples}" "" "" "")
 
 # remove the test driver source file
 SET (TestsToRun ${examples})
-REMOVE (TestsToRun examples.cpp)
+LIST (FILTER TestsToRun EXCLUDE REGEX "(^|/)examples\\.cpp$")
 
 STRING (LENGTH "${CMAKE_SOURCE_DIR}/" SOURCE_DIR_LENGTH)
 
@@ -68,7 +70,6 @@ ENDFOREACH(test)
 ##
 ## LibXML2
 ##
-EXPECTED_FAILURE (doc/cxx/examples/xmldatamanager.cpp libxml2)
 
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/Makefile.cmake ${CMAKE_CURRENT_BINARY_DIR}/Makefile.zorba)
 MESSAGE(STATUS "configured ${CMAKE_CURRENT_SOURCE_DIR}/Makefile.cmake ${CMAKE_CURRENT_BINARY_DIR}/Makefile.zorba") 

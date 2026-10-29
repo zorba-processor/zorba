@@ -1,3 +1,3 @@
 import module namespace http="http://www.zorba-xquery.com/modules/http-client";
 
-http:get("http://openshift-demo.28.io/search.jq")[2]
+http:get("http://$HTTP_TEST_SERVER/http-test-data/search.json")[2]

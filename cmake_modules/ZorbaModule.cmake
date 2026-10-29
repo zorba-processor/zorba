@@ -12,13 +12,59 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-IF(COMMAND cmake_policy)
-  IF(CMAKE_VERSION VERSION_GREATER 3.0.0 OR CMAKE_VERSION VERSION_EQUAL 3.0.0)
-    cmake_policy(SET CMP0011 OLD)
-    cmake_policy(SET CMP0026 OLD)
-    cmake_policy(SET CMP0046 OLD)
-  ENDIF(CMAKE_VERSION VERSION_GREATER 3.0.0 OR CMAKE_VERSION VERSION_EQUAL 3.0.0)  
-ENDIF(COMMAND cmake_policy)
+# Computes the on-disk path of a target's primary output at configure time.
+# Replacement for reading the LOCATION property (CMP0026), which modern
+# CMake no longer allows. Valid for single-config generators; for IDE
+# generators the path contains ${CMAKE_CFG_INTDIR}, as LOCATION did.
+FUNCTION(ZORBA_TARGET_LOCATION var tgt)
+  GET_TARGET_PROPERTY(_type "${tgt}" TYPE)
+  GET_TARGET_PROPERTY(_dir "${tgt}" BINARY_DIR)
+  IF (_type STREQUAL "EXECUTABLE")
+    SET(_outprop RUNTIME_OUTPUT_DIRECTORY)
+    SET(_pre "")
+    SET(_suf "${CMAKE_EXECUTABLE_SUFFIX}")
+  ELSEIF (_type STREQUAL "SHARED_LIBRARY")
+    SET(_outprop LIBRARY_OUTPUT_DIRECTORY)
+    SET(_pre "${CMAKE_SHARED_LIBRARY_PREFIX}")
+    SET(_suf "${CMAKE_SHARED_LIBRARY_SUFFIX}")
+    IF (WIN32)
+      SET(_outprop RUNTIME_OUTPUT_DIRECTORY)
+    ENDIF (WIN32)
+  ELSEIF (_type STREQUAL "MODULE_LIBRARY")
+    SET(_outprop LIBRARY_OUTPUT_DIRECTORY)
+    SET(_pre "${CMAKE_SHARED_MODULE_PREFIX}")
+    SET(_suf "${CMAKE_SHARED_MODULE_SUFFIX}")
+  ELSE ()
+    SET(_outprop ARCHIVE_OUTPUT_DIRECTORY)
+    SET(_pre "${CMAKE_STATIC_LIBRARY_PREFIX}")
+    SET(_suf "${CMAKE_STATIC_LIBRARY_SUFFIX}")
+  ENDIF ()
+  GET_TARGET_PROPERTY(_outdir "${tgt}" ${_outprop})
+  IF (_outdir)
+    SET(_dir "${_outdir}")
+  ENDIF (_outdir)
+  FOREACH (_p PREFIX SUFFIX)
+    GET_TARGET_PROPERTY(_v "${tgt}" ${_p})
+    IF (NOT _v STREQUAL "_v-NOTFOUND")
+      STRING(TOLOWER ${_p} _l)
+      SET(_${_l} "${_v}")
+    ENDIF ()
+  ENDFOREACH (_p)
+  IF (DEFINED _prefix)
+    SET(_pre "${_prefix}")
+  ENDIF ()
+  IF (DEFINED _suffix)
+    SET(_suf "${_suffix}")
+  ENDIF ()
+  GET_TARGET_PROPERTY(_name "${tgt}" OUTPUT_NAME)
+  IF (NOT _name)
+    SET(_name "${tgt}")
+  ENDIF (NOT _name)
+  IF (NOT CMAKE_CFG_INTDIR STREQUAL ".")
+    SET(_dir "${_dir}/${CMAKE_CFG_INTDIR}")
+  ENDIF ()
+  SET(${var} "${_dir}/${_pre}${_name}${_suf}" PARENT_SCOPE)
+ENDFUNCTION(ZORBA_TARGET_LOCATION)
 
 # Utility macro to parse CMake-style argument lists
 MACRO(PARSE_ARGUMENTS prefix arg_names onearg_names option_names)
@@ -351,7 +397,7 @@ MACRO (DECLARE_ZORBA_MODULE)
     # Remember this library for the auto-generated module Config.cmake
     # file. Also remember the target name for the hack mentioned
     # above.  QQQ and what about the installed version?
-    GET_TARGET_PROPERTY (_lib_location "${module_lib_target}" LOCATION)
+    ZORBA_TARGET_LOCATION (_lib_location "${module_lib_target}")
     SET_PROPERTY (GLOBAL APPEND PROPERTY "${PROJECT_NAME}_LIBRARIES"
       "${_lib_location}")
     SET_PROPERTY (GLOBAL PROPERTY "${_lib_location}_TARGET"
@@ -928,7 +974,7 @@ ENDMACRO (ADD_TEST_DIRECTORY)
 #     ... - arguments that will be passed to the target
 #
 MACRO(ZORBA_ADD_TEST NAME TARGET ...)
-  GET_TARGET_PROPERTY (TARGET_LOCATION "${TARGET}" LOCATION)
+  ZORBA_TARGET_LOCATION (TARGET_LOCATION "${TARGET}")
   IF (WIN32)
     IF (MSVC_IDE)
       STRING (REPLACE "/${CMAKE_CFG_INTDIR}" "" TARGET_LOCATION ${TARGET_LOCATION})
@@ -1004,7 +1050,10 @@ MACRO (ADD_XQDOC_TARGETS)
       COMMENT "Building XQDoc XHTML documentation ..."
   )
   MESSAGE(STATUS "  added target xqdoc")
-  ADD_DEPENDENCIES(xqdoc xqdoc-xml modules_svg)
+  # 'xqdoc-xml' was never defined; CMake < 3.0 (CMP0046 OLD) ignored it.
+  IF (TARGET modules_svg)
+    ADD_DEPENDENCIES(xqdoc modules_svg)
+  ENDIF (TARGET modules_svg)
   SET_TARGET_PROPERTIES (xqdoc PROPERTIES
     EXCLUDE_FROM_DEFAULT_BUILD 1
     FOLDER "Docs"
