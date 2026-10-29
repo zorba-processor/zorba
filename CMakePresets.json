@@ -1,6 +1,10 @@
 {
   "version": 3,
-  "cmakeMinimumRequired": { "major": 3, "minor": 21, "patch": 0 },
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 21,
+    "patch": 0
+  },
   "configurePresets": [
     {
       "name": "base",
@@ -29,27 +33,67 @@
       "name": "full-release",
       "displayName": "Full (XML Schema via Xerces-C), Release",
       "inherits": "base",
-      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
     },
     {
       "name": "full-debug",
       "displayName": "Full (XML Schema via Xerces-C), Debug",
       "inherits": "base",
-      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" }
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "asan",
+      "displayName": "Full, AddressSanitizer + LeakSanitizer + UBSan (Linux)",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "CMAKE_C_FLAGS_RELWITHDEBINFO": "-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize=vptr",
+        "CMAKE_CXX_FLAGS_RELWITHDEBINFO": "-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize=vptr",
+        "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize=vptr",
+        "CMAKE_SHARED_LINKER_FLAGS": "-fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize=vptr",
+        "CMAKE_MODULE_LINKER_FLAGS": "-fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize=vptr"
+      },
+      "environment": {
+        "ASAN_OPTIONS": "detect_leaks=0"
+      }
     }
   ],
   "buildPresets": [
-    { "name": "core-release", "configurePreset": "core-release" },
-    { "name": "full-release", "configurePreset": "full-release" },
-    { "name": "full-debug", "configurePreset": "full-debug" }
+    {
+      "name": "core-release",
+      "configurePreset": "core-release"
+    },
+    {
+      "name": "full-release",
+      "configurePreset": "full-release"
+    },
+    {
+      "name": "full-debug",
+      "configurePreset": "full-debug"
+    },
+    {
+      "name": "asan",
+      "configurePreset": "asan",
+      "environment": {
+        "ASAN_OPTIONS": "detect_leaks=0"
+      }
+    }
   ],
   "testPresets": [
     {
       "name": "full-release",
       "displayName": "All tests (needs the HTTP test server, see test/http-test-data/README.txt)",
       "configurePreset": "full-release",
-      "output": { "outputOnFailure": true },
-      "execution": { "timeout": 120 }
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "timeout": 120
+      }
     },
     {
       "name": "full-release-offline",
@@ -64,8 +108,27 @@
     {
       "name": "full-debug",
       "configurePreset": "full-debug",
-      "output": { "outputOnFailure": true },
-      "execution": { "timeout": 300 }
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "timeout": 300
+      }
+    },
+    {
+      "name": "asan",
+      "configurePreset": "asan",
+      "output": {
+        "outputOnFailure": false
+      },
+      "execution": {
+        "timeout": 600
+      },
+      "environment": {
+        "ASAN_OPTIONS": "detect_leaks=1:log_path=${sourceDir}/build/asan/sanitizer-logs/asan",
+        "LSAN_OPTIONS": "suppressions=${sourceDir}/test/sanitizers/lsan.supp",
+        "UBSAN_OPTIONS": "print_stacktrace=1:log_path=${sourceDir}/build/asan/sanitizer-logs/ubsan"
+      }
     }
   ]
 }
