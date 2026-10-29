@@ -162,6 +162,13 @@ main(int argc, char** argv)
     bool isW3Ctest = isW3CFTtest || isW3CXQTStest;
     std::string lQueryWithoutSuffix = 
     std::string(argv[i]).substr( 0, std::string(argv[i]).rfind('.') );
+    // Files produced by this query. Queries that differ only in their suffix
+    // (e.g. foo.xq and foo.jq) must not share them: ctest runs them in
+    // parallel. ".xq" keeps the historical names.
+    std::string lQuerySuffix =
+    std::string(argv[i]).substr( std::string(argv[i]).rfind('.') );
+    std::string lOutputBase = lQueryWithoutSuffix
+      + ( lQuerySuffix == ".xq" ? std::string() : lQuerySuffix );
     std::unique_ptr<zorba::TestSchemaURIMapper>        smapper;
     std::unique_ptr<zorba::TestModuleURIMapper>        mmapper;
     std::unique_ptr<zorba::TestCollectionURIMapper>    cmapper;
@@ -219,7 +226,7 @@ main(int argc, char** argv)
 #ifndef ZORBA_TEST_PLAN_SERIALIZATION_COMPILE_ONLY
     std::string lResultFile( rbkt_bin_dir );
     zorba::fs::append( lResultFile, "QueryResults" );
-    zorba::fs::append( lResultFile, lQueryWithoutSuffix );
+    zorba::fs::append( lResultFile, lOutputBase );
     lResultFile += ".xml.res";
 
     zorba::fs::remove( lResultFile, true );
@@ -359,7 +366,7 @@ main(int argc, char** argv)
       clock_t t0, t1;
       std::string binary_path;
       binary_path = rbkt_bin_dir + "/QueryResults/" 
-                             + lQueryWithoutSuffix + ".plan";
+                             + lOutputBase + ".plan";
       t0 = clock();
       std::ofstream fbinary(binary_path.c_str(), std::ios_base::binary);
       if(!lQuery->saveExecutionPlan(fbinary))
@@ -388,7 +395,7 @@ main(int argc, char** argv)
       clock_t t0, t1;
       std::string binary_path;
       binary_path = rbkt_bin_dir + "/QueryResults/" 
-                             + lQueryWithoutSuffix + ".plan";
+                             + lOutputBase + ".plan";
       lQuery = engine->createQuery (&errHandler);
       t0 = clock();
       std::ifstream   ifbinary(binary_path.c_str(), std::ios_base::binary);
