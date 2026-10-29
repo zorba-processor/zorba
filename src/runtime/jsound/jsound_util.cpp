@@ -79,9 +79,12 @@ struct constraint {
   bool validate( dynamic_context& ) const;
 
 private:
+  // sctx_ must be declared before ccb_: the var_exprs owned by ccb_'s
+  // ExprManager point to VarInfo objects owned by sctx_ and access them in
+  // their destructors, so sctx_ must outlive ccb_.
+  static_context_t sctx_;
   CompilerCB ccb_;
   PlanIter_t plan_;
-  static_context_t sctx_;
 
   static XQueryDiagnostics* get_shared_diagnostics();
 
@@ -956,8 +959,8 @@ inline int to_xs_int( store::Item_t const &item ) {
 
 constraint::constraint( zstring const &query ) :
   query_( query ),
-  ccb_( get_shared_diagnostics() ),
-  sctx_( GENV_ROOT_STATIC_CONTEXT.create_child_context() )
+  sctx_( GENV_ROOT_STATIC_CONTEXT.create_child_context() ),
+  ccb_( get_shared_diagnostics() )
 {
   ccb_.theRootSctx = sctx_.get();
   ccb_.theCommonLanguageEnabled = true;
