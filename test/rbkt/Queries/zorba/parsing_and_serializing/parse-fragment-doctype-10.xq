@@ -1,12 +1,9 @@
+(: Comments and PIs in the internal DTD subset are not fragment nodes. :)
 import module namespace x = "http://zorba.io/modules/xml";
 import schema namespace opt = "http://zorba.io/modules/xml-options";
 
 x:parse(
-"
-<!DOCTYPE HTML PUBLIC '-//W3C//DTD HTML 4.01 Transitional//EN' 'http://www.w3.org/TR/html4/loose.dtd'>
-<!DOCTYPE HTML PUBLIC '-//W3C//DTD HTML 4.01 Transitional//EN' 'http://www.w3.org/TR/html4/loose.dtd'>
-<from2>Jani</from2>
-<from3>Jani</from3>",
+"<!DOCTYPE a [<!-- note --><?pi data?><!ENTITY e 'x'>]><a>&amp;e;</a>",
 <opt:options>
   <opt:parse-external-parsed-entity/>
 </opt:options>

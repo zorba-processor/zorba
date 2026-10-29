@@ -121,26 +121,31 @@ inline bool is_xml_space(char c) {
  * @param s The buffered start of the input.
  * @param eof Whether \a s holds the whole input.
  * @param complete Set to \c false if more input is needed to decide.
- * @param decl_end Set to the offset just past the text declaration, or 0.
+ * @param has_decl Set to \c true if there is a text declaration.
+ * @param decl_end Set to the offset just past the byte order mark and the
+ * text declaration, if any, or 0.
  * @param doctype_end Set to the offset just past the DOCTYPE, or 0.
  */
 void scan_prolog(std::string const &s, bool eof, bool &complete,
+                 bool &has_decl,
                  std::string::size_type &decl_end,
                  std::string::size_type &doctype_end) {
   typedef std::string::size_type size_type;
   complete = true;
+  has_decl = false;
   decl_end = doctype_end = 0;
 
-  size_type i = 0;
   if (starts_with(s, 0, "\xEF\xBB\xBF"))
-    i = 3;
+    decl_end = 3;
 
+  size_type i = decl_end;
   if (starts_with(s, i, "<?xml") && s.size() > i + 5 && is_xml_space(s[i + 5])) {
     size_type const end = s.find("?>", i);
     if (end == std::string::npos) {
       complete = eof;
       return;
     }
+    has_decl = true;
     decl_end = end + 2;
   }
 
@@ -173,7 +178,23 @@ void scan_prolog(std::string const &s, bool eof, bool &complete,
     int brackets = 0;
     char quote = 0;
     for (size_type k = i + 9; k < s.size(); ++k) {
+      if (k >= MAX_PROLOG_SCAN)
+        return;
       char const c = s[k];
+      // Comments and PIs in the internal subset may contain quotes and
+      // brackets that are not markup.
+      char const *skip_close = NULL;
+      if (!quote && starts_with(s, k, "<!--"))
+        skip_close = "-->";
+      else if (!quote && starts_with(s, k, "<?"))
+        skip_close = "?>";
+      if (skip_close) {
+        size_type const end = s.find(skip_close, k);
+        if (end == std::string::npos)
+          break;
+        k = end + std::strlen(skip_close) - 1;
+        continue;
+      }
       if (quote) {
         if (c == quote)
           quote = 0;
@@ -268,11 +289,12 @@ void FragmentXmlLoader::startParser()
   std::string head;
   bool eof = false;
   bool complete = false;
+  bool has_decl;
   std::string::size_type decl_end, doctype_end;
   std::vector<char> buf(FragmentIStream::DEFAULT_BUFFER_SIZE);
   while (true)
   {
-    scan_prolog(head, eof, complete, decl_end, doctype_end);
+    scan_prolog(head, eof, complete, has_decl, decl_end, doctype_end);
     if (complete)
       break;
     std::streamsize const n = readPacket(*fs.theStream, &buf[0], buf.size());
@@ -297,7 +319,7 @@ void FragmentXmlLoader::startParser()
   std::string::size_type const prolog_end = doctype_end ? doctype_end : decl_end;
   std::string prolog(head, 0, prolog_end);
   // A text declaration may omit the version; an XML declaration may not.
-  if (decl_end && prolog.find("version", 0) >= decl_end)
+  if (has_decl && prolog.find("version", 0) >= decl_end)
   {
     std::string::size_type const pos = prolog.find("<?xml");
     prolog.insert(pos + 5, " version=\"1.0\"");
@@ -666,6 +688,8 @@ void FragmentXmlLoader::recordComment(
     void * ctx,
     const xmlChar * value)
 {
+  if (static_cast<xmlParserCtxtPtr>(ctx)->inSubset)
+    return;                             // inside the DOCTYPE
   FragmentEvent ev;
   ev.kind = FragmentEvent::COMMENT;
   ev.text = to_string(value);
@@ -678,6 +702,8 @@ void FragmentXmlLoader::recordProcessingInstruction(
     const xmlChar * target,
     const xmlChar * data)
 {
+  if (static_cast<xmlParserCtxtPtr>(ctx)->inSubset)
+    return;                             // inside the DOCTYPE
   FragmentEvent ev;
   ev.kind = FragmentEvent::PI;
   ev.name = to_string(target);
