@@ -32,7 +32,7 @@ ZORBA_GENERATE_EXE(APITests "${APITests}" "" "" "")
 
 # remove the test driver source file
 SET (TestsToRun ${APITests})
-REMOVE (TestsToRun APITests.cpp)
+LIST (FILTER TestsToRun EXCLUDE REGEX "(^|/)APITests\\.cpp$")
 
 MESSAGE(STATUS "Adding API tests for CTest")
 

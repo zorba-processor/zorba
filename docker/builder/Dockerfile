@@ -9,8 +9,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       build-essential clang cmake ninja-build ccache git ca-certificates pkg-config \
       bison flex \
       libicu-dev libxml2-dev libxslt1-dev libcurl4-openssl-dev zlib1g-dev \
-      libxerces-c-dev uuid-dev \
- && rm -rf /var/lib/apt/lists/*
+      libxerces-c-dev uuid-dev locales gdb \
+ && rm -rf /var/lib/apt/lists/* \
+ && for l in en_US de_DE fr_FR; do localedef -i $l -f UTF-8 $l.UTF-8; done
 
 ENV CCACHE_DIR=/ccache \
     CCACHE_MAXSIZE=20G \

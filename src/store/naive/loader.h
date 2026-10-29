@@ -268,18 +268,17 @@ public:
   const FragmentIStream* getFragmentStream() const { return theFragmentStream; };
   
 protected:
-  // returns true if the input buffer is not yet fully consumed
-  bool fillBuffer(FragmentIStream* theFragmentStream);  
+  void startParser();
 
-  unsigned long getCurrentInputOffset() const;
+  void feedParser();
 
-  static void checkStopParsing(void* ctx, bool force = false);
+  void finishParser();
 
-  static void startDocument(void * ctx);
+  void replay(FragmentEvent const &ev);
 
-  static void endDocument(void * ctx);
+  static FragmentIStream* streamOf(void* ctx);
 
-  static void startElement(
+  static void recordStartElement(
         void * ctx,
         const xmlChar * localname,
         const xmlChar * prefix,
@@ -290,36 +289,38 @@ protected:
         int nb_defaulted,
         const xmlChar ** attributes);
 
-  static void endElement(
+  static void recordEndElement(
         void * ctx,
         const xmlChar * localname,
         const xmlChar * prefix,
         const xmlChar * URI);
 
-  static void characters(
+  static void recordText(
+        void * ctx,
+        FragmentEvent::kind_type kind,
+        const xmlChar * text,
+        int len);
+
+  static void recordCharacters(
         void * ctx,
         const xmlChar * ch,
         int len);
 
-  static void comment(
-        void * ctx,
-        const xmlChar * value);
-
-  static void cdataBlock(
+  static void recordCdataBlock(
         void * ctx,
         const xmlChar * value,
         int len);
 
-  static void processingInstruction(
+  static void recordComment(
+        void * ctx,
+        const xmlChar * value);
+
+  static void recordProcessingInstruction(
         void * ctx,
         const xmlChar * target,
         const xmlChar * data);
-  
-  static void internalSubset(
-        void *ctx,
-        const xmlChar *name,
-        const xmlChar *ExternalID,
-        const xmlChar *SystemID);
+
+  static void recordError(void* ctx, ZORBA_XML_ERROR_PTR error);
 
 protected:
   FragmentIStream* theFragmentStream;

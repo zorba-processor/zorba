@@ -53,9 +53,6 @@ ENDFOREACH(TESTFILE)
 ##
 ## LibXML2 failures
 ##
-EXPECTED_FAILURE (iterators/zorba/flwor/flwor24.plan.xml libxml2)
-EXPECTED_FAILURE (iterators/zorba/flwor/flwor25.plan.xml libxml2)
-EXPECTED_FAILURE (iterators/zorba/flwor/flwor27.plan.xml libxml2)
 
 
 # vim:set et sw=2 ts=2:

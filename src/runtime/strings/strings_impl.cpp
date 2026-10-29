@@ -1666,6 +1666,16 @@ bool FnReplaceIterator::nextImpl(
         ERROR_LOC( loc )
       );
     replacement = temp_replacement;
+  } else {
+    // With the 'q' flag the replacement is literal; escape the characters
+    // that ICU's replaceAll() treats specially.
+    zstring temp_replacement;
+    FOR_EACH( zstring, c, replacement ) {
+      if ( *c == '\\' || *c == '$' )
+        temp_replacement += '\\';
+      temp_replacement += *c;
+    }
+    replacement = temp_replacement;
   }
 
   try
