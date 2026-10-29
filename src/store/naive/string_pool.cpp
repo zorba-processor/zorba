@@ -41,9 +41,12 @@ StringPool::~StringPool()
     }
   }
 
+  // A destructor must not throw (it would call std::terminate), so the strings
+  // that are still referenced are only reported (see above).
   if (count > 0)
   {
-    throw ZORBA_EXCEPTION(zerr::ZSTR0065_STRINGS_IN_POOL, ERROR_PARAMS(count));
+    std::cerr << "ZSTR0065: " << count << " string(s) still referenced in pool"
+              << std::endl;
   }
 }
 
