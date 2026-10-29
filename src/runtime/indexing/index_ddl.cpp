@@ -1293,8 +1293,8 @@ store::IndexCondition_t ProbeIndexRangeValueIterator::createCondition(
     if (state->theIndexDecl->isGeneral() &&
         (state->theIndexDecl->getKeyTypes())[keyNo] == NULL)
     {
-      store::SchemaTypeCode leftType;
-      store::SchemaTypeCode rightType;
+      store::SchemaTypeCode leftType = store::XS_LAST;
+      store::SchemaTypeCode rightType = store::XS_LAST;
 
       if (tempLeft != NULL)
       {

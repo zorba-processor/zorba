@@ -231,7 +231,7 @@ static void format_integer( xs_integer const &xs_n, picture const &pic,
         pic_end( u_pic_format.rend() );
 
       int digit_pos = 0;
-      unicode::code_point grouping_cp;
+      unicode::code_point grouping_cp = unicode::code_point( 0 );
       bool just_inserted_grouping_separator = false;
       int mandatory_digits = pic.primary.mandatory_digits;
       int mandatory_grouping_seps = pic.primary.mandatory_grouping_seps;

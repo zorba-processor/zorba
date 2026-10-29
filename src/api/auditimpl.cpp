@@ -107,7 +107,7 @@ Observation::~Observation() {
 //************************************************************************
 
 ObservationImpl::ObservationImpl(const Property& property, long long value)
-  : m_property(&property) {
+  : m_property(&property), m_strings(nullptr) {
   m_value.l = value;
 }
 
