@@ -4267,6 +4267,11 @@ PathExpr :
           $$ = new BooleanLiteral(LOC(@$), true);
           break;
         }
+
+        // The path expression was replaced by a literal; nothing else
+        // references it (parser values are unowned raw pointers), so release it.
+        if ($$ != NULL)
+          release_hack( rpe );
 #endif
       }
 

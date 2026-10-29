@@ -6389,6 +6389,11 @@ namespace zorba {
           (yylhs.value.expr) = new BooleanLiteral(LOC(yylhs.location), true);
           break;
         }
+
+        // The path expression was replaced by a literal; nothing else
+        // references it (parser values are unowned raw pointers), so release it.
+        if ((yylhs.value.expr) != NULL)
+          release_hack( rpe );
       }
       if ((yylhs.value.expr) == NULL)
         (yylhs.value.expr) = (rpe ?
