@@ -16,6 +16,7 @@
 
 #include "stdafx.h"
 
+#include <cstdio>
 #include <limits>
 #include <string>
 #include <stdlib.h>
@@ -387,7 +388,7 @@ zstring FloatImpl<F>::toString( bool no_scientific_format ) const {
 #endif
   } else {
     char buf[174];
-    sprintf( buf, "%#1.*E", (int)precision_, (double)value_ );
+    snprintf( buf, sizeof( buf ), "%#1.*E", (int)precision_, (double)value_ );
     char *e = ::strchr( buf, 'E' );
 
     //

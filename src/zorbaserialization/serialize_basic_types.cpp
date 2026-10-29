@@ -384,7 +384,7 @@ void operator&(Archiver& ar, float& obj)
     if (isdigit(float_str.c_str()[0]))
     {
       char strtemp[100];
-      sprintf(strtemp, "%.7e", (double)obj);
+      snprintf(strtemp, sizeof(strtemp), "%.7e", (double)obj);
       float_str = strtemp;
     }
 
@@ -415,7 +415,7 @@ void operator&(Archiver& ar, double& obj)
     if (isdigit(double_str.c_str()[0]))
     {
       char strtemp[100];
-      sprintf(strtemp, "%.16e", obj);
+      snprintf(strtemp, sizeof(strtemp), "%.16e", obj);
       double_str = strtemp;
     }
 

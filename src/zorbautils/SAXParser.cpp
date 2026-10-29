@@ -17,6 +17,8 @@
 
 #include "SAXParser.h"
 
+#include <cstdarg>
+#include <cstdio>
 #include <memory.h>
 #include <string>
 
@@ -218,7 +220,7 @@ void zorba::SAXParser::error( void * ctx, const char * msg, ... )
   char buf[1024];
   va_list args;
   va_start(args, msg);
-  vsprintf(buf, msg, args);
+  vsnprintf(buf, sizeof(buf), msg, args);
   va_end(args);
   lParser.theXQueryDiagnostics->add_error(
     NEW_ZORBA_EXCEPTION(
@@ -233,7 +235,7 @@ void zorba::SAXParser::warning( void * ctx, const char * msg, ... )
   char buf[1024];
   va_list args;
   va_start(args, msg);
-  vsprintf(buf, msg, args);
+  vsnprintf(buf, sizeof(buf), msg, args);
   va_end(args);
 
   std::cerr << buf << std::endl;

@@ -15,6 +15,7 @@
  */
 #include "stdafx.h"
 
+#include <cstdio>
 #include <iostream>
 #include <sstream>
 
@@ -1940,7 +1941,7 @@ static void addGroupElement(store::Item_t &parent,
     store::Item_t group_elem;
     GENV_ITEMFACTORY->createElementNode(group_elem, parent, group_element_name, untyped_type_name, false, false, ns_binding, baseURI);
     char strid[40];
-    sprintf(strid, "%d", i+1);
+    snprintf(strid, sizeof(strid), "%d", i+1);
     zstring zstrid(strid);
     store::Item_t strid_item;
     GENV_ITEMFACTORY->createString(strid_item, zstrid);
