@@ -75,6 +75,12 @@ ENDIF(COMPILER_FULL_PATH MATCHES "Visual Studio 8")
 
 ENDIF(NOT CLANG AND CMAKE_BUILD_TOOL MATCHES "(msdev|devenv|nmake|MSBuild)")
 
+# Flex 2.6.4 (e.g. macOS's) emits 'register' in generated scanners, which
+# Clang rejects in C++17 and later.
+IF(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-register")
+ENDIF()
+
 IF(CLANG AND WIN32)
   SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -no-integrated-as")
   SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -no-integrated-as")

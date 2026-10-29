@@ -95,11 +95,11 @@ class ProfileWrapper
   zorba::time::cpu::timer            theCPUTimer;
   zorba::time::wall::timer           theWallTimer;
   Request&                           theRequest;
-  std::auto_ptr<std::vector<Item> >& theJSONProfileData;
+  std::unique_ptr<std::vector<Item> >& theJSONProfileData;
   zorba::Item&                       theXMLProfileData;
 
 public:
-  ProfileWrapper(Request& aRequest, std::auto_ptr<std::vector<Item> >& aProfileData, zorba::Item& aXMLProfileData):
+  ProfileWrapper(Request& aRequest, std::unique_ptr<std::vector<Item> >& aProfileData, zorba::Item& aXMLProfileData):
     theProfilingEnabled(zorba::Properties::instance().getCollectProfile()),
     theProfileFormat(zorba::Properties::instance().getProfileFormat()),
     theRequest(aRequest),
@@ -216,9 +216,9 @@ protected:
   const ExternalModule*                        theModule;
   ItemFactory*                                 theFactory;
 
-  mutable std::auto_ptr<std::vector<Item> >    theJSONProfileData;
+  mutable std::unique_ptr<std::vector<Item> >    theJSONProfileData;
   mutable Item                                 theXMLProfileData;
-  mutable std::auto_ptr<ProfileDataMap>        theProfileMap;
+  mutable std::unique_ptr<ProfileDataMap>        theProfileMap;
 
 public:
   HttpSendFunction(const ExternalModule* aModule)

@@ -34,6 +34,30 @@ namespace zorba {
 namespace internal {
 namespace ztd {
 
+/**
+ * \internal
+ * Replacement for \c std::unary_function, removed in C++17: provides the
+ * same member typedefs for function objects.
+ */
+template<typename Arg,typename Result>
+struct unary_function {
+  typedef Arg argument_type;
+  typedef Result result_type;
+};
+
+/**
+ * \internal
+ * Replacement for \c std::binary_function, removed in C++17: provides the
+ * same member typedefs for function objects.
+ */
+template<typename Arg1,typename Arg2,typename Result>
+struct binary_function {
+  typedef Arg1 first_argument_type;
+  typedef Arg2 second_argument_type;
+  typedef Result result_type;
+};
+
+
 ////////// tr1 ////////////////////////////////////////////////////////////////
 
 /**
@@ -309,7 +333,7 @@ template<typename T> struct less {
  * Addison-Wesley, Reading, MA, 1997.  p. 468.
  */
 template<> struct less<char const*> :
-  std::binary_function<char const*,char const*,bool>
+  zorba::internal::ztd::binary_function<char const*,char const*,bool>
 {
   less() { }
   // This default constructor doesn't need to be defined, but g++ complains if

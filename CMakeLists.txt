@@ -502,21 +502,20 @@ ADD_DEFINITIONS(${DEFINITIONS})
 # find all dylib files (i.e. transitive closure of the library files
 # that are linked)
 IF(APPLE)
-  EXECUTE_PROCESS(
-    COMMAND ${CMAKE_SOURCE_DIR}/scripts/find_macosx_libraries.sh ${ICU_LIBRARIES}
-    OUTPUT_VARIABLE Zorba_ICUUC)
-  EXECUTE_PROCESS(
-    COMMAND ${CMAKE_SOURCE_DIR}/scripts/find_macosx_libraries.sh ${ICU_I18N_LIBRARIES}
-    OUTPUT_VARIABLE Zorba_ICUI18N)
-  EXECUTE_PROCESS(
-    COMMAND ${CMAKE_SOURCE_DIR}/scripts/find_macosx_libraries.sh ${ICU_DATA_LIBRARIES}
-    OUTPUT_VARIABLE Zorba_ICU_DATA)
-  EXECUTE_PROCESS(
-    COMMAND ${CMAKE_SOURCE_DIR}/scripts/find_macosx_libraries.sh ${XERCESC_LIBRARY}
-    OUTPUT_VARIABLE Zorba_XERCESC)
-  EXECUTE_PROCESS(
-    COMMAND ${CMAKE_SOURCE_DIR}/scripts/find_macosx_libraries.sh ${LIBXML2_LIBRARIES}
-    OUTPUT_VARIABLE Zorba_XML2)
+  # Each variable is set to ";<resolved path>" (empty if the library is unset).
+  MACRO(ZORBA_REALPATH_LIB var lib)
+    SET(${var})
+    IF (NOT "${lib}" STREQUAL "")
+      LIST(GET lib 0 _first_lib)
+      GET_FILENAME_COMPONENT(_real_lib "${_first_lib}" REALPATH)
+      SET(${var} ";${_real_lib}")
+    ENDIF ()
+  ENDMACRO(ZORBA_REALPATH_LIB)
+  ZORBA_REALPATH_LIB(Zorba_ICUUC "${ICU_LIBRARIES}")
+  ZORBA_REALPATH_LIB(Zorba_ICUI18N "${ICU_I18N_LIBRARIES}")
+  ZORBA_REALPATH_LIB(Zorba_ICU_DATA "${ICU_DATA_LIBRARIES}")
+  ZORBA_REALPATH_LIB(Zorba_XERCESC "${XERCESC_LIBRARY}")
+  ZORBA_REALPATH_LIB(Zorba_XML2 "${LIBXML2_LIBRARIES}")
 ENDIF(APPLE)
 
 

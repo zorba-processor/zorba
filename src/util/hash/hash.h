@@ -19,6 +19,7 @@
 
 // zorba
 #include <zorba/config.h>
+#include <zorba/internal/ztd.h>
 #ifndef ZORBA_HAVE_UNORDERED_MAP
 #include <zorba/internal/unique_ptr.h>
 #endif /* ZORBA_HAVE_UNORDERED_MAP */
@@ -94,7 +95,7 @@ size_t hash_c_str( char const *s, size_t init = Hash_Init );
  * @tparam T The type to hash.
  */
 template<typename T>
-struct hash : std::unary_function<T,size_t> {
+struct hash : zorba::internal::ztd::unary_function<T,size_t> {
   hash() { }
   size_t operator()( T ) const; // not defined
 };
@@ -120,7 +121,7 @@ namespace std {
  * @tparam T The type to hash.
  */
 template<typename T>
-struct hash : unary_function<T,size_t> {
+struct hash : zorba::internal::ztd::unary_function<T,size_t> {
   hash() { }
   size_t operator()( T ) const; // not defined
 };
@@ -161,7 +162,7 @@ size_t hash<double>::operator()( double v ) const {
 
 /** Partial specialization for pointer types. */
 template<typename T>
-struct hash<T*> : unary_function<T*,size_t> {
+struct hash<T*> : zorba::internal::ztd::unary_function<T*,size_t> {
   size_t operator()( T *p ) const {
     return reinterpret_cast<size_t>( p );
   }
@@ -170,7 +171,7 @@ struct hash<T*> : unary_function<T*,size_t> {
 /** Specialization for \c string. */
 template<typename CharT,class Traits,class Alloc>
 struct hash< basic_string<CharT,Traits,Alloc> > :
-  unary_function<basic_string<CharT,Traits,Alloc> const&,size_t>
+  zorba::internal::ztd::unary_function<basic_string<CharT,Traits,Alloc> const&,size_t>
 {
   size_t operator()( basic_string<CharT,Traits,Alloc> const &s ) const {
     return zorba::ztd::hash_bytes( s.data(), s.size() );
@@ -180,7 +181,7 @@ struct hash< basic_string<CharT,Traits,Alloc> > :
 /** Specialization for \c unique_ptr. */
 template<typename T,class D>
 struct hash< unique_ptr<T,D> > :
-  unary_function<unique_ptr<T,D> const&,size_t>
+  zorba::internal::ztd::unary_function<unique_ptr<T,D> const&,size_t>
 {
   size_t operator()( unique_ptr<T,D> const &p ) const {
     return reinterpret_cast<size_t>( p.get() );
@@ -192,7 +193,7 @@ struct hash< unique_ptr<T,D> > :
 /** Specialization for \c rstring. */
 template<class RepType>
 struct hash< zorba::rstring<RepType> > :
-  unary_function<zorba::rstring<RepType> const&,size_t>
+  zorba::internal::ztd::unary_function<zorba::rstring<RepType> const&,size_t>
 {
   size_t operator()( zorba::rstring<RepType> const &s ) const {
     return zorba::ztd::hash_bytes( s.data(), s.size() );

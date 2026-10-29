@@ -20,6 +20,7 @@
 
 #include <zorba/config.h>
 #include <zorba/api_shared_types.h>
+#include <zorba/item.h>
 #include <zorba/item_sequence.h>
 #include <zorba/iterator.h>
 

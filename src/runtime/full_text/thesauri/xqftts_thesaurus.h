@@ -96,7 +96,7 @@ private:
      * FYI: We need to define a comparator class because \c operator&lt; (and
      * operators in general) can't be overloaded for pointers.
      */
-    struct less : std::binary_function<synonym const*,synonym const*,bool> {
+    struct less : zorba::internal::ztd::binary_function<synonym const*,synonym const*,bool> {
       result_type operator()( first_argument_type i,
                               second_argument_type j ) const {
         return i->term < j->term;

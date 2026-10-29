@@ -95,7 +95,7 @@ protected:
  * Copy of std::equal_to in this namespace so we can specialize it below.
  */
 template<typename T>
-struct equal_to : std::binary_function<T,T,bool> {
+struct equal_to : zorba::internal::ztd::binary_function<T,T,bool> {
   bool operator()( T const &a, T const &b ) const {
     return a == b;
   }
@@ -106,7 +106,7 @@ struct equal_to : std::binary_function<T,T,bool> {
  */
 template<>
 struct equal_to<char const*> :
-  std::binary_function<char const*,char const*,bool>
+  zorba::internal::ztd::binary_function<char const*,char const*,bool>
 {
   bool operator()( char const *s1, char const *s2 ) const {
     return std::strcmp( s1, s2 ) == 0;
@@ -118,7 +118,7 @@ struct equal_to<char const*> :
  * See: http://www.sgi.com/tech/stl/identity.html
  */
 template<typename T>
-struct identity : std::unary_function<T,T> {
+struct identity : zorba::internal::ztd::unary_function<T,T> {
   T const& operator()( T const &a ) const {
     return a;
   }
@@ -129,7 +129,7 @@ struct identity : std::unary_function<T,T> {
  * See: http://www.sgi.com/tech/stl/select1st.html
  */
 template<typename PairType>
-struct select1st : std::unary_function<PairType,typename PairType::first_type> {
+struct select1st : zorba::internal::ztd::unary_function<PairType,typename PairType::first_type> {
   typename PairType::first_type const& operator()( PairType const &a ) const {
     return a.first;
   }

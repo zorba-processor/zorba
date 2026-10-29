@@ -78,7 +78,7 @@ class cacheable_function : public function
 protected:
   QueryLoc theLoc;
   TypeManager* theTypeManager;
-  std::auto_ptr<FunctionCache> theCache;
+  std::unique_ptr<FunctionCache> theCache;
 
   //
   // Cache settings

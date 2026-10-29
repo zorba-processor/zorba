@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#include <zorba/internal/ztd.h>
 #include "stdafx.h"
 
 #include <algorithm>                    /* for equal_range() */
@@ -39,7 +40,7 @@ struct rel_table_entry {
 };
 
 struct less_rel_table_entry :
-  binary_function<rel_table_entry const&,rel_table_entry const&,bool>
+  ::zorba::internal::ztd::binary_function<rel_table_entry const&,rel_table_entry const&,bool>
 {
   less_rel_table_entry() { }
   result_type operator()( first_argument_type i, second_argument_type j ) {

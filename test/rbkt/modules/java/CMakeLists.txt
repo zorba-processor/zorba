@@ -19,7 +19,9 @@
 COMPARE_VERSION_STRINGS (${CMAKE_VERSION} "2.8.6" RESULT)
 IF (${RESULT} GREATER -1)
   FIND_PACKAGE (Java COMPONENTS Development)
-  IF (Java_JAVAC_EXECUTABLE)
+  # Java_JAVAC_EXECUTABLE alone is not enough: macOS ships a javac stub
+  # that fails when no JDK is installed.
+  IF (Java_FOUND AND Java_JAVAC_EXECUTABLE)
     INCLUDE (UseJava)
 
     # Declare two "different" jars, for testing

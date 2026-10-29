@@ -28,7 +28,7 @@ namespace zorba {
 
 /**
  * A %decoder_function is the base class for decoders that are used with an
- * encoded_list.  It is similar to std::binary_function.  The reason that
+ * encoded_list.  It is similar to zorba::internal::ztd::binary_function.  The reason that
  * wasn't used is because decoder functions should pass the result via the
  * second argument rather than as a return type for efficiency of large result
  * types.  A class derived from this should have a function like:

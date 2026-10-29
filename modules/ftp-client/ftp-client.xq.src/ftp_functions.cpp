@@ -333,7 +333,7 @@ put_function::evaluate( ExternalFunction::Arguments_t const &args,
 
   istream *is;
   mem_streambuf mbuf;
-  auto_ptr<istream> raii_is;
+  unique_ptr<istream> raii_is;
   String text;
 
   if ( put_item.isStreamable() ) {

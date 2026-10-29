@@ -1642,7 +1642,7 @@ void XQueryImpl::printPlan(std::ostream& aStream, Zorba_plan_format_t format) co
     checkNotClosed();
     checkCompiled();
 
-    std::auto_ptr<IterPrinter> lPrinter;
+    std::unique_ptr<IterPrinter> lPrinter;
     switch (format)
     {
       case PLAN_FORMAT_NONE:

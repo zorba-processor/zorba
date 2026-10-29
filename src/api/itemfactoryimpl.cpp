@@ -64,7 +64,7 @@ Item ItemFactoryImpl::createString(const String& aString)
 
   theItemFactory->createString(lItem, lString);
 
-  return &*lItem;
+  return lItem.getp();
 }
 
 
@@ -75,7 +75,7 @@ Item ItemFactoryImpl::createStreamableString(
 {
   store::Item_t lItem;
   theItemFactory->createStreamableString(lItem, stream, streamReleaser, seekable);
-  return &*lItem;
+  return lItem.getp();
 }
 
 
@@ -87,7 +87,7 @@ Item ItemFactoryImpl::createStreamableString(
 {
   store::Item_t lItem;
   theItemFactory->createStreamableString(lItem, stream, streamReleaser, uri, seekable);
-  return &*lItem;
+  return lItem.getp();
 }
 
 
@@ -98,7 +98,7 @@ Item ItemFactoryImpl::createAnyURI(const String& aURI)
   store::Item_t lItem;
   theItemFactory->createAnyURI(lItem, lString);
 
-  return &*lItem;
+  return lItem.getp();
 }
 
 
@@ -109,7 +109,7 @@ Item ItemFactoryImpl::createDate( const String& aDateValue )
   store::Item_t lItem;
   theItemFactory->createDate(lItem,  lString.c_str(), lString.size());
 
-  return &*lItem;
+  return lItem.getp();
 }
 
 
@@ -121,7 +121,7 @@ Item ItemFactoryImpl::createDate (
   store::Item_t lItem;
   theItemFactory->createDate(lItem,  aYear, aMonth, aDay );
 
-  return &*lItem;
+  return lItem.getp();
 }
 
 
@@ -148,7 +148,7 @@ Item ItemFactoryImpl::createQName(
 
   store::Item_t lItem;
   theItemFactory->createQName(lItem, lNamespace, lPrefix, lLocalname);
-  return &*lItem;
+  return lItem.getp();
 }
 
 
@@ -167,7 +167,7 @@ Item ItemFactoryImpl::createQName(
 
   store::Item_t lItem;
   theItemFactory->createQName(lItem, lNamespace, zstring(), lLocalname);
-  return &*lItem;
+  return lItem.getp();
 }
 
 
@@ -192,7 +192,7 @@ ItemFactoryImpl::createQName(const String& aQNameString)
       ERROR_PARAMS(ZED(FORG0001_LocalNotNCName_2), lLocalname));
     }
   }
-  return &*lItem;
+  return lItem.getp();
 }
 
 
@@ -208,7 +208,7 @@ Item ItemFactoryImpl::createNCName(const String& aValue)
 
   store::Item_t lItem;
   theItemFactory->createNCName(lItem, lString);
-  return &*lItem;
+  return lItem.getp();
 }
 
 
@@ -219,7 +219,7 @@ Item ItemFactoryImpl::createBase64Binary(const char* aData, size_t aLength,
     store::Item_t result;
     xs_base64Binary b64( aData, aLength, aIsBase64 );
     theItemFactory->createBase64Binary( result, b64 );
-    return &*result;
+    return result.getp();
   }
   catch ( std::exception const &e ) {
     throw ZORBA_EXCEPTION(
@@ -249,7 +249,7 @@ ItemFactoryImpl::createStreamableBase64Binary(
   theItemFactory->createStreamableBase64Binary(
     lItem, stream, streamReleaser, seekable, encoded
   );
-  return &*lItem;
+  return lItem.getp();
 }
 
 
@@ -265,7 +265,7 @@ ItemFactoryImpl::createStreamableBase64Binary(
   theItemFactory->createStreamableBase64Binary(
     lItem, stream, streamReleaser, uri, seekable, encoded
   );
-  return &*lItem;
+  return lItem.getp();
 }
 
 
@@ -273,7 +273,7 @@ Item ItemFactoryImpl::createBoolean(bool aValue)
 {
   store::Item_t lItem;
   theItemFactory->createBoolean(lItem, aValue);
-  return &*lItem;
+  return lItem.getp();
 }
 
 
@@ -282,7 +282,7 @@ Item ItemFactoryImpl::createDecimalFromLong (unsigned long aValue)
   store::Item_t lItem;
   xs_decimal const lDecimal(aValue);
   theItemFactory->createDecimal(lItem, lDecimal);
-  return &*lItem;
+  return lItem.getp();
 }
 
 
@@ -296,7 +296,7 @@ Item ItemFactoryImpl::createDecimalFromDouble (double aValue)
   catch ( std::invalid_argument const& ) {
     // ignore
   }
-  return &*lItem;
+  return lItem.getp();
 }
 
 
@@ -311,7 +311,7 @@ Item ItemFactoryImpl::createDecimal (const String& aValue)
   catch ( std::exception const& ) {
     // ignore
   }
-  return &*lItem;
+  return lItem.getp();
 }
 
 
@@ -321,7 +321,7 @@ ItemFactoryImpl::createInteger(long long aInteger)
   store::Item_t lItem;
   xs_integer const lInteger(aInteger);
   theItemFactory->createInteger(lItem, lInteger);
-  return &*lItem;
+  return lItem.getp();
 }
 
 
@@ -337,7 +337,7 @@ ItemFactoryImpl::createInteger(const String& aInteger)
   catch ( std::exception const& ) {
     // ignore
   }
-  return &*lItem;
+  return lItem.getp();
 }
 
 
@@ -346,7 +346,7 @@ Item ItemFactoryImpl::createLong ( long long aLong )
   store::Item_t lItem;
 
   theItemFactory->createLong(lItem, aLong);
-  return &*lItem;
+  return lItem.getp();
 }
 
 
@@ -358,7 +358,7 @@ Item ItemFactoryImpl::createInt ( int aInt )
     theItemFactory->createInt(lItem, aInt);
   }
 
-  return &*lItem;
+  return lItem.getp();
 }
 
 
@@ -368,7 +368,7 @@ Item ItemFactoryImpl::createShort ( short aShort )
 
   theItemFactory->createShort(lItem, aShort);
 
-  return &*lItem;
+  return lItem.getp();
 }
 
 
@@ -378,7 +378,7 @@ Item ItemFactoryImpl::createByte ( char aValue )
 
   theItemFactory->createByte(lItem, aValue);
 
-  return &*lItem;
+  return lItem.getp();
 }
 
 
@@ -390,7 +390,7 @@ Item ItemFactoryImpl::createDateTime(short aYear, short aMonth, short aDay,
   theItemFactory->createDateTime(lItem, aYear, aMonth, aDay,
                                  aHour, aMinute, aSecond, aTimezone);
 
-  return &*lItem;
+  return lItem.getp();
 }
 
 
@@ -404,7 +404,7 @@ ItemFactoryImpl::createDateTime(
       lItem, aYear, aMonth, aDay,
       aHour, aMinute, aSecond);
 
-  return &*lItem;
+  return lItem.getp();
 }
 
 
@@ -415,7 +415,7 @@ Item ItemFactoryImpl::createDateTime( const String& aDateTimeValue )
   store::Item_t lItem;
   theItemFactory->createDateTime(lItem,  lString.c_str(), lString.size());
 
-  return &*lItem;
+  return lItem.getp();
 }
 
 
@@ -427,7 +427,7 @@ Item ItemFactoryImpl::createDateTimeStamp(short aYear, short aMonth, short aDay,
   theItemFactory->createDateTimeStamp(lItem, aYear, aMonth, aDay,
                                  aHour, aMinute, aSecond, aTimezone);
 
-  return &*lItem;
+  return lItem.getp();
 }
 
 
@@ -438,7 +438,7 @@ Item ItemFactoryImpl::createDateTimeStamp( const String& aDateTimeStampValue )
   store::Item_t lItem;
   theItemFactory->createDateTimeStamp(lItem,  lString.c_str(), lString.size());
 
-  return &*lItem;
+  return lItem.getp();
 }
 
 
@@ -447,7 +447,7 @@ Item ItemFactoryImpl::createDouble ( double aValue )
   store::Item_t lItem;
   xs_double const lDouble(aValue);
   theItemFactory->createDouble(lItem, lDouble);
-  return &*lItem;
+  return lItem.getp();
 }
 
 
@@ -463,7 +463,7 @@ Item ItemFactoryImpl::createDouble ( const String& aValue )
   catch ( std::exception const& ) {
     // ignore
   }
-  return &*lItem;
+  return lItem.getp();
 }
 
 
@@ -473,7 +473,7 @@ Item ItemFactoryImpl::createDuration( const String& aValue )
   store::Item_t  lItem;
   theItemFactory->createDuration(lItem, lString.c_str(), lString.size());
 
-  return &*lItem;
+  return lItem.getp();
 }
 
 
@@ -491,7 +491,7 @@ Item ItemFactoryImpl::createDuration(
                                  aYears, aMonths, aDays,
                                  aHours, aMinutes, aSeconds);
 
-  return &*lItem;
+  return lItem.getp();
 }
 
 Item ItemFactoryImpl::createDayTimeDuration( const String& aValue )
@@ -500,7 +500,7 @@ Item ItemFactoryImpl::createDayTimeDuration( const String& aValue )
   store::Item_t  lItem;
   theItemFactory->createDayTimeDuration(lItem, lString.c_str(), lString.size());
 
-  return &*lItem;
+  return lItem.getp();
 }
 
 Item ItemFactoryImpl::createYearMonthDuration( const String& aValue )
@@ -509,7 +509,7 @@ Item ItemFactoryImpl::createYearMonthDuration( const String& aValue )
   store::Item_t  lItem;
   theItemFactory->createYearMonthDuration(lItem, lString.c_str(), lString.size());
 
-  return &*lItem;
+  return lItem.getp();
 }
 
 Item ItemFactoryImpl::createDocumentNode( const String& aBaseUri, const String& aDocUri )
@@ -523,7 +523,7 @@ Item ItemFactoryImpl::createDocumentNode( const String& aBaseUri, const String& 
   catch ( std::exception const& ) {
     // ignore
   }
-  return &*lItem;
+  return lItem.getp();
 }
 
 Item ItemFactoryImpl::createFloat ( const String& aValue )
@@ -537,7 +537,7 @@ Item ItemFactoryImpl::createFloat ( const String& aValue )
   catch ( std::exception const& ) {
     // ignore
   }
-  return &*lItem;
+  return lItem.getp();
 }
 
 
@@ -546,7 +546,7 @@ Item ItemFactoryImpl::createFloat ( float aValue )
   store::Item_t lItem;
   xs_float const lFloat(aValue);
   theItemFactory->createFloat(lItem, lFloat);
-  return &*lItem;
+  return lItem.getp();
 }
 
 
@@ -555,7 +555,7 @@ Item ItemFactoryImpl::createHexBinary( const char* aHexData, size_t aSize,
 {
   store::Item_t lItem;
   theItemFactory->createHexBinary(lItem, aHexData, aSize, aIsEncoded);
-  return &*lItem;
+  return lItem.getp();
 }
 
 
@@ -566,7 +566,7 @@ Item ItemFactoryImpl::createNegativeInteger ( long long aValue )
     xs_integer const lInteger(aValue);
     theItemFactory->createNegativeInteger(lItem, lInteger);
   }
-  return &*lItem;
+  return lItem.getp();
 }
 
 
@@ -575,7 +575,7 @@ Item ItemFactoryImpl::createNonNegativeInteger ( unsigned long long aValue )
   store::Item_t lItem;
   xs_nonNegativeInteger lInteger(aValue);
   theItemFactory->createNonNegativeInteger(lItem, lInteger);
-  return &*lItem;
+  return lItem.getp();
 }
 
 
@@ -586,7 +586,7 @@ Item ItemFactoryImpl::createNonPositiveInteger ( long long aValue )
     xs_integer const lInteger(aValue);
     theItemFactory->createNonPositiveInteger(lItem, lInteger);
   }
-  return &*lItem;
+  return lItem.getp();
 }
 
 
@@ -595,7 +595,7 @@ Item ItemFactoryImpl::createPositiveInteger ( unsigned long long aValue )
   store::Item_t lItem;
   xs_nonNegativeInteger lInteger(aValue);
   theItemFactory->createPositiveInteger(lItem, lInteger);
-  return &*lItem;
+  return lItem.getp();
 }
 
 
@@ -606,7 +606,7 @@ Item ItemFactoryImpl::createGDay ( const String& aValue )
 
   theItemFactory->createGDay(lItem,  lString.c_str(), lString.size());
 
-  return &*lItem;
+  return lItem.getp();
 }
 
 
@@ -616,7 +616,7 @@ Item ItemFactoryImpl::createGDay ( short aDay )
 
   theItemFactory->createGDay(lItem,  aDay );
 
-  return &*lItem;
+  return lItem.getp();
 }
 
 
@@ -626,7 +626,7 @@ Item ItemFactoryImpl::createGMonth ( short aMonth )
 
   theItemFactory->createGMonth(lItem,  aMonth );
 
-  return &*lItem;
+  return lItem.getp();
 }
 
 
@@ -637,7 +637,7 @@ Item ItemFactoryImpl::createGMonth ( const String& aValue )
 
   theItemFactory->createGMonth(lItem,  lString.c_str(), lString.size());
 
-  return &*lItem;
+  return lItem.getp();
 }
 
 
@@ -648,7 +648,7 @@ Item ItemFactoryImpl::createGMonthDay(const String& aValue)
 
   theItemFactory->createGMonthDay(lItem,  lString.c_str(), lString.size());
 
-  return &*lItem;
+  return lItem.getp();
 }
 
 
@@ -658,7 +658,7 @@ Item ItemFactoryImpl::createGMonthDay(short aMonth, short aDay)
 
   theItemFactory->createGMonthDay(lItem,  aMonth, aDay );
 
-  return &*lItem;
+  return lItem.getp();
 }
 
 
@@ -669,7 +669,7 @@ Item ItemFactoryImpl::createGYear(const String& aValue)
 
   theItemFactory->createGYear(lItem,  lString.c_str(), lString.size() );
 
-  return &*lItem;
+  return lItem.getp();
 }
 
 
@@ -679,7 +679,7 @@ Item ItemFactoryImpl::createGYear ( short aYear )
 
   theItemFactory->createGYear(lItem,  aYear );
 
-  return &*lItem;
+  return lItem.getp();
 }
 
 
@@ -690,7 +690,7 @@ Item ItemFactoryImpl::createGYearMonth ( const String& aValue )
 
   theItemFactory->createGYearMonth(lItem, lString.c_str(), lString.size());
 
-  return &*lItem;
+  return lItem.getp();
 }
 
 
@@ -700,7 +700,7 @@ Item ItemFactoryImpl::createGYearMonth ( short aYear, short aMonth )
 
   theItemFactory->createGYearMonth(lItem,  aYear, aMonth );
 
-  return &*lItem;
+  return lItem.getp();
 }
 
 
@@ -711,7 +711,7 @@ Item ItemFactoryImpl::createTime ( const String& aValue )
 
   theItemFactory->createTime(lItem,  lString.c_str(), lString.size() );
 
-  return &*lItem;
+  return lItem.getp();
 }
 
 
@@ -721,7 +721,7 @@ Item ItemFactoryImpl::createTime ( short aHour, short aMinute, double aSecond )
 
   theItemFactory->createTime(lItem,  aHour, aMinute, aSecond );
 
-  return &*lItem;
+  return lItem.getp();
 }
 
 
@@ -733,7 +733,7 @@ Item ItemFactoryImpl::createTime(
 {
   store::Item_t lItem;
   theItemFactory->createTime(lItem,  aHour, aMinute, aSecond, aTimezone );
-  return &*lItem;
+  return lItem.getp();
 }
 
 
@@ -741,7 +741,7 @@ Item ItemFactoryImpl::createUnsignedByte(const unsigned char aValue)
 {
   store::Item_t lItem;
   theItemFactory->createUnsignedByte(lItem, aValue);
-  return &*lItem;
+  return lItem.getp();
 }
 
 
@@ -753,7 +753,7 @@ Item ItemFactoryImpl::createUnsignedInt(unsigned int aValue)
     theItemFactory->createUnsignedInt(lItem, aValue);
   }
 
-  return &*lItem;
+  return lItem.getp();
 }
 
 
@@ -761,7 +761,7 @@ Item ItemFactoryImpl::createUnsignedLong(unsigned long long aValue)
 {
   store::Item_t lItem;
   theItemFactory->createUnsignedLong(lItem, aValue);
-  return &*lItem;
+  return lItem.getp();
 }
 
 
@@ -769,7 +769,7 @@ Item ItemFactoryImpl::createUnsignedShort(unsigned short aValue)
 {
   store::Item_t lItem;
   theItemFactory->createUnsignedShort(lItem, aValue);
-  return &*lItem;
+  return lItem.getp();
 }
 
 void convertNsBindings(
@@ -820,7 +820,7 @@ zorba::Item ItemFactoryImpl::createElementNode(
                                     aHasEmptyValue,
                                     lNsBindings,
                                     lBaseUri);
-  return &*lItem;
+  return lItem.getp();
 }
 
 void ItemFactoryImpl::assignElementTypedValue(
@@ -866,7 +866,7 @@ zorba::Item ItemFactoryImpl::createAttributeNode(
                                       lNodeName,
                                       lTypeName,
                                       lTypedValue);
-  return &*lItem;
+  return lItem.getp();
 }
 
 
@@ -887,7 +887,7 @@ zorba::Item ItemFactoryImpl::createAttributeNode(
                                       lNodeName,
                                       lTypeName,
                                       lTypedValue);
-  return &*lItem;
+  return lItem.getp();
 }
 
 
@@ -898,7 +898,7 @@ zorba::Item ItemFactoryImpl::createCommentNode(Item aParent, String &aContent)
   theItemFactory->createCommentNode(lItem,
                                Unmarshaller::getInternalItem(aParent),
                                lContent);
-  return &*lItem;
+  return lItem.getp();
 }
 
 
@@ -913,7 +913,7 @@ zorba::Item ItemFactoryImpl::createPiNode(Item aParent, String &aTarget, String 
                                lTarget,
                                lContent,
                                lBaseUri);
-  return &*lItem;
+  return lItem.getp();
 }
 
 
@@ -924,7 +924,7 @@ zorba::Item ItemFactoryImpl::createTextNode(Item parent, String content)
   theItemFactory->createTextNode(lItem,
                                  Unmarshaller::getInternalItem(parent),
                                  lContent);
-  return &*lItem;
+  return lItem.getp();
 }
 
 zorba::Item ItemFactoryImpl::createUntypedAtomic(const String& value)
@@ -932,14 +932,14 @@ zorba::Item ItemFactoryImpl::createUntypedAtomic(const String& value)
   store::Item_t lItem;
   zstring &lValue = Unmarshaller::getInternalString(value);
   theItemFactory->createUntypedAtomic(lItem, lValue);
-  return &*lItem;
+  return lItem.getp();
 }
 
 zorba::Item ItemFactoryImpl::createJSONNull()
 {
   store::Item_t lItem;
   theItemFactory->createJSONNull(lItem);
-  return &*lItem;
+  return lItem.getp();
 }
 
 zorba::Item ItemFactoryImpl::createJSONObject(
@@ -964,7 +964,7 @@ zorba::Item ItemFactoryImpl::createJSONObject(
   store::Item_t lItem;
   theItemFactory->createJSONObject(lItem, names, values);
 
-  return &*lItem;
+  return lItem.getp();
 }
 
 
@@ -991,7 +991,7 @@ zorba::Item ItemFactoryImpl::createJSONArray(std::vector<Item>& aItems)
   store::Item_t lItem;
   theItemFactory->createJSONArray(lItem, items);
 
-  return &*lItem;
+  return lItem.getp();
 }
 
 zorba::Item ItemFactoryImpl::createUserTypedAtomicItem(
@@ -1002,7 +1002,7 @@ zorba::Item ItemFactoryImpl::createUserTypedAtomicItem(
   store::Item_t lBaseItem = Unmarshaller::getInternalItem(aBaseItem);
   store::Item_t lTypeName = Unmarshaller::getInternalItem(aTypeName);
   theItemFactory->createUserTypedAtomicItem(lRes, lBaseItem, lTypeName);
-  return &*lRes;
+  return lRes.getp();
 }
 
 } // namespace zorba

@@ -43,7 +43,7 @@ static bool destroy_called;
 namespace std {
 
 template<> struct less<char const*> :
-  std::binary_function<char const*,char const*,bool>
+  zorba::internal::ztd::binary_function<char const*,char const*,bool>
 {
   less() { }
 
