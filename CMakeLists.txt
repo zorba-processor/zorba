@@ -12,6 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+cmake_minimum_required(VERSION 3.20)
+
+SET(CMAKE_CXX_STANDARD 23 CACHE STRING "C++ standard")
+SET(CMAKE_CXX_STANDARD_REQUIRED ON)
+SET(CMAKE_CXX_EXTENSIONS OFF)
+
 PROJECT(zorba)
 ENABLE_TESTING()
 INCLUDE(CTest)
@@ -31,16 +37,6 @@ SET(CMAKE_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
 
 INCLUDE(${CMAKE_SOURCE_DIR}/cmake_modules/CMakeCompareVersionStrings.cmake)
 
-cmake_minimum_required(VERSION 2.6.4)
-IF(COMMAND cmake_policy)
-  cmake_policy(SET CMP0003 NEW)
-  cmake_policy(SET CMP0002 OLD)
-  # We want CMake to correctly count empty list elements.
-  cmake_policy(SET CMP0007 NEW)
-  IF(CMAKE_VERSION VERSION_GREATER 3.0.0 OR CMAKE_VERSION VERSION_EQUAL 3.0.0)
-    cmake_policy(SET CMP0026 OLD)
-  ENDIF(CMAKE_VERSION VERSION_GREATER 3.0.0 OR CMAKE_VERSION VERSION_EQUAL 3.0.0)  
-ENDIF(COMMAND cmake_policy)
 
 IF("${CMAKE_SYSTEM_NAME}" MATCHES "Linux")
   SET(LINUX "${CMAKE_SYSTEM}")
