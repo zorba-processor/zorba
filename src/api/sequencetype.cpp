@@ -512,6 +512,22 @@ SequenceType::SequenceType(const SequenceType& other)
 }
 
 
+SequenceType& SequenceType::operator=(const SequenceType& other)
+{
+  if (theType != other.theType)
+  {
+    if (other.theType)
+      RCHelper::addReference(other.theType);
+
+    if (theType)
+      RCHelper::removeReference(const_cast<XQType*>(theType));
+
+    theType = other.theType;
+  }
+  return *this;
+}
+
+
 SequenceType::~SequenceType()
 {
   if (theType)

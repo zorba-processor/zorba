@@ -213,6 +213,11 @@ public:
   SequenceType(const SequenceType& other);
 
   /**
+   * Copy assignment
+   */
+  SequenceType& operator=(const SequenceType& other);
+
+  /**
    * \brief Destructor
    */
   ~SequenceType();

@@ -245,6 +245,8 @@ public:
   public:
     iterator() : theHashTab(NULL), thePos(-1) {}
 
+    iterator(const iterator& it) = default;
+
     iterator& operator = (const iterator& it)
     {
       if(&it != this)

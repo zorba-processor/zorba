@@ -96,6 +96,8 @@ public:
 
   URI (const URI& to_copy);
 
+  URI& operator=(const URI& to_copy) = default;
+
   URI();
 
   ~URI();
