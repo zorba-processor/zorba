@@ -2,6 +2,7 @@ name: CI
 
 on:
   push:
+    branches: [master]
   pull_request:
   workflow_dispatch:
 
@@ -16,9 +17,8 @@ jobs:
   linux:
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.runner }}
-    # arm64 runs on the Ubuntu 24.04 builder (Arch Linux has no official arm64
-    # image); it stays non-blocking until it has a green history.
-    continue-on-error: ${{ matrix.experimental }}
+    # arm64 runs on the Ubuntu 24.04 builder: Arch Linux has no official
+    # arm64 image.
     strategy:
       fail-fast: false
       matrix:
@@ -27,12 +27,10 @@ jobs:
             runner: ubuntu-24.04
             builder: docker/builder-latest
             cache: linux-amd64-latest
-            experimental: false
           - name: linux-arm64 (Ubuntu 24.04)
             runner: ubuntu-24.04-arm
             builder: docker/builder
             cache: linux-arm64-ubuntu
-            experimental: true
     steps:
       - uses: actions/checkout@v4
 
