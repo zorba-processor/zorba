@@ -375,22 +375,22 @@ namespace Loki
         typedef int IntType;
 
         static IntType AtomicAdd(volatile IntType& lval, const IntType val)
-        { return lval += val; }
+        { lval = lval + val; return lval; }
 
         static IntType AtomicSubtract(volatile IntType& lval, const IntType val)
-        { return lval -= val; }
+        { lval = lval - val; return lval; }
 
         static IntType AtomicMultiply(volatile IntType& lval, const IntType val)
-        { return lval *= val; }
+        { lval = lval * val; return lval; }
 
         static IntType AtomicDivide(volatile IntType& lval, const IntType val)
-        { return lval /= val; }
+        { lval = lval / val; return lval; }
 
         static IntType AtomicIncrement(volatile IntType& lval)
-        { return ++lval; }
+        { lval = lval + 1; return lval; }
 
         static IntType AtomicDecrement(volatile IntType& lval)
-        { return --lval; }
+        { lval = lval - 1; return lval; }
 
         static void AtomicAssign(volatile IntType & lval, const IntType val)
         { lval = val; }
@@ -400,42 +400,42 @@ namespace Loki
 
         static IntType AtomicAdd(volatile IntType& lval, const IntType val, const IntType compare, bool & matches )
         {
-            lval += val;
+            lval = lval + val;
             matches = ( lval == compare );
             return lval;
         }
 
         static IntType AtomicSubtract(volatile IntType& lval, const IntType val, const IntType compare, bool & matches )
         {
-            lval -= val;
+            lval = lval - val;
             matches = ( lval == compare );
             return lval;
         }
 
         static IntType AtomicMultiply(volatile IntType& lval, const IntType val, const IntType compare, bool & matches )
         {
-            lval *= val;
+            lval = lval * val;
             matches = ( lval == compare );
             return lval;
         }
 
         static IntType AtomicDivide(volatile IntType& lval, const IntType val, const IntType compare, bool & matches )
         {
-            lval /= val;
+            lval = lval / val;
             matches = ( lval == compare );
             return lval;
         }
 
         static IntType AtomicIncrement(volatile IntType& lval, const IntType compare, bool & matches )
         {
-            ++lval;
+            lval = lval + 1;
             matches = ( lval == compare );
             return lval;
         }
 
         static IntType AtomicDecrement(volatile IntType& lval, const IntType compare, bool & matches )
         {
-            --lval;
+            lval = lval - 1;
             matches = ( lval == compare );
             return lval;
         }
