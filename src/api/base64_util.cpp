@@ -300,8 +300,7 @@ size_type encode( char const *from, size_type from_len, char *to ) {
     // long and encode that buffer so encode_chunk() remains special-case-free
     // (and thus faster) for most of the encoding.
     //
-    char from_temp[3];
-    from_temp[1] = from_temp[2] = '\0';
+    char from_temp[3] = { '\0', '\0', '\0' };
     std::copy( from, from + chunk_len, from_temp );
     encode_chunk( from_temp, to );
     //
