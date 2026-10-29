@@ -149,7 +149,7 @@ void JSONItem::detachFromCollection()
   ASSERT_INVARIANT();
   
   
-  CollectionTreeInfo* collectionInfo = theCollectionInfo;
+  CollectionTreeInfoWithTreeId* collectionInfo = theCollectionInfo;
   // Detach
   assert(collectionInfo);
   setCollectionTreeInfo(NULL);
