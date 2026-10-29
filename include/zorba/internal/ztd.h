@@ -17,6 +17,7 @@
 #ifndef ZORBA_INTERNAL_ZTD_H
 #define ZORBA_INTERNAL_ZTD_H
 
+#include <concepts>
 #include <cstring>
 #include <functional>
 #include <sstream>
@@ -136,15 +137,17 @@ namespace has_insertion_operator_impl {
    */
   template<typename T>
   class has_insertion_operator {
-    static std::ostream &s;
-    static T const &t;
   public:
     /**
      * This is \c true only when the type \c T has a global
      * \c operator&lt;&lt;() declared for it.
+     * A deleted overload (e.g., for \c char16_t* since C++20) yields
+     * \c false rather than a hard error.
      * \hideinitializer
      */
-    static bool const value = sizeof( defined( s << t ) ) == sizeof( yes );
+    static bool const value = requires( std::ostream &s, T const &t ) {
+      { s << t } -> std::same_as<std::ostream&>;
+    };
   };
 } // namespace has_insertion_operator_impl
 

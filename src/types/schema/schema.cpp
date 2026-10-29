@@ -568,7 +568,7 @@ void Schema::registerXSD(
   catch (const XMLException& e)
   {
     RAISE_ERROR(zerr::ZXQP0033_SCHEMA_XML_ERROR, loc,
-    ERROR_PARAMS(xsdURL, e.getMessage()));
+    ERROR_PARAMS(xsdURL, StrX(e.getMessage()).localFormOrDefault("")));
   }
   catch (const ZorbaException&)
   {
