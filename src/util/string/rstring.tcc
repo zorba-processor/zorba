@@ -71,7 +71,7 @@ rstring<Rep>::append( rstring<Rep2> const &s, size_type s_pos, size_type s_n ) {
 // RSTRING_APPEND_SS_2ST_X
 template<class Rep> rstring<Rep>&
 rstring<Rep>::append( std_string const &s, size_type s_pos, size_type n ) {
-  s.at( s_pos );
+  static_cast<void>( s.at( s_pos ) );   // bounds check (throws)
   n = limit_n( s_pos, s.size(), n );
   if ( n )
     append_safe( s.data() + s_pos, n );
