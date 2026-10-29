@@ -55,6 +55,7 @@ jobs:
             --cap-add SYS_PTRACE --security-opt seccomp=unconfined \
             -e ZORBA_HTTP_TEST_SERVER=zorba-http-test:8080 \
             -e CCACHE_DIR=/src/.ccache \
+            -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" \
             -v "$PWD":/src -w /src zorba-builder:ci sh -c '
               set -e
               cmake --preset asan
@@ -62,13 +63,17 @@ jobs:
               mkdir -p build/asan/sanitizer-logs
               ctest --preset asan -j"$(nproc)" --output-junit junit.xml \
                 > build/asan/ctest.log 2>&1 || true
-              tail -5 build/asan/ctest.log'
+              sed -n "/tests passed/,\$p" build/asan/ctest.log
+              # The sanitizer runtime writes logs as root with mode 0600;
+              # hand them to the runner user so later steps can read them.
+              chown -R "$HOST_UID:$HOST_GID" build/asan/sanitizer-logs \
+                build/asan/ctest.log build/asan/junit.xml .ccache || true'
 
       - name: Summarize
         if: always()
         run: |
           python3 scripts/summarize_sanitizer_logs.py \
-            build/asan/sanitizer-logs "$PWD" 60 | tee -a "$GITHUB_STEP_SUMMARY"
+            build/asan/sanitizer-logs /src 60 | tee -a "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/upload-artifact@v4
         if: always()
