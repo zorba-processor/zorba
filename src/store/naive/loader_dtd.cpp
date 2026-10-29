@@ -1563,7 +1563,7 @@ void DtdXmlLoader::startElement(
         baseUri = pathStack.top().theBaseUri;
         zstring localUri;
         attrNode->theTypedValue->getStringValue2(localUri);
-        if (baseUri == NULL)
+        if (baseUri.empty())
         {
           elemNode->addBaseUriProperty(localUri, baseUri);
         }

@@ -3705,7 +3705,7 @@ void ElementNode::adjustBaseUriProperty(
   ZORBA_FATAL(!absUri.empty(), "");
 
   store::Item_t typedValue;
-  if (relUri == NULL)
+  if (relUri.empty())
   {
     GET_FACTORY().createAnyURI(typedValue, absUri);
   }
