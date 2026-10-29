@@ -31,8 +31,9 @@ test_audit_1(zorba::Zorba* aZorba)
   std::vector<zorba::String> property_names;
   zorba::audit::Configuration::getPropertyNames(property_names);
 
-  zorba::audit::Configuration::enableProperty(config, property_names,
-                                              "xquery/compilation/filename");
+  [[maybe_unused]] bool lIsStatic;
+  lIsStatic = zorba::audit::Configuration::enableProperty(config, property_names,
+                                                          "xquery/compilation/filename");
   assert(lIsStatic);
   lIsStatic = zorba::audit::Configuration::enableProperty(config, property_names,
                                                           "xquery/compilation/parse-duration");
