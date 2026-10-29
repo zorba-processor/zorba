@@ -474,8 +474,9 @@ CollectionImpl::getAnnotations(std::vector<Annotation_t>& aAnnotations) const
 
       std::vector<store::Item_t> lLiterals = lSAnn->theLiterals;
 
-      aAnnotations.push_back(
-      new AnnotationImpl(new AnnotationInternal(lSAnn->theName, lLiterals)));
+      // AnnotationImpl stores its own copy of the given AnnotationInternal.
+      AnnotationInternal lAnn(lSAnn->theName, lLiterals);
+      aAnnotations.push_back(new AnnotationImpl(&lAnn));
     }
   }
   ZORBA_DM_CATCH
