@@ -79,9 +79,14 @@ public:
    * A %const_iterator is used to iterate over the elements of an encoded_list
    * decoding them on the fly.
    */
-  class const_iterator :
-    public std::iterator<std::forward_iterator_tag,value_type> {
+  class const_iterator {
   public:
+    typedef std::forward_iterator_tag iterator_category;
+    typedef encoded_list::value_type value_type;
+    typedef std::ptrdiff_t difference_type;
+    typedef const_pointer pointer;
+    typedef const_reference reference;
+
     const_iterator() : remaining_( 0 ), cur_ptr_( nullptr ) { }
 
     const_reference operator*() const {

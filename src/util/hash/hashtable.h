@@ -105,9 +105,14 @@ public:
 
   ////////// local_iterator ///////////////////////////////////////////////////
 
-  class local_iterator :
-    public std::iterator<std::forward_iterator_tag,value_type> {
+  class local_iterator {
   public:
+    typedef std::forward_iterator_tag iterator_category;
+    typedef hashtable_base::value_type value_type;
+    typedef hashtable_base::difference_type difference_type;
+    typedef hashtable_base::pointer pointer;
+    typedef hashtable_base::reference reference;
+
     local_iterator() : cur_node_( nullptr ) { }
 
     reference operator*() const;
@@ -132,9 +137,14 @@ public:
 
   ////////// const_local_iterator /////////////////////////////////////////////
 
-  class const_local_iterator :
-    public std::iterator<std::forward_iterator_tag,value_type const> {
+  class const_local_iterator {
   public:
+    typedef std::forward_iterator_tag iterator_category;
+    typedef hashtable_base::value_type value_type;
+    typedef hashtable_base::difference_type difference_type;
+    typedef hashtable_base::const_pointer pointer;
+    typedef hashtable_base::const_reference reference;
+
     const_local_iterator() : cur_node_( nullptr ) { }
 
     const_reference operator*() const;
@@ -161,8 +171,14 @@ public:
 
   ////////// iterator /////////////////////////////////////////////////////////
 
-  class iterator : public std::iterator<std::forward_iterator_tag,value_type> {
+  class iterator {
   public:
+    typedef std::forward_iterator_tag iterator_category;
+    typedef hashtable_base::value_type value_type;
+    typedef hashtable_base::difference_type difference_type;
+    typedef hashtable_base::pointer pointer;
+    typedef hashtable_base::reference reference;
+
     iterator() : cur_bkt_( nullptr ), cur_node_( nullptr ) { }
 
     reference operator*() const;
@@ -191,9 +207,14 @@ public:
 
   ////////// const_iterator ///////////////////////////////////////////////////
 
-  class const_iterator :
-    public std::iterator<std::forward_iterator_tag,value_type const> {
+  class const_iterator {
   public:
+    typedef std::forward_iterator_tag iterator_category;
+    typedef hashtable_base::value_type value_type;
+    typedef hashtable_base::difference_type difference_type;
+    typedef hashtable_base::const_pointer pointer;
+    typedef hashtable_base::const_reference reference;
+
     const_iterator() : cur_bkt_( nullptr ), cur_node_( nullptr ) { }
     const_iterator( iterator const& );
 

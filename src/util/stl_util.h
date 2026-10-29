@@ -61,9 +61,13 @@ using internal::ztd::less;
  * @tparam DerivedType The type of the class deriving from this.
  */
 template<class ContainerType,class DerivedType>
-class back_insert_iterator_base :
-  public std::iterator<std::output_iterator_tag,void,void,void,void> {
+class back_insert_iterator_base {
 public:
+  typedef std::output_iterator_tag iterator_category;
+  typedef void value_type;
+  typedef void difference_type;
+  typedef void pointer;
+  typedef void reference;
   typedef ContainerType container_type;
 
   DerivedType& operator*() {

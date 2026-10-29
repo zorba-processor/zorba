@@ -71,9 +71,14 @@ public:
   class const_iterator;
   friend class const_iterator;
 
-  class const_iterator :
-    public std::iterator<std::random_access_iterator_tag,value_type> {
+  class const_iterator {
   public:
+    typedef std::random_access_iterator_tag iterator_category;
+    typedef db_segment::value_type value_type;
+    typedef db_segment::difference_type difference_type;
+    typedef db_segment::const_pointer pointer;
+    typedef db_segment::const_reference reference;
+
     const_iterator() : seg_( nullptr ), i_( 0 ) {
     }
 
