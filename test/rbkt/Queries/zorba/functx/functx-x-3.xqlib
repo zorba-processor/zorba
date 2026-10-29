@@ -1,8 +1,8 @@
-module namespace def = "http://www.28msec.com/compile-time/functx-x-3";
+module namespace def = "http://test.example.com/compile-time/functx-x-3";
 
-import module namespace functx1 = "http://www.28msec.com/compile-time/lib/functx1" at "functx1.xqlib";
-import module namespace functx2 = "http://www.28msec.com/compile-time/lib/functx2" at "functx2.xqlib";
-import module namespace functx3 = "http://www.28msec.com/compile-time/lib/functx3" at "functx3.xqlib";
+import module namespace functx1 = "http://test.example.com/compile-time/lib/functx1" at "functx1.xqlib";
+import module namespace functx2 = "http://test.example.com/compile-time/lib/functx2" at "functx2.xqlib";
+import module namespace functx3 = "http://test.example.com/compile-time/lib/functx3" at "functx3.xqlib";
 
 declare namespace ann = "http://zorba.io/annotations";
 

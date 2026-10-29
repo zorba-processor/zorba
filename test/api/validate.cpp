@@ -25,6 +25,15 @@
 #include <zorba/uri_resolvers.h>
 #include <zorba/iterator.h>
 #include <zorba/zorba_exception.h>
+#include <string>
+
+// host:port of the HTTP test server (see test/http-test-data).
+static std::string http_test_server_url(char const *path)
+{
+  char const *const env = std::getenv("ZORBA_HTTP_TEST_SERVER");
+  return std::string("http://")
+    + (env && *env ? env : ZORBA_HTTP_TEST_SERVER_DEFAULT) + path;
+}
 
 using namespace zorba;
 
@@ -41,7 +50,7 @@ public:
       return;
     }
     if(aUri == "http://www.zorba-xquery.com/helloworld") {
-      oUris.push_back("http://zorbatest.28.io:8080/tutorial/helloworld.xsd");
+      oUris.push_back(http_test_server_url("/tutorial/helloworld.xsd"));
     }
   }
 };

@@ -8,7 +8,7 @@
  :
  : @see http://example.com
  :)
-module namespace gdata="http://www.28msec.com/modules/gdata";
+module namespace gdata="http://test.example.com/modules/gdata";
 
 
 (:~
@@ -25,7 +25,7 @@ declare function gdata:login($account as xs:string*, $password as xs:string+, $s
                                                                                 <part name="Email">{$account}</part>
                                                                                 <part name="Passwd">{$password}</part>
                                                                                 <part name="service">{$service}</part>
-                                                                                <part name="source">28msec.com</part>
+                                                                                <part name="source">example.com</part>
                                                                             </payload>)
     return
         if($result/rest:status-code/text()="200") then

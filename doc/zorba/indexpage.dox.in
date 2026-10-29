@@ -70,7 +70,7 @@
 
 \section zorbaspec Zorba Proprietary Specifications
   - \ref xqddf
-  - \ref scripting_spec (also see our \ref scripting_tutorial "Tutorial")
+  - \ref scripting_tutorial "XQuery Scripting Tutorial"
   - \ref options_and_annotations
 
 \section tutorials Examples

@@ -1,5 +1,5 @@
 (: Schema Imports :)
-import schema namespace oas="http://www.28msec.com/modules/oauth/server" at
+import schema namespace oas="http://test.example.com/modules/oauth/server" at
 "server.xsd";
 
 (: remove old tokens (request and authorized-request tokens) :)

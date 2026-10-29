@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <sstream>
 #include <iostream>
 #include <fstream>
 #include <vector>
@@ -527,9 +528,12 @@ main(int argc, char** argv)
       std::cout.flush();
       size_t i = 1;
       bool lResultMatches = false;
-      for (std::vector<std::string>::const_iterator lIter = lRefFiles.begin();
+      for (std::vector<std::string>::iterator lIter = lRefFiles.begin();
            lIter != lRefFiles.end(); ++lIter) 
       {
+        std::ostringstream lExpanded;
+        lExpanded << lResultFile << ".ref" << i;
+        *lIter = expand_ref_file(*lIter, lExpanded.str());
         int lLine, lCol; // where do the files differ
         std::string lRefLine, lResultLine;
         bool lRes = zorba::fileEquals(lIter->c_str(),

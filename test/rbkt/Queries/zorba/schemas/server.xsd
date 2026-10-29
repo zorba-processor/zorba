@@ -1,6 +1,6 @@
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
-xmlns:oas="http://www.28msec.com/modules/oauth/server"
-targetNamespace="http://www.28msec.com/modules/oauth/server"
+xmlns:oas="http://test.example.com/modules/oauth/server"
+targetNamespace="http://test.example.com/modules/oauth/server"
 
 elementFormDefault="qualified" >
 

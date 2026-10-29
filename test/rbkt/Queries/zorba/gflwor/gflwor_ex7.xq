@@ -3,7 +3,7 @@ import module namespace dml = "http://zorba.io/modules/store/static/collections/
 
 import module namespace util = "http://zorba.io/modules/reflection";
 
-import module namespace data = "http://www.28msec.com/WindyCityDBDemo/lib/data" at "data.xqlib";
+import module namespace data = "http://test.example.com/WindyCityDBDemo/lib/data" at "data.xqlib";
 
 declare namespace err = "http://www.w3.org/2005/xqt-errors";
 

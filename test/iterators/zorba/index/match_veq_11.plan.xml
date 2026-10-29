@@ -23,7 +23,7 @@
   <FLWORIterator>
     <ForVariable name="$$context-item">
       <ZorbaCollectionIterator>
-        <SingletonIterator value="xs:QName(http://www.28msec.com/benchmark/lib/custacc,ca,custaccs)"/>
+        <SingletonIterator value="xs:QName(http://test.example.com/benchmark/lib/custacc,ca,custaccs)"/>
       </ZorbaCollectionIterator>
     </ForVariable>
     <ReturnClause>
@@ -65,7 +65,7 @@
   <FLWORIterator>
     <ForVariable name="$$context-item">
       <ZorbaCollectionIterator>
-        <SingletonIterator value="xs:QName(http://www.28msec.com/benchmark/lib/custacc,ca,custaccs)"/>
+        <SingletonIterator value="xs:QName(http://test.example.com/benchmark/lib/custacc,ca,custaccs)"/>
       </ZorbaCollectionIterator>
     </ForVariable>
     <ReturnClause>
@@ -92,26 +92,26 @@
 <iterator-tree description="main query">
   <SequentialIterator>
     <CtxVarDeclareIterator varid="4" varname="ca:custaccs">
-      <SingletonIterator value="xs:QName(http://www.28msec.com/benchmark/lib/custacc,ca,custaccs)"/>
+      <SingletonIterator value="xs:QName(http://test.example.com/benchmark/lib/custacc,ca,custaccs)"/>
     </CtxVarDeclareIterator>
     <CtxVarDeclareIterator varid="5" varname="ca:orders">
-      <SingletonIterator value="xs:QName(http://www.28msec.com/benchmark/lib/custacc,ca,orders)"/>
+      <SingletonIterator value="xs:QName(http://test.example.com/benchmark/lib/custacc,ca,orders)"/>
     </CtxVarDeclareIterator>
     <CtxVarDeclareIterator varid="6" varname="ca:index-custaccs-str">
-      <SingletonIterator value="xs:QName(http://www.28msec.com/benchmark/lib/custacc,ca,index-custaccs-str)"/>
+      <SingletonIterator value="xs:QName(http://test.example.com/benchmark/lib/custacc,ca,index-custaccs-str)"/>
     </CtxVarDeclareIterator>
     <CtxVarDeclareIterator varid="7" varname="ca:index-custaccs-int">
-      <SingletonIterator value="xs:QName(http://www.28msec.com/benchmark/lib/custacc,ca,index-custaccs-int)"/>
+      <SingletonIterator value="xs:QName(http://test.example.com/benchmark/lib/custacc,ca,index-custaccs-int)"/>
     </CtxVarDeclareIterator>
     <SequentialIterator>
       <ApplyIterator>
         <ZorbaCreateCollectionIterator>
-          <SingletonIterator value="xs:QName(http://www.28msec.com/benchmark/lib/custacc,ca,custaccs)"/>
+          <SingletonIterator value="xs:QName(http://test.example.com/benchmark/lib/custacc,ca,custaccs)"/>
         </ZorbaCreateCollectionIterator>
       </ApplyIterator>
       <ApplyIterator>
         <ZorbaCreateCollectionIterator>
-          <SingletonIterator value="xs:QName(http://www.28msec.com/benchmark/lib/custacc,ca,orders)"/>
+          <SingletonIterator value="xs:QName(http://test.example.com/benchmark/lib/custacc,ca,orders)"/>
         </ZorbaCreateCollectionIterator>
       </ApplyIterator>
       <ApplyIterator>
@@ -148,7 +148,7 @@
           <FLWORIterator>
             <ForVariable name="$$context-item">
               <ProbeIndexPointValueIterator>
-                <SingletonIterator value="xs:QName(http://www.28msec.com/benchmark/lib/custacc,ca,index-custaccs-str)"/>
+                <SingletonIterator value="xs:QName(http://test.example.com/benchmark/lib/custacc,ca,index-custaccs-str)"/>
                 <SingletonIterator value="xs:integer(4)"/>
               </ProbeIndexPointValueIterator>
             </ForVariable>

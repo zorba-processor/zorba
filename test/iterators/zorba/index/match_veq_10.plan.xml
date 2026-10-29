@@ -2,7 +2,7 @@
   <FLWORIterator>
     <ForVariable name="$$context-item">
       <ZorbaCollectionIterator>
-        <SingletonIterator value="xs:QName(http://28.io/collections,db28,faqs)"/>
+        <SingletonIterator value="xs:QName(http://zorba-tests.example.org/collections,db28,faqs)"/>
       </ZorbaCollectionIterator>
     </ForVariable>
     <ReturnClause>
@@ -33,17 +33,17 @@
   <SequentialIterator>
     <ApplyIterator>
       <ZorbaCreateCollectionIterator>
-        <SingletonIterator value="xs:QName(http://28.io/collections,db28,faqs)"/>
+        <SingletonIterator value="xs:QName(http://zorba-tests.example.org/collections,db28,faqs)"/>
       </ZorbaCreateCollectionIterator>
     </ApplyIterator>
     <ApplyIterator>
       <ZorbaCreateCollectionIterator>
-        <SingletonIterator value="xs:QName(http://28.io/collections,db28,answers)"/>
+        <SingletonIterator value="xs:QName(http://zorba-tests.example.org/collections,db28,answers)"/>
       </ZorbaCreateCollectionIterator>
     </ApplyIterator>
     <ApplyIterator>
       <CreateIndexIterator>
-        <SingletonIterator value="xs:QName(http://28.io/collections,db28,question-id-idx)"/>
+        <SingletonIterator value="xs:QName(http://zorba-tests.example.org/collections,db28,question-id-idx)"/>
       </CreateIndexIterator>
     </ApplyIterator>
     <TupleStreamIterator>
@@ -62,7 +62,7 @@
                 <ForVariable name="answers"/>
                 <TupleSourceIterator/>
                 <ZorbaCollectionIterator>
-                  <SingletonIterator value="xs:QName(http://28.io/collections,db28,answers)"/>
+                  <SingletonIterator value="xs:QName(http://zorba-tests.example.org/collections,db28,answers)"/>
                 </ZorbaCollectionIterator>
               </ForIterator>
               <Spec>
@@ -100,7 +100,7 @@
             <FLWORIterator>
               <ForVariable name="$$context-item">
                 <ProbeIndexRangeValueIterator>
-                  <SingletonIterator value="xs:QName(http://28.io/collections,db28,question-id-idx)"/>
+                  <SingletonIterator value="xs:QName(http://zorba-tests.example.org/collections,db28,question-id-idx)"/>
                   <UnhoistIterator>
                     <LetVarIterator varname="$$opt_temp_0"/>
                   </UnhoistIterator>

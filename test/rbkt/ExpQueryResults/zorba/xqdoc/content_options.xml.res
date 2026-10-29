@@ -5,12 +5,12 @@
     <xqdoc:version>1.0</xqdoc:version>
   </xqdoc:control>
   <xqdoc:module type="library">
-    <xqdoc:uri>http://www.28msec.com/modules/gdata</xqdoc:uri>
+    <xqdoc:uri>http://test.example.com/modules/gdata</xqdoc:uri>
     <xqdoc:name></xqdoc:name>
     <xqdoc:custom tag="namespaces">
       <xqdoc:namespace prefix="atom" uri="http://www.w3.org/2005/Atom" isSchema="true"/>
-      <xqdoc:namespace prefix="atompub" uri="http://www.28msec.com/modules/atom" isSchema="false"/>
-      <xqdoc:namespace prefix="gdata" uri="http://www.28msec.com/modules/gdata" isSchema="false"/>
+      <xqdoc:namespace prefix="atompub" uri="http://test.example.com/modules/atom" isSchema="false"/>
+      <xqdoc:namespace prefix="gdata" uri="http://test.example.com/modules/gdata" isSchema="false"/>
       <xqdoc:namespace prefix="rest" uri="http://www.zorba-xquery.com/zorba/rest-functions" isSchema="false"/>
       <xqdoc:namespace prefix="zorba" uri="http://www.zorba-xquery.com/zorba/internal-functions" isSchema="false"/>
     </xqdoc:custom>

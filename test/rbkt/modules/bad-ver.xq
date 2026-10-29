@@ -2,7 +2,7 @@ xquery version "3.0";
 
 (: This module has an illegal version specification :)
 
-module namespace vm = "http://zorba-tests.28.io/modules/bad-ver";
+module namespace vm = "http://zorba-tests.example.org/modules/bad-ver";
 
 declare namespace ver = "http://zorba.io/options/versioning";
 declare option ver:module-version "1.4.";

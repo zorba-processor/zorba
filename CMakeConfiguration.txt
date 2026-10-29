@@ -83,6 +83,10 @@ ELSE (DEFINED UNIX)
   ENDIF("${ZORBA_WIN_PLATFORM}" STREQUAL "pocketpc" OR "${ZORBA_WIN_PLATFORM}" STREQUAL "smartphone")
 ENDIF (DEFINED UNIX)
 
+SET(ZORBA_HTTP_TEST_SERVER "localhost:8080" CACHE STRING
+  "host:port of the HTTP server for http-client tests (see test/http-test-data); overridable at run time with the ZORBA_HTTP_TEST_SERVER environment variable")
+MARK_AS_ADVANCED(ZORBA_HTTP_TEST_SERVER)
+
 SET(ZORBA_WITH_FILE_ACCESS ON CACHE BOOL "compile zorba and allow loading documents from the filesystem")
 MESSAGE(STATUS "ZORBA_WITH_FILE_ACCESS [ON/OFF]:      " ${ZORBA_WITH_FILE_ACCESS})
 

@@ -1,4 +1,4 @@
-import module namespace db28 = "http://28.io/collections" at "match_vrange_06.xqlib";
+import module namespace db28 = "http://zorba-tests.example.org/collections" at "match_vrange_06.xqlib";
 
 import module namespace ddl =
   "http://zorba.io/modules/store/static/collections/ddl";

@@ -1,0 +1,30 @@
+module namespace nb = "http://zorba-tests.example.org/noteboard";
+
+import module namespace dml = "http://zorba.io/modules/store/static/collections/dml";
+
+declare namespace an = "http://zorba.io/annotations";
+
+(: Notes are kept in a statically declared collection. :)
+declare collection nb:notes as element(note)*;
+
+declare variable $nb:notes as xs:QName := xs:QName("nb:notes");
+
+declare %an:sequential function nb:post($text as xs:string) as element(ul)
+{
+  dml:insert-last($nb:notes,
+    <note seq="{ count(dml:collection($nb:notes)) + 1 }">{ $text }</note>);
+  nb:recent(3)
+};
+
+declare function nb:recent($max as xs:integer) as element()
+{
+  let $notes := dml:collection($nb:notes)
+  return
+    if (empty($notes))
+    then <p class="empty">The board is empty.</p>
+    else
+      <ul>{
+        for $n in subsequence(reverse($notes), 1, $max)
+        return <li n="{ $n/@seq }">{ data($n) }</li>
+      }</ul>
+};

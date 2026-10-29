@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+ADD_DEFINITIONS(-DZORBA_HTTP_TEST_SERVER_DEFAULT="${ZORBA_HTTP_TEST_SERVER}")
+
 CREATE_TEST_SOURCELIST(APITests
   APITests.cpp
   itemfactory.cpp

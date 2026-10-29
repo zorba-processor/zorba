@@ -1,12 +1,12 @@
 xquery version "3.0";
 
-module namespace n = "http://www.28msec.com/test";
+module namespace n = "http://test.example.com/test";
 
 import module namespace ddl = "http://zorba.io/modules/store/static/collections/ddl";
 import module namespace dml = "http://zorba.io/modules/store/static/collections/dml";
 import module namespace index_ddl = "http://zorba.io/modules/store/static/indexes/ddl";
 
-declare namespace d = "http://www.28msec.com/d/";
+declare namespace d = "http://test.example.com/d/";
 
 declare namespace ann = "http://zorba.io/annotations";
 

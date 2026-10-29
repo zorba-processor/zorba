@@ -1,4 +1,4 @@
-module namespace mymod="http://www.28msec.com/modules/mymodule";
+module namespace mymod="http://test.example.com/modules/mymodule";
 
 (:~
  : This function contains some unordered annotations.

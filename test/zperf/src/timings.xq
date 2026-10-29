@@ -18,7 +18,7 @@ module namespace tims = 'http://www.example.com/timings';
 
 import module namespace functx = "http://www.functx.com"; 
 
-declare namespace pdash = "http://www.28msec.com/pdash";
+declare namespace pdash = "http://test.example.com/pdash";
 
 
 declare function tims:getFirstNumber ($string as xs:string, $firstDelimiter as xs:string, $secondDelimiter as xs:string) as xs:float

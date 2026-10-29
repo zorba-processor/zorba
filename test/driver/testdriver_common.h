@@ -164,6 +164,23 @@ void setFullTextURIMappers(
     DriverContext& driverCtx,
     const zorba::StaticContext_t& sctx);
 
+/**
+ * Returns host:port of the HTTP test server: the ZORBA_HTTP_TEST_SERVER
+ * environment variable if set, otherwise the configured default.
+ */
+std::string http_test_server();
+
+/**
+ * Replaces every occurrence of $HTTP_TEST_SERVER in s.
+ */
+void expand_http_test_server(std::string& s);
+
+/**
+ * If the reference result file ref contains $HTTP_TEST_SERVER, writes an
+ * expanded copy to tmp and returns tmp; otherwise returns ref.
+ */
+std::string expand_ref_file(const std::string& ref, const std::string& tmp);
+
 void slurp_file(
     const char* fname,
     std::string& result,

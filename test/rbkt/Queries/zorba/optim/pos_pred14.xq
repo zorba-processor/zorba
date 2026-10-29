@@ -1,5 +1,5 @@
 import module namespace coll = 
-"http://www.28msec.com/rbkt/collections" at "pos_pred14.xqlib";
+"http://test.example.com/rbkt/collections" at "pos_pred14.xqlib";
 
 import module namespace ddl = 
 "http://zorba.io/modules/store/static/collections/ddl";

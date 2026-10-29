@@ -34,6 +34,7 @@ static std::string UPDATE_SRC_DIR    = "@CMAKE_SOURCE_DIR@/test/update";
 static std::string UPDATE_BINARY_DIR = "@CMAKE_BINARY_DIR@/test/update";
 static std::string SAX2_SRC_DIR      = "@CMAKE_SOURCE_DIR@/test/sax2";
 static std::string SAX2_BINARY_DIR   = "@CMAKE_BINARY_DIR@/test/sax2";
+static std::string HTTP_TEST_SERVER_DEFAULT = "@ZORBA_HTTP_TEST_SERVER@";
 
 }
 #endif /* ZORBA_TESTDRIVER_CONFIG_H */

@@ -3,7 +3,7 @@ import module namespace http="http://zorba.io/modules/http-client";
 
 http:send-request(
 {
-  "href": "http://zorbatest.28.io:8080/remotequeue",
+  "href": "http://$HTTP_TEST_SERVER/remotequeue",
   "method": "HEAD",
   "options": {
     "follow-redirect": true

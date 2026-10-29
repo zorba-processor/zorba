@@ -3,7 +3,7 @@ import module namespace http="http://zorba.io/modules/http-client";
 variable $req :=
 {
   "method": "POST",
-  "href": "http://zorbatest.28.io:8080/http-test-data/request.php",  
+  "href": "http://$HTTP_TEST_SERVER/http-test-data/request.php",  
   "body": {
     "media-type": "text/plain",
     "content": "
@@ -11,7 +11,7 @@ variable $req :=
     "
   },
   "options": {
-    "user-agent": "28.io"
+    "user-agent": "zorba-test"
   }
 };
 

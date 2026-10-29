@@ -2,7 +2,7 @@
   <FLWORIterator>
     <ForVariable name="$$context-item">
       <ZorbaCollectionIterator>
-        <SingletonIterator value="xs:QName(http://28.io/collections,db28,foo)"/>
+        <SingletonIterator value="xs:QName(http://zorba-tests.example.org/collections,db28,foo)"/>
       </ZorbaCollectionIterator>
     </ForVariable>
     <ReturnClause>
@@ -24,7 +24,7 @@
   <FLWORIterator>
     <ForVariable name="$$context-item">
       <ZorbaCollectionIterator>
-        <SingletonIterator value="xs:QName(http://28.io/collections,db28,foo)"/>
+        <SingletonIterator value="xs:QName(http://zorba-tests.example.org/collections,db28,foo)"/>
       </ZorbaCollectionIterator>
     </ForVariable>
     <ReturnClause>
@@ -56,23 +56,23 @@
   <SequentialIterator>
     <ApplyIterator>
       <ZorbaCreateCollectionIterator>
-        <SingletonIterator value="xs:QName(http://28.io/collections,db28,foo)"/>
+        <SingletonIterator value="xs:QName(http://zorba-tests.example.org/collections,db28,foo)"/>
       </ZorbaCreateCollectionIterator>
     </ApplyIterator>
     <ApplyIterator>
       <CreateIndexIterator>
-        <SingletonIterator value="xs:QName(http://28.io/collections,db28,foo__id_)"/>
+        <SingletonIterator value="xs:QName(http://zorba-tests.example.org/collections,db28,foo__id_)"/>
       </CreateIndexIterator>
     </ApplyIterator>
     <ApplyIterator>
       <CreateIndexIterator>
-        <SingletonIterator value="xs:QName(http://28.io/collections,db28,street)"/>
+        <SingletonIterator value="xs:QName(http://zorba-tests.example.org/collections,db28,street)"/>
       </CreateIndexIterator>
     </ApplyIterator>
     <FLWORIterator>
       <ForVariable name="i">
         <ProbeIndexRangeValueIterator>
-          <SingletonIterator value="xs:QName(http://28.io/collections,db28,street)"/>
+          <SingletonIterator value="xs:QName(http://zorba-tests.example.org/collections,db28,street)"/>
           <SingletonIterator value="xs:string(Sheridan)"/>
           <SingletonIterator value="xs:string(Sheridan)"/>
           <SingletonIterator value="xs:boolean(true)"/>

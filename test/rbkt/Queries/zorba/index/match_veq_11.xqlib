@@ -1,4 +1,4 @@
-module namespace ca = 'http://www.28msec.com/benchmark/lib/custacc';
+module namespace ca = 'http://test.example.com/benchmark/lib/custacc';
 
 import module namespace db = 
   "http://zorba.io/modules/store/static/collections/dml";

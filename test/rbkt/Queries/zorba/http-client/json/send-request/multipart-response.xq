@@ -2,7 +2,7 @@ jsoniq version "1.0";
 import module namespace http = "http://zorba.io/modules/http-client";
 import schema namespace output = "http://www.w3.org/2010/xslt-xquery-serialization";
 
-variable $req := http:get("http://zorbatest.28.io:8080/http-test-data/multipart.php");
+variable $req := http:get("http://$HTTP_TEST_SERVER/http-test-data/multipart.php");
 
 for $key in keys($req.headers)
 where not(starts-with($key, "Content"))

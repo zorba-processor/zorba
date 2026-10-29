@@ -23,6 +23,16 @@
 #include <zorba/xquery_exception.h>
 #include <zorba/uri_resolvers.h>
 #include <zorba/diagnostic_list.h>
+#include <cstdlib>
+#include <string>
+
+// host:port of the HTTP test server (see test/http-test-data).
+static std::string http_test_server_url(char const *path)
+{
+  char const *const env = std::getenv("ZORBA_HTTP_TEST_SERVER");
+  return std::string("http://")
+    + (env && *env ? env : ZORBA_HTTP_TEST_SERVER_DEFAULT) + path;
+}
 
 using namespace zorba;
 
@@ -45,7 +55,7 @@ class MySchemaURIMapper : public URIMapper
       return;
     }
     if(aUri == "http://www.zorba-xquery.com/helloworld") {
-      oUris.push_back("http://zorbatest.28.io:8080/tutorial/helloworld.xsd");
+      oUris.push_back(http_test_server_url("/tutorial/helloworld.xsd"));
     }
   }
 };
@@ -83,7 +93,7 @@ class DenyAccessURIMapper : public URIMapper
     std::vector<zorba::String>& oUris) throw ()
   {
     // Deny access to an URI that would otherwise work
-    if(aUri == "http://zorbatest.28.io:8080/tutorial/helloworld.xsd" ||
+    if(aUri == "http://zorba-tests.example.org/tutorial/helloworld.xsd" ||
        aUri == "http://zorba.io/modules/fetch" ||
        aUri == "http://expath.org/ns/file") {
       oUris.push_back(URIMapper::DENY_ACCESS);
@@ -323,7 +333,7 @@ bool test_deny_schema_access(Zorba* aZorba)
   try {
     XQuery_t lQuery = aZorba->compileQuery
       ("import schema namespace lm="
-        "'http://zorbatest.28.io:8080/tutorial/helloworld.xsd'; "
+        "'http://zorba-tests.example.org/tutorial/helloworld.xsd'; "
         "validate{ <p>Hello World!</p> }", lContext);
     std::cout << lQuery << std::endl;
   } catch (ZorbaException& e) {

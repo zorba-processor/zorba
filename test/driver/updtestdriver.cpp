@@ -18,6 +18,7 @@
 #include <sstream>
 #include <fstream>
 #include <vector>
+#include <iterator>
 #include <string>
 #include <cstring>
 #include <cstdio>
@@ -306,7 +307,15 @@ main(int argc, char** argv)
     std::cout << "Query file " << lQueryFile << ": " << std::endl;
     zorba::printFile(std::cout, lQueryFile);
     std::cout << std::endl;
-    std::ifstream lQueryStream(lQueryFile.c_str());
+    std::ifstream lQueryFileStream(lQueryFile.c_str());
+    std::string lQueryText((std::istreambuf_iterator<char>(lQueryFileStream)),
+                           std::istreambuf_iterator<char>());
+    {
+      char const *const env = std::getenv("ZORBA_HTTP_TEST_SERVER");
+      zorba::ascii::replace_all(lQueryText, "$HTTP_TEST_SERVER",
+        env && *env ? std::string(env) : zorba::HTTP_TEST_SERVER_DEFAULT);
+    }
+    std::istringstream lQueryStream(lQueryText);
 
     //
     // Create static context and set it up. 

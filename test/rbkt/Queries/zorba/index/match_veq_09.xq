@@ -1,5 +1,5 @@
 import module namespace db28 = 
-  "http://28.io/collections" at "match_veq_09.xqlib";
+  "http://zorba-tests.example.org/collections" at "match_veq_09.xqlib";
 
 import module namespace dml = 
   "http://zorba.io/modules/store/static/collections/dml";

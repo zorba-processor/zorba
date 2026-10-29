@@ -4,18 +4,17 @@
     <xqdoc:version>1.0</xqdoc:version>
   </xqdoc:control>
   <xqdoc:module type="library">
-    <xqdoc:uri>http://www.zorba-xquery.com/collindex</xqdoc:uri>
-    <xqdoc:name>collindex.xqlib</xqdoc:name>
+    <xqdoc:uri>http://zorba-tests.example.org/colldecls</xqdoc:uri>
+    <xqdoc:name>colldecls.xqlib</xqdoc:name>
     <xqdoc:custom tag="namespaces">
       <xqdoc:namespace prefix="an" uri="" isSchema="false"/>
-      <xqdoc:namespace prefix="cache" uri="http://www.28msec.com/modules/http/util/cache" isSchema="false"/>
-      <xqdoc:namespace prefix="cil" uri="http://www.zorba-xquery.com/collindex" isSchema="false"/>
+      <xqdoc:namespace prefix="cd" uri="http://zorba-tests.example.org/colldecls" isSchema="false"/>
       <xqdoc:namespace prefix="ddl" uri="http://zorba.io/modules/store/static/collections/ddl" isSchema="false"/>
       <xqdoc:namespace prefix="dml" uri="http://zorba.io/modules/store/static/collections/dml" isSchema="false"/>
       <xqdoc:namespace prefix="functx" uri="http://www.functx.com" isSchema="false"/>
       <xqdoc:namespace prefix="idml" uri="http://zorba.io/modules/store/static/indexes/dml" isSchema="false"/>
-      <xqdoc:namespace prefix="req" uri="http://www.28msec.com/modules/http/request" isSchema="false"/>
-      <xqdoc:namespace prefix="resp" uri="http://www.28msec.com/modules/http/response" isSchema="false"/>
+      <xqdoc:namespace prefix="ma" uri="http://zorba-tests.example.org/modules/alpha" isSchema="false"/>
+      <xqdoc:namespace prefix="mb" uri="http://zorba-tests.example.org/modules/beta" isSchema="false"/>
     </xqdoc:custom>
   </xqdoc:module>
   <xqdoc:imports>
@@ -23,13 +22,10 @@
       <xqdoc:uri>http://www.functx.com</xqdoc:uri>
     </xqdoc:import>
     <xqdoc:import type="library">
-      <xqdoc:uri>http://www.28msec.com/modules/http/request</xqdoc:uri>
+      <xqdoc:uri>http://zorba-tests.example.org/modules/alpha</xqdoc:uri>
     </xqdoc:import>
     <xqdoc:import type="library">
-      <xqdoc:uri>http://www.28msec.com/modules/http/response</xqdoc:uri>
-    </xqdoc:import>
-    <xqdoc:import type="library">
-      <xqdoc:uri>http://www.28msec.com/modules/http/util/cache</xqdoc:uri>
+      <xqdoc:uri>http://zorba-tests.example.org/modules/beta</xqdoc:uri>
     </xqdoc:import>
     <xqdoc:import type="library">
       <xqdoc:uri>http://zorba.io/modules/store/static/collections/ddl</xqdoc:uri>
@@ -43,14 +39,14 @@
   </xqdoc:imports>
   <xqdoc:variables>
     <xqdoc:variable>
-      <xqdoc:uri>cil:entries</xqdoc:uri>
+      <xqdoc:uri>cd:orders</xqdoc:uri>
       <xqdoc:invoked arity="1">
         <xqdoc:uri>http://www.w3.org/2001/XMLSchema</xqdoc:uri>
         <xqdoc:name>QName</xqdoc:name>
       </xqdoc:invoked>
     </xqdoc:variable>
     <xqdoc:variable>
-      <xqdoc:uri>cil:idx</xqdoc:uri>
+      <xqdoc:uri>cd:by-customer</xqdoc:uri>
       <xqdoc:invoked arity="1">
         <xqdoc:uri>http://www.w3.org/2001/XMLSchema</xqdoc:uri>
         <xqdoc:name>QName</xqdoc:name>
@@ -59,10 +55,10 @@
   </xqdoc:variables>
   <xqdoc:collections>
     <xqdoc:collection>
-      <xqdoc:name>entries</xqdoc:name>
-      <xqdoc:type>element(el)*</xqdoc:type>
+      <xqdoc:name>orders</xqdoc:name>
+      <xqdoc:type>element(order)*</xqdoc:type>
       <xqdoc:comment>
-        <xqdoc:description> some comment
+        <xqdoc:description> An ordered collection of typed items.
 </xqdoc:description>
       </xqdoc:comment>
       <xqdoc:annotations>
@@ -70,9 +66,9 @@
       </xqdoc:annotations>
     </xqdoc:collection>
     <xqdoc:collection>
-      <xqdoc:name>entries2</xqdoc:name>
+      <xqdoc:name>log</xqdoc:name>
       <xqdoc:comment>
-        <xqdoc:description> some comment2
+        <xqdoc:description> An ordered collection without a type.
 </xqdoc:description>
       </xqdoc:comment>
       <xqdoc:annotations>
@@ -80,30 +76,30 @@
       </xqdoc:annotations>
     </xqdoc:collection>
     <xqdoc:collection>
-      <xqdoc:name>entries3</xqdoc:name>
-      <xqdoc:type>element(el)*</xqdoc:type>
+      <xqdoc:name>items</xqdoc:name>
+      <xqdoc:type>element(item)*</xqdoc:type>
       <xqdoc:comment>
-        <xqdoc:description> some comment3
+        <xqdoc:description> An unordered collection of typed items.
 </xqdoc:description>
       </xqdoc:comment>
     </xqdoc:collection>
     <xqdoc:collection>
-      <xqdoc:name>entries4</xqdoc:name>
+      <xqdoc:name>misc</xqdoc:name>
       <xqdoc:comment>
-        <xqdoc:description> some comment4
+        <xqdoc:description> An unordered collection without a type.
 </xqdoc:description>
       </xqdoc:comment>
     </xqdoc:collection>
   </xqdoc:collections>
   <xqdoc:indexes>
     <xqdoc:index>
-      <xqdoc:name>idx</xqdoc:name>
+      <xqdoc:name>by-customer</xqdoc:name>
       <xqdoc:source>
-        <xqdoc:uri>http://www.zorba-xquery.com/collindex</xqdoc:uri>
-        <xqdoc:name>entries</xqdoc:name>
+        <xqdoc:uri>http://zorba-tests.example.org/colldecls</xqdoc:uri>
+        <xqdoc:name>orders</xqdoc:name>
       </xqdoc:source>
       <xqdoc:comment>
-        <xqdoc:description> some comment5
+        <xqdoc:description> A unique automatic index on the customer of each order.
 </xqdoc:description>
       </xqdoc:comment>
       <xqdoc:annotations>
@@ -113,13 +109,13 @@
       </xqdoc:annotations>
     </xqdoc:index>
     <xqdoc:index>
-      <xqdoc:name>idx</xqdoc:name>
+      <xqdoc:name>by-customer-manual</xqdoc:name>
       <xqdoc:source>
-        <xqdoc:uri>http://www.zorba-xquery.com/collindex</xqdoc:uri>
-        <xqdoc:name>entries</xqdoc:name>
+        <xqdoc:uri>http://zorba-tests.example.org/colldecls</xqdoc:uri>
+        <xqdoc:name>orders</xqdoc:name>
       </xqdoc:source>
       <xqdoc:comment>
-        <xqdoc:description> some comment6
+        <xqdoc:description> A manually maintained index on the same key.
 </xqdoc:description>
       </xqdoc:comment>
     </xqdoc:index>
