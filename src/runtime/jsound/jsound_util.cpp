@@ -2257,12 +2257,20 @@ bool union_type::validate( store::Item_t const &validate_item, bool do_cast,
 ///////////////////////////////////////////////////////////////////////////////
 
 schema::schema( store::Item_t const &jsd_item ) {
-  ASSERT_KIND( jsd_item, "JSound", OBJECT );
-  load_namespace( require_value( jsd_item, "$namespace" ) );
-  store::Item_t item( get_json_value( jsd_item, "$imports" ) );
-  if ( !!item )
-    load_imports( item );
-  load_types( require_value( jsd_item, "$types" ) );
+  try {
+    ASSERT_KIND( jsd_item, "JSound", OBJECT );
+    load_namespace( require_value( jsd_item, "$namespace" ) );
+    store::Item_t item( get_json_value( jsd_item, "$imports" ) );
+    if ( !!item )
+      load_imports( item );
+    load_types( require_value( jsd_item, "$types" ) );
+  }
+  catch ( ... ) {
+    // The destructor doesn't run if the constructor throws, so delete the
+    // types created so far here.
+    ztd::delete_ptr_seq( types_ );
+    throw;
+  }
 }
 
 schema::~schema() {
