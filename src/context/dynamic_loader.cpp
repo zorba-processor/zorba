@@ -40,6 +40,17 @@
 #include <zorba/util/error_util.h>
 #include <zorba/internal/unique_ptr.h>
 
+// Under AddressSanitizer, keep external modules mapped until exit: LeakSanitizer
+// runs after this destructor and cannot symbolize allocation stacks inside
+// libraries that were already unloaded (they show up as "<unknown module>").
+#if defined(__SANITIZE_ADDRESS__)
+#  define ZORBA_SANITIZER_BUILD 1
+#elif defined(__has_feature)
+#  if __has_feature(address_sanitizer)
+#    define ZORBA_SANITIZER_BUILD 1
+#  endif
+#endif
+
 namespace zorba {
 
 static std::string computeVersionInfix(zstring const& aImportedVersion)
@@ -209,7 +220,7 @@ DynamicLoader::~DynamicLoader()
   {
 #ifdef WIN32
     FreeLibrary(lIter->second);
-#else
+#elif !defined(ZORBA_SANITIZER_BUILD)
     dlclose(lIter->second);
 #endif
   }
