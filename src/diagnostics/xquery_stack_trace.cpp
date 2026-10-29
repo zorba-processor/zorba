@@ -45,7 +45,7 @@ XQueryStackTrace::Entry::Entry( fn_name_type const &fn_name,
 
 //for plan serialization
 XQueryStackTrace::Entry::Entry() :
-  fn_name_( *(serialization::Archiver*)NULL )
+  fn_name_( "", "", "" )
 {
 }
 

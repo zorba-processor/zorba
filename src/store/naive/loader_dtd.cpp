@@ -1499,7 +1499,7 @@ void DtdXmlLoader::startElement(
       store::Item_t typeName;
 
       store::Item_t typedValue;
-      switch (attr->atype)
+      switch (static_cast<int>(attr->atype))   // int: see case 0 below
       {
         case 0:                       // libxml2 bug
         case XML_ATTRIBUTE_CDATA:

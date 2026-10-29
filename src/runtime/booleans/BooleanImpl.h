@@ -304,6 +304,19 @@ public:
   bool nextImpl(store::Item_t& result, PlanState& planState) const;
 };
 
+// Declarations of the explicit specializations of the static data member that
+// are defined in BooleanImpl.cpp (must be visible before first use).
+template<> serialization::TypeCode
+TypedValueCompareIterator<store::XS_DOUBLE>::theTypeCode;
+template<> serialization::TypeCode
+TypedValueCompareIterator<store::XS_FLOAT>::theTypeCode;
+template<> serialization::TypeCode
+TypedValueCompareIterator<store::XS_DECIMAL>::theTypeCode;
+template<> serialization::TypeCode
+TypedValueCompareIterator<store::XS_INTEGER>::theTypeCode;
+template<> serialization::TypeCode
+TypedValueCompareIterator<store::XS_STRING>::theTypeCode;
+
 
 /*******************************************************************************
   Atomic Values Equivalence Iterator

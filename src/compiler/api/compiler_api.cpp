@@ -245,7 +245,8 @@ parsenode_t XQueryCompiler::parse(std::istream& aXQuery, const zstring& aFileNam
 
 
 
-  if (typeid (*node) == typeid (ParseErrorNode))
+  const parsenode& lNode = *node;
+  if (typeid (lNode) == typeid (ParseErrorNode))
   {
     ParseErrorNode* pen = static_cast<ParseErrorNode *>(&*node);
     throw XQUERY_EXCEPTION_VAR(pen->err, 
@@ -264,7 +265,8 @@ ModuleInfo* XQueryCompiler::parseInfo(
 {
   parsenode_t lParseNode = parse(aXQuery, aFileName);
 
-  if (typeid (*lParseNode) == typeid (ParseErrorNode))
+  const parsenode& lNodeRef = *lParseNode;
+  if (typeid (lNodeRef) == typeid (ParseErrorNode))
   {
     ParseErrorNode* pen = static_cast<ParseErrorNode *>(lParseNode.getp());
     throw XQUERY_EXCEPTION_VAR(pen->err, 

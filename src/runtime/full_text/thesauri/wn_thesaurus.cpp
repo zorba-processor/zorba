@@ -533,7 +533,7 @@ thesaurus::lookup( zstring const &phrase, zstring const &relationship,
       )
     );
   }
-  return std::move( result );
+  return result;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

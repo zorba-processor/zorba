@@ -104,9 +104,9 @@ namespace zorba
   {
     // Still so ugly.
     switch (theUserMapper.mapperKind()) {
-      case URIMapper::COMPONENT:
+      case zorba::URIMapper::COMPONENT:
         return internal::URIMapper::COMPONENT;
-      case URIMapper::CANDIDATE:
+      case zorba::URIMapper::CANDIDATE:
         return internal::URIMapper::CANDIDATE;
     }
 

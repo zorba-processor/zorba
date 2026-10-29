@@ -900,8 +900,9 @@ axis_step_expr* expect_axis_step_top()
   if (axisExpr == NULL)
   {
     std::cout << "Expecting axis step on top of stack; ";
-    if (theNodeStack.top() != NULL)
-      std::cout << "typeid(top()) = " << typeid(*theNodeStack.top()).name() << std::endl;
+    expr* lTop = theNodeStack.top();
+    if (lTop != NULL)
+      std::cout << "typeid(top()) = " << typeid(*lTop).name() << std::endl;
     else
       std::cout << "top is null\n";
     ZORBA_ASSERT (false);

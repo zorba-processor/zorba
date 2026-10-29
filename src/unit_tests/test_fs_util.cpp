@@ -40,7 +40,7 @@ static bool assert_true( int no, char const *expr, int line, bool result ) {
   return result;
 }
 
-static void print_exception( int no, char const *expr, int line,
+[[maybe_unused]] static void print_exception( int no, char const *expr, int line,
                              std::exception const &e ) {
   assert_true( no, expr, line, false );
   cout << "+ exception: " << e.what() << endl;
