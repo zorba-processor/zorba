@@ -339,7 +339,7 @@ std::streamsize FastXmlLoader::readPacket(std::istream& stream, char* buf, long 
 
     return stream.gcount();
   }
-  catch (std::iostream::failure e)
+  catch (std::iostream::failure const& e)
   {
     theXQueryDiagnostics->add_error(
       NEW_ZORBA_EXCEPTION(

@@ -48,7 +48,10 @@ inline void assign( Zorba_opaque_char_ptr &ptr, char const *value ) {
 
 static void copy_from_to( Zorba_SerializerOptions const *from,
                           Zorba_SerializerOptions *to ) {
-  ::memcpy( to, from, sizeof( Zorba_SerializerOptions ) );
+  // Bitwise copy; the owned strings are duplicated below.  The void* casts
+  // tell the compiler that this is intentional.
+  ::memcpy( static_cast<void*>( to ), static_cast<void const*>( from ),
+            sizeof( Zorba_SerializerOptions ) );
   if ( from->encoding.ptr )
     to->encoding.ptr = ztd::new_strdup( from->encoding.ptr );
   if ( from->media_type.ptr )

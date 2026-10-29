@@ -605,7 +605,7 @@ StaticContextImpl::setDefaultOrderForEmptySequences(order_empty_mode_t mode )
       theCtx->set_empty_order_mode(StaticContextConsts::empty_greatest);
     else
       theCtx->set_empty_order_mode(StaticContextConsts::empty_least);
-      return true;
+    return true;
   ZORBA_CATCH
   return false;
 }

@@ -4540,7 +4540,7 @@ void static_context::clear_base_uri()
   if (theBaseUriInfo)
     delete theBaseUriInfo;
 
-    theBaseUriInfo = new BaseUriInfo;
+  theBaseUriInfo = new BaseUriInfo;
 }
 
 /***************************************************************************//**
