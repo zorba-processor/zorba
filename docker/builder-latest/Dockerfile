@@ -7,7 +7,7 @@ FROM ${BASE}
 RUN pacman -Syu --noconfirm --needed \
       base-devel gcc clang cmake ninja ccache git pkgconf \
       bison flex \
-      icu libxml2 libxslt curl zlib xerces-c util-linux-libs \
+      icu libxml2 libxslt curl zlib xerces-c util-linux-libs gdb \
  && pacman -Scc --noconfirm
 
 ENV CCACHE_DIR=/ccache \

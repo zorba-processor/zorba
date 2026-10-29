@@ -535,21 +535,6 @@ ENDIF (WIN32)
 
 ################################################################################
 
-# C++11 TR1 header location & namespace
-CHECK_CXX_SOURCE_COMPILES("
-  #include <tr1/type_traits>
-  int main() { }" ZORBA_TR1_IN_TR1_SUBDIRECTORY)
-CHECK_CXX_SOURCE_COMPILES("
-  #include <type_traits>
-  int main() { std::tr1::is_convertible<int,int> x; }" ZORBA_TR1_1)
-CHECK_CXX_SOURCE_COMPILES("
-  #include <tr1/type_traits>
-  int main() { std::tr1::is_convertible<int,int> x; }" ZORBA_TR1_2)
-
-IF (ZORBA_TR1_1 OR ZORBA_TR1_2)
-  SET (ZORBA_TR1_NS_IS_STD_TR1 1)
-ENDIF (ZORBA_TR1_1 OR ZORBA_TR1_2)
-
 # C++11 langauge features
 CHECK_CXX_SOURCE_COMPILES("
   #include <cstddef>

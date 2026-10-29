@@ -105,16 +105,18 @@ public:
   typedef TraitsType traits_type;
   typedef typename traits_type::char_type value_type;
 private:
-  typedef typename Allocator::template rebind<value_type>::other char_allocator;
+  typedef typename std::allocator_traits<Allocator>::template
+    rebind_alloc<value_type> char_allocator;
+  typedef std::allocator_traits<char_allocator> char_allocator_traits;
 public:
   typedef Allocator allocator_type;
-  typedef typename char_allocator::difference_type difference_type;
-  typedef typename char_allocator::size_type size_type;
+  typedef typename char_allocator_traits::difference_type difference_type;
+  typedef typename char_allocator_traits::size_type size_type;
 
-  typedef typename char_allocator::pointer pointer;
-  typedef typename char_allocator::const_pointer const_pointer;
-  typedef typename char_allocator::reference reference;
-  typedef typename char_allocator::const_reference const_reference;
+  typedef typename char_allocator_traits::pointer pointer;
+  typedef typename char_allocator_traits::const_pointer const_pointer;
+  typedef value_type& reference;
+  typedef value_type const& const_reference;
 
   typedef RefCountType ref_count_type;
   typedef typename RefCountType::value_type count_type;
@@ -288,7 +290,8 @@ public:
   }
 
 protected:
-  typedef typename Allocator::template rebind<char>::other raw_allocator;
+  typedef typename std::allocator_traits<Allocator>::template
+    rebind_alloc<char> raw_allocator;
 
   /**
    * Constructs a %rep_base.

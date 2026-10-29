@@ -47,7 +47,7 @@ typename ZORBA_HASHTABLE_CLASS::node*
 ZORBA_HASHTABLE_CLASS::alloc_node( value_type const &v ) {
   node *const p = node_alloc_.allocate( 1 );
   try {
-    node_alloc_.construct( p, v );
+    node_alloc_traits::construct( node_alloc_, p, v );
     return p;
   }
   catch ( ... ) {
@@ -64,7 +64,7 @@ void ZORBA_HASHTABLE_CLASS::dealloc_buckets( node **p, size_type n_bkt ) {
 
 ZORBA_HASHTABLE_TEMPLATE
 void ZORBA_HASHTABLE_CLASS::dealloc_node( node *p ) {
-  node_alloc_.destroy( p );
+  node_alloc_traits::destroy( node_alloc_, p );
   node_alloc_.deallocate( p, 1 );
 }
 
