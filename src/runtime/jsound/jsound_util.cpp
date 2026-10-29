@@ -117,8 +117,10 @@ namespace timezone {
     optional,
     required
   };
+  // Declared in this namespace so that it is found via argument-dependent
+  // lookup (e.g., by ztd::to_string()).
+  ostream& operator<<( ostream&, type );
 }
-ostream& operator<<( ostream&, timezone::type );
 
 /**
  * The abstract base class for all JSound types.
@@ -1014,8 +1016,8 @@ ostream& operator<<( ostream &os, kind k ) {
   }
 }
 
-ostream& operator<<( ostream &os, timezone::type tz ) {
-  using namespace timezone;
+namespace timezone {
+ostream& operator<<( ostream &os, type tz ) {
   switch ( tz ) {
     case prohibited: return os << "prohibited";
     case required  : return os << "required";
@@ -1023,6 +1025,7 @@ ostream& operator<<( ostream &os, timezone::type tz ) {
     default        : return os << "<unknown timezone::type: " << (int)tz << '>';
   }
 }
+} // namespace timezone
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -1481,7 +1484,7 @@ bool atomic_type::validate( store::Item_t const &item, bool do_cast,
   DECL_FACET_type( atomic, this, fractionDigits );
 
   zstring str;
-  int length;
+  int length = 0;
   if ( length_type || totalDigits_type || fractionDigits_type ) {
     str = validate_item->getStringValue();
     length = str.length();
