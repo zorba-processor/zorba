@@ -1,0 +1,3 @@
+# LeakSanitizer suppressions for the test suite.
+# Add an entry only for a leak that is understood (e.g. a process-lifetime
+# singleton) and say why next to it.

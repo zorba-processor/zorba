@@ -1236,6 +1236,9 @@ MainModule :
       $$ = $1; $$ = $3; // to prevent the Bison warning
       @1.step();
       error(@1, "syntax error, missing semicolon \";\" after statement");
+      // YYERROR does not run %destructors on this rule's RHS values: release them.
+      release_hack( $1 );
+      release_hack( $3 );
       YYERROR;
     }
   |
@@ -1244,6 +1247,9 @@ MainModule :
       $$ = $1; $$ = $3; // to prevent the Bison warning
       @1.step();
       error(@1, "syntax error, missing semicolon \";\" after declaration");
+      // YYERROR does not run %destructors on this rule's RHS values: release them.
+      release_hack( $1 );
+      release_hack( $3 );
       YYERROR;
     }
   |
@@ -1252,6 +1258,10 @@ MainModule :
       $$ = $1; $$ = $3; $$ = $5; // to prevent the Bison warning
       @3.step();
       error(@3, "syntax error, missing semicolon \";\" after declaration");
+      // YYERROR does not run %destructors on this rule's RHS values: release them.
+      release_hack( $1 );
+      release_hack( $3 );
+      release_hack( $5 );
       YYERROR;
     }
   |
@@ -1260,6 +1270,10 @@ MainModule :
       $$ = $1; $$ = $3; $$ = $5; // to prevent the Bison warning
       @1.step();
       error(@1, "syntax error, missing semicolon \";\" after statement");
+      // YYERROR does not run %destructors on this rule's RHS values: release them.
+      release_hack( $1 );
+      release_hack( $3 );
+      release_hack( $5 );
       YYERROR;
     }
 ;
@@ -1327,6 +1341,9 @@ SIND_DeclList :
       $$ = $1; $$ = $3; // to prevent the Bison warning
       @1.step();
       error(@1, "syntax error, missing semicolon \";\" after declaration");
+      // YYERROR does not run %destructors on this rule's RHS values: release them.
+      release_hack( $1 );
+      release_hack( $3 );
       YYERROR;
     }
 ;
@@ -1608,6 +1625,9 @@ VFO_DeclList :
       $$ = $1; $$ = $3; // to prevent the Bison warning
       @1.step();
       error(@1, "syntax error, missing semicolon \";\" after declaration");
+      // YYERROR does not run %destructors on this rule's RHS values: release them.
+      release_hack( $1 );
+      release_hack( $3 );
       YYERROR;
     }
 ;
@@ -1925,8 +1945,8 @@ FunctionDeclSimple :
 
       $$ = new FunctionDecl(LOC(@$),
                             static_cast<QName*>($2),
-                            &* $3->theParams,
-                            &* $3->theReturnType,
+                            $3->theParams.getp(),
+                            $3->theReturnType.getp(),
                             body,    // body
                             false,   // not explicitly updating
                             false);  // not external
@@ -4267,6 +4287,11 @@ PathExpr :
           $$ = new BooleanLiteral(LOC(@$), true);
           break;
         }
+
+        // The path expression was replaced by a literal; nothing else
+        // references it (parser values are unowned raw pointers), so release it.
+        if ($$ != NULL)
+          release_hack( rpe );
 #endif
       }
 
@@ -4833,8 +4858,8 @@ InlineFunction :
     FUNCTION FunctionSig EnclosedStatementsAndOptionalExpr
     {
       $$ = new InlineFunction(LOC(@$),
-                              &*$2->theParams,
-                              &*$2->theReturnType,
+                              $2->theParams.getp(),
+                              $2->theReturnType.getp(),
                               $3);
       delete $2;
     }

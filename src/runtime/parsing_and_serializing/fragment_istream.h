@@ -49,18 +49,18 @@ struct FragmentEvent
   struct attribute
   {
     std::string localname, prefix, uri, value;
-    bool has_prefix, has_uri;
+    bool has_prefix = false, has_uri = false;
   };
 
-  kind_type kind;
+  kind_type kind = START_ELEMENT;
   std::string name;                     // localname, or PI target
   std::string prefix, uri;
-  bool has_prefix, has_uri;
+  bool has_prefix = false, has_uri = false;
   std::string text;                     // characters, comment, or PI data
   std::vector<std::pair<std::string,std::string> > namespaces;
   std::vector<bool> ns_has_prefix;
   std::vector<attribute> attributes;
-  int nb_defaulted;
+  int nb_defaulted = 0;
 };
 
 class FragmentIStream : public std::istream

@@ -376,6 +376,21 @@ UUIDFunction::evaluate(
 
 /******************************************************************************
  *****************************************************************************/
+UtilTestsModule::~UtilTestsModule()
+{
+  for (FuncMap_t::const_iterator lIter = theFunctions.begin();
+       lIter != theFunctions.end(); ++lIter)
+  {
+    delete lIter->second;
+  }
+  theFunctions.clear();
+}
+
+void UtilTestsModule::destroy()
+{
+  delete this;
+}
+
 zorba::ExternalFunction*
 UtilTestsModule::getExternalFunction(const zorba::String& aLocalname)
 {

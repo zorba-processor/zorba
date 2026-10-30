@@ -2830,6 +2830,9 @@ namespace zorba {
       (yylhs.value.node) = (yystack_[2].value.node); (yylhs.value.node) = (yystack_[0].value.expr);
       yystack_[2].location.step();
       error(yystack_[2].location, "syntax error, missing semicolon \";\" after statement");
+      // YYERROR does not run %destructors on this rule's RHS values: release them.
+      release_hack( (yystack_[2].value.node) );
+      release_hack( (yystack_[0].value.expr) );
       YYERROR;
     }
 #line 2836 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
@@ -2841,6 +2844,9 @@ namespace zorba {
       (yylhs.value.node) = (yystack_[2].value.node); (yylhs.value.node) = (yystack_[0].value.expr);
       yystack_[2].location.step();
       error(yystack_[2].location, "syntax error, missing semicolon \";\" after declaration");
+      // YYERROR does not run %destructors on this rule's RHS values: release them.
+      release_hack( (yystack_[2].value.node) );
+      release_hack( (yystack_[0].value.expr) );
       YYERROR;
     }
 #line 2847 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
@@ -2852,6 +2858,10 @@ namespace zorba {
       (yylhs.value.node) = (yystack_[4].value.node); (yylhs.value.node) = (yystack_[2].value.node); (yylhs.value.node) = (yystack_[0].value.expr);
       yystack_[2].location.step();
       error(yystack_[2].location, "syntax error, missing semicolon \";\" after declaration");
+      // YYERROR does not run %destructors on this rule's RHS values: release them.
+      release_hack( (yystack_[4].value.node) );
+      release_hack( (yystack_[2].value.node) );
+      release_hack( (yystack_[0].value.expr) );
       YYERROR;
     }
 #line 2858 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
@@ -2863,6 +2873,10 @@ namespace zorba {
       (yylhs.value.node) = (yystack_[4].value.node); (yylhs.value.node) = (yystack_[2].value.node); (yylhs.value.node) = (yystack_[0].value.expr);
       yystack_[4].location.step();
       error(yystack_[4].location, "syntax error, missing semicolon \";\" after statement");
+      // YYERROR does not run %destructors on this rule's RHS values: release them.
+      release_hack( (yystack_[4].value.node) );
+      release_hack( (yystack_[2].value.node) );
+      release_hack( (yystack_[0].value.expr) );
       YYERROR;
     }
 #line 2869 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
@@ -2940,6 +2954,9 @@ namespace zorba {
       (yylhs.value.node) = (yystack_[2].value.node); (yylhs.value.node) = (yystack_[0].value.node);
       yystack_[2].location.step();
       error(yystack_[2].location, "syntax error, missing semicolon \";\" after declaration");
+      // YYERROR does not run %destructors on this rule's RHS values: release them.
+      release_hack( (yystack_[2].value.node) );
+      release_hack( (yystack_[0].value.node) );
       YYERROR;
     }
 #line 2946 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
@@ -3242,6 +3259,9 @@ namespace zorba {
       (yylhs.value.node) = (yystack_[2].value.node); (yylhs.value.node) = (yystack_[0].value.node);
       yystack_[2].location.step();
       error(yystack_[2].location, "syntax error, missing semicolon \";\" after declaration");
+      // YYERROR does not run %destructors on this rule's RHS values: release them.
+      release_hack( (yystack_[2].value.node) );
+      release_hack( (yystack_[0].value.node) );
       YYERROR;
     }
 #line 3248 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
@@ -3623,8 +3643,8 @@ namespace zorba {
         body = new BlockBody(LOC(yystack_[0].location));
       (yylhs.value.node) = new FunctionDecl(LOC(yylhs.location),
                             static_cast<QName*>((yystack_[2].value.expr)),
-                            &* (yystack_[1].value.fnsig)->theParams,
-                            &* (yystack_[1].value.fnsig)->theReturnType,
+                            (yystack_[1].value.fnsig)->theParams.getp(),
+                            (yystack_[1].value.fnsig)->theReturnType.getp(),
                             body,
                             false,
                             false);
@@ -6835,8 +6855,8 @@ namespace zorba {
 #line 3869 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
     {
       (yylhs.value.expr) = new InlineFunction(LOC(yylhs.location),
-                              &*(yystack_[1].value.fnsig)->theParams,
-                              &*(yystack_[1].value.fnsig)->theReturnType,
+                              (yystack_[1].value.fnsig)->theParams.getp(),
+                              (yystack_[1].value.fnsig)->theReturnType.getp(),
                               (yystack_[0].value.expr));
       delete (yystack_[1].value.fnsig);
     }

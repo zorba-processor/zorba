@@ -44,7 +44,9 @@ enum parse_state {
 };
 
 typedef std::stack<store::Item*> item_stack_type;
-typedef std::stack<store::Iterator*> iterator_stack_type;
+// Holds counted references so that iterators pushed while descending into
+// nested arrays/objects are released when popped (or on exceptions).
+typedef std::stack<store::Iterator_t> iterator_stack_type;
 typedef std::stack<parse_state> state_stack_type;
 
 namespace whitespace {
@@ -93,7 +95,7 @@ std::ostream& operator<<( std::ostream &o, parse_state s );
 # define PUSH_ITERATOR(I)                             \
     do {                                              \
       cout << __LINE__ << ":PUSH_ITERATOR()" << endl; \
-      iterator_stack.push( (I).release() );              \
+      iterator_stack.push( I );                       \
     } while (0)
 
 # define POP_ITERATOR(I)                              \
@@ -122,7 +124,7 @@ std::ostream& operator<<( std::ostream &o, parse_state s );
 
 # define PUSH_ITEM(I)       I##_item_stack.push( (I##_item).getp() )
 # define POP_ITEM(I)        I##_item = ztd::pop_stack( I##_item_stack )
-# define PUSH_ITERATOR(I)   iterator_stack.push( (I).release() )
+# define PUSH_ITERATOR(I)   iterator_stack.push( I )
 # define POP_ITERATOR()     cur_iter = ztd::pop_stack( iterator_stack )
 # define PUSH_STATE(S)      state_stack.push( S )
 # define POP_STATE()        state_stack.pop()

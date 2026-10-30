@@ -39,7 +39,8 @@ StemmerWrapper::StemmerWrapper( zorba::Stemmer::ptr api_stemmer ) :
 }
 
 void StemmerWrapper::destroy() const {
-  api_stemmer_.release()->destroy();
+  // api_stemmer_'s deleter destroys the wrapped API stemmer.
+  delete this;
 }
 
 void StemmerWrapper::properties( Properties *props ) const {

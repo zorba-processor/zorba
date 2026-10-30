@@ -248,10 +248,12 @@ bool to_string( unicode::char_type const *in, unicode::size_type in_len,
   );
   // must not check "err" here since ICU always returns "buffer overflow"
 
-  storage_type *const utf8_buf = new storage_type[ utf8_len ];
+  // +1 for a terminating null: callers may hand the buffer to a ptr_rep
+  // string, which takes ownership and null-terminates it at utf8_len.
+  storage_type *const utf8_buf = new storage_type[ utf8_len + 1 ];
   err = U_ZERO_ERROR;
   u_strToUTF8WithSub(
-    utf8_buf, utf8_len, nullptr, in, in_len, SubChar, nullptr, &err
+    utf8_buf, utf8_len + 1, nullptr, in, in_len, SubChar, nullptr, &err
   );
   if ( U_FAILURE( err ) ) {
     delete[] utf8_buf;

@@ -79,9 +79,12 @@ struct constraint {
   bool validate( dynamic_context& ) const;
 
 private:
+  // sctx_ must be declared before ccb_: the var_exprs owned by ccb_'s
+  // ExprManager point to VarInfo objects owned by sctx_ and access them in
+  // their destructors, so sctx_ must outlive ccb_.
+  static_context_t sctx_;
   CompilerCB ccb_;
   PlanIter_t plan_;
-  static_context_t sctx_;
 
   static XQueryDiagnostics* get_shared_diagnostics();
 
@@ -968,8 +971,8 @@ inline int to_xs_int( store::Item_t const &item ) {
 
 constraint::constraint( zstring const &query ) :
   query_( query ),
-  ccb_( get_shared_diagnostics() ),
-  sctx_( GENV_ROOT_STATIC_CONTEXT.create_child_context() )
+  sctx_( GENV_ROOT_STATIC_CONTEXT.create_child_context() ),
+  ccb_( get_shared_diagnostics() )
 {
   ccb_.theRootSctx = sctx_.get();
   ccb_.theCommonLanguageEnabled = true;
@@ -2267,12 +2270,20 @@ bool union_type::validate( store::Item_t const &validate_item, bool do_cast,
 ///////////////////////////////////////////////////////////////////////////////
 
 schema::schema( store::Item_t const &jsd_item ) {
-  ASSERT_KIND( jsd_item, "JSound", OBJECT );
-  load_namespace( require_value( jsd_item, "$namespace" ) );
-  store::Item_t item( get_json_value( jsd_item, "$imports" ) );
-  if ( !!item )
-    load_imports( item );
-  load_types( require_value( jsd_item, "$types" ) );
+  try {
+    ASSERT_KIND( jsd_item, "JSound", OBJECT );
+    load_namespace( require_value( jsd_item, "$namespace" ) );
+    store::Item_t item( get_json_value( jsd_item, "$imports" ) );
+    if ( !!item )
+      load_imports( item );
+    load_types( require_value( jsd_item, "$types" ) );
+  }
+  catch ( ... ) {
+    // The destructor doesn't run if the constructor throws, so delete the
+    // types created so far here.
+    ztd::delete_ptr_seq( types_ );
+    throw;
+  }
 }
 
 schema::~schema() {

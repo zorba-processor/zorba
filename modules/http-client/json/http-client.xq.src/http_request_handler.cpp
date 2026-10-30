@@ -226,6 +226,9 @@ namespace zorba { namespace http_client {
 
   void HttpRequestHandler::beginBody(String aContentType, String aSrc)
   {
+    // A multipart request has one body per part; endBody() keeps the stream
+    // of a body with content, so free the previous part's stream here.
+    delete theSerStream;
     theSerStream = new std::ostringstream();
     theCurrentContentType = aContentType;
     theContentType = "Content-Type: ";

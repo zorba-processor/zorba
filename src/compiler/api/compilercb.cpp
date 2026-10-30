@@ -24,6 +24,7 @@
 #endif
 
 #include "context/static_context.h"
+#include "functions/udf.h"
 
 #include <zorba/properties.h>
 
@@ -182,7 +183,20 @@ CompilerCB::CompilerCB(::zorba::serialization::Archiver& ar)
 ********************************************************************************/
 CompilerCB::~CompilerCB()
 {
+  // Release the anonymous udfs (and their plans) before the expressions they
+  // point to are destroyed.
+  theAnonymousUDFs.clear();
+
   delete theEM;
+}
+
+
+/*******************************************************************************
+
+********************************************************************************/
+void CompilerCB::addAnonymousUDF(user_function* udf)
+{
+  theAnonymousUDFs.push_back(udf);
 }
 
 

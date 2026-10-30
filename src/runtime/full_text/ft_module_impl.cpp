@@ -326,8 +326,11 @@ bool IsStopWordLangSupportedIterator::nextImpl( store::Item_t &result,
 
   consumeNext( item, theChildren[0], plan_state );
   try {
-    is_supported =
-      !!ft_stop_words_set::get_default( get_lang_from( item, loc ) );
+    // get_default() returns a new object owned by the caller.
+    ft_stop_words_set::ptr const stop_words(
+      ft_stop_words_set::get_default( get_lang_from( item, loc ) )
+    );
+    is_supported = !!stop_words;
   }
   catch ( ZorbaException const &e ) {
     if ( e.diagnostic() != err::FTST0009 /* lang not supported */ )

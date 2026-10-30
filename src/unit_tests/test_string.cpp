@@ -19,6 +19,7 @@
 #include <cwchar>
 #include <sstream>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 #include <zorba/zorba_string.h>
@@ -91,10 +92,9 @@ static bool assert_true( char const *expr, int line, bool result ) {
 
 inline char* new_c_string( char const *s ) 
 {
-  char * p = static_cast<char*>(::operator new(::strlen( s ) + 1));
-  return ::strcpy( p, s );
-
-    //return ::strcpy( new char[ ::strlen( s ) + 1 ], s );
+  // ptr_rep takes ownership and frees the buffer with delete[], so it must
+  // be allocated with new[].
+  return ::strcpy( new char[ ::strlen( s ) + 1 ], s );
 }
 
 /**
@@ -105,6 +105,16 @@ static void test_empty( StringType const &s ) {
   ASSERT_TRUE( s.empty() );
   ASSERT_TRUE( s.size() == 0 );
 }
+
+/**
+ * Whether constructing a StringType from a char* takes ownership of it.
+ * Only ptr_rep strings do (and free it with delete[]).
+ */
+template<class StringType>
+struct owns_c_string : std::false_type { };
+
+template<>
+struct owns_c_string<zstring_p> : std::true_type { };
 
 /**
  * Common tests for non-empty strings.
@@ -136,6 +146,8 @@ static void test_non_empty( StringType &s, char const *csc ) {
     ASSERT_TRUE( s == csc );
     ASSERT_TRUE( s2 == cs );
   }
+  if ( !owns_c_string<StringType>::value )
+    delete[] cs;
 }
 
 template<class StringType>
