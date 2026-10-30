@@ -16,6 +16,7 @@
 
 // standard
 #include <algorithm>
+#include <chrono>
 #include <cassert>
 #include <fstream>
 #include <iostream>
@@ -35,6 +36,7 @@
 #include <zorba/internal/unique_ptr.h>
 #include <zorba/item_sequence.h>
 #include <zorba/properties.h>
+#include <zorba/security.h>
 #include <zorba/serialization_callback.h>
 #include <zorba/store_manager.h>
 #include <zorba/uri_resolvers.h>
@@ -679,8 +681,15 @@ int _tmain( int argc, _TCHAR const *argv[] ) {
   Zorba *const zorba = Zorba::getInstance( store );
 
   // The command-line tool runs trusted queries: grant every capability
-  // explicitly so it is unaffected by the library default.
-  zorba->setSecurityPolicy( SecurityPolicy::unrestricted() );
+  // explicitly so it is unaffected by the library default. The limits come
+  // from --timeout and --max-udf-call-depth.
+  {
+    SecurityPolicy policy( SecurityPolicy::unrestricted() );
+    policy.setMaxCallDepth( Properties::instance().getMaxUDFCallDepth() );
+    if ( zc_props.timeout_ > 0 )
+      policy.setTimeout( std::chrono::seconds( zc_props.timeout_ ) );
+    zorba->setSecurityPolicy( policy );
+  }
 
 #ifdef DO_AUDIT
   audit::Provider* lAuditProvider = zorba->getAuditProvider();

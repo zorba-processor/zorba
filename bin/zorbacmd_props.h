@@ -107,7 +107,7 @@ struct ZorbaCmdProperties {
   ft_mappings   stop_words_mapping_;
   ft_mappings   thesaurus_mapping_;
 #endif /* ZORBA_NO_FULL_TEXT */
-  long          timeout_;               // unused
+  long          timeout_;               // seconds; <= 0 = none
   int           timezone_;
   bool          timezone_set_;
   bool          timing_;
