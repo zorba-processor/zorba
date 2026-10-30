@@ -80,6 +80,12 @@ ZORBA_SET_TEST_PROPERTY(bin/zorba4 PASS_REGULAR_EXPRESSION "(.*<child>child1</ch
 ZORBA_ADD_TEST(bin/zorba5 zorbacmd -q -f blub.xq)
 ZORBA_SET_TEST_PROPERTY(bin/zorba5 PASS_REGULAR_EXPRESSION ".*No queries submitted.*")
 
+# --timeout and --max-udf-call-depth set the security policy limits.
+ZORBA_ADD_TEST(bin/zorba_timeout zorbacmd --timeout 1 -q "count((1 to 9223372036854775807)[. lt 0])")
+ZORBA_SET_TEST_PROPERTY(bin/zorba_timeout PASS_REGULAR_EXPRESSION ".*ZXQP0068.*")
+ZORBA_ADD_TEST(bin/zorba_max_call_depth zorbacmd --max-udf-call-depth 10 -q "declare function local:f($n) { if ($n le 0) then 0 else local:f($n - 1) }; local:f(20)")
+ZORBA_SET_TEST_PROPERTY(bin/zorba_max_call_depth PASS_REGULAR_EXPRESSION ".*ZXQP0069.*")
+
 IF (UNIX)
   ADD_TEST (NAME bin/shebang
     COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/test/shebang.xq"
