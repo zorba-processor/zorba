@@ -64,6 +64,7 @@ Entries marked **(open PR)** come from pull requests that are not merged yet; co
 - Publish builder and command-line `zorba` container images to GHCR ([#25](https://github.com/zorba-processor/zorba/pull/25)).
 - Add a `bigint` preset and CI profile for the optional big-integer `xs:integer` build ([#53](https://github.com/zorba-processor/zorba/pull/53)).
 - Add an ASan, LSan and UBSan preset with a weekly CI run and a summary of memory errors, leaks and undefined behavior ([#28](https://github.com/zorba-processor/zorba/pull/28), [#34](https://github.com/zorba-processor/zorba/pull/34)).
+- Every CI build (and the Sanitizers workflow, under ASan/UBSan/LSan) replays the fuzz regression inputs in `test/fuzz/regressions/` through standalone replay drivers that need no libFuzzer ([#67](https://github.com/zorba-processor/zorba/pull/67)).
 - Add XMark and JSONiq benchmark suites with an A/B comparison workflow ([#38](https://github.com/zorba-processor/zorba/pull/38)).
 - Add a weekly W3C QT3 conformance run (pinned qt3tests commit, sharded, per-case timeout) with a committed pass baseline; any regression fails the run. First run: 26,367 of 27,055 applicable test cases pass (97.5%); fix FOTS driver bugs in version matching, XSD 1.0/1.1 dependencies, single-case selection and environment parameter collisions ([#59](https://github.com/zorba-processor/zorba/pull/59)).
 - Add an on-demand build-time measurement workflow ([#29](https://github.com/zorba-processor/zorba/pull/29)).
@@ -89,6 +90,8 @@ Entries marked **(open PR)** come from pull requests that are not merged yet; co
 
 ### Fixed
 
+- Fix a memory leak of parser error objects when a query has several lexical errors ([#67](https://github.com/zorba-processor/zorba/pull/67)).
+- Fix a memory leak when a function containing a full-text `contains text` expression is inlined, and a double delete of its positional filters (`ordered`, `window`, ...) that the leak was hiding ([#67](https://github.com/zorba-processor/zorba/pull/67)).
 - Fix a heap buffer over-read in `rstring::find_last_of` when the search starts at index 0 (reached by declaring an external function in a namespace whose URI has a one-character path), found by fuzzing ([#60](https://github.com/zorba-processor/zorba/pull/60)).
 - Fix an internal error (`ZXQP0002`) in static typing of `namespace-node()` steps on the child, descendant, sibling and ancestor axes, found by fuzzing ([#60](https://github.com/zorba-processor/zorba/pull/60)).
 - Fix the full-text grammar accepting any literal where XQFT requires a string literal (`contains text 2 "x"` now raises `XPST0003` instead of an invalid downcast) ([#60](https://github.com/zorba-processor/zorba/pull/60)).
