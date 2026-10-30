@@ -352,7 +352,7 @@ public:
    *
    * @param reachedEnd returns true if the end of string was reached while doing the match.
    */
-  bool next_match( bool *reachedEnd );
+  bool next_match( bool *reachedEnd = nullptr );
 
   /**
    * Get the number of parenthesized groups in the regular expression.
@@ -374,7 +374,7 @@ public:
    *  or [1 .. group_count] for that specific group
    * @return true if that group exists and has been matched
    */
-  bool get_group_start_end( int *start, int *end, int groupId ) const;
+  bool get_group_start_end( int *start, int *end, int groupId = 0 ) const;
 
 private:
   regex_engine::CRegexXQuery_regex  *regex_matcher;
