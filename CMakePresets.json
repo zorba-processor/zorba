@@ -51,6 +51,7 @@
       "inherits": "base",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "ZORBA_HARDENING": "OFF",
         "CMAKE_C_FLAGS_RELWITHDEBINFO": "-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize=vptr",
         "CMAKE_CXX_FLAGS_RELWITHDEBINFO": "-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize=vptr",
         "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize=vptr",
