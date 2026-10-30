@@ -155,7 +155,8 @@ figure.example {
   background: var(--code-bg); overflow: hidden;
   border-left: 4px solid var(--xml);
 }
-figure.example:has(.ex-lang:is([data-l])), figure.example.lang-jsoniq { border-left-color: var(--json); }
+figure.example.lang-jq, figure.example.lang-json { border-left-color: var(--json); }
+figure.example.lang-cpp, figure.example.lang-xml { border-left-color: var(--muted); }
 figure.example figcaption {
   display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
   font: 0.8rem/1.4 var(--sans); color: var(--muted);

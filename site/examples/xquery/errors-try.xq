@@ -1,3 +1,4 @@
+declare namespace err = "http://www.w3.org/2005/xqt-errors";
 declare namespace app = "http://example.org/app";
 
 (

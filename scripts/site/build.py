@@ -11,6 +11,8 @@ Copies <site-dir> to <output-dir> and, in every top-level .html page, replaces
   <!-- source: path/to/file -->    with the highlighted contents of a file
                                    under <site-dir>/examples (data files,
                                    library modules)
+  <!-- header: page -->            with the site header, marking the page
+  <!-- footer -->                  with the site footer
 
 With --strict, a marker whose files are missing is an error; otherwise a
 placeholder is rendered. Python standard library only.
@@ -100,6 +102,42 @@ def mode_for(suffix: str) -> str:
     return "query"
 
 
+REPO = "https://github.com/zorba-processor/zorba"
+
+PAGES = [("index", "Overview"), ("map", "The big picture"),
+         ("xquery", "XQuery"), ("jsoniq", "JSONiq"),
+         ("zorba", "Using Zorba"), ("cheatsheet", "Cheat sheet")]
+
+LOGO = ('<svg viewBox="0 0 32 32" aria-hidden="true">'
+        '<rect x="1.5" y="1.5" width="29" height="29" rx="6" fill="none" '
+        'stroke="var(--xml)" stroke-width="2.5"/>'
+        '<path d="M9 10h14L9 22h14" fill="none" stroke="var(--json)" '
+        'stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>'
+        '</svg>')
+
+
+def header(current: str) -> str:
+    links = "".join(
+        f'<a href="{name}.html"'
+        f'{" aria-current=\"page\"" if name == current else ""}>{label}</a>'
+        for name, label in PAGES)
+    return (f'<header class="site-head"><div class="bar">'
+            f'<a class="brand" href="index.html">{LOGO}Zorba</a>'
+            f'<nav aria-label="Site">{links}</nav>'
+            f'<a class="repo" href="{REPO}">Source on GitHub</a>'
+            f'</div></header>')
+
+
+def footer() -> str:
+    return ('<footer class="site-foot"><div class="bar">'
+            '<span>Zorba is open source under the '
+            '<a href="https://www.apache.org/licenses/LICENSE-2.0">Apache '
+            'License 2.0</a>. Every example on this site is run against the '
+            'current Zorba build before the site is published.</span>'
+            f'<span><a href="{REPO}">{REPO.removeprefix("https://")}</a></span>'
+            '</div></footer>')
+
+
 class Builder:
     def __init__(self, site: Path, strict: bool):
         self.site = site
@@ -135,7 +173,8 @@ class Builder:
             result = self.missing(f"expected output {rel}")
         lang = LANG_NAMES[src.suffix]
         return (
-            f'<figure class="example" id="ex-{name.replace("/", "-")}">'
+            f'<figure class="example lang-{src.suffix[1:]}" '
+            f'id="ex-{name.replace("/", "-")}">'
             f'<figcaption><span class="ex-lang">{lang}</span>'
             f'<a class="ex-file" href="examples/{html.escape(rel)}">'
             f'{html.escape(rel)}</a></figcaption>'
@@ -152,7 +191,7 @@ class Builder:
         text = path.read_text(encoding="utf-8").rstrip("\n")
         lang = LANG_NAMES.get(path.suffix, path.suffix)
         return (
-            f'<figure class="example source">'
+            f'<figure class="example source lang-{path.suffix[1:]}">'
             f'<figcaption><span class="ex-lang">{lang}</span>'
             f'<a class="ex-file" href="examples/{html.escape(rel)}">'
             f'{html.escape(rel)}</a></figcaption>'
@@ -162,6 +201,9 @@ class Builder:
     def page(self, text: str) -> str:
         text = re.sub(r"<!--\s*example:\s*(\S+?)\s*-->",
                       lambda m: self.example(m.group(1)), text)
+        text = re.sub(r"<!--\s*header:\s*(\S+?)\s*-->",
+                      lambda m: header(m.group(1)), text)
+        text = re.sub(r"<!--\s*footer\s*-->", lambda m: footer(), text)
         text = re.sub(r"<!--\s*source:\s*(\S+?)\s*-->",
                       lambda m: self.source(m.group(1)), text)
         return text

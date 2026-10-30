@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zorba: XQuery and JSONiq processor</title>
+<meta name="description" content="Zorba is an embeddable C++ processor for XQuery and JSONiq. Learn what the languages cover and how to use them, with examples verified against the current build.">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+<!-- header: index -->
+
+<div class="layout">
+<details class="toc">
+  <summary>On this page</summary>
+  <p class="toc-title">Overview</p>
+  <ol>
+    <li><a href="#what">What Zorba is</a></li>
+    <li><a href="#fit">Good fit, poor fit</a></li>
+    <li><a href="#start">Quick start</a></li>
+    <li><a href="#source">Build from source</a></li>
+    <li><a href="#read">How to read this site</a></li>
+  </ol>
+</details>
+
+<main>
+<div class="hero">
+  <div>
+    <h1>One query language for XML and JSON</h1>
+    <p class="lede">Zorba is a C++ library and command-line tool that runs XQuery and JSONiq: declarative languages for selecting, joining, grouping, transforming and updating tree-shaped data.</p>
+    <p>This site explains what those languages actually cover, then teaches them by example. Every example is executed against the current Zorba build before the site is published, and the result you see is the result Zorba produced.</p>
+  </div>
+  <div>
+    <!-- example: intro/both -->
+  </div>
+</div>
+
+<h2 id="what">What Zorba is</h2>
+<p>Zorba is a query processor, not a database server. You give it a query and some data (files, strings, URLs, values from your program) and it returns a sequence of results, serialized as XML, JSON, HTML or text. It has three faces:</p>
+<ul>
+  <li>a <strong>command-line tool</strong>, <code>zorba</code>, for running queries from files or the shell;</li>
+  <li>a <strong>C++ library</strong> with a small API to compile a query once, bind variables and iterate over results;</li>
+  <li>an <strong>in-memory store</strong> with collections, value indexes and integrity constraints, so a query can keep state between statements of a program.</li>
+</ul>
+<p>It implements XQuery 3.0 with the Update Facility, Full Text and Zorba's scripting extension, and JSONiq 1.0, both as a language of its own and as an extension that adds JSON objects and arrays to XQuery. <a href="map.html">The big picture</a> explains what each of those is and how they relate.</p>
+
+<!-- example: intro/hello -->
+<p class="why"><strong>Why it matters:</strong> XML is built with XML syntax. There is no string concatenation and no escaping to get wrong; the expression in braces is evaluated and inserted.</p>
+
+<!-- example: intro/hello-json -->
+<p class="why"><strong>Why it matters:</strong> the same loop produces JSON just as directly. In JSONiq, JSON objects and arrays are values like numbers and strings.</p>
+
+<h2 id="fit">Good fit, poor fit</h2>
+<div class="fit">
+  <div>
+    <h3>Good fit</h3>
+    <ul>
+      <li>Reshaping documents: XML to HTML, XML to JSON, JSON to XML, one schema to another.</li>
+      <li>Querying nested data where SQL needs many joins or JSON path tools run out of power: grouping, windowing, joins across documents.</li>
+      <li>Embedding a standard, well-specified query language in a C++ application.</li>
+      <li>Validating XML against XML Schema and working with typed data.</li>
+      <li>Text search inside documents with stemming, wildcards, proximity and boolean operators.</li>
+    </ul>
+  </div>
+  <div>
+    <h3>Poor fit</h3>
+    <ul>
+      <li>A persistent, multi-user database. The store is in memory and lives as long as the process.</li>
+      <li>Datasets far larger than RAM. Zorba streams some inputs, but documents are generally materialized.</li>
+      <li>Code that needs XQuery 3.1 maps, arrays, <code>=&gt;</code> or <code>?</code> lookups. Zorba predates 3.1; it covers JSON through JSONiq instead (see <a href="jsoniq.html#vs31">JSONiq and XQuery 3.1</a>).</li>
+      <li>XSLT. Zorba runs XQuery, not stylesheets.</li>
+    </ul>
+  </div>
+</div>
+
+<h2 id="start">Quick start</h2>
+<p>The fastest way to try Zorba is the container image published by the project. Run a query given on the command line:</p>
+<pre class="code shell"><code>docker run --rm ghcr.io/zorba-processor/zorba -q '1 + 1'</code></pre>
+<p>Or mount the current directory and run a query file. The extension decides the language: <code>.xq</code> is XQuery, <code>.jq</code> is JSONiq.</p>
+<pre class="code shell"><code>docker run --rm -v "$PWD":/work ghcr.io/zorba-processor/zorba -i -f -q query.xq</code></pre>
+<p><code>-f</code> says the argument of <code>-q</code> is a file, <code>-i</code> indents the output. The examples on this site run with <code>zorba -i -r -f -q file</code>; <code>-r</code> omits the XML declaration. More flags are described in <a href="zorba.html#cli">Using Zorba</a>.</p>
+
+<h2 id="source">Build from source</h2>
+<p>Zorba builds with CMake on Linux and macOS and needs a C++23 compiler, ICU, libxml2, libcurl and, for XML Schema support, Xerces-C. The repository's <a href="https://github.com/zorba-processor/zorba#readme">README</a> lists the packages for Debian, Ubuntu and Homebrew and the CMake presets to use.</p>
+
+<h2 id="read">How to read this site</h2>
+<div class="paths">
+  <a href="map.html"><strong>The big picture</strong><span>The data model and the family of specifications, with what Zorba implements.</span></a>
+  <a href="xquery.html"><strong>XQuery</strong><span>Paths, FLWOR, constructors, functions, types, errors, updates, full text.</span></a>
+  <a href="jsoniq.html"><strong>JSONiq</strong><span>Objects, arrays, navigation, null, updates, mixing JSON with XML.</span></a>
+  <a href="zorba.html"><strong>Using Zorba</strong><span>The CLI, built-in modules, collections and indexes, scripting, C++ embedding.</span></a>
+  <a href="cheatsheet.html"><strong>Cheat sheet</strong><span>The syntax on one page.</span></a>
+</div>
+<p>Each example names the file it comes from. The examples and their data live in <a href="https://github.com/zorba-processor/zorba/tree/master/site/examples"><code>site/examples</code></a> in the repository; the examples share two data files, <a href="examples/data/books.xml"><code>books.xml</code></a> and <a href="examples/data/orders.json"><code>orders.json</code></a>.</p>
+</main>
+</div>
+
+<!-- footer -->
+<script src="assets/site.js"></script>
+</body>
+</html>
