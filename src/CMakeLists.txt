@@ -228,7 +228,12 @@ LIST(APPEND ZORBA_LIBRARY_INSTALL_LIST zorba_${ZORBA_STORE_NAME})
 
 # Precompiled header: the STL/stream headers and the central internal headers
 # are parsed once instead of once per translation unit.  With ccache, set
-# CCACHE_SLOPPINESS=pch_defines,time_macros (CMake adds -fpch-preprocess).
+# CCACHE_SLOPPINESS=pch_defines,time_macros (required to cache PCH users) and
+# CCACHE_DEPEND=1.  Without depend mode, ccache falls back to preprocessor mode
+# on a direct-mode miss; GCC's -E output has no #define lines, so a change to a
+# macro defined in a header inside the PCH (e.g. ZORBA_VERSION in config.h)
+# yields the same hash, the stale .gch is served, and every translation unit
+# that uses it is a stale hit too.
 OPTION(ZORBA_USE_PCH "Use a precompiled header for the Zorba library" ON)
 IF (ZORBA_USE_PCH)
   TARGET_PRECOMPILE_HEADERS(zorba_${ZORBA_STORE_NAME} PRIVATE

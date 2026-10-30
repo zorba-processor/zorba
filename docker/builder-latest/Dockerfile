@@ -12,6 +12,8 @@ RUN pacman -Syu --noconfirm --needed \
 
 ENV CCACHE_DIR=/ccache \
     CCACHE_MAXSIZE=20G \
+    CCACHE_SLOPPINESS=pch_defines,time_macros \
+    CCACHE_DEPEND=1 \
     CMAKE_GENERATOR=Ninja \
     CMAKE_C_COMPILER_LAUNCHER=ccache \
     CMAKE_CXX_COMPILER_LAUNCHER=ccache
