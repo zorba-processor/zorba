@@ -505,6 +505,41 @@ static void test_ends_with() {
   ASSERT_TRUE( !utf8::ends_with( u_ab, "a" ) );
 }
 
+/**
+ * Tests the reverse searches at the string boundaries: index 0 must be found
+ * and a miss must not read outside the string.
+ */
+template<class StringType>
+static void test_find_last() {
+  StringType const z( "z" );
+  ASSERT_TRUE( z.find_last_of( "/" ) == StringType::npos );
+  ASSERT_TRUE( z.find_last_of( "z" ) == 0 );
+  ASSERT_TRUE( z.find_last_not_of( "z" ) == StringType::npos );
+  ASSERT_TRUE( z.find_last_not_of( "/" ) == 0 );
+  ASSERT_TRUE( z.rfind( "z" ) == 0 );
+  ASSERT_TRUE( z.rfind( 'z' ) == 0 );
+  ASSERT_TRUE( z.rfind( '/' ) == StringType::npos );
+
+  StringType const s( "/ab/" );
+  ASSERT_TRUE( s.find_last_of( "/" ) == 3 );
+  ASSERT_TRUE( s.find_last_of( "/", 2 ) == 0 );
+  ASSERT_TRUE( s.find_last_of( "/", 0 ) == 0 );
+  ASSERT_TRUE( s.find_last_of( "x" ) == StringType::npos );
+  ASSERT_TRUE( s.find_last_of( 'a', 0 ) == StringType::npos );
+  ASSERT_TRUE( s.find_last_not_of( "/" ) == 2 );
+  ASSERT_TRUE( s.find_last_not_of( "ab/" ) == StringType::npos );
+  ASSERT_TRUE( s.find_first_of( "/" ) == 0 );
+  ASSERT_TRUE( s.find_first_of( "/", 1 ) == 3 );
+  ASSERT_TRUE( s.find_first_not_of( "/" ) == 1 );
+  ASSERT_TRUE( s.rfind( "/" ) == 3 );
+  ASSERT_TRUE( s.rfind( "/", 2 ) == 0 );
+
+  StringType const e;
+  ASSERT_TRUE( e.find_last_of( "/" ) == StringType::npos );
+  ASSERT_TRUE( e.find_last_not_of( "/" ) == StringType::npos );
+  ASSERT_TRUE( e.rfind( '/' ) == StringType::npos );
+}
+
 static void test_skip_space() {
   char const s[] = "  hello world";
   ascii::size_type const s_len = ::strlen( s );
@@ -857,6 +892,10 @@ int test_string( int, char*[] ) {
   test_ends_with<string>();
   test_ends_with<zstring>();
   test_ends_with<String>();
+
+  test_find_last<string>();
+  test_find_last<zstring>();
+  test_find_last<zstring_p>();
 
   test_getline<string>();
   test_getline<zstring>();

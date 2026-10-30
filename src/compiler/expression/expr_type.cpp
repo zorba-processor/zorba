@@ -966,10 +966,14 @@ static xqtref_t axis_step_type(
     {
       return create_axis_step_type(tm, testNodeKind, testNodeName, inQuant, false);
     }
+    else if (testNodeKind == store::StoreConsts::anyNode)
+    {
+      return RTM.ANY_NODE_TYPE_STAR;
+    }
     else
     {
-      assert(testKind == match_anykind_test);
-      return RTM.ANY_NODE_TYPE_STAR;
+      // Only element or doc nodes are ancestors (e.g. ancestor::namespace-node()).
+      return RTM.EMPTY_TYPE;
     }
 
     break;
@@ -1071,15 +1075,18 @@ self:
     if (inNodeKind == store::StoreConsts::attributeNode ||
         inNodeKind == store::StoreConsts::textNode ||
         inNodeKind == store::StoreConsts::piNode ||
-        inNodeKind == store::StoreConsts::commentNode)
+        inNodeKind == store::StoreConsts::commentNode ||
+        inNodeKind == store::StoreConsts::namespaceNode)
     {
       goto self;
     }
 
-    // if we are looking for document or attribute descendants of a node, only
-    // the "self" node may qualify, so we jump to the axis_kind_self case.
+    // if we are looking for document, attribute or namespace descendants of a
+    // node, only the "self" node may qualify, so we jump to the axis_kind_self
+    // case.
     if (testNodeKind == store::StoreConsts::documentNode ||
-        testNodeKind == store::StoreConsts::attributeNode)
+        testNodeKind == store::StoreConsts::attributeNode ||
+        testNodeKind == store::StoreConsts::namespaceNode)
     {
       goto self;
     }
@@ -1146,6 +1153,7 @@ self:
 
     case store::StoreConsts::attributeNode:
     case store::StoreConsts::documentNode:
+    case store::StoreConsts::namespaceNode:
       return RTM.EMPTY_TYPE;
 
     default:
@@ -1237,6 +1245,10 @@ self:
 
     case store::StoreConsts::commentNode:
       return RTM.COMMENT_TYPE_STAR;
+
+    case store::StoreConsts::namespaceNode:
+      // Namespace nodes are never siblings, followers or predecessors.
+      return RTM.EMPTY_TYPE;
 
     default:
       ZORBA_ASSERT(false);

@@ -6288,8 +6288,10 @@ FTWords :
     ;
 
 // [153]
+// XQFT: FTWordsValue ::= StringLiteral | ("{" Expr "}"); a numeric literal
+// here is a syntax error (it used to be accepted and downcast to StringLiteral).
 FTWordsValue :
-        Literal
+        StringLiteral
         {
             $$ = new FTWordsValue(
                 LOC(@$), static_cast<StringLiteral*>($1), NULL

@@ -84,6 +84,11 @@ Entries marked **(open PR)** come from pull requests that are not merged yet; co
 
 ### Fixed
 
+- Fix a heap buffer over-read in `rstring::find_last_of` when the search starts at index 0 (reached by declaring an external function in a namespace whose URI has a one-character path), found by fuzzing ([#60](https://github.com/zorba-processor/zorba/pull/60)).
+- Fix an internal error (`ZXQP0002`) in static typing of `namespace-node()` steps on the child, descendant, sibling and ancestor axes, found by fuzzing ([#60](https://github.com/zorba-processor/zorba/pull/60)).
+- Fix the full-text grammar accepting any literal where XQFT requires a string literal (`contains text 2 "x"` now raises `XPST0003` instead of an invalid downcast) ([#60](https://github.com/zorba-processor/zorba/pull/60)).
+- Fix misaligned and overrunning blocks in the expression arena allocator: blocks are aligned to `alignof(std::max_align_t)` and requests larger than a page get their own block ([#60](https://github.com/zorba-processor/zorba/pull/60)).
+- Fix `mmap_file` read-write and write-only mappings, which opened the file write-only and failed with `EACCES` ([#60](https://github.com/zorba-processor/zorba/pull/60)).
 - Fix a crash at startup when `ZORBA_URI_PATH` or `ZORBA_LIB_PATH` is unset, and a use-after-free in locale lookup that crashed `format-date` with a language ([#25](https://github.com/zorba-processor/zorba/pull/25)).
 - Fix `fn:replace` with the `q` flag returning an empty string on ICU 78 ([#25](https://github.com/zorba-processor/zorba/pull/25)).
 - Fix a hang in `fn:parse-xml-fragment` and external parsed entities on libxml2 2.12 and later by rewriting the fragment loader on the public push-parser API ([#25](https://github.com/zorba-processor/zorba/pull/25)).
