@@ -986,14 +986,14 @@ store::Item_t DtdXmlLoader::loadXml(
 
     // xmlCtxtUseOptions(ctxt, options);
 
-    // Apply loader options. The previous global defaults were
-    // xmlSubstituteEntitiesDefault(1) and xmlLoadExtDtdDefaultValue |=
-    // XML_DETECT_IDS | XML_COMPLETE_ATTRS; their per-context equivalents are
-    // XML_PARSE_NOENT and XML_PARSE_DTDLOAD | XML_PARSE_DTDATTR.
+    // Apply loader options. Entity substitution used to come from the global
+    // xmlSubstituteEntitiesDefault(1); it is now set per context (XML_PARSE_NOENT).
+    // The former "xmlLoadExtDtdDefaultValue |= XML_DETECT_IDS | XML_COMPLETE_ATTRS"
+    // here only took effect on contexts created after this point, never on
+    // this one, so it has no per-context equivalent.
     store::LoadProperties new_props = theLoadProperties;
     new_props.setSubstituteEntities(true);
     applyLoadOptions(new_props, ctxt);
-    xmlCtxtUseOptions(ctxt, XML_PARSE_DTDLOAD | XML_PARSE_DTDATTR);
 
     if ( xmlParseDocument(ctxt)==-1 )
     {
@@ -1043,9 +1043,9 @@ store::Item_t DtdXmlLoader::loadXml(
     abortload();
     return NULL;
   }
-  else if ( auto const *lastError = xmlCtxtGetLastError(ctxt) )
+  else if ( auto const *lastError = xmlCtxtGetLastError(ctxt);
+            lastError != NULL && lastError->code != XML_ERR_OK )
   {
-    // xmlCtxtGetLastError() returns NULL if the last error code is XML_ERR_OK
     /*
     std::cout << "-- LastErrorCode: " << lastError->code << " " <<
         lastError->message << " wellformed:" << ok << std::endl; std::cout.flush();
