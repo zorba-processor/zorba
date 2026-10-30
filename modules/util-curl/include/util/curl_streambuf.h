@@ -32,6 +32,7 @@
 
 // Zorba
 #include <zorba/config.h>
+#include <zorba/security.h>
 #include <zorba/util/fs_util.h>
 
 namespace zorba {
@@ -155,6 +156,42 @@ CURL* create();
  */
 ZORBA_DLL_PUBLIC
 void destroy( CURL *instance );
+
+////////// security policy ////////////////////////////////////////////////////
+
+/**
+ * Restricts what a cURL handle may connect to, according to a security
+ * policy:
+ *  - only the http, https, ftp and ftps protocols, for the request itself and
+ *    for redirects (CURLOPT_PROTOCOLS_STR, CURLOPT_REDIR_PROTOCOLS_STR);
+ *  - every connection, including connections for redirects and reused
+ *    connections, is checked with SecurityPolicy::checkConnection() against
+ *    the URL being fetched (the redirect target after a redirect) and the
+ *    address actually connected to, so neither a redirect nor a DNS answer
+ *    that differs from the one seen when the URL was checked can reach a
+ *    host the policy denies.
+ *
+ * A policy that restricts neither network nor file access (Network and
+ * FileRead/FileWrite allowed without lists, private addresses allowed)
+ * changes nothing. The restriction stays with the handle until destroy().
+ *
+ * @param instance The cURL handle (from create()).
+ * @param policy The policy.
+ */
+ZORBA_DLL_PUBLIC
+void restrict_to_policy( CURL *instance, SecurityPolicy const &policy );
+
+/**
+ * Tells whether the policy set by restrict_to_policy() refused a connection
+ * of the handle.
+ *
+ * @param instance The cURL handle.
+ * @param reason If not null and a connection was refused, receives a
+ * message naming the URL and the reason.
+ * @return Returns \c true only if a connection was refused.
+ */
+ZORBA_DLL_PUBLIC
+bool policy_denied( CURL *instance, std::string *reason = nullptr );
 
 ////////// streambuf //////////////////////////////////////////////////////////
 

@@ -20,6 +20,7 @@
 
 #include <algorithm>                    /* for equal_range() */
 #include <cstring>                      /* for strcmp(3) */
+#include <filesystem>
 #include <limits>
 
 #include <zorba/internal/cxx_util.h>
@@ -31,6 +32,7 @@
 #include "system/globalenv.h"
 #include "util/fs_util.h"
 #include "util/locale.h"
+#include "util/security_check.h"
 #if DEBUG_FT_THESAURUS
 # include "util/oseparator.h"
 #endif
@@ -569,7 +571,17 @@ bool provider::getThesaurus( iso639_1::type lang,
   std::vector<zstring> lib_path_components;
   sctx.get_full_lib_path( lib_path_components );
   MUTATE_EACH( std::vector<zstring>, path, lib_path_components ) {
+    // The data file must lie in the library directory: the thesaurus URI
+    // (path_) comes from the query and must not lead out of it with "..".
+    // (Compared lexically: a symbolic link placed in the library directory
+    // is as trusted as the libraries there.)
+    std::string const lib_dir(
+      std::filesystem::path( path->str() ).lexically_normal().string() );
     fs::append( *path, file_path );
+    std::string const data_file(
+      std::filesystem::path( path->str() ).lexically_normal().string() );
+    if ( !security::path_within( lib_dir, data_file ) )
+      continue;
     if ( fs::get_type( *path ) == fs::file ) {
       if ( t )
         t->reset( new thesaurus( *path, lang ) );

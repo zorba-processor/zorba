@@ -17,6 +17,7 @@
 
 #include <assert.h>
 #include <algorithm>
+#include <optional>
 
 #include <zorba/external_module.h>
 #include <zorba/serialization_callback.h>
@@ -1973,6 +1974,13 @@ void static_context::apply_url_resolvers(
 
         try
         {
+          // Built-in resolvers run under the policy of this sctx (the file
+          // resolver re-checks the file it opens; the HTTP resolver runs its
+          // request under this policy).
+          std::optional<security::ResolutionScope> lScope;
+          if (lBuiltin)
+            lScope.emplace(*lPolicy, lUse, lTrusted.get());
+
           // Take ownership of returned Resource (if any)
           oResource.reset((**resolver).resolveURL(*url, aEntityData));
           if (oResource.get() != NULL)
@@ -4192,14 +4200,21 @@ void static_context::process_feature_option(
   feature::kind k;
   if (feature::kind_for(featureName->getLocalName().c_str(), k))
   {
-    // Special case: the http-uri-resolution feature is ALWAYS set on the
-    // root static context, to ensure it is applied system-wide.
-    static_context& target = (k != feature::http_resolution) ?
-          *this : GENV.getRootStaticContext();
-    if (enable)
-      target.set_feature(k);
+    if (k == feature::http_resolution)
+    {
+      // http-uri-resolution is Capability::RemoteImport. Disabling it
+      // narrows the policy of this sctx (and so of the queries compiled
+      // with it); enabling it cannot widen a policy: that takes
+      // StaticContext::setSecurityPolicy(). Queries cannot set this option
+      // (ZXQP0061), so only the API gets here.
+      if (!enable)
+        narrow_security_policy(
+            SecurityPolicy::unrestricted().deny(Capability::RemoteImport));
+    }
+    else if (enable)
+      set_feature(k);
     else
-      target.unset_feature(k);
+      unset_feature(k);
   }
   else
   {
