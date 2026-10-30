@@ -173,7 +173,7 @@ bool convert_postfix_to_target_and_selector(
     {
       rchandle<PredicateList> lNewPredicateList =
           new PredicateList(lPredicateList->get_location());
-      for (int i = 0; i < lSize - 1; ++i)
+      for (ulong i = 0; i < lSize - 1; ++i)
       {
         lNewPredicateList->push_back(lPredicateList->operator[](i));
       }
