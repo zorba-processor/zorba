@@ -17,6 +17,10 @@ cmake_minimum_required(VERSION 3.28...4.4)
 SET(CMAKE_CXX_STANDARD 23 CACHE STRING "C++ standard")
 SET(CMAKE_CXX_STANDARD_REQUIRED ON)
 SET(CMAKE_CXX_EXTENSIONS OFF)
+# CMP0155 (NEW since 3.28) scans every C++20+ source for module dependencies.
+# Zorba uses no C++ modules, and the scanner rejects sources that begin a line
+# with the identifier "module" (zorba::module, e.g. in ftp_functions.h).
+SET(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 
 PROJECT(zorba)
 ENABLE_TESTING()
