@@ -431,21 +431,12 @@ void parse_content_type( std::string const &media_type, std::string *mime_type,
       return lResult;
     }
     std::string lName = lData.substr(0, lPos);
-    std::string lValue = lData.substr(lPos + 2);
-    {
-      std::string::size_type lPosition = lValue.size() - 1;
-      while (true) {
-        if (lPosition != std::string::npos) {
-          break;
-        }
-        if (lValue[lPosition] == '\n' || lValue[lPosition] == '\r') {
-          --lPosition;
-        } else {
-          break;
-        }
-      }
-      lValue = lValue.substr(0, lPosition + 1);
-    }
+    // "Name: value"; the value may be empty ("Name:"), and trailing CR/LF
+    // were stripped above.
+    std::string::size_type const lValuePos =
+      lData.find_first_not_of(" \t", lPos + 1);
+    std::string lValue =
+      lValuePos == std::string::npos ? std::string() : lData.substr(lValuePos);
     String lNameS = fn::lower_case( lName );
     if (lNameS == "content-type") {
       parse_content_type(
@@ -464,24 +455,17 @@ void parse_content_type( std::string const &media_type, std::string *mime_type,
 
   void HttpResponseParser::parseStatusAndMessage(std::string const &aHeader)
   {
-    std::string::size_type lPos = aHeader.find(' ');
-    assert(lPos != std::string::npos);
-    std::string lStatus = aHeader.substr(lPos, aHeader.find(' ', lPos + 1));
-    theMessage = aHeader.substr(aHeader.find(' ', lPos + 1) + 1);
-    {
-      std::string::size_type lPosition = theMessage.size() - 1;
-      while (true) {
-        if (lPosition != std::string::npos) {
-          break;
-        }
-        if (theMessage[lPosition] == '\n' || theMessage[lPosition] == '\r') {
-          --lPosition;
-        } else {
-          break;
-        }
-      }
-      theMessage = theMessage.substr(0, lPosition + 1);
-    }
+    // "HTTP/1.1 404 Not Found", "HTTP/1.1 404 " or "HTTP/2 404" (HTTP/2
+    // has no reason phrase); trailing CR/LF were stripped by the caller.
+    std::string::size_type const lPos = aHeader.find(' ');
+    std::string::size_type const lMessagePos =
+      lPos == std::string::npos ? lPos : aHeader.find(' ', lPos + 1);
+    std::string const lStatus = lPos == std::string::npos ? std::string() :
+      aHeader.substr(lPos + 1, lMessagePos == std::string::npos ?
+                                 lMessagePos : lMessagePos - lPos - 1);
+    theMessage = lMessagePos == std::string::npos ?
+      std::string() : aHeader.substr(lMessagePos + 1);
+    theStatus = 0;
     std::stringstream lStream(lStatus);
     lStream >> theStatus;
     // everything that is not a valid http status is an error
