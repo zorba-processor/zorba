@@ -188,6 +188,21 @@ void convert_xquery_re( zstring const &xq_re, zstring *icu_re,
   icu_re->clear();
   icu_re->reserve( xq_re.length() );    // approximate
 
+  if ( q_flag ) {
+    //
+    // XQuery 3.0 F&O 5.6.1.1: with the 'q' flag, all characters in the
+    // regular expression are treated as representing themselves.  ICU's own
+    // literal mode is not used (see regex::compile()), so escape every ASCII
+    // punctuation character; a lone "\" is then valid too.
+    //
+    FOR_EACH( zstring, i, xq_re ) {
+      if ( ascii::is_punct( *i ) )
+        *icu_re += '\\';
+      *icu_re += *i;
+    }
+    return;
+  }
+
   char c;                               // current (raw) XQuery char
   char c_cooked;                        // current cooked XQuery char
   char prev_c_cooked = 0;               // previous c_cooked

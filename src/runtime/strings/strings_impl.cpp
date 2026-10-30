@@ -1553,6 +1553,7 @@ bool FnReplaceIterator::nextImpl(
   zstring pattern;
   zstring replacement;
   zstring resStr;
+  zstring lib_pattern;
   store::Item_t item;
   bool tmp;
 
@@ -1582,7 +1583,10 @@ bool FnReplaceIterator::nextImpl(
 
   try
   {
-    tmp = utf8::match_part(zstring(), pattern, flags.c_str());
+    // Check the translated pattern: the raw one ignores the 'q' flag, so
+    // "a?" with 'q' was taken to match the empty string.
+    convert_xquery_re( pattern, &lib_pattern, flags.c_str() );
+    tmp = utf8::match_part(zstring(), lib_pattern, flags.c_str());
   }
   catch(XQueryException& ex)
   {
@@ -1681,8 +1685,6 @@ bool FnReplaceIterator::nextImpl(
 
   try
   {
-    zstring lib_pattern;
-    convert_xquery_re( pattern, &lib_pattern, flags.c_str() );
     utf8::replace_all(input, lib_pattern, flags.c_str(), replacement, &resStr);
   }
   catch(XQueryException& ex)
