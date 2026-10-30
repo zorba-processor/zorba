@@ -19,8 +19,14 @@
 #include <cstdlib>
 #include <cstring>                      /* for memcpy(3) */
 #include <iostream>
-#ifndef WIN32
+#ifdef WIN32
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#else
+#include <arpa/inet.h>
 #include <cerrno>
+#include <netinet/in.h>
+#include <sys/socket.h>
 #include <sys/time.h>
 #endif /* WIN32 */
 
@@ -104,10 +110,152 @@ CURL* create() {
   throw exception( "curl_easy_init()", "", "" );
 }
 
+namespace {
+
+/**
+ * The policy attached to a handle by restrict_to_policy(), reachable from
+ * the handle through CURLOPT_PRIVATE and freed by destroy().
+ */
+struct policy_guard {
+  SecurityPolicy policy;
+  CURL *curl;
+  std::string denied;                   // the first refusal, if any
+
+  policy_guard( SecurityPolicy const &p, CURL *c ) : policy( p ), curl( c ) { }
+};
+
+policy_guard* get_guard( CURL *instance ) {
+  char *p = nullptr;
+  if ( curl_easy_getinfo( instance, CURLINFO_PRIVATE, &p ) != CURLE_OK )
+    return nullptr;
+  return reinterpret_cast<policy_guard*>( p );
+}
+
+// A URL for a message: without user name and password.
+std::string without_userinfo( char const *url ) {
+  std::string u( url ? url : "" );
+  std::string::size_type const start = u.find( "://" );
+  if ( start != std::string::npos ) {
+    std::string::size_type const end = u.find_first_of( "/?#", start + 3 );
+    std::string::size_type const at = u.rfind( '@', end );
+    if ( at != std::string::npos && at > start )
+      u.erase( start + 3, at + 1 - ( start + 3 ) );
+  }
+  return u;
+}
+
+bool guard_allows( policy_guard *g, char const *address ) {
+  // After a redirect, the effective URL is the redirect target.
+  char *url = nullptr;
+  curl_easy_getinfo( g->curl, CURLINFO_EFFECTIVE_URL, &url );
+  String reason;
+  if ( g->policy.checkConnection( url ? url : "", address ? address : "",
+                                  &reason ) )
+    return true;
+  if ( g->denied.empty() ) {
+    g->denied = '"';
+    g->denied += without_userinfo( url );
+    g->denied += "\": URI access not allowed: ";
+    g->denied += reason.str();
+  }
+  return false;
+}
+
+// Checks the address before the socket is created, so a denied address is
+// never connected to.
+curl_socket_t guard_open_socket( void *clientp, curlsocktype,
+                                 struct curl_sockaddr *addr ) {
+  policy_guard *const g = static_cast<policy_guard*>( clientp );
+  char buf[ INET6_ADDRSTRLEN ] = "";
+  if ( addr->family == AF_INET )
+    inet_ntop( AF_INET,
+               &reinterpret_cast<sockaddr_in*>( &addr->addr )->sin_addr,
+               buf, sizeof buf );
+  else if ( addr->family == AF_INET6 )
+    inet_ntop( AF_INET6,
+               &reinterpret_cast<sockaddr_in6*>( &addr->addr )->sin6_addr,
+               buf, sizeof buf );
+  if ( !guard_allows( g, buf ) )
+    return CURL_SOCKET_BAD;
+  return socket( addr->family, addr->socktype, addr->protocol );
+}
+
+#if LIBCURL_VERSION_NUM >= 0x075000     /* 7.80.0 */
+// Called for every request, also on a reused connection, before anything is
+// sent: checks the URL (e.g. a redirect to another path of the same host)
+// and the address connected to.
+int guard_prereq( void *clientp, char *conn_primary_ip, char*, int, int ) {
+  return guard_allows( static_cast<policy_guard*>( clientp ), conn_primary_ip )
+    ? CURL_PREREQFUNC_OK : CURL_PREREQFUNC_ABORT;
+}
+#endif
+
+bool restricts_nothing( SecurityPolicy const &p ) {
+  return p.allows( Capability::Network ) && p.getNetworkPrefixes().empty() &&
+         p.allowsPrivateAddresses() &&
+         p.allows( Capability::FileRead ) && p.getReadPaths().empty() &&
+         p.allows( Capability::FileWrite ) && p.getWritePaths().empty();
+}
+
+} // anonymous namespace
+
+void restrict_to_policy( CURL *instance, SecurityPolicy const &policy ) {
+  if ( !instance || restricts_nothing( policy ) )
+    return;
+
+  delete get_guard( instance );
+  policy_guard *const g = new policy_guard( policy, instance );
+  if ( curl_easy_setopt( instance, CURLOPT_PRIVATE, g ) != CURLE_OK ) {
+    delete g;
+    throw exception( "curl_easy_setopt(CURLOPT_PRIVATE)", "" );
+  }
+
+#if LIBCURL_VERSION_NUM >= 0x075500     /* 7.85.0 */
+  ZORBA_CURL_ASSERT(
+    curl_easy_setopt( instance, CURLOPT_PROTOCOLS_STR, "http,https,ftp,ftps" )
+  );
+  ZORBA_CURL_ASSERT(
+    curl_easy_setopt( instance, CURLOPT_REDIR_PROTOCOLS_STR,
+                      "http,https,ftp,ftps" )
+  );
+#else
+  long const protocols =
+    CURLPROTO_HTTP | CURLPROTO_HTTPS | CURLPROTO_FTP | CURLPROTO_FTPS;
+  ZORBA_CURL_ASSERT( curl_easy_setopt( instance, CURLOPT_PROTOCOLS, protocols ) );
+  ZORBA_CURL_ASSERT(
+    curl_easy_setopt( instance, CURLOPT_REDIR_PROTOCOLS, protocols )
+  );
+#endif
+
+  ZORBA_CURL_ASSERT(
+    curl_easy_setopt( instance, CURLOPT_OPENSOCKETFUNCTION, guard_open_socket )
+  );
+  ZORBA_CURL_ASSERT( curl_easy_setopt( instance, CURLOPT_OPENSOCKETDATA, g ) );
+#if LIBCURL_VERSION_NUM >= 0x075000     /* 7.80.0 */
+  ZORBA_CURL_ASSERT(
+    curl_easy_setopt( instance, CURLOPT_PREREQFUNCTION, guard_prereq )
+  );
+  ZORBA_CURL_ASSERT( curl_easy_setopt( instance, CURLOPT_PREREQDATA, g ) );
+#endif
+}
+
+bool policy_denied( CURL *instance, std::string *reason ) {
+  if ( !instance )
+    return false;
+  policy_guard const *const g = get_guard( instance );
+  if ( !g || g->denied.empty() )
+    return false;
+  if ( reason )
+    *reason = g->denied;
+  return true;
+}
+
 void destroy( CURL *instance ) {
   if ( instance ) {
+    policy_guard *const g = get_guard( instance );
     curl_easy_reset( instance );
     curl_easy_cleanup( instance );
+    delete g;
   }
 }
 
