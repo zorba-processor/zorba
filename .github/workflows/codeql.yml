@@ -1,0 +1,51 @@
+name: CodeQL
+
+on:
+  push:
+    branches: [master, security-static]
+  pull_request:
+  schedule:
+    - cron: '0 5 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: Analyze (c-cpp)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    permissions:
+      security-events: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      # Same package set as docker/builder/Dockerfile (Ubuntu 24.04). CodeQL has
+      # to observe the compiler, so the build runs directly on the runner.
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build pkg-config bison flex \
+            libicu-dev libxml2-dev libxslt1-dev libcurl4-openssl-dev zlib1g-dev \
+            libxerces-c-dev uuid-dev
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: c-cpp
+          build-mode: manual
+          queries: security-extended
+
+      - name: Build
+        run: |
+          cmake --preset full-release
+          cmake --build --preset full-release
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: /language:c-cpp
