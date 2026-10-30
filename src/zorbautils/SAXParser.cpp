@@ -72,7 +72,16 @@ bool zorba::SAXParser::parseDocument(store::Item_t& result, std::istream& stream
   theHandler.error = &SAXParser::error;
   theHandler.warning = &SAXParser::warning;
 
-  xmlSAXUserParseMemory(&theHandler, (void *) this, xmlText.c_str(), (int)xmlText.size());
+  // xmlSAXUserParseMemory() is deprecated; a push parser context with the same
+  // SAX handler and user data, fed the whole text at once, is equivalent.
+  xmlParserCtxtPtr ctxt = xmlCreatePushParserCtxt(&theHandler, (void *) this,
+                                                  NULL, 0, NULL);
+  if (ctxt != NULL)
+  {
+    xmlParseChunk(ctxt, xmlText.c_str(), (int)xmlText.size(), 0);
+    xmlParseChunk(ctxt, NULL, 0, 1);
+    xmlFreeParserCtxt(ctxt);
+  }
   result = theResult;
   return theSucceeded;
 }
