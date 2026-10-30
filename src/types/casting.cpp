@@ -1214,8 +1214,18 @@ T1_TO_T2(dec, dbl)
 
 T1_TO_T2(dec, int)
 {
-  aFactory->createInteger(result, xs_integer(aItem->getDecimalValue()));
-  return true;
+  try
+  {
+    aFactory->createInteger(result, xs_integer(aItem->getDecimalValue()));
+    return true;
+  }
+  catch (const std::range_error&)
+  {
+    // Without big integers, a decimal can exceed the xs:integer range.
+    if ( throw_on_error )
+      throwFOCA0003Exception(aItem->getStringValue(), errInfo);
+  }
+  return false;
 }
 
 

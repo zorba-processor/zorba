@@ -184,9 +184,19 @@ bool loader::next( store::Item_t *result ) {
         case token::number:
           switch ( t.get_numeric_type() ) {
             case token::integer:
-              GENV_ITEMFACTORY->createInteger(
-                item, xs_integer( t.get_value() )
-              );
+              try {
+                GENV_ITEMFACTORY->createInteger(
+                  item, xs_integer( t.get_value() )
+                );
+              }
+              catch ( std::range_error const& ) {
+                // Without big integers, xs:integer is 64-bit.
+                throw XQUERY_EXCEPTION(
+                  err::FOAR0002,
+                  ERROR_PARAMS( t.get_value() ),
+                  ERROR_LOC( t.get_loc() )
+                );
+              }
               break;
             case token::decimal:
               GENV_ITEMFACTORY->createDecimal(

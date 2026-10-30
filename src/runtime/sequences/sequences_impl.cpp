@@ -1433,7 +1433,15 @@ bool FnSumIntegerIterator::nextImpl(
         break;
       }
 
-      sum += item->getIntegerValue();
+      try
+      {
+        sum += item->getIntegerValue();
+      }
+      catch (ZorbaException& e)
+      {
+        set_source(e, loc, false);   // err:FOAR0002 on overflow
+        throw;
+      }
     }
 
     GENV_ITEMFACTORY->createInteger(result, sum);
@@ -1480,12 +1488,15 @@ OpToIterator::nextImpl(store::Item_t& result, PlanState& planState) const {
       if ( state->theLastVal >= state->theFirstVal )
       {
         state->theCurInt = state->theFirstVal;
-        while ( state->theCurInt <= state->theLastVal )
+        while ( true )
         {
           STACK_PUSH(GENV_ITEMFACTORY->createInteger(result, state->theCurInt), state);
+          // Stop before incrementing: past the largest xs:integer the
+          // increment would overflow.
+          if ( state->theCurInt == state->theLastVal )
+            break;
           ++state->theCurInt;
         }
-
       }
     }
   }
