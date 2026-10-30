@@ -216,6 +216,17 @@ FOREACH(TESTFILE ${TESTFILES})
   IF(TESTNAME MATCHES "w3c_testsuite/TestSources/")
     SET (SKIP_TEST 1)
   ENDIF(TESTNAME MATCHES "w3c_testsuite/TestSources/")
+  # xs:integer overflow: the same queries must raise an error when xs:integer
+  # is a 64-bit long long and return the exact result with big integers.
+  IF (ZORBA_WITH_BIG_INTEGER)
+    IF (TESTNAME MATCHES "^test/rbkt/zorba/numerics/integer-overflow/")
+      SET (SKIP_TEST 1)
+    ENDIF ()
+  ELSE (ZORBA_WITH_BIG_INTEGER)
+    IF (TESTNAME MATCHES "^test/rbkt/zorba/numerics/integer-overflow-bigint/")
+      SET (SKIP_TEST 1)
+    ENDIF ()
+  ENDIF (ZORBA_WITH_BIG_INTEGER)
   IF(WIN32)
     #this test fails on Windows because cannot find ourlib.dll
     #bug 908062
