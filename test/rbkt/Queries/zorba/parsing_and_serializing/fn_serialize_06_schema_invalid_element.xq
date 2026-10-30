@@ -1,4 +1,4 @@
-(: testing for error XQDY0027 if the wrong element name was provided :)
+(: testing for error XPTY0004 if the wrong element name was provided :)
 
 let $params :=
   <serialization-parameters xmlns="http://www.w3.org/2010/xslt-xquery-serialization">

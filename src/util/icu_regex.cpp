@@ -630,6 +630,22 @@ unescaped_char:
 
 namespace unicode {
 
+//
+// Bound on the work ICU may do for one match operation, in ICU match-engine
+// steps (on the order of milliseconds each). Patterns with nested nullable
+// quantifiers, e.g. "(?:r?)*?r" (QT3 fn-matches-50, test p1030), otherwise
+// never return.
+//
+static int32_t const regex_time_limit = 10000;
+
+static void check_regex_status( UErrorCode status ) {
+  if ( status == U_REGEX_TIME_OUT )
+    throw XQUERY_EXCEPTION(
+      zerr::ZXQP0001_DYNAMIC_RUNTIME_ERROR,
+      ERROR_PARAMS( "regular expression match exceeded the time limit" )
+    );
+}
+
 void regex::compile( string const &u_pattern, char const *flags,
                      char const *pattern ) {
   icu_flags_type const icu_flags =
@@ -648,6 +664,7 @@ void regex::compile( string const &u_pattern, char const *flags,
     }
     throw INVALID_RE_EXCEPTION( pattern, icu_error_key );
   }
+  matcher_->setTimeLimit( regex_time_limit, status );
 }
 
 int regex::get_group_count() const {
@@ -679,14 +696,19 @@ bool regex::get_group_start_end( int *start, int *end, int group ) const {
 bool regex::match_part( string const &s ) {
   ZORBA_ASSERT( matcher_ );
   matcher_->reset( s );
-  return !!matcher_->find();
+  UErrorCode status = U_ZERO_ERROR;
+  bool const found = !!matcher_->find( status );
+  check_regex_status( status );
+  return found;
 }
 
 bool regex::match_whole( string const &s ) {
   ZORBA_ASSERT( matcher_ );
   matcher_->reset( s );
   UErrorCode status = U_ZERO_ERROR;
-  return matcher_->matches( status ) && U_SUCCESS( status );
+  bool const matched = matcher_->matches( status );
+  check_regex_status( status );
+  return matched && U_SUCCESS( status );
 }
 
 bool regex::next( re_type_t re_type, string const &s, size_type *pos,
@@ -697,7 +719,9 @@ bool regex::next( re_type_t re_type, string const &s, size_type *pos,
   if ( *pos < s_len ) {
     matcher_->reset( s );
     UErrorCode status = U_ZERO_ERROR;
-    if ( matcher_->find( *pos, status ) ) {
+    bool const found = !!matcher_->find( *pos, status );
+    check_regex_status( status );
+    if ( found ) {
       size_type const end = matcher_->end( status );
       if ( substring ) {
         size_type const start = matcher_->start( status );
@@ -741,7 +765,9 @@ bool regex::next( re_type_t re_type, string const &s, size_type *pos,
 
 bool regex::next_match( bool *reached_end ) {
   ZORBA_ASSERT( matcher_ );
-  bool const found = !!matcher_->find();
+  UErrorCode status = U_ZERO_ERROR;
+  bool const found = !!matcher_->find( status );
+  check_regex_status( status );
   if ( reached_end ) {
 #if U_ICU_VERSION_MAJOR_NUM >= 4
     *reached_end = !!matcher_->hitEnd();
@@ -759,6 +785,7 @@ bool regex::replace_all( string const &in, string const &replacement,
   matcher_->reset( in );
   UErrorCode status = U_ZERO_ERROR;
   *out = matcher_->replaceAll( replacement, status );
+  check_regex_status( status );
   return U_SUCCESS( status ) == true;
 }
 

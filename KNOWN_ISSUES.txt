@@ -34,6 +34,15 @@ Zorba Version 2.0
   For details, see following bug:
   - 3137594 <https://bugs.launchpad.net/zorba/+bug/sf-3137594>
 
+* Xerces-C (3.3.0 and its master branch) rejects a schema that restricts an
+  element of a union type to a restriction of that union (allowed by
+  XML Schema 1.0, Type Derivation OK (Simple)): with schema full checking,
+  which Zorba enables, the import fails with XQST0059 "element ... has type
+  that does not derive from type of corresponding element in the base".
+  UnionDatatypeValidator::isSubstitutableBy() checks the member types only.
+  The QT3 test-cases importing prod/SchemaImport/unionListDefined.xsd are
+  marked not applicable in test/fots_driver/FOTSZorbaManifest.xml.
+
 * XQuery Full-Text is mostly, but not completely, implemented.
   For details, see following bugs:
   - 3172383 <https://bugs.launchpad.net/zorba/+bug/sf-3172383>
