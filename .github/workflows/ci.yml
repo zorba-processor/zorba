@@ -88,6 +88,7 @@ jobs:
   profiles:
     name: profile ${{ matrix.preset }} (linux-amd64, Arch)
     runs-on: ubuntu-24.04
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -124,7 +125,7 @@ jobs:
               ccache -s
               scripts/profile-size.sh ${{ matrix.preset }} > build/size.md
               cat build/size.md
-              ctest --preset ${{ matrix.preset }} -j"$(nproc)" \
+              ctest --preset ${{ matrix.preset }} -j"$(nproc)" --timeout 60 \
                 --output-junit junit.xml > build/ctest.log 2>&1 || { tail -n 60 build/ctest.log; exit 1; }
               tail -n 5 build/ctest.log'
 
