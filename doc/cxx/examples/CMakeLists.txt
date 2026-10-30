@@ -34,6 +34,12 @@ SET(API_EXAMPLES
   jsoniq.cpp
 )
 
+IF(ZORBA_NO_XMLSCHEMA)
+  # example 5 passes ParseOptions, which are validated against the xml options
+  # schema.
+  LIST(REMOVE_ITEM API_EXAMPLES xmldatamanager.cpp)
+ENDIF(ZORBA_NO_XMLSCHEMA)
+
 IF(ZORBA_WITH_DEBUGGER)
 #  LIST(APPEND API_EXAMPLES debugger.cpp)
 ENDIF(ZORBA_WITH_DEBUGGER)
