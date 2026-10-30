@@ -236,9 +236,16 @@
         substitutionGroup="output:serialization-parameter-element"/>
 
   <!--
+     - Serialization parameter element for item-separator parameter
+    -->
+  <xs:element id="item-separator" name="item-separator"
+        type="output:string-param-type"
+        substitutionGroup="output:serialization-parameter-element"/>
+
+  <!--
      - Serialization parameter element for media-type parameter
     -->
-  <xs:element id="media-type" name="media-type" type="output:yes-no-param-type"
+  <xs:element id="media-type" name="media-type" type="output:string-param-type"
         substitutionGroup="output:serialization-parameter-element"/>
 
   <!--
@@ -326,12 +333,17 @@
         type="output:string-param-type"
         substitutionGroup="output:serialization-parameter-element"/>
 
+  <!--
+     - Zorba: elements in other namespaces (implementation-defined
+     - parameters of other processors) are allowed and ignored, as the
+     - QT3 test suite expects (fn-serialize/serialize-xml-007a, -026).
+    -->
   <xs:element name="serialization-parameters">
     <xs:complexType>
-      <xs:sequence>
-        <xs:element ref="output:serialization-parameter-element"
-              minOccurs="0" maxOccurs="unbounded"/>
-      </xs:sequence>
+      <xs:choice minOccurs="0" maxOccurs="unbounded">
+        <xs:element ref="output:serialization-parameter-element"/>
+        <xs:any namespace="##other" processContents="skip"/>
+      </xs:choice>
     </xs:complexType>
   </xs:element>
 </xs:schema>

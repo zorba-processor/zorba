@@ -720,6 +720,30 @@ declare function env:mapper(
  :         that was not met, describing the dependency. If all dependencies
  :         are met, the empty sequence is returned.
  :)
+(:~
+ : Checks the not-applicable entries of the Zorba manifest against a
+ : test-case. An entry
+ :   <not-applicable schema-namespace="URI" reason="..."/>
+ : makes every test-case whose query refers to the schema namespace URI not
+ : applicable; it is used for test schemas that the XML Schema processor
+ : (Xerces-C) cannot load.
+ :
+ : @param $testCase the test-case.
+ : @param $zorbaManifest the Zorba manifest.
+ : @return the reasons why the test-case is not applicable, if any.
+ :)
+declare function env:check-not-applicable(
+  $testCase       as element(fots:test-case),
+  $zorbaManifest  as node()
+) as xs:string*
+{
+  let $query := string-join($testCase/fots:test//text(), "")
+  for $na in $zorbaManifest//fots:not-applicable[@schema-namespace]
+  where contains($query, data($na/@schema-namespace))
+  return concat("Not applicable in Zorba: ", data($na/@reason), " ")
+};
+
+
 declare function env:check-dependencies(
   $deps           as element(fots:dependency)*,
   $zorbaManifest  as node()

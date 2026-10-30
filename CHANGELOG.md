@@ -32,7 +32,7 @@ Entries marked **(open PR)** come from pull requests that are not merged yet; co
 - Bump the serialized execution plan format from version 25 to 26; plans saved by older builds no longer load ([#44](https://github.com/zorba-processor/zorba/pull/44)).
 - The `http-uri-resolution` feature is now the `RemoteImport` capability: disabling it applies to the context it is declared on, not the whole process, and remote module or schema imports then fail with `ZXQP0029` instead of `XQST0059` ([#66](https://github.com/zorba-processor/zorba/pull/66)).
 - Raise `err:FOAR0002` on `xs:integer` overflow instead of silently wrapping around (64-bit builds); out-of-range string casts to `xs:integer` raise `FOCA0003`, and JSON integers beyond 64 bits parse as `xs:decimal` ([#53](https://github.com/zorba-processor/zorba/pull/53)).
-- Announce removal of the SWIG language bindings (`swig/`); they are not built or tested in CI and will be replaced by a stable C API with native bindings in a later release.
+- Remove the SWIG language bindings (Java, XQJ, Python, Ruby, PHP, C#) and the `ZORBA_SUPPRESS_SWIG` option. A stable C API with native bindings is planned for a later release; the existing C API (`include/zorba/zorbac.h`) is unchanged ([#61](https://github.com/zorba-processor/zorba/pull/61)).
 
 ### Security
 
@@ -53,6 +53,7 @@ Entries marked **(open PR)** come from pull requests that are not merged yet; co
 
 ### Added
 
+- Add differential testing against Saxon-HE (`.github/workflows/differential.yml`, `test/differential/`): weekly and on demand, the plain XQuery 3.0 rbkt queries run on Zorba and Saxon-HE and disagreements are classified in an informational report ([#65](https://github.com/zorba-processor/zorba/pull/65)).
 - Add the security policy API: `SecurityPolicy` with capabilities (`ExternalEntities`, `FileRead`, `FileWrite`, `Network`, `RemoteImport`, `Environment`, `NativeModules`), allow-lists, limits and `secure()`/`unrestricted()` presets; queries can never widen the policy of their context; new error codes `ZXQP0067`, `ZXQP0068`, `ZXQP0069` ([#44](https://github.com/zorba-processor/zorba/pull/44)).
 - Add `err:ZXQP0029` for refused external resources during XML loading ([#51](https://github.com/zorba-processor/zorba/pull/51)).
 - Add a documentation site (XQuery, JSONiq and Zorba tutorials, cheat sheet) on GitHub Pages; all 59 code examples are run in CI and the shown output is verified ([#30](https://github.com/zorba-processor/zorba/pull/30)).
@@ -69,6 +70,7 @@ Entries marked **(open PR)** come from pull requests that are not merged yet; co
 - Add a pull request template with a changelog line.
 - Add `SecurityPolicy::checkURI()` to test a URI against a policy ([#56](https://github.com/zorba-processor/zorba/pull/56)).
 - Add `SecurityPolicy::checkConnection()` and `SecurityPolicy::openFile()`, a `checkURI()` overload that reports the reason, and `curl::restrict_to_policy()` in util-curl ([#66](https://github.com/zorba-processor/zorba/pull/66)).
+- Add a release workflow for `v*` tags: tests on linux-amd64, then publishes a source tarball, SPDX SBOMs, `SHA256SUMS` and signed build provenance attestations on a draft GitHub Release with notes from this changelog, and tags the multi-arch `zorba` image as `<version>` (plus `<major>.<minor>`, `<major>` and `latest` for stable releases only); master builds now publish `zorba:edge` instead of moving `latest`. See `RELEASING.md` and `docker/README.md`.
 
 ### Changed
 
@@ -87,6 +89,11 @@ Entries marked **(open PR)** come from pull requests that are not merged yet; co
 
 ### Fixed
 
+- Fix a heap buffer over-read in `rstring::find_last_of` when the search starts at index 0 (reached by declaring an external function in a namespace whose URI has a one-character path), found by fuzzing ([#60](https://github.com/zorba-processor/zorba/pull/60)).
+- Fix an internal error (`ZXQP0002`) in static typing of `namespace-node()` steps on the child, descendant, sibling and ancestor axes, found by fuzzing ([#60](https://github.com/zorba-processor/zorba/pull/60)).
+- Fix the full-text grammar accepting any literal where XQFT requires a string literal (`contains text 2 "x"` now raises `XPST0003` instead of an invalid downcast) ([#60](https://github.com/zorba-processor/zorba/pull/60)).
+- Fix misaligned and overrunning blocks in the expression arena allocator: blocks are aligned to `alignof(std::max_align_t)` and requests larger than a page get their own block ([#60](https://github.com/zorba-processor/zorba/pull/60)).
+- Fix `mmap_file` read-write and write-only mappings, which opened the file write-only and failed with `EACCES` ([#60](https://github.com/zorba-processor/zorba/pull/60)).
 - Fix a crash at startup when `ZORBA_URI_PATH` or `ZORBA_LIB_PATH` is unset, and a use-after-free in locale lookup that crashed `format-date` with a language ([#25](https://github.com/zorba-processor/zorba/pull/25)).
 - Fix `fn:replace` with the `q` flag returning an empty string on ICU 78 ([#25](https://github.com/zorba-processor/zorba/pull/25)).
 - Fix a hang in `fn:parse-xml-fragment` and external parsed entities on libxml2 2.12 and later by rewriting the fragment loader on the public push-parser API ([#25](https://github.com/zorba-processor/zorba/pull/25)).
@@ -99,9 +106,15 @@ Entries marked **(open PR)** come from pull requests that are not merged yet; co
 - Fix `jn:parse-json` raising an internal error on out-of-range numbers; it now raises `FOAR0002`, and integers beyond 64 bits parse as `xs:decimal` ([#37](https://github.com/zorba-processor/zorba/pull/37), [#53](https://github.com/zorba-processor/zorba/pull/53)).
 - Fix per-test CTest timeouts, which were never applied because `ZORBA_ADD_TEST` read a removed variable ([#53](https://github.com/zorba-processor/zorba/pull/53)).
 - Fix destruction order of expressions and FLWOR clauses, which was undefined behavior in every FLWOR query ([#37](https://github.com/zorba-processor/zorba/pull/37)).
+- Fix crashes found by the W3C QT3 suite: `xs:base64Binary(xs:hexBinary(""))`, `fn:unparsed-text-available(())`, an inline function with an empty body (now returns the empty sequence), and the http-client module on status lines without a reason phrase (HTTP/2) or empty header values, which aborted `fn:unparsed-text` on missing `http:` resources ([#64](https://github.com/zorba-processor/zorba/pull/64)).
+- Fix `fn:serialize` error codes for bad `$params`: `XPTY0004` for a wrong element, `SEPM0017` for invalid parameters, `SEPM0019` for duplicates; parameters in other namespaces are ignored and `item-separator` is accepted ([#64](https://github.com/zorba-processor/zorba/pull/64)).
+- Fix `fn:format-number` with a zero integer part when the picture has no mandatory integer digit (`.2`, `.0`), irregular grouping separators, adjacent or trailing grouping separators (`FODF1310`), overflow to infinity and negative zero ([#64](https://github.com/zorba-processor/zorba/pull/64)).
+- Fix fractional seconds (`[f]`) in `format-dateTime`/`format-time`: digit family, truncation, optional digits, grouping separators and width modifiers follow F&O 3.1; invalid width modifiers raise `FOFD1340` ([#64](https://github.com/zorba-processor/zorba/pull/64)).
+- Fix regular expressions that never finished in ICU (e.g. `(?:r?)*?r`): matching now has a time limit and raises `ZXQP0001` when it is exceeded ([#64](https://github.com/zorba-processor/zorba/pull/64)).
 
 ### Removed
 
+- Remove the SWIG language bindings: the `swig/` directory, the `ZORBA_SUPPRESS_SWIG` option, SWIG/PHP/Python lookups in CMake, the per-language Doxygen projects and examples, and the matching CPack components and NOTICE entries ([#61](https://github.com/zorba-processor/zorba/pull/61)).
 - Remove Windows support code paths ([#27](https://github.com/zorba-processor/zorba/pull/27)).
 - Remove the `zorbautils/SAXParser` class and the `ZORBA_WITH_LIBXML2_SAX` option ([#51](https://github.com/zorba-processor/zorba/pull/51)).
 - Remove 91 stale `EXPECTED_FAILURE` test entries ([#25](https://github.com/zorba-processor/zorba/pull/25)).

@@ -1,0 +1,213 @@
+# Differential testing of Zorba against Saxon-HE (test/differential).
+#
+# Runs the plain XQuery 3.0 queries of the rbkt suite on both processors and
+# reports where they disagree (summary.md and results.tsv in the
+# differential-report artifact, and the job summary). Disagreements are
+# informational: the workflow fails only on harness errors (a processor
+# that cannot run a trivial query, a shard that does not finish).
+#
+# Saxon-HE and its xmlresolver dependency come from Maven Central, pinned by
+# version and SHA-256. Bump SAXON_VERSION together with the checksums (and
+# XMLRESOLVER_VERSION if the Saxon-HE POM changes it).
+name: Differential (Saxon-HE)
+
+on:
+  workflow_dispatch:
+    inputs:
+      filter:
+        description: Comma-separated query id prefixes under test/rbkt/Queries/zorba (empty = all)
+        required: false
+        default: ''
+      shards:
+        description: Number of parallel shards
+        required: false
+        default: '2'
+  schedule:
+    - cron: '41 5 * * 2'
+  pull_request:
+    paths:
+      - .github/workflows/differential.yml
+      - test/differential/**
+
+concurrency:
+  group: differential-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  SAXON_VERSION: '13.1'
+  SAXON_SHA256: 91986ee8d80c4bafce10decfff01e618c00bd6368f0103da59b2b88b19cf75d3
+  XMLRESOLVER_VERSION: '6.1.0'
+  XMLRESOLVER_SHA256: bf787a469cfc591e3a896dc8ef388c2c8bce11500cc7d37aed16113728382033
+  XMLRESOLVER_DATA_SHA256: 1d6e4db99401ae8ba3c390ab7cb4d794a46084e1a36bdcafae91e2338e7c5b0d
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    outputs:
+      shards: ${{ steps.shards.outputs.list }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Harness unit tests
+        run: python3 -m unittest discover -s test/differential -v
+
+      - id: shards
+        run: |
+          n="${{ inputs.shards || '2' }}"
+          echo "list=$(python3 -c "import json,sys; print(json.dumps(list(range(int(sys.argv[1])))))" "$n")" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Build the builder image
+        uses: docker/build-push-action@v7
+        with:
+          context: docker/builder-latest
+          load: true
+          tags: zorba-builder:ci
+          cache-from: type=gha,scope=builder-linux-amd64-latest
+          cache-to: type=gha,mode=max,scope=builder-linux-amd64-latest
+
+      - uses: actions/cache@v6
+        with:
+          path: .ccache
+          key: ccache-differential-${{ github.sha }}
+          restore-keys: |
+            ccache-differential-
+            ccache-qt3-
+            ccache-linux-amd64-latest-
+
+      - name: Build
+        run: |
+          docker run --rm \
+            -e CCACHE_DIR=/src/.ccache \
+            -e CCACHE_SLOPPINESS=pch_defines,time_macros \
+            -v "$PWD":/src -w /src zorba-builder:ci sh -ec '
+              cmake --preset full-release
+              cmake --build --preset full-release
+              ccache -s
+              # The test machines mount the checkout at the same path, so
+              # the build tree runs in place; object files are not needed.
+              tar --zstd -cf zorba-build.tar.zst --exclude=CMakeFiles build/full-release'
+          ls -lh zorba-build.tar.zst
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: zorba-build
+          path: zorba-build.tar.zst
+          retention-days: 3
+          compression-level: 0
+
+  run:
+    needs: build
+    name: run (shard ${{ matrix.shard }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON(needs.build.outputs.shards) }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Build the builder image
+        uses: docker/build-push-action@v7
+        with:
+          context: docker/builder-latest
+          load: true
+          tags: zorba-builder:ci
+          cache-from: type=gha,scope=builder-linux-amd64-latest
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: zorba-build
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '25'
+          java-package: jre
+
+      - uses: actions/cache@v6
+        id: saxoncache
+        with:
+          path: saxon
+          key: saxon-he-${{ env.SAXON_VERSION }}-${{ env.SAXON_SHA256 }}-${{ env.XMLRESOLVER_SHA256 }}
+
+      - name: Fetch Saxon-HE
+        if: steps.saxoncache.outputs.cache-hit != 'true'
+        run: |
+          m=https://repo1.maven.org/maven2
+          mkdir -p saxon
+          curl -fsSL -o saxon/saxon-he.jar \
+            "$m/net/sf/saxon/Saxon-HE/$SAXON_VERSION/Saxon-HE-$SAXON_VERSION.jar"
+          curl -fsSL -o saxon/xmlresolver.jar \
+            "$m/org/xmlresolver/xmlresolver/$XMLRESOLVER_VERSION/xmlresolver-$XMLRESOLVER_VERSION.jar"
+          curl -fsSL -o saxon/xmlresolver-data.jar \
+            "$m/org/xmlresolver/xmlresolver/$XMLRESOLVER_VERSION/xmlresolver-$XMLRESOLVER_VERSION-data.jar"
+
+      - name: Verify Saxon-HE checksums
+        run: |
+          printf '%s  %s\n' \
+            "$SAXON_SHA256" saxon/saxon-he.jar \
+            "$XMLRESOLVER_SHA256" saxon/xmlresolver.jar \
+            "$XMLRESOLVER_DATA_SHA256" saxon/xmlresolver-data.jar \
+            | sha256sum -c -
+
+      - name: Run shard ${{ matrix.shard }}
+        run: |
+          # The Temurin JRE from setup-java is mounted into the builder
+          # container, which has the Zorba runtime libraries.
+          docker run --rm \
+            -v "$JAVA_HOME":/opt/java:ro \
+            -v "$PWD":/src -w /src zorba-builder:ci sh -ec '
+              tar --zstd -xf zorba-build.tar.zst
+              python3 test/differential/difftest.py run \
+                --zorba build/full-release/bin/zorba \
+                --java /opt/java/bin/java \
+                --saxon-classpath saxon/saxon-he.jar:saxon/xmlresolver.jar:saxon/xmlresolver-data.jar \
+                --filter "${{ inputs.filter }}" \
+                --shard ${{ matrix.shard }} \
+                --shards ${{ strategy.job-total }} \
+                --jobs "$(nproc)" \
+                --timeout 30 \
+                --out diff-out'
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: differential-shard-${{ matrix.shard }}
+          path: diff-out
+          retention-days: 30
+
+  report:
+    needs: [build, run]
+    if: always() && needs.build.result == 'success'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: differential-shard-*
+          path: shards
+
+      - name: Report
+        run: |
+          python3 test/differential/difftest.py report shards/*/ \
+            --expect-shards "${{ inputs.shards || '2' }}" \
+            --saxon-version "$SAXON_VERSION" \
+            --summary "$GITHUB_STEP_SUMMARY" \
+            --out differential-report
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: differential-report
+          path: differential-report
+          retention-days: 90

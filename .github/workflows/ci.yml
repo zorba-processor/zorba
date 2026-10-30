@@ -35,7 +35,6 @@ jobs:
               - 'modules/**'
               - 'bin/**'
               - 'test/**'
-              - 'swig/**'
               - 'schemas/**'
               - 'config/**'
               - 'cmake/**'
@@ -152,7 +151,6 @@ jobs:
             bison --version | head -1
             flex --version
             cmake -S . -B build/regen -G Ninja \
-              -DZORBA_SUPPRESS_SWIG=ON \
               -DCMAKE_DISABLE_FIND_PACKAGE_Java=ON \
               -DCMAKE_DISABLE_FIND_PACKAGE_JNI=ON \
               -DZORBA_REGENERATE_PARSER=ON > /dev/null

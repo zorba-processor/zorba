@@ -14,6 +14,7 @@
 
 SET(UNIT_TEST_SRCS
   instantiate_string.cpp
+  memory_manager.cpp
   test_ato_.cpp
   test_base64.cpp
   test_base64_streambuf.cpp
@@ -23,6 +24,7 @@ SET(UNIT_TEST_SRCS
   test_hexbinary_streambuf.cpp
   test_json_parser.cpp
   test_mem_sizeof.cpp
+  test_mmap_file.cpp
   test_parameters.cpp
   test_security_policy.cpp
   test_string.cpp
