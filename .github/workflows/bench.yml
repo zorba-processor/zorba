@@ -24,8 +24,6 @@ on:
         default: "300"
   schedule:
     - cron: "0 3 * * 0"
-  push:
-    branches: [bench]   # temporary: baseline run while the suite is being developed
 
 concurrency:
   group: bench-${{ github.ref }}
