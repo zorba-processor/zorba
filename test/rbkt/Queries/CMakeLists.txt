@@ -195,6 +195,17 @@ FOREACH(TESTFILE ${TESTFILES})
       SET (SKIP_TEST 1)
     ENDIF ()
   ENDIF (ZORBA_NO_XMLSCHEMA)
+  IF (ZORBA_NO_ICU)
+    # Without ICU there is no transcoding to or from legacy character sets, and
+    # the built-in regular expression engine differs from ICU's in corner cases
+    # (a '^' that is not leading, replacement strings like $10) and fails
+    # fn:replace("foo", "f", "$", "q") with std::bad_alloc.
+    FILE(READ "${CMAKE_CURRENT_SOURCE_DIR}/${TESTFILE}" _icu_query_text)
+    IF (_icu_query_text MATCHES "ISO-8859-|CP1252|windows-125"
+        OR TESTNAME MATCHES "^test/rbkt/zorba/(file/(cp1252|invalid_encoding)|string/Regex/regex_m5[45]|string/ReplaceFunc/replace(17|19|20)|functx/functx-x-call)$")
+      SET (SKIP_TEST 1)
+    ENDIF ()
+  ENDIF (ZORBA_NO_ICU)
   IF (ZORBA_NO_FULL_TEXT)
     STRING(REGEX MATCH "fulltext/" NEEDS_FULL_TEXT "${TESTNAME}")
     IF (NEEDS_FULL_TEXT)
