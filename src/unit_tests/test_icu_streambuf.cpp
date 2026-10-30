@@ -147,6 +147,27 @@ static bool test_attach( test const *t ) {
   return ext_str == expected_ext_str;
 }
 
+/**
+ * Writes more than one pivot buffer's worth (4096 UChars) of text in a single
+ * call.  ucnv_convertEx() fills the pivot buffer up to the pivot limit it is
+ * given, so a wrong limit makes ICU write past the end of the buffer.
+ */
+static bool test_large_write() {
+  size_t const n = 20000;
+  string const utf8_str( n, 'a' );
+  string expected_ext_str;
+  for ( size_t i = 0; i < n; ++i )
+    expected_ext_str += string( "\0a", 2 );
+
+  ostringstream oss;
+  icu_streambuf xbuf( "UTF-16BE", oss.rdbuf() );
+  oss.ios::rdbuf( &xbuf );
+
+  oss.write( utf8_str.data(), static_cast<streamsize>( n ) );
+  oss << flush;
+  return oss.str() == expected_ext_str;
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 
 namespace zorba {
@@ -161,6 +182,7 @@ int test_icu_streambuf( int, char*[] ) {
     ASSERT_TRUE_AND_NO_EXCEPTION( test_no, test_put( t ) );
     ASSERT_TRUE_AND_NO_EXCEPTION( test_no, test_attach( t ) );
   }
+  ASSERT_TRUE_AND_NO_EXCEPTION( test_no, test_large_write() );
   cout << failures << " test(s) failed\n";
   return failures ? 1 : 0;
 }
