@@ -139,6 +139,10 @@ public:
 
   Properties* getProperties();
 
+  void setSecurityPolicy(const SecurityPolicy& aPolicy);
+
+  SecurityPolicy getSecurityPolicy() const;
+
 protected:
   ZorbaImpl();
 

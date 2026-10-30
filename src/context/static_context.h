@@ -19,6 +19,7 @@
 
 #include <deque>
 #include <map>
+#include <memory>
 #include <set>
 #include <vector>
 
@@ -28,6 +29,7 @@
 #include <zorba/error.h>
 #include <zorba/diagnostic_list.h>
 #include <zorba/internal/unique_ptr.h>
+#include <zorba/security.h>
 
 #ifdef WIN32
 #include "store/api/item.h"
@@ -459,6 +461,20 @@ public:
   Feature flags that are used when a particular feature (e.g. scripting
   or ddl) is enabled. The definition of the features is located in
   context/featueres.h.
+
+  theSecurityPolicy / theSecurityPolicyNarrows:
+  ----------------------------------------------
+  The security policy attached to "this" sctx, or NULL. There are two kinds:
+  - explicit (theSecurityPolicyNarrows == false): set by the embedder through
+    the API (StaticContext::setSecurityPolicy(), or Zorba::setSecurityPolicy()
+    on the root sctx). Trusted: it replaces whatever is inherited and may be
+    wider than the parent's policy.
+  - narrowing (theSecurityPolicyNarrows == true): set by the engine on a sctx
+    it creates on a query's behalf. It is intersected with the inherited
+    policy, so it can never widen it.
+  The policy in effect (get_security_policy()) is the nearest explicit policy
+  up the chain, intersected with every narrowing policy below it. A sctx with
+  neither inherits its parent's policy in effect. Queries cannot change it.
 ********************************************************************************/
 
 class static_context : public SyncedRCObject
@@ -701,6 +717,10 @@ protected:
 
   uint32_t                                   theTempIndexCounter;
 
+  std::unique_ptr<SecurityPolicy>            theSecurityPolicy;
+
+  bool                                       theSecurityPolicyNarrows = false;
+
 public:
   static bool is_builtin_module(const zstring& ns);
 
@@ -718,6 +738,8 @@ public:
   void serialize_resolvers(serialization::Archiver& ar);
 
   void serialize_tracestream(serialization::Archiver& ar);
+
+  void serialize_security_policy(serialization::Archiver& ar);
 
   void serialize(serialization::Archiver& ar);
 
@@ -833,6 +855,46 @@ public:
       const zstring& aUri,
       internal::EntityData::Kind aEntityKind,
       std::vector<zstring>& oComponents) const;
+
+  //
+  // Security policy
+  //
+
+  /**
+   * Sets an explicit policy on "this" sctx (embedder API only). It replaces
+   * the inherited policy for "this" sctx and its descendants and may be wider
+   * than the parent's.
+   */
+  void set_security_policy(const SecurityPolicy& aPolicy);
+
+  /**
+   * Sets a narrowing policy on "this" sctx. Used by the engine for contexts it
+   * creates on a query's behalf (module imports, eval, zorba-query, ...): the
+   * policy in effect becomes the intersection of aPolicy and the inherited
+   * policy, so it can never widen what the creator runs under.
+   */
+  void narrow_security_policy(const SecurityPolicy& aPolicy);
+
+  /**
+   * Returns the policy attached to "this" sctx, or NULL if none was set.
+   */
+  const SecurityPolicy* get_local_security_policy() const
+  {
+    return theSecurityPolicy.get();
+  }
+
+  /**
+   * Returns the policy in effect for "this" sctx: the nearest explicit policy
+   * up the chain, intersected with the narrowing policies below it. If the
+   * chain has no explicit policy, SecurityPolicy::unrestricted() is the base.
+   */
+  SecurityPolicy get_security_policy() const;
+
+  /**
+   * Returns true if the policy in effect for "this" sctx allows the given
+   * capability. Cheaper than get_security_policy().allows(aCap).
+   */
+  bool allows_capability(Capability aCap) const;
 
   void set_uri_path(const std::vector<zstring>& aURIPath);
 

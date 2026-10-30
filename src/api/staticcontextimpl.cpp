@@ -1982,5 +1982,25 @@ StaticContextImpl::clearBaseURI()
   }
 }
 
+
+/*******************************************************************************
+
+********************************************************************************/
+void
+StaticContextImpl::setSecurityPolicy(const SecurityPolicy& aPolicy)
+{
+  theCtx->set_security_policy(aPolicy);
+}
+
+
+/*******************************************************************************
+
+********************************************************************************/
+SecurityPolicy
+StaticContextImpl::getSecurityPolicy() const
+{
+  return theCtx->get_security_policy();
+}
+
 } /* namespace zorba */
 /* vim:set et sw=2 ts=2: */

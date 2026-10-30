@@ -2479,6 +2479,18 @@
     <diagnostic code="ZXQP0066" name="INVALID_ANNOTATION_LITERAL_VALUE">
       <value>"$1": is not a valid annotation literal for annotation "$2", $3</value>
     </diagnostic>
+
+    <diagnostic code="ZXQP0067" name="CAPABILITY_NOT_ENABLED">
+      <value>"$1": requires capability "$2"</value>
+    </diagnostic>
+
+    <diagnostic code="ZXQP0068" name="QUERY_TIMEOUT">
+      <value>query timeout exceeded${: 1}</value>
+    </diagnostic>
+
+    <diagnostic code="ZXQP0069" name="CALL_DEPTH_EXCEEDED">
+      <value>maximum function call depth of $1 exceeded</value>
+    </diagnostic>
       
     <diagnostic code="ZXQP8401" name="THESAURUS_VERSION_MISMATCH"
       if="!defined(ZORBA_NO_FULL_TEXT)">

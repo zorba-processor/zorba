@@ -22,6 +22,7 @@ SET(API_SRCS
     iterator.cpp
     zorba.cpp
     zorbaimpl.cpp
+    security.cpp
     xqueryimpl.cpp
     sax2impl.cpp
     staticcontextimpl.cpp

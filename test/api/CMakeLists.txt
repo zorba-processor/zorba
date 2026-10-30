@@ -27,6 +27,7 @@ CREATE_TEST_SOURCELIST(APITests
   external_function_errors.cpp
   userdefined_uri_resolution.cpp
   validate.cpp
+  security_policy.cpp
 )
 
 # add the executable
