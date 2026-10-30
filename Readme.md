@@ -30,6 +30,10 @@ Requirements: a C++23 compiler (GCC 13+, Clang 17+ or Apple Clang 16+),
 CMake 3.28+, Ninja, ICU, libxml2, libcurl, and Xerces-C 3.2+ for XML Schema
 support. libxslt is optional (XQueryX).
 
+CI builds and tests Linux x86_64 (GCC and Clang), Linux arm64, and macOS
+arm64. macOS x86_64 should build but is not tested in CI. Windows is not
+supported.
+
 Debian / Ubuntu:
 
 ```bash
