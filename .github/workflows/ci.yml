@@ -120,7 +120,7 @@ jobs:
             -e CCACHE_SLOPPINESS=pch_defines,time_macros \
             -v "$PWD":/src -w /src zorba-builder:ci sh -ec '
               cmake --preset ${{ matrix.preset }}
-              cmake --build --preset ${{ matrix.preset }}
+              cmake --build --preset ${{ matrix.preset }} -- -k 0
               ccache -s
               scripts/profile-size.sh ${{ matrix.preset }} > build/size.md
               cat build/size.md
