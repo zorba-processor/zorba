@@ -1,10 +1,18 @@
 # Differential testing of Zorba against Saxon-HE (test/differential).
 #
-# Runs the plain XQuery 3.0 queries of the rbkt suite on both processors and
-# reports where they disagree (summary.md and results.tsv in the
-# differential-report artifact, and the job summary). Disagreements are
-# informational: the workflow fails only on harness errors (a processor
-# that cannot run a trivial query, a shard that does not finish).
+# Three query sets (input `set`; scheduled and pull request runs do all):
+#   rbkt      the plain XQuery 3.0 queries of the rbkt suite, on both
+#             processors
+#   boundary  generated boundary-value matrices (boundary.py), on both
+#             processors
+#   property  generated property tests (property.py), on Zorba only; the
+#             seed is the `seed` input or the run number, and is printed in
+#             the report
+# Each set gets summary.md and results.tsv in the differential-report
+# artifact (one directory per set) and the job summary. Disagreements and
+# property failures are informational: the workflow fails only on harness
+# errors (a processor that cannot run a trivial query, a shard that does
+# not finish).
 #
 # Saxon-HE and its xmlresolver dependency come from Maven Central, pinned by
 # version and SHA-256. Bump SAXON_VERSION together with the checksums (and
@@ -14,14 +22,27 @@ name: Differential (Saxon-HE)
 on:
   workflow_dispatch:
     inputs:
+      set:
+        description: Query set
+        type: choice
+        options: [all, rbkt, boundary, property]
+        default: all
       filter:
-        description: Comma-separated query id prefixes under test/rbkt/Queries/zorba (empty = all)
+        description: Comma-separated query or case id prefixes (empty = all)
         required: false
         default: ''
       shards:
-        description: Number of parallel shards
+        description: Number of parallel shards for rbkt
         required: false
         default: '2'
+      boundary_shards:
+        description: Number of parallel shards for boundary
+        required: false
+        default: '3'
+      seed:
+        description: Property test seed (empty = run number)
+        required: false
+        default: ''
   schedule:
     - cron: '41 5 * * 2'
   pull_request:
@@ -48,7 +69,8 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     outputs:
-      shards: ${{ steps.shards.outputs.list }}
+      matrix: ${{ steps.shards.outputs.matrix }}
+      counts: ${{ steps.shards.outputs.counts }}
     steps:
       - uses: actions/checkout@v7
 
@@ -56,9 +78,24 @@ jobs:
         run: python3 -m unittest discover -s test/differential -v
 
       - id: shards
+        env:
+          SET: ${{ inputs.set || 'all' }}
+          RBKT_SHARDS: ${{ inputs.shards || '2' }}
+          BOUNDARY_SHARDS: ${{ inputs.boundary_shards || '3' }}
         run: |
-          n="${{ inputs.shards || '2' }}"
-          echo "list=$(python3 -c "import json,sys; print(json.dumps(list(range(int(sys.argv[1])))))" "$n")" >> "$GITHUB_OUTPUT"
+          python3 - >> "$GITHUB_OUTPUT" <<'EOF'
+          import json, os
+          sel = os.environ["SET"]
+          counts = {"rbkt": int(os.environ["RBKT_SHARDS"]),
+                    "boundary": int(os.environ["BOUNDARY_SHARDS"]),
+                    "property": 1}
+          if sel != "all":
+              counts = {sel: counts[sel]}
+          include = [{"set": s, "shard": i, "shards": n}
+                     for s, n in counts.items() for i in range(n)]
+          print("matrix=" + json.dumps({"include": include}))
+          print("counts=" + json.dumps(counts))
+          EOF
 
       - uses: docker/setup-buildx-action@v4
 
@@ -103,13 +140,12 @@ jobs:
 
   run:
     needs: build
-    name: run (shard ${{ matrix.shard }})
+    name: run (${{ matrix.set }} ${{ matrix.shard }})
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     strategy:
       fail-fast: false
-      matrix:
-        shard: ${{ fromJSON(needs.build.outputs.shards) }}
+      matrix: ${{ fromJSON(needs.build.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v7
 
@@ -128,19 +164,21 @@ jobs:
           name: zorba-build
 
       - uses: actions/setup-java@v6
+        if: matrix.set != 'property'
         with:
           distribution: temurin
           java-version: '25'
           java-package: jre
 
       - uses: actions/cache@v6
+        if: matrix.set != 'property'
         id: saxoncache
         with:
           path: saxon
           key: saxon-he-${{ env.SAXON_VERSION }}-${{ env.SAXON_SHA256 }}-${{ env.XMLRESOLVER_SHA256 }}
 
       - name: Fetch Saxon-HE
-        if: steps.saxoncache.outputs.cache-hit != 'true'
+        if: matrix.set != 'property' && steps.saxoncache.outputs.cache-hit != 'true'
         run: |
           m=https://repo1.maven.org/maven2
           mkdir -p saxon
@@ -152,6 +190,7 @@ jobs:
             "$m/org/xmlresolver/xmlresolver/$XMLRESOLVER_VERSION/xmlresolver-$XMLRESOLVER_VERSION-data.jar"
 
       - name: Verify Saxon-HE checksums
+        if: matrix.set != 'property'
         run: |
           printf '%s  %s\n' \
             "$SAXON_SHA256" saxon/saxon-he.jar \
@@ -159,21 +198,35 @@ jobs:
             "$XMLRESOLVER_DATA_SHA256" saxon/xmlresolver-data.jar \
             | sha256sum -c -
 
-      - name: Run shard ${{ matrix.shard }}
+      - name: Run ${{ matrix.set }} shard ${{ matrix.shard }}
+        env:
+          SET: ${{ matrix.set }}
+          SHARD: ${{ matrix.shard }}
+          SHARDS: ${{ matrix.shards }}
+          FILTER: ${{ inputs.filter }}
+          SEED: ${{ inputs.seed || github.run_number }}
         run: |
           # The Temurin JRE from setup-java is mounted into the builder
-          # container, which has the Zorba runtime libraries.
-          docker run --rm \
-            -v "$JAVA_HOME":/opt/java:ro \
+          # container, which has the Zorba runtime libraries. The property
+          # set runs on Zorba only.
+          java=
+          saxon_args=
+          if [ "$SET" != property ]; then
+            java="$JAVA_HOME"
+            saxon_args="--java /opt/java/bin/java --saxon-classpath saxon/saxon-he.jar:saxon/xmlresolver.jar:saxon/xmlresolver-data.jar"
+          fi
+          docker run --rm ${java:+-v "$java":/opt/java:ro} \
+            -e SET -e SHARD -e SHARDS -e FILTER -e SEED -e SAXON_ARGS="$saxon_args" \
             -v "$PWD":/src -w /src zorba-builder:ci sh -ec '
               tar --zstd -xf zorba-build.tar.zst
               python3 test/differential/difftest.py run \
+                --set "$SET" \
+                --seed "$SEED" \
                 --zorba build/full-release/bin/zorba \
-                --java /opt/java/bin/java \
-                --saxon-classpath saxon/saxon-he.jar:saxon/xmlresolver.jar:saxon/xmlresolver-data.jar \
-                --filter "${{ inputs.filter }}" \
-                --shard ${{ matrix.shard }} \
-                --shards ${{ strategy.job-total }} \
+                $SAXON_ARGS \
+                --filter "$FILTER" \
+                --shard "$SHARD" \
+                --shards "$SHARDS" \
                 --jobs "$(nproc)" \
                 --timeout 30 \
                 --out diff-out'
@@ -181,7 +234,7 @@ jobs:
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: differential-shard-${{ matrix.shard }}
+          name: differential-${{ matrix.set }}-shard-${{ matrix.shard }}
           path: diff-out
           retention-days: 30
 
@@ -194,16 +247,25 @@ jobs:
 
       - uses: actions/download-artifact@v8
         with:
-          pattern: differential-shard-*
+          pattern: differential-*-shard-*
           path: shards
 
       - name: Report
+        env:
+          COUNTS: ${{ needs.build.outputs.counts }}
         run: |
-          python3 test/differential/difftest.py report shards/*/ \
-            --expect-shards "${{ inputs.shards || '2' }}" \
-            --saxon-version "$SAXON_VERSION" \
-            --summary "$GITHUB_STEP_SUMMARY" \
-            --out differential-report
+          rc=0
+          for set in rbkt boundary property; do
+            n=$(python3 -c 'import json,os,sys; print(json.loads(os.environ["COUNTS"]).get(sys.argv[1], 0))' "$set")
+            [ "$n" = 0 ] && continue
+            python3 test/differential/difftest.py report \
+              --set "$set" shards/differential-"$set"-shard-*/ \
+              --expect-shards "$n" \
+              --saxon-version "$SAXON_VERSION" \
+              --summary "$GITHUB_STEP_SUMMARY" \
+              --out differential-report/"$set" || rc=1
+          done
+          exit $rc
 
       - uses: actions/upload-artifact@v7
         if: always()

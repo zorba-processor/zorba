@@ -18,11 +18,17 @@
 Run: python3 -m unittest discover -s test/differential
 """
 
+import decimal
 import os
+import re
 import tempfile
+import types
 import unittest
 
+import boundary
 import difftest as dt
+import property as prop
+import xqgen
 
 
 def res(out="", err="", rc=0, timeout=False):
@@ -218,6 +224,145 @@ class Selection(unittest.TestCase):
         self.assertIsNone(spec["unsupported"])
         text = "declare variable $input-context external; $input-context"
         self.assertIsNone(dt.classify_query("w3c/q", text, spec))
+
+
+class BatchFormat(unittest.TestCase):
+    def test_parse_complete(self):
+        self.assertEqual(xqgen.parse_batch_output(
+            "#1 integer:2\n#0 ()\n#2 !FOAR0001\n", 3),
+            ["()", "integer:2", "!FOAR0001"])
+
+    def test_parse_incomplete_or_malformed(self):
+        self.assertIsNone(xqgen.parse_batch_output("#0 ()\n", 2))
+        self.assertIsNone(xqgen.parse_batch_output("#0 ()\nnoise\n#1 ()", 2))
+        self.assertIsNone(xqgen.parse_batch_output("#0 ()\n#0 ()", 1))
+
+    def test_xq_string(self):
+        self.assertEqual(xqgen.xq_string('a"&\r\U0001F600'),
+                         '"a""&amp;&#xD;&#x1F600;"')
+
+    def test_xq_text(self):
+        self.assertEqual(xqgen.xq_text('{<&>}"', attr=True),
+                         "{{&lt;&amp;&gt;}}&quot;")
+
+    def test_batch_query_numbers_cases(self):
+        q = xqgen.batch_query(["1", "2"])
+        self.assertIn('concat("#1 "', q)
+        self.assertTrue(q.startswith('xquery version "3.0";'))
+
+
+class CaseClassification(unittest.TestCase):
+    def test_classes(self):
+        cases = [
+            (("integer:1", "integer:1"), ("agree", "")),
+            (("!FOAR0001", "!FOAR0001"), ("agree", "both-error")),
+            (("!FOAR0001", "!FOAR0002"), ("different-error-code", "")),
+            (("!FOAR0001", "integer:1"), ("zorba-error-only", "")),
+            (("!CRASH:SIGSEGV", "integer:1"), ("zorba-error-only", "crash")),
+            (("integer:1", "!XPTY0004"), ("saxon-error-only", "")),
+            ((None, "integer:1"), ("timeout", "zorba")),
+            (("double:1.0E20", "double:1E20"), ("agree", "numeric-lexical")),
+            (("double:NaN", "double:NaN"), ("agree", "")),
+            (("double:0.3", "double:0.30000000000000004"),
+             ("different-result", "numeric-precision")),
+            (("float:2", "float:1.999"), ("different-result", "")),
+            (("decimal:1", "integer:1"), ("different-result", "type-only")),
+            (("string:a", "string:b"), ("different-result", "")),
+            (("integer:1 integer:2", "integer:1"), ("different-result", "")),
+        ]
+        for (z, s), want in cases:
+            with self.subTest(z=z, s=s):
+                self.assertEqual(dt.classify_case(z, s), want)
+
+    def test_property(self):
+        self.assertEqual(dt.classify_property("boolean:true")[0], "pass")
+        self.assertEqual(dt.classify_property("boolean:false")[0], "fail")
+        self.assertEqual(dt.classify_property("()")[0], "fail")
+        self.assertEqual(dt.classify_property("!XPTY0004")[0], "error")
+        self.assertEqual(dt.classify_property(None)[0], "timeout")
+
+
+class Batching(unittest.TestCase):
+    def test_make_batches(self):
+        cs = [{"id": str(i), "expr": "1", "solo": i == 2} for i in range(7)]
+        sizes = [[c["id"] for c in b] for b in dt.make_batches(cs, 3)]
+        self.assertEqual(sizes, [["2"], ["0", "1", "3"], ["4", "5", "6"]])
+
+    def test_split_until_failing_case_is_alone(self):
+        case_re = re.compile(r'concat\("#(\d+) ", try \{ local:show\(\(\n'
+                             r'(.*?)\n\)\)', re.S)
+
+        def fake_run(cmd, timeout, cwd):
+            path = [a for a in cmd if a.endswith(".xq")][0]
+            with open(path) as f:
+                exprs = case_re.findall(f.read())
+            if any(e == "BAD" for _, e in exprs):
+                return {"rc": 1, "out": "", "timeout": False, "seconds": 0,
+                        "err": "static error [err:XPTY0004]"}
+            out = "\n".join("#%s integer:%s" % (n, e) for n, e in exprs)
+            return {"rc": 0, "out": out, "err": "", "timeout": False,
+                    "seconds": 0}
+
+        orig = dt.run_process
+        dt.run_process = fake_run
+        try:
+            with tempfile.TemporaryDirectory() as d:
+                args = types.SimpleNamespace(zorba="zorba", rbkt=d, out=d,
+                                             timeout=1)
+                cs = [{"id": str(i), "expr": e, "solo": False}
+                      for i, e in enumerate(["1", "2", "BAD", "4", "5"])]
+                stats = dt.Stats()
+                got = dt.run_side("zorba", cs, args, "t", stats)
+        finally:
+            dt.run_process = orig
+        self.assertEqual(got, ["integer:1", "integer:2", "!XPTY0004",
+                               "integer:4", "integer:5"])
+        self.assertGreater(stats.splits["zorba"], 0)
+
+
+class Generators(unittest.TestCase):
+    def test_boundary_deterministic_and_unique(self):
+        a, b = boundary.cases(), boundary.cases()
+        self.assertEqual(a, b)
+        self.assertEqual(len({c["id"] for c in a}), len(a))
+        for c in a:
+            self.assertTrue(c["expr"].isascii(), c["id"])
+
+    def test_cast_table(self):
+        self.assertTrue(boundary.cast_valid("dT", "gYear"))
+        self.assertFalse(boundary.cast_valid("tim", "date"))
+        self.assertTrue(boundary.cast_valid("bool", "double"))
+        self.assertFalse(boundary.cast_valid("uri", "QName"))
+        self.assertTrue(boundary.cast_valid("int", "string"))
+
+    def test_property_seeded(self):
+        self.assertEqual(prop.cases(5), prop.cases(5))
+        self.assertNotEqual(prop.cases(5), prop.cases(6))
+        cs = prop.cases(5)
+        self.assertEqual(len({c["id"] for c in cs}), len(cs))
+        for c in cs:
+            # Element names may be non-ASCII; values use character refs.
+            self.assertFalse(re.search(r"[\x00-\x08\x0a-\x1f\x7f-\x9f]", c["expr"]),
+                             c["id"])
+
+    def test_oracles(self):
+        self.assertEqual(prop.substring_oracle("motor car", 6, 3), " ca")
+        self.assertEqual(prop.substring_oracle("metadata", 4, 3), "ada")
+        self.assertEqual(prop.substring_oracle("12345", 1.5, 2.6), "234")
+        self.assertEqual(prop.substring_oracle("12345", 0, 3), "12")
+        self.assertEqual(prop.subsequence_oracle([1, 2, 3, 4, 5], -0.5, 2),
+                         [1])
+        self.assertEqual(prop.dtd_canonical(90061), "P1DT1H1M1S")
+        self.assertEqual(prop.dtd_canonical(-3600), "-PT1H")
+        self.assertEqual(prop.dtd_micro(500000), "PT0.5S")
+        self.assertEqual(prop.ymd_canonical(-13), "-P1Y1M")
+        self.assertEqual(prop.ymd_canonical(0), "P0M")
+        self.assertEqual(prop.canonical_decimal(decimal.Decimal("-0.00")),
+                         "0")
+        self.assertEqual(prop.canonical_decimal(decimal.Decimal("12.3400")),
+                         "12.34")
+        self.assertEqual(prop.encode_for_uri("a b~\u00e9"), "a%20b~%C3%A9")
+        self.assertEqual(prop.float32_repr(0.1), "0.1")
 
 
 if __name__ == "__main__":
