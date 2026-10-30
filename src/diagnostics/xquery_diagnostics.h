@@ -62,6 +62,17 @@ public:
   }
 
   /**
+   * Adds an exception ahead of the ones already in the list, for an error
+   * that is the cause of those (only the first error is usually reported).
+   *
+   * @param exception The exception to add.  The %XQueryDiagnostics takes
+   * ownership of the exception.
+   */
+  void add_error_first( ZorbaException const *exception ) {
+    errors_.insert( errors_.begin(), exception );
+  }
+
+  /**
    * Adds an exception to the list of exceptions.
    *
    * @param exception The exception to add.  The %XQueryDiagnostics takes

@@ -28,6 +28,7 @@ CREATE_TEST_SOURCELIST(APITests
   userdefined_uri_resolution.cpp
   validate.cpp
   security_policy.cpp
+  xml_parser_security.cpp
 )
 
 # add the executable

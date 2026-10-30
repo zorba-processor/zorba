@@ -87,6 +87,7 @@ bool FnParseXmlIterator::nextImpl(store::Item_t& result, PlanState& planState) c
       store::LoadProperties loadProps;
       loadProps.setStoreDocument(false);
       loadProps.setUseCachedDocument(false);
+      loadProps.setSecurityPolicy(theSctx->get_security_policy());
       result = lStore.loadDocument(baseUri, docUri, *is, loadProps);
     }
     catch (const ZorbaException& e)

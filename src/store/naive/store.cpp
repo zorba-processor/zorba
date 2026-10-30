@@ -996,6 +996,10 @@ store::Item_t Store::loadDocument(
 
   root = loader->loadXml(baseUri, docUri, stream);
 
+  // A resource refused by the security policy is the cause of whatever the
+  // parser reported after it (or of a silently incomplete document).
+  loader->reportDeniedResource();
+
   if (!lXQueryDiagnostics.errors().empty())
   {
     lXQueryDiagnostics.errors().front()->polymorphic_throw();

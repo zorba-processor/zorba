@@ -15,31 +15,26 @@
  */
 
 // Fuzz target: parse arbitrary bytes as an XML document with fn:parse-xml.
-// The default load properties neither load external DTDs nor substitute
-// external entities, but libxml2 still tries to open some external entities,
-// so the harness installs an entity loader that refuses everything: the
-// fuzzer must stay off the network and the filesystem.
+// The instance runs under SecurityPolicy::secure(), so the parser loads no
+// external DTD, entity or XInclude target: the fuzzer stays off the network
+// and the filesystem, and inputs that try (XXE) exercise the denial path.
 //
 // XmlDataManager is not used because it needs XML Schema support (it imports
 // the parse options schema), which the core fuzz build leaves out.
 
-#include <libxml/parser.h>
+#include <zorba/security.h>
 
 #include "fuzz_common.h"
 
 namespace {
 zorba_fuzz::ParseQuery* theQuery;
-
-xmlParserInputPtr denyEntityLoader(const char*, const char*, xmlParserCtxtPtr)
-{
-  return nullptr;
-}
 }
 
 extern "C" int LLVMFuzzerInitialize(int*, char***)
 {
   zorba_fuzz::engine().init();
-  xmlSetExternalEntityLoader(&denyEntityLoader);
+  zorba_fuzz::engine().zorba->setSecurityPolicy(
+      zorba::SecurityPolicy::secure());
   theQuery = new zorba_fuzz::ParseQuery();
   theQuery->init(
       "declare variable $input as xs:string external;\n"

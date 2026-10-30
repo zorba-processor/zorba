@@ -54,6 +54,7 @@
 
 #include <xercesc/sax2/DefaultHandler.hpp>
 #include <xercesc/sax2/SAX2XMLReader.hpp>
+#include <xercesc/parsers/SAX2XMLReaderImpl.hpp>
 #include <xercesc/sax2/XMLReaderFactory.hpp>
 
 #include <xercesc/validators/common/GrammarResolver.hpp>
@@ -61,6 +62,9 @@
 
 #include <xercesc/util/OutOfMemoryException.hpp>
 #include <xercesc/util/PlatformUtils.hpp>
+#include <xercesc/util/SecurityManager.hpp>
+#include <xercesc/util/XMLEntityResolver.hpp>
+#include <xercesc/util/XMLResourceIdentifier.hpp>
 #include <xercesc/util/XMLString.hpp>
 #include <xercesc/util/XMLUni.hpp>
 #include <xercesc/util/XMLUri.hpp>

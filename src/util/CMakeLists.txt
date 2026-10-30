@@ -32,6 +32,7 @@ SET(UTIL_SRCS
   utf8_util.cpp
   utf8_streambuf.cpp
   xml_util.cpp
+  xml_parser_security.cpp
   fx/fxcharheap.cpp
   string/empty_rep_base.cpp
   http_util.h

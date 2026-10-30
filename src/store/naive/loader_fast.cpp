@@ -87,13 +87,25 @@ XmlLoader::XmlLoader(
   theFactory(static_cast<BasicItemFactory*>(factory)),
   theXQueryDiagnostics(xqueryDiagnostics),
   theTraceLevel(0),
-  theBuildDataGuide(dataguide)
+  theBuildDataGuide(dataguide),
+  theParserSecurity(loadProperties.getSecurityPolicy())
 {
 }
 
 
 XmlLoader::~XmlLoader() 
 {
+}
+
+
+bool XmlLoader::reportDeniedResource()
+{
+  if (!theParserSecurity.denied())
+    return false;
+  theXQueryDiagnostics->add_error_first(
+    NEW_ZORBA_EXCEPTION(zerr::ZXQP0029_URI_ACCESS_DENIED,
+                        ERROR_PARAMS(theParserSecurity.deniedURI())));
+  return true;
 }
 
 
@@ -394,6 +406,8 @@ store::Item_t FastXmlLoader::loadXml(
 
   thePathStack.push(PathStepInfo(NULL, baseUri));
 
+  xml::ParserSecurity::Scope lSecurityScope(theParserSecurity);
+
   try
   {
     std::streamsize numChars = readPacket(stream, theBuffer, INPUT_CHUNK_SIZE);
@@ -421,13 +435,6 @@ store::Item_t FastXmlLoader::loadXml(
                                    static_cast<int>(numChars),
                                    doc_uri);
 
-    // Apply loader options
-    store::LoadProperties new_props = theLoadProperties;
-    new_props.setSubstituteEntities(true); // This is required for some Zorba tests,
-                                           // e.g. rbkt/Queries/zorba/entity/entity.xq
-                                           // It should probably be handled in a different way
-    applyLoadOptions(new_props, ctxt);
-
     if (ctxt == NULL)
     {
       theXQueryDiagnostics->
@@ -436,6 +443,14 @@ store::Item_t FastXmlLoader::loadXml(
       abortload();
 			return NULL;
     }
+
+    // Apply loader options. Entity substitution (XML_PARSE_NOENT) is what
+    // makes libxml2 record internal entity declarations for this SAX handler,
+    // e.g. for rbkt/Queries/zorba/entity/entity.xq; external entities are
+    // subject to the security policy (see xml::ParserSecurity).
+    store::LoadProperties new_props = theLoadProperties;
+    new_props.setSubstituteEntities(true);
+    applyLoadOptions(new_props, ctxt);
 
     while ((numChars = readPacket(stream, theBuffer, INPUT_CHUNK_SIZE)) > 0)
     {

@@ -81,7 +81,7 @@ namespace zorba { namespace simplestore {
 ********************************************************************************/
 void XmlLoader::applyLoadOptions(const store::LoadProperties& props, xmlParserCtxtPtr ctxt)
 {
-  xmlCtxtUseOptions(ctxt, props.toLibXmlOptions());
+  theParserSecurity.configure(ctxt, props.toLibXmlOptions());
 }
 
 
@@ -282,7 +282,8 @@ void FragmentXmlLoader::startParser()
   }
   fs.ctxt->_private = &fs;
   // Entity substitution is what xmlSubstituteEntitiesDefault(1) used to do.
-  xmlCtxtUseOptions(fs.ctxt, theLoadProperties.toLibXmlOptions() | XML_PARSE_NOENT);
+  theParserSecurity.configure(fs.ctxt,
+                              theLoadProperties.toLibXmlOptions() | XML_PARSE_NOENT);
   fs.parser_started = true;
 
   // Buffer enough input to find the end of the prolog.
@@ -486,6 +487,10 @@ store::Item_t FragmentXmlLoader::loadXml(
 
   theFragmentStream = static_cast<FragmentIStream*>(&stream);
   FragmentIStream &fs = *theFragmentStream;
+
+  // The parser context in fs outlives this loader (one loader per call), so
+  // each call scopes its own security state around the parsing it does.
+  xml::ParserSecurity::Scope lSecurityScope(theParserSecurity);
 
   try
   {
@@ -925,6 +930,8 @@ store::Item_t DtdXmlLoader::loadXml(
   }
 
   thePathStack.push(PathStepInfo(NULL, baseUri));
+
+  xml::ParserSecurity::Scope lSecurityScope(theParserSecurity);
 
   try
   {
