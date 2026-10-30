@@ -67,15 +67,17 @@ deep_nesting(int argc, char* argv[])
   lZorba->setSecurityPolicy(SecurityPolicy::unrestricted());
 
   size_t const N = 100000;
-  probe(lZorba, "parentheses",
-        repeat("(", N) + "1" + repeat(")", N));
-  probe(lZorba, "additions", "1" + repeat(" + 1", N));
-  probe(lZorba, "element constructors",
-        repeat("<a>", N) + repeat("</a>", N));
-  probe(lZorba, "parse-json arrays",
-        "parse-json(\"" + repeat("[", N) + repeat("]", N) + "\")");
   probe(lZorba, "parse-xml elements",
         "parse-xml(\"" + repeat("<a>", N) + repeat("</a>", N) + "\")");
+  probe(lZorba, "parse-json arrays (count)",
+        "count(parse-json(\"" + repeat("[", N) + repeat("]", N) + "\"))");
+  probe(lZorba, "parse-json arrays (serialized)",
+        "parse-json(\"" + repeat("[", N) + repeat("]", N) + "\")");
+  probe(lZorba, "parentheses",
+        repeat("(", N) + "1" + repeat(")", N));
+  probe(lZorba, "element constructors",
+        repeat("<a>", N) + repeat("</a>", N));
+  probe(lZorba, "additions", "1" + repeat(" + 1", N));
 
   lZorba->shutdown();
   StoreManager::shutdownStore(lStore);

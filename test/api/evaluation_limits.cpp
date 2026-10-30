@@ -19,6 +19,7 @@
 // depth limit (ZXQP0069), including the machine-stack guard that applies
 // when the depth is unlimited.
 
+#include <algorithm>
 #include <chrono>
 #include <cstdint>
 #include <iostream>
@@ -99,7 +100,18 @@ StaticContext_t context(Zorba* z, const SecurityPolicy& p)
 
 Outcome run(Zorba* z, const SecurityPolicy& p, const std::string& aQuery)
 {
-  XQuery_t q = z->compileQuery(aQuery, context(z, p));
+  XQuery_t q;
+  try
+  {
+    q = z->compileQuery(aQuery, context(z, p));
+  }
+  catch (ZorbaException const& e)
+  {
+    Outcome o;
+    o.code = e.diagnostic().qname().localname();
+    o.message = e.what();
+    return o;
+  }
   return execute(q);
 }
 
@@ -133,8 +145,8 @@ const char ENDLESS_CATCH_ALL[] =
   "return try { (1 to $max)[. lt 0] } catch * { () }";
 
 const char ENDLESS_EVAL[] =
-  "eval(\"declare variable $max as xs:integer external := "
-  "9223372036854775807; (1 to $max)[. lt 0]\")";
+  "import module namespace r = \"http://zorba.io/modules/reflection\";\n"
+  "r:eval(\"(1 to 9223372036854775807)[. lt 0]\")";
 
 // A finite query that takes some time (well over 50 ms on any machine).
 const char SLOW[] =
@@ -171,7 +183,10 @@ void test_timeout(Zorba* z)
 
   // eval shares the deadline of the query that runs it.
   o = run(z, p, ENDLESS_EVAL);
-  CHECK(failed_with(o, "ZXQP0068"));
+  if (o.code == "XQST0059")
+    std::cout << "reflection module not built: eval case skipped" << std::endl;
+  else
+    CHECK(failed_with(o, "ZXQP0068"));
   CHECK(o.elapsed < milliseconds(200) + SLACK);
 
   // A query that finishes in time is unaffected.
@@ -216,6 +231,23 @@ void test_no_timeout_by_default(Zorba* z)
   CHECK(SecurityPolicy::unrestricted().getTimeout() == milliseconds(0));
   CHECK(succeeded_with(run(z, SecurityPolicy::unrestricted(), SLOW),
                        "2500000"));
+}
+
+// Reports the cost of the deadline checks: the same query with no timeout
+// and with a timeout that never fires (best of 3 each).
+void report_timeout_overhead(Zorba* z)
+{
+  SecurityPolicy const none = SecurityPolicy::unrestricted();
+  SecurityPolicy const hour =
+    SecurityPolicy::unrestricted().setTimeout(seconds(3600));
+  milliseconds best_none(INT64_MAX), best_hour(INT64_MAX);
+  for (int i = 0; i < 3; ++i)
+  {
+    best_none = std::min(best_none, run(z, none, SLOW).elapsed);
+    best_hour = std::min(best_hour, run(z, hour, SLOW).elapsed);
+  }
+  std::cout << "timeout overhead: " << best_none.count() << " ms without, "
+            << best_hour.count() << " ms with a timeout" << std::endl;
 }
 
 void test_call_depth(Zorba* z)
@@ -287,6 +319,7 @@ evaluation_limits(int argc, char* argv[])
     test_timeout(lZorba);
     test_set_timeout_override(lZorba);
     test_no_timeout_by_default(lZorba);
+    report_timeout_overhead(lZorba);
     test_call_depth(lZorba);
     test_stack_guard(lZorba);
   }
