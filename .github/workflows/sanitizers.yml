@@ -17,12 +17,12 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 240
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
 
       - name: Build the builder image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: docker/builder-latest
           load: true
@@ -31,7 +31,7 @@ jobs:
           cache-to: type=gha,mode=max,scope=builder-linux-amd64-latest
 
       - name: Build the HTTP test server image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: docker/http-test-server/Dockerfile
@@ -40,7 +40,7 @@ jobs:
           cache-from: type=gha,scope=http-test-linux-amd64-latest
           cache-to: type=gha,mode=max,scope=http-test-linux-amd64-latest
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: .ccache
           key: ccache-asan-${{ github.sha }}
@@ -77,7 +77,7 @@ jobs:
             build/asan/sanitizer-logs /src 60 --junit build/asan/junit.xml \
             | tee -a "$GITHUB_STEP_SUMMARY"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: sanitizer-logs

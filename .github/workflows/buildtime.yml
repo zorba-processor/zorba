@@ -17,12 +17,12 @@ jobs:
       matrix:
         job: [gcc-ninja, gcc-nopch, warm-ccache, warm-nopch, clang-trace]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
 
       - name: Build the builder image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: docker/builder-latest
           load: true
@@ -32,7 +32,7 @@ jobs:
 
       - name: Build the HTTP test server image
         if: matrix.job == 'gcc-ninja' || matrix.job == 'gcc-nopch'
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: docker/http-test-server/Dockerfile
@@ -60,7 +60,7 @@ jobs:
 
       - name: Upload results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: buildtime-${{ matrix.job }}
           path: out/

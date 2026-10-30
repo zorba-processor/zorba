@@ -44,11 +44,11 @@ jobs:
     steps:
       # The harness (bench/) always comes from the ref the workflow runs on,
       # so A and B are measured with identical queries.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Restore benchmark data
         id: data
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: bench-data
           key: bench-data-${{ hashFiles('bench/gen_json.py', 'bench/gen_data.sh', 'bench/xmlgen.sha256') }}
@@ -58,27 +58,27 @@ jobs:
 
       - name: Save benchmark data
         if: steps.data.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: bench-data
           key: bench-data-${{ hashFiles('bench/gen_json.py', 'bench/gen_data.sh', 'bench/xmlgen.sha256') }}
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ env.REF_A }}
           path: src-a
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         if: env.REF_B != ''
         with:
           ref: ${{ env.REF_B }}
           path: src-b
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
 
       # Same scope as ci.yml so the image comes from the shared cache.
       - name: Build the builder image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: docker/builder-latest
           load: true
@@ -86,7 +86,7 @@ jobs:
           cache-from: type=gha,scope=builder-linux-amd64-latest
           cache-to: type=gha,mode=max,scope=builder-linux-amd64-latest
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: .ccache
           key: ccache-linux-amd64-latest-bench-${{ github.run_id }}
@@ -107,7 +107,7 @@ jobs:
           python3 -I bench/run.py compare out/a.json out/b.json --md out/compare.md
           cat out/compare.md >> "$GITHUB_STEP_SUMMARY"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: bench-results

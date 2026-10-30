@@ -42,12 +42,12 @@ jobs:
             cc: clang
             cxx: clang++
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
 
       - name: Build the builder image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ${{ matrix.builder }}
           load: true
@@ -56,7 +56,7 @@ jobs:
           cache-to: type=gha,mode=max,scope=builder-${{ matrix.cache }}
 
       - name: Build the HTTP test server image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: docker/http-test-server/Dockerfile
@@ -65,7 +65,7 @@ jobs:
           cache-from: type=gha,scope=http-test-${{ matrix.cache }}
           cache-to: type=gha,mode=max,scope=http-test-${{ matrix.cache }}
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: .ccache
           key: ccache-${{ matrix.cache }}-${{ github.sha }}
@@ -112,7 +112,7 @@ jobs:
 
       - name: Upload the regenerated parsers and scanners
         if: always() && matrix.cache == 'linux-amd64-latest'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: generated-parser
           path: |
@@ -124,7 +124,7 @@ jobs:
 
       - name: Upload test results
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-results-${{ matrix.cache }}
           path: |
@@ -140,12 +140,12 @@ jobs:
       matrix:
         preset: [embedded, embedded-noicu, full-nopch]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
 
       - name: Build the builder image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: docker/builder-latest
           load: true
@@ -153,7 +153,7 @@ jobs:
           cache-from: type=gha,scope=builder-linux-amd64-latest
           cache-to: type=gha,mode=max,scope=builder-linux-amd64-latest
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: .ccache
           key: ccache-profile-${{ matrix.preset }}-${{ github.sha }}
@@ -199,7 +199,7 @@ jobs:
 
       - name: Upload test results
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-results-profile-${{ matrix.preset }}
           path: |
@@ -214,14 +214,14 @@ jobs:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
       CCACHE_SLOPPINESS: pch_defines,time_macros
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install dependencies
         run: |
           brew install icu4c libxml2 xerces-c ninja ccache
           echo "CMAKE_PREFIX_PATH=$(brew --prefix icu4c):$(brew --prefix libxml2):$(brew --prefix xerces-c)" >> "$GITHUB_ENV"
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: .ccache
           key: ccache-macos-arm64-${{ github.sha }}
@@ -244,7 +244,7 @@ jobs:
 
       - name: Upload test results
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-results-macos-arm64
           path: |
