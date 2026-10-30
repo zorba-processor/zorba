@@ -23,6 +23,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <iterator>
 #include <stdexcept>
 
 #include <zorba/config.h>
@@ -178,16 +179,6 @@ icu_streambuf::int_type icu_streambuf::overflow( int_type c ) {
   return c;
 }
 
-#ifdef __GNUC__
-# ifdef GCC_PRAGMA_DIAGNOSTIC_PUSH
-#   pragma GCC diagnostic push
-# endif /* GCC_PRAGMA_DIAGNOSTIC_PUSH */
-//
-// Disables warnings about p.pivot_buf_ + sizeof p.pivot_buf_.
-//
-# pragma GCC diagnostic ignored "-Warray-bounds"
-#endif /* __GNUC__ */
-
 bool icu_streambuf::to_external( char_type const **from,
                                  char_type const *from_end, char **to,
                                  char const *to_end, bool flush ) {
@@ -195,7 +186,7 @@ bool icu_streambuf::to_external( char_type const **from,
   ucnv_convertEx(
     external_conv_, utf8_conv_, to, to_end, from, from_end,
     p_.pivot_buf_, &p_.pivot_source_, &p_.pivot_target_,
-    p_.pivot_buf_ + sizeof p_.pivot_buf_,
+    std::end( p_.pivot_buf_ ),
     /*reset*/ false, flush, &err
   );
   if ( err == U_TRUNCATED_CHAR_FOUND || err == U_BUFFER_OVERFLOW_ERROR )
@@ -214,7 +205,7 @@ bool icu_streambuf::to_utf8( char const **from, char const *from_end,
   ucnv_convertEx(
     utf8_conv_, external_conv_, to, to_end, from, from_end,
     g_.pivot_buf_, &g_.pivot_source_, &g_.pivot_target_,
-    g_.pivot_buf_ + sizeof g_.pivot_buf_,
+    std::end( g_.pivot_buf_ ),
     /*reset*/ false, flush, &err
   );
   if ( err == U_TRUNCATED_CHAR_FOUND || err == U_BUFFER_OVERFLOW_ERROR )
@@ -225,14 +216,6 @@ bool icu_streambuf::to_utf8( char const **from, char const *from_end,
     );
   return true;
 }
-
-#ifndef WIN32
-#ifdef GCC_PRAGMA_DIAGNOSTIC_PUSH
-# pragma GCC diagnostic pop
-#else
-# pragma GCC diagnostic warning "-Warray-bounds"
-#endif /* GCC_PRAGMA_DIAGNOSTIC_PUSH */
-#endif /* WIN32 */
 
 icu_streambuf::int_type icu_streambuf::underflow() {
 #ifdef ZORBA_DEBUG_ICU_STREAMBUF
