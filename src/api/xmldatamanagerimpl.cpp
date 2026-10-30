@@ -263,6 +263,16 @@ ItemSequence_t XmlDataManagerImpl::parseXML(
 {
   ZORBA_DM_TRY
   {
+#ifdef ZORBA_NO_XMLSCHEMA
+    // The options go through the xml module and its options schema, which are
+    // not available without XML Schema support. Plain parsing uses fn:parse-xml.
+    if (aOptions.isDtdValidationEnabled() ||
+        aOptions.isExternalEntityProcessingEnabled())
+      throw ZORBA_EXCEPTION(err::XQST0009);
+
+    return new SingletonItemSequence(parseXML(aStream));
+#endif
+
     Item lQName = theFactory->createQName(static_context::ZORBA_XML_FN_NS, "parse");
 
     // create a streamable string item
@@ -311,6 +321,16 @@ ItemSequence_t XmlDataManagerImpl::parseXML(
 {
   ZORBA_DM_TRY
   {
+#ifdef ZORBA_NO_XMLSCHEMA
+    // The options go through the xml module and its options schema, which are
+    // not available without XML Schema support. Plain parsing uses fn:parse-xml.
+    if (aOptions.isDtdValidationEnabled() ||
+        aOptions.isExternalEntityProcessingEnabled())
+      throw ZORBA_EXCEPTION(err::XQST0009);
+
+    return new SingletonItemSequence(parseXML(aStream, aBaseURI));
+#endif
+
     Item lQName = theFactory->createQName(static_context::ZORBA_XML_FN_NS,
                                           "parse");
 
