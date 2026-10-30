@@ -2,7 +2,7 @@ name: CodeQL
 
 on:
   push:
-    branches: [master, codeql-fixes]
+    branches: [master]
   pull_request:
   schedule:
     - cron: '0 5 * * 1'
