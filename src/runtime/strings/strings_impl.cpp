@@ -2461,7 +2461,9 @@ bool StringAnalyzeStringIterator::nextImpl( store::Item_t& result,
   PlanIteratorState *state;
   DEFAULT_STACK_INIT(PlanIteratorState, state, planState);
 
-  consumeNext( item, theChildren[0].getp(), planState );
+  // $input is xs:string?: the empty sequence behaves as the empty string.
+  if ( !consumeNext( item, theChildren[0].getp(), planState ) )
+    GENV_ITEMFACTORY->createString( item, input );
 #if STREAM_ANALYZE_STRING
   if ( item->isStreamable() ) {
     is = &item->getStream();
