@@ -36,6 +36,10 @@
 #include <vector>
 
 #include <zorba/diagnostic_handler.h>
+#include <zorba/dynamic_context.h>
+#include <zorba/item.h>
+#include <zorba/item_factory.h>
+#include <zorba/iterator.h>
 #include <zorba/diagnostic_list.h>
 #include <zorba/options.h>
 #include <zorba/static_context.h>
@@ -70,15 +74,18 @@ public:
   void warning(zorba::XQueryWarning const&) override {}
 };
 
-// Denies every URI the query tries to resolve (module and schema imports,
-// fn:doc, ...): a fuzzer must not reach the network or the filesystem.
-class DenyAllMapper : public zorba::URIMapper
+// Denies file: URIs (schema and module imports "at" a local path, fn:doc,
+// ...): a fuzzer must not read the local filesystem. http(s) URIs are left
+// alone so that Zorba's builtin modules can still be imported; the fuzz build
+// has no curl, so nothing can actually be fetched over the network.
+class DenyFileMapper : public zorba::URIMapper
 {
 public:
-  void mapURI(const zorba::String, zorba::EntityData const*,
+  void mapURI(const zorba::String aUri, zorba::EntityData const*,
               std::vector<zorba::String>& oUris) override
   {
-    oUris.push_back(zorba::URIMapper::DENY_ACCESS);
+    if (aUri.compare(0, 5, "file:") == 0 || aUri.compare(0, 1, "/") == 0)
+      oUris.push_back(zorba::URIMapper::DENY_ACCESS);
   }
 };
 
@@ -87,7 +94,7 @@ struct Engine
   void* store = nullptr;
   zorba::Zorba* zorba = nullptr;
   QuietHandler handler;
-  DenyAllMapper mapper;
+  DenyFileMapper mapper;
 
   void init()
   {
@@ -126,6 +133,49 @@ inline void compile(const uint8_t* data, size_t size, bool jsoniq)
     check_internal(e);
   }
 }
+
+// A query compiled once, with one external xs:string variable $input, that
+// is re-executed for every fuzz input. Used to reach the XML and JSON parsers
+// through fn:parse-xml / jn:parse-json, which is the same path that
+// XmlDataManager::parseXML and JsonDataManager::parseJSON take.
+class ParseQuery
+{
+public:
+  void init(const char* text)
+  {
+    Engine& eng = engine();
+    zorba::StaticContext_t sctx = eng.zorba->createStaticContext(&eng.handler);
+    sctx->registerURIMapper(&eng.mapper);
+    Zorba_CompilerHints_t hints;
+    theQuery = eng.zorba->createQuery();
+    theQuery->compile(text, sctx, hints);  // throws: a harness bug
+  }
+
+  void run(const uint8_t* data, size_t size)
+  {
+    Engine& eng = engine();
+    try
+    {
+      zorba::Item input = eng.zorba->getItemFactory()->createString(
+          std::string(reinterpret_cast<const char*>(data), size));
+      theQuery->getDynamicContext()->setVariable("input", input);
+      zorba::Iterator_t it = theQuery->iterator();
+      it->open();
+      zorba::Item item;
+      while (it->next(item))
+      {
+      }
+      it->close();
+    }
+    catch (zorba::ZorbaException const& e)
+    {
+      check_internal(e);
+    }
+  }
+
+private:
+  zorba::XQuery_t theQuery;
+};
 
 } // namespace zorba_fuzz
 

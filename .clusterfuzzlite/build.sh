@@ -7,8 +7,12 @@ FUZZ_DIR="$SRC/zorba/test/fuzz"
 BUILD="$WORK/zorba-build"
 mkdir -p "$BUILD"
 
-# CMAKE_BUILD_TYPE=None: use exactly the flags OSS-Fuzz provides, and keep
-# assert() enabled.
+# CMAKE_BUILD_TYPE=None: use the flags OSS-Fuzz provides, plus NDEBUG like a
+# release build. NDEBUG matters beyond assert(): without it the translator
+# loads the source of Zorba's builtin modules on import, and those files are
+# not shipped to the fuzzing runner. ZORBA_ASSERT stays active regardless.
+export CFLAGS="$CFLAGS -DNDEBUG"
+export CXXFLAGS="$CXXFLAGS -DNDEBUG"
 cmake -S "$SRC/zorba" -B "$BUILD" -G Ninja \
   -DCMAKE_BUILD_TYPE=None \
   -DZORBA_BUILD_FUZZERS=ON \

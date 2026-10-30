@@ -14,41 +14,31 @@
  * limitations under the License.
  */
 
-// Fuzz target: parse arbitrary bytes as an XML document with
-// XmlDataManager::parseXML (fn:parse-xml). External entities and DTDs are
-// not loaded with the default load properties (no XML_PARSE_DTDLOAD /
-// XML_PARSE_NOENT), so this does not touch the network or the filesystem.
-
-#include <sstream>
-
-#include <zorba/item.h>
-#include <zorba/xmldatamanager.h>
+// Fuzz target: parse arbitrary bytes as an XML document with fn:parse-xml.
+// The default load properties neither load external DTDs nor substitute
+// external entities, so the parser stays off the network and filesystem.
+//
+// XmlDataManager is not used because it needs XML Schema support (it imports
+// the parse options schema), which the core fuzz build leaves out.
 
 #include "fuzz_common.h"
 
 namespace {
-zorba::XmlDataManager_t theXmlMgr;
+zorba_fuzz::ParseQuery* theQuery;
 }
 
 extern "C" int LLVMFuzzerInitialize(int*, char***)
 {
-  zorba_fuzz::Engine& eng = zorba_fuzz::engine();
-  eng.init();
-  theXmlMgr = eng.zorba->getXmlDataManager();
-  theXmlMgr->registerDiagnosticHandler(&eng.handler);
+  zorba_fuzz::engine().init();
+  theQuery = new zorba_fuzz::ParseQuery();
+  theQuery->init(
+      "declare variable $input as xs:string external;\n"
+      "fn:parse-xml($input)");
   return 0;
 }
 
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
 {
-  std::istringstream in(std::string(reinterpret_cast<const char*>(data), size));
-  try
-  {
-    zorba::Item doc = theXmlMgr->parseXML(in);
-  }
-  catch (zorba::ZorbaException const& e)
-  {
-    zorba_fuzz::check_internal(e);
-  }
+  theQuery->run(data, size);
   return 0;
 }

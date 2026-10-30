@@ -14,52 +14,31 @@
  * limitations under the License.
  */
 
-// Fuzz target: parse arbitrary bytes as JSON with JsonDataManager::parseJSON
-// (jn:parse-json), allowing multiple top-level items, and drain the result
-// so every item is actually parsed.
-
-#include <sstream>
-
-#include <zorba/item.h>
-#include <zorba/item_sequence.h>
-#include <zorba/iterator.h>
-#include <zorba/jsondatamanager.h>
+// Fuzz target: parse arbitrary bytes as JSON with jn:parse-json (multiple
+// top-level items allowed) and drain the result so every item is parsed.
+//
+// JsonDataManager is not used because it needs XML Schema support (it
+// imports the parse options schema), which the core fuzz build leaves out.
 
 #include "fuzz_common.h"
 
 namespace {
-zorba::JsonDataManager_t theJsonMgr;
+zorba_fuzz::ParseQuery* theQuery;
 }
 
 extern "C" int LLVMFuzzerInitialize(int*, char***)
 {
-  zorba_fuzz::Engine& eng = zorba_fuzz::engine();
-  eng.init();
-  theJsonMgr = eng.zorba->getJsonDataManager();
-  theJsonMgr->registerDiagnosticHandler(&eng.handler);
+  zorba_fuzz::engine().init();
+  theQuery = new zorba_fuzz::ParseQuery();
+  theQuery->init(
+      "import module namespace jn = \"http://jsoniq.org/functions\";\n"
+      "declare variable $input as xs:string external;\n"
+      "jn:parse-json($input)");
   return 0;
 }
 
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
 {
-  std::istringstream in(std::string(reinterpret_cast<const char*>(data), size));
-  try
-  {
-    zorba::ItemSequence_t seq = theJsonMgr->parseJSON(in);
-    if (!seq.isNull())
-    {
-      zorba::Iterator_t it = seq->getIterator();
-      it->open();
-      zorba::Item item;
-      while (it->next(item))
-      {
-      }
-      it->close();
-    }
-  }
-  catch (zorba::ZorbaException const& e)
-  {
-    zorba_fuzz::check_internal(e);
-  }
+  theQuery->run(data, size);
   return 0;
 }
