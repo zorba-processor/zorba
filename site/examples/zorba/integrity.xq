@@ -9,13 +9,16 @@ ddl:create($shop:products);
 icddl:activate($shop:unique-sku);
 dml:insert($shop:products, <product sku="A1" category="tea">Green tea</product>);
 
-try {
-  {
-    dml:insert($shop:products, <product sku="A1" category="tea">Duplicate</product>);
-    "inserted"
+variable $outcome :=
+  try {
+    {
+      dml:insert($shop:products, <product sku="A1" category="tea">Duplicate</product>);
+      "inserted"
+    }
   }
-}
-catch * {
-  concat("rejected: ", local-name-from-QName($err:code))
-},
-count(dml:collection($shop:products))
+  catch * {
+    concat("rejected: ", local-name-from-QName($err:code))
+  };
+
+<second-insert>{ $outcome }</second-insert>,
+<products>{ count(dml:collection($shop:products)) }</products>

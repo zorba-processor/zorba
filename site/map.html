@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The big picture: XQuery, JSONiq and Zorba</title>
+<meta name="description" content="The data model behind XQuery and JSONiq, how XPath, XQuery, XSLT and SQL relate, and which specifications Zorba implements.">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+<!-- header: map -->
+
+<div class="layout">
+<details class="toc">
+  <summary>On this page</summary>
+  <p class="toc-title">The big picture</p>
+  <ol>
+    <li><a href="#idea">The idea in one paragraph</a></li>
+    <li><a href="#sequences">Everything is a sequence</a></li>
+    <li><a href="#items">Four kinds of items</a></li>
+    <li><a href="#nodes">Nodes and values</a></li>
+    <li><a href="#null">Null and the empty sequence</a></li>
+    <li><a href="#expressions">Expressions, not statements</a></li>
+    <li><a href="#xpath">XPath inside XQuery</a></li>
+    <li><a href="#sql">Coming from SQL</a></li>
+    <li><a href="#xslt">XQuery and XSLT</a></li>
+    <li><a href="#family">The specification family</a></li>
+    <li><a href="#support">What Zorba supports</a></li>
+  </ol>
+</details>
+
+<main>
+<h1>The big picture</h1>
+<p class="lede">XQuery and JSONiq are easy to underestimate. They look like path expressions with some loops, but they are complete functional languages over one data model, with optional layers for updates, text search, side effects and storage. This page lays out the whole map before the tutorials go into detail.</p>
+
+<h2 id="idea">The idea in one paragraph</h2>
+<p>Every value is a <strong>sequence</strong> of <strong>items</strong>. An item is an atomic value (a number, a string, a date), a node of an XML tree, a JSON object or array, or a function. Every construct of the language is an <strong>expression</strong> that takes sequences and returns a sequence, so expressions nest freely: a path can appear inside a loop, a loop inside an element constructor, a constructor inside a function argument. XPath is the sublanguage for navigating trees; XQuery adds variables, loops, sorting, grouping, constructors, functions and modules; JSONiq adds JSON. Extensions add updates, full-text search, imperative scripting and persistent collections.</p>
+
+<h2 id="sequences">Everything is a sequence</h2>
+<p>A sequence is an ordered list of zero or more items. Three rules explain most of what surprises newcomers:</p>
+<ul>
+  <li><strong>Sequences are flat.</strong> A sequence never contains another sequence. Writing <code>(1, (2, 3))</code> gives the three-item sequence <code>(1, 2, 3)</code>. To nest, you need a structure: an XML element or a JSON array.</li>
+  <li><strong>One item is a sequence of length one.</strong> There is no difference between <code>42</code> and <code>(42)</code>, so functions that "return a value" and functions that "return a list" are the same thing.</li>
+  <li><strong>The empty sequence <code>()</code> stands for "nothing".</strong> A path that matches nothing returns <code>()</code>, and most functions given <code>()</code> return <code>()</code> rather than failing.</li>
+</ul>
+
+<figure class="model-svg wide" aria-labelledby="seq-cap">
+<svg viewBox="0 0 760 210" role="img" aria-label="A sequence of six items: two atomic values, an element node, a JSON object, a JSON array and a function">
+  <text x="10" y="22" class="small">One sequence, six items. Sequences hold any mix of item kinds.</text>
+  <path class="l" d="M22 44 q-12 46 0 92" stroke-width="2"/>
+  <path class="l" d="M738 44 q12 46 0 92" stroke-width="2"/>
+  <!-- atomic 42 -->
+  <rect class="atom" x="36" y="62" width="84" height="56" rx="4"/>
+  <text x="78" y="95" text-anchor="middle">42</text>
+  <!-- atomic text -->
+  <rect class="atom" x="136" y="62" width="84" height="56" rx="4"/>
+  <text x="178" y="95" text-anchor="middle">"text"</text>
+  <!-- node tree -->
+  <rect class="node" x="236" y="48" width="150" height="84" rx="4"/>
+  <text x="311" y="68" text-anchor="middle">&lt;book&gt;</text>
+  <line x1="311" y1="73" x2="276" y2="96"/>
+  <line x1="311" y1="73" x2="346" y2="96"/>
+  <text x="276" y="110" text-anchor="middle" class="small">@id</text>
+  <text x="346" y="110" text-anchor="middle" class="small">&lt;title&gt;</text>
+  <line x1="346" y1="114" x2="346" y2="122"/>
+  <text x="346" y="130" text-anchor="middle" class="small">text</text>
+  <!-- object -->
+  <rect class="jnode" x="402" y="62" width="110" height="56" rx="4"/>
+  <text x="457" y="95" text-anchor="middle">{ "k": 1 }</text>
+  <!-- array -->
+  <rect class="jnode" x="528" y="62" width="90" height="56" rx="4"/>
+  <text x="573" y="95" text-anchor="middle">[ 1, 2 ]</text>
+  <!-- function -->
+  <rect class="fn" x="634" y="62" width="96" height="56" rx="4"/>
+  <text x="682" y="95" text-anchor="middle">upper-case#1</text>
+  <!-- labels -->
+  <text x="78" y="158" text-anchor="middle" class="small">atomic value</text>
+  <text x="178" y="158" text-anchor="middle" class="small">atomic value</text>
+  <text x="311" y="158" text-anchor="middle" class="small">node (a tree)</text>
+  <text x="457" y="158" text-anchor="middle" class="small">JSON object</text>
+  <text x="573" y="158" text-anchor="middle" class="small">JSON array</text>
+  <text x="682" y="158" text-anchor="middle" class="small">function item</text>
+  <line x1="36" y1="178" x2="386" y2="178"/>
+  <text x="211" y="197" text-anchor="middle" class="small">XQuery data model (XDM)</text>
+  <line x1="402" y1="178" x2="618" y2="178"/>
+  <text x="510" y="197" text-anchor="middle" class="small">added by JSONiq</text>
+  <line x1="634" y1="178" x2="730" y2="178"/>
+  <text x="682" y="197" text-anchor="middle" class="small">XQuery 3.0</text>
+</svg>
+</figure>
+
+<!-- example: model/flat -->
+<p class="why"><strong>Why it matters:</strong> the first number is the count. Flattening is why you can concatenate results with a comma without worrying about levels of nesting.</p>
+
+<!-- example: model/singleton -->
+<p class="why"><strong>Why it matters:</strong> there is no separate "scalar" and "list" world. Predicates like <code>[1]</code> work on any value, and <code>count</code>, <code>empty</code> and friends are the way to ask how many items you have.</p>
+
+<h2 id="items">Four kinds of items</h2>
+<dl>
+  <dt><strong>Atomic values</strong></dt>
+  <dd>Typed scalars. The types come from XML Schema: <code>xs:string</code>, <code>xs:integer</code>, <code>xs:decimal</code>, <code>xs:double</code>, <code>xs:boolean</code>, <code>xs:date</code>, <code>xs:dateTime</code>, <code>xs:duration</code>, <code>xs:QName</code> and a few dozen more. Decimal arithmetic is exact; dates and durations have real arithmetic.</dd>
+  <dt><strong>Nodes</strong></dt>
+  <dd>The parts of an XML tree: document, element, attribute, text, comment, processing instruction and namespace nodes. A node has an identity and a position in its tree, so it has a parent, children and siblings.</dd>
+  <dt><strong>JSON items</strong></dt>
+  <dd>Objects (unordered string-keyed maps) and arrays (ordered lists whose members can be sequences of any length, flattened when you take them out). JSONiq adds them to the data model, together with the atomic value <code>null</code>.</dd>
+  <dt><strong>Function items</strong></dt>
+  <dd>Functions as values (XQuery 3.0): named function references like <code>upper-case#1</code>, inline functions, and partial applications. They are what makes <code>for-each</code>, <code>filter</code> and <code>fold-left</code> possible.</dd>
+</dl>
+<!-- example: model/kinds -->
+<p class="why"><strong>Why it matters:</strong> <code>typeswitch</code> and <code>instance of</code> work uniformly across every kind of item, which is how one query handles XML and JSON input with the same code.</p>
+
+<h2 id="nodes">Nodes and values</h2>
+<p>A node is not its text. When an operation needs a value (arithmetic, comparison, a function that takes a string), the node is <strong>atomized</strong>: its typed value is extracted. Without a schema, the typed value of an element is <code>xs:untypedAtomic</code>, which converts to whatever the context needs, so <code>price * 2</code> just works. With a schema (see <a href="xquery.html#types">types</a>), atomization yields properly typed values.</p>
+<p>Nodes also have identity: two elements with the same content are equal by value (<code>deep-equal</code>) but are not the same node (<code>is</code>).</p>
+<!-- example: model/atomize -->
+<p class="why"><strong>Why it matters:</strong> most "why did my comparison fail" puzzles are about atomization or identity. Keep the two ideas apart and the language becomes predictable.</p>
+
+<h2 id="null">Null and the empty sequence</h2>
+<p>XQuery has no null. "No value" is the empty sequence, and it propagates: <code>() + 1</code> is <code>()</code>. JSON needs a real null because <code>{"coupon": null}</code> and <code>{}</code> are different documents. JSONiq therefore has both, and they mean different things:</p>
+<ul>
+  <li><code>null</code> is an item. A sequence containing it has length one.</li>
+  <li>Looking up a key that does not exist returns <code>()</code>, length zero.</li>
+</ul>
+<!-- example: model/null-vs-empty -->
+<p class="why"><strong>Why it matters:</strong> you can tell "explicitly null" from "absent" in a JSON document, which most JSON query tools blur. The JSONiq page shows <a href="jsoniq.html#null">how this plays out in queries</a>.</p>
+
+<h2 id="expressions">Expressions, not statements</h2>
+<p>A query is one expression whose value is the result. There are no statements to sequence and no variables to reassign: <code>let</code> binds a name to a value once, <code>if</code> returns a value, and a <code>for</code> loop returns the concatenation of what each iteration returns. This is what lets a query nest a loop inside an element constructor inside a function call.</p>
+<p>The absence of side effects is also what makes queries optimizable: Zorba can reorder, inline and rewrite expressions. Updates and scripting, described below, are carefully specified exceptions.</p>
+
+<h2 id="xpath">XPath inside XQuery</h2>
+<p>XPath is the expression language for addressing parts of a tree: <code>//book[@lang = "es"]/title</code>. XQuery 1.0 was defined as XPath 2.0 plus a prolog (declarations of namespaces, variables, functions and modules), FLWOR expressions, node constructors and a type system. XQuery 3.0 extends XPath 3.0 the same way. As a result, every XPath 2.0 or 3.0 expression is already a complete XQuery query:</p>
+<!-- example: model/xpath -->
+<p class="why"><strong>Why it matters:</strong> if you have used XPath in a browser, in XSLT or in an XML library, you already know the navigation part of XQuery.</p>
+<p>XPath 1.0, the version most libraries still ship, has no sequences (it has node-sets), only four data types and no conditional or loop expressions. XQuery is built on the 2.0 model and later.</p>
+
+<h2 id="sql">Coming from SQL</h2>
+<p>The FLWOR expression (<code>for</code>, <code>let</code>, <code>where</code>, <code>order by</code>, <code>return</code>) plays the role of SELECT, but works on nested data and returns any shape you construct.</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>SQL</th><th>XQuery / JSONiq</th><th>Note</th></tr></thead>
+  <tbody>
+    <tr><td><code>FROM t</code></td><td><code>for $r in $rows</code></td><td>Iterates any sequence: nodes, objects, numbers.</td></tr>
+    <tr><td><code>WHERE</code></td><td><code>where</code>, or a predicate <code>[...]</code></td><td></td></tr>
+    <tr><td><code>JOIN ... ON</code></td><td>two <code>for</code> clauses and a <code>where</code></td><td>Outer joins use <code>allowing empty</code>.</td></tr>
+    <tr><td><code>GROUP BY</code></td><td><code>group by</code></td><td>After grouping, the other variables hold the whole group as a sequence.</td></tr>
+    <tr><td><code>ORDER BY</code></td><td><code>order by</code></td><td></td></tr>
+    <tr><td><code>ROW_NUMBER()</code></td><td><code>count $n</code>, <code>at $pos</code></td><td></td></tr>
+    <tr><td>window functions</td><td><code>tumbling window</code>, <code>sliding window</code></td><td>Splits a sequence into windows by start and end conditions.</td></tr>
+    <tr><td><code>SELECT</code> list</td><td><code>return</code></td><td>Builds any result: XML, JSON, text, nested structures.</td></tr>
+    <tr><td><code>NULL</code></td><td><code>()</code>, or <code>null</code> in JSONiq</td><td>See <a href="#null">null and the empty sequence</a>.</td></tr>
+    <tr><td>views, stored functions</td><td>functions and library modules</td><td></td></tr>
+    <tr><td><code>INSERT</code>, <code>UPDATE</code>, <code>DELETE</code></td><td>Update Facility, JSONiq updates</td><td></td></tr>
+    <tr><td>tables, indexes, constraints</td><td>Zorba collections, indexes, integrity constraints</td><td>Zorba's data definition facility (XQDDF).</td></tr>
+  </tbody>
+</table>
+</div>
+<p>The deeper difference is the data model: SQL rows are flat and typed by a fixed schema; XQuery items can be trees of any depth, and a schema is optional.</p>
+
+<h2 id="xslt">XQuery and XSLT</h2>
+<p>XSLT 2.0 and 3.0 share XPath, the data model and the function library with XQuery. They differ in style: XSLT is organized as template rules that fire on the nodes of the input (push processing), while XQuery is organized as expressions that pull the data they need. Document-to-document transformation with many small rules tends to read better in XSLT; querying, joining and building new structures tends to read better in XQuery. Zorba runs XQuery and JSONiq only; it does not execute XSLT stylesheets.</p>
+
+<h2 id="family">The specification family</h2>
+<p>XQuery is not one document but a family of W3C specifications plus JSONiq and Zorba's own extensions. The diagram shows how they relate and what Zorba implements; the table below it gives the details.</p>
+
+<div class="specmap wide" role="figure" aria-label="Specification family diagram">
+<div class="table-wrap" style="margin:0">
+<svg viewBox="0 0 900 470" style="min-width:720px" role="img" aria-label="Diagram of the XQuery specification family and what Zorba implements; the same information is in the table below.">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="var(--muted)"/>
+    </marker>
+  </defs>
+
+  <!-- row labels -->
+  <text x="20" y="20" class="small">Core language, by version</text>
+  <text x="20" y="232" class="title">Extensions</text>
+  <text x="20" y="248" class="small">to XQuery 3.0</text>
+  <text x="20" y="332" class="title">JSON</text>
+  <text x="20" y="348" class="small">JSONiq 1.0</text>
+  <text x="20" y="422" class="title">Zorba</text>
+  <text x="20" y="438" class="small">and beyond</text>
+
+  <!-- core row -->
+  <rect class="box" x="20" y="30" width="150" height="58" rx="6"/>
+  <text x="95" y="55" text-anchor="middle" class="title">XPath 1.0</text>
+  <text x="95" y="74" text-anchor="middle" class="small">1999, superseded by 2.0</text>
+
+  <rect class="box impl" x="210" y="30" width="190" height="58" rx="6"/>
+  <text x="305" y="55" text-anchor="middle" class="title">XQuery 1.0, XPath 2.0</text>
+  <text x="305" y="74" text-anchor="middle" class="small">2007</text>
+
+  <rect class="box impl" x="440" y="30" width="200" height="58" rx="6"/>
+  <text x="540" y="55" text-anchor="middle" class="title">XQuery 3.0, XPath 3.0</text>
+  <text x="540" y="74" text-anchor="middle" class="small">2014, the version Zorba targets</text>
+
+  <rect class="box missing" x="680" y="30" width="200" height="58" rx="6"/>
+  <text x="780" y="55" text-anchor="middle" class="title">XQuery 3.1</text>
+  <text x="780" y="74" text-anchor="middle" class="small">2017: maps, arrays, =&gt;, ?</text>
+
+  <line class="link" x1="170" y1="59" x2="208" y2="59" marker-end="url(#arrow)"/>
+  <line class="link" x1="400" y1="59" x2="438" y2="59" marker-end="url(#arrow)"/>
+  <line class="link" x1="640" y1="59" x2="678" y2="59" marker-end="url(#arrow)"/>
+
+  <!-- foundation -->
+  <rect class="box impl" x="210" y="120" width="670" height="52" rx="6"/>
+  <text x="545" y="142" text-anchor="middle" class="title">Shared foundation</text>
+  <text x="545" y="160" text-anchor="middle" class="small">data model (XDM), functions and operators, serialization, XML Schema types and validation</text>
+  <line class="ext" x1="540" y1="88" x2="540" y2="118"/>
+
+  <!-- extensions -->
+  <rect class="box impl" x="150" y="210" width="175" height="64" rx="6"/>
+  <text x="237" y="234" text-anchor="middle" class="title">Update Facility 1.0</text>
+  <text x="237" y="252" text-anchor="middle" class="small">2011: insert, delete, replace,</text>
+  <text x="237" y="266" text-anchor="middle" class="small">rename, copy-modify</text>
+
+  <rect class="box impl" x="340" y="210" width="175" height="64" rx="6"/>
+  <text x="427" y="234" text-anchor="middle" class="title">Full Text 1.0</text>
+  <text x="427" y="252" text-anchor="middle" class="small">2011: contains text, stemming,</text>
+  <text x="427" y="266" text-anchor="middle" class="small">wildcards; most features</text>
+
+  <rect class="box impl" x="530" y="210" width="175" height="64" rx="6"/>
+  <text x="617" y="234" text-anchor="middle" class="title">Scripting</text>
+  <text x="617" y="252" text-anchor="middle" class="small">based on a W3C draft:</text>
+  <text x="617" y="266" text-anchor="middle" class="small">assignment, while, blocks</text>
+
+  <rect class="box" x="720" y="210" width="160" height="64" rx="6"/>
+  <text x="800" y="234" text-anchor="middle" class="title">XQueryX</text>
+  <text x="800" y="252" text-anchor="middle" class="small">queries written as XML;</text>
+  <text x="800" y="266" text-anchor="middle" class="small">optional build flag</text>
+
+  <!-- json -->
+  <rect class="box impl-json" x="150" y="310" width="175" height="64" rx="6"/>
+  <text x="237" y="334" text-anchor="middle" class="title">JSONiq syntax</text>
+  <text x="237" y="352" text-anchor="middle" class="small">.jq files: $o.key, $a[[1]],</text>
+  <text x="237" y="366" text-anchor="middle" class="small">$a[], $$, null, true</text>
+
+  <rect class="box impl-json" x="340" y="310" width="175" height="64" rx="6"/>
+  <text x="427" y="334" text-anchor="middle" class="title">JSON in XQuery</text>
+  <text x="427" y="352" text-anchor="middle" class="small">.xq files: $o("key"),</text>
+  <text x="427" y="366" text-anchor="middle" class="small">$a(1), $a()</text>
+
+  <rect class="box impl-json" x="530" y="310" width="175" height="64" rx="6"/>
+  <text x="617" y="334" text-anchor="middle" class="title">JSONiq updates</text>
+  <text x="617" y="352" text-anchor="middle" class="small">insert json, delete json,</text>
+  <text x="617" y="366" text-anchor="middle" class="small">replace, rename, append</text>
+
+  <!-- zorba -->
+  <rect class="box impl" x="150" y="400" width="270" height="56" rx="6"/>
+  <text x="285" y="424" text-anchor="middle" class="title">XQDDF</text>
+  <text x="285" y="442" text-anchor="middle" class="small">collections, indexes, integrity constraints</text>
+
+  <rect class="box impl" x="435" y="400" width="270" height="56" rx="6"/>
+  <text x="570" y="424" text-anchor="middle" class="title">Built-in modules</text>
+  <text x="570" y="442" text-anchor="middle" class="small">files, HTTP, strings, math, JSON-XML, CSV</text>
+
+  <rect class="box missing" x="720" y="400" width="160" height="56" rx="6"/>
+  <text x="800" y="424" text-anchor="middle" class="title">XSLT</text>
+  <text x="800" y="442" text-anchor="middle" class="small">shares XPath; not run</text>
+</svg>
+</div>
+<div class="legend">
+  <span><i class="l-impl"></i>Implemented by Zorba</span>
+  <span><i class="l-json"></i>Implemented, JSON-related</span>
+  <span><i class="l-miss"></i>Not implemented</span>
+</div>
+</div>
+
+<h2 id="support">What Zorba supports</h2>
+<p>Checked against the parser, the function library and the test suite in this repository.</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Specification</th><th>Status</th><th>Details</th></tr></thead>
+  <tbody>
+    <tr><td>XQuery 1.0 and 3.0</td><td><span class="yes">Yes</span></td><td>Version declarations <code>"1.0"</code> and <code>"3.0"</code> are accepted; 3.0 is the default. Includes <code>group by</code>, windows, <code>count</code>, <code>allowing empty</code>, <code>try</code>/<code>catch</code>, <code>switch</code>, higher-order functions, <code>!</code> and <code>||</code>. Serialization options given as an XDM instance in output declarations are not supported.</td></tr>
+    <tr><td>XPath and XQuery Functions and Operators 3.0</td><td><span class="yes">Yes</span></td><td>Including <code>for-each</code>, <code>filter</code>, <code>fold-left</code>, <code>format-number</code>, <code>format-date</code>, <code>analyze-string</code>, <code>parse-xml</code>, <code>serialize</code>, <code>unparsed-text</code>, and the <code>math:</code> functions.</td></tr>
+    <tr><td>XQuery 3.1</td><td><span class="no">No</span></td><td>A <code>xquery version "3.1"</code> declaration is rejected. There are no <code>map { }</code> or square-array constructors in the XQuery 3.1 sense, no <code>=&gt;</code> arrow operator, no <code>?</code> lookup operator and no 3.1 functions such as <code>fn:parse-json</code> or <code>fn:json-doc</code>. JSON is handled by JSONiq instead.</td></tr>
+    <tr><td>XML Schema 1.0 and 1.1</td><td><span class="yes">Yes</span></td><td><code>import schema</code>, <code>validate</code>, typed data. Needs the Xerces-C build (the default <code>full-release</code> preset and the container image).</td></tr>
+    <tr><td>Update Facility 1.0</td><td><span class="yes">Yes</span></td><td>Insert, delete, replace, rename, copy-modify-return, updating functions.</td></tr>
+    <tr><td>Full Text 1.0</td><td><span class="part">Mostly</span></td><td><code>contains text</code> with stemming, wildcards, thesaurus, stop words, case and diacritics options, boolean operators, distance and window. The repository's known-issues file notes that it is not completely implemented.</td></tr>
+    <tr><td>Scripting</td><td><span class="yes">Yes</span></td><td>Zorba's own variant of the W3C Scripting Extension drafts, which never became a Recommendation: <code>variable</code>, assignment with <code>:=</code>, blocks, <code>while</code>, <code>exit returning</code>, sequential functions. <code>break</code> and <code>continue</code> do not work inside a FLWOR.</td></tr>
+    <tr><td>JSONiq 1.0</td><td><span class="yes">Yes</span></td><td>Both syntaxes: the JSONiq syntax (<code>.jq</code> files or <code>--jsoniq</code>) and the JSONiq extension to XQuery (JSON constructors and navigation in <code>.xq</code> files). Includes JSONiq updates and the <code>jn:</code> and <code>libjn:</code> function libraries.</td></tr>
+    <tr><td>XQDDF</td><td><span class="yes">Yes</span></td><td>Zorba's data definition facility: static and dynamic collections, value and general indexes, integrity constraints. Indexes are used when probed explicitly; the optimizer does not rewrite queries to use them automatically.</td></tr>
+    <tr><td>Serialization 3.0</td><td><span class="part">Mostly</span></td><td>Methods <code>xml</code>, <code>xhtml</code>, <code>html</code>, <code>text</code>, <code>json</code> and <code>json-xml-hybrid</code> (the default). Character maps are not implemented.</td></tr>
+    <tr><td>XQueryX</td><td><span class="part">Optional</span></td><td>Enabled with the CMake option <code>ZORBA_XQUERYX</code> and libxslt. It is off by default and in the container image.</td></tr>
+    <tr><td>XSLT</td><td><span class="no">No</span></td><td>Not part of Zorba.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="pager"><a href="index.html">Overview</a><a href="xquery.html">Next: XQuery</a></div>
+</main>
+</div>
+
+<!-- footer -->
+<script src="assets/site.js"></script>
+</body>
+</html>
