@@ -29,10 +29,12 @@
 **  safer to require the version.
 */
 %skeleton "lalr1.cc"  /*  -*- C++ -*- */
-%require "2.6"
-%defines
-%name-prefix "zorba"
-%error-verbose
+%require "3.8"
+%header
+%define api.namespace {zorba}
+// "verbose" (not "detailed"): the error messages are compared by the tests and
+// post-processed by error() below, which relies on the verbose token names.
+%define parse.error verbose
 
 
 // Expected shift/reduce conflicts
@@ -44,9 +46,9 @@
 
 
 #ifdef XQUERY_PARSER
-%define "parser_class_name" {xquery_parser}
+%define api.parser.class {xquery_parser}
 #else
-%define "parser_class_name" {jsoniq_parser}
+%define api.parser.class {jsoniq_parser}
 #endif
 
 
@@ -68,6 +70,8 @@
 %initial-action
 {
     @$.begin.filename = @$.end.filename = &(driver.theFilename2);
+    // The skeleton counts syntax errors in yynerrs_ but never reads it.
+    static_cast<void>(yynerrs_);
 };
 
 
@@ -856,6 +860,12 @@ template<typename T> inline void release_hack( T *ref ) {
         RCHelper::removeReference( ref );
     }
 }
+
+// Bison does not run %destructor on the RHS values of a rule whose action
+// executes YYERROR, so such actions must release them before YYERROR.
+template<typename... T> inline void release_hack_all( T*... refs ) {
+    ( release_hack( refs ), ... );
+}
 %}
 
 
@@ -1078,7 +1088,7 @@ bool convert_postfix_to_target_and_selector(
     {
       rchandle<PredicateList> lNewPredicateList =
           new PredicateList(lPredicateList->get_location());
-      for (int i = 0; i < lSize - 1; ++i)
+      for (ulong i = 0; i < lSize - 1; ++i)
       {
         lNewPredicateList->push_back(lPredicateList->operator[](i));
       }
@@ -1568,7 +1578,7 @@ ModuleImport :
   |
     IMPORT MODULE NAMESPACE  QNAME  EQUALS  URI_LITERAL  AT  URILiteralList
     {
-      ERROR_IF_QNAME_NOT_NCNAME($4, @4); 
+      ERROR_IF_QNAME_NOT_NCNAME($4, @4, $8);
       $$ = new ModuleImport(LOC(@$),
                             static_cast<QName*>($4),
                             SYMTAB($6),
@@ -2914,6 +2924,7 @@ VarInDeclList :
       error(@3, "syntax error, unexpected QName \""
           + static_cast<VarInDecl*>($3)->get_var_name()->get_qname().str() + "\" (missing \"$\" sign?)");
       delete $1;
+      release_hack( $3 );
       YYERROR;
     }
 ;
@@ -4564,7 +4575,7 @@ PostfixExpr :
     }  
   |  PostfixExpr DOT QNAME
      {
-       ERROR_IF_QNAME_NOT_NCNAME($3, @3); 
+       ERROR_IF_QNAME_NOT_NCNAME($3, @3, $1);
        StringLiteral* sl = new StringLiteral( LOC(@$), static_cast<QName*>($3));
        $$ = new JSONObjectLookup(LOC(@$), LOC(@2), $1, sl);
      }
@@ -4659,21 +4670,21 @@ NumericLiteral :
             $$ = NumericLiteral::new_literal(
                 LOC(@$), ParseConstants::num_decimal, *$1
             );            
-            delete yylval.decval;
+            delete $1;
         }
     |   INTEGER_LITERAL
         {
             $$ = NumericLiteral::new_literal(
                 LOC(@$), ParseConstants::num_integer, *$1
             );            
-            delete yylval.ival;
+            delete $1;
         }
     |   DOUBLE_LITERAL
         {
             $$ = NumericLiteral::new_literal(
                 LOC(@$), ParseConstants::num_double, *$1
             );            
-            delete yylval.dval;
+            delete $1;
         }
     ;
 
@@ -4896,6 +4907,7 @@ DirElemConstructor :
                   static_cast<QName*>($6)->get_qname().str() +
                   "> does not match start tag <" +
                   static_cast<QName*>($2)->get_qname().str() + ">");
+        release_hack_all( $2, $6 );
         YYERROR;
       }
 
@@ -4921,6 +4933,7 @@ DirElemConstructor :
                   static_cast<QName*>($7)->get_qname().str() +
                   "> does not match start tag <" +
                   static_cast<QName*>($2)->get_qname().str() + ">");
+        release_hack_all( $2, $3, $7 );
         YYERROR;
       }
 
@@ -4940,6 +4953,7 @@ DirElemConstructor :
                   static_cast<QName*>($7)->get_qname().str() +
                   "> does not match start tag <" +
                   static_cast<QName*>($2)->get_qname().str() + ">");
+        release_hack_all( $2, $5, $7 );
         YYERROR;
       }
 
@@ -4959,6 +4973,7 @@ DirElemConstructor :
                   static_cast<QName*>($8)->get_qname().str() +
                   "> does not match start tag <" +
                   static_cast<QName*>($2)->get_qname().str() + ">");
+        release_hack_all( $2, $3, $6, $8 );
         YYERROR;
       }
 
@@ -6871,7 +6886,7 @@ JSONPairList :
 #ifdef JSONIQ_PARSER
         QNAME COLON ExprSingle
         {
-          ERROR_IF_QNAME_NOT_NCNAME($1, @1);
+          ERROR_IF_QNAME_NOT_NCNAME($1, @1, $3);
           
           // this warning will be added only if common-language is enabled
           driver.addCommonLanguageWarning(@1, ZED(ZWST0009_OBJECT_KEY_NOT_QUOTED));
@@ -6900,7 +6915,7 @@ JSONPairList :
 #ifdef JSONIQ_PARSER        
     |   JSONPairList COMMA QNAME COLON ExprSingle
         {
-          ERROR_IF_QNAME_NOT_NCNAME($3, @3);
+          ERROR_IF_QNAME_NOT_NCNAME($3, @3, $1, $5);
           JSONPairList* jpl = dynamic_cast<JSONPairList*>($1);
           assert(jpl);
           StringLiteral* sl = new StringLiteral( LOC(@$), static_cast<QName*>($3) );
@@ -6989,6 +7004,8 @@ JSONAppendExpr :
 JSONDeleteExpr :
         _DELETE JSON PostfixExpr
         {
+          // Owns $3 on every path, including YYERROR (which skips %destructor).
+          rchandle<exprnode> lPostfixExpr = $3;
           rchandle<exprnode> lTargetExpr;
           rchandle<exprnode> lSelectorExpr;
           string lError;
@@ -7032,6 +7049,8 @@ JSONDeleteExpr :
 JSONRenameExpr :
         RENAME JSON PostfixExpr AS ExprSingle
         {
+          // Owns $3 on every path, including YYERROR (which skips %destructor).
+          rchandle<exprnode> lPostfixExpr = $3;
           rchandle<exprnode> lTargetExpr;
           rchandle<exprnode> lSelectorExpr;
           string lError;
@@ -7084,6 +7103,8 @@ JSONRenameExpr :
 JSONReplaceExpr :
         REPLACE VALUE OF JSON PostfixExpr WITH ExprSingle
         {
+          // Owns $5 on every path, including YYERROR (which skips %destructor).
+          rchandle<exprnode> lPostfixExpr = $5;
           rchandle<exprnode> lTargetExpr;
           rchandle<exprnode> lSelectorExpr;
           string lError;
