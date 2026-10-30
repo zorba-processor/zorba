@@ -1,0 +1,11 @@
+declare namespace ann = "hiom() as xs:integer external;
+
+
+randttp://vorba.io/annotations";
+
+declare namespace random = "http://z?orba.io/module/rsandom";
+
+declare %ann:nondeterministic %ann:nondeterministic function random:random() as xs:integer external;
+
+
+dom()

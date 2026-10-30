@@ -19,6 +19,7 @@
 #define ZORBA_COMPILER_MEMMANAGER_H
 
 #include <cassert>
+#include <cstddef>
 #include <stdlib.h>
 #include <vector>
 
@@ -45,9 +46,27 @@ public:
 
   ~MemoryManager();
 
+  // Every block is aligned for any fundamental type: sizes are rounded up to
+  // a multiple of alignof(std::max_align_t), and pages come from new[] (which
+  // is at least that aligned) with a size that is a multiple of it.
+  static constexpr size_t theAlignment = alignof(std::max_align_t);
+
+  static_assert(thePageSize % theAlignment == 0,
+                "the page size must keep blocks aligned");
+
   void* allocate(size_t size)
   {
-    assert(size > 0 && size <= thePageSize);
+    assert(size > 0);
+    size = (size + theAlignment - 1) & ~(theAlignment - 1);
+
+    // Larger than a page: give it a block of its own instead of running past
+    // the end of a fresh page.
+    if (size > thePageSize)
+    {
+      char* block = new char[size];
+      thePages.push_back(block);
+      return block;
+    }
 
     if (theFreeSize < size)
     {

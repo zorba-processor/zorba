@@ -70,6 +70,22 @@
   <dependency type="xsd-version" value="1.1" satisfied="false"/>
 
 
+  <!-- Test schemas Xerces-C cannot load, so every test-case importing them
+       fails with XQST0059 for a reason unrelated to the feature tested.
+       unionListDefined.xsd (prod/SchemaImport) restricts an element of type
+       s:approximateDate (a union) to s:restrictedUnion, a restriction of that
+       union. XSD 1.0 allows it (Type Derivation OK (Simple)), but Xerces-C
+       (3.3.0 and master) UnionDatatypeValidator::isSubstitutableBy() checks
+       only the member types and never walks the base chain of the derived
+       type, so the particle derivation check (schema full checking) reports
+       "element 'e' has type that does not derive from type of corresponding
+       element in the base". 161 test-cases in prod-CastableExpr,
+       prod-CastExpr.schema, prod-FunctionCall, prod-InstanceofExpr,
+       prod-ContextItemDecl, op-add-dayTimeDuration-to-date and
+       op-dateTime-equal. -->
+  <not-applicable schema-namespace="http://www.w3.org/XQueryTest/unionListDefined"
+                  reason="Xerces-C rejects unionListDefined.xsd (restriction of a union-typed element to a restriction of the union; Xerces-C UnionDatatypeValidator::isSubstitutableBy bug)"/>
+
   <!-- Are these correct? -->
   <dependency type="limits" value="year_lt_0" satisfied="true"/>
 </test-suite-result>

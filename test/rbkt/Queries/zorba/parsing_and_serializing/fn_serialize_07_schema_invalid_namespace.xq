@@ -1,4 +1,4 @@
-(: testing for error XQDY0027 if the wrong namespace name was provided :)
+(: testing for error XPTY0004 if the wrong namespace name was provided :)
 
 let $params :=
   <serialization-parameters xmlns="wrong_namespace">

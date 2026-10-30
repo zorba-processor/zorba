@@ -56,6 +56,7 @@ void mmap_file::init() {
   fd_ = -1;
 #else
   fd_ = INVALID_HANDLE_VALUE;
+  mapping_ = NULL;
 #endif /* WIN32 */
   size_ = 0;
   addr_ = nullptr;
@@ -67,17 +68,15 @@ void mmap_file::open( char const *path, ios::openmode mode ) {
 
 #ifndef WIN32
 
-  int flags = 0;
-  int prot  = PROT_NONE;
-
-  if ( mode & ios::in ) {
-    flags |= O_RDONLY;
-    prot  |= PROT_READ;
-  }
-  if ( mode & ios::out ) {
-    flags |= O_WRONLY;
-    prot  |= PROT_WRITE;
-  }
+  // O_RDONLY, O_WRONLY and O_RDWR are values, not bits (O_RDONLY is 0), so
+  // they cannot be OR'd together. And mmap(2) needs a descriptor open for
+  // reading even for a write-only mapping, so any write access means O_RDWR.
+  int const flags = (mode & ios::out) ? O_RDWR : O_RDONLY;
+  int prot = PROT_NONE;
+  if ( mode & ios::in )
+    prot |= PROT_READ;
+  if ( mode & ios::out )
+    prot |= PROT_WRITE;
 
   if ( (fd_ = ::open( path, flags )) == -1 )
     throw ZORBA_IO_EXCEPTION( "open()", path_ );
@@ -116,7 +115,8 @@ void mmap_file::open( char const *path, ios::openmode mode ) {
     protect       = PAGE_READONLY;
   }
   if ( mode & ios::out ) {
-    createAccess |= GENERIC_WRITE;
+    // A PAGE_READWRITE mapping needs a handle with read access too.
+    createAccess |= GENERIC_READ | GENERIC_WRITE;
     shareMode    |= FILE_SHARE_WRITE;
     mapAccess    |= FILE_MAP_WRITE;
     protect       = PAGE_READWRITE;

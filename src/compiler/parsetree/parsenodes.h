@@ -4466,7 +4466,10 @@ public:
     exprnode(loc_),
     theParamList(aParamList),
     theReturnType(aReturnType),
-    theEnclosedExpr(aEnclosedExpr)
+    // An empty body "{}" yields the empty sequence, as for a declared
+    // function (FunctionDeclSimple in parser.y). The parser passes NULL then.
+    theEnclosedExpr(aEnclosedExpr ? aEnclosedExpr
+                                  : rchandle<exprnode>(new BlockBody(loc_)))
   {}
 
   rchandle<ParamList> getParamList() const { return theParamList; }

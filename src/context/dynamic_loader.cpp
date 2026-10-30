@@ -78,7 +78,7 @@ static zstring computeLibraryName(
   zstring lBranchPath;
 
   // if the URI ends in '/'
-  if (lIndexOfLastSlash == lPathNotation.size())
+  if (!lPathNotation.empty() && lIndexOfLastSlash == lPathNotation.size() - 1)
   {
     lBranchPath = lPathNotation;
   }

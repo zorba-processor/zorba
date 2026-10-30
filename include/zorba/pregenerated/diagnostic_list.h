@@ -417,6 +417,10 @@ extern ZORBA_DLL_PUBLIC XQueryErrorCode SERE0015;
 
 extern ZORBA_DLL_PUBLIC XQueryErrorCode SEPM0016;
 
+extern ZORBA_DLL_PUBLIC XQueryErrorCode SEPM0017;
+
+extern ZORBA_DLL_PUBLIC XQueryErrorCode SEPM0019;
+
 } // namespace err
 
 namespace zerr {
