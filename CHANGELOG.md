@@ -85,6 +85,7 @@ Entries marked **(open PR)** come from pull requests that are not merged yet; co
 
 ### Fixed
 
+- Fix a memory leak of parser error objects when a query has several lexical errors.
 - Fix a memory leak when a function containing a full-text `contains text` expression is inlined, and a double delete of its positional filters (`ordered`, `window`, ...) that the leak was hiding.
 - Fix a crash at startup when `ZORBA_URI_PATH` or `ZORBA_LIB_PATH` is unset, and a use-after-free in locale lookup that crashed `format-date` with a language ([#25](https://github.com/zorba-processor/zorba/pull/25)).
 - Fix `fn:replace` with the `q` flag returning an empty string on ICU 78 ([#25](https://github.com/zorba-processor/zorba/pull/25)).
