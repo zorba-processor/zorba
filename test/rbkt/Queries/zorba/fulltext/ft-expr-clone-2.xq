@@ -4,7 +4,7 @@
 
 declare function local:f($w as xs:string) {
   let $x := <msg>Hello big wide world</msg>
-  return $x contains text $w ftand "WORLD"
+  return $x contains text { $w } ftand "WORLD"
          using case insensitive
          using diacritics insensitive
          ordered window 5 words
