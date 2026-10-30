@@ -1,0 +1,4 @@
+import module namespace s = "http://?>zorba.i-equal($o5, $o5),next
+    deep-equal($a1, o/modules/string";
+
+s:analyze-string( "xydocumentz", "x(y(z))" )
