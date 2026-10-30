@@ -129,11 +129,14 @@ ZORBA_SET_TEST_PROPERTY(bin/zorba_uri_path_3
 
 # test the --disable-http-resolution flag, using the corresponding test query
 # from rbkt/zorba/uris/disable-http and a timeout.
-ZORBA_ADD_TEST(bin/zorba_disable_http_download zorbacmd
+# (the test query imports a schema)
+IF(NOT ZORBA_NO_XMLSCHEMA)
+  ZORBA_ADD_TEST(bin/zorba_disable_http_download zorbacmd
   -f -q "${_testdir}/uris/disable-http.xq" --disable-http-resolution)
-ZORBA_SET_TEST_PROPERTY(bin/zorba_disable_http_download
+  ZORBA_SET_TEST_PROPERTY(bin/zorba_disable_http_download
   PASS_REGULAR_EXPRESSION "XQST0059")
-ZORBA_SET_TEST_PROPERTY(bin/zorba_disable_http_download TIMEOUT 5)
+  ZORBA_SET_TEST_PROPERTY(bin/zorba_disable_http_download TIMEOUT 5)
+ENDIF(NOT ZORBA_NO_XMLSCHEMA)
 
 IF(WIN32)
   SET(PATH_SEP "\;")

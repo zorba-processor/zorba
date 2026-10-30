@@ -97,7 +97,10 @@ void JsonDataManagerImpl::initStaticContext(DiagnosticHandler* aDiagnosticHandle
   std::ostringstream lProlog;
   lProlog
     << "import module namespace j = '" << static_context::JSONIQ_FN_NS << "';"
-    << "import schema namespace opt = '" << static_context::ZORBA_XML_FN_OPTIONS_NS << "';";
+#ifndef ZORBA_NO_XMLSCHEMA
+    << "import schema namespace opt = '" << static_context::ZORBA_XML_FN_OPTIONS_NS << "';"
+#endif
+    ;
 
   theContext->loadProlog(lProlog.str(), lHints);
 }

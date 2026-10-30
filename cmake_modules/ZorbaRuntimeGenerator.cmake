@@ -77,16 +77,19 @@ MACRO(ZORBA_RUNTIME_GENERATOR GEN_QUERY EXTVARS SPEC_FILES EXTRA_DEPS OUTPUT)
 #MESSAGE(STATUS  "       ${GEN_SCRIPT} ${CMAKE_SOURCE_DIR}/cmake_modules/ZorbaRuntimeGenerator.cmake) ")
 #MESSAGE(STATUS  "***************************************************************************************** ")
 
-ADD_TEST("RuntimeGeneratorTest-${TEST_NAME}" "${CMAKE_COMMAND}"
-    -D "source_dir=${CMAKE_SOURCE_DIR}"
-    -D "binary_dir=${CMAKE_BINARY_DIR}"
-    -D "ZORBA_EXE=${ZORBA_EXE}"
-    -D "query=${GEN_QUERY}" 
-    -D "gen_file=${OUTPUT}"
-    -D "extvars:STRING=${EXTVARS}"
-    -D "files:STRING=${SPEC_FILES}"
-    -D "test_only:BOOLEAN=TRUE"
-    -P "${GEN_SCRIPT}")
+# The generator scripts load the xml module, which needs XML Schema support.
+IF(NOT ZORBA_NO_XMLSCHEMA)
+  ADD_TEST("RuntimeGeneratorTest-${TEST_NAME}" "${CMAKE_COMMAND}"
+      -D "source_dir=${CMAKE_SOURCE_DIR}"
+      -D "binary_dir=${CMAKE_BINARY_DIR}"
+      -D "ZORBA_EXE=${ZORBA_EXE}"
+      -D "query=${GEN_QUERY}" 
+      -D "gen_file=${OUTPUT}"
+      -D "extvars:STRING=${EXTVARS}"
+      -D "files:STRING=${SPEC_FILES}"
+      -D "test_only:BOOLEAN=TRUE"
+      -P "${GEN_SCRIPT}")
+ENDIF(NOT ZORBA_NO_XMLSCHEMA)
 ENDMACRO(ZORBA_RUNTIME_GENERATOR)
 
 MACRO(ZORBA_DIAGNOSTIC_GENERATOR GEN_QUERY EXTVARS SPEC_FILES EXTRA_DEPS OUTPUT)
@@ -116,16 +119,19 @@ MACRO(ZORBA_DIAGNOSTIC_GENERATOR GEN_QUERY EXTVARS SPEC_FILES EXTRA_DEPS OUTPUT)
     MAIN_DEPENDENCY ${GEN_QUERY}
     DEPENDS ${ABSOLUTE_SPEC_FILES} ${EXTRA_DEPS}
     ${GEN_SCRIPT} ${CMAKE_SOURCE_DIR}/cmake_modules/ZorbaRuntimeGenerator.cmake)
-  ADD_TEST("RuntimeGeneratorTest-${TEST_NAME}" "${CMAKE_COMMAND}"
-    -D "source_dir=${CMAKE_SOURCE_DIR}"
-    -D "binary_dir=${CMAKE_BINARY_DIR}"
-    -D "ZORBA_EXE=${ZORBA_EXE}"
-    -D "query=${GEN_QUERY}" 
-    -D "gen_file=${OUTPUT}"
-    -D "extvars:STRING=${EXTVARS}"
-    -D "files:STRING=${SPEC_FILES}"
-    -D "test_only:BOOLEAN=TRUE"
-    -P "${GEN_SCRIPT}")
+  # The generator scripts load the xml module, which needs XML Schema support.
+  IF(NOT ZORBA_NO_XMLSCHEMA)
+    ADD_TEST("RuntimeGeneratorTest-${TEST_NAME}" "${CMAKE_COMMAND}"
+      -D "source_dir=${CMAKE_SOURCE_DIR}"
+      -D "binary_dir=${CMAKE_BINARY_DIR}"
+      -D "ZORBA_EXE=${ZORBA_EXE}"
+      -D "query=${GEN_QUERY}" 
+      -D "gen_file=${OUTPUT}"
+      -D "extvars:STRING=${EXTVARS}"
+      -D "files:STRING=${SPEC_FILES}"
+      -D "test_only:BOOLEAN=TRUE"
+      -P "${GEN_SCRIPT}")
+  ENDIF(NOT ZORBA_NO_XMLSCHEMA)
 ENDMACRO(ZORBA_DIAGNOSTIC_GENERATOR)
 
 MACRO(ZORBA_AUDIT_GENERATOR GEN_QUERY EXTVARS EXTRA_DEPS OUTPUT)
@@ -150,13 +156,16 @@ MACRO(ZORBA_AUDIT_GENERATOR GEN_QUERY EXTVARS EXTRA_DEPS OUTPUT)
     MAIN_DEPENDENCY ${GEN_QUERY}
     DEPENDS ${EXTRA_DEPS}
     ${GEN_SCRIPT} ${CMAKE_SOURCE_DIR}/cmake_modules/ZorbaRuntimeGenerator.cmake)
-  ADD_TEST("RuntimeGeneratorTest-${TEST_NAME}" "${CMAKE_COMMAND}"
-    -D "source_dir=${CMAKE_SOURCE_DIR}"
-    -D "binary_dir=${CMAKE_BINARY_DIR}"
-    -D "ZORBA_EXE=${ZORBA_EXE}"
-    -D "query=${GEN_QUERY}" 
-    -D "gen_file=${OUTPUT}"
-    -D "extvars:STRING=${EXTVARS}"
-    -D "test_only:BOOLEAN=TRUE"
-    -P "${GEN_SCRIPT}")
+  # The generator scripts load the xml module, which needs XML Schema support.
+  IF(NOT ZORBA_NO_XMLSCHEMA)
+    ADD_TEST("RuntimeGeneratorTest-${TEST_NAME}" "${CMAKE_COMMAND}"
+      -D "source_dir=${CMAKE_SOURCE_DIR}"
+      -D "binary_dir=${CMAKE_BINARY_DIR}"
+      -D "ZORBA_EXE=${ZORBA_EXE}"
+      -D "query=${GEN_QUERY}" 
+      -D "gen_file=${OUTPUT}"
+      -D "extvars:STRING=${EXTVARS}"
+      -D "test_only:BOOLEAN=TRUE"
+      -P "${GEN_SCRIPT}")
+  ENDIF(NOT ZORBA_NO_XMLSCHEMA)
 ENDMACRO(ZORBA_AUDIT_GENERATOR)

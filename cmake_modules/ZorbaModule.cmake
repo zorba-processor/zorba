@@ -1058,18 +1058,21 @@ MACRO (ADD_XQDOC_TARGETS)
     EXCLUDE_FROM_DEFAULT_BUILD 1
     FOLDER "Docs"
   )
-  ADD_TEST( test/xqdoc/make_xqdoc
-      ${Zorba_EXE}
-      --omit-xml-declaration
-      -f
-      -q "${ZORBA_XQDOC_HTML_XQ}"
-      -e "zorbaManifestPath:=${zorba_manifest_file}"
-      -e "xhtmlRequisitesPath:=${ZORBA_XHTML_REQUISITES_PATH}"
-      -e "xqdocBuildPath:=${CMAKE_BINARY_DIR}/test/rbkt/QueryResults/zorba/xqdoc"
-      -e "zorbaVersion:=${ZORBA_MAJOR_NUMBER}.${ZORBA_MINOR_NUMBER}"
-  )
-  SET_TESTS_PROPERTIES("test/xqdoc/make_xqdoc" PROPERTIES PASS_REGULAR_EXPRESSION "XQDoc generated successfully!")
-  MESSAGE(STATUS "  added test test/xqdoc/make_xqdoc")
+  # The xqdoc module needs XML Schema support.
+  IF (NOT ZORBA_NO_XMLSCHEMA)
+    ADD_TEST( test/xqdoc/make_xqdoc
+        ${Zorba_EXE}
+        --omit-xml-declaration
+        -f
+        -q "${ZORBA_XQDOC_HTML_XQ}"
+        -e "zorbaManifestPath:=${zorba_manifest_file}"
+        -e "xhtmlRequisitesPath:=${ZORBA_XHTML_REQUISITES_PATH}"
+        -e "xqdocBuildPath:=${CMAKE_BINARY_DIR}/test/rbkt/QueryResults/zorba/xqdoc"
+        -e "zorbaVersion:=${ZORBA_MAJOR_NUMBER}.${ZORBA_MINOR_NUMBER}"
+    )
+    SET_TESTS_PROPERTIES("test/xqdoc/make_xqdoc" PROPERTIES PASS_REGULAR_EXPRESSION "XQDoc generated successfully!")
+    MESSAGE(STATUS "  added test test/xqdoc/make_xqdoc")
+  ENDIF (NOT ZORBA_NO_XMLSCHEMA)
   MESSAGE(STATUS "ADD_XQDOC_TARGETS END")
 ENDMACRO(ADD_XQDOC_TARGETS)
 

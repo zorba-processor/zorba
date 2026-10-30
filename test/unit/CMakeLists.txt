@@ -112,6 +112,11 @@ IF(WIN32)
   LIST(REMOVE_ITEM UNIT_TESTS_SRCS "string_test.cpp")
 ENDIF(WIN32)
 
+IF(ZORBA_NO_XMLSCHEMA)
+  # imports the http-client schema
+  LIST(REMOVE_ITEM UNIT_TESTS_SRCS "main_sequential.cpp")
+ENDIF(ZORBA_NO_XMLSCHEMA)
+
 CREATE_TEST_SOURCELIST(UnitTests
   UnitTests.cpp
   ${UNIT_TESTS_SRCS}
