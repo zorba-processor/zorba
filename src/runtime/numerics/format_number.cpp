@@ -607,6 +607,15 @@ set_active:
   if ( !got_mandatory_digit && decimal_separator_pos == utf8::npos )
     sub_pic->integer_part.minimum_size = 1;
 
+  //
+  // Ibid (bug 29164): if the minimum-integer-part-size and the maximum-
+  // fractional-part-size are both zero (e.g., "#."), the minimum-integer-
+  // part-size is set to one: format-number(0.2, '#.') is "0".
+  //
+  if ( !sub_pic->integer_part.minimum_size &&
+       !sub_pic->fractional_part.maximum_size )
+    sub_pic->integer_part.minimum_size = 1;
+
   if ( rightmost_active_pos != utf8::npos &&
        rightmost_active_pos + 1 < u_format.size() ) {
     //
