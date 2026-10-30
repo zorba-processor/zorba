@@ -15,9 +15,11 @@
  */
 #include "stdafx.h"
 
+#include <cstdint>
 #include <typeinfo>
 
 #include <zorba/properties.h>
+#include <zorba/security.h>
 
 #include "compiler/api/compilercb.h"
 
@@ -25,12 +27,14 @@
 
 #include "runtime/base/plan_iterator.h"
 #include "runtime/util/flowctl_exception.h"
+#include "runtime/util/stack_limit.h"
 
 #include "store/api/item_factory.h"
 #include "store/api/store.h"
 
 #include "system/globalenv.h"
 
+#include "util/string_util.h"
 #include "zorbatypes/integer.h"
 
 #include "diagnostics/util_macros.h"
@@ -71,7 +75,9 @@ PlanState::PlanState(
   theQuery(0),
   theGlobalDynCtx(globalDctx),
   theLocalDynCtx(localDctx),
-  theHasToQuit(false),
+  theDebuggerCommons(NULL),
+  theTimeout(0),
+  theDeadlineCountdown(0),
   theProfile( Properties::instance().getCollectProfile() ),
   theBlockOwned(true)
 {
@@ -90,16 +96,83 @@ PlanState::PlanState(PlanState& aPlanState):
       theLocalDynCtx(aPlanState.theLocalDynCtx),
       theNodeConstuctionPath(aPlanState.theNodeConstuctionPath),
       theDebuggerCommons(aPlanState.theDebuggerCommons),
-      theHasToQuit(aPlanState.theHasToQuit),
+      theDeadline(aPlanState.theDeadline),
+      theTimeout(aPlanState.theTimeout),
+      theDeadlineCountdown(aPlanState.theDeadlineCountdown),
       theProfile(aPlanState.theProfile),
       theBlockOwned(false)
 {
 }
 
-void PlanState::checkDepth(const QueryLoc& loc)
+void PlanState::initLimits(const CompilerCB* ccb)
 {
-  if (theStackDepth > 256)
-    RAISE_ERROR(zerr::ZXQP0003_INTERNAL_ERROR, loc, ERROR_PARAMS(ZED(StackOverflow)));
+  static_context const* sctx =
+    ccb && ccb->theRootSctx ? ccb->theRootSctx : &GENV_ROOT_STATIC_CONTEXT;
+  SecurityPolicy const lPolicy = sctx->get_security_policy();
+
+  uint32_t const lDepth = lPolicy.getMaxCallDepth();
+  theMaxStackDepth = lDepth == 0 ? UINT32_MAX : lDepth;
+
+  // XQuery::setTimeout() (seconds; 0 = none) overrides the policy timeout.
+  if (ccb && ccb->theHaveTimeout)
+    setDeadline(std::chrono::seconds(ccb->theTimeout));
+  else
+    setDeadline(lPolicy.getTimeout());
+}
+
+
+void PlanState::inheritLimits(const PlanState& aParent)
+{
+  theMaxStackDepth = aParent.theMaxStackDepth;
+  theDeadline = aParent.theDeadline;
+  theTimeout = aParent.theTimeout;
+  theDeadlineCountdown = aParent.theTimeout.count() > 0 ?
+                         DEADLINE_CHECK_INTERVAL : 0;
+}
+
+
+void PlanState::setDeadline(std::chrono::milliseconds aTimeout)
+{
+  theTimeout = aTimeout;
+  if (aTimeout.count() > 0)
+  {
+    theDeadline = std::chrono::steady_clock::now() + aTimeout;
+    theDeadlineCountdown = DEADLINE_CHECK_INTERVAL;
+  }
+  else
+  {
+    theDeadlineCountdown = 0;
+  }
+}
+
+
+void PlanState::checkDeadline(const QueryLoc& loc)
+{
+  if (std::chrono::steady_clock::now() < theDeadline)
+  {
+    theDeadlineCountdown = DEADLINE_CHECK_INTERVAL;
+    return;
+  }
+
+  theDeadlineCountdown = 1;
+  RAISE_ERROR(zerr::ZXQP0068_QUERY_TIMEOUT, loc,
+    ERROR_PARAMS(ztd::to_string(theTimeout.count()) + " ms"));
+}
+
+
+void PlanState::checkCallDepth(uint32_t aDepth, const QueryLoc& loc) const
+{
+  if (aDepth > theMaxStackDepth)
+  {
+    RAISE_ERROR(zerr::ZXQP0069_CALL_DEPTH_EXCEEDED, loc,
+      ERROR_PARAMS(ZED(ZXQP0069_Limit_2), theMaxStackDepth));
+  }
+
+  if (stack_limit::exhausted())
+  {
+    RAISE_ERROR(zerr::ZXQP0069_CALL_DEPTH_EXCEEDED, loc,
+      ERROR_PARAMS(ZED(ZXQP0069_Stack_2), aDepth));
+  }
 }
 
 
@@ -235,12 +308,10 @@ bool PlanIterator::consumeNext(
     const PlanIterator* iter,
     PlanState& planState)
 {
-  if (planState.theHasToQuit) 
-  {
-    // std::cout << "Plan interupted" << std::endl;
+  if (planState.theDeadlineCountdown != 0 &&
+      --planState.theDeadlineCountdown == 0)
+    planState.checkDeadline(iter->loc);
 
-    throw FlowCtlException(FlowCtlException::INTERRUPT);
-  }
   bool status = iter->produceNext(result, planState);
 
   if (planState.theCompilerCB->theConfig.print_item_flow)

@@ -97,8 +97,10 @@ class ExprManager;
   ---------------
   Set to true if the root expr of the query or eval expr is an updating expr.
 
-  theTimeout :
-  ------------
+  theHaveTimeout, theTimeout :
+  ----------------------------
+  Set by XQuery::setTimeout(): if theHaveTimeout, theTimeout (seconds, 0 = none)
+  replaces the timeout of the security policy (see PlanState::initLimits).
 
   theTempIndexCounter :
   ---------------------

@@ -527,7 +527,7 @@ extern entry const dict_en[] = {
   { "zerr:ZXQP0066", "\"$1\": is not a valid annotation literal for annotation \"$2\", $3" },
   { "zerr:ZXQP0067", "\"$1\": requires capability \"$2\"" },
   { "zerr:ZXQP0068", "query timeout exceeded${: 1}" },
-  { "zerr:ZXQP0069", "maximum function call depth of $1 exceeded" },
+  { "zerr:ZXQP0069", "$1" },
 #if !defined(ZORBA_NO_FULL_TEXT)
   { "zerr:ZXQP8401", "\"$1\": wrong WordNet file version; should be \"$2\"" },
 #endif
@@ -1092,6 +1092,8 @@ extern entry const dict_en[] = {
   { "~ZXQP0062_ONE_OR_MORE_LITERALS", "requires one or more literals" },
   { "~ZXQP0062_ZERO_OR_ONE_LITERALS", "allows at most one literal" },
   { "~ZXQP0065_NO_ARGUMENTS", "function has no arguments" },
+  { "~ZXQP0069_Limit_2", "maximum function call depth of $2 exceeded" },
+  { "~ZXQP0069_Stack_2", "not enough stack space left for a function call at depth $2" },
   { "~ZeroLenURI", "zero-length URI (and no base URI given)" },
   { "~dynamic error", "dynamic error" },
   { "~dynamic warning", "dynamic warning" },

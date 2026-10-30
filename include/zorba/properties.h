@@ -194,6 +194,11 @@ public:
     loop_hoisting_ = b;
   }
 
+  /**
+   * The engine no longer reads this value: the call depth limit comes from the
+   * security policy (SecurityPolicy::setMaxCallDepth()). Kept for source
+   * compatibility; the \c zorba command passes it to the policy.
+   */
   uint32_t getMaxUDFCallDepth() const {
     return max_udf_call_depth_;
   }

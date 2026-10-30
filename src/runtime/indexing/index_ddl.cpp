@@ -305,7 +305,7 @@ bool CreateIndexIterator::nextImpl(store::Item_t& result, PlanState& planState) 
 
   buildPlan = indexDecl->getBuildPlan(loc); 
   
-  planWrapper = new PlanWrapper(buildPlan, ccb, NULL, NULL, 0, false, 0); 
+  planWrapper = new PlanWrapper(buildPlan, ccb, NULL, NULL, &planState);
 
   createIndexSpec(indexDecl, planState.theLocalDynCtx->get_implicit_timezone(), spec);
 
@@ -441,7 +441,7 @@ bool RefreshIndexIterator::nextImpl(
 
   buildPlan = indexDecl->getBuildPlan(loc); 
   
-  planWrapper = new PlanWrapper(buildPlan, ccb, dctx, NULL, 0, false, 0); 
+  planWrapper = new PlanWrapper(buildPlan, ccb, dctx, NULL, &planState);
 
   result = GENV_ITEMFACTORY->createPendingUpdateList();
 

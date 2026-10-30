@@ -321,9 +321,7 @@ void EvalIterator::init(
                                           evalCCB,
                                           evalDctx,
                                           planState.theQuery,
-                                          planState.theStackDepth + 1,
-                                          state->theCCB->theHaveTimeout,
-                                          state->theCCB->theTimeout);
+                                          &planState);
 
   state->thePlanWrapper->checkDepth(loc);
 

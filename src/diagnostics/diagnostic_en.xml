@@ -2511,7 +2511,19 @@
     </diagnostic>
 
     <diagnostic code="ZXQP0069" name="CALL_DEPTH_EXCEEDED">
-      <value>maximum function call depth of $1 exceeded</value>
+      <comment>
+        A function call (or eval) would exceed the maximum call depth of the
+        security policy, or would leave too little machine stack.
+      </comment>
+      <value>$1</value>
+
+      <entry key="Limit_2">
+        <value>maximum function call depth of $2 exceeded</value>
+      </entry>
+
+      <entry key="Stack_2">
+        <value>not enough stack space left for a function call at depth $2</value>
+      </entry>
     </diagnostic>
       
     <diagnostic code="ZXQP8401" name="THESAURUS_VERSION_MISMATCH"

@@ -490,10 +490,7 @@ static bool execute(
     PlanWrapperHolder pw(new PlanWrapper(plan,
                                          &expr_ccb,
                                          0,      // dynamic ctx
-                                         NULL,   // xquery
-                                         0,      // stack depth
-                                         expr_ccb.theHaveTimeout,
-                                         expr_ccb.theTimeout));
+                                         NULL)); // xquery
     if (pw->next(item))
     {
       if (item->isError())

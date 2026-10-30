@@ -24,7 +24,6 @@
 
 #include "runtime/api/plan_wrapper.h"
 #include "runtime/base/plan_iterator.h"
-#include "runtime/util/timeout.h"
 #include "runtime/visitors/iterprinter.h"
 #include "runtime/visitors/printer_visitor_api.h"
 
@@ -40,14 +39,12 @@ PlanWrapper::PlanWrapper(
     CompilerCB* aCompilerCB,
     dynamic_context* aDynamicContext,
     XQueryImpl* query,
-    uint32_t aStackDepth,
-    bool haveTimeout,
-    unsigned long timeout)
+    const PlanState* aParentState)
   :
   theIterator(aIter),
   theDynamicContext(NULL),
   theIsOpen(false),
-  theTimeout(NULL),
+  theHasParent(aParentState != NULL),
   theExitValue(0)
 {
   assert (aCompilerCB);
@@ -65,8 +62,13 @@ PlanWrapper::PlanWrapper(
   thePlanState = new PlanState(aDynamicContext,
                                aDynamicContext,
                                lStateSize,
-                               aStackDepth,
-                               Properties::instance().getMaxUDFCallDepth());
+                               aParentState ?
+                                 aParentState->theStackDepth + 1 : 0);
+
+  if (aParentState)
+    thePlanState->inheritLimits(*aParentState);
+  else
+    thePlanState->initLimits(aCompilerCB);
 
   // set the compiler cb in the state
   thePlanState->theCompilerCB = aCompilerCB;
@@ -74,12 +76,6 @@ PlanWrapper::PlanWrapper(
 #ifdef ZORBA_WITH_DEBUGGER
   thePlanState->theDebuggerCommons = aCompilerCB->theDebuggerCommons;
 #endif
-
-  if (haveTimeout) 
-  {
-    StateWrapper lWrapper(*thePlanState);
-    theTimeout = new Timeout(timeout, lWrapper);
-  }
 }
 
 
@@ -90,15 +86,6 @@ PlanWrapper::~PlanWrapper()
 {
   if (theIsOpen)
     theIterator->close(*thePlanState);
-
-  if (theTimeout) 
-  {
-    // Terminate could throw an exception
-    // but does not for this particular implementation
-    theTimeout->terminate();
-  }
-
-  delete theTimeout;
 
   delete thePlanState; 
   thePlanState = NULL;
@@ -119,15 +106,13 @@ void PlanWrapper::open()
 {
   ZORBA_ASSERT(!theIsOpen);
 
+  // A top-level plan's deadline starts when it is opened (initLimits ran at
+  // construction); a nested plan keeps the deadline of its parent.
+  if (!theHasParent)
+    thePlanState->setDeadline(thePlanState->theTimeout);
+
   uint32_t offset = 0;
   theIterator->open(*thePlanState, offset);
-
-  if (theTimeout) 
-  {
-    // Start a thread that will suspend itself for the given amount of time,
-    // and then it will wake up and set theHasToQuit flag of the plan state.
-    theTimeout->start();
-  }
 
   theIsOpen = true;
 }

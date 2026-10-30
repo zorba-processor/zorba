@@ -248,7 +248,10 @@ void XQueryImpl::setTimeout(long aTimeout /* = -1 */)
 {
   SYNC_CODE(AutoMutex lock(&theMutex);)
 
-  theCompilerCB->theTimeout = aTimeout;
+  // Read by PlanState::initLimits when the query is executed: a value >= 0
+  // replaces the security policy timeout (0 = none), -1 restores it.
+  theCompilerCB->theHaveTimeout = aTimeout >= 0;
+  theCompilerCB->theTimeout = aTimeout >= 0 ? static_cast<uint32_t>(aTimeout) : 0;
 }
 
 
@@ -1343,10 +1346,7 @@ PlanWrapper_t XQueryImpl::generateWrapper()
       static_cast<PlanIterator*>(thePlanProxy->theRootIter.getp()),
       theCompilerCB,
       theDynamicContext,
-      this,
-      0, // stack depth
-      theCompilerCB->theHaveTimeout,
-      theCompilerCB->theTimeout);
+      this);
 
   return lPlan;
 }

@@ -168,8 +168,10 @@ void UDFunctionCallIteratorState::open(
   thePlanState = new PlanState(planState.theGlobalDynCtx,
                                theLocalDCtx,
                                thePlanStateSize,
-                               planState.theStackDepth + 1,
-                               planState.theMaxStackDepth);
+                               planState.theStackDepth + 1);
+
+  // Same call depth limit and deadline as the caller.
+  thePlanState->inheritLimits(planState);
 
   thePlanState->theCompilerCB = planState.theCompilerCB;
 #ifdef ZORBA_WITH_DEBUGGER
@@ -374,11 +376,8 @@ void UDFunctionCallIterator::openImpl(PlanState& planState, uint32_t& offset)
     state->init(planState);
   }
 
-  if (planState.theStackDepth + 1 > planState.theMaxStackDepth)
-  {
-    RAISE_ERROR(zerr::ZXQP0003_INTERNAL_ERROR, loc,
-      ERROR_PARAMS(ZED(StackOverflow)));
-  }
+  // Raise ZXQP0069 instead of overflowing the machine stack.
+  planState.checkCallDepth(planState.theStackDepth + 1, loc);
 
   // Create the plan for the udf body (if not done already) and allocate
   // the plan state (but not the state block) and dynamic context.

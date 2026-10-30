@@ -86,13 +86,16 @@ class ZORBA_DLL_PUBLIC XQuery : public SmartObject
   resetDiagnosticHandler() = 0;
   
   /**
-   * \brief Set a timeout, after which the execution of the query will be
-   * aborted.
+   * \brief Overrides the timeout of the security policy for this query.
    *
-   * @param aTimeout is an optional argument, which declares, that the
-   *        execution of a query will be aborted after aTimeout number of
-   *        seconds. If aTimeout is set to -1 (default), the query will
-   *        never abort.
+   * There is one timeout mechanism: the security policy timeout
+   * (SecurityPolicy::setTimeout(), see zorba/security.h), which aborts the
+   * evaluation with zerr:ZXQP0068. This method replaces the policy's value for
+   * this query only.
+   *
+   * @param aTimeout the timeout in seconds, counted from the start of each
+   *        execution; 0 means no timeout for this query; -1 (default) means
+   *        the timeout of the security policy of the query's static context.
    */
   virtual void
   setTimeout(long aTimeout = -1) = 0;

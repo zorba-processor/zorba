@@ -994,10 +994,8 @@ XQueryDiagnostics* constraint::get_shared_diagnostics() {
 }
 
 bool constraint::validate( dynamic_context &dctx ) const {
-  PlanState state(
-    &dctx, &dctx, plan_->getStateSizeOfSubtree(), 0,
-    Properties::instance().getMaxUDFCallDepth()
-  );
+  PlanState state( &dctx, &dctx, plan_->getStateSizeOfSubtree() );
+  state.initLimits( &ccb_ );
   state.theCompilerCB = const_cast<CompilerCB*>( &ccb_ );
   uint32_t offset = 0;
   plan_->open( state, offset );
