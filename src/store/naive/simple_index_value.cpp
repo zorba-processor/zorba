@@ -76,10 +76,7 @@ ValueIndexCompareFunction::ValueIndexCompareFunction(
 ValueIndexCompareFunction::~ValueIndexCompareFunction()
 {
   for (csize i = 0; i < theCollators.size(); ++i)
-  {
-    if (theCollators[i])
-      delete theCollators[i]; 
-  }
+    delete theCollators[i];
 }
 
 

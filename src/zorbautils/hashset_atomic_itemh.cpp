@@ -38,8 +38,7 @@ AtomicItemHandleHashSet::~AtomicItemHandleHashSet()
 {
   clear();
 
-  if (theCompareParam)
-    delete theCompareParam; 
+  delete theCompareParam;
 }
 
 

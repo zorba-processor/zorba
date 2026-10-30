@@ -34,9 +34,11 @@ Mutex::Mutex()
   ZORBA_FATAL(pshared == PTHREAD_PROCESS_PRIVATE, "mutex pshared = " << pshared);
 #endif
 
-  pthread_mutex_init(&theMutex, &attr);
+  int ret = pthread_mutex_init(&theMutex, &attr);
 
   pthread_mutexattr_destroy(&attr);
+
+  ZORBA_FATAL(!ret, "Failed to initialize mutex. Error code = " << ret << " message = " << strerror(ret));
 
 #elif defined WIN32
   //threads can acquire same mutex multiple times
