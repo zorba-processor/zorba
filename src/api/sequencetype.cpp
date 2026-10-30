@@ -512,6 +512,22 @@ SequenceType::SequenceType(const SequenceType& other)
 }
 
 
+SequenceType& SequenceType::operator=(const SequenceType& other)
+{
+  if (theType != other.theType)
+  {
+    if (other.theType)
+      RCHelper::addReference(other.theType);
+
+    if (theType)
+      RCHelper::removeReference(const_cast<XQType*>(theType));
+
+    theType = other.theType;
+  }
+  return *this;
+}
+
+
 SequenceType::~SequenceType()
 {
   if (theType)
@@ -748,6 +764,7 @@ SequenceType SequenceType::getContentType() const
 
       return Unmarshaller::createSequenceType(contentType);
     }
+    [[fallthrough]];
   }
   default:
   {
@@ -775,6 +792,7 @@ String SequenceType::getContentTypeUri() const
       if (contentType != NULL)
         return Unmarshaller::newString(contentType->getQName()->getNamespace());
     }
+    [[fallthrough]];
   }
   default:
   {
@@ -802,6 +820,7 @@ String SequenceType::getContentTypeLocalName() const
       if (contentType != NULL)
         return Unmarshaller::newString(contentType->getQName()->getLocalName());
     }
+    [[fallthrough]];
   }
   default:
   {

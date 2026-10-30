@@ -287,7 +287,7 @@ void TestTokenizer::tokenize_string( char const *s, size_type s_len,
             default:
               continue;
           }
-          // no break;
+          [[fallthrough]];
         case '!':
         case '?':
           ++state().sent;

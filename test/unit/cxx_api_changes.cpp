@@ -230,8 +230,8 @@ cxx_api_changes_test5(Zorba* aZorba)
     Item item = aZorba->getItemFactory()->createInt(4);
     
 
-    bool isBound1;
-    bool isBound2;
+    bool isBound1 = false;
+    bool isBound2 = false;
 
     for(; lIte != lEnd; ++lIte)
     {
@@ -270,8 +270,8 @@ cxx_api_changes_test6(Zorba* aZorba)
     
     XQuery_t lQuery = aZorba->compileQuery(lIn);
 
-    bool isBound1;
-    bool isBound2;
+    bool isBound1 = false;
+    bool isBound2 = false;
 
     isBound1 = lQuery->getDynamicContext()->isBoundContextItem();
 

@@ -38,7 +38,7 @@ namespace zorba {
 ********************************************************************************/
 bool NodePositionIterator::nextImpl(store::Item_t& result, PlanState& planState) const
 {
-  bool valid;
+  [[maybe_unused]] bool valid;
   store::Item_t inNode;
 
   PlanIteratorState* state;

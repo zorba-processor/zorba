@@ -302,8 +302,8 @@ void SimpleTempSeqIter::init(
 {
   theTempSeq = tempSeq;
 
-  xs_long start;
-  xs_long end;
+  xs_long start = 0;
+  xs_long end = 0;
 
   try
   {

@@ -17,39 +17,8 @@
 #ifndef ATOMIC_INT_H
 #define ATOMIC_INT_H
 
-#if defined( sun ) || defined( __sun )
-# if defined( __SVR4 ) || defined( __svr4__ )
-#   define __SOLARIS__ 1
-# endif
-#endif
-
-#if defined( __APPLE__ )
-# include <libkern/OSAtomic.h>
-#elif defined( __GNUC__ )
-# if __GNUC__ * 100 + __GNUC_MINOR__ >= 402
-#   include <ext/atomicity.h>
-# else
-#   include <bits/atomicity.h>
-# endif
-# if __GNUC__ * 100 + __GNUC_MINOR__ >= 420
-#   define GNU_EXCHANGE_AND_ADD __gnu_cxx::__exchange_and_add_dispatch
-# else
-#   define GNU_EXCHANGE_AND_ADD __gnu_cxx::__exchange_and_add
-# endif
-#elif defined( __FreeBSD__ )
-# include <sys/types.h>
-# include <machine/atomic.h>
-#elif defined( __NetBSD__ )
-# include <sys/atomic.h>
-#elif defined( __SOLARIS__ )
-# include <atomic.h>
-#elif defined( _WIN32 )
-# include <windows.h>
-# include <intrin.h>                    /* for _ReadBarrier() */
-# pragma intrinsic(_ReadBarrier)
-#else
-# error "Unsupported operating system for atomic operations"
-#endif
+#include <atomic>
+#include <cstdint>
 
 namespace zorba {
 
@@ -62,15 +31,7 @@ namespace zorba {
  */
 class atomic_int {
 public:
-#if defined( __APPLE__ ) || defined( __NetBSD__ ) || defined( __SOLARIS__ )
-  typedef int32_t value_type;
-#elif defined( __GNUC__ )
-  typedef _Atomic_word value_type;
-#elif defined( __FreeBSD__ )
-  typedef int value_type;
-#elif defined( _WIN32 )
-  typedef LONG value_type;
-#endif
+  typedef std::int32_t value_type;
 
   /**
    * Constructs an %atomic_int.
@@ -87,7 +48,7 @@ public:
    * @return Returns a reference to <code>this</code>.
    */
   atomic_int& operator=( value_type n ) {
-    store_impl( n );
+    store( n );
     return *this;
   }
 
@@ -97,7 +58,7 @@ public:
    * @return Returns the current value.
    */
   value_type load() const {
-    return load_impl();
+    return value_.load( std::memory_order_acquire );
   }
 
   /**
@@ -106,7 +67,7 @@ public:
    * @param n The new value.
    */
   void store( value_type n ) {
-    store_impl( n );
+    value_.store( n, std::memory_order_release );
   }
 
   /**
@@ -115,7 +76,7 @@ public:
    * @return Returns the new value.
    */
   value_type operator++() {
-    return pre_inc();
+    return value_.fetch_add( 1, std::memory_order_acq_rel ) + 1;
   }
 
   /**
@@ -124,7 +85,7 @@ public:
    * @return Returns the old value.
    */
   value_type operator++(int) {
-    return post_inc();
+    return value_.fetch_add( 1, std::memory_order_acq_rel );
   }
 
   /**
@@ -133,7 +94,7 @@ public:
    * @return Returns the new value.
    */
   value_type operator--() {
-    return pre_dec();
+    return value_.fetch_sub( 1, std::memory_order_acq_rel ) - 1;
   }
 
   /**
@@ -142,7 +103,7 @@ public:
    * @return Returns the old value.
    */
   value_type operator--(int) {
-    return post_dec();
+    return value_.fetch_sub( 1, std::memory_order_acq_rel );
   }
 
   /**
@@ -151,7 +112,7 @@ public:
    * @return Returns the new value.
    */
   value_type operator+=( value_type n ) {
-    return add( n );
+    return value_.fetch_add( n, std::memory_order_acq_rel ) + n;
   }
 
   /**
@@ -160,130 +121,11 @@ public:
    * @return Returns the new value.
    */
   value_type operator-=( value_type n ) {
-    return add( -n );
+    return value_.fetch_sub( n, std::memory_order_acq_rel ) - n;
   }
 
 private:
-  value_type value_;
-
-  value_type load_impl() const {
-#if defined( __FreeBSD__ )
-    return atomic_load_acq_int( &value_ );
-#else
-    value_type const temp = *(value_type volatile*)&value_;
-# if defined( __APPLE__ )
-    OSMemoryBarrier();
-# elif defined( __GNUC__ )
-    _GLIBCXX_READ_MEM_BARRIER;
-# elif defined( __NetBSD__ ) || defined( __SOLARIS__ )
-    membar_consumer();
-# elif defined( _WIN32 )
-    _ReadBarrier();
-# elif defined( __INTEL_COMPILER )
-    __memory_barrier();
-# endif
-    return temp;
-#endif
-  }
-
-  void store_impl( value_type n ) {
-#if defined( __FreeBSD__ )
-    atomic_store_rel_int( &value_, n );
-#elif defined( _WIN32 )
-    InterlockedExchange( &value_, n );
-#else
-# if defined( __APPLE__ )
-    OSMemoryBarrier();
-# elif defined( __GNUC__ )
-    _GLIBCXX_WRITE_MEM_BARRIER;
-# elif defined( __NetBSD__ ) || defined( __SOLARIS__ )
-    membar_producer();
-# elif defined( __INTEL_COMPILER )
-    __memory_barrier();
-# endif
-    *(value_type volatile*)&value_ = n;
-#endif
-  }
-
-  value_type add( value_type n ) {
-#if defined( __APPLE__ )
-    return OSAtomicAdd32( n, &value_ );
-#elif defined( __GNUC__ )
-    return GNU_EXCHANGE_AND_ADD( &value_, n ) + n;
-#elif defined( __FreeBSD__ )
-    return atomic_fetchadd_int( &value_, n ) + n;
-#elif defined( __NetBSD__ )
-    return (value_type)atomic_add_32_nv( (uint32_t*)&value_, n );
-#elif defined( __SOLARIS__ )
-    return atomic_add_32_nv( (uint32_t*)&value_, n );
-#elif defined( _WIN32 )
-    return InterlockedExchangeAdd( &value_, n ) + n;
-#endif
-  }
-
-  value_type pre_dec() {
-#if defined( __APPLE__ )
-    return OSAtomicDecrement32( &value_ );
-#elif defined( __GNUC__ )
-    return GNU_EXCHANGE_AND_ADD( &value_, -1 ) - 1;
-#elif defined( __FreeBSD__ )
-    return atomic_fetchadd_int( &value_, -1 ) - 1;
-#elif defined( __NetBSD__ )
-    return (value_type)atomic_add_int_nv( (uint32_t*)&value_, -1 );
-#elif defined( __SOLARIS__ )
-    return atomic_add_int_nv( (uint32_t*)&value_, -1 );
-#elif defined( _WIN32 )
-    return InterlockedDecrement( &value_ );
-#endif
-  }
-
-  value_type pre_inc() {
-#if defined( __APPLE__ )
-    return OSAtomicIncrement32( &value_ );
-#elif defined( __GNUC__ )
-    return GNU_EXCHANGE_AND_ADD( &value_, 1 ) + 1;
-#elif defined( __FreeBSD__ )
-    return atomic_fetchadd_int( &value_, 1 ) + 1;
-#elif defined( __NetBSD__ )
-    return (value_type)atomic_add_int_nv( (uint32_t*)&value_, 1 );
-#elif defined( __SOLARIS__ )
-    return atomic_add_32_nv( &value_, 1 );
-#elif defined( _WIN32 )
-    return InterlockedIncrement( &value_ );
-#endif
-  }
-
-  value_type post_dec() {
-#if defined( __APPLE__ )
-    return OSAtomicDecrement32( &value_ ) + 1;
-#elif defined( __GNUC__ )
-    return GNU_EXCHANGE_AND_ADD( &value_, -1 );
-#elif defined( __FreeBSD__ )
-    return atomic_fetchadd_int( &value_, -1 );
-#elif defined( __NetBSD__ )
-    return (value_type)atomic_add_int_nv( (uint32_t*)&value_, -1 ) + 1;
-#elif defined( __SOLARIS__ )
-    return atomic_add_int_nv( &value_, -1 ) + 1;
-#elif defined( _WIN32 )
-    return InterlockedExchangeAdd( &value_, -1 );
-#endif
-  }
-
-  value_type post_inc() {
-#if defined( __APPLE__ )
-    return OSAtomicIncrement32( &value_ ) - 1;
-#elif defined( __GNUC__ )
-    return GNU_EXCHANGE_AND_ADD( &value_, 1 );
-#elif defined( __FreeBSD__ )
-    return atomic_fetchadd_int( &value_, 1 );
-#elif defined( __NetBSD__ )
-    return (value_type)atomic_add_int_nv( (uint32_t*)&value_, 1 ) - 1;
-#elif defined( __SOLARIS__ )
-    return atomic_add_32_nv( &value_, 1 ) - 1;
-#elif defined( _WIN32 )
-    return InterlockedExchangeAdd( &value_, 1 );
-#endif
-  }
+  std::atomic<value_type> value_;
 
   // forbid because they can't be done atomically
   atomic_int( atomic_int const& );

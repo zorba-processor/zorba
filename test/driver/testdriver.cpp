@@ -140,7 +140,7 @@ main(int argc, char** argv)
   driverContext.theRbktBinaryDir = rbkt_bin_dir;
   driverContext.theSpec = &lSpec;
 
-  for (int testcnt = 1; i < argc; ++i, ++testcnt)
+  for (; i < argc; ++i)
   {
     std::string lQueryFile( rbkt_src_dir );
     zorba::fs::append( lQueryFile, "Queries" );
@@ -613,7 +613,7 @@ main(int argc, char** argv)
 
 #endif//ifndef ZORBA_TEST_PLAN_SERIALIZATION_COMPILE_ONLY
 
-  } // for (int testcnt = 1; i < argc; ++i, ++testcnt)
+  } // for (; i < argc; ++i)
   std::cout << "testdriver: success" << std::endl;
   return 0;
 }

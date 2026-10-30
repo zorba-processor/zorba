@@ -18,7 +18,7 @@
 #include <zorba/config.h>
 #include <zorba/util/uuid.h>
 
-#include <cstdio>                       /* for sprintf(3) */
+#include <cstdio>                       /* for snprintf(3) */
 
 #if defined( __APPLE__ )
 # include <cstring>                     /* for memcpy(3) */
@@ -79,8 +79,8 @@ uuid::version uuid::get_version() const {
 
 ostream& operator<<( ostream &os, uuid const &u ) {
   char buf[37];
-  sprintf(                              // verbose & tedious, but fast
-    buf,
+  snprintf(                             // verbose & tedious, but fast
+    buf, sizeof( buf ),
     "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x",
     u.data[ 0], u.data[ 1], u.data[ 2], u.data[ 3],
     u.data[ 4], u.data[ 5], u.data[ 6], u.data[ 7],

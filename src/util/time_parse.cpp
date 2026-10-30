@@ -586,7 +586,7 @@ case_I: parse_num( c, &bp, 1, 12, &tm->tm_hour );
           break;
         } else if ( sign )              // sign followed by non-digit
 bad_tz:   throw invalid_value( bp0, 4 + !!sign, c );
-        // no break;
+        [[fallthrough]];
       } // case 'z'
 
       case 'Z': { // RFC 2822 timezone name only: ZZZ

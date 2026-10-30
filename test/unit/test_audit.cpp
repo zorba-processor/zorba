@@ -31,7 +31,7 @@ test_audit_1(zorba::Zorba* aZorba)
   std::vector<zorba::String> property_names;
   zorba::audit::Configuration::getPropertyNames(property_names);
 
-  bool lIsStatic;
+  [[maybe_unused]] bool lIsStatic;
   lIsStatic = zorba::audit::Configuration::enableProperty(config, property_names,
                                                           "xquery/compilation/filename");
   assert(lIsStatic);
@@ -65,10 +65,8 @@ test_audit_1(zorba::Zorba* aZorba)
     return false;
   } else {
     // one record for the eval query and one for the main query
-    const zorba::audit::Record* lRecord = event->at(0);
-    assert(lRecord->size() == 5);
-    lRecord = event->at(1);
-    assert(lRecord->size() == 5);
+    assert(event->at(0)->size() == 5);
+    assert(event->at(1)->size() == 5);
     std::cerr << *event << std::endl;
   }
 

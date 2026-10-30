@@ -83,7 +83,7 @@ TestThesaurus::lookup( String const &phrase, String const &relationship,
   iterator::ptr result;
   if ( entry != thesaurus_data.end() )
     result.reset( new iterator( *entry->second ) );
-  return std::move( result );
+  return result;
 }
 
 void TestThesaurus::iterator::destroy() const {

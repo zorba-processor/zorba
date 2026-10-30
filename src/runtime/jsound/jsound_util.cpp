@@ -117,8 +117,10 @@ namespace timezone {
     optional,
     required
   };
+  // Declared in this namespace so that it is found via argument-dependent
+  // lookup (e.g., by ztd::to_string()).
+  ostream& operator<<( ostream&, type );
 }
-ostream& operator<<( ostream&, timezone::type );
 
 /**
  * The abstract base class for all JSound types.
@@ -141,6 +143,16 @@ protected:
   virtual void assert_subtype_of( type const* ) const = 0;
   void load_about( store::Item_t const& );
   type const* find_facet( facet_mask facet ) const;
+
+  /**
+   * Finds the facet in \a obj (or its base types) and down-casts the result.
+   * This is a function (rather than inline in a macro) so that callers can
+   * pass \c this without comparing it to null.
+   */
+  template<class T>
+  static T const* find_facet_as( type const *obj, facet_mask facet ) {
+    return obj ? static_cast<T const*>( obj->find_facet( facet ) ) : nullptr;
+  }
   virtual void load_baseType( store::Item_t const&, schema const& );
   void load_constraints( store::Item_t const& );
   void load_enumeration( store::Item_t const& );
@@ -503,7 +515,7 @@ private:
  * \hideinitializer
  */
 #define FIND_FACET(TYPE,OBJ,FACET) \
-  ( (OBJ) ? static_cast<TYPE##_type const*>( (OBJ)->find_facet( facet_##FACET ) ) : nullptr )
+  find_facet_as<TYPE##_type>( (OBJ), facet_##FACET )
 
 /**
  * Tests whether the given item is both an atomic type and whether said type is
@@ -1004,8 +1016,8 @@ ostream& operator<<( ostream &os, kind k ) {
   }
 }
 
-ostream& operator<<( ostream &os, timezone::type tz ) {
-  using namespace timezone;
+namespace timezone {
+ostream& operator<<( ostream &os, type tz ) {
   switch ( tz ) {
     case prohibited: return os << "prohibited";
     case required  : return os << "required";
@@ -1013,6 +1025,7 @@ ostream& operator<<( ostream &os, timezone::type tz ) {
     default        : return os << "<unknown timezone::type: " << (int)tz << '>';
   }
 }
+} // namespace timezone
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -1471,7 +1484,7 @@ bool atomic_type::validate( store::Item_t const &item, bool do_cast,
   DECL_FACET_type( atomic, this, fractionDigits );
 
   zstring str;
-  int length;
+  int length = 0;
   if ( length_type || totalDigits_type || fractionDigits_type ) {
     str = validate_item->getStringValue();
     length = str.length();

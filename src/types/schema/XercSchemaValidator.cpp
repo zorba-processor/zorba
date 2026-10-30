@@ -1917,7 +1917,7 @@ XercSchemaValidator::checkRecurseAsIfGroup(SchemaGrammar* const currentGrammar,
         for (XMLSize_t j = current; j < count2; j++) {
 
 
-            if (baseNodes->elementAt(j)->getMinTotalRange() * baseSpecNode->getMinOccurs()) { //!emptiable
+            if (baseNodes->elementAt(j)->getMinTotalRange() * baseSpecNode->getMinOccurs() != 0) { //!emptiable
                 codeToThrow =  XMLExcepts::PD_Recurse2;
                 break;
             }

@@ -79,8 +79,6 @@ public:
   virtual void
   destroy()
   {
-    if (!dynamic_cast<HttpClientModule*>(this))
-      return;
     delete this;
   }
 

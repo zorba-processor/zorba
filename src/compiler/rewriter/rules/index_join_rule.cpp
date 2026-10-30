@@ -805,8 +805,8 @@ bool IndexJoinRule::findIndexPos(PredicateInfo& predInfo, csize boundVarId)
   // Find the position of the boundary var
   //
   var_expr* boundVar = NULL; 
-  expr* boundExpr;
-  csize boundStackPos;
+  expr* boundExpr = NULL;
+  csize boundStackPos = numStackedExprs; // not found; checked by the assert below
   csize boundVarPos; 
 
   if (boundVarId == 0)

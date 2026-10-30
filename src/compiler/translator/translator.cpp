@@ -900,8 +900,9 @@ axis_step_expr* expect_axis_step_top()
   if (axisExpr == NULL)
   {
     std::cout << "Expecting axis step on top of stack; ";
-    if (theNodeStack.top() != NULL)
-      std::cout << "typeid(top()) = " << typeid(*theNodeStack.top()).name() << std::endl;
+    expr* lTop = theNodeStack.top();
+    if (lTop != NULL)
+      std::cout << "typeid(top()) = " << typeid(*lTop).name() << std::endl;
     else
       std::cout << "top is null\n";
     ZORBA_ASSERT (false);
@@ -12279,7 +12280,7 @@ expr* generate_fn_body(
     if (arguments[0]->get_return_type()->max_card() <= 1)
       f = BUILTIN_FUNC(OP_ZORBA_SINGLE_OBJECT_LOOKUP_2);
 
-    // fall through
+    [[fallthrough]];
   }
   case FunctionConsts::OP_ZORBA_SINGLE_OBJECT_LOOKUP_2:
   {
@@ -12293,7 +12294,7 @@ expr* generate_fn_body(
     if (arguments[0]->get_return_type()->max_card() <= 1)
       f = BUILTIN_FUNC(OP_ZORBA_SINGLE_ARRAY_LOOKUP_2);
 
-    // fall through
+    [[fallthrough]];
   }
   case FunctionConsts::OP_ZORBA_SINGLE_ARRAY_LOOKUP_2:
   {

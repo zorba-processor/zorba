@@ -497,6 +497,7 @@ void operator&(Archiver& ar, store::Item*& obj)
           obj->addReference(); 
 
         ar.register_reference(id, ARCHIVE_FIELD_PTR, obj);
+        [[fallthrough]];
       }
       case store::Item::PUL:
       {

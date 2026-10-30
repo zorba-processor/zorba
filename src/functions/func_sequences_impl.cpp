@@ -533,7 +533,8 @@ PlanIter_t op_zorba_subsequence_int::codegen(
     std::vector<PlanIter_t>& aArgs,
     expr& aAnn) const
 {
-  const std::type_info& lFirstArgType = typeid(*aArgs[0]);
+  const PlanIterator& lFirstArg = *aArgs[0];
+  const std::type_info& lFirstArgType = typeid(lFirstArg);
 
   fo_expr& subseqExpr = static_cast<fo_expr&>(aAnn);
   const expr* inputExpr = subseqExpr.get_arg(0);

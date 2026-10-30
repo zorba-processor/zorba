@@ -61,9 +61,13 @@ using internal::ztd::less;
  * @tparam DerivedType The type of the class deriving from this.
  */
 template<class ContainerType,class DerivedType>
-class back_insert_iterator_base :
-  public std::iterator<std::output_iterator_tag,void,void,void,void> {
+class back_insert_iterator_base {
 public:
+  typedef std::output_iterator_tag iterator_category;
+  typedef void value_type;
+  typedef void difference_type;
+  typedef void pointer;
+  typedef void reference;
   typedef ContainerType container_type;
 
   DerivedType& operator*() {
@@ -420,10 +424,6 @@ ge0( IntType ) {
   return true;
 }
 
-inline bool ge0( char c ) {
-  return c >= 0;
-}
-
 template<typename NumericType> inline
 typename std::enable_if<ZORBA_TR1_NS::is_signed<NumericType>::value,bool>::type
 lt0( NumericType n ) {
@@ -436,10 +436,6 @@ lt0( IntType ) {
   return false;
 }
 
-inline bool lt0( char c ) {
-  return c < 0;
-}
-
 template<typename NumericType> inline
 typename std::enable_if<ZORBA_TR1_NS::is_signed<NumericType>::value,bool>::type
 le0( NumericType n ) {
@@ -450,10 +446,6 @@ template<typename IntType> inline
 typename std::enable_if<ZORBA_TR1_NS::is_unsigned<IntType>::value,bool>::type
 le0( IntType n ) {
   return n == 0;
-}
-
-inline bool le0( char c ) {
-  return c <= 0;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

@@ -135,7 +135,7 @@ long long atoll( char const *buf, char const *end, char const **last ) {
     switch ( *s ) {
       case '-':
         minus = true;
-        // no break;
+        [[fallthrough]];
       case '+':
         s0 = ++s;
         break;

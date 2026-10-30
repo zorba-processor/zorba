@@ -171,6 +171,14 @@ public:
       ulong byteLen,
       bool isBinary = false);
 
+  // Deep copy: the remote buffer (if any) must not be shared.
+  OrdPath(const OrdPath& other)
+  {
+    memset(theBuffer.local, 0, MAX_EMBEDDED_BYTE_LEN);
+    markLocal();
+    *this = other;
+  }
+
   ~OrdPath() 
   {
     if (!isLocal())

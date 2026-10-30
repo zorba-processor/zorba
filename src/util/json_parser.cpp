@@ -757,6 +757,7 @@ bool parser::next( token *t ) {
                   case token::none        : break;
                   default: THROW_UNEXPECTED_TOKEN( peeked_token_ );
                 }
+                [[fallthrough]];
       case J1:  return false;
 
       // <Array> ::= '[' <Element>* ']'

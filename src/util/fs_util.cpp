@@ -482,8 +482,9 @@ void iterator::ctor_impl() {
 
 iterator::~iterator() {
 #ifndef WIN32
-  if ( ::closedir( dir_ ) != 0 )
-    throw fs::exception( "closedir()", path() );
+  // A destructor must not throw (it would call std::terminate), so a failure of
+  // closedir() can only be ignored here.
+  ::closedir( dir_ );
 #else
   win32_closedir();
 #endif /* WIN32 */

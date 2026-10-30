@@ -390,7 +390,7 @@ static void x2j_array( store::Item_t const &parent, store::Item_t *array ) {
       case store::StoreConsts::textNode:
         if ( ascii::is_space( child->getStringValue() ) )
           break;
-        // no break;
+        [[fallthrough]];
       default:
         throw XQUERY_EXCEPTION(
           zerr::ZJSE0004_BAD_NODE,
@@ -619,7 +619,7 @@ static void x2j_object( store::Item_t const &parent, store::Item_t *object ) {
       case store::StoreConsts::textNode:
         if ( ascii::is_space( child->getStringValue() ) )
           break;
-        // no break;
+        [[fallthrough]];
       default:
         throw XQUERY_EXCEPTION(
           zerr::ZJSE0004_BAD_NODE,

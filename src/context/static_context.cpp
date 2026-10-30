@@ -1679,7 +1679,7 @@ std::unique_ptr<internal::Resource> static_context::resolve_uri(
   std::unique_ptr<internal::Resource> lRetval;
   apply_url_resolvers(lUris, &aEntityData, lRetval, oErrorMessage);
 
-  return std::move(lRetval);
+  return lRetval;
 }
 
 void static_context::get_component_uris(
@@ -4540,7 +4540,7 @@ void static_context::clear_base_uri()
   if (theBaseUriInfo)
     delete theBaseUriInfo;
 
-    theBaseUriInfo = new BaseUriInfo;
+  theBaseUriInfo = new BaseUriInfo;
 }
 
 /***************************************************************************//**

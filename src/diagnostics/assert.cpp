@@ -59,7 +59,7 @@ static void print_stack_trace( ostream &o ) {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void assertion_failed( char const *condition, 
+[[noreturn]] void assertion_failed( char const *condition, 
                        char const *file, 
                        int line,
                        char const *msg) {

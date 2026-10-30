@@ -370,8 +370,10 @@ xs_integer SimpleCollection::addNodes(
 
   if (targetPos < numNodes)
   {
-    memmove(&theTrees[targetPos + numNewNodes], 
-            &theTrees[targetPos],
+    // Bitwise relocation of the handles; the vacated slots are reset with
+    // setNull() (not released) below.
+    memmove(static_cast<void*>(&theTrees[targetPos + numNewNodes]),
+            static_cast<void const*>(&theTrees[targetPos]),
             (numNodes-targetPos) * sizeof(store::Item_t));
   }
 

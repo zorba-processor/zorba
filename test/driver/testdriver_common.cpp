@@ -321,11 +321,13 @@ zorba::Item createItem(DriverContext& driverCtx, std::string strValue)
     else if(type == "anyURI")
       return itemfactory->createAnyURI(val);
     else
+    {
       //only primitive types allowed, see http://www.w3.org/TR/xmlschema-2/#built-in-primitive-datatypes
       std::cerr << "Type {" << type
                 << "} is not a primitive data type.\n Derived types not supported."
                 << std::endl;
-      return  NULL;
+    }
+    return  NULL;
   }
 }
 

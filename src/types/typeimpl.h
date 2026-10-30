@@ -383,6 +383,8 @@ public:
   }
 
 public:
+  XQType(const XQType&) = default;
+
   virtual ~XQType();
 
   TypeManager* get_manager() const { return theManager; }

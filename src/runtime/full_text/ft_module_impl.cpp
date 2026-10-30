@@ -110,7 +110,7 @@ static Tokenizer::ptr get_tokenizer( iso639_1::type lang,
       ERROR_PARAMS( iso639_1::str( lang ), ZED( FTST0009_BadTokenizerLang ) ),
       ERROR_LOC( loc )
     );
-  return std::move( tokenizer );
+  return tokenizer;
 }
 
 static void make_token_object( FTToken const &token, store::Item_t &result ) {
@@ -713,7 +713,7 @@ bool TokenizeNodesIterator::nextImpl( store::Item_t &result,
             tokenizer.release();
             add_sentinel = true;
           }
-          // no break;
+          [[fallthrough]];
         case store::StoreConsts::documentNode: {
           list<store::Item_t>::iterator pos = state->includes_.begin();
           store::Iterator_t i = inc->getChildren();
