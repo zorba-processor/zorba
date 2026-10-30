@@ -1,0 +1,9 @@
+[
+  { "id": 1, "customer": "ana", "status": "shipped", "coupon": null,
+    "items": [ { "sku": "A1", "qty": 2, "price": 3.5 },
+               { "sku": "B7", "qty": 1, "price": 12 } ] },
+  { "id": 2, "customer": "luis", "status": "pending",
+    "items": [ { "sku": "A1", "qty": 5, "price": 3.5 } ] },
+  { "id": 3, "customer": "ana", "status": "shipped", "coupon": "FALL10",
+    "items": [ { "sku": "C3", "qty": 1, "price": 40 } ] }
+]
