@@ -30,6 +30,7 @@ status is one of: pass, fail, wrongError, n/a, skip, error.
 import argparse
 import concurrent.futures
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -126,6 +127,8 @@ class Runner:
                                timeout=timeout)
         except subprocess.TimeoutExpired:
             return None, "timeout after %ds" % timeout, out
+        finally:
+            shutil.rmtree(workdir, ignore_errors=True)
         if p.returncode != 0:
             err = p.stderr.decode("utf-8", "replace").strip().splitlines()
             tail = one_line(" | ".join(err[-3:])) if err else ""
@@ -179,7 +182,7 @@ class Runner:
 
     def keep(self, out, name):
         dest = os.path.join(self.args.out, "xml", name + ".xml")
-        os.replace(out, dest)
+        shutil.move(out, dest)
 
 
 def main():
