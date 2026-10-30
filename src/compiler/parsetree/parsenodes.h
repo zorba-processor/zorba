@@ -1139,7 +1139,7 @@ protected:
 public:
   ParamList(const QueryLoc&);
 
-  void push_back(rchandle<Param> param_h) { param_hv.push_back(param_h); }
+  void push_back(rchandle<Param> param_h);
 
   rchandle<Param> operator[](int i) const { return param_hv[i]; }
 
@@ -1174,6 +1174,11 @@ public:
 
   void accept(parsenode_visitor&) const;
 };
+
+inline void ParamList::push_back(rchandle<Param> param_h)
+{
+  param_hv.push_back(param_h);
+}
 
 
 /*******************************************************************************
@@ -1980,7 +1985,7 @@ public:
   FLWORClauseList(const QueryLoc&);
 
 public:
-  void push_back(rchandle<FLWORClause> cl) { theClauses.push_back(cl); }
+  void push_back(rchandle<FLWORClause> cl);
 
   rchandle<FLWORClause> operator[](int i) const { return theClauses[i]; }
 
@@ -2004,6 +2009,11 @@ class FLWORClause : public parsenode
 public:
   FLWORClause(const QueryLoc& loc) : parsenode(loc) {}
 };
+
+inline void FLWORClauseList::push_back(rchandle<FLWORClause> cl)
+{
+  theClauses.push_back(cl);
+}
 
 
 /*******************************************************************************
@@ -2057,7 +2067,7 @@ protected:
 public:
   VarInDeclList(const QueryLoc&);
 
-  void push_back(rchandle<VarInDecl> vardecl_h) { vardecl_hv.push_back(vardecl_h); }
+  void push_back(rchandle<VarInDecl> vardecl_h);
 
   rchandle<VarInDecl> operator[](int i) const { return vardecl_hv[i]; }
 
@@ -2096,6 +2106,11 @@ public:
 
   void accept(parsenode_visitor&) const;
 };
+
+inline void VarInDeclList::push_back(rchandle<VarInDecl> vardecl_h)
+{
+  vardecl_hv.push_back(vardecl_h);
+}
 
 
 /*******************************************************************************
@@ -2149,7 +2164,7 @@ protected:
 public:
   VarGetsDeclList(const QueryLoc&);
 
-  void push_back(rchandle<VarGetsDecl> vardecl_h) { vardecl_hv.push_back(vardecl_h); }
+  void push_back(rchandle<VarGetsDecl> vardecl_h);
 
   rchandle<VarGetsDecl> operator[](int i) const { return vardecl_hv[i]; }
 
@@ -2197,6 +2212,11 @@ public:
 
   void accept(parsenode_visitor&) const;
 };
+
+inline void VarGetsDeclList::push_back(rchandle<VarGetsDecl> vardecl_h)
+{
+  vardecl_hv.push_back(vardecl_h);
+}
 
 
 /*******************************************************************************
@@ -2364,7 +2384,7 @@ protected:
 public:
   OrderSpecList(const QueryLoc&);
 
-  void push_back(rchandle<OrderSpec> spec_h) { spec_hv.push_back(spec_h); }
+  void push_back(rchandle<OrderSpec> spec_h);
 
   OrderSpec* operator[](int i) const { return spec_hv[i].getp(); }
 
@@ -2395,6 +2415,11 @@ public:
 
   void accept(parsenode_visitor&) const;
 };
+
+inline void OrderSpecList::push_back(rchandle<OrderSpec> spec_h)
+{
+  spec_hv.push_back(spec_h);
+}
 
 
 /*******************************************************************************
@@ -2705,7 +2730,7 @@ protected:
 public:
   QVarInDeclList(const QueryLoc&);
 
-  void push_back(rchandle<QVarInDecl> decl_h) { qvar_decl_hv.push_back(decl_h); }
+  void push_back(rchandle<QVarInDecl> decl_h);
 
   rchandle<QVarInDecl> operator[](int i) const { return qvar_decl_hv[i]; }
 
@@ -2746,6 +2771,11 @@ public:
   void accept(parsenode_visitor&) const;
 };
 
+inline void QVarInDeclList::push_back(rchandle<QVarInDecl> decl_h)
+{
+  qvar_decl_hv.push_back(decl_h);
+}
+
 
 /*******************************************************************************
   SwitchExpr ::= "switch" "(" Expr ")"
@@ -2782,8 +2812,7 @@ protected:
 public:
   SwitchCaseClauseList(const QueryLoc&);
 
-  void push_back(rchandle<SwitchCaseClause> clause_h)
-  { clause_hv.push_back(clause_h); }
+  void push_back(rchandle<SwitchCaseClause> clause_h);
 
   rchandle<SwitchCaseClause> operator[](int i) const
   { return clause_hv[i]; }
@@ -2827,6 +2856,11 @@ public:
 
   void accept(parsenode_visitor&) const;
 };
+
+inline void SwitchCaseClauseList::push_back(rchandle<SwitchCaseClause> clause_h)
+{
+  clause_hv.push_back(clause_h);
+}
 
 
 class SwitchCaseOperandList : public parsenode
@@ -2911,8 +2945,7 @@ protected:
 public:
   CaseClauseList(const QueryLoc&);
 
-  void push_back(rchandle<CaseClause> clause_h)
-  { theClauses.push_back(clause_h); }
+  void push_back(rchandle<CaseClause> clause_h);
 
   const CaseClause* operator[](csize i) const
   { return theClauses[i]; }
@@ -2961,6 +2994,11 @@ public:
 
   void accept(parsenode_visitor&) const;
 };
+
+inline void CaseClauseList::push_back(rchandle<CaseClause> clause_h)
+{
+  theClauses.push_back(clause_h);
+}
 
 
 /*******************************************************************************
@@ -4673,10 +4711,7 @@ protected:
 public:
   QuoteAttrContentList(const QueryLoc&);
 
-  void push_back(rchandle<QuoteAttrValueContent> quot_atval_content_h)
-  {
-    quot_atval_content_hv.push_back(quot_atval_content_h);
-  }
+  void push_back(rchandle<QuoteAttrValueContent> quot_atval_content_h);
 
   rchandle<QuoteAttrValueContent> operator[](int i) const
   {
@@ -4698,10 +4733,7 @@ protected:
 public:
   AposAttrContentList(const QueryLoc&);
 
-  void push_back(rchandle<AposAttrValueContent> apos_atval_content_h)
-  {
-    apos_atval_content_hv.push_back(apos_atval_content_h);
-  }
+  void push_back(rchandle<AposAttrValueContent> apos_atval_content_h);
 
   rchandle<AposAttrValueContent> operator[](int i) const
   {
@@ -4741,6 +4773,11 @@ public:
   void accept(parsenode_visitor&) const;
 };
 
+inline void QuoteAttrContentList::push_back(rchandle<QuoteAttrValueContent> quot_atval_content_h)
+{
+  quot_atval_content_hv.push_back(quot_atval_content_h);
+}
+
 
 /*******************************************************************************
   [123] AposAttrValueContent ::= EscapeApos | AposAttrContentChar | CommonContent
@@ -4771,6 +4808,11 @@ public:
   void accept(parsenode_visitor&) const;
 };
 
+inline void AposAttrContentList::push_back(rchandle<AposAttrValueContent> apos_atval_content_h)
+{
+  apos_atval_content_hv.push_back(apos_atval_content_h);
+}
+
 
 /*******************************************************************************
   [119a] DirElemContentList ::= DirElemContent+
@@ -4783,10 +4825,7 @@ protected:
 public:
   DirElemContentList(const QueryLoc&);
 
-  void push_back(rchandle<DirElemContent> dir_content_h)
-  {
-    dir_content_hv.push_back(dir_content_h);
-  }
+  void push_back(rchandle<DirElemContent> dir_content_h);
 
   rchandle<DirElemContent> operator[](int i) const
   {
@@ -4845,6 +4884,11 @@ public:
 
   void accept(parsenode_visitor&) const;
 };
+
+inline void DirElemContentList::push_back(rchandle<DirElemContent> dir_content_h)
+{
+  dir_content_hv.push_back(dir_content_h);
+}
 
 
 /*******************************************************************************
@@ -6029,10 +6073,7 @@ protected:
 public:
   CopyVarList(const QueryLoc& loc);
 
-  void push_back(rchandle<VarBinding> binding)
-  {
-    var_bindings.push_back(binding);
-  }
+  void push_back(rchandle<VarBinding> binding);
 
   rchandle<VarBinding> operator[](int i) const
   {
@@ -6066,6 +6107,11 @@ public:
 
   void accept(parsenode_visitor&) const;
 };
+
+inline void CopyVarList::push_back(rchandle<VarBinding> binding)
+{
+  var_bindings.push_back(binding);
+}
 
 
 
