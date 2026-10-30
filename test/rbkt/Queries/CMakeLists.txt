@@ -169,9 +169,25 @@ FOREACH(TESTFILE ${TESTFILES})
     # Skip queries that need XML Schema: explicit schema imports, validate
     # expressions, and the modules that import the options schema (xml, xqdoc).
     FILE(READ "${CMAKE_CURRENT_SOURCE_DIR}/${TESTFILE}" _query_text)
-    IF (_query_text MATCHES "import[ \t\r\n]+schema|validate[ \t\r\n]*(\\{|strict|lax|type)|/modules/(xml|xqdoc|schema)[\"']")
+    # fn:analyze-string and fn:serialize with a parameters element need the
+    # fn and serialization schemas.
+    SET (_schema_re "import[ \t\r\n]+schema|validate[ \t\r\n]*(\\{|strict|lax|type)|/modules/(xml|xqdoc|schema)[\"']|analyze-string|serialization-parameters")
+    IF (_query_text MATCHES "${_schema_re}")
       SET (SKIP_TEST 1)
-    ENDIF()
+    ELSE ()
+      # Also look one level down, into the library modules the query imports.
+      GET_FILENAME_COMPONENT (_query_dir "${CMAKE_CURRENT_SOURCE_DIR}/${TESTFILE}" PATH)
+      STRING (REGEX MATCHALL "at[ \t\r\n]+[\"']([^\"']+)[\"']" _imports "${_query_text}")
+      FOREACH (_import ${_imports})
+        STRING (REGEX REPLACE "^at[ \t\r\n]+[\"']([^\"']+)[\"']$" "\\1" _import_path "${_import}")
+        IF (EXISTS "${_query_dir}/${_import_path}")
+          FILE (READ "${_query_dir}/${_import_path}" _lib_text)
+          IF (_lib_text MATCHES "${_schema_re}")
+            SET (SKIP_TEST 1)
+          ENDIF ()
+        ENDIF ()
+      ENDFOREACH (_import)
+    ENDIF ()
   ENDIF (ZORBA_NO_XMLSCHEMA)
   IF (ZORBA_NO_FULL_TEXT)
     STRING(REGEX MATCH "fulltext/" NEEDS_FULL_TEXT "${TESTNAME}")
