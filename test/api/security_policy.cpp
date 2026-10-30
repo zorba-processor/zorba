@@ -15,8 +15,9 @@
  */
 
 // Tests for the SecurityPolicy API (include/zorba/security.h): defaults,
-// inheritance through static contexts, the "children cannot widen" rule,
-// copy semantics and plan serialization. Enforcement is tested elsewhere.
+// inheritance through static contexts, embedder widening, copy semantics and
+// plan serialization. That engine-created contexts cannot widen is tested in
+// src/unit_tests/test_security_policy.cpp (needs the internal API).
 
 #include <chrono>
 #include <iostream>
@@ -213,19 +214,25 @@ void test_instance_default(Zorba* z)
   // Part 1 of the secure-by-default work keeps the old behavior.
   CHECK(z->getSecurityPolicy() == SecurityPolicy::unrestricted());
 
-  StaticContext_t sctx = z->createStaticContext();
-  CHECK(sctx->getSecurityPolicy() == SecurityPolicy::unrestricted());
+  StaticContext_t inheriting = z->createStaticContext();
+  CHECK(inheriting->getSecurityPolicy() == SecurityPolicy::unrestricted());
 
-  // Narrowing the instance default narrows existing contexts too.
-  sctx->setSecurityPolicy(SecurityPolicy::unrestricted());
+  StaticContext_t explicitCtx = z->createStaticContext();
+  explicitCtx->setSecurityPolicy(SecurityPolicy::unrestricted());
+
+  // Changing the instance default affects contexts that inherit it, not
+  // contexts with an explicit policy.
   z->setSecurityPolicy(SecurityPolicy::secure());
   CHECK(z->getSecurityPolicy() == SecurityPolicy::secure());
-  CHECK(sctx->getSecurityPolicy() == SecurityPolicy::secure());
+  CHECK(inheriting->getSecurityPolicy() == SecurityPolicy::secure());
+  CHECK(inheriting->createChildContext()->getSecurityPolicy() ==
+        SecurityPolicy::secure());
   CHECK(z->createStaticContext()->getSecurityPolicy() ==
         SecurityPolicy::secure());
+  CHECK(explicitCtx->getSecurityPolicy() == SecurityPolicy::unrestricted());
 
   z->setSecurityPolicy(SecurityPolicy::unrestricted());
-  CHECK(sctx->getSecurityPolicy() == SecurityPolicy::unrestricted());
+  CHECK(inheriting->getSecurityPolicy() == SecurityPolicy::unrestricted());
 }
 
 void test_inheritance(Zorba* z)
@@ -268,50 +275,40 @@ void test_inheritance(Zorba* z)
         grandchild->getSecurityPolicy());
 }
 
-void test_cannot_widen(Zorba* z)
+void test_embedder_widening(Zorba* z)
 {
-  StaticContext_t parent = z->createStaticContext();
-  SecurityPolicy p = SecurityPolicy::secure()
-    .allow(Capability::Network)
-    .addNetworkPrefix("https://api.example.com/v1/")
-    .setTimeout(seconds(10));
-  parent->setSecurityPolicy(p);
+  // Typical use: secure process default, one trusted context that may read
+  // a directory.
+  z->setSecurityPolicy(SecurityPolicy::secure());
 
-  StaticContext_t child = parent->createChildContext();
+  SecurityPolicy trusted = SecurityPolicy::secure();
+  trusted.allow(Capability::FileRead).addReadPath("/srv/data");
 
-  // Unrestricted on the child yields the parent's policy.
+  StaticContext_t sctx = z->createStaticContext();
+  CHECK(sctx->getSecurityPolicy() == SecurityPolicy::secure());
+  sctx->setSecurityPolicy(trusted);
+  CHECK(sctx->getSecurityPolicy() == trusted);
+  CHECK(!trusted.isWithin(SecurityPolicy::secure())); // really wider
+
+  // Children without a policy of their own inherit it.
+  StaticContext_t child = sctx->createChildContext();
+  CHECK(child->getSecurityPolicy() == trusted);
+
+  // The embedder may also set a wider policy on a child of a narrower one.
   child->setSecurityPolicy(SecurityPolicy::unrestricted());
-  CHECK(child->getSecurityPolicy() == p);
+  CHECK(child->getSecurityPolicy() == SecurityPolicy::unrestricted());
+  CHECK(sctx->getSecurityPolicy() == trusted);
 
-  // A capability the parent denies stays denied.
-  child->setSecurityPolicy(SecurityPolicy::secure()
-                             .allow(Capability::Network)
-                             .allow(Capability::Environment));
-  CHECK(child->getSecurityPolicy().allows(Capability::Network));
-  CHECK(!child->getSecurityPolicy().allows(Capability::Environment));
+  // Queries compiled with a context run under its policy.
+  XQuery_t q = z->compileQuery("1", sctx);
+  CHECK(q->getStaticContext()->getSecurityPolicy() == trusted);
 
-  // A wider prefix is narrowed to the parent's.
-  child->setSecurityPolicy(SecurityPolicy::unrestricted()
-                             .addNetworkPrefix("https://api.example.com/"));
-  CHECK(child->getSecurityPolicy().getNetworkPrefixes().size() == 1 &&
-        child->getSecurityPolicy().getNetworkPrefixes()[0] ==
-          "https://api.example.com/v1/");
+  // Other contexts still get the instance default.
+  CHECK(z->createStaticContext()->getSecurityPolicy() ==
+        SecurityPolicy::secure());
 
-  // A disjoint prefix leaves no network access.
-  child->setSecurityPolicy(SecurityPolicy::unrestricted()
-                             .addNetworkPrefix("https://evil.example/"));
-  CHECK(!child->getSecurityPolicy().allows(Capability::Network));
-
-  // A longer or absent timeout does not lift the parent's.
-  child->setSecurityPolicy(SecurityPolicy::unrestricted()
-                             .setTimeout(seconds(60)));
-  CHECK(child->getSecurityPolicy().getTimeout() == seconds(10));
-  child->setSecurityPolicy(SecurityPolicy::unrestricted()
-                             .setTimeout(milliseconds(0)));
-  CHECK(child->getSecurityPolicy().getTimeout() == seconds(10));
-
-  // The effective policy is always within the parent's.
-  CHECK(child->getSecurityPolicy().isWithin(parent->getSecurityPolicy()));
+  z->setSecurityPolicy(SecurityPolicy::unrestricted());
+  CHECK(sctx->getSecurityPolicy() == trusted);
 }
 
 void test_plan_serialization(Zorba* z)
@@ -356,7 +353,7 @@ security_policy(int argc, char* argv[])
     test_narrowing();
     test_instance_default(lZorba);
     test_inheritance(lZorba);
-    test_cannot_widen(lZorba);
+    test_embedder_widening(lZorba);
     test_plan_serialization(lZorba);
   }
   catch (ZorbaException const& e)

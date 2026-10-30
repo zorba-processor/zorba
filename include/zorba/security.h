@@ -70,12 +70,24 @@ enum class Capability : uint32_t {
  *
  * A policy is attached to the Zorba instance (the process-wide default, see
  * Zorba::setSecurityPolicy()) and optionally to a StaticContext (see
- * StaticContext::setSecurityPolicy()). The policy in effect for a context is
- * the narrowest combination (see narrowedBy()) of its own policy and the
- * policies of all its ancestors up to the instance default, so a context can
- * restrict but never extend what its parent allows.
- *
- * Queries cannot change the policy; only the C++ API can.
+ * StaticContext::setSecurityPolicy()):
+ * - A context with no policy of its own inherits the policy in effect for its
+ *   parent; contexts created with Zorba::createStaticContext() inherit the
+ *   instance default.
+ * - A policy set through the API on a context replaces the inherited one for
+ *   that context and its descendants. The embedder is trusted, so it may be
+ *   wider than the parent's, e.g. a secure() instance default and one
+ *   context allowed to read a given directory:
+ * \code
+ * zorba->setSecurityPolicy(SecurityPolicy::secure());
+ * StaticContext_t trusted = zorba->createStaticContext();
+ * trusted->setSecurityPolicy(SecurityPolicy::secure()
+ *     .allow(Capability::FileRead).addReadPath("/srv/data"));
+ * \endcode
+ * - Queries can never widen the policy they run under: there is no XQuery
+ *   construct that changes it, and the contexts the engine creates on a
+ *   query's behalf (module imports, eval, the zorba-query module) inherit it
+ *   and can only narrow it (see narrowedBy()).
  *
  * \note Enforcement is being introduced in stages. Setting a policy does not
  *       yet restrict query evaluation, and the instance default is currently

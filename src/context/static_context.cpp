@@ -1862,8 +1862,8 @@ void static_context::apply_url_resolvers(
 
 /*******************************************************************************
   The policy is serialized with the plan so that a loaded plan keeps the
-  restrictions it was compiled under. On load, the policy of the loading
-  instance (root sctx) still applies on top of it.
+  policy it was compiled under. Contexts without an explicit policy in the
+  serialized chain inherit the loading instance's default.
 ********************************************************************************/
 void static_context::serialize_security_policy(serialization::Archiver& ar)
 {
@@ -1881,6 +1881,8 @@ void static_context::serialize_security_policy(serialization::Archiver& ar)
   ar & lHasPolicy;
   if (!lHasPolicy)
     return;
+
+  ar & theSecurityPolicyNarrows;
 
   uint32_t lCaps = 0;
   std::vector<zstring> lReadPaths;
@@ -1945,33 +1947,70 @@ void static_context::serialize_security_policy(serialization::Archiver& ar)
 void static_context::set_security_policy(const SecurityPolicy& aPolicy)
 {
   theSecurityPolicy.reset(new SecurityPolicy(aPolicy));
+  theSecurityPolicyNarrows = false;
 }
 
 
 /*******************************************************************************
 
 ********************************************************************************/
+void static_context::narrow_security_policy(const SecurityPolicy& aPolicy)
+{
+  // If a policy is already attached, narrow it in place and keep its kind:
+  // an explicit policy stays the base, so ancestors still do not apply.
+  if (theSecurityPolicy)
+    theSecurityPolicy.reset(
+        new SecurityPolicy(theSecurityPolicy->narrowedBy(aPolicy)));
+  else
+  {
+    theSecurityPolicy.reset(new SecurityPolicy(aPolicy));
+    theSecurityPolicyNarrows = true;
+  }
+}
+
+
+/*******************************************************************************
+  Walk up to the nearest explicit policy, intersecting the narrowing policies
+  met on the way.
+********************************************************************************/
 SecurityPolicy static_context::get_security_policy() const
 {
-  SecurityPolicy lPolicy = SecurityPolicy::unrestricted();
+  std::unique_ptr<SecurityPolicy> lNarrowing;
+  const SecurityPolicy* lBase = NULL;
+
   for (const static_context* sctx = this; sctx != NULL; sctx = sctx->theParent)
   {
-    if (sctx->theSecurityPolicy)
-      lPolicy = lPolicy.narrowedBy(*sctx->theSecurityPolicy);
+    const SecurityPolicy* p = sctx->theSecurityPolicy.get();
+    if (p == NULL)
+      continue;
+    if (!sctx->theSecurityPolicyNarrows)
+    {
+      lBase = p;
+      break;
+    }
+    if (lNarrowing)
+      lNarrowing.reset(new SecurityPolicy(lNarrowing->narrowedBy(*p)));
+    else
+      lNarrowing.reset(new SecurityPolicy(*p));
   }
+
+  SecurityPolicy lPolicy =
+    lBase ? *lBase : SecurityPolicy::unrestricted();
+  if (lNarrowing)
+    lPolicy = lPolicy.narrowedBy(*lNarrowing);
   return lPolicy;
 }
 
 
 /*******************************************************************************
-  Narrowing can only clear capabilities (allow-list intersections may clear
-  FileRead/FileWrite/Network as well), so walk the chain and stop at the first
-  policy that denies the capability. If none denies it, the allow-lists still
-  have to be intersected, which only get_security_policy() does.
+  Intersection can only clear capabilities, so any policy on the way to (and
+  including) the nearest explicit one that denies the capability denies it.
+  If all allow it, allow-list intersections may still clear FileRead,
+  FileWrite or Network; only get_security_policy() computes those.
 ********************************************************************************/
 bool static_context::allows_capability(Capability aCap) const
 {
-  bool lListsSet = false;
+  bool lNarrowedLists = false;
   for (const static_context* sctx = this; sctx != NULL; sctx = sctx->theParent)
   {
     const SecurityPolicy* p = sctx->theSecurityPolicy.get();
@@ -1979,11 +2018,13 @@ bool static_context::allows_capability(Capability aCap) const
       continue;
     if (!p->allows(aCap))
       return false;
+    if (!sctx->theSecurityPolicyNarrows)
+      break;
     if (!p->getReadPaths().empty() || !p->getWritePaths().empty() ||
         !p->getNetworkPrefixes().empty())
-      lListsSet = true;
+      lNarrowedLists = true;
   }
-  return lListsSet ? get_security_policy().allows(aCap) : true;
+  return lNarrowedLists ? get_security_policy().allows(aCap) : true;
 }
 
 

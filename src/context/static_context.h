@@ -462,12 +462,19 @@ public:
   or ddl) is enabled. The definition of the features is located in
   context/featueres.h.
 
-  theSecurityPolicy:
-  ------------------
-  The security policy set on "this" sctx through the API, or NULL. The policy
-  in effect is the narrowest combination of the policies of "this" sctx and
-  all its ancestors (see get_security_policy()); the root sctx holds the
-  instance default (Zorba::setSecurityPolicy()). Queries cannot change it.
+  theSecurityPolicy / theSecurityPolicyNarrows:
+  ----------------------------------------------
+  The security policy attached to "this" sctx, or NULL. There are two kinds:
+  - explicit (theSecurityPolicyNarrows == false): set by the embedder through
+    the API (StaticContext::setSecurityPolicy(), or Zorba::setSecurityPolicy()
+    on the root sctx). Trusted: it replaces whatever is inherited and may be
+    wider than the parent's policy.
+  - narrowing (theSecurityPolicyNarrows == true): set by the engine on a sctx
+    it creates on a query's behalf. It is intersected with the inherited
+    policy, so it can never widen it.
+  The policy in effect (get_security_policy()) is the nearest explicit policy
+  up the chain, intersected with every narrowing policy below it. A sctx with
+  neither inherits its parent's policy in effect. Queries cannot change it.
 ********************************************************************************/
 
 class static_context : public SyncedRCObject
@@ -712,6 +719,8 @@ protected:
 
   std::unique_ptr<SecurityPolicy>            theSecurityPolicy;
 
+  bool                                       theSecurityPolicyNarrows = false;
+
 public:
   static bool is_builtin_module(const zstring& ns);
 
@@ -852,13 +861,22 @@ public:
   //
 
   /**
-   * Sets the policy of "this" sctx. It can only narrow the policy inherited
-   * from the ancestors: get_security_policy() combines both.
+   * Sets an explicit policy on "this" sctx (embedder API only). It replaces
+   * the inherited policy for "this" sctx and its descendants and may be wider
+   * than the parent's.
    */
   void set_security_policy(const SecurityPolicy& aPolicy);
 
   /**
-   * Returns the policy set on "this" sctx, or NULL if none was set.
+   * Sets a narrowing policy on "this" sctx. Used by the engine for contexts it
+   * creates on a query's behalf (module imports, eval, zorba-query, ...): the
+   * policy in effect becomes the intersection of aPolicy and the inherited
+   * policy, so it can never widen what the creator runs under.
+   */
+  void narrow_security_policy(const SecurityPolicy& aPolicy);
+
+  /**
+   * Returns the policy attached to "this" sctx, or NULL if none was set.
    */
   const SecurityPolicy* get_local_security_policy() const
   {
@@ -866,9 +884,9 @@ public:
   }
 
   /**
-   * Returns the policy in effect for "this" sctx: the narrowest combination of
-   * the policies set on "this" sctx and all its ancestors. If none is set
-   * anywhere in the chain, returns SecurityPolicy::unrestricted().
+   * Returns the policy in effect for "this" sctx: the nearest explicit policy
+   * up the chain, intersected with the narrowing policies below it. If the
+   * chain has no explicit policy, SecurityPolicy::unrestricted() is the base.
    */
   SecurityPolicy get_security_policy() const;
 

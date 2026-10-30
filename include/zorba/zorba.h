@@ -336,9 +336,10 @@ class ZORBA_DLL_PUBLIC Zorba
 
   /** \brief Sets the process-wide default security policy.
    *
-   * The policy applies to every static context and to operations that have
-   * no static context (e.g. XmlDataManager::parseXML()). A StaticContext can
-   * narrow it with StaticContext::setSecurityPolicy() but never extend it.
+   * The policy applies to every static context that has no policy of its
+   * own on its parent chain (see StaticContext::setSecurityPolicy()) and to
+   * operations that have no static context (e.g. XmlDataManager::parseXML()).
+   * Changing it affects existing contexts that inherit it.
    *
    * Call this before compiling or executing queries; changing the policy
    * while queries run on other threads is not synchronized.
