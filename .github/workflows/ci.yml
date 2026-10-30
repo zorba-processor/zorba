@@ -122,9 +122,11 @@ jobs:
               cmake --preset ${{ matrix.preset }}
               cmake --build --preset ${{ matrix.preset }}
               ccache -s
-              scripts/profile-size.sh ${{ matrix.preset }} | tee -a build/size.md
+              scripts/profile-size.sh ${{ matrix.preset }} > build/size.md
+              cat build/size.md
               ctest --preset ${{ matrix.preset }} -j"$(nproc)" \
-                --output-junit junit.xml | tee build/ctest.log'
+                --output-junit junit.xml > build/ctest.log 2>&1 || { tail -n 60 build/ctest.log; exit 1; }
+              tail -n 5 build/ctest.log'
 
       - name: Summary
         if: always()
