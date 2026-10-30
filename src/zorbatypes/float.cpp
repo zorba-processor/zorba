@@ -17,6 +17,8 @@
 #include "stdafx.h"
 
 #include <cstdio>
+#include <charconv>
+#include <cstdlib>
 #include <limits>
 #include <string>
 #include <stdlib.h>
@@ -348,80 +350,71 @@ zstring FloatImpl<F>::toString( bool no_scientific_format ) const {
   if ( isNegZero() )
     return "-0";
 
+  //
+  // F&O 3.1 19.1.2.2: the result uses the shortest sequence of significant
+  // digits that converts back to the same xs:float or xs:double value.
+  // std::to_chars with a format but no precision produces exactly that.
+  //
+  char sci[64];
+  std::to_chars_result const r =
+    std::to_chars( sci, sci + sizeof sci, value_, std::chars_format::scientific );
+  *r.ptr = '\0';
+
+  // sci is: [-]d[.ddd]e(+|-)xx
+  char const *p = sci;
+  bool const negative = *p == '-';
+  if ( negative )
+    ++p;
+  std::string digits;
+  for ( ; *p != 'e'; ++p )
+    if ( *p != '.' )
+      digits += *p;
+  int const exponent = std::atoi( p + 1 );
+  while ( digits.size() > 1 && digits.back() == '0' )
+    digits.pop_back();
+
+  zstring result;
+  if ( negative )
+    result += '-';
+
   value_type const abs_val = fabs( value_ );
   value_type const lower = 0.000001f, upper = 1000000.0f;
 
-  if ( no_scientific_format || (abs_val >= lower && abs_val < upper) ||
-       abs_val == 0 ) {
-#if 1
-    // This is the "spec" implementation, i.e., it is an exact application of
-    // the spec in  http://www.w3.org/TR/xpath-functions/#casting
-    MAPM temp( value_ );
-    temp = temp.round( precision_ );
-    return Decimal::toString( temp, isNegZero(), max_precision() );
-#else
-    std::stringstream stream;
-    stream.precision(7);
-    stream.setf(std::ios::fixed);
-    stream << value_;
-
-    zstring result(stream.str());
-
-    // remove non-significant trailing 0's
-    long i = result.size() - 1;
-    while (str[i] == '0')
-      --i;
-
-    if (i >= 0) {
-      long j = i;
-      while (str[j] != '.')
-        --j;
-
-      if (j >= 0)
-        if (j == i)
-          result.resize(i);
-        else
-          result.resize(i+1);
+  if ( no_scientific_format || (abs_val >= lower && abs_val < upper) ) {
+    //
+    // Converted to xs:decimal, then to xs:string: no exponent, and no
+    // fractional part if it is zero.
+    //
+    int const ndigits = static_cast<int>( digits.size() );
+    if ( exponent < 0 ) {
+      result += "0.";
+      result.append( static_cast<zstring::size_type>( -exponent - 1 ), '0' );
+      result += digits.c_str();
+    } else if ( exponent + 1 >= ndigits ) {
+      result += digits.c_str();
+      result.append( static_cast<zstring::size_type>( exponent + 1 - ndigits ),
+                     '0' );
+    } else {
+      result.append( digits, 0, exponent + 1 );
+      result += '.';
+      result.append( digits, exponent + 1, std::string::npos );
     }
-
-    return result;
-#endif
   } else {
-    char buf[174];
-    snprintf( buf, sizeof( buf ), "%#1.*E", (int)precision_, (double)value_ );
-    char *e = ::strchr( buf, 'E' );
-
     //
-    // Clean-up, part 1: remove trailing zeros from mantissa
-    // e.g.: xx.xx12300Exx => xx.xx123Exx
+    // Mantissa with one digit before the point and at least one after it,
+    // then "E" and the exponent without "+" or leading zeros, e.g., 1.0E7.
     //
-    char *zero = e - 1;
-    while ( *zero == '0' && zero[-1] != '.' )
-      --zero;
-    if ( zero < e - 1 )
-      ::memmove( zero + 1, e, strlen( e ) + 1 );
-
-    //
-    // Clean-up, part 2: remove '+' and leading '0' from exponent
-    // e.g: 1E+xx => 1Exx, 1E-0x => 1E-x
-    //
-    e = ::strchr( buf, 'E' );
-    char *dest = ++e;
-    switch ( *e ) {
-      case '-':
-        ++dest;
-        [[fallthrough]];
-      case '+':
-        ++e;
-    }
-    if ( *e == '0' )
-      ++e;
-    if ( dest < e )
-      ::memmove( dest, e, strlen( e ) + 1 );
-
-    Decimal::reduce( buf );
-    return buf;
+    result += digits[0];
+    result += '.';
+    if ( digits.size() > 1 )
+      result.append( digits, 1, std::string::npos );
+    else
+      result += '0';
+    result += 'E';
+    ascii::itoa_buf_type buf;
+    result += ascii::itoa( exponent, buf );
   }
+  return result;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
