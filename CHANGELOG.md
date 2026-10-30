@@ -100,6 +100,7 @@ Entries marked **(open PR)** come from pull requests that are not merged yet; co
 - Fix `fn:serialize` error codes for bad `$params`: `XPTY0004` for a wrong element, `SEPM0017` for invalid parameters, `SEPM0019` for duplicates; parameters in other namespaces are ignored and `item-separator` is accepted ([#64](https://github.com/zorba-processor/zorba/pull/64)).
 - Fix `fn:format-number` with a zero integer part when the picture has no mandatory integer digit (`.2`, `.0`), irregular grouping separators, adjacent or trailing grouping separators (`FODF1310`), overflow to infinity and negative zero ([#64](https://github.com/zorba-processor/zorba/pull/64)).
 - Fix fractional seconds (`[f]`) in `format-dateTime`/`format-time`: digit family, truncation, optional digits, grouping separators and width modifiers follow F&O 3.1; invalid width modifiers raise `FOFD1340` ([#64](https://github.com/zorba-processor/zorba/pull/64)).
+- Fix regular expressions that never finished in ICU (e.g. `(?:r?)*?r`): matching now has a time limit and raises `ZXQP0001` when it is exceeded ([#64](https://github.com/zorba-processor/zorba/pull/64)).
 
 ### Removed
 
