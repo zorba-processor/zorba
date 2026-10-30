@@ -153,8 +153,7 @@ public:
 
   ~ItemValuesCollHandleHashMap() 
   {
-    if (theCompareParam)
-      delete theCompareParam; 
+    delete theCompareParam; 
   }
  
   iterator begin() { return theMap.begin(); }

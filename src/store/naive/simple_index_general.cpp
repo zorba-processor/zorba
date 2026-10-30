@@ -63,8 +63,7 @@ GeneralIndexCompareFunction::GeneralIndexCompareFunction(
 ********************************************************************************/
 GeneralIndexCompareFunction::~GeneralIndexCompareFunction()
 {
-  if (theCollator)
-    delete theCollator; 
+  delete theCollator; 
 }
 
 

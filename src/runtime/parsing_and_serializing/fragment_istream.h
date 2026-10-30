@@ -146,10 +146,7 @@ public:
   {
     theBuffer.clear();
 
-    if (theIss)
-    {
-      delete theIss;
-    }
+    delete theIss;
     
     if (theStreamReleaser)
     {

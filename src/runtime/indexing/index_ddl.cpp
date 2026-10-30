@@ -1370,8 +1370,7 @@ ProbeIndexRangeGeneralIteratorState::ProbeIndexRangeGeneralIteratorState()
 
 ProbeIndexRangeGeneralIteratorState::~ProbeIndexRangeGeneralIteratorState()
 {
-  if (theNodeHashSet)
-    delete theNodeHashSet;
+  delete theNodeHashSet;
 }
 
 

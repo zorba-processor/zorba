@@ -913,20 +913,11 @@ FLWORIterator::FLWORIterator(
 ********************************************************************************/
 FLWORIterator::~FLWORIterator()
 {
-  if (theOrderByClause)
-  {
-    delete theOrderByClause;
-  }
+  delete theOrderByClause;
 
-  if (theMaterializeClause)
-  {
-    delete theMaterializeClause;
-  }
+  delete theMaterializeClause;
 
-  if (theGroupByClause)
-  { 
-    delete theGroupByClause;
-  }
+  delete theGroupByClause;
 }
 
 

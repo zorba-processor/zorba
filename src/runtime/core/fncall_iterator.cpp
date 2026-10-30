@@ -124,8 +124,7 @@ UDFunctionCallIteratorState::~UDFunctionCallIteratorState()
   if (thePlanOpen)
     thePlan->close(*thePlanState);
 
-  if (thePlanState != NULL)
-    delete thePlanState;
+  delete thePlanState;
 
   if (theLocalDCtx != NULL && theIsLocalDCtxOwner)
     delete theLocalDCtx;

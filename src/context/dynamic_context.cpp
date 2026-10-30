@@ -174,14 +174,11 @@ dynamic_context::~dynamic_context()
     delete keymap;
   }
 
-  if(theEnvironmentVariables)
-    delete theEnvironmentVariables;
+  delete theEnvironmentVariables;
 
-  if (theAvailableIndices)
-    delete theAvailableIndices;
+  delete theAvailableIndices;
 
-  if (theAvailableMaps)
-    delete theAvailableMaps;
+  delete theAvailableMaps;
 }
 
 

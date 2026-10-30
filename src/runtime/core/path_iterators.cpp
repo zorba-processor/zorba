@@ -1617,8 +1617,7 @@ PrecedingReverseAxisState::PrecedingReverseAxisState()
 
 PrecedingReverseAxisState::~PrecedingReverseAxisState()
 {
-  if (theAncestor.second != NULL)
-    delete theAncestor.second;
+  delete theAncestor.second;
 
   ulong len = (ulong)theCurrentPath.size();
   for (ulong i = 0; i < len; ++i)
