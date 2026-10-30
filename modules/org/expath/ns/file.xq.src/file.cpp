@@ -17,6 +17,7 @@
 #include "file.h"
 
 // standard
+#include <ctime>
 #include <fstream>
 #include <sstream>
 #include <stdexcept>
@@ -33,6 +34,24 @@
 
 // local
 #include "file_module.h"
+
+// Reentrant localtime()/gmtime(): external functions may be evaluated by
+// several threads at once, and the C versions return a shared static buffer.
+static bool local_time( std::time_t t, struct tm *result ) {
+#ifdef WIN32
+  return ::localtime_s( result, &t ) == 0;
+#else
+  return ::localtime_r( &t, result ) != nullptr;
+#endif /* WIN32 */
+}
+
+static bool gm_time( std::time_t t, struct tm *result ) {
+#ifdef WIN32
+  return ::gmtime_s( result, &t ) == 0;
+#else
+  return ::gmtime_r( &t, result ) != nullptr;
+#endif /* WIN32 */
+}
 
 namespace zorba {
 namespace filemodule {
@@ -341,10 +360,9 @@ LastModifiedFunction::evaluate(
     raiseFileError( "FOFL0001", "file not found", path );
 
   try {
-    time_t lTime = info.mtime;
-    // result of localtime needs to be copied.
-    // Otherwise, nasty side effecs do happen
-    struct tm lT( *localtime( &lTime ) );
+    struct tm lT;
+    if ( !local_time( info.mtime, &lT ) )
+      throw std::runtime_error( "localtime() failed" );
     int gmtOffset = LastModifiedFunction::getGmtOffset();
 
     return ItemSequence_t(
@@ -370,13 +388,15 @@ int
 LastModifiedFunction::getGmtOffset()
 {
   time_t t = ::time(0);
-  struct tm* data;
-  data = localtime(&t);
-  data->tm_isdst = 0;
-  time_t a = mktime(data);
-  data = gmtime(&t);
-  data->tm_isdst = 0;
-  time_t b = mktime(data);
+  struct tm data;
+  if ( !local_time( t, &data ) )
+    return 0;
+  data.tm_isdst = 0;
+  time_t a = mktime(&data);
+  if ( !gm_time( t, &data ) )
+    return 0;
+  data.tm_isdst = 0;
+  time_t b = mktime(&data);
   return (int)(a - b)/3600; 
 }
 
