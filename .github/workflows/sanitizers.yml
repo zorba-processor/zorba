@@ -7,7 +7,7 @@ on:
   schedule:
     - cron: '0 6 * * 1'
   push:
-    branches: [sanitizers, ubsan]
+    branches: [sanitizers]
 
 permissions:
   contents: read
