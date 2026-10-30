@@ -1093,3 +1093,4 @@ version 0.9.1 (2008.04.30):
       (implements the XQuery Data Model (XDM) W3C recommendation)
   * This release 0.9 passes 97.6% of the W3C tests of XQuery 1.0 test suite
     and 99.4% of the XQuery Update Facility test suite.
+
