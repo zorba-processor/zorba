@@ -47,11 +47,13 @@ Entries marked **(open PR)** come from pull requests that are not merged yet; co
 - Fix crashes, hangs and aborts found by fuzzing: endless loop and out-of-memory on unterminated comments or tags at end of input, `fn:analyze-string` on an empty input, infinite loop in `URI::toPathNotation`, abort on `xml:base=""`, null dereferences in JSON update expressions, and out-of-range reads in QName parsing ([#37](https://github.com/zorba-processor/zorba/pull/37)).
 - Fix undefined behavior reported by UBSan: 21 sites and 445 reports reduced to 0 ([#34](https://github.com/zorba-processor/zorba/pull/34)).
 - Check `pthread` return values and treat failures as fatal ([#27](https://github.com/zorba-processor/zorba/pull/27), [#50](https://github.com/zorba-processor/zorba/pull/50)).
+- Enforce the security policy at URL resolution: `fn:doc`, `fn:unparsed-text`, module and schema import, thesauri, stop words, JSound and `fetch` are checked before any built-in resolver runs. File paths are compared after resolving `..` and symlinks, URLs by scheme, host, port and path segment, and with `Network` allowed, hosts resolving to loopback, private or link-local addresses are refused unless explicitly allowed. Refusals raise `ZXQP0029`. `ZORBA_URI_PATH` and `ZORBA_LIB_PATH` are honored only with the `Environment` capability. Redirects and DNS rebinding are not covered yet ([#56](https://github.com/zorba-processor/zorba/pull/56)).
 
 ### Added
 
 - Add the security policy API: `SecurityPolicy` with capabilities (`ExternalEntities`, `FileRead`, `FileWrite`, `Network`, `RemoteImport`, `Environment`, `NativeModules`), allow-lists, limits and `secure()`/`unrestricted()` presets; queries can never widen the policy of their context; new error codes `ZXQP0067`, `ZXQP0068`, `ZXQP0069` ([#44](https://github.com/zorba-processor/zorba/pull/44)).
 - Add `err:ZXQP0029` for refused external resources during XML loading **(open PR [#51](https://github.com/zorba-processor/zorba/pull/51))**.
+- Add `SecurityPolicy::checkURI()` to test a URI against a policy ([#56](https://github.com/zorba-processor/zorba/pull/56)).
 - Add a documentation site (XQuery, JSONiq and Zorba tutorials, cheat sheet) on GitHub Pages; all 59 code examples are run in CI and the shown output is verified ([#30](https://github.com/zorba-processor/zorba/pull/30)).
 - Add a new logo and color palette to the site and README ([#46](https://github.com/zorba-processor/zorba/pull/46)).
 - Add `CMakePresets.json` with configure, build, test and workflow presets (`core-release`, `full-release`, `full-debug`, `full-release-offline`) ([#25](https://github.com/zorba-processor/zorba/pull/25), [#31](https://github.com/zorba-processor/zorba/pull/31)).
