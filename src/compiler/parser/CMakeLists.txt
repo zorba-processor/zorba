@@ -146,3 +146,17 @@ ENDIF (PARSER_GENERATED_FILES)
 # this script should be used before commiting if one modified the parser/scanner
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/compiler/parser/copyparser.sh.cmake ${CMAKE_BINARY_DIR}/copyparser.sh)
 MESSAGE(STATUS "configured ${CMAKE_CURRENT_SOURCE_DIR}/compiler/parser/copyparser.sh.cmake -->${CMAKE_BINARY_DIR}/copyparser.sh")
+
+# The generated parsers and scanners (a few huge table-driven functions) are
+# the slowest translation units of the build at -O2/-O3; -O1 compiles them
+# much faster without a measurable effect on parsing time.
+IF (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+  SET(PARSER_O1_SRCS)
+  FOREACH (GENERATED_SRC xquery_parser jsoniq_parser xquery_scanner jsoniq_scanner)
+    LIST(APPEND PARSER_O1_SRCS
+      ${CMAKE_CURRENT_SOURCE_DIR}/compiler/parser/${GENERATED_SRC}.cpp
+      ${CMAKE_CURRENT_BINARY_DIR}/compiler/parser/${GENERATED_SRC}.cpp)
+  ENDFOREACH (GENERATED_SRC)
+  SET_SOURCE_FILES_PROPERTIES(${PARSER_O1_SRCS} PROPERTIES
+    COMPILE_OPTIONS "$<$<CONFIG:Release,RelWithDebInfo>:-O1>")
+ENDIF ()
