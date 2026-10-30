@@ -62,6 +62,7 @@ Entries marked **(open PR)** come from pull requests that are not merged yet; co
 - Add a `bigint` preset and CI profile for the optional big-integer `xs:integer` build ([#53](https://github.com/zorba-processor/zorba/pull/53)).
 - Add an ASan, LSan and UBSan preset with a weekly CI run and a summary of memory errors, leaks and undefined behavior ([#28](https://github.com/zorba-processor/zorba/pull/28), [#34](https://github.com/zorba-processor/zorba/pull/34)).
 - Add XMark and JSONiq benchmark suites with an A/B comparison workflow ([#38](https://github.com/zorba-processor/zorba/pull/38)).
+- Add a weekly W3C QT3 conformance run (pinned qt3tests commit, sharded, per-case timeout) with a committed pass baseline; any regression fails the run. First run: 26,367 of 27,055 applicable test cases pass (97.5%); fix FOTS driver bugs in version matching, XSD 1.0/1.1 dependencies, single-case selection and environment parameter collisions ([#59](https://github.com/zorba-processor/zorba/pull/59)).
 - Add an on-demand build-time measurement workflow ([#29](https://github.com/zorba-processor/zorba/pull/29)).
 - Add a pull request template with a changelog line.
 - Add `SecurityPolicy::checkURI()` to test a URI against a policy ([#56](https://github.com/zorba-processor/zorba/pull/56)).
