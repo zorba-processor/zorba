@@ -144,6 +144,19 @@ class Classify(unittest.TestCase):
                                      res(err=serr, rc=2), ""),
                          ("agree", "both-error"))
 
+    def test_warnings_are_not_errors(self):
+        serr = ("Warning on line 12 column 40 of q.xq:\n"
+                "  XPTY0004  The required item type ... is node()\n"
+                "Type error on line 12 column 40 of q.xq:\n"
+                "  XPTY0019  The required item type ...\n")
+        self.assertEqual(dt.saxon_error_code(res(err=serr, rc=2)), "XPTY0019")
+        zerr = ('<exception xmlns="http://zorba.io/warnings"><code namespace='
+                '"http://zorba.io/warnings" local-name="ZWST0002"/></exception>'
+                '<exception xmlns="http://zorba.io/errors"><code namespace='
+                '"http://www.w3.org/2005/xqt-errors" local-name="XPTY0019"/>'
+                '</exception>')
+        self.assertEqual(dt.zorba_error_code(res(err=zerr, rc=1)), "XPTY0019")
+
     def test_saxon_java_exception(self):
         self.assertEqual(dt.saxon_error_code(res(
             err='Exception in thread "main" java.lang.StackOverflowError\n'

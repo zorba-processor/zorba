@@ -366,10 +366,14 @@ def code_name(ns, local):
 def zorba_error_code(res):
     if res["rc"] < 0:
         return "CRASH:" + signal_name(-res["rc"])
-    m = re.search(r'<code namespace="([^"]*)" local-name="([^"]*)"',
-                  res["err"])
-    if m:
-        return code_name(m.group(1), m.group(2))
+    # With --print-errors-as-xml, each diagnostic is an <exception> element;
+    # warnings use a namespace containing "warning".
+    for ns, body in re.findall(r'<exception xmlns="([^"]*)">(.*?)</exception>',
+                               res["err"], re.S):
+        m = re.search(r'<code namespace="([^"]*)" local-name="([^"]*)"',
+                      body)
+        if m and "warn" not in ns:
+            return code_name(m.group(1), m.group(2))
     m = STD_CODE_RE.search(res["err"]) or ANY_CODE_RE.search(res["err"])
     return m.group(1) if m else "UNKNOWN"
 
@@ -377,7 +381,7 @@ def zorba_error_code(res):
 def saxon_error_code(res):
     if res["rc"] < 0:
         return "CRASH:" + signal_name(-res["rc"])
-    err = res["err"]
+    err = strip_saxon_warnings(res["err"])
     m = JAVA_EXC_RE.search(err)
     if m:
         return "JAVA:" + m.group(1)
@@ -394,6 +398,18 @@ def saxon_error_code(res):
         return m.group(1)
     m = ANY_CODE_RE.search(err)
     return m.group(1) if m else "UNKNOWN"
+
+
+def strip_saxon_warnings(err):
+    """Drop Saxon warning messages: a message starts with an unindented line
+    and continues with indented lines; warnings start with "Warning"."""
+    kept, skipping = [], False
+    for line in err.splitlines():
+        if line and not line[0].isspace():
+            skipping = line.startswith("Warning")
+        if not skipping:
+            kept.append(line)
+    return "\n".join(kept) + "\n"
 
 
 def local_name(code):
