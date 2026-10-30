@@ -167,6 +167,7 @@ class Selection(unittest.TestCase):
             'declare namespace z = "http://zorba.io/modules/x"; 1':
                 "zorba-specific",
             "jn:keys({})": "jsoniq",
+            "#!/usr/bin/zorba -q\n1": "zorba-specific",
             '{ "a" : 1 }': "jsoniq",
             "insert node <a/> into $x": "updates",
             '$x contains text "a"': "full-text",

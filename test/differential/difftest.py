@@ -117,7 +117,8 @@ CONTENT_RULES = [
     ("zorba-specific", re.compile(
         r"http://zorba\.io/|http://www\.zorba-xquery\.com/|"
         r"http://expath\.org/|http://www\.28msec\.com/|"
-        r"%\s*(?:an|zann):|\b(?:zerr|zwarn):[A-Za-z]")),
+        r"%\s*(?:an|zann):|\b(?:zerr|zwarn):[A-Za-z]|"
+        r"\A\s*#!")),  # shebang line, a Zorba extension
     ("full-text", re.compile(
         r"\bcontains\s+text\b|\bftcontains\b|\bftand\b|\bftor\b|"
         r"\busing\s+(?:stemming|thesaurus|stop\s+words)\b")),
@@ -429,25 +430,74 @@ XML_DECL_RE = re.compile(r"^\ufeff?\s*<\?xml[^?]*\?>")
 WRAP = "difftest-wrapper"
 
 
-def canonical(s):
-    """Canonical form of a serialized result: the XML declaration is
-    dropped and, if the output parses as an XML fragment, it is put in
-    C14N 2.0 form (attribute order, namespace declarations, empty-element
-    syntax and character references no longer matter). Text is kept
-    exactly, including whitespace."""
+def _strip(s):
     s = XML_DECL_RE.sub("", s)
     if s.endswith("\n") and not s.endswith("\n\n"):
         s = s[:-1]
-    if "<" in s or "&" in s:
-        try:
-            # Prefixes are rewritten (n0, n1, ...): results are compared by
-            # expanded names, as fn:deep-equal does.
-            c = ET.canonicalize("<%s>%s</%s>" % (WRAP, s, WRAP),
-                                rewrite_prefixes=True)
-            return c[len(WRAP) + 2:-(len(WRAP) + 3)]
-        except ET.ParseError:
-            pass
     return s
+
+
+def parse_fragment(s):
+    """Parse a serialized result as the content of a wrapper element (with
+    comments and processing instructions). None if it is not well-formed."""
+    s = _strip(s)
+    if "<" not in s and "&" not in s:
+        return None
+    parser = ET.XMLParser(target=ET.TreeBuilder(insert_comments=True,
+                                                insert_pis=True))
+    try:
+        parser.feed("<%s>%s</%s>" % (WRAP, s, WRAP))
+        return parser.close()
+    except ET.ParseError:
+        return None
+
+
+def _escape(s, attr=False):
+    s = s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    if attr:
+        s = s.replace('"', "&quot;").replace("\t", "&#9;")
+        s = s.replace("\n", "&#10;").replace("\r", "&#13;")
+    return s.replace("\r", "&#13;")
+
+
+def _serialize(e, out):
+    """Prefix-independent serialization: names are written as {uri}local
+    (as ElementTree reports them), attributes are sorted, namespace
+    declarations are dropped; results are compared by expanded names, as
+    fn:deep-equal does."""
+    if e.tag is ET.Comment:
+        out.append("<!--%s-->" % e.text)
+    elif e.tag is ET.ProcessingInstruction:
+        out.append("<?%s?>" % e.text)
+    else:
+        out.append("<" + e.tag)
+        for k, v in sorted(e.attrib.items()):
+            out.append(' %s="%s"' % (k, _escape(v, True)))
+        out.append(">")
+        _serialize_content(e, out)
+        out.append("</%s>" % e.tag)
+    out.append(_escape(e.tail or ""))
+
+
+def _serialize_content(e, out):
+    out.append(_escape(e.text or ""))
+    for child in e:
+        _serialize(child, out)
+
+
+def canonical(s):
+    """Canonical form of a serialized result: the XML declaration (and one
+    trailing newline) is dropped and, if the output parses as an XML
+    fragment, it is re-serialized by _serialize, so attribute order,
+    namespace prefixes and declarations, empty-element syntax and character
+    references no longer matter. Text is kept exactly, including
+    whitespace."""
+    root = parse_fragment(s)
+    if root is None:
+        return _strip(s)
+    out = []
+    _serialize_content(root, out)
+    return "".join(out)
 
 
 TOKEN_RE = re.compile(r"(<[^>]*>|\s+)")
@@ -492,18 +542,19 @@ GROUP_BY_RE = re.compile(r"\bgroup\s+by\b")
 ORDER_BY_RE = re.compile(r"\border\s+by\b")
 
 
-def top_level_items(c):
-    """Split a canonical result into its top-level items: serialized
-    elements and whitespace-separated text tokens. None if it does not
-    parse."""
-    try:
-        root = ET.fromstring("<%s>%s</%s>" % (WRAP, c, WRAP))
-    except ET.ParseError:
-        return None
+def top_level_items(s):
+    """Split a serialized result into its top-level items (canonical
+    serializations of nodes and whitespace-separated text tokens). None if
+    it does not parse."""
+    root = parse_fragment(s)
+    if root is None:
+        return _strip(s).split()
     items = (root.text or "").split()
     for child in root:
         tail, child.tail = child.tail, None
-        items.append(ET.tostring(child, encoding="unicode"))
+        out = []
+        _serialize(child, out)
+        items.append("".join(out))
         items.extend((tail or "").split())
     return items
 
@@ -534,8 +585,7 @@ def compare(zout, sout, text):
         return False, "numeric-precision"
     why = order_unspecified(text)
     if why:
-        iz, is_ = top_level_items(cz), top_level_items(cs)
-        if iz is not None and is_ is not None and sorted(iz) == sorted(is_):
+        if sorted(top_level_items(zout)) == sorted(top_level_items(sout)):
             return True, why
     return False, ""
 
