@@ -44,7 +44,7 @@ jobs:
     steps:
       # The harness (bench/) always comes from the ref the workflow runs on,
       # so A and B are measured with identical queries.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Restore benchmark data
         id: data
@@ -63,12 +63,12 @@ jobs:
           path: bench-data
           key: bench-data-${{ hashFiles('bench/gen_json.py', 'bench/gen_data.sh', 'bench/xmlgen.sha256') }}
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ env.REF_A }}
           path: src-a
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         if: env.REF_B != ''
         with:
           ref: ${{ env.REF_B }}

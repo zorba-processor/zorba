@@ -39,7 +39,7 @@ jobs:
     env:
       RECORD: ${{ (github.event_name == 'workflow_dispatch' && inputs.record) || contains(github.event.head_commit.message, '[record]') }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: docker/login-action@v3
         with:

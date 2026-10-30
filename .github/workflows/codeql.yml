@@ -21,7 +21,7 @@ jobs:
       security-events: write
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Same package set as docker/builder/Dockerfile (Ubuntu 24.04). CodeQL has
       # to observe the compiler, so the build runs directly on the runner.
