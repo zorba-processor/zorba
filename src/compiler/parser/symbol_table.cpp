@@ -137,6 +137,8 @@ off_t symbol_table::put_qname(char const* text, size_t length, bool do_trim_star
     prefix = prefix.substr(1, pos);
 
     off_t uri = put_uri(prefix.c_str(), prefix.size());
+    if (uri < 0)  // invalid entity or character reference in the URI
+      return -1;
     name = get(uri) + ":" + name;
 
     last_qname = heap.put(name.c_str(), 0, name.size());
