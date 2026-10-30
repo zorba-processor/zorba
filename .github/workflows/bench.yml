@@ -48,7 +48,7 @@ jobs:
 
       - name: Restore benchmark data
         id: data
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: bench-data
           key: bench-data-${{ hashFiles('bench/gen_json.py', 'bench/gen_data.sh', 'bench/xmlgen.sha256') }}
@@ -58,7 +58,7 @@ jobs:
 
       - name: Save benchmark data
         if: steps.data.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: bench-data
           key: bench-data-${{ hashFiles('bench/gen_json.py', 'bench/gen_data.sh', 'bench/xmlgen.sha256') }}
@@ -86,7 +86,7 @@ jobs:
           cache-from: type=gha,scope=builder-linux-amd64-latest
           cache-to: type=gha,mode=max,scope=builder-linux-amd64-latest
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: .ccache
           key: ccache-linux-amd64-latest-bench-${{ github.run_id }}

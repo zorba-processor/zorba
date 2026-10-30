@@ -40,7 +40,7 @@ jobs:
           cache-from: type=gha,scope=http-test-linux-amd64-latest
           cache-to: type=gha,mode=max,scope=http-test-linux-amd64-latest
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: .ccache
           key: ccache-asan-${{ github.sha }}

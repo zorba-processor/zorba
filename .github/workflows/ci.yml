@@ -65,7 +65,7 @@ jobs:
           cache-from: type=gha,scope=http-test-${{ matrix.cache }}
           cache-to: type=gha,mode=max,scope=http-test-${{ matrix.cache }}
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: .ccache
           key: ccache-${{ matrix.cache }}-${{ github.sha }}
@@ -121,7 +121,7 @@ jobs:
           cache-from: type=gha,scope=builder-linux-amd64-latest
           cache-to: type=gha,mode=max,scope=builder-linux-amd64-latest
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: .ccache
           key: ccache-profile-${{ matrix.preset }}-${{ github.sha }}
@@ -189,7 +189,7 @@ jobs:
           brew install icu4c libxml2 xerces-c ninja ccache
           echo "CMAKE_PREFIX_PATH=$(brew --prefix icu4c):$(brew --prefix libxml2):$(brew --prefix xerces-c)" >> "$GITHUB_ENV"
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: .ccache
           key: ccache-macos-arm64-${{ github.sha }}
