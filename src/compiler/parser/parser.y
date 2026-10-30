@@ -29,10 +29,12 @@
 **  safer to require the version.
 */
 %skeleton "lalr1.cc"  /*  -*- C++ -*- */
-%require "2.6"
-%defines
-%name-prefix "zorba"
-%error-verbose
+%require "3.8"
+%header
+%define api.namespace {zorba}
+// "verbose" (not "detailed"): the error messages are compared by the tests and
+// post-processed by error() below, which relies on the verbose token names.
+%define parse.error verbose
 
 
 // Expected shift/reduce conflicts
@@ -44,9 +46,9 @@
 
 
 #ifdef XQUERY_PARSER
-%define "parser_class_name" {xquery_parser}
+%define api.parser.class {xquery_parser}
 #else
-%define "parser_class_name" {jsoniq_parser}
+%define api.parser.class {jsoniq_parser}
 #endif
 
 
@@ -68,6 +70,8 @@
 %initial-action
 {
     @$.begin.filename = @$.end.filename = &(driver.theFilename2);
+    // The skeleton counts syntax errors in yynerrs_ but never reads it.
+    static_cast<void>(yynerrs_);
 };
 
 
@@ -4659,21 +4663,21 @@ NumericLiteral :
             $$ = NumericLiteral::new_literal(
                 LOC(@$), ParseConstants::num_decimal, *$1
             );            
-            delete yylval.decval;
+            delete $1;
         }
     |   INTEGER_LITERAL
         {
             $$ = NumericLiteral::new_literal(
                 LOC(@$), ParseConstants::num_integer, *$1
             );            
-            delete yylval.ival;
+            delete $1;
         }
     |   DOUBLE_LITERAL
         {
             $$ = NumericLiteral::new_literal(
                 LOC(@$), ParseConstants::num_double, *$1
             );            
-            delete yylval.dval;
+            delete $1;
         }
     ;
 
