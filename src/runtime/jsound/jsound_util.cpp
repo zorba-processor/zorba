@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <zorba/internal/ztd.h>
 #include "stdafx.h"
 #include <cstring>
 #include <iostream>
@@ -779,7 +780,7 @@ inline void assert_type_matches( store::Item_t const &item, type const *t,
 
 static type const* find_builtin_atomic_type( zstring const &type_name,
                                              bool not_found_error = true ) {
-  typedef map<char const*,atomic_type const*> map_type;
+  typedef map<char const*,atomic_type const*,::zorba::internal::ztd::less<char const*> > map_type;
   static map_type m;
 
 #define INIT_ATOMIC_TYPE(TYPE,CODE)               \

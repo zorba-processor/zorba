@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#include <zorba/internal/ztd.h>
 #include "stdafx.h"
 
 #include <map>
@@ -63,7 +64,7 @@ namespace thesaurus_impl {
    * @return Returns the implementation's type or \c unknown.
    */
   static type find( zstring const &name ) {
-    typedef map<char const*,type> impl_map_t;
+    typedef map<char const*,type,::zorba::internal::ztd::less<char const*> > impl_map_t;
     static impl_map_t impl_map;
     if ( impl_map.empty() ) {
       impl_map[ "wordnet" ] = wordnet;
