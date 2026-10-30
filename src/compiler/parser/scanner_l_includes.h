@@ -93,6 +93,18 @@ typedef zorba::PARSER_CLASS::token_type token_type;
     PUSH_STATE(pushed); \
   } while(0)
 
+/*
+  Used by the <<EOF>> rules that report an error (UNRECOGNIZED) in a
+  non-INITIAL state. During error recovery the parser keeps calling the
+  scanner; without leaving the state, every call would match the same
+  <<EOF>> rule again, allocate a new error and never return END, so the
+  parse never terminates. In INITIAL the next call yields END.
+*/
+#define EOF_ERROR_END() \
+  do { \
+    BEGIN INITIAL; \
+  } while(0)
+
 
   /*______________________________________________________________________
    |
