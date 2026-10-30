@@ -1,0 +1,151 @@
+name: WebAssembly (spike)
+
+# Exploratory WebAssembly build of Zorba with Emscripten. Builds the zorba
+# CLI as a Node.js-runnable wasm module (no ICU, no Xerces, no curl, no
+# full-text), runs the site examples under node and reports sizes.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [wasm-spike]
+
+concurrency:
+  group: wasm-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  LIBXML2_VERSION: "2.13.8"
+  WASM_PREFIX: /opt/wasm
+
+jobs:
+  wasm:
+    name: emscripten (node)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    container: emscripten/emsdk:4.0.10
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Host tools
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends ninja-build bison flex brotli xz-utils
+          cmake --version | head -1
+          emcc --version | head -1
+          node --version
+
+      - uses: actions/cache@v4
+        id: deps
+        with:
+          path: ${{ env.WASM_PREFIX }}
+          key: wasm-deps-emsdk4.0.10-libxml2-${{ env.LIBXML2_VERSION }}
+
+      - name: libxml2 (static, wasm)
+        if: steps.deps.outputs.cache-hit != 'true'
+        run: |
+          v=$LIBXML2_VERSION
+          mkdir -p /tmp/deps && cd /tmp/deps
+          curl -fsSL "https://download.gnome.org/sources/libxml2/${v%.*}/libxml2-$v.tar.xz" | tar xJ
+          emcmake cmake -S libxml2-$v -B build-libxml2 -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="$WASM_PREFIX" \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DLIBXML2_WITH_ICONV=OFF -DLIBXML2_WITH_ICU=OFF \
+            -DLIBXML2_WITH_LZMA=OFF -DLIBXML2_WITH_ZLIB=OFF \
+            -DLIBXML2_WITH_THREADS=OFF -DLIBXML2_WITH_HTTP=OFF \
+            -DLIBXML2_WITH_FTP=OFF -DLIBXML2_WITH_PYTHON=OFF \
+            -DLIBXML2_WITH_PROGRAMS=OFF -DLIBXML2_WITH_TESTS=OFF
+          cmake --build build-libxml2
+          cmake --install build-libxml2
+
+      - name: Configure Zorba
+        run: |
+          EH="-fwasm-exceptions"
+          LINK="$EH -sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=8MB -sNODERAWFS=1 -sEXIT_RUNTIME=1"
+          emcmake cmake -S . -B build-wasm -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_FLAGS="$EH" -DCMAKE_CXX_FLAGS="$EH" \
+            -DCMAKE_EXE_LINKER_FLAGS="$LINK" \
+            -DLIBXML2_INCLUDE_DIR="$WASM_PREFIX/include/libxml2" \
+            -DLIBXML2_LIBRARY="$WASM_PREFIX/lib/libxml2.a" \
+            -DZORBA_NO_ICU=ON \
+            -DZORBA_NO_FULL_TEXT=ON \
+            -DZORBA_NO_XMLSCHEMA=ON \
+            -DCMAKE_DISABLE_FIND_PACKAGE_XercesC=ON \
+            -DZORBA_SUPPRESS_CURL=ON \
+            -DZORBA_WITH_DEBUGGER=OFF \
+            -DZORBA_WITH_THESAURUS=OFF \
+            -DZORBA_WITH_UNIT_TESTS=OFF \
+            -DZORBA_SUPPRESS_SWIG=ON \
+            -DZORBA_FOR_ONE_THREAD_ONLY=ON \
+            -DCMAKE_DISABLE_FIND_PACKAGE_LibXslt=ON \
+            -DCMAKE_DISABLE_FIND_PACKAGE_Java=ON \
+            -DCMAKE_DISABLE_FIND_PACKAGE_JNI=ON \
+            2>&1 | tee configure.log
+
+      - name: Build Zorba (ninja -k 0)
+        run: |
+          set +e
+          cmake --build build-wasm -- -k 0 > build.log 2>&1
+          rc=$?
+          echo "build exit code: $rc"
+          echo "::group::first errors"
+          grep -n -E "error:|undefined symbol|FAILED:" build.log | head -60
+          echo "::endgroup::"
+          echo "error count: $(grep -c 'error:' build.log)"
+          ls -la build-wasm/bin || true
+          exit 0
+
+      - name: Run queries under node
+        run: |
+          js=$(ls build-wasm/bin/zorba.js 2>/dev/null || true)
+          if [ -z "$js" ]; then echo "zorba.js not built"; exit 0; fi
+          mkdir -p /tmp/zbin
+          printf '#!/bin/sh\nexec node %s "$@"\n' "$PWD/$js" > /tmp/zbin/zorba
+          chmod +x /tmp/zbin/zorba
+          export PATH=/tmp/zbin:$PATH
+          set +e
+          zorba -q '1+1'
+          zorba -q '<a>{ for $i in 1 to 3 return <b>{$i}</b> }</a>'
+          zorba -q 'jsoniq version "1.0"; { "sum" : sum(1 to 10) }'
+          sh scripts/site/run_examples.sh site/examples /tmp/out > run.log 2>&1
+          pass=0; fail=0
+          for o in $(cd site/examples && find . -name '*.out' | sort); do
+            if [ -f "/tmp/out/$o" ] && cmp -s "site/examples/$o" "/tmp/out/$o"; then
+              pass=$((pass+1))
+            else
+              fail=$((fail+1)); echo "MISMATCH $o"
+              head -c 400 "/tmp/out/${o%.out}.err" 2>/dev/null; echo
+            fi
+          done
+          echo "site examples: $pass match, $fail differ"
+
+      - name: Sizes
+        if: always()
+        run: |
+          for f in build-wasm/bin/zorba.wasm build-wasm/bin/zorba.js build-wasm/bin/zorba.data; do
+            [ -f "$f" ] || continue
+            raw=$(stat -c %s "$f")
+            gz=$(gzip -9 -c "$f" | wc -c)
+            br=$(brotli -q 11 -c "$f" | wc -c)
+            echo "$f raw=$raw gzip=$gz brotli=$br"
+          done
+          ls -la build-wasm/src/*.a 2>/dev/null || true
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wasm-logs
+          path: |
+            configure.log
+            build.log
+            run.log
+            build-wasm/CMakeFiles/CMakeConfigureLog.yaml
+          if-no-files-found: ignore
