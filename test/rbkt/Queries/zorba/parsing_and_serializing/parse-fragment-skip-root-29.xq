@@ -1,7 +1,7 @@
 import module namespace z = "http://zorba.io/modules/xml";
 import schema namespace opt = "http://zorba.io/modules/xml-options";
 
-z:parse("<?xml version='1.0'?>
+z:parse("<?xml version='1.0' encoding='UTF-8'?>
 <level1>
   level1 text start
   <level2>

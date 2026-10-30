@@ -807,6 +807,7 @@ extern entry const dict_en[] = {
   { "~ParseFragmentDoctypeNotAllowedHere", "a DOCTYPE declaration must appear before any element or text node, and at most once" },
   { "~ParseFragmentInvalidOptions", "invalid options passed to the parse-xml:parse() function, the element must be in the schema target namespace" },
   { "~ParseFragmentOptionCombinationNotAllowed", "only one of the <schema-validate/>, <DTD-validate/> or <parse-external-parsed-entity/> options can be specified" },
+  { "~ParseFragmentTextDeclNoEncoding", "a text declaration must have an encoding declaration" },
   { "~PromotionImpossible", "promotion not possible" },
 #if defined(ZORBA_NO_ICU)
   { "~REGEX_BROKEN_PIs_CONSTRUCT", "broken \\\\p{Is} construct; valid characters are [a-zA-Z0-9-]" },

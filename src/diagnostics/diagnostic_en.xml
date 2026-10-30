@@ -4845,6 +4845,10 @@
       <value>only one of the &lt;schema-validate/&gt;, &lt;DTD-validate/&gt; or &lt;parse-external-parsed-entity/&gt; options can be specified</value>
     </entry>
 
+    <entry key="ParseFragmentTextDeclNoEncoding">
+      <value>a text declaration must have an encoding declaration</value>
+    </entry>
+
     <entry key="ParseFragmentInvalidOptions">
       <value>invalid options passed to the parse-xml:parse() function, the element must be in the schema target namespace</value>
     </entry>

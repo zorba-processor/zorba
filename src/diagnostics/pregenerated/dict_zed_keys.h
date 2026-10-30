@@ -464,6 +464,7 @@
 #define ZED_warning "~warning"
 #define ZED_xqueryx_empty_content "~xqueryx_empty_content"
 #define ZED_ParseFragmentOptionCombinationNotAllowed "~ParseFragmentOptionCombinationNotAllowed"
+#define ZED_ParseFragmentTextDeclNoEncoding "~ParseFragmentTextDeclNoEncoding"
 #define ZED_ParseFragmentInvalidOptions "~ParseFragmentInvalidOptions"
 #define ZED_ParseFragmentDoctypeNotAllowed "~ParseFragmentDoctypeNotAllowed"
 #define ZED_ParseFragmentDoctypeNotAllowedHere "~ParseFragmentDoctypeNotAllowedHere"
