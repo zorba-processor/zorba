@@ -26,6 +26,7 @@
 #include "zorbatypes/integer.h"
 #include "zorbatypes/numconversions.h"
 #include "zorbatypes/URI.h"
+#include "util/ascii_util.h"
 
 #include "diagnostics/xquery_diagnostics.h"
 #include "diagnostics/assert.h"
@@ -412,6 +413,28 @@ T1_TO_T2(str, dec)
 }
 
 
+/**
+ * Returns true if \a s is in the lexical space of xs:integer: optional
+ * whitespace, an optional sign, one or more digits, optional whitespace.
+ */
+static bool is_xs_integer_lexical(zstring const& s)
+{
+  zstring::size_type i = 0, n = s.size();
+  while (i < n && ascii::is_space(s[i]))
+    ++i;
+  while (n > i && ascii::is_space(s[n - 1]))
+    --n;
+  if (i < n && (s[i] == '+' || s[i] == '-'))
+    ++i;
+  if (i == n)
+    return false;
+  for (; i < n; ++i)
+    if (!ascii::is_digit(s[i]))
+      return false;
+  return true;
+}
+
+
 T1_TO_T2(str, int)
 {
   try 
@@ -427,8 +450,15 @@ T1_TO_T2(str, int)
   }
   catch (const std::range_error& ) 
   {
+    // Integer reports both a bad lexical form and a value too large for a
+    // 64-bit xs:integer as range_error: the former is FORG0001, the latter
+    // FOCA0003 (input value too large for integer).
     if ( throw_on_error )
+    {
+      if (is_xs_integer_lexical(strval))
+        throwFOCA0003Exception(strval, errInfo);
       throwFORG0001Exception(strval, errInfo);
+    }
   }
   return false;
 }

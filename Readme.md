@@ -59,8 +59,9 @@ Presets: `core-release` (no XML Schema), `full-release`, `full-debug`. The
 installation prefix is fixed at configure time.
 
 By default `xs:integer` is a 64-bit `long long`: arithmetic, `fn:sum` and the
-like raise `err:FOAR0002` when a result does not fit (casts from out-of-range
-numbers raise `err:FOCA0003`). The `bigint` preset
+like raise `err:FOAR0002` when a result does not fit, casts of out-of-range
+values to `xs:integer` raise `err:FOCA0003`, and JSON integers that do not fit
+are parsed as `xs:decimal`. The `bigint` preset
 (`ZORBA_WITH_BIG_INTEGER=ON`) makes `xs:integer` arbitrary precision instead,
 using the bundled MAPM library that already backs `xs:decimal`. MAPM keeps
 static working buffers and is not thread-safe, so do not run queries

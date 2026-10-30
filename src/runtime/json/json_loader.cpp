@@ -190,11 +190,11 @@ bool loader::next( store::Item_t *result ) {
                 );
               }
               catch ( std::range_error const& ) {
-                // Without big integers, xs:integer is 64-bit.
-                throw XQUERY_EXCEPTION(
-                  err::FOAR0002,
-                  ERROR_PARAMS( t.get_value() ),
-                  ERROR_LOC( t.get_loc() )
+                // Without big integers, xs:integer is 64-bit: keep a larger
+                // integer (e.g. an ID) exactly as an xs:decimal rather than
+                // failing to parse the document.
+                GENV_ITEMFACTORY->createDecimal(
+                  item, xs_decimal( t.get_value() )
                 );
               }
               break;
