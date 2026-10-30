@@ -225,6 +225,15 @@ LIST(APPEND requiredlibs ${requiredlibs-store})
 #
 ADD_LIBRARY(zorba_${ZORBA_STORE_NAME} SHARED ${ZORBA_SRCS} ${STORE_SRCS})
 LIST(APPEND ZORBA_LIBRARY_INSTALL_LIST zorba_${ZORBA_STORE_NAME})
+
+# Precompiled header: the STL/stream headers and the central internal headers
+# are parsed once instead of once per translation unit.  With ccache, set
+# CCACHE_SLOPPINESS=pch_defines,time_macros (CMake adds -fpch-preprocess).
+OPTION(ZORBA_USE_PCH "Use a precompiled header for the Zorba library" ON)
+IF (ZORBA_USE_PCH)
+  TARGET_PRECOMPILE_HEADERS(zorba_${ZORBA_STORE_NAME} PRIVATE
+    "$<$<COMPILE_LANGUAGE:CXX>:${CMAKE_CURRENT_SOURCE_DIR}/precompiled/zorba_pch.h>")
+ENDIF (ZORBA_USE_PCH)
 TARGET_LINK_LIBRARIES(zorba_${ZORBA_STORE_NAME} ${requiredlibs})
 
 SET_TARGET_PROPERTIES(zorba_${ZORBA_STORE_NAME} PROPERTIES VERSION ${ZORBA_MAJOR_NUMBER}.${ZORBA_MINOR_NUMBER}.${ZORBA_PATCH_NUMBER})

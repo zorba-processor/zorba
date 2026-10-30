@@ -17,8 +17,6 @@
 #define ZORBA_STORE_ITEM_HANDLE_H
 
 #include <string>
-#include <sstream>
-
 
 namespace zorba 
 {
@@ -195,9 +193,7 @@ public:
 public:
 	std::string debug() const
   {
-    std::ostringstream oss;
-    oss << "ItemHandle[refcount=" << p->getRefCount() << ']';
-    return oss.str();
+    return "ItemHandle[refcount=" + std::to_string(p->getRefCount()) + ']';
   }
 
 protected:

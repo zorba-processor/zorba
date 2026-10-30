@@ -17,6 +17,7 @@
 
 #include <cassert>
 #include <limits>
+#include <sstream>
 
 #include "zorbautils/hashfun.h"
 #include "diagnostics/xquery_diagnostics.h"

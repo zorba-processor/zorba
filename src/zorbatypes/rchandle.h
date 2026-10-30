@@ -17,14 +17,12 @@
 #ifndef ZORBA_RCHANDLE_H
 #define ZORBA_RCHANDLE_H
 
-#include <sstream>
 #include <errno.h>
+#include <string>
 
 #include <zorba/config.h>
 
 #include "common/common.h"
-
-#include "zorbautils/fatal.h"
 
 #include "util/atomic_int.h"
 
@@ -339,9 +337,7 @@ public:
 public:
   std::string debug() const
   {
-    std::ostringstream oss;
-    oss << "rchandle[refcount=" << p->getRefCount() << ']';
-    return oss.str();
+    return "rchandle[refcount=" + std::to_string(p->getRefCount()) + ']';
   }
 
 protected:
