@@ -7,6 +7,11 @@ collections and indexes.
 
 [![CI](https://github.com/zorba-processor/zorba/actions/workflows/ci.yml/badge.svg)](https://github.com/zorba-processor/zorba/actions/workflows/ci.yml)
 
+## Documentation
+
+Tutorial and reference for XQuery, JSONiq and Zorba, with examples verified
+against the current build: https://zorba-processor.github.io/zorba/
+
 ## Docker
 
 ```bash

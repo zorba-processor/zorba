@@ -1,0 +1,4 @@
+<all-priced>true</all-priced>
+<any-under-13>true</any-under-13>
+<general>true</general>
+<value>eq needs exactly one item</value>

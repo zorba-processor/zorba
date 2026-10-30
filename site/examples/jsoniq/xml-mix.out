@@ -1,0 +1,12 @@
+<orders>
+  <order id="1" customer="ana">
+    <item sku="A1" qty="2"/>
+    <item sku="B7" qty="1"/>
+  </order>
+  <order id="2" customer="luis">
+    <item sku="A1" qty="5"/>
+  </order>
+  <order id="3" customer="ana">
+    <item sku="C3" qty="1"/>
+  </order>
+</orders>

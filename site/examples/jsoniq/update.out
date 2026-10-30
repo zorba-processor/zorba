@@ -1,0 +1,7 @@
+{
+  "id" : 2, 
+  "client" : "luis", 
+  "status" : "shipped", 
+  "items" : [ "A1", "B7" ], 
+  "carrier" : "dhl"
+}

@@ -1,0 +1,11 @@
+[ {
+  "id" : "b2", 
+  "title" : "Gödel, Escher, Bach", 
+  "price" : 24, 
+  "tags" : [ "essay", "mathematics" ]
+}, {
+  "id" : "b3", 
+  "title" : "Neuromancer", 
+  "price" : 12.99, 
+  "tags" : [ "novel", "science fiction" ]
+} ]
