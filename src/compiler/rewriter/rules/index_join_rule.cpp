@@ -53,6 +53,14 @@ struct PredicateInfo
 
   bool          theIsGeneral;
 
+  // True if the operands of a value comparison do not have static types that
+  // allow indexing them directly (e.g., both are xs:anyAtomicType?, as is the
+  // case for JSONiq navigation and for untyped XML). The index is then built
+  // on a normalized xs:string key (see createNormalizedKey()) that is equal
+  // for every pair of items for which "eq" may be true, and the predicate is
+  // kept in the WHERE clause to filter out the extra candidates.
+  bool          theNormalizeKeys;
+
   csize         theStackPos;
   csize         theChildPos;
 };
@@ -142,7 +150,8 @@ expr* IndexJoinRule::apply(RewriterContext& rCtx, expr* node, bool& modified)
         rewriteJoin(predInfo);
         modified = true;
 
-        predInfo.theFlworExpr->remove_clause(c, i);
+        if (!predInfo.theNormalizeKeys)
+          predInfo.theFlworExpr->remove_clause(c, i);
 
         expr* e = theVarDefExprs.back();
         ZORBA_ASSERT(e == node);
@@ -168,12 +177,15 @@ expr* IndexJoinRule::apply(RewriterContext& rCtx, expr* node, bool& modified)
             modified = true;
 
             // TODO: just remove the pred instead of replacing it with true.
-            expr* trueExpr = rCtx.theEM->
-            create_const_expr(flworExpr->get_sctx(),
-                              flworExpr->get_udf(),
-                              flworExpr->get_loc(),
-                              true);
-            (**iter) = trueExpr;
+            if (!predInfo.theNormalizeKeys)
+            {
+              expr* trueExpr = rCtx.theEM->
+              create_const_expr(flworExpr->get_sctx(),
+                                flworExpr->get_udf(),
+                                flworExpr->get_loc(),
+                                true);
+              (**iter) = trueExpr;
+            }
               
             expr* e = theVarDefExprs.back();
             ZORBA_ASSERT(e == node);
@@ -377,6 +389,7 @@ bool IndexJoinRule::isIndexJoinPredicate(PredicateInfo& predInfo)
     return false;
 
   predInfo.theIsGeneral = (opKind == CompareConsts::GENERAL_EQUAL);
+  predInfo.theNormalizeKeys = false;
 
   expr* op1 = foExpr->get_arg(0);
   expr* op2 = foExpr->get_arg(1);
@@ -444,6 +457,12 @@ bool IndexJoinRule::isIndexJoinPredicate(PredicateInfo& predInfo)
   forlet_clause* innerVarClause = predInfo.theInnerVar->get_forlet_clause();
 
   if (innerVarClause->get_pos_var() != NULL)
+    return false;
+
+  // The inner var is already bound to an index probe (the predicate may have
+  // been kept in the WHERE clause after a rewrite with normalized keys).
+  if (innerVarClause->get_expr()->get_function_kind() ==
+      FunctionConsts::FN_ZORBA_XQDDF_PROBE_INDEX_POINT_VALUE_N)
     return false;
 
   // The inner var must not be an outer FOR var
@@ -534,15 +553,18 @@ bool IndexJoinRule::isIndexJoinPredicate(PredicateInfo& predInfo)
         outerQuant != SequenceType::QUANT_QUESTION)
       return false;
 
-    // The type of the inner operand in the join predicate must not be
-    // xs:anyAtomic.
-    if (TypeOps::is_equal(tm, *primeInnerType, *rtm.ANY_ATOMIC_TYPE_ONE, innerLoc))
-      return false;
+    // The index key type is the type of the inner operand, so it must not be
+    // xs:anyAtomic, and the prime type of the outer operand must be a subtype
+    // of it. Otherwise, if both operands are atomic, index normalized keys.
+    if (TypeOps::is_equal(tm, *primeInnerType, *rtm.ANY_ATOMIC_TYPE_ONE, innerLoc) ||
+        !TypeOps::is_subtype(tm, *primeOuterType, *primeInnerType, outerLoc))
+    {
+      if (!TypeOps::is_subtype(tm, *primeInnerType, *rtm.ANY_ATOMIC_TYPE_ONE, innerLoc) ||
+          !TypeOps::is_subtype(tm, *primeOuterType, *rtm.ANY_ATOMIC_TYPE_ONE, outerLoc))
+        return false;
 
-    // The prime type of the outer operand in the join predicate must be a
-    // subtype of the prime type of the inner operand.
-    if (!TypeOps::is_subtype(tm, *primeOuterType, *primeInnerType, outerLoc))
-      return false;
+      predInfo.theNormalizeKeys = true;
+    }
   }
   else
   {
@@ -971,6 +993,88 @@ bool IndexJoinRule::findIndexPos(PredicateInfo& predInfo, csize boundVarId)
 
 
 /*******************************************************************************
+  Wrap "keyExpr" (of static type xs:anyAtomicType?) into an expr that computes
+  a normalized xs:string key for it:
+
+    let $k := keyExpr
+    return
+      if (empty($k)) then ()
+      else if ($k instance of xs:decimal or $k instance of xs:double or
+               $k instance of xs:float)
+      then concat("n", string(abs(xs:double($k))))
+      else if ($k instance of xs:string or $k instance of xs:untypedAtomic or
+               $k instance of xs:anyURI)
+      then concat("s", string($k))
+      else "o"
+
+  If "$a eq $b" can be true, then the keys of $a and $b are equal: numbers are
+  compared via promotion, so equal numbers have equal xs:double values;
+  xs:untypedAtomic and xs:anyURI are compared as xs:string (the index uses the
+  default collation, like "eq"). Items of other types share the key "o". The
+  converse does not hold, so the join predicate must still be applied to the
+  probe results. Pairs for which "eq" would raise a type error get different
+  keys and are never compared (permitted by "Errors and Optimization").
+********************************************************************************/
+expr* IndexJoinRule::createNormalizedKey(
+    expr* keyExpr,
+    static_context* sctx,
+    user_function* udf,
+    const QueryLoc& loc)
+{
+  ExprManager* em = theRootExpr->get_ccb()->getExprManager();
+  RootTypeManager& rtm = GENV_TYPESYSTEM;
+
+  var_expr* keyVar = theRCtx->createTempVar(sctx, loc, var_expr::let_var);
+  keyVar->set_type(keyExpr->get_return_type());
+
+  std::vector<expr*> numArgs(3);
+  numArgs[0] = em->create_instanceof_expr(sctx, udf, loc, keyVar, rtm.DECIMAL_TYPE_ONE);
+  numArgs[1] = em->create_instanceof_expr(sctx, udf, loc, keyVar, rtm.DOUBLE_TYPE_ONE);
+  numArgs[2] = em->create_instanceof_expr(sctx, udf, loc, keyVar, rtm.FLOAT_TYPE_ONE);
+  expr* isNumeric = em->create_fo_expr(sctx, udf, loc, BUILTIN_FUNC(OP_OR_N), numArgs);
+
+  std::vector<expr*> strArgs(3);
+  strArgs[0] = em->create_instanceof_expr(sctx, udf, loc, keyVar, rtm.STRING_TYPE_ONE);
+  strArgs[1] = em->create_instanceof_expr(sctx, udf, loc, keyVar, rtm.UNTYPED_ATOMIC_TYPE_ONE);
+  strArgs[2] = em->create_instanceof_expr(sctx, udf, loc, keyVar, rtm.ANY_URI_TYPE_ONE);
+  expr* isString = em->create_fo_expr(sctx, udf, loc, BUILTIN_FUNC(OP_OR_N), strArgs);
+
+  expr* numValue =
+  em->create_fo_expr(sctx, udf, loc, BUILTIN_FUNC(FN_STRING_1),
+    em->create_fo_expr(sctx, udf, loc, BUILTIN_FUNC(FN_ABS_1),
+      em->create_cast_expr(sctx, udf, loc, keyVar, rtm.DOUBLE_TYPE_ONE, false)));
+
+  std::vector<expr*> numKeyArgs(2);
+  numKeyArgs[0] = em->create_const_expr(sctx, udf, loc, "n");
+  numKeyArgs[1] = numValue;
+  expr* numKey = em->create_fo_expr(sctx, udf, loc, BUILTIN_FUNC(FN_CONCAT_N), numKeyArgs);
+
+  std::vector<expr*> strKeyArgs(2);
+  strKeyArgs[0] = em->create_const_expr(sctx, udf, loc, "s");
+  strKeyArgs[1] = em->create_fo_expr(sctx, udf, loc, BUILTIN_FUNC(FN_STRING_1), keyVar);
+  expr* strKey = em->create_fo_expr(sctx, udf, loc, BUILTIN_FUNC(FN_CONCAT_N), strKeyArgs);
+
+  expr* body =
+  em->create_if_expr(sctx, udf, loc,
+    em->create_fo_expr(sctx, udf, loc, BUILTIN_FUNC(FN_EMPTY_1), keyVar),
+    em->create_seq(sctx, udf, loc),
+    em->create_if_expr(sctx, udf, loc,
+      isNumeric,
+      numKey,
+      em->create_if_expr(sctx, udf, loc,
+        isString,
+        strKey,
+        em->create_const_expr(sctx, udf, loc, "o"))));
+
+  flwor_expr* flwor = em->create_flwor_expr(sctx, udf, loc);
+  flwor->add_clause(em->create_let_clause(sctx, loc, keyVar, keyExpr));
+  flwor->set_return_expr(body);
+
+  return flwor;
+}
+
+
+/*******************************************************************************
 
 ********************************************************************************/
 void IndexJoinRule::rewriteJoin(PredicateInfo& predInfo)
@@ -1016,17 +1120,36 @@ void IndexJoinRule::rewriteJoin(PredicateInfo& predInfo)
   std::vector<xqtref_t> columnTypes(1);
   std::vector<OrderModifier> modifiers(1);
 
-  columnExprs[0] = predInfo.theInnerOp;
+  // The probe key: with normalized keys the predicate stays in the WHERE
+  // clause, so its operands are cloned instead of moved.
+  expr* probeKeyExpr = const_cast<expr*>(predInfo.theOuterOp);
 
-  columnTypes[0] = (predInfo.theIsGeneral ?
-                    NULL :
-                    predInfo.theInnerOp->get_return_type());
+  if (predInfo.theNormalizeKeys)
+  {
+    expr::substitution_t subst;
+    subst[predInfo.theInnerVar] = idx->getDomainVariable();
+
+    columnExprs[0] = createNormalizedKey(predInfo.theInnerOp->clone(udf, subst),
+                                         sctx, udf, loc);
+    columnTypes[0] = GENV_TYPESYSTEM.STRING_TYPE_QUESTION;
+
+    probeKeyExpr = createNormalizedKey(predInfo.theOuterOp->clone(udf),
+                                       sctx, udf, loc);
+  }
+  else
+  {
+    columnExprs[0] = predInfo.theInnerOp;
+
+    columnTypes[0] = (predInfo.theIsGeneral ?
+                      NULL :
+                      predInfo.theInnerOp->get_return_type());
+
+    expr_tools::replace_var(columnExprs[0], predInfo.theInnerVar, idx->getDomainVariable());
+  }
 
   modifiers[0].theAscending = true;
   modifiers[0].theEmptyLeast = true;
   modifiers[0].theCollation = sctx->get_default_collation(QueryLoc::null);
-
-  expr_tools::replace_var(columnExprs[0], predInfo.theInnerVar, idx->getDomainVariable());
 
   idx->setKeyExpressions(columnExprs);
 
@@ -1127,7 +1250,16 @@ void IndexJoinRule::rewriteJoin(PredicateInfo& predInfo)
                    loc,
                    BUILTIN_FUNC(FN_ZORBA_XQDDF_PROBE_INDEX_POINT_VALUE_N),
                    qnameExpr,
-                   const_cast<expr*>(predInfo.theOuterOp));
+                   probeKeyExpr);
+  }
+
+  if (probeKeyExpr != predInfo.theOuterOp)
+  {
+    DynamicBitset keyVars;
+    expr_tools::build_expr_to_vars_map(probeKeyExpr,
+                                       *theVarIdMap,
+                                       keyVars,
+                                       *theExprVarsMap);
   }
 
   DynamicBitset probeVars = (*theExprVarsMap)[predInfo.theOuterOp];
