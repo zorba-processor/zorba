@@ -61,9 +61,9 @@ protected:
   typedef struct
   {
     zstring      str;
-    bool         binary;
-    csize        count;
-    csize        theDiskPos;//1 based
+    bool         binary = false;
+    csize        count = 0;
+    csize        theDiskPos = 0;//1 based
   } StringInfo;
 
   ZSTRING_HASH_MAP(csize, StringPoolMap);

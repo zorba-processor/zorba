@@ -22,6 +22,7 @@
 #include <cmath>
 #include <limits>
 #include <string>
+#include <type_traits>
 
 // Zorba
 #include <zorba/config.h>
@@ -801,17 +802,40 @@ inline IntegerImpl<T>& IntegerImpl<T>::operator=( IntegerImpl<U> const &i ) {
 
 ////////// arithmetic operators ///////////////////////////////////////////////
 
+namespace integer_detail {
+
+// Without ZORBA_WITH_BIG_INTEGER, value_type is long long and xs:integer
+// arithmetic wraps on overflow (e.g. test udf-fib-rec expects fib(100) modulo
+// 2^64). Signed overflow is undefined, so do the wrapping arithmetic on the
+// unsigned type; the result is the same two's-complement value.
+template<typename V,class Op>
+inline V wrapping( V a, V b, Op op ) {
+  if constexpr ( std::is_integral_v<V> && std::is_signed_v<V> ) {
+    typedef std::make_unsigned_t<V> U;
+    return static_cast<V>( op( static_cast<U>( a ), static_cast<U>( b ) ) );
+  } else {
+    return op( a, b );
+  }
+}
+
+} // namespace integer_detail
+
 #define ZORBA_INTEGER_OP(OP)                                                \
   template<class T,class U> inline                                          \
   Integer operator OP( IntegerImpl<T> const &i, IntegerImpl<U> const &j ) { \
-    return Integer( i.value_ OP j.value_ );                                 \
+    return Integer( integer_detail::wrapping(                               \
+      i.value_, j.value_, []( auto a, auto b ) { return a OP b; } ) );      \
   }
 
 ZORBA_INTEGER_OP(+)
 ZORBA_INTEGER_OP(-)
 ZORBA_INTEGER_OP(*)
-ZORBA_INTEGER_OP(%)
 #undef ZORBA_INTEGER_OP
+
+template<class T,class U>
+inline Integer operator%( IntegerImpl<T> const &i, IntegerImpl<U> const &j ) {
+  return Integer( i.value_ % j.value_ );
+}
 
 template<class T,class U>
 inline Integer operator/( IntegerImpl<T> const &i, IntegerImpl<U> const &j ) {
@@ -915,16 +939,23 @@ ZORBA_INTEGER_OP(unsigned long long)
 
 #define ZORBA_INTEGER_OP(OP)                                                \
   template<class T> inline                                                  \
-  IntegerImpl<T>& IntegerImpl<T>::operator OP( IntegerImpl<T> const &i ) {  \
-    T::check_value( value_ OP i.value_ );                                   \
+  IntegerImpl<T>& IntegerImpl<T>::operator OP##=( IntegerImpl<T> const &i ) { \
+    value_ = integer_detail::wrapping(                                      \
+      value_, i.value_, []( auto a, auto b ) { return a OP b; } );          \
+    T::check_value( value_ );                                               \
     return *this;                                                           \
   }
 
-ZORBA_INTEGER_OP(+=)
-ZORBA_INTEGER_OP(-=)
-ZORBA_INTEGER_OP(*=)
-ZORBA_INTEGER_OP(%=)
+ZORBA_INTEGER_OP(+)
+ZORBA_INTEGER_OP(-)
+ZORBA_INTEGER_OP(*)
 #undef ZORBA_INTEGER_OP
+
+template<class T>
+inline IntegerImpl<T>& IntegerImpl<T>::operator%=( IntegerImpl<T> const &i ) {
+  T::check_value( value_ %= i.value_ );
+  return *this;
+}
 
 template<class T>
 inline IntegerImpl<T>& IntegerImpl<T>::operator/=( IntegerImpl<T> const &i ) {

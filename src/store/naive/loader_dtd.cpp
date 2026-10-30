@@ -1450,24 +1450,28 @@ void DtdXmlLoader::startElement(
                   << std::endl);
 
     // Process namespace bindings
-    store::NsBindings& bindings = elemNode->getNsContext()->getBindings();
+    // The element has an NsBindingsContext only if it declares namespaces.
     int i = 0;
-    for (xmlNs *ns = node->nsDef; ns != NULL; ns = ns->next)
+    if (numBindings > 0)
     {
-      const char* prefix = reinterpret_cast<const char*>(ns->prefix);
-      const char* nsuri = reinterpret_cast<const char*>(ns->href);
+      store::NsBindings& bindings = elemNode->getNsContext()->getBindings();
+      for (xmlNs *ns = node->nsDef; ns != NULL; ns = ns->next)
+      {
+        const char* prefix = reinterpret_cast<const char*>(ns->prefix);
+        const char* nsuri = reinterpret_cast<const char*>(ns->href);
 
-      if (prefix == NULL)
-        prefix = "";
+        if (prefix == NULL)
+          prefix = "";
 
-      zstring pooledNs;
-      store.getNamespacePool().insertc(nsuri, pooledNs);
+        zstring pooledNs;
+        store.getNamespacePool().insertc(nsuri, pooledNs);
 
-      bindings[i].first = prefix;
-      bindings[i].second = pooledNs;
+        bindings[i].first = prefix;
+        bindings[i].second = pooledNs;
 
-      LOADER_TRACE1("namespace decl: [" << prefix  << ":" << nsuri << "]");
-      i++;
+        LOADER_TRACE1("namespace decl: [" << prefix  << ":" << nsuri << "]");
+        i++;
+      }
     }
 
     if ( i > 0 )

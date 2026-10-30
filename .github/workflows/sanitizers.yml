@@ -72,8 +72,10 @@ jobs:
       - name: Summarize
         if: always()
         run: |
+          # UBSan reports are only in the test output (see the script).
           python3 scripts/summarize_sanitizer_logs.py \
-            build/asan/sanitizer-logs /src 60 | tee -a "$GITHUB_STEP_SUMMARY"
+            build/asan/sanitizer-logs /src 60 --junit build/asan/junit.xml \
+            | tee -a "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/upload-artifact@v4
         if: always()
