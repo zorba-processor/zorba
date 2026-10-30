@@ -375,6 +375,54 @@ void test_instance_default(Zorba* z, const Files& f)
   z->setSecurityPolicy(SecurityPolicy::unrestricted());
 }
 
+#ifdef ZORBA_XQUERYX
+// XQueryX query text is parsed by libxml2 too. The query uses an entity from
+// an external DTD subset (the XQueryX detection does not accept an internal
+// subset), which is loaded only with ExternalEntities and FileRead.
+void test_xqueryx(Zorba* z, const Files& f)
+{
+  std::string const lQuery =
+    "<?xml version=\"1.0\"?>\n"
+    "<!DOCTYPE xqx:module SYSTEM \"" + f.dtdURI + "\">\n"
+    "<xqx:module xmlns:xqx=\"http://www.w3.org/2005/XQueryX\">"
+    "<xqx:mainModule><xqx:queryBody>"
+    "<xqx:stringConstantExpr><xqx:value>&e;</xqx:value>"
+    "</xqx:stringConstantExpr>"
+    "</xqx:queryBody></xqx:mainModule></xqx:module>";
+
+  for (int lSecure = 1; lSecure >= 0; --lSecure)
+  {
+    StaticContext_t sctx = context(z, lSecure ? SecurityPolicy::secure()
+                                              : SecurityPolicy::unrestricted());
+    Outcome o;
+    try
+    {
+      XQuery_t q = z->compileQuery(lQuery, sctx);
+      Iterator_t it = q->iterator();
+      it->open();
+      Item item;
+      while (it->next(item))
+        o.value += item.getStringValue().str();
+      it->close();
+      o.ok = true;
+    }
+    catch (ZorbaException const& e)
+    {
+      o.code = e.diagnostic().qname().localname();
+      o.message = e.what();
+    }
+    if (lSecure)
+    {
+      // The external subset is not loaded: no secret, whatever the outcome.
+      CHECK(o.value.find(SECRET) == std::string::npos);
+      CHECK(o.message.find(SECRET) == std::string::npos);
+    }
+    else
+      CHECK(expanded(o, SECRET));
+  }
+}
+#endif
+
 // Entity expansion must fail fast with an error under every policy; libxml2's
 // amplification checks are never disabled.
 void test_billion_laughs(Zorba* z)
@@ -416,6 +464,9 @@ xml_parser_security(int argc, char* argv[])
     test_allow_lists(lZorba, lFiles);
     test_unrestricted(lZorba, lFiles);
     test_instance_default(lZorba, lFiles);
+#ifdef ZORBA_XQUERYX
+    test_xqueryx(lZorba, lFiles);
+#endif
     test_billion_laughs(lZorba);
   }
   catch (ZorbaException const& e)
