@@ -96,10 +96,11 @@ jobs:
       - name: Build the site
         run: python3 scripts/site/build.py site _site $([ "$RECORD" = true ] || echo --strict)
 
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         if: github.ref == 'refs/heads/master' && env.RECORD != 'true'
         with:
           path: _site
+          include-hidden-files: true
 
   deploy:
     needs: examples
@@ -113,4 +114,4 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
