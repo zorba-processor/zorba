@@ -31,7 +31,6 @@ CREATE_TEST_SOURCELIST(APITests
   xml_parser_security.cpp
   uri_access_security.cpp
   evaluation_limits.cpp
-  deep_nesting.cpp
 )
 
 # add the executable

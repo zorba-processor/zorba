@@ -41,10 +41,7 @@ size_t reserve();
  * Returns true if entering one more call level would leave less than
  * reserve() bytes of stack.
  */
-inline bool exhausted()
-{
-  return remaining() < reserve();
-}
+bool exhausted();
 
 } // namespace stack_limit
 } // namespace zorba

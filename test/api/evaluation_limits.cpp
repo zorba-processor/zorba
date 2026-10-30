@@ -269,11 +269,13 @@ void test_call_depth(Zorba* z)
   CHECK(failed_with(o, "ZXQP0069"));
   CHECK(o.message.find("100") != std::string::npos);
 
-  // Mutual recursion through function items counts too.
+  std::cout << "  function items" << std::endl;
+  // Recursion through function items counts too.
   CHECK(failed_with(run(z, p,
       "declare function local:f($g, $n) { $g($g, $n + 1) };\n"
       "local:f(local:f#2, 0)"), "ZXQP0069"));
 
+  std::cout << "  higher limit" << std::endl;
   // A higher limit allows deeper recursion.
   p.setMaxCallDepth(5000);
   CHECK(succeeded_with(run(z, p, depth_query(2000)), "2000"));
@@ -290,6 +292,7 @@ void test_stack_guard(Zorba* z)
   CHECK(failed_with(o, "ZXQP0069"));
   CHECK(o.message.find("stack") != std::string::npos);
 
+  std::cout << "  measuring" << std::endl;
   uint64_t lo = 1, hi = 100000000;
   while (lo + 1 < hi)
   {
@@ -316,11 +319,17 @@ evaluation_limits(int argc, char* argv[])
 
   try
   {
+    std::cout << "test_timeout" << std::endl;
     test_timeout(lZorba);
+    std::cout << "test_set_timeout_override" << std::endl;
     test_set_timeout_override(lZorba);
+    std::cout << "test_no_timeout_by_default" << std::endl;
     test_no_timeout_by_default(lZorba);
+    std::cout << "report_timeout_overhead" << std::endl;
     report_timeout_overhead(lZorba);
+    std::cout << "test_call_depth" << std::endl;
     test_call_depth(lZorba);
+    std::cout << "test_stack_guard" << std::endl;
     test_stack_guard(lZorba);
   }
   catch (ZorbaException const& e)

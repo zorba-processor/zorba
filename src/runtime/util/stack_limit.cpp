@@ -36,6 +36,7 @@ struct Bounds
 {
   uintptr_t low = 0;   // lowest usable address (the stack grows down)
   uintptr_t high = 0;  // highest address; 0 = unknown
+  size_t reserve = 0;
 };
 
 Bounds query_bounds()
@@ -70,6 +71,14 @@ Bounds query_bounds()
     pthread_attr_destroy(&attr);
   }
 #endif
+  if (b.high != 0)
+  {
+    // A quarter of the stack, at least 64 KiB, at most 1 MiB.
+    size_t const KiB = 1024;
+    size_t const lQuarter = (b.high - b.low) / 4;
+    b.reserve = lQuarter < 64 * KiB ? 64 * KiB :
+                lQuarter > 1024 * KiB ? 1024 * KiB : lQuarter;
+  }
   return b;
 }
 
@@ -106,16 +115,18 @@ size_t remaining()
 
 size_t reserve()
 {
-  size_t const KiB = 1024;
+  return bounds().reserve;
+}
+
+
+bool exhausted()
+{
   Bounds const& b = bounds();
-  if (b.high == 0)
-    return 0;
-  size_t const lQuarter = (b.high - b.low) / 4;
-  if (lQuarter < 64 * KiB)
-    return 64 * KiB;
-  if (lQuarter > 1024 * KiB)
-    return 1024 * KiB;
-  return lQuarter;
+  uintptr_t const sp = current_frame();
+  // Unknown bounds, or a stack the thread library does not know about.
+  if (b.high == 0 || sp <= b.low || sp > b.high)
+    return false;
+  return sp - b.low < b.reserve;
 }
 
 } // namespace stack_limit
