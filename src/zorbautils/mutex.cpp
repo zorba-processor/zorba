@@ -25,16 +25,20 @@ Mutex::Mutex()
 {
 #ifdef ZORBA_HAVE_PTHREAD_H
   pthread_mutexattr_t attr;
-  pthread_mutexattr_init(&attr);
-  pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_ERRORCHECK);
+  int ret = pthread_mutexattr_init(&attr);
+  ZORBA_FATAL(!ret, "Failed to initialize mutex attributes. Error code = " << ret << " message = " << strerror(ret));
+
+  ret = pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_ERRORCHECK);
+  ZORBA_FATAL(!ret, "Failed to set mutex type. Error code = " << ret << " message = " << strerror(ret));
 
 #ifndef NDEBUG
   int pshared;
-  pthread_mutexattr_getpshared(&attr, &pshared);
+  ret = pthread_mutexattr_getpshared(&attr, &pshared);
+  ZORBA_FATAL(!ret, "Failed to get mutex pshared attribute. Error code = " << ret << " message = " << strerror(ret));
   ZORBA_FATAL(pshared == PTHREAD_PROCESS_PRIVATE, "mutex pshared = " << pshared);
 #endif
 
-  int ret = pthread_mutex_init(&theMutex, &attr);
+  ret = pthread_mutex_init(&theMutex, &attr);
 
   pthread_mutexattr_destroy(&attr);
 
