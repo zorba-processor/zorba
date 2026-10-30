@@ -1,0 +1,197 @@
+# Weekly W3C QT3 (FOTS) conformance run with the Zorba FOTS driver
+# (test/fots_driver, run by test/fots/qt3_run.py).
+#
+# The suite is pinned to one qt3tests commit (QT3_COMMIT). The run fails
+# only if a test case listed in test/fots/qt3-baseline-pass.txt no longer
+# passes; newly passing test cases are reported in the job summary, which
+# also says how to update the baseline. Test cases whose dependencies Zorba
+# does not satisfy (XQuery 3.1, XPath-only, XSD 1.1, ... see
+# test/fots_driver/FOTSZorbaManifest.xml) are reported as not applicable.
+name: QT3 conformance
+
+on:
+  workflow_dispatch:
+    inputs:
+      filter:
+        description: Comma-separated test-set name prefixes (empty = whole suite)
+        required: false
+        default: ''
+      shards:
+        description: Number of parallel shards
+        required: false
+        default: '4'
+  schedule:
+    - cron: '17 4 * * 1'
+  # TEMPORARY (development of this workflow; workflow_dispatch only works
+  # once the file is on master). Removed before merge.
+  push:
+    branches: [qt3-suite]
+
+concurrency:
+  group: qt3-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # w3c/qt3tests master, 2026-05-14 ("Relax expected results for JSON
+  # numeric output"). Bump deliberately: new or changed test cases move the
+  # numbers, so regenerate the baseline in the same change.
+  QT3_COMMIT: 201a6e466940cdfc727f4babfedcde5332b9f578
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    outputs:
+      shards: ${{ steps.shards.outputs.list }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - id: shards
+        run: |
+          n="${{ inputs.shards || '4' }}"
+          echo "list=$(python3 -c "import json,sys; print(json.dumps(list(range(int(sys.argv[1])))))" "$n")" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Build the builder image
+        uses: docker/build-push-action@v7
+        with:
+          context: docker/builder-latest
+          load: true
+          tags: zorba-builder:ci
+          cache-from: type=gha,scope=builder-linux-amd64-latest
+          cache-to: type=gha,mode=max,scope=builder-linux-amd64-latest
+
+      - uses: actions/cache@v6
+        with:
+          path: .ccache
+          key: ccache-qt3-${{ github.sha }}
+          restore-keys: |
+            ccache-qt3-
+            ccache-linux-amd64-latest-
+
+      - name: Build
+        run: |
+          docker run --rm \
+            -e CCACHE_DIR=/src/.ccache \
+            -e CCACHE_SLOPPINESS=pch_defines,time_macros \
+            -v "$PWD":/src -w /src zorba-builder:ci sh -ec '
+              cmake --preset full-release
+              cmake --build --preset full-release
+              ccache -s
+              # The test machines mount the checkout at the same path, so
+              # the build tree runs in place; object files are not needed.
+              tar --zstd -cf zorba-build.tar.zst --exclude=CMakeFiles build/full-release'
+          ls -lh zorba-build.tar.zst
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: zorba-build
+          path: zorba-build.tar.zst
+          retention-days: 3
+          compression-level: 0
+
+  run:
+    needs: build
+    name: run (shard ${{ matrix.shard }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 350
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON(needs.build.outputs.shards) }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Build the builder image
+        uses: docker/build-push-action@v7
+        with:
+          context: docker/builder-latest
+          load: true
+          tags: zorba-builder:ci
+          cache-from: type=gha,scope=builder-linux-amd64-latest
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: zorba-build
+
+      - uses: actions/cache@v6
+        id: qt3cache
+        with:
+          path: qt3tests
+          key: qt3tests-${{ env.QT3_COMMIT }}
+
+      - name: Fetch qt3tests
+        if: steps.qt3cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir qt3tests
+          curl -fsSL "https://codeload.github.com/w3c/qt3tests/tar.gz/$QT3_COMMIT" \
+            | tar xz --strip-components=1 -C qt3tests
+
+      - name: Run QT3 shard ${{ matrix.shard }}
+        run: |
+          # QTTEST* are read by fn:environment-variable test cases.
+          docker run --rm \
+            -e QTTEST=42 -e QTTEST2=other -e QTTESTEMPTY= \
+            -v "$PWD":/src -w /src zorba-builder:ci sh -ec '
+              tar --zstd -xf zorba-build.tar.zst
+              python3 test/fots/qt3_run.py \
+                --zorba build/full-release/bin/zorba \
+                --driver test/fots_driver/cli.xq \
+                --manifest test/fots_driver/FOTSZorbaManifest.xml \
+                --expected-failures build/full-release/FOTSExpectedFailures.xml \
+                --catalog qt3tests/catalog.xml \
+                --baseline test/fots/qt3-baseline-pass.txt \
+                --filter "${{ inputs.filter || 'prod-Literal,fn-abs,fn-matches.re,prod-CastExpr,fn-environment-variable,misc-Serialization' }}" \
+                --shard ${{ matrix.shard }} \
+                --shards ${{ strategy.job-total }} \
+                --jobs "$(nproc)" \
+                --case-timeout 60 \
+                --budget 17400 \
+                --verbose \
+                --out qt3-out'
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: qt3-shard-${{ matrix.shard }}
+          path: qt3-out
+          retention-days: 30
+
+  report:
+    needs: [build, run]
+    if: always() && needs.build.result == 'success'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: qt3-shard-*
+          path: shards
+
+      - name: Report and compare against the baseline
+        run: |
+          python3 test/fots/qt3_report.py shards/*/results.tsv \
+            --baseline test/fots/qt3-baseline-pass.txt \
+            --qt3-commit "$QT3_COMMIT" \
+            --summary "$GITHUB_STEP_SUMMARY" \
+            --out qt3-report
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: qt3-report
+          path: qt3-report
+          retention-days: 90
+
+      - name: Fail if a shard did not complete
+        if: needs.run.result != 'success'
+        run: |
+          echo "::error::at least one QT3 shard failed or was cancelled; results are partial"
+          exit 1
