@@ -87,6 +87,7 @@
 #define ZED_XQST0116_Requirement "~XQST0116_Requirement"
 #define ZED_XQST0123_UnrecognizedXQueryOption_2 "~XQST0123_UnrecognizedXQueryOption_2"
 #define ZED_XQST0123_UnrecognizedRequiredFeature_2 "~XQST0123_UnrecognizedRequiredFeature_2"
+#define ZED_XQST0125_InlineVisibility "~XQST0125_InlineVisibility"
 #define ZED_XPDY0002_VariableHasNoValue_2 "~XPDY0002_VariableHasNoValue_2"
 #define ZED_XPDY0002_VariableUndeclared_2 "~XPDY0002_VariableUndeclared_2"
 #define ZED_XPDY0002_ContextUndeclared_2 "~XPDY0002_ContextUndeclared_2"

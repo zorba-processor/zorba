@@ -4876,6 +4876,17 @@ InlineFunction :
                               $3);
       delete $2;
     }
+  |
+    AnnotationList FUNCTION FunctionSig EnclosedStatementsAndOptionalExpr
+    {
+      InlineFunction* f = new InlineFunction(LOC(@$),
+                                             $3->theParams.getp(),
+                                             $3->theReturnType.getp(),
+                                             $4);
+      f->setAnnotations(static_cast<AnnotationListParsenode*>($1));
+      $$ = f;
+      delete $3;
+    }
 ;
 
 
@@ -5819,6 +5830,18 @@ FunctionTest :
   | TypedFunctionTest
     {
       $$ = $1;
+    }
+  | AnnotationList AnyFunctionTest
+    {
+      static_cast<AnyFunctionTest*>($2)->
+      setAnnotations(static_cast<AnnotationListParsenode*>($1));
+      $$ = $2;
+    }
+  | AnnotationList TypedFunctionTest
+    {
+      static_cast<TypedFunctionTest*>($2)->
+      setAnnotations(static_cast<AnnotationListParsenode*>($1));
+      $$ = $2;
     }
 ;
 

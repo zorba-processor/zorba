@@ -1002,6 +1002,18 @@
 
     </diagnostic>
 
+    <diagnostic code="XQST0125">
+      <comment>
+        It is a static error if an inline function expression is annotated as
+        %public or %private.
+      </comment>
+      <value>$1</value>
+
+      <entry key="InlineVisibility">
+        <value>%public and %private are not allowed on an inline function expression</value>
+      </entry>
+    </diagnostic>
+
     <diagnostic code="XQST0126">
       <comment>
         It is a static error if all-extensions appears in a require-feature option declaration.
