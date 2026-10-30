@@ -114,8 +114,10 @@ jobs:
           restore-keys: ccache-profile-${{ matrix.preset }}-
 
       # No HTTP test server here: the presets' test filters exclude the tests that need it.
-      - name: Build and test
+      - name: Configure and build
+        timeout-minutes: 30
         run: |
+          mkdir -p build
           docker run --rm \
             -e CCACHE_DIR=/src/.ccache \
             -e CCACHE_SLOPPINESS=pch_defines,time_macros \
@@ -124,10 +126,18 @@ jobs:
               cmake --build --preset ${{ matrix.preset }} -- -k 0
               ccache -s
               scripts/profile-size.sh ${{ matrix.preset }} > build/size.md
-              cat build/size.md
+              cat build/size.md'
+
+      - name: Test
+        timeout-minutes: 20
+        run: |
+          docker run --rm \
+            -v "$PWD":/src -w /src zorba-builder:ci sh -c '
               ctest --preset ${{ matrix.preset }} -j"$(nproc)" --timeout 60 \
-                --output-junit junit.xml > build/ctest.log 2>&1 || { tail -n 60 build/ctest.log; exit 1; }
-              tail -n 5 build/ctest.log'
+                --output-junit junit.xml > build/ctest.log 2>&1
+              rc=$?
+              tail -n 60 build/ctest.log
+              exit $rc'
 
       - name: Summary
         if: always()
