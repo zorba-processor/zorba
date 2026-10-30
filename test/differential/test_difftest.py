@@ -134,8 +134,9 @@ class Classify(unittest.TestCase):
                          ("timeout", "zorba"))
 
     def test_saxon_lexical_error_code(self):
-        zerr = ('<code namespace="http://www.example.com" '
-                'local-name="testerror"/>')
+        zerr = ('<exception xmlns="http://zorba.io/errors">'
+                '<code namespace="http://www.example.com" '
+                'local-name="testerror"/></exception>')
         serr = ("Error on line 1 column 19 of error4.xq:\n"
                 "  example:testerror  my error !\n")
         self.assertEqual(dt.saxon_error_code(res(err=serr, rc=2)),
