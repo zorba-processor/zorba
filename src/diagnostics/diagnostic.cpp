@@ -181,8 +181,15 @@ parameters::value_type parameters::lookup_param( size_type i ) const {
   if ( i > params_.size() )
     return value_type();
   value_type param( params_[ i - 1 ] );
-  if ( !param.empty() && param[0] == ZED_PREFIX[0] )
-    param = zorba::diagnostic::dict::lookup( param );
+  if ( !param.empty() && param[0] == ZED_PREFIX[0] ) {
+    //
+    // Parameters may carry user data (a JSON string, an XML namespace URI,
+    // a libxml2 message quoting the input) that merely starts with the
+    // dictionary-key prefix: only substitute actual keys.
+    //
+    if ( char const *const value = zorba::diagnostic::dict::find( param.c_str() ) )
+      param = value;
+  }
   return param;
 }
 
