@@ -15,6 +15,7 @@
  */
 #include "stdafx.h"
 
+#include <algorithm>
 #include <vector>
 
 #include "common/shared_types.h"
@@ -49,6 +50,9 @@ struct picture {
       int grouping_interval;            // only in integer part
       int maximum_size;                 // only in fractional part
     };
+    // Integer part, irregular grouping: the number of digits to the right of
+    // each grouping separator.
+    std::vector<int> grouping_positions;
 
     part() {
       mandatory_grouping_seps = minimum_size = maximum_size = 0;
@@ -135,63 +139,29 @@ static void check_multiple( zstring const &sub_pic, zstring const &sign,
 static void format_integer_part( zstring const &value,
                                  picture::sub_picture const &sub_pic,
                                  picture const &pic, zstring *dest ) {
-  zstring::const_reverse_iterator n_i( value.rbegin() );
-  zstring::const_reverse_iterator const n_end( value.rend() );
-
   picture::part const &part = sub_pic.integer_part;
-
-  utf8_string<zstring const> const u_format( part.format );
-  utf8_string<zstring const>::const_reverse_iterator
-    format_i( u_format.rbegin() );
-  utf8_string<zstring const>::const_reverse_iterator const
-    format_end( u_format.rend() );
-
-  int digit_pos = 0;
-  bool just_inserted_grouping_separator = false;
-  int minimum_size = part.minimum_size;
-  int mandatory_grouping_seps = part.mandatory_grouping_seps;
   utf8_string<zstring> u_dest( *dest );
 
   //
-  // Step through both the integer part and sub-picture from right-to-left.
+  // XQuery F&O 3.1 4.7.5 (also the 3.0 erratum of bug 29534): a grouping
+  // separator is output at each integer-part-grouping-position that has a
+  // digit to its left. Regular grouping positions repeat to the left of
+  // the sub-picture.
   //
-  while ( n_i != n_end || format_i != format_end ) {
-    unicode::code_point digit_cp = pic.VAR_CP( mandatory_digit_sign );
-    if ( n_i != n_end )
-      digit_cp += *n_i - '0';
-    if ( format_i != format_end ) {     // haven't exhausted the picture
-      if ( !minimum_size && !mandatory_grouping_seps && n_i == n_end )
-        break;
-      unicode::code_point const format_cp = *format_i++;
-      if ( format_cp == pic.VAR_CP( optional_digit_sign ) ||
-           unicode::is_Nd( format_cp ) ) {
-        u_dest.insert( 0, 1, digit_cp );
-        if ( n_i != n_end ) ++n_i;
-        ++digit_pos;
-        just_inserted_grouping_separator = false;
-        if ( minimum_size )
-          --minimum_size;
-      } else {                          // must be a grouping-separator
-        u_dest.insert( 0, 1, pic.VAR_CP( grouping_separator_sign ) );
-        just_inserted_grouping_separator = true;
-        if ( mandatory_grouping_seps )
-          --mandatory_grouping_seps;
-      }
-    } else {                            // have exhausted the picture
-      if ( part.grouping_interval && !(digit_pos % part.grouping_interval) ) {
-        if ( just_inserted_grouping_separator )
-          just_inserted_grouping_separator = false;
-        else {
-          u_dest.insert( 0, 1, pic.VAR_CP( grouping_separator_sign ) );
-          just_inserted_grouping_separator = true;
-          continue;
-        }
-      }
-      u_dest.insert( 0, 1, digit_cp );
-      if ( n_i != n_end ) ++n_i;
-      ++digit_pos;
-    }
-  } // while
+  zstring::size_type const n = value.size();
+  for ( zstring::size_type i = 0; i < n; ++i ) {
+    u_dest += pic.VAR_CP( mandatory_digit_sign ) + (value[i] - '0');
+    int const right = static_cast<int>( n - i - 1 );
+    if ( !right )
+      break;
+    bool const group = part.grouping_interval ?
+      !(right % part.grouping_interval) :
+      std::find( part.grouping_positions.begin(),
+                 part.grouping_positions.end(), right ) !=
+        part.grouping_positions.end();
+    if ( group )
+      u_dest += pic.VAR_CP( grouping_separator_sign );
+  }
 }
 
 static void format_fractional_part( zstring const &value,
@@ -265,7 +235,8 @@ static void format_number( store::Item_t &number_item, picture const &pic,
   // the input number is positive, and the negative sub-picture and its
   // associated variables are used otherwise.
   //
-  bool const is_negative = double_item->compare( zero ) < 0;
+  bool const is_negative = double_item->compare( zero ) < 0 ||
+    double_item->getDoubleValue().isNegZero();
   picture::sub_picture const &sub_pic =
     is_negative ? pic.neg_subpicture : pic.pos_subpicture;
 
@@ -293,6 +264,17 @@ static void format_number( store::Item_t &number_item, picture const &pic,
   else if ( sub_pic.has_per_mille )
     adjusted_number *= 1000;
 
+  if ( adjusted_number.isPosInf() ) {
+    //
+    // The adjusted number overflowed (e.g., 1e308 with a percent-sign): it
+    // is formatted as infinity.
+    //
+    *dest  = sub_pic.prefix;
+    *dest += pic.VAR( infinity );
+    *dest += sub_pic.suffix;
+    return;
+  }
+
   //
   // Ibid: This value is then rounded so that it uses no more than maximum-
   // fractional-part-size digits in its fractional part. The rounded number is
@@ -318,12 +300,25 @@ static void format_number( store::Item_t &number_item, picture const &pic,
   zstring::size_type const decimal_separator_pos = number_str.find( '.' );
   zstring integer_str, fractional_str;
   integer_str = number_str.substr( 0, decimal_separator_pos );
+  //
+  // Ibid (bug 29164): with a minimum-integer-part-size of zero, a zero
+  // integer part has no digits (".5" for format-number(0.5, '#.#')).
+  //
+  if ( !sub_pic.integer_part.minimum_size && integer_str == "0" )
+    integer_str.clear();
   ascii::left_pad( &integer_str, sub_pic.integer_part.minimum_size, '0' );
   if ( decimal_separator_pos != zstring::npos )
     fractional_str = number_str.substr( decimal_separator_pos + 1 );
   ascii::right_pad(
     &fractional_str, sub_pic.fractional_part.minimum_size, '0'
   );
+  //
+  // Ibid: if that leaves no digit at all, a single zero digit is output in
+  // the fractional part (".0" for format-number(0, '#.#')). The integer
+  // part can be empty only if the sub-picture has a decimal-separator-sign.
+  //
+  if ( integer_str.empty() && fractional_str.empty() )
+    fractional_str = "0";
 
   format_integer_part( integer_str, sub_pic, pic, dest );
   // Insert prefix afterwards so as not to complicate format_integer_part().
@@ -365,26 +360,20 @@ static void parse_subpicture( picture::sub_picture *sub_pic,
     &picture::sub_picture::integer_part;
 
   bool got_active = false;
-  bool got_grouping_separator = false;    // used only for integer part
   bool got_mandatory_digit = false;
   bool got_optional_digit = false;
   bool got_part_mandatory_digit = false;
   bool got_part_optional_digit = false;
   bool got_passive_after_active = false;
-  bool grouping_interval_possible = true; // used only for integer part
   bool just_got_decimal_separator = false;
   bool just_got_grouping_separator = false;
-
-  utf8::size_type grouping_interval = 0;  // used only for integer part
-  int grouping_separators = 0;
 
   utf8::size_type decimal_separator_pos = utf8::npos;
   utf8::size_type leftmost_active_pos = utf8::npos;
   utf8::size_type rightmost_active_pos = utf8::npos;
   utf8::size_type pos = 0;
-  utf8::size_type prev_grouping_pos = utf8::npos;
 
-  unicode::code_point cp, zero_cp;
+  unicode::code_point cp, zero_cp, rightmost_active_cp = 0;
 
   utf8_string<zstring> u_format( sub_pic->format );
   utf8_string<zstring>::const_iterator u( u_format.begin() );
@@ -425,28 +414,23 @@ static void parse_subpicture( picture::sub_picture *sub_pic,
         //
         goto got_decimal_grouping_adjacent;
       }
+      if ( just_got_grouping_separator ) {
+        //
+        // Ibid: A sub-picture must not contain two adjacent instances of the
+        // grouping-separator-sign.
+        //
+        throw XQUERY_EXCEPTION(
+          err::FODF1310,
+          ERROR_PARAMS(
+            pic.format,
+            ZED( FODF1310_NoAdjacentGroupSep_3 ),
+            unicode::printable_cp( cp )
+          ),
+          ERROR_LOC( loc )
+        );
+      }
       just_got_decimal_separator = false;
       just_got_grouping_separator = true;
-      ++grouping_separators;
-
-      if ( decimal_separator_pos == utf8::npos &&
-           grouping_interval_possible ) {
-        //
-        // [I]f these integer-part-grouping-positions are at regular intervals
-        // (that is, if they form a sequence N, 2N, 3N, ... for some integer
-        // value N, including the case where there is only one number in the
-        // list), then the sequence contains all integer multiples of N as far
-        // as necessary to accommodate the largest possible number.
-        //
-        if ( !got_grouping_separator )
-          got_grouping_separator = true;
-        else if ( !grouping_interval )
-          grouping_interval = pos - prev_grouping_pos;
-        else if ( pos - prev_grouping_pos != grouping_interval )
-          grouping_interval_possible = false;
-        prev_grouping_pos = pos + 1;
-      }
-
       goto set_active;
     }
 
@@ -582,6 +566,7 @@ set_active:
     if ( leftmost_active_pos == utf8::npos )
       leftmost_active_pos = pos;
     rightmost_active_pos = pos;
+    rightmost_active_cp = cp;
   } // for
 
   if ( !(got_optional_digit || got_mandatory_digit) ) {
@@ -596,27 +581,23 @@ set_active:
     );
   }
 
-  if ( grouping_interval_possible ) {
-    if ( decimal_separator_pos != utf8::npos )
-      pos = decimal_separator_pos;
-    if ( !grouping_interval ) {
-      if ( got_grouping_separator ) {
-        //
-        // There's only a single grouping separator, e.g., "1,000".
-        //
-        grouping_interval = pos - prev_grouping_pos;
-      }
-    } else if ( pos - prev_grouping_pos != grouping_interval ) {
-      //
-      // There are multiple grouping separators, but they're not equally spaced
-      // from the last digit, e.g., "1,000,00".  (This is most likely a mistake
-      // on the part of the user.)
-      //
-      grouping_interval = 0;
-    }
-    sub_pic->integer_part.grouping_interval = grouping_interval;
-  } else
-    sub_pic->integer_part.mandatory_grouping_seps = grouping_separators;
+  if ( decimal_separator_pos == utf8::npos &&
+       rightmost_active_cp == pic.VAR_CP( grouping_separator_sign ) ) {
+    //
+    // Ibid: A sub-picture must not contain a grouping-separator-sign that
+    // appears, in the absence of a decimal-separator-sign, at the end of the
+    // integer part.
+    //
+    throw XQUERY_EXCEPTION(
+      err::FODF1310,
+      ERROR_PARAMS(
+        pic.format,
+        ZED( FODF1310_NoGroupSepAtEnd_3 ),
+        unicode::printable_cp( rightmost_active_cp )
+      ),
+      ERROR_LOC( loc )
+    );
+  }
 
   //
   // Ibid 4.7.4: [I]f the sub-picture contains no decimal-digit-family
@@ -659,6 +640,43 @@ set_active:
   if ( decimal_separator_pos != utf8::npos ) {
     sub_pic->fractional_part.format =
       u_format.substr( decimal_separator_pos + 1 );
+  }
+
+  //
+  // Ibid: The integer-part-grouping-positions are the number of digit signs
+  // to the right of each grouping-separator-sign in the integer part. They
+  // are regular if there is a G such that every position is a multiple of G
+  // and every multiple of G less than the number of digit signs in the
+  // integer part is a position (F&O 3.1; 3.0 erratum, bug 29534); G is then
+  // the smallest position and grouping repeats every G digits. Otherwise
+  // only the given positions are used.
+  //
+  {
+    picture::part &int_part = sub_pic->integer_part;
+    utf8_string<zstring const> const u_int( int_part.format );
+    std::vector<int> positions;
+    int digits = 0;
+    for ( utf8_string<zstring const>::const_reverse_iterator
+          i( u_int.rbegin() ); i != u_int.rend(); ++i ) {
+      if ( *i == pic.VAR_CP( grouping_separator_sign ) )
+        positions.push_back( digits );
+      else
+        ++digits;
+    }
+    if ( !positions.empty() ) {
+      int const g = positions.front();
+      bool regular = g > 0;
+      for ( std::vector<int>::const_iterator i( positions.begin() );
+            regular && i != positions.end(); ++i )
+        regular = !(*i % g);
+      for ( int m = g; regular && m < digits; m += g )
+        regular = std::find( positions.begin(), positions.end(), m ) !=
+          positions.end();
+      if ( regular )
+        int_part.grouping_interval = g;
+      else
+        int_part.grouping_positions = positions;
+    }
   }
 
   return;
