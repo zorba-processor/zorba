@@ -54,6 +54,7 @@
 
 #include <xercesc/sax2/DefaultHandler.hpp>
 #include <xercesc/sax2/SAX2XMLReader.hpp>
+#include <xercesc/parsers/SAX2XMLReaderImpl.hpp>
 #include <xercesc/sax2/XMLReaderFactory.hpp>
 
 #include <xercesc/validators/common/GrammarResolver.hpp>

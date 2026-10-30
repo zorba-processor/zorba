@@ -542,9 +542,11 @@ void Schema::registerXSD(
 
   try
   {
-    SAX2XMLReader* reader =
-    XMLReaderFactory::createXMLReader(XMLPlatformUtils::fgMemoryManager,
-                                      theGrammarPool);
+    // The implementation class (what XMLReaderFactory::createXMLReader()
+    // returns) is used directly for setXMLEntityResolver(), which the
+    // SAX2XMLReader interface does not have.
+    SAX2XMLReaderImpl* reader =
+    new SAX2XMLReaderImpl(XMLPlatformUtils::fgMemoryManager, theGrammarPool);
 
     parser.reset(reader);
     // Perform namespace processing
@@ -576,7 +578,7 @@ void Schema::registerXSD(
 
     XMLChArray xerces_xsdURL(xsdURL);
     StaticContextEntityResolver lEntityResolver(xerces_xsdURL.get(), aSctx, stream);
-    parser->setXMLEntityResolver(&lEntityResolver);
+    reader->setXMLEntityResolver(&lEntityResolver);
 
     // Bounds entity expansion in schema documents (Xerces' default limit).
     XERCES_CPP_NAMESPACE::SecurityManager lSecurityManager;
