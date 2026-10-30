@@ -86,6 +86,12 @@ protected:
 
   void rewriteJoin(PredicateInfo& predInfo);
 
+  expr* createNormalizedKey(
+      expr* keyExpr,
+      static_context* sctx,
+      user_function* udf,
+      const QueryLoc& loc);
+
   void expandVars(expr* idxExpr, csize outerVarId, csize innerVarId);
 };
 
