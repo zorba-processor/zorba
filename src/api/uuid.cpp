@@ -28,7 +28,7 @@
 #elif defined( _WIN32 )
 # include <Rpc.h>
 #else
-# error "Unsupported operating system for generating UUIDs"
+# include <random>                     /* portable fallback, e.g. Emscripten */
 #endif
 
 using namespace std;
@@ -47,6 +47,16 @@ void uuid::create( uuid *result ) {
   uuid_generate( result->data );
 #elif defined( _WIN32 )
   UuidCreateSequential( (UUID*)result->data );
+#else
+  // No platform UUID API: generate an RFC 4122 version 4 (random) UUID.
+  std::random_device rd;
+  for ( size_t i = 0; i < sizeof result->data; i += 4 ) {
+    unsigned const r = rd();
+    for ( size_t j = 0; j < 4 && i + j < sizeof result->data; ++j )
+      result->data[ i + j ] = static_cast<value_type>( r >> (8 * j) );
+  }
+  result->data[6] = static_cast<value_type>( (result->data[6] & 0x0Fu) | 0x40u );
+  result->data[8] = static_cast<value_type>( (result->data[8] & 0x3Fu) | 0x80u );
 #endif /* _WIN32 */
 }
 
