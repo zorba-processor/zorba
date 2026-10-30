@@ -149,7 +149,7 @@ class CommandArgType
       *((std::string*)aValue) = aIn;
     }
 
-    TypedCommandArgType<T, Idx, Tuple>() {}
+    TypedCommandArgType() {}
     T theDefault;
     bool theIsVoid;
   };
