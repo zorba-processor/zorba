@@ -45,6 +45,8 @@ public:
 
   virtual Resource* resolveURL(zstring const& aUrl,
     EntityData const* aEntityData);
+
+  virtual bool isBuiltin() const { return true; }
 };
 
 /**
@@ -56,6 +58,8 @@ public:
 
   virtual Resource* resolveURL(zstring const& aUrl,
     EntityData const* aEntityData);
+
+  virtual bool isBuiltin() const { return true; }
 };
 
 /**
@@ -68,6 +72,8 @@ public:
 
   virtual Resource* resolveURL(zstring const& aUrl,
     EntityData const* aEntityData);
+
+  virtual bool isBuiltin() const { return true; }
 };
 
 #ifndef ZORBA_NO_FULL_TEXT
@@ -77,6 +83,8 @@ class ThesaurusURLResolver : public URLResolver
 public:
   // inherited
   Resource* resolveURL( zstring const &aUrl, EntityData const* );
+
+  virtual bool isBuiltin() const { return true; }
 };
 
 #endif /* ZORBA_NO_FULL_TEXT */

@@ -99,6 +99,9 @@ getFetchResource(
     return lStreamRes;
 
   } catch (ZorbaException const& e) {
+    // A denial by the security policy keeps its error code.
+    if (e.diagnostic() == zerr::ZXQP0029_URI_ACCESS_DENIED)
+      throw;
     throw XQUERY_EXCEPTION(
       zuri::URI_UNRESOLVED_OR_NOSTREAM,
       ERROR_PARAMS( aUri->getStringValue(), e.what() ),

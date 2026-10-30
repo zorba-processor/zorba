@@ -17,6 +17,8 @@
 
 #include <string>
 #include <fstream>
+#include <mutex>
+#include <unordered_map>
 #include <vector>
 #include <sstream>
 
@@ -1516,6 +1518,66 @@ static void fillTime (
 }
 
 
+/*******************************************************************************
+  fn:doc caches documents in the store by URI, and the store is shared by all
+  queries. A document that fn:doc loaded through a built-in URL resolver was
+  allowed by the policy of the query that loaded it, which may be wider than
+  the policy of a later query. This registry remembers, per URI, which cached
+  document fn:doc loaded and from which URL, so that a cache hit is checked
+  against the policy of the query asking for it. Documents the embedder put
+  into the store, or that an embedder resolver served, are not in the
+  registry and are returned as before.
+
+  An entry is keyed by the address of the document node. If the document was
+  deleted from the store and another one stored under the same URI, the
+  addresses differ and the entry is dropped (should the new document reuse
+  the address, it is checked like the old one: the error is a denial, never
+  a disclosure).
+********************************************************************************/
+namespace {
+
+struct DocSource
+{
+  const store::Item* theDoc;
+  zstring            theUrl;
+};
+
+std::mutex theDocSourcesMutex;
+std::unordered_map<std::string, DocSource> theDocSources;
+
+void remember_doc_source(
+    zstring const& aUri,
+    const store::Item* aDoc,
+    internal::Resource const& aResource)
+{
+  std::lock_guard<std::mutex> lLock(theDocSourcesMutex);
+  if (aResource.isFromBuiltinResolver())
+    theDocSources[aUri.str()] = DocSource{aDoc, aResource.getUrl()};
+  else
+    theDocSources.erase(aUri.str());
+}
+
+bool cached_doc_source(
+    zstring const& aUri,
+    const store::Item* aDoc,
+    zstring& oUrl)
+{
+  std::lock_guard<std::mutex> lLock(theDocSourcesMutex);
+  auto const it = theDocSources.find(aUri.str());
+  if (it == theDocSources.end())
+    return false;
+  if (it->second.theDoc != aDoc)
+  {
+    theDocSources.erase(it);
+    return false;
+  }
+  oUrl = it->second.theUrl;
+  return true;
+}
+
+} // anonymous namespace
+
+
 static void loadDocument(
     zstring const& aUri,
     static_context* aSctx,
@@ -1539,7 +1601,24 @@ static void loadDocument(
   }
 
   if (oResult != NULL)
+  {
+    zstring lSourceUrl;
+    if (cached_doc_source(lNormUri, oResult.getp(), lSourceUrl))
+    {
+      try
+      {
+        aSctx->check_uri_access(lSourceUrl, internal::EntityData::DOCUMENT,
+                                aUri);
+      }
+      catch (XQueryException& e)
+      {
+        oResult = NULL;
+        set_source(e, loc);
+        throw;
+      }
+    }
     return;
+  }
 
   // Prepare a LoadProperties for loading the stream into the store
   store::LoadProperties lLoadProperties;
@@ -1593,6 +1672,8 @@ static void loadDocument(
   {
     throw XQUERY_EXCEPTION(err::FODC0002, ERROR_PARAMS( aUri ), ERROR_LOC(loc));
   }
+
+  remember_doc_source(lNormUri, oResult.getp(), *lStreamResource);
 }
 
 
@@ -1633,7 +1714,10 @@ bool FnDocAvailableIterator::nextImpl(store::Item_t& result, PlanState& planStat
     }
     catch (ZorbaException& e)
     {
-      if (e.diagnostic() == err::FODC0005)
+      // A denial by the security policy is reported, not turned into
+      // "not available".
+      if (e.diagnostic() == err::FODC0005 ||
+          e.diagnostic() == zerr::ZXQP0029_URI_ACCESS_DENIED)
       {
         set_source( e, loc );
         throw;
@@ -1829,8 +1913,12 @@ bool FnUnparsedTextAvailableIterator::nextImpl(store::Item_t& result, PlanState&
   {
     readDocument(uriString, encodingString, theSctx, planState, loc, unparsedText);
   }
-  catch (XQueryException const&)
+  catch (XQueryException const& e)
   {
+    // A denial by the security policy is reported, not turned into
+    // "not available".
+    if (e.diagnostic() == zerr::ZXQP0029_URI_ACCESS_DENIED)
+      throw;
     unparsedText = NULL;
   }
 
