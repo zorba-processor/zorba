@@ -1030,7 +1030,9 @@ bool convert_postfix_to_target_and_selector(
 
   // XQuery syntax ("foo") or (1).
   if (lDynamicFunctionInvocation != NULL) {
-    if (lDynamicFunctionInvocation->getArgList()->size() != 1)
+    // $a() has no ArgList at all.
+    if (lDynamicFunctionInvocation->getArgList() == NULL ||
+        lDynamicFunctionInvocation->getArgList()->size() != 1)
     {
       *anError = "An object or array lookup with exactly one argument is expected. Zero or more than one argument were found.";
       return false;
