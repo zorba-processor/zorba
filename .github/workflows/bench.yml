@@ -107,7 +107,7 @@ jobs:
           python3 -I bench/run.py compare out/a.json out/b.json --md out/compare.md
           cat out/compare.md >> "$GITHUB_STEP_SUMMARY"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: bench-results

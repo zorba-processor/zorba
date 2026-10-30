@@ -83,7 +83,7 @@ jobs:
 
       - name: Upload actual outputs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: example-outputs
           path: ${{ runner.temp }}/actual
