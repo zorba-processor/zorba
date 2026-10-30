@@ -53,6 +53,7 @@ void initializeTestList()
 
   libunittests["mem_sizeof"] = test_mem_sizeof;
   libunittests["memory_manager"] = test_memory_manager;
+  libunittests["mmap_file"] = test_mmap_file;
 
   libunittests["json_parser"] = test_json_parser;
   libunittests["parameters"] = test_parameters;
