@@ -150,7 +150,8 @@ jobs:
             for t in "paths/attr_ns$" "w3c/ForExpr010$" "comandline_doc_example_2$"; do
               cmd=$(ctest -R "$t" -N -V | grep -i "test command" | head -1 | sed "s/.*Test command: //")
               echo "CMD: $cmd"
-              eval "gdb -batch -ex 'catch throw' -ex run -ex bt --args $cmd" 2>&1 | tail -25
+              printf "catch throw\nrun\nbt\n" > /tmp/g.gdb
+              eval "gdb -batch -x /tmp/g.gdb --args $cmd" 2>&1 | tail -25
             done'
 
       - name: Summary
