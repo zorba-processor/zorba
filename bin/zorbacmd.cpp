@@ -678,6 +678,10 @@ int _tmain( int argc, _TCHAR const *argv[] ) {
   void *const store = StoreManager::getStore();
   Zorba *const zorba = Zorba::getInstance( store );
 
+  // The command-line tool runs trusted queries: grant every capability
+  // explicitly so it is unaffected by the library default.
+  zorba->setSecurityPolicy( SecurityPolicy::unrestricted() );
+
 #ifdef DO_AUDIT
   audit::Provider* lAuditProvider = zorba->getAuditProvider();
 
