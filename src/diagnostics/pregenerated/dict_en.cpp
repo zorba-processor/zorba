@@ -826,9 +826,7 @@ extern entry const dict_en[] = {
 #if defined(ZORBA_NO_ICU)
   { "~REGEX_INVALID_UNICODE_CODEPOINT_u", "invalid unicode hex, should be in form \\\\uXXXX or \\\\UXXXXXXXX" },
 #endif
-#if defined(ZORBA_NO_ICU)
   { "~REGEX_INVALID_USE_OF_SUBCLASS", "improper use of class subtraction: it must be the last construct in a class group [xxx-[yyy]]" },
-#endif
 #if defined(ZORBA_NO_ICU)
   { "~REGEX_MAX_LT_MIN", "in {min,max}, max is less than min" },
 #endif
@@ -850,9 +848,7 @@ extern entry const dict_en[] = {
 #if defined(ZORBA_NO_ICU)
   { "~REGEX_UNKNOWN_PC_CONSTRUCT", "unknown \\\\p{C?} category; supported categories: C, Cc, Cf, Co, Cn(for not assigned)" },
 #endif
-#if defined(ZORBA_NO_ICU)
   { "~REGEX_UNKNOWN_PIs_CONSTRUCT", "unknown \\\\p{Is} category block; see supported block escapes here: http://www.w3.org/TR/xmlschema-2/#charcter-classes" },
-#endif
 #if defined(ZORBA_NO_ICU)
   { "~REGEX_UNKNOWN_PL_CONSTRUCT", "unknown \\\\p{L?} category; supported categories: L, Lu, Ll, Lt, Lm, Lo" },
 #endif

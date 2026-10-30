@@ -4725,7 +4725,7 @@
       <value>broken \\p{Is} construct; valid characters are [a-zA-Z0-9-]</value>
     </entry>
 
-    <entry key="REGEX_UNKNOWN_PIs_CONSTRUCT" if="defined(ZORBA_NO_ICU)">
+    <entry key="REGEX_UNKNOWN_PIs_CONSTRUCT">
       <value>unknown \\p{Is} category block; see supported block escapes here: http://www.w3.org/TR/xmlschema-2/#charcter-classes</value>
     </entry>
 
@@ -4749,7 +4749,7 @@
       <value>malformed class subtraction</value>
     </entry>
 
-    <entry key="REGEX_INVALID_USE_OF_SUBCLASS" if="defined(ZORBA_NO_ICU)">
+    <entry key="REGEX_INVALID_USE_OF_SUBCLASS">
       <value>improper use of class subtraction: it must be the last construct in a class group [xxx-[yyy]]</value>
     </entry>
 
