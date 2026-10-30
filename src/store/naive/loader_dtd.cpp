@@ -998,8 +998,20 @@ store::Item_t DtdXmlLoader::loadXml(
       return NULL;
     }
   }
-  catch(...)
+  // An exception escaping libxml2 (e.g. thrown by the error callback) must
+  // still be reported: the callers take a null document with no error as
+  // success.
+  catch (ZorbaException const& e)
   {
+    theXQueryDiagnostics->add_error(e);
+    abortload();
+    thePathStack.clear();
+    return NULL;
+  }
+  catch (...)
+  {
+    theXQueryDiagnostics->add_error(
+      NEW_ZORBA_EXCEPTION(zerr::ZXQP0003_INTERNAL_ERROR));
     abortload();
     thePathStack.clear();
     return NULL;
