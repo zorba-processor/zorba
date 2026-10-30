@@ -113,8 +113,9 @@ IF(WIN32)
 ENDIF(WIN32)
 
 IF(ZORBA_NO_XMLSCHEMA)
-  # imports the http-client schema
-  LIST(REMOVE_ITEM UNIT_TESTS_SRCS "main_sequential.cpp")
+  # main_sequential imports the http-client schema, staticcollectionmanager
+  # runs a query that imports a schema
+  LIST(REMOVE_ITEM UNIT_TESTS_SRCS "main_sequential.cpp" "staticcollectionmanager.cpp")
 ENDIF(ZORBA_NO_XMLSCHEMA)
 
 CREATE_TEST_SOURCELIST(UnitTests
