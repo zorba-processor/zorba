@@ -19,7 +19,7 @@ on:
       shards:
         description: Number of parallel shards
         required: false
-        default: '4'
+        default: '2'
   schedule:
     - cron: '17 4 * * 1'
   # TEMPORARY (development of this workflow; workflow_dispatch only works
@@ -51,7 +51,7 @@ jobs:
 
       - id: shards
         run: |
-          n="${{ inputs.shards || '4' }}"
+          n="${{ inputs.shards || '2' }}"
           echo "list=$(python3 -c "import json,sys; print(json.dumps(list(range(int(sys.argv[1])))))" "$n")" >> "$GITHUB_OUTPUT"
 
       - uses: docker/setup-buildx-action@v4
@@ -147,7 +147,7 @@ jobs:
                 --expected-failures build/full-release/FOTSExpectedFailures.xml \
                 --catalog qt3tests/catalog.xml \
                 --baseline test/fots/qt3-baseline-pass.txt \
-                --filter "${{ inputs.filter || 'prod-Literal,fn-abs,fn-matches.re,prod-CastExpr,fn-environment-variable,misc-Serialization' }}" \
+                --filter "${{ inputs.filter }}" \
                 --shard ${{ matrix.shard }} \
                 --shards ${{ strategy.job-total }} \
                 --jobs "$(nproc)" \
