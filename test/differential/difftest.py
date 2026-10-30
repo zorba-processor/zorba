@@ -592,6 +592,14 @@ def split_prefixes(s):
 
 
 def cmd_run(args):
+    # Processes run in the query's directory, so paths must be absolute.
+    args.zorba = os.path.abspath(args.zorba)
+    if os.sep in args.java:
+        args.java = os.path.abspath(args.java)
+    args.saxon_classpath = os.pathsep.join(
+        os.path.abspath(p) for p in args.saxon_classpath.split(os.pathsep))
+    args.rbkt = os.path.abspath(args.rbkt)
+    args.out = os.path.abspath(args.out)
     os.makedirs(args.out, exist_ok=True)
     status = {"ok": False, "shard": args.shard, "shards": args.shards}
     try:
