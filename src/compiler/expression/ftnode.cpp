@@ -176,7 +176,7 @@ inline PointerType clone_ptr(
     user_function* udf,
     expr::substitution_t &s )
 {
-  return static_cast<PointerType>( p->clone( udf, s ).release() );
+  return static_cast<PointerType>( p->clone( udf, s ) );
 }
 
 
@@ -192,7 +192,7 @@ inline RCHandleValueType* clone_ptr(
     user_function* udf,
     expr::substitution_t &s )
 {
-  return static_cast<RCHandleValueType*>( p->clone(udf, s).release() );
+  return static_cast<RCHandleValueType*>( p->clone( udf, s ) );
 }
 
 
@@ -244,7 +244,7 @@ ft_visit_result::type ftand::accept( ftnode_visitor &v ) {
   END_VISIT( v );
 }
 
-ftnode_t ftand::clone(user_function* udf, expr::substitution_t &s ) const {
+ftnode* ftand::clone(user_function* udf, expr::substitution_t &s ) const {
   ftnode_list_t copy;
   clone_list( get_node_list(), &copy, udf, s );
   return new ftand( get_loc(), copy );
@@ -274,7 +274,7 @@ ft_visit_result::type ftcase_option::accept( ftnode_visitor &v ) {
   END_VISIT( v );
 }
 
-ftnode_t ftcase_option::clone(user_function* udf, expr::substitution_t& ) const {
+ftnode* ftcase_option::clone(user_function* udf, expr::substitution_t& ) const {
   return new ftcase_option( get_loc(), mode_ );
 }
 
@@ -302,7 +302,7 @@ ft_visit_result::type ftcontent_filter::accept( ftnode_visitor &v ) {
   END_VISIT( v );
 }
 
-ftnode_t ftcontent_filter::clone(user_function* udf,  expr::substitution_t &s ) const {
+ftnode* ftcontent_filter::clone(user_function* udf,  expr::substitution_t &s ) const {
   return new ftcontent_filter( get_loc(), mode_ );
 }
 
@@ -331,7 +331,7 @@ ft_visit_result::type ftdiacritics_option::accept( ftnode_visitor &v ) {
   END_VISIT( v );
 }
 
-ftnode_t ftdiacritics_option::clone(user_function* udf,  expr::substitution_t& ) const {
+ftnode* ftdiacritics_option::clone(user_function* udf,  expr::substitution_t& ) const {
   return new ftdiacritics_option( get_loc(), mode_ );
 }
 
@@ -368,7 +368,7 @@ ft_visit_result::type ftdistance_filter::accept( ftnode_visitor &v ) {
   END_VISIT( v );
 }
 
-ftnode_t ftdistance_filter::clone(user_function* udf,  expr::substitution_t &s ) const {
+ftnode* ftdistance_filter::clone(user_function* udf,  expr::substitution_t &s ) const {
   return new ftdistance_filter( get_loc(), clone_ptr_if( range_, udf, s ), unit_ );
 }
 
@@ -407,7 +407,7 @@ ft_visit_result::type ftextension_selection::accept( ftnode_visitor &v ) {
   END_VISIT( v );
 }
 
-ftnode_t ftextension_selection::clone(user_function* udf,  expr::substitution_t &s ) const {
+ftnode* ftextension_selection::clone(user_function* udf,  expr::substitution_t &s ) const {
   return new ftextension_selection(
              get_loc(), pragmas_, clone_ptr_if( ftselection_, udf, s )
   );
@@ -441,7 +441,7 @@ ft_visit_result::type ftextension_option::accept( ftnode_visitor &v ) {
   END_VISIT( v );
 }
 
-ftnode_t ftextension_option::clone(user_function* udf,  expr::substitution_t& ) const {
+ftnode* ftextension_option::clone(user_function* udf,  expr::substitution_t& ) const {
   return new ftextension_option( get_loc(), qname_, val_ );
 }
 
@@ -498,7 +498,7 @@ ft_visit_result::type ftlanguage_option::accept( ftnode_visitor &v ) {
   END_VISIT( v );
 }
 
-ftnode_t ftlanguage_option::clone(user_function* udf,  expr::substitution_t& ) const {
+ftnode* ftlanguage_option::clone(user_function* udf,  expr::substitution_t& ) const {
   return new ftlanguage_option( get_loc(), lang_ );
 }
 
@@ -531,7 +531,7 @@ ft_visit_result::type ftmatch_options::accept( ftnode_visitor &v ) {
   END_VISIT( v );
 }
 
-ftnode_t ftmatch_options::clone(user_function* udf,  expr::substitution_t &s ) const {
+ftnode* ftmatch_options::clone(user_function* udf,  expr::substitution_t &s ) const {
   unique_ptr<ftmatch_options> p( new ftmatch_options( get_loc() ) );
   if ( case_option_ )
     p->set_case_option( clone_ptr( case_option_, udf, s ) );
@@ -610,7 +610,7 @@ ft_visit_result::type ftmild_not::accept( ftnode_visitor &v ) {
   END_VISIT( v );
 }
 
-ftnode_t ftmild_not::clone(user_function* udf,  expr::substitution_t &s ) const {
+ftnode* ftmild_not::clone(user_function* udf,  expr::substitution_t &s ) const {
   ftnode_list_t copy;
   clone_list( get_node_list(), &copy, udf, s );
   return new ftmild_not( get_loc(), copy );
@@ -652,7 +652,7 @@ ft_visit_result::type ftor::accept( ftnode_visitor &v ) {
   END_VISIT( v );
 }
 
-ftnode_t ftor::clone(user_function* udf,  expr::substitution_t &s ) const {
+ftnode* ftor::clone(user_function* udf,  expr::substitution_t &s ) const {
   ftnode_list_t copy;
   clone_list( get_node_list(), &copy, udf, s );
   return new ftor( get_loc(), copy );
@@ -678,7 +678,7 @@ ft_visit_result::type ftorder_filter::accept( ftnode_visitor &v ) {
   END_VISIT( v );
 }
 
-ftnode_t ftorder_filter::clone(user_function* udf,  expr::substitution_t &s ) const {
+ftnode* ftorder_filter::clone(user_function* udf,  expr::substitution_t &s ) const {
   return new ftorder_filter( get_loc() );
 }
 
@@ -722,7 +722,7 @@ ft_visit_result::type ftprimary_with_options::accept( ftnode_visitor &v ) {
   END_VISIT( v );
 }
 
-ftnode_t ftprimary_with_options::clone(user_function* udf,  expr::substitution_t &s ) const {
+ftnode* ftprimary_with_options::clone(user_function* udf,  expr::substitution_t &s ) const {
   unique_ptr<ftprimary_with_options> p(
     new ftprimary_with_options( get_loc() )
   );
@@ -778,7 +778,7 @@ ft_visit_result::type ftrange::accept( ftnode_visitor &v ) {
   END_VISIT( v );
 }
 
-ftnode_t ftrange::clone(user_function* udf,  expr::substitution_t &s ) const {
+ftnode* ftrange::clone(user_function* udf,  expr::substitution_t &s ) const {
   return new ftrange(
     get_loc(), mode_,
     clone_ptr( expr1_, udf, s ),
@@ -817,7 +817,7 @@ ft_visit_result::type ftscope_filter::accept( ftnode_visitor &v ) {
   END_VISIT( v );
 }
 
-ftnode_t ftscope_filter::clone(user_function* udf,  expr::substitution_t &s ) const {
+ftnode* ftscope_filter::clone(user_function* udf,  expr::substitution_t &s ) const {
   return new ftscope_filter( get_loc(), scope_, unit_ );
 }
 
@@ -874,8 +874,12 @@ ft_visit_result::type ftselection::accept( ftnode_visitor &v ) {
   END_VISIT( v );
 }
 
-ftnode_t ftselection::clone(user_function* udf,  expr::substitution_t &s ) const {
-  return new ftselection( get_loc(), ftor_->clone( udf, s ).release(), list_ );
+ftnode* ftselection::clone(user_function* udf,  expr::substitution_t &s ) const {
+  // The positional filters are owned (and deleted) by each ftselection, so
+  // they are cloned, not shared.
+  ftpos_filter_list_t copy;
+  clone_list( list_, &copy, udf, s );
+  return new ftselection( get_loc(), ftor_->clone( udf, s ), copy );
 }
 
 ostream& ftselection::put( ostream &o ) const {
@@ -905,7 +909,7 @@ ft_visit_result::type ftstem_option::accept( ftnode_visitor &v ) {
   END_VISIT( v );
 }
 
-ftnode_t ftstem_option::clone(user_function* udf,  expr::substitution_t& ) const {
+ftnode* ftstem_option::clone(user_function* udf,  expr::substitution_t& ) const {
   return new ftstem_option( get_loc(), mode_ );
 }
 
@@ -939,7 +943,7 @@ ft_visit_result::type ftstop_words::accept( ftnode_visitor &v ) {
   END_VISIT( v );
 }
 
-ftnode_t ftstop_words::clone(user_function* udf,  expr::substitution_t& ) const {
+ftnode* ftstop_words::clone(user_function* udf,  expr::substitution_t& ) const {
   return new ftstop_words( get_loc(), uri_, list_, mode_ );
 }
 
@@ -991,7 +995,7 @@ ft_visit_result::type ftstop_word_option::accept( ftnode_visitor &v ) {
   END_VISIT( v );
 }
 
-ftnode_t ftstop_word_option::clone(user_function* udf,  expr::substitution_t &s ) const {
+ftnode* ftstop_word_option::clone(user_function* udf,  expr::substitution_t &s ) const {
   list_t copy;
   clone_list( stop_words_, &copy, udf, s );
   return new ftstop_word_option( get_loc(), copy, mode_ );
@@ -1039,7 +1043,7 @@ ft_visit_result::type ftthesaurus_id::accept( ftnode_visitor &v ) {
   END_VISIT( v );
 }
 
-ftnode_t ftthesaurus_id::clone(user_function* udf,  expr::substitution_t &s ) const {
+ftnode* ftthesaurus_id::clone(user_function* udf,  expr::substitution_t &s ) const {
   return new ftthesaurus_id(
          get_loc(), uri_, relationship_, clone_ptr_if( levels_, udf, s )
   );
@@ -1086,7 +1090,7 @@ ft_visit_result::type ftthesaurus_option::accept( ftnode_visitor &v ) {
   END_VISIT( v );
 }
 
-ftnode_t ftthesaurus_option::clone(user_function* udf,  expr::substitution_t &s ) const {
+ftnode* ftthesaurus_option::clone(user_function* udf,  expr::substitution_t &s ) const {
   thesaurus_id_list_t copy;
   clone_list( thesaurus_id_list_, &copy, udf, s );
   return new ftthesaurus_option(
@@ -1125,8 +1129,8 @@ ft_visit_result::type ftunary_not::accept( ftnode_visitor &v ) {
   END_VISIT( v );
 }
 
-ftnode_t ftunary_not::clone(user_function* udf,  expr::substitution_t &s ) const {
-  return new ftunary_not( get_loc(), subnode_->clone( udf, s ).release() );
+ftnode* ftunary_not::clone(user_function* udf,  expr::substitution_t &s ) const {
+  return new ftunary_not( get_loc(), subnode_->clone( udf, s ) );
 }
 
 ostream& ftunary_not::put( ostream &o ) const {
@@ -1151,7 +1155,7 @@ ft_visit_result::type ftweight::accept( ftnode_visitor &v ) {
   END_VISIT( v );
 }
 
-ftnode_t ftweight::clone(user_function* udf,  expr::substitution_t &s ) const {
+ftnode* ftweight::clone(user_function* udf,  expr::substitution_t &s ) const {
   return new ftweight( get_loc(), weight_expr_->clone( udf, s ) );
 }
 
@@ -1181,7 +1185,7 @@ ft_visit_result::type ftwild_card_option::accept( ftnode_visitor &v ) {
   END_VISIT( v );
 }
 
-ftnode_t ftwild_card_option::clone(user_function* udf,  expr::substitution_t &s ) const {
+ftnode* ftwild_card_option::clone(user_function* udf,  expr::substitution_t &s ) const {
   return new ftwild_card_option( get_loc(), mode_ );
 }
 
@@ -1214,7 +1218,7 @@ ft_visit_result::type ftwindow_filter::accept( ftnode_visitor &v ) {
   END_VISIT( v );
 }
 
-ftnode_t ftwindow_filter::clone(user_function* udf,  expr::substitution_t &s ) const {
+ftnode* ftwindow_filter::clone(user_function* udf,  expr::substitution_t &s ) const {
   return new ftwindow_filter(get_loc(), window_expr_->clone( udf, s ), unit_ );
 }
 
@@ -1250,7 +1254,7 @@ ft_visit_result::type ftwords::accept( ftnode_visitor &v ) {
   END_VISIT( v );
 }
 
-ftnode_t ftwords::clone(user_function* udf,  expr::substitution_t &s ) const {
+ftnode* ftwords::clone(user_function* udf,  expr::substitution_t &s ) const {
   return new ftwords( get_loc(), value_expr_->clone( udf, s ), mode_ );
 }
 
@@ -1293,7 +1297,7 @@ ft_visit_result::type ftwords_times::accept( ftnode_visitor &v ) {
   END_VISIT( v );
 }
 
-ftnode_t ftwords_times::clone(user_function* udf,  expr::substitution_t &s ) const {
+ftnode* ftwords_times::clone(user_function* udf,  expr::substitution_t &s ) const {
   return new ftwords_times(get_loc(),
                            clone_ptr( ftwords_, udf, s ),
                            clone_ptr_if( fttimes_, udf, s )
