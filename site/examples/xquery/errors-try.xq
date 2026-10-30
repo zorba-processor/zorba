@@ -10,5 +10,5 @@ declare namespace app = "http://example.org/app";
   try {
     error(QName("http://example.org/app", "app:E42"), "stock is negative")
   }
-  catch app:* { $err:description }
+  catch app:E42 { $err:description }
 )

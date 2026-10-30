@@ -1,1 +1,1 @@
-doc("../data/books.xml")//book[@lang = "es"]/title/string()
+doc("../data/books.xml")//book[@lang = "es"]/title
