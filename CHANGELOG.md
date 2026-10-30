@@ -31,7 +31,7 @@ Entries marked **(open PR)** come from pull requests that are not merged yet; co
 - Add the security policy API (`include/zorba/security.h`, `Zorba::setSecurityPolicy`, `StaticContext::setSecurityPolicy`); the default stays `unrestricted()` for now, and the library default is planned to become `secure()` before 5.0.0 ([#44](https://github.com/zorba-processor/zorba/pull/44)).
 - Bump the serialized execution plan format from version 25 to 26; plans saved by older builds no longer load ([#44](https://github.com/zorba-processor/zorba/pull/44)).
 - Raise `err:FOAR0002` on `xs:integer` overflow instead of silently wrapping around (64-bit builds); out-of-range string casts to `xs:integer` raise `FOCA0003`, and JSON integers beyond 64 bits parse as `xs:decimal` ([#53](https://github.com/zorba-processor/zorba/pull/53)).
-- Remove the SWIG language bindings (Java, XQJ, Python, Ruby, PHP, C#) and the `ZORBA_SUPPRESS_SWIG` option. A stable C API with native bindings is planned for a later release; the existing C API (`include/zorba/zorbac.h`) is unchanged ([#PR](https://github.com/zorba-processor/zorba/pull/PR)).
+- Remove the SWIG language bindings (Java, XQJ, Python, Ruby, PHP, C#) and the `ZORBA_SUPPRESS_SWIG` option. A stable C API with native bindings is planned for a later release; the existing C API (`include/zorba/zorbac.h`) is unchanged ([#61](https://github.com/zorba-processor/zorba/pull/61)).
 
 ### Security
 
@@ -99,7 +99,7 @@ Entries marked **(open PR)** come from pull requests that are not merged yet; co
 
 ### Removed
 
-- Remove the SWIG language bindings: the `swig/` directory, the `ZORBA_SUPPRESS_SWIG` option, SWIG/PHP/Python lookups in CMake, the per-language Doxygen projects and examples, and the matching CPack components and NOTICE entries ([#PR](https://github.com/zorba-processor/zorba/pull/PR)).
+- Remove the SWIG language bindings: the `swig/` directory, the `ZORBA_SUPPRESS_SWIG` option, SWIG/PHP/Python lookups in CMake, the per-language Doxygen projects and examples, and the matching CPack components and NOTICE entries ([#61](https://github.com/zorba-processor/zorba/pull/61)).
 - Remove Windows support code paths ([#27](https://github.com/zorba-processor/zorba/pull/27)).
 - Remove the `zorbautils/SAXParser` class and the `ZORBA_WITH_LIBXML2_SAX` option ([#51](https://github.com/zorba-processor/zorba/pull/51)).
 - Remove 91 stale `EXPECTED_FAILURE` test entries ([#25](https://github.com/zorba-processor/zorba/pull/25)).
