@@ -17,6 +17,9 @@
 // Fuzz target: parse arbitrary bytes as JSON with jn:parse-json (multiple
 // top-level items allowed) and drain the result so every item is parsed.
 //
+// The jn prefix is predeclared; importing the module would need its source
+// file, which is not shipped to the fuzzing runner.
+//
 // JsonDataManager is not used because it needs XML Schema support (it
 // imports the parse options schema), which the core fuzz build leaves out.
 
@@ -31,7 +34,6 @@ extern "C" int LLVMFuzzerInitialize(int*, char***)
   zorba_fuzz::engine().init();
   theQuery = new zorba_fuzz::ParseQuery();
   theQuery->init(
-      "import module namespace jn = \"http://jsoniq.org/functions\";\n"
       "declare variable $input as xs:string external;\n"
       "jn:parse-json($input)");
   return 0;
