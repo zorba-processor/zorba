@@ -36,6 +36,7 @@
 #include <vector>
 
 #include <zorba/diagnostic_handler.h>
+#include <zorba/diagnostic_list.h>
 #include <zorba/options.h>
 #include <zorba/static_context.h>
 #include <zorba/store_manager.h>
