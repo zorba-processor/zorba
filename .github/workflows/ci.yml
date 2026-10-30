@@ -128,6 +128,18 @@ jobs:
               scripts/profile-size.sh ${{ matrix.preset }} > build/size.md
               cat build/size.md'
 
+      - name: Diagnose (temporary)
+        if: matrix.preset == 'embedded'
+        continue-on-error: true
+        timeout-minutes: 5
+        run: |
+          docker run --rm -v "$PWD":/src -w /src zorba-builder:ci sh -c '
+            cd build/embedded
+            ctest -R "YearFromDateTimeFunc4$" -N -V | grep -i "test command" | head -3
+            cmd=$(ctest -R "YearFromDateTimeFunc4$" -N -V | grep -i "test command" | head -1 | sed "s/.*Test command: //")
+            echo "CMD: $cmd"
+            gdb -batch -ex "catch throw" -ex run -ex bt --args $cmd 2>&1 | tail -40'
+
       - name: Test
         timeout-minutes: 20
         run: |
