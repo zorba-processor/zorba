@@ -164,15 +164,19 @@ declare %ann:nondeterministic function env:decl-namespaces(
 
 
 (:~
- : Return true if the prefix will be bound to a schema in the Query
- : It's a bug in the FOTS if this function returns true: TODO report to W3C
+ : Return true if the prefix will be bound by the query itself (schema or
+ : module import, or namespace declaration).
  :)
 declare %private %ann:nondeterministic function env:is-schema-prefix-bound(
   $prefix as xs:string,
   $test   as xs:string
 ) as xs:boolean
 {
-  contains($test, concat('import schema namespace ', $prefix))
+  (: Also true if the query declares the prefix itself: declaring it
+     twice is XQST0033. :)
+  matches($test,
+          concat('(import\s+schema|import\s+module|declare)\s+namespace\s+',
+                 $prefix, '\s*='))
 };
 
 
@@ -514,12 +518,16 @@ declare function env:set-variables(
                        else concat("(", $select, ")")
       let $varName := $param/@name
       where (exists($select) and exists($param[@declared eq "true"]))
+      (: An environment shared by several test-cases may declare more
+         parameters than a given query declares; binding an undeclared
+         variable is an error. :)
       return
-        concat('zq:bind-variable( $queryID, xs:QName("',
+        concat('(if (xs:QName("', $param/@name, '") = zq:external-variables($queryID)) ',
+               'then zq:bind-variable( $queryID, xs:QName("',
                $param/@name,
                '"), ',
                $varValue,
-               ');')
+               ') else ());')
     )
     ,
     "&#xA;"
