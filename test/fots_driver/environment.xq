@@ -730,9 +730,16 @@ declare function env:check-dependencies(
                       then data($dep/@satisfied)
                       else "true"
 
-    let $zorbaDep := $zorbaManifest//fots:dependency[@type eq $dep/@type and
-                                                     @value eq $dep/@value and
-                                                     @satisfied eq $satisfied]
+    (: A spec dependency is a space-separated list of alternatives
+       (e.g. "XP30+ XQ10+"): it is met if Zorba supports any one of them. :)
+    let $zorbaDep :=
+      if ($dep/@type eq "spec")
+      then $zorbaManifest//fots:dependency[@type eq "spec" and
+                                           @satisfied eq $satisfied and
+                                           @value = tokenize(normalize-space($dep/@value), " ")]
+      else $zorbaManifest//fots:dependency[@type eq $dep/@type and
+                                           @value eq $dep/@value and
+                                           @satisfied eq $satisfied]
     return
       if (empty($zorbaDep))
       then
