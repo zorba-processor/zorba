@@ -1077,7 +1077,7 @@ bool convert_postfix_to_target_and_selector(
       return false;
     }
     *aSelectorExpr = lConstructor->get_expr();
-    if (aSelectorExpr == NULL)
+    if (*aSelectorExpr == NULL)
     {
       *anError = "An object or array lookup with exactly one argument is expected. No argument was found.";
       return false;
