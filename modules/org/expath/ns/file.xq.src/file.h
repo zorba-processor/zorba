@@ -17,6 +17,7 @@
 #define ZORBA_FILEMODULE_FILE_H
 
 #include <zorba/item_sequence.h>
+#include <zorba/security.h>
 #include <zorba/util/fs_util.h>
 #include <zorba/zorba_string.h>
 
@@ -305,20 +306,23 @@ protected:
     String            theFile;
     String            theEncoding;
     const ReadTextLinesFunction* theFunc;
+    SecurityPolicy    thePolicy;
 
     class LinesIterator : public Iterator {
     protected:
       const String&     theFile;
       const String&     theEncoding;
       const ReadTextLinesFunction* theFunc;
+      const SecurityPolicy& thePolicy;
 
-      std::ifstream* theStream;
+      std::istream* theStream;
 
     public:
       LinesIterator(
           const String&,
           const String&,
-          const ReadTextLinesFunction*);
+          const ReadTextLinesFunction*,
+          const SecurityPolicy&);
 
       virtual ~LinesIterator();
 
@@ -332,7 +336,8 @@ protected:
     LinesItemSequence(
         const String& aFile,
         const String& aEncoding,
-        const ReadTextLinesFunction*);
+        const ReadTextLinesFunction*,
+        const SecurityPolicy&);
 
     Iterator_t getIterator();
   };
