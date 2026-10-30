@@ -366,6 +366,23 @@ jobs:
           out="$(docker run --rm "$REF" -q '1 + 1')"
           echo "$out"
           grep -Eq '(^|>)2$' <<< "$out"
+          # Xerces-C must be the patched build in /usr/local (KNOWN_ISSUES.txt):
+          # it loads a schema restricting a union-typed element to a
+          # restriction of the union, which stock Xerces-C 3.3.0 rejects.
+          libs="$(docker run --rm --entrypoint sh "$REF" -c 'ldd "$(command -v zorba)"')"
+          grep -i xerces <<< "$libs" | sort -u
+          grep -q 'libxerces-c-3.3.so => /usr/local/lib/' <<< "$libs"
+          mkdir -p xsd
+          printf '%s\n' '<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:u="urn:u" targetNamespace="urn:u" elementFormDefault="qualified">' \
+            '<xs:simpleType name="d"><xs:union memberTypes="xs:date xs:gYear"/></xs:simpleType>' \
+            '<xs:simpleType name="r"><xs:restriction base="u:d"><xs:pattern value="20.*"/></xs:restriction></xs:simpleType>' \
+            '<xs:complexType name="b"><xs:sequence><xs:element name="e" type="u:d"/></xs:sequence></xs:complexType>' \
+            '<xs:complexType name="c"><xs:complexContent><xs:restriction base="u:b"><xs:sequence><xs:element name="e" type="u:r"/></xs:sequence></xs:restriction></xs:complexContent></xs:complexType>' \
+            '<xs:element name="x" type="u:c"/>' \
+            '</xs:schema>' > xsd/u.xsd
+          out="$(docker run --rm -v "$PWD/xsd:/xsd:ro" "$REF" -q 'import schema namespace u = "urn:u" at "file:///xsd/u.xsd"; validate { <u:x><u:e>2024</u:e></u:x> } instance of element(u:x)')"
+          echo "$out"
+          grep -Eq '(^|>)true$' <<< "$out"
         env:
           REF: ${{ env.DRY_RUN == 'true' && 'zorba-release:local' || format('{0}@{1}', env.IMAGE, steps.build.outputs.digest) }}
 
