@@ -107,6 +107,7 @@ void XmlDataManagerImpl::initStaticContext(DiagnosticHandler* aDiagnosticHandler
 
   theContext = lZorba->createStaticContext(aDiagnosticHandler);
 
+#ifndef ZORBA_NO_XMLSCHEMA
   Zorba_CompilerHints_t lHints;
   std::ostringstream lProlog;
   lProlog
@@ -114,6 +115,10 @@ void XmlDataManagerImpl::initStaticContext(DiagnosticHandler* aDiagnosticHandler
     << "import schema namespace opt = '" << static_context::ZORBA_XML_FN_OPTIONS_NS << "';";
 
   theContext->loadProlog(lProlog.str(), lHints);
+#endif
+  // Without XML Schema support the xml module (which imports the options
+  // schema) cannot be loaded; parseXML() and canonicalizeXML() are then
+  // unavailable, but the data manager itself still works.
 }
 
 
@@ -258,6 +263,16 @@ ItemSequence_t XmlDataManagerImpl::parseXML(
 {
   ZORBA_DM_TRY
   {
+#ifdef ZORBA_NO_XMLSCHEMA
+    // The options go through the xml module and its options schema, which are
+    // not available without XML Schema support. Plain parsing uses fn:parse-xml.
+    if (aOptions.isDtdValidationEnabled() ||
+        aOptions.isExternalEntityProcessingEnabled())
+      throw ZORBA_EXCEPTION(err::XQST0009);
+
+    return new SingletonItemSequence(parseXML(aStream));
+#endif
+
     Item lQName = theFactory->createQName(static_context::ZORBA_XML_FN_NS, "parse");
 
     // create a streamable string item
@@ -306,6 +321,33 @@ ItemSequence_t XmlDataManagerImpl::parseXML(
 {
   ZORBA_DM_TRY
   {
+#ifdef ZORBA_NO_XMLSCHEMA
+    // The options go through the xml module and its options schema, which are
+    // not available without XML Schema support. Plain parsing uses fn:parse-xml.
+    if (aOptions.isDtdValidationEnabled() ||
+        aOptions.isExternalEntityProcessingEnabled())
+      throw ZORBA_EXCEPTION(err::XQST0009);
+
+    {
+      // fn:parse-xml has no base URI parameter; it uses the static base URI.
+      StaticContext_t lSctx = theContext->createChildContext();
+      lSctx->setBaseURI(aBaseURI);
+
+      Item lQName = theFactory->createQName(static_context::W3C_FN_NS,
+                                            "parse-xml");
+      std::vector<ItemSequence_t> lArgs;
+      lArgs.push_back(new SingletonItemSequence(
+          theFactory->createStreamableString(aStream, &streamReleaser)));
+
+      ItemSequence_t lSeq = lSctx->invoke(lQName, lArgs);
+      Iterator_t lIter = lSeq->getIterator();
+      lIter->open();
+      Item lRes;
+      lIter->next(lRes);
+      return new SingletonItemSequence(lRes);
+    }
+#endif
+
     Item lQName = theFactory->createQName(static_context::ZORBA_XML_FN_NS,
                                           "parse");
 

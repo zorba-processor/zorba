@@ -61,6 +61,37 @@
       "environment": {
         "ASAN_OPTIONS": "detect_leaks=0"
       }
+    },
+    {
+      "name": "embedded",
+      "displayName": "Embedded (no Full-Text, no XML Schema, no debugger, no thesaurus, no network, no unit tests), Release",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "ZORBA_NO_FULL_TEXT": "ON",
+        "ZORBA_NO_XMLSCHEMA": "ON",
+        "ZORBA_WITH_DEBUGGER": "OFF",
+        "ZORBA_WITH_THESAURUS": "OFF",
+        "CMAKE_DISABLE_FIND_PACKAGE_XercesC": "ON",
+        "ZORBA_SUPPRESS_CURL": "ON",
+        "ZORBA_WITH_UNIT_TESTS": "OFF"
+      }
+    },
+    {
+      "name": "embedded-noicu",
+      "displayName": "Embedded without ICU, Release",
+      "inherits": "embedded",
+      "cacheVariables": {
+        "ZORBA_NO_ICU": "ON"
+      }
+    },
+    {
+      "name": "full-nopch",
+      "displayName": "Full, precompiled header disabled, Release",
+      "inherits": "full-release",
+      "cacheVariables": {
+        "ZORBA_USE_PCH": "OFF"
+      }
     }
   ],
   "buildPresets": [
@@ -82,6 +113,18 @@
       "environment": {
         "ASAN_OPTIONS": "detect_leaks=0"
       }
+    },
+    {
+      "name": "embedded",
+      "configurePreset": "embedded"
+    },
+    {
+      "name": "embedded-noicu",
+      "configurePreset": "embedded-noicu"
+    },
+    {
+      "name": "full-nopch",
+      "configurePreset": "full-nopch"
     }
   ],
   "testPresets": [
@@ -129,6 +172,54 @@
         "ASAN_OPTIONS": "detect_leaks=1:log_path=${sourceDir}/build/asan/sanitizer-logs/asan",
         "LSAN_OPTIONS": "suppressions=${sourceDir}/test/sanitizers/lsan.supp",
         "UBSAN_OPTIONS": "print_stacktrace=1:log_path=${sourceDir}/build/asan/sanitizer-logs/ubsan"
+      }
+    },
+    {
+      "name": "embedded",
+      "displayName": "Tests that need no HTTP test server",
+      "configurePreset": "embedded",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "timeout": 120
+      },
+      "filter": {
+        "exclude": {
+          "name": "http-client|test/api/validate$|userdefined_uri_resolution|uri_resolvers|streaming-udf|store/example_[13]$|uris/disable-http-3|update/zorba/store/sc1|update/zorba/store/sc2_ex"
+        }
+      }
+    },
+    {
+      "name": "embedded-noicu",
+      "displayName": "Tests that need no HTTP test server",
+      "configurePreset": "embedded-noicu",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "timeout": 120
+      },
+      "filter": {
+        "exclude": {
+          "name": "http-client|test/api/validate$|userdefined_uri_resolution|uri_resolvers|streaming-udf|store/example_[13]$|uris/disable-http-3|update/zorba/store/sc1|update/zorba/store/sc2_ex"
+        }
+      }
+    },
+    {
+      "name": "full-nopch",
+      "displayName": "Tests that need no HTTP test server",
+      "configurePreset": "full-nopch",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "timeout": 120
+      },
+      "filter": {
+        "exclude": {
+          "name": "http-client|test/api/validate$|userdefined_uri_resolution|uri_resolvers|streaming-udf|store/example_[13]$|uris/disable-http-3|update/zorba/store/sc1|update/zorba/store/sc2_ex"
+        }
       }
     }
   ],

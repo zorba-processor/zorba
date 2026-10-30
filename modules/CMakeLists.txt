@@ -37,8 +37,12 @@ ADD_SUBDIRECTORY(store)
 ADD_SUBDIRECTORY(structured-items)
 ADD_SUBDIRECTORY(uri)
 ADD_SUBDIRECTORY(w3c)
-ADD_SUBDIRECTORY(xml)    
-ADD_SUBDIRECTORY(xqdoc)
+# The xml and xqdoc modules import the options schemas and so need XML Schema
+# support (the other schema-dependent modules are not built without it either).
+IF (NOT ZORBA_NO_XMLSCHEMA)
+  ADD_SUBDIRECTORY(xml)
+  ADD_SUBDIRECTORY(xqdoc)
+ENDIF (NOT ZORBA_NO_XMLSCHEMA)
 ADD_SUBDIRECTORY(zorba-query)
 ADD_SUBDIRECTORY(reflection)
 

@@ -99,6 +99,82 @@ jobs:
             build/full-release/junit.xml
             build/full-release/Testing/Temporary/LastTest.log
 
+  profiles:
+    name: profile ${{ matrix.preset }} (linux-amd64, Arch)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        preset: [embedded, embedded-noicu, full-nopch]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build the builder image
+        uses: docker/build-push-action@v6
+        with:
+          context: docker/builder-latest
+          load: true
+          tags: zorba-builder:ci
+          cache-from: type=gha,scope=builder-linux-amd64-latest
+          cache-to: type=gha,mode=max,scope=builder-linux-amd64-latest
+
+      - uses: actions/cache@v4
+        with:
+          path: .ccache
+          key: ccache-profile-${{ matrix.preset }}-${{ github.sha }}
+          restore-keys: ccache-profile-${{ matrix.preset }}-
+
+      # No HTTP test server here: the presets' test filters exclude the tests that need it.
+      - name: Configure and build
+        timeout-minutes: 30
+        run: |
+          mkdir -p build
+          docker run --rm \
+            -e CCACHE_DIR=/src/.ccache \
+            -e CCACHE_SLOPPINESS=pch_defines,time_macros \
+            -v "$PWD":/src -w /src zorba-builder:ci sh -ec '
+              cmake --preset ${{ matrix.preset }}
+              cmake --build --preset ${{ matrix.preset }} -- -k 0
+              ccache -s
+              scripts/profile-size.sh ${{ matrix.preset }} > build/size.md
+              cat build/size.md'
+
+      - name: Test
+        timeout-minutes: 20
+        run: |
+          docker run --rm \
+            -v "$PWD":/src -w /src zorba-builder:ci sh -c '
+              ulimit -c 0
+              ctest --preset ${{ matrix.preset }} -j"$(nproc)" --timeout 60 \
+                --output-junit junit.xml > build/ctest.log 2>&1
+              rc=$?
+              tail -n 60 build/ctest.log
+              exit $rc'
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            cat build/size.md 2>/dev/null || true
+            echo
+            echo '```'
+            tail -n 5 build/ctest.log 2>/dev/null || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload test results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-profile-${{ matrix.preset }}
+          path: |
+            build/${{ matrix.preset }}/junit.xml
+            build/${{ matrix.preset }}/Testing/Temporary/LastTest.log
+            build/ctest.log
+
   macos:
     name: macos-arm64 (Apple Clang, Homebrew)
     runs-on: macos-15

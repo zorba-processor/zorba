@@ -30,7 +30,10 @@ INCLUDE(${CMAKE_SOURCE_DIR}/cmake_modules/ZorbaGenerateExe.cmake)
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/driver)
 ADD_SUBDIRECTORY(driver)
 ADD_SUBDIRECTORY(api)
-ADD_SUBDIRECTORY(iterators)
+# The plan/profile test queries import the serialization schema.
+IF(NOT ZORBA_NO_XMLSCHEMA)
+  ADD_SUBDIRECTORY(iterators)
+ENDIF(NOT ZORBA_NO_XMLSCHEMA)
 ADD_SUBDIRECTORY(rbkt)
 
 IF(ZORBA_WITH_UNIT_TESTS)

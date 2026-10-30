@@ -162,6 +162,47 @@ FOREACH(TESTFILE ${TESTFILES})
       SET (FOUND_XQTS 1)
     ENDIF (_testdriver_mt_available AND ZORBATEST_USE_MT_XQTS)
   ENDIF (TESTNAME MATCHES "^test/rbkt/w3c_testsuite")
+  IF (ZORBA_NO_XMLSCHEMA)
+    # Skip queries that need XML Schema: explicit schema imports, validate
+    # expressions, and the modules that import the options schema (xml, xqdoc).
+    FILE(READ "${CMAKE_CURRENT_SOURCE_DIR}/${TESTFILE}" _query_text)
+    # fn:analyze-string and fn:serialize with a parameters element need the
+    # fn and serialization schemas.
+    SET (_schema_re "import[ \t\r\n]+schema|validate[ \t\r\n]*(\\{|strict|lax|type)|/modules/(xml|xqdoc|schema)[\"']|analyze-string|serialization-parameters")
+    IF (_query_text MATCHES "${_schema_re}")
+      SET (SKIP_TEST 1)
+    ELSE ()
+      # Also look one level down, into the library modules the query imports.
+      GET_FILENAME_COMPONENT (_query_dir "${CMAKE_CURRENT_SOURCE_DIR}/${TESTFILE}" PATH)
+      STRING (REGEX MATCHALL "at[ \t\r\n]+[\"']([^\"']+)[\"']" _imports "${_query_text}")
+      FOREACH (_import ${_imports})
+        STRING (REGEX REPLACE "^at[ \t\r\n]+[\"']([^\"']+)[\"']$" "\\1" _import_path "${_import}")
+        IF (EXISTS "${_query_dir}/${_import_path}")
+          FILE (READ "${_query_dir}/${_import_path}" _lib_text)
+          IF (_lib_text MATCHES "${_schema_re}")
+            SET (SKIP_TEST 1)
+          ENDIF ()
+        ENDIF ()
+      ENDFOREACH (_import)
+    ENDIF ()
+  ENDIF (ZORBA_NO_XMLSCHEMA)
+  IF (ZORBA_NO_XMLSCHEMA)
+    # These need a schema (the module is resolved by URI) or Xerces itself.
+    IF (TESTNAME MATCHES "^test/rbkt/zorba/versioning/(schema1|link1)$")
+      SET (SKIP_TEST 1)
+    ENDIF ()
+  ENDIF (ZORBA_NO_XMLSCHEMA)
+  IF (ZORBA_NO_ICU)
+    # Without ICU there is no transcoding to or from legacy character sets, and
+    # the built-in regular expression engine differs from ICU's in corner cases
+    # (a '^' that is not leading, replacement strings like $10) and fails
+    # fn:replace("foo", "f", "$", "q") with std::bad_alloc.
+    FILE(READ "${CMAKE_CURRENT_SOURCE_DIR}/${TESTFILE}" _icu_query_text)
+    IF (_icu_query_text MATCHES "ISO-8859-|CP1252|windows-125"
+        OR TESTNAME MATCHES "^test/rbkt/zorba/(file/(cp1252|invalid_encoding)|string/Regex/regex_m5[45]|string/ReplaceFunc/replace(17|19|20)|functx/functx-x-call)$")
+      SET (SKIP_TEST 1)
+    ENDIF ()
+  ENDIF (ZORBA_NO_ICU)
   IF (ZORBA_NO_FULL_TEXT)
     STRING(REGEX MATCH "fulltext/" NEEDS_FULL_TEXT "${TESTNAME}")
     IF (NEEDS_FULL_TEXT)
@@ -503,14 +544,20 @@ EXPECTED_FAILURE (test/rbkt/zorba/testdriver/bom_bug 3381121)
 
 # Bug 921624. If this test takes more than a couple seconds, it must be
 # hitting w3.org for the DTD, which is bad.
-SET_TESTS_PROPERTIES(test/rbkt/zorba/schemas/local-xhtml
-  PROPERTIES TIMEOUT 10)
+IF(TEST test/rbkt/zorba/schemas/local-xhtml)
+  SET_TESTS_PROPERTIES(test/rbkt/zorba/schemas/local-xhtml
+    PROPERTIES TIMEOUT 10)
+ENDIF()
 # Bug 867363. These should fail or pass quickly because HTTP download
 # is disabled.
-SET_TESTS_PROPERTIES(test/rbkt/zorba/uris/disable-http
-  PROPERTIES TIMEOUT 10)
-SET_TESTS_PROPERTIES(test/rbkt/zorba/uris/disable-http-2
-  PROPERTIES TIMEOUT 10)
+IF(TEST test/rbkt/zorba/uris/disable-http)
+  SET_TESTS_PROPERTIES(test/rbkt/zorba/uris/disable-http
+    PROPERTIES TIMEOUT 10)
+ENDIF()
+IF(TEST test/rbkt/zorba/uris/disable-http-2)
+  SET_TESTS_PROPERTIES(test/rbkt/zorba/uris/disable-http-2
+    PROPERTIES TIMEOUT 10)
+ENDIF()
 
 
 # --------------------------------------------------------------------------
