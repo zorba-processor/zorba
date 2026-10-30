@@ -93,6 +93,9 @@ public:
   ZorbaParserError* invalidCharRef(const char* _error_token, const location& loc);
   ZorbaParserError* parserErr(const std::string& _message, const location& loc, Error const &code = err::XPST0003);
   ZorbaParserError* parserErr(const std::string& _message, const QueryLoc& loc, Error const &code = err::XPST0003);
+
+private:
+  ZorbaParserError* setParserError(ZorbaParserError* err);
 };
 
 }	/* namespace zorba */
