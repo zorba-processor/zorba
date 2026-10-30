@@ -74,11 +74,11 @@ jobs:
           ref: ${{ env.REF_B }}
           path: src-b
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
 
       # Same scope as ci.yml so the image comes from the shared cache.
       - name: Build the builder image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: docker/builder-latest
           load: true
