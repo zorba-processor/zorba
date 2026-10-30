@@ -1147,6 +1147,7 @@ void static_context::serialize(::zorba::serialization::Archiver& ar)
 
   serialize_resolvers(ar);
   serialize_tracestream(ar);
+  serialize_security_policy(ar);
 
   ar & theURIPath;
   ar & theLibPath;
@@ -1856,6 +1857,133 @@ void static_context::apply_url_resolvers(
       }
     }
   }
+}
+
+
+/*******************************************************************************
+  The policy is serialized with the plan so that a loaded plan keeps the
+  restrictions it was compiled under. On load, the policy of the loading
+  instance (root sctx) still applies on top of it.
+********************************************************************************/
+void static_context::serialize_security_policy(serialization::Archiver& ar)
+{
+  static const Capability lAllCaps[] = {
+    Capability::ExternalEntities,
+    Capability::FileRead,
+    Capability::FileWrite,
+    Capability::Network,
+    Capability::RemoteImport,
+    Capability::Environment,
+    Capability::NativeModules
+  };
+
+  bool lHasPolicy = (theSecurityPolicy != nullptr);
+  ar & lHasPolicy;
+  if (!lHasPolicy)
+    return;
+
+  uint32_t lCaps = 0;
+  std::vector<zstring> lReadPaths;
+  std::vector<zstring> lWritePaths;
+  std::vector<zstring> lNetworkPrefixes;
+  bool lAllowPrivate = false;
+  long long lTimeout = 0;
+  uint32_t lMaxCallDepth = 0;
+  uint32_t lMaxAmplification = 0;
+
+  if (ar.is_serializing_out())
+  {
+    const SecurityPolicy& p = *theSecurityPolicy;
+    for (Capability c : lAllCaps)
+      if (p.allows(c))
+        lCaps |= static_cast<uint32_t>(c);
+    for (const String& s : p.getReadPaths())
+      lReadPaths.push_back(zstring(s.c_str()));
+    for (const String& s : p.getWritePaths())
+      lWritePaths.push_back(zstring(s.c_str()));
+    for (const String& s : p.getNetworkPrefixes())
+      lNetworkPrefixes.push_back(zstring(s.c_str()));
+    lAllowPrivate = p.allowsPrivateAddresses();
+    lTimeout = static_cast<long long>(p.getTimeout().count());
+    lMaxCallDepth = p.getMaxCallDepth();
+    lMaxAmplification = p.getMaxEntityAmplification();
+  }
+
+  ar & lCaps;
+  ar & lReadPaths;
+  ar & lWritePaths;
+  ar & lNetworkPrefixes;
+  ar & lAllowPrivate;
+  ar & lTimeout;
+  ar & lMaxCallDepth;
+  ar & lMaxAmplification;
+
+  if (!ar.is_serializing_out())
+  {
+    SecurityPolicy p = SecurityPolicy::secure();
+    for (Capability c : lAllCaps)
+      if (lCaps & static_cast<uint32_t>(c))
+        p.allow(c);
+    for (const zstring& s : lReadPaths)
+      p.addReadPath(String(s.c_str()));
+    for (const zstring& s : lWritePaths)
+      p.addWritePath(String(s.c_str()));
+    for (const zstring& s : lNetworkPrefixes)
+      p.addNetworkPrefix(String(s.c_str()));
+    p.setAllowPrivateAddresses(lAllowPrivate);
+    p.setTimeout(std::chrono::milliseconds(lTimeout));
+    p.setMaxCallDepth(lMaxCallDepth);
+    p.setMaxEntityAmplification(lMaxAmplification);
+    theSecurityPolicy.reset(new SecurityPolicy(p));
+  }
+}
+
+
+/*******************************************************************************
+
+********************************************************************************/
+void static_context::set_security_policy(const SecurityPolicy& aPolicy)
+{
+  theSecurityPolicy.reset(new SecurityPolicy(aPolicy));
+}
+
+
+/*******************************************************************************
+
+********************************************************************************/
+SecurityPolicy static_context::get_security_policy() const
+{
+  SecurityPolicy lPolicy = SecurityPolicy::unrestricted();
+  for (const static_context* sctx = this; sctx != NULL; sctx = sctx->theParent)
+  {
+    if (sctx->theSecurityPolicy)
+      lPolicy = lPolicy.narrowedBy(*sctx->theSecurityPolicy);
+  }
+  return lPolicy;
+}
+
+
+/*******************************************************************************
+  Narrowing can only clear capabilities (allow-list intersections may clear
+  FileRead/FileWrite/Network as well), so walk the chain and stop at the first
+  policy that denies the capability. If none denies it, the allow-lists still
+  have to be intersected, which only get_security_policy() does.
+********************************************************************************/
+bool static_context::allows_capability(Capability aCap) const
+{
+  bool lListsSet = false;
+  for (const static_context* sctx = this; sctx != NULL; sctx = sctx->theParent)
+  {
+    const SecurityPolicy* p = sctx->theSecurityPolicy.get();
+    if (p == NULL)
+      continue;
+    if (!p->allows(aCap))
+      return false;
+    if (!p->getReadPaths().empty() || !p->getWritePaths().empty() ||
+        !p->getNetworkPrefixes().empty())
+      lListsSet = true;
+  }
+  return lListsSet ? get_security_policy().allows(aCap) : true;
 }
 
 

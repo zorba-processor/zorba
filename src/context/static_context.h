@@ -19,6 +19,7 @@
 
 #include <deque>
 #include <map>
+#include <memory>
 #include <set>
 #include <vector>
 
@@ -28,6 +29,7 @@
 #include <zorba/error.h>
 #include <zorba/diagnostic_list.h>
 #include <zorba/internal/unique_ptr.h>
+#include <zorba/security.h>
 
 #ifdef WIN32
 #include "store/api/item.h"
@@ -459,6 +461,13 @@ public:
   Feature flags that are used when a particular feature (e.g. scripting
   or ddl) is enabled. The definition of the features is located in
   context/featueres.h.
+
+  theSecurityPolicy:
+  ------------------
+  The security policy set on "this" sctx through the API, or NULL. The policy
+  in effect is the narrowest combination of the policies of "this" sctx and
+  all its ancestors (see get_security_policy()); the root sctx holds the
+  instance default (Zorba::setSecurityPolicy()). Queries cannot change it.
 ********************************************************************************/
 
 class static_context : public SyncedRCObject
@@ -701,6 +710,8 @@ protected:
 
   uint32_t                                   theTempIndexCounter;
 
+  std::unique_ptr<SecurityPolicy>            theSecurityPolicy;
+
 public:
   static bool is_builtin_module(const zstring& ns);
 
@@ -718,6 +729,8 @@ public:
   void serialize_resolvers(serialization::Archiver& ar);
 
   void serialize_tracestream(serialization::Archiver& ar);
+
+  void serialize_security_policy(serialization::Archiver& ar);
 
   void serialize(serialization::Archiver& ar);
 
@@ -833,6 +846,37 @@ public:
       const zstring& aUri,
       internal::EntityData::Kind aEntityKind,
       std::vector<zstring>& oComponents) const;
+
+  //
+  // Security policy
+  //
+
+  /**
+   * Sets the policy of "this" sctx. It can only narrow the policy inherited
+   * from the ancestors: get_security_policy() combines both.
+   */
+  void set_security_policy(const SecurityPolicy& aPolicy);
+
+  /**
+   * Returns the policy set on "this" sctx, or NULL if none was set.
+   */
+  const SecurityPolicy* get_local_security_policy() const
+  {
+    return theSecurityPolicy.get();
+  }
+
+  /**
+   * Returns the policy in effect for "this" sctx: the narrowest combination of
+   * the policies set on "this" sctx and all its ancestors. If none is set
+   * anywhere in the chain, returns SecurityPolicy::unrestricted().
+   */
+  SecurityPolicy get_security_policy() const;
+
+  /**
+   * Returns true if the policy in effect for "this" sctx allows the given
+   * capability. Cheaper than get_security_policy().allows(aCap).
+   */
+  bool allows_capability(Capability aCap) const;
 
   void set_uri_path(const std::vector<zstring>& aURIPath);
 

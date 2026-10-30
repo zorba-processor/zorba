@@ -33,6 +33,7 @@
 #include <zorba/zorba.h>
 #include <zorba/store_manager.h>
 #include <zorba/zorba_exception.h>
+#include <zorba/security.h>
 
 namespace zorba {
 
@@ -844,6 +845,31 @@ class ZORBA_DLL_PUBLIC StaticContext : public SmartObject
    */
   virtual bool
   setDefaultFunctionNamespaces( const std::vector<String>& aURIs ) = 0;
+
+  /** \brief Sets the security policy of this static context.
+   *
+   * The policy in effect for this context, for its child contexts and for
+   * queries compiled with it is the narrowest combination (see
+   * SecurityPolicy::narrowedBy()) of \p aPolicy and the policy in effect for
+   * the parent context; for a context created with
+   * Zorba::createStaticContext(), the parent is the instance default (see
+   * Zorba::setSecurityPolicy()). A context can therefore restrict what its
+   * parent allows but never extend it: a wider policy is silently narrowed.
+   *
+   * Setting a policy replaces the one previously set on this context.
+   *
+   * @param aPolicy the policy to set.
+   */
+  virtual void
+  setSecurityPolicy(const SecurityPolicy& aPolicy) = 0;
+
+  /** \brief Returns the security policy in effect for this static context.
+   *
+   * @return the narrowest combination of the policy set on this context (if
+   *         any) and the policies in effect for its ancestors.
+   */
+  virtual SecurityPolicy
+  getSecurityPolicy() const = 0;
 };
 
 } /* namespace zorba */

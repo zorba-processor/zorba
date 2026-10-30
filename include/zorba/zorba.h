@@ -36,6 +36,7 @@
 #include <zorba/zorba_string.h>
 #include <zorba/iterator.h>
 #include <zorba/properties.h>
+#include <zorba/security.h>
 
 namespace zorba {
 
@@ -332,6 +333,30 @@ class ZORBA_DLL_PUBLIC Zorba
    * @deprecated Use Properties::instance() instead.
    */
   virtual Properties* getProperties() = 0;
+
+  /** \brief Sets the process-wide default security policy.
+   *
+   * The policy applies to every static context and to operations that have
+   * no static context (e.g. XmlDataManager::parseXML()). A StaticContext can
+   * narrow it with StaticContext::setSecurityPolicy() but never extend it.
+   *
+   * Call this before compiling or executing queries; changing the policy
+   * while queries run on other threads is not synchronized.
+   *
+   * The default is currently SecurityPolicy::unrestricted(); it will become
+   * SecurityPolicy::secure() in Zorba 5.0.0. Applications that need the old
+   * behavior should set SecurityPolicy::unrestricted() explicitly.
+   *
+   * @param aPolicy the new default policy.
+   */
+  virtual void setSecurityPolicy(const SecurityPolicy& aPolicy) = 0;
+
+  /** \brief Returns the process-wide default security policy.
+   *
+   * @return a copy of the policy last set with setSecurityPolicy(), or the
+   *         library default.
+   */
+  virtual SecurityPolicy getSecurityPolicy() const = 0;
 
   /**
    * @deprecated Use Properties::instance() instead.
