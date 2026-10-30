@@ -19,7 +19,6 @@
 #include <algorithm>                    /* for equal_range() */
 #include <cstring>
 
-#include "util/less.h"
 #include "iso2788.h"
 #include "diagnostics/assert.h"
 

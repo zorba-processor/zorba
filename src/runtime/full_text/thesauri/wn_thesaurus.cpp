@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#include <zorba/internal/ztd.h>
 #include "stdafx.h"
 
 #define DEBUG_FT_THESAURUS 0
@@ -29,7 +30,6 @@
 #include "diagnostics/xquery_diagnostics.h"
 #include "system/globalenv.h"
 #include "util/fs_util.h"
-#include "util/less.h"
 #include "util/locale.h"
 #if DEBUG_FT_THESAURUS
 # include "util/oseparator.h"
@@ -509,7 +509,7 @@ char const* thesaurus::find_lemma( zstring const &phrase ) const {
   typedef pair<db_segment::const_iterator,db_segment::const_iterator> range_t;
 
   char const *const c_phrase = phrase.c_str();
-  less<char const*> const comparator;
+  ::zorba::internal::ztd::less<char const*> const comparator;
 
   range_t const range =
     ::equal_range( wn_lemmas_.begin(), wn_lemmas_.end(), c_phrase, comparator );

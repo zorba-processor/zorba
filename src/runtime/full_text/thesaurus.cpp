@@ -25,7 +25,6 @@
 #include "diagnostics/dict.h"
 #include "diagnostics/xquery_diagnostics.h"
 #include "util/fs_util.h"
-#include "util/less.h"
 #include "util/string_util.h"
 #include "util/uri_util.h"
 

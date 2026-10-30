@@ -44,7 +44,6 @@
 #include "types/typeops.h"
 #include "util/ascii_util.h"
 #include "util/fs_util.h"
-#include "util/less.h"
 #include "util/regex.h"
 #include "util/stl_util.h"
 #include "util/string_util.h"
