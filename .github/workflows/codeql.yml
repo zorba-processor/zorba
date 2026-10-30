@@ -63,10 +63,18 @@ jobs:
           queries: security-extended
           config-file: ./.github/codeql/codeql-config.yml
 
+      # Build only the library, zorbacmd and the module libraries. The default
+      # "all" target also compiles test/ (drivers, unit tests, extern test
+      # functions), which only adds path-injection alerts on test code that
+      # opens files named on its own command line. There is no CMake switch
+      # that skips test/driver, so name the targets explicitly.
       - name: Build
         run: |
           cmake --preset full-release
-          cmake --build --preset full-release
+          modules=$(ninja -C build/full-release -t targets all \
+                    | sed -nE 's/^(modlib[0-9]+_[A-Za-z0-9_]+):.*/\1/p')
+          cmake --build --preset full-release \
+            --target zorba_simplestore zorbacmd $modules
 
       - name: Perform CodeQL analysis
         uses: github/codeql-action/analyze@v4
@@ -78,12 +86,20 @@ jobs:
       # paths-ignore does not filter results for compiled languages: files
       # CMake generates under build/ (test drivers, doc examples) are compiled
       # and analyzed like any other source. Drop their results before upload.
-      - name: Drop results in generated build-tree files
+      #
+      # Also drop results in the vendored MAPM big-number library
+      # (src/zorbatypes/mapm/). Its 3 cpp/invalid-pointer-deref alerts are
+      # false positives in Ooura FFT loops (`j < n; j += 16` with n a power of
+      # two >= 16, arrays sized n(+8)); the code is third-party and unmodified.
+      # Only MAPM is filtered: src/ compiler code and all other first-party
+      # code stay in scope.
+      - name: Drop results in generated build-tree files and third-party MAPM
         run: |
           for f in sarif-results/*.sarif; do
             jq '.runs[].results |= map(select(
                   (.locations[0].physicalLocation.artifactLocation.uri // "")
-                  | startswith("build/") | not))' "$f" > "$f.tmp"
+                  | (startswith("build/") or startswith("src/zorbatypes/mapm/"))
+                  | not))' "$f" > "$f.tmp"
             mv "$f.tmp" "$f"
           done
 

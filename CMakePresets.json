@@ -91,7 +91,9 @@
       "inherits": "full-release",
       "cacheVariables": {
         "ZORBA_USE_PCH": "OFF",
-        "ZORBA_WITH_DEBUGGER": "ON"
+        "ZORBA_WITH_DEBUGGER": "ON",
+        "ZORBA_XQUERYX": "ON",
+        "ZORBA_TEST_XQUERYX": "ON"
       }
     }
   ],

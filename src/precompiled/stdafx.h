@@ -77,7 +77,6 @@
   #include "zorbautils/lock.h"
   #include "zorbautils/mutex.h"
   #include "zorbautils/runnable.h"
-  #include "zorbautils/SAXParser.h"
   #include "zorbautils/stack.h"
   #include "zorbautils/string_util.h"
   #include "unit_tests/unit_test_list.h"

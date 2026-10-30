@@ -200,7 +200,11 @@ parsenode_t XQueryCompiler::parse(std::istream& aXQuery, const zstring& aFileNam
     //translate from xqueryx to xquery using XSLT
     //read all input stream into std::string
 
-    converted_xquery_str = xqxconvertor->XQueryX2XQuery(xquery_str.c_str());
+    converted_xquery_str = xqxconvertor->XQueryX2XQuery(
+        xquery_str.c_str(),
+        theCompilerCB->theRootSctx ?
+          theCompilerCB->theRootSctx->get_security_policy() :
+          GENV_ROOT_STATIC_CONTEXT.get_security_policy());
 
 #ifndef NDEBUG
     printf ("\n\n%s", converted_xquery_str);  // debug

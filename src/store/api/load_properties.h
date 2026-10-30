@@ -16,9 +16,12 @@
 #ifndef ZORBA_STORE_LOAD_PROPERTIES_H
 #define ZORBA_STORE_LOAD_PROPERTIES_H
 
+#include <memory>
+
 #include "common/common.h"
 #include "diagnostics/assert.h"
 #include <libxml/parser.h>
+#include <zorba/security.h>
 
 
 namespace zorba
@@ -64,6 +67,11 @@ private:
                                 // nodes will not have their parent link set to the 
                                 // the document node. This is used by the parse-fragment
                                 // functions.
+
+  // The security policy the parser runs under. NULL: the policy of the Zorba
+  // instance (root static context). Callers that have a static context set
+  // its policy. Not cleared by reset(), so that a reset can never widen it.
+  std::shared_ptr<const SecurityPolicy> theSecurityPolicy;
                                
 
 public:
@@ -350,6 +358,16 @@ public:
     return theNoNetworkAccess ;
   }
 
+  // theSecurityPolicy
+  void setSecurityPolicy(const SecurityPolicy& aPolicy)
+  {
+    theSecurityPolicy = std::make_shared<const SecurityPolicy>(aPolicy);
+  }
+  const SecurityPolicy* getSecurityPolicy() const
+  {
+    return theSecurityPolicy.get();
+  }
+
   /**
    * @brief Return a libxml2 options bit-field based, suitable for using
    * while using libxml2 to parse XML. The following members of this
@@ -364,6 +382,8 @@ public:
    *  - getNoCDATA()
    *  - getNoXIncludeNodes()
    *  - getNoNetworkAccess()
+   * These are the options requested; xml::ParserSecurity derives the ones
+   * actually used from them and the security policy.
    * @return said bit-field.
    */
   int toLibXmlOptions() const
