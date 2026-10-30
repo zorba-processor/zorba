@@ -90,7 +90,8 @@
       "displayName": "Full, precompiled header disabled, Release",
       "inherits": "full-release",
       "cacheVariables": {
-        "ZORBA_USE_PCH": "OFF"
+        "ZORBA_USE_PCH": "OFF",
+        "ZORBA_WITH_DEBUGGER": "ON"
       }
     }
   ],

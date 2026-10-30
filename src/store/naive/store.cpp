@@ -575,8 +575,7 @@ void Store::populateValueIndex(
   }
   catch(...)
   {
-    if (key != NULL)
-      delete key;
+    delete key;
 
     sourceIter->close();
     throw;

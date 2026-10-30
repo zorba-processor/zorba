@@ -63,10 +63,7 @@ onExitProcess(ExitCode aExitCode) {
   std::cout << std::endl << "Terminating debugger client." << std::endl;
 
 #ifndef WIN32
-  XqdbClient* lClient = theClient.release();
-  if (lClient) {
-    delete lClient;
-  }
+  theClient.reset();
 #endif
 
   exit(aExitCode);
@@ -366,10 +363,7 @@ _tmain(int argc, _TCHAR* argv[])
   }
 
 #ifndef WIN32
-  XqdbClient* lClient = theClient.release();
-  if (lClient) {
-    delete lClient;
-  }
+  theClient.reset();
 #endif
 
   return 0;

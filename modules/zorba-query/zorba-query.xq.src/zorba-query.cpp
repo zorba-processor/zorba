@@ -211,10 +211,7 @@ bool QueryMap::deleteQuery(const String& aKeyName)
 ********************************************************************************/
 void QueryMap::destroy() throw()
 {
-  if (theQueryMap)
-  {
-    delete theQueryMap;
-  }
+  delete theQueryMap;
   delete this;
 }
 

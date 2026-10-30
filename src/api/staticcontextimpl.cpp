@@ -153,15 +153,11 @@ StaticContextImpl::~StaticContextImpl()
   if ( ! theUserDiagnosticHandler )
     delete theDiagnosticHandler;
 
-  if ( theCollectionMgr )
-  {
-    delete theCollectionMgr;
-  }
+  delete theCollectionMgr;
 
   theCtx = NULL;
 
-  if (theCompilerCB)
-    delete theCompilerCB;
+  delete theCompilerCB;
 }
 
 

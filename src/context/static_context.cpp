@@ -902,22 +902,15 @@ static_context::~static_context()
     delete theExternalModulesMap;
   }
 
-  if (theW3CCollectionMap)
-    delete theW3CCollectionMap;
+  delete theW3CCollectionMap;
 
-  if (theCollectionMap)
-    delete theCollectionMap;
+  delete theCollectionMap;
 
-  if (theIndexMap)
-    delete theIndexMap;
+  delete theIndexMap;
 
-  if (theICMap)
-    delete theICMap;
+  delete theICMap;
 
-  if (theFunctionMap)
-  {
-    delete theFunctionMap;
-  }
+  delete theFunctionMap;
 
   if (theFunctionArityMap)
   {
@@ -944,11 +937,9 @@ static_context::~static_context()
     theImportedPrivateVariablesMap = NULL;
   }
 
-  if (theNamespaceBindings)
-    delete theNamespaceBindings;
+  delete theNamespaceBindings;
 
-  if (theDefaultCollation)
-    delete theDefaultCollation;
+  delete theDefaultCollation;
 
   if (theCollationMap)
   {
@@ -963,15 +954,13 @@ static_context::~static_context()
     theCollationMap = 0;
   }
 
-  if (theOptionMap)
-    delete theOptionMap;
+  delete theOptionMap;
 
 #ifndef ZORBA_NO_FULL_TEXT
   delete theFTMatchOptions;
 #endif /* ZORBA_NO_FULL_TEXT */
 
-  if (theBaseUriInfo)
-    delete theBaseUriInfo;
+  delete theBaseUriInfo;
 
   if (theParent && !theParent->is_global_root_sctx())
     RCHelper::removeReference(theParent);
@@ -4719,8 +4708,7 @@ void static_context::import_module(const static_context* module, const QueryLoc&
 ********************************************************************************/
 void static_context::clear_base_uri()
 {
-  if (theBaseUriInfo)
-    delete theBaseUriInfo;
+  delete theBaseUriInfo;
 
   theBaseUriInfo = new BaseUriInfo;
 }
