@@ -41,7 +41,6 @@ jobs:
             cache: linux-amd64-clang
             cc: clang
             cxx: clang++
-            build_args: -- -k 0
     steps:
       - uses: actions/checkout@v4
 
@@ -83,7 +82,7 @@ jobs:
             -e CCACHE_SLOPPINESS=pch_defines,time_macros \
             -v "$PWD":/src -w /src zorba-builder:ci sh -ec '
               cmake --preset full-release
-              cmake --build --preset full-release ${{ matrix.build_args }}
+              cmake --build --preset full-release
               ccache -s
               ctest --preset full-release -j"$(nproc)" \
                 --output-junit junit.xml'
