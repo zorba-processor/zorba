@@ -66,6 +66,39 @@ inline void check_internal(zorba::ZorbaException const& e)
   }
 }
 
+// Zorba's API takes UTF-8 text; invalid UTF-8 is rejected at the API
+// boundary with an internal error (ZXQP0003) that says nothing about the
+// engine. Such inputs are skipped. Accepts the UTF-8 of RFC 3629.
+inline bool is_valid_utf8(const uint8_t* p, size_t n)
+{
+  size_t i = 0;
+  while (i < n)
+  {
+    uint8_t c = p[i];
+    size_t len;
+    uint32_t cp;
+    if (c < 0x80) { ++i; continue; }
+    else if ((c & 0xE0) == 0xC0) { len = 2; cp = c & 0x1F; }
+    else if ((c & 0xF0) == 0xE0) { len = 3; cp = c & 0x0F; }
+    else if ((c & 0xF8) == 0xF0) { len = 4; cp = c & 0x07; }
+    else return false;
+    if (i + len > n)
+      return false;
+    for (size_t k = 1; k < len; ++k)
+    {
+      if ((p[i + k] & 0xC0) != 0x80)
+        return false;
+      cp = (cp << 6) | (p[i + k] & 0x3F);
+    }
+    if ((len == 2 && cp < 0x80) || (len == 3 && cp < 0x800) ||
+        (len == 4 && cp < 0x10000) || cp > 0x10FFFF ||
+        (cp >= 0xD800 && cp <= 0xDFFF))
+      return false;
+    i += len;
+  }
+  return true;
+}
+
 // Collects errors instead of throwing; warnings are dropped.
 class QuietHandler : public zorba::DiagnosticHandler
 {
@@ -114,6 +147,8 @@ inline Engine& engine()
 // Compile (not execute) the input as a main module.
 inline void compile(const uint8_t* data, size_t size, bool jsoniq)
 {
+  if (!is_valid_utf8(data, size))
+    return;
   Engine& eng = engine();
   std::string text(reinterpret_cast<const char*>(data), size);
   try
@@ -153,6 +188,8 @@ public:
 
   void run(const uint8_t* data, size_t size)
   {
+    if (!is_valid_utf8(data, size))
+      return;
     Engine& eng = engine();
     try
     {

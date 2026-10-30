@@ -30,6 +30,9 @@ FOREACH(target ${ZORBA_FUZZ_TARGETS})
   SET_TARGET_PROPERTIES(${target} PROPERTIES FOLDER "Fuzz")
 ENDFOREACH(target)
 
+# xml_parse installs its own libxml2 external entity loader.
+TARGET_LINK_LIBRARIES(xml_parse ${LIBXML2_LIBRARIES})
+
 ADD_CUSTOM_TARGET(fuzzers DEPENDS ${ZORBA_FUZZ_TARGETS})
 
 # Regression inputs: regressions/<target>/<name> must run cleanly through

@@ -53,14 +53,16 @@ cp "$FUZZ_DIR/xquery.dict" "$OUT/xquery_compile.dict"
 cp "$FUZZ_DIR/xquery.dict" "$OUT/jsoniq_compile.dict"
 cp "$FUZZ_DIR/xml.dict" "$OUT/xml_parse.dict"
 cp "$FUZZ_DIR/json.dict" "$OUT/json_parse.dict"
-# Leak detection is off for now: leaks on Zorba's error paths would stop
-# every run before it reaches memory-safety bugs.
+# Leak detection is off for now (both libFuzzer's per-input check and
+# LeakSanitizer at exit): leaks would stop every run before it reaches
+# memory-safety bugs.
 for t in $TARGETS; do
   case $t in
     *_compile) max_len=4096 ;;
     *) max_len=16384 ;;
   esac
-  printf '[libfuzzer]\nmax_len = %s\ndetect_leaks = 0\n' "$max_len" > "$OUT/$t.options"
+  printf '[libfuzzer]\nmax_len = %s\ndetect_leaks = 0\n\n[asan]\ndetect_leaks = 0\n' \
+    "$max_len" > "$OUT/$t.options"
 done
 
 python3 "$FUZZ_DIR/make_seed_corpora.py" "$SRC/zorba" "$OUT"
