@@ -212,7 +212,7 @@ declare function env:decl-decimal-formats(
         $default,
         "decimal-format",
         if(exists($prefix) and empty($namespace))
-        then concat("%Q{", namespace-uri-from-QName($eqName), "}", local-name-from-QName($eqName))
+        then concat("Q{", namespace-uri-from-QName($eqName), "}", local-name-from-QName($eqName))
         else $name,
         env:set-properties($tmp),
         ";"
