@@ -452,10 +452,14 @@ T1_TO_T2(str, int)
   {
     // Integer reports both a bad lexical form and a value too large for a
     // 64-bit xs:integer as range_error: the former is FORG0001, the latter
-    // FOCA0003 (input value too large for integer).
+    // FOCA0003 (input value too large for integer). For a derived target
+    // (xs:long, ...) a value outside its range is invalid: FORG0001.
     if ( throw_on_error )
     {
-      if (is_xs_integer_lexical(strval))
+      store::SchemaTypeCode const target = errInfo.theTargetType ?
+        TypeOps::get_atomic_type_code(*errInfo.theTargetType) :
+        errInfo.theTargetTypeCode;
+      if (target == store::XS_INTEGER && is_xs_integer_lexical(strval))
         throwFOCA0003Exception(strval, errInfo);
       throwFORG0001Exception(strval, errInfo);
     }
