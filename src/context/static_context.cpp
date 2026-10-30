@@ -1998,6 +1998,19 @@ bool static_context::validate(
     return res;
 
   }
+#else
+  // Without XML Schema support no schema declarations can exist, so lax
+  // validation leaves every node untyped: the result is the input.
+  // Returning false without setting validatedResult left callers with a null
+  // item (the test driver then crashed in doc:put).
+  if (validationMode == StaticContextConsts::lax_validation)
+  {
+    validatedResult = rootElement;
+    return true;
+  }
+
+  if (validationMode == StaticContextConsts::strict_validation)
+    throw ZORBA_EXCEPTION(err::XQST0009);
 #endif //ZORBA_NO_XMLSCHEMA
 
   return false;
