@@ -2267,6 +2267,25 @@
       <value>"$1": value for parameter "$2" invalid${; 3}</value>
     </diagnostic>
 
+    <diagnostic code="SEPM0017">
+      <comment>
+       It is an error if evaluating an expression in order to extract the
+       setting of a serialization parameter from a data model instance would
+       yield an error, or if the data model instance used to specify the
+       settings of serialization parameters is not valid.
+      </comment>
+      <value>invalid serialization parameters${: 1}</value>
+    </diagnostic>
+
+    <diagnostic code="SEPM0019">
+      <comment>
+       It is an error if an instance of the data model used to specify the
+       settings of serialization parameters specifies the value of the same
+       parameter more than once.
+      </comment>
+      <value>"$1": serialization parameter specified more than once</value>
+    </diagnostic>
+
    </namespace>
 
    <!--////////// Zorba XQuery Processor Errors ////////////////////////////-->

@@ -1877,3 +1877,24 @@ declare variable $err:SERE0015 as xs:QName := fn:QName($err:NS, "err:SERE0015");
  : @see http://www.w3.org/2005/xqt-errors
 :)
 declare variable $err:SEPM0016 as xs:QName := fn:QName($err:NS, "err:SEPM0016");
+
+(:~
+ :
+ : It is an error if evaluating an expression in order to extract the
+ : setting of a serialization parameter from a data model instance would
+ : yield an error, or if the data model instance used to specify the
+ : settings of serialization parameters is not valid.
+ : 
+ : @see http://www.w3.org/2005/xqt-errors
+:)
+declare variable $err:SEPM0017 as xs:QName := fn:QName($err:NS, "err:SEPM0017");
+
+(:~
+ :
+ : It is an error if an instance of the data model used to specify the
+ : settings of serialization parameters specifies the value of the same
+ : parameter more than once.
+ : 
+ : @see http://www.w3.org/2005/xqt-errors
+:)
+declare variable $err:SEPM0019 as xs:QName := fn:QName($err:NS, "err:SEPM0019");

@@ -116,6 +116,8 @@ extern entry const dict_en[] = {
   { "err:SEPM0009", "omit-xml-declaration parameter is \"yes\" and $1" },
   { "err:SEPM0010", "the output method is \"xml\", the value of the undeclare-prefixes parameter is \"yes\", and the value of the version parameter is \"1.0\"" },
   { "err:SEPM0016", "\"$1\": value for parameter \"$2\" invalid${; 3}" },
+  { "err:SEPM0017", "invalid serialization parameters${: 1}" },
+  { "err:SEPM0019", "\"$1\": serialization parameter specified more than once" },
   { "err:SERE0003", "serializer can't satisfy the rules for either a well-formed XML document entity or a well-formed XML external general parsed entity" },
   { "err:SERE0005", "invalid NCName character" },
   { "err:SERE0006", "\"$1\": invalid character for XML version $2" },
