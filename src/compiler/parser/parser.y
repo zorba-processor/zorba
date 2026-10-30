@@ -1945,8 +1945,8 @@ FunctionDeclSimple :
 
       $$ = new FunctionDecl(LOC(@$),
                             static_cast<QName*>($2),
-                            &* $3->theParams,
-                            &* $3->theReturnType,
+                            $3->theParams.getp(),
+                            $3->theReturnType.getp(),
                             body,    // body
                             false,   // not explicitly updating
                             false);  // not external
@@ -4858,8 +4858,8 @@ InlineFunction :
     FUNCTION FunctionSig EnclosedStatementsAndOptionalExpr
     {
       $$ = new InlineFunction(LOC(@$),
-                              &*$2->theParams,
-                              &*$2->theReturnType,
+                              $2->theParams.getp(),
+                              $2->theReturnType.getp(),
                               $3);
       delete $2;
     }

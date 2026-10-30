@@ -3643,8 +3643,8 @@ namespace zorba {
         body = new BlockBody(LOC(yystack_[0].location));
       (yylhs.value.node) = new FunctionDecl(LOC(yylhs.location),
                             static_cast<QName*>((yystack_[2].value.expr)),
-                            &* (yystack_[1].value.fnsig)->theParams,
-                            &* (yystack_[1].value.fnsig)->theReturnType,
+                            (yystack_[1].value.fnsig)->theParams.getp(),
+                            (yystack_[1].value.fnsig)->theReturnType.getp(),
                             body,
                             false,
                             false);
@@ -6855,8 +6855,8 @@ namespace zorba {
 #line 3869 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
     {
       (yylhs.value.expr) = new InlineFunction(LOC(yylhs.location),
-                              &*(yystack_[1].value.fnsig)->theParams,
-                              &*(yystack_[1].value.fnsig)->theReturnType,
+                              (yystack_[1].value.fnsig)->theParams.getp(),
+                              (yystack_[1].value.fnsig)->theReturnType.getp(),
                               (yystack_[0].value.expr));
       delete (yystack_[1].value.fnsig);
     }
