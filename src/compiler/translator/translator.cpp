@@ -1789,7 +1789,7 @@ expr* wrap_in_coercion(
   inlineUDF->setOptimized(true);
 
   inlineFuncExpr->set_function(inlineUDF.get(), inlineUDF->numArgs());
-  inlineUDF.release();
+  theCCB->addAnonymousUDF(inlineUDF.release());
 
   // pop the scope.
   pop_scope();
@@ -12689,6 +12689,7 @@ expr* generate_literal_function(
 {
   xqtref_t type;
   std::unique_ptr<user_function> udf;
+  bool isAnonymousUDF = true;
   expr* body;
   
   function_item_expr* fiExpr =
@@ -12969,6 +12970,7 @@ expr* generate_literal_function(
     else
     {
       udf.reset(static_cast<user_function*>(func));
+      isAnonymousUDF = false;  // a declared UDF, owned by its static context
     }
   }
 
@@ -12978,7 +12980,11 @@ expr* generate_literal_function(
   // UDF, in which case udf->numArgs() returns 0 since the UDF declaration has
   // not been fully processed yet.  
   fiExpr->set_function(udf.get(), arity);
-  udf.release();
+
+  if (isAnonymousUDF)
+    theCCB->addAnonymousUDF(udf.release());
+  else
+    udf.release();
 
   return fiExpr;
 }
@@ -13181,7 +13187,7 @@ void generate_inline_function(
     theCCB->theConfig.translate_cb(udf->getBody(),
                                    udf->getName()->getStringValue().c_str());
 
-  udf.release();
+  theCCB->addAnonymousUDF(udf.release());
 }
 
 

@@ -228,6 +228,13 @@ public:
   
   bool                      theCommonLanguageEnabled;
 
+  // Owns the anonymous user_function objects created by the translator
+  // (inline functions, function items for builtins/type constructors, and
+  // coercion wrappers). They are referenced elsewhere only through raw
+  // pointers (FunctionItemInfo::theFunction), and their bodies live in theEM,
+  // so they share the lifetime of this ccb. Not copied, not serialized.
+  std::vector<function_t>   theAnonymousUDFs;
+
 public:
   SERIALIZABLE_CLASS(CompilerCB);
   CompilerCB(::zorba::serialization::Archiver& ar);
@@ -259,6 +266,8 @@ public:
   static_context* getStaticContext(int id);
 
   ExprManager* getExprManager() const { return theEM; }
+
+  void addAnonymousUDF(user_function* udf);
 
   uint8_t getVisitId() { return theNextVisitId++; }
 
