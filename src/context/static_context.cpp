@@ -2040,12 +2040,23 @@ void static_context::get_uri_path(std::vector<zstring>& path) const
 ********************************************************************************/
 void static_context::get_full_uri_path(std::vector<zstring>& path) const
 {
+  collect_uri_path(path, allows_capability(Capability::Environment));
+}
+
+
+void static_context::collect_uri_path(
+    std::vector<zstring>& path,
+    bool aEnv) const
+{
   if (theParent != NULL)
   {
-    theParent->get_full_uri_path(path);
+    theParent->collect_uri_path(path, aEnv);
   }
 
   get_uri_path(path);
+
+  if (aEnv)
+    path.insert(path.end(), theEnvURIPath.begin(), theEnvURIPath.end());
 }
 
 /*******************************************************************************
@@ -2071,12 +2082,35 @@ void static_context::get_lib_path(std::vector<zstring>& path) const
 ********************************************************************************/
 void static_context::get_full_lib_path(std::vector<zstring>& path) const
 {
+  collect_lib_path(path, allows_capability(Capability::Environment));
+}
+
+
+void static_context::collect_lib_path(
+    std::vector<zstring>& path,
+    bool aEnv) const
+{
   if (theParent != NULL)
   {
-    theParent->get_full_lib_path(path);
+    theParent->collect_lib_path(path, aEnv);
   }
 
   get_lib_path(path);
+
+  if (aEnv)
+    path.insert(path.end(), theEnvLibPath.begin(), theEnvLibPath.end());
+}
+
+
+/*******************************************************************************
+
+********************************************************************************/
+void static_context::set_env_paths(
+    const std::vector<zstring>& aURIPath,
+    const std::vector<zstring>& aLibPath)
+{
+  theEnvURIPath = aURIPath;
+  theEnvLibPath = aLibPath;
 }
 
 

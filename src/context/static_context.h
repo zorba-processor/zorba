@@ -638,6 +638,13 @@ protected:
 
   checked_vector<zstring>                 theLibPath;
 
+  // Directories from the ZORBA_URI_PATH / ZORBA_LIB_PATH environment
+  // variables (root sctx only, not serialized). They are part of the full
+  // URI / lib path only where the policy allows Capability::Environment.
+  std::vector<zstring>                    theEnvURIPath;
+
+  std::vector<zstring>                    theEnvLibPath;
+
   ExternalModuleMap                     * theExternalModulesMap;
 
   rchandle<TypeManager>                   theTypeManager;
@@ -907,6 +914,13 @@ public:
   void get_lib_path(std::vector<zstring>& oLibPath) const;
 
   void get_full_lib_path(std::vector<zstring>& oLibPath) const;
+
+  /**
+   * Sets the directories taken from the environment (root sctx only).
+   */
+  void set_env_paths(
+      const std::vector<zstring>& aURIPath,
+      const std::vector<zstring>& aLibPath);
 
   //
   // Validating Items
@@ -1266,6 +1280,10 @@ private:
       internal::EntityData const* aEntityData,
       std::unique_ptr<internal::Resource>& oResource,
       zstring& oErrorMessage) const;
+
+  void collect_uri_path(std::vector<zstring>& oURIPath, bool aEnv) const;
+
+  void collect_lib_path(std::vector<zstring>& oLibPath, bool aEnv) const;
 };
 
 
