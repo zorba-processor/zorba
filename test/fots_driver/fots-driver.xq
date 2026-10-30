@@ -402,8 +402,12 @@ declare %ann:sequential function driver:run-fots(
         }
         else
         {
+          (: run-test-case names exactly one test case; a prefix match would
+             also run e.g. foo-10..foo-19 when asked for foo-1. :)
           for $name in $testCaseNames
-          where some $prefix in $testCasePrefixes satisfies starts-with($name, $prefix)
+          where if ($cliMode eq 'run-test-case')
+                then $name = $testCasePrefixes
+                else some $prefix in $testCasePrefixes satisfies starts-with($name, $prefix)
           return $name
         }
       }

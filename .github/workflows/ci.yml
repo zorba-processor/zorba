@@ -191,7 +191,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        preset: [embedded, embedded-noicu, full-nopch]
+        # bigint: ZORBA_WITH_BIG_INTEGER=ON (arbitrary-precision xs:integer).
+        preset: [embedded, embedded-noicu, full-nopch, bigint]
     steps:
       - uses: actions/checkout@v7
 

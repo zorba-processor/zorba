@@ -16,11 +16,11 @@ Entries marked **(open PR)** come from pull requests that are not merged yet; co
 |---|---|---|
 | CI | None in the repository | Every change builds and tests on Linux amd64, Linux arm64, macOS and Clang |
 | Memory and undefined behavior | Valgrind memcheck configured in CTest, not run in any CI | ASan, LSan and UBSan in CI; ASan failing tests 450 → 1, UBSan sites 21 → 0 |
-| Security | No policy, XXE active | CodeQL, hardening flags, libFuzzer and ClusterFuzzLite, security policy API; XXE closed (open PR #51); secure-by-default planned |
+| Security | No policy, XXE active | CodeQL, hardening flags, libFuzzer and ClusterFuzzLite, security policy API; XXE closed (#51); secure-by-default planned |
 | Compiler warnings | 1,897 to 5,949 per platform | Dozens or fewer |
-| Build options tested | Full build only; other options had rotted | `embedded`, `embedded-noicu`, `full-nopch`, debugger in CI; XQueryX (open PR #51) and big-integer (open PR, PR pending) profiles |
-| Test timeouts | Never enforced (`NORMAL_TIMEOUT_VALUE` macro bug) | Enforced (open PR, PR pending) |
-| W3C conformance | QT3 harness present but inactive | Weekly QT3 run (pending first run) |
+| Build options tested | Full build only; other options had rotted | `embedded`, `embedded-noicu`, `full-nopch`, debugger in CI; XQueryX and big-integer profiles |
+| Test timeouts | Never enforced (`NORMAL_TIMEOUT_VALUE` macro bug) | Enforced |
+| W3C conformance | QT3 harness present but inactive | Weekly QT3 run in CI: 26,367 of 27,055 applicable test cases pass (97.5%) |
 | Performance | Not measured | XMark and JSONiq benchmarks with A/B comparison; cold build 795 s → 376 s; hash join example 22 s → 0.5 s |
 | Toolchain | `auto_ptr`, TR1, CMake 2.8-era checks, Flex 2.5.35 | C++23, CMake 3.28, Bison 3.8, Flex 2.6.4, ICU 78, libxml2 2.15, Xerces-C 3.3 |
 
@@ -30,13 +30,13 @@ Entries marked **(open PR)** come from pull requests that are not merged yet; co
 - Require a C++23 compiler (GCC 13+, Clang, Apple Clang) and CMake 3.28 or newer; CMake presets use schema v6 ([#25](https://github.com/zorba-processor/zorba/pull/25), [#31](https://github.com/zorba-processor/zorba/pull/31)).
 - Add the security policy API (`include/zorba/security.h`, `Zorba::setSecurityPolicy`, `StaticContext::setSecurityPolicy`); the default stays `unrestricted()` for now, and the library default is planned to become `secure()` before 5.0.0 ([#44](https://github.com/zorba-processor/zorba/pull/44)).
 - Bump the serialized execution plan format from version 25 to 26; plans saved by older builds no longer load ([#44](https://github.com/zorba-processor/zorba/pull/44)).
-- Raise `err:FOAR0002` on `xs:integer` overflow instead of silently wrapping around (64-bit builds); out-of-range string casts to `xs:integer` raise `FOCA0003`, and JSON integers beyond 64 bits parse as `xs:decimal` **(open PR, PR pending)**.
+- Raise `err:FOAR0002` on `xs:integer` overflow instead of silently wrapping around (64-bit builds); out-of-range string casts to `xs:integer` raise `FOCA0003`, and JSON integers beyond 64 bits parse as `xs:decimal` ([#53](https://github.com/zorba-processor/zorba/pull/53)).
 - Announce removal of the SWIG language bindings (`swig/`); they are not built or tested in CI and will be replaced by a stable C API with native bindings in a later release.
 
 ### Security
 
-- Fix XML external entity (XXE) processing: `fn:doc`, `fn:parse-xml`, `x:parse` and `XmlDataManager::parseXML` read `SYSTEM` entities from any file and bypassed URI mappers and resolvers. External resources are now loaded only if the security policy allows `ExternalEntities`, `FileRead` or `Network`; `XML_PARSE_NONET` is always on, entity amplification is limited, and refused resources raise `ZXQP0029` **(open PR [#51](https://github.com/zorba-processor/zorba/pull/51))**.
-- Harden XQueryX and Xerces schema loading: no global libxml2 state, libxslt security preferences forbid file and network access, Xerces gets an entity resolver and a `SecurityManager`; remove the unused `zorbautils/SAXParser` and the `ZORBA_WITH_LIBXML2_SAX` option **(open PR [#51](https://github.com/zorba-processor/zorba/pull/51))**.
+- Fix XML external entity (XXE) processing: `fn:doc`, `fn:parse-xml`, `x:parse` and `XmlDataManager::parseXML` read `SYSTEM` entities from any file and bypassed URI mappers and resolvers. External resources are now loaded only if the security policy allows `ExternalEntities`, `FileRead` or `Network`; `XML_PARSE_NONET` is always on, entity amplification is limited, and refused resources raise `ZXQP0029` ([#51](https://github.com/zorba-processor/zorba/pull/51)).
+- Harden XQueryX and Xerces schema loading: no global libxml2 state, libxslt security preferences forbid file and network access, Xerces gets an entity resolver and a `SecurityManager`; remove the unused `zorbautils/SAXParser` and the `ZORBA_WITH_LIBXML2_SAX` option ([#51](https://github.com/zorba-processor/zorba/pull/51)).
 - Fix parameter re-substitution in diagnostics: user text quoted in an error message (for example from the JSON parser) could inject `$N` markers and expand other parameters or raise an internal error ([#45](https://github.com/zorba-processor/zorba/pull/45)).
 - Enable compiler and linker hardening by default on GCC and Clang (`ZORBA_HARDENING`): PIE, stack protector, stack-clash protection, `_FORTIFY_SOURCE`, RELRO/BIND_NOW, libstdc++/libc++ assertions; CI verifies the binaries ([#33](https://github.com/zorba-processor/zorba/pull/33)).
 - Add CodeQL scanning (security-extended) on pushes, pull requests and weekly; of 79 initial alerts, 12 were real and fixed, the rest are triaged as false positives or by design ([#33](https://github.com/zorba-processor/zorba/pull/33), [#35](https://github.com/zorba-processor/zorba/pull/35)).
@@ -47,22 +47,25 @@ Entries marked **(open PR)** come from pull requests that are not merged yet; co
 - Fix crashes, hangs and aborts found by fuzzing: endless loop and out-of-memory on unterminated comments or tags at end of input, `fn:analyze-string` on an empty input, infinite loop in `URI::toPathNotation`, abort on `xml:base=""`, null dereferences in JSON update expressions, and out-of-range reads in QName parsing ([#37](https://github.com/zorba-processor/zorba/pull/37)).
 - Fix undefined behavior reported by UBSan: 21 sites and 445 reports reduced to 0 ([#34](https://github.com/zorba-processor/zorba/pull/34)).
 - Check `pthread` return values and treat failures as fatal ([#27](https://github.com/zorba-processor/zorba/pull/27), [#50](https://github.com/zorba-processor/zorba/pull/50)).
+- Enforce the security policy at URL resolution: `fn:doc`, `fn:unparsed-text`, module and schema import, thesauri, stop words, JSound and `fetch` are checked before any built-in resolver runs. File paths are compared after resolving `..` and symlinks, URLs by scheme, host, port and path segment, and with `Network` allowed, hosts resolving to loopback, private or link-local addresses are refused unless explicitly allowed. Refusals raise `ZXQP0029`. `ZORBA_URI_PATH` and `ZORBA_LIB_PATH` are honored only with the `Environment` capability. Redirects and DNS rebinding are not covered yet ([#56](https://github.com/zorba-processor/zorba/pull/56)).
 
 ### Added
 
 - Add the security policy API: `SecurityPolicy` with capabilities (`ExternalEntities`, `FileRead`, `FileWrite`, `Network`, `RemoteImport`, `Environment`, `NativeModules`), allow-lists, limits and `secure()`/`unrestricted()` presets; queries can never widen the policy of their context; new error codes `ZXQP0067`, `ZXQP0068`, `ZXQP0069` ([#44](https://github.com/zorba-processor/zorba/pull/44)).
-- Add `err:ZXQP0029` for refused external resources during XML loading **(open PR [#51](https://github.com/zorba-processor/zorba/pull/51))**.
+- Add `err:ZXQP0029` for refused external resources during XML loading ([#51](https://github.com/zorba-processor/zorba/pull/51)).
 - Add a documentation site (XQuery, JSONiq and Zorba tutorials, cheat sheet) on GitHub Pages; all 59 code examples are run in CI and the shown output is verified ([#30](https://github.com/zorba-processor/zorba/pull/30)).
 - Add a new logo and color palette to the site and README ([#46](https://github.com/zorba-processor/zorba/pull/46)).
 - Add `CMakePresets.json` with configure, build, test and workflow presets (`core-release`, `full-release`, `full-debug`, `full-release-offline`) ([#25](https://github.com/zorba-processor/zorba/pull/25), [#31](https://github.com/zorba-processor/zorba/pull/31)).
 - Add build profile presets `embedded`, `embedded-noicu` and `full-nopch`, each built and tested in CI with a library size report ([#42](https://github.com/zorba-processor/zorba/pull/42)).
 - Add CI on GitHub Actions: linux-amd64 (GCC 16), linux-arm64 (GCC 13), macOS arm64 (Apple Clang) and a Clang job; HTTP tests run against a containerized test server ([#25](https://github.com/zorba-processor/zorba/pull/25), [#39](https://github.com/zorba-processor/zorba/pull/39)).
 - Publish builder and command-line `zorba` container images to GHCR ([#25](https://github.com/zorba-processor/zorba/pull/25)).
-- Add a `bigint` preset and CI profile for the optional big-integer `xs:integer` build **(open PR, PR pending)**.
+- Add a `bigint` preset and CI profile for the optional big-integer `xs:integer` build ([#53](https://github.com/zorba-processor/zorba/pull/53)).
 - Add an ASan, LSan and UBSan preset with a weekly CI run and a summary of memory errors, leaks and undefined behavior ([#28](https://github.com/zorba-processor/zorba/pull/28), [#34](https://github.com/zorba-processor/zorba/pull/34)).
 - Add XMark and JSONiq benchmark suites with an A/B comparison workflow ([#38](https://github.com/zorba-processor/zorba/pull/38)).
+- Add a weekly W3C QT3 conformance run (pinned qt3tests commit, sharded, per-case timeout) with a committed pass baseline; any regression fails the run. First run: 26,367 of 27,055 applicable test cases pass (97.5%); fix FOTS driver bugs in version matching, XSD 1.0/1.1 dependencies, single-case selection and environment parameter collisions ([#59](https://github.com/zorba-processor/zorba/pull/59)).
 - Add an on-demand build-time measurement workflow ([#29](https://github.com/zorba-processor/zorba/pull/29)).
 - Add a pull request template with a changelog line.
+- Add `SecurityPolicy::checkURI()` to test a URI against a policy ([#56](https://github.com/zorba-processor/zorba/pull/56)).
 
 ### Changed
 
@@ -76,7 +79,7 @@ Entries marked **(open PR)** come from pull requests that are not merged yet; co
 - Update all GitHub Actions to their latest versions on Node 24 ([#43](https://github.com/zorba-processor/zorba/pull/43)).
 - Run CI builds and security scans only when code changes ([#48](https://github.com/zorba-processor/zorba/pull/48)).
 - Build the debugger (`xqdb`) in the `full-nopch` CI profile; `XqdbClient` members are `std::unique_ptr`; remove redundant null checks before `delete` ([#27](https://github.com/zorba-processor/zorba/pull/27), [#50](https://github.com/zorba-processor/zorba/pull/50)).
-- Build XQueryX and run its tests in the `full-nopch` CI profile **(open PR [#51](https://github.com/zorba-processor/zorba/pull/51))**.
+- Build XQueryX and run its tests in the `full-nopch` CI profile ([#51](https://github.com/zorba-processor/zorba/pull/51)).
 - Remove references to the former company's infrastructure (test hosts, CDash, CircleCI, Docker Hub) and replace two test modules carrying its copyright notice ([#25](https://github.com/zorba-processor/zorba/pull/25)).
 
 ### Fixed
@@ -90,13 +93,14 @@ Entries marked **(open PR)** come from pull requests that are not merged yet; co
 - Fix leaks and double frees on parse-error paths (Bison `YYERROR` rules, `NumericLiteral`) ([#36](https://github.com/zorba-processor/zorba/pull/36)).
 - Fix an assertion failure (`"i >= 0"`) when nested FLWOR expressions are flattened and an index key refers to an out-of-scope variable ([#41](https://github.com/zorba-processor/zorba/pull/41)).
 - Fix `XmlDataManager` and `JsonDataManager` failing at start (`XQST0009`) and a crash in `static_context::validate` in builds without XML Schema or ICU ([#42](https://github.com/zorba-processor/zorba/pull/42)).
-- Fix `jn:parse-json` raising an internal error on out-of-range numbers; it now raises `FOAR0002` ([#37](https://github.com/zorba-processor/zorba/pull/37)).
+- Fix `jn:parse-json` raising an internal error on out-of-range numbers; it now raises `FOAR0002`, and integers beyond 64 bits parse as `xs:decimal` ([#37](https://github.com/zorba-processor/zorba/pull/37), [#53](https://github.com/zorba-processor/zorba/pull/53)).
+- Fix per-test CTest timeouts, which were never applied because `ZORBA_ADD_TEST` read a removed variable ([#53](https://github.com/zorba-processor/zorba/pull/53)).
 - Fix destruction order of expressions and FLWOR clauses, which was undefined behavior in every FLWOR query ([#37](https://github.com/zorba-processor/zorba/pull/37)).
 
 ### Removed
 
 - Remove Windows support code paths ([#27](https://github.com/zorba-processor/zorba/pull/27)).
-- Remove the `zorbautils/SAXParser` class and the `ZORBA_WITH_LIBXML2_SAX` option **(open PR [#51](https://github.com/zorba-processor/zorba/pull/51))**.
+- Remove the `zorbautils/SAXParser` class and the `ZORBA_WITH_LIBXML2_SAX` option ([#51](https://github.com/zorba-processor/zorba/pull/51)).
 - Remove 91 stale `EXPECTED_FAILURE` test entries ([#25](https://github.com/zorba-processor/zorba/pull/25)).
 
 ## Before 5.0

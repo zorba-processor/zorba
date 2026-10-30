@@ -108,7 +108,7 @@ private:
   typedef std::map<term_t,synonym_set_t> thesaurus_t;
   thesaurus_t thesaurus_;
 
-  void read_xqftts_file( zstring const &uri );
+  void read_xqftts_file( zstring const &path );
 
   // forbid these
   thesaurus( thesaurus const& );

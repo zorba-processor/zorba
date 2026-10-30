@@ -275,10 +275,12 @@ void test_secure_context(Zorba* z, const Files& f)
   StaticContext_t child = sctx->createChildContext();
   CHECK(denied(parse_xml(z, child, xxe_system(f)), "FODC0006", f.secretURI));
 
-  // fn:doc of a document with an XXE (reading the document itself is not
-  // restricted yet; its external entity is).
+  // fn:doc of a document with an XXE: reading the document needs FileRead;
+  // its external entity also needs ExternalEntities.
   std::string const lDocURI = f.write("doc-with-xxe.xml", xxe_system(f));
-  CHECK(denied(doc(z, sctx, lDocURI), "FODC0002", f.secretURI));
+  StaticContext_t readable = context(z, SecurityPolicy::secure()
+      .allow(Capability::FileRead));
+  CHECK(denied(doc(z, readable, lDocURI), "FODC0002", f.secretURI));
 }
 
 void test_allow_lists(Zorba* z, const Files& f)

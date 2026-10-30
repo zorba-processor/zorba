@@ -2390,7 +2390,7 @@
     </diagnostic>
 
     <diagnostic code="ZXQP0029" name="URI_ACCESS_DENIED">
-      <value>"$1": URI access not allowed</value>
+      <value>"$1": URI access not allowed${: 2}</value>
     </diagnostic>
 
     <diagnostic code="ZXQP0030" name="DEADLOCK">

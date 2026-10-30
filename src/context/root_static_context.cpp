@@ -265,19 +265,25 @@ void root_static_context::init()
   // place; it becomes SecurityPolicy::secure() in 5.0.0.
   set_security_policy(SecurityPolicy::unrestricted());
 
+  // Directories from the environment. They used to be appended to the paths
+  // above after those had been set, so they had no effect. They are kept
+  // apart now: the full URI / lib path includes them only where the policy
+  // allows Capability::Environment.
+  std::vector<zstring> lEnvURIPath;
+  std::vector<zstring> lEnvLibPath;
 #ifdef WIN32
-  // get a relative path from the environment for URI
-  append_env_var (L"ZORBA_MODULE_PATH", lRootURIPath, zstring(ZORBA_CORE_URI_DIR), zstring(ZORBA_NONCORE_URI_DIR));
-  append_env_var (L"ZORBA_MODULE_PATH", lRootLibPath, zstring(ZORBA_CORE_LIB_DIR), zstring(ZORBA_NONCORE_LIB_DIR));
+  append_env_var (L"ZORBA_MODULE_PATH", lEnvURIPath, zstring(ZORBA_CORE_URI_DIR), zstring(ZORBA_NONCORE_URI_DIR));
+  append_env_var (L"ZORBA_MODULE_PATH", lEnvLibPath, zstring(ZORBA_CORE_LIB_DIR), zstring(ZORBA_NONCORE_LIB_DIR));
 
-  append_env_var (L"ZORBA_URI_PATH", lRootURIPath, zstring(ZORBA_CORE_URI_DIR), zstring(ZORBA_NONCORE_URI_DIR));
-  append_env_var (L"ZORBA_LIB_PATH", lRootLibPath, zstring(ZORBA_CORE_LIB_DIR), zstring(ZORBA_NONCORE_LIB_DIR));
+  append_env_var (L"ZORBA_URI_PATH", lEnvURIPath, zstring(ZORBA_CORE_URI_DIR), zstring(ZORBA_NONCORE_URI_DIR));
+  append_env_var (L"ZORBA_LIB_PATH", lEnvLibPath, zstring(ZORBA_CORE_LIB_DIR), zstring(ZORBA_NONCORE_LIB_DIR));
 
 #else
-  append_env_var ("ZORBA_URI_PATH", lRootURIPath);
-  append_env_var ("ZORBA_LIB_PATH", lRootLibPath);
+  append_env_var ("ZORBA_URI_PATH", lEnvURIPath);
+  append_env_var ("ZORBA_LIB_PATH", lEnvLibPath);
 
 #endif
+  set_env_paths(lEnvURIPath, lEnvLibPath);
 } 
 
 

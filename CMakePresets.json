@@ -95,6 +95,14 @@
         "ZORBA_XQUERYX": "ON",
         "ZORBA_TEST_XQUERYX": "ON"
       }
+    },
+    {
+      "name": "bigint",
+      "displayName": "Full, arbitrary-precision xs:integer (MAPM; not thread-safe, see KNOWN_ISSUES.txt), Release",
+      "inherits": "full-release",
+      "cacheVariables": {
+        "ZORBA_WITH_BIG_INTEGER": "ON"
+      }
     }
   ],
   "buildPresets": [
@@ -128,6 +136,10 @@
     {
       "name": "full-nopch",
       "configurePreset": "full-nopch"
+    },
+    {
+      "name": "bigint",
+      "configurePreset": "bigint"
     }
   ],
   "testPresets": [
@@ -213,6 +225,22 @@
       "name": "full-nopch",
       "displayName": "Tests that need no HTTP test server",
       "configurePreset": "full-nopch",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "timeout": 120
+      },
+      "filter": {
+        "exclude": {
+          "name": "http-client|test/api/validate$|userdefined_uri_resolution|uri_resolvers|streaming-udf|store/example_[13]$|uris/disable-http-3|update/zorba/store/sc1|update/zorba/store/sc2_ex"
+        }
+      }
+    },
+    {
+      "name": "bigint",
+      "displayName": "Tests that need no HTTP test server",
+      "configurePreset": "bigint",
       "output": {
         "outputOnFailure": true
       },

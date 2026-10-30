@@ -21,6 +21,8 @@
 #include <zorba/config.h>
 #include <zorba/security.h>
 
+#include "util/security_check.h"
+
 namespace zorba {
 
 namespace {
@@ -275,6 +277,33 @@ const std::vector<String>& SecurityPolicy::getWritePaths() const
 const std::vector<String>& SecurityPolicy::getNetworkPrefixes() const
 {
   return theImpl->theNetworkPrefixes;
+}
+
+
+bool SecurityPolicy::checkURI(
+    const String& aURI,
+    EntityData::Kind aKind,
+    bool aWrite) const
+{
+  security::Use lUse;
+  switch (aKind)
+  {
+    case EntityData::SCHEMA:
+    case EntityData::MODULE:
+      lUse = security::Use::Import;
+      break;
+    case EntityData::THESAURUS:
+    case EntityData::STOP_WORDS:
+      lUse = security::Use::Data;
+      break;
+    case EntityData::COLLECTION:
+      lUse = security::Use::Collection;
+      break;
+    default:
+      lUse = security::Use::Document;
+      break;
+  }
+  return security::check(*this, aURI.str(), lUse, aWrite).allowed;
 }
 
 
