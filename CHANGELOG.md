@@ -51,7 +51,7 @@ Entries marked **(open PR)** come from pull requests that are not merged yet; co
 
 ### Added
 
-- Every CI build (and the Sanitizers workflow, under ASan/UBSan/LSan) replays the fuzz regression inputs in `test/fuzz/regressions/` through standalone replay drivers that need no libFuzzer.
+- Every CI build (and the Sanitizers workflow, under ASan/UBSan/LSan) replays the fuzz regression inputs in `test/fuzz/regressions/` through standalone replay drivers that need no libFuzzer ([#67](https://github.com/zorba-processor/zorba/pull/67)).
 - Add the security policy API: `SecurityPolicy` with capabilities (`ExternalEntities`, `FileRead`, `FileWrite`, `Network`, `RemoteImport`, `Environment`, `NativeModules`), allow-lists, limits and `secure()`/`unrestricted()` presets; queries can never widen the policy of their context; new error codes `ZXQP0067`, `ZXQP0068`, `ZXQP0069` ([#44](https://github.com/zorba-processor/zorba/pull/44)).
 - Add `err:ZXQP0029` for refused external resources during XML loading ([#51](https://github.com/zorba-processor/zorba/pull/51)).
 - Add a documentation site (XQuery, JSONiq and Zorba tutorials, cheat sheet) on GitHub Pages; all 59 code examples are run in CI and the shown output is verified ([#30](https://github.com/zorba-processor/zorba/pull/30)).
@@ -85,8 +85,8 @@ Entries marked **(open PR)** come from pull requests that are not merged yet; co
 
 ### Fixed
 
-- Fix a memory leak of parser error objects when a query has several lexical errors.
-- Fix a memory leak when a function containing a full-text `contains text` expression is inlined, and a double delete of its positional filters (`ordered`, `window`, ...) that the leak was hiding.
+- Fix a memory leak of parser error objects when a query has several lexical errors ([#67](https://github.com/zorba-processor/zorba/pull/67)).
+- Fix a memory leak when a function containing a full-text `contains text` expression is inlined, and a double delete of its positional filters (`ordered`, `window`, ...) that the leak was hiding ([#67](https://github.com/zorba-processor/zorba/pull/67)).
 - Fix a crash at startup when `ZORBA_URI_PATH` or `ZORBA_LIB_PATH` is unset, and a use-after-free in locale lookup that crashed `format-date` with a language ([#25](https://github.com/zorba-processor/zorba/pull/25)).
 - Fix `fn:replace` with the `q` flag returning an empty string on ICU 78 ([#25](https://github.com/zorba-processor/zorba/pull/25)).
 - Fix a hang in `fn:parse-xml-fragment` and external parsed entities on libxml2 2.12 and later by rewriting the fragment loader on the public push-parser API ([#25](https://github.com/zorba-processor/zorba/pull/25)).
