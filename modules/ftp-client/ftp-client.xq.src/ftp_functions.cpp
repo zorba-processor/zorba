@@ -446,7 +446,7 @@ connect_function::evaluate( ExternalFunction::Arguments_t const &args,
       conn.insert( (String::size_type)0, 1, '@' );
       if ( !password.empty() ) {
         char *const esc_password =
-          curl_escape( const_cast<char*>( password.data() ), password.size() );
+          curl_easy_escape( nullptr, password.data(), static_cast<int>( password.size() ) );
         conn.insert( 0, esc_password );
         curl_free( esc_password );
         conn.insert( (String::size_type)0, 1, ':' );
