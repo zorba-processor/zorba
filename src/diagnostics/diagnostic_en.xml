@@ -1308,6 +1308,9 @@
       <entry key="NoOptDigitAfterMandatory">
         <value>"#": optional-digit-sign must precede all mandatory-digit-signs</value>
       </entry>
+      <entry key="NoOptDigitBeforeMandatory">
+        <value>"#": optional-digit-sign must follow all mandatory-digit-signs for fractional seconds</value>
+      </entry>
     </diagnostic>
 
     <diagnostic code="FOFD1350">

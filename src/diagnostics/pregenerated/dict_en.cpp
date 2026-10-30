@@ -666,6 +666,7 @@ extern entry const dict_en[] = {
   { "~FOFD1340_NoGroupSepAtEnd_4", "\"$4\": grouping separator illegal at end of decimal-digit-pattern" },
   { "~FOFD1340_NoGroupSepAtStart_4", "\"$4\": grouping separator illegal at start of decimal-digit-pattern" },
   { "~FOFD1340_NoOptDigitAfterMandatory", "\"#\": optional-digit-sign must precede all mandatory-digit-signs" },
+  { "~FOFD1340_NoOptDigitBeforeMandatory", "\"#\": optional-digit-sign must follow all mandatory-digit-signs for fractional seconds" },
   { "~FOFD1340_Picture", "picture" },
   { "~FOFD1340_Place", "place" },
   { "~FORG0001_BadHexDigit_2", "'$2': invalid hexedecimal digit" },
