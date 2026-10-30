@@ -16,13 +16,14 @@ jobs:
           - variant: baseline
             sloppy: pch_defines,time_macros
             extra: ""
-          - variant: nodirect
+          - variant: depend
             sloppy: pch_defines,time_macros
             extra: ""
-            nodirect: "1"
-          - variant: nopch
+            depend: "1"
+          - variant: depend-nopch
             sloppy: pch_defines,time_macros
             extra: "-DZORBA_USE_PCH=OFF"
+            depend: "1"
     steps:
       - uses: actions/checkout@v7
       - uses: docker/setup-buildx-action@v4
@@ -35,7 +36,7 @@ jobs:
       - name: Repro
         run: |
           docker run --rm -e SLOPPY='${{ matrix.sloppy }}' -e EXTRA='${{ matrix.extra }}' \
-            -e NODIRECT='${{ matrix.nodirect }}' -v "$PWD":/src -w /src zorba-builder:ci \
+            -e NODIRECT='${{ matrix.nodirect }}' -e DEPEND='${{ matrix.depend }}' -v "$PWD":/src -w /src zorba-builder:ci \
             sh scripts/ccache-pch/repro.sh
       - uses: actions/upload-artifact@v7
         if: always()

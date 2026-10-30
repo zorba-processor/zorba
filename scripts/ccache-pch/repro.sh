@@ -7,8 +7,9 @@ OUT=/src/out; mkdir -p $OUT
 S=$OUT/summary.txt; : > $S
 export CCACHE_DIR=/src/.ccache CCACHE_MAXSIZE=20G CCACHE_SLOPPINESS="$SLOPPY"
 [ "${NODIRECT:-0}" = 1 ] && export CCACHE_NODIRECT=1
+[ "${DEPEND:-0}" = 1 ] && export CCACHE_DEPEND=1
 { ccache --version | head -1; gcc --version | head -1; cmake --version | head -1
-  echo "SLOPPY=$SLOPPY EXTRA=$EXTRA NODIRECT=${NODIRECT:-0}"; } >> $S
+  echo "SLOPPY=$SLOPPY EXTRA=$EXTRA NODIRECT=${NODIRECT:-0} DEPEND=${DEPEND:-0}"; } >> $S
 Q='declare namespace ver = "http://zorba.io/options/versioning"; declare option ver:zorba-version "5.0"; 1+1'
 step() { # name major debug
   name=$1; maj=$2
