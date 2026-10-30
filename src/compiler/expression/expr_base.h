@@ -18,6 +18,7 @@
 #define ZORBA_COMPILER_EXPR_BASE
 
 #include <map>
+#include <set>
 
 #include <zorba/config.h>
 
