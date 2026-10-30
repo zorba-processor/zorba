@@ -7,7 +7,7 @@ FROM ${BASE}
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
       build-essential clang cmake ninja-build ccache git ca-certificates pkg-config \
-      bison flex \
+      bison flex libfl-dev \
       libicu-dev libxml2-dev libxslt1-dev libcurl4-openssl-dev zlib1g-dev \
       libxerces-c-dev uuid-dev locales gdb \
  && rm -rf /var/lib/apt/lists/* \

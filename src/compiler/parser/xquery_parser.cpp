@@ -1,8 +1,8 @@
-// A Bison parser, made by GNU Bison 3.0.2.
+// A Bison parser, made by GNU Bison 3.8.2.
 
 // Skeleton implementation for Bison LALR(1) parsers in C++
 
-// Copyright (C) 2002-2013 Free Software Foundation, Inc.
+// Copyright (C) 2002-2015, 2018-2021 Free Software Foundation, Inc.
 
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -15,7 +15,7 @@
 // GNU General Public License for more details.
 
 // You should have received a copy of the GNU General Public License
-// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 // As a special exception, you may create a larger work that contains
 // part or all of the Bison parser skeleton and distribute that work
@@ -30,14 +30,15 @@
 // This special exception was added by the Free Software Foundation in
 // version 2.2 of Bison.
 
-// Take the name prefix into account.
-#define yylex   zorbalex
+// DO NOT RELY ON FEATURES THAT ARE NOT DOCUMENTED in the manual,
+// especially those whose name start with YY_ or yy_.  They are
+// private implementation details that can be changed or removed.
 
-// First part of user declarations.
-#line 1 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:399
+
+
+// First part of user prologue.
 
 #define XQUERY_PARSER
-#line 59 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:399
 
 
 #include "common/common.h"
@@ -59,10 +60,13 @@
 #define SYMTAB_PUT( s ) driver.symtab.put( s )
 #define LOC( p ) driver.createQueryLoc( p )
 
-#define ERROR_IF_QNAME_NOT_NCNAME(qname, location)                \
+// The optional trailing arguments are the rule's other RHS semantic values:
+// YYERROR skips their %destructor, so they are released here with the QName.
+#define ERROR_IF_QNAME_NOT_NCNAME(qname, location, ...)           \
   do {                                                            \
     if ( ! static_cast<QName*>(qname)->is_ncname()) {             \
       error((location), "A NCName is expected, found a QName");   \
+      release_hack_all( (qname) __VA_OPT__(,) __VA_ARGS__ );      \
       YYERROR;                                                    \
   }                                                               \
   } while (0);          
@@ -73,7 +77,6 @@
 using namespace std;
 using namespace zorba;
 
-#line 102 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:399
 
 
 #ifdef XQUERY_PARSER
@@ -90,20 +93,11 @@ using namespace zorba;
 #endif
 
 
-#line 94 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:399
 
-# ifndef YY_NULLPTR
-#  if defined __cplusplus && 201103L <= __cplusplus
-#   define YY_NULLPTR nullptr
-#  else
-#   define YY_NULLPTR 0
-#  endif
-# endif
 
 #include "xquery_parser.hpp"
 
-// User implementation prologue.
-#line 784 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:407
+// Second part of user prologue.
 
 template<typename T> inline void release_hack( T *ref ) {
     if ( ref ) {
@@ -111,7 +105,9 @@ template<typename T> inline void release_hack( T *ref ) {
         RCHelper::removeReference( ref );
     }
 }
-#line 838 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:407
+template<typename... T> inline void release_hack_all( T*... refs ) {
+    ( release_hack( refs ), ... );
+}
 
 namespace {
 bool convert_postfix_to_target_and_selector(
@@ -143,7 +139,7 @@ bool convert_postfix_to_target_and_selector(
 };
 }
 
-#line 147 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:407
+
 
 
 #ifndef YY_
@@ -155,6 +151,16 @@ bool convert_postfix_to_target_and_selector(
 # endif
 # ifndef YY_
 #  define YY_(msgid) msgid
+# endif
+#endif
+
+
+// Whether we are compiled with exception support.
+#ifndef YY_EXCEPTIONS
+# if defined __GNUC__ && !defined __EXCEPTIONS
+#  define YY_EXCEPTIONS 0
+# else
+#  define YY_EXCEPTIONS 1
 # endif
 #endif
 
@@ -175,12 +181,9 @@ bool convert_postfix_to_target_and_selector(
         {                                                               \
           (Current).begin = (Current).end = YYRHSLOC (Rhs, 0).end;      \
         }                                                               \
-    while (/*CONSTCOND*/ false)
+    while (false)
 # endif
 
-
-// Suppress unused-variable warnings by "using" E.
-#define YYUSE(E) ((void) (E))
 
 // Enable debugging if requested.
 #if YYDEBUG
@@ -194,7 +197,7 @@ bool convert_postfix_to_target_and_selector(
     {                                           \
       *yycdebug_ << Title << ' ';               \
       yy_print_ (*yycdebug_, Symbol);           \
-      *yycdebug_ << std::endl;                  \
+      *yycdebug_ << '\n';                       \
     }                                           \
   } while (false)
 
@@ -207,74 +210,35 @@ bool convert_postfix_to_target_and_selector(
 # define YY_STACK_PRINT()               \
   do {                                  \
     if (yydebug_)                       \
-      yystack_print_ ();                \
+      yy_stack_print_ ();                \
   } while (false)
 
 #else // !YYDEBUG
 
 # define YYCDEBUG if (false) std::cerr
-# define YY_SYMBOL_PRINT(Title, Symbol)  YYUSE(Symbol)
-# define YY_REDUCE_PRINT(Rule)           static_cast<void>(0)
-# define YY_STACK_PRINT()                static_cast<void>(0)
+# define YY_SYMBOL_PRINT(Title, Symbol)  YY_USE (Symbol)
+# define YY_REDUCE_PRINT(Rule)           static_cast<void> (0)
+# define YY_STACK_PRINT()                static_cast<void> (0)
 
 #endif // !YYDEBUG
 
 #define yyerrok         (yyerrstatus_ = 0)
-#define yyclearin       (yyempty = true)
+#define yyclearin       (yyla.clear ())
 
 #define YYACCEPT        goto yyacceptlab
 #define YYABORT         goto yyabortlab
 #define YYERROR         goto yyerrorlab
 #define YYRECOVERING()  (!!yyerrstatus_)
 
-
 namespace zorba {
-#line 233 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:474
-
-  /* Return YYSTR after stripping away unnecessary quotes and
-     backslashes, so that it's suitable for yyerror.  The heuristic is
-     that double-quoting is unnecessary unless the string contains an
-     apostrophe, a comma, or backslash (other than backslash-backslash).
-     YYSTR is taken from yytname.  */
-  std::string
-  xquery_parser::yytnamerr_ (const char *yystr)
-  {
-    if (*yystr == '"')
-      {
-        std::string yyr = "";
-        char const *yyp = yystr;
-
-        for (;;)
-          switch (*++yyp)
-            {
-            case '\'':
-            case ',':
-              goto do_not_strip_quotes;
-
-            case '\\':
-              if (*++yyp != '\\')
-                goto do_not_strip_quotes;
-              // Fall through.
-            default:
-              yyr += *yyp;
-              break;
-
-            case '"':
-              return yyr;
-            }
-      do_not_strip_quotes: ;
-      }
-
-    return yystr;
-  }
-
 
   /// Build a parser object.
   xquery_parser::xquery_parser (xquery_driver& driver_yyarg)
-    :
 #if YYDEBUG
-      yydebug_ (false),
+    : yydebug_ (false),
       yycdebug_ (&std::cerr),
+#else
+    :
 #endif
       driver (driver_yyarg)
   {}
@@ -282,147 +246,168 @@ namespace zorba {
   xquery_parser::~xquery_parser ()
   {}
 
-
-  /*---------------.
-  | Symbol types.  |
-  `---------------*/
-
-  inline
-  xquery_parser::syntax_error::syntax_error (const location_type& l, const std::string& m)
-    : std::runtime_error (m)
-    , location (l)
+  xquery_parser::syntax_error::~syntax_error () YY_NOEXCEPT YY_NOTHROW
   {}
+
+  /*---------.
+  | symbol.  |
+  `---------*/
 
   // basic_symbol.
   template <typename Base>
-  inline
-  xquery_parser::basic_symbol<Base>::basic_symbol ()
-    : value ()
-  {}
-
-  template <typename Base>
-  inline
-  xquery_parser::basic_symbol<Base>::basic_symbol (const basic_symbol& other)
-    : Base (other)
-    , value ()
-    , location (other.location)
-  {
-    value = other.value;
-  }
-
-
-  template <typename Base>
-  inline
-  xquery_parser::basic_symbol<Base>::basic_symbol (typename Base::kind_type t, const semantic_type& v, const location_type& l)
-    : Base (t)
-    , value (v)
-    , location (l)
+  xquery_parser::basic_symbol<Base>::basic_symbol (const basic_symbol& that)
+    : Base (that)
+    , value (that.value)
+    , location (that.location)
   {}
 
 
   /// Constructor for valueless symbols.
   template <typename Base>
-  inline
-  xquery_parser::basic_symbol<Base>::basic_symbol (typename Base::kind_type t, const location_type& l)
+  xquery_parser::basic_symbol<Base>::basic_symbol (typename Base::kind_type t, YY_MOVE_REF (location_type) l)
     : Base (t)
     , value ()
     , location (l)
   {}
 
   template <typename Base>
-  inline
-  xquery_parser::basic_symbol<Base>::~basic_symbol ()
+  xquery_parser::basic_symbol<Base>::basic_symbol (typename Base::kind_type t, YY_RVREF (value_type) v, YY_RVREF (location_type) l)
+    : Base (t)
+    , value (YY_MOVE (v))
+    , location (YY_MOVE (l))
+  {}
+
+
+  template <typename Base>
+  xquery_parser::symbol_kind_type
+  xquery_parser::basic_symbol<Base>::type_get () const YY_NOEXCEPT
   {
+    return this->kind ();
+  }
+
+
+  template <typename Base>
+  bool
+  xquery_parser::basic_symbol<Base>::empty () const YY_NOEXCEPT
+  {
+    return this->kind () == symbol_kind::S_YYEMPTY;
   }
 
   template <typename Base>
-  inline
   void
   xquery_parser::basic_symbol<Base>::move (basic_symbol& s)
   {
-    super_type::move(s);
-    value = s.value;
-    location = s.location;
+    super_type::move (s);
+    value = YY_MOVE (s.value);
+    location = YY_MOVE (s.location);
   }
 
-  // by_type.
-  inline
-  xquery_parser::by_type::by_type ()
-     : type (empty)
+  // by_kind.
+  xquery_parser::by_kind::by_kind () YY_NOEXCEPT
+    : kind_ (symbol_kind::S_YYEMPTY)
   {}
 
-  inline
-  xquery_parser::by_type::by_type (const by_type& other)
-    : type (other.type)
+#if 201103L <= YY_CPLUSPLUS
+  xquery_parser::by_kind::by_kind (by_kind&& that) YY_NOEXCEPT
+    : kind_ (that.kind_)
+  {
+    that.clear ();
+  }
+#endif
+
+  xquery_parser::by_kind::by_kind (const by_kind& that) YY_NOEXCEPT
+    : kind_ (that.kind_)
   {}
 
-  inline
-  xquery_parser::by_type::by_type (token_type t)
-    : type (yytranslate_ (t))
+  xquery_parser::by_kind::by_kind (token_kind_type t) YY_NOEXCEPT
+    : kind_ (yytranslate_ (t))
   {}
 
-  inline
+
+
   void
-  xquery_parser::by_type::move (by_type& that)
+  xquery_parser::by_kind::clear () YY_NOEXCEPT
   {
-    type = that.type;
-    that.type = empty;
+    kind_ = symbol_kind::S_YYEMPTY;
   }
 
-  inline
-  int
-  xquery_parser::by_type::type_get () const
+  void
+  xquery_parser::by_kind::move (by_kind& that)
   {
-    return type;
+    kind_ = that.kind_;
+    that.clear ();
   }
+
+  xquery_parser::symbol_kind_type
+  xquery_parser::by_kind::kind () const YY_NOEXCEPT
+  {
+    return kind_;
+  }
+
+
+  xquery_parser::symbol_kind_type
+  xquery_parser::by_kind::type_get () const YY_NOEXCEPT
+  {
+    return this->kind ();
+  }
+
 
 
   // by_state.
-  inline
-  xquery_parser::by_state::by_state ()
-    : state (empty)
+  xquery_parser::by_state::by_state () YY_NOEXCEPT
+    : state (empty_state)
   {}
 
-  inline
-  xquery_parser::by_state::by_state (const by_state& other)
-    : state (other.state)
+  xquery_parser::by_state::by_state (const by_state& that) YY_NOEXCEPT
+    : state (that.state)
   {}
 
-  inline
+  void
+  xquery_parser::by_state::clear () YY_NOEXCEPT
+  {
+    state = empty_state;
+  }
+
   void
   xquery_parser::by_state::move (by_state& that)
   {
     state = that.state;
-    that.state = empty;
+    that.clear ();
   }
 
-  inline
-  xquery_parser::by_state::by_state (state_type s)
+  xquery_parser::by_state::by_state (state_type s) YY_NOEXCEPT
     : state (s)
   {}
 
-  inline
-  xquery_parser::symbol_number_type
-  xquery_parser::by_state::type_get () const
+  xquery_parser::symbol_kind_type
+  xquery_parser::by_state::kind () const YY_NOEXCEPT
   {
-    return state == empty ? 0 : yystos_[state];
+    if (state == empty_state)
+      return symbol_kind::S_YYEMPTY;
+    else
+      return YY_CAST (symbol_kind_type, yystos_[+state]);
   }
 
-  inline
   xquery_parser::stack_symbol_type::stack_symbol_type ()
   {}
 
-
-  inline
-  xquery_parser::stack_symbol_type::stack_symbol_type (state_type s, symbol_type& that)
-    : super_type (s, that.location)
+  xquery_parser::stack_symbol_type::stack_symbol_type (YY_RVREF (stack_symbol_type) that)
+    : super_type (YY_MOVE (that.state), YY_MOVE (that.value), YY_MOVE (that.location))
   {
-    value = that.value;
+#if 201103L <= YY_CPLUSPLUS
     // that is emptied.
-    that.type = empty;
+    that.state = empty_state;
+#endif
   }
 
-  inline
+  xquery_parser::stack_symbol_type::stack_symbol_type (state_type s, YY_MOVE_REF (symbol_type) that)
+    : super_type (s, YY_MOVE (that.value), YY_MOVE (that.location))
+  {
+    // that is emptied.
+    that.kind_ = symbol_kind::S_YYEMPTY;
+  }
+
+#if YY_CPLUSPLUS < 201103L
   xquery_parser::stack_symbol_type&
   xquery_parser::stack_symbol_type::operator= (const stack_symbol_type& that)
   {
@@ -432,9 +417,19 @@ namespace zorba {
     return *this;
   }
 
+  xquery_parser::stack_symbol_type&
+  xquery_parser::stack_symbol_type::operator= (stack_symbol_type& that)
+  {
+    state = that.state;
+    value = that.value;
+    location = that.location;
+    // that is emptied.
+    that.state = empty_state;
+    return *this;
+  }
+#endif
 
   template <typename Base>
-  inline
   void
   xquery_parser::yy_destroy_ (const char* yymsg, basic_symbol<Base>& yysym) const
   {
@@ -442,2003 +437,1147 @@ namespace zorba {
       YY_SYMBOL_PRINT (yymsg, yysym);
 
     // User destructor.
-    switch (yysym.type_get ())
+    switch (yysym.kind ())
     {
-            case 111: // "'DECIMAL'"
-
-#line 783 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { delete (yysym.value.decval); }
-#line 452 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_DECIMAL_LITERAL: // "'DECIMAL'"
+                    { delete (yysym.value.decval); }
         break;
-
-      case 125: // "'DOUBLE'"
 
-#line 782 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { delete (yysym.value.dval); }
-#line 459 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_DOUBLE_LITERAL: // "'DOUBLE'"
+                    { delete (yysym.value.dval); }
         break;
 
-      case 150: // "'INTEGER'"
-
-#line 781 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { delete (yysym.value.ival); }
-#line 466 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_INTEGER_LITERAL: // "'INTEGER'"
+                    { delete (yysym.value.ival); }
         break;
-
-      case 338: // VersionDecl
 
-#line 804 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 473 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_VersionDecl: // VersionDecl
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 339: // MainModule
-
-#line 797 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 480 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_MainModule: // MainModule
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 340: // LibraryModule
 
-#line 797 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 487 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_LibraryModule: // LibraryModule
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 341: // ModuleDecl
-
-#line 797 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 494 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_ModuleDecl: // ModuleDecl
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 342: // SIND_DeclList
 
-#line 800 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 501 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_SIND_DeclList: // SIND_DeclList
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 343: // SIND_Decl
-
-#line 800 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 508 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_SIND_Decl: // SIND_Decl
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 344: // Setter
 
-#line 801 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 515 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_Setter: // Setter
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 345: // BoundarySpaceDecl
-
-#line 794 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 522 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_BoundarySpaceDecl: // BoundarySpaceDecl
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 346: // DefaultCollationDecl
 
-#line 795 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 529 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_DefaultCollationDecl: // DefaultCollationDecl
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 347: // BaseURIDecl
-
-#line 794 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 536 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_BaseURIDecl: // BaseURIDecl
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 348: // ConstructionDecl
 
-#line 794 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 543 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_ConstructionDecl: // ConstructionDecl
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 349: // OrderingModeDecl
-
-#line 799 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 550 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_OrderingModeDecl: // OrderingModeDecl
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 350: // EmptyOrderDecl
-
-#line 796 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 557 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_EmptyOrderDecl: // EmptyOrderDecl
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 351: // CopyNamespacesDecl
 
-#line 795 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 564 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_CopyNamespacesDecl: // CopyNamespacesDecl
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 352: // Import
-
-#line 796 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 571 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_Import: // Import
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 353: // SchemaImport
 
-#line 800 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 578 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_SchemaImport: // SchemaImport
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 354: // URILiteralList
-
-#line 802 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 585 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_URILiteralList: // URILiteralList
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 355: // SchemaPrefix
 
-#line 801 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 592 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_SchemaPrefix: // SchemaPrefix
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 356: // ModuleImport
-
-#line 797 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 599 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_ModuleImport: // ModuleImport
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 357: // NamespaceDecl
 
-#line 797 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 606 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_NamespaceDecl: // NamespaceDecl
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 358: // DefaultNamespaceDecl
-
-#line 795 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 613 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_DefaultNamespaceDecl: // DefaultNamespaceDecl
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 359: // VFO_DeclList
-
-#line 804 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 620 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_VFO_DeclList: // VFO_DeclList
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 360: // VFO_Decl
 
-#line 804 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 627 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_VFO_Decl: // VFO_Decl
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 361: // DecimalFormatDecl
-
-#line 804 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 634 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_DecimalFormatDecl: // DecimalFormatDecl
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 362: // DecimalFormatParamList
 
-#line 810 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { delete (yysym.value.vstrpair); }
-#line 641 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_DecimalFormatParamList: // DecimalFormatParamList
+                    { delete (yysym.value.vstrpair); }
         break;
 
-      case 363: // DecimalFormatParam
-
-#line 810 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { delete (yysym.value.strpair); }
-#line 648 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_DecimalFormatParam: // DecimalFormatParam
+                    { delete (yysym.value.strpair); }
         break;
-
-      case 365: // OptionDecl
 
-#line 798 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 655 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_OptionDecl: // OptionDecl
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 366: // FTOptionDecl
-
-#line 806 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 662 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_FTOptionDecl: // FTOptionDecl
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 367: // CtxItemDecl
 
-#line 802 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 669 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_CtxItemDecl: // CtxItemDecl
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 368: // CtxItemDecl2
-
-#line 802 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 676 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_CtxItemDecl2: // CtxItemDecl2
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 369: // CtxItemDecl3
-
-#line 802 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 683 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_CtxItemDecl3: // CtxItemDecl3
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 370: // CtxItemDecl4
 
-#line 803 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 690 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_CtxItemDecl4: // CtxItemDecl4
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 371: // VarDecl
-
-#line 803 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 697 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_VarDecl: // VarDecl
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 372: // VarNameAndType
 
-#line 810 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { delete (yysym.value.varnametype); }
-#line 704 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_VarNameAndType: // VarNameAndType
+                    { delete (yysym.value.varnametype); }
         break;
 
-      case 373: // AnnotationList
-
-#line 793 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 711 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_AnnotationList: // AnnotationList
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 374: // Annotation
 
-#line 793 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 718 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_Annotation: // Annotation
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 375: // AnnotationLiteralList
-
-#line 793 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 725 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_AnnotationLiteralList: // AnnotationLiteralList
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 376: // FunctionDecl
 
-#line 796 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 732 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_FunctionDecl: // FunctionDecl
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 377: // FunctionDecl2
-
-#line 796 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 739 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_FunctionDecl2: // FunctionDecl2
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 378: // FunctionDeclSimple
-
-#line 796 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 746 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_FunctionDeclSimple: // FunctionDeclSimple
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 379: // FunctionDeclUpdating
 
-#line 796 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 753 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_FunctionDeclUpdating: // FunctionDeclUpdating
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 380: // FunctionSig
-
-#line 810 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { delete (yysym.value.fnsig); }
-#line 760 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_FunctionSig: // FunctionSig
+                    { delete (yysym.value.fnsig); }
         break;
-
-      case 381: // ParamList
 
-#line 799 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 767 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_ParamList: // ParamList
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 382: // Param
-
-#line 799 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 774 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_Param: // Param
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 383: // CollectionDecl
 
-#line 802 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 781 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_CollectionDecl: // CollectionDecl
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 385: // IndexDecl
-
-#line 802 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 788 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_IndexDecl: // IndexDecl
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 386: // IndexKeyList
 
-#line 802 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 795 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_IndexKeyList: // IndexKeyList
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 387: // IndexKeySpec
-
-#line 802 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 802 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_IndexKeySpec: // IndexKeySpec
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 388: // IntegrityConstraintDecl
-
-#line 802 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_IntegrityConstraintDecl: // IntegrityConstraintDecl
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 389: // QueryBody
 
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 816 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_QueryBody: // QueryBody
+                    { release_hack( (yysym.value.expr) ); }
         break;
 
-      case 390: // StatementsAndOptionalExprTop
-
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 823 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_StatementsAndOptionalExprTop: // StatementsAndOptionalExprTop
+                    { release_hack( (yysym.value.expr) ); }
         break;
-
-      case 391: // StatementsAndOptionalExpr
 
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 830 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_StatementsAndOptionalExpr: // StatementsAndOptionalExpr
+                    { release_hack( (yysym.value.expr) ); }
         break;
 
-      case 392: // StatementsAndExpr
-
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 837 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_StatementsAndExpr: // StatementsAndExpr
+                    { release_hack( (yysym.value.expr) ); }
         break;
-
-      case 393: // Statements
 
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 844 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_Statements: // Statements
+                    { release_hack( (yysym.value.expr) ); }
         break;
 
-      case 394: // Statement
-
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 851 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_Statement: // Statement
+                    { release_hack( (yysym.value.expr) ); }
         break;
-
-      case 395: // BlockStatement
 
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 858 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_BlockStatement: // BlockStatement
+                    { release_hack( (yysym.value.expr) ); }
         break;
 
-      case 396: // BlockExpr
-
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 865 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_BlockExpr: // BlockExpr
+                    { release_hack( (yysym.value.expr) ); }
         break;
 
-      case 397: // EnclosedStatementsAndOptionalExpr
-
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 872 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_EnclosedStatementsAndOptionalExpr: // EnclosedStatementsAndOptionalExpr
+                    { release_hack( (yysym.value.expr) ); }
         break;
-
-      case 398: // VarDeclStatement
 
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 879 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_VarDeclStatement: // VarDeclStatement
+                    { release_hack( (yysym.value.expr) ); }
         break;
 
-      case 401: // AssignStatement
-
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 886 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_AssignStatement: // AssignStatement
+                    { release_hack( (yysym.value.expr) ); }
         break;
-
-      case 402: // ApplyStatement
 
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 893 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_ApplyStatement: // ApplyStatement
+                    { release_hack( (yysym.value.expr) ); }
         break;
 
-      case 403: // ExitStatement
-
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 900 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_ExitStatement: // ExitStatement
+                    { release_hack( (yysym.value.expr) ); }
         break;
-
-      case 404: // WhileStatement
 
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 907 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_WhileStatement: // WhileStatement
+                    { release_hack( (yysym.value.expr) ); }
         break;
 
-      case 405: // FlowCtlStatement
-
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 914 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_FlowCtlStatement: // FlowCtlStatement
+                    { release_hack( (yysym.value.expr) ); }
         break;
-
-      case 406: // FLWORStatement
 
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 921 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_FLWORStatement: // FLWORStatement
+                    { release_hack( (yysym.value.expr) ); }
         break;
 
-      case 407: // ReturnStatement
-
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 928 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_ReturnStatement: // ReturnStatement
+                    { release_hack( (yysym.value.expr) ); }
         break;
 
-      case 408: // IfStatement
-
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 935 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_IfStatement: // IfStatement
+                    { release_hack( (yysym.value.expr) ); }
         break;
-
-      case 409: // TryStatement
 
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 942 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_TryStatement: // TryStatement
+                    { release_hack( (yysym.value.expr) ); }
         break;
 
-      case 410: // CatchListStatement
-
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 949 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_CatchListStatement: // CatchListStatement
+                    { release_hack( (yysym.value.expr) ); }
         break;
-
-      case 411: // CatchStatement
 
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 956 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_CatchStatement: // CatchStatement
+                    { release_hack( (yysym.value.expr) ); }
         break;
 
-      case 412: // VoidStatement
-
-#line 805 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 963 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_VoidStatement: // VoidStatement
+                    { release_hack( (yysym.value.expr) ); }
         break;
-
-      case 413: // Expr
 
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 970 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_Expr: // Expr
+                    { release_hack( (yysym.value.expr) ); }
         break;
 
-      case 414: // ExprSingle
-
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 977 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_ExprSingle: // ExprSingle
+                    { release_hack( (yysym.value.expr) ); }
         break;
-
-      case 415: // ExprSimple
 
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 984 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_ExprSimple: // ExprSimple
+                    { release_hack( (yysym.value.expr) ); }
         break;
 
-      case 416: // FLWORExpr
-
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 991 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_FLWORExpr: // FLWORExpr
+                    { release_hack( (yysym.value.expr) ); }
         break;
 
-      case 417: // ReturnExpr
-
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 998 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_ReturnExpr: // ReturnExpr
+                    { release_hack( (yysym.value.expr) ); }
         break;
-
-      case 421: // FLWORWinCond
 
-#line 803 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1005 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_FLWORWinCond: // FLWORWinCond
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 422: // WindowClause
-
-#line 796 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1012 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_WindowClause: // WindowClause
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 423: // CountClause
 
-#line 804 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1019 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_CountClause: // CountClause
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 424: // ForLetWinClause
-
-#line 796 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1026 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_ForLetWinClause: // ForLetWinClause
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 426: // FLWORClauseList
 
-#line 796 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1033 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_FLWORClauseList: // FLWORClauseList
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 427: // ForClause
-
-#line 796 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1040 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_ForClause: // ForClause
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 429: // VarInDeclList
 
-#line 803 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1047 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_VarInDeclList: // VarInDeclList
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 430: // VarInDecl
-
-#line 803 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1054 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_VarInDecl: // VarInDecl
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 431: // PositionalVar
-
-#line 799 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1061 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_PositionalVar: // PositionalVar
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 432: // FTScoreVar
 
-#line 806 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1068 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_FTScoreVar: // FTScoreVar
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 433: // LetClause
-
-#line 797 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1075 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_LetClause: // LetClause
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 434: // VarGetsDeclList
 
-#line 803 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1082 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_VarGetsDeclList: // VarGetsDeclList
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 435: // VarGetsDecl
-
-#line 803 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1089 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_VarGetsDecl: // VarGetsDecl
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 436: // WindowVarDecl
 
-#line 803 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1096 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_WindowVarDecl: // WindowVarDecl
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 437: // WindowVars
-
-#line 803 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1103 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_WindowVars: // WindowVars
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 438: // WindowVars3
 
-#line 803 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1110 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_WindowVars3: // WindowVars3
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 439: // WindowVars2
-
-#line 803 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1117 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_WindowVars2: // WindowVars2
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 440: // WhereClause
-
-#line 804 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1124 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_WhereClause: // WhereClause
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 441: // GroupByClause
 
-#line 798 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1131 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_GroupByClause: // GroupByClause
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 442: // GroupSpecList
-
-#line 798 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1138 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_GroupSpecList: // GroupSpecList
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 443: // GroupSpec
 
-#line 798 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1145 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_GroupSpec: // GroupSpec
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 444: // GroupCollationSpec
-
-#line 798 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1152 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_GroupCollationSpec: // GroupCollationSpec
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 445: // OrderByClause
 
-#line 798 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1159 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_OrderByClause: // OrderByClause
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 446: // OrderSpecList
-
-#line 799 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1166 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_OrderSpecList: // OrderSpecList
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 447: // OrderSpec
 
-#line 799 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1173 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_OrderSpec: // OrderSpec
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 448: // OrderModifier
-
-#line 798 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1180 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_OrderModifier: // OrderModifier
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 449: // OrderDirSpec
-
-#line 798 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1187 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_OrderDirSpec: // OrderDirSpec
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 450: // OrderEmptySpec
 
-#line 798 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1194 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_OrderEmptySpec: // OrderEmptySpec
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 451: // OrderCollationSpec
-
-#line 798 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1201 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_OrderCollationSpec: // OrderCollationSpec
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 452: // QuantifiedExpr
 
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 1208 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_QuantifiedExpr: // QuantifiedExpr
+                    { release_hack( (yysym.value.expr) ); }
         break;
 
-      case 453: // QVarInDeclList
-
-#line 799 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1215 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_QVarInDeclList: // QVarInDeclList
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 454: // QVarInDecl
 
-#line 799 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1222 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_QVarInDecl: // QVarInDecl
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 455: // SwitchExpr
-
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 1229 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_SwitchExpr: // SwitchExpr
+                    { release_hack( (yysym.value.expr) ); }
         break;
-
-      case 456: // SwitchCaseClauseList
 
-#line 805 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1236 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_SwitchCaseClauseList: // SwitchCaseClauseList
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 457: // SwitchCaseClause
-
-#line 805 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1243 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_SwitchCaseClause: // SwitchCaseClause
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 458: // SwitchCaseOperandList
-
-#line 805 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1250 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_SwitchCaseOperandList: // SwitchCaseOperandList
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 459: // SwitchStatement
 
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 1257 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_SwitchStatement: // SwitchStatement
+                    { release_hack( (yysym.value.expr) ); }
         break;
 
-      case 462: // TypeswitchExpr
-
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 1264 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_TypeswitchExpr: // TypeswitchExpr
+                    { release_hack( (yysym.value.expr) ); }
         break;
-
-      case 463: // TypeswitchStatement
 
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 1271 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_TypeswitchStatement: // TypeswitchStatement
+                    { release_hack( (yysym.value.expr) ); }
         break;
 
-      case 464: // CaseClauseList
-
-#line 794 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1278 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_CaseClauseList: // CaseClauseList
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 465: // CaseClause
 
-#line 794 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1285 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_CaseClause: // CaseClause
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 468: // SequenceTypeList
-
-#line 801 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1292 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_SequenceTypeList: // SequenceTypeList
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 469: // IfExpr
 
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 1299 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_IfExpr: // IfExpr
+                    { release_hack( (yysym.value.expr) ); }
         break;
 
-      case 470: // OrExpr
-
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 1306 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_OrExpr: // OrExpr
+                    { release_hack( (yysym.value.expr) ); }
         break;
 
-      case 471: // AndExpr
-
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 1313 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_AndExpr: // AndExpr
+                    { release_hack( (yysym.value.expr) ); }
         break;
-
-      case 472: // ComparisonExpr
 
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 1320 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_ComparisonExpr: // ComparisonExpr
+                    { release_hack( (yysym.value.expr) ); }
         break;
 
-      case 474: // FTContainsExpr
-
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 1327 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_FTContainsExpr: // FTContainsExpr
+                    { release_hack( (yysym.value.expr) ); }
         break;
-
-      case 475: // StringConcatExpr
 
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 1334 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_StringConcatExpr: // StringConcatExpr
+                    { release_hack( (yysym.value.expr) ); }
         break;
 
-      case 476: // opt_FTIgnoreOption
-
-#line 806 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1341 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_opt_FTIgnoreOption: // opt_FTIgnoreOption
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 477: // RangeExpr
 
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 1348 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_RangeExpr: // RangeExpr
+                    { release_hack( (yysym.value.expr) ); }
         break;
 
-      case 478: // AdditiveExpr
-
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 1355 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_AdditiveExpr: // AdditiveExpr
+                    { release_hack( (yysym.value.expr) ); }
         break;
-
-      case 479: // MultiplicativeExpr
 
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 1362 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_MultiplicativeExpr: // MultiplicativeExpr
+                    { release_hack( (yysym.value.expr) ); }
         break;
 
-      case 480: // UnionExpr
-
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 1369 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_UnionExpr: // UnionExpr
+                    { release_hack( (yysym.value.expr) ); }
         break;
 
-      case 481: // IntersectExceptExpr
-
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 1376 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_IntersectExceptExpr: // IntersectExceptExpr
+                    { release_hack( (yysym.value.expr) ); }
         break;
-
-      case 482: // InstanceofExpr
 
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 1383 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_InstanceofExpr: // InstanceofExpr
+                    { release_hack( (yysym.value.expr) ); }
         break;
 
-      case 483: // TreatExpr
-
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 1390 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_TreatExpr: // TreatExpr
+                    { release_hack( (yysym.value.expr) ); }
         break;
-
-      case 484: // CastableExpr
 
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 1397 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_CastableExpr: // CastableExpr
+                    { release_hack( (yysym.value.expr) ); }
         break;
 
-      case 485: // CastExpr
-
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 1404 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_CastExpr: // CastExpr
+                    { release_hack( (yysym.value.expr) ); }
         break;
-
-      case 486: // SingleType
 
-#line 801 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1411 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_SingleType: // SingleType
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 487: // UnaryExpr
-
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 1418 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_UnaryExpr: // UnaryExpr
+                    { release_hack( (yysym.value.expr) ); }
         break;
-
-      case 488: // SignList
 
-#line 801 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1425 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_SignList: // SignList
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 489: // ValueExpr
-
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 1432 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_ValueExpr: // ValueExpr
+                    { release_hack( (yysym.value.expr) ); }
         break;
 
-      case 490: // SimpleMapExpr
-
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 1439 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_SimpleMapExpr: // SimpleMapExpr
+                    { release_hack( (yysym.value.expr) ); }
         break;
-
-      case 491: // ValueComp
 
-#line 802 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1446 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_ValueComp: // ValueComp
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 492: // NodeComp
-
-#line 805 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1453 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_NodeComp: // NodeComp
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 493: // ValidateExpr
 
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 1460 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_ValidateExpr: // ValidateExpr
+                    { release_hack( (yysym.value.expr) ); }
         break;
 
-      case 494: // ExtensionExpr
-
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 1467 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_ExtensionExpr: // ExtensionExpr
+                    { release_hack( (yysym.value.expr) ); }
         break;
-
-      case 495: // Pragma_list
 
-#line 799 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1474 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_Pragma_list: // Pragma_list
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 496: // Pragma
-
-#line 799 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1481 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_Pragma: // Pragma
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 497: // PathExpr
 
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 1488 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_PathExpr: // PathExpr
+                    { release_hack( (yysym.value.expr) ); }
         break;
 
-      case 499: // RelativePathExpr
-
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 1495 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_RelativePathExpr: // RelativePathExpr
+                    { release_hack( (yysym.value.expr) ); }
         break;
-
-      case 500: // StepExpr
 
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 1502 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_StepExpr: // StepExpr
+                    { release_hack( (yysym.value.expr) ); }
         break;
 
-      case 501: // AxisStep
-
-#line 808 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 1509 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_AxisStep: // AxisStep
+                    { release_hack( (yysym.value.expr) ); }
         break;
-
-      case 502: // ForwardStep
 
-#line 792 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1516 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_ForwardStep: // ForwardStep
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 503: // ForwardAxis
-
-#line 792 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1523 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_ForwardAxis: // ForwardAxis
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 504: // AbbrevForwardStep
 
-#line 792 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1530 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_AbbrevForwardStep: // AbbrevForwardStep
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 505: // ReverseStep
-
-#line 792 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1537 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_ReverseStep: // ReverseStep
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 506: // ReverseAxis
 
-#line 792 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1544 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_ReverseAxis: // ReverseAxis
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 507: // NodeTest
-
-#line 792 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1551 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_NodeTest: // NodeTest
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 508: // NameTest
-
-#line 797 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1558 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_NameTest: // NameTest
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 509: // Wildcard
 
-#line 804 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1565 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_Wildcard: // Wildcard
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 510: // PostfixExpr
-
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 1572 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_PostfixExpr: // PostfixExpr
+                    { release_hack( (yysym.value.expr) ); }
         break;
-
-      case 511: // PredicateList
 
-#line 799 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1579 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_PredicateList: // PredicateList
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 512: // Predicate
-
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 1586 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_Predicate: // Predicate
+                    { release_hack( (yysym.value.expr) ); }
         break;
-
-      case 513: // PrimaryExpr
 
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 1593 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_PrimaryExpr: // PrimaryExpr
+                    { release_hack( (yysym.value.expr) ); }
         break;
 
-      case 514: // Literal
-
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 1600 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_Literal: // Literal
+                    { release_hack( (yysym.value.expr) ); }
         break;
-
-      case 515: // NumericLiteral
 
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 1607 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_NumericLiteral: // NumericLiteral
+                    { release_hack( (yysym.value.expr) ); }
         break;
 
-      case 516: // VarRef
-
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 1614 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_VarRef: // VarRef
+                    { release_hack( (yysym.value.expr) ); }
         break;
 
-      case 517: // ParenthesizedExpr
-
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 1621 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_ParenthesizedExpr: // ParenthesizedExpr
+                    { release_hack( (yysym.value.expr) ); }
         break;
-
-      case 518: // ContextItemExpr
 
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 1628 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_ContextItemExpr: // ContextItemExpr
+                    { release_hack( (yysym.value.expr) ); }
         break;
 
-      case 519: // OrderedExpr
-
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 1635 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_OrderedExpr: // OrderedExpr
+                    { release_hack( (yysym.value.expr) ); }
         break;
-
-      case 520: // UnorderedExpr
 
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 1642 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_UnorderedExpr: // UnorderedExpr
+                    { release_hack( (yysym.value.expr) ); }
         break;
 
-      case 521: // FunctionCall
-
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 1649 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_FunctionCall: // FunctionCall
+                    { release_hack( (yysym.value.expr) ); }
         break;
-
-      case 522: // ArgList
 
-#line 793 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1656 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_ArgList: // ArgList
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 526: // Constructor
-
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 1663 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_Constructor: // Constructor
+                    { release_hack( (yysym.value.expr) ); }
         break;
-
-      case 527: // DirectConstructor
 
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 1670 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_DirectConstructor: // DirectConstructor
+                    { release_hack( (yysym.value.expr) ); }
         break;
 
-      case 528: // DirElemConstructor
-
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 1677 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_DirElemConstructor: // DirElemConstructor
+                    { release_hack( (yysym.value.expr) ); }
         break;
 
-      case 529: // DirElemContentList
-
-#line 795 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1684 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_DirElemContentList: // DirElemContentList
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 530: // DirAttributeList
 
-#line 795 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1691 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_DirAttributeList: // DirAttributeList
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 531: // DirAttr
-
-#line 795 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1698 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_DirAttr: // DirAttr
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 533: // DirAttributeValue
 
-#line 795 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1705 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_DirAttributeValue: // DirAttributeValue
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 534: // opt_QuoteAttrContentList
-
-#line 800 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1712 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_opt_QuoteAttrContentList: // opt_QuoteAttrContentList
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 535: // QuoteAttrContentList
 
-#line 800 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1719 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_QuoteAttrContentList: // QuoteAttrContentList
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 536: // opt_AposAttrContentList
-
-#line 793 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1726 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_opt_AposAttrContentList: // opt_AposAttrContentList
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 537: // AposAttrContentList
 
-#line 793 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1733 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_AposAttrContentList: // AposAttrContentList
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 538: // QuoteAttrValueContent
-
-#line 800 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1740 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_QuoteAttrValueContent: // QuoteAttrValueContent
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 539: // AposAttrValueContent
-
-#line 793 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1747 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_AposAttrValueContent: // AposAttrValueContent
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 540: // DirElemContent
 
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 1754 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_DirElemContent: // DirElemContent
+                    { release_hack( (yysym.value.expr) ); }
         break;
 
-      case 541: // CommonContent
-
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 1761 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_CommonContent: // CommonContent
+                    { release_hack( (yysym.value.expr) ); }
         break;
-
-      case 542: // DirCommentConstructor
 
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 1768 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_DirCommentConstructor: // DirCommentConstructor
+                    { release_hack( (yysym.value.expr) ); }
         break;
 
-      case 543: // DirPIConstructor
-
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 1775 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_DirPIConstructor: // DirPIConstructor
+                    { release_hack( (yysym.value.expr) ); }
         break;
-
-      case 544: // CDataSection
 
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 1782 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_CDataSection: // CDataSection
+                    { release_hack( (yysym.value.expr) ); }
         break;
 
-      case 545: // ComputedConstructor
-
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 1789 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_ComputedConstructor: // ComputedConstructor
+                    { release_hack( (yysym.value.expr) ); }
         break;
-
-      case 546: // CompDocConstructor
 
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 1796 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_CompDocConstructor: // CompDocConstructor
+                    { release_hack( (yysym.value.expr) ); }
         break;
 
-      case 547: // CompElemConstructor
-
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 1803 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_CompElemConstructor: // CompElemConstructor
+                    { release_hack( (yysym.value.expr) ); }
         break;
 
-      case 548: // CompAttrConstructor
-
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 1810 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_CompAttrConstructor: // CompAttrConstructor
+                    { release_hack( (yysym.value.expr) ); }
         break;
-
-      case 549: // CompTextConstructor
 
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 1817 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_CompTextConstructor: // CompTextConstructor
+                    { release_hack( (yysym.value.expr) ); }
         break;
 
-      case 550: // CompCommentConstructor
-
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 1824 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_CompCommentConstructor: // CompCommentConstructor
+                    { release_hack( (yysym.value.expr) ); }
         break;
-
-      case 551: // CompPIConstructor
 
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 1831 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_CompPIConstructor: // CompPIConstructor
+                    { release_hack( (yysym.value.expr) ); }
         break;
 
-      case 552: // CompNamespaceConstructor
-
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 1838 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_CompNamespaceConstructor: // CompNamespaceConstructor
+                    { release_hack( (yysym.value.expr) ); }
         break;
-
-      case 553: // TypeDeclaration
 
-#line 801 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1845 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_TypeDeclaration: // TypeDeclaration
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 554: // SequenceType
-
-#line 801 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1852 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_SequenceType: // SequenceType
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 555: // OccurrenceIndicator
 
-#line 797 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1859 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_OccurrenceIndicator: // OccurrenceIndicator
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 556: // ItemType
-
-#line 797 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1866 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_ItemType: // ItemType
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 557: // TypeList
-
-#line 804 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1873 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_TypeList: // TypeList
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 558: // GeneralizedAtomicType
 
-#line 794 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1880 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_GeneralizedAtomicType: // GeneralizedAtomicType
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 559: // SimpleType
-
-#line 794 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1887 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_SimpleType: // SimpleType
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 560: // KindTest
 
-#line 797 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1894 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_KindTest: // KindTest
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 561: // AnyKindTest
-
-#line 793 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1901 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_AnyKindTest: // AnyKindTest
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 563: // DocumentTest
 
-#line 795 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1908 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_DocumentTest: // DocumentTest
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 564: // NamespaceTest
-
-#line 801 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1915 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_NamespaceTest: // NamespaceTest
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 565: // TextTest
 
-#line 801 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1922 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_TextTest: // TextTest
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 566: // CommentTest
-
-#line 794 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1929 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_CommentTest: // CommentTest
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 567: // PITest
-
-#line 799 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1936 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_PITest: // PITest
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 568: // AttributeTest
 
-#line 794 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1943 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_AttributeTest: // AttributeTest
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 569: // SchemaAttributeTest
-
-#line 800 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1950 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_SchemaAttributeTest: // SchemaAttributeTest
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 570: // ElementTest
 
-#line 795 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1957 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_ElementTest: // ElementTest
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 571: // SchemaElementTest
-
-#line 800 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1964 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_SchemaElementTest: // SchemaElementTest
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 572: // TypeName
 
-#line 801 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1971 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_TypeName: // TypeName
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 573: // TypeName_WITH_HOOK
-
-#line 801 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1978 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_TypeName_WITH_HOOK: // TypeName_WITH_HOOK
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 574: // StringLiteral
 
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 1985 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_StringLiteral: // StringLiteral
+                    { release_hack( (yysym.value.expr) ); }
         break;
 
-      case 576: // AnyFunctionTest
-
-#line 804 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1992 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_AnyFunctionTest: // AnyFunctionTest
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 577: // TypedFunctionTest
-
-#line 804 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 1999 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_TypedFunctionTest: // TypedFunctionTest
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 580: // InsertExpr
 
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 2006 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_InsertExpr: // InsertExpr
+                    { release_hack( (yysym.value.expr) ); }
         break;
 
-      case 581: // DeleteExpr
-
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 2013 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_DeleteExpr: // DeleteExpr
+                    { release_hack( (yysym.value.expr) ); }
         break;
-
-      case 582: // ReplaceExpr
 
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 2020 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_ReplaceExpr: // ReplaceExpr
+                    { release_hack( (yysym.value.expr) ); }
         break;
 
-      case 583: // RenameExpr
-
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 2027 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_RenameExpr: // RenameExpr
+                    { release_hack( (yysym.value.expr) ); }
         break;
-
-      case 584: // TransformExpr
 
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 2034 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_TransformExpr: // TransformExpr
+                    { release_hack( (yysym.value.expr) ); }
         break;
 
-      case 585: // VarNameList
-
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 2041 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_VarNameList: // VarNameList
+                    { release_hack( (yysym.value.expr) ); }
         break;
-
-      case 586: // VarNameDecl
 
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 2048 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_VarNameDecl: // VarNameDecl
+                    { release_hack( (yysym.value.expr) ); }
         break;
 
-      case 587: // TryExpr
-
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 2055 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_TryExpr: // TryExpr
+                    { release_hack( (yysym.value.expr) ); }
         break;
 
-      case 588: // CatchListExpr
-
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 2062 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_CatchListExpr: // CatchListExpr
+                    { release_hack( (yysym.value.expr) ); }
         break;
-
-      case 589: // CatchExpr
 
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 2069 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_CatchExpr: // CatchExpr
+                    { release_hack( (yysym.value.expr) ); }
         break;
 
-      case 590: // BracedExpr
-
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 2076 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_BracedExpr: // BracedExpr
+                    { release_hack( (yysym.value.expr) ); }
         break;
-
-      case 591: // NameTestList
 
-#line 810 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { delete (yysym.value.name_test_list); }
-#line 2083 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_NameTestList: // NameTestList
+                    { delete (yysym.value.name_test_list); }
         break;
 
-      case 592: // FTSelection
-
-#line 806 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 2090 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_FTSelection: // FTSelection
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 595: // FTOr
 
-#line 806 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 2097 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_FTOr: // FTOr
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 596: // FTAnd
-
-#line 806 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 2104 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_FTAnd: // FTAnd
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 597: // FTMildNot
 
-#line 806 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 2111 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_FTMildNot: // FTMildNot
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 598: // FTUnaryNot
-
-#line 806 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 2118 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_FTUnaryNot: // FTUnaryNot
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 599: // FTPrimaryWithOptions
-
-#line 806 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 2125 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_FTPrimaryWithOptions: // FTPrimaryWithOptions
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 600: // opt_FTMatchOptions
 
-#line 806 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 2132 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_opt_FTMatchOptions: // opt_FTMatchOptions
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 602: // FTWeight
-
-#line 806 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 2139 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_FTWeight: // FTWeight
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 603: // FTPrimary
 
-#line 806 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 2146 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_FTPrimary: // FTPrimary
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 604: // opt_FTTimes
-
-#line 806 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 2153 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_opt_FTTimes: // opt_FTTimes
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 605: // FTExtensionSelection
 
-#line 806 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 2160 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_FTExtensionSelection: // FTExtensionSelection
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 607: // FTWords
-
-#line 806 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 2167 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_FTWords: // FTWords
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 608: // FTWordsValue
 
-#line 806 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 2174 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_FTWordsValue: // FTWordsValue
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 610: // FTAnyallOption
-
-#line 806 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 2181 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_FTAnyallOption: // FTAnyallOption
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 613: // FTPosFilter
-
-#line 806 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 2188 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_FTPosFilter: // FTPosFilter
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 614: // FTOrder
 
-#line 806 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 2195 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_FTOrder: // FTOrder
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 615: // FTWindow
-
-#line 806 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 2202 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_FTWindow: // FTWindow
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 616: // FTDistance
 
-#line 806 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 2209 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_FTDistance: // FTDistance
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 617: // FTUnit
-
-#line 806 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 2216 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_FTUnit: // FTUnit
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 618: // FTMatchOptions
 
-#line 806 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 2223 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_FTMatchOptions: // FTMatchOptions
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 619: // FTMatchOption
-
-#line 806 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 2230 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_FTMatchOption: // FTMatchOption
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 620: // FTCaseOption
 
-#line 806 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 2237 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_FTCaseOption: // FTCaseOption
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 621: // FTDiacriticsOption
-
-#line 806 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 2244 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_FTDiacriticsOption: // FTDiacriticsOption
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 622: // FTExtensionOption
-
-#line 806 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 2251 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_FTExtensionOption: // FTExtensionOption
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 623: // FTStemOption
 
-#line 806 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 2258 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_FTStemOption: // FTStemOption
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 624: // FTThesaurusOption
-
-#line 806 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 2265 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_FTThesaurusOption: // FTThesaurusOption
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 628: // FTThesaurusID
 
-#line 806 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 2272 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_FTThesaurusID: // FTThesaurusID
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 631: // FTStopWordOption
-
-#line 806 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 2279 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_FTStopWordOption: // FTStopWordOption
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 632: // FTStopWords
 
-#line 806 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 2286 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_FTStopWords: // FTStopWords
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 636: // FTStopWordsInclExcl
-
-#line 806 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 2293 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_FTStopWordsInclExcl: // FTStopWordsInclExcl
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 637: // FTLanguageOption
 
-#line 806 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 2300 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_FTLanguageOption: // FTLanguageOption
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 638: // FTWildCardOption
-
-#line 806 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 2307 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_FTWildCardOption: // FTWildCardOption
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 639: // FTContent
-
-#line 806 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 2314 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_FTContent: // FTContent
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 640: // FTTimes
 
-#line 806 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 2321 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_FTTimes: // FTTimes
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 641: // FTRange
-
-#line 806 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 2328 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_FTRange: // FTRange
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 642: // FTScope
 
-#line 806 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 2335 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_FTScope: // FTScope
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 643: // FTBigUnit
-
-#line 806 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 2342 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_FTBigUnit: // FTBigUnit
+                    { release_hack( (yysym.value.node) ); }
         break;
-
-      case 644: // FTIgnoreOption
 
-#line 806 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 2349 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_FTIgnoreOption: // FTIgnoreOption
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 645: // JSONArrayConstructor
-
-#line 807 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 2356 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_JSONArrayConstructor: // JSONArrayConstructor
+                    { release_hack( (yysym.value.expr) ); }
         break;
-
-      case 646: // JSONSimpleObjectUnion
 
-#line 807 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 2363 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_JSONSimpleObjectUnion: // JSONSimpleObjectUnion
+                    { release_hack( (yysym.value.expr) ); }
         break;
 
-      case 647: // JSONAccumulatorObjectUnion
-
-#line 807 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 2370 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_JSONAccumulatorObjectUnion: // JSONAccumulatorObjectUnion
+                    { release_hack( (yysym.value.expr) ); }
         break;
 
-      case 648: // JSONObjectConstructor
-
-#line 807 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 2377 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_JSONObjectConstructor: // JSONObjectConstructor
+                    { release_hack( (yysym.value.expr) ); }
         break;
-
-      case 649: // JSONPairList
 
-#line 807 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.node) ); }
-#line 2384 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_JSONPairList: // JSONPairList
+                    { release_hack( (yysym.value.node) ); }
         break;
 
-      case 650: // JSONInsertExpr
-
-#line 807 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 2391 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_JSONInsertExpr: // JSONInsertExpr
+                    { release_hack( (yysym.value.expr) ); }
         break;
-
-      case 651: // JSONAppendExpr
 
-#line 807 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 2398 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_JSONAppendExpr: // JSONAppendExpr
+                    { release_hack( (yysym.value.expr) ); }
         break;
 
-      case 652: // JSONDeleteExpr
-
-#line 807 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 2405 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_JSONDeleteExpr: // JSONDeleteExpr
+                    { release_hack( (yysym.value.expr) ); }
         break;
-
-      case 653: // JSONRenameExpr
 
-#line 807 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 2412 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_JSONRenameExpr: // JSONRenameExpr
+                    { release_hack( (yysym.value.expr) ); }
         break;
 
-      case 654: // JSONReplaceExpr
-
-#line 807 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 2419 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_JSONReplaceExpr: // JSONReplaceExpr
+                    { release_hack( (yysym.value.expr) ); }
         break;
-
-      case 657: // QNAME
 
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 2426 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_QNAME: // QNAME
+                    { release_hack( (yysym.value.expr) ); }
         break;
 
-      case 658: // FUNCTION_NAME
-
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 2433 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_FUNCTION_NAME: // FUNCTION_NAME
+                    { release_hack( (yysym.value.expr) ); }
         break;
 
-      case 659: // EQNAME
-
-#line 809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:599
-        { release_hack( (yysym.value.expr) ); }
-#line 2440 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:599
+      case symbol_kind::S_EQNAME: // EQNAME
+                    { release_hack( (yysym.value.expr) ); }
         break;
-
 
       default:
         break;
@@ -2448,40 +1587,45 @@ namespace zorba {
 #if YYDEBUG
   template <typename Base>
   void
-  xquery_parser::yy_print_ (std::ostream& yyo,
-                                     const basic_symbol<Base>& yysym) const
+  xquery_parser::yy_print_ (std::ostream& yyo, const basic_symbol<Base>& yysym) const
   {
     std::ostream& yyoutput = yyo;
-    YYUSE (yyoutput);
-    symbol_number_type yytype = yysym.type_get ();
-    yyo << (yytype < yyntokens_ ? "token" : "nterm")
-        << ' ' << yytname_[yytype] << " ("
-        << yysym.location << ": ";
-    YYUSE (yytype);
-    yyo << ')';
+    YY_USE (yyoutput);
+    if (yysym.empty ())
+      yyo << "empty symbol";
+    else
+      {
+        symbol_kind_type yykind = yysym.kind ();
+        yyo << (yykind < YYNTOKENS ? "token" : "nterm")
+            << ' ' << yysym.name () << " ("
+            << yysym.location << ": ";
+        YY_USE (yykind);
+        yyo << ')';
+      }
   }
 #endif
 
-  inline
   void
-  xquery_parser::yypush_ (const char* m, state_type s, symbol_type& sym)
-  {
-    stack_symbol_type t (s, sym);
-    yypush_ (m, t);
-  }
-
-  inline
-  void
-  xquery_parser::yypush_ (const char* m, stack_symbol_type& s)
+  xquery_parser::yypush_ (const char* m, YY_MOVE_REF (stack_symbol_type) sym)
   {
     if (m)
-      YY_SYMBOL_PRINT (m, s);
-    yystack_.push (s);
+      YY_SYMBOL_PRINT (m, sym);
+    yystack_.push (YY_MOVE (sym));
   }
 
-  inline
   void
-  xquery_parser::yypop_ (unsigned int n)
+  xquery_parser::yypush_ (const char* m, state_type s, YY_MOVE_REF (symbol_type) sym)
+  {
+#if 201103L <= YY_CPLUSPLUS
+    yypush_ (m, stack_symbol_type (s, std::move (sym)));
+#else
+    stack_symbol_type ss (s, sym);
+    yypush_ (m, ss);
+#endif
+  }
+
+  void
+  xquery_parser::yypop_ (int n) YY_NOEXCEPT
   {
     yystack_.pop (n);
   }
@@ -2513,35 +1657,37 @@ namespace zorba {
   }
 #endif // YYDEBUG
 
-  inline xquery_parser::state_type
+  xquery_parser::state_type
   xquery_parser::yy_lr_goto_state_ (state_type yystate, int yysym)
   {
-    int yyr = yypgoto_[yysym - yyntokens_] + yystate;
+    int yyr = yypgoto_[yysym - YYNTOKENS] + yystate;
     if (0 <= yyr && yyr <= yylast_ && yycheck_[yyr] == yystate)
       return yytable_[yyr];
     else
-      return yydefgoto_[yysym - yyntokens_];
+      return yydefgoto_[yysym - YYNTOKENS];
   }
 
-  inline bool
-  xquery_parser::yy_pact_value_is_default_ (int yyvalue)
+  bool
+  xquery_parser::yy_pact_value_is_default_ (int yyvalue) YY_NOEXCEPT
   {
     return yyvalue == yypact_ninf_;
   }
 
-  inline bool
-  xquery_parser::yy_table_value_is_error_ (int yyvalue)
+  bool
+  xquery_parser::yy_table_value_is_error_ (int yyvalue) YY_NOEXCEPT
   {
     return yyvalue == yytable_ninf_;
   }
 
   int
+  xquery_parser::operator() ()
+  {
+    return parse ();
+  }
+
+  int
   xquery_parser::parse ()
   {
-    /// Whether yyla contains a lookahead.
-    bool yyempty = true;
-
-    // State.
     int yyn;
     /// Length of the RHS of the rule being reduced.
     int yylen = 0;
@@ -2559,68 +1705,89 @@ namespace zorba {
     /// The return value of parse ().
     int yyresult;
 
-    // FIXME: This shoud be completely indented.  It is not yet to
-    // avoid gratuitous conflicts when merging into the master branch.
+#if YY_EXCEPTIONS
     try
+#endif // YY_EXCEPTIONS
       {
-    YYCDEBUG << "Starting parse" << std::endl;
+    YYCDEBUG << "Starting parse\n";
 
 
     // User initialization code.
-    #line 128 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:725
 {
     yyla.location.begin.filename = yyla.location.end.filename = &(driver.theFilename2);
+    static_cast<void>(yynerrs_);
 }
 
-#line 2576 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:725
+
 
     /* Initialize the stack.  The initial state will be set in
        yynewstate, since the latter expects the semantical and the
        location values to have been already stored, initialize these
        stacks with a primary value.  */
     yystack_.clear ();
-    yypush_ (YY_NULLPTR, 0, yyla);
+    yypush_ (YY_NULLPTR, 0, YY_MOVE (yyla));
 
-    // A new symbol was pushed on the stack.
+  /*-----------------------------------------------.
+  | yynewstate -- push a new symbol on the stack.  |
+  `-----------------------------------------------*/
   yynewstate:
-    YYCDEBUG << "Entering state " << yystack_[0].state << std::endl;
+    YYCDEBUG << "Entering state " << int (yystack_[0].state) << '\n';
+    YY_STACK_PRINT ();
 
     // Accept?
     if (yystack_[0].state == yyfinal_)
-      goto yyacceptlab;
+      YYACCEPT;
 
     goto yybackup;
 
-    // Backup.
-  yybackup:
 
+  /*-----------.
+  | yybackup.  |
+  `-----------*/
+  yybackup:
     // Try to take a decision without lookahead.
-    yyn = yypact_[yystack_[0].state];
+    yyn = yypact_[+yystack_[0].state];
     if (yy_pact_value_is_default_ (yyn))
       goto yydefault;
 
     // Read a lookahead token.
-    if (yyempty)
+    if (yyla.empty ())
       {
-        YYCDEBUG << "Reading a token: ";
+        YYCDEBUG << "Reading a token\n";
+#if YY_EXCEPTIONS
         try
+#endif // YY_EXCEPTIONS
           {
-            yyla.type = yytranslate_ (yylex (&yyla.value, &yyla.location));
+            yyla.kind_ = yytranslate_ (yylex (&yyla.value, &yyla.location));
           }
+#if YY_EXCEPTIONS
         catch (const syntax_error& yyexc)
           {
+            YYCDEBUG << "Caught exception: " << yyexc.what() << '\n';
             error (yyexc);
             goto yyerrlab1;
           }
-        yyempty = false;
+#endif // YY_EXCEPTIONS
       }
     YY_SYMBOL_PRINT ("Next token is", yyla);
 
+    if (yyla.kind () == symbol_kind::S_YYerror)
+    {
+      // The scanner already issued an error message, process directly
+      // to error recovery.  But do not keep the error token as
+      // lookahead, it is too special and may lead us to an endless
+      // loop in error recovery. */
+      yyla.kind_ = symbol_kind::S_YYUNDEF;
+      goto yyerrlab1;
+    }
+
     /* If the proper action on seeing token YYLA.TYPE is to reduce or
        to detect an error, take that action.  */
-    yyn += yyla.type_get ();
-    if (yyn < 0 || yylast_ < yyn || yycheck_[yyn] != yyla.type_get ())
-      goto yydefault;
+    yyn += yyla.kind ();
+    if (yyn < 0 || yylast_ < yyn || yycheck_[yyn] != yyla.kind ())
+      {
+        goto yydefault;
+      }
 
     // Reduce or error.
     yyn = yytable_[yyn];
@@ -2632,34 +1799,33 @@ namespace zorba {
         goto yyreduce;
       }
 
-    // Discard the token being shifted.
-    yyempty = true;
-
     // Count tokens shifted since error; after three, turn off error status.
     if (yyerrstatus_)
       --yyerrstatus_;
 
     // Shift the lookahead token.
-    yypush_ ("Shifting", yyn, yyla);
+    yypush_ ("Shifting", state_type (yyn), YY_MOVE (yyla));
     goto yynewstate;
+
 
   /*-----------------------------------------------------------.
   | yydefault -- do the default action for the current state.  |
   `-----------------------------------------------------------*/
   yydefault:
-    yyn = yydefact_[yystack_[0].state];
+    yyn = yydefact_[+yystack_[0].state];
     if (yyn == 0)
       goto yyerrlab;
     goto yyreduce;
 
+
   /*-----------------------------.
-  | yyreduce -- Do a reduction.  |
+  | yyreduce -- do a reduction.  |
   `-----------------------------*/
   yyreduce:
     yylen = yyr2_[yyn];
     {
       stack_symbol_type yylhs;
-      yylhs.state = yy_lr_goto_state_(yystack_[yylen].state, yyr1_[yyn]);
+      yylhs.state = yy_lr_goto_state_ (yystack_[yylen].state, yyr1_[yyn]);
       /* If YYLEN is nonzero, implement the default value of the
          action: '$$ = $1'.  Otherwise, use the top of the stack.
 
@@ -2671,712 +1837,652 @@ namespace zorba {
       else
         yylhs.value = yystack_[0].value;
 
-      // Compute the default @$.
+      // Default location.
       {
-        slice<stack_symbol_type, stack_type> slice (yystack_, yylen);
-        YYLLOC_DEFAULT (yylhs.location, slice, yylen);
+        stack_type::slice range (yystack_, yylen);
+        YYLLOC_DEFAULT (yylhs.location, range, yylen);
+        yyerror_range[1].location = yylhs.location;
       }
 
       // Perform the reduction.
       YY_REDUCE_PRINT (yyn);
+#if YY_EXCEPTIONS
       try
+#endif // YY_EXCEPTIONS
         {
           switch (yyn)
             {
-  case 3:
-#line 874 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
-        (yylhs.value.node) = (yystack_[0].value.node);
-      }
-#line 2692 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 2: // Module: ModuleWithoutBOM
+      { (yylhs.value.node) = (yystack_[0].value.node); }
     break;
 
-  case 4:
-#line 878 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 3: // Module: "'BOM_UTF8'" ModuleWithoutBOM
+      {
         (yylhs.value.node) = (yystack_[0].value.node);
       }
-#line 2700 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 5:
-#line 882 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 4: // Module: "'#!/shebang" ModuleWithoutBOM
+      {
         (yylhs.value.node) = (yystack_[0].value.node);
       }
-#line 2708 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 6:
-#line 888 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 5: // Module: "'BOM_UTF8'" "'#!/shebang" ModuleWithoutBOM
+      {
+        (yylhs.value.node) = (yystack_[0].value.node);
+      }
+    break;
+
+  case 6: // ERROR: error
+      {
         (yylhs.value.node) = NULL;
       }
-#line 2716 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 7:
-#line 892 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 7: // ERROR: error "'unrecognized'"
+      {
         (yylhs.value.node) = NULL; YYABORT;
       }
-#line 2724 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 8:
-#line 896 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 8: // ERROR: ERROR error
+      {
         (yylhs.value.node) = NULL; YYABORT;
       }
-#line 2732 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 9:
-#line 902 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 9: // ModuleWithoutBOM: MainModule
     {
       (yylhs.value.node) = (yystack_[0].value.node);
       driver.set_expr( (yylhs.value.node) );
     }
-#line 2741 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 10:
-#line 908 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 10: // ModuleWithoutBOM: VersionDecl MainModule
     {
       MainModule* mm = dynamic_cast<MainModule*>((yystack_[0].value.node));
       mm->set_version_decl( static_cast<VersionDecl*>((yystack_[1].value.node)) );
       (yylhs.value.node) = (yystack_[0].value.node);
       driver.set_expr( (yylhs.value.node) );
     }
-#line 2752 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 11:
-#line 916 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 11: // ModuleWithoutBOM: LibraryModule
     {
       (yylhs.value.node) = (yystack_[0].value.node);
       driver.set_expr( (yylhs.value.node) );
     }
-#line 2761 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 12:
-#line 922 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 12: // ModuleWithoutBOM: VersionDecl LibraryModule
     {
       LibraryModule* lm = dynamic_cast<LibraryModule*>((yystack_[0].value.node));
       lm->set_version_decl( static_cast<VersionDecl*>((yystack_[1].value.node)) );
       (yylhs.value.node) = (yystack_[0].value.node);
       driver.set_expr( (yylhs.value.node) );
     }
-#line 2772 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 13:
-#line 931 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 13: // VersionDecl: "'xquery'" "'version'" "'STRING'" "';'"
     {
       (yylhs.value.node) = new VersionDecl( LOC(yylhs.location), SYMTAB((yystack_[1].value.sval)), "utf-8" );
     }
-#line 2780 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 14:
-#line 936 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 14: // VersionDecl: "'xquery'" "'version'" "'STRING'" "'encoding'" "'STRING'" "';'"
     {
       (yylhs.value.node) = new VersionDecl( LOC(yylhs.location), SYMTAB((yystack_[3].value.sval)), SYMTAB((yystack_[1].value.sval)) );
     }
-#line 2788 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 15:
-#line 942 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 15: // MainModule: SIND_DeclList "';'" QueryBody
     {
       Prolog* prolog = new Prolog(LOC(yylhs.location), static_cast<SIND_DeclList*>((yystack_[2].value.node)), NULL);
       (yylhs.value.node) = new MainModule(LOC(yylhs.location), static_cast<QueryBody*>((yystack_[0].value.expr)), prolog);
     }
-#line 2797 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 16:
-#line 948 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 16: // MainModule: VFO_DeclList "';'" QueryBody
     {
       Prolog* prolog = new Prolog(LOC(yylhs.location), NULL, static_cast<VFO_DeclList*>((yystack_[2].value.node)));
       (yylhs.value.node) = new MainModule(LOC(yylhs.location), static_cast<QueryBody*>((yystack_[0].value.expr)), prolog);
     }
-#line 2806 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 17:
-#line 954 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 17: // MainModule: SIND_DeclList "';'" VFO_DeclList "';'" QueryBody
     {
       Prolog* prolog = new Prolog(LOC(yylhs.location),
                                   static_cast<SIND_DeclList*>((yystack_[4].value.node)),
                                   static_cast<VFO_DeclList*>((yystack_[2].value.node)));
       (yylhs.value.node) = new MainModule(LOC(yylhs.location), static_cast<QueryBody*>((yystack_[0].value.expr)), prolog);
     }
-#line 2817 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 18:
-#line 962 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 18: // MainModule: QueryBody
     {
       (yylhs.value.node) = new MainModule( LOC(yylhs.location), static_cast<QueryBody*>((yystack_[0].value.expr)), NULL );
     }
-#line 2825 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 19:
-#line 967 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 19: // MainModule: SIND_DeclList ERROR QueryBody
     {
       (yylhs.value.node) = (yystack_[2].value.node); (yylhs.value.node) = (yystack_[0].value.expr);
       yystack_[2].location.step();
       error(yystack_[2].location, "syntax error, missing semicolon \";\" after statement");
-      // YYERROR does not run %destructors on this rule's RHS values: release them.
       release_hack( (yystack_[2].value.node) );
       release_hack( (yystack_[0].value.expr) );
       YYERROR;
     }
-#line 2836 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 20:
-#line 975 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 20: // MainModule: VFO_DeclList ERROR QueryBody
     {
       (yylhs.value.node) = (yystack_[2].value.node); (yylhs.value.node) = (yystack_[0].value.expr);
       yystack_[2].location.step();
       error(yystack_[2].location, "syntax error, missing semicolon \";\" after declaration");
-      // YYERROR does not run %destructors on this rule's RHS values: release them.
       release_hack( (yystack_[2].value.node) );
       release_hack( (yystack_[0].value.expr) );
       YYERROR;
     }
-#line 2847 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 21:
-#line 983 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 21: // MainModule: SIND_DeclList "';'" VFO_DeclList ERROR QueryBody
     {
       (yylhs.value.node) = (yystack_[4].value.node); (yylhs.value.node) = (yystack_[2].value.node); (yylhs.value.node) = (yystack_[0].value.expr);
       yystack_[2].location.step();
       error(yystack_[2].location, "syntax error, missing semicolon \";\" after declaration");
-      // YYERROR does not run %destructors on this rule's RHS values: release them.
       release_hack( (yystack_[4].value.node) );
       release_hack( (yystack_[2].value.node) );
       release_hack( (yystack_[0].value.expr) );
       YYERROR;
     }
-#line 2858 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 22:
-#line 991 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 22: // MainModule: SIND_DeclList ERROR VFO_DeclList "';'" QueryBody
     {
       (yylhs.value.node) = (yystack_[4].value.node); (yylhs.value.node) = (yystack_[2].value.node); (yylhs.value.node) = (yystack_[0].value.expr);
       yystack_[4].location.step();
       error(yystack_[4].location, "syntax error, missing semicolon \";\" after statement");
-      // YYERROR does not run %destructors on this rule's RHS values: release them.
       release_hack( (yystack_[4].value.node) );
       release_hack( (yystack_[2].value.node) );
       release_hack( (yystack_[0].value.expr) );
       YYERROR;
     }
-#line 2869 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 23:
-#line 1000 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 23: // LibraryModule: ModuleDecl
     {
       (yylhs.value.node) = new LibraryModule(LOC(yylhs.location), static_cast<ModuleDecl*>((yystack_[0].value.node)), NULL);
     }
-#line 2877 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 24:
-#line 1005 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 24: // LibraryModule: ModuleDecl SIND_DeclList "';'"
     {
       Prolog* prolog = new Prolog(LOC(yylhs.location), static_cast<SIND_DeclList*>((yystack_[1].value.node)), NULL);
       (yylhs.value.node) = new LibraryModule(LOC(yylhs.location), static_cast<ModuleDecl*>((yystack_[2].value.node)), prolog);
     }
-#line 2886 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 25:
-#line 1011 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 25: // LibraryModule: ModuleDecl VFO_DeclList "';'"
     {
       Prolog* prolog = new Prolog(LOC(yylhs.location), NULL, static_cast<VFO_DeclList*>((yystack_[1].value.node)));
       (yylhs.value.node) = new LibraryModule(LOC(yylhs.location), static_cast<ModuleDecl*>((yystack_[2].value.node)), prolog);
     }
-#line 2895 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 26:
-#line 1017 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 26: // LibraryModule: ModuleDecl SIND_DeclList "';'" VFO_DeclList "';'"
     {
       Prolog* prolog = new Prolog(LOC(yylhs.location),
                                   static_cast<SIND_DeclList*>((yystack_[3].value.node)),
                                   static_cast<VFO_DeclList*>((yystack_[1].value.node)));
       (yylhs.value.node) = new LibraryModule(LOC(yylhs.location), static_cast<ModuleDecl*>((yystack_[4].value.node)), prolog);
     }
-#line 2906 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 27:
-#line 1026 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 27: // ModuleDecl: "'module'" "'namespace'" QNAME "'='" URI_LITERAL "';'"
     {
       ERROR_IF_QNAME_NOT_NCNAME((yystack_[3].value.expr), yystack_[3].location);
       (yylhs.value.node) = new ModuleDecl( LOC(yylhs.location), static_cast<QName*>((yystack_[3].value.expr)), SYMTAB((yystack_[1].value.sval)) );
       dynamic_cast<ModuleDecl*>((yylhs.value.node))->setComment( SYMTAB((yystack_[5].value.sval)) );
     }
-#line 2916 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 28:
-#line 1034 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 28: // SIND_DeclList: SIND_Decl
     {
       SIND_DeclList *sdl = new SIND_DeclList( LOC(yylhs.location) );
       sdl->push_back( (yystack_[0].value.node) );
       (yylhs.value.node) = sdl;
     }
-#line 2926 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 29:
-#line 1041 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 29: // SIND_DeclList: SIND_DeclList "';'" SIND_Decl
     {
       ((SIND_DeclList*)(yystack_[2].value.node))->push_back( (yystack_[0].value.node) );
       (yylhs.value.node) = (yystack_[2].value.node);
     }
-#line 2935 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 30:
-#line 1047 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 30: // SIND_DeclList: SIND_DeclList ERROR SIND_Decl
     {
       (yylhs.value.node) = (yystack_[2].value.node); (yylhs.value.node) = (yystack_[0].value.node);
       yystack_[2].location.step();
       error(yystack_[2].location, "syntax error, missing semicolon \";\" after declaration");
-      // YYERROR does not run %destructors on this rule's RHS values: release them.
       release_hack( (yystack_[2].value.node) );
       release_hack( (yystack_[0].value.node) );
       YYERROR;
     }
-#line 2946 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 44:
-#line 1073 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 31: // SIND_Decl: Setter
+    { (yylhs.value.node) = (yystack_[0].value.node); }
+    break;
+
+  case 32: // SIND_Decl: Import
+    { (yylhs.value.node) = (yystack_[0].value.node); }
+    break;
+
+  case 33: // SIND_Decl: NamespaceDecl
+    { (yylhs.value.node) = (yystack_[0].value.node); }
+    break;
+
+  case 34: // SIND_Decl: DefaultNamespaceDecl
+    { (yylhs.value.node) = (yystack_[0].value.node); }
+    break;
+
+  case 35: // SIND_Decl: FTOptionDecl
+    { (yylhs.value.node) = (yystack_[0].value.node); }
+    break;
+
+  case 36: // Setter: BoundarySpaceDecl
+    { (yylhs.value.node) = (yystack_[0].value.node); }
+    break;
+
+  case 37: // Setter: DefaultCollationDecl
+    { (yylhs.value.node) = (yystack_[0].value.node); }
+    break;
+
+  case 38: // Setter: BaseURIDecl
+    { (yylhs.value.node) = (yystack_[0].value.node); }
+    break;
+
+  case 39: // Setter: ConstructionDecl
+    { (yylhs.value.node) = (yystack_[0].value.node); }
+    break;
+
+  case 40: // Setter: OrderingModeDecl
+    { (yylhs.value.node) = (yystack_[0].value.node); }
+    break;
+
+  case 41: // Setter: EmptyOrderDecl
+    { (yylhs.value.node) = (yystack_[0].value.node); }
+    break;
+
+  case 42: // Setter: CopyNamespacesDecl
+    { (yylhs.value.node) = (yystack_[0].value.node); }
+    break;
+
+  case 43: // Setter: RevalidationDecl
+    { (yylhs.value.node) = (yystack_[0].value.node); }
+    break;
+
+  case 44: // BoundarySpaceDecl: "'declare'" "'boundary-space'" "'preserve'"
     {
       (yylhs.value.node) = new BoundarySpaceDecl(LOC(yylhs.location), StaticContextConsts::preserve_space);
     }
-#line 2954 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 45:
-#line 1078 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 45: // BoundarySpaceDecl: "'declare'" "'boundary-space'" "'strip'"
     {
       (yylhs.value.node) = new BoundarySpaceDecl(LOC(yylhs.location), StaticContextConsts::strip_space);
     }
-#line 2962 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 46:
-#line 1084 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 46: // DefaultCollationDecl: "'declare'" "'default'" "'collation'" URI_LITERAL
     {
       (yylhs.value.node) = new DefaultCollationDecl( LOC(yylhs.location), SYMTAB((yystack_[0].value.sval)) );
     }
-#line 2970 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 47:
-#line 1090 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 47: // BaseURIDecl: "'declare'" "'base-uri'" URI_LITERAL
     {
       (yylhs.value.node) = new BaseURIDecl( LOC(yylhs.location), SYMTAB((yystack_[0].value.sval)) );
     }
-#line 2978 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 48:
-#line 1096 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 48: // ConstructionDecl: "'declare'" "'construction'" "'preserve'"
     {
       (yylhs.value.node) = new ConstructionDecl(LOC(yylhs.location), StaticContextConsts::cons_preserve);
     }
-#line 2986 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 49:
-#line 1101 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 49: // ConstructionDecl: "'declare'" "'construction'" "'strip'"
     {
       (yylhs.value.node) = new ConstructionDecl(LOC(yylhs.location), StaticContextConsts::cons_strip);
     }
-#line 2994 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 50:
-#line 1107 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 50: // OrderingModeDecl: "'declare'" "'ordering'" "'ordered'"
     {
       (yylhs.value.node) = new OrderingModeDecl(LOC(yylhs.location), StaticContextConsts::ordered);
     }
-#line 3002 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 51:
-#line 1112 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 51: // OrderingModeDecl: "'declare'" "'ordering'" "'unordered'"
     {
       (yylhs.value.node) = new OrderingModeDecl(LOC(yylhs.location), StaticContextConsts::unordered);
     }
-#line 3010 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 52:
-#line 1118 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 52: // EmptyOrderDecl: "'declare'" "'default'" "'order'" "'empty'" "'greatest'"
     {
       (yylhs.value.node) = new EmptyOrderDecl(LOC(yylhs.location), StaticContextConsts::empty_greatest);
     }
-#line 3018 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 53:
-#line 1123 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 53: // EmptyOrderDecl: "'declare'" "'default'" "'order'" "'empty'" "'least'"
     {
       (yylhs.value.node) = new EmptyOrderDecl(LOC(yylhs.location), StaticContextConsts::empty_least);
     }
-#line 3026 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 54:
-#line 1129 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 54: // CopyNamespacesDecl: "'declare'" "'copy-namespaces'" "'preserve'" "','" "'inherit'"
     {
       (yylhs.value.node) = new CopyNamespacesDecl(LOC(yylhs.location), true, true);
     }
-#line 3034 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 55:
-#line 1134 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 55: // CopyNamespacesDecl: "'declare'" "'copy-namespaces'" "'preserve'" "','" "'<no inherit>'"
     {
       (yylhs.value.node) = new CopyNamespacesDecl(LOC(yylhs.location), true, false);
     }
-#line 3042 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 56:
-#line 1139 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 56: // CopyNamespacesDecl: "'declare'" "'copy-namespaces'" "'<no preserve>'" "','" "'inherit'"
     {
       (yylhs.value.node) = new CopyNamespacesDecl(LOC(yylhs.location), false, true);
     }
-#line 3050 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 57:
-#line 1144 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 57: // CopyNamespacesDecl: "'declare'" "'copy-namespaces'" "'<no preserve>'" "','" "'<no inherit>'"
     {
       (yylhs.value.node) = new CopyNamespacesDecl(LOC(yylhs.location), false, false);
     }
-#line 3058 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 60:
-#line 1154 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 58: // Import: SchemaImport
+    { (yylhs.value.node) = (yystack_[0].value.node); }
+    break;
+
+  case 59: // Import: ModuleImport
+    { (yylhs.value.node) = (yystack_[0].value.node); }
+    break;
+
+  case 60: // Import: "'import'" "'QName'" error
     {
       (yylhs.value.node) = (yylhs.value.node);
       error(yystack_[1].location, "syntax error, \"import\" should be followed by either \"schema\" or \"module\"");
       YYERROR;
     }
-#line 3068 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 61:
-#line 1162 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 61: // SchemaImport: "'import'" "'schema'" URI_LITERAL
     {
       (yylhs.value.node) = new SchemaImport( LOC(yylhs.location), NULL, SYMTAB((yystack_[0].value.sval)), NULL );
     }
-#line 3076 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 62:
-#line 1167 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 62: // SchemaImport: "'import'" "'schema'" SchemaPrefix URI_LITERAL
     {
       (yylhs.value.node) = new SchemaImport(LOC(yylhs.location),
                             dynamic_cast<SchemaPrefix*>((yystack_[1].value.node)),
                             SYMTAB((yystack_[0].value.sval)),
                             NULL);
     }
-#line 3087 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 63:
-#line 1175 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 63: // SchemaImport: "'import'" "'schema'" URI_LITERAL "'at'" URILiteralList
     {
       (yylhs.value.node) = new SchemaImport(LOC(yylhs.location),
                             NULL,
                             SYMTAB((yystack_[2].value.sval)),
                             dynamic_cast<URILiteralList*>((yystack_[0].value.node)));
     }
-#line 3098 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 64:
-#line 1183 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 64: // SchemaImport: "'import'" "'schema'" SchemaPrefix URI_LITERAL "'at'" URILiteralList
     {
       (yylhs.value.node) = new SchemaImport(LOC(yylhs.location),
                             dynamic_cast<SchemaPrefix*>((yystack_[3].value.node)),
                             SYMTAB((yystack_[2].value.sval)),
                             dynamic_cast<URILiteralList*>((yystack_[0].value.node)));
     }
-#line 3109 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 65:
-#line 1192 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 65: // URILiteralList: URI_LITERAL
     {
       URILiteralList *ull = new URILiteralList( LOC(yylhs.location));
       ull->push_back( SYMTAB((yystack_[0].value.sval)) );
       (yylhs.value.node) = ull;
     }
-#line 3119 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 66:
-#line 1199 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 66: // URILiteralList: URILiteralList "','" URI_LITERAL
     {
       if ( URILiteralList *ull = dynamic_cast<URILiteralList*>((yystack_[2].value.node)) )
         ull->push_back( SYMTAB((yystack_[0].value.sval)) );
       (yylhs.value.node) = (yystack_[2].value.node);
     }
-#line 3129 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 67:
-#line 1207 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 67: // SchemaPrefix: "'namespace'" QNAME "'='"
     {
       ERROR_IF_QNAME_NOT_NCNAME((yystack_[1].value.expr), yystack_[1].location);
       (yylhs.value.node) = new SchemaPrefix( LOC(yylhs.location), static_cast<QName*>((yystack_[1].value.expr)));
     }
-#line 3138 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 68:
-#line 1213 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 68: // SchemaPrefix: "'default'" "'element'" "'namespace'"
     {
       (yylhs.value.node) = new SchemaPrefix( LOC(yylhs.location), true );
     }
-#line 3146 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 69:
-#line 1219 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 69: // ModuleImport: "'import'" "'module'" URI_LITERAL
     {
       (yylhs.value.node) = new ModuleImport(LOC(yylhs.location), SYMTAB((yystack_[0].value.sval)), NULL);
       dynamic_cast<ModuleImport *>((yylhs.value.node))->setComment(SYMTAB((yystack_[1].value.sval)));
     }
-#line 3155 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 70:
-#line 1225 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 70: // ModuleImport: "'import'" "'module'" "'namespace'" QNAME "'='" URI_LITERAL
     {
       ERROR_IF_QNAME_NOT_NCNAME((yystack_[2].value.expr), yystack_[2].location);
       (yylhs.value.node) = new ModuleImport(LOC(yylhs.location), static_cast<QName*>((yystack_[2].value.expr)), SYMTAB((yystack_[0].value.sval)), NULL);
       dynamic_cast<ModuleImport *>((yylhs.value.node))->setComment(SYMTAB((yystack_[4].value.sval)));
     }
-#line 3165 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 71:
-#line 1232 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 71: // ModuleImport: "'import'" "'module'" URI_LITERAL "'at'" URILiteralList
     {
       (yylhs.value.node) = new ModuleImport(LOC(yylhs.location),
                             SYMTAB((yystack_[2].value.sval)),
                             dynamic_cast<URILiteralList*>((yystack_[0].value.node)));
       dynamic_cast<ModuleImport *>((yylhs.value.node))->setComment(SYMTAB((yystack_[3].value.sval)));
     }
-#line 3176 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 72:
-#line 1240 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 72: // ModuleImport: "'import'" "'module'" "'namespace'" QNAME "'='" URI_LITERAL "'at'" URILiteralList
     {
-      ERROR_IF_QNAME_NOT_NCNAME((yystack_[4].value.expr), yystack_[4].location);
+      ERROR_IF_QNAME_NOT_NCNAME((yystack_[4].value.expr), yystack_[4].location, (yystack_[0].value.node));
       (yylhs.value.node) = new ModuleImport(LOC(yylhs.location),
                             static_cast<QName*>((yystack_[4].value.expr)),
                             SYMTAB((yystack_[2].value.sval)),
                             dynamic_cast<URILiteralList*>((yystack_[0].value.node)));
       dynamic_cast<ModuleImport *>((yylhs.value.node))->setComment(SYMTAB((yystack_[6].value.sval)));
     }
-#line 3189 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 73:
-#line 1251 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 73: // NamespaceDecl: "'declare'" "'namespace'" QNAME "'='" URI_LITERAL
     {
       ERROR_IF_QNAME_NOT_NCNAME((yystack_[2].value.expr), yystack_[2].location);
       (yylhs.value.node) = new NamespaceDecl( LOC(yylhs.location), static_cast<QName*>((yystack_[2].value.expr)), SYMTAB((yystack_[0].value.sval)) );
     }
-#line 3198 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 74:
-#line 1258 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 74: // DefaultNamespaceDecl: "'declare'" "'default'" "'element'" "'namespace'" URI_LITERAL
     {
       (yylhs.value.node) = new DefaultNamespaceDecl(LOC(yylhs.location),
                                     ParseConstants::ns_element_default,
                                     SYMTAB((yystack_[0].value.sval)));
     }
-#line 3208 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 75:
-#line 1265 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 75: // DefaultNamespaceDecl: "'declare'" "'default'" "'function'" "'namespace'" URI_LITERAL
     {
       (yylhs.value.node) = new DefaultNamespaceDecl(LOC(yylhs.location),
                                     ParseConstants::ns_function_default,
                                     SYMTAB((yystack_[0].value.sval)));
     }
-#line 3218 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 76:
-#line 1273 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 76: // VFO_DeclList: VFO_Decl
     {
       VFO_DeclList *vdl = new VFO_DeclList( LOC(yylhs.location));
       vdl->push_back( (yystack_[0].value.node) );
       (yylhs.value.node) = vdl;
     }
-#line 3228 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 77:
-#line 1280 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 77: // VFO_DeclList: VFO_DeclList "';'" VFO_Decl
     {
       ((VFO_DeclList*)(yystack_[2].value.node))->push_back( (yystack_[0].value.node) );
       (yylhs.value.node) = (yystack_[2].value.node);
     }
-#line 3237 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 78:
-#line 1286 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 78: // VFO_DeclList: VFO_DeclList ERROR VFO_Decl
     {
       (yylhs.value.node) = (yystack_[2].value.node); (yylhs.value.node) = (yystack_[0].value.node);
       yystack_[2].location.step();
       error(yystack_[2].location, "syntax error, missing semicolon \";\" after declaration");
-      // YYERROR does not run %destructors on this rule's RHS values: release them.
       release_hack( (yystack_[2].value.node) );
       release_hack( (yystack_[0].value.node) );
       YYERROR;
     }
-#line 3248 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 87:
-#line 1305 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 79: // VFO_Decl: DecimalFormatDecl
+    { (yylhs.value.node) = (yystack_[0].value.node); }
+    break;
+
+  case 80: // VFO_Decl: OptionDecl
+    { (yylhs.value.node) = (yystack_[0].value.node); }
+    break;
+
+  case 81: // VFO_Decl: CtxItemDecl
+    { (yylhs.value.node) = (yystack_[0].value.node); }
+    break;
+
+  case 82: // VFO_Decl: VarDecl
+    { (yylhs.value.node) = (yystack_[0].value.node); }
+    break;
+
+  case 83: // VFO_Decl: FunctionDecl
+    { (yylhs.value.node) = (yystack_[0].value.node); }
+    break;
+
+  case 84: // VFO_Decl: CollectionDecl
+    { (yylhs.value.node) = (yystack_[0].value.node); }
+    break;
+
+  case 85: // VFO_Decl: IndexDecl
+    { (yylhs.value.node) = (yystack_[0].value.node); }
+    break;
+
+  case 86: // VFO_Decl: IntegrityConstraintDecl
+    { (yylhs.value.node) = (yystack_[0].value.node); }
+    break;
+
+  case 87: // DecimalFormatDecl: "'declare'" "'default'" "'decimal-format'" DecimalFormatParamList
     {
       (yylhs.value.node) = new DecimalFormatNode(LOC(yylhs.location), (yystack_[0].value.vstrpair));
       delete (yystack_[0].value.vstrpair);
     }
-#line 3257 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 88:
-#line 1311 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 88: // DecimalFormatDecl: "'declare'" "'decimal-format'" QNAME DecimalFormatParamList
     {
       (yylhs.value.node) = new DecimalFormatNode(LOC(yylhs.location), static_cast<QName*>((yystack_[1].value.expr)), (yystack_[0].value.vstrpair));
       delete (yystack_[0].value.vstrpair);
     }
-#line 3266 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 89:
-#line 1318 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 89: // DecimalFormatParamList: DecimalFormatParam
     {
       (yylhs.value.vstrpair) = new vector<string_pair_t>();
       (yylhs.value.vstrpair)->push_back( *(yystack_[0].value.strpair) );
       delete (yystack_[0].value.strpair);
     }
-#line 3276 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 90:
-#line 1325 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 90: // DecimalFormatParamList: DecimalFormatParamList DecimalFormatParam
     {
       (yystack_[1].value.vstrpair)->push_back( *(yystack_[0].value.strpair) );
       delete (yystack_[0].value.strpair);
       (yylhs.value.vstrpair) = (yystack_[1].value.vstrpair);
     }
-#line 3286 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 91:
-#line 1333 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 91: // DecimalFormatParam: DecimalFormatParamName "'='" StringLiteral
     {
       StringLiteral *sl = static_cast<StringLiteral*>((yystack_[0].value.expr));
       (yylhs.value.strpair) = new string_pair_t( (yystack_[2].value.strval), sl->get_strval().str() );
       delete sl;
     }
-#line 3296 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 92:
-#line 1340 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.strval) = "decimal-separator"; }
-#line 3302 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 92: // DecimalFormatParamName: "'decimal-separator'"
+                        { (yylhs.value.strval) = "decimal-separator"; }
     break;
 
-  case 93:
-#line 1341 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.strval) = "digit"; }
-#line 3308 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 93: // DecimalFormatParamName: "'digit'"
+            { (yylhs.value.strval) = "digit"; }
     break;
 
-  case 94:
-#line 1342 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.strval) = "grouping-separator"; }
-#line 3314 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 94: // DecimalFormatParamName: "'grouping-separator'"
+                         { (yylhs.value.strval) = "grouping-separator"; }
     break;
 
-  case 95:
-#line 1343 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.strval) = "infinity"; }
-#line 3320 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 95: // DecimalFormatParamName: "'infinity'"
+                     { (yylhs.value.strval) = "infinity"; }
     break;
 
-  case 96:
-#line 1344 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.strval) = "minus-sign"; }
-#line 3326 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 96: // DecimalFormatParamName: "'minus-sign'"
+                 { (yylhs.value.strval) = "minus-sign"; }
     break;
 
-  case 97:
-#line 1345 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.strval) = "NaN"; }
-#line 3332 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 97: // DecimalFormatParamName: "'NaN'"
+          { (yylhs.value.strval) = "NaN"; }
     break;
 
-  case 98:
-#line 1346 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.strval) = "pattern-separator"; }
-#line 3338 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 98: // DecimalFormatParamName: "'pattern-separator'"
+                        { (yylhs.value.strval) = "pattern-separator"; }
     break;
 
-  case 99:
-#line 1347 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.strval) = "percent"; }
-#line 3344 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 99: // DecimalFormatParamName: "'percent'"
+              { (yylhs.value.strval) = "percent"; }
     break;
 
-  case 100:
-#line 1348 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.strval) = "per-mille"; }
-#line 3350 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 100: // DecimalFormatParamName: "'per-mille'"
+                { (yylhs.value.strval) = "per-mille"; }
     break;
 
-  case 101:
-#line 1349 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.strval) = "zero-digit"; }
-#line 3356 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 101: // DecimalFormatParamName: "'zero-digit'"
+                 { (yylhs.value.strval) = "zero-digit"; }
     break;
 
-  case 102:
-#line 1353 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 102: // OptionDecl: "'declare'" "'option'" QNAME "'STRING'"
     {
       (yylhs.value.node) = new OptionDecl(LOC(yylhs.location), static_cast<QName*>((yystack_[1].value.expr)), SYMTAB((yystack_[0].value.sval)));
       if (static_cast<QName*>((yystack_[1].value.expr))->get_localname() == "enable")
@@ -3388,79 +2494,61 @@ namespace zorba {
           driver.enableCommonLanguage();
       }
     }
-#line 3372 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 103:
-#line 1367 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 103: // FTOptionDecl: "'declare'" "'ft-option'" FTMatchOptions
     {
       (yylhs.value.node) = new FTOptionDecl( LOC(yylhs.location), dynamic_cast<FTMatchOptions*>((yystack_[0].value.node)) );
     }
-#line 3380 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 104:
-#line 1373 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 104: // CtxItemDecl: "'declare'" "'context'" "'item'" CtxItemDecl2
     {
       (yylhs.value.node) = (yystack_[0].value.node);
     }
-#line 3388 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 105:
-#line 1379 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 105: // CtxItemDecl2: "'as'" ItemType CtxItemDecl3
     {
       CtxItemDecl* d = dynamic_cast<CtxItemDecl*>((yystack_[0].value.node));
       d->theType = (yystack_[1].value.node);
       (yylhs.value.node) = d;
     }
-#line 3398 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 106:
-#line 1386 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 106: // CtxItemDecl2: CtxItemDecl3
     {
       (yylhs.value.node) = (yystack_[0].value.node);
     }
-#line 3406 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 107:
-#line 1392 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 107: // CtxItemDecl3: CtxItemDecl4
     {
       CtxItemDecl* d = dynamic_cast<CtxItemDecl*>((yystack_[0].value.node));
       d->theIsExternal = false;
       (yylhs.value.node) = d;
     }
-#line 3416 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 108:
-#line 1399 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 108: // CtxItemDecl3: "'external'"
     {
       (yylhs.value.node) = new CtxItemDecl(LOC(yylhs.location), NULL);
     }
-#line 3424 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 109:
-#line 1404 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 109: // CtxItemDecl3: "'external'" CtxItemDecl4
     {
       (yylhs.value.node) = (yystack_[0].value.node);
     }
-#line 3432 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 110:
-#line 1410 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 110: // CtxItemDecl4: "':='" ExprSingle
     {
       (yylhs.value.node) = new CtxItemDecl(LOC(yylhs.location), (yystack_[0].value.expr));
     }
-#line 3440 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 111:
-#line 1416 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 111: // VarDecl: "'declare'" VarNameAndType "':='" ExprSingle
     {
       std::unique_ptr<VarNameAndType> nt(dynamic_cast<VarNameAndType *>((yystack_[2].value.varnametype)));
       (yylhs.value.node) = new GlobalVarDecl(LOC(yylhs.location),
@@ -3471,11 +2559,9 @@ namespace zorba {
                              false);
       static_cast<GlobalVarDecl*>((yylhs.value.node))->setComment(SYMTAB((yystack_[3].value.sval)));
     }
-#line 3455 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 112:
-#line 1428 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 112: // VarDecl: "'declare'" VarNameAndType "'external'"
     {
       std::unique_ptr<VarNameAndType> nt(dynamic_cast<VarNameAndType *>((yystack_[1].value.varnametype)));
       (yylhs.value.node) = new GlobalVarDecl(LOC(yylhs.location),
@@ -3486,11 +2572,9 @@ namespace zorba {
                              true);
       static_cast<GlobalVarDecl*>((yylhs.value.node))->setComment(SYMTAB((yystack_[2].value.sval)));
     }
-#line 3470 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 113:
-#line 1440 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 113: // VarDecl: "'declare'" VarNameAndType "'external'" "':='" ExprSingle
     {
       std::unique_ptr<VarNameAndType> nt(dynamic_cast<VarNameAndType *>((yystack_[3].value.varnametype)));
       (yylhs.value.node) = new GlobalVarDecl(LOC(yylhs.location),
@@ -3501,142 +2585,120 @@ namespace zorba {
                              true);
       static_cast<GlobalVarDecl*>((yylhs.value.node))->setComment(SYMTAB((yystack_[4].value.sval)));
     }
-#line 3485 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 114:
-#line 1453 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 114: // VarNameAndType: "'variable'" "'$'" QNAME
     {
       (yylhs.value.varnametype) = new VarNameAndType(LOC(yylhs.location), static_cast<QName*>((yystack_[0].value.expr)), NULL, NULL);
     }
-#line 3493 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 115:
-#line 1458 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 115: // VarNameAndType: "'variable'" "'$'" QNAME TypeDeclaration
     {
       (yylhs.value.varnametype) = new VarNameAndType(LOC(yylhs.location),
                               static_cast<QName*>((yystack_[1].value.expr)),
                               dynamic_cast<SequenceTypeAST *>((yystack_[0].value.node)),
                               NULL);
     }
-#line 3504 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 116:
-#line 1466 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 116: // VarNameAndType: AnnotationList "'variable'" "'$'" QNAME
     {
       (yylhs.value.varnametype) = new VarNameAndType(LOC(yylhs.location),
                               static_cast<QName*>((yystack_[0].value.expr)),
                               NULL,
                               static_cast<AnnotationListParsenode*>((yystack_[3].value.node)));
     }
-#line 3515 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 117:
-#line 1474 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 117: // VarNameAndType: AnnotationList "'variable'" "'$'" QNAME TypeDeclaration
     {
       (yylhs.value.varnametype) = new VarNameAndType(LOC(yylhs.location),
                               static_cast<QName*>((yystack_[1].value.expr)),
                               dynamic_cast<SequenceTypeAST *>((yystack_[0].value.node)),
                               static_cast<AnnotationListParsenode*>((yystack_[4].value.node)));
     }
-#line 3526 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 118:
-#line 1483 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 118: // AnnotationList: Annotation
     {
       (yylhs.value.node) = new AnnotationListParsenode(LOC(yylhs.location), static_cast<AnnotationParsenode*>((yystack_[0].value.node)));
     }
-#line 3534 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 119:
-#line 1488 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 119: // AnnotationList: AnnotationList Annotation
     {
       static_cast<AnnotationListParsenode*>((yystack_[1].value.node))->push_back(static_cast<AnnotationParsenode*>((yystack_[0].value.node)));
       (yylhs.value.node) = (yystack_[1].value.node);
     }
-#line 3543 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 120:
-#line 1495 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 120: // Annotation: "'%QName'"
     {
       (yylhs.value.node) = new AnnotationParsenode(LOC(yylhs.location), new QName(LOC(yylhs.location), SYMTAB((yystack_[0].value.sval))), NULL);
     }
-#line 3551 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 121:
-#line 1500 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 121: // Annotation: "'%QName'" "'('" AnnotationLiteralList "')'"
     {
       (yylhs.value.node) = new AnnotationParsenode(LOC(yylhs.location),
                                    new QName(LOC(yylhs.location), SYMTAB((yystack_[3].value.sval))),
                                    static_cast<AnnotationLiteralListParsenode*>((yystack_[1].value.node)));
     }
-#line 3561 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 122:
-#line 1507 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 122: // Annotation: "'%EQName'"
     {
       (yylhs.value.node) = new AnnotationParsenode(LOC(yylhs.location), new QName(LOC(yylhs.location), SYMTAB((yystack_[0].value.sval)), true), NULL);
     }
-#line 3569 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 123:
-#line 1512 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 123: // Annotation: "'%EQName'" "'('" AnnotationLiteralList "')'"
     {
       (yylhs.value.node) = new AnnotationParsenode(LOC(yylhs.location),
                                    new QName(LOC(yylhs.location), SYMTAB((yystack_[3].value.sval)), true),
                                    static_cast<AnnotationLiteralListParsenode*>((yystack_[1].value.node)));
     }
-#line 3579 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 124:
-#line 1520 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 124: // AnnotationLiteralList: Literal
     {
       (yylhs.value.node) = new AnnotationLiteralListParsenode(LOC(yylhs.location), (yystack_[0].value.expr));
     }
-#line 3587 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 125:
-#line 1525 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 125: // AnnotationLiteralList: AnnotationLiteralList "','" Literal
     {
       static_cast<AnnotationLiteralListParsenode*>((yystack_[2].value.node))->push_back((yystack_[0].value.expr));
       (yylhs.value.node) = (yystack_[2].value.node);
     }
-#line 3596 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 126:
-#line 1532 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 126: // FunctionDecl: "'declare'" FunctionDecl2
     {
       static_cast<FunctionDecl*>((yystack_[0].value.node))->setComment( SYMTAB((yystack_[1].value.sval)) );
       (yylhs.value.node) = (yystack_[0].value.node);
     }
-#line 3605 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 127:
-#line 1538 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 127: // FunctionDecl: "'declare'" AnnotationList FunctionDecl2
     {
       FunctionDecl* fdecl = static_cast<FunctionDecl*>((yystack_[0].value.node));
       fdecl->setComment( SYMTAB((yystack_[2].value.sval)) );
       fdecl->set_annotations(static_cast<AnnotationListParsenode*>((yystack_[1].value.node)));
       (yylhs.value.node) = (yystack_[0].value.node);
     }
-#line 3616 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 130:
-#line 1551 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 128: // FunctionDecl2: FunctionDeclSimple
+    { (yylhs.value.node) = (yystack_[0].value.node); }
+    break;
+
+  case 129: // FunctionDecl2: FunctionDeclUpdating
+    { (yylhs.value.node) = (yystack_[0].value.node); }
+    break;
+
+  case 130: // FunctionDeclSimple: "'function'" FUNCTION_NAME FunctionSig EnclosedStatementsAndOptionalExpr
     {
       exprnode* body = (yystack_[0].value.expr);
       if (body == NULL)
@@ -3650,11 +2712,9 @@ namespace zorba {
                             false);
       delete (yystack_[1].value.fnsig);
     }
-#line 3634 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 131:
-#line 1565 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 131: // FunctionDeclSimple: "'function'" FUNCTION_NAME FunctionSig "'external'"
     {
       (yylhs.value.node) = new FunctionDecl(LOC (yylhs.location),
                             static_cast<QName*>((yystack_[2].value.expr)),
@@ -3665,11 +2725,9 @@ namespace zorba {
                             true);
       delete (yystack_[1].value.fnsig);
     }
-#line 3649 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 132:
-#line 1578 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 132: // FunctionDeclUpdating: "'updating'" "'function'" FUNCTION_NAME FunctionSig EnclosedStatementsAndOptionalExpr
     {
       exprnode* body = (yystack_[0].value.expr);
       if (body == NULL)
@@ -3683,11 +2741,9 @@ namespace zorba {
                             false);
       delete (yystack_[1].value.fnsig);
     }
-#line 3667 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 133:
-#line 1593 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 133: // FunctionDeclUpdating: "'updating'" "'function'" FUNCTION_NAME FunctionSig "'external'"
     {
       (yylhs.value.node) = new FunctionDecl(LOC(yylhs.location),
                             static_cast<QName*>((yystack_[2].value.expr)),
@@ -3698,81 +2754,63 @@ namespace zorba {
                             true);
       delete (yystack_[1].value.fnsig);
     }
-#line 3682 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 134:
-#line 1606 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 134: // FunctionSig: "'('" "')'"
     {
       (yylhs.value.fnsig) = new FunctionSig(NULL);
     }
-#line 3690 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 135:
-#line 1611 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 135: // FunctionSig: "'('" ParamList "')'"
     {
       (yylhs.value.fnsig) = new FunctionSig(dynamic_cast<ParamList*>((yystack_[1].value.node)));
     }
-#line 3698 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 136:
-#line 1616 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 136: // FunctionSig: "'('" "')'" "'as'" SequenceType
     {
       (yylhs.value.fnsig) = new FunctionSig(NULL, dynamic_cast<SequenceTypeAST*>((yystack_[0].value.node)));
     }
-#line 3706 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 137:
-#line 1621 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 137: // FunctionSig: "'('" ParamList "')'" "'as'" SequenceType
     {
       (yylhs.value.fnsig) = new FunctionSig(dynamic_cast<ParamList*>((yystack_[3].value.node)), dynamic_cast<SequenceTypeAST*>((yystack_[0].value.node)));
     }
-#line 3714 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 138:
-#line 1627 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 138: // ParamList: Param
     {
       ParamList *pl = new ParamList( LOC(yylhs.location) );
       pl->push_back( dynamic_cast<Param*>((yystack_[0].value.node)) );
       (yylhs.value.node) = pl;
     }
-#line 3724 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 139:
-#line 1634 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 139: // ParamList: ParamList "','" Param
     {
       if ( ParamList *pl = dynamic_cast<ParamList*>((yystack_[2].value.node)) )
         pl->push_back( dynamic_cast<Param*>((yystack_[0].value.node)) );
       (yylhs.value.node) = (yystack_[2].value.node);
     }
-#line 3734 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 140:
-#line 1642 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 140: // Param: "'$'" QNAME
     {
       (yylhs.value.node) = new Param(LOC(yylhs.location), static_cast<QName*>((yystack_[0].value.expr)), NULL);
     }
-#line 3742 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 141:
-#line 1647 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 141: // Param: "'$'" QNAME TypeDeclaration
     {
       (yylhs.value.node) = new Param(LOC(yylhs.location),
                      static_cast<QName*>((yystack_[1].value.expr)),
                      dynamic_cast<SequenceTypeAST *>((yystack_[0].value.node)));
     }
-#line 3752 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 142:
-#line 1655 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 142: // CollectionDecl: "'declare'" "'collection'" QNAME
     {
       (yylhs.value.node) = new CollectionDecl( LOC(yylhs.location),
                               static_cast<QName*>((yystack_[0].value.expr)),
@@ -3780,11 +2818,9 @@ namespace zorba {
                               NULL);
       static_cast<CollectionDecl*>((yylhs.value.node))->setComment(SYMTAB((yystack_[2].value.sval)));
     }
-#line 3764 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 143:
-#line 1663 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 143: // CollectionDecl: "'declare'" "'collection'" QNAME "'as'" CollectionTypeDecl
     {
       (yylhs.value.node) = new CollectionDecl( LOC(yylhs.location),
                               static_cast<QName*>((yystack_[2].value.expr)),
@@ -3792,11 +2828,9 @@ namespace zorba {
                               static_cast<SequenceTypeAST*>((yystack_[0].value.node)));
       static_cast<CollectionDecl*>((yylhs.value.node))->setComment(SYMTAB((yystack_[4].value.sval)));
     }
-#line 3776 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 144:
-#line 1671 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 144: // CollectionDecl: "'declare'" AnnotationList "'collection'" QNAME
     {
       (yylhs.value.node) = new CollectionDecl( LOC(yylhs.location),
                                static_cast<QName*>((yystack_[0].value.expr)),
@@ -3804,11 +2838,9 @@ namespace zorba {
                                0);
       static_cast<CollectionDecl*>((yylhs.value.node))->setComment(SYMTAB((yystack_[3].value.sval)));
     }
-#line 3788 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 145:
-#line 1679 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 145: // CollectionDecl: "'declare'" AnnotationList "'collection'" QNAME "'as'" CollectionTypeDecl
     {
       (yylhs.value.node) = new CollectionDecl( LOC(yylhs.location),
                                static_cast<QName*>((yystack_[2].value.expr)),
@@ -3816,47 +2848,37 @@ namespace zorba {
                                static_cast<SequenceTypeAST*>((yystack_[0].value.node)));
       static_cast<CollectionDecl*>((yylhs.value.node))->setComment(SYMTAB((yystack_[5].value.sval)));
     }
-#line 3800 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 146:
-#line 1689 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 146: // CollectionTypeDecl: KindTest
     {
       (yylhs.value.node) = static_cast<parsenode*>(new SequenceTypeAST(LOC(yylhs.location), (yystack_[0].value.node), NULL));
     }
-#line 3808 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 147:
-#line 1693 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 147: // CollectionTypeDecl: KindTest OccurrenceIndicator
     {
       (yylhs.value.node) = static_cast<parsenode*>(new SequenceTypeAST(LOC(yylhs.location),
                                                     (yystack_[1].value.node),
                                                     dynamic_cast<OccurrenceIndicator*>((yystack_[0].value.node))));
     }
-#line 3818 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 148:
-#line 1699 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 148: // CollectionTypeDecl: JSONTest
     {
       (yylhs.value.node) = static_cast<parsenode*>(new SequenceTypeAST(LOC(yylhs.location), (yystack_[0].value.node), NULL));
     }
-#line 3826 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 149:
-#line 1703 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 149: // CollectionTypeDecl: JSONTest OccurrenceIndicator
     {
       (yylhs.value.node) = static_cast<parsenode*>(new SequenceTypeAST(LOC(yylhs.location),
                                                     (yystack_[1].value.node),
                                                     dynamic_cast<OccurrenceIndicator*>((yystack_[0].value.node))));
     }
-#line 3836 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 150:
-#line 1710 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 150: // IndexDecl: "'declare'" "'index'" QNAME "'on'" "'nodes'" PathExpr "'by'" IndexKeyList
     {
       (yylhs.value.node) = new AST_IndexDecl(LOC(yylhs.location),
                              static_cast<QName*>((yystack_[5].value.expr)),
@@ -3865,11 +2887,9 @@ namespace zorba {
                              NULL);
       static_cast<AST_IndexDecl*>((yylhs.value.node))->setComment( SYMTAB((yystack_[7].value.sval)) );
     }
-#line 3849 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 151:
-#line 1719 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 151: // IndexDecl: "'declare'" AnnotationList "'index'" QNAME "'on'" "'nodes'" PathExpr "'by'" IndexKeyList
     {
       (yylhs.value.node) = new AST_IndexDecl(LOC(yylhs.location),
                              static_cast<QName*>((yystack_[5].value.expr)),
@@ -3878,71 +2898,57 @@ namespace zorba {
                              static_cast<AnnotationListParsenode*>((yystack_[7].value.node)));
       static_cast<AST_IndexDecl*>((yylhs.value.node))->setComment( SYMTAB((yystack_[8].value.sval)) );
     }
-#line 3862 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 152:
-#line 1730 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 152: // IndexKeyList: IndexKeySpec
     {
       IndexKeyList* keyList = new IndexKeyList(LOC(yylhs.location));
       keyList->addKeySpec(dynamic_cast<IndexKeySpec*>((yystack_[0].value.node)));
       (yylhs.value.node) = keyList;
     }
-#line 3872 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 153:
-#line 1736 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 153: // IndexKeyList: IndexKeyList "','" IndexKeySpec
     {
       dynamic_cast<IndexKeyList*>((yystack_[2].value.node))->addKeySpec(dynamic_cast<IndexKeySpec*>((yystack_[0].value.node)));
       (yylhs.value.node) = (yystack_[2].value.node);
     }
-#line 3881 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 154:
-#line 1743 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 154: // IndexKeySpec: PathExpr
     {
       (yylhs.value.node) = new IndexKeySpec(LOC(yylhs.location), (yystack_[0].value.expr), NULL, NULL);
     }
-#line 3889 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 155:
-#line 1748 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 155: // IndexKeySpec: PathExpr TypeDeclaration
     {
       (yylhs.value.node) = new IndexKeySpec(LOC(yylhs.location),
                             (yystack_[1].value.expr),
                             dynamic_cast<SequenceTypeAST*>((yystack_[0].value.node)),
                             NULL);
     }
-#line 3900 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 156:
-#line 1755 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 156: // IndexKeySpec: PathExpr OrderCollationSpec
     {
       (yylhs.value.node) = new IndexKeySpec(LOC(yylhs.location),
                             (yystack_[1].value.expr),
                             NULL,
                             dynamic_cast<OrderCollationSpec*>((yystack_[0].value.node)));
     }
-#line 3911 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 157:
-#line 1762 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 157: // IndexKeySpec: PathExpr TypeDeclaration OrderCollationSpec
     {
       (yylhs.value.node) = new IndexKeySpec(LOC(yylhs.location),
                             (yystack_[2].value.expr),
                             dynamic_cast<SequenceTypeAST*>((yystack_[1].value.node)),
                             dynamic_cast<OrderCollationSpec*>((yystack_[0].value.node)));
     }
-#line 3922 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 158:
-#line 1772 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 158: // IntegrityConstraintDecl: "'declare'" "'integrity'" "'constraint'" QNAME "'on'" "'collection'" QNAME "'$'" QNAME "'check'" ExprSingle
     {
       (yylhs.value.node) = new ICCollSimpleCheck(LOC(yylhs.location),
                                  static_cast<QName*>((yystack_[7].value.expr)),
@@ -3950,11 +2956,9 @@ namespace zorba {
                                  static_cast<QName*>((yystack_[2].value.expr)),
                                  (yystack_[0].value.expr));
     }
-#line 3934 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 159:
-#line 1782 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 159: // IntegrityConstraintDecl: "'declare'" "'integrity'" "'constraint'" QNAME "'on'" "'collection'" QNAME "'node'" "'$'" QNAME "'check'" "'unique'" "'key'" PathExpr
     {
       (yylhs.value.node) = new ICCollUniqueKeyCheck(LOC(yylhs.location),
                                     static_cast<QName*>((yystack_[10].value.expr)),
@@ -3962,11 +2966,9 @@ namespace zorba {
                                     static_cast<QName*>((yystack_[4].value.expr)),
                                     (yystack_[0].value.expr));
     }
-#line 3946 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 160:
-#line 1792 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 160: // IntegrityConstraintDecl: "'declare'" "'integrity'" "'constraint'" QNAME "'on'" "'collection'" QNAME "'foreach'" "'node'" "'$'" QNAME "'check'" ExprSingle
     {
       (yylhs.value.node) = new ICCollForeachNode(LOC(yylhs.location),
                                  static_cast<QName*>((yystack_[9].value.expr)),
@@ -3974,11 +2976,9 @@ namespace zorba {
                                  static_cast<QName*>((yystack_[2].value.expr)),
                                  (yystack_[0].value.expr));
     }
-#line 3958 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 161:
-#line 1803 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 161: // IntegrityConstraintDecl: "'declare'" "'integrity'" "'constraint'" QNAME "'foreign'" "'key'" "'from'" "'collection'" QNAME "'node'" "'$'" QNAME "'key'" PathExpr "'to'" "'collection'" QNAME "'node'" "'$'" QNAME "'key'" PathExpr
     {
       (yylhs.value.node) = new ICForeignKey( LOC(yylhs.location),
                             static_cast<QName*>((yystack_[18].value.expr)),
@@ -3989,11 +2989,9 @@ namespace zorba {
                             static_cast<QName*>((yystack_[2].value.expr)),
                             (yystack_[0].value.expr));
     }
-#line 3973 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 162:
-#line 1816 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 162: // QueryBody: StatementsAndOptionalExprTop
     {
       if ((yystack_[0].value.expr) == NULL)
       {
@@ -4007,97 +3005,75 @@ namespace zorba {
       }
       (yylhs.value.expr) = new QueryBody(LOC(yylhs.location), (yystack_[0].value.expr));
     }
-#line 3991 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 163:
-#line 1832 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 163: // StatementsAndOptionalExprTop: StatementsAndExpr
     {
       (yylhs.value.expr) = (yystack_[0].value.expr);
     }
-#line 3999 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 164:
-#line 1836 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 164: // StatementsAndOptionalExprTop: Statements
     {
       (yylhs.value.expr) = (yystack_[0].value.expr);
     }
-#line 4007 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 165:
-#line 1840 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 165: // StatementsAndOptionalExprTop: %empty
     {
       (yylhs.value.expr) = NULL;
     }
-#line 4015 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 166:
-#line 1846 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 166: // StatementsAndOptionalExpr: StatementsAndExpr
     {
       (yylhs.value.expr) = (yystack_[0].value.expr);
     }
-#line 4023 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 167:
-#line 1850 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 167: // StatementsAndOptionalExpr: Statements
     {
       (yylhs.value.expr) = (yystack_[0].value.expr);
     }
-#line 4031 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 168:
-#line 1854 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 168: // StatementsAndOptionalExpr: %empty
     {
       (yylhs.value.expr) = NULL;
     }
-#line 4039 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 169:
-#line 1860 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 169: // StatementsAndExpr: Expr
     {
       (yylhs.value.expr) = (yystack_[0].value.expr);
     }
-#line 4047 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 170:
-#line 1865 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 170: // StatementsAndExpr: Statements Expr
     {
       BlockBody* blk = static_cast<BlockBody*>((yystack_[1].value.expr));
       blk->add((yystack_[0].value.expr));
       (yylhs.value.expr) = blk;
     }
-#line 4057 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 171:
-#line 1873 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 171: // Statements: Statement
     {
       BlockBody* blk = new BlockBody(LOC(yylhs.location));
       blk->add((yystack_[0].value.expr));
       (yylhs.value.expr) = blk;
     }
-#line 4067 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 172:
-#line 1880 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 172: // Statements: Statements Statement
     {
       BlockBody* blk = static_cast<BlockBody*>((yystack_[1].value.expr));
       blk->add((yystack_[0].value.expr));
       (yylhs.value.expr) = blk;
     }
-#line 4077 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 173:
-#line 1887 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 173: // Statements: Statements Expr ERROR Statement
     {
       (yylhs.value.expr) = (yystack_[3].value.expr);
       (yylhs.value.expr) = (yystack_[2].value.expr);
@@ -4108,28 +3084,74 @@ namespace zorba {
       delete (yystack_[0].value.expr);
       YYERROR;
     }
-#line 4092 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 187:
-#line 1915 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 174: // Statement: BlockStatement
+    { (yylhs.value.expr) = (yystack_[0].value.expr); }
+    break;
+
+  case 175: // Statement: VarDeclStatement
+    { (yylhs.value.expr) = (yystack_[0].value.expr); }
+    break;
+
+  case 176: // Statement: AssignStatement
+    { (yylhs.value.expr) = (yystack_[0].value.expr); }
+    break;
+
+  case 177: // Statement: ApplyStatement
+    { (yylhs.value.expr) = (yystack_[0].value.expr); }
+    break;
+
+  case 178: // Statement: ExitStatement
+    { (yylhs.value.expr) = (yystack_[0].value.expr); }
+    break;
+
+  case 179: // Statement: WhileStatement
+    { (yylhs.value.expr) = (yystack_[0].value.expr); }
+    break;
+
+  case 180: // Statement: FlowCtlStatement
+    { (yylhs.value.expr) = (yystack_[0].value.expr); }
+    break;
+
+  case 181: // Statement: FLWORStatement
+    { (yylhs.value.expr) = (yystack_[0].value.expr); }
+    break;
+
+  case 182: // Statement: IfStatement
+    { (yylhs.value.expr) = (yystack_[0].value.expr); }
+    break;
+
+  case 183: // Statement: TypeswitchStatement
+    { (yylhs.value.expr) = (yystack_[0].value.expr); }
+    break;
+
+  case 184: // Statement: SwitchStatement
+    { (yylhs.value.expr) = (yystack_[0].value.expr); }
+    break;
+
+  case 185: // Statement: TryStatement
+    { (yylhs.value.expr) = (yystack_[0].value.expr); }
+    break;
+
+  case 186: // Statement: VoidStatement
+    { (yylhs.value.expr) = (yystack_[0].value.expr); }
+    break;
+
+  case 187: // BlockStatement: "'{'" Statements "'}'"
     {
       (yylhs.value.expr) = (yystack_[1].value.expr);
     }
-#line 4100 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 188:
-#line 1920 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 188: // BlockStatement: "'{'" "'}'"
     {
       driver.addCommonLanguageWarning(yystack_[1].location, ZED(ZWST0009_EMPTY_BLOCK));
       (yylhs.value.expr) = new BlockBody(LOC(yylhs.location));
     }
-#line 4109 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 189:
-#line 1927 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 189: // BlockExpr: "'{'" StatementsAndOptionalExpr "'}'"
     {
       BlockBody* block = dynamic_cast<BlockBody*>((yystack_[1].value.expr));
       if ((yystack_[1].value.expr) == NULL)
@@ -4147,58 +3169,46 @@ namespace zorba {
         (yylhs.value.expr) = (yystack_[1].value.expr);
       }
     }
-#line 4131 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 190:
-#line 1947 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 190: // EnclosedStatementsAndOptionalExpr: "'{'" StatementsAndOptionalExpr "'}'"
     {
       (yylhs.value.expr) = (yystack_[1].value.expr);
     }
-#line 4139 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 191:
-#line 1953 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 191: // VarDeclStatement: BlockVarDeclList "';'"
     {
       (yylhs.value.expr) = (yystack_[1].value.expr);
     }
-#line 4147 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 192:
-#line 1959 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 192: // BlockVarDeclList: BlockVarDeclList "','" BlockVarDecl
     {
       VarDeclStmt* vdecl = static_cast<VarDeclStmt*>((yystack_[2].value.expr));
       vdecl->add((yystack_[0].value.node));
       (yylhs.value.expr) = vdecl;
     }
-#line 4157 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 193:
-#line 1966 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 193: // BlockVarDeclList: "'variable'" BlockVarDecl
     {
       VarDeclStmt* vdecl = new VarDeclStmt(LOC(yylhs.location), NULL);
       vdecl->add((yystack_[0].value.node));
       (yylhs.value.expr) = vdecl;
     }
-#line 4167 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 194:
-#line 1973 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 194: // BlockVarDeclList: AnnotationList "'variable'" BlockVarDecl
     {
       VarDeclStmt* vdecl = new VarDeclStmt(LOC(yylhs.location),
                                            static_cast<AnnotationListParsenode*>((yystack_[2].value.node)));
       vdecl->add((yystack_[0].value.node));
       (yylhs.value.expr) = vdecl;
     }
-#line 4178 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 195:
-#line 1982 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 195: // BlockVarDecl: "'$'" QNAME
     {
       LocalVarDecl* vd = new LocalVarDecl(LOC(yylhs.location),
                                           static_cast<QName*>((yystack_[0].value.expr)),
@@ -4207,11 +3217,9 @@ namespace zorba {
                                           NULL);
       (yylhs.value.node) = vd;
     }
-#line 4191 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 196:
-#line 1991 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 196: // BlockVarDecl: "'$'" QNAME TypeDeclaration
     {
       LocalVarDecl* vd = new LocalVarDecl(LOC(yylhs.location),
                                           static_cast<QName*>((yystack_[1].value.expr)),
@@ -4220,11 +3228,9 @@ namespace zorba {
                                           NULL);
       (yylhs.value.node) = vd;
     }
-#line 4204 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 197:
-#line 2000 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 197: // BlockVarDecl: "'$'" QNAME "':='" ExprSingle
     {
       LocalVarDecl* vd = new LocalVarDecl(LOC(yylhs.location),
                                           static_cast<QName*>((yystack_[2].value.expr)),
@@ -4233,11 +3239,9 @@ namespace zorba {
                                           NULL);
       (yylhs.value.node) = vd;
     }
-#line 4217 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 198:
-#line 2009 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 198: // BlockVarDecl: "'$'" QNAME TypeDeclaration "':='" ExprSingle
     {
       LocalVarDecl* vd = new LocalVarDecl(LOC(yylhs.location),
                                           static_cast<QName*>((yystack_[3].value.expr)),
@@ -4246,35 +3250,27 @@ namespace zorba {
                                           NULL);
       (yylhs.value.node) = vd;
     }
-#line 4230 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 199:
-#line 2020 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 199: // AssignStatement: "'$'" QNAME "':='" ExprSingle "';'"
     {
       (yylhs.value.expr) = new AssignExpr(LOC(yylhs.location), static_cast<QName*>((yystack_[3].value.expr)), (yystack_[1].value.expr));
     }
-#line 4238 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 200:
-#line 2026 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 200: // ApplyStatement: ExprSimple "';'"
     {
       (yylhs.value.expr) = new ApplyExpr(LOC(yylhs.location), (yystack_[1].value.expr));
     }
-#line 4246 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 201:
-#line 2032 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 201: // ExitStatement: "'exit'" "'returning'" ExprSingle "';'"
     {
       (yylhs.value.expr) = new ExitExpr(LOC(yylhs.location), (yystack_[1].value.expr));
     }
-#line 4254 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 202:
-#line 2038 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 202: // WhileStatement: "'while'" "'('" Expr "')'" Statement
     {
       BlockBody* bb = dynamic_cast<BlockBody *>((yystack_[0].value.expr));
       if (bb == NULL)
@@ -4284,27 +3280,21 @@ namespace zorba {
       }
       (yylhs.value.expr) = new WhileExpr(LOC(yylhs.location), (yystack_[2].value.expr), bb);
     }
-#line 4268 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 203:
-#line 2050 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 203: // FlowCtlStatement: "'break'" "'loop'" "';'"
     {
       (yylhs.value.expr) = new FlowCtlStatement(LOC(yylhs.location), FlowCtlStatement::BREAK);
     }
-#line 4276 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 204:
-#line 2055 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 204: // FlowCtlStatement: "'continue'" "'loop'" "';'"
     {
       (yylhs.value.expr) = new FlowCtlStatement( LOC(yylhs.location), FlowCtlStatement::CONTINUE );
     }
-#line 4284 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 205:
-#line 2061 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 205: // FLWORStatement: FLWORClauseList ReturnStatement
     {
       ReturnExpr* re = dynamic_cast<ReturnExpr*>((yystack_[0].value.expr));
       (yylhs.value.expr) = new FLWORExpr(LOC(yylhs.location),
@@ -4314,11 +3304,9 @@ namespace zorba {
                          driver.theCompilerCB->theConfig.force_gflwor);
       delete (yystack_[0].value.expr);
     }
-#line 4298 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 206:
-#line 2073 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 206: // ReturnStatement: ReturnOrSelect Statement
     {
       exprnode* retExpr = (yystack_[0].value.expr);
       if (dynamic_cast<VarDeclStmt*>(retExpr) != NULL)
@@ -4329,11 +3317,9 @@ namespace zorba {
       }
       (yylhs.value.expr) = new ReturnExpr(LOC(yylhs.location), retExpr);
     }
-#line 4313 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 207:
-#line 2086 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 207: // IfStatement: "'if'" "'('" Expr "')'" "'then'" Statement "'else'" Statement
     {
       exprnode* thenExpr = (yystack_[2].value.expr);
       exprnode* elseExpr = (yystack_[0].value.expr);
@@ -4351,65 +3337,51 @@ namespace zorba {
       }
       (yylhs.value.expr) = new IfExpr(LOC(yylhs.location), (yystack_[5].value.expr), thenExpr, elseExpr);
     }
-#line 4335 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 208:
-#line 2106 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 208: // TryStatement: "'try'" BlockStatement CatchListStatement
     {
       (yylhs.value.expr) = new TryExpr(LOC(yylhs.location), (yystack_[1].value.expr), (yystack_[0].value.expr));
     }
-#line 4343 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 209:
-#line 2112 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 209: // CatchListStatement: CatchStatement
     {
       CatchListExpr* cle = new CatchListExpr( LOC(yylhs.location) );
       cle->push_back( static_cast<CatchExpr*>((yystack_[0].value.expr)) );
       (yylhs.value.expr) = cle;
     }
-#line 4353 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 210:
-#line 2119 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 210: // CatchListStatement: CatchListStatement CatchStatement
     {
       CatchListExpr *cle = dynamic_cast<CatchListExpr*>((yystack_[1].value.expr));
       if ( cle )
         cle->push_back( static_cast<CatchExpr*>((yystack_[0].value.expr)) );
       (yylhs.value.expr) = (yystack_[1].value.expr);
     }
-#line 4364 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 211:
-#line 2128 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 211: // CatchStatement: "'catch'" NameTestList BlockStatement
     {
        (yylhs.value.expr) = new CatchExpr(LOC(yylhs.location), *(yystack_[1].value.name_test_list), (yystack_[0].value.expr));
        delete (yystack_[1].value.name_test_list);
     }
-#line 4373 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 212:
-#line 2135 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 212: // VoidStatement: "';'"
     {
       (yylhs.value.expr) = new BlockBody(LOC(yylhs.location));
     }
-#line 4381 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 213:
-#line 2141 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 213: // Expr: ExprSingle
     {
       (yylhs.value.expr) = (yystack_[0].value.expr);
     }
-#line 4389 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 214:
-#line 2146 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 214: // Expr: Expr "','" ExprSingle
     {
       Expr* expr = dynamic_cast<Expr*>((yystack_[2].value.expr));
       if ( !expr )
@@ -4420,11 +3392,9 @@ namespace zorba {
       expr->push_back( (yystack_[0].value.expr) );
       (yylhs.value.expr) = expr;
     }
-#line 4404 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 215:
-#line 2158 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 215: // Expr: Expr ERROR ExprSingle
     {
       (yylhs.value.expr) = (yystack_[2].value.expr);
       (yylhs.value.expr) = (yystack_[0].value.expr);
@@ -4434,11 +3404,81 @@ namespace zorba {
       delete (yystack_[0].value.expr);
       YYERROR;
     }
-#line 4418 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 234:
-#line 2192 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 216: // ExprSingle: FLWORExpr
+        { (yylhs.value.expr) = (yystack_[0].value.expr); }
+    break;
+
+  case 217: // ExprSingle: SwitchExpr
+      { (yylhs.value.expr) = (yystack_[0].value.expr); }
+    break;
+
+  case 218: // ExprSingle: TypeswitchExpr
+      { (yylhs.value.expr) = (yystack_[0].value.expr); }
+    break;
+
+  case 219: // ExprSingle: IfExpr
+      { (yylhs.value.expr) = (yystack_[0].value.expr); }
+    break;
+
+  case 220: // ExprSingle: TryExpr
+      { (yylhs.value.expr) = (yystack_[0].value.expr); }
+    break;
+
+  case 221: // ExprSingle: ExprSimple
+      { (yylhs.value.expr) = (yystack_[0].value.expr); }
+    break;
+
+  case 222: // ExprSimple: OrExpr
+        { (yylhs.value.expr) = (yystack_[0].value.expr); }
+    break;
+
+  case 223: // ExprSimple: QuantifiedExpr
+      { (yylhs.value.expr) = (yystack_[0].value.expr); }
+    break;
+
+  case 224: // ExprSimple: InsertExpr
+      { (yylhs.value.expr) = (yystack_[0].value.expr); }
+    break;
+
+  case 225: // ExprSimple: DeleteExpr
+      { (yylhs.value.expr) = (yystack_[0].value.expr); }
+    break;
+
+  case 226: // ExprSimple: RenameExpr
+      { (yylhs.value.expr) = (yystack_[0].value.expr); }
+    break;
+
+  case 227: // ExprSimple: ReplaceExpr
+      { (yylhs.value.expr) = (yystack_[0].value.expr); }
+    break;
+
+  case 228: // ExprSimple: TransformExpr
+      { (yylhs.value.expr) = (yystack_[0].value.expr); }
+    break;
+
+  case 229: // ExprSimple: JSONDeleteExpr
+      { (yylhs.value.expr) = (yystack_[0].value.expr); }
+    break;
+
+  case 230: // ExprSimple: JSONInsertExpr
+      { (yylhs.value.expr) = (yystack_[0].value.expr); }
+    break;
+
+  case 231: // ExprSimple: JSONRenameExpr
+      { (yylhs.value.expr) = (yystack_[0].value.expr); }
+    break;
+
+  case 232: // ExprSimple: JSONReplaceExpr
+      { (yylhs.value.expr) = (yystack_[0].value.expr); }
+    break;
+
+  case 233: // ExprSimple: JSONAppendExpr
+      { (yylhs.value.expr) = (yystack_[0].value.expr); }
+    break;
+
+  case 234: // FLWORExpr: FLWORClauseList ReturnExpr
     {
       ReturnExpr *re = dynamic_cast<ReturnExpr*>((yystack_[0].value.expr));
       (yylhs.value.expr) = new FLWORExpr(LOC(yylhs.location),
@@ -4448,66 +3488,50 @@ namespace zorba {
                          driver.theCompilerCB->theConfig.force_gflwor);
       delete (yystack_[0].value.expr);
     }
-#line 4432 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 235:
-#line 2204 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 235: // ReturnExpr: ReturnOrSelect ExprSingle
     {
       (yylhs.value.expr) = new ReturnExpr( LOC(yylhs.location), (yystack_[0].value.expr) );
     }
-#line 4440 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 236:
-#line 2210 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 236: // ReturnOrSelect: "'return'"
     {
     }
-#line 4447 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 237:
-#line 2215 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 237: // WindowType: "'sliding'" "'window'"
     {
       (yylhs.value.strval) = parser::the_sliding;
     }
-#line 4455 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 238:
-#line 2220 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 238: // WindowType: "'tumbling'" "'window'"
     {
       (yylhs.value.strval) = parser::the_tumbling;
     }
-#line 4463 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 239:
-#line 2226 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 239: // FLWORWinCondType: "'start'"
     {
       (yylhs.value.strval) = parser::the_start;
     }
-#line 4471 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 240:
-#line 2231 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 240: // FLWORWinCondType: "'end'"
     {
       (yylhs.value.strval) = parser::the_end;
     }
-#line 4479 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 241:
-#line 2236 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 241: // FLWORWinCondType: "'only'" "'end'"
+  {
     (yylhs.value.strval) = parser::the_only_end;
   }
-#line 4487 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 242:
-#line 2242 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 242: // FLWORWinCond: FLWORWinCondType WindowVars "'when'" ExprSingle
     {
       (yylhs.value.node) = new FLWORWinCond(LOC(yylhs.location),
                             dynamic_cast<WindowVars*>((yystack_[2].value.node)),
@@ -4515,11 +3539,9 @@ namespace zorba {
                             (yystack_[3].value.strval) == parser::the_start,
                             (yystack_[3].value.strval) == parser::the_only_end);
     }
-#line 4499 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 243:
-#line 2251 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 243: // FLWORWinCond: FLWORWinCondType "'when'" ExprSingle
     {
       (yylhs.value.node) = new FLWORWinCond(LOC(yylhs.location),
                             NULL,
@@ -4527,11 +3549,9 @@ namespace zorba {
                             (yystack_[2].value.strval) == parser::the_start,
                             (yystack_[2].value.strval) == parser::the_only_end);
     }
-#line 4511 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 244:
-#line 2261 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 244: // WindowClause: ForOrFrom WindowType WindowVarDecl FLWORWinCond FLWORWinCond
     {
       (yylhs.value.node) = new WindowClause (LOC (yylhs.location),
                              ((yystack_[3].value.strval) == parser::the_tumbling ?
@@ -4541,11 +3561,9 @@ namespace zorba {
                              dynamic_cast<FLWORWinCond *> ((yystack_[1].value.node)),
                              dynamic_cast<FLWORWinCond *> ((yystack_[0].value.node)));
     }
-#line 4525 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 245:
-#line 2271 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 245: // WindowClause: ForOrFrom WindowType WindowVarDecl FLWORWinCond
     {
       (yylhs.value.node) = new WindowClause (LOC (yylhs.location),
                              ((yystack_[2].value.strval) == parser::the_tumbling ?
@@ -4554,47 +3572,69 @@ namespace zorba {
                              dynamic_cast<WindowVarDecl *> ((yystack_[1].value.node)),
                              dynamic_cast<FLWORWinCond *> ((yystack_[0].value.node)), NULL);
     }
-#line 4538 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 246:
-#line 2282 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 246: // CountClause: "'count'" "'$'" QNAME
     {
       (yylhs.value.node) = new CountClause(LOC(yylhs.location), static_cast<QName*>((yystack_[0].value.expr)));
     }
-#line 4546 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 255:
-#line 2300 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 247: // ForLetWinClause: ForClause
+    { (yylhs.value.node) = (yystack_[0].value.node); }
+    break;
+
+  case 248: // ForLetWinClause: LetClause
+    { (yylhs.value.node) = (yystack_[0].value.node); }
+    break;
+
+  case 249: // ForLetWinClause: WindowClause
+    { (yylhs.value.node) = (yystack_[0].value.node); }
+    break;
+
+  case 250: // FLWORClause: ForLetWinClause
+    { (yylhs.value.node) = (yystack_[0].value.node); }
+    break;
+
+  case 251: // FLWORClause: WhereClause
+    { (yylhs.value.node) = (yystack_[0].value.node); }
+    break;
+
+  case 252: // FLWORClause: OrderByClause
+    { (yylhs.value.node) = (yystack_[0].value.node); }
+    break;
+
+  case 253: // FLWORClause: GroupByClause
+    { (yylhs.value.node) = (yystack_[0].value.node); }
+    break;
+
+  case 254: // FLWORClause: CountClause
+    { (yylhs.value.node) = (yystack_[0].value.node); }
+    break;
+
+  case 255: // FLWORClauseList: ForLetWinClause
     {
       FLWORClauseList *fcl = new FLWORClauseList( LOC(yylhs.location) );
       fcl->push_back( dynamic_cast<FLWORClause*>((yystack_[0].value.node)) );
       (yylhs.value.node) = fcl;
     }
-#line 4556 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 256:
-#line 2307 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 256: // FLWORClauseList: FLWORClauseList FLWORClause
     {
       FLWORClauseList *fcl = dynamic_cast<FLWORClauseList*>((yystack_[1].value.node));
       fcl->push_back( dynamic_cast<FLWORClause*>((yystack_[0].value.node)) );
       (yylhs.value.node) = fcl;
     }
-#line 4566 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 257:
-#line 2315 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 257: // ForClause: ForOrFrom "'$'" VarInDeclList
     {
       (yylhs.value.node) = new ForClause(LOC(yylhs.location), dynamic_cast<VarInDeclList*>((yystack_[0].value.node)));
     }
-#line 4574 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 258:
-#line 2319 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 258: // ForClause: "'for'" error VarInDeclList
     {
       (yylhs.value.node) = (yystack_[0].value.node);
       error(yystack_[1].location, "syntax error, unexpected qualified name \""
@@ -4602,60 +3642,49 @@ namespace zorba {
       delete (yystack_[0].value.node);
       YYERROR;
     }
-#line 4586 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 259:
-#line 2327 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 259: // ForClause: ForOrFrom "'unrecognized'"
     {
       (yylhs.value.node) = NULL;
       error(yystack_[0].location, "");
       YYERROR;
     }
-#line 4596 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 260:
-#line 2335 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 260: // ForOrFrom: "'for'"
     {
     }
-#line 4603 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 261:
-#line 2340 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 261: // VarInDeclList: VarInDecl
     {
       VarInDeclList* vdl = new VarInDeclList( LOC(yylhs.location) );
       vdl->push_back( dynamic_cast<VarInDecl*>((yystack_[0].value.node)) );
       (yylhs.value.node) = vdl;
     }
-#line 4613 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 262:
-#line 2347 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 262: // VarInDeclList: VarInDeclList "','" "'$'" VarInDecl
     {
       if ( VarInDeclList* vdl = dynamic_cast<VarInDeclList*>((yystack_[3].value.node)) )
         vdl->push_back( dynamic_cast<VarInDecl*>((yystack_[0].value.node)) );
       (yylhs.value.node) = (yystack_[3].value.node);
     }
-#line 4623 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 263:
-#line 2354 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 263: // VarInDeclList: VarInDeclList "','" VarInDecl
     {
       (yylhs.value.node) = (yystack_[2].value.node);
       error(yystack_[0].location, "syntax error, unexpected QName \""
           + static_cast<VarInDecl*>((yystack_[0].value.node))->get_var_name()->get_qname().str() + "\" (missing \"$\" sign?)");
       delete (yystack_[2].value.node);
+      release_hack( (yystack_[0].value.node) );
       YYERROR;
     }
-#line 4635 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 264:
-#line 2364 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 264: // VarInDecl: QNAME "'in'" ExprSingle
     {
       (yylhs.value.node) = new VarInDecl(LOC(yylhs.location),
                          static_cast<QName*>((yystack_[2].value.expr)),
@@ -4665,11 +3694,9 @@ namespace zorba {
                          (yystack_[0].value.expr),
                          false);
     }
-#line 4649 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 265:
-#line 2374 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 265: // VarInDecl: QNAME "'allowing'" "'empty'" "'in'" ExprSingle
     {
       (yylhs.value.node) = new VarInDecl(LOC(yylhs.location),
                          static_cast<QName*>((yystack_[4].value.expr)),
@@ -4679,11 +3706,9 @@ namespace zorba {
                          (yystack_[0].value.expr),
                          true);
     }
-#line 4663 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 266:
-#line 2384 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 266: // VarInDecl: QNAME TypeDeclaration "'in'" ExprSingle
     {
       (yylhs.value.node) = new VarInDecl(LOC(yylhs.location),
                          static_cast<QName*>((yystack_[3].value.expr)),
@@ -4693,11 +3718,9 @@ namespace zorba {
                          (yystack_[0].value.expr),
                          false);
     }
-#line 4677 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 267:
-#line 2394 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 267: // VarInDecl: QNAME TypeDeclaration "'allowing'" "'empty'" "'in'" ExprSingle
     {
       (yylhs.value.node) = new VarInDecl(LOC(yylhs.location),
                          static_cast<QName*>((yystack_[5].value.expr)),
@@ -4707,11 +3730,9 @@ namespace zorba {
                          (yystack_[0].value.expr),
                          true);
     }
-#line 4691 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 268:
-#line 2404 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 268: // VarInDecl: QNAME PositionalVar "'in'" ExprSingle
     {
       (yylhs.value.node) = new VarInDecl(LOC(yylhs.location),
                          static_cast<QName*>((yystack_[3].value.expr)),
@@ -4721,11 +3742,9 @@ namespace zorba {
                          (yystack_[0].value.expr),
                          false);
     }
-#line 4705 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 269:
-#line 2414 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 269: // VarInDecl: QNAME "'allowing'" "'empty'" PositionalVar "'in'" ExprSingle
     {
       (yylhs.value.node) = new VarInDecl(LOC(yylhs.location),
                          static_cast<QName*>((yystack_[5].value.expr)),
@@ -4735,11 +3754,9 @@ namespace zorba {
                          (yystack_[0].value.expr),
                          true);
     }
-#line 4719 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 270:
-#line 2424 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 270: // VarInDecl: QNAME TypeDeclaration PositionalVar "'in'" ExprSingle
     {
       (yylhs.value.node) = new VarInDecl(LOC(yylhs.location),
                          static_cast<QName*>((yystack_[4].value.expr)),
@@ -4749,11 +3766,9 @@ namespace zorba {
                          (yystack_[0].value.expr),
                          false);
     }
-#line 4733 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 271:
-#line 2434 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 271: // VarInDecl: QNAME TypeDeclaration "'allowing'" "'empty'" PositionalVar "'in'" ExprSingle
     {
       (yylhs.value.node) = new VarInDecl(LOC(yylhs.location),
                          static_cast<QName*>((yystack_[6].value.expr)),
@@ -4763,11 +3778,9 @@ namespace zorba {
                          (yystack_[0].value.expr),
                          true);
     }
-#line 4747 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 272:
-#line 2444 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 272: // VarInDecl: QNAME FTScoreVar "'in'" ExprSingle
     {
       (yylhs.value.node) = new VarInDecl(LOC(yylhs.location),
                          static_cast<QName*>((yystack_[3].value.expr)),
@@ -4776,11 +3789,9 @@ namespace zorba {
                          (yystack_[0].value.expr),
                          false);
     }
-#line 4760 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 273:
-#line 2453 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 273: // VarInDecl: QNAME TypeDeclaration FTScoreVar "'in'" ExprSingle
     {
       (yylhs.value.node) = new VarInDecl(LOC(yylhs.location),
                          static_cast<QName*>((yystack_[4].value.expr)),
@@ -4790,11 +3801,9 @@ namespace zorba {
                          (yystack_[0].value.expr),
                          false);
     }
-#line 4774 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 274:
-#line 2463 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 274: // VarInDecl: QNAME PositionalVar FTScoreVar "'in'" ExprSingle
     {
       (yylhs.value.node) = new VarInDecl(LOC (yylhs.location),
                          static_cast<QName*>((yystack_[4].value.expr)),
@@ -4804,11 +3813,9 @@ namespace zorba {
                          (yystack_[0].value.expr),
                          false);
     }
-#line 4788 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 275:
-#line 2473 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 275: // VarInDecl: QNAME TypeDeclaration PositionalVar FTScoreVar "'in'" ExprSingle
     {
       (yylhs.value.node) = new VarInDecl(LOC (yylhs.location),
                          static_cast<QName*>((yystack_[5].value.expr)),
@@ -4818,55 +3825,43 @@ namespace zorba {
                          (yystack_[0].value.expr),
                          false);
     }
-#line 4802 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 276:
-#line 2485 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 276: // PositionalVar: "'at'" "'$'" QNAME
     {
       (yylhs.value.node) = new PositionalVar(LOC(yylhs.location), static_cast<QName*>((yystack_[0].value.expr)));
     }
-#line 4810 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 277:
-#line 2491 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 277: // FTScoreVar: "'score'" "'$'" QNAME
     {
       (yylhs.value.node) = new FTScoreVar(LOC(yylhs.location), static_cast<QName*>((yystack_[0].value.expr)));
     }
-#line 4818 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 278:
-#line 2497 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 278: // LetClause: "'let'" VarGetsDeclList
+        {
             (yylhs.value.node) = new LetClause( LOC(yylhs.location), dynamic_cast<VarGetsDeclList*>((yystack_[0].value.node)) );
         }
-#line 4826 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 279:
-#line 2503 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 279: // VarGetsDeclList: VarGetsDecl
+        {
             VarGetsDeclList *vgdl = new VarGetsDeclList( LOC(yylhs.location) );
             vgdl->push_back( dynamic_cast<VarGetsDecl*>((yystack_[0].value.node)) );
             (yylhs.value.node) = vgdl;
         }
-#line 4836 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 280:
-#line 2509 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 280: // VarGetsDeclList: VarGetsDeclList "','" VarGetsDecl
+        {
             if( VarGetsDeclList *vgdl = dynamic_cast<VarGetsDeclList*>((yystack_[2].value.node)) )
                 vgdl->push_back( dynamic_cast<VarGetsDecl*>((yystack_[0].value.node)) );
             (yylhs.value.node) = (yystack_[2].value.node);
         }
-#line 4846 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 281:
-#line 2517 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 281: // VarGetsDecl: "'$'" QNAME "':='" ExprSingle
     {
       (yylhs.value.node) = new VarGetsDecl(LOC (yylhs.location),
                            static_cast<QName*>((yystack_[2].value.expr)),
@@ -4874,11 +3869,9 @@ namespace zorba {
                            NULL,
                            (yystack_[0].value.expr));
     }
-#line 4858 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 282:
-#line 2525 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 282: // VarGetsDecl: "'$'" QNAME TypeDeclaration "':='" ExprSingle
     {
       (yylhs.value.node) = new VarGetsDecl(LOC (yylhs.location),
                            static_cast<QName*>((yystack_[3].value.expr)),
@@ -4886,11 +3879,9 @@ namespace zorba {
                            NULL,
                            (yystack_[0].value.expr));
     }
-#line 4870 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 283:
-#line 2533 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 283: // VarGetsDecl: FTScoreVar "':='" ExprSingle
     {
       (yylhs.value.node) = new VarGetsDecl(LOC (yylhs.location),
                            dynamic_cast<FTScoreVar*>((yystack_[2].value.node))->get_var_name(),
@@ -4898,11 +3889,9 @@ namespace zorba {
                            dynamic_cast<FTScoreVar*>((yystack_[2].value.node)),
                            (yystack_[0].value.expr));
      }
-#line 4882 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 284:
-#line 2541 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 284: // VarGetsDecl: "'$'" QNAME TypeDeclaration FTScoreVar "':='" ExprSingle
     {
       (yylhs.value.node) = new VarGetsDecl(LOC (yylhs.location),
                            static_cast<QName*>((yystack_[4].value.expr)),
@@ -4910,134 +3899,112 @@ namespace zorba {
                            dynamic_cast<FTScoreVar*>((yystack_[2].value.node)),
                            (yystack_[0].value.expr));
     }
-#line 4894 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 285:
-#line 2551 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 285: // WindowVarDecl: "'$'" QNAME "'in'" ExprSingle
     {
       (yylhs.value.node) = new WindowVarDecl(LOC (yylhs.location),
                              static_cast<QName*>((yystack_[2].value.expr)),
                              NULL, (yystack_[0].value.expr));
     }
-#line 4904 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 286:
-#line 2557 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 286: // WindowVarDecl: "'$'" QNAME TypeDeclaration "'in'" ExprSingle
     {
       (yylhs.value.node) = new WindowVarDecl(LOC (yylhs.location),
                              static_cast<QName*>((yystack_[3].value.expr)),
                              dynamic_cast<SequenceTypeAST *>((yystack_[2].value.node)),
                              (yystack_[0].value.expr));
     }
-#line 4915 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 288:
-#line 2567 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 287: // WindowVars: WindowVars3
+    { (yylhs.value.node) = (yystack_[0].value.node); }
+    break;
+
+  case 288: // WindowVars: "'$'" QNAME
     {
       (yylhs.value.node) = new WindowVars(LOC(yylhs.location), NULL, static_cast<QName*>((yystack_[0].value.expr)), NULL, NULL);
     }
-#line 4923 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 289:
-#line 2571 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 289: // WindowVars: "'$'" QNAME WindowVars3
     {
       (yylhs.value.node) = (yystack_[0].value.node);
       dynamic_cast<WindowVars *>((yylhs.value.node))->set_curr(static_cast<QName*>((yystack_[1].value.expr)));
     }
-#line 4932 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 290:
-#line 2578 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 290: // WindowVars3: PositionalVar
     {
       (yylhs.value.node) = new WindowVars(LOC(yylhs.location), dynamic_cast<PositionalVar*>((yystack_[0].value.node)), NULL, NULL, NULL);
     }
-#line 4940 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 291:
-#line 2582 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 291: // WindowVars3: PositionalVar WindowVars2
     {
       (yylhs.value.node) = (yystack_[0].value.node);
       dynamic_cast<WindowVars *>((yylhs.value.node))->set_posvar(dynamic_cast<PositionalVar*>((yystack_[1].value.node)));
     }
-#line 4949 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 293:
-#line 2590 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 292: // WindowVars3: WindowVars2
+    { (yylhs.value.node) = (yystack_[0].value.node); }
+    break;
+
+  case 293: // WindowVars2: "'previous'" "'$'" QNAME "'next'" "'$'" QNAME
     {
       (yylhs.value.node) = new WindowVars(LOC(yylhs.location), NULL, NULL, static_cast<QName*>((yystack_[3].value.expr)), static_cast<QName*>((yystack_[0].value.expr)));
     }
-#line 4957 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 294:
-#line 2594 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 294: // WindowVars2: "'next'" "'$'" QNAME
     {
       (yylhs.value.node) = new WindowVars(LOC(yylhs.location), NULL, NULL, NULL, static_cast<QName*>((yystack_[0].value.expr)));
     }
-#line 4965 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 295:
-#line 2598 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 295: // WindowVars2: "'previous'" "'$'" QNAME
     {
       (yylhs.value.node) = new WindowVars(LOC(yylhs.location), NULL, NULL, static_cast<QName*>((yystack_[0].value.expr)), NULL);
     }
-#line 4973 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 296:
-#line 2604 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 296: // WhereClause: "'where'" ExprSingle
     {
       (yylhs.value.node) = new WhereClause(LOC (yylhs.location), (yystack_[0].value.expr));
     }
-#line 4981 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 297:
-#line 2610 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 297: // GroupByClause: "'group'" "'by'" GroupSpecList
     {
       (yylhs.value.node) = new GroupByClause(LOC(yylhs.location), dynamic_cast<GroupSpecList*>((yystack_[0].value.node)));
     }
-#line 4989 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 298:
-#line 2616 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 298: // GroupSpecList: GroupSpec
     {
       GroupSpecList* gsl = new GroupSpecList(LOC(yylhs.location));
       gsl->push_back(static_cast<GroupSpec*>((yystack_[0].value.node)));
       (yylhs.value.node) = gsl;
     }
-#line 4999 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 299:
-#line 2622 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 299: // GroupSpecList: GroupSpecList "','" GroupSpec
     {
       GroupSpecList* gsl = static_cast<GroupSpecList*>((yystack_[2].value.node));
       gsl->push_back(static_cast<GroupSpec*>((yystack_[0].value.node)));
       (yylhs.value.node) = gsl;
     }
-#line 5009 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 300:
-#line 2630 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 300: // GroupSpec: "'$'" QNAME "':='" ExprSingle
     {
       (yylhs.value.node) = new GroupSpec(LOC(yylhs.location), static_cast<QName*>((yystack_[2].value.expr)), NULL, (yystack_[0].value.expr), NULL);
     }
-#line 5017 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 301:
-#line 2634 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 301: // GroupSpec: "'$'" QNAME TypeDeclaration "':='" ExprSingle
     {
       (yylhs.value.node) = new GroupSpec(LOC(yylhs.location),
                          static_cast<QName*>((yystack_[3].value.expr)),
@@ -5045,11 +4012,9 @@ namespace zorba {
                          (yystack_[0].value.expr),
                          NULL);
     }
-#line 5029 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 302:
-#line 2642 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 302: // GroupSpec: "'$'" QNAME TypeDeclaration "':='" ExprSingle GroupCollationSpec
     {
       (yylhs.value.node) = new GroupSpec(LOC(yylhs.location),
                          static_cast<QName*>((yystack_[4].value.expr)),
@@ -5057,11 +4022,9 @@ namespace zorba {
                          (yystack_[1].value.expr),
                          static_cast<GroupCollationSpec*>((yystack_[0].value.node)));
     }
-#line 5041 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 303:
-#line 2650 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 303: // GroupSpec: "'$'" QNAME "':='" ExprSingle GroupCollationSpec
     {
       (yylhs.value.node) = new GroupSpec(LOC(yylhs.location),
                          static_cast<QName*>((yystack_[3].value.expr)),
@@ -5069,11 +4032,9 @@ namespace zorba {
                          (yystack_[1].value.expr),
                          static_cast<GroupCollationSpec*>((yystack_[0].value.node)));
     }
-#line 5053 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 304:
-#line 2658 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 304: // GroupSpec: ExprSingle
     {
       VarRef* varRef = dynamic_cast<VarRef*>((yystack_[0].value.expr));
       if (varRef != NULL)
@@ -5081,11 +4042,9 @@ namespace zorba {
       else
         (yylhs.value.node) = new GroupSpec(LOC(yylhs.location), NULL, NULL, (yystack_[0].value.expr), NULL);
     }
-#line 5065 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 305:
-#line 2666 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 305: // GroupSpec: ExprSingle GroupCollationSpec
     {
       VarRef* varRef = dynamic_cast<VarRef*>((yystack_[1].value.expr));
       if (varRef != NULL)
@@ -5093,108 +4052,86 @@ namespace zorba {
       else
         (yylhs.value.node) = new GroupSpec(LOC(yylhs.location), NULL, NULL, (yystack_[1].value.expr), static_cast<GroupCollationSpec*>((yystack_[0].value.node)));
     }
-#line 5077 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 306:
-#line 2676 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 306: // GroupCollationSpec: "'collation'" URI_LITERAL
     {
       (yylhs.value.node) = new GroupCollationSpec( LOC(yylhs.location), SYMTAB((yystack_[0].value.sval)) );
     }
-#line 5085 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 307:
-#line 2682 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 307: // OrderByClause: "'order'" "'by'" OrderSpecList
+        {
             (yylhs.value.node) = new OrderByClause(
                 LOC(yylhs.location), dynamic_cast<OrderSpecList*>((yystack_[0].value.node))
             );
         }
-#line 5095 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 308:
-#line 2688 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 308: // OrderByClause: "'stable'" "'order'" "'by'" OrderSpecList
+        {
             (yylhs.value.node) = new OrderByClause(
                 LOC(yylhs.location), dynamic_cast<OrderSpecList*>((yystack_[0].value.node)), true
             );
         }
-#line 5105 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 309:
-#line 2696 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 309: // OrderSpecList: OrderSpec
+        {
             OrderSpecList *osl = new OrderSpecList( LOC(yylhs.location) );
             osl->push_back( dynamic_cast<OrderSpec*>((yystack_[0].value.node)) );
             (yylhs.value.node) = osl;
         }
-#line 5115 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 310:
-#line 2702 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 310: // OrderSpecList: OrderSpecList "','" OrderSpec
+        {
             if ( OrderSpecList* osl = dynamic_cast<OrderSpecList*>((yystack_[2].value.node)) )
                 osl->push_back( dynamic_cast<OrderSpec*>((yystack_[0].value.node)) );
             (yylhs.value.node) = (yystack_[2].value.node);
         }
-#line 5125 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 311:
-#line 2710 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 311: // OrderSpec: ExprSingle
+        {
             (yylhs.value.node) = new OrderSpec( LOC(yylhs.location), (yystack_[0].value.expr), NULL );
         }
-#line 5133 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 312:
-#line 2714 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 312: // OrderSpec: ExprSingle OrderModifier
+        {
             (yylhs.value.node) = new OrderSpec(
                 LOC(yylhs.location), (yystack_[1].value.expr), dynamic_cast<OrderModifierPN*>((yystack_[0].value.node))
             );
         }
-#line 5143 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 313:
-#line 2722 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 313: // OrderModifier: OrderDirSpec
+        {
             (yylhs.value.node) = new OrderModifierPN(
                 LOC(yylhs.location), dynamic_cast<OrderDirSpec*>((yystack_[0].value.node)), NULL, NULL
             );
         }
-#line 5153 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 314:
-#line 2728 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 314: // OrderModifier: OrderEmptySpec
+        {
             (yylhs.value.node) = new OrderModifierPN(
                 LOC(yylhs.location), NULL, dynamic_cast<OrderEmptySpec*>((yystack_[0].value.node)), NULL
             );
         }
-#line 5163 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 315:
-#line 2734 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 315: // OrderModifier: OrderCollationSpec
+        {
             (yylhs.value.node) = new OrderModifierPN(
                 LOC(yylhs.location), NULL, NULL, dynamic_cast<OrderCollationSpec*>((yystack_[0].value.node))
             );
         }
-#line 5173 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 316:
-#line 2740 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 316: // OrderModifier: OrderDirSpec OrderEmptySpec
+        {
             (yylhs.value.node) = new OrderModifierPN(
                 LOC(yylhs.location),
                 dynamic_cast<OrderDirSpec*>((yystack_[1].value.node)),
@@ -5202,12 +4139,10 @@ namespace zorba {
                 NULL
             );
         }
-#line 5186 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 317:
-#line 2749 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 317: // OrderModifier: OrderDirSpec OrderCollationSpec
+        {
             (yylhs.value.node) = new OrderModifierPN(
                 LOC(yylhs.location),
                 dynamic_cast<OrderDirSpec*>((yystack_[1].value.node)),
@@ -5215,12 +4150,10 @@ namespace zorba {
                 dynamic_cast<OrderCollationSpec*>((yystack_[0].value.node))
             );
         }
-#line 5199 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 318:
-#line 2758 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 318: // OrderModifier: OrderEmptySpec OrderCollationSpec
+        {
             (yylhs.value.node) = new OrderModifierPN(
                 LOC(yylhs.location),
                 NULL,
@@ -5228,12 +4161,10 @@ namespace zorba {
                 dynamic_cast<OrderCollationSpec*>((yystack_[0].value.node))
             );
         }
-#line 5212 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 319:
-#line 2767 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 319: // OrderModifier: OrderDirSpec OrderEmptySpec OrderCollationSpec
+        {
             (yylhs.value.node) = new OrderModifierPN(
                 LOC(yylhs.location),
                 dynamic_cast<OrderDirSpec*>((yystack_[2].value.node)),
@@ -5241,56 +4172,44 @@ namespace zorba {
                 dynamic_cast<OrderCollationSpec*>((yystack_[0].value.node))
             );
         }
-#line 5225 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 320:
-#line 2778 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 320: // OrderDirSpec: "'ascending'"
+        {
             (yylhs.value.node) = new OrderDirSpec( LOC(yylhs.location), ParseConstants::dir_ascending );
         }
-#line 5233 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 321:
-#line 2782 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 321: // OrderDirSpec: "'descending'"
+        {
             (yylhs.value.node) = new OrderDirSpec( LOC(yylhs.location), ParseConstants::dir_descending );
         }
-#line 5241 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 322:
-#line 2788 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 322: // OrderEmptySpec: "'empty'" "'greatest'"
+        {
             (yylhs.value.node) = new OrderEmptySpec(
                 LOC(yylhs.location), StaticContextConsts::empty_greatest
             );
         }
-#line 5251 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 323:
-#line 2794 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 323: // OrderEmptySpec: "'empty'" "'least'"
+        {
             (yylhs.value.node) = new OrderEmptySpec(
                 LOC(yylhs.location), StaticContextConsts::empty_least
             );
         }
-#line 5261 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 324:
-#line 2802 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 324: // OrderCollationSpec: "'collation'" URI_LITERAL
+        {
             (yylhs.value.node) = new OrderCollationSpec( LOC(yylhs.location), SYMTAB((yystack_[0].value.sval)) );
         }
-#line 5269 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 325:
-#line 2808 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 325: // QuantifiedExpr: "'some'" "'$'" QVarInDeclList "'satisfies'" ExprSingle
+        {
             (yylhs.value.expr) = new QuantifiedExpr(
                 LOC(yylhs.location),
                 ParseConstants::quant_some,
@@ -5298,12 +4217,10 @@ namespace zorba {
                 (yystack_[0].value.expr)
             );
         }
-#line 5282 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 326:
-#line 2817 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 326: // QuantifiedExpr: "'every'" "'$'" QVarInDeclList "'satisfies'" ExprSingle
+        {
             (yylhs.value.expr) = new QuantifiedExpr(
                 LOC(yylhs.location),
                 ParseConstants::quant_every,
@@ -5311,153 +4228,121 @@ namespace zorba {
                 (yystack_[0].value.expr)
             );
         }
-#line 5295 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 327:
-#line 2828 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 327: // QVarInDeclList: QVarInDecl
     {
       QVarInDeclList *qvidl = new QVarInDeclList( LOC(yylhs.location) );
       qvidl->push_back( dynamic_cast<QVarInDecl*>((yystack_[0].value.node)) );
       (yylhs.value.node) = qvidl;
     }
-#line 5305 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 328:
-#line 2834 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 328: // QVarInDeclList: QVarInDeclList "','" "'$'" QVarInDecl
     {
       QVarInDeclList *qvidl = dynamic_cast<QVarInDeclList*>((yystack_[3].value.node));
       qvidl->push_back( dynamic_cast<QVarInDecl*>((yystack_[0].value.node)) );
       (yylhs.value.node) = (yystack_[3].value.node);
     }
-#line 5315 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 329:
-#line 2842 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 329: // QVarInDecl: QNAME "'in'" ExprSingle
     {
       (yylhs.value.node) = new QVarInDecl(LOC(yylhs.location), static_cast<QName*>((yystack_[2].value.expr)), (yystack_[0].value.expr));
     }
-#line 5323 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 330:
-#line 2846 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 330: // QVarInDecl: QNAME TypeDeclaration "'in'" ExprSingle
     {
       (yylhs.value.node) = new QVarInDecl(LOC(yylhs.location),
                           static_cast<QName*>((yystack_[3].value.expr)),
                           dynamic_cast<SequenceTypeAST *>((yystack_[2].value.node)),
                           (yystack_[0].value.expr));
     }
-#line 5334 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 331:
-#line 2855 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 331: // SwitchExpr: "'switch'" "'('" Expr "')'" SwitchCaseClauseList "'default'" ReturnOrSelect ExprSingle
     {
       (yylhs.value.expr) = new SwitchExpr(LOC(yylhs.location), (yystack_[5].value.expr), static_cast<SwitchCaseClauseList*>((yystack_[3].value.node)), (yystack_[0].value.expr));
     }
-#line 5342 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 332:
-#line 2861 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 332: // SwitchCaseClauseList: SwitchCaseClause
     {
       SwitchCaseClauseList* scc_list_p = new SwitchCaseClauseList(LOC(yylhs.location));
       scc_list_p->push_back(static_cast<SwitchCaseClause*>((yystack_[0].value.node)));
       (yylhs.value.node) = scc_list_p;
     }
-#line 5352 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 333:
-#line 2867 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 333: // SwitchCaseClauseList: SwitchCaseClauseList SwitchCaseClause
     {
       SwitchCaseClauseList* scc_list_p = static_cast<SwitchCaseClauseList*>((yystack_[1].value.node));
       scc_list_p->push_back(static_cast<SwitchCaseClause*>((yystack_[0].value.node)));
       (yylhs.value.node) = (yystack_[1].value.node);
     }
-#line 5362 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 334:
-#line 2875 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 334: // SwitchCaseClause: SwitchCaseOperandList ReturnOrSelect ExprSingle
     {
       (yylhs.value.node) = new SwitchCaseClause(LOC(yylhs.location), dynamic_cast<SwitchCaseOperandList*>((yystack_[2].value.node)), (yystack_[0].value.expr));
     }
-#line 5370 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 335:
-#line 2881 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 335: // SwitchCaseOperandList: "'case'" ExprSingle
     {
       SwitchCaseOperandList* sco_list_p = new SwitchCaseOperandList(LOC(yylhs.location));
       sco_list_p->push_back((yystack_[0].value.expr));
       (yylhs.value.node) = sco_list_p;
     }
-#line 5380 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 336:
-#line 2887 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 336: // SwitchCaseOperandList: SwitchCaseOperandList "'case'" ExprSingle
     {
       SwitchCaseOperandList* sco_list_p = static_cast<SwitchCaseOperandList*>((yystack_[2].value.node));
       sco_list_p->push_back((yystack_[0].value.expr));
       (yylhs.value.node) = (yystack_[2].value.node);
     }
-#line 5390 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 337:
-#line 2895 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 337: // SwitchStatement: "'switch'" "'('" Expr "')'" SwitchCaseStatementList "'default'" ReturnOrSelect Statement
     {
       (yylhs.value.expr) = new SwitchExpr(LOC(yylhs.location), (yystack_[5].value.expr), static_cast<SwitchCaseClauseList*>((yystack_[3].value.node)), (yystack_[0].value.expr));
     }
-#line 5398 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 338:
-#line 2901 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 338: // SwitchCaseStatementList: SwitchCaseStatement
     {
       SwitchCaseClauseList* scc_list_p = new SwitchCaseClauseList(LOC(yylhs.location));
       scc_list_p->push_back(static_cast<SwitchCaseClause*>((yystack_[0].value.node)));
       (yylhs.value.node) = scc_list_p;
     }
-#line 5408 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 339:
-#line 2907 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 339: // SwitchCaseStatementList: SwitchCaseStatementList SwitchCaseStatement
     {
       SwitchCaseClauseList* scc_list_p = static_cast<SwitchCaseClauseList*>((yystack_[1].value.node));
       scc_list_p->push_back(static_cast<SwitchCaseClause*>((yystack_[0].value.node)));
       (yylhs.value.node) = (yystack_[1].value.node);
     }
-#line 5418 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 340:
-#line 2915 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 340: // SwitchCaseStatement: SwitchCaseOperandList ReturnOrSelect Statement
     {
       (yylhs.value.node) = new SwitchCaseClause(LOC(yylhs.location), dynamic_cast<SwitchCaseOperandList*>((yystack_[2].value.node)), (yystack_[0].value.expr));
     }
-#line 5426 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 341:
-#line 2921 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 341: // TypeswitchExpr: "'typeswitch'" "'('" Expr "')'" CaseClauseList "'default'" ReturnOrSelect ExprSingle
     {
       (yylhs.value.expr) = new TypeswitchExpr(LOC(yylhs.location),
                               (yystack_[5].value.expr),
                               static_cast<CaseClauseList*>((yystack_[3].value.node)),
                               (yystack_[0].value.expr));
     }
-#line 5437 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 342:
-#line 2928 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 342: // TypeswitchExpr: "'typeswitch'" "'('" Expr "')'" CaseClauseList "'default'" "'$'" QNAME ReturnOrSelect ExprSingle
     {
       (yylhs.value.expr) = new TypeswitchExpr(LOC (yylhs.location),
                               (yystack_[7].value.expr),
@@ -5465,22 +4350,18 @@ namespace zorba {
                               static_cast<QName*>((yystack_[2].value.expr)),
                               (yystack_[0].value.expr));
     }
-#line 5449 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 343:
-#line 2938 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 343: // TypeswitchStatement: "'typeswitch'" "'('" Expr "')'" CaseStatementList "'default'" ReturnOrSelect Statement
     {
       (yylhs.value.expr) = new TypeswitchExpr(LOC(yylhs.location),
                               (yystack_[5].value.expr),
                               static_cast<CaseClauseList*>((yystack_[3].value.node)),
                               (yystack_[0].value.expr));
     }
-#line 5460 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 344:
-#line 2945 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 344: // TypeswitchStatement: "'typeswitch'" "'('" Expr "')'" CaseClauseList "'default'" "'$'" QNAME ReturnOrSelect Statement
     {
       (yylhs.value.expr) = new TypeswitchExpr(LOC (yylhs.location),
                               (yystack_[7].value.expr),
@@ -5488,162 +4369,128 @@ namespace zorba {
                               static_cast<QName*>((yystack_[2].value.expr)),
                               (yystack_[0].value.expr));
     }
-#line 5472 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 345:
-#line 2955 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 345: // CaseClauseList: CaseClause
     {
       CaseClauseList* cc_list_p = new CaseClauseList(LOC (yylhs.location));
       cc_list_p->push_back(static_cast<CaseClause*>((yystack_[0].value.node)));
       (yylhs.value.node) = cc_list_p;
     }
-#line 5482 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 346:
-#line 2961 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 346: // CaseClauseList: CaseClauseList CaseClause
     {
       CaseClauseList* cc_list_p = dynamic_cast<CaseClauseList*>((yystack_[1].value.node));
       cc_list_p->push_back(static_cast<CaseClause*>((yystack_[0].value.node)));
       (yylhs.value.node) = (yystack_[1].value.node);
     }
-#line 5492 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 347:
-#line 2969 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 347: // CaseClause: "'case'" SequenceTypeList ReturnOrSelect ExprSingle
     {
       (yylhs.value.node) = new CaseClause(LOC (yylhs.location),
                           static_cast<SequenceTypeList*>((yystack_[2].value.node)),
                           (yystack_[0].value.expr));
     }
-#line 5502 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 348:
-#line 2975 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 348: // CaseClause: "'case'" "'$'" QNAME "'as'" SequenceTypeList ReturnOrSelect ExprSingle
     {
       (yylhs.value.node) = new CaseClause(LOC (yylhs.location),
                           static_cast<QName*>((yystack_[4].value.expr)),
                           static_cast<SequenceTypeList*>((yystack_[2].value.node)),
                           (yystack_[0].value.expr));
      }
-#line 5513 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 349:
-#line 2984 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 349: // CaseStatementList: CaseStatement
     {
       CaseClauseList* cc_list_p = new CaseClauseList(LOC (yylhs.location));
       cc_list_p->push_back(static_cast<CaseClause*>((yystack_[0].value.node)));
       (yylhs.value.node) = cc_list_p;
     }
-#line 5523 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 350:
-#line 2990 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 350: // CaseStatementList: CaseStatementList CaseStatement
     {
       CaseClauseList* cc_list_p = static_cast<CaseClauseList*>((yystack_[1].value.node));
       cc_list_p->push_back(static_cast<CaseClause*>((yystack_[0].value.node)));
       (yylhs.value.node) = (yystack_[1].value.node);
     }
-#line 5533 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 351:
-#line 2998 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 351: // CaseStatement: "'case'" SequenceTypeList ReturnOrSelect Statement
     {
       (yylhs.value.node) = new CaseClause(LOC (yylhs.location),
                           static_cast<SequenceTypeList*>((yystack_[2].value.node)),
                           (yystack_[0].value.expr));
     }
-#line 5543 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 352:
-#line 3004 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 352: // CaseStatement: "'case'" "'$'" QNAME "'as'" SequenceTypeList ReturnOrSelect Statement
     {
       (yylhs.value.node) = new CaseClause(LOC (yylhs.location),
                           static_cast<QName*>((yystack_[4].value.expr)),
                           static_cast<SequenceTypeList*>((yystack_[2].value.node)),
                           (yystack_[0].value.expr));
      }
-#line 5554 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 353:
-#line 3013 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 353: // SequenceTypeList: SequenceType
     {
       SequenceTypeList* seqList = new SequenceTypeList(LOC(yylhs.location));
       seqList->push_back(static_cast<SequenceTypeAST*>((yystack_[0].value.node)));
       (yylhs.value.node) = seqList;
     }
-#line 5564 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 354:
-#line 3019 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 354: // SequenceTypeList: SequenceTypeList "'|'" SequenceType
     {
       SequenceTypeList* seqList = static_cast<SequenceTypeList*>((yystack_[2].value.node));
       seqList->push_back(static_cast<SequenceTypeAST*>((yystack_[0].value.node)));
       (yylhs.value.node) = (yystack_[2].value.node);
     }
-#line 5574 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 355:
-#line 3027 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 355: // IfExpr: "'if'" "'('" Expr "')'" "'then'" ExprSingle "'else'" ExprSingle
     {
       (yylhs.value.expr) = new IfExpr(LOC (yylhs.location), (yystack_[5].value.expr), (yystack_[2].value.expr), (yystack_[0].value.expr));
     }
-#line 5582 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 356:
-#line 3033 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 356: // OrExpr: AndExpr
     {
       (yylhs.value.expr) = (yystack_[0].value.expr);
     }
-#line 5590 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 357:
-#line 3037 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 357: // OrExpr: OrExpr "'or'" AndExpr
     {
       (yylhs.value.expr) = new OrExpr( LOC(yylhs.location), (yystack_[2].value.expr), (yystack_[0].value.expr) );
     }
-#line 5598 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 358:
-#line 3043 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 358: // AndExpr: ComparisonExpr
+        {
             (yylhs.value.expr) = (yystack_[0].value.expr);
         }
-#line 5606 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 359:
-#line 3048 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 359: // AndExpr: AndExpr "'and'" ComparisonExpr
+        {
             (yylhs.value.expr) = new AndExpr( LOC(yylhs.location), (yystack_[2].value.expr), (yystack_[0].value.expr) );
         }
-#line 5614 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 360:
-#line 3054 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 360: // ComparisonExpr: FTContainsExpr
+        {
             (yylhs.value.expr) = (yystack_[0].value.expr);
         }
-#line 5622 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 361:
-#line 3058 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 361: // ComparisonExpr: FTContainsExpr ValueComp FTContainsExpr
+        {
             (yylhs.value.expr) = new ComparisonExpr(
                 LOC(yylhs.location),
                 dynamic_cast<ValueComp*>((yystack_[1].value.node)),
@@ -5651,22 +4498,18 @@ namespace zorba {
                 (yystack_[0].value.expr)
             );
         }
-#line 5635 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 362:
-#line 3067 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 362: // ComparisonExpr: FTContainsExpr NodeComp FTContainsExpr
+        {
             (yylhs.value.expr) = new ComparisonExpr(
                 LOC(yylhs.location), dynamic_cast<NodeComp*>((yystack_[1].value.node)), (yystack_[2].value.expr), (yystack_[0].value.expr)
             );
         }
-#line 5645 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 363:
-#line 3073 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 363: // ComparisonExpr: FTContainsExpr "'='" FTContainsExpr
+        {
             (yylhs.value.expr) = new ComparisonExpr(
                 LOC(yylhs.location),
                 new GeneralComp( LOC(yylhs.location), ParseConstants::op_eq ),
@@ -5674,12 +4517,10 @@ namespace zorba {
                 (yystack_[0].value.expr)
             );
         }
-#line 5658 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 364:
-#line 3082 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 364: // ComparisonExpr: FTContainsExpr "'!='" FTContainsExpr
+        {
             (yylhs.value.expr) = new ComparisonExpr(
                 LOC(yylhs.location),
                 new GeneralComp( LOC(yylhs.location), ParseConstants::op_ne ),
@@ -5687,20 +4528,16 @@ namespace zorba {
                 (yystack_[0].value.expr)
             );
         }
-#line 5671 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 365:
-#line 3091 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 365: // $@1: %empty
+        {
             driver.getXqueryLexer()->interpretAsLessThan();
         }
-#line 5679 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 366:
-#line 3095 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 366: // ComparisonExpr: FTContainsExpr "'<'" $@1 FTContainsExpr
+        {
             (yylhs.value.expr) = new ComparisonExpr(
                 LOC(yylhs.location),
                 new GeneralComp( LOC(yylhs.location), ParseConstants::op_lt ),
@@ -5708,12 +4545,10 @@ namespace zorba {
                 (yystack_[0].value.expr)
             );
         }
-#line 5692 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 367:
-#line 3104 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 367: // ComparisonExpr: FTContainsExpr "'<='" FTContainsExpr
+        {
             (yylhs.value.expr) = new ComparisonExpr(
                 LOC(yylhs.location),
                 new GeneralComp( LOC(yylhs.location), ParseConstants::op_le ),
@@ -5721,12 +4556,10 @@ namespace zorba {
                 (yystack_[0].value.expr)
             );
         }
-#line 5705 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 368:
-#line 3113 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 368: // ComparisonExpr: FTContainsExpr "'>'" FTContainsExpr
+        {
             (yylhs.value.expr) = new ComparisonExpr(
                 LOC(yylhs.location),
                 new GeneralComp( LOC(yylhs.location), ParseConstants::op_gt ),
@@ -5734,12 +4567,10 @@ namespace zorba {
                 (yystack_[0].value.expr)
             );
         }
-#line 5718 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 369:
-#line 3122 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 369: // ComparisonExpr: FTContainsExpr "'>='" FTContainsExpr
+        {
             (yylhs.value.expr) = new ComparisonExpr(
                 LOC(yylhs.location),
                 new GeneralComp( LOC(yylhs.location), ParseConstants::op_ge ),
@@ -5747,20 +4578,16 @@ namespace zorba {
                 (yystack_[0].value.expr)
             );
         }
-#line 5731 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 370:
-#line 3133 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 370: // FTContainsExpr: StringConcatExpr
+        {
             (yylhs.value.expr) = (yystack_[0].value.expr);
         }
-#line 5739 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 371:
-#line 3137 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 371: // FTContainsExpr: StringConcatExpr "'contains'" "'text'" FTSelection opt_FTIgnoreOption
+        {
             (yylhs.value.expr) = new FTContainsExpr(
                 LOC(yylhs.location),
                 (yystack_[4].value.expr),
@@ -5768,506 +4595,400 @@ namespace zorba {
                 dynamic_cast<FTIgnoreOption*>((yystack_[0].value.node))
             );
         }
-#line 5752 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 372:
-#line 3148 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 372: // StringConcatExpr: RangeExpr
+        {
           (yylhs.value.expr) = (yystack_[0].value.expr);
         }
-#line 5760 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 373:
-#line 3152 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 373: // StringConcatExpr: RangeExpr "'||'" StringConcatExpr
+        {
           (yylhs.value.expr) = new StringConcatExpr(LOC(yylhs.location), (yystack_[2].value.expr), (yystack_[0].value.expr));
         }
-#line 5768 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 374:
-#line 3157 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 374: // opt_FTIgnoreOption: %empty
+        {
             (yylhs.value.node) = NULL;
         }
-#line 5776 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 375:
-#line 3161 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 375: // opt_FTIgnoreOption: FTIgnoreOption
+        {
             (yylhs.value.node) = (yystack_[0].value.node);
         }
-#line 5784 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 376:
-#line 3167 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 376: // RangeExpr: AdditiveExpr
+        {
             (yylhs.value.expr) = (yystack_[0].value.expr);
         }
-#line 5792 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 377:
-#line 3171 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 377: // RangeExpr: AdditiveExpr "'to'" AdditiveExpr
+        {
             (yylhs.value.expr) = new RangeExpr( LOC(yylhs.location), (yystack_[2].value.expr), (yystack_[0].value.expr) );
         }
-#line 5800 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 378:
-#line 3177 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 378: // AdditiveExpr: MultiplicativeExpr
+        {
             (yylhs.value.expr) = (yystack_[0].value.expr);
         }
-#line 5808 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 379:
-#line 3181 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 379: // AdditiveExpr: AdditiveExpr "'+'" MultiplicativeExpr
+        {
             (yylhs.value.expr) = new AdditiveExpr( LOC(yylhs.location), ParseConstants::op_plus, (yystack_[2].value.expr), (yystack_[0].value.expr) );
         }
-#line 5816 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 380:
-#line 3185 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 380: // AdditiveExpr: AdditiveExpr "'-'" MultiplicativeExpr
+        {
             (yylhs.value.expr) = new AdditiveExpr( LOC(yylhs.location), ParseConstants::op_minus, (yystack_[2].value.expr), (yystack_[0].value.expr) );
         }
-#line 5824 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 381:
-#line 3191 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 381: // MultiplicativeExpr: UnionExpr
+        {
             (yylhs.value.expr) = (yystack_[0].value.expr);
         }
-#line 5832 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 382:
-#line 3195 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 382: // MultiplicativeExpr: MultiplicativeExpr "'*'" UnionExpr
+        {
             (yylhs.value.expr) = new MultiplicativeExpr(
                 LOC(yylhs.location), ParseConstants::op_mul, (yystack_[2].value.expr), (yystack_[0].value.expr)
             );
         }
-#line 5842 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 383:
-#line 3201 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 383: // MultiplicativeExpr: MultiplicativeExpr "'div'" UnionExpr
+        {
             (yylhs.value.expr) = new MultiplicativeExpr(
                 LOC(yylhs.location), ParseConstants::op_div, (yystack_[2].value.expr), (yystack_[0].value.expr)
             );
         }
-#line 5852 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 384:
-#line 3207 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 384: // MultiplicativeExpr: MultiplicativeExpr "'idiv'" UnionExpr
+        {
             (yylhs.value.expr) = new MultiplicativeExpr(
                 LOC(yylhs.location), ParseConstants::op_idiv, (yystack_[2].value.expr), (yystack_[0].value.expr)
             );
         }
-#line 5862 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 385:
-#line 3213 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 385: // MultiplicativeExpr: MultiplicativeExpr "'mod'" UnionExpr
+        {
             (yylhs.value.expr) = new MultiplicativeExpr(
                 LOC(yylhs.location), ParseConstants::op_mod, (yystack_[2].value.expr), (yystack_[0].value.expr)
             );
         }
-#line 5872 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 386:
-#line 3221 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 386: // UnionExpr: IntersectExceptExpr
+        {
             (yylhs.value.expr) = (yystack_[0].value.expr);
         }
-#line 5880 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 387:
-#line 3225 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 387: // UnionExpr: UnionExpr "'union'" IntersectExceptExpr
+        {
             (yylhs.value.expr) = new UnionExpr( LOC(yylhs.location), (yystack_[2].value.expr), (yystack_[0].value.expr) );
         }
-#line 5888 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 388:
-#line 3229 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 388: // UnionExpr: UnionExpr "'|'" IntersectExceptExpr
+        {
             (yylhs.value.expr) = new UnionExpr( LOC(yylhs.location), (yystack_[2].value.expr), (yystack_[0].value.expr) );
         }
-#line 5896 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 389:
-#line 3235 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 389: // IntersectExceptExpr: InstanceofExpr
+        {
             (yylhs.value.expr) = (yystack_[0].value.expr);
         }
-#line 5904 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 390:
-#line 3239 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 390: // IntersectExceptExpr: IntersectExceptExpr "'intersect'" InstanceofExpr
+        {
             (yylhs.value.expr) = new IntersectExceptExpr(
                 LOC(yylhs.location), ParseConstants::op_intersect, (yystack_[2].value.expr), (yystack_[0].value.expr)
             );
         }
-#line 5914 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 391:
-#line 3245 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 391: // IntersectExceptExpr: IntersectExceptExpr "'except'" InstanceofExpr
+        {
             (yylhs.value.expr) = new IntersectExceptExpr(
                 LOC(yylhs.location), ParseConstants::op_except, (yystack_[2].value.expr), (yystack_[0].value.expr)
             );
         }
-#line 5924 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 392:
-#line 3253 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 392: // InstanceofExpr: TreatExpr
+        {
             (yylhs.value.expr) = (yystack_[0].value.expr);
         }
-#line 5932 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 393:
-#line 3257 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 393: // InstanceofExpr: TreatExpr "'instance'" "'of'" SequenceType
+        {
             (yylhs.value.expr) = new InstanceofExpr(
                 LOC(yylhs.location), (yystack_[3].value.expr), dynamic_cast<SequenceTypeAST*>((yystack_[0].value.node))
             );
         }
-#line 5942 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 394:
-#line 3265 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 394: // TreatExpr: CastableExpr
+        {
             (yylhs.value.expr) = (yystack_[0].value.expr);
         }
-#line 5950 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 395:
-#line 3269 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 395: // TreatExpr: CastableExpr "'treat'" "'as'" SequenceType
+        {
             (yylhs.value.expr) = new TreatExpr(
                 LOC(yylhs.location), (yystack_[3].value.expr), dynamic_cast<SequenceTypeAST*>((yystack_[0].value.node))
             );
         }
-#line 5960 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 396:
-#line 3277 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 396: // CastableExpr: CastExpr
+        {
             (yylhs.value.expr) = (yystack_[0].value.expr);
         }
-#line 5968 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 397:
-#line 3281 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 397: // CastableExpr: CastExpr "'castable'" "'as'" SingleType
+        {
             (yylhs.value.expr) = new CastableExpr(
                 LOC(yylhs.location), (yystack_[3].value.expr), dynamic_cast<SingleType*>((yystack_[0].value.node))
             );
         }
-#line 5978 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 398:
-#line 3289 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 398: // CastExpr: UnaryExpr
+        {
             (yylhs.value.expr) = (yystack_[0].value.expr);
         }
-#line 5986 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 399:
-#line 3293 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 399: // CastExpr: UnaryExpr "'cast'" "'as'" SingleType
+        {
             (yylhs.value.expr) = new CastExpr(
                 LOC(yylhs.location), (yystack_[3].value.expr), dynamic_cast<SingleType*>((yystack_[0].value.node))
             );
         }
-#line 5996 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 400:
-#line 3301 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 400: // SingleType: SimpleType
     {
       (yylhs.value.node) = new SingleType(LOC(yylhs.location), dynamic_cast<SimpleType*>((yystack_[0].value.node)), false);
     }
-#line 6004 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 401:
-#line 3305 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 401: // SingleType: SimpleType "'?'"
     {
       (yylhs.value.node) = new SingleType(LOC(yylhs.location), dynamic_cast<SimpleType*>((yystack_[1].value.node)), true);
     }
-#line 6012 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 402:
-#line 3311 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 402: // UnaryExpr: ValueExpr
+        {
             (yylhs.value.expr) = (yystack_[0].value.expr);
         }
-#line 6020 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 403:
-#line 3315 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 403: // UnaryExpr: SignList ValueExpr
+        {
             (yylhs.value.expr) = new UnaryExpr( LOC(yylhs.location), dynamic_cast<SignList*>((yystack_[1].value.node)), (yystack_[0].value.expr) );
         }
-#line 6028 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 404:
-#line 3321 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 404: // SignList: "'+'"
+        {
             (yylhs.value.node) = new SignList( LOC(yylhs.location), true );
         }
-#line 6036 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 405:
-#line 3325 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 405: // SignList: "'-'"
+        {
             (yylhs.value.node) = new SignList( LOC(yylhs.location), false );
         }
-#line 6044 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 406:
-#line 3329 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 406: // SignList: SignList "'+'"
+        {
             (yylhs.value.node) = (yystack_[1].value.node);
         }
-#line 6052 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 407:
-#line 3333 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 407: // SignList: SignList "'-'"
+        {
             if ( SignList *sl = dynamic_cast<SignList*>((yystack_[1].value.node)) )
                 sl->negate();
             (yylhs.value.node) = (yystack_[1].value.node);
         }
-#line 6062 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 411:
-#line 3346 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 408: // ValueExpr: ValidateExpr
+        { (yylhs.value.expr) = (yystack_[0].value.expr); }
+    break;
+
+  case 409: // ValueExpr: SimpleMapExpr
+      { (yylhs.value.expr) = (yystack_[0].value.expr); }
+    break;
+
+  case 410: // ValueExpr: ExtensionExpr
+      { (yylhs.value.expr) = (yystack_[0].value.expr); }
+    break;
+
+  case 411: // SimpleMapExpr: PathExpr
+      {
         (yylhs.value.expr) = (yystack_[0].value.expr);
       }
-#line 6070 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 412:
-#line 3351 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 412: // SimpleMapExpr: SimpleMapExpr "'!'" PathExpr
+      {
         (yylhs.value.expr) = new SimpleMapExpr(LOC(yylhs.location), (yystack_[2].value.expr), (yystack_[0].value.expr));
       }
-#line 6078 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 413:
-#line 3357 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 413: // ValueComp: "'eq'"
+        {
             (yylhs.value.node) = new ValueComp( LOC(yylhs.location), ParseConstants::op_val_eq );
         }
-#line 6086 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 414:
-#line 3361 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 414: // ValueComp: "'ne'"
+        {
             (yylhs.value.node) = new ValueComp( LOC(yylhs.location), ParseConstants::op_val_ne );
         }
-#line 6094 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 415:
-#line 3365 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 415: // ValueComp: "'lt'"
+        {
             (yylhs.value.node) = new ValueComp( LOC(yylhs.location), ParseConstants::op_val_lt );
         }
-#line 6102 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 416:
-#line 3369 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 416: // ValueComp: "'le'"
+        {
             (yylhs.value.node) = new ValueComp( LOC(yylhs.location), ParseConstants::op_val_le );
         }
-#line 6110 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 417:
-#line 3373 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 417: // ValueComp: "'gt'"
+        {
             (yylhs.value.node) = new ValueComp( LOC(yylhs.location), ParseConstants::op_val_gt );
         }
-#line 6118 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 418:
-#line 3377 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 418: // ValueComp: "'ge'"
+        {
             (yylhs.value.node) = new ValueComp( LOC(yylhs.location), ParseConstants::op_val_ge );
         }
-#line 6126 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 419:
-#line 3383 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 419: // NodeComp: "'is'"
+        {
             (yylhs.value.node) = new NodeComp( LOC(yylhs.location), ParseConstants::op_is );
         }
-#line 6134 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 420:
-#line 3387 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 420: // NodeComp: "'<<'"
+        {
             (yylhs.value.node) = new NodeComp( LOC(yylhs.location), ParseConstants::op_precedes );
         }
-#line 6142 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 421:
-#line 3391 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 421: // NodeComp: "'follows'"
+        {
             (yylhs.value.node) = new NodeComp( LOC(yylhs.location), ParseConstants::op_follows );
         }
-#line 6150 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 422:
-#line 3397 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 422: // ValidateExpr: "'validate'" "'{'" StatementsAndExpr "'}'"
+        {
             (yylhs.value.expr) = new ValidateExpr( LOC(yylhs.location), "strict", (yystack_[1].value.expr) );
         }
-#line 6158 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 423:
-#line 3401 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 423: // ValidateExpr: "'validate'" "'lax'" "'{'" StatementsAndExpr "'}'"
+        {
             (yylhs.value.expr) = new ValidateExpr( LOC(yylhs.location), "lax", (yystack_[1].value.expr) );
         }
-#line 6166 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 424:
-#line 3405 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 424: // ValidateExpr: "'validate'" "'strict'" "'{'" StatementsAndExpr "'}'"
+        {
             (yylhs.value.expr) = new ValidateExpr( LOC(yylhs.location), "strict", (yystack_[1].value.expr) );
         }
-#line 6174 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 425:
-#line 3409 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 425: // ValidateExpr: "'validate'" "'type'" TypeName "'{'" StatementsAndExpr "'}'"
+        {
             (yylhs.value.expr) = new ValidateExpr(
                 LOC(yylhs.location), dynamic_cast<TypeName*>((yystack_[3].value.node))->get_name(), (yystack_[1].value.expr)
             );
             delete (yystack_[3].value.node);
         }
-#line 6185 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 426:
-#line 3418 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 426: // ExtensionExpr: Pragma_list "'{'" StatementsAndOptionalExpr "'}'"
+        {
             (yylhs.value.expr) = new ExtensionExpr(
                 LOC(yylhs.location), dynamic_cast<PragmaList*>((yystack_[3].value.node)), (yystack_[1].value.expr)
             );
         }
-#line 6195 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 427:
-#line 3426 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 427: // Pragma_list: Pragma
+        {
             PragmaList *pl = new PragmaList( LOC(yylhs.location) );
             pl->push_back( dynamic_cast<Pragma*>((yystack_[0].value.node)) );
             (yylhs.value.node) = pl;
         }
-#line 6205 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 428:
-#line 3432 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 428: // Pragma_list: Pragma_list Pragma
+        {
             if ( PragmaList *pl = dynamic_cast<PragmaList*>((yystack_[1].value.node)) )
                 pl->push_back( dynamic_cast<Pragma*>((yystack_[0].value.node)) );
             (yylhs.value.node) = (yystack_[1].value.node);
         }
-#line 6215 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 429:
-#line 3440 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 429: // Pragma: "'(#'" QNAME "'pragma literal'"
+        {
             (yylhs.value.node) = new Pragma( LOC(yylhs.location), static_cast<QName*>((yystack_[1].value.expr)), SYMTAB((yystack_[0].value.sval)) );
         }
-#line 6223 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 430:
-#line 3444 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 430: // Pragma: "'(#'" "'QName #)'"
+        {
             (yylhs.value.node) = new Pragma( LOC(yylhs.location), new QName( LOC(yylhs.location), SYMTAB((yystack_[0].value.sval)) ), "" );
         }
-#line 6231 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 431:
-#line 3448 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 431: // Pragma: "'(#'" "'EQName #)'"
+        {
             (yylhs.value.node) = new Pragma( LOC(yylhs.location), new QName( LOC(yylhs.location), SYMTAB((yystack_[0].value.sval)), true ), "" );
         }
-#line 6239 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 432:
-#line 3454 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 432: // PathExpr: LeadingSlash
     {
       (yylhs.value.expr) = new PathExpr(LOC(yylhs.location), ParseConstants::path_leading_lone_slash, NULL);
     }
-#line 6247 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 433:
-#line 3458 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 433: // PathExpr: LeadingSlash RelativePathExpr
     {
       RelativePathExpr* rpe;
       rpe = new RelativePathExpr(LOC(yylhs.location), ParseConstants::st_slash, NULL, (yystack_[0].value.expr), false);
@@ -6275,11 +4996,9 @@ namespace zorba {
                         ParseConstants::path_leading_slash,
                         rpe);
     }
-#line 6259 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 434:
-#line 3466 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 434: // PathExpr: "'//'" RelativePathExpr
     {
       RelativePathExpr* rpe;
       rpe = new RelativePathExpr(LOC(yylhs.location), ParseConstants::st_slashslash, NULL, (yystack_[0].value.expr), false);
@@ -6287,11 +5006,9 @@ namespace zorba {
                         ParseConstants::path_leading_slashslash,
                         rpe);
     }
-#line 6271 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 435:
-#line 3474 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 435: // PathExpr: RelativePathExpr
     {
       (yylhs.value.expr) = NULL;
       RelativePathExpr* rpe = dynamic_cast<RelativePathExpr*>((yystack_[0].value.expr));
@@ -6309,19 +5026,15 @@ namespace zorba {
               new PathExpr( LOC(yylhs.location), ParseConstants::path_relative, (yystack_[0].value.expr)) :
               (yystack_[0].value.expr));
     }
-#line 6293 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 436:
-#line 3494 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 436: // LeadingSlash: "'/'"
     {
       (yylhs.value.expr) = NULL;
     }
-#line 6301 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 437:
-#line 3500 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 437: // RelativePathExpr: StepExpr
     {
       AxisStep* as = dynamic_cast<AxisStep*>((yystack_[0].value.expr));
       (yylhs.value.expr) = (as ?
@@ -6331,444 +5044,416 @@ namespace zorba {
             :
             (yystack_[0].value.expr));
     }
-#line 6315 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 438:
-#line 3510 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 438: // RelativePathExpr: StepExpr "'/'" RelativePathExpr
     {
       (yylhs.value.expr) = new RelativePathExpr(LOC(yylhs.location), ParseConstants::st_slash, (yystack_[2].value.expr), (yystack_[0].value.expr), false);
     }
-#line 6323 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 439:
-#line 3514 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 439: // RelativePathExpr: StepExpr "'//'" RelativePathExpr
     {
       (yylhs.value.expr) = new RelativePathExpr(LOC(yylhs.location), ParseConstants::st_slashslash, (yystack_[2].value.expr), (yystack_[0].value.expr), false);
     }
-#line 6331 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 442:
-#line 3524 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 440: // StepExpr: AxisStep
+    { (yylhs.value.expr) = (yystack_[0].value.expr); }
+    break;
+
+  case 441: // StepExpr: PostfixExpr
+    { (yylhs.value.expr) = (yystack_[0].value.expr); }
+    break;
+
+  case 442: // AxisStep: ForwardStep
+        {
             (yylhs.value.expr) = new AxisStep(
                 LOC(yylhs.location), dynamic_cast<ForwardStep*>((yystack_[0].value.node)), NULL
             );
         }
-#line 6341 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 443:
-#line 3530 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 443: // AxisStep: ForwardStep PredicateList
+        {
             (yylhs.value.expr) = new AxisStep(
                 LOC(yylhs.location),
                 dynamic_cast<ForwardStep*>((yystack_[1].value.node)),
                 dynamic_cast<PredicateList*>((yystack_[0].value.node))
             );
         }
-#line 6353 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 444:
-#line 3538 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 444: // AxisStep: ReverseStep
+        {
             (yylhs.value.expr) = new AxisStep(
                 LOC(yylhs.location), dynamic_cast<ReverseStep*>((yystack_[0].value.node)), NULL
             );
         }
-#line 6363 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 445:
-#line 3544 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 445: // AxisStep: ReverseStep PredicateList
+        {
             (yylhs.value.expr) = new AxisStep(
                 LOC(yylhs.location),
                 dynamic_cast<ReverseStep*>((yystack_[1].value.node)),
                 dynamic_cast<PredicateList*>((yystack_[0].value.node))
             );
         }
-#line 6375 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 446:
-#line 3554 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 446: // ForwardStep: ForwardAxis NodeTest
+        {
             (yylhs.value.node) = new ForwardStep(
                 LOC(yylhs.location), dynamic_cast<ForwardAxis*>((yystack_[1].value.node)), (yystack_[0].value.node)
             );
         }
-#line 6385 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 447:
-#line 3560 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 447: // ForwardStep: AbbrevForwardStep
+        {
             (yylhs.value.node) = new ForwardStep(
                 LOC(yylhs.location), dynamic_cast<AbbrevForwardStep*>((yystack_[0].value.node))
             );
         }
-#line 6395 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 448:
-#line 3568 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 448: // ForwardAxis: "'child'" "'::'"
+        {
             (yylhs.value.node) = new ForwardAxis( LOC(yylhs.location), ParseConstants::axis_child );
         }
-#line 6403 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 449:
-#line 3572 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 449: // ForwardAxis: "'descendant'" "'::'"
+        {
             (yylhs.value.node) = new ForwardAxis( LOC(yylhs.location), ParseConstants::axis_descendant);
         }
-#line 6411 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 450:
-#line 3576 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 450: // ForwardAxis: "'attribute'" "'::'"
+        {
             (yylhs.value.node) = new ForwardAxis( LOC(yylhs.location), ParseConstants::axis_attribute );
         }
-#line 6419 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 451:
-#line 3580 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 451: // ForwardAxis: "'self'" "'::'"
+        {
             (yylhs.value.node) = new ForwardAxis( LOC(yylhs.location), ParseConstants::axis_self );
         }
-#line 6427 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 452:
-#line 3584 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 452: // ForwardAxis: "'descendant-or-self'" "'::'"
+        {
             (yylhs.value.node) = new ForwardAxis(
                 LOC(yylhs.location), ParseConstants::axis_descendant_or_self
             );
         }
-#line 6437 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 453:
-#line 3590 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 453: // ForwardAxis: "'following-sibling'" "'::'"
+        {
             (yylhs.value.node) = new ForwardAxis(
                 LOC(yylhs.location), ParseConstants::axis_following_sibling
             );
         }
-#line 6447 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 454:
-#line 3596 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 454: // ForwardAxis: "'following'" "'::'"
+        {
             (yylhs.value.node) = new ForwardAxis( LOC(yylhs.location), ParseConstants::axis_following );
         }
-#line 6455 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 455:
-#line 3602 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 455: // AbbrevForwardStep: NodeTest
+        {
             (yylhs.value.node) = new AbbrevForwardStep( LOC(yylhs.location), (yystack_[0].value.node), false );
         }
-#line 6463 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 456:
-#line 3606 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 456: // AbbrevForwardStep: "'@'" NodeTest
+        {
             (yylhs.value.node) = new AbbrevForwardStep( LOC(yylhs.location), (yystack_[0].value.node), true );
         }
-#line 6471 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 457:
-#line 3612 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 457: // ReverseStep: ReverseAxis NodeTest
+        {
             (yylhs.value.node) = new ReverseStep( LOC(yylhs.location), dynamic_cast<ReverseAxis*>((yystack_[1].value.node)), (yystack_[0].value.node) );
         }
-#line 6479 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 458:
-#line 3616 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 458: // ReverseStep: "'..'"
+        {
             ReverseAxis *ra = new ReverseAxis(
                 LOC(yylhs.location), ParseConstants::axis_parent
             );
             (yylhs.value.node) = new ReverseStep( LOC(yylhs.location), ra, NULL );
         }
-#line 6490 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 459:
-#line 3625 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 459: // ReverseAxis: "'parent'" "'::'"
+        {
             (yylhs.value.node) = new ReverseAxis( LOC(yylhs.location), ParseConstants::axis_parent );
         }
-#line 6498 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 460:
-#line 3629 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 460: // ReverseAxis: "'ancestor'" "'::'"
+        {
             (yylhs.value.node) = new ReverseAxis( LOC(yylhs.location), ParseConstants::axis_ancestor );
         }
-#line 6506 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 461:
-#line 3633 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 461: // ReverseAxis: "'preceding-sibling'" "'::'"
+        {
             (yylhs.value.node) = new ReverseAxis(
                 LOC(yylhs.location), ParseConstants::axis_preceding_sibling
             );
         }
-#line 6516 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 462:
-#line 3639 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 462: // ReverseAxis: "'preceding'" "'::'"
+        {
             (yylhs.value.node) = new ReverseAxis( LOC(yylhs.location), ParseConstants::axis_preceding );
         }
-#line 6524 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 463:
-#line 3643 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 463: // ReverseAxis: "'ancestor-or-self'" "'::'"
+        {
             (yylhs.value.node) = new ReverseAxis(
                 LOC(yylhs.location), ParseConstants::axis_ancestor_or_self
             );
         }
-#line 6534 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 466:
-#line 3655 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 464: // NodeTest: KindTest
+        { (yylhs.value.node) = (yystack_[0].value.node); }
+    break;
+
+  case 465: // NodeTest: NameTest
+      { (yylhs.value.node) = (yystack_[0].value.node); }
+    break;
+
+  case 466: // NameTest: QNAME
+        {
             (yylhs.value.node) = new NameTest( LOC(yylhs.location), static_cast<QName*>((yystack_[0].value.expr)) );
         }
-#line 6542 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 467:
-#line 3659 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 467: // NameTest: Wildcard
+        {
             (yylhs.value.node) = new NameTest( LOC(yylhs.location), dynamic_cast<Wildcard*>((yystack_[0].value.node)) );
         }
-#line 6550 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 468:
-#line 3665 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 468: // Wildcard: "'*'"
     {
       (yylhs.value.node) = new Wildcard(LOC(yylhs.location), "", "", ParseConstants::wild_all, false);
     }
-#line 6558 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 469:
-#line 3669 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 469: // Wildcard: "'pref:*'"
     {
       (yylhs.value.node) = new Wildcard(LOC(yylhs.location), SYMTAB((yystack_[0].value.sval)), "", ParseConstants::wild_elem, false);
     }
-#line 6566 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 470:
-#line 3673 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 470: // Wildcard: "'ns:*'"
     {
       (yylhs.value.node) = new Wildcard(LOC(yylhs.location), SYMTAB((yystack_[0].value.sval)), "", ParseConstants::wild_elem, true);
     }
-#line 6574 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 471:
-#line 3677 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 471: // Wildcard: "'*:QName'"
     {
       (yylhs.value.node) = new Wildcard(LOC(yylhs.location), "", SYMTAB((yystack_[0].value.sval)), ParseConstants::wild_prefix, false);
     }
-#line 6582 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 472:
-#line 3683 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 472: // PostfixExpr: PrimaryExpr
+     {
        (yylhs.value.expr) = (yystack_[0].value.expr);
      }
-#line 6590 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 473:
-#line 3687 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 473: // PostfixExpr: PostfixExpr PredicateList
+     {
        (yylhs.value.expr) = new FilterExpr(LOC(yylhs.location), (yystack_[1].value.expr), dynamic_cast<PredicateList*>((yystack_[0].value.node)));
      }
-#line 6598 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 474:
-#line 3691 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 474: // PostfixExpr: PostfixExpr "'('" "')'"
+     {
        (yylhs.value.expr) = new DynamicFunctionInvocation(LOC(yylhs.location), (yystack_[2].value.expr), false);
      }
-#line 6606 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 475:
-#line 3695 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 475: // PostfixExpr: PostfixExpr "'('" ArgList "')'"
+     {
        (yylhs.value.expr) = new DynamicFunctionInvocation(LOC(yylhs.location), (yystack_[3].value.expr), dynamic_cast<ArgList*>((yystack_[1].value.node)), false);
      }
-#line 6614 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 476:
-#line 3701 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 476: // PredicateList: Predicate
     {
       PredicateList* pl = new PredicateList( LOC(yylhs.location) );
       pl->push_back(dynamic_cast<exprnode*>((yystack_[0].value.expr)));
       (yylhs.value.node) = pl;
     }
-#line 6624 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 477:
-#line 3707 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 477: // PredicateList: PredicateList Predicate
     {
       if (PredicateList* pl = dynamic_cast<PredicateList*>((yystack_[1].value.node)))
         pl->push_back(dynamic_cast<exprnode*>((yystack_[0].value.expr)));
       (yylhs.value.node) = (yystack_[1].value.node);
     }
-#line 6634 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 478:
-#line 3715 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 478: // Predicate: "'['" Expr "']'"
     {
       (yylhs.value.expr) = (yystack_[1].value.expr);
     }
-#line 6642 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 493:
-#line 3737 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 479: // PrimaryExpr: Literal
+        { (yylhs.value.expr) = (yystack_[0].value.expr); }
+    break;
+
+  case 480: // PrimaryExpr: VarRef
+      { (yylhs.value.expr) = (yystack_[0].value.expr); }
+    break;
+
+  case 481: // PrimaryExpr: ParenthesizedExpr
+      { (yylhs.value.expr) = (yystack_[0].value.expr); }
+    break;
+
+  case 482: // PrimaryExpr: ContextItemExpr
+      { (yylhs.value.expr) = (yystack_[0].value.expr); }
+    break;
+
+  case 483: // PrimaryExpr: FunctionCall
+      { (yylhs.value.expr) = (yystack_[0].value.expr); }
+    break;
+
+  case 484: // PrimaryExpr: Constructor
+      { (yylhs.value.expr) = (yystack_[0].value.expr); }
+    break;
+
+  case 485: // PrimaryExpr: OrderedExpr
+      { (yylhs.value.expr) = (yystack_[0].value.expr); }
+    break;
+
+  case 486: // PrimaryExpr: UnorderedExpr
+      { (yylhs.value.expr) = (yystack_[0].value.expr); }
+    break;
+
+  case 487: // PrimaryExpr: FunctionItemExpr
+      { (yylhs.value.expr) = (yystack_[0].value.expr); }
+    break;
+
+  case 488: // PrimaryExpr: BlockExpr
+      { (yylhs.value.expr) = (yystack_[0].value.expr); }
+    break;
+
+  case 489: // PrimaryExpr: JSONObjectConstructor
+      { (yylhs.value.expr) = (yystack_[0].value.expr); }
+    break;
+
+  case 490: // PrimaryExpr: JSONArrayConstructor
+      { (yylhs.value.expr) = (yystack_[0].value.expr); }
+    break;
+
+  case 491: // PrimaryExpr: JSONSimpleObjectUnion
+      { (yylhs.value.expr) = (yystack_[0].value.expr); }
+    break;
+
+  case 492: // PrimaryExpr: JSONAccumulatorObjectUnion
+      { (yylhs.value.expr) = (yystack_[0].value.expr); }
+    break;
+
+  case 493: // Literal: NumericLiteral
+        {
             (yylhs.value.expr) = (yystack_[0].value.expr);
         }
-#line 6650 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 494:
-#line 3741 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 494: // Literal: StringLiteral
+        {
             (yylhs.value.expr) = (yystack_[0].value.expr);
         }
-#line 6658 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 495:
-#line 3747 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 495: // NumericLiteral: "'DECIMAL'"
+        {
             (yylhs.value.expr) = NumericLiteral::new_literal(
                 LOC(yylhs.location), ParseConstants::num_decimal, *(yystack_[0].value.decval)
             );
-            delete yyla.value.decval;
+            delete (yystack_[0].value.decval);
         }
-#line 6669 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 496:
-#line 3754 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 496: // NumericLiteral: "'INTEGER'"
+        {
             (yylhs.value.expr) = NumericLiteral::new_literal(
                 LOC(yylhs.location), ParseConstants::num_integer, *(yystack_[0].value.ival)
             );
-            delete yyla.value.ival;
+            delete (yystack_[0].value.ival);
         }
-#line 6680 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 497:
-#line 3761 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 497: // NumericLiteral: "'DOUBLE'"
+        {
             (yylhs.value.expr) = NumericLiteral::new_literal(
                 LOC(yylhs.location), ParseConstants::num_double, *(yystack_[0].value.dval)
             );
-            delete yyla.value.dval;
+            delete (yystack_[0].value.dval);
         }
-#line 6691 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 498:
-#line 3770 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 498: // VarRef: "'$'" QNAME
+        {
             (yylhs.value.expr) = new VarRef(LOC(yylhs.location), static_cast<QName*>((yystack_[0].value.expr)));
         }
-#line 6699 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 499:
-#line 3776 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 499: // ParenthesizedExpr: "'('" "')'"
+        {
             (yylhs.value.expr) = new ParenthesizedExpr( LOC(yylhs.location), NULL);
         }
-#line 6707 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 500:
-#line 3780 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 500: // ParenthesizedExpr: "'('" Expr "')'"
+        {
             (yylhs.value.expr) = new ParenthesizedExpr( LOC(yylhs.location), (yystack_[1].value.expr) );
         }
-#line 6715 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 501:
-#line 3786 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 501: // ContextItemExpr: "'.'"
+        {
             driver.addCommonLanguageWarning(yystack_[0].location, ZED(ZWST0009_CONTEXT_ITEM_EXPR));
             (yylhs.value.expr) = new ContextItemExpr( LOC(yylhs.location) );
         }
-#line 6724 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 502:
-#line 3793 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 502: // OrderedExpr: "'ordered'" "'{'" Expr "'}'"
+        {
             (yylhs.value.expr) = new OrderedExpr( LOC(yylhs.location), (yystack_[1].value.expr) );
         }
-#line 6732 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 503:
-#line 3799 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 503: // UnorderedExpr: "'unordered'" "'{'" Expr "'}'"
+        {
             (yylhs.value.expr) = new UnorderedExpr( LOC(yylhs.location), (yystack_[1].value.expr) );
         }
-#line 6740 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 504:
-#line 3805 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 504: // FunctionCall: FUNCTION_NAME "'('" "')'"
     {
       (yylhs.value.expr) = new FunctionCall(LOC(yylhs.location), static_cast<QName*>((yystack_[2].value.expr)), NULL);
     }
-#line 6748 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 505:
-#line 3809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 505: // FunctionCall: FUNCTION_NAME "'('" ArgList "')'"
     {
       ArgList* argList = dynamic_cast<ArgList*>((yystack_[1].value.node));
       if (argList->has_placeholder())
@@ -6784,75 +5469,59 @@ namespace zorba {
         (yylhs.value.expr) = new FunctionCall(LOC(yylhs.location), static_cast<QName*>((yystack_[3].value.expr)), argList);
       }
     }
-#line 6768 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 506:
-#line 3827 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 506: // ArgList: "'?'"
     {
       ArgList* al = new ArgList(LOC(yylhs.location));
       al->push_back(new ArgumentPlaceholder(LOC(yylhs.location)));
       (yylhs.value.node) = al;
     }
-#line 6778 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 507:
-#line 3833 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 507: // ArgList: ArgList "','" "'?'"
     {
       if (ArgList* al = dynamic_cast<ArgList*>((yystack_[2].value.node)))
         al->push_back(new ArgumentPlaceholder(LOC(yylhs.location)));
       (yylhs.value.node) = (yystack_[2].value.node);
     }
-#line 6788 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 508:
-#line 3839 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 508: // ArgList: ExprSingle
     {
       ArgList *al = new ArgList( LOC(yylhs.location) );
       al->push_back( (yystack_[0].value.expr) );
       (yylhs.value.node) = al;
     }
-#line 6798 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 509:
-#line 3845 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 509: // ArgList: ArgList "','" ExprSingle
     {
       if ( ArgList *al = dynamic_cast<ArgList*>((yystack_[2].value.node)) )
         al->push_back( (yystack_[0].value.expr) );
       (yylhs.value.node) = (yystack_[2].value.node);
     }
-#line 6808 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 510:
-#line 3853 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 510: // FunctionItemExpr: LiteralFunctionItem
     {
       (yylhs.value.expr) = (yystack_[0].value.expr);
     }
-#line 6816 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 511:
-#line 3857 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 511: // FunctionItemExpr: InlineFunction
     {
       (yylhs.value.expr) = (yystack_[0].value.expr);
     }
-#line 6824 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 512:
-#line 3863 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 512: // LiteralFunctionItem: FUNCTION_NAME "'#'" "'INTEGER'"
     {
       (yylhs.value.expr) = new LiteralFunctionItem(LOC (yylhs.location), dynamic_cast<QName*>((yystack_[2].value.expr)), (yystack_[0].value.ival));
     }
-#line 6832 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 513:
-#line 3869 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 513: // InlineFunction: "'function'" FunctionSig EnclosedStatementsAndOptionalExpr
     {
       (yylhs.value.expr) = new InlineFunction(LOC(yylhs.location),
                               (yystack_[1].value.fnsig)->theParams.getp(),
@@ -6860,11 +5529,29 @@ namespace zorba {
                               (yystack_[0].value.expr));
       delete (yystack_[1].value.fnsig);
     }
-#line 6844 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 519:
-#line 3888 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 514: // Constructor: DirectConstructor
+    { (yylhs.value.expr) = (yystack_[0].value.expr); }
+    break;
+
+  case 515: // Constructor: ComputedConstructor
+  { (yylhs.value.expr) = (yystack_[0].value.expr); }
+    break;
+
+  case 516: // DirectConstructor: DirElemConstructor
+    { (yylhs.value.expr) = (yystack_[0].value.expr); }
+    break;
+
+  case 517: // DirectConstructor: DirCommentConstructor
+    { (yylhs.value.expr) = (yystack_[0].value.expr); }
+    break;
+
+  case 518: // DirectConstructor: DirPIConstructor
+    { (yylhs.value.expr) = (yystack_[0].value.expr); }
+    break;
+
+  case 519: // DirElemConstructor: "'<'" QNAME OptionalBlank "'/>'"
     {
       (yylhs.value.expr) = new DirElemConstructor(LOC(yylhs.location),
                                   static_cast<QName*>((yystack_[2].value.expr)),
@@ -6872,11 +5559,9 @@ namespace zorba {
                                   NULL,
                                   NULL);
     }
-#line 6856 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 520:
-#line 3896 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 520: // DirElemConstructor: "'<'" QNAME OptionalBlank "'> (tag end)'" "'</ (start tag end)'" QNAME OptionalBlank "'> (tag end)'"
     {
       if (static_cast<QName*>((yystack_[6].value.expr))->get_qname() != static_cast<QName*>((yystack_[2].value.expr))->get_qname())
       {
@@ -6884,6 +5569,7 @@ namespace zorba {
                   static_cast<QName*>((yystack_[2].value.expr))->get_qname().str() +
                   "> does not match start tag <" +
                   static_cast<QName*>((yystack_[6].value.expr))->get_qname().str() + ">");
+        release_hack_all( (yystack_[6].value.expr), (yystack_[2].value.expr) );
         YYERROR;
       }
       (yylhs.value.expr) = new DirElemConstructor(LOC(yylhs.location),
@@ -6892,11 +5578,9 @@ namespace zorba {
                                   NULL,
                                   NULL);
     }
-#line 6876 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 521:
-#line 3912 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 521: // DirElemConstructor: "'<'" QNAME DirAttributeList OptionalBlank "'/>'"
     {
       (yylhs.value.expr) = new DirElemConstructor(LOC(yylhs.location),
                                   static_cast<QName*>((yystack_[3].value.expr)),
@@ -6904,11 +5588,9 @@ namespace zorba {
                                   dynamic_cast<DirAttributeList*>((yystack_[2].value.node)),
                                   NULL);
     }
-#line 6888 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 522:
-#line 3920 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 522: // DirElemConstructor: "'<'" QNAME DirAttributeList OptionalBlank "'> (tag end)'" "'</ (start tag end)'" QNAME OptionalBlank "'> (tag end)'"
     {
       if (static_cast<QName*>((yystack_[7].value.expr))->get_qname() != static_cast<QName*>((yystack_[2].value.expr))->get_qname())
       {
@@ -6916,6 +5598,7 @@ namespace zorba {
                   static_cast<QName*>((yystack_[2].value.expr))->get_qname().str() +
                   "> does not match start tag <" +
                   static_cast<QName*>((yystack_[7].value.expr))->get_qname().str() + ">");
+        release_hack_all( (yystack_[7].value.expr), (yystack_[6].value.node), (yystack_[2].value.expr) );
         YYERROR;
       }
       (yylhs.value.expr) = new DirElemConstructor(LOC(yylhs.location),
@@ -6924,11 +5607,9 @@ namespace zorba {
                                   dynamic_cast<DirAttributeList*>((yystack_[6].value.node)),
                                   NULL);
     }
-#line 6908 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 523:
-#line 3938 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 523: // DirElemConstructor: "'<'" QNAME OptionalBlank "'> (tag end)'" DirElemContentList "'</ (start tag end)'" QNAME OptionalBlank "'> (tag end)'"
     {
       if (static_cast<QName*>((yystack_[7].value.expr))->get_qname() != static_cast<QName*>((yystack_[2].value.expr))->get_qname())
       {
@@ -6936,6 +5617,7 @@ namespace zorba {
                   static_cast<QName*>((yystack_[2].value.expr))->get_qname().str() +
                   "> does not match start tag <" +
                   static_cast<QName*>((yystack_[7].value.expr))->get_qname().str() + ">");
+        release_hack_all( (yystack_[7].value.expr), (yystack_[4].value.node), (yystack_[2].value.expr) );
         YYERROR;
       }
       (yylhs.value.expr) = new DirElemConstructor(LOC(yylhs.location),
@@ -6944,11 +5626,9 @@ namespace zorba {
                                   NULL,
                                   dynamic_cast<DirElemContentList*>((yystack_[4].value.node)));
     }
-#line 6928 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 524:
-#line 3956 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 524: // DirElemConstructor: "'<'" QNAME DirAttributeList OptionalBlank "'> (tag end)'" DirElemContentList "'</ (start tag end)'" QNAME OptionalBlank "'> (tag end)'"
     {
       if (static_cast<QName*>((yystack_[8].value.expr))->get_qname() != static_cast<QName*>((yystack_[2].value.expr))->get_qname())
       {
@@ -6956,6 +5636,7 @@ namespace zorba {
                   static_cast<QName*>((yystack_[2].value.expr))->get_qname().str() +
                   "> does not match start tag <" +
                   static_cast<QName*>((yystack_[8].value.expr))->get_qname().str() + ">");
+        release_hack_all( (yystack_[8].value.expr), (yystack_[7].value.node), (yystack_[4].value.node), (yystack_[2].value.expr) );
         YYERROR;
       }
       (yylhs.value.expr) = new DirElemConstructor(LOC(yylhs.location),
@@ -6964,869 +5645,671 @@ namespace zorba {
                                   dynamic_cast<DirAttributeList*>((yystack_[7].value.node)),
                                   dynamic_cast<DirElemContentList*>((yystack_[4].value.node)));
     }
-#line 6948 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 525:
-#line 3974 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 525: // DirElemContentList: DirElemContent
     {
       DirElemContentList *decl = new DirElemContentList( LOC(yylhs.location) );
       decl->push_back( dynamic_cast<DirElemContent*>((yystack_[0].value.expr)) );
       (yylhs.value.node) = decl;
     }
-#line 6958 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 526:
-#line 3980 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 526: // DirElemContentList: DirElemContentList DirElemContent
     {
       DirElemContentList *decl = dynamic_cast<DirElemContentList*>((yystack_[1].value.node));
       if ( decl )
         decl->push_back( dynamic_cast<DirElemContent*>((yystack_[0].value.expr)) );
       (yylhs.value.node) = (yystack_[1].value.node);
     }
-#line 6969 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 527:
-#line 3989 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 527: // DirAttributeList: DirAttr
     {
       DirAttributeList *dal = new DirAttributeList( LOC(yylhs.location) );
       dal->push_back( dynamic_cast<DirAttr*>((yystack_[0].value.node)) );
       (yylhs.value.node) = dal;
     }
-#line 6979 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 528:
-#line 3995 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 528: // DirAttributeList: DirAttributeList DirAttr
     {
       DirAttributeList *dal = dynamic_cast<DirAttributeList*>((yystack_[1].value.node));
       if ( dal )
         dal->push_back( dynamic_cast<DirAttr*>((yystack_[0].value.node)) );
       (yylhs.value.node) = (yystack_[1].value.node);
     }
-#line 6990 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 529:
-#line 4004 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 529: // DirAttr: "'<blank>'" QNAME OptionalBlank "'='" OptionalBlank DirAttributeValue
     {
       (yylhs.value.node) = new DirAttr(LOC(yylhs.location),
                        static_cast<QName*>((yystack_[4].value.expr)),
                        dynamic_cast<DirAttributeValue*>((yystack_[0].value.node)));
     }
-#line 7000 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 532:
-#line 4014 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 532: // DirAttributeValue: "'\"'" opt_QuoteAttrContentList "'\"'"
     {
       (yylhs.value.node) = new DirAttributeValue(LOC(yylhs.location),
                                  dynamic_cast<QuoteAttrContentList*>((yystack_[1].value.node)));
     }
-#line 7009 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 533:
-#line 4019 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 533: // DirAttributeValue: "'''" opt_AposAttrContentList "'''"
     {
       (yylhs.value.node) = new DirAttributeValue( LOC(yylhs.location),
                                   dynamic_cast<AposAttrContentList*>((yystack_[1].value.node)));
     }
-#line 7018 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 534:
-#line 4025 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 534: // opt_QuoteAttrContentList: %empty
     {
       (yylhs.value.node) = new QuoteAttrContentList( LOC(yylhs.location) );
     }
-#line 7026 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 535:
-#line 4029 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 535: // opt_QuoteAttrContentList: QuoteAttrContentList
     {
       (yylhs.value.node) = (yystack_[0].value.node);
     }
-#line 7034 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 536:
-#line 4035 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 536: // QuoteAttrContentList: "'\"\"'"
     {
       QuoteAttrContentList *qacl = new QuoteAttrContentList( LOC(yylhs.location) );
       qacl->push_back( new QuoteAttrValueContent( LOC(yylhs.location), "\"" ) );
       (yylhs.value.node) = qacl;
     }
-#line 7044 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 537:
-#line 4041 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 537: // QuoteAttrContentList: QuoteAttrValueContent
     {
       QuoteAttrContentList *qacl = new QuoteAttrContentList( LOC(yylhs.location) );
       qacl->push_back( dynamic_cast<QuoteAttrValueContent*>((yystack_[0].value.node)) );
       (yylhs.value.node) = qacl;
     }
-#line 7054 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 538:
-#line 4047 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 538: // QuoteAttrContentList: QuoteAttrContentList "'\"\"'"
     {
       QuoteAttrContentList* qacl = dynamic_cast<QuoteAttrContentList*>((yystack_[1].value.node));
       if ( qacl )
         qacl->push_back( new QuoteAttrValueContent( LOC(yylhs.location), "\"" ) );
       (yylhs.value.node) = (yystack_[1].value.node);
     }
-#line 7065 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 539:
-#line 4054 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 539: // QuoteAttrContentList: QuoteAttrContentList QuoteAttrValueContent
     {
       QuoteAttrContentList *qacl = dynamic_cast<QuoteAttrContentList*>((yystack_[1].value.node));
       if ( qacl )
         qacl->push_back( dynamic_cast<QuoteAttrValueContent*>((yystack_[0].value.node)) );
       (yylhs.value.node) = (yystack_[1].value.node);
     }
-#line 7076 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 540:
-#line 4062 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 540: // opt_AposAttrContentList: %empty
     {
       (yylhs.value.node) = new AposAttrContentList( LOC(yylhs.location) );
     }
-#line 7084 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 541:
-#line 4066 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 541: // opt_AposAttrContentList: AposAttrContentList
     {
       (yylhs.value.node) = (yystack_[0].value.node);
     }
-#line 7092 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 542:
-#line 4072 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 542: // AposAttrContentList: "''''"
     {
       AposAttrContentList *aacl = new AposAttrContentList( LOC(yylhs.location) );
       aacl->push_back( new AposAttrValueContent( LOC(yylhs.location),"'") );
       (yylhs.value.node) = aacl;
     }
-#line 7102 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 543:
-#line 4078 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 543: // AposAttrContentList: AposAttrValueContent
     {
       AposAttrContentList *aacl = new AposAttrContentList( LOC(yylhs.location) );
       aacl->push_back( dynamic_cast<AposAttrValueContent*>((yystack_[0].value.node)) );
       (yylhs.value.node) = aacl;
     }
-#line 7112 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 544:
-#line 4084 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 544: // AposAttrContentList: AposAttrContentList "''''"
     {
       AposAttrContentList *aacl = dynamic_cast<AposAttrContentList*>((yystack_[1].value.node));
       if (aacl)
         aacl->push_back( new AposAttrValueContent( LOC(yylhs.location),"'") );
       (yylhs.value.node) = (yystack_[1].value.node);
     }
-#line 7123 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 545:
-#line 4091 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 545: // AposAttrContentList: AposAttrContentList AposAttrValueContent
     {
       AposAttrContentList *aacl = dynamic_cast<AposAttrContentList*>((yystack_[1].value.node));
       if ( aacl )
         aacl->push_back( dynamic_cast<AposAttrValueContent*>((yystack_[0].value.node)) );
       (yylhs.value.node) = (yystack_[1].value.node);
     }
-#line 7134 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 546:
-#line 4100 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 546: // QuoteAttrValueContent: "'quote attribute content'"
     {
       (yylhs.value.node) = new QuoteAttrValueContent( LOC(yylhs.location), SYMTAB((yystack_[0].value.sval)) );
     }
-#line 7142 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 547:
-#line 4104 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 547: // QuoteAttrValueContent: CommonContent
     {
       (yylhs.value.node) = new QuoteAttrValueContent(LOC(yylhs.location), dynamic_cast<CommonContent*>((yystack_[0].value.expr)));
     }
-#line 7150 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 548:
-#line 4110 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 548: // AposAttrValueContent: "'apos attribute content'"
     {
       (yylhs.value.node) = new AposAttrValueContent( LOC(yylhs.location), SYMTAB((yystack_[0].value.sval)) );
     }
-#line 7158 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 549:
-#line 4114 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 549: // AposAttrValueContent: CommonContent
     {
       (yylhs.value.node) = new AposAttrValueContent(LOC(yylhs.location), dynamic_cast<CommonContent*>((yystack_[0].value.expr)));
     }
-#line 7166 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 550:
-#line 4120 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 550: // DirElemContent: DirectConstructor
     {
       (yylhs.value.expr) = new DirElemContent( LOC(yylhs.location), (yystack_[0].value.expr) );
     }
-#line 7174 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 551:
-#line 4124 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 551: // DirElemContent: "'element content'"
     {
       (yylhs.value.expr) = new DirElemContent( LOC(yylhs.location), SYMTAB((yystack_[0].value.sval)) );
     }
-#line 7182 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 552:
-#line 4128 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 552: // DirElemContent: CDataSection
     {
       rchandle<CDataSection> cdata_h = dynamic_cast<CDataSection*>((yystack_[0].value.expr));
       (yylhs.value.expr) = new DirElemContent( LOC(yylhs.location), cdata_h );
     }
-#line 7191 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 553:
-#line 4133 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 553: // DirElemContent: CommonContent
     {
       rchandle<CommonContent> cont_h = dynamic_cast<CommonContent*>((yystack_[0].value.expr));
       (yylhs.value.expr) = new DirElemContent( LOC(yylhs.location), cont_h );
     }
-#line 7200 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 554:
-#line 4140 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 554: // CommonContent: "'&#charref;'"
     {
       (yylhs.value.expr) = new CommonContent(LOC(yylhs.location), ParseConstants::cont_charref, SYMTAB((yystack_[0].value.sval)));
     }
-#line 7208 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 555:
-#line 4144 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 555: // CommonContent: "'{{'"
     {
       (yylhs.value.expr) = new CommonContent(LOC(yylhs.location), ParseConstants::cont_escape_lbrace);
     }
-#line 7216 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 556:
-#line 4148 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 556: // CommonContent: "'<double {>'"
     {
       (yylhs.value.expr) = new CommonContent(LOC(yylhs.location), ParseConstants::cont_escape_rbrace);
     }
-#line 7224 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 557:
-#line 4152 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 557: // CommonContent: "'{'" StatementsAndExpr "'}'"
     {
       (yylhs.value.expr) = new CommonContent(LOC(yylhs.location), new EnclosedExpr(LOC(yylhs.location), (yystack_[1].value.expr)));
     }
-#line 7232 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 558:
-#line 4158 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 558: // DirCommentConstructor: "'<!--'" "'XML comment'" "'-->'"
     {
       (yylhs.value.expr) = new DirCommentConstructor( LOC(yylhs.location), SYMTAB((yystack_[1].value.sval)) );
     }
-#line 7240 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 559:
-#line 4163 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 559: // DirCommentConstructor: "'<!--'" "'-->'"
     {
       (yylhs.value.expr) = new DirCommentConstructor( LOC(yylhs.location), "" );
     }
-#line 7248 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 560:
-#line 4169 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 560: // DirPIConstructor: "'<?'" QNAME "'?>'"
     {
       ERROR_IF_QNAME_NOT_NCNAME((yystack_[1].value.expr), yystack_[1].location);
       (yylhs.value.expr) = new DirPIConstructor( LOC(yylhs.location), static_cast<QName*>((yystack_[1].value.expr)) );
     }
-#line 7257 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 561:
-#line 4175 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 561: // DirPIConstructor: "'<?'" QNAME "'char literal and pi end'"
     {
       ERROR_IF_QNAME_NOT_NCNAME((yystack_[1].value.expr), yystack_[1].location);
       (yylhs.value.expr) = new DirPIConstructor( LOC(yylhs.location), static_cast<QName*>((yystack_[1].value.expr)), SYMTAB((yystack_[0].value.sval)) );
     }
-#line 7266 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 562:
-#line 4182 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 562: // CDataSection: "'CDATA[['" "'char literal]]>'"
     {
       (yylhs.value.expr) = new CDataSection( LOC(yylhs.location),SYMTAB((yystack_[0].value.sval)) );
     }
-#line 7274 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 563:
-#line 4188 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 563: // ComputedConstructor: CompDocConstructor
     {
       (yylhs.value.expr) = (yystack_[0].value.expr);
     }
-#line 7282 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 564:
-#line 4193 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 564: // ComputedConstructor: CompElemConstructor
     {
       (yylhs.value.expr) = (yystack_[0].value.expr);
     }
-#line 7290 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 565:
-#line 4198 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 565: // ComputedConstructor: CompAttrConstructor
     {
       (yylhs.value.expr) = (yystack_[0].value.expr);
     }
-#line 7298 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 566:
-#line 4203 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 566: // ComputedConstructor: CompTextConstructor
     {
       (yylhs.value.expr) = (yystack_[0].value.expr);
     }
-#line 7306 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 567:
-#line 4208 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 567: // ComputedConstructor: CompCommentConstructor
     {
       (yylhs.value.expr) = (yystack_[0].value.expr);
     }
-#line 7314 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 568:
-#line 4213 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 568: // ComputedConstructor: CompPIConstructor
     {
       (yylhs.value.expr) = (yystack_[0].value.expr);
     }
-#line 7322 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 570:
-#line 4221 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 569: // ComputedConstructor: CompNamespaceConstructor
+    { (yylhs.value.expr) = (yystack_[0].value.expr); }
+    break;
+
+  case 570: // CompDocConstructor: "'document'" "'{'" StatementsAndExpr "'}'"
     {
       (yylhs.value.expr) = new CompDocConstructor( LOC(yylhs.location), (yystack_[1].value.expr) );
     }
-#line 7330 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 571:
-#line 4227 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 571: // CompElemConstructor: "'element QName {'" StatementsAndOptionalExpr "'}'"
     {
       (yylhs.value.expr) = new CompElemConstructor(LOC(yylhs.location), new QName(LOC(yylhs.location), SYMTAB((yystack_[2].value.sval))), (yystack_[1].value.expr));
     }
-#line 7338 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 572:
-#line 4231 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 572: // CompElemConstructor: "'element'" "'{'" Expr "'}'" "'{'" StatementsAndOptionalExpr "'}'"
     {
       (yylhs.value.expr) = new CompElemConstructor( LOC(yylhs.location), (yystack_[4].value.expr), (yystack_[1].value.expr) );
     }
-#line 7346 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 573:
-#line 4237 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 573: // CompAttrConstructor: "'attribute QName {'" StatementsAndOptionalExpr "'}'"
     {
       (yylhs.value.expr) = new CompAttrConstructor( LOC(yylhs.location), new QName(LOC(yylhs.location), SYMTAB((yystack_[2].value.sval))), (yystack_[1].value.expr) );
     }
-#line 7354 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 574:
-#line 4241 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 574: // CompAttrConstructor: "'attribute'" "'{'" Expr "'}'" "'{'" StatementsAndOptionalExpr "'}'"
     {
       (yylhs.value.expr) = new CompAttrConstructor( LOC(yylhs.location), (yystack_[4].value.expr), (yystack_[1].value.expr) );
     }
-#line 7362 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 575:
-#line 4247 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 575: // CompTextConstructor: "'text'" "'{'" StatementsAndExpr "'}'"
     {
       (yylhs.value.expr) = new CompTextConstructor( LOC(yylhs.location), (yystack_[1].value.expr) );
     }
-#line 7370 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 576:
-#line 4253 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 576: // CompCommentConstructor: "'comment'" "'{'" StatementsAndExpr "'}'"
     {
       (yylhs.value.expr) = new CompCommentConstructor( LOC(yylhs.location), (yystack_[1].value.expr) );
     }
-#line 7378 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 577:
-#line 4259 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 577: // CompPIConstructor: "'processing-instruction NCName {'" StatementsAndOptionalExpr "'}'"
     {
       (yylhs.value.expr) = new CompPIConstructor(LOC(yylhs.location), SYMTAB((yystack_[2].value.sval)), (yystack_[1].value.expr));
     }
-#line 7386 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 578:
-#line 4263 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 578: // CompPIConstructor: "'processing-instruction'" "'{'" Expr "'}'" "'{'" StatementsAndOptionalExpr "'}'"
     {
       (yylhs.value.expr) = new CompPIConstructor(LOC(yylhs.location), (yystack_[4].value.expr), (yystack_[1].value.expr));
     }
-#line 7394 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 579:
-#line 4269 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 579: // CompNamespaceConstructor: "'namespace NCName {'" StatementsAndExpr "'}'"
     {
       (yylhs.value.expr) = new CompNamespaceConstructor(LOC(yylhs.location), SYMTAB((yystack_[2].value.sval)), (yystack_[1].value.expr));
     }
-#line 7402 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 580:
-#line 4273 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 580: // CompNamespaceConstructor: "'namespace'" "'{'" Expr "'}'" "'{'" StatementsAndExpr "'}'"
     {
       (yylhs.value.expr) = new CompNamespaceConstructor(LOC(yylhs.location), (yystack_[4].value.expr), (yystack_[1].value.expr));
     }
-#line 7410 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 581:
-#line 4279 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 581: // TypeDeclaration: "'as'" SequenceType
     {
       (yylhs.value.node) = (yystack_[0].value.node);
     }
-#line 7418 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 582:
-#line 4285 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 582: // SequenceType: ItemType
+        {
             (yylhs.value.node) = new SequenceTypeAST( LOC(yylhs.location), (yystack_[0].value.node), NULL );
         }
-#line 7426 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 583:
-#line 4289 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 583: // SequenceType: ItemType OccurrenceIndicator
+        {
             (yylhs.value.node) = new SequenceTypeAST(LOC(yylhs.location), (yystack_[1].value.node), dynamic_cast<OccurrenceIndicator*>((yystack_[0].value.node)));
         }
-#line 7434 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 584:
-#line 4293 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 584: // SequenceType: "'empty-sequence'" "'('" "')'"
+        {
             (yylhs.value.node) = new SequenceTypeAST( LOC(yylhs.location), NULL, NULL );
         }
-#line 7442 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 585:
-#line 4299 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 585: // OccurrenceIndicator: "'?'"
+        {
             (yylhs.value.node) = new OccurrenceIndicator(
                 LOC(yylhs.location), ParseConstants::occurs_optionally
             );
         }
-#line 7452 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 586:
-#line 4305 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 586: // OccurrenceIndicator: "'*'"
+        {
             (yylhs.value.node) = new OccurrenceIndicator(
                 LOC(yylhs.location), ParseConstants::occurs_zero_or_more
             );
         }
-#line 7462 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 587:
-#line 4311 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 587: // OccurrenceIndicator: "'+'"
+        {
             (yylhs.value.node) = new OccurrenceIndicator(
                 LOC(yylhs.location), ParseConstants::occurs_one_or_more
             );
         }
-#line 7472 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 588:
-#line 4319 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 588: // ItemType: GeneralizedAtomicType
+        {
             (yylhs.value.node) = (yystack_[0].value.node);
         }
-#line 7480 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 589:
-#line 4323 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 589: // ItemType: KindTest
+        {
             (yylhs.value.node) = (yystack_[0].value.node);
         }
-#line 7488 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 590:
-#line 4327 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 590: // ItemType: "'item'" "'('" "')'"
+        {
             (yylhs.value.node) = new ItemType( LOC(yylhs.location), true );
         }
-#line 7496 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 591:
-#line 4331 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 591: // ItemType: "'structured-item'" "'('" "')'"
+        {
             (yylhs.value.node) = new StructuredItemType(LOC(yylhs.location));
         }
-#line 7504 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 592:
-#line 4335 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 592: // ItemType: FunctionTest
+        {
             (yylhs.value.node) = (yystack_[0].value.node);
         }
-#line 7512 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 593:
-#line 4339 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 593: // ItemType: ParenthesizedItemType
+        {
             (yylhs.value.node) = (yystack_[0].value.node);
         }
-#line 7520 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 594:
-#line 4343 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 594: // ItemType: JSONTest
+        {
             (yylhs.value.node) = (yystack_[0].value.node);
         }
-#line 7528 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 595:
-#line 4349 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 595: // TypeList: SequenceType
+        {
           TypeList* aTypeList = new TypeList(LOC (yylhs.location));
           aTypeList->push_back(dynamic_cast<SequenceTypeAST *>((yystack_[0].value.node)));
           (yylhs.value.node) = aTypeList;
         }
-#line 7538 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 596:
-#line 4355 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 596: // TypeList: TypeList "','" SequenceType
+        {
           TypeList* aTypeList = dynamic_cast<TypeList *>((yystack_[2].value.node));
           aTypeList->push_back(dynamic_cast<SequenceTypeAST *>((yystack_[0].value.node)));
           (yylhs.value.node) = (yystack_[2].value.node);
         }
-#line 7548 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 597:
-#line 4363 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 597: // GeneralizedAtomicType: QNAME
     {
       (yylhs.value.node) = new GeneralizedAtomicType( LOC(yylhs.location), static_cast<QName*>((yystack_[0].value.expr)) );
     }
-#line 7556 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 598:
-#line 4369 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 598: // SimpleType: QNAME
     {
       (yylhs.value.node) = new SimpleType( LOC(yylhs.location), static_cast<QName*>((yystack_[0].value.expr)) );
     }
-#line 7564 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 599:
-#line 4375 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 599: // KindTest: DocumentTest
     {
       (yylhs.value.node) = (yystack_[0].value.node);
     }
-#line 7572 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 600:
-#line 4379 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 600: // KindTest: ElementTest
     {
       (yylhs.value.node) = (yystack_[0].value.node);
     }
-#line 7580 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 601:
-#line 4383 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 601: // KindTest: AttributeTest
     {
       (yylhs.value.node) = (yystack_[0].value.node);
     }
-#line 7588 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 602:
-#line 4387 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 602: // KindTest: SchemaElementTest
     {
       (yylhs.value.node) = (yystack_[0].value.node);
     }
-#line 7596 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 603:
-#line 4391 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 603: // KindTest: SchemaAttributeTest
     {
       (yylhs.value.node) = (yystack_[0].value.node);
     }
-#line 7604 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 604:
-#line 4395 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 604: // KindTest: PITest
     {
       (yylhs.value.node) = (yystack_[0].value.node);
     }
-#line 7612 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 605:
-#line 4399 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 605: // KindTest: CommentTest
     {
       (yylhs.value.node) = (yystack_[0].value.node);
     }
-#line 7620 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 606:
-#line 4403 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 606: // KindTest: TextTest
     {
       (yylhs.value.node) = (yystack_[0].value.node);
     }
-#line 7628 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 607:
-#line 4407 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 607: // KindTest: NamespaceTest
     {
       (yylhs.value.node) = (yystack_[0].value.node);
     }
-#line 7636 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 608:
-#line 4411 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 608: // KindTest: AnyKindTest
     {
       (yylhs.value.node) = (yystack_[0].value.node);
     }
-#line 7644 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 609:
-#line 4417 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 609: // AnyKindTest: NODE_KIND_TEST "'('" "')'"
     {
       (yylhs.value.node) = new AnyKindTest( LOC(yylhs.location) );
     }
-#line 7652 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 610:
-#line 4423 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 610: // NODE_KIND_TEST: "'node'"
     {
       (yylhs.value.expr) = NULL;
     }
-#line 7660 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 611:
-#line 4429 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 611: // DocumentTest: "'document-node'" "'('" "')'"
     {
       (yylhs.value.node) = new DocumentTest(LOC(yylhs.location));
     }
-#line 7668 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 612:
-#line 4433 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 612: // DocumentTest: "'document-node'" "'('" ElementTest "')'"
     {
       (yylhs.value.node) = new DocumentTest(LOC(yylhs.location), dynamic_cast<ElementTest*>((yystack_[1].value.node)));
     }
-#line 7676 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 613:
-#line 4437 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 613: // DocumentTest: "'document-node'" "'('" SchemaElementTest "')'"
     {
       (yylhs.value.node) = new DocumentTest(LOC(yylhs.location), dynamic_cast<SchemaElementTest*>((yystack_[1].value.node)));
     }
-#line 7684 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 614:
-#line 4443 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 614: // NamespaceTest: "'namespace-node'" "'('" "')'"
     {
       (yylhs.value.node) = new NamespaceTest(LOC(yylhs.location));
     }
-#line 7692 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 615:
-#line 4448 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 615: // TextTest: "'text'" "'('" "')'"
     {
       (yylhs.value.node) = new TextTest(LOC(yylhs.location));
     }
-#line 7700 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 616:
-#line 4454 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 616: // CommentTest: "'comment'" "'('" "')'"
     {
       (yylhs.value.node) = new CommentTest(LOC(yylhs.location));
     }
-#line 7708 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 617:
-#line 4460 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 617: // PITest: "'processing-instruction'" "'('" "')'"
+        {
             (yylhs.value.node) = new PITest( LOC(yylhs.location), "" );
         }
-#line 7716 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 618:
-#line 4464 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 618: // PITest: "'processing-instruction'" "'('" QNAME "')'"
+        {
             ERROR_IF_QNAME_NOT_NCNAME((yystack_[1].value.expr), yystack_[1].location);
             (yylhs.value.node) = new PITest( LOC(yylhs.location), static_cast<QName*>((yystack_[1].value.expr)) );
         }
-#line 7725 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 619:
-#line 4469 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 619: // PITest: "'processing-instruction'" "'('" "'STRING'" "')'"
+        {
             (yylhs.value.node) = new PITest( LOC(yylhs.location), SYMTAB((yystack_[1].value.sval)) );
         }
-#line 7733 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 620:
-#line 4475 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 620: // AttributeTest: "'attribute'" "'('" "')'"
+        {
             (yylhs.value.node) = new AttributeTest( LOC(yylhs.location), NULL, NULL );
         }
-#line 7741 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 621:
-#line 4479 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 621: // AttributeTest: "'attribute'" "'('" QNAME "')'"
+        {
             (yylhs.value.node) = new AttributeTest(
                 LOC(yylhs.location), static_cast<QName*>((yystack_[1].value.expr)), NULL
             );
         }
-#line 7751 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 622:
-#line 4485 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 622: // AttributeTest: "'attribute'" "'('" QNAME "','" TypeName "')'"
+        {
             (yylhs.value.node) = new AttributeTest(
                 LOC(yylhs.location), static_cast<QName*>((yystack_[3].value.expr)), dynamic_cast<TypeName*>((yystack_[1].value.node))
             );
         }
-#line 7761 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 623:
-#line 4491 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 623: // AttributeTest: "'attribute'" "'('" "'*'" "')'"
+        {
             (yylhs.value.node) = new AttributeTest( LOC(yylhs.location), NULL, NULL );
         }
-#line 7769 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 624:
-#line 4495 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 624: // AttributeTest: "'attribute'" "'('" "'*'" "','" TypeName "')'"
+        {
             (yylhs.value.node) = new AttributeTest(
                 LOC(yylhs.location), NULL, dynamic_cast<TypeName*>((yystack_[1].value.node))
             );
         }
-#line 7779 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 625:
-#line 4503 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 625: // SchemaAttributeTest: "'schema-attribute'" "'('" QNAME "')'"
+        {
             (yylhs.value.node) = new SchemaAttributeTest( LOC(yylhs.location), static_cast<QName*>((yystack_[1].value.expr)) );
         }
-#line 7787 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 626:
-#line 4509 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 626: // ElementTest: "'element'" "'('" "')'"
+        {
             (yylhs.value.node) = new ElementTest( LOC(yylhs.location), NULL, NULL, true );
         }
-#line 7795 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 627:
-#line 4513 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 627: // ElementTest: "'element'" "'('" QNAME "')'"
+        {
             (yylhs.value.node) = new ElementTest(
                 LOC(yylhs.location), static_cast<QName*>((yystack_[1].value.expr)), NULL, true
             );
         }
-#line 7805 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 628:
-#line 4519 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 628: // ElementTest: "'element'" "'('" QNAME "','" TypeName "')'"
+        {
             (yylhs.value.node) = new ElementTest(
                 LOC(yylhs.location),
                 static_cast<QName*>((yystack_[3].value.expr)),
@@ -7834,12 +6317,10 @@ namespace zorba {
                 false
             );
         }
-#line 7818 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 629:
-#line 4528 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 629: // ElementTest: "'element'" "'('" QNAME "','" TypeName_WITH_HOOK "')'"
+        {
             (yylhs.value.node) = new ElementTest(
                 LOC(yylhs.location),
                 static_cast<QName*>((yystack_[3].value.expr)),
@@ -7847,507 +6328,395 @@ namespace zorba {
                 true
             );
         }
-#line 7831 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 630:
-#line 4537 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 630: // ElementTest: "'element'" "'('" "'*'" "')'"
+        {
             (yylhs.value.node) = new ElementTest(
                 LOC(yylhs.location), NULL, NULL, true
             );
         }
-#line 7841 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 631:
-#line 4543 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 631: // ElementTest: "'element'" "'('" "'*'" "','" TypeName "')'"
+        {
             (yylhs.value.node) = new ElementTest(
                 LOC(yylhs.location), NULL, dynamic_cast<TypeName*>((yystack_[1].value.node)), false
             );
         }
-#line 7851 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 632:
-#line 4549 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 632: // ElementTest: "'element'" "'('" "'*'" "','" TypeName_WITH_HOOK "')'"
+        {
             (yylhs.value.node) = new ElementTest(
                 LOC(yylhs.location), NULL, dynamic_cast<TypeName*>((yystack_[1].value.node)), true
             );
         }
-#line 7861 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 633:
-#line 4557 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 633: // SchemaElementTest: "'schema-element'" "'('" QNAME "')'"
+        {
             (yylhs.value.node) = new SchemaElementTest( LOC(yylhs.location), static_cast<QName*>((yystack_[1].value.expr)) );
         }
-#line 7869 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 634:
-#line 4563 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 634: // TypeName: QNAME
+        {
             (yylhs.value.node) = new TypeName( LOC(yylhs.location), static_cast<QName*>((yystack_[0].value.expr)) );
         }
-#line 7877 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 635:
-#line 4569 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 635: // TypeName_WITH_HOOK: QNAME "'?'"
+        {
             (yylhs.value.node) = new TypeName( LOC(yylhs.location), static_cast<QName*>((yystack_[1].value.expr)), true );
         }
-#line 7885 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 636:
-#line 4575 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 636: // StringLiteral: "'STRING'"
+        {
             (yylhs.value.expr) = new StringLiteral( LOC(yylhs.location), SYMTAB((yystack_[0].value.sval)) );
         }
-#line 7893 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 637:
-#line 4581 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 637: // FunctionTest: AnyFunctionTest
     {
       (yylhs.value.node) = (yystack_[0].value.node);
     }
-#line 7901 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 638:
-#line 4585 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 638: // FunctionTest: TypedFunctionTest
     {
       (yylhs.value.node) = (yystack_[0].value.node);
     }
-#line 7909 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 639:
-#line 4591 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 639: // AnyFunctionTest: "'function'" "'('" "'*'" "')'"
     {
       (yylhs.value.node) = new AnyFunctionTest(LOC(yylhs.location));
     }
-#line 7917 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 640:
-#line 4597 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 640: // TypedFunctionTest: "'function'" "'('" "')'" "'as'" SequenceType
+        {
           (yylhs.value.node) = new TypedFunctionTest(LOC (yylhs.location), dynamic_cast<SequenceTypeAST *>((yystack_[0].value.node)));
         }
-#line 7925 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 641:
-#line 4601 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 641: // TypedFunctionTest: "'function'" "'('" TypeList "')'" "'as'" SequenceType
+        {
           (yylhs.value.node) = new TypedFunctionTest(LOC (yylhs.location),
               dynamic_cast<TypeList *>((yystack_[3].value.node)),
               dynamic_cast<SequenceTypeAST *>((yystack_[0].value.node)));
         }
-#line 7935 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 642:
-#line 4609 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 642: // ParenthesizedItemType: "'('" ItemType "')'"
+        {
            (yylhs.value.node) = (yystack_[1].value.node);
         }
-#line 7943 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 643:
-#line 4615 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 643: // RevalidationDecl: "'declare'" "'revalidation'" "'strict'"
+        {
             (yylhs.value.node) = new RevalidationDecl(
                 LOC(yylhs.location), StaticContextConsts::strict_validation
             );
         }
-#line 7953 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 644:
-#line 4621 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 644: // RevalidationDecl: "'declare'" "'revalidation'" "'lax'"
+        {
             (yylhs.value.node) = new RevalidationDecl(
                 LOC(yylhs.location), StaticContextConsts::lax_validation
             );
         }
-#line 7963 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 645:
-#line 4627 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 645: // RevalidationDecl: "'declare'" "'revalidation'" "'skip'"
+        {
             (yylhs.value.node) = new RevalidationDecl(
                 LOC(yylhs.location), StaticContextConsts::skip_validation
             );
         }
-#line 7973 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 646:
-#line 4635 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 646: // InsertExpr: "'insert'" "'node'" ExprSingle "'into'" ExprSingle
+        {
             (yylhs.value.expr) = new InsertExpr( LOC(yylhs.location), store::UpdateConsts::INTO, (yystack_[2].value.expr), (yystack_[0].value.expr) );
         }
-#line 7981 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 647:
-#line 4639 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 647: // InsertExpr: "'insert'" "'node'" ExprSingle "'as'" "'first'" "'into'" ExprSingle
+        {
             (yylhs.value.expr) = new InsertExpr(
                 LOC(yylhs.location), store::UpdateConsts::AS_FIRST_INTO, (yystack_[4].value.expr), (yystack_[0].value.expr)
             );
         }
-#line 7991 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 648:
-#line 4645 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 648: // InsertExpr: "'insert'" "'node'" ExprSingle "'as'" "'last'" "'into'" ExprSingle
+        {
             (yylhs.value.expr) = new InsertExpr(
                 LOC(yylhs.location), store::UpdateConsts::AS_LAST_INTO, (yystack_[4].value.expr), (yystack_[0].value.expr)
             );
         }
-#line 8001 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 649:
-#line 4651 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 649: // InsertExpr: "'insert'" "'node'" ExprSingle "'after'" ExprSingle
+        {
             (yylhs.value.expr) = new InsertExpr( LOC(yylhs.location), store::UpdateConsts::AFTER, (yystack_[2].value.expr), (yystack_[0].value.expr) );
         }
-#line 8009 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 650:
-#line 4655 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 650: // InsertExpr: "'insert'" "'node'" ExprSingle "'before'" ExprSingle
+        {
             (yylhs.value.expr) = new InsertExpr(
                 LOC (yylhs.location), store::UpdateConsts::BEFORE, (yystack_[2].value.expr), (yystack_[0].value.expr)
             );
         }
-#line 8019 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 651:
-#line 4661 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 651: // InsertExpr: "'insert'" "'nodes'" ExprSingle "'into'" ExprSingle
+        {
             (yylhs.value.expr) = new InsertExpr( LOC(yylhs.location), store::UpdateConsts::INTO, (yystack_[2].value.expr), (yystack_[0].value.expr) );
         }
-#line 8027 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 652:
-#line 4665 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 652: // InsertExpr: "'insert'" "'nodes'" ExprSingle "'as'" "'first'" "'into'" ExprSingle
+        {
             (yylhs.value.expr) = new InsertExpr(
                 LOC(yylhs.location), store::UpdateConsts::AS_FIRST_INTO, (yystack_[4].value.expr), (yystack_[0].value.expr)
             );
         }
-#line 8037 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 653:
-#line 4671 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 653: // InsertExpr: "'insert'" "'nodes'" ExprSingle "'as'" "'last'" "'into'" ExprSingle
+        {
             (yylhs.value.expr) = new InsertExpr(
                   LOC(yylhs.location), store::UpdateConsts::AS_LAST_INTO, (yystack_[4].value.expr), (yystack_[0].value.expr)
             );
         }
-#line 8047 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 654:
-#line 4677 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 654: // InsertExpr: "'insert'" "'nodes'" ExprSingle "'after'" ExprSingle
+        {
             (yylhs.value.expr) = new InsertExpr(
                 LOC (yylhs.location),
                 store::UpdateConsts::AFTER, (yystack_[2].value.expr), (yystack_[0].value.expr)
             );
         }
-#line 8058 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 655:
-#line 4684 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 655: // InsertExpr: "'insert'" "'nodes'" ExprSingle "'before'" ExprSingle
+        {
             (yylhs.value.expr) = new InsertExpr(
                 LOC (yylhs.location), store::UpdateConsts::BEFORE, (yystack_[2].value.expr), (yystack_[0].value.expr)
             );
         }
-#line 8068 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 656:
-#line 4692 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 656: // DeleteExpr: "'delete'" "'node'" ExprSingle
+        {
             (yylhs.value.expr) = new DeleteExpr( LOC (yylhs.location), (yystack_[0].value.expr) );
         }
-#line 8076 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 657:
-#line 4697 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 657: // DeleteExpr: "'delete'" "'nodes'" ExprSingle
+        {
             (yylhs.value.expr) = new DeleteExpr( LOC (yylhs.location), (yystack_[0].value.expr) );
         }
-#line 8084 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 658:
-#line 4703 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 658: // ReplaceExpr: "'replace'" "'node'" ExprSingle "'with'" ExprSingle
+        {
             (yylhs.value.expr) = new ReplaceExpr(
                 LOC(yylhs.location), store::UpdateConsts::NODE, (yystack_[2].value.expr), (yystack_[0].value.expr)
             );
         }
-#line 8094 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 659:
-#line 4709 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 659: // ReplaceExpr: "'replace'" "'value'" "'of'" "'node'" ExprSingle "'with'" ExprSingle
+        {
             (yylhs.value.expr) = new ReplaceExpr(
                 LOC(yylhs.location), store::UpdateConsts::VALUE_OF_NODE, (yystack_[2].value.expr), (yystack_[0].value.expr)
             );
         }
-#line 8104 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 660:
-#line 4717 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 660: // RenameExpr: "'rename'" "'node'" ExprSingle "'as'" ExprSingle
+        {
             (yylhs.value.expr) = new RenameExpr( LOC (yylhs.location), (yystack_[2].value.expr), (yystack_[0].value.expr) );
         }
-#line 8112 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 661:
-#line 4723 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 661: // TransformExpr: "'copy'" "'$'" VarNameList "'modify'" ExprSingle ReturnOrSelect ExprSingle
     {
       CopyVarList *cvl = dynamic_cast<CopyVarList*>((yystack_[4].value.expr));
       (yylhs.value.expr) = new TransformExpr( LOC(yylhs.location), cvl, (yystack_[2].value.expr), (yystack_[0].value.expr) );
     }
-#line 8121 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 662:
-#line 4730 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 662: // VarNameList: VarNameDecl
     {
       CopyVarList* lList = new CopyVarList(LOC(yylhs.location));
       lList->push_back (dynamic_cast<VarBinding*> ((yystack_[0].value.expr)));
       (yylhs.value.expr) = lList;
     }
-#line 8131 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 663:
-#line 4736 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 663: // VarNameList: VarNameList "','" "'$'" VarNameDecl
     {
       CopyVarList* lList = dynamic_cast<CopyVarList*>((yystack_[3].value.expr));
       VarBinding* lBinding = dynamic_cast<VarBinding*>((yystack_[0].value.expr));
       lList->push_back(lBinding);
       (yylhs.value.expr) = lList;
     }
-#line 8142 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 664:
-#line 4745 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 664: // VarNameDecl: QNAME "':='" ExprSingle
     {
        (yylhs.value.expr) = new VarBinding(LOC(yylhs.location), static_cast<QName*>((yystack_[2].value.expr)), (yystack_[0].value.expr));
     }
-#line 8150 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 665:
-#line 4751 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 665: // TryExpr: "'try'" "'{'" Expr "'}'" CatchListExpr
+        {
             (yylhs.value.expr) = new TryExpr( LOC(yylhs.location), (yystack_[2].value.expr), (yystack_[0].value.expr) );
         }
-#line 8158 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 666:
-#line 4757 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 666: // CatchListExpr: CatchExpr
+        {
             CatchListExpr *cle = new CatchListExpr( LOC(yylhs.location) );
             cle->push_back( static_cast<CatchExpr*>((yystack_[0].value.expr)) );
             (yylhs.value.expr) = cle;
         }
-#line 8168 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 667:
-#line 4763 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 667: // CatchListExpr: CatchListExpr CatchExpr
+        {
             CatchListExpr *cle = dynamic_cast<CatchListExpr*>((yystack_[1].value.expr));
             if ( cle )
                 cle->push_back( static_cast<CatchExpr*>((yystack_[0].value.expr)) );
             (yylhs.value.expr) = (yystack_[1].value.expr);
         }
-#line 8179 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 668:
-#line 4772 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 668: // CatchExpr: "'catch'" NameTestList BracedExpr
     {
        (yylhs.value.expr) = new CatchExpr(LOC(yylhs.location), *(yystack_[1].value.name_test_list), (yystack_[0].value.expr));
        delete (yystack_[1].value.name_test_list);
     }
-#line 8188 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 669:
-#line 4779 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
+  case 669: // BracedExpr: "'{'" Expr "'}'"
     {
       (yylhs.value.expr) = (yystack_[1].value.expr);
     }
-#line 8196 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 670:
-#line 4785 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 670: // NameTestList: NameTest
+        {
             CatchExpr::NameTestList *ntl = new CatchExpr::NameTestList;
             ntl->push_back( static_cast<NameTest*>((yystack_[0].value.node)) );
             (yylhs.value.name_test_list) = ntl;
         }
-#line 8206 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 671:
-#line 4791 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 671: // NameTestList: NameTestList "'|'" NameTest
+        {
             CatchExpr::NameTestList *ntl =
                 static_cast<CatchExpr::NameTestList*>((yystack_[2].value.name_test_list));
             ntl->push_back( static_cast<NameTest*>((yystack_[0].value.node)) );
             (yylhs.value.name_test_list) = ntl;
         }
-#line 8217 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 672:
-#line 4800 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 672: // FTSelection: FTOr opt_FTPosFilter_list
+        {
             (yylhs.value.node) = new FTSelection( LOC(yylhs.location), (yystack_[1].value.node), (yystack_[0].value.pos_filter_list) );
             delete (yystack_[0].value.pos_filter_list);
         }
-#line 8226 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 673:
-#line 4807 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 673: // opt_FTPosFilter_list: %empty
+        {
             (yylhs.value.pos_filter_list) = NULL;
         }
-#line 8234 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 674:
-#line 4811 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 674: // opt_FTPosFilter_list: FTPosFilter_list
+        {
             (yylhs.value.pos_filter_list) = (yystack_[0].value.pos_filter_list);
         }
-#line 8242 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 675:
-#line 4817 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 675: // FTPosFilter_list: FTPosFilter
+        {
             (yylhs.value.pos_filter_list) = new FTSelection::pos_filter_list_t;
             (yylhs.value.pos_filter_list)->push_back( dynamic_cast<FTPosFilter*>((yystack_[0].value.node)) );
         }
-#line 8251 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 676:
-#line 4822 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 676: // FTPosFilter_list: FTPosFilter_list FTPosFilter
+        {
             (yystack_[1].value.pos_filter_list)->push_back( dynamic_cast<FTPosFilter*>((yystack_[0].value.node)) );
             (yylhs.value.pos_filter_list) = (yystack_[1].value.pos_filter_list);
         }
-#line 8260 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 677:
-#line 4829 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 677: // FTOr: FTAnd
+        {
             (yylhs.value.node) = (yystack_[0].value.node);
         }
-#line 8268 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 678:
-#line 4833 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 678: // FTOr: FTOr "'ftor'" FTAnd
+        {
             (yylhs.value.node) = new FTOr( LOC(yylhs.location), (yystack_[2].value.node), (yystack_[0].value.node) );
         }
-#line 8276 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 679:
-#line 4839 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 679: // FTAnd: FTMildNot
+        {
             (yylhs.value.node) = (yystack_[0].value.node);
         }
-#line 8284 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 680:
-#line 4843 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 680: // FTAnd: FTAnd "'ftand'" FTMildNot
+        {
             (yylhs.value.node) = new FTAnd( LOC(yylhs.location), (yystack_[2].value.node), (yystack_[0].value.node) );
         }
-#line 8292 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 681:
-#line 4849 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 681: // FTMildNot: FTUnaryNot
+        {
             (yylhs.value.node) = (yystack_[0].value.node);
         }
-#line 8300 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 682:
-#line 4853 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 682: // FTMildNot: FTMildNot "'not'" "'in'" FTUnaryNot
+        {
             (yylhs.value.node) = new FTMildNot( LOC(yylhs.location), (yystack_[3].value.node), (yystack_[0].value.node) );
         }
-#line 8308 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 683:
-#line 4859 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 683: // FTUnaryNot: FTPrimaryWithOptions
+        {
             (yylhs.value.node) = (yystack_[0].value.node);
         }
-#line 8316 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 684:
-#line 4863 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 684: // FTUnaryNot: "'ftnot'" FTPrimaryWithOptions
+        {
             (yylhs.value.node) = new FTUnaryNot(
                 LOC(yylhs.location), dynamic_cast<FTPrimaryWithOptions*>((yystack_[0].value.node))
             );
         }
-#line 8326 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 685:
-#line 4871 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 685: // FTPrimaryWithOptions: FTPrimary opt_FTMatchOptions opt_FTWeight
+        {
             (yylhs.value.node) = new FTPrimaryWithOptions(
                 LOC(yylhs.location),
                 dynamic_cast<FTPrimary*>((yystack_[2].value.node)),
@@ -8355,486 +6724,374 @@ namespace zorba {
                 dynamic_cast<FTWeight*>((yystack_[0].value.node))
             );
         }
-#line 8339 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 686:
-#line 4881 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 686: // opt_FTMatchOptions: %empty
+        {
             (yylhs.value.node) = NULL;
         }
-#line 8347 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 687:
-#line 4885 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 687: // opt_FTMatchOptions: FTMatchOptions
+        {
             (yylhs.value.node) = (yystack_[0].value.node);
         }
-#line 8355 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 688:
-#line 4890 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 688: // opt_FTWeight: %empty
+        {
             (yylhs.value.node) = NULL;
         }
-#line 8363 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 689:
-#line 4894 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 689: // opt_FTWeight: FTWeight
+        {
             (yylhs.value.node) = (yystack_[0].value.node);
         }
-#line 8371 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 690:
-#line 4900 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 690: // FTWeight: "'weight'" "'{'" Expr "'}'"
+        {
             (yylhs.value.node) = new FTWeight( LOC(yylhs.location), dynamic_cast<exprnode*>((yystack_[1].value.expr)) );
         }
-#line 8379 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 691:
-#line 4906 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 691: // FTPrimary: FTWords opt_FTTimes
+        {
             (yylhs.value.node) = new FTWordsTimes(
                 LOC(yylhs.location),
                 dynamic_cast<FTWords*>((yystack_[1].value.node)),
                 dynamic_cast<FTTimes*>((yystack_[0].value.node))
             );
         }
-#line 8391 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 692:
-#line 4914 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 692: // FTPrimary: "'('" FTSelection "')'"
+        {
             (yylhs.value.node) = (yystack_[1].value.node);
         }
-#line 8399 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 693:
-#line 4918 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 693: // FTPrimary: FTExtensionSelection
+        {
             (yylhs.value.node) = (yystack_[0].value.node);
         }
-#line 8407 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 694:
-#line 4923 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 694: // opt_FTTimes: %empty
+        {
             (yylhs.value.node) = NULL;
         }
-#line 8415 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 695:
-#line 4927 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 695: // opt_FTTimes: FTTimes
+        {
             (yylhs.value.node) = (yystack_[0].value.node);
         }
-#line 8423 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 696:
-#line 4933 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 696: // FTExtensionSelection: Pragma_list "'{'" opt_FTSelection "'}'"
+        {
             (yylhs.value.node) = new FTExtensionSelection(
                 LOC(yylhs.location),
                 dynamic_cast<PragmaList*>((yystack_[3].value.node)),
                 dynamic_cast<FTSelection*>((yystack_[1].value.node))
             );
         }
-#line 8435 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 697:
-#line 4942 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 697: // opt_FTSelection: %empty
+        {
             (yylhs.value.node) = NULL;
         }
-#line 8443 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 698:
-#line 4946 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 698: // opt_FTSelection: FTSelection
+        {
             (yylhs.value.node) = (yystack_[0].value.node);
         }
-#line 8451 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 699:
-#line 4952 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 699: // FTWords: FTWordsValue opt_FTAnyallOption
+        {
             (yylhs.value.node) = new FTWords(
                 LOC(yylhs.location),
                 dynamic_cast<FTWordsValue*>((yystack_[1].value.node)),
                 dynamic_cast<FTAnyallOption*>((yystack_[0].value.node))
             );
         }
-#line 8463 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 700:
-#line 4962 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 700: // FTWordsValue: Literal
+        {
             (yylhs.value.node) = new FTWordsValue(
                 LOC(yylhs.location), static_cast<StringLiteral*>((yystack_[0].value.expr)), NULL
             );
         }
-#line 8473 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 701:
-#line 4968 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 701: // FTWordsValue: "'{'" Expr "'}'"
+        {
             (yylhs.value.node) = new FTWordsValue(
                 LOC(yylhs.location), NULL, dynamic_cast<exprnode*>((yystack_[1].value.expr))
             );
         }
-#line 8483 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 702:
-#line 4975 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 702: // opt_FTAnyallOption: %empty
+        {
             (yylhs.value.node) = new FTAnyallOption( LOC(yylhs.location), ft_anyall_mode::any );
         }
-#line 8491 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 703:
-#line 4979 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 703: // opt_FTAnyallOption: FTAnyallOption
+        {
             (yylhs.value.node) = (yystack_[0].value.node);
         }
-#line 8499 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 704:
-#line 4985 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 704: // FTAnyallOption: "'any'" opt_word
+        {
             (yylhs.value.node) = new FTAnyallOption( LOC(yylhs.location), (yystack_[0].value.ft_anyall_value) );
         }
-#line 8507 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 705:
-#line 4989 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 705: // FTAnyallOption: "'all'" opt_words
+        {
             (yylhs.value.node) = new FTAnyallOption( LOC(yylhs.location), (yystack_[0].value.ft_anyall_value) );
         }
-#line 8515 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 706:
-#line 4993 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 706: // FTAnyallOption: "'phrase'"
+        {
             (yylhs.value.node) = new FTAnyallOption( LOC(yylhs.location), ft_anyall_mode::phrase );
         }
-#line 8523 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 707:
-#line 4998 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 707: // opt_word: %empty
+        {
             (yylhs.value.ft_anyall_value) = ft_anyall_mode::any;
         }
-#line 8531 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 708:
-#line 5002 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 708: // opt_word: "'word'"
+        {
             (yylhs.value.ft_anyall_value) = ft_anyall_mode::any_word;
         }
-#line 8539 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 709:
-#line 5007 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 709: // opt_words: %empty
+        {
             (yylhs.value.ft_anyall_value) = ft_anyall_mode::all;
         }
-#line 8547 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 710:
-#line 5011 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 710: // opt_words: "'words'"
+        {
             (yylhs.value.ft_anyall_value) = ft_anyall_mode::all_words;
         }
-#line 8555 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 711:
-#line 5017 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 711: // FTPosFilter: FTOrder
+        {
             (yylhs.value.node) = (yystack_[0].value.node);
         }
-#line 8563 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 712:
-#line 5021 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 712: // FTPosFilter: FTWindow
+        {
             (yylhs.value.node) = (yystack_[0].value.node);
         }
-#line 8571 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 713:
-#line 5025 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 713: // FTPosFilter: FTDistance
+        {
             (yylhs.value.node) = (yystack_[0].value.node);
         }
-#line 8579 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 714:
-#line 5029 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 714: // FTPosFilter: FTScope
+        {
             (yylhs.value.node) = (yystack_[0].value.node);
         }
-#line 8587 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 715:
-#line 5033 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 715: // FTPosFilter: FTContent
+        {
             (yylhs.value.node) = (yystack_[0].value.node);
         }
-#line 8595 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 716:
-#line 5039 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 716: // FTOrder: "'ordered'"
+        {
             (yylhs.value.node) = new FTOrder( LOC(yylhs.location) );
         }
-#line 8603 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 717:
-#line 5045 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 717: // FTWindow: "'window'" AdditiveExpr FTUnit
+        {
             (yylhs.value.node) = new FTWindow(
                 LOC(yylhs.location),
                 static_cast<AdditiveExpr*>((yystack_[1].value.expr)),
                 static_cast<FTUnit*>((yystack_[0].value.node))
             );
         }
-#line 8615 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 718:
-#line 5055 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 718: // FTDistance: "'distance'" FTRange FTUnit
+        {
             (yylhs.value.node) = new FTDistance(
                 LOC(yylhs.location),
                 dynamic_cast<FTRange*>((yystack_[1].value.node)),
                 dynamic_cast<FTUnit*>((yystack_[0].value.node))
             );
         }
-#line 8627 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 719:
-#line 5065 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 719: // FTUnit: "'words'"
+        {
             (yylhs.value.node) = new FTUnit( LOC(yylhs.location), ft_unit::words );
         }
-#line 8635 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 720:
-#line 5069 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 720: // FTUnit: "'sentences'"
+        {
             (yylhs.value.node) = new FTUnit( LOC(yylhs.location), ft_unit::sentences );
         }
-#line 8643 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 721:
-#line 5073 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 721: // FTUnit: "'paragraphs'"
+        {
             (yylhs.value.node) = new FTUnit( LOC(yylhs.location), ft_unit::paragraphs );
         }
-#line 8651 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 722:
-#line 5079 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 722: // FTMatchOptions: "'using'" FTMatchOption
+        {
             FTMatchOptions *mo = new FTMatchOptions( LOC(yylhs.location) );
             mo->push_back( dynamic_cast<FTMatchOption*>((yystack_[0].value.node)) );
             (yylhs.value.node) = mo;
         }
-#line 8661 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 723:
-#line 5085 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 723: // FTMatchOptions: FTMatchOptions "'using'" FTMatchOption
+        {
             FTMatchOptions *mo = dynamic_cast<FTMatchOptions*>((yystack_[2].value.node));
             mo->push_back( dynamic_cast<FTMatchOption*>((yystack_[0].value.node)) );
             (yylhs.value.node) = (yystack_[2].value.node);
         }
-#line 8671 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 724:
-#line 5093 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 724: // FTMatchOption: FTCaseOption
+        {
             (yylhs.value.node) = (yystack_[0].value.node);
         }
-#line 8679 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 725:
-#line 5097 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 725: // FTMatchOption: FTDiacriticsOption
+        {
             (yylhs.value.node) = (yystack_[0].value.node);
         }
-#line 8687 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 726:
-#line 5101 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 726: // FTMatchOption: FTExtensionOption
+        {
             (yylhs.value.node) = (yystack_[0].value.node);
         }
-#line 8695 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 727:
-#line 5105 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 727: // FTMatchOption: FTLanguageOption
+        {
             (yylhs.value.node) = (yystack_[0].value.node);
         }
-#line 8703 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 728:
-#line 5109 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 728: // FTMatchOption: FTStemOption
+        {
             (yylhs.value.node) = (yystack_[0].value.node);
         }
-#line 8711 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 729:
-#line 5113 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 729: // FTMatchOption: FTStopWordOption
+        {
             (yylhs.value.node) = (yystack_[0].value.node);
         }
-#line 8719 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 730:
-#line 5117 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 730: // FTMatchOption: FTThesaurusOption
+        {
             (yylhs.value.node) = (yystack_[0].value.node);
         }
-#line 8727 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 731:
-#line 5121 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 731: // FTMatchOption: FTWildCardOption
+        {
             (yylhs.value.node) = (yystack_[0].value.node);
         }
-#line 8735 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 732:
-#line 5127 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 732: // FTCaseOption: "'case'" "'sensitive'"
+        {
             (yylhs.value.node) = new FTCaseOption( LOC(yylhs.location), ft_case_mode::sensitive );
         }
-#line 8743 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 733:
-#line 5131 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 733: // FTCaseOption: "'case'" "'insensitive'"
+        {
             (yylhs.value.node) = new FTCaseOption( LOC(yylhs.location), ft_case_mode::insensitive );
         }
-#line 8751 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 734:
-#line 5135 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 734: // FTCaseOption: "'lowercase'"
+        {
             (yylhs.value.node) = new FTCaseOption( LOC(yylhs.location), ft_case_mode::lower );
         }
-#line 8759 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 735:
-#line 5139 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 735: // FTCaseOption: "'uppercase'"
+        {
             (yylhs.value.node) = new FTCaseOption( LOC(yylhs.location), ft_case_mode::upper );
         }
-#line 8767 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 736:
-#line 5145 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 736: // FTDiacriticsOption: "'diacritics'" "'sensitive'"
+        {
             (yylhs.value.node) = new FTDiacriticsOption(
                 LOC(yylhs.location), ft_diacritics_mode::sensitive
             );
         }
-#line 8777 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 737:
-#line 5151 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 737: // FTDiacriticsOption: "'diacritics'" "'insensitive'"
+        {
             (yylhs.value.node) = new FTDiacriticsOption(
                 LOC(yylhs.location), ft_diacritics_mode::insensitive
             );
         }
-#line 8787 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 738:
-#line 5159 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 738: // FTExtensionOption: "'option'" QNAME "'STRING'"
+        {
             (yylhs.value.node) = new FTExtensionOption(
                 LOC(yylhs.location), static_cast<QName*>((yystack_[1].value.expr)), SYMTAB((yystack_[0].value.sval))
             );
         }
-#line 8797 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 739:
-#line 5167 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 739: // FTStemOption: "'stemming'"
+        {
             (yylhs.value.node) = new FTStemOption( LOC(yylhs.location), ft_stem_mode::stemming );
         }
-#line 8805 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 740:
-#line 5171 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 740: // FTStemOption: "'no'" "'stemming'"
+        {
             (yylhs.value.node) = new FTStemOption( LOC(yylhs.location), ft_stem_mode::no_stemming );
         }
-#line 8813 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 741:
-#line 5177 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 741: // FTThesaurusOption: "'thesaurus'" FTThesaurusID_or_default
+        {
             FTThesaurusOption::thesaurus_id_list_t *til = NULL;
             if ( (yystack_[0].value.node) ) {
                 til = new FTThesaurusOption::thesaurus_id_list_t;
@@ -8843,12 +7100,10 @@ namespace zorba {
             (yylhs.value.node) = new FTThesaurusOption( LOC(yylhs.location), til, !til );
             delete til;
         }
-#line 8827 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 742:
-#line 5187 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 742: // FTThesaurusOption: "'thesaurus'" "'('" FTThesaurusID_or_default opt_FTThesaurus_list "')'"
+        {
             FTThesaurusOption::thesaurus_id_list_t *til = (yystack_[1].value.thesaurus_id_list);
             if ( (yystack_[2].value.node) ) {
                 if ( !til )
@@ -8858,112 +7113,86 @@ namespace zorba {
             (yylhs.value.node) = new FTThesaurusOption( LOC(yylhs.location), til, !(yystack_[2].value.node) );
             delete til;
         }
-#line 8842 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 743:
-#line 5198 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 743: // FTThesaurusOption: "'no'" "'thesaurus'"
+        {
             (yylhs.value.node) = new FTThesaurusOption( LOC(yylhs.location), NULL, false, true );
         }
-#line 8850 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 744:
-#line 5204 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 744: // FTThesaurusID_or_default: FTThesaurusID
+        {
             (yylhs.value.node) = (yystack_[0].value.node);
         }
-#line 8858 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 745:
-#line 5208 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 745: // FTThesaurusID_or_default: "'default'"
+        {
             (yylhs.value.node) = NULL;
         }
-#line 8866 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 746:
-#line 5213 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 746: // opt_FTThesaurus_list: %empty
+        {
             (yylhs.value.thesaurus_id_list) = NULL;
         }
-#line 8874 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 747:
-#line 5217 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 747: // opt_FTThesaurus_list: "','" FTThesaurus_list
+        {
             (yylhs.value.thesaurus_id_list) = (yystack_[0].value.thesaurus_id_list);
         }
-#line 8882 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 748:
-#line 5223 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 748: // FTThesaurus_list: FTThesaurusID
+        {
             (yylhs.value.thesaurus_id_list) = new FTThesaurusOption::thesaurus_id_list_t;
             (yylhs.value.thesaurus_id_list)->push_back( dynamic_cast<FTThesaurusID*>((yystack_[0].value.node)) );
         }
-#line 8891 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 749:
-#line 5228 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 749: // FTThesaurus_list: FTThesaurus_list "','" FTThesaurusID
+        {
             (yystack_[2].value.thesaurus_id_list)->push_back( dynamic_cast<FTThesaurusID*>((yystack_[0].value.node)) );
             (yylhs.value.thesaurus_id_list) = (yystack_[2].value.thesaurus_id_list);
         }
-#line 8900 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 750:
-#line 5235 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 750: // FTThesaurusID: "'at'" "'STRING'" opt_relationship opt_levels
+        {
             (yylhs.value.node) = new FTThesaurusID(
                 LOC(yylhs.location), SYMTAB((yystack_[2].value.sval)), SYMTAB((yystack_[1].value.sval)), dynamic_cast<FTRange*>((yystack_[0].value.node))
             );
         }
-#line 8910 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 751:
-#line 5242 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 751: // opt_relationship: %empty
+        {
             (yylhs.value.sval) = 0;
         }
-#line 8918 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 752:
-#line 5246 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 752: // opt_relationship: "'relationship'" "'STRING'"
+        {
             (yylhs.value.sval) = (yystack_[0].value.sval);
         }
-#line 8926 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 753:
-#line 5252 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 753: // opt_levels: %empty
+        {
             (yylhs.value.node) = NULL;
         }
-#line 8934 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 754:
-#line 5256 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 754: // opt_levels: FTRange "'levels'"
+        {
             (yylhs.value.node) = (yystack_[1].value.node);
         }
-#line 8942 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 755:
-#line 5262 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 755: // FTStopWordOption: "'stop'" "'words'" FTStopWords opt_FTStopWordsInclExcl_list
+        {
             (yylhs.value.node) = new FTStopWordOption(
                 LOC(yylhs.location),
                 dynamic_cast<FTStopWords*>((yystack_[1].value.node)), (yystack_[0].value.incl_excl_list),
@@ -8971,354 +7200,276 @@ namespace zorba {
             );
             delete (yystack_[0].value.incl_excl_list);
         }
-#line 8955 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 756:
-#line 5271 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 756: // FTStopWordOption: "'stop'" "'words'" "'default'" opt_FTStopWordsInclExcl_list
+        {
             (yylhs.value.node) = new FTStopWordOption(
                 LOC(yylhs.location), NULL, (yystack_[0].value.incl_excl_list), ft_stop_words_mode::with_default
             );
             delete (yystack_[0].value.incl_excl_list);
         }
-#line 8966 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 757:
-#line 5278 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 757: // FTStopWordOption: "'no'" "'stop'" "'words'"
+        {
             (yylhs.value.node) = new FTStopWordOption(
                 LOC(yylhs.location), NULL, NULL, ft_stop_words_mode::without
             );
         }
-#line 8976 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 758:
-#line 5286 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 758: // FTStopWords: "'at'" "'STRING'"
+        {
             (yylhs.value.node) = new FTStopWords( LOC(yylhs.location), SYMTAB((yystack_[0].value.sval)), NULL );
         }
-#line 8984 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 759:
-#line 5290 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 759: // FTStopWords: "'('" STRING_LITERAL_list "')'"
+        {
             (yylhs.value.node) = new FTStopWords( LOC(yylhs.location), "", (yystack_[1].value.strlist) );
         }
-#line 8992 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 760:
-#line 5296 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 760: // STRING_LITERAL_list: "'STRING'"
+        {
             string_list_t *sl = new string_list_t;
             sl->push_back( SYMTAB((yystack_[0].value.sval)) );
             (yylhs.value.strlist) = sl;
         }
-#line 9002 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 761:
-#line 5302 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 761: // STRING_LITERAL_list: STRING_LITERAL_list "','" "'STRING'"
+        {
             if ( (yystack_[2].value.strlist) )
                 (yystack_[2].value.strlist)->push_back( SYMTAB((yystack_[0].value.sval)) );
             (yylhs.value.strlist) = (yystack_[2].value.strlist);
         }
-#line 9012 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 762:
-#line 5309 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 762: // opt_FTStopWordsInclExcl_list: %empty
+        {
             (yylhs.value.incl_excl_list) = NULL;
         }
-#line 9020 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 763:
-#line 5313 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 763: // opt_FTStopWordsInclExcl_list: FTStopWordsInclExcl_list
+        {
             (yylhs.value.incl_excl_list) = (yystack_[0].value.incl_excl_list);
         }
-#line 9028 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 764:
-#line 5319 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 764: // FTStopWordsInclExcl_list: FTStopWordsInclExcl
+        {
             (yylhs.value.incl_excl_list) = new FTStopWordOption::incl_excl_list_t;
             (yylhs.value.incl_excl_list)->push_back( dynamic_cast<FTStopWordsInclExcl*>((yystack_[0].value.node)) );
         }
-#line 9037 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 765:
-#line 5324 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 765: // FTStopWordsInclExcl_list: FTStopWordsInclExcl_list FTStopWordsInclExcl
+        {
             FTStopWordOption::incl_excl_list_t *iel = (yystack_[1].value.incl_excl_list);
             if ( !iel )
                 iel = new FTStopWordOption::incl_excl_list_t;
             iel->push_back( dynamic_cast<FTStopWordsInclExcl*>((yystack_[0].value.node)) );
             (yylhs.value.incl_excl_list) = iel;
         }
-#line 9049 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 766:
-#line 5334 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 766: // FTStopWordsInclExcl: "'union'" FTStopWords
+        {
             (yylhs.value.node) = new FTStopWordsInclExcl(
                 LOC(yylhs.location),
                 dynamic_cast<FTStopWords*>((yystack_[0].value.node)),
                 ft_stop_words_unex::union_
             );
         }
-#line 9061 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 767:
-#line 5342 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 767: // FTStopWordsInclExcl: "'except'" FTStopWords
+        {
             (yylhs.value.node) = new FTStopWordsInclExcl(
                 LOC(yylhs.location),
                 dynamic_cast<FTStopWords*>((yystack_[0].value.node)),
                 ft_stop_words_unex::except
             );
         }
-#line 9073 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 768:
-#line 5352 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 768: // FTLanguageOption: "'language'" "'STRING'"
+        {
             (yylhs.value.node) = new FTLanguageOption( LOC(yylhs.location), SYMTAB((yystack_[0].value.sval)) );
         }
-#line 9081 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 769:
-#line 5358 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 769: // FTWildCardOption: "'wildcards'"
+        {
             (yylhs.value.node) = new FTWildCardOption( LOC(yylhs.location), ft_wild_card_mode::with );
         }
-#line 9089 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 770:
-#line 5362 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 770: // FTWildCardOption: "'no'" "'wildcards'"
+        {
             (yylhs.value.node) = new FTWildCardOption( LOC(yylhs.location), ft_wild_card_mode::without );
         }
-#line 9097 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 771:
-#line 5368 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 771: // FTContent: "'at'" "'start'"
+        {
             (yylhs.value.node) = new FTContent( LOC(yylhs.location), ft_content_mode::at_start );
         }
-#line 9105 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 772:
-#line 5372 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 772: // FTContent: "'at'" "'end'"
+        {
             (yylhs.value.node) = new FTContent( LOC(yylhs.location), ft_content_mode::at_end );
         }
-#line 9113 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 773:
-#line 5376 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 773: // FTContent: "'entire'" "'content'"
+        {
             (yylhs.value.node) = new FTContent( LOC(yylhs.location), ft_content_mode::entire );
         }
-#line 9121 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 774:
-#line 5382 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 774: // FTTimes: "'occurs'" FTRange "'times'"
+        {
             (yylhs.value.node) = new FTTimes( LOC(yylhs.location), dynamic_cast<FTRange*>((yystack_[1].value.node)) );
         }
-#line 9129 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 775:
-#line 5388 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 775: // FTRange: "'exactly'" AdditiveExpr
+        {
             (yylhs.value.node) = new FTRange( LOC(yylhs.location), ft_range_mode::exactly, (yystack_[0].value.expr) );
         }
-#line 9137 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 776:
-#line 5392 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 776: // FTRange: "'at'" "'least'" AdditiveExpr
+        {
             (yylhs.value.node) = new FTRange( LOC(yylhs.location), ft_range_mode::at_least, (yystack_[0].value.expr) );
         }
-#line 9145 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 777:
-#line 5396 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 777: // FTRange: "'at'" "'most'" AdditiveExpr
+        {
             (yylhs.value.node) = new FTRange( LOC(yylhs.location), ft_range_mode::at_most, (yystack_[0].value.expr) );
         }
-#line 9153 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 778:
-#line 5400 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 778: // FTRange: "'from'" AdditiveExpr "'to'" AdditiveExpr
+        {
             (yylhs.value.node) = new FTRange( LOC(yylhs.location), ft_range_mode::from_to, (yystack_[2].value.expr), (yystack_[0].value.expr) );
         }
-#line 9161 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 779:
-#line 5406 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 779: // FTScope: "'same'" FTBigUnit
+        {
             (yylhs.value.node) = new FTScope(
                 LOC(yylhs.location),
                 ft_scope::same,
                 dynamic_cast<FTBigUnit*>((yystack_[0].value.node))
             );
         }
-#line 9173 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 780:
-#line 5414 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 780: // FTScope: "'different'" FTBigUnit
+        {
             (yylhs.value.node) = new FTScope(
                 LOC(yylhs.location),
                 ft_scope::different,
                 dynamic_cast<FTBigUnit*>((yystack_[0].value.node))
             );
         }
-#line 9185 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 781:
-#line 5424 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 781: // FTBigUnit: "'sentence'"
+        {
             (yylhs.value.node) = new FTBigUnit( LOC(yylhs.location), ft_big_unit::sentence );
         }
-#line 9193 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 782:
-#line 5428 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 782: // FTBigUnit: "'paragraph'"
+        {
             (yylhs.value.node) = new FTBigUnit( LOC(yylhs.location), ft_big_unit::paragraph );
         }
-#line 9201 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 783:
-#line 5434 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 783: // FTIgnoreOption: "'without'" "'content'" UnionExpr
+        {
             (yylhs.value.node) = new FTIgnoreOption( LOC(yylhs.location), static_cast<UnionExpr*>((yystack_[0].value.expr)) );
         }
-#line 9209 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 784:
-#line 5440 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 784: // JSONArrayConstructor: "'['" "']'"
+        {
           (yylhs.value.expr) = new JSONArrayConstructor( LOC(yylhs.location), NULL );
         }
-#line 9217 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 785:
-#line 5444 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 785: // JSONArrayConstructor: "'['" Expr "']'"
+        {
           (yylhs.value.expr) = new JSONArrayConstructor( LOC(yylhs.location), (yystack_[1].value.expr) );
         }
-#line 9225 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 786:
-#line 5450 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 786: // JSONSimpleObjectUnion: "'{|'" "'|}'"
+        {
           (yylhs.value.expr) = new JSONObjectConstructor(LOC(yylhs.location), NULL, false);
         }
-#line 9233 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 787:
-#line 5454 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 787: // JSONSimpleObjectUnion: "'{|'" Expr "'|}'"
+        {
           (yylhs.value.expr) = new JSONObjectConstructor(LOC(yylhs.location), (yystack_[1].value.expr), false);
         }
-#line 9241 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 788:
-#line 5460 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 788: // JSONAccumulatorObjectUnion: "'{['" "']}'"
+        {
           (yylhs.value.expr) = new JSONObjectConstructor(LOC(yylhs.location), NULL, true);
         }
-#line 9249 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 789:
-#line 5464 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 789: // JSONAccumulatorObjectUnion: "'{['" Expr "']}'"
+        {
           (yylhs.value.expr) = new JSONObjectConstructor(LOC(yylhs.location), (yystack_[1].value.expr), true);
         }
-#line 9257 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 790:
-#line 5470 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 790: // JSONObjectConstructor: "'{'" JSONPairList "'}'"
+        {
           (yylhs.value.expr) = new JSONDirectObjectConstructor(LOC(yylhs.location),
                                                dynamic_cast<JSONPairList*>((yystack_[1].value.node)));
         }
-#line 9266 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 791:
-#line 5477 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 791: // JSONPairList: ExprSingle "':'" ExprSingle
+        {
           JSONPairList* jpl = new JSONPairList(LOC(yylhs.location));
           jpl->push_back(new JSONPairConstructor(LOC(yylhs.location), (yystack_[2].value.expr), (yystack_[0].value.expr)));
           (yylhs.value.node) = jpl;
         }
-#line 9276 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 792:
-#line 5483 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 792: // JSONPairList: JSONPairList "','" ExprSingle "':'" ExprSingle
+        {
           JSONPairList* jpl = dynamic_cast<JSONPairList*>((yystack_[4].value.node));
           assert(jpl);
           jpl->push_back(new JSONPairConstructor(LOC(yylhs.location), (yystack_[2].value.expr), (yystack_[0].value.expr)));
           (yylhs.value.node) = jpl;
         }
-#line 9287 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 793:
-#line 5492 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 793: // JSONInsertExpr: "'insert'" "'json'" ExprSingle "'into'" ExprSingle
+        {
           (yylhs.value.expr) = new JSONObjectInsertExpr(LOC(yylhs.location),
                                         (yystack_[2].value.expr),
                                         (yystack_[0].value.expr));
         }
-#line 9297 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 794:
-#line 5498 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 794: // JSONInsertExpr: "'insert'" "'json'" JSONPairList "'into'" ExprSingle
+        {
           JSONPairList* jpl = dynamic_cast<JSONPairList*>((yystack_[2].value.node));
           (yylhs.value.expr) = new JSONObjectInsertExpr(
               LOC(yylhs.location),
@@ -9327,28 +7478,23 @@ namespace zorba {
                   jpl),
               (yystack_[0].value.expr));
         }
-#line 9311 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 795:
-#line 5508 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 795: // JSONInsertExpr: "'insert'" "'json'" ExprSingle "'into'" ExprSingle "'at'" "'position'" ExprSingle
+        {
           (yylhs.value.expr) = new JSONArrayInsertExpr(LOC(yylhs.location), (yystack_[5].value.expr), (yystack_[3].value.expr), (yystack_[0].value.expr));
         }
-#line 9319 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 796:
-#line 5514 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 796: // JSONAppendExpr: "'append'" "'json'" ExprSingle "'into'" ExprSingle
+        {
           (yylhs.value.expr) = new JSONArrayAppendExpr(LOC(yylhs.location), (yystack_[2].value.expr), (yystack_[0].value.expr));
         }
-#line 9327 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 797:
-#line 5520 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 797: // JSONDeleteExpr: "'delete'" "'json'" PostfixExpr
+        {
+          rchandle<exprnode> lPostfixExpr = (yystack_[0].value.expr);
           rchandle<exprnode> lTargetExpr;
           rchandle<exprnode> lSelectorExpr;
           string lError;
@@ -9362,12 +7508,11 @@ namespace zorba {
               lTargetExpr,
               lSelectorExpr);
         }
-#line 9346 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 798:
-#line 5537 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 798: // JSONRenameExpr: "'rename'" "'json'" PostfixExpr "'as'" ExprSingle
+        {
+          rchandle<exprnode> lPostfixExpr = (yystack_[2].value.expr);
           rchandle<exprnode> lTargetExpr;
           rchandle<exprnode> lSelectorExpr;
           string lError;
@@ -9388,12 +7533,11 @@ namespace zorba {
                 lSelectorExpr,
                 (yystack_[0].value.expr));
         }
-#line 9372 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 799:
-#line 5561 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 799: // JSONReplaceExpr: "'replace'" "'value'" "'of'" "'json'" PostfixExpr "'with'" ExprSingle
+        {
+          rchandle<exprnode> lPostfixExpr = (yystack_[2].value.expr);
           rchandle<exprnode> lTargetExpr;
           rchandle<exprnode> lSelectorExpr;
           string lError;
@@ -9409,1391 +7553,953 @@ namespace zorba {
                 lSelectorExpr,
                 (yystack_[0].value.expr));
         }
-#line 9393 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 800:
-#line 5580 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 800: // JSONTest: "'json-item'" "'('" "')'"
+        {
           (yylhs.value.node) = new JSON_Test(LOC(yylhs.location), store::StoreConsts::jsonItem);
         }
-#line 9401 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 801:
-#line 5584 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 801: // JSONTest: "'array'" "'('" "')'"
+        {
           (yylhs.value.node) = new JSON_Test(LOC(yylhs.location), store::StoreConsts::jsonArray);
         }
-#line 9409 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 802:
-#line 5588 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    {
+  case 802: // JSONTest: "'object'" "'('" "')'"
+        {
           (yylhs.value.node) = new JSON_Test(LOC(yylhs.location), store::StoreConsts::jsonObject);
         }
-#line 9417 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
     break;
 
-  case 805:
-#line 5597 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB((yystack_[0].value.sval))); }
-#line 9423 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 803: // URI_LITERAL: "'STRING'"
+        { (yylhs.value.sval) = (yystack_[0].value.sval); }
     break;
 
-  case 806:
-#line 5598 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("attribute"))); }
-#line 9429 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 804: // QNAME: FUNCTION_NAME
+        { (yylhs.value.expr) = (yystack_[0].value.expr); }
     break;
 
-  case 807:
-#line 5599 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("comment"))); }
-#line 9435 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 805: // QNAME: "'NCName_sval'"
+                  { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB((yystack_[0].value.sval))); }
     break;
 
-  case 808:
-#line 5600 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("document-node"))); }
-#line 9441 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 806: // QNAME: "'attribute'"
+                { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("attribute"))); }
     break;
 
-  case 809:
-#line 5601 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("namespace-node"))); }
-#line 9447 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 807: // QNAME: "'comment'"
+              { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("comment"))); }
     break;
 
-  case 810:
-#line 5602 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("element"))); }
-#line 9453 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 808: // QNAME: "'document-node'"
+                    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("document-node"))); }
     break;
 
-  case 811:
-#line 5603 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("item"))); }
-#line 9459 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 809: // QNAME: "'namespace-node'"
+              { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("namespace-node"))); }
     break;
 
-  case 812:
-#line 5604 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("if"))); }
-#line 9465 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 810: // QNAME: "'element'"
+              { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("element"))); }
     break;
 
-  case 813:
-#line 5605 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("node"))); }
-#line 9471 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 811: // QNAME: "'item'"
+           { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("item"))); }
     break;
 
-  case 814:
-#line 5606 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("processing-instruction"))); }
-#line 9477 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 812: // QNAME: "'if'"
+         { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("if"))); }
     break;
 
-  case 815:
-#line 5607 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("schema-attribute"))); }
-#line 9483 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 813: // QNAME: "'node'"
+           { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("node"))); }
     break;
 
-  case 816:
-#line 5608 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("schema-element"))); }
-#line 9489 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 814: // QNAME: "'processing-instruction'"
+                             { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("processing-instruction"))); }
     break;
 
-  case 817:
-#line 5609 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("text"))); }
-#line 9495 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 815: // QNAME: "'schema-attribute'"
+                       { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("schema-attribute"))); }
     break;
 
-  case 818:
-#line 5610 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("typeswitch"))); }
-#line 9501 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 816: // QNAME: "'schema-element'"
+                     { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("schema-element"))); }
     break;
 
-  case 819:
-#line 5611 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("switch"))); }
-#line 9507 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 817: // QNAME: "'text'"
+           { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("text"))); }
     break;
 
-  case 820:
-#line 5612 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("empty-sequence"))); }
-#line 9513 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 818: // QNAME: "'typeswitch'"
+                 { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("typeswitch"))); }
     break;
 
-  case 821:
-#line 5613 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("while"))); }
-#line 9519 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 819: // QNAME: "'switch'"
+             { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("switch"))); }
     break;
 
-  case 822:
-#line 5614 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("json"))); }
-#line 9525 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 820: // QNAME: "'empty-sequence'"
+                     { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("empty-sequence"))); }
     break;
 
-  case 823:
-#line 5615 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("array"))); }
-#line 9531 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 821: // QNAME: "'while'"
+            { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("while"))); }
     break;
 
-  case 824:
-#line 5616 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("object"))); }
-#line 9537 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 822: // QNAME: "'json'"
+           { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("json"))); }
     break;
 
-  case 825:
-#line 5617 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("json-item"))); }
-#line 9543 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 823: // QNAME: "'array'"
+            { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("array"))); }
     break;
 
-  case 826:
-#line 5618 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("structured-item"))); }
-#line 9549 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 824: // QNAME: "'object'"
+             { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("object"))); }
     break;
 
-  case 828:
-#line 5622 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB((yystack_[0].value.sval))); }
-#line 9555 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 825: // QNAME: "'json-item'"
+                { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("json-item"))); }
     break;
 
-  case 829:
-#line 5623 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("xquery"))); }
-#line 9561 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 826: // QNAME: "'structured-item'"
+                      { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("structured-item"))); }
     break;
 
-  case 830:
-#line 5624 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("empty"))); }
-#line 9567 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 827: // FUNCTION_NAME: EQNAME
+        { (yylhs.value.expr) = (yystack_[0].value.expr); }
     break;
 
-  case 831:
-#line 5625 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("boundary-space"))); }
-#line 9573 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 828: // FUNCTION_NAME: "'QName'"
+                 { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB((yystack_[0].value.sval))); }
     break;
 
-  case 832:
-#line 5626 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("ft-option"))); }
-#line 9579 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 829: // FUNCTION_NAME: "'xquery'"
+             { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("xquery"))); }
     break;
 
-  case 833:
-#line 5627 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("base-uri"))); }
-#line 9585 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 830: // FUNCTION_NAME: "'empty'"
+             { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("empty"))); }
     break;
 
-  case 834:
-#line 5628 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("lax"))); }
-#line 9591 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 831: // FUNCTION_NAME: "'boundary-space'"
+                     { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("boundary-space"))); }
     break;
 
-  case 835:
-#line 5629 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("strict"))); }
-#line 9597 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 832: // FUNCTION_NAME: "'ft-option'"
+                { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("ft-option"))); }
     break;
 
-  case 836:
-#line 5630 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("idiv"))); }
-#line 9603 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 833: // FUNCTION_NAME: "'base-uri'"
+               { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("base-uri"))); }
     break;
 
-  case 837:
-#line 5631 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("document"))); }
-#line 9609 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 834: // FUNCTION_NAME: "'lax'"
+          { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("lax"))); }
     break;
 
-  case 838:
-#line 5632 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("ftnot"))); }
-#line 9615 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 835: // FUNCTION_NAME: "'strict'"
+              { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("strict"))); }
     break;
 
-  case 839:
-#line 5633 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("not"))); }
-#line 9621 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 836: // FUNCTION_NAME: "'idiv'"
+           { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("idiv"))); }
     break;
 
-  case 840:
-#line 5634 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("sensitive"))); }
-#line 9627 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 837: // FUNCTION_NAME: "'document'"
+               { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("document"))); }
     break;
 
-  case 841:
-#line 5635 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("insensitive"))); }
-#line 9633 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 838: // FUNCTION_NAME: "'ftnot'"
+            { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("ftnot"))); }
     break;
 
-  case 842:
-#line 5636 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("diacritics"))); }
-#line 9639 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 839: // FUNCTION_NAME: "'not'"
+          { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("not"))); }
     break;
 
-  case 843:
-#line 5637 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("without"))); }
-#line 9645 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 840: // FUNCTION_NAME: "'sensitive'"
+                { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("sensitive"))); }
     break;
 
-  case 844:
-#line 5638 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("stemming"))); }
-#line 9651 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 841: // FUNCTION_NAME: "'insensitive'"
+                  { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("insensitive"))); }
     break;
 
-  case 845:
-#line 5639 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("thesaurus"))); }
-#line 9657 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 842: // FUNCTION_NAME: "'diacritics'"
+                 { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("diacritics"))); }
     break;
 
-  case 846:
-#line 5640 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("stop"))); }
-#line 9663 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 843: // FUNCTION_NAME: "'without'"
+              { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("without"))); }
     break;
 
-  case 847:
-#line 5641 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("wildcards"))); }
-#line 9669 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 844: // FUNCTION_NAME: "'stemming'"
+               { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("stemming"))); }
     break;
 
-  case 848:
-#line 5642 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("entire"))); }
-#line 9675 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 845: // FUNCTION_NAME: "'thesaurus'"
+                { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("thesaurus"))); }
     break;
 
-  case 849:
-#line 5643 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("content"))); }
-#line 9681 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 846: // FUNCTION_NAME: "'stop'"
+           { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("stop"))); }
     break;
 
-  case 850:
-#line 5644 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("word"))); }
-#line 9687 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 847: // FUNCTION_NAME: "'wildcards'"
+                { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("wildcards"))); }
     break;
 
-  case 851:
-#line 5645 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("start"))); }
-#line 9693 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 848: // FUNCTION_NAME: "'entire'"
+             { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("entire"))); }
     break;
 
-  case 852:
-#line 5646 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("end"))); }
-#line 9699 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 849: // FUNCTION_NAME: "'content'"
+              { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("content"))); }
     break;
 
-  case 853:
-#line 5647 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("most"))); }
-#line 9705 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 850: // FUNCTION_NAME: "'word'"
+           { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("word"))); }
     break;
 
-  case 854:
-#line 5648 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("skip"))); }
-#line 9711 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 851: // FUNCTION_NAME: "'start'"
+            { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("start"))); }
     break;
 
-  case 855:
-#line 5649 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("copy"))); }
-#line 9717 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 852: // FUNCTION_NAME: "'end'"
+          { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("end"))); }
     break;
 
-  case 856:
-#line 5650 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("general"))); }
-#line 9723 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 853: // FUNCTION_NAME: "'most'"
+           { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("most"))); }
     break;
 
-  case 857:
-#line 5651 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("value"))); }
-#line 9729 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 854: // FUNCTION_NAME: "'skip'"
+           { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("skip"))); }
     break;
 
-  case 858:
-#line 5652 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("eq"))); }
-#line 9735 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 855: // FUNCTION_NAME: "'copy'"
+           { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("copy"))); }
     break;
 
-  case 859:
-#line 5653 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("ne"))); }
-#line 9741 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 856: // FUNCTION_NAME: "'general'"
+              { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("general"))); }
     break;
 
-  case 860:
-#line 5654 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("lt"))); }
-#line 9747 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 857: // FUNCTION_NAME: "'value'"
+            { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("value"))); }
     break;
 
-  case 861:
-#line 5655 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("le"))); }
-#line 9753 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 858: // FUNCTION_NAME: "'eq'"
+             { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("eq"))); }
     break;
 
-  case 862:
-#line 5656 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("gt"))); }
-#line 9759 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 859: // FUNCTION_NAME: "'ne'"
+             { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("ne"))); }
     break;
 
-  case 863:
-#line 5657 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("ge"))); }
-#line 9765 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 860: // FUNCTION_NAME: "'lt'"
+             { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("lt"))); }
     break;
 
-  case 864:
-#line 5658 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("at"))); }
-#line 9771 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 861: // FUNCTION_NAME: "'le'"
+             { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("le"))); }
     break;
 
-  case 865:
-#line 5659 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("context"))); }
-#line 9777 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 862: // FUNCTION_NAME: "'gt'"
+             { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("gt"))); }
     break;
 
-  case 866:
-#line 5660 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("variable"))); }
-#line 9783 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 863: // FUNCTION_NAME: "'ge'"
+             { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("ge"))); }
     break;
 
-  case 867:
-#line 5661 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("return"))); }
-#line 9789 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 864: // FUNCTION_NAME: "'at'"
+         { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("at"))); }
     break;
 
-  case 868:
-#line 5662 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("for"))); }
-#line 9795 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 865: // FUNCTION_NAME: "'context'"
+              { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("context"))); }
     break;
 
-  case 869:
-#line 5663 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("from"))); }
-#line 9801 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 866: // FUNCTION_NAME: "'variable'"
+               { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("variable"))); }
     break;
 
-  case 870:
-#line 5664 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("allowing"))); }
-#line 9807 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 867: // FUNCTION_NAME: "'return'"
+             { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("return"))); }
     break;
 
-  case 871:
-#line 5665 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("sliding"))); }
-#line 9813 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 868: // FUNCTION_NAME: "'for'"
+          { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("for"))); }
     break;
 
-  case 872:
-#line 5666 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("tumbling"))); }
-#line 9819 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 869: // FUNCTION_NAME: "'from'"
+           { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("from"))); }
     break;
 
-  case 873:
-#line 5667 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("previous"))); }
-#line 9825 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 870: // FUNCTION_NAME: "'allowing'"
+               { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("allowing"))); }
     break;
 
-  case 874:
-#line 5668 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("next"))); }
-#line 9831 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 871: // FUNCTION_NAME: "'sliding'"
+              { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("sliding"))); }
     break;
 
-  case 875:
-#line 5669 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("only"))); }
-#line 9837 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 872: // FUNCTION_NAME: "'tumbling'"
+               { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("tumbling"))); }
     break;
 
-  case 876:
-#line 5670 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("when"))); }
-#line 9843 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 873: // FUNCTION_NAME: "'previous'"
+               { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("previous"))); }
     break;
 
-  case 877:
-#line 5671 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("count"))); }
-#line 9849 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 874: // FUNCTION_NAME: "'next'"
+           { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("next"))); }
     break;
 
-  case 878:
-#line 5672 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("in"))); }
-#line 9855 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 875: // FUNCTION_NAME: "'only'"
+           { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("only"))); }
     break;
 
-  case 879:
-#line 5673 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("let"))); }
-#line 9861 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 876: // FUNCTION_NAME: "'when'"
+           { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("when"))); }
     break;
 
-  case 880:
-#line 5674 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("where"))); }
-#line 9867 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 877: // FUNCTION_NAME: "'count'"
+            { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("count"))); }
     break;
 
-  case 881:
-#line 5675 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("by"))); }
-#line 9873 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 878: // FUNCTION_NAME: "'in'"
+          { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("in"))); }
     break;
 
-  case 882:
-#line 5676 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("group"))); }
-#line 9879 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 879: // FUNCTION_NAME: "'let'"
+          { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("let"))); }
     break;
 
-  case 883:
-#line 5677 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("order"))); }
-#line 9885 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 880: // FUNCTION_NAME: "'where'"
+            { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("where"))); }
     break;
 
-  case 884:
-#line 5678 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("stable"))); }
-#line 9891 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 881: // FUNCTION_NAME: "'by'"
+         { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("by"))); }
     break;
 
-  case 885:
-#line 5679 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("ascending"))); }
-#line 9897 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 882: // FUNCTION_NAME: "'group'"
+            { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("group"))); }
     break;
 
-  case 886:
-#line 5680 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("descending"))); }
-#line 9903 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 883: // FUNCTION_NAME: "'order'"
+            { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("order"))); }
     break;
 
-  case 887:
-#line 5681 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("greatest"))); }
-#line 9909 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 884: // FUNCTION_NAME: "'stable'"
+             { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("stable"))); }
     break;
 
-  case 888:
-#line 5682 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("least"))); }
-#line 9915 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 885: // FUNCTION_NAME: "'ascending'"
+                { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("ascending"))); }
     break;
 
-  case 889:
-#line 5683 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("collation"))); }
-#line 9921 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 886: // FUNCTION_NAME: "'descending'"
+                 { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("descending"))); }
     break;
 
-  case 890:
-#line 5684 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("some"))); }
-#line 9927 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 887: // FUNCTION_NAME: "'greatest'"
+               { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("greatest"))); }
     break;
 
-  case 891:
-#line 5685 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("every"))); }
-#line 9933 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 888: // FUNCTION_NAME: "'least'"
+            { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("least"))); }
     break;
 
-  case 892:
-#line 5686 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("satisfies"))); }
-#line 9939 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 889: // FUNCTION_NAME: "'collation'"
+                { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("collation"))); }
     break;
 
-  case 893:
-#line 5687 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("case"))); }
-#line 9945 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 890: // FUNCTION_NAME: "'some'"
+           { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("some"))); }
     break;
 
-  case 894:
-#line 5688 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("as"))); }
-#line 9951 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 891: // FUNCTION_NAME: "'every'"
+            { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("every"))); }
     break;
 
-  case 895:
-#line 5689 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("then"))); }
-#line 9957 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 892: // FUNCTION_NAME: "'satisfies'"
+                { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("satisfies"))); }
     break;
 
-  case 896:
-#line 5690 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("else"))); }
-#line 9963 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 893: // FUNCTION_NAME: "'case'"
+           { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("case"))); }
     break;
 
-  case 897:
-#line 5691 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("or"))); }
-#line 9969 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 894: // FUNCTION_NAME: "'as'"
+         { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("as"))); }
     break;
 
-  case 898:
-#line 5692 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("and"))); }
-#line 9975 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 895: // FUNCTION_NAME: "'then'"
+           { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("then"))); }
     break;
 
-  case 899:
-#line 5693 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("instance"))); }
-#line 9981 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 896: // FUNCTION_NAME: "'else'"
+           { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("else"))); }
     break;
 
-  case 900:
-#line 5694 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("of"))); }
-#line 9987 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 897: // FUNCTION_NAME: "'or'"
+         { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("or"))); }
     break;
 
-  case 901:
-#line 5695 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("castable"))); }
-#line 9993 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 898: // FUNCTION_NAME: "'and'"
+          { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("and"))); }
     break;
 
-  case 902:
-#line 5696 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("to"))); }
-#line 9999 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 899: // FUNCTION_NAME: "'instance'"
+               { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("instance"))); }
     break;
 
-  case 903:
-#line 5697 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("div"))); }
-#line 10005 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 900: // FUNCTION_NAME: "'of'"
+         { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("of"))); }
     break;
 
-  case 904:
-#line 5698 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("mod"))); }
-#line 10011 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 901: // FUNCTION_NAME: "'castable'"
+               { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("castable"))); }
     break;
 
-  case 905:
-#line 5699 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("union"))); }
-#line 10017 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 902: // FUNCTION_NAME: "'to'"
+         { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("to"))); }
     break;
 
-  case 906:
-#line 5700 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("intersect"))); }
-#line 10023 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 903: // FUNCTION_NAME: "'div'"
+          { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("div"))); }
     break;
 
-  case 907:
-#line 5701 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("except"))); }
-#line 10029 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 904: // FUNCTION_NAME: "'mod'"
+          { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("mod"))); }
     break;
 
-  case 908:
-#line 5702 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("validate"))); }
-#line 10035 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 905: // FUNCTION_NAME: "'union'"
+            { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("union"))); }
     break;
 
-  case 909:
-#line 5703 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("type"))); }
-#line 10041 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 906: // FUNCTION_NAME: "'intersect'"
+                { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("intersect"))); }
     break;
 
-  case 910:
-#line 5704 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("cast"))); }
-#line 10047 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 907: // FUNCTION_NAME: "'except'"
+             { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("except"))); }
     break;
 
-  case 911:
-#line 5705 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("treat"))); }
-#line 10053 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 908: // FUNCTION_NAME: "'validate'"
+               { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("validate"))); }
     break;
 
-  case 912:
-#line 5706 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("is"))); }
-#line 10059 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 909: // FUNCTION_NAME: "'type'"
+           { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("type"))); }
     break;
 
-  case 913:
-#line 5707 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("preserve"))); }
-#line 10065 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 910: // FUNCTION_NAME: "'cast'"
+           { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("cast"))); }
     break;
 
-  case 914:
-#line 5708 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("strip"))); }
-#line 10071 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 911: // FUNCTION_NAME: "'treat'"
+            { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("treat"))); }
     break;
 
-  case 915:
-#line 5709 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("namespace"))); }
-#line 10077 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 912: // FUNCTION_NAME: "'is'"
+         { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("is"))); }
     break;
 
-  case 916:
-#line 5710 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("external"))); }
-#line 10083 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 913: // FUNCTION_NAME: "'preserve'"
+               { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("preserve"))); }
     break;
 
-  case 917:
-#line 5711 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("encoding"))); }
-#line 10089 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 914: // FUNCTION_NAME: "'strip'"
+            { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("strip"))); }
     break;
 
-  case 918:
-#line 5712 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("no-preserve"))); }
-#line 10095 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 915: // FUNCTION_NAME: "'namespace'"
+                { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("namespace"))); }
     break;
 
-  case 919:
-#line 5713 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("inherit"))); }
-#line 10101 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 916: // FUNCTION_NAME: "'external'"
+               { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("external"))); }
     break;
 
-  case 920:
-#line 5714 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("no-inherit"))); }
-#line 10107 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 917: // FUNCTION_NAME: "'encoding'"
+               { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("encoding"))); }
     break;
 
-  case 921:
-#line 5715 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("declare"))); }
-#line 10113 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 918: // FUNCTION_NAME: "'<no preserve>'"
+                  { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("no-preserve"))); }
     break;
 
-  case 922:
-#line 5716 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("construction"))); }
-#line 10119 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 919: // FUNCTION_NAME: "'inherit'"
+              { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("inherit"))); }
     break;
 
-  case 923:
-#line 5717 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("ordering"))); }
-#line 10125 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 920: // FUNCTION_NAME: "'<no inherit>'"
+                 { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("no-inherit"))); }
     break;
 
-  case 924:
-#line 5718 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("default"))); }
-#line 10131 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 921: // FUNCTION_NAME: "'declare'"
+              { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("declare"))); }
     break;
 
-  case 925:
-#line 5719 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("copy-namespaces"))); }
-#line 10137 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 922: // FUNCTION_NAME: "'construction'"
+                   { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("construction"))); }
     break;
 
-  case 926:
-#line 5720 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("option"))); }
-#line 10143 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 923: // FUNCTION_NAME: "'ordering'"
+               { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("ordering"))); }
     break;
 
-  case 927:
-#line 5721 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("version"))); }
-#line 10149 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 924: // FUNCTION_NAME: "'default'"
+              { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("default"))); }
     break;
 
-  case 928:
-#line 5722 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("import"))); }
-#line 10155 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 925: // FUNCTION_NAME: "'copy-namespaces'"
+                      { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("copy-namespaces"))); }
     break;
 
-  case 929:
-#line 5723 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("schema"))); }
-#line 10161 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 926: // FUNCTION_NAME: "'option'"
+             { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("option"))); }
     break;
 
-  case 930:
-#line 5724 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("module"))); }
-#line 10167 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 927: // FUNCTION_NAME: "'version'"
+              { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("version"))); }
     break;
 
-  case 931:
-#line 5725 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("function"))); }
-#line 10173 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 928: // FUNCTION_NAME: "'import'"
+             { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("import"))); }
     break;
 
-  case 932:
-#line 5726 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("score"))); }
-#line 10179 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 929: // FUNCTION_NAME: "'schema'"
+             { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("schema"))); }
     break;
 
-  case 933:
-#line 5727 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("contains"))); }
-#line 10185 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 930: // FUNCTION_NAME: "'module'"
+             { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("module"))); }
     break;
 
-  case 934:
-#line 5728 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("weight"))); }
-#line 10191 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 931: // FUNCTION_NAME: "'function'"
+               { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("function"))); }
     break;
 
-  case 935:
-#line 5729 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("window"))); }
-#line 10197 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 932: // FUNCTION_NAME: "'score'"
+            { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("score"))); }
     break;
 
-  case 936:
-#line 5730 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("distance"))); }
-#line 10203 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 933: // FUNCTION_NAME: "'contains'"
+               { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("contains"))); }
     break;
 
-  case 937:
-#line 5731 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("occurs"))); }
-#line 10209 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 934: // FUNCTION_NAME: "'weight'"
+             { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("weight"))); }
     break;
 
-  case 938:
-#line 5732 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("times"))); }
-#line 10215 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 935: // FUNCTION_NAME: "'window'"
+             { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("window"))); }
     break;
 
-  case 939:
-#line 5733 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("same"))); }
-#line 10221 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 936: // FUNCTION_NAME: "'distance'"
+               { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("distance"))); }
     break;
 
-  case 940:
-#line 5734 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("different"))); }
-#line 10227 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 937: // FUNCTION_NAME: "'occurs'"
+             { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("occurs"))); }
     break;
 
-  case 941:
-#line 5735 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("lowercase"))); }
-#line 10233 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 938: // FUNCTION_NAME: "'times'"
+            { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("times"))); }
     break;
 
-  case 942:
-#line 5736 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("uppercase"))); }
-#line 10239 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 939: // FUNCTION_NAME: "'same'"
+           { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("same"))); }
     break;
 
-  case 943:
-#line 5737 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("relationship"))); }
-#line 10245 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 940: // FUNCTION_NAME: "'different'"
+                { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("different"))); }
     break;
 
-  case 944:
-#line 5738 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("levels"))); }
-#line 10251 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 941: // FUNCTION_NAME: "'lowercase'"
+                { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("lowercase"))); }
     break;
 
-  case 945:
-#line 5739 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("language"))); }
-#line 10257 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 942: // FUNCTION_NAME: "'uppercase'"
+                { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("uppercase"))); }
     break;
 
-  case 946:
-#line 5740 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("any"))); }
-#line 10263 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 943: // FUNCTION_NAME: "'relationship'"
+                   { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("relationship"))); }
     break;
 
-  case 947:
-#line 5741 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("all"))); }
-#line 10269 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 944: // FUNCTION_NAME: "'levels'"
+             { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("levels"))); }
     break;
 
-  case 948:
-#line 5742 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("exactly"))); }
-#line 10275 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 945: // FUNCTION_NAME: "'language'"
+               { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("language"))); }
     break;
 
-  case 949:
-#line 5743 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("words"))); }
-#line 10281 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 946: // FUNCTION_NAME: "'any'"
+          { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("any"))); }
     break;
 
-  case 950:
-#line 5744 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("sentences"))); }
-#line 10287 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 947: // FUNCTION_NAME: "'all'"
+          { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("all"))); }
     break;
 
-  case 951:
-#line 5745 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("sentence"))); }
-#line 10293 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 948: // FUNCTION_NAME: "'exactly'"
+              { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("exactly"))); }
     break;
 
-  case 952:
-#line 5746 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("phrase"))); }
-#line 10299 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 949: // FUNCTION_NAME: "'words'"
+            { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("words"))); }
     break;
 
-  case 953:
-#line 5747 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("paragraph"))); }
-#line 10305 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 950: // FUNCTION_NAME: "'sentences'"
+                { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("sentences"))); }
     break;
 
-  case 954:
-#line 5748 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("paragraphs"))); }
-#line 10311 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 951: // FUNCTION_NAME: "'sentence'"
+               { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("sentence"))); }
     break;
 
-  case 955:
-#line 5749 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("modify"))); }
-#line 10317 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 952: // FUNCTION_NAME: "'phrase'"
+             { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("phrase"))); }
     break;
 
-  case 956:
-#line 5750 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("first"))); }
-#line 10323 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 953: // FUNCTION_NAME: "'paragraph'"
+                { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("paragraph"))); }
     break;
 
-  case 957:
-#line 5751 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("append"))); }
-#line 10329 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 954: // FUNCTION_NAME: "'paragraphs'"
+                 { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("paragraphs"))); }
     break;
 
-  case 958:
-#line 5752 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("insert"))); }
-#line 10335 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 955: // FUNCTION_NAME: "'modify'"
+             { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("modify"))); }
     break;
 
-  case 959:
-#line 5753 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("replace"))); }
-#line 10341 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 956: // FUNCTION_NAME: "'first'"
+            { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("first"))); }
     break;
 
-  case 960:
-#line 5754 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("rename"))); }
-#line 10347 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 957: // FUNCTION_NAME: "'append'"
+             { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("append"))); }
     break;
 
-  case 961:
-#line 5755 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("delete"))); }
-#line 10353 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 958: // FUNCTION_NAME: "'insert'"
+             { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("insert"))); }
     break;
 
-  case 962:
-#line 5756 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("before"))); }
-#line 10359 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 959: // FUNCTION_NAME: "'replace'"
+              { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("replace"))); }
     break;
 
-  case 963:
-#line 5757 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("after"))); }
-#line 10365 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 960: // FUNCTION_NAME: "'rename'"
+             { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("rename"))); }
     break;
 
-  case 964:
-#line 5758 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("revalidation"))); }
-#line 10371 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 961: // FUNCTION_NAME: "'delete'"
+              { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("delete"))); }
     break;
 
-  case 965:
-#line 5759 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("with"))); }
-#line 10377 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 962: // FUNCTION_NAME: "'before'"
+             { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("before"))); }
     break;
 
-  case 966:
-#line 5760 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("nodes"))); }
-#line 10383 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 963: // FUNCTION_NAME: "'after'"
+            { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("after"))); }
     break;
 
-  case 967:
-#line 5761 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("last"))); }
-#line 10389 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 964: // FUNCTION_NAME: "'revalidation'"
+                   { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("revalidation"))); }
     break;
 
-  case 968:
-#line 5762 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("into"))); }
-#line 10395 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 965: // FUNCTION_NAME: "'with'"
+           { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("with"))); }
     break;
 
-  case 969:
-#line 5763 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("simple"))); }
-#line 10401 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 966: // FUNCTION_NAME: "'nodes'"
+            { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("nodes"))); }
     break;
 
-  case 970:
-#line 5764 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("sequential"))); }
-#line 10407 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 967: // FUNCTION_NAME: "'last'"
+           { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("last"))); }
     break;
 
-  case 971:
-#line 5765 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("updating"))); }
-#line 10413 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 968: // FUNCTION_NAME: "'into'"
+           { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("into"))); }
     break;
 
-  case 972:
-#line 5766 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("ordered"))); }
-#line 10419 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 969: // FUNCTION_NAME: "'simple'"
+             { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("simple"))); }
     break;
 
-  case 973:
-#line 5767 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("unordered"))); }
-#line 10425 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 970: // FUNCTION_NAME: "'sequential'"
+                 { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("sequential"))); }
     break;
 
-  case 974:
-#line 5768 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("returning"))); }
-#line 10431 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 971: // FUNCTION_NAME: "'updating'"
+               { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("updating"))); }
     break;
 
-  case 975:
-#line 5769 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("exit"))); }
-#line 10437 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 972: // FUNCTION_NAME: "'ordered'"
+              { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("ordered"))); }
     break;
 
-  case 976:
-#line 5770 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("loop"))); }
-#line 10443 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 973: // FUNCTION_NAME: "'unordered'"
+                { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("unordered"))); }
     break;
 
-  case 977:
-#line 5771 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("break"))); }
-#line 10449 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 974: // FUNCTION_NAME: "'returning'"
+                { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("returning"))); }
     break;
 
-  case 978:
-#line 5772 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("continue"))); }
-#line 10455 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 975: // FUNCTION_NAME: "'exit'"
+           { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("exit"))); }
     break;
 
-  case 979:
-#line 5773 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("try"))); }
-#line 10461 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 976: // FUNCTION_NAME: "'loop'"
+           { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("loop"))); }
     break;
 
-  case 980:
-#line 5774 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("catch"))); }
-#line 10467 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 977: // FUNCTION_NAME: "'break'"
+            { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("break"))); }
     break;
 
-  case 981:
-#line 5775 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("using"))); }
-#line 10473 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 978: // FUNCTION_NAME: "'continue'"
+               { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("continue"))); }
     break;
 
-  case 982:
-#line 5776 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("set"))); }
-#line 10479 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 979: // FUNCTION_NAME: "'try'"
+          { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("try"))); }
     break;
 
-  case 983:
-#line 5777 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("index"))); }
-#line 10485 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 980: // FUNCTION_NAME: "'catch'"
+            { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("catch"))); }
     break;
 
-  case 984:
-#line 5778 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("unique"))); }
-#line 10491 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 981: // FUNCTION_NAME: "'using'"
+            { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("using"))); }
     break;
 
-  case 985:
-#line 5779 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("non"))); }
-#line 10497 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 982: // FUNCTION_NAME: "'set'"
+          { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("set"))); }
     break;
 
-  case 986:
-#line 5780 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("on"))); }
-#line 10503 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 983: // FUNCTION_NAME: "'index'"
+            { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("index"))); }
     break;
 
-  case 987:
-#line 5781 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("range"))); }
-#line 10509 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 984: // FUNCTION_NAME: "'unique'"
+             { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("unique"))); }
     break;
 
-  case 988:
-#line 5782 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("equality"))); }
-#line 10515 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 985: // FUNCTION_NAME: "'non'"
+          { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("non"))); }
     break;
 
-  case 989:
-#line 5783 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("manually"))); }
-#line 10521 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 986: // FUNCTION_NAME: "'on'"
+         { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("on"))); }
     break;
 
-  case 990:
-#line 5784 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("automatically"))); }
-#line 10527 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 987: // FUNCTION_NAME: "'range'"
+            { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("range"))); }
     break;
 
-  case 991:
-#line 5785 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("maintained"))); }
-#line 10533 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 988: // FUNCTION_NAME: "'equality'"
+               { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("equality"))); }
     break;
 
-  case 992:
-#line 5786 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("decimal-format"))); }
-#line 10539 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 989: // FUNCTION_NAME: "'manually'"
+               { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("manually"))); }
     break;
 
-  case 993:
-#line 5787 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("decimal-separator"))); }
-#line 10545 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 990: // FUNCTION_NAME: "'automatically'"
+                    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("automatically"))); }
     break;
 
-  case 994:
-#line 5788 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("grouping-separator"))); }
-#line 10551 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 991: // FUNCTION_NAME: "'maintained'"
+                 { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("maintained"))); }
     break;
 
-  case 995:
-#line 5789 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("infinity"))); }
-#line 10557 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 992: // FUNCTION_NAME: "'decimal-format'"
+                     { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("decimal-format"))); }
     break;
 
-  case 996:
-#line 5790 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("minus-sign"))); }
-#line 10563 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 993: // FUNCTION_NAME: "'decimal-separator'"
+                        { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("decimal-separator"))); }
     break;
 
-  case 997:
-#line 5791 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("NaN"))); }
-#line 10569 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 994: // FUNCTION_NAME: "'grouping-separator'"
+                         { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("grouping-separator"))); }
     break;
 
-  case 998:
-#line 5792 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("percent"))); }
-#line 10575 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 995: // FUNCTION_NAME: "'infinity'"
+                     { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("infinity"))); }
     break;
 
-  case 999:
-#line 5793 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("per-mille"))); }
-#line 10581 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 996: // FUNCTION_NAME: "'minus-sign'"
+                 { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("minus-sign"))); }
     break;
 
-  case 1000:
-#line 5794 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("zero-digit"))); }
-#line 10587 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 997: // FUNCTION_NAME: "'NaN'"
+          { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("NaN"))); }
     break;
 
-  case 1001:
-#line 5795 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("digit"))); }
-#line 10593 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 998: // FUNCTION_NAME: "'percent'"
+              { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("percent"))); }
     break;
 
-  case 1002:
-#line 5796 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("pattern-separator"))); }
-#line 10599 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 999: // FUNCTION_NAME: "'per-mille'"
+                { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("per-mille"))); }
     break;
 
-  case 1003:
-#line 5797 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("collection"))); }
-#line 10605 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 1000: // FUNCTION_NAME: "'zero-digit'"
+                 { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("zero-digit"))); }
     break;
 
-  case 1004:
-#line 5798 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("const"))); }
-#line 10611 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 1001: // FUNCTION_NAME: "'digit'"
+            { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("digit"))); }
     break;
 
-  case 1005:
-#line 5799 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("append-only"))); }
-#line 10617 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 1002: // FUNCTION_NAME: "'pattern-separator'"
+                        { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("pattern-separator"))); }
     break;
 
-  case 1006:
-#line 5800 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("queue"))); }
-#line 10623 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 1003: // FUNCTION_NAME: "'collection'"
+                 { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("collection"))); }
     break;
 
-  case 1007:
-#line 5801 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("mutable"))); }
-#line 10629 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 1004: // FUNCTION_NAME: "'const'"
+               { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("const"))); }
     break;
 
-  case 1008:
-#line 5802 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("read-only"))); }
-#line 10635 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 1005: // FUNCTION_NAME: "'append-only'"
+                  { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("append-only"))); }
     break;
 
-  case 1009:
-#line 5803 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("integrity"))); }
-#line 10641 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 1006: // FUNCTION_NAME: "'queue'"
+            { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("queue"))); }
     break;
 
-  case 1010:
-#line 5804 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("constraint"))); }
-#line 10647 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 1007: // FUNCTION_NAME: "'mutable'"
+              { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("mutable"))); }
     break;
 
-  case 1011:
-#line 5805 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("check"))); }
-#line 10653 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 1008: // FUNCTION_NAME: "'read-only'"
+                { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("read-only"))); }
     break;
 
-  case 1012:
-#line 5806 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("key"))); }
-#line 10659 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 1009: // FUNCTION_NAME: "'integrity'"
+                { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("integrity"))); }
     break;
 
-  case 1013:
-#line 5807 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("foreach"))); }
-#line 10665 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 1010: // FUNCTION_NAME: "'constraint'"
+                 { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("constraint"))); }
     break;
 
-  case 1014:
-#line 5808 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("foreign"))); }
-#line 10671 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 1011: // FUNCTION_NAME: "'check'"
+            { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("check"))); }
     break;
 
-  case 1015:
-#line 5809 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("keys"))); }
-#line 10677 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 1012: // FUNCTION_NAME: "'key'"
+          { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("key"))); }
     break;
 
-  case 1016:
-#line 5810 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("ancestor"))); }
-#line 10683 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 1013: // FUNCTION_NAME: "'foreach'"
+              { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("foreach"))); }
     break;
 
-  case 1017:
-#line 5811 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("child"))); }
-#line 10689 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 1014: // FUNCTION_NAME: "'foreign'"
+              { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("foreign"))); }
     break;
 
-  case 1018:
-#line 5812 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("descendant"))); }
-#line 10695 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 1015: // FUNCTION_NAME: "'keys'"
+           { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("keys"))); }
     break;
 
-  case 1019:
-#line 5813 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("parent"))); }
-#line 10701 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 1016: // FUNCTION_NAME: "'ancestor'"
+               { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("ancestor"))); }
     break;
 
-  case 1020:
-#line 5814 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("preceding"))); }
-#line 10707 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 1017: // FUNCTION_NAME: "'child'"
+            { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("child"))); }
     break;
 
-  case 1021:
-#line 5815 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("self"))); }
-#line 10713 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 1018: // FUNCTION_NAME: "'descendant'"
+                 { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("descendant"))); }
     break;
 
-  case 1022:
-#line 5816 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("following"))); }
-#line 10719 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 1019: // FUNCTION_NAME: "'parent'"
+             { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("parent"))); }
     break;
 
-  case 1023:
-#line 5817 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("ancestor-or-self"))); }
-#line 10725 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 1020: // FUNCTION_NAME: "'preceding'"
+                { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("preceding"))); }
     break;
 
-  case 1024:
-#line 5818 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("descendant-or-self"))); }
-#line 10731 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 1021: // FUNCTION_NAME: "'self'"
+           { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("self"))); }
     break;
 
-  case 1025:
-#line 5819 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("following-sibling"))); }
-#line 10737 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 1022: // FUNCTION_NAME: "'following'"
+                { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("following"))); }
     break;
 
-  case 1026:
-#line 5820 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("preceding-sibling"))); }
-#line 10743 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 1023: // FUNCTION_NAME: "'ancestor-or-self'"
+                       { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("ancestor-or-self"))); }
     break;
 
-  case 1027:
-#line 5821 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("position"))); }
-#line 10749 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 1024: // FUNCTION_NAME: "'descendant-or-self'"
+                         { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("descendant-or-self"))); }
     break;
 
-  case 1028:
-#line 5824 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:847
-    { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB((yystack_[0].value.sval)), true); }
-#line 10755 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
+  case 1025: // FUNCTION_NAME: "'following-sibling'"
+                        { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("following-sibling"))); }
     break;
 
+  case 1026: // FUNCTION_NAME: "'preceding-sibling'"
+                        { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("preceding-sibling"))); }
+    break;
+
+  case 1027: // FUNCTION_NAME: "'position'"
+               { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB(SYMTAB_PUT("position"))); }
+    break;
+
+  case 1028: // EQNAME: "'EQName'"
+                { (yylhs.value.expr) = new QName(LOC(yylhs.location), SYMTAB((yystack_[0].value.sval)), true); }
+    break;
+
+
 
-#line 10759 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:847
             default:
               break;
             }
         }
+#if YY_EXCEPTIONS
       catch (const syntax_error& yyexc)
         {
+          YYCDEBUG << "Caught exception: " << yyexc.what() << '\n';
           error (yyexc);
           YYERROR;
         }
+#endif // YY_EXCEPTIONS
       YY_SYMBOL_PRINT ("-> $$ =", yylhs);
       yypop_ (yylen);
       yylen = 0;
-      YY_STACK_PRINT ();
 
       // Shift the result of the reduction.
-      yypush_ (YY_NULLPTR, yylhs);
+      yypush_ (YY_NULLPTR, YY_MOVE (yylhs));
     }
     goto yynewstate;
+
 
   /*--------------------------------------.
   | yyerrlab -- here on detecting error.  |
@@ -10803,8 +8509,9 @@ namespace zorba {
     if (!yyerrstatus_)
       {
         ++yynerrs_;
-        error (yyla.location, yysyntax_error_ (yystack_[0].state,
-                                           yyempty ? yyempty_ : yyla.type_get ()));
+        context yyctx (*this, yyla);
+        std::string msg = yysyntax_error_ (yyctx);
+        error (yyla.location, YY_MOVE (msg));
       }
 
 
@@ -10815,12 +8522,12 @@ namespace zorba {
            error, discard it.  */
 
         // Return failure if at end of input.
-        if (yyla.type_get () == yyeof_)
+        if (yyla.kind () == symbol_kind::S_YYEOF)
           YYABORT;
-        else if (!yyempty)
+        else if (!yyla.empty ())
           {
             yy_destroy_ ("Error: discarding", yyla);
-            yyempty = true;
+            yyla.clear ();
           }
       }
 
@@ -10832,76 +8539,89 @@ namespace zorba {
   | yyerrorlab -- error raised explicitly by YYERROR.  |
   `---------------------------------------------------*/
   yyerrorlab:
-
-    /* Pacify compilers like GCC when the user code never invokes
-       YYERROR and the label yyerrorlab therefore never appears in user
-       code.  */
+    /* Pacify compilers when the user code never invokes YYERROR and
+       the label yyerrorlab therefore never appears in user code.  */
     if (false)
-      goto yyerrorlab;
-    yyerror_range[1].location = yystack_[yylen - 1].location;
+      YYERROR;
+
     /* Do not reclaim the symbols of the rule whose action triggered
        this YYERROR.  */
     yypop_ (yylen);
     yylen = 0;
+    YY_STACK_PRINT ();
     goto yyerrlab1;
+
 
   /*-------------------------------------------------------------.
   | yyerrlab1 -- common code for both syntax error and YYERROR.  |
   `-------------------------------------------------------------*/
   yyerrlab1:
     yyerrstatus_ = 3;   // Each real token shifted decrements this.
+    // Pop stack until we find a state that shifts the error token.
+    for (;;)
+      {
+        yyn = yypact_[+yystack_[0].state];
+        if (!yy_pact_value_is_default_ (yyn))
+          {
+            yyn += symbol_kind::S_YYerror;
+            if (0 <= yyn && yyn <= yylast_
+                && yycheck_[yyn] == symbol_kind::S_YYerror)
+              {
+                yyn = yytable_[yyn];
+                if (0 < yyn)
+                  break;
+              }
+          }
+
+        // Pop the current state because it cannot handle the error token.
+        if (yystack_.size () == 1)
+          YYABORT;
+
+        yyerror_range[1].location = yystack_[0].location;
+        yy_destroy_ ("Error: popping", yystack_[0]);
+        yypop_ ();
+        YY_STACK_PRINT ();
+      }
     {
       stack_symbol_type error_token;
-      for (;;)
-        {
-          yyn = yypact_[yystack_[0].state];
-          if (!yy_pact_value_is_default_ (yyn))
-            {
-              yyn += yyterror_;
-              if (0 <= yyn && yyn <= yylast_ && yycheck_[yyn] == yyterror_)
-                {
-                  yyn = yytable_[yyn];
-                  if (0 < yyn)
-                    break;
-                }
-            }
-
-          // Pop the current state because it cannot handle the error token.
-          if (yystack_.size () == 1)
-            YYABORT;
-
-          yyerror_range[1].location = yystack_[0].location;
-          yy_destroy_ ("Error: popping", yystack_[0]);
-          yypop_ ();
-          YY_STACK_PRINT ();
-        }
 
       yyerror_range[2].location = yyla.location;
       YYLLOC_DEFAULT (error_token.location, yyerror_range, 2);
 
       // Shift the error token.
-      error_token.state = yyn;
-      yypush_ ("Shifting", error_token);
+      error_token.state = state_type (yyn);
+      yypush_ ("Shifting", YY_MOVE (error_token));
     }
     goto yynewstate;
 
-    // Accept.
+
+  /*-------------------------------------.
+  | yyacceptlab -- YYACCEPT comes here.  |
+  `-------------------------------------*/
   yyacceptlab:
     yyresult = 0;
     goto yyreturn;
 
-    // Abort.
+
+  /*-----------------------------------.
+  | yyabortlab -- YYABORT comes here.  |
+  `-----------------------------------*/
   yyabortlab:
     yyresult = 1;
     goto yyreturn;
 
+
+  /*-----------------------------------------------------.
+  | yyreturn -- parsing is finished, return the result.  |
+  `-----------------------------------------------------*/
   yyreturn:
-    if (!yyempty)
+    if (!yyla.empty ())
       yy_destroy_ ("Cleanup: discarding lookahead", yyla);
 
     /* Do not reclaim the symbols of the rule whose action triggered
        this YYABORT or YYACCEPT.  */
     yypop_ (yylen);
+    YY_STACK_PRINT ();
     while (1 < yystack_.size ())
       {
         yy_destroy_ ("Cleanup: popping", yystack_[0]);
@@ -10910,13 +8630,13 @@ namespace zorba {
 
     return yyresult;
   }
+#if YY_EXCEPTIONS
     catch (...)
       {
-        YYCDEBUG << "Exception caught: cleaning lookahead and stack"
-                 << std::endl;
+        YYCDEBUG << "Exception caught: cleaning lookahead and stack\n";
         // Do not try to display the values of the reclaimed symbols,
-        // as their printer might throw an exception.
-        if (!yyempty)
+        // as their printers might throw an exception.
+        if (!yyla.empty ())
           yy_destroy_ (YY_NULLPTR, yyla);
 
         while (1 < yystack_.size ())
@@ -10926,33 +8646,118 @@ namespace zorba {
           }
         throw;
       }
+#endif // YY_EXCEPTIONS
   }
 
   void
   xquery_parser::error (const syntax_error& yyexc)
   {
-    error (yyexc.location, yyexc.what());
+    error (yyexc.location, yyexc.what ());
   }
 
-  // Generate an error message.
+  /* Return YYSTR after stripping away unnecessary quotes and
+     backslashes, so that it's suitable for yyerror.  The heuristic is
+     that double-quoting is unnecessary unless the string contains an
+     apostrophe, a comma, or backslash (other than backslash-backslash).
+     YYSTR is taken from yytname.  */
   std::string
-  xquery_parser::yysyntax_error_ (state_type yystate, symbol_number_type yytoken) const
+  xquery_parser::yytnamerr_ (const char *yystr)
   {
-    std::string yyres;
-    // Number of reported tokens (one for the "unexpected", one per
-    // "expected").
-    size_t yycount = 0;
-    // Its maximum.
-    enum { YYERROR_VERBOSE_ARGS_MAXIMUM = 5 };
-    // Arguments of yyformat.
-    char const *yyarg[YYERROR_VERBOSE_ARGS_MAXIMUM];
+    if (*yystr == '"')
+      {
+        std::string yyr;
+        char const *yyp = yystr;
 
+        for (;;)
+          switch (*++yyp)
+            {
+            case '\'':
+            case ',':
+              goto do_not_strip_quotes;
+
+            case '\\':
+              if (*++yyp != '\\')
+                goto do_not_strip_quotes;
+              else
+                goto append;
+
+            append:
+            default:
+              yyr += *yyp;
+              break;
+
+            case '"':
+              return yyr;
+            }
+      do_not_strip_quotes: ;
+      }
+
+    return yystr;
+  }
+
+  std::string
+  xquery_parser::symbol_name (symbol_kind_type yysymbol)
+  {
+    return yytnamerr_ (yytname_[yysymbol]);
+  }
+
+
+
+  // xquery_parser::context.
+  xquery_parser::context::context (const xquery_parser& yyparser, const symbol_type& yyla)
+    : yyparser_ (yyparser)
+    , yyla_ (yyla)
+  {}
+
+  int
+  xquery_parser::context::expected_tokens (symbol_kind_type yyarg[], int yyargn) const
+  {
+    // Actual number of expected tokens
+    int yycount = 0;
+
+    const int yyn = yypact_[+yyparser_.yystack_[0].state];
+    if (!yy_pact_value_is_default_ (yyn))
+      {
+        /* Start YYX at -YYN if negative to avoid negative indexes in
+           YYCHECK.  In other words, skip the first -YYN actions for
+           this state because they are default actions.  */
+        const int yyxbegin = yyn < 0 ? -yyn : 0;
+        // Stay within bounds of both yycheck and yytname.
+        const int yychecklim = yylast_ - yyn + 1;
+        const int yyxend = yychecklim < YYNTOKENS ? yychecklim : YYNTOKENS;
+        for (int yyx = yyxbegin; yyx < yyxend; ++yyx)
+          if (yycheck_[yyx + yyn] == yyx && yyx != symbol_kind::S_YYerror
+              && !yy_table_value_is_error_ (yytable_[yyx + yyn]))
+            {
+              if (!yyarg)
+                ++yycount;
+              else if (yycount == yyargn)
+                return 0;
+              else
+                yyarg[yycount++] = YY_CAST (symbol_kind_type, yyx);
+            }
+      }
+
+    if (yyarg && yycount == 0 && 0 < yyargn)
+      yyarg[0] = symbol_kind::S_YYEMPTY;
+    return yycount;
+  }
+
+
+
+
+
+
+  int
+  xquery_parser::yy_syntax_error_arguments_ (const context& yyctx,
+                                                 symbol_kind_type yyarg[], int yyargn) const
+  {
     /* There are many possibilities here to consider:
        - If this state is a consistent state with a default action, then
          the only way this function was invoked is if the default action
          is an error action.  In that case, don't check for expected
          tokens because there are none.
-       - The only way there can be no lookahead present (in yytoken) is
+       - The only way there can be no lookahead present (in yyla) is
          if this state is a consistent state with a default action.
          Thus, detecting the absence of a lookahead is sufficient to
          determine that there is no unexpected or expected token to
@@ -10965,40 +8770,32 @@ namespace zorba {
        - Of course, the expected token list depends on states to have
          correct lookahead information, and it depends on the parser not
          to perform extra reductions after fetching a lookahead from the
-         scanner and before detecting a syntax error.  Thus, state
-         merging (from LALR or IELR) and default reductions corrupt the
-         expected token list.  However, the list is correct for
-         canonical LR with one exception: it will still contain any
-         token that will not be accepted due to an error action in a
-         later state.
+         scanner and before detecting a syntax error.  Thus, state merging
+         (from LALR or IELR) and default reductions corrupt the expected
+         token list.  However, the list is correct for canonical LR with
+         one exception: it will still contain any token that will not be
+         accepted due to an error action in a later state.
     */
-    if (yytoken != yyempty_)
+
+    if (!yyctx.lookahead ().empty ())
       {
-        yyarg[yycount++] = yytname_[yytoken];
-        int yyn = yypact_[yystate];
-        if (!yy_pact_value_is_default_ (yyn))
-          {
-            /* Start YYX at -YYN if negative to avoid negative indexes in
-               YYCHECK.  In other words, skip the first -YYN actions for
-               this state because they are default actions.  */
-            int yyxbegin = yyn < 0 ? -yyn : 0;
-            // Stay within bounds of both yycheck and yytname.
-            int yychecklim = yylast_ - yyn + 1;
-            int yyxend = yychecklim < yyntokens_ ? yychecklim : yyntokens_;
-            for (int yyx = yyxbegin; yyx < yyxend; ++yyx)
-              if (yycheck_[yyx + yyn] == yyx && yyx != yyterror_
-                  && !yy_table_value_is_error_ (yytable_[yyx + yyn]))
-                {
-                  if (yycount == YYERROR_VERBOSE_ARGS_MAXIMUM)
-                    {
-                      yycount = 1;
-                      break;
-                    }
-                  else
-                    yyarg[yycount++] = yytname_[yyx];
-                }
-          }
+        if (yyarg)
+          yyarg[0] = yyctx.token ();
+        int yyn = yyctx.expected_tokens (yyarg ? yyarg + 1 : yyarg, yyargn - 1);
+        return yyn + 1;
       }
+    return 0;
+  }
+
+  // Generate an error message.
+  std::string
+  xquery_parser::yysyntax_error_ (const context& yyctx) const
+  {
+    // Its maximum.
+    enum { YYARGS_MAX = 5 };
+    // Arguments of yyformat.
+    symbol_kind_type yyarg[YYARGS_MAX];
+    int yycount = yy_syntax_error_arguments_ (yyctx, yyarg, YYARGS_MAX);
 
     char const* yyformat = YY_NULLPTR;
     switch (yycount)
@@ -11007,21 +8804,23 @@ namespace zorba {
         case N:                               \
           yyformat = S;                       \
         break
-        YYCASE_(0, YY_("syntax error"));
-        YYCASE_(1, YY_("syntax error, unexpected %s"));
-        YYCASE_(2, YY_("syntax error, unexpected %s, expecting %s"));
-        YYCASE_(3, YY_("syntax error, unexpected %s, expecting %s or %s"));
-        YYCASE_(4, YY_("syntax error, unexpected %s, expecting %s or %s or %s"));
-        YYCASE_(5, YY_("syntax error, unexpected %s, expecting %s or %s or %s or %s"));
+      default: // Avoid compiler warnings.
+        YYCASE_ (0, YY_("syntax error"));
+        YYCASE_ (1, YY_("syntax error, unexpected %s"));
+        YYCASE_ (2, YY_("syntax error, unexpected %s, expecting %s"));
+        YYCASE_ (3, YY_("syntax error, unexpected %s, expecting %s or %s"));
+        YYCASE_ (4, YY_("syntax error, unexpected %s, expecting %s or %s or %s"));
+        YYCASE_ (5, YY_("syntax error, unexpected %s, expecting %s or %s or %s or %s"));
 #undef YYCASE_
       }
 
+    std::string yyres;
     // Argument number.
-    size_t yyi = 0;
+    std::ptrdiff_t yyi = 0;
     for (char const* yyp = yyformat; *yyp; ++yyp)
       if (yyp[0] == '%' && yyp[1] == 's' && yyi < yycount)
         {
-          yyres += yytnamerr_ (yyarg[yyi++]);
+          yyres += symbol_name (yyarg[yyi++]);
           ++yyp;
         }
       else
@@ -11030,11 +8829,11 @@ namespace zorba {
   }
 
 
-  const short int xquery_parser::yypact_ninf_ = -1425;
+  const short xquery_parser::yypact_ninf_ = -1425;
 
-  const short int xquery_parser::yytable_ninf_ = -869;
+  const short xquery_parser::yytable_ninf_ = -869;
 
-  const short int
+  const short
   xquery_parser::yypact_[] =
   {
     4693, -1425, -1425, -1425, -1425,  6247,  6247,  6247,  6247, -1425,
@@ -11224,7 +9023,7 @@ namespace zorba {
    16318,  1187, 11517, -1425
   };
 
-  const unsigned short int
+  const short
   xquery_parser::yydefact_[] =
   {
      165,   469,   470,   805,   471,   168,   168,   168,     0,   828,
@@ -11414,7 +9213,7 @@ namespace zorba {
        0,     0,     0,   161
   };
 
-  const short int
+  const short
   xquery_parser::yypgoto_[] =
   {
    -1425, -1425,  -188,  -176, -1425,  1204,  1214, -1425,  1180,  -552,
@@ -11452,10 +9251,10 @@ namespace zorba {
    -1425,  -929,  -383,   914,   -64, -1425
   };
 
-  const short int
+  const short
   xquery_parser::yydefgoto_[] =
   {
-      -1,   258,   632,   259,   260,   261,   262,   263,   264,   265,
+       0,   258,   632,   259,   260,   261,   262,   263,   264,   265,
      266,   267,   268,   269,   270,   271,   272,   273,   274,   275,
     1263,   783,   276,   277,   278,   279,   280,   281,   966,   967,
      968,   282,   283,   284,   972,   973,   974,   285,   450,   286,
@@ -11490,7 +9289,7 @@ namespace zorba {
      415,  1167,  1264,   416,   417,   418
   };
 
-  const short int
+  const short
   xquery_parser::yytable_[] =
   {
      312,   644,   604,   717,   717,   312,   312,   312,   312,   423,
@@ -13218,7 +11017,7 @@ namespace zorba {
        0,   533,   251
   };
 
-  const short int
+  const short
   xquery_parser::yycheck_[] =
   {
        0,   316,   183,   430,   431,     5,     6,     7,     8,     5,
@@ -14946,7 +12745,7 @@ namespace zorba {
       -1,   315,   316
   };
 
-  const unsigned short int
+  const short
   xquery_parser::yystos_[] =
   {
        0,    11,    12,    16,    20,    21,    22,    23,    24,    25,
@@ -15136,7 +12935,7 @@ namespace zorba {
      119,   657,   306,   497
   };
 
-  const unsigned short int
+  const short
   xquery_parser::yyr1_[] =
   {
        0,   334,   335,   335,   335,   335,   336,   336,   336,   337,
@@ -15244,7 +13043,7 @@ namespace zorba {
      658,   658,   658,   658,   658,   658,   658,   658,   659
   };
 
-  const unsigned char
+  const signed char
   xquery_parser::yyr2_[] =
   {
        0,     2,     1,     2,     2,     3,     1,     2,     2,     1,
@@ -15353,13 +13152,13 @@ namespace zorba {
   };
 
 
-
+#if YYDEBUG || 1
   // YYTNAME[SYMBOL-NUM] -- String name of the symbol SYMBOL-NUM.
-  // First, the terminals, then, starting at \a yyntokens_, nonterminals.
+  // First, the terminals, then, starting at \a YYNTOKENS, nonterminals.
   const char*
   const xquery_parser::yytname_[] =
   {
-  "\"'end of file'\"", "error", "$undefined", "\"'unrecognized'\"",
+  "\"'end of file'\"", "error", "\"invalid token\"", "\"'unrecognized'\"",
   "\"'error'\"", "\"'apos attribute content'\"", "\"'char literal'\"",
   "\"'char literal]]>'\"", "\"'char literal and pi end'\"",
   "\"'&#charref;'\"", "\"'element content'\"", "\"'pref:*'\"",
@@ -15532,138 +13331,138 @@ namespace zorba {
   "JSONAppendExpr", "JSONDeleteExpr", "JSONRenameExpr", "JSONReplaceExpr",
   "JSONTest", "URI_LITERAL", "QNAME", "FUNCTION_NAME", "EQNAME", YY_NULLPTR
   };
+#endif
+
 
 #if YYDEBUG
-  const unsigned short int
+  const short
   xquery_parser::yyrline_[] =
   {
-       0,   872,   872,   873,   877,   881,   887,   891,   895,   901,
-     907,   915,   921,   930,   935,   941,   947,   953,   961,   966,
-     974,   982,   990,   999,  1004,  1010,  1016,  1025,  1033,  1040,
-    1046,  1055,  1056,  1057,  1058,  1059,  1062,  1063,  1064,  1065,
-    1066,  1067,  1068,  1069,  1072,  1077,  1083,  1089,  1095,  1100,
-    1106,  1111,  1117,  1122,  1128,  1133,  1138,  1143,  1149,  1151,
-    1153,  1161,  1166,  1174,  1182,  1191,  1198,  1206,  1212,  1218,
-    1224,  1231,  1239,  1250,  1257,  1264,  1272,  1279,  1285,  1294,
-    1295,  1296,  1297,  1298,  1299,  1300,  1301,  1304,  1310,  1317,
-    1324,  1332,  1340,  1341,  1342,  1343,  1344,  1345,  1346,  1347,
-    1348,  1349,  1352,  1366,  1372,  1378,  1385,  1391,  1398,  1403,
-    1409,  1415,  1427,  1439,  1452,  1457,  1465,  1473,  1482,  1487,
-    1494,  1499,  1506,  1511,  1519,  1524,  1531,  1537,  1546,  1547,
-    1550,  1564,  1577,  1592,  1605,  1610,  1615,  1620,  1626,  1633,
-    1641,  1646,  1654,  1662,  1670,  1678,  1688,  1692,  1698,  1702,
-    1709,  1718,  1729,  1735,  1742,  1747,  1754,  1761,  1770,  1780,
-    1790,  1800,  1815,  1831,  1835,  1840,  1845,  1849,  1854,  1859,
-    1864,  1872,  1879,  1886,  1899,  1900,  1901,  1902,  1903,  1904,
-    1905,  1906,  1907,  1908,  1909,  1910,  1911,  1914,  1919,  1926,
-    1946,  1952,  1958,  1965,  1972,  1981,  1990,  1999,  2008,  2019,
-    2025,  2031,  2037,  2049,  2054,  2060,  2072,  2085,  2105,  2111,
-    2118,  2127,  2134,  2140,  2145,  2157,  2169,  2170,  2171,  2172,
-    2173,  2174,  2177,  2178,  2179,  2180,  2181,  2182,  2183,  2184,
-    2185,  2186,  2187,  2188,  2191,  2203,  2209,  2214,  2219,  2225,
-    2230,  2235,  2241,  2250,  2260,  2270,  2281,  2287,  2288,  2289,
-    2292,  2293,  2294,  2295,  2296,  2299,  2306,  2314,  2318,  2326,
-    2334,  2339,  2346,  2353,  2363,  2373,  2383,  2393,  2403,  2413,
-    2423,  2433,  2443,  2452,  2462,  2472,  2484,  2490,  2496,  2502,
-    2508,  2516,  2524,  2532,  2540,  2550,  2556,  2565,  2566,  2570,
-    2577,  2581,  2586,  2589,  2593,  2597,  2603,  2609,  2615,  2621,
-    2629,  2633,  2641,  2649,  2657,  2665,  2675,  2681,  2687,  2695,
-    2701,  2709,  2713,  2721,  2727,  2733,  2739,  2748,  2757,  2766,
-    2777,  2781,  2787,  2793,  2801,  2807,  2816,  2827,  2833,  2841,
-    2845,  2854,  2860,  2866,  2874,  2880,  2886,  2894,  2900,  2906,
-    2914,  2920,  2927,  2937,  2944,  2954,  2960,  2968,  2974,  2983,
-    2989,  2997,  3003,  3012,  3018,  3026,  3032,  3036,  3042,  3047,
-    3053,  3057,  3066,  3072,  3081,  3091,  3090,  3103,  3112,  3121,
-    3132,  3136,  3147,  3151,  3157,  3160,  3166,  3170,  3176,  3180,
-    3184,  3190,  3194,  3200,  3206,  3212,  3220,  3224,  3228,  3234,
-    3238,  3244,  3252,  3256,  3264,  3268,  3276,  3280,  3288,  3292,
-    3300,  3304,  3310,  3314,  3320,  3324,  3328,  3332,  3340,  3341,
-    3342,  3345,  3350,  3356,  3360,  3364,  3368,  3372,  3376,  3382,
-    3386,  3390,  3396,  3400,  3404,  3408,  3417,  3425,  3431,  3439,
-    3443,  3447,  3453,  3457,  3465,  3473,  3493,  3499,  3509,  3513,
-    3519,  3520,  3523,  3529,  3537,  3543,  3553,  3559,  3567,  3571,
-    3575,  3579,  3583,  3589,  3595,  3601,  3605,  3611,  3615,  3624,
-    3628,  3632,  3638,  3642,  3650,  3651,  3654,  3658,  3664,  3668,
-    3672,  3676,  3682,  3686,  3690,  3694,  3700,  3706,  3714,  3720,
-    3721,  3722,  3723,  3724,  3725,  3726,  3727,  3728,  3729,  3730,
-    3731,  3732,  3733,  3736,  3740,  3746,  3753,  3760,  3769,  3775,
-    3779,  3785,  3792,  3798,  3804,  3808,  3826,  3832,  3838,  3844,
-    3852,  3856,  3862,  3868,  3878,  3879,  3882,  3883,  3884,  3887,
-    3895,  3911,  3919,  3935,  3953,  3973,  3979,  3988,  3994,  4003,
-    4010,  4011,  4013,  4018,  4025,  4028,  4034,  4040,  4046,  4053,
-    4062,  4065,  4071,  4077,  4083,  4090,  4099,  4103,  4109,  4113,
-    4119,  4123,  4127,  4132,  4139,  4143,  4147,  4151,  4157,  4162,
-    4168,  4174,  4181,  4187,  4192,  4197,  4202,  4207,  4212,  4217,
-    4220,  4226,  4230,  4236,  4240,  4246,  4252,  4258,  4262,  4268,
-    4272,  4278,  4284,  4288,  4292,  4298,  4304,  4310,  4318,  4322,
-    4326,  4330,  4334,  4338,  4342,  4348,  4354,  4362,  4368,  4374,
-    4378,  4382,  4386,  4390,  4394,  4398,  4402,  4406,  4410,  4416,
-    4422,  4428,  4432,  4436,  4442,  4447,  4453,  4459,  4463,  4468,
-    4474,  4478,  4484,  4490,  4494,  4502,  4508,  4512,  4518,  4527,
-    4536,  4542,  4548,  4556,  4562,  4568,  4574,  4580,  4584,  4590,
-    4596,  4600,  4608,  4614,  4620,  4626,  4634,  4638,  4644,  4650,
-    4654,  4660,  4664,  4670,  4676,  4683,  4691,  4696,  4702,  4708,
-    4716,  4722,  4729,  4735,  4744,  4750,  4756,  4762,  4771,  4778,
-    4784,  4790,  4799,  4806,  4810,  4816,  4821,  4828,  4832,  4838,
-    4842,  4848,  4852,  4858,  4862,  4870,  4881,  4884,  4890,  4893,
-    4899,  4905,  4913,  4917,  4923,  4926,  4932,  4942,  4945,  4951,
-    4961,  4967,  4975,  4978,  4984,  4988,  4992,  4998,  5001,  5007,
-    5010,  5016,  5020,  5024,  5028,  5032,  5038,  5044,  5054,  5064,
-    5068,  5072,  5078,  5084,  5092,  5096,  5100,  5104,  5108,  5112,
-    5116,  5120,  5126,  5130,  5134,  5138,  5144,  5150,  5158,  5166,
-    5170,  5176,  5186,  5197,  5203,  5207,  5213,  5216,  5222,  5227,
-    5234,  5242,  5245,  5251,  5255,  5261,  5270,  5277,  5285,  5289,
-    5295,  5301,  5309,  5312,  5318,  5323,  5333,  5341,  5351,  5357,
-    5361,  5367,  5371,  5375,  5381,  5387,  5391,  5395,  5399,  5405,
-    5413,  5423,  5427,  5433,  5439,  5443,  5449,  5453,  5459,  5463,
-    5469,  5476,  5482,  5491,  5497,  5507,  5513,  5519,  5536,  5560,
-    5579,  5583,  5587,  5593,  5596,  5597,  5598,  5599,  5600,  5601,
-    5602,  5603,  5604,  5605,  5606,  5607,  5608,  5609,  5610,  5611,
-    5612,  5613,  5614,  5615,  5616,  5617,  5618,  5621,  5622,  5623,
-    5624,  5625,  5626,  5627,  5628,  5629,  5630,  5631,  5632,  5633,
-    5634,  5635,  5636,  5637,  5638,  5639,  5640,  5641,  5642,  5643,
-    5644,  5645,  5646,  5647,  5648,  5649,  5650,  5651,  5652,  5653,
-    5654,  5655,  5656,  5657,  5658,  5659,  5660,  5661,  5662,  5663,
-    5664,  5665,  5666,  5667,  5668,  5669,  5670,  5671,  5672,  5673,
-    5674,  5675,  5676,  5677,  5678,  5679,  5680,  5681,  5682,  5683,
-    5684,  5685,  5686,  5687,  5688,  5689,  5690,  5691,  5692,  5693,
-    5694,  5695,  5696,  5697,  5698,  5699,  5700,  5701,  5702,  5703,
-    5704,  5705,  5706,  5707,  5708,  5709,  5710,  5711,  5712,  5713,
-    5714,  5715,  5716,  5717,  5718,  5719,  5720,  5721,  5722,  5723,
-    5724,  5725,  5726,  5727,  5728,  5729,  5730,  5731,  5732,  5733,
-    5734,  5735,  5736,  5737,  5738,  5739,  5740,  5741,  5742,  5743,
-    5744,  5745,  5746,  5747,  5748,  5749,  5750,  5751,  5752,  5753,
-    5754,  5755,  5756,  5757,  5758,  5759,  5760,  5761,  5762,  5763,
-    5764,  5765,  5766,  5767,  5768,  5769,  5770,  5771,  5772,  5773,
-    5774,  5775,  5776,  5777,  5778,  5779,  5780,  5781,  5782,  5783,
-    5784,  5785,  5786,  5787,  5788,  5789,  5790,  5791,  5792,  5793,
-    5794,  5795,  5796,  5797,  5798,  5799,  5800,  5801,  5802,  5803,
-    5804,  5805,  5806,  5807,  5808,  5809,  5810,  5811,  5812,  5813,
-    5814,  5815,  5816,  5817,  5818,  5819,  5820,  5821,  5824
+       0,   879,   879,   880,   884,   888,   894,   898,   902,   908,
+     914,   922,   928,   937,   942,   948,   954,   960,   968,   973,
+     983,   993,  1004,  1016,  1021,  1027,  1033,  1042,  1050,  1057,
+    1063,  1074,  1075,  1076,  1077,  1078,  1081,  1082,  1083,  1084,
+    1085,  1086,  1087,  1088,  1091,  1096,  1102,  1108,  1114,  1119,
+    1125,  1130,  1136,  1141,  1147,  1152,  1157,  1162,  1168,  1170,
+    1172,  1180,  1185,  1193,  1201,  1210,  1217,  1225,  1231,  1237,
+    1243,  1250,  1258,  1269,  1276,  1283,  1291,  1298,  1304,  1315,
+    1316,  1317,  1318,  1319,  1320,  1321,  1322,  1325,  1331,  1338,
+    1345,  1353,  1361,  1362,  1363,  1364,  1365,  1366,  1367,  1368,
+    1369,  1370,  1373,  1387,  1393,  1399,  1406,  1412,  1419,  1424,
+    1430,  1436,  1448,  1460,  1473,  1478,  1486,  1494,  1503,  1508,
+    1515,  1520,  1527,  1532,  1540,  1545,  1552,  1558,  1567,  1568,
+    1571,  1585,  1598,  1613,  1626,  1631,  1636,  1641,  1647,  1654,
+    1662,  1667,  1675,  1683,  1691,  1699,  1709,  1713,  1719,  1723,
+    1730,  1739,  1750,  1756,  1763,  1768,  1775,  1782,  1791,  1801,
+    1811,  1821,  1836,  1852,  1856,  1861,  1866,  1870,  1875,  1880,
+    1885,  1893,  1900,  1907,  1920,  1921,  1922,  1923,  1924,  1925,
+    1926,  1927,  1928,  1929,  1930,  1931,  1932,  1935,  1940,  1947,
+    1967,  1973,  1979,  1986,  1993,  2002,  2011,  2020,  2029,  2040,
+    2046,  2052,  2058,  2070,  2075,  2081,  2093,  2106,  2126,  2132,
+    2139,  2148,  2155,  2161,  2166,  2178,  2190,  2191,  2192,  2193,
+    2194,  2195,  2198,  2199,  2200,  2201,  2202,  2203,  2204,  2205,
+    2206,  2207,  2208,  2209,  2212,  2224,  2230,  2235,  2240,  2246,
+    2251,  2256,  2262,  2271,  2281,  2291,  2302,  2308,  2309,  2310,
+    2313,  2314,  2315,  2316,  2317,  2320,  2327,  2335,  2339,  2347,
+    2355,  2360,  2367,  2374,  2385,  2395,  2405,  2415,  2425,  2435,
+    2445,  2455,  2465,  2474,  2484,  2494,  2506,  2512,  2518,  2524,
+    2530,  2538,  2546,  2554,  2562,  2572,  2578,  2587,  2588,  2592,
+    2599,  2603,  2608,  2611,  2615,  2619,  2625,  2631,  2637,  2643,
+    2651,  2655,  2663,  2671,  2679,  2687,  2697,  2703,  2709,  2717,
+    2723,  2731,  2735,  2743,  2749,  2755,  2761,  2770,  2779,  2788,
+    2799,  2803,  2809,  2815,  2823,  2829,  2838,  2849,  2855,  2863,
+    2867,  2876,  2882,  2888,  2896,  2902,  2908,  2916,  2922,  2928,
+    2936,  2942,  2949,  2959,  2966,  2976,  2982,  2990,  2996,  3005,
+    3011,  3019,  3025,  3034,  3040,  3048,  3054,  3058,  3064,  3069,
+    3075,  3079,  3088,  3094,  3103,  3113,  3112,  3125,  3134,  3143,
+    3154,  3158,  3169,  3173,  3179,  3182,  3188,  3192,  3198,  3202,
+    3206,  3212,  3216,  3222,  3228,  3234,  3242,  3246,  3250,  3256,
+    3260,  3266,  3274,  3278,  3286,  3290,  3298,  3302,  3310,  3314,
+    3322,  3326,  3332,  3336,  3342,  3346,  3350,  3354,  3362,  3363,
+    3364,  3367,  3372,  3378,  3382,  3386,  3390,  3394,  3398,  3404,
+    3408,  3412,  3418,  3422,  3426,  3430,  3439,  3447,  3453,  3461,
+    3465,  3469,  3475,  3479,  3487,  3495,  3515,  3521,  3531,  3535,
+    3541,  3542,  3545,  3551,  3559,  3565,  3575,  3581,  3589,  3593,
+    3597,  3601,  3605,  3611,  3617,  3623,  3627,  3633,  3637,  3646,
+    3650,  3654,  3660,  3664,  3672,  3673,  3676,  3680,  3686,  3690,
+    3694,  3698,  3704,  3708,  3712,  3716,  3722,  3728,  3736,  3742,
+    3743,  3744,  3745,  3746,  3747,  3748,  3749,  3750,  3751,  3752,
+    3753,  3754,  3755,  3758,  3762,  3768,  3775,  3782,  3791,  3797,
+    3801,  3807,  3814,  3820,  3826,  3830,  3848,  3854,  3860,  3866,
+    3874,  3878,  3884,  3890,  3900,  3901,  3904,  3905,  3906,  3909,
+    3917,  3934,  3942,  3959,  3978,  3999,  4005,  4014,  4020,  4029,
+    4036,  4037,  4039,  4044,  4051,  4054,  4060,  4066,  4072,  4079,
+    4088,  4091,  4097,  4103,  4109,  4116,  4125,  4129,  4135,  4139,
+    4145,  4149,  4153,  4158,  4165,  4169,  4173,  4177,  4183,  4188,
+    4194,  4200,  4207,  4213,  4218,  4223,  4228,  4233,  4238,  4243,
+    4246,  4252,  4256,  4262,  4266,  4272,  4278,  4284,  4288,  4294,
+    4298,  4304,  4310,  4314,  4318,  4324,  4330,  4336,  4344,  4348,
+    4352,  4356,  4360,  4364,  4368,  4374,  4380,  4388,  4394,  4400,
+    4404,  4408,  4412,  4416,  4420,  4424,  4428,  4432,  4436,  4442,
+    4448,  4454,  4458,  4462,  4468,  4473,  4479,  4485,  4489,  4494,
+    4500,  4504,  4510,  4516,  4520,  4528,  4534,  4538,  4544,  4553,
+    4562,  4568,  4574,  4582,  4588,  4594,  4600,  4606,  4610,  4616,
+    4622,  4626,  4634,  4640,  4646,  4652,  4660,  4664,  4670,  4676,
+    4680,  4686,  4690,  4696,  4702,  4709,  4717,  4722,  4728,  4734,
+    4742,  4748,  4755,  4761,  4770,  4776,  4782,  4788,  4797,  4804,
+    4810,  4816,  4825,  4832,  4836,  4842,  4847,  4854,  4858,  4864,
+    4868,  4874,  4878,  4884,  4888,  4896,  4907,  4910,  4916,  4919,
+    4925,  4931,  4939,  4943,  4949,  4952,  4958,  4968,  4971,  4977,
+    4987,  4993,  5001,  5004,  5010,  5014,  5018,  5024,  5027,  5033,
+    5036,  5042,  5046,  5050,  5054,  5058,  5064,  5070,  5080,  5090,
+    5094,  5098,  5104,  5110,  5118,  5122,  5126,  5130,  5134,  5138,
+    5142,  5146,  5152,  5156,  5160,  5164,  5170,  5176,  5184,  5192,
+    5196,  5202,  5212,  5223,  5229,  5233,  5239,  5242,  5248,  5253,
+    5260,  5268,  5271,  5277,  5281,  5287,  5296,  5303,  5311,  5315,
+    5321,  5327,  5335,  5338,  5344,  5349,  5359,  5367,  5377,  5383,
+    5387,  5393,  5397,  5401,  5407,  5413,  5417,  5421,  5425,  5431,
+    5439,  5449,  5453,  5459,  5465,  5469,  5475,  5479,  5485,  5489,
+    5495,  5502,  5508,  5517,  5523,  5533,  5539,  5545,  5563,  5588,
+    5608,  5612,  5616,  5622,  5625,  5626,  5627,  5628,  5629,  5630,
+    5631,  5632,  5633,  5634,  5635,  5636,  5637,  5638,  5639,  5640,
+    5641,  5642,  5643,  5644,  5645,  5646,  5647,  5650,  5651,  5652,
+    5653,  5654,  5655,  5656,  5657,  5658,  5659,  5660,  5661,  5662,
+    5663,  5664,  5665,  5666,  5667,  5668,  5669,  5670,  5671,  5672,
+    5673,  5674,  5675,  5676,  5677,  5678,  5679,  5680,  5681,  5682,
+    5683,  5684,  5685,  5686,  5687,  5688,  5689,  5690,  5691,  5692,
+    5693,  5694,  5695,  5696,  5697,  5698,  5699,  5700,  5701,  5702,
+    5703,  5704,  5705,  5706,  5707,  5708,  5709,  5710,  5711,  5712,
+    5713,  5714,  5715,  5716,  5717,  5718,  5719,  5720,  5721,  5722,
+    5723,  5724,  5725,  5726,  5727,  5728,  5729,  5730,  5731,  5732,
+    5733,  5734,  5735,  5736,  5737,  5738,  5739,  5740,  5741,  5742,
+    5743,  5744,  5745,  5746,  5747,  5748,  5749,  5750,  5751,  5752,
+    5753,  5754,  5755,  5756,  5757,  5758,  5759,  5760,  5761,  5762,
+    5763,  5764,  5765,  5766,  5767,  5768,  5769,  5770,  5771,  5772,
+    5773,  5774,  5775,  5776,  5777,  5778,  5779,  5780,  5781,  5782,
+    5783,  5784,  5785,  5786,  5787,  5788,  5789,  5790,  5791,  5792,
+    5793,  5794,  5795,  5796,  5797,  5798,  5799,  5800,  5801,  5802,
+    5803,  5804,  5805,  5806,  5807,  5808,  5809,  5810,  5811,  5812,
+    5813,  5814,  5815,  5816,  5817,  5818,  5819,  5820,  5821,  5822,
+    5823,  5824,  5825,  5826,  5827,  5828,  5829,  5830,  5831,  5832,
+    5833,  5834,  5835,  5836,  5837,  5838,  5839,  5840,  5841,  5842,
+    5843,  5844,  5845,  5846,  5847,  5848,  5849,  5850,  5853
   };
 
-  // Print the state stack on the debug stream.
   void
-  xquery_parser::yystack_print_ ()
+  xquery_parser::yy_stack_print_ () const
   {
     *yycdebug_ << "Stack now";
     for (stack_type::const_iterator
            i = yystack_.begin (),
            i_end = yystack_.end ();
          i != i_end; ++i)
-      *yycdebug_ << ' ' << i->state;
-    *yycdebug_ << std::endl;
+      *yycdebug_ << ' ' << int (i->state);
+    *yycdebug_ << '\n';
   }
 
-  // Report on the debug stream that the rule \a yyrule is going to be reduced.
   void
-  xquery_parser::yy_reduce_print_ (int yyrule)
+  xquery_parser::yy_reduce_print_ (int yyrule) const
   {
-    unsigned int yylno = yyrline_[yyrule];
+    int yylno = yyrline_[yyrule];
     int yynrhs = yyr2_[yyrule];
     // Print the symbols being reduced, and their result.
     *yycdebug_ << "Reducing stack by rule " << yyrule - 1
-               << " (line " << yylno << "):" << std::endl;
+               << " (line " << yylno << "):\n";
     // The symbols being reduced.
     for (int yyi = 0; yyi < yynrhs; yyi++)
       YY_SYMBOL_PRINT ("   $" << yyi + 1 << " =",
@@ -15671,16 +13470,16 @@ namespace zorba {
   }
 #endif // YYDEBUG
 
-  // Symbol number corresponding to token number t.
-  inline
-  xquery_parser::token_number_type
-  xquery_parser::yytranslate_ (int t)
+  xquery_parser::symbol_kind_type
+  xquery_parser::yytranslate_ (int t) YY_NOEXCEPT
   {
+    // YYTRANSLATE[TOKEN-NUM] -- Symbol number corresponding to
+    // TOKEN-NUM as returned by yylex.
     static
-    const token_number_type
+    const short
     translate_table[] =
     {
-     0,     2,     2,     2,     2,     2,     2,     2,     2,     2,
+       0,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
@@ -15740,21 +13539,19 @@ namespace zorba {
      315,   316,   317,   318,   319,   320,   321,   322,   323,   324,
      325,   326,   327,   328,   329,   330,   331,   332,   333
     };
-    const unsigned int user_token_number_max_ = 588;
-    const token_number_type undef_token_ = 2;
+    // Last valid token kind.
+    const int code_max = 588;
 
-    if (static_cast<int>(t) <= yyeof_)
-      return yyeof_;
-    else if (static_cast<unsigned int> (t) <= user_token_number_max_)
-      return translate_table[t];
+    if (t <= 0)
+      return symbol_kind::S_YYEOF;
+    else if (t <= code_max)
+      return static_cast <symbol_kind_type> (translate_table[t]);
     else
-      return undef_token_;
+      return symbol_kind::S_YYUNDEF;
   }
 
-
 } // zorba
-#line 15737 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.cpp" // lalr1.cc:1155
-#line 5826 "/home/federico/zorba/build/src/compiler/parser/xquery_parser.y" // lalr1.cc:1156
+
 
 namespace zorba {
 static bool contains(const zstring& msg, const char* str1, const char* str2)

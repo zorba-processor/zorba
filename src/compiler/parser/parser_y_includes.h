@@ -74,10 +74,13 @@ typedef std::pair<zorba::zstring,zorba::zstring> string_pair_t;
 #define SYMTAB_PUT( s ) driver.symtab.put( s )
 #define LOC( p ) driver.createQueryLoc( p )
 
-#define ERROR_IF_QNAME_NOT_NCNAME(qname, location)                \
+// The optional trailing arguments are the rule's other RHS semantic values:
+// YYERROR skips their %destructor, so they are released here with the QName.
+#define ERROR_IF_QNAME_NOT_NCNAME(qname, location, ...)           \
   do {                                                            \
     if ( ! static_cast<QName*>(qname)->is_ncname()) {             \
       error((location), "A NCName is expected, found a QName");   \
+      release_hack_all( (qname) __VA_OPT__(,) __VA_ARGS__ );      \
       YYERROR;                                                    \
   }                                                               \
   } while (0);          

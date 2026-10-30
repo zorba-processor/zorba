@@ -90,6 +90,38 @@ jobs:
       - name: Verify hardening
         run: scripts/check-hardening.sh build/full-release
 
+      # The checked-in parsers/scanners must be what this image's bison and
+      # flex generate from parser.y/scanner.l (see
+      # src/compiler/parser/CMakeLists.txt). The regenerated files are
+      # uploaded as the generated-parser artifact.
+      - name: Check that the generated parsers and scanners are up to date
+        if: matrix.cache == 'linux-amd64-latest'
+        run: |
+          docker run --rm -v "$PWD":/src -w /src zorba-builder:ci sh -ec '
+            bison --version | head -1
+            flex --version
+            cmake -S . -B build/regen -G Ninja \
+              -DZORBA_SUPPRESS_SWIG=ON \
+              -DCMAKE_DISABLE_FIND_PACKAGE_Java=ON \
+              -DCMAKE_DISABLE_FIND_PACKAGE_JNI=ON \
+              -DZORBA_REGENERATE_PARSER=ON > /dev/null
+            cmake --build build/regen --target zorba_parser_sources
+            sh build/regen/copyparser.sh'
+          git status --short -- src/compiler/parser
+          git diff --stat --exit-code -- src/compiler/parser
+
+      - name: Upload the regenerated parsers and scanners
+        if: always() && matrix.cache == 'linux-amd64-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-parser
+          path: |
+            src/compiler/parser/*_parser.cpp
+            src/compiler/parser/*_parser.hpp
+            src/compiler/parser/*_scanner.cpp
+            src/compiler/parser/location.hh
+            src/compiler/parser/FlexLexer.h
+
       - name: Upload test results
         if: failure()
         uses: actions/upload-artifact@v7
