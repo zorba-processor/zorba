@@ -264,11 +264,6 @@ MESSAGE(STATUS "CMAKE_COMPILER_IS_GNUCXX:             " ${CMAKE_COMPILER_IS_GNUC
 MESSAGE(STATUS "CMAKE_AR:                             " ${CMAKE_AR})
 MESSAGE(STATUS "CMAKE_RANLIB:                         " ${CMAKE_RANLIB})
 
-IF(LIBXML2_FOUND)
-     SET(ZORBA_WITH_LIBXML2_SAX ON CACHE BOOL "compile with a sax parser for libxml2")
-ELSE(LIBXML2_FOUND)
-     SET(ZORBA_WITH_LIBXML2_SAX ON CACHE BOOL "compile with a sax parser for libxml2")
-ENDIF(LIBXML2_FOUND)
 
 IF(WIN32)
   SET(CPACK_INSTALL_PREFIX "" CACHE STRING "Set to empty string so that cpack can work")

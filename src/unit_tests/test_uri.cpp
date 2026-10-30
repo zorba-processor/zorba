@@ -864,6 +864,24 @@ int runUriTest(int argc, char* argv[])
     return 11;
   }
 
+  // An authority starting with '.' used to make toPathNotation() loop
+  // forever (found by the jsoniq_compile fuzzer through a module import).
+  try
+  {
+    URI dotted("http://.zorba.io/a");
+    if (dotted.toPathNotation() != "io/zorba//a")
+    {
+      std::cerr << "path notation " << dotted.toPathNotation()
+                << " is not equal to io/zorba//a" << std::endl;
+      return 12;
+    }
+  }
+  catch (ZorbaException const& e)
+  {
+    std::cerr << e << std::endl;
+    return 11;
+  }
+
   return 0;
 }
 

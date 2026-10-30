@@ -261,6 +261,10 @@ void root_static_context::init()
   set_feature( feature::trace );
   set_feature( feature::http_resolution );
 
+  // Instance default security policy. Unrestricted until enforcement is in
+  // place; it becomes SecurityPolicy::secure() in 5.0.0.
+  set_security_policy(SecurityPolicy::unrestricted());
+
 #ifdef WIN32
   // get a relative path from the environment for URI
   append_env_var (L"ZORBA_MODULE_PATH", lRootURIPath, zstring(ZORBA_CORE_URI_DIR), zstring(ZORBA_NONCORE_URI_DIR));

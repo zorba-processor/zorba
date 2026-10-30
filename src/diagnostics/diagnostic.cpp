@@ -166,12 +166,16 @@ void parameters::add_param( value_type const &s ) {
   params_.push_back( s );
   value_type &p = params_.back();
   //
-  // We have to escape any literal \ characters in the parameter.
+  // A parameter's value is inserted literally: substitute() makes one pass
+  // per parameter over the whole string, so a value inserted by an earlier
+  // pass is scanned again by the later ones.  Escape the \ and $ characters
+  // so that user text (e.g., a quoted piece of the input) can neither form
+  // a substitution of its own nor break the escaping of the message.
   //
   for ( value_type::size_type pos = 0;
-        (pos = p.find( '\\', pos )) != value_type::npos;
+        (pos = p.find_first_of( "\\$", pos )) != value_type::npos;
         pos += 2 ) {
-    p.replace( pos, 1, "\\\\" );
+    p.insert( pos, 1, '\\' );
   }
 }
 
@@ -181,8 +185,15 @@ parameters::value_type parameters::lookup_param( size_type i ) const {
   if ( i > params_.size() )
     return value_type();
   value_type param( params_[ i - 1 ] );
-  if ( !param.empty() && param[0] == ZED_PREFIX[0] )
-    param = zorba::diagnostic::dict::lookup( param );
+  if ( !param.empty() && param[0] == ZED_PREFIX[0] ) {
+    //
+    // Parameters may carry user data (a JSON string, an XML namespace URI,
+    // a libxml2 message quoting the input) that merely starts with the
+    // dictionary-key prefix: only substitute actual keys.
+    //
+    if ( char const *const value = zorba::diagnostic::dict::find( param.c_str() ) )
+      param = value;
+  }
   return param;
 }
 
@@ -213,15 +224,12 @@ void parameters::substitute( value_type *s ) const {
             break;
           case '\\':
             //
-            // We can't erase the \ here until the last iteration of the loop
-            // since it has to do its job of escaping characters for all 9
-            // passes.  Until then, simply skip over the next character (in
-            // particular, the $) so it's not treated specially.
+            // We can't erase the \ here since it has to do its job of
+            // escaping characters for all 9 passes: simply skip over the next
+            // character (in particular, the $) so it's not treated specially.
+            // The escapes are removed after the last pass.
             //
-            if ( i == 9 )
-              s->erase( pos, 1 );
-            else
-              ++pos;
+            ++pos;
             break;
         }
         continue;
@@ -322,6 +330,14 @@ replace_or_erase:
 
     } // for ( ... pos ...
   } // for ( ... i ...
+
+  //
+  // Remove the escapes only now, after all 9 passes, so that the values
+  // inserted by the 9th pass are unescaped like all the others.
+  //
+  for ( value_type::size_type pos = 0;
+        (pos = s->find( '\\', pos )) != value_type::npos; ++pos )
+    s->erase( pos, 1 );
 }
 
 bool parameters::then_else( bool expr, value_type const &s,

@@ -1,0 +1,35 @@
+name: ClusterFuzzLite batch fuzzing
+
+# Daily batch fuzzing of the libFuzzer targets in test/fuzz under ASan and
+# UBSan. The fuzz-seconds budget is split across the targets. Crashes are
+# uploaded as workflow artifacts; the corpus is kept in the default GitHub
+# artifacts store (no storage repo).
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+permissions: read-all
+
+jobs:
+  BatchFuzzing:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        sanitizer: [address, undefined]
+    steps:
+      - name: Build fuzzers (${{ matrix.sanitizer }})
+        uses: google/clusterfuzzlite/actions/build_fuzzers@v1
+        with:
+          language: c++
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          sanitizer: ${{ matrix.sanitizer }}
+
+      - name: Run fuzzers (${{ matrix.sanitizer }})
+        uses: google/clusterfuzzlite/actions/run_fuzzers@v1
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          fuzz-seconds: 3600
+          mode: batch
+          sanitizer: ${{ matrix.sanitizer }}

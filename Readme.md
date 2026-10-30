@@ -1,4 +1,9 @@
-# Zorba
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="doc/logo/zorba-logo-dark.svg">
+    <img src="doc/logo/zorba-logo.svg" alt="Zorba" height="64">
+  </picture>
+</p>
 
 Zorba is an embeddable XQuery and JSONiq processor written in C++. It
 implements XQuery 3.0, XQuery Update Facility, XQuery Full Text, XQuery

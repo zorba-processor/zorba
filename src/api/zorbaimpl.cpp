@@ -298,6 +298,22 @@ Properties* ZorbaImpl::getProperties()
 }
 
 
+/*******************************************************************************
+  The instance default is stored on the root static context, so that every
+  static context inherits it through the parent chain.
+********************************************************************************/
+void ZorbaImpl::setSecurityPolicy(const SecurityPolicy& aPolicy)
+{
+  GENV_ROOT_STATIC_CONTEXT.set_security_policy(aPolicy);
+}
+
+
+SecurityPolicy ZorbaImpl::getSecurityPolicy() const
+{
+  return GENV_ROOT_STATIC_CONTEXT.get_security_policy();
+}
+
+
 void ZorbaImpl::notifyError( DiagnosticHandler *eh, ZorbaException const &ze )
 {
   eh->error( ze );

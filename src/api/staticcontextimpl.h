@@ -357,6 +357,12 @@ public:
 
   virtual void
   clearBaseURI();
+
+  virtual void
+  setSecurityPolicy(const SecurityPolicy& aPolicy);
+
+  virtual SecurityPolicy
+  getSecurityPolicy() const;
 };
 
 } // namespace zorba

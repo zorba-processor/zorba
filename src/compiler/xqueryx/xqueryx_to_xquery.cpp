@@ -17,10 +17,13 @@
 
 #include <zorba/config.h>
 
+#include <cstring>
+
 #ifdef ZORBA_XQUERYX
 
 #include <libxslt/xslt.h>
 #include <libxslt/transform.h>
+#include <libxslt/security.h>
 #include <libxml/xmlerror.h>
 #include <libxslt/xsltutils.h>
 
@@ -28,6 +31,7 @@
 #include "compiler/xqueryx/xqueryx_xslt.h"
 
 #include <diagnostics/xquery_diagnostics.h>
+#include "util/xml_parser_security.h"
 
 namespace zorba {
 
@@ -83,32 +87,72 @@ void XQueryXConvertor::zorba_xslt_error_handler(void *ctx, const char *msg, ...)
   free(buffer);
 }
 
-char* XQueryXConvertor::XQueryX2XQuery( const char *xqueryx)
+// Parses the XQueryX text with the per-context settings of the security
+// policy. The global libxml2 defaults (xmlSubstituteEntitiesDefault,
+// xmlLoadExtDtdDefaultValue) are left alone: they used to be set here and
+// leaked into every later libxml2 parse in the process.
+static xmlDocPtr parse_xqueryx(const char *xqueryx, xml::ParserSecurity& security)
+{
+  xml::ParserSecurity::Scope scope(security);
+  xmlParserCtxtPtr ctxt = xmlCreatePushParserCtxt(NULL, NULL, NULL, 0, NULL);
+  if (!ctxt)
+    return NULL;
+  security.configure(ctxt, XML_PARSE_NOENT | XML_PARSE_DTDLOAD);
+  xmlParseChunk(ctxt, xqueryx, static_cast<int>(strlen(xqueryx)), 1);
+  xmlDocPtr doc = ctxt->myDoc;
+  ctxt->myDoc = NULL;
+  if (doc && (!ctxt->wellFormed || security.denied()))
+  {
+    xmlFreeDoc(doc);
+    doc = NULL;
+  }
+  xmlFreeParserCtxt(ctxt);
+  return doc;
+}
+
+char* XQueryXConvertor::XQueryX2XQuery( const char *xqueryx, const SecurityPolicy& policy )
 {
   XQueryX_init();
 
   xmlDocPtr doc, res;
 
-  //setup libxml
-  xmlSubstituteEntitiesDefault(1);
-  xmlLoadExtDtdDefaultValue = 1;
   errstr.clear();
   xmlSetGenericErrorFunc(&errstr, zorba_xslt_error_handler);
   xsltSetGenericErrorFunc(&errstr, zorba_xslt_error_handler);
 
-  doc = xmlParseDoc((xmlChar*)xqueryx);
+  xml::ParserSecurity security(policy);
+  doc = parse_xqueryx(xqueryx, security);
 
   try{
+  if (security.denied())
+    throw ZORBA_EXCEPTION(zerr::ZXQP0029_URI_ACCESS_DENIED,
+                          ERROR_PARAMS(security.deniedURI()));
   if(!doc)
     throw ZORBA_EXCEPTION(zerr::ZXQP0031_MALFORMED_XQUERYX_INPUT, ERROR_PARAMS(errstr));
 
-  //xsltTransformContextPtr ctxt;
-  //ctxt = xsltNewTransformContext((xsltStylesheetPtr)xqueryx_xslt, doc);
+  // The stylesheet is built in and needs no I/O: forbid all of it.
+  xsltSecurityPrefsPtr prefs = xsltNewSecurityPrefs();
+  xsltTransformContextPtr tctxt =
+    xsltNewTransformContext((xsltStylesheetPtr)xqueryx_xslt, doc);
+  if (!prefs || !tctxt)
+  {
+    if (tctxt) xsltFreeTransformContext(tctxt);
+    if (prefs) xsltFreeSecurityPrefs(prefs);
+    xmlFreeDoc(doc);
+    throw ZORBA_EXCEPTION( zerr::ZXQP0032_ERROR_TRANSFORMING_XQUERYX_TO_XQUERY, ERROR_PARAMS(errstr) );
+  }
+  xsltSetSecurityPrefs(prefs, XSLT_SECPREF_READ_FILE, xsltSecurityForbid);
+  xsltSetSecurityPrefs(prefs, XSLT_SECPREF_WRITE_FILE, xsltSecurityForbid);
+  xsltSetSecurityPrefs(prefs, XSLT_SECPREF_CREATE_DIRECTORY, xsltSecurityForbid);
+  xsltSetSecurityPrefs(prefs, XSLT_SECPREF_READ_NETWORK, xsltSecurityForbid);
+  xsltSetSecurityPrefs(prefs, XSLT_SECPREF_WRITE_NETWORK, xsltSecurityForbid);
+  xsltSetCtxtSecurityPrefs(prefs, tctxt);
 
   const char  *param[]= {NULL};
-//  res = xsltApplyStylesheetUser((xsltStylesheetPtr)xqueryx_xslt, doc, param,
-//                                  NULL, stderr, ctxt);
-  res = xsltApplyStylesheet((xsltStylesheetPtr)xqueryx_xslt, doc, param);
+  res = xsltApplyStylesheetUser((xsltStylesheetPtr)xqueryx_xslt, doc, param,
+                                NULL, NULL, tctxt);
+  xsltFreeTransformContext(tctxt);
+  xsltFreeSecurityPrefs(prefs);
   if(!res)
   {
     xmlFreeDoc(doc);

@@ -1654,6 +1654,12 @@ void URI::build_path_notation() const
   {
     lPathNotation << lToTokenize.substr(pos + 1, lastPos - pos) << "/";
 
+    // A leading '.' leaves an empty first label. Stop here: "pos - 1" would
+    // wrap around to npos and the search would restart from the end of the
+    // string, looping forever.
+    if (pos == 0)
+      break;
+
     lastPos = pos - 1;
     pos = lToTokenize.find_last_of(".", lastPos);
     if (pos == std::string::npos) 

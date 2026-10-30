@@ -14,7 +14,51 @@ permissions:
   contents: read
 
 jobs:
+  # Gate: required status checks must still report, so jobs are skipped
+  # (which counts as passing) instead of the whole workflow being filtered.
+  changes:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      code: ${{ steps.f.outputs.code || steps.all.outputs.code }}
+    steps:
+      - id: f
+        if: github.event_name == 'pull_request'
+        uses: dorny/paths-filter@v4
+        with:
+          filters: |
+            code:
+              - 'src/**'
+              - 'include/**'
+              - 'modules/**'
+              - 'bin/**'
+              - 'test/**'
+              - 'swig/**'
+              - 'schemas/**'
+              - 'config/**'
+              - 'cmake/**'
+              - 'cmake_modules/**'
+              - 'docker/**'
+              - '.clusterfuzzlite/**'
+              - '.github/codeql/**'
+              - 'CMakeLists.txt'
+              - 'CMake*.txt'
+              - 'CMake*.json'
+              - '*.cmake'
+              - '*.cmake.in'
+              - 'CTest*'
+              - 'CPack*'
+              - '.github/workflows/ci.yml'
+      - id: all
+        if: github.event_name != 'pull_request'
+        run: echo "code=true" >> "$GITHUB_OUTPUT"
+
   linux:
+    # Gating is per step, not per job: a skipped matrix job reports its name
+    # as a literal "matrix.name", which would leave the required checks pending.
+    needs: changes
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.runner }}
     # arm64 runs on the Ubuntu 24.04 builder: Arch Linux has no official
@@ -42,12 +86,15 @@ jobs:
             cc: clang
             cxx: clang++
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+        if: needs.changes.outputs.code == 'true'
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
+        if: needs.changes.outputs.code == 'true'
 
       - name: Build the builder image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
+        if: needs.changes.outputs.code == 'true'
         with:
           context: ${{ matrix.builder }}
           load: true
@@ -56,7 +103,8 @@ jobs:
           cache-to: type=gha,mode=max,scope=builder-${{ matrix.cache }}
 
       - name: Build the HTTP test server image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
+        if: needs.changes.outputs.code == 'true'
         with:
           context: .
           file: docker/http-test-server/Dockerfile
@@ -65,13 +113,15 @@ jobs:
           cache-from: type=gha,scope=http-test-${{ matrix.cache }}
           cache-to: type=gha,mode=max,scope=http-test-${{ matrix.cache }}
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
+        if: needs.changes.outputs.code == 'true'
         with:
           path: .ccache
           key: ccache-${{ matrix.cache }}-${{ github.sha }}
           restore-keys: ccache-${{ matrix.cache }}-
 
       - name: Build and test
+        if: needs.changes.outputs.code == 'true'
         run: |
           docker network create zorba-test
           docker run -d --name zorba-http-test --network zorba-test zorba-http-test:ci
@@ -88,6 +138,7 @@ jobs:
                 --output-junit junit.xml'
 
       - name: Verify hardening
+        if: needs.changes.outputs.code == 'true'
         run: scripts/check-hardening.sh build/full-release
 
       # The checked-in parsers/scanners must be what this image's bison and
@@ -95,7 +146,7 @@ jobs:
       # src/compiler/parser/CMakeLists.txt). The regenerated files are
       # uploaded as the generated-parser artifact.
       - name: Check that the generated parsers and scanners are up to date
-        if: matrix.cache == 'linux-amd64-latest'
+        if: needs.changes.outputs.code == 'true' && matrix.cache == 'linux-amd64-latest'
         run: |
           docker run --rm -v "$PWD":/src -w /src zorba-builder:ci sh -ec '
             bison --version | head -1
@@ -111,8 +162,8 @@ jobs:
           git diff --stat --exit-code -- src/compiler/parser
 
       - name: Upload the regenerated parsers and scanners
-        if: always() && matrix.cache == 'linux-amd64-latest'
-        uses: actions/upload-artifact@v4
+        if: needs.changes.outputs.code == 'true' && always() && matrix.cache == 'linux-amd64-latest'
+        uses: actions/upload-artifact@v7
         with:
           name: generated-parser
           path: |
@@ -123,8 +174,8 @@ jobs:
             src/compiler/parser/FlexLexer.h
 
       - name: Upload test results
-        if: failure()
-        uses: actions/upload-artifact@v4
+        if: needs.changes.outputs.code == 'true' && failure()
+        uses: actions/upload-artifact@v7
         with:
           name: test-results-${{ matrix.cache }}
           path: |
@@ -132,6 +183,8 @@ jobs:
             build/full-release/Testing/Temporary/LastTest.log
 
   profiles:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     name: profile ${{ matrix.preset }} (linux-amd64, Arch)
     runs-on: ubuntu-24.04
     timeout-minutes: 45
@@ -141,12 +194,12 @@ jobs:
         # bigint: ZORBA_WITH_BIG_INTEGER=ON (arbitrary-precision xs:integer).
         preset: [embedded, embedded-noicu, full-nopch, bigint]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
 
       - name: Build the builder image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: docker/builder-latest
           load: true
@@ -154,7 +207,7 @@ jobs:
           cache-from: type=gha,scope=builder-linux-amd64-latest
           cache-to: type=gha,mode=max,scope=builder-linux-amd64-latest
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: .ccache
           key: ccache-profile-${{ matrix.preset }}-${{ github.sha }}
@@ -200,7 +253,7 @@ jobs:
 
       - name: Upload test results
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-results-profile-${{ matrix.preset }}
           path: |
@@ -209,20 +262,22 @@ jobs:
             build/ctest.log
 
   macos:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     name: macos-arm64 (Apple Clang, Homebrew)
     runs-on: macos-15
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
       CCACHE_SLOPPINESS: pch_defines,time_macros
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install dependencies
         run: |
           brew install icu4c libxml2 xerces-c ninja ccache
           echo "CMAKE_PREFIX_PATH=$(brew --prefix icu4c):$(brew --prefix libxml2):$(brew --prefix xerces-c)" >> "$GITHUB_ENV"
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: .ccache
           key: ccache-macos-arm64-${{ github.sha }}
@@ -245,7 +300,7 @@ jobs:
 
       - name: Upload test results
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-results-macos-arm64
           path: |

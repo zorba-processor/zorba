@@ -66,8 +66,7 @@ xquery_driver::xquery_driver(CompilerCB* aCompilerCB, GRAMMAR_TYPE a_grammar_typ
 
 xquery_driver::~xquery_driver()
 {
-  if (parserError)
-    delete parserError;
+  delete parserError;
 }
 
 void xquery_driver::addCommonLanguageWarning(const location &loc, const char* warning)

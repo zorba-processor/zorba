@@ -4,6 +4,28 @@ on:
   push:
     branches: [master]
   pull_request:
+    paths:
+      - 'src/**'
+      - 'include/**'
+      - 'modules/**'
+      - 'bin/**'
+      - 'test/**'
+      - 'swig/**'
+      - 'schemas/**'
+      - 'config/**'
+      - 'cmake/**'
+      - 'cmake_modules/**'
+      - 'docker/**'
+      - '.clusterfuzzlite/**'
+      - '.github/codeql/**'
+      - 'CMakeLists.txt'
+      - 'CMake*.txt'
+      - 'CMake*.json'
+      - '*.cmake'
+      - '*.cmake.in'
+      - 'CTest*'
+      - 'CPack*'
+      - '.github/workflows/codeql.yml'
   schedule:
     - cron: '0 5 * * 1'
   workflow_dispatch:
@@ -21,7 +43,7 @@ jobs:
       security-events: write
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Same package set as docker/builder/Dockerfile (Ubuntu 24.04). CodeQL has
       # to observe the compiler, so the build runs directly on the runner.
@@ -34,7 +56,7 @@ jobs:
             libxerces-c-dev uuid-dev
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
+        uses: github/codeql-action/init@v4
         with:
           languages: c-cpp
           build-mode: manual
@@ -47,7 +69,7 @@ jobs:
           cmake --build --preset full-release
 
       - name: Perform CodeQL analysis
-        uses: github/codeql-action/analyze@v3
+        uses: github/codeql-action/analyze@v4
         with:
           category: /language:c-cpp
           upload: failure-only
@@ -66,7 +88,7 @@ jobs:
           done
 
       - name: Upload results
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: sarif-results
           category: /language:c-cpp

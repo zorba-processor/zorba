@@ -10951,6 +10951,10 @@ void post_predicate_visit(const PredicateList& v, const exprnode* pred, void*)
     expr* selectorExpr = static_cast<json_array_expr*>(predExpr)->get_expr();
     expr* accessorExpr;
 
+    // "[[ ]]": an array lookup needs a selector.
+    if (selectorExpr == NULL)
+      RAISE_ERROR(err::XPST0003, loc, ERROR_PARAMS("empty array lookup"));
+
     xqtref_t domainType = arrayExpr->get_return_type();
 
     std::vector<expr*> args(2);

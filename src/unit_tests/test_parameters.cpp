@@ -203,6 +203,52 @@ static void test_escapes() {
   }
 }
 
+static void test_literal_values() {
+  //
+  // Parameter values may carry user text (e.g., a piece of the input quoted
+  // by a parser error message): they must be inserted literally and never be
+  // scanned for substitutions again by the passes for higher parameters.
+  //
+  {
+    string s( "x$1y$2" );
+    parameters const p( MAKE_PARAMS( "$2", "bar" ) );
+    ASSERT_NO_EXCEPTION( p.substitute( &s ) );
+    ASSERT_TRUE( s == "x$2ybar" );
+  }
+  {
+    string s( "x$1y$2" );
+    parameters const p( MAKE_PARAMS( "${2}", "bar" ) );
+    ASSERT_NO_EXCEPTION( p.substitute( &s ) );
+    ASSERT_TRUE( s == "x${2}ybar" );
+  }
+  { // found by fuzzing (json_parse): a malformed $i?then in a value
+    string s( "x$1y" );
+    parameters const p( MAKE_PARAMS( "{9$4?( ", "", "", "z" ) );
+    ASSERT_NO_EXCEPTION( p.substitute( &s ) );
+    ASSERT_TRUE( s == "x{9$4?( y" );
+  }
+  {
+    string s( "x$1y" );
+    parameters const p( MAKE_PARAMS( "a\\$2b", "bar" ) );
+    ASSERT_NO_EXCEPTION( p.substitute( &s ) );
+    ASSERT_TRUE( s == "xa\\$2by" );
+  }
+  {
+    string s( "x${1}y" );
+    parameters const p( MAKE_PARAMS( "$2?{3}", "bar", "baz" ) );
+    ASSERT_NO_EXCEPTION( p.substitute( &s ) );
+    ASSERT_TRUE( s == "x$2?{3}y" );
+  }
+  { // the 9th value is unescaped like the others
+    string s( "x$9y" );
+    parameters const p(
+      MAKE_PARAMS( "1", "2", "3", "4", "5", "6", "7", "8", "a\\b$1" )
+    );
+    ASSERT_NO_EXCEPTION( p.substitute( &s ) );
+    ASSERT_TRUE( s == "xa\\b$1y" );
+  }
+}
+
 static void test_exceptions() {
   {
     string s( "x$1?y" );
@@ -226,6 +272,7 @@ int test_parameters( int, char*[] ) {
   test_braces();
   test_conditionals();
   test_escapes();
+  test_literal_values();
   test_exceptions();
 
   cout << failures << " test(s) failed\n";

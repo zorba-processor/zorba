@@ -31,6 +31,7 @@
 
 #include "store/api/item.h"
 #include "store/api/load_properties.h"
+#include "util/xml_parser_security.h"
 
 #include "ordpath.h"
 
@@ -101,6 +102,11 @@ protected:
 
   bool                             theBuildDataGuide;
 
+  // Security configuration of the parse (from theLoadProperties). Every
+  // libxml2 call that parses must run inside an xml::ParserSecurity::Scope
+  // on it, so that external entities are checked against the policy.
+  xml::ParserSecurity              theParserSecurity;
+
 
 protected:
   void applyLoadOptions(const store::LoadProperties& props, xmlParserCtxtPtr ctxt);
@@ -121,6 +127,13 @@ public:
       std::istream& xmlStream) = 0;
 
   static void error( void *ctx, ZORBA_XML_ERROR_PTR );
+
+  /**
+   * If the security policy refused an external resource during the parse,
+   * adds zerr:ZXQP0029 for it ahead of the parser errors it caused and
+   * returns true.
+   */
+  bool reportDeniedResource();
 };
 
 

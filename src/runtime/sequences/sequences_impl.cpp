@@ -1557,6 +1557,7 @@ static void loadDocument(
   lLoadProperties.setStoreDocument(true);
   lLoadProperties.setDTDValidate( aSctx->is_feature_set( feature::dtd ) );
   lLoadProperties.setBaseUri(lNormUri);
+  lLoadProperties.setSecurityPolicy(aSctx->get_security_policy());
 
   // Resolve URI to a stream
   zstring lErrorMessage;

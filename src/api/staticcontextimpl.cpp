@@ -153,15 +153,11 @@ StaticContextImpl::~StaticContextImpl()
   if ( ! theUserDiagnosticHandler )
     delete theDiagnosticHandler;
 
-  if ( theCollectionMgr )
-  {
-    delete theCollectionMgr;
-  }
+  delete theCollectionMgr;
 
   theCtx = NULL;
 
-  if (theCompilerCB)
-    delete theCompilerCB;
+  delete theCompilerCB;
 }
 
 
@@ -1980,6 +1976,26 @@ StaticContextImpl::clearBaseURI()
   {
     ZorbaImpl::notifyError(theDiagnosticHandler, e.what());
   }
+}
+
+
+/*******************************************************************************
+
+********************************************************************************/
+void
+StaticContextImpl::setSecurityPolicy(const SecurityPolicy& aPolicy)
+{
+  theCtx->set_security_policy(aPolicy);
+}
+
+
+/*******************************************************************************
+
+********************************************************************************/
+SecurityPolicy
+StaticContextImpl::getSecurityPolicy() const
+{
+  return theCtx->get_security_policy();
 }
 
 } /* namespace zorba */

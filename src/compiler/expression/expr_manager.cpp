@@ -49,23 +49,9 @@ ExprManager::ExprManager(CompilerCB* ccb)
 //calls on the destructors and also keeps tracks of certain numbers
 ExprManager::~ExprManager()
 {
-  for(std::vector<expr*>::iterator iter = theExprs.begin();
-      iter != theExprs.end();
-      ++iter)
-  {
-    //We assume that the exprs being deleted they may be "held"
-    //by a reference or pointer somewhere and will try deleting them again.
-    //To prevent deleting an already deleted expr, we replace them with
-    //a NullExpr
-
-    expr* exp = *iter;
-
-    exp->~expr();
-
-    //constructs a new NULLExpr where the old expr existed
-    //new (exp) NullExpr();
-  }
-
+  // The clause and wincond destructors detach the var_exprs they bind
+  // (set_flwor_clause(NULL)), so they must run while those exprs are still
+  // alive: destroy the exprs last.
   for(std::vector<flwor_clause*>::iterator iter = theFlworClauses.begin();
       iter != theFlworClauses.end();
       ++iter)
@@ -109,6 +95,23 @@ ExprManager::~ExprManager()
     pragma* pragma = *iter;
     pragma->~pragma();
     // new (clause) NullCopyClause();
+  }
+
+  for(std::vector<expr*>::iterator iter = theExprs.begin();
+      iter != theExprs.end();
+      ++iter)
+  {
+    //We assume that the exprs being deleted they may be "held"
+    //by a reference or pointer somewhere and will try deleting them again.
+    //To prevent deleting an already deleted expr, we replace them with
+    //a NullExpr
+
+    expr* exp = *iter;
+
+    exp->~expr();
+
+    //constructs a new NULLExpr where the old expr existed
+    //new (exp) NullExpr();
   }
 }
 

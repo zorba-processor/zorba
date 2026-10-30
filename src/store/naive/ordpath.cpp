@@ -4378,6 +4378,16 @@ void OrdPathStack::compressComp(ulong comp, int32_t value)
     );
   }
 
+  // theBitsAvailable == 0 means the previous component ended exactly on a
+  // byte boundary. Start the new component in the next byte: the code below
+  // assumes at least one free bit (otherwise it shifts a uint32_t by 32 and,
+  // for an overflow component, decrements theBitsAvailable past zero).
+  if (theBitsAvailable == 0)
+  {
+    theBitsAvailable = 8;
+    ++theByteIndex;
+  }
+
   if (overflow)
   {
     // push 1111 1111 0 into the ordpath

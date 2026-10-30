@@ -834,7 +834,7 @@ CDataChars													({NonClosingSquareBracketChar}|"]"{NonSqBraNonGTChar}|"]]
 <MODE_START_TAG>"/>" { POP_STATE(); return token::EMPTY_TAG_END; }
 <MODE_START_TAG>{QName} { TRY_SVAL_TOKEN (QNAME_SVAL, put_qname(yytext, yyleng), yytext); }
 <MODE_START_TAG>{CatchAll} { yylval->err = getDriver()->unrecognizedCharErr(yytext, *yylloc); return token::UNRECOGNIZED; }
-<MODE_START_TAG><<EOF>> { yylval->err = getDriver()->unterminatedElementConstructor(*yylloc); return token::UNRECOGNIZED; }
+<MODE_START_TAG><<EOF>> { yylval->err = getDriver()->unterminatedElementConstructor(*yylloc); EOF_ERROR_END(); return token::UNRECOGNIZED; }
 
 
   /*______________________________________________________________________
@@ -862,7 +862,7 @@ CDataChars													({NonClosingSquareBracketChar}|"]"{NonSqBraNonGTChar}|"]]
 <MODE_ELEMENT_CONTENT>{CharRef}+ { TRY_CHARREF_LITERAL(CHAR_REF_LITERAL, put_charref, yytext, yyleng); }
 <MODE_ELEMENT_CONTENT>"{{" { return token::DOUBLE_LBRACE; }
 <MODE_ELEMENT_CONTENT>"}}" { return token::DOUBLE_RBRACE; }
-<MODE_ELEMENT_CONTENT><<EOF>> { yylval->err = getDriver()->noClosingTagForElementConstructor(*yylloc); return token::UNRECOGNIZED; }
+<MODE_ELEMENT_CONTENT><<EOF>> { yylval->err = getDriver()->noClosingTagForElementConstructor(*yylloc); EOF_ERROR_END(); return token::UNRECOGNIZED; }
 
 
   /*______________________________________________________________________
@@ -875,7 +875,7 @@ CDataChars													({NonClosingSquareBracketChar}|"]"{NonSqBraNonGTChar}|"]]
 
 <MODE_END_TAG>">" { POP_STATE(); return token::TAG_END; }
 <MODE_END_TAG>{QName}{WSstar} { TRY_SVAL_TOKEN (QNAME_SVAL, put_qname(yytext, yyleng, false, true), yytext); }
-<MODE_END_TAG><<EOF>> { yylval->err = getDriver()->noClosingTagForElementConstructor(*yylloc); return token::UNRECOGNIZED; }
+<MODE_END_TAG><<EOF>> { yylval->err = getDriver()->noClosingTagForElementConstructor(*yylloc); EOF_ERROR_END(); return token::UNRECOGNIZED; }
 
 
   /*______________________________________________________________________
@@ -903,7 +903,7 @@ CDataChars													({NonClosingSquareBracketChar}|"]"{NonSqBraNonGTChar}|"]]
 <MODE_EXPR_COMMENT>"(:"    { PUSH_STATE(MODE_EXPR_COMMENT); }
 <MODE_EXPR_COMMENT>[^:)(]+ { /* do nothing */ }
 <MODE_EXPR_COMMENT>.       { /* do nothing */ }
-<MODE_EXPR_COMMENT><<EOF>> { yylval->err = getDriver()->unterminatedCommentErr(*yylloc); return token::UNRECOGNIZED; }
+<MODE_EXPR_COMMENT><<EOF>> { yylval->err = getDriver()->unterminatedCommentErr(*yylloc); EOF_ERROR_END(); return token::UNRECOGNIZED; }
 
 
   /*______________________________________________________________________
@@ -918,7 +918,7 @@ CDataChars													({NonClosingSquareBracketChar}|"]"{NonSqBraNonGTChar}|"]]
 <MODE_EXPR_DOC_COMMENT>[^:]*    { getDriver()->theDocComment << yytext; }
 <MODE_EXPR_DOC_COMMENT>":"+[^)] { getDriver()->theDocComment << yytext; }
 <MODE_EXPR_DOC_COMMENT>":"+")"  { POP_STATE(); }
-<MODE_EXPR_DOC_COMMENT><<EOF>>  { yylval->err = getDriver()->unterminatedCommentErr(*yylloc); return token::UNRECOGNIZED; }
+<MODE_EXPR_DOC_COMMENT><<EOF>>  { yylval->err = getDriver()->unterminatedCommentErr(*yylloc); EOF_ERROR_END(); return token::UNRECOGNIZED; }
 
 
   /*______________________________________________________________________

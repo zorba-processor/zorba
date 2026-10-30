@@ -132,8 +132,7 @@ void XmlTree::destroy() throw()
 #endif
 
 #ifndef EMBEDED_TYPE
-  if (theTypesMap)
-    delete theTypesMap;
+  delete theTypesMap;
 #endif
 
   delete this;

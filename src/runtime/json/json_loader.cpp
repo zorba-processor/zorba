@@ -17,6 +17,8 @@
 #include "stdafx.h"
 #include <zorba/config.h>
 
+#include <stdexcept>
+
 // Zorba
 #include <store/api/item.h>
 #include <store/api/store.h>
@@ -182,34 +184,48 @@ bool loader::next( store::Item_t *result ) {
         case ',':
           continue;
         case token::number:
-          switch ( t.get_numeric_type() ) {
-            case token::integer:
-              try {
-                GENV_ITEMFACTORY->createInteger(
-                  item, xs_integer( t.get_value() )
-                );
-              }
-              catch ( std::range_error const& ) {
-                // Without big integers, xs:integer is 64-bit: keep a larger
-                // integer (e.g. an ID) exactly as an xs:decimal rather than
-                // failing to parse the document.
+          try {
+            switch ( t.get_numeric_type() ) {
+              case token::integer:
+                try {
+                  GENV_ITEMFACTORY->createInteger(
+                    item, xs_integer( t.get_value() )
+                  );
+                }
+                catch ( std::range_error const& ) {
+                  // Without big integers, xs:integer is 64-bit: keep a larger
+                  // integer (e.g. an ID) exactly as an xs:decimal rather than
+                  // failing to parse the document.
+                  GENV_ITEMFACTORY->createDecimal(
+                    item, xs_decimal( t.get_value() )
+                  );
+                }
+                break;
+              case token::decimal:
                 GENV_ITEMFACTORY->createDecimal(
                   item, xs_decimal( t.get_value() )
                 );
-              }
-              break;
-            case token::decimal:
-              GENV_ITEMFACTORY->createDecimal(
-                item, xs_decimal( t.get_value() )
-              );
-              break;
-            case token::floating_point:
-              GENV_ITEMFACTORY->createDouble(
-                item, xs_double( t.get_value() )
-              );
-              break;
-            default:
-              assert( false );
+                break;
+              case token::floating_point:
+                GENV_ITEMFACTORY->createDouble(
+                  item, xs_double( t.get_value() )
+                );
+                break;
+              default:
+                assert( false );
+            }
+          }
+          catch ( std::range_error const& ) {
+            //
+            // The number does not fit the type (e.g. xs:double overflows).
+            // Raise what an out-of-range numeric literal in a query raises
+            // instead of letting std::range_error escape as an internal error.
+            //
+            throw XQUERY_EXCEPTION(
+              err::FOAR0002,
+              ERROR_PARAMS( t.get_value() ),
+              ERROR_LOC( t.get_loc() )
+            );
           }
           break;
         case token::string:

@@ -1,0 +1,6 @@
+variable $a := [ "fo@o" , "bar" ];
+
+delete json $a[[]];
+
+$a
+

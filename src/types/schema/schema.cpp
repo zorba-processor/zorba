@@ -169,16 +169,45 @@ private:
 
 
 /**
- * A Xerces EntityResolver that looks for a specific URL and returns
- * InputSource that reads from a particular std::istream.
+ * A Xerces XMLEntityResolver that looks for a specific URL and returns
+ * InputSource that reads from a particular std::istream. Other schema
+ * documents (include, import, redefine) are resolved through the static
+ * context. External entities and DTDs referenced by a schema document need
+ * Capability::ExternalEntities.
  */
-class StaticContextEntityResolver :  public XERCES_CPP_NAMESPACE::EntityResolver
+class StaticContextEntityResolver :  public XERCES_CPP_NAMESPACE::XMLEntityResolver
 {
 public:
   /**
-   * EntityResolver method
+   * XMLEntityResolver method
    */
   XERCES_CPP_NAMESPACE::InputSource* resolveEntity(
+    XERCES_CPP_NAMESPACE::XMLResourceIdentifier* resourceIdentifier)
+  {
+    typedef XERCES_CPP_NAMESPACE::XMLResourceIdentifier RI;
+    const XMLCh* const publicId = resourceIdentifier->getPublicId();
+    const XMLCh* const systemId = resourceIdentifier->getSystemId();
+
+    // Xerces also reports the top-level schema document of loadGrammar() as
+    // an external entity.
+    bool const lIsTopLevel = systemId != NULL &&
+      XMLString::compareString(systemId, theLogicalURI) == 0;
+
+    if (!lIsTopLevel &&
+        resourceIdentifier->getResourceIdentifierType() == RI::ExternalEntity &&
+        !theSctx->allows_capability(Capability::ExternalEntities))
+    {
+      const XMLCh* const lId = systemId ? systemId : publicId;
+      zstring const lStrId = lId ? zstring(StrX(lId).localForm()) : zstring();
+      throw XQUERY_EXCEPTION(zerr::ZXQP0029_URI_ACCESS_DENIED,
+                             ERROR_PARAMS(lStrId));
+    }
+
+    return resolve(publicId, systemId);
+  }
+
+private:
+  XERCES_CPP_NAMESPACE::InputSource* resolve(
     const XMLCh* const publicId,
     const XMLCh* const systemId)
   {
@@ -300,6 +329,7 @@ public:
     }
   }
 
+public:
   StaticContextEntityResolver(
       const XMLCh* const aLogicalURI,
       static_context * aSctx,
@@ -512,9 +542,11 @@ void Schema::registerXSD(
 
   try
   {
-    SAX2XMLReader* reader =
-    XMLReaderFactory::createXMLReader(XMLPlatformUtils::fgMemoryManager,
-                                      theGrammarPool);
+    // The implementation class (what XMLReaderFactory::createXMLReader()
+    // returns) is used directly for setXMLEntityResolver(), which the
+    // SAX2XMLReader interface does not have.
+    SAX2XMLReaderImpl* reader =
+    new SAX2XMLReaderImpl(XMLPlatformUtils::fgMemoryManager, theGrammarPool);
 
     parser.reset(reader);
     // Perform namespace processing
@@ -546,7 +578,11 @@ void Schema::registerXSD(
 
     XMLChArray xerces_xsdURL(xsdURL);
     StaticContextEntityResolver lEntityResolver(xerces_xsdURL.get(), aSctx, stream);
-    parser->setEntityResolver(&lEntityResolver);
+    reader->setXMLEntityResolver(&lEntityResolver);
+
+    // Bounds entity expansion in schema documents (Xerces' default limit).
+    XERCES_CPP_NAMESPACE::SecurityManager lSecurityManager;
+    parser->setProperty(XMLUni::fgXercesSecurityManager, &lSecurityManager);
 
     //this works but using loadProlog
     //parser->loadGrammar("file:///location/file.xsd",

@@ -902,22 +902,15 @@ static_context::~static_context()
     delete theExternalModulesMap;
   }
 
-  if (theW3CCollectionMap)
-    delete theW3CCollectionMap;
+  delete theW3CCollectionMap;
 
-  if (theCollectionMap)
-    delete theCollectionMap;
+  delete theCollectionMap;
 
-  if (theIndexMap)
-    delete theIndexMap;
+  delete theIndexMap;
 
-  if (theICMap)
-    delete theICMap;
+  delete theICMap;
 
-  if (theFunctionMap)
-  {
-    delete theFunctionMap;
-  }
+  delete theFunctionMap;
 
   if (theFunctionArityMap)
   {
@@ -944,11 +937,9 @@ static_context::~static_context()
     theImportedPrivateVariablesMap = NULL;
   }
 
-  if (theNamespaceBindings)
-    delete theNamespaceBindings;
+  delete theNamespaceBindings;
 
-  if (theDefaultCollation)
-    delete theDefaultCollation;
+  delete theDefaultCollation;
 
   if (theCollationMap)
   {
@@ -963,15 +954,13 @@ static_context::~static_context()
     theCollationMap = 0;
   }
 
-  if (theOptionMap)
-    delete theOptionMap;
+  delete theOptionMap;
 
 #ifndef ZORBA_NO_FULL_TEXT
   delete theFTMatchOptions;
 #endif /* ZORBA_NO_FULL_TEXT */
 
-  if (theBaseUriInfo)
-    delete theBaseUriInfo;
+  delete theBaseUriInfo;
 
   if (theParent && !theParent->is_global_root_sctx())
     RCHelper::removeReference(theParent);
@@ -1147,6 +1136,7 @@ void static_context::serialize(::zorba::serialization::Archiver& ar)
 
   serialize_resolvers(ar);
   serialize_tracestream(ar);
+  serialize_security_policy(ar);
 
   ar & theURIPath;
   ar & theLibPath;
@@ -1856,6 +1846,174 @@ void static_context::apply_url_resolvers(
       }
     }
   }
+}
+
+
+/*******************************************************************************
+  The policy is serialized with the plan so that a loaded plan keeps the
+  policy it was compiled under. Contexts without an explicit policy in the
+  serialized chain inherit the loading instance's default.
+********************************************************************************/
+void static_context::serialize_security_policy(serialization::Archiver& ar)
+{
+  static const Capability lAllCaps[] = {
+    Capability::ExternalEntities,
+    Capability::FileRead,
+    Capability::FileWrite,
+    Capability::Network,
+    Capability::RemoteImport,
+    Capability::Environment,
+    Capability::NativeModules
+  };
+
+  bool lHasPolicy = (theSecurityPolicy != nullptr);
+  ar & lHasPolicy;
+  if (!lHasPolicy)
+    return;
+
+  ar & theSecurityPolicyNarrows;
+
+  uint32_t lCaps = 0;
+  std::vector<zstring> lReadPaths;
+  std::vector<zstring> lWritePaths;
+  std::vector<zstring> lNetworkPrefixes;
+  bool lAllowPrivate = false;
+  long long lTimeout = 0;
+  uint32_t lMaxCallDepth = 0;
+  uint32_t lMaxAmplification = 0;
+
+  if (ar.is_serializing_out())
+  {
+    const SecurityPolicy& p = *theSecurityPolicy;
+    for (Capability c : lAllCaps)
+      if (p.allows(c))
+        lCaps |= static_cast<uint32_t>(c);
+    for (const String& s : p.getReadPaths())
+      lReadPaths.push_back(zstring(s.c_str()));
+    for (const String& s : p.getWritePaths())
+      lWritePaths.push_back(zstring(s.c_str()));
+    for (const String& s : p.getNetworkPrefixes())
+      lNetworkPrefixes.push_back(zstring(s.c_str()));
+    lAllowPrivate = p.allowsPrivateAddresses();
+    lTimeout = static_cast<long long>(p.getTimeout().count());
+    lMaxCallDepth = p.getMaxCallDepth();
+    lMaxAmplification = p.getMaxEntityAmplification();
+  }
+
+  ar & lCaps;
+  ar & lReadPaths;
+  ar & lWritePaths;
+  ar & lNetworkPrefixes;
+  ar & lAllowPrivate;
+  ar & lTimeout;
+  ar & lMaxCallDepth;
+  ar & lMaxAmplification;
+
+  if (!ar.is_serializing_out())
+  {
+    SecurityPolicy p = SecurityPolicy::secure();
+    for (Capability c : lAllCaps)
+      if (lCaps & static_cast<uint32_t>(c))
+        p.allow(c);
+    for (const zstring& s : lReadPaths)
+      p.addReadPath(String(s.c_str()));
+    for (const zstring& s : lWritePaths)
+      p.addWritePath(String(s.c_str()));
+    for (const zstring& s : lNetworkPrefixes)
+      p.addNetworkPrefix(String(s.c_str()));
+    p.setAllowPrivateAddresses(lAllowPrivate);
+    p.setTimeout(std::chrono::milliseconds(lTimeout));
+    p.setMaxCallDepth(lMaxCallDepth);
+    p.setMaxEntityAmplification(lMaxAmplification);
+    theSecurityPolicy.reset(new SecurityPolicy(p));
+  }
+}
+
+
+/*******************************************************************************
+
+********************************************************************************/
+void static_context::set_security_policy(const SecurityPolicy& aPolicy)
+{
+  theSecurityPolicy.reset(new SecurityPolicy(aPolicy));
+  theSecurityPolicyNarrows = false;
+}
+
+
+/*******************************************************************************
+
+********************************************************************************/
+void static_context::narrow_security_policy(const SecurityPolicy& aPolicy)
+{
+  // If a policy is already attached, narrow it in place and keep its kind:
+  // an explicit policy stays the base, so ancestors still do not apply.
+  if (theSecurityPolicy)
+    theSecurityPolicy.reset(
+        new SecurityPolicy(theSecurityPolicy->narrowedBy(aPolicy)));
+  else
+  {
+    theSecurityPolicy.reset(new SecurityPolicy(aPolicy));
+    theSecurityPolicyNarrows = true;
+  }
+}
+
+
+/*******************************************************************************
+  Walk up to the nearest explicit policy, intersecting the narrowing policies
+  met on the way.
+********************************************************************************/
+SecurityPolicy static_context::get_security_policy() const
+{
+  std::unique_ptr<SecurityPolicy> lNarrowing;
+  const SecurityPolicy* lBase = NULL;
+
+  for (const static_context* sctx = this; sctx != NULL; sctx = sctx->theParent)
+  {
+    const SecurityPolicy* p = sctx->theSecurityPolicy.get();
+    if (p == NULL)
+      continue;
+    if (!sctx->theSecurityPolicyNarrows)
+    {
+      lBase = p;
+      break;
+    }
+    if (lNarrowing)
+      lNarrowing.reset(new SecurityPolicy(lNarrowing->narrowedBy(*p)));
+    else
+      lNarrowing.reset(new SecurityPolicy(*p));
+  }
+
+  SecurityPolicy lPolicy =
+    lBase ? *lBase : SecurityPolicy::unrestricted();
+  if (lNarrowing)
+    lPolicy = lPolicy.narrowedBy(*lNarrowing);
+  return lPolicy;
+}
+
+
+/*******************************************************************************
+  Intersection can only clear capabilities, so any policy on the way to (and
+  including) the nearest explicit one that denies the capability denies it.
+  If all allow it, allow-list intersections may still clear FileRead,
+  FileWrite or Network; only get_security_policy() computes those.
+********************************************************************************/
+bool static_context::allows_capability(Capability aCap) const
+{
+  bool lNarrowedLists = false;
+  for (const static_context* sctx = this; sctx != NULL; sctx = sctx->theParent)
+  {
+    const SecurityPolicy* p = sctx->theSecurityPolicy.get();
+    if (p == NULL)
+      continue;
+    if (!p->allows(aCap))
+      return false;
+    if (!sctx->theSecurityPolicyNarrows)
+      break;
+    if (!p->getReadPaths().empty() || !p->getWritePaths().empty() ||
+        !p->getNetworkPrefixes().empty())
+      lNarrowedLists = true;
+  }
+  return lNarrowedLists ? get_security_policy().allows(aCap) : true;
 }
 
 
@@ -4550,8 +4708,7 @@ void static_context::import_module(const static_context* module, const QueryLoc&
 ********************************************************************************/
 void static_context::clear_base_uri()
 {
-  if (theBaseUriInfo)
-    delete theBaseUriInfo;
+  delete theBaseUriInfo;
 
   theBaseUriInfo = new BaseUriInfo;
 }

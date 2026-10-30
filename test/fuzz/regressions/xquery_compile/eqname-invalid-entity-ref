@@ -1,0 +1,22 @@
+jsoniq version "1.0";
+import module namespace http="http://zorba.io/modules/http-client";
+
+variable $result := http:post("http://$HTTPb/cin/objectext", ser/$HTTP({declare namespace w = "foo:bar";
+
+for slidi=>ng window $Q{foo:bar}w in (0 |o 10)
+start $Q{foo:bar}s uniqueat $Q{import module namespace dc&x = "http:00`000a.io/modules/dctx";
+
+variable $x := dctar}e at $Q{foo:bar}y previous $Q 6] [7, 8, 9]
+]
+r}w in (0 |o 10)
+start $Q{funexpected "'QName'"ar}x previous $Q{foo:bar}sp next $Q{foo:bar}s $Q-;
+};
+$x, dctx:snapshot-id dctx:s{foo:bar}e at $Q{foo:(0)
+[7,entire
+]
+( false() 
+ret000001urn <window>{
+  st), " 1
+  )010, 20}<, 30, 40)/contewinapshot-idnndow(t>
+)
+

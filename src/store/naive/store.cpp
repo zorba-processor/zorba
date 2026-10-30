@@ -575,8 +575,7 @@ void Store::populateValueIndex(
   }
   catch(...)
   {
-    if (key != NULL)
-      delete key;
+    delete key;
 
     sourceIter->close();
     throw;
@@ -996,6 +995,10 @@ store::Item_t Store::loadDocument(
   std::unique_ptr<XmlLoader> loader(getXmlLoader(&lXQueryDiagnostics, loadProperties));
 
   root = loader->loadXml(baseUri, docUri, stream);
+
+  // A resource refused by the security policy is the cause of whatever the
+  // parser reported after it (or of a silently incomplete document).
+  loader->reportDeniedResource();
 
   if (!lXQueryDiagnostics.errors().empty())
   {
