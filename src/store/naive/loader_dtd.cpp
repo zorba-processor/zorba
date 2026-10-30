@@ -1003,8 +1003,20 @@ store::Item_t DtdXmlLoader::loadXml(
       return NULL;
     }
   }
-  catch(...)
+  // An exception escaping libxml2 (e.g. thrown by the error callback) must
+  // still be reported: the callers take a null document with no error as
+  // success.
+  catch (ZorbaException const& e)
   {
+    theXQueryDiagnostics->add_error(e);
+    abortload();
+    thePathStack.clear();
+    return NULL;
+  }
+  catch (...)
+  {
+    theXQueryDiagnostics->add_error(
+      NEW_ZORBA_EXCEPTION(zerr::ZXQP0003_INTERNAL_ERROR));
     abortload();
     thePathStack.clear();
     return NULL;
@@ -1573,18 +1585,23 @@ void DtdXmlLoader::startElement(
         baseUri = pathStack.top().theBaseUri;
         zstring localUri;
         attrNode->theTypedValue->getStringValue2(localUri);
-        if (baseUri.empty())
+        // xml:base="" with no inherited base URI leaves the element without
+        // one; addBaseUriProperty() requires a non-empty URI (ZORBA_FATAL).
+        if (!baseUri.empty() || !localUri.empty())
         {
-          elemNode->addBaseUriProperty(localUri, baseUri);
-        }
-        else
-        {
-          elemNode->addBaseUriProperty(baseUri, localUri);
-        }
+          if (baseUri.empty())
+          {
+            elemNode->addBaseUriProperty(localUri, baseUri);
+          }
+          else
+          {
+            elemNode->addBaseUriProperty(baseUri, localUri);
+          }
 
-        elemNode->getBaseURI(baseUri);
+          elemNode->getBaseURI(baseUri);
 
-        ++i;
+          ++i;
+        }
       }
 
       loader.theOrdPath.nextChild();

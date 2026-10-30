@@ -70,7 +70,7 @@ static bool get_dict( iso639_1::type lang, entry const **begin,
 
 ///////////////////////////////////////////////////////////////////////////////
 
-char const* lookup( char const *key ) {
+char const* find( char const *key ) {
   typedef pair<entry const*,entry const*> range_type;
   //
   // It's possible an exception was thrown after shutdown has already started
@@ -89,8 +89,13 @@ char const* lookup( char const *key ) {
   range_type const result =
     ::equal_range( begin, end, entry_to_find, less_entry() );
 
-  ZORBA_ASSERT( result.first != result.second );
-  return result.first->value;
+  return result.first != result.second ? result.first->value : nullptr;
+}
+
+char const* lookup( char const *key ) {
+  char const *const value = find( key );
+  ZORBA_ASSERT( value );
+  return value;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

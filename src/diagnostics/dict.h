@@ -57,6 +57,15 @@ char const* lookup( char const *key );
 /**
  * Looks up the given key in the language dictionary.
  *
+ * @param key The key to look up.
+ * @return Returns the value for the given key or null if there is no such
+ * key.
+ */
+char const* find( char const *key );
+
+/**
+ * Looks up the given key in the language dictionary.
+ *
  * @tparam StringType The key's string type.
  * @param key The key to look up.
  * @return Returns the value for the given key.
