@@ -1236,6 +1236,9 @@ MainModule :
       $$ = $1; $$ = $3; // to prevent the Bison warning
       @1.step();
       error(@1, "syntax error, missing semicolon \";\" after statement");
+      // YYERROR does not run %destructors on this rule's RHS values: release them.
+      release_hack( $1 );
+      release_hack( $3 );
       YYERROR;
     }
   |
@@ -1244,6 +1247,9 @@ MainModule :
       $$ = $1; $$ = $3; // to prevent the Bison warning
       @1.step();
       error(@1, "syntax error, missing semicolon \";\" after declaration");
+      // YYERROR does not run %destructors on this rule's RHS values: release them.
+      release_hack( $1 );
+      release_hack( $3 );
       YYERROR;
     }
   |
@@ -1252,6 +1258,10 @@ MainModule :
       $$ = $1; $$ = $3; $$ = $5; // to prevent the Bison warning
       @3.step();
       error(@3, "syntax error, missing semicolon \";\" after declaration");
+      // YYERROR does not run %destructors on this rule's RHS values: release them.
+      release_hack( $1 );
+      release_hack( $3 );
+      release_hack( $5 );
       YYERROR;
     }
   |
@@ -1260,6 +1270,10 @@ MainModule :
       $$ = $1; $$ = $3; $$ = $5; // to prevent the Bison warning
       @1.step();
       error(@1, "syntax error, missing semicolon \";\" after statement");
+      // YYERROR does not run %destructors on this rule's RHS values: release them.
+      release_hack( $1 );
+      release_hack( $3 );
+      release_hack( $5 );
       YYERROR;
     }
 ;
@@ -1327,6 +1341,9 @@ SIND_DeclList :
       $$ = $1; $$ = $3; // to prevent the Bison warning
       @1.step();
       error(@1, "syntax error, missing semicolon \";\" after declaration");
+      // YYERROR does not run %destructors on this rule's RHS values: release them.
+      release_hack( $1 );
+      release_hack( $3 );
       YYERROR;
     }
 ;
@@ -1608,6 +1625,9 @@ VFO_DeclList :
       $$ = $1; $$ = $3; // to prevent the Bison warning
       @1.step();
       error(@1, "syntax error, missing semicolon \";\" after declaration");
+      // YYERROR does not run %destructors on this rule's RHS values: release them.
+      release_hack( $1 );
+      release_hack( $3 );
       YYERROR;
     }
 ;
