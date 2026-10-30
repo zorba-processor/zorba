@@ -39,6 +39,7 @@ jobs:
           languages: c-cpp
           build-mode: manual
           queries: security-extended
+          config-file: ./.github/codeql/codeql-config.yml
 
       - name: Build
         run: |

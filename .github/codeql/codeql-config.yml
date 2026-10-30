@@ -1,0 +1,3 @@
+# Generated and build-tree files (examples, test drivers) are not shipped source.
+paths-ignore:
+  - build/**
