@@ -112,7 +112,7 @@ jobs:
 
       - name: Upload the regenerated parsers and scanners
         if: always() && matrix.cache == 'linux-amd64-latest'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: generated-parser
           path: |
