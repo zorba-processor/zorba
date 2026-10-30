@@ -61,6 +61,9 @@
 
 #include <xercesc/util/OutOfMemoryException.hpp>
 #include <xercesc/util/PlatformUtils.hpp>
+#include <xercesc/util/SecurityManager.hpp>
+#include <xercesc/util/XMLEntityResolver.hpp>
+#include <xercesc/util/XMLResourceIdentifier.hpp>
 #include <xercesc/util/XMLString.hpp>
 #include <xercesc/util/XMLUni.hpp>
 #include <xercesc/util/XMLUri.hpp>
