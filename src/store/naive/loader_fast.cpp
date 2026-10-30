@@ -369,7 +369,8 @@ store::Item_t FastXmlLoader::loadXml(
   //  xmlParserCtxtPtr ctxt = NULL;
   theTree = GET_STORE().getNodeFactory().createXmlTree();
 
-  xmlSubstituteEntitiesDefault(1);
+  // Entity substitution is enabled per parser context below (XML_PARSE_NOENT
+  // via setSubstituteEntities(true)); xmlSubstituteEntitiesDefault() is deprecated.
 
   theBaseUri = baseUri;
 
