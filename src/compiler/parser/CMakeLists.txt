@@ -27,47 +27,37 @@ SET(PARSER_SRCS
 SET(PARSER_BUILD_SRCS)
 
 ###################################################################
-# Bison checks 
-SET (GENERATE_BISON_FILES TRUE)
+# Parser and scanner generation
+#
+# The generated parsers and scanners are checked in, and the build compiles
+# the checked-in copies unless ZORBA_REGENERATE_PARSER is ON. After changing
+# parser.y, scanner.l or the *_includes.h files, configure a build directory
+# with -DZORBA_REGENERATE_PARSER=ON, build the zorba_parser_sources target and
+# run the generated copyparser.sh. CI regenerates the files in the
+# docker/builder-latest image and fails if the checked-in copies differ.
+OPTION(ZORBA_REGENERATE_PARSER
+  "Regenerate the parsers/scanners with bison (>= 3.8) and flex (>= 2.6.4)" OFF)
 
-MACRO(BISON_VERSION_GREATER a b)
-  COMPARE_VERSION_STRINGS("${a}" "${b}" result)
-    IF(result LESS 0)
-        SET (GENERATE_BISON_FILES FALSE)
-        MESSAGE(STATUS "Bison: ${a} <  ${b}")
-     ELSE(result LESS 0)
-       IF(result GREATER 0)
-         MESSAGE(STATUS "Bison: ${a} >  ${b}")
-       ELSE(result GREATER 0)
-          MESSAGE(STATUS "Bison: ${a} == ${b}")
-       ENDIF(result GREATER 0)
-     ENDIF(result LESS 0)
-ENDMACRO(BISON_VERSION_GREATER)
+SET(GENERATE_BISON_FILES FALSE)
+SET(GENERATE_FLEX_FILES FALSE)
 
-MACRO(BISON_VERSION_LESS a b)
-  COMPARE_VERSION_STRINGS("${a}" "${b}" result)
-    IF(result GREATER 0)
-        SET (GENERATE_BISON_FILES FALSE)
-        MESSAGE(STATUS "Bison: ${a} >  ${b}")
-     ELSE(result GREATER 0)
-       IF(result LESS 0)
-         MESSAGE(STATUS "Bison: ${a} <  ${b}")
-       ELSE(result LESS 0)
-          MESSAGE(STATUS "Bison: ${a} == ${b}")
-       ENDIF(result LESS 0)
-     ENDIF(result GREATER 0)
-ENDMACRO(BISON_VERSION_LESS)
+IF (ZORBA_REGENERATE_PARSER)
+  COMPARE_VERSION_STRINGS("${BISON_VERSION_FULL}" "3.8" BISON_VERSION_RESULT)
+  IF (NOT BISON_EXECUTABLE OR BISON_VERSION_RESULT LESS 0)
+    MESSAGE(FATAL_ERROR "ZORBA_REGENERATE_PARSER needs GNU Bison >= 3.8 (found: ${BISON_VERSION_FULL})")
+  ENDIF ()
+  COMPARE_VERSION_STRINGS("${FLEX_VERSION_FULL}" "2.6.4" FLEX_VERSION_RESULT)
+  IF (NOT FLEX_EXECUTABLE OR FLEX_VERSION_RESULT LESS 0)
+    MESSAGE(FATAL_ERROR "ZORBA_REGENERATE_PARSER needs flex >= 2.6.4 (found: ${FLEX_VERSION_FULL})")
+  ENDIF ()
+  IF (NOT ZORBA_HAVE_FLEXLEXER_H OR NOT FLEX_INCLUDE_DIR)
+    MESSAGE(FATAL_ERROR "ZORBA_REGENERATE_PARSER needs flex's FlexLexer.h")
+  ENDIF ()
+  SET(GENERATE_BISON_FILES TRUE)
+  SET(GENERATE_FLEX_FILES TRUE)
+ENDIF (ZORBA_REGENERATE_PARSER)
 
-# Bison lowest and highest supported versions
-BISON_VERSION_GREATER("${BISON_VERSION_FULL}" "2.6")
-BISON_VERSION_LESS("${BISON_VERSION_FULL}" "3.0")
-
-# Bison 3.0 removed yylval, yyla.value should be used instead
-IF(BISON_MAJOR_VERSION GREATER 2)
-  SET (YYLVAL_DEFINE "-Dyylval=yyla.value")
-ELSE(BISON_MAJOR_VERSION GREATER 2)
-  SET (YYLVAL_DEFINE "")
-ENDIF(BISON_MAJOR_VERSION GREATER 2)
+SET(PARSER_GENERATED_FILES)
 
 MACRO(GENERATE_GRAMMAR_FILE PARSER_TYPE)
   SET(TARGET_PATH "${CMAKE_CURRENT_BINARY_DIR}/compiler/parser")
@@ -82,7 +72,7 @@ MACRO(GENERATE_GRAMMAR_FILE PARSER_TYPE)
             ">>"
            "${TARGET_PATH}/${PARSER_TYPE}.y"
       COMMAND ${CMAKE_CXX_COMPILER} 
-      ARGS "-xc++" "-P" "-D${PARSER_DEFINE}" "${YYLVAL_DEFINE}"
+      ARGS "-xc++" "-P" "-D${PARSER_DEFINE}"
            "-E" "${CMAKE_CURRENT_SOURCE_DIR}/compiler/parser/parser.y"
            ">>" "${TARGET_PATH}/${PARSER_TYPE}.y"
       DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/compiler/parser/parser.y" "${CMAKE_CURRENT_SOURCE_DIR}/compiler/parser/parser_y_includes.h"
@@ -90,9 +80,10 @@ MACRO(GENERATE_GRAMMAR_FILE PARSER_TYPE)
   
   BISON_FILE(${TARGET_PATH}/${PARSER_TYPE}.y)
   LIST(APPEND PARSER_BUILD_SRCS ${TARGET_PATH}/${PARSER_TYPE}.cpp)
+  LIST(APPEND PARSER_GENERATED_FILES ${TARGET_PATH}/${PARSER_TYPE}.cpp
+       ${TARGET_PATH}/${PARSER_TYPE}.hpp ${TARGET_PATH}/location.hh)
 ENDMACRO(GENERATE_GRAMMAR_FILE PARSER_TYPE)
 
-# Bison setup for the parser
 IF (GENERATE_BISON_FILES)
     SET(BISON_GENERATE_DEFINES TRUE)
     IF(NOT EXISTS "${CMAKE_CURRENT_BINARY_DIR}/compiler/parser")
@@ -101,37 +92,9 @@ IF (GENERATE_BISON_FILES)
     
     GENERATE_GRAMMAR_FILE(xquery_parser)
     GENERATE_GRAMMAR_FILE(jsoniq_parser)
-    
 ELSE (GENERATE_BISON_FILES)
-    IF (BISON_EXECUTABLE)
-        MESSAGE(STATUS "         GNU Bison's version " ${BISON_VERSION_FULL} " is less than required (2.4) -- the parser will not be regenerated")
-    ELSE (BISON_EXECUTABLE)
-        MESSAGE(STATUS "         GNU Bison is not available -- the parser will not be regenerated")
-    ENDIF (BISON_EXECUTABLE)
-    MESSAGE(STATUS "         Using repository files " ${CMAKE_CURRENT_SOURCE_DIR}/xquery_parser.cpp ${CMAKE_CURRENT_SOURCE_DIR}/jsoniq_parser.cpp)
     LIST(APPEND PARSER_SRCS xquery_parser.cpp jsoniq_parser.cpp)
 ENDIF (GENERATE_BISON_FILES)
-
-###################################################################
-# Flex checks 
-
-SET (GENERATE_FLEX_FILES TRUE)
-
-MACRO(COMPARE_FLEX_VERSION a b)
-  COMPARE_VERSION_STRINGS("${a}" "${b}" result)
-    IF(result LESS 0)
-        SET(GENERATE_FLEX_FILES FALSE)
-        MESSAGE(STATUS "Flex: ${a} <  ${b}")
-     ELSE(result LESS 0)
-       IF(result GREATER 0)
-         MESSAGE(STATUS "Flex: ${a} >  ${b}")
-       ELSE(result GREATER 0)
-          MESSAGE(STATUS "Flex: ${a} == ${b}")
-       ENDIF(result GREATER 0)
-     ENDIF(result LESS 0)
-ENDMACRO(COMPARE_FLEX_VERSION)
-
-COMPARE_FLEX_VERSION("${FLEX_VERSION_FULL}" "2.5.35")
 
 MACRO(GENERATE_FLEX_FILE SCANNER_TYPE)
   SET(TARGET_PATH ${CMAKE_CURRENT_BINARY_DIR}/compiler/parser)  
@@ -155,11 +118,10 @@ MACRO(GENERATE_FLEX_FILE SCANNER_TYPE)
     
   FLEX_FILE(${TARGET_PATH}/${SCANNER_TYPE}.l)  
   LIST(APPEND PARSER_BUILD_SRCS ${CMAKE_BINARY_DIR}/src/compiler/parser/${SCANNER_TYPE}.cpp)
+  LIST(APPEND PARSER_GENERATED_FILES ${CMAKE_BINARY_DIR}/src/compiler/parser/${SCANNER_TYPE}.cpp)
 ENDMACRO(GENERATE_FLEX_FILE SCANNER_TYPE)
 
-
-# Flex setup for the scanner
-IF (GENERATE_FLEX_FILES AND ZORBA_HAVE_FLEXLEXER_H AND FLEX_INCLUDE_DIR)
+IF (GENERATE_FLEX_FILES)
     IF(NOT EXISTS "${CMAKE_CURRENT_BINARY_DIR}/compiler/parser")
       FILE(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/compiler/parser")
     ENDIF(NOT EXISTS "${CMAKE_CURRENT_BINARY_DIR}/compiler/parser")
@@ -169,20 +131,15 @@ IF (GENERATE_FLEX_FILES AND ZORBA_HAVE_FLEXLEXER_H AND FLEX_INCLUDE_DIR)
     
     GENERATE_FLEX_FILE(xquery_scanner)
     GENERATE_FLEX_FILE(jsoniq_scanner)
-        
-ELSE (GENERATE_FLEX_FILES AND ZORBA_HAVE_FLEXLEXER_H AND FLEX_INCLUDE_DIR)
-    IF (NOT ZORBA_HAVE_FLEXLEXER_H)
-        MESSAGE(STATUS "         FlexLexer.h has not been found -- the lexer will not be regenerated")
-    ELSE (NOT ZORBA_HAVE_FLEXLEXER_H)
-        IF (FLEX_EXECUTABLE)
-            MESSAGE(STATUS "         GNU Flex version " ${FLEX_VERSION_FULL} " is less than required (2.5.35) -- the lexer will not be regenerated")
-        ELSE (FLEX_EXECUTABLE)
-            MESSAGE(STATUS "         GNU Flex is not available -- the lexer will not be regenerated")
-        ENDIF (FLEX_EXECUTABLE)
-    ENDIF (NOT ZORBA_HAVE_FLEXLEXER_H)
-    MESSAGE(STATUS "         Using repository file " ${CMAKE_CURRENT_SOURCE_DIR}/xquery_scanner.cpp ${CMAKE_CURRENT_SOURCE_DIR}/jsoniq_scanner.cpp)
+    LIST(APPEND PARSER_GENERATED_FILES ${CMAKE_CURRENT_BINARY_DIR}/FlexLexer.h)
+ELSE (GENERATE_FLEX_FILES)
     LIST(APPEND PARSER_SRCS xquery_scanner.cpp jsoniq_scanner.cpp)
-ENDIF (GENERATE_FLEX_FILES AND ZORBA_HAVE_FLEXLEXER_H AND FLEX_INCLUDE_DIR)
+ENDIF (GENERATE_FLEX_FILES)
+
+IF (PARSER_GENERATED_FILES)
+  LIST(REMOVE_DUPLICATES PARSER_GENERATED_FILES)
+  ADD_CUSTOM_TARGET(zorba_parser_sources DEPENDS ${PARSER_GENERATED_FILES})
+ENDIF (PARSER_GENERATED_FILES)
 
 # generate a script that copies the generated parser and scanner files from the build
 # directory into the source directory

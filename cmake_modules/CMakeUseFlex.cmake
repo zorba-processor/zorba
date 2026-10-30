@@ -87,7 +87,9 @@ IF(FLEX_EXECUTABLE)
     ADD_CUSTOM_COMMAND(
       OUTPUT "${OUTFILE}"
       COMMAND "${FLEX_EXECUTABLE}"
-      ARGS -t --debug "${FILENAME}"
+      # -L: no #line directives, so that the output does not depend on the
+      # build directory and can be checked in.
+      ARGS -t -L --debug "${FILENAME}"
       # flex's --outfile doesn't seem to work right, so redirect stdout
           > "${OUTFILE}"
       DEPENDS "${FILENAME}"

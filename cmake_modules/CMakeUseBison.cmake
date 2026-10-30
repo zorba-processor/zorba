@@ -16,10 +16,6 @@
 # Defines the following:
 #  BISON_EXECUTABLE - path to the bison executable
 #  BISON_FILE - parse a file with bison
-#  BISON_PREFIX_OUTPUTS - Set to true to make BISON_FILE produce prefixed
-#                         symbols in the generated output based on filename.
-#                         So for ${filename}.y, you'll get ${filename}parse(), etc.
-#                         instead of yyparse().
 #  BISON_GENERATE_DEFINES - Set to true to make BISON_FILE output the matching
 #                           .h file for a .c file. You want this if you're using
 #                           flex.
@@ -28,10 +24,6 @@
 #  BISON_MINOR_VERSION    - Returns the Bison minor version 
 #
 
-
-IF(NOT DEFINED BISON_PREFIX_OUTPUTS)
-  SET(BISON_PREFIX_OUTPUTS FALSE)
-ENDIF(NOT DEFINED BISON_PREFIX_OUTPUTS)
 
 IF(NOT DEFINED BISON_GENERATE_DEFINES)
   SET(BISON_GENERATE_DEFINES FALSE)
@@ -66,38 +58,44 @@ IF(BISON_EXECUTABLE)
     IF(NOT EXISTS "${CMAKE_CURRENT_BINARY_DIR}/${PATH}")
       FILE(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/${PATH}")
     ENDIF(NOT EXISTS "${CMAKE_CURRENT_BINARY_DIR}/${PATH}")
-    IF(BISON_PREFIX_OUTPUTS)
-      SET(PREFIX "${HEAD}")
-    ELSE(BISON_PREFIX_OUTPUTS)
-      SET(PREFIX "yy")
-    ENDIF(BISON_PREFIX_OUTPUTS)
     SET(OUTFILE "${PATH}/${HEAD}.cpp")
+    # Bison runs in the output directory on relative file names and without
+    # #line directives, so that the output (header guards included) does not
+    # depend on the build directory and can be checked in.
     IF(BISON_GENERATE_DEFINES)
       SET(HEADER "${PATH}/${HEAD}.hpp")
       SET(LOCATION "${PATH}/location.hh")
-      SET(POSITION "${PATH}/position.hh")
-      SET(STACK "${PATH}/stack.hh")
-	  
+      # Every parser generated in the same directory writes the same
+      # location.hh; only the first one may declare it as an output.
+      STRING(MAKE_C_IDENTIFIER "${LOCATION}" _bison_location_id)
+      IF(DEFINED _BISON_LOCATION_${_bison_location_id})
+        SET(_bison_location_output)
+      ELSE()
+        SET(_BISON_LOCATION_${_bison_location_id} TRUE)
+        SET(_bison_location_output "${LOCATION}")
+      ENDIF()
+
       ADD_CUSTOM_COMMAND(
-        OUTPUT "${OUTFILE}" "${HEADER}" "${LOCATION}" "${POSITION}" "${STACK}"
+        OUTPUT "${OUTFILE}" "${HEADER}" ${_bison_location_output}
         COMMAND "${BISON_EXECUTABLE}"
-        ARGS "--name-prefix=${PREFIX}"
-        "--defines"
+        ARGS "--header=${HEAD}.hpp"
         "-t"
-        "-rall"
         "--locations"
-        "--output-file=${OUTFILE}"
-        "${FILENAME}"
+        "--no-lines"
+        "--output=${HEAD}.cpp"
+        "${HEAD}.y"
+        WORKING_DIRECTORY "${PATH}"
         DEPENDS "${FILENAME}")
-      SET_SOURCE_FILES_PROPERTIES("${OUTFILE}" "${HEADER}" "${LOCATION}" "${POSITION}" "${STACK}" PROPERTIES GENERATED TRUE)
-      SET_SOURCE_FILES_PROPERTIES("${HEADER}" "${LOCATION}" "${POSITION}" "${STACK}" PROPERTIES HEADER_FILE_ONLY TRUE)
+      SET_SOURCE_FILES_PROPERTIES("${OUTFILE}" "${HEADER}" "${LOCATION}" PROPERTIES GENERATED TRUE)
+      SET_SOURCE_FILES_PROPERTIES("${HEADER}" "${LOCATION}" PROPERTIES HEADER_FILE_ONLY TRUE)
     ELSE(BISON_GENERATE_DEFINES)
       ADD_CUSTOM_COMMAND(
         OUTPUT "${OUTFILE}"
         COMMAND "${BISON_EXECUTABLE}"
-        ARGS "--name-prefix=${PREFIX}"
-        "--output-file=${OUTFILE}"
-        "${FILENAME}"
+        ARGS "--no-lines"
+        "--output=${HEAD}.cpp"
+        "${HEAD}.y"
+        WORKING_DIRECTORY "${PATH}"
         DEPENDS "${FILENAME}")
       SET_SOURCE_FILES_PROPERTIES("${OUTFILE}" PROPERTIES GENERATED TRUE)
     ENDIF(BISON_GENERATE_DEFINES)
