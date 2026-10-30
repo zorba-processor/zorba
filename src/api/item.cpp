@@ -515,7 +515,8 @@ Item::getArrayValue(uint32_t aIndex) const
   ITEM_TRY
     SYNC_CODE(AutoLock lock(GENV_STORE.getGlobalLock(), Lock::READ);)
     xs_integer lIndex(aIndex);
-    return &*m_item->getArrayValue(lIndex);
+    // getp(): the result is null when aIndex is out of bounds.
+    return m_item->getArrayValue(lIndex).getp();
   ITEM_CATCH
   return Item();
 }

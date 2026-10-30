@@ -20,8 +20,6 @@
 #ifndef ZORBA_ASSERT_H
 #define ZORBA_ASSERT_H
 
-#include <sstream>
-
 #include <zorba/internal/cxx_util.h>
 
 namespace zorba {

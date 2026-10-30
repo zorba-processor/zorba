@@ -1,0 +1,7 @@
+<json xmlns="http://john.snelson.org.uk/parsing-json-into-xquery" type="object">
+  <pair name="sku" type="string">A1</pair>
+  <pair name="qty" type="number">2</pair>
+  <pair name="tags" type="array">
+    <item type="string">new</item>
+  </pair>
+</json>

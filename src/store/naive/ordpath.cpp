@@ -17,6 +17,7 @@
 
 #include <cassert>
 #include <limits>
+#include <sstream>
 
 #include "zorbautils/hashfun.h"
 #include "diagnostics/xquery_diagnostics.h"
@@ -4416,11 +4417,17 @@ void OrdPathStack::compressComp(ulong comp, int32_t value)
     ulong bitsUsed = (bitsNeeded < theBitsAvailable ?
                       bitsNeeded : theBitsAvailable);
 
-    unsigned char byte = (unsigned char)
-                         ((eval & OrdPath::theValueMasks[bitsUsed]) >>
-                          (32 - theBitsAvailable));
+    // theBitsAvailable is 0 on entry when the last byte is already full
+    // (see nextChild()/popChild()). Then bitsUsed is 0 and nothing is written,
+    // but the shift by (32 - theBitsAvailable) would be undefined.
+    if (bitsUsed > 0)
+    {
+      unsigned char byte = (unsigned char)
+                           ((eval & OrdPath::theValueMasks[bitsUsed]) >>
+                            (32 - theBitsAvailable));
 
-    theBuffer[theByteIndex] |= byte;
+      theBuffer[theByteIndex] |= byte;
+    }
 
     eval = eval << bitsUsed;
     bitsNeeded -= bitsUsed;

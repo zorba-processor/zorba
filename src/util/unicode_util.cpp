@@ -21,6 +21,7 @@
 #include <cstdlib>
 #include <cwchar>
 #include <functional>                   /* for binary_function */
+#include <iterator>
 #include <utility>                      /* for pair */
 
 #ifndef ZORBA_NO_ICU
@@ -2115,8 +2116,8 @@ case_table_entry const lower2upper[] = {
  * Each row contains the [begin,end) pointers for the respective table.
  */
 case_table_entry const *const case_tables[][2] = {
-  { upper2lower, upper2lower + sizeof( upper2lower ) / sizeof upper2lower[0] },
-  { lower2upper, lower2upper + sizeof( lower2upper ) / sizeof lower2upper[0] },
+  { std::begin( upper2lower ), std::end( upper2lower ) },
+  { std::begin( lower2upper ), std::end( lower2upper ) },
 };
 
 enum case_type {

@@ -1,0 +1,7 @@
+{
+  "keys" : [ "a", "b", "c" ], 
+  "size" : 3, 
+  "members" : [ 10, 20, 30 ], 
+  "is-object" : true, 
+  "sum" : 60
+}

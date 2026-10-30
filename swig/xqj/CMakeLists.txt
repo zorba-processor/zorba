@@ -82,33 +82,10 @@ IF (Java_JAVAC_EXECUTABLE)
   # JAR GENERATION
   FILE(GLOB XQJ_SWIG_FILES "${CMAKE_CURRENT_BINARY_DIR}/*.java")
   
-  COMPARE_VERSION_STRINGS (${CMAKE_VERSION} "2.8.6" RESULT)
-  IF (${RESULT} GREATER -1)
-    INCLUDE (UseJava)
-    SET(CMAKE_JAVA_INCLUDE_PATH  ${CMAKE_JAVA_INCLUDE_PATH} ${ZORBA_JAVA_JAR} "${CMAKE_CURRENT_BINARY_DIR}/tck/xqjapi.jar") # JAVA_SWIG_FILES is predefined in Java binding
-    ADD_JAR(zorba_xqj ${XQJ_SWIG_FILES})
-    ADD_DEPENDENCIES(zorba_xqj zorba_api_java)
-    SET_TARGET_PROPERTIES (zorba_xqj PROPERTIES FOLDER "APIs" OUTPUT_NAME "zorba_xqj" PROJECT_LABEL "XQJ")
-  ELSE (${RESULT} GREATER -1)
-    IF (WIN32)
-      STRING(REGEX REPLACE "/" "\\\\" ZORBA_JAVA_JAR ${ZORBA_JAVA_JAR}) 
-      STRING(REGEX REPLACE "/" "\\\\" ZORBA_XQJ_JAR ${CMAKE_CURRENT_BINARY_DIR}) 
-      SET(XQJ_CLASSPATH "${ZORBA_JAVA_JAR}\;${ZORBA_XQJ_JAR}\\tck\\xqjapi.jar")
-    ELSE (WIN32)
-      SET(XQJ_CLASSPATH "${ZORBA_JAVA_JAR}:${CMAKE_CURRENT_BINARY_DIR}/tck/xqjapi.jar")
-    ENDIF (WIN32)
-    MESSAGE(STATUS "XQJ CLASSPATH " ${XQJ_CLASSPATH})
-    ADD_LIBRARY(XQJ dummy.c)
-    SET_TARGET_PROPERTIES (XQJ PROPERTIES FOLDER "APIs" OUTPUT_NAME "zorba_xqj" PROJECT_LABEL "XQJ")
-    ADD_DEPENDENCIES(XQJ zorba_api_java)
-    ADD_CUSTOM_COMMAND(TARGET XQJ
-                     POST_BUILD
-                     COMMAND cmake -E echo "Compiling XQJ files..."
-                     COMMAND ${Java_JAVAC_EXECUTABLE} -cp ${XQJ_CLASSPATH} *.java -d ${CMAKE_CURRENT_BINARY_DIR}
-                     COMMAND cmake -E echo "Creating jar file..."
-                     COMMAND ${Java_JAR_EXECUTABLE} cf zorba_xqj.jar org
-    )
-  ENDIF (${RESULT} GREATER -1)
+  SET(CMAKE_JAVA_INCLUDE_PATH  ${CMAKE_JAVA_INCLUDE_PATH} ${ZORBA_JAVA_JAR} "${CMAKE_CURRENT_BINARY_DIR}/tck/xqjapi.jar") # JAVA_SWIG_FILES is predefined in Java binding
+  ADD_JAR(zorba_xqj ${XQJ_SWIG_FILES})
+  ADD_DEPENDENCIES(zorba_xqj zorba_api_java)
+  SET_TARGET_PROPERTIES (zorba_xqj PROPERTIES FOLDER "APIs" OUTPUT_NAME "zorba_xqj" PROJECT_LABEL "XQJ")
 
   # Install section
   SET(XQJ_JAR_FILE "${CMAKE_CURRENT_BINARY_DIR}/zorba_xqj.jar")

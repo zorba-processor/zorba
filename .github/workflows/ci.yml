@@ -68,12 +68,16 @@ jobs:
           docker run --rm --network zorba-test \
             -e ZORBA_HTTP_TEST_SERVER=zorba-http-test:8080 \
             -e CCACHE_DIR=/src/.ccache \
+            -e CCACHE_SLOPPINESS=pch_defines,time_macros \
             -v "$PWD":/src -w /src zorba-builder:ci sh -ec '
               cmake --preset full-release
               cmake --build --preset full-release
               ccache -s
               ctest --preset full-release -j"$(nproc)" \
                 --output-junit junit.xml'
+
+      - name: Verify hardening
+        run: scripts/check-hardening.sh build/full-release
 
       - name: Upload test results
         if: failure()
@@ -89,6 +93,7 @@ jobs:
     runs-on: macos-15
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_SLOPPINESS: pch_defines,time_macros
     steps:
       - uses: actions/checkout@v4
 

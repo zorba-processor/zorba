@@ -1,0 +1,10 @@
+<book id="b3" year="1984">
+  <title>Neuromancer</title>
+  <writer>William Gibson</writer>
+  <price>9.99</price>
+  <tags>
+    <tag>novel</tag>
+    <tag>science fiction</tag>
+    <tag>cyberpunk</tag>
+  </tags>
+</book>

@@ -1,0 +1,9 @@
+[ {
+  "customer" : "ana", 
+  "orders" : 2, 
+  "skus" : [ "A1", "B7", "C3" ]
+}, {
+  "customer" : "luis", 
+  "orders" : 1, 
+  "skus" : [ "A1" ]
+} ]

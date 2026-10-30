@@ -1,0 +1,26 @@
+<library>
+  <book id="b1" year="1967" lang="es">
+    <title>Cien años de soledad</title>
+    <author>Gabriel García Márquez</author>
+    <price>18.50</price>
+    <tags><tag>novel</tag><tag>magic realism</tag></tags>
+  </book>
+  <book id="b2" year="1979" lang="en">
+    <title>Gödel, Escher, Bach</title>
+    <author>Douglas Hofstadter</author>
+    <price>24.00</price>
+    <tags><tag>essay</tag><tag>mathematics</tag></tags>
+  </book>
+  <book id="b3" year="1984" lang="en">
+    <title>Neuromancer</title>
+    <author>William Gibson</author>
+    <price>12.99</price>
+    <tags><tag>novel</tag><tag>science fiction</tag></tags>
+  </book>
+  <book id="b4" year="1985" lang="es">
+    <title>El amor en los tiempos del cólera</title>
+    <author>Gabriel García Márquez</author>
+    <price>16.00</price>
+    <tags><tag>novel</tag></tags>
+  </book>
+</library>

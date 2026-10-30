@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Using Zorba</title>
+<meta name="description" content="The zorba command line, built-in modules, collections, indexes and integrity constraints, scripting, and embedding Zorba in C++.">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+<!-- header: zorba -->
+
+<div class="layout">
+<details class="toc">
+  <summary>On this page</summary>
+  <p class="toc-title">Using Zorba</p>
+  <ol>
+    <li><a href="#cli">The command line</a></li>
+    <li><a href="#external">External variables</a></li>
+    <li><a href="#modules">Built-in modules</a></li>
+    <li><a href="#collections">Collections</a></li>
+    <li><a href="#indexes">Static collections and indexes</a></li>
+    <li><a href="#constraints">Integrity constraints</a></li>
+    <li><a href="#scripting">Scripting</a></li>
+    <li><a href="#embed">Embedding in C++</a></li>
+    <li><a href="#limits">Limits</a></li>
+  </ol>
+</details>
+
+<main>
+<h1>Using Zorba</h1>
+<p class="lede">The parts of Zorba that are not the language itself: how to run queries, which libraries ship with it, the in-memory store, and the C++ API.</p>
+
+<h2 id="cli">The command line</h2>
+<p><code>zorba</code> runs one or more queries and writes the results to standard output. A query is either given inline or, with <code>-f</code>, read from a file. A <code>.jq</code> file is parsed as JSONiq; anything else as XQuery unless <code>-j</code> is given.</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Option</th><th>Effect</th></tr></thead>
+  <tbody>
+    <tr><td><code>-q &lt;query&gt;</code></td><td>The query text, or a file name with <code>-f</code>.</td></tr>
+    <tr><td><code>-f</code>, <code>--as-files</code></td><td>Treat the <code>-q</code> arguments as file names.</td></tr>
+    <tr><td><code>-i</code>, <code>--indent</code></td><td>Indent the output.</td></tr>
+    <tr><td><code>-r</code>, <code>--omit-xml-declaration</code></td><td>Do not print <code>&lt;?xml ...?&gt;</code>.</td></tr>
+    <tr><td><code>-j</code>, <code>--jsoniq</code></td><td>Parse the query as JSONiq whatever its extension.</td></tr>
+    <tr><td><code>-e name:=value</code></td><td>Bind an external variable to a string; <code>-e name=file</code> binds it to the parsed XML document in a file.</td></tr>
+    <tr><td><code>--context-item &lt;file&gt;</code></td><td>Make the XML document in a file the context item.</td></tr>
+    <tr><td><code>-z name=value</code></td><td>Set a serialization parameter, for example <code>-z method=json</code> or <code>-z method=xhtml</code>.</td></tr>
+    <tr><td><code>--serialize-text</code>, <code>--serialize-html</code></td><td>Shortcuts for the text and HTML output methods.</td></tr>
+    <tr><td><code>-o &lt;file&gt;</code></td><td>Write the result to a file.</td></tr>
+    <tr><td><code>--module-path &lt;dirs&gt;</code></td><td>Directories to search for imported modules.</td></tr>
+    <tr><td><code>--base-uri &lt;uri&gt;</code></td><td>Set the static base URI used to resolve relative paths.</td></tr>
+    <tr><td><code>-t</code>, <code>--timing</code></td><td>Print compilation and execution times.</td></tr>
+    <tr><td><code>--compile-only</code>, <code>--parse-only</code></td><td>Check a query without running it.</td></tr>
+  </tbody>
+</table>
+</div>
+<p><code>zorba --help</code> lists everything, including optimizer and debugging switches. By default the output method is <code>json-xml-hybrid</code>: XML nodes are serialized as XML, JSON items as JSON, and atomic values separated by spaces, which is what you see in the examples on this site.</p>
+
+<h2 id="external">External variables</h2>
+<p>A query declares the inputs it expects with <code>declare variable ... external</code>, optionally with a type and a default. The command line or the C++ API supplies the values.</p>
+<!-- example: zorba/external-var -->
+<p class="why"><strong>Why it matters:</strong> a query becomes a reusable program with parameters instead of a string you edit.</p>
+
+<h2 id="modules">Built-in modules</h2>
+<p>These library modules ship with Zorba and are imported by namespace URI, with no <code>at</code> clause. Older Zorba releases had many more modules in separate repositories (archives, images, databases, and so on); those are not part of this code base.</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Namespace URI</th><th>What it offers</th></tr></thead>
+  <tbody>
+    <tr><td><code>http://expath.org/ns/file</code></td><td>Read, write, list and delete files and directories (EXPath File).</td></tr>
+    <tr><td><code>http://zorba.io/modules/http-client</code></td><td>HTTP requests with JSON-shaped requests and responses.</td></tr>
+    <tr><td><code>http://www.zorba-xquery.com/modules/http-client</code></td><td>The older, XML-shaped HTTP client interface.</td></tr>
+    <tr><td><code>http://zorba.io/modules/fetch</code></td><td>Fetch the content of a URI as text or binary.</td></tr>
+    <tr><td><code>http://zorba.io/modules/string</code></td><td>Splitting and other string helpers.</td></tr>
+    <tr><td><code>http://zorba.io/modules/math</code></td><td>Spreadsheet-style math and statistics (median, standard deviation, Roman numerals, ...).</td></tr>
+    <tr><td><code>http://zorba.io/modules/random</code></td><td>Random numbers and UUIDs.</td></tr>
+    <tr><td><code>http://zorba.io/modules/base64</code></td><td>Base64 encoding and decoding.</td></tr>
+    <tr><td><code>http://zorba.io/modules/datetime</code></td><td>Current time, timestamps, parsing dates with a pattern.</td></tr>
+    <tr><td><code>http://zorba.io/modules/sequence</code></td><td>Set operations on atomic values.</td></tr>
+    <tr><td><code>http://zorba.io/modules/uri</code></td><td>Parsing, serializing and decoding URIs.</td></tr>
+    <tr><td><code>http://zorba.io/modules/xml</code></td><td>Parsing XML with options, and canonicalization.</td></tr>
+    <tr><td><code>http://zorba.io/modules/schema</code></td><td>Schema types of validated nodes, validation in place.</td></tr>
+    <tr><td><code>http://zorba.io/modules/json-xml</code></td><td>Generic conversion between JSON and XML (JsonML and other formats).</td></tr>
+    <tr><td><code>http://zorba.io/modules/json-csv</code></td><td>CSV to JSON objects and back.</td></tr>
+    <tr><td><code>http://jsoniq.org/functions</code>, <code>http://jsoniq.org/function-library</code></td><td>The JSONiq function libraries (<code>keys</code>, <code>members</code>, <code>parse-json</code>, <code>descendant-objects</code>, ...).</td></tr>
+    <tr><td><code>http://jsound.io/modules/jsound</code></td><td>Validating JSON against JSound schemas.</td></tr>
+    <tr><td><code>http://zorba.io/modules/full-text</code></td><td>Tokenizing, stemming, stop words and thesaurus lookups outside <code>contains text</code>.</td></tr>
+    <tr><td><code>http://zorba.io/modules/node</code>, <code>.../node-position</code>, <code>.../reference</code></td><td>Structural relationships between nodes (ancestor-of, level, ...), node positions and stable node references.</td></tr>
+    <tr><td><code>http://zorba.io/modules/item</code></td><td>The size of an item.</td></tr>
+    <tr><td><code>http://zorba.io/modules/reflection</code></td><td>Calling functions by name, evaluating query strings.</td></tr>
+    <tr><td><code>http://zorba.io/modules/zorba-query</code></td><td>Compiling and running queries from inside a query.</td></tr>
+    <tr><td><code>http://zorba.io/modules/sctx</code>, <code>http://zorba.io/modules/dctx</code></td><td>Inspecting the static and dynamic context.</td></tr>
+    <tr><td><code>http://zorba.io/modules/store/...</code></td><td>Collections, indexes and integrity constraints (below), named documents, and key-value maps in the store.</td></tr>
+    <tr><td><code>http://zorba.io/modules/sleep</code></td><td>Pausing a query.</td></tr>
+    <tr><td><code>http://zorba.io/modules/xqdoc</code></td><td>Generating xqDoc documentation for modules.</td></tr>
+    <tr><td><code>http://www.functx.com</code></td><td>The FunctX library of general-purpose XQuery functions.</td></tr>
+  </tbody>
+</table>
+</div>
+<!-- example: zorba/modules -->
+<!-- example: zorba/csv -->
+<p class="why"><strong>Why it matters:</strong> common chores (files, HTTP, CSV, statistics) are a module import away, without writing C++ extensions.</p>
+
+<h2 id="collections">Collections</h2>
+<p>A collection is a named, ordered set of documents or JSON items kept in Zorba's store for the life of the process. The dynamic collection modules create collections by QName at run time; the data manipulation functions insert and delete whole items. These are updating functions, and in a program with several statements (see <a href="#scripting">scripting</a>) each statement's updates are applied when it ends.</p>
+<!-- example: zorba/dynamic-collection -->
+<p class="why"><strong>Why it matters:</strong> <code>dml:delete</code> is needed because the items of a collection are roots. The Update Facility's <code>delete node</code> has no effect on a node without a parent.</p>
+
+<h2 id="indexes">Static collections and indexes</h2>
+<p>XQDDF, Zorba's data definition facility, declares collections, indexes and constraints in the prolog of a library module, much as SQL DDL declares tables. A declared collection has a type, and a declared index is maintained by the store as the collection changes.</p>
+<!-- source: zorba/lib/shop.xqm -->
+<!-- example: zorba/static-collection -->
+<p class="why"><strong>Why it matters:</strong> an index probe finds the matching items without scanning the collection. Zorba does not choose indexes automatically: you probe them by name, as above.</p>
+
+<h2 id="constraints">Integrity constraints</h2>
+<p>Integrity constraints declared on a collection are checked when updates are applied, once activated. Here the second insert of the same <code>sku</code> violates a unique key, the whole update is rejected, and the collection keeps one product.</p>
+<!-- example: zorba/integrity -->
+<p class="why"><strong>Why it matters:</strong> invariants live next to the data definition instead of being re-checked by every query that writes.</p>
+
+<h2 id="scripting">Scripting</h2>
+<p>Zorba's scripting extension adds imperative constructs to XQuery and JSONiq: statements separated by semicolons, mutable variables declared with <code>variable</code>, assignment with <code>:=</code>, blocks in braces, <code>while</code> loops, <code>exit returning</code>, and functions annotated <code>%an:sequential</code> that may have side effects. The updates of each statement are applied before the next one runs.</p>
+<!-- example: zorba/scripting -->
+<p class="why"><strong>Why it matters:</strong> programs that create collections, load data, update it and then query it can be written in one file, as in the collection examples above.</p>
+<div class="note"><p><code>break</code> and <code>continue</code> are not implemented inside FLWOR expressions; use <code>while</code> loops when you need them.</p></div>
+
+<h2 id="embed">Embedding in C++</h2>
+<p>The C++ API is in <code>include/zorba</code>. The usual pattern: create a store and a <code>Zorba</code> instance, compile a query into an <code>XQuery</code> object, bind external variables on its dynamic context, iterate over the result, and shut down in reverse order. Compilation errors and runtime errors are thrown as <code>ZorbaException</code>. This program is compiled against the installed headers and linked with <code>libzorba_simplestore</code> as part of the site build.</p>
+<!-- example: zorba/embed -->
+<p class="why"><strong>Why it matters:</strong> a compiled query can be executed many times with different variables, which is how an application uses Zorba as its query engine. More examples are in <a href="https://github.com/zorba-processor/zorba/tree/master/doc/cxx/examples"><code>doc/cxx/examples</code></a>.</p>
+
+<h2 id="limits">Limits</h2>
+<ul>
+  <li>The store is in memory and not persistent: collections disappear when the process ends.</li>
+  <li>No XQuery 3.1 (maps, arrays, <code>=&gt;</code>, <code>?</code>). Use JSONiq.</li>
+  <li>Full Text is mostly, not completely, implemented; serialization character maps are not implemented.</li>
+  <li>XQueryX needs a build with <code>ZORBA_XQUERYX</code> enabled.</li>
+  <li>No XSLT.</li>
+</ul>
+<p>The source, the issue tracker and build instructions are in the <a href="https://github.com/zorba-processor/zorba">GitHub repository</a>.</p>
+
+<div class="pager"><a href="jsoniq.html">JSONiq</a><a href="cheatsheet.html">Next: Cheat sheet</a></div>
+</main>
+</div>
+
+<!-- footer -->
+<script src="assets/site.js"></script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+{
+  "name" : "Zorba", 
+  "languages" : [ "XQuery", "JSONiq" ], 
+  "embeddable" : true, 
+  "homepage" : null, 
+  "since" : 2008, 
+  "squares" : [ 1, 4, 9, 16 ], 
+  "nested" : {
+    "empty-array" : [  ], 
+    "empty-object" : {
+
+    }
+  }
+}

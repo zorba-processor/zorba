@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>XQuery and JSONiq cheat sheet</title>
+<meta name="description" content="Compact reference for XQuery, JSONiq and Zorba syntax. Each entry links to a verified example.">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+<!-- header: cheatsheet -->
+
+<main style="max-width:76rem;margin:0 auto;padding:2rem 1rem 4rem">
+<h1>Cheat sheet</h1>
+<p class="lede">The syntax on one page. Every entry appears in a verified example on the tutorial pages; follow the link at the end of each row to see it run.</p>
+
+<div class="cheat">
+
+<section>
+<h2>Paths</h2>
+<table><tbody>
+<tr><td><code>//book</code></td><td>book elements at any depth <a href="map.html#xpath">ex</a></td></tr>
+<tr><td><code>/library/book/title</code></td><td>child steps from the root <a href="xquery.html#paths">ex</a></td></tr>
+<tr><td><code>//book[@lang = "es"]</code></td><td>filter by attribute <a href="map.html#xpath">ex</a></td></tr>
+<tr><td><code>//book[2]</code></td><td>second book child of each parent <a href="xquery.html#predicates">ex</a></td></tr>
+<tr><td><code>(//book)[last()]</code></td><td>last of the whole sequence <a href="xquery.html#predicates">ex</a></td></tr>
+<tr><td><code>ancestor::book</code>, <code>..</code></td><td>up the tree <a href="xquery.html#axes">ex</a></td></tr>
+<tr><td><code>following-sibling::author</code></td><td>sideways <a href="xquery.html#axes">ex</a></td></tr>
+<tr><td><code>price/xs:decimal(.)</code></td><td>function as a step <a href="xquery.html#values">ex</a></td></tr>
+<tr><td><code>$titles ! upper-case(.)</code></td><td>map over a sequence <a href="xquery.html#values">ex</a></td></tr>
+</tbody></table>
+</section>
+
+<section>
+<h2>Comparisons</h2>
+<table><tbody>
+<tr><td><code>$seq = "en"</code></td><td>true if any item matches <a href="xquery.html#comparisons">ex</a></td></tr>
+<tr><td><code>$one eq "en"</code></td><td>exactly one item each side <a href="xquery.html#comparisons">ex</a></td></tr>
+<tr><td><code>some $b in $books satisfies $b/price &lt; 13</code></td><td>existential <a href="xquery.html#comparisons">ex</a></td></tr>
+<tr><td><code>every $b in $books satisfies $b/price &gt; 0</code></td><td>universal <a href="xquery.html#comparisons">ex</a></td></tr>
+<tr><td><code>$a is $b</code>, <code>deep-equal($a, $b)</code></td><td>identity, value equality <a href="map.html#nodes">ex</a></td></tr>
+</tbody></table>
+</section>
+
+<section>
+<h2>FLWOR</h2>
+<table><tbody>
+<tr><td><code>for $b in $books</code></td><td>iterate <a href="xquery.html#flwor">ex</a></td></tr>
+<tr><td><code>let $p := xs:decimal($b/price)</code></td><td>bind once <a href="xquery.html#flwor">ex</a></td></tr>
+<tr><td><code>where $p &lt; 20</code></td><td>filter <a href="xquery.html#flwor">ex</a></td></tr>
+<tr><td><code>order by $p descending</code></td><td>sort <a href="xquery.html#flwor">ex</a></td></tr>
+<tr><td><code>group by $author := string($b/author)</code></td><td>group <a href="xquery.html#group">ex</a></td></tr>
+<tr><td><code>for $b at $pos in ...</code></td><td>input position <a href="xquery.html#count">ex</a></td></tr>
+<tr><td><code>count $rank</code></td><td>number the results <a href="xquery.html#count">ex</a></td></tr>
+<tr><td><code>for $b allowing empty in ...</code></td><td>outer join <a href="xquery.html#joins">ex</a></td></tr>
+<tr><td><code>for tumbling window $w in $s
+  start at $s when true()
+  end at $e when $e - $s eq 2</code></td><td>batches <a href="xquery.html#windows">ex</a></td></tr>
+<tr><td><code>for sliding window $w in $s ...
+  only end at $e when ...</code></td><td>moving windows <a href="xquery.html#windows">ex</a></td></tr>
+<tr><td><code>return ...</code></td><td>result per binding <a href="xquery.html#flwor">ex</a></td></tr>
+</tbody></table>
+</section>
+
+<section>
+<h2>Constructors</h2>
+<table><tbody>
+<tr><td><code>&lt;li lang="{$b/@lang}"&gt;{ $t }&lt;/li&gt;</code></td><td>direct, with enclosed expressions <a href="xquery.html#constructors">ex</a></td></tr>
+<tr><td><code>element { concat("h", $n) } { ... }</code></td><td>computed element name <a href="xquery.html#constructors">ex</a></td></tr>
+<tr><td><code>attribute id { $name }</code></td><td>computed attribute <a href="xquery.html#constructors">ex</a></td></tr>
+<tr><td><code>text { "Release notes" }</code></td><td>text node <a href="xquery.html#constructors">ex</a></td></tr>
+</tbody></table>
+</section>
+
+<section>
+<h2>Functions and modules</h2>
+<table><tbody>
+<tr><td><code>declare function local:f($x as xs:integer)
+  as xs:integer { ... };</code></td><td>user function <a href="xquery.html#functions">ex</a></td></tr>
+<tr><td><code>function($x) { $x * $x }</code></td><td>inline function <a href="xquery.html#hof">ex</a></td></tr>
+<tr><td><code>upper-case#1</code></td><td>function reference <a href="xquery.html#hof">ex</a></td></tr>
+<tr><td><code>for-each($s, $f)</code>, <code>filter($s, $p)</code>, <code>fold-left($s, 0, $f)</code></td><td>higher-order <a href="xquery.html#hof">ex</a></td></tr>
+<tr><td><code>module namespace geo = "http://example.org/geo";</code></td><td>library module <a href="xquery.html#modules">ex</a></td></tr>
+<tr><td><code>import module namespace geo =
+  "http://example.org/geo" at "lib/geo.xqm";</code></td><td>import <a href="xquery.html#modules">ex</a></td></tr>
+</tbody></table>
+</section>
+
+<section>
+<h2>Types and errors</h2>
+<table><tbody>
+<tr><td><code>xs:integer("42")</code>, <code>"2026-10-29" cast as xs:date</code></td><td>convert <a href="xquery.html#types">ex</a></td></tr>
+<tr><td><code>"4x2" castable as xs:integer</code></td><td>test conversion <a href="xquery.html#types">ex</a></td></tr>
+<tr><td><code>3 instance of xs:decimal</code></td><td>test type <a href="xquery.html#types">ex</a></td></tr>
+<tr><td><code>switch ($c) case "es" return ... default return ...</code></td><td>by value <a href="xquery.html#types">ex</a></td></tr>
+<tr><td><code>typeswitch ($i) case element() return ...</code></td><td>by type <a href="map.html#items">ex</a></td></tr>
+<tr><td><code>validate { $node }</code></td><td>schema validation <a href="xquery.html#schema">ex</a></td></tr>
+<tr><td><code>try { ... } catch err:FORG0001 { $err:code }</code></td><td>catch by name <a href="xquery.html#errors">ex</a></td></tr>
+<tr><td><code>catch * { $err:description }</code></td><td>catch all <a href="xquery.html#errors">ex</a></td></tr>
+<tr><td><code>error(QName($ns, "app:E42"), "message")</code></td><td>raise <a href="xquery.html#errors">ex</a></td></tr>
+</tbody></table>
+</section>
+
+<section>
+<h2>Updates</h2>
+<table><tbody>
+<tr><td><code>copy $b := $book modify (...) return $b</code></td><td>update a copy <a href="xquery.html#updates">ex</a></td></tr>
+<tr><td><code>insert node &lt;tag/&gt; into $b/tags</code></td><td>insert <a href="xquery.html#updates">ex</a></td></tr>
+<tr><td><code>delete node $b/@lang</code></td><td>delete <a href="xquery.html#updates">ex</a></td></tr>
+<tr><td><code>replace value of node $b/price with "9.99"</code></td><td>replace content <a href="xquery.html#updates">ex</a></td></tr>
+<tr><td><code>rename node $b/author as "writer"</code></td><td>rename <a href="xquery.html#updates">ex</a></td></tr>
+</tbody></table>
+</section>
+
+<section>
+<h2>Full text</h2>
+<table><tbody>
+<tr><td><code>$p contains text "fox"</code></td><td>word search <a href="xquery.html#fulltext">ex</a></td></tr>
+<tr><td><code>... "fox" using stemming</code></td><td>match word forms <a href="xquery.html#fulltext">ex</a></td></tr>
+<tr><td><code>... "bear fox" any word</code></td><td>any of the words <a href="xquery.html#fulltext">ex</a></td></tr>
+<tr><td><code>"brown" ftand ftnot "bear"</code></td><td>boolean <a href="xquery.html#fulltext">ex</a></td></tr>
+<tr><td><code>"quick" ftand "fox" window 3 words</code></td><td>proximity <a href="xquery.html#fulltext">ex</a></td></tr>
+<tr><td><code>"run.*" using wildcards</code></td><td>wildcards <a href="xquery.html#fulltext">ex</a></td></tr>
+</tbody></table>
+</section>
+
+<section>
+<h2>JSONiq (.jq)</h2>
+<table><tbody>
+<tr><td><code>{ "a": 1, "b": [ 1, 2 ], "c": null }</code></td><td>construct <a href="jsoniq.html#construct">ex</a></td></tr>
+<tr><td><code>$o.customer.name</code>, <code>$o."ship to"</code>, <code>$o.$key</code></td><td>key lookup <a href="jsoniq.html#navigate">ex</a></td></tr>
+<tr><td><code>$a[[2]]</code></td><td>array member, from 1 <a href="jsoniq.html#navigate">ex</a></td></tr>
+<tr><td><code>$a[]</code></td><td>all members <a href="jsoniq.html#navigate">ex</a></td></tr>
+<tr><td><code>keys($o)</code>, <code>members($a)</code>, <code>size($a)</code></td><td>introspection <a href="jsoniq.html#functions">ex</a></td></tr>
+<tr><td><code>$people[$$.age ge 18]</code></td><td>context item <a href="jsoniq.html#context">ex</a></td></tr>
+<tr><td><code>parse-json(unparsed-text("orders.json"))</code></td><td>load JSON <a href="jsoniq.html#load">ex</a></td></tr>
+<tr><td><code>{| $o1, $o2 |}</code></td><td>merge objects <a href="jsoniq.html#merge">ex</a></td></tr>
+<tr><td><code>case object</code>, <code>case null</code>, <code>case string</code></td><td>JSON types <a href="jsoniq.html#types">ex</a></td></tr>
+</tbody></table>
+</section>
+
+<section>
+<h2>JSONiq updates</h2>
+<table><tbody>
+<tr><td><code>insert json { "k": 1 } into $o</code></td><td>add pairs <a href="jsoniq.html#updates">ex</a></td></tr>
+<tr><td><code>append json "B7" into $o.items</code></td><td>add to array <a href="jsoniq.html#updates">ex</a></td></tr>
+<tr><td><code>delete json $o.coupon</code></td><td>remove a key <a href="jsoniq.html#updates">ex</a></td></tr>
+<tr><td><code>replace value of json $o.status with "shipped"</code></td><td>change a value <a href="jsoniq.html#updates">ex</a></td></tr>
+<tr><td><code>rename json $o.customer as "client"</code></td><td>rename a key <a href="jsoniq.html#updates">ex</a></td></tr>
+</tbody></table>
+</section>
+
+<section>
+<h2>JSON in XQuery (.xq)</h2>
+<table><tbody>
+<tr><td><code>$o("name")</code></td><td>key lookup <a href="jsoniq.html#xqsyntax">ex</a></td></tr>
+<tr><td><code>$a(2)</code></td><td>array member <a href="jsoniq.html#xqsyntax">ex</a></td></tr>
+<tr><td><code>$a()</code></td><td>all members <a href="jsoniq.html#xqsyntax">ex</a></td></tr>
+<tr><td><code>jn:null()</code></td><td>null <a href="jsoniq.html#xqsyntax">ex</a></td></tr>
+<tr><td><code>replace value of json $o("a") with 2</code></td><td>update <a href="jsoniq.html#xqsyntax">ex</a></td></tr>
+</tbody></table>
+</section>
+
+<section>
+<h2>Zorba</h2>
+<table><tbody>
+<tr><td><code>zorba -i -r -f -q query.xq</code></td><td>run a file, indented <a href="zorba.html#cli">ex</a></td></tr>
+<tr><td><code>-e name:=Rodolfo</code></td><td>external variable <a href="zorba.html#external">ex</a></td></tr>
+<tr><td><code>variable $i := 1;
+while ($i le 5) { $i := $i + 1; }</code></td><td>scripting <a href="zorba.html#scripting">ex</a></td></tr>
+<tr><td><code>ddl:create($name);
+dml:insert-last($name, $items);</code></td><td>dynamic collection <a href="zorba.html#collections">ex</a></td></tr>
+<tr><td><code>dml:delete(dml:collection($name)[...])</code></td><td>remove from collection <a href="zorba.html#collections">ex</a></td></tr>
+<tr><td><code>declare collection shop:products as element(product)*;</code></td><td>static collection <a href="zorba.html#indexes">ex</a></td></tr>
+<tr><td><code>idml:probe-index-point-value($idx, "tea")</code></td><td>index lookup <a href="zorba.html#indexes">ex</a></td></tr>
+</tbody></table>
+</section>
+
+</div>
+</main>
+
+<!-- footer -->
+</body>
+</html>

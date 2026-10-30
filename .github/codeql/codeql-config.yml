@@ -1,0 +1,5 @@
+# Generated and build-tree files (examples, test drivers) are not shipped source.
+# For C/C++ this does not stop extraction of files the build compiles; the
+# workflow also strips build/ results from the SARIF before upload.
+paths-ignore:
+  - build/**

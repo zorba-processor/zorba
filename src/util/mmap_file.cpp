@@ -67,11 +67,6 @@ void mmap_file::open( char const *path, ios::openmode mode ) {
 
 #ifndef WIN32
 
-  struct stat stat_buf;
-  if ( ::stat( path, &stat_buf ) == -1 )
-    throw ZORBA_IO_EXCEPTION( "stat()", path_ );
-  size_ = stat_buf.st_size;
-
   int flags = 0;
   int prot  = PROT_NONE;
 
@@ -86,6 +81,13 @@ void mmap_file::open( char const *path, ios::openmode mode ) {
 
   if ( (fd_ = ::open( path, flags )) == -1 )
     throw ZORBA_IO_EXCEPTION( "open()", path_ );
+
+  // Get the size from the opened descriptor, not the path, so it describes
+  // the file actually being mapped.
+  struct stat stat_buf;
+  if ( ::fstat( fd_, &stat_buf ) == -1 )
+    throw ZORBA_IO_EXCEPTION( "fstat()", path_ );
+  size_ = stat_buf.st_size;
 
   addr_ = ::mmap( nullptr, size_, prot, MAP_SHARED, fd_, 0 );
   if ( addr_ == MAP_FAILED ) {

@@ -37,8 +37,7 @@ private:
   std::vector<struct curl_slist*> theHeaderLists;
   bool theLastBodyHadContent;
   std::ostringstream* theSerStream;
-  struct curl_httppost* thePost;
-  struct curl_httppost* theLast;
+  curl_mime* theMime;
   String theCurrentContentType;
   std::string thePostDataString;
   const char* thePostData;
