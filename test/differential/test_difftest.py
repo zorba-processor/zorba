@@ -47,6 +47,12 @@ class Canonical(unittest.TestCase):
             dt.canonical('<p:a xmlns:p="u"><p:b xmlns:p="u"/></p:a>'),
             dt.canonical('<p:a xmlns:p="u"><p:b/></p:a>'))
 
+    def test_prefixes_do_not_matter(self):
+        self.assertEqual(dt.canonical('<fn:a xmlns:fn="u"><fn:b/></fn:a>'),
+                         dt.canonical('<a xmlns="u"><b/></a>'))
+        self.assertNotEqual(dt.canonical('<a xmlns="u"/>'),
+                            dt.canonical('<a xmlns="v"/>'))
+
     def test_atomics_unchanged(self):
         self.assertEqual(dt.canonical("1 2 3"), "1 2 3")
 
@@ -74,6 +80,17 @@ class Compare(unittest.TestCase):
         self.assertEqual(dt.compare("1 2", "2 1", "unordered { (1, 2) }"),
                          (True, "unordered"))
         self.assertEqual(dt.compare("1 2", "2 1", "(1, 2)"), (False, ""))
+
+    def test_group_by_without_order_by(self):
+        q = "for $x in 1 to 4 group by $k := $x mod 2 return <g>{$x}</g>"
+        self.assertEqual(dt.compare("<g>1 3</g><g>2 4</g>",
+                                    "<g>2 4</g><g>1 3</g>", q),
+                         (True, "group-order"))
+        # Order within a group still matters.
+        self.assertEqual(dt.compare("<g>1 3</g>", "<g>3 1</g>", q),
+                         (False, ""))
+        self.assertEqual(dt.compare("1 2", "2 1", q + " order by $k"),
+                         (False, ""))
 
     def test_different(self):
         self.assertEqual(dt.compare("a", "b", ""), (False, ""))
@@ -115,6 +132,23 @@ class Classify(unittest.TestCase):
     def test_timeout(self):
         self.assertEqual(dt.classify(res(timeout=True), res("1"), ""),
                          ("timeout", "zorba"))
+
+    def test_saxon_lexical_error_code(self):
+        zerr = ('<code namespace="http://www.example.com" '
+                'local-name="testerror"/>')
+        serr = ("Error on line 1 column 19 of error4.xq:\n"
+                "  example:testerror  my error !\n")
+        self.assertEqual(dt.saxon_error_code(res(err=serr, rc=2)),
+                         "example:testerror")
+        self.assertEqual(dt.classify(res(err=zerr, rc=1),
+                                     res(err=serr, rc=2), ""),
+                         ("agree", "both-error"))
+
+    def test_saxon_java_exception(self):
+        self.assertEqual(dt.saxon_error_code(res(
+            err='Exception in thread "main" java.lang.StackOverflowError\n'
+                '\tat net.sf.saxon.X(X.java:46)\n', rc=1)),
+            "JAVA:StackOverflowError")
 
     def test_saxon_custom_error_code(self):
         self.assertEqual(dt.saxon_error_code(res(

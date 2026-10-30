@@ -352,6 +352,8 @@ def run_process(cmd, timeout, cwd):
 STD_CODE_RE = re.compile(r"\b((?:XP|XQ|FO|SE|SR|XU|FT|XT)[A-Z]{2}\d{4})\b")
 ANY_CODE_RE = re.compile(r"\b([A-Z]{4}\d{4})\b")
 EQNAME_RE = re.compile(r"Q\{([^}]*)\}([\w.-]+)")
+JAVA_EXC_RE = re.compile(r"Exception in thread \"[^\"]*\" (?:[\w$]+\.)*([\w$]+)")
+SAXON_LEXICAL_CODE_RE = re.compile(r"^\s+([A-Za-z_][\w.-]*:[A-Za-z_][\w.-]*)\s", re.M)
 
 
 def code_name(ns, local):
@@ -375,14 +377,41 @@ def saxon_error_code(res):
     if res["rc"] < 0:
         return "CRASH:" + signal_name(-res["rc"])
     err = res["err"]
+    m = JAVA_EXC_RE.search(err)
+    if m:
+        return "JAVA:" + m.group(1)
     m = EQNAME_RE.search(err)
     std = STD_CODE_RE.search(err)
     if m and (not std or m.start() < std.start()):
         return code_name(m.group(1), m.group(2))
     if std:
         return std.group(1)
+    # Codes in other namespaces are reported as lexical QNames
+    # ("  my:code  message" on the line after "Error ...").
+    m = SAXON_LEXICAL_CODE_RE.search(err)
+    if m:
+        return m.group(1)
     m = ANY_CODE_RE.search(err)
     return m.group(1) if m else "UNKNOWN"
+
+
+def local_name(code):
+    if code.startswith("Q{"):
+        return code.split("}", 1)[1]
+    return code.split(":", 1)[-1]
+
+
+def codes_match(zc, sc):
+    """Error codes are equal if their expanded names are equal. Saxon
+    reports codes outside the standard namespace by lexical QName only, so
+    a prefixed Saxon code matches a Zorba code with the same local name."""
+    if "UNKNOWN" in (zc, sc):
+        return False
+    if zc == sc:
+        return True
+    if ":" in sc and not sc.startswith("Q{") and zc.startswith("Q{"):
+        return local_name(zc) == local_name(sc)
+    return False
 
 
 def signal_name(n):
@@ -411,7 +440,10 @@ def canonical(s):
         s = s[:-1]
     if "<" in s or "&" in s:
         try:
-            c = ET.canonicalize("<%s>%s</%s>" % (WRAP, s, WRAP))
+            # Prefixes are rewritten (n0, n1, ...): results are compared by
+            # expanded names, as fn:deep-equal does.
+            c = ET.canonicalize("<%s>%s</%s>" % (WRAP, s, WRAP),
+                                rewrite_prefixes=True)
             return c[len(WRAP) + 2:-(len(WRAP) + 3)]
         except ET.ParseError:
             pass
@@ -456,6 +488,36 @@ def tokens_equal(ta, tb, rel):
 
 
 UNORDERED_RE = re.compile(r"\bunordered\b|\bordering\s+unordered\b")
+GROUP_BY_RE = re.compile(r"\bgroup\s+by\b")
+ORDER_BY_RE = re.compile(r"\border\s+by\b")
+
+
+def top_level_items(c):
+    """Split a canonical result into its top-level items: serialized
+    elements and whitespace-separated text tokens. None if it does not
+    parse."""
+    try:
+        root = ET.fromstring("<%s>%s</%s>" % (WRAP, c, WRAP))
+    except ET.ParseError:
+        return None
+    items = (root.text or "").split()
+    for child in root:
+        tail, child.tail = child.tail, None
+        items.append(ET.tostring(child, encoding="unicode"))
+        items.extend((tail or "").split())
+    return items
+
+
+def order_unspecified(text):
+    """The order of the result is implementation-dependent: an unordered
+    expression or ordering mode, or group by without order by (the order of
+    the groups is implementation-dependent)."""
+    code = strip_comments(text)
+    if UNORDERED_RE.search(code):
+        return "unordered"
+    if GROUP_BY_RE.search(code) and not ORDER_BY_RE.search(code):
+        return "group-order"
+    return None
 
 
 def compare(zout, sout, text):
@@ -470,8 +532,11 @@ def compare(zout, sout, text):
         return True, "numeric-lexical"
     if tokens_equal(tz, ts, 1e-12):
         return False, "numeric-precision"
-    if UNORDERED_RE.search(strip_comments(text)) and sorted(tz) == sorted(ts):
-        return True, "unordered"
+    why = order_unspecified(text)
+    if why:
+        iz, is_ = top_level_items(cz), top_level_items(cs)
+        if iz is not None and is_ is not None and sorted(iz) == sorted(is_):
+            return True, why
     return False, ""
 
 
@@ -484,7 +549,7 @@ def classify(zres, sres, text):
     zerr, serr = zres["rc"] != 0, sres["rc"] != 0
     if zerr and serr:
         zc, sc = zorba_error_code(zres), saxon_error_code(sres)
-        if zc == sc and zc != "UNKNOWN":
+        if codes_match(zc, sc):
             return "agree", "both-error"
         return "different-error-code", ""
     if zerr:
