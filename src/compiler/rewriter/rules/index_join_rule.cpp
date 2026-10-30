@@ -424,6 +424,19 @@ bool IndexJoinRule::isIndexJoinPredicate(PredicateInfo& predInfo)
   if (predInfo.theInnerVar->get_kind() != var_expr::for_var)
     return false;
 
+  // The inner operand becomes the index key expr, where only the inner var is
+  // replaced by the index domain var. So, the inner operand must reference the
+  // inner var directly: findLoopVar() may have reached it through a LET var or
+  // a FOR var over a single item (e.g. after FLWOR unnesting), and such a var
+  // is not in scope where the index is built.
+  {
+    std::vector<csize> innerOpVars;
+    (*theExprVarsMap)[predInfo.theInnerOp].getSet(innerOpVars);
+
+    if (innerOpVars.size() != 1 || innerOpVars[0] != predInfo.theInnerVarId)
+      return false;
+  }
+
   if (predInfo.theInnerVar->get_flwor_clause() ==
       predInfo.theOuterVar->get_flwor_clause())
     return false;
