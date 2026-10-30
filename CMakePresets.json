@@ -1,8 +1,8 @@
 {
-  "version": 3,
+  "version": 6,
   "cmakeMinimumRequired": {
     "major": 3,
-    "minor": 21,
+    "minor": 28,
     "patch": 0
   },
   "configurePresets": [
@@ -129,6 +129,26 @@
         "LSAN_OPTIONS": "suppressions=${sourceDir}/test/sanitizers/lsan.supp",
         "UBSAN_OPTIONS": "print_stacktrace=1:log_path=${sourceDir}/build/asan/sanitizer-logs/ubsan"
       }
+    }
+  ],
+  "workflowPresets": [
+    {
+      "name": "full-release",
+      "displayName": "Configure, build and run all tests (needs the HTTP test server)",
+      "steps": [
+        { "type": "configure", "name": "full-release" },
+        { "type": "build", "name": "full-release" },
+        { "type": "test", "name": "full-release" }
+      ]
+    },
+    {
+      "name": "full-release-offline",
+      "displayName": "Configure, build and run tests that do not need the HTTP test server",
+      "steps": [
+        { "type": "configure", "name": "full-release" },
+        { "type": "build", "name": "full-release" },
+        { "type": "test", "name": "full-release-offline" }
+      ]
     }
   ]
 }

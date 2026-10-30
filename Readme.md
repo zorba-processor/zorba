@@ -17,7 +17,7 @@ docker run --rm -v "$PWD":/work ghcr.io/zorba-processor/zorba -f -q query.xq
 ## Building
 
 Requirements: a C++23 compiler (GCC 13+, Clang 17+ or Apple Clang 16+),
-CMake 3.21+, Ninja, ICU, libxml2, libcurl, and Xerces-C 3.2+ for XML Schema
+CMake 3.28+, Ninja, ICU, libxml2, libcurl, and Xerces-C 3.2+ for XML Schema
 support. libxslt is optional (XQueryX).
 
 Debian / Ubuntu:
@@ -41,6 +41,13 @@ Configure, build and install with the presets in `CMakePresets.json`:
 cmake --preset full-release -DCMAKE_INSTALL_PREFIX=/usr/local/zorba
 cmake --build --preset full-release
 cmake --install build/full-release
+```
+
+Or run configure, build and test in one step with a workflow preset:
+
+```bash
+cmake --workflow --preset full-release           # needs the HTTP test server
+cmake --workflow --preset full-release-offline   # skips network tests
 ```
 
 Presets: `core-release` (no XML Schema), `full-release`, `full-debug`. The

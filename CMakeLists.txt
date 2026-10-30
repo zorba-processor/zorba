@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.28...4.4)
 
 SET(CMAKE_CXX_STANDARD 23 CACHE STRING "C++ standard")
 SET(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -364,7 +364,13 @@ IF (NOT ZORBA_SUPPRESS_SWIG)
     #
     # Python
     #
-    FIND_PACKAGE (PythonInterp)
+    # FindPythonInterp is removed under CMP0148 (NEW since CMake 3.27);
+    # keep the legacy variable names used by the doc/swig subdirectories.
+    FIND_PACKAGE (Python3 COMPONENTS Interpreter)
+    IF (Python3_Interpreter_FOUND)
+      SET (PYTHONINTERP_FOUND TRUE)
+      SET (PYTHON_EXECUTABLE "${Python3_EXECUTABLE}")
+    ENDIF (Python3_Interpreter_FOUND)
     FIND_PACKAGE (PythonLibs)
     
   ELSE (SWIG_FOUND)
