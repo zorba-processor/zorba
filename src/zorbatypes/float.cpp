@@ -207,9 +207,9 @@ FloatImpl<F> FloatImpl<F>::acos() const {
   if ( *this < numeric_consts<FloatImpl>::neg_one() ||
        *this > numeric_consts<FloatImpl>::one() )
     return nan();
-  return FloatImpl<F>(
-    isNegZero() ? -std::acos( value_ ) : std::acos( value_ )
-  );
+  // acos(+0) = acos(-0) = +pi/2 (F&O 3.0 4.8.10): the sign of zero does not
+  // carry over.
+  return FloatImpl<F>( std::acos( value_ ) );
 }
 
 template<typename F>
