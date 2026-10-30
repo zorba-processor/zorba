@@ -297,15 +297,23 @@ streamsize icu_streambuf::xsputn( char_type const *from, streamsize size ) {
   char ebuf[ Large_External_Buf_Size ], *to = ebuf;
   char const *const to_end = to + sizeof ebuf;
 
-  while ( size > 0 ) {
+  //
+  // Keep going until all input is consumed *and* the pivot buffer is drained:
+  // ucnv_convertEx() can consume the last of the input into the pivot while
+  // the output buffer is full, leaving UChars in the pivot that would
+  // otherwise never be written.
+  //
+  while ( size > 0 || p_.pivot_source_ < p_.pivot_target_ ) {
     char_type const *const from_orig = from;
     to_external( &from, from_end, &to, to_end );
-    streamsize n = to - ebuf;
-    if ( n && !original()->sputn( ebuf, n ) )
+    streamsize const out = to - ebuf;
+    if ( out && !original()->sputn( ebuf, out ) )
       break;
     to = ebuf;
-    n = from - from_orig;
-    size -= n, return_size += n;
+    streamsize const in = from - from_orig;
+    if ( !in && !out )
+      break;                            // no progress: avoid spinning
+    size -= in, return_size += in;
   }
   return return_size;
 }
