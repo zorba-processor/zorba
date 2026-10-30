@@ -21,6 +21,8 @@
 
 namespace zorba {
 
+class SecurityPolicy;
+
 struct xsltStylesheet;
 
 class XQueryXConvertor
@@ -33,7 +35,7 @@ public:
   ~XQueryXConvertor();
   
   void XQueryX_init();
-  char* XQueryX2XQuery( const char *xqueryx);
+  char* XQueryX2XQuery( const char *xqueryx, const SecurityPolicy& policy );
 
   bool isWhitespace(char c);
   char* skipWhitespaces(char *xquery_str);
