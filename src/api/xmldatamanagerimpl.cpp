@@ -107,6 +107,7 @@ void XmlDataManagerImpl::initStaticContext(DiagnosticHandler* aDiagnosticHandler
 
   theContext = lZorba->createStaticContext(aDiagnosticHandler);
 
+#ifndef ZORBA_NO_XMLSCHEMA
   Zorba_CompilerHints_t lHints;
   std::ostringstream lProlog;
   lProlog
@@ -114,6 +115,10 @@ void XmlDataManagerImpl::initStaticContext(DiagnosticHandler* aDiagnosticHandler
     << "import schema namespace opt = '" << static_context::ZORBA_XML_FN_OPTIONS_NS << "';";
 
   theContext->loadProlog(lProlog.str(), lHints);
+#endif
+  // Without XML Schema support the xml module (which imports the options
+  // schema) cannot be loaded; parseXML() and canonicalizeXML() are then
+  // unavailable, but the data manager itself still works.
 }
 
 
