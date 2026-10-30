@@ -14,7 +14,50 @@ permissions:
   contents: read
 
 jobs:
+  # Gate: required status checks must still report, so jobs are skipped
+  # (which counts as passing) instead of the whole workflow being filtered.
+  changes:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      code: ${{ steps.f.outputs.code || steps.all.outputs.code }}
+    steps:
+      - id: f
+        if: github.event_name == 'pull_request'
+        uses: dorny/paths-filter@v4
+        with:
+          filters: |
+            code:
+              - 'src/**'
+              - 'include/**'
+              - 'modules/**'
+              - 'bin/**'
+              - 'test/**'
+              - 'swig/**'
+              - 'schemas/**'
+              - 'config/**'
+              - 'cmake/**'
+              - 'cmake_modules/**'
+              - 'docker/**'
+              - '.clusterfuzzlite/**'
+              - '.github/codeql/**'
+              - 'CMakeLists.txt'
+              - 'CMake*.txt'
+              - 'CMake*.json'
+              - '*.cmake'
+              - '*.cmake.in'
+              - 'CTest*'
+              - 'CPack*'
+              - '.github/workflows/ci.yml'
+      - id: all
+        if: github.event_name != 'pull_request'
+        run: echo "code=true" >> "$GITHUB_OUTPUT"
+
   linux:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.runner }}
     # arm64 runs on the Ubuntu 24.04 builder: Arch Linux has no official
@@ -132,6 +175,8 @@ jobs:
             build/full-release/Testing/Temporary/LastTest.log
 
   profiles:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     name: profile ${{ matrix.preset }} (linux-amd64, Arch)
     runs-on: ubuntu-24.04
     timeout-minutes: 45
@@ -208,6 +253,8 @@ jobs:
             build/ctest.log
 
   macos:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     name: macos-arm64 (Apple Clang, Homebrew)
     runs-on: macos-15
     env:
