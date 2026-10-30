@@ -126,16 +126,20 @@ jobs:
           zorba -q '<a>{ for $i in 1 to 3 return <b>{$i}</b> }</a>'
           zorba -q 'jsoniq version "1.0"; { "sum" : sum(1 to 10) }'
           sh scripts/site/run_examples.sh site/examples /tmp/out > run.log 2>&1
-          pass=0; fail=0
+          pass=0; nl=0; fail=0
           for o in $(cd site/examples && find . -name '*.out' | sort); do
-            if [ -f "/tmp/out/$o" ] && cmp -s "site/examples/$o" "/tmp/out/$o"; then
+            exp="site/examples/$o"; got="/tmp/out/$o"
+            if cmp -s "$exp" "$got"; then
               pass=$((pass+1))
+            elif diff -q <(sed '$a\' "$exp") <(sed '$a\' "$got") > /dev/null; then
+              nl=$((nl+1))
             else
               fail=$((fail+1)); echo "MISMATCH $o"
-              head -c 400 "/tmp/out/${o%.out}.err" 2>/dev/null; echo
+              diff <(sed '$a\' "$exp") <(sed '$a\' "$got") | head -8
+              head -c 300 "/tmp/out/${o%.out}.err"; echo
             fi
           done
-          echo "site examples: $pass match, $fail differ"
+          echo "site examples: $pass identical, $nl differ only in final newline, $fail differ"
 
       - name: Sizes
         if: always()
@@ -158,5 +162,5 @@ jobs:
             configure.log
             build.log
             run.log
-            build-wasm/CMakeFiles/CMakeConfigureLog.yaml
+            /tmp/out
           if-no-files-found: ignore
