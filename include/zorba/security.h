@@ -22,6 +22,7 @@
 #include <vector>
 
 #include <zorba/config.h>
+#include <zorba/uri_resolvers.h>
 #include <zorba/zorba_string.h>
 
 namespace zorba {
@@ -89,9 +90,11 @@ enum class Capability : uint32_t {
  *   query's behalf (module imports, eval, the zorba-query module) inherit it
  *   and can only narrow it (see narrowedBy()).
  *
- * \note Enforcement is being introduced in stages. Setting a policy does not
- *       yet restrict query evaluation, and the instance default is currently
- *       unrestricted(). It will become secure() in Zorba 5.0.0.
+ * \note Enforcement is being introduced in stages. Currently enforced: the
+ *       XML parser (external entities) and URI resolution by the built-in
+ *       resolvers (documents, unparsed text, module, schema, thesaurus and
+ *       stop-word loading, the fetch module). The instance default is
+ *       currently unrestricted(); it will become secure() in Zorba 5.0.0.
  */
 class ZORBA_DLL_PUBLIC SecurityPolicy
 {
@@ -176,6 +179,46 @@ public:
 
   /** \brief Returns the prefixes added with addNetworkPrefix(). */
   const std::vector<String>& getNetworkPrefixes() const;
+
+  /**
+   * \brief Returns true if the policy allows a URI to be accessed for the
+   *        given kind of entity.
+   *
+   * This is the check Zorba applies before its built-in URL resolvers load a
+   * URI. External modules that access URIs themselves can use it too.
+   *
+   * - Paths and \c file: URIs need Capability::FileRead (or
+   *   Capability::FileWrite if \p aWrite) and, if there are read (write)
+   *   paths, must lie under one of them. Paths are compared in canonical
+   *   form: absolute, with <code>.</code> and <code>..</code> resolved and
+   *   symbolic links of the existing part of the path followed, so neither
+   *   <code>..</code> nor a symbolic link can escape a directory. The
+   *   comparison is case-insensitive where the file system is (Windows,
+   *   case-insensitive macOS volumes).
+   * - \c http, \c https and \c ftp URLs need Capability::Network, and for
+   *   EntityData::MODULE and EntityData::SCHEMA also
+   *   Capability::RemoteImport. If there are network prefixes, the URL must
+   *   lie under one of them: same scheme, host (case-insensitive) and port
+   *   (default ports are implied), and a path that equals the prefix path or
+   *   continues it after a '/' (after removal of dot segments). User info,
+   *   query and fragment are not part of the match.
+   * - Unless allowsPrivateAddresses(), the host must not resolve to a
+   *   loopback, private, shared, link-local, multicast or reserved address
+   *   (all addresses it resolves to are checked; a host that does not
+   *   resolve is denied). A network prefix whose host is such an address
+   *   literal, or "localhost", allows that host explicitly. The check is made
+   *   when the URI is resolved; it does not protect against a DNS server
+   *   that answers differently for the actual connection.
+   * - EntityData::COLLECTION URIs name collections in the store and are
+   *   always allowed.
+   *
+   * Module and schema imports from Zorba's trusted URI and library paths
+   * are allowed without Capability::FileRead when Zorba resolves them; this
+   * function does not know those paths and applies the FileRead rule.
+   */
+  bool checkURI(const String& aURI,
+                EntityData::Kind aKind,
+                bool aWrite = false) const;
 
   /**
    * \brief Sets whether network access may reach loopback, private
