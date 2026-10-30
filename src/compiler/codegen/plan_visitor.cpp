@@ -16,6 +16,7 @@
 #include "stdafx.h"
 
 #include <iostream>
+#include <sstream>
 #include <list>
 #include <stack>
 #include <vector>
