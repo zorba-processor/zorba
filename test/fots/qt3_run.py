@@ -183,6 +183,9 @@ class Runner:
     def keep(self, out, name):
         dest = os.path.join(self.args.out, "xml", name + ".xml")
         shutil.move(out, dest)
+        # mkstemp creates 0600 files; the container runs as root and the
+        # artifact upload as the runner user.
+        os.chmod(dest, 0o644)
 
 
 def main():
