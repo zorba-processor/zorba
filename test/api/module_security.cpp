@@ -242,9 +242,11 @@ void test_import_gate(Zorba* z)
   CHECK(failed_with(run(z, context(z, SecurityPolicy::secure()
                                       .allow(Capability::FileRead)), lFile),
                     "ZXQP0067", "NativeModules"));
+#ifdef ZORBA_HAVE_CURL
   CHECK(failed_with(run(z, context(z, SecurityPolicy::secure()
                                       .allow(Capability::Network)), lHttp),
                     "ZXQP0067", "NativeModules"));
+#endif
   CHECK(failed_with(run(z, context(z, SecurityPolicy::secure()
                                       .allow(Capability::NativeModules)),
                         lFile), "ZXQP0067", "FileRead or FileWrite"));
@@ -254,10 +256,12 @@ void test_import_gate(Zorba* z)
                                   .allow(Capability::FileWrite)
                                   .allow(Capability::NativeModules)), lFile),
                 lSep));
+#ifdef ZORBA_HAVE_CURL
   CHECK(allowed(run(z, context(z, SecurityPolicy::secure()
                                   .allow(Capability::Network)
                                   .allow(Capability::NativeModules)), lHttp),
                 "1"));
+#endif
 
   // A native module without a capability of its own (zorba-query).
   std::string const lZq = std::string(ZQ_NS) +
@@ -270,7 +274,9 @@ void test_import_gate(Zorba* z)
   // Unrestricted: nothing changes.
   StaticContext_t all = context(z, SecurityPolicy::unrestricted());
   CHECK(allowed(run(z, all, lFile), lSep));
+#ifdef ZORBA_HAVE_CURL
   CHECK(allowed(run(z, all, lHttp), "1"));
+#endif
   CHECK(allowed(run(z, all, lZq), "2"));
 }
 
@@ -611,6 +617,11 @@ void test_zorba_query(Zorba* z, const Files& f)
 // every connection. Needs the HTTP test server; skipped without it.
 void test_http_client(Zorba* z)
 {
+#ifndef ZORBA_HAVE_CURL
+  (void)z;
+  std::cerr << "  built without cURL, skipping HTTP client tests" << std::endl;
+}
+#else
   std::string const lServer = http_test_server();
   std::string const lBase = "http://" + lServer;
   std::string const GET = std::string(HTTP_NS) + URI_VAR +
@@ -701,6 +712,7 @@ void test_http_client(Zorba* z)
       std::cerr << "  cannot resolve " << lHost << std::endl;
   }
 }
+#endif /* ZORBA_HAVE_CURL */
 
 } // anonymous namespace
 
