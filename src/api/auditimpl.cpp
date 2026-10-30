@@ -367,7 +367,9 @@ bool NOPEventImpl::audit(const String&) const {
 }
 
 const Property* NOPEventImpl::getDynamicProperty(const String&) const {
-  return 0;
+  // Like ConfigurationImpl, never return null: ScopedAuditor binds the result
+  // to a reference.
+  return &INVALID;
 }
 
 Record* NOPEventImpl::createRecord() {
