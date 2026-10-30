@@ -77,9 +77,14 @@ void operator&(Archiver& ar, XQPCollator*& obj);
 
 void operator&(Archiver& ar, MAPM& obj);
 
+// When reading, obj is not initialized yet (the object was created by its
+// serialization constructor), so it must not be loaded: an out-of-range enum
+// value is undefined behavior.
 #define SERIALIZE_ENUM(enum_type, obj)              \
 {                                                   \
-  uint32_t int_enum = static_cast<uint32_t>(obj);   \
+  uint32_t int_enum = (ar.is_serializing_out() ?    \
+                       static_cast<uint32_t>(obj) : \
+                       0);                          \
   serialize_enum(ar, int_enum);                     \
                                                     \
   if (!ar.is_serializing_out())                     \
