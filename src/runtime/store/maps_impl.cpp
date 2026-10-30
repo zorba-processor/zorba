@@ -614,9 +614,23 @@ MapInsertIterator::nextImpl(
       if ((lValue->isNode() || lValue->isArray() || lValue->isObject())
           && lValue->getCollection() == 0)
       {
+        // GCC 16 reports a false positive -Wstringop-overflow here: after
+        // inlining, the compiler cannot prove that the string literals assigned
+        // below are disjunct from lType's buffer, so it follows the in-place
+        // branch of rstring::assign() (which only applies to a source inside
+        // the string's own buffer) with the 4-char capacity of "node".
+        // A literal is never inside lType, so assign() takes replace_safe(),
+        // which grows the buffer first.
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstringop-overflow"
+#endif
         zstring lType = "node";
         if (lValue->isArray()) lType = "array";
         else if (lValue->isObject()) lType = "object";
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
 
         RAISE_ERROR(zerr::ZDDY0042_ITEM_NOT_IN_COLLECTION, loc,
         ERROR_PARAMS(lName->getLocalName(), lType));
