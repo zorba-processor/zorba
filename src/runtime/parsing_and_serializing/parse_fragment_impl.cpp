@@ -28,6 +28,7 @@
 #include "store/api/load_properties.h"
 
 #include "system/globalenv.h"
+#include "util/xml_parser_security.h"
 
 #include "types/schema/schema.h"
 #include "types/schema/validate.h"
@@ -225,6 +226,7 @@ bool FnZorbaParseXmlFragmentIterator::nextImpl(
     state->theProperties.setUseCachedDocument(false);
     processOptions(tempItem, state->theProperties, theSctx, loc);
     state->theProperties.setCreateDocParentLink(false);
+    state->theProperties.setSecurityPolicy(theSctx->get_security_policy());
 
     // baseURI serves both as the base URI used by the XML parser
     // to resolve relative entity references within the document,
@@ -389,8 +391,37 @@ bool FnZorbaCanonicalizeIterator::nextImpl(store::Item_t& result, PlanState& pla
     {
       result->getStringValue2(lDocString);  
     }
-   int lOptions = XML_PARSE_NOERROR | state->theProperties.toLibXmlOptions();
-   lDoc = xmlReadMemory(lDocString.c_str(), lDocString.size(), "input.xml", NULL, lOptions);
+    // A push parser with the default (tree building) SAX handler, so that
+    // the context can be configured before anything is parsed.
+    xml::ParserSecurity lSecurity(theSctx->get_security_policy());
+    {
+      xml::ParserSecurity::Scope lSecurityScope(lSecurity);
+      xmlParserCtxtPtr lCtxt =
+        xmlCreatePushParserCtxt(NULL, NULL, NULL, 0, "input.xml");
+      lDoc = NULL;
+      if (lCtxt != NULL)
+      {
+        lSecurity.configure(lCtxt, XML_PARSE_NOERROR |
+                                   state->theProperties.toLibXmlOptions());
+        xmlParseChunk(lCtxt, lDocString.c_str(),
+                      static_cast<int>(lDocString.size()), 1);
+        lDoc = lCtxt->myDoc;
+        lCtxt->myDoc = NULL;
+        if (lDoc != NULL && (!lCtxt->wellFormed || lSecurity.denied()))
+        {
+          xmlFreeDoc(lDoc);
+          lDoc = NULL;
+        }
+        xmlFreeParserCtxt(lCtxt);
+      }
+    }
+    if (lSecurity.denied())
+    {
+      ZorbaException const lDenied(ZORBA_EXCEPTION(
+        zerr::ZXQP0029_URI_ACCESS_DENIED, ERROR_PARAMS(lSecurity.deniedURI())));
+      throw XQUERY_EXCEPTION(err::FOCZ0001,
+        ERROR_PARAMS("x:canonicalize()", lDenied.what()), ERROR_LOC(loc));
+    }
     if (!lDoc)
     {
       zstring lErrorMsg;
@@ -402,6 +433,10 @@ bool FnZorbaCanonicalizeIterator::nextImpl(store::Item_t& result, PlanState& pla
     lDocString = zstring((char*)lResult);    
     xmlFree(lResult);
     xmlFreeDoc(lDoc);
+  }
+  catch ( ZorbaException const& )
+  {
+    throw;
   }
   catch ( std::exception const& )
   {
@@ -449,6 +484,7 @@ bool FnParseXmlFragmentIterator::nextImpl(
     state->theProperties.setBaseUri(theSctx->get_base_uri());
     state->theProperties.setParseExternalParsedEntity(true);
     state->theProperties.setStoreDocument(false);
+    state->theProperties.setSecurityPolicy(theSctx->get_security_policy());
 
     state->baseUri = state->theProperties.getBaseUri();    
 

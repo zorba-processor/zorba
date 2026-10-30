@@ -198,6 +198,7 @@ JSONDecodeFromRoundtripIterator::decodeNode(
 {
   store::LoadProperties lProperties;
   lProperties.setStoreDocument(false);
+  lProperties.setSecurityPolicy(theSctx->get_security_policy());
   store::Item_t lDoc;
   zstring lXmlString;
   switch (aKind)
