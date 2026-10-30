@@ -247,6 +247,11 @@ FOREACH(TESTFILE ${TESTFILES})
   IF(NOT SKIP_TEST)
 
     ZORBA_ADD_TEST("${TESTNAME}" testdriver ${TESTFILE})
+    # Boundary-value tests: a regression (e.g. a range that never stops at
+    # the largest xs:integer) loops forever, so fail fast.
+    IF (TESTNAME MATCHES "^test/rbkt/zorba/numerics/integer-")
+      SET_TESTS_PROPERTIES ("${TESTNAME}" PROPERTIES TIMEOUT 30)
+    ENDIF ()
 
     # Create directory for output, if it doesn't exist
     GET_FILENAME_COMPONENT(_bucket_path ${TESTFILE} PATH)
