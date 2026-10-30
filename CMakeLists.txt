@@ -60,6 +60,30 @@ IF (NOT CMAKE_BUILD_TYPE)
        FORCE)
 ENDIF (NOT CMAKE_BUILD_TYPE)
 
+# libFuzzer targets (test/fuzz). Needs clang. Under OSS-Fuzz/ClusterFuzzLite
+# the environment provides the instrumentation in CFLAGS/CXXFLAGS and the
+# fuzzing engine in LIB_FUZZING_ENGINE; otherwise instrument the whole build
+# here with libFuzzer + ASan + UBSan.
+OPTION(ZORBA_BUILD_FUZZERS "Build the libFuzzer targets in test/fuzz (clang only)" OFF)
+IF (ZORBA_BUILD_FUZZERS)
+  IF (NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    MESSAGE(FATAL_ERROR "ZORBA_BUILD_FUZZERS requires clang")
+  ENDIF ()
+  IF (DEFINED ENV{LIB_FUZZING_ENGINE})
+    SET (ZORBA_FUZZING_ENGINE "$ENV{LIB_FUZZING_ENGINE}" CACHE STRING
+         "Link flags of the fuzzing engine")
+  ELSE ()
+    SET (ZORBA_FUZZING_ENGINE "-fsanitize=fuzzer" CACHE STRING
+         "Link flags of the fuzzing engine")
+    SET (_zorba_fuzz_san "-fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer")
+    SET (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=fuzzer-no-link ${_zorba_fuzz_san}")
+    SET (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=fuzzer-no-link ${_zorba_fuzz_san}")
+    SET (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${_zorba_fuzz_san}")
+    SET (CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${_zorba_fuzz_san}")
+  ENDIF ()
+  MESSAGE(STATUS "ZORBA_BUILD_FUZZERS: ON (engine: ${ZORBA_FUZZING_ENGINE})")
+ENDIF (ZORBA_BUILD_FUZZERS)
+
 # set the default installation directory to "dist" in the build directory
 IF (CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
   SET (CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/dist CACHE STRING
