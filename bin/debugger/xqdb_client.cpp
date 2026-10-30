@@ -26,24 +26,19 @@
 namespace zorba { namespace debugger {
 
 XqdbClient::XqdbClient(unsigned int aPort)
+  : theIdQueue(new LockFreeQueue<std::size_t>()),
+    theQuitQueue(new LockFreeQueue<bool>()),
+    theEventHandler(new EventHandler(*theIdQueue, *theQuitQueue)),
+    theCommandPrompt(new CommandPrompt())
 {
-  theIdQueue = new LockFreeQueue<std::size_t>();
-  theQuitQueue = new LockFreeQueue<bool>();
-  theEventHandler = new EventHandler(*theIdQueue, *theQuitQueue);
   theEventHandler->init();
 
-  theCommandPrompt = new CommandPrompt();
-  theCommandLineHandler = new CommandLineHandler(aPort, *theIdQueue, *theQuitQueue, theEventHandler, theCommandPrompt);
+  theCommandLineHandler.reset(new CommandLineHandler(
+      aPort, *theIdQueue, *theQuitQueue, theEventHandler.get(), theCommandPrompt.get()));
 }
 
 XqdbClient::~XqdbClient()
 {
-  delete theCommandLineHandler;
-  delete theCommandPrompt;
-  delete theEventHandler;
-
-  delete theIdQueue;
-  delete theQuitQueue;
 }
 
 void

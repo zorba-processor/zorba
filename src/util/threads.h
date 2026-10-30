@@ -187,10 +187,29 @@
 
 #elif defined(LOKI_PTHREAD_H)
 
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+
+namespace Loki
+{
+    // Aborts if a pthread call failed; mirrors the ZORBA_FATAL checks in
+    // zorbautils/mutex.cpp (this header must not depend on zorbautils).
+    inline void CheckPthread(int ret, const char* what)
+    {
+        if (ret != 0)
+        {
+            std::fprintf(stderr, "Zorba Internal Fatal Error: %s failed. Error code = %d message = %s\n",
+                         what, ret, std::strerror(ret));
+            std::abort();
+        }
+    }
+}
+
 
 #define LOKI_THREADS_MUTEX(x)           pthread_mutex_t (x);
 
-#define LOKI_THREADS_MUTEX_INIT(x)      ::pthread_mutex_init(x, 0)
+#define LOKI_THREADS_MUTEX_INIT(x)      ::Loki::CheckPthread(::pthread_mutex_init(x, 0), "pthread_mutex_init")
 
 // define to 1 to enable recursive mutex support
 #if 0
@@ -202,14 +221,14 @@
 #endif
 
 #define LOKI_THREADS_MUTEX_DELETE(x)    ::pthread_mutex_destroy (x)
-#define LOKI_THREADS_MUTEX_LOCK(x)      ::pthread_mutex_lock (x)
-#define LOKI_THREADS_MUTEX_UNLOCK(x)    ::pthread_mutex_unlock (x)
+#define LOKI_THREADS_MUTEX_LOCK(x)      ::Loki::CheckPthread(::pthread_mutex_lock (x), "pthread_mutex_lock")
+#define LOKI_THREADS_MUTEX_UNLOCK(x)    ::Loki::CheckPthread(::pthread_mutex_unlock (x), "pthread_mutex_unlock")
 #define LOKI_THREADS_LONG               long
 
 #define LOKI_THREADS_ATOMIC(x)                                           \
-                pthread_mutex_lock(&atomic_mutex_);                      \
+                ::Loki::CheckPthread(::pthread_mutex_lock(&atomic_mutex_), "pthread_mutex_lock");                      \
                 x;                                                       \
-                pthread_mutex_unlock(&atomic_mutex_)
+                ::Loki::CheckPthread(::pthread_mutex_unlock(&atomic_mutex_), "pthread_mutex_unlock")
 
 #define LOKI_THREADS_ATOMIC_FUNCTIONS                                \
     private:                                                         \
@@ -217,84 +236,84 @@
     public:                                                          \
         static IntType AtomicMultiply(volatile IntType& lval, const IntType val) \
         {                                                                \
-            ::pthread_mutex_lock( &atomic_mutex_ );                      \
+            ::Loki::CheckPthread(::pthread_mutex_lock(&atomic_mutex_), "pthread_mutex_lock");                      \
             lval *= val;                                                 \
-            ::pthread_mutex_unlock( &atomic_mutex_ );                    \
+            ::Loki::CheckPthread(::pthread_mutex_unlock(&atomic_mutex_), "pthread_mutex_unlock");                    \
             return lval;                                                 \
         }                                                                \
                                                                          \
         static IntType AtomicDivide(volatile IntType& lval, const IntType val) \
         {                                                                \
-            ::pthread_mutex_lock( &atomic_mutex_ );                      \
+            ::Loki::CheckPthread(::pthread_mutex_lock(&atomic_mutex_), "pthread_mutex_lock");                      \
             lval /= val;                                                 \
-            ::pthread_mutex_unlock( &atomic_mutex_ );                    \
+            ::Loki::CheckPthread(::pthread_mutex_unlock(&atomic_mutex_), "pthread_mutex_unlock");                    \
             return lval;                                                 \
         }                                                                \
                                                                          \
         static IntType AtomicIncrement(volatile IntType& lval)           \
         {                                                                \
-            ::pthread_mutex_lock( &atomic_mutex_ );                      \
+            ::Loki::CheckPthread(::pthread_mutex_lock(&atomic_mutex_), "pthread_mutex_lock");                      \
             ++lval;                                                      \
-            ::pthread_mutex_unlock( &atomic_mutex_ );                    \
+            ::Loki::CheckPthread(::pthread_mutex_unlock(&atomic_mutex_), "pthread_mutex_unlock");                    \
             return lval;                                                 \
         }                                                                \
                                                                          \
         static IntType AtomicDecrement(volatile IntType& lval)           \
         {                                                                \
-            ::pthread_mutex_lock( &atomic_mutex_ );                      \
+            ::Loki::CheckPthread(::pthread_mutex_lock(&atomic_mutex_), "pthread_mutex_lock");                      \
             --lval;                                                      \
-            ::pthread_mutex_unlock( &atomic_mutex_ );                    \
+            ::Loki::CheckPthread(::pthread_mutex_unlock(&atomic_mutex_), "pthread_mutex_unlock");                    \
             return lval;                                                 \
         }                                                                \
                                                                          \
         static void AtomicAssign(volatile IntType& lval, const IntType val) \
         {                                                                \
-            ::pthread_mutex_lock( &atomic_mutex_ );                      \
+            ::Loki::CheckPthread(::pthread_mutex_lock(&atomic_mutex_), "pthread_mutex_lock");                      \
             lval = val;                                                  \
-            ::pthread_mutex_unlock( &atomic_mutex_ );                    \
+            ::Loki::CheckPthread(::pthread_mutex_unlock(&atomic_mutex_), "pthread_mutex_unlock");                    \
             return lval;                                                 \
         }                                                                \
                                                                          \
         static void AtomicAssign(IntType& lval, volatile const IntType& val) \
         {                                                                \
-            ::pthread_mutex_lock( &atomic_mutex_ );                      \
+            ::Loki::CheckPthread(::pthread_mutex_lock(&atomic_mutex_), "pthread_mutex_lock");                      \
             lval = val;                                                  \
-            ::pthread_mutex_unlock( &atomic_mutex_ );                    \
+            ::Loki::CheckPthread(::pthread_mutex_unlock(&atomic_mutex_), "pthread_mutex_unlock");                    \
             return lval;                                                 \
         }                                                                \
                                                                          \
         static IntType AtomicIncrement(volatile IntType& lval, const IntType compare, bool & matches ) \
         {                                                                \
-            ::pthread_mutex_lock( &atomic_mutex_ );                      \
+            ::Loki::CheckPthread(::pthread_mutex_lock(&atomic_mutex_), "pthread_mutex_lock");                      \
             ++lval;                                                      \
             matches = ( compare == lval );                               \
-            ::pthread_mutex_unlock( &atomic_mutex_ );                    \
+            ::Loki::CheckPthread(::pthread_mutex_unlock(&atomic_mutex_), "pthread_mutex_unlock");                    \
             return lval;                                                 \
         }                                                                \
                                                                          \
         static IntType AtomicDecrement(volatile IntType& lval, const IntType compare, bool & matches ) \
         {                                                                \
-            ::pthread_mutex_lock( &atomic_mutex_ );                      \
+            ::Loki::CheckPthread(::pthread_mutex_lock(&atomic_mutex_), "pthread_mutex_lock");                      \
             --lval;                                                      \
             matches = ( compare == lval );                               \
-            ::pthread_mutex_unlock( &atomic_mutex_ );                    \
+            ::Loki::CheckPthread(::pthread_mutex_unlock(&atomic_mutex_), "pthread_mutex_unlock");                    \
             return lval;                                                 \
         }                                                                \
         static IntType AtomicMultiply(volatile IntType& lval, const IntType val, const IntType compare, bool & matches ) \
         {                                                               \
-            ::pthread_mutex_lock( &atomic_mutex_ );                     \
+            ::Loki::CheckPthread(::pthread_mutex_lock(&atomic_mutex_), "pthread_mutex_lock");                     \
             lval *= val;                                                \
             matches = ( lval == compare );                              \
-            ::pthread_mutex_unlock( &atomic_mutex_ );                   \
+            ::Loki::CheckPthread(::pthread_mutex_unlock(&atomic_mutex_), "pthread_mutex_unlock");                   \
             return lval;                                                \
         }                                                               \
                                                                         \
         static IntType AtomicDivide(volatile IntType& lval, const IntType val, const IntType compare, bool & matches ) \
         {                                                               \
-            ::pthread_mutex_lock( &atomic_mutex_ );                     \
+            ::Loki::CheckPthread(::pthread_mutex_lock(&atomic_mutex_), "pthread_mutex_lock");                     \
             lval /= val;                                                \
             matches = ( lval == compare );                              \
-            ::pthread_mutex_unlock( &atomic_mutex_ );                   \
+            ::Loki::CheckPthread(::pthread_mutex_unlock(&atomic_mutex_), "pthread_mutex_unlock");                   \
             return lval;                                                \
         }
 

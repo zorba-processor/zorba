@@ -31,7 +31,7 @@ ItemIterator::ItemIterator(const std::vector<store::Item_t>& items, bool copy)
 }
 
 
-ItemIterator::ItemIterator() : theItems(NULL)
+ItemIterator::ItemIterator() : theIsOwner(false), theItems(NULL)
 {
 }
 
@@ -80,7 +80,7 @@ ItemIterator::reset()
 void
 ItemIterator::close() 
 {
-  if (theItems && theIsOwner)
+  if (theIsOwner)
   {
     delete theItems;
     theItems = NULL;

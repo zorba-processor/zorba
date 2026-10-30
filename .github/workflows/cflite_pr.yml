@@ -5,6 +5,28 @@ name: ClusterFuzzLite PR fuzzing
 # the batch workflow is reused through the default GitHub artifacts store.
 on:
   pull_request:
+    paths:
+      - 'src/**'
+      - 'include/**'
+      - 'modules/**'
+      - 'bin/**'
+      - 'test/**'
+      - 'swig/**'
+      - 'schemas/**'
+      - 'config/**'
+      - 'cmake/**'
+      - 'cmake_modules/**'
+      - 'docker/**'
+      - '.clusterfuzzlite/**'
+      - '.github/codeql/**'
+      - 'CMakeLists.txt'
+      - 'CMake*.txt'
+      - 'CMake*.json'
+      - '*.cmake'
+      - '*.cmake.in'
+      - 'CTest*'
+      - 'CPack*'
+      - '.github/workflows/cflite_pr.yml'
   workflow_dispatch:
 
 permissions: read-all

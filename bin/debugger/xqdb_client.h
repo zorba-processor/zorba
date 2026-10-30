@@ -17,6 +17,8 @@
 #ifndef ZORBA_DEBUGGER_XQDB_CLIENT_H
 #define ZORBA_DEBUGGER_XQDB_CLIENT_H
 
+#include <zorba/internal/unique_ptr.h>
+
 #include "command_prompt.h"
 #include "command_line_handler.h"
 
@@ -36,12 +38,14 @@ class XqdbClient {
 
   private:
 
-    LockFreeQueue<std::size_t>* theIdQueue;
-    LockFreeQueue<bool>*        theQuitQueue;
+    // Members are destroyed in reverse order of declaration: the command line
+    // handler goes first, the queues last.
+    std::unique_ptr<LockFreeQueue<std::size_t>> theIdQueue;
+    std::unique_ptr<LockFreeQueue<bool>>        theQuitQueue;
 
-    EventHandler*       theEventHandler;
-    CommandPrompt*      theCommandPrompt;
-    CommandLineHandler* theCommandLineHandler;
+    std::unique_ptr<EventHandler>       theEventHandler;
+    std::unique_ptr<CommandPrompt>      theCommandPrompt;
+    std::unique_ptr<CommandLineHandler> theCommandLineHandler;
 };
 
   
