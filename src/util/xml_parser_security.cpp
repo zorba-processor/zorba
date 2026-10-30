@@ -16,21 +16,15 @@
 #include "stdafx.h"
 
 #include <atomic>
-#include <cctype>
-#include <climits>
-#include <cstdlib>
-#include <stdexcept>
-#include <vector>
 
 #include <libxml/parserInternals.h>
 #include <libxml/xmlIO.h>
 #include <libxml/xmlerror.h>
 #include <libxml/xmlversion.h>
 
-#include <zorba/util/fs_util.h>
-
 #include "context/static_context.h"
 #include "system/globalenv.h"
+#include "util/security_check.h"
 
 #include "xml_parser_security.h"
 
@@ -101,105 +95,6 @@ void install_entity_loader()
 #endif /* LIBXML_VERSION */
 
 
-// The scheme of a URI, lower-cased, or "" if it has none. A single letter
-// followed by ':' is a Windows drive, not a scheme.
-std::string uri_scheme(const std::string& aURI)
-{
-  std::string::size_type const lColon = aURI.find(':');
-  if (lColon == std::string::npos || lColon < 2)
-    return std::string();
-  if (!std::isalpha(static_cast<unsigned char>(aURI[0])))
-    return std::string();
-  std::string lScheme;
-  for (std::string::size_type i = 0; i < lColon; ++i)
-  {
-    unsigned char const c = static_cast<unsigned char>(aURI[i]);
-    if (!std::isalnum(c) && c != '+' && c != '-' && c != '.')
-      return std::string();
-    lScheme += static_cast<char>(std::tolower(c));
-  }
-  return lScheme;
-}
-
-bool is_separator(char c)
-{
-  return c == '/' || c == '\\';
-}
-
-// Absolute, lexically normalized path of a file path or file: URI, with
-// symbolic links resolved where the path (or its parent directory) exists.
-// Throws std::invalid_argument for malformed input.
-std::string canonical_path(const std::string& aPathOrURI)
-{
-  std::string const lCwd = fs::curdir();
-  std::string lPath = fs::normalize_path(aPathOrURI.c_str(), lCwd.c_str());
-#ifndef WIN32
-  char lBuf[PATH_MAX];
-  if (::realpath(lPath.c_str(), lBuf) != nullptr)
-    return lBuf;
-  std::string::size_type const lSep = lPath.rfind('/');
-  if (lSep != std::string::npos && lSep > 0)
-  {
-    std::string const lParent(lPath, 0, lSep);
-    if (::realpath(lParent.c_str(), lBuf) != nullptr)
-      return std::string(lBuf) + lPath.substr(lSep);
-  }
-#endif
-  return lPath;
-}
-
-// True if path aInner equals directory aOuter or lies below it.
-bool dir_covers(std::string aOuter, const std::string& aInner)
-{
-  while (aOuter.size() > 1 && is_separator(aOuter.back()))
-    aOuter.erase(aOuter.size() - 1);
-  if (aInner.compare(0, aOuter.size(), aOuter) != 0)
-    return false;
-  return aInner.size() == aOuter.size() ||
-         is_separator(aOuter.back()) ||
-         is_separator(aInner[aOuter.size()]);
-}
-
-bool file_allowed(const SecurityPolicy& aPolicy, const std::string& aURI)
-{
-  if (!aPolicy.allows(Capability::FileRead))
-    return false;
-  const std::vector<String>& lDirs = aPolicy.getReadPaths();
-  if (lDirs.empty())
-    return true;
-  try
-  {
-    std::string const lPath = canonical_path(aURI);
-    for (const String& lDir : lDirs)
-    {
-      if (dir_covers(canonical_path(lDir.str()), lPath))
-        return true;
-    }
-  }
-  catch (const std::exception&)
-  {
-  }
-  return false;
-}
-
-// Plain prefix match on the URI as the parser sees it. Normalization of
-// network URLs (host case, default ports) comes with the general URL
-// enforcement in static_context.
-bool network_allowed(const SecurityPolicy& aPolicy, const std::string& aURI)
-{
-  if (!aPolicy.allows(Capability::Network))
-    return false;
-  const std::vector<String>& lPrefixes = aPolicy.getNetworkPrefixes();
-  if (lPrefixes.empty())
-    return true;
-  for (const String& lPrefix : lPrefixes)
-  {
-    if (aURI.compare(0, lPrefix.size(), lPrefix.str()) == 0)
-      return true;
-  }
-  return false;
-}
-
 } // anonymous namespace
 
 
@@ -208,22 +103,7 @@ bool allows_external_resource(const SecurityPolicy& aPolicy, const char* aURI)
   if (!aPolicy.allows(Capability::ExternalEntities) ||
       aURI == nullptr || *aURI == '\0')
     return false;
-
-  std::string const lURI(aURI);
-  std::string const lScheme = uri_scheme(lURI);
-
-  if (lScheme.empty() || lScheme == "file")
-    return file_allowed(aPolicy, lURI);
-
-  if (lScheme == "http" || lScheme == "https" || lScheme == "ftp")
-    return network_allowed(aPolicy, lURI);
-
-  // Anything else is up to libxml2's loader; allow it only if neither file
-  // nor network access is restricted.
-  return aPolicy.allows(Capability::FileRead) &&
-         aPolicy.getReadPaths().empty() &&
-         aPolicy.allows(Capability::Network) &&
-         aPolicy.getNetworkPrefixes().empty();
+  return security::check(aPolicy, aURI, security::Use::Document).allowed;
 }
 
 

@@ -504,7 +504,7 @@ extern entry const dict_en[] = {
   { "zerr:ZXQP0025", "\"$1\": could not fetch resource${; reason: 2}" },
   { "zerr:ZXQP0026", "\"$1\": invalid enumerated value for $2" },
   { "zerr:ZXQP0028", "\"$1\": target namespace not provided by module from $2" },
-  { "zerr:ZXQP0029", "\"$1\": URI access not allowed" },
+  { "zerr:ZXQP0029", "\"$1\": URI access not allowed${: 2}" },
   { "zerr:ZXQP0030", "deadlock" },
   { "zerr:ZXQP0031", "malformed XQueryX XML input${: 1}" },
   { "zerr:ZXQP0032", "error transforming XQueryX to XQuery${: 1}" },

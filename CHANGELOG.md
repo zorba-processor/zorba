@@ -47,6 +47,7 @@ Entries marked **(open PR)** come from pull requests that are not merged yet; co
 - Fix crashes, hangs and aborts found by fuzzing: endless loop and out-of-memory on unterminated comments or tags at end of input, `fn:analyze-string` on an empty input, infinite loop in `URI::toPathNotation`, abort on `xml:base=""`, null dereferences in JSON update expressions, and out-of-range reads in QName parsing ([#37](https://github.com/zorba-processor/zorba/pull/37)).
 - Fix undefined behavior reported by UBSan: 21 sites and 445 reports reduced to 0 ([#34](https://github.com/zorba-processor/zorba/pull/34)).
 - Check `pthread` return values and treat failures as fatal ([#27](https://github.com/zorba-processor/zorba/pull/27), [#50](https://github.com/zorba-processor/zorba/pull/50)).
+- Enforce the security policy at URL resolution: `fn:doc`, `fn:unparsed-text`, module and schema import, thesauri, stop words, JSound and `fetch` are checked before any built-in resolver runs. File paths are compared after resolving `..` and symlinks, URLs by scheme, host, port and path segment, and with `Network` allowed, hosts resolving to loopback, private or link-local addresses are refused unless explicitly allowed. Refusals raise `ZXQP0029`. `ZORBA_URI_PATH` and `ZORBA_LIB_PATH` are honored only with the `Environment` capability. Redirects and DNS rebinding are not covered yet ([#56](https://github.com/zorba-processor/zorba/pull/56)).
 
 ### Added
 
@@ -63,6 +64,7 @@ Entries marked **(open PR)** come from pull requests that are not merged yet; co
 - Add XMark and JSONiq benchmark suites with an A/B comparison workflow ([#38](https://github.com/zorba-processor/zorba/pull/38)).
 - Add an on-demand build-time measurement workflow ([#29](https://github.com/zorba-processor/zorba/pull/29)).
 - Add a pull request template with a changelog line.
+- Add `SecurityPolicy::checkURI()` to test a URI against a policy ([#56](https://github.com/zorba-processor/zorba/pull/56)).
 
 ### Changed
 

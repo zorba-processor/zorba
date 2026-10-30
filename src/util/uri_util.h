@@ -202,33 +202,6 @@ encode( StringType &s, bool encode_slash = true ) {
   s = temp;
 }
 
-////////// Fetching ///////////////////////////////////////////////////////////
-
-/**
- * Fetches a resource from the given URI to a local file.
- *
- * @param uri The URI specifying the resource.
- * @param is_temp If not \c nullptr, on return this is set to \c true if the
- * local file is a created temporary file; \c false otherwise.
- * @return Returns the full path to the file the resource was fetched to.
- */
-zstring fetch( char const *uri, bool *is_temp );
-
-/**
- * Fetches a resource from the given URI to a local file.
- *
- * @tparam URIStringType The URI's string type.
- * @param uri The URI specifying the resource.
- * @param is_temp If not \c nullptr, on return this is set to \c true if the
- * local file is a created temporary file; \c false otherwise.
- * @return Returns the full path to the file the resource was fetched to.
- */
-template<class URIStringType> inline
-typename std::enable_if<ZORBA_HAS_C_STR(URIStringType),zstring>::type
-fetch( URIStringType const &uri, bool *is_temp = nullptr ) {
-  return fetch( uri.c_str(), is_temp );
-}
-
 ///////////////////////////////////////////////////////////////////////////////
 
 } // namespace uri

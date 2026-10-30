@@ -233,15 +233,11 @@ thesaurus::lookup( zstring const &phrase, zstring const &relationship,
   ZORBA_EXCEPTION( zerr::ZXQP0024_XML_DOES_NOT_MATCH_SCHEMA, \
                    ERROR_PARAMS( WHAT, ZED( ZED_KEY ) ) )
 
-void thesaurus::read_xqftts_file( zstring const &xqftts_uri ) {
-  ZORBA_ASSERT( !xqftts_uri.empty() );
-  bool is_temp_file;
-  zstring const thesaurus_xml_file( uri::fetch( xqftts_uri, &is_temp_file ) );
-  fs::auto_remover<zstring> file_remover;
-  if ( is_temp_file )
-    file_remover.reset( thesaurus_xml_file );
-
-  ifstream ifs( thesaurus_xml_file.c_str() );
+void thesaurus::read_xqftts_file( zstring const &path ) {
+  ZORBA_ASSERT( !path.empty() );
+  // The path is the local file of the "xqftts:" URI that the static context
+  // resolved (and checked against the security policy): read it directly.
+  ifstream ifs( path.c_str() );
   store::LoadProperties props;
   props.setStoreDocument( false );
   store::Item_t doc = GENV_STORE.loadDocument( "", "", ifs, props );

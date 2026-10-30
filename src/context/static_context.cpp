@@ -65,6 +65,7 @@
 #include "types/schema/validate.h"
 
 #include <util/uri_util.h>
+#include "util/security_check.h"
 
 #include "functions/function.h"
 #include "functions/library.h"
@@ -1667,7 +1668,7 @@ std::unique_ptr<internal::Resource> static_context::resolve_uri(
   apply_uri_mappers(aUri, &aEntityData, internal::URIMapper::CANDIDATE, lUris);
 
   std::unique_ptr<internal::Resource> lRetval;
-  apply_url_resolvers(lUris, &aEntityData, lRetval, oErrorMessage);
+  apply_url_resolvers(aUri, lUris, &aEntityData, lRetval, oErrorMessage);
 
   return lRetval;
 }
@@ -1785,16 +1786,126 @@ void static_context::apply_uri_mappers(
 }
 
 
+namespace {
+
+security::Use security_use(internal::EntityData::Kind aKind)
+{
+  switch (aKind)
+  {
+    case internal::EntityData::SCHEMA:
+    case internal::EntityData::MODULE:
+      return security::Use::Import;
+#ifndef ZORBA_NO_FULL_TEXT
+    case internal::EntityData::THESAURUS:
+    case internal::EntityData::STOP_WORDS:
+      return security::Use::Data;
+#endif
+    case internal::EntityData::COLLECTION:
+      return security::Use::Collection;
+    default:
+      return security::Use::Document;
+  }
+}
+
+// The second parameter of ZXQP0029: why the access was denied, naming the
+// candidate URL if it is not the URI the query asked for.
+zstring denial_reason(
+    zstring const& aRequested,
+    zstring const& aUrl,
+    std::string const& aReason)
+{
+  zstring lReason;
+  if (aUrl != aRequested)
+  {
+    lReason = "\"";
+    lReason += aUrl;
+    lReason += "\": ";
+  }
+  lReason.append(aReason);
+  return lReason;
+}
+
+} // anonymous namespace
+
+
+/*******************************************************************************
+  Canonical forms of the trusted directories: the full URI and lib paths.
+  Module, schema, thesaurus and stop-word files under them need no
+  capability. Relative entries are taken relative to the current directory.
+********************************************************************************/
+void static_context::get_trusted_dirs(std::vector<std::string>& oDirs) const
+{
+  std::vector<zstring> lDirs;
+  get_full_uri_path(lDirs);
+  get_full_lib_path(lDirs);
+  for (zstring const& lDir : lDirs)
+  {
+    try
+    {
+      oDirs.push_back(security::canonical_path(lDir.str()));
+    }
+    catch (std::exception const&)
+    {
+      // An entry that cannot be canonicalized trusts nothing.
+    }
+  }
+}
+
+
 /***************************************************************************//**
 
 ********************************************************************************/
+void static_context::check_uri_access(
+    zstring const& aUrl,
+    internal::EntityData::Kind aEntityKind,
+    zstring const& aRequested) const
+{
+  security::Use const lUse = security_use(aEntityKind);
+  SecurityPolicy const lPolicy = get_security_policy();
+  std::vector<std::string> lTrusted;
+  if ((lUse == security::Use::Import || lUse == security::Use::Data) &&
+      !(lPolicy.allows(Capability::FileRead) && lPolicy.getReadPaths().empty()))
+    get_trusted_dirs(lTrusted);
+  security::Verdict const lVerdict = security::check(
+      lPolicy, aUrl.str(), lUse, false, &lTrusted);
+  if (!lVerdict.allowed)
+  {
+    throw XQUERY_EXCEPTION(zerr::ZXQP0029_URI_ACCESS_DENIED,
+    ERROR_PARAMS(aRequested, denial_reason(aRequested, aUrl, lVerdict.reason)));
+  }
+}
+
+
+/***************************************************************************//**
+  Passes each candidate URL to the URL resolvers until one returns a Resource.
+
+  Before a candidate goes to a built-in resolver (URLResolver::isBuiltin()),
+  the security policy in effect for "this" sctx is checked for it. A denied
+  candidate is skipped. If no candidate resolves, ZXQP0029 is thrown if the
+  requested URI itself was denied, or if every candidate checked was denied
+  (reporting the first), so that a denial is not reported as "not found".
+  Resolvers registered by the embedder are not checked.
+
+  Exceptions thrown by resolvers are not propagated (a resolver may fail on a
+  candidate that another resolver serves); the first message is returned in
+  oErrorMessage. A ZXQP0029 thrown by a resolver is a denial, not a failure:
+  it is propagated.
+********************************************************************************/
 void static_context::apply_url_resolvers(
+    zstring const& aRequested,
     std::vector<zstring>& aUrls,
     internal::EntityData const* aEntityData,
     std::unique_ptr<internal::Resource>& oResource,
     zstring& oErrorMessage) const
 {
   oErrorMessage.clear();
+
+  security::Use const lUse = security_use(aEntityData->getKind());
+  std::unique_ptr<SecurityPolicy> lPolicy;
+  std::unique_ptr<std::vector<std::string> > lTrusted;
+  zstring lDeniedUrl;
+  std::string lDeniedReason;
+  bool lAnyAllowed = false;
 
   // Iterate through all candidate URLs...
   for (std::vector<zstring>::iterator url = aUrls.begin();
@@ -1810,6 +1921,10 @@ void static_context::apply_url_resolvers(
       continue;
     }
 
+    // -1: not checked yet; 0: denied; 1: allowed. Checked once per candidate,
+    // when the first built-in resolver is reached.
+    int lAllowed = -1;
+
     // Iterate upwards through the static_context tree...
     for (static_context const* sctx = this;
          sctx != NULL; sctx = sctx->theParent)
@@ -1819,6 +1934,43 @@ void static_context::apply_url_resolvers(
              sctx->theURLResolvers.begin();
            resolver != sctx->theURLResolvers.end(); resolver++)
       {
+        bool const lBuiltin = (**resolver).isBuiltin();
+        if (lBuiltin)
+        {
+          if (lAllowed < 0)
+          {
+            if (!lPolicy)
+              lPolicy.reset(new SecurityPolicy(get_security_policy()));
+            // Trusted directories matter only where file reads are
+            // restricted.
+            if (!lTrusted &&
+                (lUse == security::Use::Import ||
+                 lUse == security::Use::Data) &&
+                !(lPolicy->allows(Capability::FileRead) &&
+                  lPolicy->getReadPaths().empty()))
+            {
+              lTrusted.reset(new std::vector<std::string>());
+              get_trusted_dirs(*lTrusted);
+            }
+            security::Verdict const lVerdict = security::check(
+                *lPolicy, url->str(), lUse, false, lTrusted.get());
+            lAllowed = lVerdict.allowed ? 1 : 0;
+            if (lVerdict.allowed)
+              lAnyAllowed = true;
+            // Report the denial of the URI the query asked for if there is
+            // one, else the first denial of a candidate derived from it.
+            if (!lVerdict.allowed &&
+                (lDeniedUrl.empty() ||
+                 (*url == aRequested && lDeniedUrl != aRequested)))
+            {
+              lDeniedUrl = *url;
+              lDeniedReason = lVerdict.reason;
+            }
+          }
+          if (lAllowed == 0)
+            continue;
+        }
+
         try
         {
           // Take ownership of returned Resource (if any)
@@ -1827,7 +1979,18 @@ void static_context::apply_url_resolvers(
           {
             // Populate the URL used to load this Resource
             oResource->setUrl(*url);
+            oResource->setFromBuiltinResolver(lBuiltin);
             return;
+          }
+        }
+        catch (ZorbaException const& e)
+        {
+          if (e.diagnostic() == zerr::ZXQP0029_URI_ACCESS_DENIED)
+            throw;
+          if (oErrorMessage.empty())
+          {
+            // Really no point in saving anything more than the first message
+            oErrorMessage = e.what();
           }
         }
         catch (const std::exception& e)
@@ -1845,6 +2008,16 @@ void static_context::apply_url_resolvers(
         }
       }
     }
+  }
+
+  // A denied candidate that the mappers derived from an allowed URI (e.g. a
+  // file under the URI path for an http document) does not turn a failure to
+  // load the allowed URI into a denial.
+  if (!lDeniedUrl.empty() && (lDeniedUrl == aRequested || !lAnyAllowed))
+  {
+    throw XQUERY_EXCEPTION(zerr::ZXQP0029_URI_ACCESS_DENIED,
+    ERROR_PARAMS(aRequested,
+                 denial_reason(aRequested, lDeniedUrl, lDeniedReason)));
   }
 }
 
@@ -2040,12 +2213,23 @@ void static_context::get_uri_path(std::vector<zstring>& path) const
 ********************************************************************************/
 void static_context::get_full_uri_path(std::vector<zstring>& path) const
 {
+  collect_uri_path(path, allows_capability(Capability::Environment));
+}
+
+
+void static_context::collect_uri_path(
+    std::vector<zstring>& path,
+    bool aEnv) const
+{
   if (theParent != NULL)
   {
-    theParent->get_full_uri_path(path);
+    theParent->collect_uri_path(path, aEnv);
   }
 
   get_uri_path(path);
+
+  if (aEnv)
+    path.insert(path.end(), theEnvURIPath.begin(), theEnvURIPath.end());
 }
 
 /*******************************************************************************
@@ -2071,12 +2255,35 @@ void static_context::get_lib_path(std::vector<zstring>& path) const
 ********************************************************************************/
 void static_context::get_full_lib_path(std::vector<zstring>& path) const
 {
+  collect_lib_path(path, allows_capability(Capability::Environment));
+}
+
+
+void static_context::collect_lib_path(
+    std::vector<zstring>& path,
+    bool aEnv) const
+{
   if (theParent != NULL)
   {
-    theParent->get_full_lib_path(path);
+    theParent->collect_lib_path(path, aEnv);
   }
 
   get_lib_path(path);
+
+  if (aEnv)
+    path.insert(path.end(), theEnvLibPath.begin(), theEnvLibPath.end());
+}
+
+
+/*******************************************************************************
+
+********************************************************************************/
+void static_context::set_env_paths(
+    const std::vector<zstring>& aURIPath,
+    const std::vector<zstring>& aLibPath)
+{
+  theEnvURIPath = aURIPath;
+  theEnvLibPath = aLibPath;
 }
 
 

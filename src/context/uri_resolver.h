@@ -55,6 +55,12 @@ public:
    */
   zstring const& getUrl() const { return theUrl; }
 
+  /**
+   * @brief True if a built-in URL resolver (see URLResolver::isBuiltin())
+   * loaded this Resource, i.e. if the security policy was checked for it.
+   */
+  bool isFromBuiltinResolver() const { return theFromBuiltin; }
+
   virtual ~Resource() = 0;
 
 protected:
@@ -67,9 +73,11 @@ private:
    * Used by static_context to populate the URL.
    */
   void setUrl(zstring const &aUrl) { theUrl = aUrl; }
+  void setFromBuiltinResolver(bool aBuiltin) { theFromBuiltin = aBuiltin; }
   friend class zorba::static_context;
 
   zstring theUrl;
+  bool theFromBuiltin = false;
 };
 
 /**
@@ -244,6 +252,16 @@ class URLResolver
    */
   virtual Resource* resolveURL(zstring const& aUrl,
                                EntityData const* aEntityData) = 0;
+
+  /**
+   * @brief True for Zorba's own resolvers, which reach the file system or
+   * the network on behalf of the query.
+   *
+   * The static context checks the security policy before it passes a URL
+   * to a built-in resolver. Other resolvers (registered by the embedder, or
+   * serving in-memory content) are trusted and not checked.
+   */
+  virtual bool isBuiltin() const { return false; }
 };
 
 /**
