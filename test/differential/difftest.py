@@ -885,6 +885,10 @@ def run_side(side, cases, args, tag, stats):
     stats.add(side, parsed is None and not single)
     if parsed is not None or not single:
         os.remove(path)
+    elif not res["timeout"]:
+        # Keep the diagnostics of a case that fails on its own.
+        with open(path[:-3] + ".err", "w", encoding="utf-8") as f:
+            f.write(res["err"][:4000])
     if parsed is not None:
         return parsed
     if single:
@@ -1018,6 +1022,34 @@ def run_batch(batch, index, args, stats):
     return rows
 
 
+def batch_sanity_check(args, sides):
+    """Every processor must run the batch format (prelude, try/catch,
+    result lines); otherwise every case would be reported as an error."""
+    exprs = ["1 + 1", "xs:double('INF')", "()", "error(xs:QName('err:FOER0000'))"]
+    want = ["integer:2", "double:INF", "()", "!FOER0000"]
+    d = os.path.join(args.out, "sanity")
+    os.makedirs(d, exist_ok=True)
+    path = os.path.join(d, "batch.xq")
+    text = xqgen.batch_query(exprs)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(text)
+    q = {"text": text, "spec": {"vars": []}}
+    for side in sides:
+        if side == "zorba":
+            cmd = zorba_command(args.zorba, path, q, args.rbkt)
+        else:
+            cmd = saxon_command(args.java, args.saxon_classpath, path, q,
+                                args.rbkt)
+        res = run_process(cmd, 120, d)
+        got = (xqgen.parse_batch_output(res["out"], len(exprs))
+               if res["rc"] == 0 else None)
+        if got != want:
+            raise HarnessError("%s batch sanity check failed (rc %s): got %r"
+                               "\n%s\n%s" % (side, res["rc"], got,
+                                              res["out"][-2000:],
+                                              res["err"][-2000:]))
+
+
 def run_generated(args):
     status = {"ok": False, "shard": args.shard, "shards": args.shards,
               "set": args.set}
@@ -1026,8 +1058,9 @@ def run_generated(args):
         print("property seed: %s" % args.seed, flush=True)
     stats = Stats()
     try:
-        sanity_check(args, ("zorba",) if args.set == "property"
-                     else ("zorba", "saxon"))
+        sides = ("zorba",) if args.set == "property" else ("zorba", "saxon")
+        sanity_check(args, sides)
+        batch_sanity_check(args, sides)
         cases = generated_cases(args)
         batches = make_batches(cases, args.batch_size)
         mine = [(i, b) for i, b in enumerate(batches)

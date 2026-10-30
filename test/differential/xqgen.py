@@ -38,6 +38,7 @@ ERR_NS = "http://www.w3.org/2005/xqt-errors"
 
 PRELUDE = r'''xquery version "3.0";
 declare namespace output = "http://www.w3.org/2010/xslt-xquery-serialization";
+declare namespace err = "http://www.w3.org/2005/xqt-errors";
 declare option output:method "text";
 
 declare function local:t($i as item()) as xs:string {
