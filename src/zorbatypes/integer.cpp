@@ -23,6 +23,7 @@
 // Zorba
 #include <zorba/internal/cxx_util.h>
 #include <zorba/internal/unique_ptr.h>
+#include "diagnostics/xquery_diagnostics.h"
 #include "util/string_util.h"
 
 // local
@@ -34,6 +35,37 @@
 using namespace std;
 
 namespace zorba {
+
+///////////////////////////////////////////////////////////////////////////////
+
+namespace integer_detail {
+
+[[noreturn]] static void raise_overflow( string const &expr ) {
+  throw XQUERY_EXCEPTION(
+    err::FOAR0002,
+    ERROR_PARAMS(
+      BUILD_STRING(
+        expr, " is outside the xs:integer range [",
+        numeric_limits<long long>::min(), ", ",
+        numeric_limits<long long>::max(), ']'
+      )
+    )
+  );
+}
+
+void throw_overflow( char const *op, long long a, long long b ) {
+  raise_overflow( BUILD_STRING( a, ' ', op, ' ', b ) );
+}
+
+void throw_overflow( char const *op, long long a ) {
+  raise_overflow( BUILD_STRING( op, a ) );
+}
+
+void throw_overflow( unsigned long long n ) {
+  raise_overflow( BUILD_STRING( n ) );
+}
+
+} // namespace integer_detail
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -50,12 +82,15 @@ void integer_traits::throw_error( MAPM const &n, char const *op ) {
 template<class T>
 typename IntegerImpl<T>::value_type IntegerImpl<T>::ftoi( double d ) {
   d = d >= 0 ? floor( d ) : ceil( d );
-  value_type const i = static_cast<value_type>(d);
-  if ( i != d )
+  // Converting a double outside [-2^63, 2^63) (or NaN) to long long is
+  // undefined behavior, so check the range first; both bounds are exact
+  // doubles.
+  double const limit = -static_cast<double>( numeric_limits<value_type>::min() );
+  if ( !(d >= -limit && d < limit) )
     throw range_error(
       BUILD_STRING( '"', d, "\": value too large/small for integer" )
     );
-  return i;
+  return static_cast<value_type>( d );
 }
 #endif /* ZORBA_WITH_BIG_INTEGER */
 
@@ -407,13 +442,40 @@ Double IntegerImpl<T>::pow( IntegerImpl<T> const &power ) const {
 
 template<class T>
 IntegerImpl<T> IntegerImpl<T>::round( IntegerImpl<T> const &precision ) const {
-  return IntegerImpl( Decimal::round2( itod(), precision.itod() ) );
+  MAPM const result( Decimal::round2( itod(), precision.itod() ) );
+#ifndef ZORBA_WITH_BIG_INTEGER
+  try {
+    return IntegerImpl( result );
+  }
+  catch ( range_error const& ) {
+    // Rounding to a negative precision can carry past the largest value.
+    integer_detail::raise_overflow(
+      BUILD_STRING( "round(", value_, ", ", precision.value_, ')' )
+    );
+  }
+#else
+  return IntegerImpl( result );
+#endif /* ZORBA_WITH_BIG_INTEGER */
 }
 
 template<class T>
 IntegerImpl<T>
 IntegerImpl<T>::roundHalfToEven( IntegerImpl const &precision ) const {
-  return IntegerImpl( Decimal::roundHalfToEven2( itod(), precision.itod() ) );
+  MAPM const result( Decimal::roundHalfToEven2( itod(), precision.itod() ) );
+#ifndef ZORBA_WITH_BIG_INTEGER
+  try {
+    return IntegerImpl( result );
+  }
+  catch ( range_error const& ) {
+    integer_detail::raise_overflow(
+      BUILD_STRING(
+        "round-half-to-even(", value_, ", ", precision.value_, ')'
+      )
+    );
+  }
+#else
+  return IntegerImpl( result );
+#endif /* ZORBA_WITH_BIG_INTEGER */
 }
 
 ////////// miscellaneous //////////////////////////////////////////////////////

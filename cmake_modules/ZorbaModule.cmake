@@ -990,7 +990,12 @@ MACRO(ZORBA_ADD_TEST NAME TARGET ...)
                                            ${ARGV10} ${ARGV11} ${ARGV12} ${ARGV13} ${ARGV14} ${ARGV15} ${ARGV16} ${ARGV17}
                                            ${ARGV18} ${ARGV19} ${ARGV20} ${ARGV21} ${ARGV22} ${ARGV23} ${ARGV24} ${ARGV25}
                                            ${ARGV26} ${ARGV27} ${ARGV28} ${ARGV29} ${ARGV30} ${ARGV31} ${ARGV32} ${ARGV33})
-  SET_TESTS_PROPERTIES ("${NAME}" PROPERTIES TIMEOUT "${NORMAL_TIMEOUT_VALUE}")
+  # NORMAL_TIMEOUT_VALUE is normally unset. Setting TIMEOUT to "" would mean
+  # "no timeout" and override ctest --timeout and the test presets' timeout,
+  # so a hanging test would hang the whole run.
+  IF (NORMAL_TIMEOUT_VALUE)
+    SET_TESTS_PROPERTIES ("${NAME}" PROPERTIES TIMEOUT "${NORMAL_TIMEOUT_VALUE}")
+  ENDIF (NORMAL_TIMEOUT_VALUE)
   GET_PROPERTY (TEST_EXTRAPROPS GLOBAL PROPERTY "EXTRAPROPS-${NAME}")
   IF (TEST_EXTRAPROPS)
     MESSAGE (STATUS "using additional properties for ${NAME}: [${TEST_EXTRAPROPS}]")

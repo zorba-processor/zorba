@@ -103,7 +103,16 @@ AbsIterator::nextImpl(store::Item_t& result, PlanState& planState) const
       }
       else
       {
-        GENV_ITEMFACTORY->createInteger(result, -result->getIntegerValue());
+        try
+        {
+          // abs(INT64_MIN) raises err:FOAR0002 (without big integers).
+          GENV_ITEMFACTORY->createInteger(result, -result->getIntegerValue());
+        }
+        catch (ZorbaException& e)
+        {
+          set_source(e, loc, false);
+          throw;
+        }
       }
     }
     else if (TypeOps::is_subtype(type, store::XS_DECIMAL))
@@ -288,8 +297,18 @@ RoundIterator::nextImpl(store::Item_t& result, PlanState& planState) const
     else if (TypeOps::is_subtype(type, store::XS_INTEGER))
     {
       if (precision_integer.sign() < 0)
-        GENV_ITEMFACTORY->
-        createInteger(result, result->getIntegerValue().round(precision_integer));
+      {
+        try
+        {
+          GENV_ITEMFACTORY->
+          createInteger(result, result->getIntegerValue().round(precision_integer));
+        }
+        catch (ZorbaException& e)
+        {
+          set_source(e, loc, false);
+          throw;
+        }
+      }
     }
 
     else if (TypeOps::is_subtype(type, store::XS_DECIMAL))
@@ -360,8 +379,16 @@ bool RoundHalfToEvenIterator::nextImpl(
     }
     else if (TypeOps::is_subtype(type, store::XS_INTEGER))
     {
-      GENV_ITEMFACTORY->
-      createInteger(result, result->getIntegerValue().roundHalfToEven(precision));
+      try
+      {
+        GENV_ITEMFACTORY->
+        createInteger(result, result->getIntegerValue().roundHalfToEven(precision));
+      }
+      catch (ZorbaException& e)
+      {
+        set_source(e, loc, false);
+        throw;
+      }
     }
     else if (TypeOps::is_subtype(type, store::XS_DECIMAL))
     {

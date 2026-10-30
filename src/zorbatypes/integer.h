@@ -633,6 +633,31 @@ typedef IntegerImpl<nonNegative_traits> NonNegativeInteger;
 typedef IntegerImpl<nonPositive_traits> NonPositiveInteger;
 typedef IntegerImpl<positive_traits>    PositiveInteger;
 
+namespace integer_detail {
+
+/**
+ * Throws err:FOAR0002 for an xs:integer result that does not fit
+ * IntegerImpl::value_type (only possible without ZORBA_WITH_BIG_INTEGER).
+ */
+[[noreturn]] void throw_overflow( char const *op, long long a, long long b );
+[[noreturn]] void throw_overflow( char const *op, long long a );
+[[noreturn]] void throw_overflow( unsigned long long n );
+
+/**
+ * Converts an unsigned value to the signed integral type \a V, raising
+ * err:FOAR0002 if it does not fit (e.g. xs:unsignedLong values above
+ * 2^63-1).
+ */
+template<typename V,typename U>
+inline V from_unsigned( U n ) {
+  static_assert( std::is_unsigned_v<U> );
+  if ( n > static_cast<std::make_unsigned_t<V>>( std::numeric_limits<V>::max() ) )
+    throw_overflow( n );
+  return static_cast<V>( n );
+}
+
+} // namespace integer_detail
+
 ////////// constructors ///////////////////////////////////////////////////////
 
 template<class T>
@@ -703,13 +728,13 @@ inline IntegerImpl<T>::IntegerImpl( unsigned int n ) :
 
 template<class T>
 inline IntegerImpl<T>::IntegerImpl( unsigned long n ) :
-  value_( static_cast<value_type>( T::check_value( n ) ) )
+  value_( integer_detail::from_unsigned<value_type>( T::check_value( n ) ) )
 {
 }
 
 template<class T>
 inline IntegerImpl<T>::IntegerImpl( unsigned long long n ) :
-  value_( static_cast<value_type>( T::check_value( n ) ) )
+  value_( integer_detail::from_unsigned<value_type>( T::check_value( n ) ) )
 {
 }
 #endif /* ZORBA_WITH_BIG_INTEGER */
@@ -719,7 +744,7 @@ inline IntegerImpl<T>::IntegerImpl( float n ) :
 #ifdef ZORBA_WITH_BIG_INTEGER
   value_( static_cast<double>( T::check_value( n ) ) )
 #else
-  value_( static_cast<value_type>( T::check_value( n ) ) )
+  value_( ftoi( T::check_value( n ) ) )
 #endif /* ZORBA_WITH_BIG_INTEGER */
 {
 }
@@ -729,7 +754,7 @@ inline IntegerImpl<T>::IntegerImpl( double n ) :
 #ifdef ZORBA_WITH_BIG_INTEGER
   value_( T::check_value( n ) )
 #else
-  value_( static_cast<value_type>( T::check_value( n ) ) )
+  value_( ftoi( T::check_value( n ) ) )
 #endif /* ZORBA_WITH_BIG_INTEGER */
 {
 }
@@ -771,14 +796,35 @@ ZORBA_ASSIGN_OP(long)
 ZORBA_ASSIGN_OP(unsigned char)
 ZORBA_ASSIGN_OP(unsigned short)
 ZORBA_ASSIGN_OP(unsigned int)
-ZORBA_ASSIGN_OP(float)
-ZORBA_ASSIGN_OP(double)
 #ifndef ZORBA_WITH_BIG_INTEGER
 ZORBA_ASSIGN_OP(long long)
-ZORBA_ASSIGN_OP(unsigned long)
-ZORBA_ASSIGN_OP(unsigned long long)
 #endif /* ZORBA_WITH_BIG_INTEGER */
 #undef ZORBA_ASSIGN_OP
+
+// Truncate toward zero; out of range throws std::range_error.
+#define ZORBA_ASSIGN_OP(N)                                      \
+  template<class T> inline                                      \
+  IntegerImpl<T>& IntegerImpl<T>::operator=( N n ) {            \
+    value_ = ftoi( static_cast<double>( T::check_value( n ) ) ); \
+    return *this;                                               \
+  }
+
+ZORBA_ASSIGN_OP(float)
+ZORBA_ASSIGN_OP(double)
+#undef ZORBA_ASSIGN_OP
+
+#ifndef ZORBA_WITH_BIG_INTEGER
+#define ZORBA_ASSIGN_OP(N)                                      \
+  template<class T> inline                                      \
+  IntegerImpl<T>& IntegerImpl<T>::operator=( N n ) {            \
+    value_ = integer_detail::from_unsigned<value_type>( T::check_value( n ) ); \
+    return *this;                                               \
+  }
+
+ZORBA_ASSIGN_OP(unsigned long)
+ZORBA_ASSIGN_OP(unsigned long long)
+#undef ZORBA_ASSIGN_OP
+#endif /* ZORBA_WITH_BIG_INTEGER */
 
 template<class T>
 inline IntegerImpl<T>& IntegerImpl<T>::operator=( char const *s ) {
@@ -804,53 +850,100 @@ inline IntegerImpl<T>& IntegerImpl<T>::operator=( IntegerImpl<U> const &i ) {
 
 namespace integer_detail {
 
-// Without ZORBA_WITH_BIG_INTEGER, value_type is long long and xs:integer
-// arithmetic wraps on overflow (e.g. test udf-fib-rec expects fib(100) modulo
-// 2^64). Signed overflow is undefined, so do the wrapping arithmetic on the
-// unsigned type; the result is the same two's-complement value.
-template<typename V,class Op>
-inline V wrapping( V a, V b, Op op ) {
-  if constexpr ( std::is_integral_v<V> && std::is_signed_v<V> ) {
-    typedef std::make_unsigned_t<V> U;
-    return static_cast<V>( op( static_cast<U>( a ), static_cast<U>( b ) ) );
+/**
+ * Computes \a a \a Op \a b where \a Op is one of \c + \c - \c * \c / \c %.
+ * When \a V is a built-in integer type (no ZORBA_WITH_BIG_INTEGER), a result
+ * that does not fit \a V raises err:FOAR0002 (XPath F&O 3.1 4.2) instead of
+ * wrapping (signed overflow is undefined behavior).  Division by zero is the
+ * caller's responsibility.
+ */
+template<char Op,typename V>
+inline V arith( V const &a, V const &b ) {
+  if constexpr ( std::is_integral_v<V> ) {
+    static_assert( std::is_signed_v<V> );
+    V r = 0;
+    bool overflow;
+    if constexpr ( Op == '+' )
+      overflow = __builtin_add_overflow( a, b, &r );
+    else if constexpr ( Op == '-' )
+      overflow = __builtin_sub_overflow( a, b, &r );
+    else if constexpr ( Op == '*' )
+      overflow = __builtin_mul_overflow( a, b, &r );
+    else if constexpr ( Op == '/' ) {
+      overflow = b == -1 && a == std::numeric_limits<V>::min();
+      if ( !overflow )
+        r = a / b;
+    } else {
+      static_assert( Op == '%' );
+      // The result is 0, but INT_MIN % -1 traps on x86.
+      overflow = false;
+      r = b == -1 ? 0 : a % b;
+    }
+    if ( overflow ) {
+      char const op[] = { Op, '\0' };
+      throw_overflow( op, a, b );
+    }
+    return r;
   } else {
-    return op( a, b );
+    if constexpr ( Op == '+' )
+      return a + b;
+    else if constexpr ( Op == '-' )
+      return a - b;
+    else if constexpr ( Op == '*' )
+      return a * b;
+    else if constexpr ( Op == '/' )
+      return a / b;
+    else {
+      static_assert( Op == '%' );
+      return a % b;
+    }
   }
+}
+
+template<typename V>
+inline V negate( V const &a ) {
+  if constexpr ( std::is_integral_v<V> ) {
+    if ( a == std::numeric_limits<V>::min() )
+      throw_overflow( "-", a );
+  }
+  return -a;
 }
 
 } // namespace integer_detail
 
+// The operator macros below pass (#OP)[0], the operator's first character
+// (e.g. '+' for both + and +=), as integer_detail::arith's Op.
+
 #define ZORBA_INTEGER_OP(OP)                                                \
   template<class T,class U> inline                                          \
   Integer operator OP( IntegerImpl<T> const &i, IntegerImpl<U> const &j ) { \
-    return Integer( integer_detail::wrapping(                               \
-      i.value_, j.value_, []( auto a, auto b ) { return a OP b; } ) );      \
+    return Integer( integer_detail::arith<(#OP)[0]>( i.value_, j.value_ ) ); \
   }
 
 ZORBA_INTEGER_OP(+)
 ZORBA_INTEGER_OP(-)
 ZORBA_INTEGER_OP(*)
+ZORBA_INTEGER_OP(%)
 #undef ZORBA_INTEGER_OP
 
 template<class T,class U>
-inline Integer operator%( IntegerImpl<T> const &i, IntegerImpl<U> const &j ) {
-  return Integer( i.value_ % j.value_ );
-}
-
-template<class T,class U>
 inline Integer operator/( IntegerImpl<T> const &i, IntegerImpl<U> const &j ) {
-  return Integer( Integer::ftoi( i.value_ / j.value_ ) );
+  return Integer(
+    Integer::ftoi( integer_detail::arith<'/'>( i.value_, j.value_ ) )
+  );
 }
 
 #define ZORBA_INTEGER_OP(OP,N)                                    \
   template<class T> inline                                        \
   Integer operator OP( IntegerImpl<T> const &i, N n ) {           \
-    return Integer( i.value_ OP Integer::make_value_type( n ) );  \
+    return Integer( integer_detail::arith<(#OP)[0]>(              \
+      i.value_, Integer::make_value_type( n ) ) );                \
   }                                                               \
                                                                   \
   template<class T> inline                                        \
   Integer operator OP( N n, IntegerImpl<T> const &i ) {           \
-    return Integer( Integer::make_value_type( n ) OP i.value_ );  \
+    return Integer( integer_detail::arith<(#OP)[0]>(              \
+      Integer::make_value_type( n ), i.value_ ) );                \
   }
 
 ZORBA_INTEGER_OP(+,char)
@@ -912,12 +1005,14 @@ ZORBA_INTEGER_OP(%,unsigned long long)
 #define ZORBA_INTEGER_OP(N)                           \
   template<class T> inline                            \
   Integer operator/( IntegerImpl<T> const &i, N n ) { \
-    return Integer( Integer::ftoi( i.value_ / Integer::make_value_type( n ) ) ); \
+    return Integer( Integer::ftoi( integer_detail::arith<'/'>( \
+      i.value_, Integer::make_value_type( n ) ) ) );  \
   }                                                   \
                                                       \
   template<class T> inline                            \
   Integer operator/( N n, IntegerImpl<T> const &i ) { \
-    return Integer( Integer::ftoi( Integer::make_value_type( n ) / i.value_ ) ); \
+    return Integer( Integer::ftoi( integer_detail::arith<'/'>( \
+      Integer::make_value_type( n ), i.value_ ) ) );  \
   }
 
 ZORBA_INTEGER_OP(signed char)
@@ -940,33 +1035,28 @@ ZORBA_INTEGER_OP(unsigned long long)
 #define ZORBA_INTEGER_OP(OP)                                                \
   template<class T> inline                                                  \
   IntegerImpl<T>& IntegerImpl<T>::operator OP##=( IntegerImpl<T> const &i ) { \
-    value_ = integer_detail::wrapping(                                      \
-      value_, i.value_, []( auto a, auto b ) { return a OP b; } );          \
-    T::check_value( value_ );                                               \
+    value_ = T::check_value(                                                \
+      integer_detail::arith<(#OP)[0]>( value_, i.value_ ) );                \
     return *this;                                                           \
   }
 
 ZORBA_INTEGER_OP(+)
 ZORBA_INTEGER_OP(-)
 ZORBA_INTEGER_OP(*)
+ZORBA_INTEGER_OP(%)
 #undef ZORBA_INTEGER_OP
 
 template<class T>
-inline IntegerImpl<T>& IntegerImpl<T>::operator%=( IntegerImpl<T> const &i ) {
-  T::check_value( value_ %= i.value_ );
-  return *this;
-}
-
-template<class T>
 inline IntegerImpl<T>& IntegerImpl<T>::operator/=( IntegerImpl<T> const &i ) {
-  value_ = T::check_value( ftoi( value_ / i.value_ ) );
+  value_ = T::check_value( ftoi( integer_detail::arith<'/'>( value_, i.value_ ) ) );
   return *this;
 }
 
 #define ZORBA_INTEGER_OP(OP,N)                          \
   template<class T> inline                              \
   IntegerImpl<T>& IntegerImpl<T>::operator OP( N n ) {  \
-    T::check_value( value_ OP make_value_type( n ) );   \
+    value_ = T::check_value( integer_detail::arith<(#OP)[0]>( \
+      value_, make_value_type( n ) ) );                 \
     return *this;                                       \
   }
 
@@ -1029,7 +1119,8 @@ ZORBA_INTEGER_OP(%=,unsigned long long)
 #define ZORBA_INTEGER_OP(N)                                           \
   template<class T> inline                                            \
   IntegerImpl<T>& IntegerImpl<T>::operator/=( N n ) {                 \
-    value_ = T::check_value( ftoi( value_ / make_value_type( n ) ) ); \
+    value_ = T::check_value( ftoi( integer_detail::arith<'/'>(        \
+      value_, make_value_type( n ) ) ) );                             \
     return *this;                                                     \
   }
 
@@ -1052,32 +1143,32 @@ ZORBA_INTEGER_OP(unsigned long long)
 
 template<class T>
 inline Integer IntegerImpl<T>::operator-() const {
-  return Integer( -value_ );
+  return Integer( integer_detail::negate( value_ ) );
 }
 
 template<class T>
 inline IntegerImpl<T>& IntegerImpl<T>::operator++() {
-  T::check_value( ++value_ );
+  value_ = T::check_value( integer_detail::arith<'+'>( value_, make_value_type( 1 ) ) );
   return *this;
 }
 
 template<class T>
 inline IntegerImpl<T> IntegerImpl<T>::operator++(int) {
   IntegerImpl<T> const result( *this );
-  T::check_value( ++value_ );
+  ++*this;
   return result;
 }
 
 template<class T>
 inline IntegerImpl<T>& IntegerImpl<T>::operator--() {
-  T::check_value( --value_ );
+  value_ = T::check_value( integer_detail::arith<'-'>( value_, make_value_type( 1 ) ) );
   return *this;
 }
 
 template<class T>
 inline IntegerImpl<T> IntegerImpl<T>::operator--(int) {
   IntegerImpl<T> const result( *this );
-  T::check_value( --value_ );
+  --*this;
   return result;
 }
 

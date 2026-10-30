@@ -187,9 +187,19 @@ bool loader::next( store::Item_t *result ) {
           try {
             switch ( t.get_numeric_type() ) {
               case token::integer:
-                GENV_ITEMFACTORY->createInteger(
-                  item, xs_integer( t.get_value() )
-                );
+                try {
+                  GENV_ITEMFACTORY->createInteger(
+                    item, xs_integer( t.get_value() )
+                  );
+                }
+                catch ( std::range_error const& ) {
+                  // Without big integers, xs:integer is 64-bit: keep a larger
+                  // integer (e.g. an ID) exactly as an xs:decimal rather than
+                  // failing to parse the document.
+                  GENV_ITEMFACTORY->createDecimal(
+                    item, xs_decimal( t.get_value() )
+                  );
+                }
                 break;
               case token::decimal:
                 GENV_ITEMFACTORY->createDecimal(
@@ -207,11 +217,9 @@ bool loader::next( store::Item_t *result ) {
           }
           catch ( std::range_error const& ) {
             //
-            // The number does not fit the type (xs:integer is 64 bits wide
-            // unless Zorba is built with ZORBA_WITH_BIG_INTEGER; xs:double
-            // overflows). Raise what an out-of-range numeric literal in a
-            // query raises instead of letting std::range_error escape as an
-            // internal error.
+            // The number does not fit the type (e.g. xs:double overflows).
+            // Raise what an out-of-range numeric literal in a query raises
+            // instead of letting std::range_error escape as an internal error.
             //
             throw XQUERY_EXCEPTION(
               err::FOAR0002,

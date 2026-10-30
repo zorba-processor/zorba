@@ -15,6 +15,8 @@
  */
 #include "stdafx.h"
 
+#include <stdexcept>
+
 #include "common/shared_types.h"
 
 #include "diagnostics/assert.h"
@@ -45,6 +47,48 @@
 
 namespace zorba
 {
+
+/**
+ * Evaluates \a f, an xs:integer computation that may raise err:FOAR0002 on
+ * overflow from the Integer class (which does not know the query location),
+ * and attaches \a loc to such an error.
+ */
+template<class F>
+static bool with_integer_loc( QueryLoc const *loc, F &&f )
+{
+  try
+  {
+    return f();
+  }
+  catch (ZorbaException& e)
+  {
+    if (loc)
+      set_source(e, *loc, false);
+    throw;
+  }
+}
+
+/**
+ * Returns \a f's result, an xs:integer quotient computed from
+ * xs:double/xs:float/xs:decimal operands, raising err:FOAR0002 when it does
+ * not fit xs:integer (F&O 3.1 4.2).
+ */
+template<class F>
+static xs_integer idiv_to_integer( QueryLoc const *loc, F &&f )
+{
+  try
+  {
+    return f();
+  }
+  catch (std::range_error const& e)
+  {
+    throw XQUERY_EXCEPTION(err::FOAR0002, ERROR_PARAMS(e.what()), ERROR_LOC(loc));
+  }
+  catch (std::invalid_argument const& e)   // the quotient overflowed to INF
+  {
+    throw XQUERY_EXCEPTION(err::FOAR0002, ERROR_PARAMS(e.what()), ERROR_LOC(loc));
+  }
+}
 
 SERIALIZABLE_TEMPLATE_INSTANCE(NumArithIterator,
                                NumArithIterator<AddOperation>,
@@ -280,12 +324,14 @@ bool AddOperation::compute<store::XS_INTEGER,store::XS_INTEGER>(
     store::Item_t& result,
     dynamic_context* /* dctx */,
     const TypeManager* /* tm */,
-    const QueryLoc*,
+    const QueryLoc* loc,
     const store::Item* i0,
     const store::Item* i1)
 {
-  return GENV_ITEMFACTORY->
-         createInteger(result, i0->getIntegerValue() + i1->getIntegerValue());
+  return with_integer_loc(loc, [&] {
+    return GENV_ITEMFACTORY->
+           createInteger(result, i0->getIntegerValue() + i1->getIntegerValue());
+  });
 }
 
 
@@ -339,12 +385,14 @@ bool SubtractOperation::compute<store::XS_INTEGER,store::XS_INTEGER>(
     store::Item_t& result,
     dynamic_context* /* dctx */,
     const TypeManager* /* tm */,
-    const QueryLoc*,
+    const QueryLoc* loc,
     const store::Item* i0,
     const store::Item* i1 )
 {
-  return GENV_ITEMFACTORY->
-         createInteger(result, i0->getIntegerValue() - i1->getIntegerValue());
+  return with_integer_loc(loc, [&] {
+    return GENV_ITEMFACTORY->
+           createInteger(result, i0->getIntegerValue() - i1->getIntegerValue());
+  });
 }
 
 
@@ -398,12 +446,14 @@ bool MultiplyOperation::compute<store::XS_INTEGER,store::XS_INTEGER>(
     store::Item_t& result,
     dynamic_context* /* dctx */,
     const TypeManager* /* tm */,
-    const QueryLoc*,
+    const QueryLoc* loc,
     const store::Item* i0,
     const store::Item* i1)
 {
-  return GENV_ITEMFACTORY->
-         createInteger(result,  i0->getIntegerValue() * i1->getIntegerValue());
+  return with_integer_loc(loc, [&] {
+    return GENV_ITEMFACTORY->
+           createInteger(result, i0->getIntegerValue() * i1->getIntegerValue());
+  });
 }
 
 
@@ -514,7 +564,8 @@ bool IntegerDivideOperation::compute<store::XS_DOUBLE,store::XS_DOUBLE>(
     return GENV_ITEMFACTORY->createInteger(result, numeric_consts<xs_integer>::zero());
   }
 
-  xs_integer const lInteger( d0 / d1 );
+  xs_integer const lInteger(
+    idiv_to_integer(loc, [&] { return xs_integer( d0 / d1 ); }) );
   return GENV_ITEMFACTORY->createInteger (result,  lInteger );
 }
 
@@ -553,7 +604,8 @@ bool IntegerDivideOperation::compute<store::XS_FLOAT,store::XS_FLOAT>(
     return GENV_ITEMFACTORY->createInteger(result, numeric_consts<xs_integer>::zero());
   }
 
-  xs_integer const lInteger( f0 / f1 );
+  xs_integer const lInteger(
+    idiv_to_integer(loc, [&] { return xs_integer( f0 / f1 ); }) );
   return GENV_ITEMFACTORY->createInteger(result, lInteger);
 }
 
@@ -574,7 +626,8 @@ bool IntegerDivideOperation::compute<store::XS_DECIMAL,store::XS_DECIMAL>(
   {
     throw XQUERY_EXCEPTION( err::FOAR0001, ERROR_LOC( loc ) );
   }
-  return GENV_ITEMFACTORY->createInteger(result, Integer(ld0 / ld1));
+  return GENV_ITEMFACTORY->createInteger(
+    result, idiv_to_integer(loc, [&] { return Integer( ld0 / ld1 ); }) );
 }
 
 
@@ -595,7 +648,10 @@ bool IntegerDivideOperation::compute<store::XS_INTEGER,store::XS_INTEGER>(
     throw XQUERY_EXCEPTION( err::FOAR0001, ERROR_LOC( loc ) );
   }
 
-  return GENV_ITEMFACTORY->createInteger (result, ll0 / ll1);
+  // INT64_MIN idiv -1 raises err:FOAR0002 (without big integers).
+  return with_integer_loc(loc, [&] {
+    return GENV_ITEMFACTORY->createInteger (result, ll0 / ll1);
+  });
 }
 
 
@@ -666,7 +722,9 @@ bool ModOperation::compute<store::XS_INTEGER, store::XS_INTEGER>(
   {
     throw XQUERY_EXCEPTION(err::FOAR0001, ERROR_LOC(loc));
   }
-  return GENV_ITEMFACTORY->createInteger(result, ll0 % ll1);
+  return with_integer_loc(loc, [&] {
+    return GENV_ITEMFACTORY->createInteger(result, ll0 % ll1);
+  });
 }
 
 
@@ -993,9 +1051,11 @@ bool OpNumericUnaryIterator::nextImpl(store::Item_t& result, PlanState& planStat
     }
     else if (TypeOps::is_subtype(type, store::XS_INTEGER))
     {
-      GENV_ITEMFACTORY->
-      createInteger(result,
-                    (thePlus ? item->getIntegerValue() : -item->getIntegerValue()));
+      with_integer_loc(&loc, [&] {
+        return GENV_ITEMFACTORY->
+        createInteger(result,
+                      (thePlus ? item->getIntegerValue() : -item->getIntegerValue()));
+      });
     }
     else if (TypeOps::is_subtype(type, store::XS_DECIMAL))
     {
