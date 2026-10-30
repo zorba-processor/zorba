@@ -1,0 +1,16 @@
+[ {
+  "id" : 1, 
+  "coupon is null" : true, 
+  "coupon missing" : false, 
+  "coupon or default" : "none"
+}, {
+  "id" : 2, 
+  "coupon is null" : null, 
+  "coupon missing" : true, 
+  "coupon or default" : "none"
+}, {
+  "id" : 3, 
+  "coupon is null" : false, 
+  "coupon missing" : false, 
+  "coupon or default" : "FALL10"
+} ]

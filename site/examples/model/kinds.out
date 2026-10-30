@@ -1,0 +1,9 @@
+xs:integer   atomic value
+xs:string    atomic value
+xs:double    atomic value
+xs:date      atomic value
+element()    node
+text()       node
+object()     JSON item
+array()      JSON item
+function(*)  function item

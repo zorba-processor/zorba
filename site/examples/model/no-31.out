@@ -1,0 +1,5 @@
+<compile query="xquery version &quot;3.0&quot;; 1 + 1">compiles</compile>
+<compile query="xquery version &quot;3.1&quot;; 1 + 1">error XQST0031</compile>
+<compile query="map { &quot;a&quot;: 1 }">error XPST0003</compile>
+<compile query="(1, 2, 3) =&gt; count()">error XPST0003</compile>
+<compile query="{ &quot;a&quot;: 1 }(&quot;a&quot;)">compiles</compile>
