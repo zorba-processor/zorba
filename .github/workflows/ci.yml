@@ -140,20 +140,6 @@ jobs:
               tail -n 60 build/ctest.log
               exit $rc'
 
-      - name: Diagnose segfaults (temporary)
-        if: always() && matrix.preset == 'embedded'
-        continue-on-error: true
-        timeout-minutes: 5
-        run: |
-          docker run --rm --cap-add=SYS_PTRACE -v "$PWD":/src -w /src zorba-builder:ci sh -c '
-            cd build/embedded
-            for t in "paths/attr_ns$" "w3c/ForExpr010$" "comandline_doc_example_2$"; do
-              cmd=$(ctest -R "$t" -N -V | grep -i "test command" | head -1 | sed "s/.*Test command: //")
-              echo "CMD: $cmd"
-              printf "catch throw\nrun\nbt\n" > /tmp/g.gdb
-              eval "gdb -batch -x /tmp/g.gdb --args $cmd" 2>&1 | tail -25
-            done'
-
       - name: Summary
         if: always()
         run: |
