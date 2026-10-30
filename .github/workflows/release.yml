@@ -1,0 +1,512 @@
+name: Release
+
+# Builds a tagged release: tests on linux-amd64, then publishes
+#   - a source tarball, SBOMs and SHA256SUMS on a DRAFT GitHub Release
+#     (the owner reviews and publishes it; see RELEASING.md),
+#   - the multi-arch ghcr.io/<owner>/zorba image with the release tags
+#     (see docker/README.md),
+#   - build provenance and SBOM attestations for the tarball and the image.
+#
+# workflow_dispatch runs the same pipeline without a tag. With dry_run (the
+# default) nothing is pushed and no release is created; the would-be release
+# assets and notes are uploaded as the "release-assets" workflow artifact.
+# Pull requests that change this workflow get the same dry run, with the
+# version taken from the newest versioned CHANGELOG.md section plus "-dryrun".
+on:
+  push:
+    tags: ['v*']
+  pull_request:
+    paths: ['.github/workflows/release.yml']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version without the leading v (e.g. 5.0.0-alpha.1); empty = derive from the tag ref
+        required: false
+        type: string
+      dry_run:
+        description: Build, test and attest the tarball, but push no image and create no release
+        required: false
+        type: boolean
+        default: true
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions: {}
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE: ghcr.io/${{ github.repository_owner }}/zorba
+
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      tag: ${{ steps.v.outputs.tag }}
+      prerelease: ${{ steps.v.outputs.prerelease }}
+      latest: ${{ steps.v.outputs.latest }}
+      dry_run: ${{ steps.v.outputs.dry_run }}
+      image_tags: ${{ steps.v.outputs.image_tags }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Determine version, prerelease and image tags
+        id: v
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || github.event_name == 'pull_request' }}
+        run: |
+          set -euo pipefail
+          version="${INPUT_VERSION#v}"
+          if [ -z "$version" ] && [ "$GITHUB_EVENT_NAME" = pull_request ]; then
+            version="$(grep -m1 -oE '^## \[[0-9]+\.[0-9]+\.[0-9]+\]' CHANGELOG.md | tr -d '#[] ')-dryrun"
+          fi
+          if [ -z "$version" ]; then
+            case "$GITHUB_REF" in
+              refs/tags/v*) version="${GITHUB_REF#refs/tags/v}" ;;
+              *) echo "::error::No version input and $GITHUB_REF is not a v* tag"; exit 1 ;;
+            esac
+          fi
+          re='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?$'
+          if ! [[ "$version" =~ $re ]]; then
+            echo "::error::'$version' is not a SemVer version (X.Y.Z or X.Y.Z-pre)"; exit 1
+          fi
+          major="${BASH_REMATCH[1]}" minor="${BASH_REMATCH[2]}" patch="${BASH_REMATCH[3]}"
+          tag="v$version"
+          dry_run="${DRY_RUN:-false}"
+          # A real release must run on the tag it publishes.
+          if [ "$dry_run" != true ] && [ "$GITHUB_REF" != "refs/tags/$tag" ]; then
+            echo "::error::A non-dry run must run on refs/tags/$tag (got $GITHUB_REF)"; exit 1
+          fi
+
+          prerelease=false
+          [ -n "${BASH_REMATCH[4]}" ] && prerelease=true
+
+          # latest = this version is stable and the highest stable v* tag.
+          latest=false
+          if [ "$prerelease" = false ]; then
+            highest=$( { git ls-remote --tags --refs origin 'refs/tags/v*' \
+                          | sed 's|.*refs/tags/v||'; echo "$version"; } \
+                       | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1)
+            [ "$highest" = "$version" ] && latest=true
+          fi
+
+          tags="$version"
+          if [ "$prerelease" = false ]; then
+            tags="$tags $major.$minor $major"
+          fi
+          [ "$latest" = true ] && tags="$tags latest"
+
+          # The release must report the version it is tagged with.
+          cm="$(sed -nE 's/^SET\(ZORBA_(MAJOR|MINOR|PATCH)_NUMBER "([0-9]+)"\)/\2/p' CMakeLists.txt | paste -sd.)"
+          if [ "$cm" != "$major.$minor.$patch" ]; then
+            msg="CMakeLists.txt sets version $cm, but the release is $major.$minor.$patch"
+            if [ "$dry_run" = true ]; then echo "::warning::$msg"; else echo "::error::$msg"; exit 1; fi
+          fi
+
+          {
+            echo "version=$version"
+            echo "tag=$tag"
+            echo "prerelease=$prerelease"
+            echo "latest=$latest"
+            echo "dry_run=$dry_run"
+            echo "image_tags=$tags"
+          } | tee -a "$GITHUB_OUTPUT"
+          {
+            echo "### Release $tag"
+            echo
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Dry run | $dry_run |"
+            echo "| Prerelease | $prerelease |"
+            echo "| GitHub latest | $latest |"
+            echo "| Image tags | \`$tags\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Extract the release notes from CHANGELOG.md
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+          TAG: ${{ steps.v.outputs.tag }}
+          PRERELEASE: ${{ steps.v.outputs.prerelease }}
+        run: |
+          set -euo pipefail
+          # 5.0.0-alpha.1 uses the "## [5.0.0]" section.
+          base="${VERSION%%-*}"
+          heading="$(grep -m1 -F "## [$base]" CHANGELOG.md || true)"
+          if [ -z "$heading" ]; then
+            echo "::error::CHANGELOG.md has no '## [$base]' section"; exit 1
+          fi
+          case "$heading" in
+            *Unreleased*) echo "::warning::CHANGELOG.md still dates [$base] as Unreleased" ;;
+          esac
+          section="$(awk -v h="## [$base]" 'index($0,h)==1{f=1;next} f&&/^## /{exit} f' CHANGELOG.md | sed -e '/./,$!d')"
+          if [ "$(grep -c . <<< "$section")" -lt 3 ]; then
+            echo "::error::The [$base] section of CHANGELOG.md looks empty"; exit 1
+          fi
+          if grep -qF '(open PR)' <<< "$section"; then
+            echo "::warning::The [$base] section still has entries marked (open PR)"
+          fi
+          {
+            if [ "$PRERELEASE" = true ]; then
+              echo "Prerelease of Zorba $base. The notes below list all changes in $base so far."
+              echo
+            fi
+            echo "$section"
+            echo
+            echo "### Container image"
+            echo
+            echo '```bash'
+            echo "docker run --rm ${IMAGE}:${VERSION} -q '1 + 1'"
+            echo '```'
+            echo
+            echo "### Verifying"
+            echo
+            echo '```bash'
+            echo "sha256sum -c SHA256SUMS"
+            echo "gh attestation verify zorba-${VERSION}.tar.gz -R ${GITHUB_REPOSITORY}"
+            echo "gh attestation verify oci://${IMAGE}:${VERSION} -R ${GITHUB_REPOSITORY}"
+            echo '```'
+          } > release-notes.md
+          { echo; echo "<details><summary>Release notes</summary>"; echo; cat release-notes.md; echo; echo "</details>"; } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-notes
+          path: release-notes.md
+          retention-days: 7
+
+  # Same build and full test run as the linux-amd64 job in ci.yml.
+  test:
+    needs: prepare
+    name: test linux-amd64 (Arch, latest toolchain)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Build the builder image
+        uses: docker/build-push-action@v7
+        with:
+          context: docker/builder-latest
+          load: true
+          tags: zorba-builder:ci
+          cache-from: type=gha,scope=builder-linux-amd64-latest
+
+      - name: Build the HTTP test server image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: docker/http-test-server/Dockerfile
+          load: true
+          tags: zorba-http-test:ci
+          cache-from: type=gha,scope=http-test-linux-amd64-latest
+
+      # Restore only: release builds must not evict the CI caches.
+      - uses: actions/cache/restore@v6
+        with:
+          path: .ccache
+          key: ccache-linux-amd64-latest-${{ github.sha }}
+          restore-keys: ccache-linux-amd64-latest-
+
+      - name: Build and test
+        run: |
+          docker network create zorba-test
+          docker run -d --name zorba-http-test --network zorba-test zorba-http-test:ci
+          docker run --rm --network zorba-test \
+            -e ZORBA_HTTP_TEST_SERVER=zorba-http-test:8080 \
+            -e CC=gcc -e CXX=g++ \
+            -e CCACHE_DIR=/src/.ccache \
+            -e CCACHE_SLOPPINESS=pch_defines,time_macros \
+            -v "$PWD":/src -w /src zorba-builder:ci sh -ec '
+              cmake --preset full-release
+              cmake --build --preset full-release
+              ccache -s
+              ctest --preset full-release -j"$(nproc)" \
+                --output-junit junit.xml'
+
+      - name: Verify hardening
+        run: scripts/check-hardening.sh build/full-release
+
+      - name: Upload test results
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-results-release
+          path: |
+            build/full-release/junit.xml
+            build/full-release/Testing/Temporary/LastTest.log
+
+  source:
+    needs: prepare
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Create the source tarball
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          git archive --format=tar --prefix="zorba-$VERSION/" HEAD \
+            | gzip -n -9 > "dist/zorba-$VERSION.tar.gz"
+          mkdir -p sbom-src
+          tar -xzf "dist/zorba-$VERSION.tar.gz" -C sbom-src
+          ls -l dist
+
+      - name: Generate the source SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          path: sbom-src/zorba-${{ env.VERSION }}
+          format: spdx-json
+          output-file: dist/zorba-${{ env.VERSION }}-source.spdx.json
+          upload-artifact: false
+          upload-release-assets: false
+
+      # Pull requests from forks get no OIDC token.
+      - name: Attest build provenance (tarball)
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/attest@v4
+        with:
+          subject-path: dist/zorba-${{ env.VERSION }}.tar.gz
+
+      - name: Attest the SBOM (tarball)
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/attest@v4
+        with:
+          subject-path: dist/zorba-${{ env.VERSION }}.tar.gz
+          sbom-path: dist/zorba-${{ env.VERSION }}-source.spdx.json
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist-source
+          path: dist/*
+          retention-days: 7
+
+  # Each architecture builds natively (no QEMU). A real release pushes the
+  # untagged per-arch images by digest; tags are only set in image-manifest,
+  # after the tests passed. A dry run loads the image locally instead.
+  image:
+    needs: prepare
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    strategy:
+      matrix:
+        include:
+          - platform: linux/amd64
+            arch: amd64
+            runner: ubuntu-24.04
+          - platform: linux/arm64
+            arch: arm64
+            runner: ubuntu-24.04-arm
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
+      DRY_RUN: ${{ needs.prepare.outputs.dry_run }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        if: env.DRY_RUN != 'true'
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: build
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: docker/runtime/Dockerfile
+          platforms: ${{ matrix.platform }}
+          labels: |
+            org.opencontainers.image.title=zorba
+            org.opencontainers.image.version=${{ env.VERSION }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.licenses=Apache-2.0
+          # The docker exporter used by the dry run cannot store attestations.
+          provenance: ${{ env.DRY_RUN == 'true' && 'false' || '' }}
+          outputs: >-
+            ${{ env.DRY_RUN == 'true'
+                && 'type=docker,name=zorba-release:local'
+                || format('type=image,name={0},push-by-digest=true,name-canonical=true,push=true', env.IMAGE) }}
+          cache-from: type=gha,scope=runtime-${{ matrix.runner }}
+
+      - name: Generate the image SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ env.DRY_RUN == 'true' && 'zorba-release:local' || format('{0}@{1}', env.IMAGE, steps.build.outputs.digest) }}
+          format: spdx-json
+          output-file: zorba-${{ env.VERSION }}-image-${{ matrix.arch }}.spdx.json
+          upload-artifact: false
+          upload-release-assets: false
+
+      - name: Smoke test
+        run: |
+          out="$(docker run --rm "$REF" -q '1 + 1')"
+          echo "$out"
+          grep -Eq '(^|>)2$' <<< "$out"
+        env:
+          REF: ${{ env.DRY_RUN == 'true' && 'zorba-release:local' || format('{0}@{1}', env.IMAGE, steps.build.outputs.digest) }}
+
+      - name: Attest the SBOM (image ${{ matrix.arch }})
+        if: env.DRY_RUN != 'true'
+        uses: actions/attest@v4
+        with:
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          sbom-path: zorba-${{ env.VERSION }}-image-${{ matrix.arch }}.spdx.json
+          push-to-registry: true
+
+      - name: Export digest
+        if: env.DRY_RUN != 'true'
+        run: |
+          mkdir -p /tmp/digests
+          touch "/tmp/digests/${DIGEST#sha256:}"
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+      - uses: actions/upload-artifact@v7
+        if: env.DRY_RUN != 'true'
+        with:
+          name: digest-${{ matrix.arch }}
+          path: /tmp/digests/*
+          retention-days: 1
+      - uses: actions/upload-artifact@v7
+        with:
+          name: sbom-image-${{ matrix.arch }}
+          path: zorba-${{ env.VERSION }}-image-${{ matrix.arch }}.spdx.json
+          retention-days: 7
+
+  image-manifest:
+    needs: [prepare, test, image]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
+      TAGS: ${{ needs.prepare.outputs.image_tags }}
+      DRY_RUN: ${{ needs.prepare.outputs.dry_run }}
+    steps:
+      - name: Planned tags
+        run: |
+          for t in $TAGS; do echo "${IMAGE}:$t"; done
+          { echo "### Image tags"; for t in $TAGS; do echo "- \`${IMAGE}:$t\`"; done; } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/download-artifact@v8
+        if: env.DRY_RUN != 'true'
+        with:
+          pattern: digest-*
+          path: /tmp/digests
+          merge-multiple: true
+      - uses: docker/setup-buildx-action@v4
+        if: env.DRY_RUN != 'true'
+      - uses: docker/login-action@v4
+        if: env.DRY_RUN != 'true'
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create and push the manifest list
+        id: manifest
+        if: env.DRY_RUN != 'true'
+        working-directory: /tmp/digests
+        run: |
+          set -euo pipefail
+          args=()
+          for t in $TAGS; do args+=(-t "${IMAGE}:$t"); done
+          docker buildx imagetools create "${args[@]}" $(printf "${IMAGE}@sha256:%s " *)
+          docker buildx imagetools inspect "${IMAGE}:${VERSION}"
+          digest="$(docker buildx imagetools inspect "${IMAGE}:${VERSION}" --format '{{json .Manifest}}' | jq -r .digest)"
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+      - name: Attest build provenance (image)
+        if: env.DRY_RUN != 'true'
+        uses: actions/attest@v4
+        with:
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ steps.manifest.outputs.digest }}
+          push-to-registry: true
+
+  release:
+    needs: [prepare, test, source, image, image-manifest]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
+      TAG: ${{ needs.prepare.outputs.tag }}
+      PRERELEASE: ${{ needs.prepare.outputs.prerelease }}
+      LATEST: ${{ needs.prepare.outputs.latest }}
+      DRY_RUN: ${{ needs.prepare.outputs.dry_run }}
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: release-notes
+          path: notes
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist-source
+          path: dist
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: sbom-image-*
+          path: dist
+          merge-multiple: true
+
+      - name: Checksums
+        working-directory: dist
+        run: |
+          sha256sum -- * > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Upload the would-be release (dry run)
+        if: env.DRY_RUN == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-assets
+          path: |
+            dist/*
+            notes/release-notes.md
+          retention-days: 7
+
+      - name: Create or update the draft release
+        if: env.DRY_RUN != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" --json isDraft -q .isDraft 2>/dev/null | grep -qx true; then
+            echo "Updating the existing draft release $TAG"
+            gh release edit "$TAG" --notes-file notes/release-notes.md
+            gh release upload "$TAG" dist/* --clobber
+          else
+            flags=(--draft --verify-tag --title "Zorba $VERSION" --notes-file notes/release-notes.md --latest="$LATEST")
+            [ "$PRERELEASE" = true ] && flags+=(--prerelease)
+            gh release create "$TAG" "${flags[@]}" dist/*
+          fi
+          echo "Draft release: $(gh release view "$TAG" --json url -q .url)" >> "$GITHUB_STEP_SUMMARY"

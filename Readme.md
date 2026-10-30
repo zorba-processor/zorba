@@ -20,9 +20,13 @@ against the current build: https://zorba-processor.github.io/zorba/
 ## Docker
 
 ```bash
-docker run --rm ghcr.io/zorba-processor/zorba -q '1 + 1'
-docker run --rm -v "$PWD":/work ghcr.io/zorba-processor/zorba -f -q query.xq
+docker run --rm ghcr.io/zorba-processor/zorba:edge -q '1 + 1'
+docker run --rm -v "$PWD":/work ghcr.io/zorba-processor/zorba:edge -f -q query.xq
 ```
+
+`edge` is the latest master build; releases are tagged by version, and
+`latest` is the newest stable release. See [docker/README.md](docker/README.md)
+for all image tags.
 
 ## Building
 

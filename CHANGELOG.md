@@ -66,6 +66,7 @@ Entries marked **(open PR)** come from pull requests that are not merged yet; co
 - Add an on-demand build-time measurement workflow ([#29](https://github.com/zorba-processor/zorba/pull/29)).
 - Add a pull request template with a changelog line.
 - Add `SecurityPolicy::checkURI()` to test a URI against a policy ([#56](https://github.com/zorba-processor/zorba/pull/56)).
+- Add a release workflow for `v*` tags: tests on linux-amd64, then publishes a source tarball, SPDX SBOMs, `SHA256SUMS` and signed build provenance attestations on a draft GitHub Release with notes from this changelog, and tags the multi-arch `zorba` image as `<version>` (plus `<major>.<minor>`, `<major>` and `latest` for stable releases only); master builds now publish `zorba:edge` instead of moving `latest`. See `RELEASING.md` and `docker/README.md`.
 
 ### Changed
 
