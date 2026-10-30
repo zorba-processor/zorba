@@ -38,15 +38,9 @@ XqdbClient::XqdbClient(unsigned int aPort)
 
 XqdbClient::~XqdbClient()
 {
-  if (theCommandLineHandler) {
-    delete theCommandLineHandler;
-  }
-  if (theCommandPrompt) {
-    delete theCommandPrompt;
-  }
-  if (theEventHandler) {
-    delete theEventHandler;
-  }
+  delete theCommandLineHandler;
+  delete theCommandPrompt;
+  delete theEventHandler;
 
   delete theIdQueue;
   delete theQuitQueue;
