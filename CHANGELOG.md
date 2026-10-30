@@ -69,6 +69,7 @@ Entries marked **(open PR)** come from pull requests that are not merged yet; co
 
 ### Changed
 
+- Set the version to 5.0.0; versioned install paths change accordingly (`share/zorba-5.0.0`, core module directories, `share/cmake/zorba-5.0.0`) (VERSION_PR).
 - Speed up hash joins: the index-join rule now applies to comparisons on untyped XML and JSON operands; a JSONiq join over 10 MB drops from 22 s to 0.5 s, and over 100 MB from a 300 s timeout to 8.2 s ([#41](https://github.com/zorba-processor/zorba/pull/41)).
 - Cut the cold build from 795 s to 376 s with a precompiled header (`ZORBA_USE_PCH`, default on) and header cleanup ([#29](https://github.com/zorba-processor/zorba/pull/29)).
 - Port the grammar to Bison 3.8 and Flex 2.6.4 and regenerate the parsers; parser and scanner files compile at `-O1` (parsers from about 225 s to about 55 s each), and the cold build drops from 658 s to 427 s. Regeneration is opt-in (`ZORBA_REGENERATE_PARSER`) and CI checks the checked-in files for drift ([#36](https://github.com/zorba-processor/zorba/pull/36)).
