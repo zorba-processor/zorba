@@ -353,16 +353,15 @@ void convert_xquery_re( zstring const &xq_re, zstring *icu_re,
         case '$':
           if ( q_flag )
             *icu_re += '\\';
-          else if ( !m_flag && i + 1 == xq_re.end() ) {
+          else if ( !m_flag && !in_char_class ) {
             //
             // XQuery 3.0 F&O 5.6.1: By default, ... $ matches the end of the
             // entire string.  [Newlines are treated as any other character.]
             //
             // However, in ICU, $ always matches before any trailing newlines.
             //
-            // To make ICU work as XQuery needs it to, substitute \z for $ when
-            // it is the last character in the regular expression (and multi-
-            // line mode is not set).
+            // To make ICU work as XQuery needs it to, substitute \z for $
+            // outside a character class (when multi-line mode is not set).
             //
             icu_re->append( "\\z" );
             goto next;
@@ -522,13 +521,15 @@ void convert_xquery_re( zstring const &xq_re, zstring *icu_re,
           }
           break;
         case '^':
-          if ( q_flag )
+          //
+          // XQuery 3.0 F&O 5.6.1: outside a character class, ^ is always an
+          // anchor (it is not a normal character there), so "^^" matches at
+          // the start of the string.  Inside a character class, ^ negates
+          // only as the first character; elsewhere it is an ordinary
+          // character (XSD XmlChar).
+          //
+          if ( q_flag || (in_char_class && !is_first_char) )
             *icu_re += '\\';
-          else if ( !is_first_char ) {
-            if ( in_char_class )
-              goto unescaped_char;
-            *icu_re += '\\';
-          }
           break;
         case '|':
           if ( q_flag )
