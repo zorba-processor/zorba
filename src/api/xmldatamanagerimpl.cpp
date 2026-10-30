@@ -328,7 +328,22 @@ ItemSequence_t XmlDataManagerImpl::parseXML(
         aOptions.isExternalEntityProcessingEnabled())
       throw ZORBA_EXCEPTION(err::XQST0009);
 
-    return new SingletonItemSequence(parseXML(aStream, aBaseURI));
+    // fn:parse-xml has no base URI parameter; it uses the static base URI.
+    StaticContext_t lSctx = theContext->createChildContext();
+    lSctx->setBaseURI(aBaseURI);
+
+    Item lQName = theFactory->createQName(static_context::W3C_FN_NS,
+                                          "parse-xml");
+    std::vector<ItemSequence_t> lArgs;
+    lArgs.push_back(new SingletonItemSequence(
+        theFactory->createStreamableString(aStream, &streamReleaser)));
+
+    ItemSequence_t lSeq = lSctx->invoke(lQName, lArgs);
+    Iterator_t lIter = lSeq->getIterator();
+    lIter->open();
+    Item lRes;
+    lIter->next(lRes);
+    return new SingletonItemSequence(lRes);
 #endif
 
     Item lQName = theFactory->createQName(static_context::ZORBA_XML_FN_NS,
