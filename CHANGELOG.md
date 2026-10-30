@@ -30,6 +30,7 @@ Entries marked **(open PR)** come from pull requests that are not merged yet; co
 - Require a C++23 compiler (GCC 13+, Clang, Apple Clang) and CMake 3.28 or newer; CMake presets use schema v6 ([#25](https://github.com/zorba-processor/zorba/pull/25), [#31](https://github.com/zorba-processor/zorba/pull/31)).
 - Add the security policy API (`include/zorba/security.h`, `Zorba::setSecurityPolicy`, `StaticContext::setSecurityPolicy`); the default stays `unrestricted()` for now, and the library default is planned to become `secure()` before 5.0.0 ([#44](https://github.com/zorba-processor/zorba/pull/44)).
 - Bump the serialized execution plan format from version 25 to 26; plans saved by older builds no longer load ([#44](https://github.com/zorba-processor/zorba/pull/44)).
+- The `http-uri-resolution` feature is now the `RemoteImport` capability: disabling it applies to the context it is declared on, not the whole process, and remote module or schema imports then fail with `ZXQP0029` instead of `XQST0059` ([#66](https://github.com/zorba-processor/zorba/pull/66)).
 - Raise `err:FOAR0002` on `xs:integer` overflow instead of silently wrapping around (64-bit builds); out-of-range string casts to `xs:integer` raise `FOCA0003`, and JSON integers beyond 64 bits parse as `xs:decimal` ([#53](https://github.com/zorba-processor/zorba/pull/53)).
 - Announce removal of the SWIG language bindings (`swig/`); they are not built or tested in CI and will be replaced by a stable C API with native bindings in a later release.
 
@@ -48,6 +49,7 @@ Entries marked **(open PR)** come from pull requests that are not merged yet; co
 - Fix undefined behavior reported by UBSan: 21 sites and 445 reports reduced to 0 ([#34](https://github.com/zorba-processor/zorba/pull/34)).
 - Check `pthread` return values and treat failures as fatal ([#27](https://github.com/zorba-processor/zorba/pull/27), [#50](https://github.com/zorba-processor/zorba/pull/50)).
 - Enforce the security policy at URL resolution: `fn:doc`, `fn:unparsed-text`, module and schema import, thesauri, stop words, JSound and `fetch` are checked before any built-in resolver runs. File paths are compared after resolving `..` and symlinks, URLs by scheme, host, port and path segment, and with `Network` allowed, hosts resolving to loopback, private or link-local addresses are refused unless explicitly allowed. Refusals raise `ZXQP0029`. `ZORBA_URI_PATH` and `ZORBA_LIB_PATH` are honored only with the `Environment` capability. Redirects and DNS rebinding are not covered yet ([#56](https://github.com/zorba-processor/zorba/pull/56)).
+- Enforce the security policy in modules: importing the file module needs `FileRead` or `FileWrite`, the http-client and ftp-client modules need `Network` (`ZXQP0067`); native libraries load only with `NativeModules`. The file module checks every path (canonical, so `..` and symlinks cannot escape) and opens files race-free; the HTTP and FTP clients allow only http/https/ftp/ftps and check every redirect target and the address of every connection, closing the redirect and DNS-rebinding gaps. `fn:environment-variable` and `fn:available-environment-variables` return nothing without `Environment`. HTTP resolution, zorba-query queries and the file resolver run under the caller's policy; `zq:load-from-query-plan` needs an unrestricted caller; WordNet thesauri need `NativeModules` ([#66](https://github.com/zorba-processor/zorba/pull/66)).
 
 ### Added
 
@@ -66,6 +68,7 @@ Entries marked **(open PR)** come from pull requests that are not merged yet; co
 - Add an on-demand build-time measurement workflow ([#29](https://github.com/zorba-processor/zorba/pull/29)).
 - Add a pull request template with a changelog line.
 - Add `SecurityPolicy::checkURI()` to test a URI against a policy ([#56](https://github.com/zorba-processor/zorba/pull/56)).
+- Add `SecurityPolicy::checkConnection()` and `SecurityPolicy::openFile()`, a `checkURI()` overload that reports the reason, and `curl::restrict_to_policy()` in util-curl ([#66](https://github.com/zorba-processor/zorba/pull/66)).
 
 ### Changed
 
