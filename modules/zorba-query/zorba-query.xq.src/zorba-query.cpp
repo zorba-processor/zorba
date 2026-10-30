@@ -814,7 +814,9 @@ bool EvaluateItemSequence::EvaluateIterator::next(Item& aItem)
   {
     if (!theIterator->next(aItem))
       return false;
-    if (aItem.isFunction())
+    // The public Item API has no isFunction(); an item that is neither
+    // atomic, a node nor a JSON item is a function item.
+    if (!aItem.isAtomic() && !aItem.isNode() && !aItem.isJSONItem())
       theQueryData->setReturnedFunctionItem();
     return true;
   }
