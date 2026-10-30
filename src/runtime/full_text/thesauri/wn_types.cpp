@@ -13,13 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#include <zorba/internal/ztd.h>
 #include "stdafx.h"
 
 // standard
 #include <algorithm>                    /* for lower_bound */
 
 // Zorba
-#include "util/less.h"
 #include "diagnostics/assert.h"
 
 // local
@@ -61,7 +61,7 @@ namespace part_of_speech {
 inline int find_index( char const *const *begin, char const *const *end,
                        char const *s ) {
   char const *const *const entry =
-    ::lower_bound( begin, end, s, less<char const*>() );
+    ::lower_bound( begin, end, s, ::zorba::internal::ztd::less<char const*>() );
   return entry != end && ::strcmp( s, *entry ) == 0 ? entry - begin : 0;
 } 
 

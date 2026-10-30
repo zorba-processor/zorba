@@ -32,6 +32,12 @@ namespace zorba
 /*******************************************************************************
 
 ********************************************************************************/
+SingletonRuleMajorDriverBase::SingletonRuleMajorDriverBase(rule_ptr_t rule)
+{
+  theRules.push_back(rule);
+}
+
+
 RuleMajorDriver::RuleMajorDriver()
 {
 }

@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <zorba/internal/ztd.h>
 #include "stdafx.h"
 
 #include <algorithm>
@@ -33,7 +34,6 @@
 #endif /* WIN32 */
 
 // local
-#include "less.h"
 #include "time_util.h"
 
 #define DEF_END(CHAR_ARRAY)                             \
@@ -51,7 +51,7 @@ using namespace std;
 inline int find_index( char const *const *begin, char const *const *end,
                        char const *s ) {
   char const *const *const entry =
-    ::lower_bound( begin, end, s, less<char const*>() );
+    ::lower_bound( begin, end, s, ::zorba::internal::ztd::less<char const*>() );
   return entry != end && ::strcmp( s, *entry ) == 0 ? entry - begin : 0;
 }
 

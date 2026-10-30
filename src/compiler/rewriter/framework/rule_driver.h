@@ -69,10 +69,7 @@ public:
 class SingletonRuleMajorDriverBase : public RuleMajorDriver 
 {
 public:
-  SingletonRuleMajorDriverBase(rule_ptr_t rule)
-  { 
-    theRules.push_back(rule);
-  }
+  SingletonRuleMajorDriverBase(rule_ptr_t rule);
 };
 
 

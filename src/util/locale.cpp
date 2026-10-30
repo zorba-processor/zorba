@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#include <zorba/internal/ztd.h>
 #include "stdafx.h"
 
 // standard
@@ -33,7 +34,6 @@
 #include <zorba/internal/cxx_util.h>
 #include <zorba/internal/unique_ptr.h>
 #include "util/ascii_util.h"
-#include "util/less.h"
 #include "util/stl_util.h"
 #include "util/string_util.h"
 
@@ -69,7 +69,7 @@ typedef nl_item locale_index_type;
 inline int find_index( char const *const *begin, char const *const *end,
                        char const *s ) {
   char const *const *const entry =
-    ::lower_bound( begin, end, s, less<char const*>() );
+    ::lower_bound( begin, end, s, ::zorba::internal::ztd::less<char const*>() );
   return entry != end && ::strcmp( s, *entry ) == 0 ? entry - begin : 0;
 }
 

@@ -27,10 +27,20 @@ jobs:
             runner: ubuntu-24.04
             builder: docker/builder-latest
             cache: linux-amd64-latest
+            cc: gcc
+            cxx: g++
           - name: linux-arm64 (Ubuntu 24.04)
             runner: ubuntu-24.04-arm
             builder: docker/builder
             cache: linux-arm64-ubuntu
+            cc: gcc
+            cxx: g++
+          - name: linux-amd64-clang (Arch, Clang + libstdc++)
+            runner: ubuntu-24.04
+            builder: docker/builder-latest
+            cache: linux-amd64-clang
+            cc: clang
+            cxx: clang++
     steps:
       - uses: actions/checkout@v4
 
@@ -67,6 +77,7 @@ jobs:
           docker run -d --name zorba-http-test --network zorba-test zorba-http-test:ci
           docker run --rm --network zorba-test \
             -e ZORBA_HTTP_TEST_SERVER=zorba-http-test:8080 \
+            -e CC=${{ matrix.cc }} -e CXX=${{ matrix.cxx }} \
             -e CCACHE_DIR=/src/.ccache \
             -e CCACHE_SLOPPINESS=pch_defines,time_macros \
             -v "$PWD":/src -w /src zorba-builder:ci sh -ec '

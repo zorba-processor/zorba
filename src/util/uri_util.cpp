@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#include <zorba/internal/ztd.h>
 #include "stdafx.h"
 
 #include <algorithm>                    /* for lower_bound() */
@@ -29,7 +30,6 @@
 #include "zorbatypes/zstring.h"
 
 #include "fs_util.h"
-#include "less.h"
 #include "uri_util.h"
 #include "http_util.h"
 
@@ -145,7 +145,7 @@ scheme get_scheme( char const *uri, char const **ppcolon ) {
     zstring const sname( uri, pcolon - uri );
     char const *const s = sname.c_str();
     char const *const *const entry =
-      ::lower_bound( begin, end, s, less<char const*>() );
+      ::lower_bound( begin, end, s, ::zorba::internal::ztd::less<char const*>() );
     return entry != end && ::strcmp( s, *entry ) == 0 ?
       static_cast<scheme>( entry - begin ) : unknown;
   }

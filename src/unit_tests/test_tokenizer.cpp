@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <zorba/internal/ztd.h>
 #include "stdafx.h"
 #include <algorithm>
 #include <cctype>
@@ -39,21 +40,6 @@ using namespace zorba::locale;
 static bool destroy_called;
 
 ///////////////////////////////////////////////////////////////////////////////
-
-namespace std {
-
-template<> struct less<char const*> :
-  zorba::internal::ztd::binary_function<char const*,char const*,bool>
-{
-  less() { }
-
-  result_type
-  operator()( first_argument_type a, second_argument_type b ) const {
-    return std::strcmp( a, b ) < 0;
-  }
-};
-
-} // namespace std
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -123,7 +109,7 @@ void TestTokenizer::item( Item const &item, bool entering ) {
     Item qname;
     item.getNodeName( qname );
     if ( ::binary_search( block_elements, end, qname.getLocalName().c_str(),
-                          less<char const*>() ) ) {
+                          ::zorba::internal::ztd::less<char const*>() ) ) {
       ++state().para;
     }
   }
