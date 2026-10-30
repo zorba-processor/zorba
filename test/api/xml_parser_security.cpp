@@ -103,14 +103,14 @@ std::string xxe_system(const Files& f)
          "<r>&xxe;</r>";
 }
 
-std::string xxe_parameter(const Files& f)
+[[maybe_unused]] std::string xxe_parameter(const Files& f)
 {
   return "<?xml version=\"1.0\"?>\n"
          "<!DOCTYPE r [<!ENTITY % pe SYSTEM \"" + f.entitiesURI + "\"> %pe;]>\n"
          "<r>&e;</r>";
 }
 
-std::string xxe_external_dtd(const Files& f)
+[[maybe_unused]] std::string xxe_external_dtd(const Files& f)
 {
   return "<?xml version=\"1.0\"?>\n"
          "<!DOCTYPE r SYSTEM \"" + f.dtdURI + "\">\n"
