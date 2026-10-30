@@ -12,10 +12,10 @@ Entries marked **(open PR)** come from pull requests that are not merged yet; co
 
 ### At a glance: 3.1 → 5.0
 
-| Area | Before (3.1) | Now (5.0) |
+| Area | Before (3.1, 2016) | Now (5.0) |
 |---|---|---|
 | CI | None in the repository | Every change builds and tests on Linux amd64, Linux arm64, macOS and Clang |
-| Memory and undefined behavior | Not checked in CI | ASan, LSan and UBSan in CI; ASan failing tests 450 → 1, UBSan sites 21 → 0 |
+| Memory and undefined behavior | Valgrind memcheck configured in CTest, not run in any CI | ASan, LSan and UBSan in CI; ASan failing tests 450 → 1, UBSan sites 21 → 0 |
 | Security | No policy, XXE active | CodeQL, hardening flags, libFuzzer and ClusterFuzzLite, security policy API; XXE closed (open PR #51); secure-by-default planned |
 | Compiler warnings | 1,897 to 5,949 per platform | Dozens or fewer |
 | Build options tested | Full build only; other options had rotted | `embedded`, `embedded-noicu`, `full-nopch`, debugger in CI; XQueryX (open PR #51) and big-integer (open PR, PR pending) profiles |
