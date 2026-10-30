@@ -108,12 +108,11 @@ PAGES = [("index", "Overview"), ("map", "The big picture"),
          ("xquery", "XQuery"), ("jsoniq", "JSONiq"),
          ("zorba", "Using Zorba"), ("cheatsheet", "Cheat sheet")]
 
-LOGO = ('<svg viewBox="0 0 32 32" aria-hidden="true">'
-        '<rect x="1.5" y="1.5" width="29" height="29" rx="6" fill="none" '
-        'stroke="var(--xml)" stroke-width="2.5"/>'
-        '<path d="M9 10h14L9 22h14" fill="none" stroke="var(--json)" '
-        'stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>'
-        '</svg>')
+LOGO = ('<picture>'
+        '<source srcset="assets/zorba-logo-dark.svg" '
+        'media="(prefers-color-scheme: dark)">'
+        '<img src="assets/zorba-logo.svg" alt="Zorba" height="28">'
+        '</picture>')
 
 
 def header(current: str) -> str:
@@ -122,7 +121,7 @@ def header(current: str) -> str:
         f'{" aria-current=\"page\"" if name == current else ""}>{label}</a>'
         for name, label in PAGES)
     return (f'<header class="site-head"><div class="bar">'
-            f'<a class="brand" href="index.html">{LOGO}Zorba</a>'
+            f'<a class="brand" href="index.html">{LOGO}</a>'
             f'<nav aria-label="Site">{links}</nav>'
             f'<a class="repo" href="{REPO}">Source on GitHub</a>'
             f'</div></header>')

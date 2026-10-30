@@ -1,28 +1,29 @@
 /* Zorba documentation site. No external fonts, no framework. */
 
 :root {
-  --paper: #f6f7f9;
+  --brand: #2A83D9;     /* logo figure: borders, highlights, non-text accents */
+  --paper: #f5f7fa;
   --surface: #ffffff;
-  --ink: #1c2532;
-  --muted: #586374;
-  --rule: #d8dde4;
-  --xml: #3c42b0;        /* XQuery / XML */
-  --xml-soft: #e7e8fa;
-  --json: #9a5a0c;       /* JSONiq / JSON */
-  --json-soft: #f8ecdc;
-  --yes: #24704a;
+  --ink: #111111;
+  --muted: #4a5568;
+  --rule: #d5dce5;
+  --xml: #1a62b0;
+  --xml-soft: #e3eefa;
+  --json: #8f5400;
+  --json-soft: #f8ecd9;
+  --yes: #1f6b45;
   --yes-soft: #e1f1e8;
-  --no: #9b3434;
-  --no-soft: #f6e3e3;
-  --code-bg: #eef1f5;
-  --out-bg: #fbfbfc;
-  --tok-k: #3c42b0;
-  --tok-s: #2f6f3e;
-  --tok-c: #7b8494;
-  --tok-v: #9a5a0c;
-  --tok-n: #8a3a8f;
-  --tok-t: #1f5f8f;
-  --tok-f: #1c2532;
+  --no: #a02d2d;
+  --no-soft: #f7e3e3;
+  --code-bg: #edf1f6;
+  --out-bg: #fafbfc;
+  --tok-k: #1a62b0;
+  --tok-s: #2b6a3a;
+  --tok-c: #5f6b7c;
+  --tok-v: #8f5400;
+  --tok-n: #82358c;
+  --tok-t: #12608f;
+  --tok-f: #111111;
 
   --serif: Charter, "Bitstream Charter", "Iowan Old Style", "Sitka Text", Cambria, Georgia, serif;
   --sans: "Avenir Next", "Segoe UI", "Helvetica Neue", Ubuntu, system-ui, sans-serif;
@@ -33,28 +34,29 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --paper: #14181e;
-    --surface: #1a1f27;
-    --ink: #dce2ea;
-    --muted: #97a1b0;
-    --rule: #2c333e;
-    --xml: #a7abff;
-    --xml-soft: #262a4a;
+    --brand: #3B93E6;
+    --paper: #12161c;
+    --surface: #181d25;
+    --ink: #f2f4f7;
+    --muted: #9aa6b6;
+    --rule: #2a323d;
+    --xml: #6db3f2;
+    --xml-soft: #1a2d44;
     --json: #e6aa5a;
     --json-soft: #3a2c1a;
     --yes: #6fcf98;
     --yes-soft: #1d3428;
     --no: #f08c8c;
     --no-soft: #3d2222;
-    --code-bg: #1d232c;
-    --out-bg: #171b22;
-    --tok-k: #a7abff;
+    --code-bg: #1b212a;
+    --out-bg: #151a21;
+    --tok-k: #6db3f2;
     --tok-s: #8fd19e;
-    --tok-c: #7d8797;
+    --tok-c: #8a95a5;
     --tok-v: #e6aa5a;
     --tok-n: #e3a0e8;
     --tok-t: #7cc0f0;
-    --tok-f: #dce2ea;
+    --tok-f: #f2f4f7;
   }
 }
 
@@ -86,14 +88,13 @@ a:focus-visible, summary:focus-visible { outline: 2px solid var(--xml); outline-
   display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap;
 }
 .brand {
-  font-weight: 700; font-size: 1.15rem; color: var(--ink); text-decoration: none;
-  letter-spacing: -0.01em; display: flex; align-items: center; gap: 0.5rem;
+  display: flex; align-items: center; text-decoration: none;
 }
-.brand svg { width: 1.6rem; height: 1.6rem; }
+.brand img { height: 1.7rem; width: auto; display: block; }
 .site-head nav { display: flex; gap: 0.25rem 1.1rem; flex-wrap: wrap; font-size: 0.95rem; }
 .site-head nav a { color: var(--muted); text-decoration: none; padding: 0.15rem 0; border-bottom: 2px solid transparent; }
 .site-head nav a:hover { color: var(--ink); }
-.site-head nav a[aria-current="page"] { color: var(--ink); border-bottom-color: var(--xml); }
+.site-head nav a[aria-current="page"] { color: var(--ink); border-bottom-color: var(--brand); }
 .site-head .repo { margin-left: auto; font-size: 0.9rem; color: var(--muted); }
 
 /* ---------- layout ---------- */
@@ -112,7 +113,7 @@ a:focus-visible, summary:focus-visible { outline: 2px solid var(--xml); outline-
 .toc li { margin: 0; }
 .toc a { display: block; padding: 0.22rem 0 0.22rem 0.75rem; color: var(--muted); text-decoration: none; border-left: 2px solid var(--rule); }
 .toc a:hover { color: var(--ink); border-left-color: var(--muted); }
-.toc a.active { color: var(--ink); border-left-color: var(--xml); }
+.toc a.active { color: var(--ink); border-left-color: var(--brand); }
 .toc .toc-title { font-weight: 600; color: var(--ink); margin: 0 0 0.6rem; }
 
 main { padding: 2rem 0 4rem; min-width: 0; }
@@ -153,7 +154,7 @@ p.why strong { color: var(--ink); font-weight: 600; }
 figure.example {
   margin: 1.25rem 0 1rem; border: 1px solid var(--rule); border-radius: 8px;
   background: var(--code-bg); overflow: hidden;
-  border-left: 4px solid var(--xml);
+  border-left: 4px solid var(--brand);
 }
 figure.example.lang-jq, figure.example.lang-json { border-left-color: var(--json); }
 figure.example.lang-cpp, figure.example.lang-xml { border-left-color: var(--muted); }
@@ -210,7 +211,7 @@ td code { white-space: nowrap; }
   display: block; padding: 1rem 1.1rem; text-decoration: none; color: var(--ink);
   border-top: 3px solid var(--rule); background: var(--surface);
 }
-.paths a:hover { border-top-color: var(--xml); }
+.paths a:hover { border-top-color: var(--brand); }
 .paths strong { display: block; font-family: var(--sans); font-size: 1.05rem; margin-bottom: 0.25rem; }
 .paths span { color: var(--muted); font-size: 0.95rem; }
 .fit { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; max-width: 52rem; }
