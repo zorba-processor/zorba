@@ -2133,7 +2133,15 @@ bool begin_visit(trycatch_expr& v)
          lIter != vars.end();
          ++lIter)
     {
-      catchvar_iter_map.put((uint64_t)&*(lIter->second), new std::vector<LetVarIter_t>());
+      // The same catch var may be visited again (e.g. if the trycatch expr is
+      // generated twice); put() replaces the entry, so free the old vector
+      // (end_visit has already copied its contents).
+      uint64_t key = (uint64_t)&*(lIter->second);
+      std::vector<LetVarIter_t>* oldVec;
+      if (catchvar_iter_map.get(key, oldVec))
+        delete oldVec;
+
+      catchvar_iter_map.put(key, new std::vector<LetVarIter_t>());
     }
   }
   return true;
