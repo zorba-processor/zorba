@@ -14,7 +14,51 @@ permissions:
   contents: read
 
 jobs:
+  # Gate: required status checks must still report, so jobs are skipped
+  # (which counts as passing) instead of the whole workflow being filtered.
+  changes:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      code: ${{ steps.f.outputs.code || steps.all.outputs.code }}
+    steps:
+      - id: f
+        if: github.event_name == 'pull_request'
+        uses: dorny/paths-filter@v4
+        with:
+          filters: |
+            code:
+              - 'src/**'
+              - 'include/**'
+              - 'modules/**'
+              - 'bin/**'
+              - 'test/**'
+              - 'swig/**'
+              - 'schemas/**'
+              - 'config/**'
+              - 'cmake/**'
+              - 'cmake_modules/**'
+              - 'docker/**'
+              - '.clusterfuzzlite/**'
+              - '.github/codeql/**'
+              - 'CMakeLists.txt'
+              - 'CMake*.txt'
+              - 'CMake*.json'
+              - '*.cmake'
+              - '*.cmake.in'
+              - 'CTest*'
+              - 'CPack*'
+              - '.github/workflows/ci.yml'
+      - id: all
+        if: github.event_name != 'pull_request'
+        run: echo "code=true" >> "$GITHUB_OUTPUT"
+
   linux:
+    # Gating is per step, not per job: a skipped matrix job reports its name
+    # as a literal "matrix.name", which would leave the required checks pending.
+    needs: changes
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.runner }}
     # arm64 runs on the Ubuntu 24.04 builder: Arch Linux has no official
@@ -43,11 +87,14 @@ jobs:
             cxx: clang++
     steps:
       - uses: actions/checkout@v7
+        if: needs.changes.outputs.code == 'true'
 
       - uses: docker/setup-buildx-action@v4
+        if: needs.changes.outputs.code == 'true'
 
       - name: Build the builder image
         uses: docker/build-push-action@v7
+        if: needs.changes.outputs.code == 'true'
         with:
           context: ${{ matrix.builder }}
           load: true
@@ -57,6 +104,7 @@ jobs:
 
       - name: Build the HTTP test server image
         uses: docker/build-push-action@v7
+        if: needs.changes.outputs.code == 'true'
         with:
           context: .
           file: docker/http-test-server/Dockerfile
@@ -66,12 +114,14 @@ jobs:
           cache-to: type=gha,mode=max,scope=http-test-${{ matrix.cache }}
 
       - uses: actions/cache@v6
+        if: needs.changes.outputs.code == 'true'
         with:
           path: .ccache
           key: ccache-${{ matrix.cache }}-${{ github.sha }}
           restore-keys: ccache-${{ matrix.cache }}-
 
       - name: Build and test
+        if: needs.changes.outputs.code == 'true'
         run: |
           docker network create zorba-test
           docker run -d --name zorba-http-test --network zorba-test zorba-http-test:ci
@@ -88,6 +138,7 @@ jobs:
                 --output-junit junit.xml'
 
       - name: Verify hardening
+        if: needs.changes.outputs.code == 'true'
         run: scripts/check-hardening.sh build/full-release
 
       # The checked-in parsers/scanners must be what this image's bison and
@@ -95,7 +146,7 @@ jobs:
       # src/compiler/parser/CMakeLists.txt). The regenerated files are
       # uploaded as the generated-parser artifact.
       - name: Check that the generated parsers and scanners are up to date
-        if: matrix.cache == 'linux-amd64-latest'
+        if: needs.changes.outputs.code == 'true' && matrix.cache == 'linux-amd64-latest'
         run: |
           docker run --rm -v "$PWD":/src -w /src zorba-builder:ci sh -ec '
             bison --version | head -1
@@ -111,7 +162,7 @@ jobs:
           git diff --stat --exit-code -- src/compiler/parser
 
       - name: Upload the regenerated parsers and scanners
-        if: always() && matrix.cache == 'linux-amd64-latest'
+        if: needs.changes.outputs.code == 'true' && always() && matrix.cache == 'linux-amd64-latest'
         uses: actions/upload-artifact@v7
         with:
           name: generated-parser
@@ -123,7 +174,7 @@ jobs:
             src/compiler/parser/FlexLexer.h
 
       - name: Upload test results
-        if: failure()
+        if: needs.changes.outputs.code == 'true' && failure()
         uses: actions/upload-artifact@v7
         with:
           name: test-results-${{ matrix.cache }}
@@ -132,6 +183,8 @@ jobs:
             build/full-release/Testing/Temporary/LastTest.log
 
   profiles:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     name: profile ${{ matrix.preset }} (linux-amd64, Arch)
     runs-on: ubuntu-24.04
     timeout-minutes: 45
@@ -208,6 +261,8 @@ jobs:
             build/ctest.log
 
   macos:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     name: macos-arm64 (Apple Clang, Homebrew)
     runs-on: macos-15
     env:
