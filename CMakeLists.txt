@@ -497,6 +497,9 @@ MARK_AS_ADVANCED(ZORBA_CORE_LIB_DIR)
 # add compiler variables
 ADD_DEFINITIONS(${DEFINITIONS})
 
+# compiler/linker hardening flags (option ZORBA_HARDENING)
+INCLUDE(${CMAKE_SOURCE_DIR}/cmake_modules/ZorbaHardening.cmake)
+
 
 ################################################################################
 # find all dylib files (i.e. transitive closure of the library files

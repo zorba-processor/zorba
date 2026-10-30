@@ -75,6 +75,9 @@ jobs:
               ctest --preset full-release -j"$(nproc)" \
                 --output-junit junit.xml'
 
+      - name: Verify hardening
+        run: scripts/check-hardening.sh build/full-release
+
       - name: Upload test results
         if: failure()
         uses: actions/upload-artifact@v4
