@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JSONiq tutorial</title>
+<meta name="description" content="JSONiq in Zorba: objects and arrays, navigation, FLWOR over JSON, null handling, updates, mixing JSON with XML, and how it compares with XQuery 3.1.">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+<!-- header: jsoniq -->
+
+<div class="layout">
+<details class="toc">
+  <summary>On this page</summary>
+  <p class="toc-title">JSONiq</p>
+  <ol>
+    <li><a href="#two">Two syntaxes</a></li>
+    <li><a href="#construct">Objects and arrays</a></li>
+    <li><a href="#navigate">Navigation</a></li>
+    <li><a href="#functions">Keys, members, size</a></li>
+    <li><a href="#context">The context item is $$</a></li>
+    <li><a href="#load">Loading JSON</a></li>
+    <li><a href="#flwor">FLWOR over JSON</a></li>
+    <li><a href="#group">Grouping</a></li>
+    <li><a href="#null">Null and absent keys</a></li>
+    <li><a href="#types">Types</a></li>
+    <li><a href="#merge">Merging objects</a></li>
+    <li><a href="#updates">Updates</a></li>
+    <li><a href="#xml">JSON and XML together</a></li>
+    <li><a href="#xqsyntax">JSON in XQuery syntax</a></li>
+    <li><a href="#vs31">JSONiq and XQuery 3.1</a></li>
+  </ol>
+</details>
+
+<main>
+<h1>JSONiq</h1>
+<p class="lede">JSONiq takes the XQuery machinery (sequences, FLWOR, functions, modules, updates) and points it at JSON. Objects and arrays become items, <code>null</code> becomes a value, and navigation gets a syntax that looks like JavaScript.</p>
+
+<h2 id="two">Two syntaxes</h2>
+<p>Zorba implements JSONiq 1.0 in two forms, and they share one data model and one function library:</p>
+<ul>
+  <li><strong>The JSONiq syntax</strong>, used for files ending in <code>.jq</code> or with the <code>--jsoniq</code> flag. It adds <code>$o.key</code> lookups, <code>$a[[i]]</code> and <code>$a[]</code> for arrays, the literals <code>true</code>, <code>false</code> and <code>null</code>, and uses <code>$$</code> for the context item because <code>.</code> is taken.</li>
+  <li><strong>The JSONiq extension to XQuery</strong>, used in <code>.xq</code> files. JSON constructors work as in JSONiq, but navigation is done by calling objects and arrays like functions: <code>$o("key")</code>, <code>$a(1)</code>, <code>$a()</code>. See <a href="#xqsyntax">JSON in XQuery syntax</a>.</li>
+</ul>
+<p>Everything on the <a href="xquery.html">XQuery page</a> applies to both, apart from those syntax differences. Most examples here use the JSONiq syntax.</p>
+
+<h2 id="construct">Objects and arrays</h2>
+<p>JSON is written as JSON. Any value position can hold an expression, including a FLWOR that fills an array.</p>
+<!-- example: jsoniq/construct -->
+<p class="why"><strong>Why it matters:</strong> output is built from typed values and serialized by Zorba, so quoting and escaping cannot go wrong.</p>
+
+<h2 id="navigate">Navigation</h2>
+<p>A dot looks up a key. The key can be a name, a quoted string (for keys with spaces or symbols) or a variable. <code>[[n]]</code> picks the n-th member of an array, counting from 1, and <code>[]</code> unboxes all members into a sequence.</p>
+<!-- example: jsoniq/navigate -->
+<p class="why"><strong>Why it matters:</strong> lookups apply to every item of a sequence, so <code>$order.items[].sku</code> walks into every item at once, like a path in XPath.</p>
+
+<h2 id="functions">Keys, members, size</h2>
+<p>The JSONiq function library works without a prefix: <code>keys</code> returns the keys of an object, <code>members</code> the members of an array, <code>size</code> the number of members.</p>
+<!-- example: jsoniq/keys-members -->
+<p class="why"><strong>Why it matters:</strong> with <code>keys</code> you can process objects whose keys you do not know in advance, such as dictionaries keyed by id.</p>
+
+<h2 id="context">The context item is $$</h2>
+<p>Inside a predicate or after the simple map operator <code>!</code>, the current item is <code>$$</code> in JSONiq syntax.</p>
+<!-- example: jsoniq/context-item -->
+<p class="why"><strong>Why it matters:</strong> code ported from XQuery needs <code>.</code> rewritten to <code>$$</code> when it moves into a <code>.jq</code> file.</p>
+
+<h2 id="load">Loading JSON</h2>
+<p><code>parse-json</code> parses a string, and <code>unparsed-text</code> reads a file. The sample file holds an array of orders; <code>[]</code> turns it into a sequence of objects.</p>
+<!-- source: data/orders.json -->
+<!-- example: jsoniq/load -->
+<p class="why"><strong>Why it matters:</strong> a sequence of objects is the JSONiq equivalent of a table, and everything else on this page works on it.</p>
+
+<h2 id="flwor">FLWOR over JSON</h2>
+<p>The FLWOR expression works on objects exactly as on nodes. Here a nested FLWOR computes each order's total.</p>
+<!-- example: jsoniq/flwor -->
+<p class="why"><strong>Why it matters:</strong> nested arrays are handled where they are, with no flattening step or UNNEST.</p>
+
+<h2 id="group">Grouping</h2>
+<!-- example: jsoniq/group -->
+<p class="why"><strong>Why it matters:</strong> after <code>group by</code>, <code>$o</code> holds all orders of the customer, so <code>$o.items[].sku</code> collects across them.</p>
+
+<h2 id="null">Null and absent keys</h2>
+<p>A key can be present with the value <code>null</code>, or absent. A lookup of an absent key returns the empty sequence, so comparisons on it return the empty sequence too. When an object value expression returns the empty sequence, the constructor stores <code>null</code>; that is why the second order shows <code>null</code> in the first comparison.</p>
+<!-- example: jsoniq/nulls -->
+<p class="why"><strong>Why it matters:</strong> you decide whether "null" and "missing" mean the same thing for your data, and test for each separately when they do not.</p>
+
+<h2 id="types">Types</h2>
+<p>JSONiq names the JSON types directly: <code>object</code>, <code>array</code>, <code>null</code>, and the atomic types <code>string</code>, <code>integer</code>, <code>boolean</code> and so on without the <code>xs:</code> prefix. <code>json-item</code> matches objects and arrays.</p>
+<!-- example: jsoniq/types -->
+<p class="why"><strong>Why it matters:</strong> heterogeneous JSON, where a field is sometimes a string and sometimes an array, is handled with one <code>typeswitch</code>.</p>
+
+<h2 id="merge">Merging objects</h2>
+<p><code>{| ... |}</code> merges a sequence of objects into one. Combined with a FLWOR it builds objects whose keys are computed.</p>
+<!-- example: jsoniq/merge -->
+<p class="why"><strong>Why it matters:</strong> computed keys turn a list into a dictionary in one expression.</p>
+
+<h2 id="updates">Updates</h2>
+<p>JSONiq updates mirror the XML ones: <code>insert json</code>, <code>delete json</code>, <code>replace value of json</code>, <code>rename json</code> and <code>append json</code>. They follow the same rules: changes are collected and applied together, and <code>copy</code>/<code>modify</code>/<code>return</code> applies them to a copy.</p>
+<!-- example: jsoniq/update -->
+<p class="why"><strong>Why it matters:</strong> JSON documents can be modified in place, in a collection or in a copy, with the same guarantees as XML updates.</p>
+
+<h2 id="xml">JSON and XML together</h2>
+<p>JSON items and XML nodes live in the same data model, so one query can read one and produce the other. From XML to JSON, construct objects from node values:</p>
+<!-- example: jsoniq/xml-to-json -->
+<p>From JSON to XML, construct elements from JSON values. This example uses XQuery syntax, where direct XML constructors are at home:</p>
+<!-- example: jsoniq/xml-mix -->
+<p>For a generic mapping that does not depend on the shape of the data, the <code>json-xml</code> module converts in both directions.</p>
+<!-- example: jsoniq/jx-convert -->
+<p class="why"><strong>Why it matters:</strong> integration work between XML systems and JSON APIs is a query, not a hand-written converter.</p>
+
+<h2 id="xqsyntax">JSON in XQuery syntax</h2>
+<p>In <code>.xq</code> files the dot is part of names (<code>$o.name</code> would be a variable called <code>o.name</code>), <code>null</code> would be a path step, and <code>.</code> is the context item. So objects and arrays are called like functions, <code>jn:null()</code> produces null, and the JSONiq functions are available unprefixed or with the predeclared <code>jn</code> prefix.</p>
+<!-- example: jsoniq/xquery-syntax -->
+<p>Updates use the same call syntax to address the target:</p>
+<!-- example: jsoniq/xquery-update -->
+<p class="why"><strong>Why it matters:</strong> existing XQuery code can process JSON without switching languages.</p>
+
+<h2 id="vs31">JSONiq and XQuery 3.1</h2>
+<p>XQuery 3.1, published in 2017, solved the same problem differently: it added maps and arrays to XQuery itself. Zorba does not implement 3.1 (see <a href="map.html#support">what Zorba supports</a>). If you read XQuery 3.1 code elsewhere, this table translates it.</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Task</th><th>JSONiq syntax (<code>.jq</code>)</th><th>Zorba XQuery (<code>.xq</code>)</th><th>XQuery 3.1, not in Zorba</th></tr></thead>
+  <tbody>
+    <tr><td>Object or map</td><td><code>{ "a": 1 }</code></td><td><code>{ "a": 1 }</code></td><td><code>map { "a": 1 }</code></td></tr>
+    <tr><td>Array</td><td><code>[ 1, 2 ]</code></td><td><code>[ 1, 2 ]</code></td><td><code>[ 1, 2 ]</code>, <code>array { }</code></td></tr>
+    <tr><td>Look up a key</td><td><code>$o.a</code></td><td><code>$o("a")</code></td><td><code>$o?a</code>, <code>$o("a")</code></td></tr>
+    <tr><td>Array member</td><td><code>$a[[1]]</code></td><td><code>$a(1)</code></td><td><code>$a?1</code>, <code>$a(1)</code></td></tr>
+    <tr><td>All members</td><td><code>$a[]</code></td><td><code>$a()</code></td><td><code>$a?*</code></td></tr>
+    <tr><td>Keys</td><td><code>keys($o)</code></td><td><code>keys($o)</code></td><td><code>map:keys($o)</code></td></tr>
+    <tr><td>Array length</td><td><code>size($a)</code></td><td><code>size($a)</code></td><td><code>array:size($a)</code></td></tr>
+    <tr><td>JSON null</td><td><code>null</code></td><td><code>jn:null()</code></td><td>empty sequence after <code>parse-json</code></td></tr>
+    <tr><td>Parse JSON text</td><td><code>parse-json($s)</code></td><td><code>jn:parse-json($s)</code></td><td><code>fn:parse-json($s)</code></td></tr>
+    <tr><td>Change a value</td><td><code>replace value of json $o.a with 2</code></td><td><code>replace value of json $o("a") with 2</code></td><td>no update syntax; <code>map:put</code> returns a new map</td></tr>
+  </tbody>
+</table>
+</div>
+<p class="why"><strong>Why it matters:</strong> the concepts carry over one to one, and the main practical differences are null handling and the update syntax, which 3.1 does not have.</p>
+
+<div class="pager"><a href="xquery.html">XQuery</a><a href="zorba.html">Next: Using Zorba</a></div>
+</main>
+</div>
+
+<!-- footer -->
+<script src="assets/site.js"></script>
+</body>
+</html>

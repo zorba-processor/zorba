@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>XQuery tutorial</title>
+<meta name="description" content="A progressive XQuery tutorial: paths, FLWOR, constructors, functions, types, errors, updates and full-text search, with verified examples.">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+<!-- header: xquery -->
+
+<div class="layout">
+<details class="toc">
+  <summary>On this page</summary>
+  <p class="toc-title">XQuery</p>
+  <ol>
+    <li><a href="#data">The sample data</a></li>
+    <li><a href="#paths">Paths</a></li>
+    <li><a href="#predicates">Predicates</a></li>
+    <li><a href="#axes">Axes</a></li>
+    <li><a href="#values">From nodes to values</a></li>
+    <li><a href="#comparisons">Comparisons and quantifiers</a></li>
+    <li><a href="#flwor">FLWOR</a></li>
+    <li><a href="#group">Grouping</a></li>
+    <li><a href="#count">Positions and ranks</a></li>
+    <li><a href="#joins">Joins</a></li>
+    <li><a href="#windows">Windows</a></li>
+    <li><a href="#constructors">Constructors</a></li>
+    <li><a href="#functions">Functions</a></li>
+    <li><a href="#hof">Functions as values</a></li>
+    <li><a href="#modules">Modules</a></li>
+    <li><a href="#strings">Strings, numbers, dates</a></li>
+    <li><a href="#types">Types and casting</a></li>
+    <li><a href="#schema">Schema validation</a></li>
+    <li><a href="#errors">Errors</a></li>
+    <li><a href="#updates">Updates</a></li>
+    <li><a href="#fulltext">Full-text search</a></li>
+  </ol>
+</details>
+
+<main>
+<h1>XQuery</h1>
+<p class="lede">From a path expression to grouping, windows, updates and text search. Each section is short: an idea, an example run by Zorba, its output, and why it is worth knowing.</p>
+
+<h2 id="data">The sample data</h2>
+<p>Most examples read the same small file. <code>doc()</code> loads and parses an XML document; relative paths resolve against the location of the query file.</p>
+<!-- source: data/books.xml -->
+
+<h2 id="paths">Paths</h2>
+<p>A path is a series of steps separated by <code>/</code>. Each step selects nodes relative to the nodes selected by the previous step. <code>//</code> means "at any depth". The result comes back in document order, without duplicates.</p>
+<!-- example: xquery/path-steps -->
+<p class="why"><strong>Why it matters:</strong> a path returns nodes, not strings. The titles above are still elements that you can navigate further or copy into new documents.</p>
+
+<h2 id="predicates">Predicates</h2>
+<p>Square brackets filter. A boolean predicate keeps the items for which it is true; a number selects by position, starting at 1. Predicates can be chained and can contain paths of their own.</p>
+<!-- example: xquery/path-predicates -->
+<p class="why"><strong>Why it matters:</strong> <code>//book[2]</code> means "each book that is the second book child of its parent", while <code>(//book)[last()]</code> takes the last item of the whole sequence. The parentheses change the meaning.</p>
+
+<h2 id="axes">Axes</h2>
+<p>A step moves along an axis. <code>child::</code> is the default and <code>@</code> abbreviates <code>attribute::</code>. Others go up (<code>parent::</code>, written <code>..</code>, and <code>ancestor::</code>), sideways (<code>following-sibling::</code>, <code>preceding-sibling::</code>) or down (<code>descendant::</code>).</p>
+<!-- example: xquery/path-axes -->
+<p class="why"><strong>Why it matters:</strong> you can start from the node you found and move in any direction, instead of restructuring the query to come from the top.</p>
+
+<h2 id="values">From nodes to values</h2>
+<p>Aggregates and string functions atomize their input. A function call can be a path step (<code>price/xs:decimal(.)</code>), and the simple map operator <code>!</code> applies an expression to each item of a sequence, with <code>.</code> bound to the item.</p>
+<!-- example: xquery/path-values -->
+<p class="why"><strong>Why it matters:</strong> converting with <code>xs:decimal</code> gives exact decimal arithmetic. Summing the untyped values directly would convert them to <code>xs:double</code>, with binary rounding.</p>
+
+<h2 id="comparisons">Comparisons and quantifiers</h2>
+<p>There are two families of comparison. <strong>General comparisons</strong> (<code>=</code>, <code>!=</code>, <code>&lt;</code>, <code>&gt;</code>, ...) compare sequences and are true if <em>any</em> pair of items matches. <strong>Value comparisons</strong> (<code>eq</code>, <code>ne</code>, <code>lt</code>, <code>gt</code>, ...) compare exactly one item with one item and raise an error otherwise. <code>some</code> and <code>every</code> quantify explicitly.</p>
+<!-- example: xquery/quantified -->
+<p class="why"><strong>Why it matters:</strong> <code>$books/@lang = "en"</code> reads like an equality test but means "at least one book is in English". Use <code>eq</code> when you expect a single value and want to be told if you get several.</p>
+
+<h2 id="flwor">FLWOR</h2>
+<p>The FLWOR expression (pronounced "flower") is the workhorse. <code>for</code> iterates, <code>let</code> binds a value, <code>where</code> filters, <code>order by</code> sorts and <code>return</code> builds the result for each surviving binding.</p>
+<!-- example: xquery/flwor-basic -->
+<p class="why"><strong>Why it matters:</strong> the clauses can repeat and appear in almost any order, so a FLWOR covers what SQL spreads across SELECT, FROM, WHERE, ORDER BY and subqueries.</p>
+
+<h2 id="group">Grouping</h2>
+<p><code>group by</code> (XQuery 3.0) partitions the bindings by a key. After the clause, every other variable holds the sequence of values from its group, so <code>count($b)</code> counts the books of each author and <code>sum($price)</code> adds their prices.</p>
+<!-- example: xquery/flwor-group -->
+<p class="why"><strong>Why it matters:</strong> before 3.0 this needed <code>distinct-values</code> plus a nested query per key. Now it is a single clause.</p>
+
+<h2 id="count">Positions and ranks</h2>
+<p><code>for $x at $pos</code> binds the position of each item in the input sequence. The <code>count</code> clause numbers the bindings at the point where it appears, so after <code>order by</code> it gives a rank.</p>
+<!-- example: xquery/flwor-count -->
+<p class="why"><strong>Why it matters:</strong> the two numbers answer different questions: where the item was in the input, and where it is in the result.</p>
+
+<h2 id="joins">Joins</h2>
+<p>Two <code>for</code> clauses form a join; the predicate or <code>where</code> is the join condition. <code>allowing empty</code> keeps an outer binding even when the inner sequence is empty, like a left outer join.</p>
+<!-- example: xquery/flwor-join -->
+<p class="why"><strong>Why it matters:</strong> joins work across documents and sources, not only across tables of one database.</p>
+
+<h2 id="windows">Windows</h2>
+<p>A window clause slides over a sequence and binds a whole sub-sequence at a time. A <strong>tumbling</strong> window starts a new window after the previous one ends; a <strong>sliding</strong> window starts one at every position that meets the start condition. <code>only end</code> drops windows whose end condition never became true.</p>
+<!-- example: xquery/flwor-tumbling -->
+<!-- example: xquery/flwor-sliding -->
+<p class="why"><strong>Why it matters:</strong> batching, sessions in logs and moving averages over time series become declarative.</p>
+
+<h2 id="constructors">Constructors</h2>
+<p>Direct constructors write XML literally. Curly braces inside content or attribute values evaluate an expression and insert its result.</p>
+<!-- example: xquery/ctor-direct -->
+<p>Computed constructors build nodes whose names are themselves computed.</p>
+<!-- example: xquery/ctor-computed -->
+<p class="why"><strong>Why it matters:</strong> output is built as a tree, so it is always well formed, and characters such as <code>&lt;</code> and <code>&amp;</code> are escaped by the serializer.</p>
+
+<h2 id="functions">Functions</h2>
+<p>Functions are declared in the prolog, before the query body. Functions in a main module go in the <code>local</code> namespace. Parameter and return types are optional; when present, arguments are checked and converted.</p>
+<!-- example: xquery/func-declare -->
+<p class="why"><strong>Why it matters:</strong> recursion is the natural way to walk trees of unknown depth, and typed signatures catch mistakes early.</p>
+
+<h2 id="hof">Functions as values</h2>
+<p>XQuery 3.0 has function items: inline functions (<code>function($x) { ... }</code>), named references (<code>upper-case#1</code>, where the number is the arity) and dynamic calls (<code>$f(3)</code>). The standard library has the usual higher-order functions.</p>
+<!-- example: xquery/func-higher-order -->
+<p class="why"><strong>Why it matters:</strong> behaviour can be passed as a parameter, which makes generic library functions possible.</p>
+
+<h2 id="modules">Modules</h2>
+<p>A library module declares a target namespace and contains functions and variables in it. A main module imports it with <code>import module namespace</code>; the <code>at</code> clause gives its location.</p>
+<!-- source: xquery/lib/geo.xqm -->
+<!-- example: xquery/func-module -->
+<p class="why"><strong>Why it matters:</strong> modules are how code is shared, and how Zorba's built-in libraries are exposed (see <a href="zorba.html#modules">built-in modules</a>).</p>
+
+<h2 id="strings">Strings, numbers, dates</h2>
+<p>The standard function library includes regular expressions (<code>matches</code>, <code>replace</code>, <code>tokenize</code>, <code>analyze-string</code>) and, since 3.0, formatting of numbers and dates. The <code>||</code> operator concatenates strings.</p>
+<!-- example: xquery/strings -->
+<p class="why"><strong>Why it matters:</strong> most text munging needs no extension library.</p>
+
+<h2 id="types">Types and casting</h2>
+<p>Every atomic value has a type. Constructor functions like <code>xs:date("...")</code> and <code>cast as</code> convert; <code>castable as</code> tests without failing; <code>instance of</code> checks the type of a value. Integer division with <code>div</code> gives an exact decimal; with doubles you get binary floating point.</p>
+<!-- example: xquery/types-cast -->
+<p><code>switch</code> selects by value, <code>typeswitch</code> by type (see <a href="map.html#items">the item kinds example</a>).</p>
+<!-- example: xquery/types-switch -->
+<p class="why"><strong>Why it matters:</strong> dates, durations and decimals behave like values with arithmetic, not like strings you have to parse again.</p>
+
+<h2 id="schema">Schema validation</h2>
+<p>With an XML Schema imported, <code>validate</code> checks a node and annotates it with types. Atomizing a validated element then gives typed values: here <code>xs:positiveInteger</code> and <code>xs:decimal</code> instead of untyped text. Invalid input raises <code>err:XQDY0027</code>.</p>
+<!-- source: xquery/lib/order.xsd -->
+<!-- example: xquery/validate -->
+<p class="why"><strong>Why it matters:</strong> input checking and typing come from the schema you already have, not from hand-written checks in every query.</p>
+
+<h2 id="errors">Errors</h2>
+<p>Errors are identified by QNames. <code>try</code>/<code>catch</code> (XQuery 3.0) catches them by name, by namespace wildcard or with <code>*</code>; inside the <code>catch</code>, variables such as <code>$err:code</code> and <code>$err:description</code> describe the error. <code>error()</code> raises your own.</p>
+<!-- example: xquery/errors-try -->
+<div class="note"><p>XQuery 3.0 says the <code>err</code> prefix is predeclared. In Zorba some catch clauses fail with <code>XPST0081</code> ("can not expand prefix") unless the prefix is declared, so the examples on this site declare it explicitly. The declaration is valid in any processor.</p></div>
+<p class="why"><strong>Why it matters:</strong> failures in one part of a result, such as a malformed date in one record, can be handled without aborting the whole query.</p>
+
+<h2 id="updates">Updates</h2>
+<p>The Update Facility adds expressions that change nodes: <code>insert node</code>, <code>delete node</code>, <code>replace node</code>, <code>replace value of node</code> and <code>rename node</code>. Changes are collected into a pending update list and applied together at the end, so expressions never see a half-updated tree. <code>copy</code>/<code>modify</code>/<code>return</code> applies updates to a copy and returns it.</p>
+<!-- example: xquery/update-transform -->
+<!-- example: xquery/update-original -->
+<p class="why"><strong>Why it matters:</strong> "the same document with a few changes" is one expression instead of a full rebuild. To make changes persist across statements, apply them to nodes in a <a href="zorba.html#collections">collection</a> or use <a href="zorba.html#scripting">scripting</a>.</p>
+
+<h2 id="fulltext">Full-text search</h2>
+<p><code>contains text</code> searches the words of a node, not its characters: it tokenizes the text, ignores case by default and can apply stemming, wildcards, stop words and thesauri.</p>
+<!-- example: xquery/fulltext-basic -->
+<p>Searches combine with <code>ftand</code>, <code>ftor</code> and <code>ftnot</code>, and can be restricted by distance or window.</p>
+<!-- example: xquery/fulltext-ops -->
+<p class="why"><strong>Why it matters:</strong> "fox" does not match "Foxes" as a substring test would, but it does with stemming. Word-aware search is part of the query language instead of a separate engine.</p>
+
+<div class="pager"><a href="map.html">The big picture</a><a href="jsoniq.html">Next: JSONiq</a></div>
+</main>
+</div>
+
+<!-- footer -->
+<script src="assets/site.js"></script>
+</body>
+</html>
