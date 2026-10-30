@@ -31,6 +31,7 @@
 #include <zorba/diagnostic_list.h>
 #include <zorba/item.h>
 #include <zorba/item_factory.h>
+#include <zorba/item_sequence.h>
 #include <zorba/iterator.h>
 #include <zorba/security.h>
 #include <zorba/static_context.h>
@@ -184,6 +185,21 @@ Outcome parse_xml(Zorba* z, StaticContext_t sctx, const std::string& aXml)
              "input", aXml);
 }
 
+// x:canonicalize builds a libxml2 tree with the default SAX2 handler, the
+// parse path where parameter entities are processed (the store's SAX loader
+// behind fn:parse-xml ignores them).
+[[maybe_unused]] Outcome canonicalize(Zorba* z, StaticContext_t sctx,
+                                      const std::string& aXml)
+{
+  return run(z, sctx,
+             "import module namespace x = \"http://zorba.io/modules/xml\";\n"
+             "declare namespace opt = \"http://zorba.io/modules/xml-options\";\n"
+             "declare variable $input as xs:string external;\n"
+             "x:canonicalize($input, <opt:options><opt:substitute-entities/>"
+             "</opt:options>)",
+             "input", aXml);
+}
+
 Outcome doc(Zorba* z, StaticContext_t sctx, const std::string& aURI)
 {
   return run(z, sctx,
@@ -229,7 +245,10 @@ void test_unrestricted(Zorba* z, const Files& f)
 {
   StaticContext_t sctx = context(z, SecurityPolicy::unrestricted());
   CHECK(expanded(parse_xml(z, sctx, xxe_system(f)), SECRET));
-  CHECK(expanded(parse_xml(z, sctx, xxe_parameter(f)), SECRET));
+#ifndef ZORBA_NO_XMLSCHEMA
+  CHECK(expanded(canonicalize(z, sctx, xxe_parameter(f)), SECRET));
+  CHECK(expanded(canonicalize(z, sctx, xxe_system(f)), SECRET));
+#endif
   CHECK(expanded(parse_xml(z, sctx, INTERNAL_ENTITY), "hello"));
 
   // Also with the instance default.
@@ -242,8 +261,12 @@ void test_secure_context(Zorba* z, const Files& f)
   StaticContext_t sctx = context(z, SecurityPolicy::secure());
 
   CHECK(denied(parse_xml(z, sctx, xxe_system(f)), "FODC0006", f.secretURI));
-  CHECK(denied(parse_xml(z, sctx, xxe_parameter(f)), "FODC0006",
+#ifndef ZORBA_NO_XMLSCHEMA
+  CHECK(denied(canonicalize(z, sctx, xxe_parameter(f)), "FOCZ0001",
                f.entitiesURI));
+  CHECK(denied(canonicalize(z, sctx, xxe_system(f)), "FOCZ0001",
+               f.secretURI));
+#endif
 
   // Internal entities do not need any capability.
   CHECK(expanded(parse_xml(z, sctx, INTERNAL_ENTITY), "hello"));
@@ -271,7 +294,9 @@ void test_allow_lists(Zorba* z, const Files& f)
       .allow(Capability::FileRead)
       .addReadPath(f.dir.string()));
   CHECK(expanded(parse_xml(z, inDir, xxe_system(f)), SECRET));
-  CHECK(expanded(parse_xml(z, inDir, xxe_parameter(f)), SECRET));
+#ifndef ZORBA_NO_XMLSCHEMA
+  CHECK(expanded(canonicalize(z, inDir, xxe_parameter(f)), SECRET));
+#endif
 
   // FileRead restricted to another directory.
   StaticContext_t otherDir = context(z, SecurityPolicy::secure()
