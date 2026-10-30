@@ -832,6 +832,8 @@ ENDIF (NOT is_init)
 #  where "testname" is the full test name and "bugid" is the Sourceforge
 #  Tracker artifact ID.
 MACRO(expected_failure testname bugid)
+  # Tests can be left unregistered by the build options (e.g. no XML Schema).
+  IF (TEST "${testname}")
   # The meat: flip the "will_fail" flag
   get_test_property ("${testname}" WILL_FAIL willfail)
   if (willfail)
@@ -842,6 +844,7 @@ MACRO(expected_failure testname bugid)
 
   set_tests_properties ("${testname}"
     PROPERTIES WILL_FAIL ${willfail})
+  ENDIF (TEST "${testname}")
 
   # Also store the name and bug ID of this test in our output file
   file (APPEND "${expected_failures_file}"

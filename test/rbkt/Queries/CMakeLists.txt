@@ -514,14 +514,20 @@ EXPECTED_FAILURE (test/rbkt/zorba/testdriver/bom_bug 3381121)
 
 # Bug 921624. If this test takes more than a couple seconds, it must be
 # hitting w3.org for the DTD, which is bad.
-SET_TESTS_PROPERTIES(test/rbkt/zorba/schemas/local-xhtml
-  PROPERTIES TIMEOUT 10)
+IF(TEST test/rbkt/zorba/schemas/local-xhtml)
+  SET_TESTS_PROPERTIES(test/rbkt/zorba/schemas/local-xhtml
+    PROPERTIES TIMEOUT 10)
+ENDIF()
 # Bug 867363. These should fail or pass quickly because HTTP download
 # is disabled.
-SET_TESTS_PROPERTIES(test/rbkt/zorba/uris/disable-http
-  PROPERTIES TIMEOUT 10)
-SET_TESTS_PROPERTIES(test/rbkt/zorba/uris/disable-http-2
-  PROPERTIES TIMEOUT 10)
+IF(TEST test/rbkt/zorba/uris/disable-http)
+  SET_TESTS_PROPERTIES(test/rbkt/zorba/uris/disable-http
+    PROPERTIES TIMEOUT 10)
+ENDIF()
+IF(TEST test/rbkt/zorba/uris/disable-http-2)
+  SET_TESTS_PROPERTIES(test/rbkt/zorba/uris/disable-http-2
+    PROPERTIES TIMEOUT 10)
+ENDIF()
 
 
 # --------------------------------------------------------------------------
