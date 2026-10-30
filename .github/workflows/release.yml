@@ -10,9 +10,13 @@ name: Release
 # workflow_dispatch runs the same pipeline without a tag. With dry_run (the
 # default) nothing is pushed and no release is created; the would-be release
 # assets and notes are uploaded as the "release-assets" workflow artifact.
+# Pull requests that change this workflow get the same dry run, with the
+# version taken from the newest versioned CHANGELOG.md section plus "-dryrun".
 on:
   push:
     tags: ['v*']
+  pull_request:
+    paths: ['.github/workflows/release.yml']
   workflow_dispatch:
     inputs:
       version:
@@ -27,7 +31,7 @@ on:
 
 concurrency:
   group: release-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions: {}
 
@@ -55,10 +59,13 @@ jobs:
         id: v
         env:
           INPUT_VERSION: ${{ inputs.version }}
-          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || github.event_name == 'pull_request' }}
         run: |
           set -euo pipefail
           version="${INPUT_VERSION#v}"
+          if [ -z "$version" ] && [ "$GITHUB_EVENT_NAME" = pull_request ]; then
+            version="$(grep -m1 -oE '^## \[[0-9]+\.[0-9]+\.[0-9]+\]' CHANGELOG.md | tr -d '#[] ')-dryrun"
+          fi
           if [ -z "$version" ]; then
             case "$GITHUB_REF" in
               refs/tags/v*) version="${GITHUB_REF#refs/tags/v}" ;;
@@ -271,12 +278,15 @@ jobs:
           upload-artifact: false
           upload-release-assets: false
 
+      # Pull requests from forks get no OIDC token.
       - name: Attest build provenance (tarball)
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         uses: actions/attest@v4
         with:
           subject-path: dist/zorba-${{ env.VERSION }}.tar.gz
 
       - name: Attest the SBOM (tarball)
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         uses: actions/attest@v4
         with:
           subject-path: dist/zorba-${{ env.VERSION }}.tar.gz

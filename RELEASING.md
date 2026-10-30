@@ -28,6 +28,10 @@ tags.
    gh workflow run release.yml -R zorba-processor/zorba --ref master -f version=X.Y.Z-pre -f dry_run=true
    ```
 
+   The dry run uploads the would-be release (tarball, SBOMs, `SHA256SUMS`,
+   notes) as the `release-assets` artifact of the run. Pull requests that
+   change `release.yml` run the same dry run automatically.
+
 5. Tag the master commit and push the tag:
 
    ```bash
