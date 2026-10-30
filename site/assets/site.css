@@ -287,3 +287,8 @@ td code { white-space: nowrap; }
 @media (prefers-reduced-motion: no-preference) {
   .toc a { transition: color 0.15s, border-color 0.15s; }
 }
+
+main > pre.code {
+  background: var(--code-bg); border: 1px solid var(--rule); border-radius: 8px;
+  margin: 0.5rem 0 1rem;
+}

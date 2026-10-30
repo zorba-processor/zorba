@@ -110,7 +110,7 @@
 <p class="why"><strong>Why it matters:</strong> integration work between XML systems and JSON APIs is a query, not a hand-written converter.</p>
 
 <h2 id="xqsyntax">JSON in XQuery syntax</h2>
-<p>In <code>.xq</code> files the dot is part of names (<code>$o.name</code> would be a variable called <code>o.name</code>), <code>null</code> would be a path step, and <code>.</code> is the context item. So objects and arrays are called like functions, <code>jn:null()</code> produces null, and the JSONiq functions are available unprefixed or with the predeclared <code>jn</code> prefix.</p>
+<p>In <code>.xq</code> files the dot is part of names (<code>$o.name</code> would be a variable called <code>o.name</code>), <code>null</code> would be a path step, and <code>.</code> is the context item. So objects and arrays are called like functions, <code>jn:null()</code> produces null, and the JSONiq functions are called through the <code>jn</code> prefix, bound by importing <code>http://jsoniq.org/functions</code>. (Unlike in <code>.jq</code> files, not all of them resolve without the prefix: <code>members</code> does not.)</p>
 <!-- example: jsoniq/xquery-syntax -->
 <p>Updates use the same call syntax to address the target:</p>
 <!-- example: jsoniq/xquery-update -->
@@ -127,8 +127,8 @@
     <tr><td>Look up a key</td><td><code>$o.a</code></td><td><code>$o("a")</code></td><td><code>$o?a</code>, <code>$o("a")</code></td></tr>
     <tr><td>Array member</td><td><code>$a[[1]]</code></td><td><code>$a(1)</code></td><td><code>$a?1</code>, <code>$a(1)</code></td></tr>
     <tr><td>All members</td><td><code>$a[]</code></td><td><code>$a()</code></td><td><code>$a?*</code></td></tr>
-    <tr><td>Keys</td><td><code>keys($o)</code></td><td><code>keys($o)</code></td><td><code>map:keys($o)</code></td></tr>
-    <tr><td>Array length</td><td><code>size($a)</code></td><td><code>size($a)</code></td><td><code>array:size($a)</code></td></tr>
+    <tr><td>Keys</td><td><code>keys($o)</code></td><td><code>jn:keys($o)</code></td><td><code>map:keys($o)</code></td></tr>
+    <tr><td>Array length</td><td><code>size($a)</code></td><td><code>jn:size($a)</code></td><td><code>array:size($a)</code></td></tr>
     <tr><td>JSON null</td><td><code>null</code></td><td><code>jn:null()</code></td><td>empty sequence after <code>parse-json</code></td></tr>
     <tr><td>Parse JSON text</td><td><code>parse-json($s)</code></td><td><code>jn:parse-json($s)</code></td><td><code>fn:parse-json($s)</code></td></tr>
     <tr><td>Change a value</td><td><code>replace value of json $o.a with 2</code></td><td><code>replace value of json $o("a") with 2</code></td><td>no update syntax; <code>map:put</code> returns a new map</td></tr>
