@@ -76,6 +76,9 @@ jobs:
               ctest --preset full-release -j"$(nproc)" \
                 --output-junit junit.xml'
 
+      - name: Verify hardening
+        run: scripts/check-hardening.sh build/full-release
+
       # The checked-in parsers/scanners must be what this image's bison and
       # flex generate from parser.y/scanner.l (see
       # src/compiler/parser/CMakeLists.txt). The regenerated files are

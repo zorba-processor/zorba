@@ -1,0 +1,72 @@
+name: CodeQL
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  schedule:
+    - cron: '0 5 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: Analyze (c-cpp)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    permissions:
+      security-events: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      # Same package set as docker/builder/Dockerfile (Ubuntu 24.04). CodeQL has
+      # to observe the compiler, so the build runs directly on the runner.
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build pkg-config bison flex \
+            libicu-dev libxml2-dev libxslt1-dev libcurl4-openssl-dev zlib1g-dev \
+            libxerces-c-dev uuid-dev
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: c-cpp
+          build-mode: manual
+          queries: security-extended
+          config-file: ./.github/codeql/codeql-config.yml
+
+      - name: Build
+        run: |
+          cmake --preset full-release
+          cmake --build --preset full-release
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: /language:c-cpp
+          upload: failure-only
+          output: sarif-results
+
+      # paths-ignore does not filter results for compiled languages: files
+      # CMake generates under build/ (test drivers, doc examples) are compiled
+      # and analyzed like any other source. Drop their results before upload.
+      - name: Drop results in generated build-tree files
+        run: |
+          for f in sarif-results/*.sarif; do
+            jq '.runs[].results |= map(select(
+                  (.locations[0].physicalLocation.artifactLocation.uri // "")
+                  | startswith("build/") | not))' "$f" > "$f.tmp"
+            mv "$f.tmp" "$f"
+          done
+
+      - name: Upload results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: sarif-results
+          category: /language:c-cpp

@@ -901,7 +901,9 @@ store::Item_t DtdXmlLoader::loadXml(
 {
   theTree = GET_STORE().getNodeFactory().createXmlTree();
 
-  xmlSubstituteEntitiesDefault(1);
+  // Entity substitution and DTD loading are enabled per parser context below;
+  // the global defaults (xmlSubstituteEntitiesDefault, xmlLoadExtDtdDefaultValue)
+  // are deprecated.
 
   theBaseUri = baseUri;
 
@@ -984,15 +986,18 @@ store::Item_t DtdXmlLoader::loadXml(
 
     // xmlCtxtUseOptions(ctxt, options);
 
-    xmlLoadExtDtdDefaultValue |= XML_DETECT_IDS;
-    xmlLoadExtDtdDefaultValue |= XML_COMPLETE_ATTRS;
-
-    // Apply loader options
-    applyLoadOptions(theLoadProperties, ctxt);
+    // Apply loader options. Entity substitution used to come from the global
+    // xmlSubstituteEntitiesDefault(1); it is now set per context (XML_PARSE_NOENT).
+    // The former "xmlLoadExtDtdDefaultValue |= XML_DETECT_IDS | XML_COMPLETE_ATTRS"
+    // here only took effect on contexts created after this point, never on
+    // this one, so it has no per-context equivalent.
+    store::LoadProperties new_props = theLoadProperties;
+    new_props.setSubstituteEntities(true);
+    applyLoadOptions(new_props, ctxt);
 
     if ( xmlParseDocument(ctxt)==-1 )
     {
-      // std::cout << "  xmlParseDocument: Error: Unable to create tree: " << ctxt->lastError.message << std::endl;
+      // std::cout << "  xmlParseDocument: Error: Unable to create tree: " << xmlCtxtGetLastError(ctxt)->message << std::endl;
       theXQueryDiagnostics->add_error(NEW_ZORBA_EXCEPTION(zerr::ZSTR0021_LOADER_PARSING_ERROR,ERROR_PARAMS( ZED( XMLParserNoCreateTree ) )));
       abortload();
       return NULL;
@@ -1038,15 +1043,16 @@ store::Item_t DtdXmlLoader::loadXml(
     abortload();
     return NULL;
   }
-  else if ( ctxt->lastError.code != XML_ERR_OK )
+  else if ( auto const *lastError = xmlCtxtGetLastError(ctxt);
+            lastError != NULL && lastError->code != XML_ERR_OK )
   {
     /*
-    std::cout << "-- LastErrorCode: " << ctxt->lastError.code << " " <<
-        ctxt->lastError.message << " wellformed:" << ok << std::endl; std::cout.flush();
+    std::cout << "-- LastErrorCode: " << lastError->code << " " <<
+        lastError->message << " wellformed:" << ok << std::endl; std::cout.flush();
     */
 
-    if ( ctxt->lastError.code == XML_NS_ERR_UNDEFINED_NAMESPACE ||
-        ctxt->lastError.code != XML_ERR_NO_DTD )
+    if ( lastError->code == XML_NS_ERR_UNDEFINED_NAMESPACE ||
+        lastError->code != XML_ERR_NO_DTD )
     {
       theXQueryDiagnostics->add_error(
         NEW_ZORBA_EXCEPTION(
@@ -1444,24 +1450,28 @@ void DtdXmlLoader::startElement(
                   << std::endl);
 
     // Process namespace bindings
-    store::NsBindings& bindings = elemNode->getNsContext()->getBindings();
+    // The element has an NsBindingsContext only if it declares namespaces.
     int i = 0;
-    for (xmlNs *ns = node->nsDef; ns != NULL; ns = ns->next)
+    if (numBindings > 0)
     {
-      const char* prefix = reinterpret_cast<const char*>(ns->prefix);
-      const char* nsuri = reinterpret_cast<const char*>(ns->href);
+      store::NsBindings& bindings = elemNode->getNsContext()->getBindings();
+      for (xmlNs *ns = node->nsDef; ns != NULL; ns = ns->next)
+      {
+        const char* prefix = reinterpret_cast<const char*>(ns->prefix);
+        const char* nsuri = reinterpret_cast<const char*>(ns->href);
 
-      if (prefix == NULL)
-        prefix = "";
+        if (prefix == NULL)
+          prefix = "";
 
-      zstring pooledNs;
-      store.getNamespacePool().insertc(nsuri, pooledNs);
+        zstring pooledNs;
+        store.getNamespacePool().insertc(nsuri, pooledNs);
 
-      bindings[i].first = prefix;
-      bindings[i].second = pooledNs;
+        bindings[i].first = prefix;
+        bindings[i].second = pooledNs;
 
-      LOADER_TRACE1("namespace decl: [" << prefix  << ":" << nsuri << "]");
-      i++;
+        LOADER_TRACE1("namespace decl: [" << prefix  << ":" << nsuri << "]");
+        i++;
+      }
     }
 
     if ( i > 0 )

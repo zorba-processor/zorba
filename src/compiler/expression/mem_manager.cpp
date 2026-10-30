@@ -32,9 +32,6 @@ MemoryManager::MemoryManager()
 
   thePageStart = new char[thePageSize];
 
-  if (thePageStart == NULL)
-    throw std::bad_alloc();
-
   thePageEnd = thePageStart + thePageSize;
   theFreeSize = thePageSize;
   thePages.push_back(thePageStart);

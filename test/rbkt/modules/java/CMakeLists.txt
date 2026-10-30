@@ -15,26 +15,22 @@
 # For now we only test building a .jar that we want Zorba to make available
 # on the JVM claspath. This test scenario should be extended to include a
 # Zorba module using the .jar, etc.
-# We make use of the much-improved Java support added in CMake 2.8.6.
-COMPARE_VERSION_STRINGS (${CMAKE_VERSION} "2.8.6" RESULT)
-IF (${RESULT} GREATER -1)
-  FIND_PACKAGE (Java COMPONENTS Development)
-  # Java_JAVAC_EXECUTABLE alone is not enough: macOS ships a javac stub
-  # that fails when no JDK is installed.
-  IF (Java_FOUND AND Java_JAVAC_EXECUTABLE)
-    INCLUDE (UseJava)
+FIND_PACKAGE (Java COMPONENTS Development)
+# Java_JAVAC_EXECUTABLE alone is not enough: macOS ships a javac stub
+# that fails when no JDK is installed.
+IF (Java_FOUND AND Java_JAVAC_EXECUTABLE)
+  INCLUDE (UseJava)
 
-    # Declare two "different" jars, for testing
-    ADD_JAR (JavaTest Test.java)
-    ADD_JAR (JavaTest2 Test.java)
+  # Declare two "different" jars, for testing
+  ADD_JAR (JavaTest Test.java)
+  ADD_JAR (JavaTest2 Test.java)
 
-    # Tell Zorba about the jars
-    GET_PROPERTY (JavaTest_JAR_FILE TARGET JavaTest PROPERTY JAR_FILE)
-    GET_PROPERTY (JavaTest2_JAR_FILE TARGET JavaTest2 PROPERTY JAR_FILE)
-    DECLARE_ZORBA_JAR(FILE ${JavaTest_JAR_FILE} TARGET JavaTest TEST_ONLY)
-    DECLARE_ZORBA_JAR(FILE ${JavaTest2_JAR_FILE} TARGET JavaTest2 TEST_ONLY)
-    SET_TARGET_PROPERTIES (JavaTest PROPERTIES FOLDER "Tests")
-    SET_TARGET_PROPERTIES (JavaTest2 PROPERTIES FOLDER "Tests")
+  # Tell Zorba about the jars
+  GET_PROPERTY (JavaTest_JAR_FILE TARGET JavaTest PROPERTY JAR_FILE)
+  GET_PROPERTY (JavaTest2_JAR_FILE TARGET JavaTest2 PROPERTY JAR_FILE)
+  DECLARE_ZORBA_JAR(FILE ${JavaTest_JAR_FILE} TARGET JavaTest TEST_ONLY)
+  DECLARE_ZORBA_JAR(FILE ${JavaTest2_JAR_FILE} TARGET JavaTest2 TEST_ONLY)
+  SET_TARGET_PROPERTIES (JavaTest PROPERTIES FOLDER "Tests")
+  SET_TARGET_PROPERTIES (JavaTest2 PROPERTIES FOLDER "Tests")
 
-  ENDIF (Java_JAVAC_EXECUTABLE)
-ENDIF (${RESULT} GREATER -1)
+ENDIF (Java_JAVAC_EXECUTABLE)

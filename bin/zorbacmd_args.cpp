@@ -413,7 +413,7 @@ void atoi( char const *s,  T *result, int offset = 0 ) {
 
 template<class C,typename T> inline
 void atoi( char const *s, C &c, void (C::*f)( T ), int offset = 0 ) {
-  T temp;
+  T temp{};
   atoi( s, &temp, offset );
   (c.*f)( temp );
 }
@@ -646,7 +646,7 @@ int parse_args( int argc, char const *argv[] ) {
       zc_props.omit_xml_declaration_ = true;
     else if ( IS_OPT( "--optimization-level", "-O" ) ) {
       PARSE_ARG( "--optimization-level" );
-      unsigned opt_level;
+      unsigned opt_level = 0;
       atoi( ARG_VAL, &opt_level );
       if ( opt_level > 2 ) {
         error = "Only 0, 1 and 2 are allowed as values for --optimization-level";

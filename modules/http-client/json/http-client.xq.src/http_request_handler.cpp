@@ -39,8 +39,7 @@ namespace zorba { namespace http_client {
       theInsideMultipart(false),
       theLastBodyHadContent(false),
       theSerStream(NULL),
-      thePost(NULL),
-      theLast(NULL),
+      theMime(NULL),
       thePostData(NULL)
   {
     theHeaderLists.push_back(NULL);
@@ -56,8 +55,8 @@ namespace zorba { namespace http_client {
       }
     }
 
-    if (thePost != NULL) {
-      curl_formfree(thePost);
+    if (theMime != NULL) {
+      curl_mime_free(theMime);
     }
     delete theSerStream;
   }
@@ -407,21 +406,17 @@ namespace zorba { namespace http_client {
       curl_easy_setopt(theCurl, CURLOPT_POSTFIELDSIZE, thePostDataString.length());
       curl_easy_setopt(theCurl, CURLOPT_POSTFIELDS, thePostData);
     } else {
-      if (theMultiPartFileName == "")
-        curl_formadd(&thePost, &theLast,
-                     CURLFORM_COPYNAME, theMultipartName.c_str(),
-                     CURLFORM_COPYCONTENTS, thePostData,
-                     CURLFORM_CONTENTSLENGTH, thePostDataString.length(),
-                     CURLFORM_CONTENTHEADER, theHeaderLists.back(),
-                     CURLFORM_END);
-      else
-        curl_formadd(&thePost, &theLast,
-                     CURLFORM_COPYNAME, theMultipartName.c_str(),
-                     CURLFORM_BUFFER, theMultiPartFileName.c_str(),
-                     CURLFORM_BUFFERPTR, thePostData,
-                     CURLFORM_BUFFERLENGTH, thePostDataString.length(),
-                     CURLFORM_CONTENTHEADER, theHeaderLists.back(),
-                     CURLFORM_END);
+      if (theMime == NULL)
+        theMime = curl_mime_init(theCurl);
+      curl_mimepart* lPart = curl_mime_addpart(theMime);
+      curl_mime_name(lPart, theMultipartName.c_str());
+      // curl_mime_data copies the data
+      curl_mime_data(lPart, thePostData, thePostDataString.length());
+      if (theMultiPartFileName != "")
+        curl_mime_filename(lPart, theMultiPartFileName.c_str());
+      // The Content-Type of the part is in the header list; the list is
+      // owned by this handler (owner flag 0) and freed in the destructor.
+      curl_mime_headers(lPart, theHeaderLists.back(), 0);
       theHeaderLists.push_back(NULL);
     }
   }
@@ -441,7 +436,9 @@ namespace zorba { namespace http_client {
   void HttpRequestHandler::endMultipart()
   {
     theInsideMultipart = false;
-    curl_easy_setopt(theCurl, CURLOPT_HTTPPOST, thePost);
+    if (theMime != NULL) {
+      curl_easy_setopt(theCurl, CURLOPT_MIMEPOST, theMime);
+    }
   }
 
   void HttpRequestHandler::end()

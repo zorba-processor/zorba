@@ -335,26 +335,14 @@ string curdir() {
 
 zstring get_temp_file() {
 #ifndef WIN32
-  static char const mkdtemp_template[] = "zorba_tmp.XXXXXXXX";
-  static size_t const mkdtemp_template_len = ::strlen( mkdtemp_template );
-
-  char const *tmp_dir = ::getenv( "TMPDIR" );
-  if ( !tmp_dir )
-    tmp_dir = "/tmp";
-  unique_ptr<char[]> buf(
-    new char[
-      ::strlen( tmp_dir )
-      + 1 // dir_separator
-      + mkdtemp_template_len
-      + 1 // null
-    ]
-  );
-  ::strcpy( buf.get(), tmp_dir );
-  append( buf.get(), mkdtemp_template );
-  char const *const path = ::mkdtemp( buf.get() );
-  if ( !path )
-    throw fs::exception( "mkdtemp()", path );
-  return path;
+  char const *const env_tmp_dir = ::getenv( "TMPDIR" );
+  std::string buf( env_tmp_dir && *env_tmp_dir ? env_tmp_dir : "/tmp" );
+  if ( buf.back() != dir_separator )
+    buf += dir_separator;
+  buf += "zorba_tmp.XXXXXXXX";
+  if ( !::mkdtemp( buf.data() ) )
+    throw fs::exception( "mkdtemp()", buf.c_str() );
+  return zstring( buf.c_str() );
 #else
   WCHAR wtemp[ MAX_PATH ];
   // GetTempFileName() needs a 14-character cushion.

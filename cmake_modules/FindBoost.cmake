@@ -379,9 +379,9 @@ ELSE (_boost_IN_CACHE)
       ELSE (NOT CMAKE_COMPILER_IS_GNUCC)
         IF (NOT CYGWIN)
         #find out the version of gcc being used.
-        EXEC_PROGRAM(${CMAKE_CXX_COMPILER}
-            ARGS --version
+        EXECUTE_PROCESS(COMMAND ${CMAKE_CXX_COMPILER} --version
             OUTPUT_VARIABLE _boost_COMPILER_VERSION
+            OUTPUT_STRIP_TRAILING_WHITESPACE
         )
         STRING(REGEX REPLACE ".* ([0-9])\\.([0-9])\\.[0-9] .*" "\\1\\2"
                _boost_COMPILER_VERSION ${_boost_COMPILER_VERSION})
