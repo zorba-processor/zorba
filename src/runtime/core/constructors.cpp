@@ -43,6 +43,7 @@
 #include "util/ascii_util.h"
 #include "util/string_util.h"
 #include "util/utf8_util.h"
+#include "util/xml_util.h"
 
 using namespace std;
 
@@ -1456,6 +1457,7 @@ bool NameCastIterator::nextImpl(store::Item_t& result, PlanState& planState) con
   xqtref_t lItemType;
   store::Item_t temp;
   bool valid = false;
+  bool isEQName = false;
 
   PlanIteratorState* state;
   DEFAULT_STACK_INIT(PlanIteratorState, state, planState);
@@ -1471,39 +1473,68 @@ bool NameCastIterator::nextImpl(store::Item_t& result, PlanState& planState) con
     RAISE_ERROR(err::XPTY0004, loc, ERROR_PARAMS(ZED(SeqNoCastToQName)));
   }
 
-  try
+  if (result->isAtomic() &&
+      (result->getTypeCode() == store::XS_STRING ||
+       result->getTypeCode() == store::XS_UNTYPED_ATOMIC))
   {
-    temp = result;
-    valid = GenericCast::castToQName(result,
-                                     temp,
-                                     &*theNCtx,
-                                     theIsAttrName,
-                                     theSctx->get_typemanager(),
-                                     loc);
-  }
-  catch (ZorbaException const& e)
-  {
-    if (e.diagnostic() != err::XPTY0004)
+    // A name of the form Q{uri}local (URIQualifiedName) is taken as an
+    // expanded QName; the URI is whitespace-normalized like a URILiteral.
+    zstring name = result->getStringValue();
+    ascii::trim_space(name);
+    if (name.compare(0, 2, "Q{") == 0)
     {
-      zstring name = result->getStringValue();
-      if (name.find(":") != zstring::npos && name.substr(0, name.find(":")) == "xmlns")
+      zstring::size_type const close = name.find('}');
+      zstring local;
+      if (close != zstring::npos)
+        local = name.substr(close + 1);
+      if (close == zstring::npos || !xml::is_NCName(local))
       {
-        // this needs to be checked and thrown here as the optimizer
-        // might try to fold a const expression and would return a different error code
-        if (theIsAttrName)
-          RAISE_ERROR(err::XQDY0044, loc, ERROR_PARAMS(name));
-        else
-          RAISE_ERROR(err::XQDY0096, loc, ERROR_PARAMS(name));
-      }
-      else
-      { 
         RAISE_ERROR(err::XQDY0074, loc,
         ERROR_PARAMS(ZED(XQDY0074_NotCastToQName), name));
       }
+      zstring uri;
+      ascii::normalize_space(name.substr(2, close - 2), &uri);
+      GENV_ITEMFACTORY->createQName(result, uri, zstring(), local);
+      isEQName = true;
     }
-    else
+  }
+
+  if (!isEQName)
+  {
+    try
     {
-      throw;
+      temp = result;
+      valid = GenericCast::castToQName(result,
+                                       temp,
+                                       &*theNCtx,
+                                       theIsAttrName,
+                                       theSctx->get_typemanager(),
+                                       loc);
+    }
+    catch (ZorbaException const& e)
+    {
+      if (e.diagnostic() != err::XPTY0004)
+      {
+        zstring name = result->getStringValue();
+        if (name.find(":") != zstring::npos && name.substr(0, name.find(":")) == "xmlns")
+        {
+          // this needs to be checked and thrown here as the optimizer
+          // might try to fold a const expression and would return a different error code
+          if (theIsAttrName)
+            RAISE_ERROR(err::XQDY0044, loc, ERROR_PARAMS(name));
+          else
+            RAISE_ERROR(err::XQDY0096, loc, ERROR_PARAMS(name));
+        }
+        else
+        { 
+          RAISE_ERROR(err::XQDY0074, loc,
+          ERROR_PARAMS(ZED(XQDY0074_NotCastToQName), name));
+        }
+      }
+      else
+      {
+        throw;
+      }
     }
   }
 

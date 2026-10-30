@@ -139,6 +139,8 @@
 %token <sval> PREFIX_WILDCARD               "'*:QName'"
 %token <sval> COMP_ELEMENT_QNAME_LBRACE     "'element QName {'"
 %token <sval> COMP_ATTRIBUTE_QNAME_LBRACE   "'attribute QName {'"
+%token <sval> COMP_ELEMENT_EQNAME_LBRACE    "'element EQName {'"
+%token <sval> COMP_ATTRIBUTE_EQNAME_LBRACE  "'attribute EQName {'"
 %token <sval> COMP_PI_NCNAME_LBRACE         "'processing-instruction NCName {'"
 %token <sval> COMP_NS_NCNAME_LBRACE         "'namespace NCName {'"
 %token <sval> QNAME_SVAL                    "'QName'"
@@ -5296,6 +5298,10 @@ CompElemConstructor :
     {
       $$ = new CompElemConstructor(LOC(@$), new QName(LOC(@$), SYMTAB($1)), $2);
     }
+|   COMP_ELEMENT_EQNAME_LBRACE StatementsAndOptionalExpr RBRACE
+    {
+      $$ = new CompElemConstructor(LOC(@$), new QName(LOC(@$), SYMTAB($1), true), $2);
+    }
 |   ELEMENT LBRACE Expr RBRACE LBRACE StatementsAndOptionalExpr RBRACE
     {
       $$ = new CompElemConstructor( LOC(@$), $3, $6 );
@@ -5316,6 +5322,10 @@ CompAttrConstructor :
     COMP_ATTRIBUTE_QNAME_LBRACE StatementsAndOptionalExpr RBRACE
     {
       $$ = new CompAttrConstructor( LOC(@$), new QName(LOC(@$), SYMTAB($1)), $2 );
+    }
+|   COMP_ATTRIBUTE_EQNAME_LBRACE StatementsAndOptionalExpr RBRACE
+    {
+      $$ = new CompAttrConstructor( LOC(@$), new QName(LOC(@$), SYMTAB($1), true), $2 );
     }
 |   ATTRIBUTE LBRACE Expr RBRACE LBRACE StatementsAndOptionalExpr RBRACE
     {

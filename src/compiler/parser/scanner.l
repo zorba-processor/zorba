@@ -757,6 +757,12 @@ CDataChars													({NonClosingSquareBracketChar}|"]"{NonSqBraNonGTChar}|"]]
   else
     COMP_CONSTR_ROLLBACK(true);
 }
+<MODE_ELEM_COMP_CONSTR,MODE_ATTR_COMP_CONSTR>{EQName}                                        {
+  if (yy_comp_constr_qname == "")
+    yy_comp_constr_qname = yytext;
+  else
+    COMP_CONSTR_ROLLBACK(true);
+}
 <MODE_PI_COMP_CONSTR,MODE_NS_COMP_CONSTR>{NCName}                                            {
   if (yy_comp_constr_qname == "")
     yy_comp_constr_qname = yytext;
@@ -772,7 +778,13 @@ CDataChars													({NonClosingSquareBracketChar}|"]"{NonSqBraNonGTChar}|"]]
     BEGIN INITIAL;
     std::string temp = yy_comp_constr_qname;
     yy_comp_constr_qname = "";
-    if (_STATE == MODE_ELEM_COMP_CONSTR)
+    // A QName cannot contain '{', so "Q{" starts a URIQualifiedName.
+    bool const eqname = temp.compare(0, 2, "Q{") == 0;
+    if (_STATE == MODE_ELEM_COMP_CONSTR && eqname)
+      TRY_SVAL_TOKEN(COMP_ELEMENT_EQNAME_LBRACE, put_qname(temp.c_str(), temp.size(), false, false, true), temp.c_str());
+    else if (_STATE == MODE_ATTR_COMP_CONSTR && eqname)
+      TRY_SVAL_TOKEN(COMP_ATTRIBUTE_EQNAME_LBRACE, put_qname(temp.c_str(), temp.size(), false, false, true), temp.c_str());
+    else if (_STATE == MODE_ELEM_COMP_CONSTR)
       TRY_SVAL_TOKEN(COMP_ELEMENT_QNAME_LBRACE, put_qname(temp.c_str(), temp.size()), temp.c_str());
     else if (_STATE == MODE_ATTR_COMP_CONSTR)
       TRY_SVAL_TOKEN(COMP_ATTRIBUTE_QNAME_LBRACE, put_qname(temp.c_str(), temp.size()), temp.c_str());
