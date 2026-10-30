@@ -67,6 +67,16 @@ jobs:
       - name: Configure Zorba
         run: |
           EH="-fwasm-exceptions"
+          # CMake's CheckTypeSize cannot read sizes from Emscripten's .js
+          # try_compile output (every check "fails"), so seed the wasm32
+          # values. The MS-only __int32 types stay undetected (correct).
+          SIZES=""
+          for kv in ZORBA_HAVE_INT32_T=4 ZORBA_HAVE_UINT32_T=4 ZORBA_HAVE_INT64_T=8 \
+                    ZORBA_SIZEOF_DOUBLE=8 ZORBA_SIZEOF_FLOAT=4 ZORBA_SIZEOF_INT=4 \
+                    ZORBA_SIZEOF_LONG=4 ZORBA_SIZEOF_LONG_LONG=8 ZORBA_SIZEOF_VOID_P=4 \
+                    ZORBA_SIZEOF_SHORT=2 ZORBA_SIZEOF_SIZE_T=4 ZORBA_SIZEOF_WCHAR_T=4; do
+            SIZES="$SIZES -DHAVE_${kv%%=*}=TRUE -D$kv"
+          done
           LINK="$EH -sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=8MB -sNODERAWFS=1 -sEXIT_RUNTIME=1"
           emcmake cmake -S . -B build-wasm -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
@@ -87,6 +97,7 @@ jobs:
             -DCMAKE_DISABLE_FIND_PACKAGE_LibXslt=ON \
             -DCMAKE_DISABLE_FIND_PACKAGE_Java=ON \
             -DCMAKE_DISABLE_FIND_PACKAGE_JNI=ON \
+            $SIZES \
             2>&1 | tee configure.log
 
       - name: Build Zorba (ninja -k 0)
