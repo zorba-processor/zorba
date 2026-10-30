@@ -22,10 +22,6 @@ on:
         default: '2'
   schedule:
     - cron: '17 4 * * 1'
-  # TEMPORARY (development of this workflow; workflow_dispatch only works
-  # once the file is on master). Removed before merge.
-  push:
-    branches: [qt3-suite]
 
 concurrency:
   group: qt3-${{ github.ref }}
