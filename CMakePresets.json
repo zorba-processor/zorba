@@ -13,7 +13,6 @@
       "binaryDir": "${sourceDir}/build/${presetName}",
       "cacheVariables": {
         "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
-        "ZORBA_SUPPRESS_SWIG": "ON",
         "CMAKE_DISABLE_FIND_PACKAGE_Java": "ON",
         "CMAKE_DISABLE_FIND_PACKAGE_JNI": "ON"
       }

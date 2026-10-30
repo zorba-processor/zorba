@@ -10,7 +10,6 @@ on:
       - 'modules/**'
       - 'bin/**'
       - 'test/**'
-      - 'swig/**'
       - 'schemas/**'
       - 'config/**'
       - 'cmake/**'
