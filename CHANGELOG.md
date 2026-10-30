@@ -53,7 +53,6 @@ Entries marked **(open PR)** come from pull requests that are not merged yet; co
 
 - Add the security policy API: `SecurityPolicy` with capabilities (`ExternalEntities`, `FileRead`, `FileWrite`, `Network`, `RemoteImport`, `Environment`, `NativeModules`), allow-lists, limits and `secure()`/`unrestricted()` presets; queries can never widen the policy of their context; new error codes `ZXQP0067`, `ZXQP0068`, `ZXQP0069` ([#44](https://github.com/zorba-processor/zorba/pull/44)).
 - Add `err:ZXQP0029` for refused external resources during XML loading **(open PR [#51](https://github.com/zorba-processor/zorba/pull/51))**.
-- Add `SecurityPolicy::checkURI()` to test a URI against a policy ([#56](https://github.com/zorba-processor/zorba/pull/56)).
 - Add a documentation site (XQuery, JSONiq and Zorba tutorials, cheat sheet) on GitHub Pages; all 59 code examples are run in CI and the shown output is verified ([#30](https://github.com/zorba-processor/zorba/pull/30)).
 - Add a new logo and color palette to the site and README ([#46](https://github.com/zorba-processor/zorba/pull/46)).
 - Add `CMakePresets.json` with configure, build, test and workflow presets (`core-release`, `full-release`, `full-debug`, `full-release-offline`) ([#25](https://github.com/zorba-processor/zorba/pull/25), [#31](https://github.com/zorba-processor/zorba/pull/31)).
@@ -65,6 +64,7 @@ Entries marked **(open PR)** come from pull requests that are not merged yet; co
 - Add XMark and JSONiq benchmark suites with an A/B comparison workflow ([#38](https://github.com/zorba-processor/zorba/pull/38)).
 - Add an on-demand build-time measurement workflow ([#29](https://github.com/zorba-processor/zorba/pull/29)).
 - Add a pull request template with a changelog line.
+- Add `SecurityPolicy::checkURI()` to test a URI against a policy ([#56](https://github.com/zorba-processor/zorba/pull/56)).
 
 ### Changed
 
