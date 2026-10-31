@@ -114,8 +114,6 @@ public:
   
   void resetAttList();
 
-  void resetTextInfo();
-  
   std::list<AttributeValidationInfo*>* getAttributeList()
   {
     return &_attributeList;
