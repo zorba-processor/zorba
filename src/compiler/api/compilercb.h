@@ -89,6 +89,25 @@ class XQueryDiagnostics;
   item that refers to a detached obj, or a reference to a detached obj held
   by another QueryResources or by an owner (release()).
 
+  Cost: a collection walks the whole graph, including the members of the
+  eager temp sequences and JSON items held by the dctx variables. So that the
+  collections triggered by the references a function item gains and drops
+  while it is used (e.g. a function item of the graph read from a prolog
+  variable, or a function item created and dropped by an escaped function)
+  do not walk the graph each time, a collection that finds the graph
+  referenced from outside remembers a few of the nodes referenced from
+  outside from which the root is reachable ("witnesses"), together with the
+  graph generation (graphGeneration()). The generation changes whenever an
+  edge of any graph may have changed: a QueryResources is detached, a
+  variable of a detached dctx or of a closure dctx is set, a JSON item is
+  updated, or garbage is released. As long as it has not changed, the edges
+  into a witness still exist (so it is alive), and while a witness still has
+  more references than edges into it, the root is still referenced from
+  outside, and the walk is skipped. While the dctx variables of garbage are
+  released, the collections started by the function items and
+  QueryResources objs that are destroyed are deferred until the release is
+  done, and run once per QueryResources.
+
   The external function parameters of the dctx are destroyed by dispose() in
   any case, as they were before: they are opaque (e.g. the zorba-query module
   keeps the queries it prepares, with the URL resolver function items passed
@@ -123,6 +142,22 @@ protected:
   rchandle<QueryResources>       theParent;
   rchandle<QueryResources>       theDctxParent;
   bool                           theIsDetached;
+
+  // See "Cost" in the class comment.
+  struct Witness
+  {
+    const void * thePtr;
+    int          theKind;
+    long         theInternalRefs;
+  };
+
+  enum { MAX_WITNESSES = 4 };
+
+  unsigned long                  theWitnessGeneration;
+  csize                          theNumWitnesses;
+  Witness                        theWitnesses[MAX_WITNESSES];
+
+  static std::atomic<unsigned long> theGraphGeneration;
 
 public:
   // For tests: the number of QueryResources objs alive, and the number of
@@ -166,6 +201,24 @@ public:
     references from outside the graph.
   */
   static void collectCycles(QueryResources* const* held, csize numHeld);
+
+  /*
+    Returns false if the last collection of each detached obj in roots found
+    it referenced from outside its graph, and that still holds (see "Cost" in
+    the class comment); collectCycles() would then do nothing.
+  */
+  static bool mayCollect(QueryResources* const* roots, csize numRoots);
+
+  // See "Cost" in the class comment.
+  static void graphChanged()
+  {
+    theGraphGeneration.fetch_add(1, std::memory_order_relaxed);
+  }
+
+  static unsigned long graphGeneration()
+  {
+    return theGraphGeneration.load(std::memory_order_relaxed);
+  }
 
 private:
   void destroy();

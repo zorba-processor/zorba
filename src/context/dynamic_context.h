@@ -147,6 +147,9 @@ protected:
 
   uint64_t                     theSnapshotID;
 
+  // See track_writes().
+  bool                         theTracksWrites;
+
 public:
   double                       theDocLoadingUserTime;
   double                       theDocLoadingTime;
@@ -158,6 +161,8 @@ public:
 
 protected:
   void destroy_keymap();
+
+  void release_old_value(VarValue& old);
 
 public:
   dynamic_context* getParent() { return theParent; }
@@ -215,6 +220,11 @@ public:
   void release_variables();
 
   void release_parameters();
+
+  // From now on, setting a variable changes the graph generation (see
+  // QueryResources): the variables of this dctx are edges of the graph that
+  // QueryResources::collectCycles() examines.
+  void track_writes() { theTracksWrites = true; }
 
   void add_variable(ulong varid, store::Item_t& value);
 

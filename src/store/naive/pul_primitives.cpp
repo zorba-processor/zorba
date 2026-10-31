@@ -39,6 +39,8 @@
 #include "diagnostics/xquery_diagnostics.h"
 #include "diagnostics/util_macros.h"
 
+#include "compiler/api/compilercb.h"
+
 using namespace zorba::simplestore::json;
 
 namespace zorba {
@@ -1997,6 +1999,10 @@ UpdJSONObjectInsert::UpdJSONObjectInsert(
 
 void UpdJSONObjectInsert::apply()
 {
+  // The members of a JSON item are edges of the graph that
+  // QueryResources::collectCycles() examines.
+  QueryResources::graphChanged();
+
   ZORBA_ASSERT(theTarget->isObject());
 
   JSONObject* obj = static_cast<JSONObject*>(theTarget.getp());
@@ -2017,6 +2023,10 @@ void UpdJSONObjectInsert::apply()
 
 void UpdJSONObjectInsert::undo()
 {
+  // The members of a JSON item are edges of the graph that
+  // QueryResources::collectCycles() examines.
+  QueryResources::graphChanged();
+
   if (!theIsApplied)
   {
     return;
@@ -2051,6 +2061,10 @@ UpdJSONObjectDelete::UpdJSONObjectDelete(
 
 void UpdJSONObjectDelete::apply()
 {
+  // The members of a JSON item are edges of the graph that
+  // QueryResources::collectCycles() examines.
+  QueryResources::graphChanged();
+
   JSONObject* obj = static_cast<JSONObject*>(theTarget.getp());
 
   theOldValue = obj->remove(theName);
@@ -2061,6 +2075,10 @@ void UpdJSONObjectDelete::apply()
 
 void UpdJSONObjectDelete::undo()
 {
+  // The members of a JSON item are edges of the graph that
+  // QueryResources::collectCycles() examines.
+  QueryResources::graphChanged();
+
   if (!theIsApplied)
   {
     return;
@@ -2095,6 +2113,10 @@ UpdJSONObjectReplaceValue::UpdJSONObjectReplaceValue(
 
 void UpdJSONObjectReplaceValue::apply()
 {
+  // The members of a JSON item are edges of the graph that
+  // QueryResources::collectCycles() examines.
+  QueryResources::graphChanged();
+
   JSONObject* obj = static_cast<JSONObject*>(theTarget.getp());
 
   theOldValue = obj->setValue(theName, theNewValue);
@@ -2108,6 +2130,10 @@ void UpdJSONObjectReplaceValue::apply()
 
 void UpdJSONObjectReplaceValue::undo()
 {
+  // The members of a JSON item are edges of the graph that
+  // QueryResources::collectCycles() examines.
+  QueryResources::graphChanged();
+
   if (!theIsApplied)
     return;
 
@@ -2239,6 +2265,10 @@ UpdJSONArrayInsert::UpdJSONArrayInsert(
 
 void UpdJSONArrayInsert::apply()
 {
+  // The members of a JSON item are edges of the graph that
+  // QueryResources::collectCycles() examines.
+  QueryResources::graphChanged();
+
   JSONArray* array = static_cast<JSONArray*>(theTarget.getp());
 
   array->insert_before(thePosition, theMembers);
@@ -2249,6 +2279,10 @@ void UpdJSONArrayInsert::apply()
 
 void UpdJSONArrayInsert::undo()
 {
+  // The members of a JSON item are edges of the graph that
+  // QueryResources::collectCycles() examines.
+  QueryResources::graphChanged();
+
   if (!theIsApplied)
   {
     return;
@@ -2283,6 +2317,10 @@ UpdJSONArrayAppend::UpdJSONArrayAppend(
 
 void UpdJSONArrayAppend::apply()
 {
+  // The members of a JSON item are edges of the graph that
+  // QueryResources::collectCycles() examines.
+  QueryResources::graphChanged();
+
   JSONArray* array = static_cast<JSONArray*>(theTarget.getp());
 
   array->push_back(theMembers);
@@ -2293,6 +2331,10 @@ void UpdJSONArrayAppend::apply()
 
 void UpdJSONArrayAppend::undo()
 {
+  // The members of a JSON item are edges of the graph that
+  // QueryResources::collectCycles() examines.
+  QueryResources::graphChanged();
+
   if (!theIsApplied)
   {
     return;
@@ -2327,6 +2369,10 @@ UpdJSONArrayDelete::UpdJSONArrayDelete(
 
 void UpdJSONArrayDelete::apply()
 {
+  // The members of a JSON item are edges of the graph that
+  // QueryResources::collectCycles() examines.
+  QueryResources::graphChanged();
+
   JSONArray* array = static_cast<JSONArray*>(theTarget.getp());
   
   theOldValue = array->remove(thePosition);
@@ -2340,6 +2386,10 @@ void UpdJSONArrayDelete::apply()
 
 void UpdJSONArrayDelete::undo()
 {
+  // The members of a JSON item are edges of the graph that
+  // QueryResources::collectCycles() examines.
+  QueryResources::graphChanged();
+
   if (!theIsApplied)
   {
     return;
@@ -2371,6 +2421,10 @@ UpdJSONArrayReplaceValue::UpdJSONArrayReplaceValue(
 
 void UpdJSONArrayReplaceValue::apply()
 {
+  // The members of a JSON item are edges of the graph that
+  // QueryResources::collectCycles() examines.
+  QueryResources::graphChanged();
+
   JSONArray* array = static_cast<JSONArray*>(theTarget.getp());
 
   theOldValue = array->replace(thePosition, theNewValue);
@@ -2383,6 +2437,10 @@ void UpdJSONArrayReplaceValue::apply()
 
 void UpdJSONArrayReplaceValue::undo()
 {
+  // The members of a JSON item are edges of the graph that
+  // QueryResources::collectCycles() examines.
+  QueryResources::graphChanged();
+
   if (!theIsApplied)
   {
     return;

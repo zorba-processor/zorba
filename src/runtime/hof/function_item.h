@@ -214,10 +214,16 @@ public:
 
   theInternalRefs:
   ----------------
-  Non-zero if this item is stored in the dctx of a detached QueryResources
-  (see QueryResources::collectCycles()): the number of references to it from
-  that graph when it was last examined. When its reference count drops to
-  that number or below, the cycles through it may have become unreachable.
+  theInternalRefsGeneration:
+  --------------------------
+  If this item was part of the graph of a detached QueryResources the last
+  time such a graph was found referenced from outside (see
+  QueryResources::collectCycles()): the number of references to it from that
+  graph, and the graph generation then. While the generation is unchanged and
+  the reference count stays above that number, the item is still referenced
+  from outside the graph and dropping a reference to it does not start a
+  collection. Otherwise (stale generation) any dropped reference does, if the
+  item refers to a detached QueryResources.
 
 ********************************************************************************/
 class FunctionItem : public store::Item, public zorba::serialization::SerializeBaseClass
@@ -245,6 +251,8 @@ protected:
 
   long                            theInternalRefs;
 
+  unsigned long                   theInternalRefsGeneration;
+
   SYNC_CODE(mutable RCLock        theRCLock;)
 
 
@@ -271,11 +279,7 @@ public:
 
   // Called by store::Item::removeReference() when the reference count has
   // dropped to remaining (> 0).
-  void referenceDropped(long remaining)
-  {
-    if (theInternalRefs != 0 && remaining <= theInternalRefs)
-      collectCycles();
-  }
+  void referenceDropped(long remaining);
 
   bool isInline() const { return theFunctionItemInfo->theIsInline; }
   
@@ -312,6 +316,8 @@ public:
   zstring show() const;
 
 private:
+  bool refersToDetached() const;
+
   void collectCycles();
 };
 

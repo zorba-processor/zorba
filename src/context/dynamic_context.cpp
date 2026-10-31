@@ -35,6 +35,7 @@
 #include "compiler/expression/var_expr.h"
 #include "compiler/xqddf/value_index.h"
 #include "compiler/parsetree/parsenodes.h"
+#include "compiler/api/compilercb.h"
 
 #include "types/root_typemanager.h"
 
@@ -129,6 +130,7 @@ dynamic_context::dynamic_context(dynamic_context* parent)
   theAvailableMaps(NULL),
   theEnvironmentVariables(NULL),
   theSnapshotID(0),
+  theTracksWrites(false),
   theDocLoadingUserTime(0.0),
   theDocLoadingTime(0)
 {
@@ -500,27 +502,14 @@ void dynamic_context::set_variable(
 
   // variables can be set multiple times, so we need to make sure to remove
   // previously set temp sequences
-  if (var.theState == VarValue::item)
-  {
-    assert(var.theValue.item != NULL);
-    var.theValue.item->removeReference();
-  }
-  else if (var.theState == VarValue::temp_seq)
-  {
-    assert(var.theValue.temp_seq != NULL);
-    RCHelper::removeReference(var.theValue.temp_seq);
-  }
-  else if (var.theState == VarValue::declared)
-  {
-    assert(var.theValue.item == NULL);
-  }
-  else
-  {
-    ZORBA_ASSERT(false);
-  }
+  VarValue old;
+  old.theState = var.theState;
+  old.theValue = var.theValue;
 
   var.theState = VarValue::temp_seq;
   var.theValue.temp_seq = seq.release();
+
+  release_old_value(old);
 }
 
 
@@ -544,27 +533,14 @@ void dynamic_context::set_variable(
 
   // variables can be set multiple times, so we need to make sure to remove
   // previously set temp sequences
-  if (var.theState == VarValue::item)
-  {
-    assert(var.theValue.item != NULL);
-    var.theValue.item->removeReference();
-  }
-  else if (var.theState == VarValue::temp_seq)
-  {
-    assert(var.theValue.temp_seq != NULL);
-    RCHelper::removeReference(var.theValue.temp_seq);
-  }
-  else if (var.theState == VarValue::declared)
-  {
-    assert(var.theValue.item == NULL);
-  }
-  else
-  {
-    ZORBA_ASSERT(false);
-  }
+  VarValue old;
+  old.theState = var.theState;
+  old.theValue = var.theValue;
 
   var.theState = VarValue::item;
   var.theValue.item = valueItem.release();
+
+  release_old_value(old);
 }
 
 
@@ -585,27 +561,51 @@ void dynamic_context::unset_variable(
 
   VarValue& var = theVarValues[varid];
 
-  if (var.theState == VarValue::item)
+  VarValue old;
+  old.theState = var.theState;
+  old.theValue = var.theValue;
+
+  var.theState = VarValue::declared;
+  var.theValue.item = NULL;
+
+  release_old_value(old);
+}
+
+
+/*******************************************************************************
+  Releases the previous value of a variable, after the variable has been given
+  its new value: releasing the old value may destroy a function item, which
+  may examine the variables of this dctx (see QueryResources). old is reset.
+********************************************************************************/
+void dynamic_context::release_old_value(VarValue& old)
+{
+  if (theTracksWrites)
+    QueryResources::graphChanged();
+
+  if (old.theState == VarValue::item)
   {
-    assert(var.theValue.item != NULL);
-    var.theValue.item->removeReference();
+    assert(old.theValue.item != NULL);
+    store::Item* item = old.theValue.item;
+    old.theState = VarValue::declared;
+    old.theValue.item = NULL;
+    item->removeReference();
   }
-  else if (var.theState == VarValue::temp_seq)
+  else if (old.theState == VarValue::temp_seq)
   {
-    assert(var.theValue.temp_seq != NULL);
-    RCHelper::removeReference(var.theValue.temp_seq);
+    assert(old.theValue.temp_seq != NULL);
+    store::TempSeq* seq = old.theValue.temp_seq;
+    old.theState = VarValue::declared;
+    old.theValue.item = NULL;
+    RCHelper::removeReference(seq);
   }
-  else if (var.theState == VarValue::declared)
+  else if (old.theState == VarValue::declared)
   {
-    assert(var.theValue.item == NULL);
+    assert(old.theValue.item == NULL);
   }
   else
   {
     ZORBA_ASSERT(false);
   }
-
-  var.theState = VarValue::declared;
-  var.theValue.item = NULL;
 }
 
 

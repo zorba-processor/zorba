@@ -208,6 +208,8 @@ void CompilerCB::addAnonymousUDF(user_function* udf)
 /*******************************************************************************
   class QueryResources (collectCycles() is in runtime/hof/function_item.cpp)
 ********************************************************************************/
+std::atomic<unsigned long> QueryResources::theGraphGeneration(1);
+
 std::atomic<long> QueryResources::theNumAlive(0);
 
 std::atomic<unsigned long> QueryResources::theNumWalks(0);
@@ -233,7 +235,9 @@ QueryResources::QueryResources()
 #ifdef ZORBA_WITH_DEBUGGER
   theDebuggerCommons(NULL),
 #endif
-  theIsDetached(false)
+  theIsDetached(false),
+  theWitnessGeneration(0),
+  theNumWitnesses(0)
 {
   ++theNumAlive;
 }
@@ -286,6 +290,11 @@ void QueryResources::dispose(
     theParent = parent;
     theDctxParent = (dctxParent != parent ? dctxParent : NULL);
     theIsDetached = true;
+
+    // From now on the dctx variables are edges of a graph.
+    if (theDctx)
+      theDctx->track_writes();
+    graphChanged();
 
     // The caller's reference does not count.
     QueryResources* held[1] = { this };
