@@ -927,17 +927,11 @@ static_context::~static_context()
     delete theFunctionArityMap;
   }
 
-  if (theVariablesMap)
-  {
-    delete theVariablesMap;
-    theVariablesMap = NULL;
-  }
+  delete theVariablesMap;
+  theVariablesMap = NULL;
 
-  if (theImportedPrivateVariablesMap)
-  {
-    delete theImportedPrivateVariablesMap;
-    theImportedPrivateVariablesMap = NULL;
-  }
+  delete theImportedPrivateVariablesMap;
+  theImportedPrivateVariablesMap = NULL;
 
   delete theNamespaceBindings;
 
