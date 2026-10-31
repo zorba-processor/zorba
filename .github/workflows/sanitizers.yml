@@ -3,7 +3,8 @@ name: Sanitizers
 # Full test suite under AddressSanitizer, LeakSanitizer and UBSan (GCC, Arch
 # latest-toolchain builder), and the thread-safety tests under ThreadSanitizer
 # (TSan cannot be combined with ASan, so it is a separate build).
-# Non-blocking: it reports, it does not gate PRs.
+# It does not gate PRs (it does not run on them), but a run fails when any
+# test fails under the sanitizers, so failures cannot hide behind the summary.
 on:
   workflow_dispatch:
     inputs:
@@ -71,13 +72,15 @@ jobs:
               cmake --preset asan
               cmake --build --preset asan
               mkdir -p build/asan/sanitizer-logs
+              rc=0
               ctest --preset asan -j"$(nproc)" --output-junit junit.xml \
-                > build/asan/ctest.log 2>&1 || true
+                > build/asan/ctest.log 2>&1 || rc=$?
               sed -n "/tests passed/,\$p" build/asan/ctest.log
               # The sanitizer runtime writes logs as root with mode 0600;
               # hand them to the runner user so later steps can read them.
               chown -R "$HOST_UID:$HOST_GID" build/asan/sanitizer-logs \
-                build/asan/ctest.log build/asan/junit.xml .ccache || true'
+                build/asan/ctest.log build/asan/junit.xml .ccache || true
+              exit $rc'
 
       - name: Summarize
         if: always()
