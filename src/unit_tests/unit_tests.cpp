@@ -77,6 +77,10 @@ void initializeTestList()
   libunittests["utf8_streambuf"] = test_utf8_streambuf;
   libunittests["uuid"] = test_uuid;
 
+#ifndef ZORBA_NO_XMLSCHEMA
+  libunittests["xerces_utf8"] = test_xerces_utf8;
+#endif /* ZORBA_NO_XMLSCHEMA */
+
 #ifndef ZORBA_HAVE_UNORDERED_MAP
   libunittests["unordered_map"] = test_unordered_map;
 #endif /* ZORBA_HAVE_UNORDERED_MAP */

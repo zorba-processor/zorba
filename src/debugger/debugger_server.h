@@ -81,6 +81,29 @@ class DebuggerServer {
     std::string
     getVariableName(std::string& aFullName);
 
+    // the following return 0 on success, otherwise a DBGP error code
+    // and the error message in aError
+    int
+    checkPropertyContext(int aDepth, std::string& aError);
+
+    int
+    getPropertyValue(
+      DebuggerCommand& aCommand,
+      std::string& aFullName,
+      int aDepth,
+      std::string& aValue,
+      std::size_t& aSize,
+      std::string& aError);
+
+    // aSuccess is false if the variable exists but can not take the value
+    int
+    setProperty(
+      DebuggerCommand& aCommand,
+      std::string& aFullName,
+      int aDepth,
+      bool& aSuccess,
+      std::string& aError);
+
     void
     buildStackFrame(
       StackFrame& frame,
@@ -98,13 +121,18 @@ class DebuggerServer {
       std::string& fullName,
       std::string& name,
       std::string& type,
-      std::ostream& stream);
+      std::ostream& stream,
+      int page = -1,
+      int maxData = 0);
 
     void
     buildChildProperties(
       std::string& name,
       std::list<std::pair<zstring, zstring> >& children,
-      std::ostream& stream);
+      std::ostream& stream,
+      std::size_t first = 0,
+      std::size_t count = static_cast<std::size_t>(-1),
+      int maxData = 0);
 
     bool
     getEnvVar(const std::string& name, std::string& value);

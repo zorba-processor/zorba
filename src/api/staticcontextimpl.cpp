@@ -1571,9 +1571,16 @@ ItemSequence_t StaticContextImpl::invokeFunc(
 
     XQuery_t query(new XQueryImpl());
 
-    // compile without any hints
+    // Compile without any hints, directly against "this" (compile() forks its
+    // own child sctx and does not modify "this"). Do not wrap "this" in an
+    // intermediate StaticContextImpl: that copy has no CompilerCB and resets
+    // the max var id, and its extra sctx level hides the init expr of a
+    // loadProlog() prolog (static_context::get_query_expr() is looked up on
+    // the parent of the query's root sctx only). The globals of modules
+    // imported by loadProlog() would then not be initialized, and the
+    // wrapper query's own vars could reuse their dynamic-context ids.
     Zorba_CompilerHints_t lHints;
-    StaticContext_t querySctx = new StaticContextImpl(*this);
+    StaticContext_t querySctx(const_cast<StaticContextImpl*>(this));
 
     query->compile(queryStr, querySctx, lHints);
 
@@ -1670,9 +1677,9 @@ ItemSequence_t StaticContextImpl::invokeFuncItem(
 
     XQuery_t query(new XQueryImpl());
 
-    // compile without any hints
+    // compile without any hints, directly against "this" (see invokeFunc())
     Zorba_CompilerHints_t lHints;
-    StaticContext_t querySctx = new StaticContextImpl(*this);
+    StaticContext_t querySctx(const_cast<StaticContextImpl*>(this));
 
     query->compile(queryStr, querySctx, lHints);
 

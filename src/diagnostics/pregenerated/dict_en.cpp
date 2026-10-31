@@ -88,7 +88,7 @@ extern entry const dict_en[] = {
   { "err:FOTY0015", "\"$1\": argument to fn:deep-equal() contains a function item" },
   { "err:FOUP0001", "first operand of fn:put() is not a node of a supported kind" },
   { "err:FOUP0002", "second operand of fn:put() is not a valid lexical representation of the xs:anyURI type" },
-  { "err:FOUT1170", "\"$1\": error retrieving resource containing text" },
+  { "err:FOUT1170", "\"$1\": error retrieving resource containing text${: 2}" },
   { "err:FOUT1190", "\"$1\": can not decode resource retrieved" },
 #if !defined(ZORBA_NO_FULL_TEXT)
   { "err:FTDY0016", "\"$1\": invalid weight: absolute value must be in [0,1000]" },
@@ -100,13 +100,13 @@ extern entry const dict_en[] = {
   { "err:FTDY0020", "${\"1\": }invalid wildcard syntax${: 2}" },
 #endif
 #if !defined(ZORBA_NO_FULL_TEXT)
-  { "err:FTST0008", "\"$1\": unknown stop-word list" },
+  { "err:FTST0008", "\"$1\": unknown stop-word list${: 2}" },
 #endif
 #if !defined(ZORBA_NO_FULL_TEXT)
   { "err:FTST0009", "\"$1\": unsupported language${ 2}" },
 #endif
 #if !defined(ZORBA_NO_FULL_TEXT)
-  { "err:FTST0018", "\"$1\": unknown thesaurus" },
+  { "err:FTST0018", "\"$1\": unknown thesaurus${: 2}" },
 #endif
 #if !defined(ZORBA_NO_FULL_TEXT)
   { "err:FTST0019", "\"$1\": match option specified more than once" },
@@ -210,6 +210,7 @@ extern entry const dict_en[] = {
   { "err:XQST0113", "context item declaration with initializing expression not allowed in library module" },
   { "err:XQST0114", "\"$1\": duplicate decimal format property" },
   { "err:XQST0116", "$1" },
+  { "err:XQST0118", "$1" },
   { "err:XQST0120", "\"$1\": feature not supported" },
   { "err:XQST0122", "$1" },
   { "err:XQST0123", "$1" },

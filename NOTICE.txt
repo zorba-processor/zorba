@@ -2,7 +2,7 @@
 Zorba 3.1.0
 -----------
 
-(Note: This file is generated automatically from NOTICE.xml.
+(Note: This file is generated automatically from doc/legal/NOTICE.xml.
 Please do not modify this file directly.)
 
 
@@ -137,7 +137,7 @@ Copyright: 1998 Paul J. Lucas
     
 ----------------------------------------------------
 
-cmake_modules/FindBoost.cmake
+cmake/modules/FindBoost.cmake
 
 Copyright: 
       2006-2008 Andreas Schneider <mail@cynapses.org>
@@ -152,7 +152,7 @@ Copyright:
     
 ----------------------------------------------------
 
-cmake_modules/FindJNI.cmake
+cmake/modules/FindJNI.cmake
 
 Copyright: 2001-2009 Kitware, Inc.
 
@@ -405,25 +405,6 @@ Copyright: 2005 Jochen Kalmbach
 
 
       Under BSD License: http://www.opensource.org/licenses/bsd-license.php
-    
-----------------------------------------------------
-
-src/util/singleton.h
-src/util/threads.h
-
-Copyright: 2001 Andrei Alexandrescu
-
-
-      This code accompanies the book:
-      Alexandrescu, Andrei. "Modern C++ Design: Generic Programming and Design
-          Patterns Applied". Copyright (c) 2001. Addison-Wesley.
-      Permission to use, copy, modify, distribute and sell this software for any
-          purpose is hereby granted without fee, provided that the above copyright
-          notice appear in all copies and that both that copyright notice and this
-          permission notice appear in supporting documentation.
-      The author or Addison-Wesley Longman make no representations about the
-          suitability of this software for any purpose. It is provided "as is"
-          without express or implied warranty.
     
 ----------------------------------------------------
 

@@ -2088,7 +2088,7 @@ QueryLoc expandQueryLoc(const QueryLoc& aLocationFrom, const QueryLoc& aLocation
   beginning (e.g. inside functions).
 ********************************************************************************/
 void wrap_in_debugger_expr(
-  expr* aExpr,
+  expr*& aExpr,
   const QueryLoc& aLoc,
   bool aIsMainModuleBreakable = false,
   bool aIsVarDeclaration = false)
@@ -2124,7 +2124,13 @@ void wrap_in_debugger_expr(
 
       store::Item* lVarname = argVar->get_name();
 
-      if (lVarname->getStringValue() == "$$dot")
+      // the focus (context item, position, size) is not passed to the
+      // debugger eval: it may be undefined at this point and reading it
+      // would make every eval fail
+      const zstring& lVarnameStr = lVarname->getStringValue();
+      if (lVarnameStr == static_context::DOT_VAR_NAME ||
+          lVarnameStr == static_context::DOT_POS_VAR_NAME ||
+          lVarnameStr == static_context::DOT_SIZE_VAR_NAME)
       {
         continue;
       }
@@ -2342,14 +2348,19 @@ void* import_schema(
          lIter != lCandidates.end();
          ++lIter)
     {
+      zstring lCandidateError;
       lSchema = theSctx->resolve_uri(*lIter, internal::EntityData::SCHEMA,
-                                     lErrorMessage);
+                                     lCandidateError);
 
       lStream = dynamic_cast<internal::StreamResource*>(lSchema.get());
       if (lStream != NULL)
       {
         break;
       }
+      // Report why the first candidate (e.g. the location hint the query
+      // gave, if the security policy denied it) could not be loaded.
+      if (lErrorMessage.empty())
+        lErrorMessage = lCandidateError;
     }
 
     if (lStream == NULL)
@@ -14121,12 +14132,16 @@ void end_visit(const CommonContent& v, void* /*visit_state*/)
 
     while (curRef < end)
     {
-      int d = xml::parse_entity(curRef, &content);
-      if (d < 0)
+      // XQuery 3.0 3.9.1.3 (and 3.1.1 for string literals): a character
+      // reference must identify a valid XML character, e.g. not &#x0;.
+      unicode::code_point cp;
+      int d = xml::parse_entity(curRef, &cp);
+      if (d < 0 || !xml::is_valid(cp))
       {
         RAISE_ERROR(err::XQST0090, loc,
         ERROR_PARAMS(curRef, theSctx->xquery_version()));
       }
+      utf8::encode(cp, &content);
       curRef += d;
 
       if (curRef >= end)
@@ -16256,7 +16271,7 @@ void end_visit (const FTThesaurusID& v, void* /*visit_state*/) {
     theSctx->resolve_uri( uri, internal::EntityData::THESAURUS, error_msg )
   );
   if ( !rsrc.get() )
-    RAISE_ERROR(err::FTST0018, loc, ERROR_PARAMS( uri ));
+    RAISE_ERROR(err::FTST0018, loc, ERROR_PARAMS( uri, error_msg ));
 
   ftrange *levels;
   if ( v.get_levels() ) {

@@ -589,6 +589,32 @@ DebuggerCommons::eval(const zstring& aExpr, Zorba_SerializerOptions& aSerOpts)
   return lRes;
 }
 
+void
+DebuggerCommons::evalItems(
+  const zstring& aExpr,
+  std::vector<store::Item_t>& aResult)
+{
+  theExecEval = true;
+  zstring lStore = aExpr;
+  GlobalEnvironment::getInstance().getItemFactory()->createString(theEvalItem,
+                                                                  lStore);
+  try {
+    theIteratorStack.back()->evalItems(thePlanState, aResult);
+    theExecEval = false;
+  } catch (...) {
+    theExecEval = false;
+    throw;
+  }
+}
+
+int
+DebuggerCommons::setVariable(
+  const zstring& aName,
+  std::vector<store::Item_t>& aValue)
+{
+  return theIteratorStack.back()->setVariable(thePlanState, aName, aValue);
+}
+
 store::Item_t
 DebuggerCommons::getEvalItem()
 {

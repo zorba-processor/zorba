@@ -33,6 +33,14 @@ Print the queries.
 --print-errors-as-xml, -x
 Print the errors as XML.
 
+--print-ast, -a
+Print the parse tree of the query as XML. To draw it with Graphviz, convert it with <tt>scripts/ast2dot.xq</tt>:
+<pre>
+zorba -f --parse-only --print-ast -q query.xq | grep -v '^AST for ' > ast.xml
+zorba -f -q scripts/ast2dot.xq -e ast=ast.xml -z method=text > ast.dot
+dot -Tsvg ast.dot -o ast.svg
+</pre>
+
 --byte-order-mark
 Set the byte-order-mark for the serializer.
 
@@ -86,6 +94,14 @@ Do not serialize (discard) result.
 
 --debug, -d
 Launch the Zorba debugger server and connect to a DBGP-enabled debugger client.
+The server evaluates property values and eval expressions in the suspended
+query. property_set (the "set" command of xqdb) takes an XQuery expression and
+assigns its result to a variable; only variables that an XQuery Scripting
+assignment could assign (mutable prolog and block-local variables) can be set,
+and the value must match the declared type of the variable, as for an
+assignment. Known limitation: queries run through an eval (including the
+expressions evaluated by the debugger) are not compiled in debug mode, so
+breakpoints can not be set inside them.
 
 --debug-host, -h
 The host where the DBGP-enabled debugger client listens for connections. Defaults to: 127.0.0.1
@@ -97,7 +113,31 @@ The port on which the DBGP-enabled debugger client listens for connections. Defa
 Print no logo when starting.
 
 --timeout
-Specify a timeout in seconds. After the specified time, the execution of the query will be aborted.
+Specify a timeout in seconds (0 = none, the default). After the specified time, the evaluation of the query is aborted with zerr:ZXQP0068.
+
+--max-call-depth, --max-udf-call-depth
+Maximum depth of user-defined function calls (default 1024; 0 = no limit other than the available stack). Deeper calls raise zerr:ZXQP0069.
+
+--secure
+Start from the secure policy, in which queries have no capability, instead of the unrestricted one; then apply --allow and --deny. The current directory is not added to the URI and library paths (pass it with --module-path . if needed).
+
+--allow <capability>[,<capability>...]
+Allow capabilities to queries. Applied in command-line order with --deny.
+
+--deny <capability>[,<capability>...]
+Deny capabilities to queries.
+
+--read-path <dir>
+Restrict file-read to files under the directory (repeatable).
+
+--write-path <dir>
+Restrict file-write to files under the directory (repeatable).
+
+--network-prefix <url>
+Restrict network to URLs under the prefix (repeatable).
+
+--private-addresses {allow|deny}
+Whether network access may reach loopback, private and link-local addresses (default: allow, or deny with --secure).
 
 --uri-path
 URI path (list of directories) added to the built-in URI resolver, i.e. where to find modules/schemas to import.
@@ -133,8 +173,47 @@ Do not execute the query; just compile it and save the execution plan in the fil
 Do not compile the query; instead load the execution plan from the file specified by the -f -q options (or by any file specified without any other argument), and execute the loaded plan.
 
 --disable-http-resolution
-Do not use HTTP to resolve URIs
+Do not import modules or schemas over the network. Same as --deny remote-import.
 \endverbatim
+
+\section commandLineSecurity Restricting queries
+
+By default, the command line utility runs queries with every capability
+(SecurityPolicy::unrestricted()): a query may read and write files, use the
+network, read environment variables, expand external entities in XML input and
+load modules implemented in C++. To run a query you do not trust, start from
+<tt>--secure</tt> (SecurityPolicy::secure()) and allow only what it needs:
+
+\verbatim
+zorba --secure --allow file-read --read-path /srv/data --timeout 10 -f -q report.xq
+\endverbatim
+
+The capabilities (see zorba::Capability) are:
+<table border="0">
+ <tr><td><tt>external-entities</tt></td><td>External DTD subsets, external entities and XInclude in XML input.</td></tr>
+ <tr><td><tt>file-read</tt></td><td>Documents, unparsed text, stop words, thesauri and file module reads from the file system.</td></tr>
+ <tr><td><tt>file-write</tt></td><td>File module writes, deletes and directory creation.</td></tr>
+ <tr><td><tt>network</tt></td><td>http, https and ftp access for documents, unparsed text and the http-client and ftp-client modules.</td></tr>
+ <tr><td><tt>remote-import</tt></td><td>Module and schema import over the network (also needs <tt>network</tt>).</td></tr>
+ <tr><td><tt>environment</tt></td><td>fn:environment-variable, fn:available-environment-variables, and the ZORBA_URI_PATH and ZORBA_LIB_PATH environment variables.</td></tr>
+ <tr><td><tt>native-modules</tt></td><td>Modules whose functions are implemented in C++ (e.g. the file, http-client and zorba-query modules).</td></tr>
+ <tr><td><tt>all</tt></td><td>All of the above.</td></tr>
+</table>
+
+<tt>--allow</tt> and <tt>--deny</tt> are applied in command-line order after
+the starting policy, so <tt>--deny all --allow file-read</tt> is the same as
+<tt>--secure --allow file-read</tt>, and <tt>--deny network</tt> keeps
+everything else allowed. <tt>--read-path</tt>, <tt>--write-path</tt> and
+<tt>--network-prefix</tt> narrow an allowed capability; paths are compared
+after resolving <tt>..</tt> and symbolic links. A warning is printed if one
+is given while its capability is not allowed.
+
+A denied file or network access raises zerr:ZXQP0029; importing a module that
+needs a denied capability raises zerr:ZXQP0067; the environment functions
+return the empty sequence. Modules and schemas in the URI and library paths
+(which include the current directory) can always be imported. The query files,
+<tt>--context-item</tt>, external variable files and <tt>--output-file</tt>
+are opened by the command line utility itself and are not restricted.
 
 \section commandlineexamples Examples
 

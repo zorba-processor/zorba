@@ -1578,7 +1578,6 @@ void SchemaValidatorFilter::error(
 
   theErrorOccurred = true;
   theEventBuffer->resetAttList();
-  theEventBuffer->resetTextInfo();
 
   XMLBuffer exc_msg(1023);
   exc_msg.set( XMLChArray("Schema validation failed: ").get() );

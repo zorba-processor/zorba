@@ -712,6 +712,16 @@ declare variable $err:XQST0116 as xs:QName := fn:QName($err:NS, "err:XQST0116");
 
 (:~
  :
+ : In a direct element constructor, the name used in the end tag must
+ : exactly match the name used in the corresponding start tag, including
+ : its prefix or absence of a prefix.
+ : 
+ : @see http://www.w3.org/2005/xqt-errors
+:)
+declare variable $err:XQST0118 as xs:QName := fn:QName($err:NS, "err:XQST0118");
+
+(:~
+ :
  : It is a static error if a feature required by require-feature is not
  : supported by the implementation.
  : 

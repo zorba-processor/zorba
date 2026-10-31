@@ -115,9 +115,11 @@ int HttpSendFunction::doRequest(Request& aRequest, ItemSequence_t& aResult,
       aRequest.theOptions.theOverrideContentType.c_str(), lStatusOnly));
   CURLcode lRetCode = lRespParser->parse();
 
+  // A redirect or connection refused by the security policy is an HTTP
+  // error; the message names the policy and the reason.
   std::string lDenied;
   if (lRetCode && curl::policy_denied(lCURL, &lDenied))
-    lThrower.raiseException("http://zorba.io/errors", "ZXQP0029", lDenied);
+    lThrower.raiseException("HTTP", lDenied);
 
   if (lRetCode == CURLE_OPERATION_TIMEDOUT)
     lThrower.raiseException("TIMEOUT", "A timeout occurred waiting for the response");
@@ -169,9 +171,10 @@ HttpSendFunction::evaluate(const ExternalFunction::Arguments_t& args,
     String lReason;
     if (!lPolicy.checkURI(lRequest.theHref, EntityData::DOCUMENT, false,
                           &lReason))
-      lThrower.raiseException("http://zorba.io/errors", "ZXQP0029",
+      lThrower.raiseException("HTTP",
                               std::string("\"") + lRequest.theHref.str() +
-                              "\": URI access not allowed: " + lReason.str());
+                              "\": access denied by security policy (" +
+                              lReason.str() + ")");
   }
 
   RetrySpecification& lRetrySpec = lRequest.theOptions.theRetrySpec;

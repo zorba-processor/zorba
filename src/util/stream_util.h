@@ -43,8 +43,7 @@ template<typename charT,class Traits> inline
 void set_uri( std::basic_ios<charT,Traits> &ios, char const *uri ) {
   int const index = get_stream_uri_index();
   void *&pword = ios.pword( index );
-  if ( pword )
-    delete[] static_cast<char const*>( pword );
+  delete[] static_cast<char const*>( pword );
   pword = ztd::new_strdup( uri );
   ios.register_callback( delete_stream_uri_callback, index );
 }

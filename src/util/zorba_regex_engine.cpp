@@ -1702,8 +1702,14 @@ bool CRegexXQuery_piece::match_piece_iter_reluctant(
       }
       else
       {
-        //try further
-        if(retmatch)
+        //try further, unless the last repetition matched the empty string:
+        //repeating it again cannot get further, and with no maximum
+        //(e.g. a back-reference to an empty group under *?) it would loop
+        //forever
+        size_t const nlens = match_lens.size();
+        bool const empty_repetition = (nlens >= 2) &&
+          (match_lens[nlens-1].first == match_lens[nlens-2].first);
+        if(retmatch && !empty_repetition)
         {
           i++;
           if((max < 0) || (i<=max))

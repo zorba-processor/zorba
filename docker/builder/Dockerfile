@@ -4,7 +4,7 @@
 #
 # Xerces-C is built from the zorba-processor fork (tag pinned to a commit)
 # instead of the distribution package: stock Xerces-C <= 3.3.0 rejects valid
-# schemas that restrict a union type (see KNOWN_ISSUES.txt). It is built in
+# schemas that restrict a union type (see doc/KNOWN_ISSUES.txt). It is built in
 # the layer it is installed in, against the image's own ICU and curl, and
 # only its headers and libraries are kept, in /usr/local.
 ARG BASE=ubuntu:24.04
@@ -20,8 +20,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
  && for l in en_US de_DE fr_FR; do localedef -i $l -f UTF-8 $l.UTF-8; done
 
 ARG XERCES_REPO=https://github.com/zorba-processor/xerces-c.git
-ARG XERCES_TAG=v3.3.0-zorba.2
-ARG XERCES_COMMIT=e8b9a8714269b54367343f6081620d2295315c66
+ARG XERCES_TAG=v3.3.0-zorba.4
+ARG XERCES_COMMIT=90e9babe7d84e08cbdde55e4e27392f5a5a6b095
 RUN git clone --depth 1 --branch "${XERCES_TAG}" "${XERCES_REPO}" /tmp/xerces \
  && test "$(git -C /tmp/xerces rev-parse HEAD)" = "${XERCES_COMMIT}" \
  && cmake -S /tmp/xerces -B /tmp/xerces/build -G Ninja -DCMAKE_BUILD_TYPE=Release \

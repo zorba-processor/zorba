@@ -149,6 +149,14 @@ declare variable $zerr:ZXQP0026 as xs:QName := fn:QName($zerr:NS, "zerr:ZXQP0026
 declare variable $zerr:ZXQP0028 as xs:QName := fn:QName($zerr:NS, "zerr:ZXQP0028");
 
 (:~
+ :
+ : A URI mapper of the embedder refused the URI (URIMapper::DENY_ACCESS),
+ : or the security policy refused an external entity or DTD while a
+ : document was parsed. A resource that the security policy denies is
+ : reported with the error the specification prescribes for a resource
+ : that is not available (e.g. XQST0059, FODC0002, FOUT1170), not with
+ : this code.
+ : 
 :)
 declare variable $zerr:ZXQP0029 as xs:QName := fn:QName($zerr:NS, "zerr:ZXQP0029");
 

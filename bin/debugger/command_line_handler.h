@@ -53,6 +53,7 @@ namespace zorba { namespace debugger {
     ContextGet,
     Source,
     Eval,
+    PropertySet,
     StepIn,
     StepOut,
     StepOver
@@ -117,6 +118,12 @@ class CommandLineHandler
       assert(false);
     }
 
+    template<int>
+    void handle(ZORBA_TR1_NS::tuple<bstring, bstring>& aTuple)
+    {
+      assert(false);
+    }
+
   private:
     LockFreeConsumer<std::size_t>&  theConsumer;
     LockFreeConsumer<bool>&         theContinueQueue;
@@ -173,6 +180,9 @@ void CommandLineHandler::handle<Source>(ZORBA_TR1_NS::tuple<bint, bint, bstring>
   
 template<>
 void CommandLineHandler::handle<Eval>(ZORBA_TR1_NS::tuple<bstring>& aTuple);
+
+template<>
+void CommandLineHandler::handle<PropertySet>(ZORBA_TR1_NS::tuple<bstring, bstring>& aTuple);
 
 template<>
 void CommandLineHandler::handle<StepIn> (ZORBA_TR1_NS::tuple<> &t);

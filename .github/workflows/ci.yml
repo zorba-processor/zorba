@@ -16,6 +16,51 @@ permissions:
 jobs:
   # Gate: required status checks must still report, so jobs are skipped
   # (which counts as passing) instead of the whole workflow being filtered.
+  #
+  # Which jobs run (pull requests only; pushes to master and manual runs
+  # always run everything). Filters live in .github/ci-filters.yml.
+  #
+  #   change                          linux x3 + macos   profile jobs
+  #   ------------------------------  -----------------  -------------------
+  #   docs, changelog, site, scripts  skipped            skipped
+  #   src/, include/, modules/, bin/, run                see the table below
+  #   test/, schemas/, cmake/, ...
+  #   CMake files, cmake/, workflow,  run                all four
+  #   docker/builder-latest
+  #
+  # Profile jobs (CMakePresets.json) run when a file in their area changes.
+  # Every profile also runs for build-system changes, the pregenerated-source
+  # generators (src/runtime/spec, src/diagnostics) and src/unit_tests.
+  #
+  #   profile         what it changes                      runs when these change
+  #   --------------  -----------------------------------  ----------------------------------
+  #   embedded        ZORBA_NO_FULL_TEXT, _NO_XMLSCHEMA,   files with those guards: src/api,
+  #                   _WITH_DEBUGGER=OFF, _WITH_THESAURUS  capi, compiler, context, functions,
+  #                   =OFF, _SUPPRESS_CURL                 runtime, store, system, types,
+  #                                                        include/, bin/zorbacmd*, C++ in
+  #                                                        modules/, test/api|unit|driver, schema,
+  #                                                        full-text and validation tests
+  #   embedded-noicu  embedded + ZORBA_NO_ICU              embedded's, plus src/util,
+  #                                                        zorbautils, zorbatypes,
+  #                                                        zorbaserialization, regex, string,
+  #                                                        collation, charset, unicode, date and
+  #                                                        time tests
+  #   bigint          ZORBA_WITH_BIG_INTEGER               include/, src/zorbatypes, system,
+  #                                                        runtime/numerics, types, store, api,
+  #                                                        test/api|unit|fots_driver, numeric,
+  #                                                        integer and decimal tests
+  #   full-nopch      ZORBA_USE_PCH=OFF (headers stand     include/, any src/**/*.h|hpp|tcc,
+  #                   alone), _WITH_DEBUGGER=ON,           src/debugger, runtime/debug|eval|core|
+  #                   ZORBA_XQUERYX=ON                     api|visitors, compiler/xqueryx|api|
+  #                                                        expression|translator|codegen,
+  #                                                        bin/debugger, bin/zorbacmd*, test/api|
+  #                                                        unit|driver|update, .xqx tests
+  #
+  # scripts/check-profile-filters.sh (job "profile filters") fails when a file
+  # containing a profile's guard macro is not matched by that profile's
+  # patterns, so the mapping cannot rot unnoticed. Residual risk: code that
+  # uses a disabled feature WITHOUT a guard, in a file outside the profile's
+  # area, is only caught by the master push run.
   changes:
     runs-on: ubuntu-24.04
     permissions:
@@ -23,36 +68,57 @@ jobs:
       pull-requests: read
     outputs:
       code: ${{ steps.f.outputs.code || steps.all.outputs.code }}
+      profiles: ${{ steps.profiles.outputs.list }}
     steps:
+      - uses: actions/checkout@v7
       - id: f
         if: github.event_name == 'pull_request'
         uses: dorny/paths-filter@v4
         with:
-          filters: |
-            code:
-              - 'src/**'
-              - 'include/**'
-              - 'modules/**'
-              - 'bin/**'
-              - 'test/**'
-              - 'schemas/**'
-              - 'config/**'
-              - 'cmake/**'
-              - 'cmake_modules/**'
-              - 'docker/**'
-              - '.clusterfuzzlite/**'
-              - '.github/codeql/**'
-              - 'CMakeLists.txt'
-              - 'CMake*.txt'
-              - 'CMake*.json'
-              - '*.cmake'
-              - '*.cmake.in'
-              - 'CTest*'
-              - 'CPack*'
-              - '.github/workflows/ci.yml'
+          filters: .github/ci-filters.yml
       - id: all
         if: github.event_name != 'pull_request'
         run: echo "code=true" >> "$GITHUB_OUTPUT"
+      - id: profiles
+        env:
+          EVENT: ${{ github.event_name }}
+          EMBEDDED: ${{ steps.f.outputs.embedded }}
+          NOICU: ${{ steps.f.outputs.embedded-noicu }}
+          NOPCH: ${{ steps.f.outputs.full-nopch }}
+          BIGINT: ${{ steps.f.outputs.bigint }}
+        run: |
+          if [ "$EVENT" != pull_request ]; then
+            list='["embedded","embedded-noicu","full-nopch","bigint"]'
+          else
+            list=
+            [ "$EMBEDDED" = true ] && list="$list\"embedded\","
+            [ "$NOICU" = true ] && list="$list\"embedded-noicu\","
+            [ "$NOPCH" = true ] && list="$list\"full-nopch\","
+            [ "$BIGINT" = true ] && list="$list\"bigint\","
+            list="[${list%,}]"
+          fi
+          echo "profiles: $list"
+          echo "list=$list" >> "$GITHUB_OUTPUT"
+
+  # Cheap and always on: keeps .github/ci-filters.yml in step with the guard
+  # macros of the profiles (see the comment above).
+  profile-filters:
+    name: profile filters
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - run: scripts/check-profile-filters.sh
+
+  # Every call in src/ and modules/ that reaches the file system, the
+  # network, the environment, native libraries or the XML parser must be in
+  # the reviewed allow-list (see scripts/check-os-access.sh), so that new OS
+  # access cannot bypass the security policy unnoticed.
+  os-access-audit:
+    name: OS access audit
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - run: scripts/check-os-access.sh
 
   linux:
     # Gating is per step, not per job: a skipped matrix job reports its name
@@ -70,36 +136,39 @@ jobs:
             runner: ubuntu-24.04
             builder: docker/builder-latest
             cache: linux-amd64-latest
+            suffix: ''
             cc: gcc
             cxx: g++
           - name: linux-arm64 (Ubuntu 24.04)
             runner: ubuntu-24.04-arm
             builder: docker/builder
             cache: linux-arm64-ubuntu
+            suffix: -arm64
             cc: gcc
             cxx: g++
           - name: linux-amd64-clang (Arch, Clang + libstdc++)
             runner: ubuntu-24.04
             builder: docker/builder-latest
             cache: linux-amd64-clang
+            suffix: ''
             cc: clang
             cxx: clang++
     steps:
       - uses: actions/checkout@v7
         if: needs.changes.outputs.code == 'true'
 
-      - uses: docker/setup-buildx-action@v4
-        if: needs.changes.outputs.code == 'true'
-
-      - name: Build the builder image
-        uses: docker/build-push-action@v7
+      - name: Builder image
+        uses: ./.github/actions/builder-image
         if: needs.changes.outputs.code == 'true'
         with:
           context: ${{ matrix.builder }}
-          load: true
-          tags: zorba-builder:ci
-          cache-from: type=gha,scope=builder-${{ matrix.cache }}
-          cache-to: type=gha,mode=max,scope=builder-${{ matrix.cache }}
+          suffix: ${{ matrix.suffix }}
+          cache-scope: ${{ matrix.cache }}
+
+      # The HTTP test server image needs buildx even when the builder image
+      # was pulled.
+      - uses: docker/setup-buildx-action@v4
+        if: needs.changes.outputs.code == 'true'
 
       - name: Build the HTTP test server image
         uses: docker/build-push-action@v7
@@ -186,28 +255,25 @@ jobs:
 
   profiles:
     needs: changes
-    if: needs.changes.outputs.code == 'true'
+    if: needs.changes.outputs.profiles != '[]'
     name: profile ${{ matrix.preset }} (linux-amd64, Arch)
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
-        # bigint: ZORBA_WITH_BIG_INTEGER=ON (arbitrary-precision xs:integer).
-        preset: [embedded, embedded-noicu, full-nopch, bigint]
+        # Subset of [embedded, embedded-noicu, full-nopch, bigint] chosen by
+        # the changes job. bigint: ZORBA_WITH_BIG_INTEGER=ON (arbitrary-
+        # precision xs:integer).
+        preset: ${{ fromJSON(needs.changes.outputs.profiles) }}
     steps:
       - uses: actions/checkout@v7
 
-      - uses: docker/setup-buildx-action@v4
-
-      - name: Build the builder image
-        uses: docker/build-push-action@v7
+      - name: Builder image
+        uses: ./.github/actions/builder-image
         with:
           context: docker/builder-latest
-          load: true
-          tags: zorba-builder:ci
-          cache-from: type=gha,scope=builder-linux-amd64-latest
-          cache-to: type=gha,mode=max,scope=builder-linux-amd64-latest
+          cache-scope: linux-amd64-latest
 
       - uses: actions/cache@v6
         with:

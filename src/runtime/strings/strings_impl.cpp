@@ -18,6 +18,12 @@
 #include <cstdio>
 #include <iostream>
 #include <sstream>
+#include <vector>
+
+#include <zorba/config.h>
+#ifndef ZORBA_NO_ICU
+# include <unicode/uchar.h>
+#endif /* ZORBA_NO_ICU */
 
 #include "common/common.h"
 
@@ -913,6 +919,77 @@ static void to_case_full(
 }
 
 
+#ifndef ZORBA_NO_ICU
+/**
+ * Checks the Final_Sigma casing context (Unicode 3.13, table 3-17) of the
+ * code-point at position \a i: it is preceded by a cased letter and zero or
+ * more case-ignorable characters, and it is not followed by zero or more
+ * case-ignorable characters and a cased letter.
+ */
+static bool is_final_sigma(
+    std::vector<unicode::code_point> const &cps,
+    std::vector<unicode::code_point>::size_type i)
+{
+  std::vector<unicode::code_point>::size_type j = i;
+  bool cased_before = false;
+  while (j > 0)
+  {
+    UChar32 const c = cps[--j];
+    if (u_hasBinaryProperty(c, UCHAR_CASE_IGNORABLE))
+      continue;
+    cased_before = u_hasBinaryProperty(c, UCHAR_CASED);
+    break;
+  }
+  if (!cased_before)
+    return false;
+  for (j = i + 1; j < cps.size(); ++j)
+  {
+    UChar32 const c = cps[j];
+    if (u_hasBinaryProperty(c, UCHAR_CASE_IGNORABLE))
+      continue;
+    return !u_hasBinaryProperty(c, UCHAR_CASED);
+  }
+  return true;
+}
+#endif /* ZORBA_NO_ICU */
+
+
+/**
+ * Lower-cases a string with the full Unicode case mappings, including the
+ * one context-dependent mapping that is not language-sensitive (F&O 3.0
+ * 5.4.8 excludes only those): a capital sigma at the end of a word becomes
+ * a final sigma (U+03A3 becomes U+03C2 instead of U+03C3).  The casing
+ * properties come from ICU; without ICU the capital sigma always becomes
+ * U+03C3.
+ */
+static void to_lower_full_string(zstring const &in, zstring *out)
+{
+#ifndef ZORBA_NO_ICU
+  utf8_string<zstring const> const u_in( in );
+  std::vector<unicode::code_point> cps;
+  for ( utf8_string<zstring const>::const_iterator i = u_in.begin();
+        i != u_in.end(); ++i )
+    cps.push_back( *i );
+  utf8_string<zstring> u_out( *out );
+  unicode::code_point mapped[3];
+
+  for ( std::vector<unicode::code_point>::size_type i = 0; i < cps.size(); ++i )
+  {
+    if ( cps[i] == 0x03A3 && is_final_sigma( cps, i ) )
+    {
+      u_out += unicode::code_point( 0x03C2 );   // GREEK SMALL LETTER FINAL SIGMA
+      continue;
+    }
+    int const n = unicode::to_lower_full( cps[i], mapped );
+    for ( int k = 0; k < n; ++k )
+      u_out += mapped[k];
+  }
+#else
+  to_case_full( in, out, unicode::to_lower_full );
+#endif /* ZORBA_NO_ICU */
+}
+
+
 /**
   *______________________________________________________________________
   *
@@ -969,7 +1046,7 @@ bool LowerCaseIterator::nextImpl(
   {
     item->getStringValue2(strval);
 
-    to_case_full(strval, &resStr, unicode::to_lower_full);
+    to_lower_full_string(strval, &resStr);
 
     STACK_PUSH(GENV_ITEMFACTORY->createString(result, resStr), state);
   }

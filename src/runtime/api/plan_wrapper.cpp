@@ -42,7 +42,6 @@ PlanWrapper::PlanWrapper(
     const PlanState* aParentState)
   :
   theIterator(aIter),
-  theDynamicContext(NULL),
   theIsOpen(false),
   theHasParent(aParentState != NULL),
   theExitValue(0)
@@ -53,8 +52,8 @@ PlanWrapper::PlanWrapper(
   {
     // aDynamicContext is NULL when we try to execute the plan of an expression
     // that is being folded by the optimizer. 
-    aDynamicContext = new dynamic_context();
-    theDynamicContext = aDynamicContext;
+    theDynamicContext.reset(new dynamic_context());
+    aDynamicContext = theDynamicContext.get();
   }
 
   uint32_t lStateSize = theIterator->getStateSizeOfSubtree();
@@ -90,12 +89,9 @@ PlanWrapper::~PlanWrapper()
   delete thePlanState; 
   thePlanState = NULL;
 
-  // De-allocate locally allocated dctx, if any
-  if (theDynamicContext != NULL)
-  {
-    delete theDynamicContext;
-    theDynamicContext = NULL;
-  }
+  // De-allocate the locally allocated dctx, if any, right after the plan
+  // state and before the remaining members.
+  theDynamicContext.reset();
 }
 
 

@@ -927,17 +927,11 @@ static_context::~static_context()
     delete theFunctionArityMap;
   }
 
-  if (theVariablesMap)
-  {
-    delete theVariablesMap;
-    theVariablesMap = NULL;
-  }
+  delete theVariablesMap;
+  theVariablesMap = NULL;
 
-  if (theImportedPrivateVariablesMap)
-  {
-    delete theImportedPrivateVariablesMap;
-    theImportedPrivateVariablesMap = NULL;
-  }
+  delete theImportedPrivateVariablesMap;
+  theImportedPrivateVariablesMap = NULL;
 
   delete theNamespaceBindings;
 
@@ -1808,22 +1802,15 @@ security::Use security_use(internal::EntityData::Kind aKind)
   }
 }
 
-// The second parameter of ZXQP0029: why the access was denied, naming the
-// candidate URL if it is not the URI the query asked for.
-zstring denial_reason(
+// The message for a denied access, naming the candidate URL if it is not the
+// URI the query asked for (callers name that one in their own message).
+zstring denial_message(
     zstring const& aRequested,
     zstring const& aUrl,
     std::string const& aReason)
 {
-  zstring lReason;
-  if (aUrl != aRequested)
-  {
-    lReason = "\"";
-    lReason += aUrl;
-    lReason += "\": ";
-  }
-  lReason.append(aReason);
-  return lReason;
+  return zstring(security::denial_message(
+      aUrl != aRequested ? aUrl.str() : std::string(), aReason));
 }
 
 } // anonymous namespace
@@ -1856,10 +1843,11 @@ void static_context::get_trusted_dirs(std::vector<std::string>& oDirs) const
 /***************************************************************************//**
 
 ********************************************************************************/
-void static_context::check_uri_access(
+bool static_context::check_uri_access(
     zstring const& aUrl,
     internal::EntityData::Kind aEntityKind,
-    zstring const& aRequested) const
+    zstring const& aRequested,
+    zstring& oErrorMessage) const
 {
   security::Use const lUse = security_use(aEntityKind);
   SecurityPolicy const lPolicy = get_security_policy();
@@ -1871,9 +1859,10 @@ void static_context::check_uri_access(
       lPolicy, aUrl.str(), lUse, false, &lTrusted);
   if (!lVerdict.allowed)
   {
-    throw XQUERY_EXCEPTION(zerr::ZXQP0029_URI_ACCESS_DENIED,
-    ERROR_PARAMS(aRequested, denial_reason(aRequested, aUrl, lVerdict.reason)));
+    oErrorMessage = denial_message(aRequested, aUrl, lVerdict.reason);
+    return false;
   }
+  return true;
 }
 
 
@@ -1882,15 +1871,22 @@ void static_context::check_uri_access(
 
   Before a candidate goes to a built-in resolver (URLResolver::isBuiltin()),
   the security policy in effect for "this" sctx is checked for it. A denied
-  candidate is skipped. If no candidate resolves, ZXQP0029 is thrown if the
-  requested URI itself was denied, or if every candidate checked was denied
-  (reporting the first), so that a denial is not reported as "not found".
-  Resolvers registered by the embedder are not checked.
+  candidate is skipped. Resolvers registered by the embedder are not checked.
 
-  Exceptions thrown by resolvers are not propagated (a resolver may fail on a
-  candidate that another resolver serves); the first message is returned in
-  oErrorMessage. A ZXQP0029 thrown by a resolver is a denial, not a failure:
-  it is propagated.
+  A denied resource is not available: no Resource is returned, and the
+  caller raises the error its specification prescribes for a resource that
+  is not available (XQST0059 for a module or schema import, FODC0002 for
+  fn:doc, FOUT1170 for fn:unparsed-text, ...), with oErrorMessage, which
+  then says that the access was denied by the security policy and why
+  (security::denial_message()). This happens if no candidate resolves and
+  the requested URI itself was denied, or every candidate checked was denied
+  (reporting the first); or if a built-in resolver denies the resource it is
+  about to read (security::AccessDenied), which ends the resolution.
+
+  Other exceptions thrown by resolvers are not propagated (a resolver may
+  fail on a candidate that another resolver serves); the first message is
+  returned in oErrorMessage. A ZXQP0029 thrown by a resolver (an embedder's
+  refusal) is propagated.
 ********************************************************************************/
 void static_context::apply_url_resolvers(
     zstring const& aRequested,
@@ -1991,6 +1987,12 @@ void static_context::apply_url_resolvers(
             return;
           }
         }
+        catch (security::AccessDenied const& e)
+        {
+          oResource.reset();
+          oErrorMessage = e.what();
+          return;
+        }
         catch (ZorbaException const& e)
         {
           if (e.diagnostic() == zerr::ZXQP0029_URI_ACCESS_DENIED)
@@ -2023,9 +2025,7 @@ void static_context::apply_url_resolvers(
   // load the allowed URI into a denial.
   if (!lDeniedUrl.empty() && (lDeniedUrl == aRequested || !lAnyAllowed))
   {
-    throw XQUERY_EXCEPTION(zerr::ZXQP0029_URI_ACCESS_DENIED,
-    ERROR_PARAMS(aRequested,
-                 denial_reason(aRequested, lDeniedUrl, lDeniedReason)));
+    oErrorMessage = denial_message(aRequested, lDeniedUrl, lDeniedReason);
   }
 }
 

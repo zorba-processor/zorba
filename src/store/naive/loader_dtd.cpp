@@ -798,11 +798,8 @@ void DtdXmlLoader::abortload()
   theBaseUri.clear();
   theDocUri.clear();
 
-  if (theTree != NULL)
-  {
-    delete theTree;
-    theTree = NULL;
-  }
+  delete theTree;
+  theTree = NULL;
 
   theOrdPath.init();
   theRootNode = NULL;
