@@ -74,7 +74,7 @@ class tokenize_iterator : public Sequence<String>::iterator {
 public:
   tokenize_iterator( String const &input, char const *pattern,
                      char const *flags ) {
-    re_.compile( pattern, flags );
+    re_.compile_xquery( zstring( pattern ), flags );
     unicode::to_string( input, &u_input_ );
     pos_ = 0;
   }

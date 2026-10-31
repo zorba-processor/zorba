@@ -1379,8 +1379,8 @@ void atomic_type::load_pattern( store::Item_t const &pattern_item ) {
   ASSERT_TYPE( pattern_item, "$pattern", XS_STRING );
   zstring const xquery_re( pattern_item->getStringValue() );
   try {
-    convert_xquery_re( xquery_re, &pattern_ );
-    pattern_re_.compile( pattern_ );
+    pattern_ = xquery_re;
+    pattern_re_.compile_xquery( pattern_ );
   }
   catch ( ZorbaException const &e ) {
     throw XQUERY_EXCEPTION(

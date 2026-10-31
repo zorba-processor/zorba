@@ -213,17 +213,13 @@ static void check_block_escape( zstring const &s_raw,
 
 //#define DEBUG_CONVERT_REGEX
 
-//
-// Start of the ICU comment that convert_xquery_re() puts in front of a
-// pattern with a back-reference; the hex-encoded XQuery pattern follows.
-//
-static char const backref_marker[] = "(?#zorba-backref:";
-
 #define IS_CHAR_RANGE_BEGIN (in_char_class && is_char_range_begin( xq_re, i ))
 #define PEEK_C              ztd::peek( xq_re, i )
 
 void convert_xquery_re( zstring const &xq_re, zstring *icu_re,
-                        char const *xq_flags ) {
+                        char const *xq_flags, bool *has_backref ) {
+  if ( has_backref )
+    *has_backref = false;
   icu_flags_type const icu_flags = convert_xquery_flags( xq_flags );
   bool const i_flag = (icu_flags & UREGEX_CASE_INSENSITIVE) != 0;
   bool const m_flag = (icu_flags & UREGEX_MULTILINE) != 0;
@@ -819,25 +815,8 @@ next:
     ascii::replace_all( *icu_re, "\\P{InPrivateUse}", 16, "\\P{Co}", 6 );
   } // q_flag
 
-  if ( got_backref ) {
-    //
-    // ICU makes a back-reference to a capturing group that did not
-    // participate in the match fail, and a group inside a repeated group keeps
-    // what it captured in an earlier iteration.  XQuery F&O 3.0 5.6.1 has such
-    // a back-reference match the empty string, so regex::compile() matches
-    // these patterns with Zorba's own engine.  It needs the XQuery pattern for
-    // that: put it, hex-encoded, in a leading ICU comment, which ICU ignores.
-    //
-    static char const hex[] = "0123456789abcdef";
-    zstring marker( backref_marker );
-    FOR_EACH( zstring, j, xq_re ) {
-      unsigned char const b = static_cast<unsigned char>( *j );
-      marker += hex[ b >> 4 ];
-      marker += hex[ b & 0x0F ];
-    }
-    marker += ')';
-    icu_re->insert( 0, marker );
-  }
+  if ( has_backref )
+    *has_backref = got_backref;
 
 #ifdef DEBUG_CONVERT_REGEX
   cout << "XQ : " << xq_re   << endl;
@@ -872,41 +851,58 @@ static void check_regex_status( UErrorCode status ) {
     );
 }
 
-/**
- * Gets the XQuery pattern that convert_xquery_re() put in front of a pattern
- * with a back-reference.
- *
- * @param pattern The converted pattern.
- * @param xq_pattern Set to the XQuery pattern.
- * @return Returns \c true only if \a pattern has one.
- */
-static bool get_backref_xq_pattern( char const *pattern, zstring *xq_pattern ) {
-  size_t const marker_len = sizeof( backref_marker ) - 1;
-  if ( !pattern || std::strncmp( pattern, backref_marker, marker_len ) != 0 )
-    return false;
-  xq_pattern->clear();
-  for ( char const *p = pattern + marker_len; *p && *p != ')'; p += 2 ) {
-    if ( !ascii::is_xdigit( p[0] ) || !ascii::is_xdigit( p[1] ) )
-      return false;
-    unsigned char const hi = ascii::is_digit( p[0] ) ? p[0] - '0' : (p[0] | 0x20) - 'a' + 10;
-    unsigned char const lo = ascii::is_digit( p[1] ) ? p[1] - '0' : (p[1] | 0x20) - 'a' + 10;
-    *xq_pattern += static_cast<char>( (hi << 4) | lo );
-  }
-  return true;
-}
-
 regex::~regex() {
   delete matcher_;
   delete zre_;
 }
 
+void regex::compile_xquery( zstring const &xq_pattern, char const *flags ) {
+  zstring icu_pattern;
+  bool has_backref;
+  convert_xquery_re( xq_pattern, &icu_pattern, flags, &has_backref );
+  string u_pattern;
+  to_string( icu_pattern, &u_pattern );
+  //
+  // Compile with ICU also when Zorba's engine will match: ICU's errors for an
+  // invalid pattern stay the same, and ICU matches if that engine rejects a
+  // valid construct.
+  //
+  compile( u_pattern, flags, xq_pattern.c_str() );
+  if ( !has_backref )
+    return;
+
+  //
+  // ICU makes a back-reference to a capturing group that did not participate
+  // in the match fail, and a group inside a repeated group keeps what it
+  // captured in an earlier iteration; XQuery F&O 3.0 5.6.1 has such a
+  // back-reference match the empty string.
+  //
+  icu_flags_type const icu_flags = convert_xquery_flags( flags );
+  zre_flags_ = 0;
+  if ( icu_flags & UREGEX_CASE_INSENSITIVE )
+    zre_flags_ |= REGEX_ASCII_CASE_INSENSITIVE;
+  if ( icu_flags & UREGEX_DOTALL )
+    zre_flags_ |= REGEX_ASCII_DOTALL;
+  if ( icu_flags & UREGEX_MULTILINE )
+    zre_flags_ |= REGEX_ASCII_MULTILINE;
+  if ( icu_flags & UREGEX_COMMENTS )
+    zre_flags_ |= REGEX_ASCII_NO_WHITESPACE;
+  try {
+    regex_engine::CRegexXQuery_parser parser;
+    zre_ = parser.parse( xq_pattern.c_str(), zre_flags_ );
+  }
+  catch ( XQueryException const& ) {
+    //
+    // The pattern is valid (convert_xquery_re() and ICU accepted it), but
+    // Zorba's engine rejects a few valid constructs, e.g., a '^' that is not
+    // at the start of a branch: keep matching with ICU.
+    //
+    zre_ = nullptr;
+  }
+}
+
 void regex::compile( string const &u_pattern, char const *flags,
                      char const *pattern ) {
-  zstring xq_pattern;
-  bool const has_backref = get_backref_xq_pattern( pattern, &xq_pattern );
-  if ( has_backref )
-    pattern = xq_pattern.c_str();       // for error messages
-
   icu_flags_type const icu_flags =
     convert_xquery_flags( flags ) & ~UREGEX_LITERAL;
   delete matcher_;
@@ -926,30 +922,6 @@ void regex::compile( string const &u_pattern, char const *flags,
     throw INVALID_RE_EXCEPTION( pattern, icu_error_key );
   }
   matcher_->setTimeLimit( regex_time_limit, status );
-
-  if ( has_backref ) {
-    zre_flags_ = 0;
-    if ( icu_flags & UREGEX_CASE_INSENSITIVE )
-      zre_flags_ |= REGEX_ASCII_CASE_INSENSITIVE;
-    if ( icu_flags & UREGEX_DOTALL )
-      zre_flags_ |= REGEX_ASCII_DOTALL;
-    if ( icu_flags & UREGEX_MULTILINE )
-      zre_flags_ |= REGEX_ASCII_MULTILINE;
-    if ( icu_flags & UREGEX_COMMENTS )
-      zre_flags_ |= REGEX_ASCII_NO_WHITESPACE;
-    try {
-      regex_engine::CRegexXQuery_parser parser;
-      zre_ = parser.parse( xq_pattern.c_str(), zre_flags_ );
-    }
-    catch ( XQueryException const& ) {
-      //
-      // The pattern is valid (convert_xquery_re() and ICU accepted it), but
-      // Zorba's engine rejects a few valid constructs, e.g., a '^' that is not
-      // at the start of a branch: keep matching with ICU.
-      //
-      zre_ = nullptr;
-    }
-  }
 }
 
 void regex::z_set_subject( string const &s, size_type from ) {

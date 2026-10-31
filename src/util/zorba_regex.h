@@ -38,8 +38,11 @@ namespace zorba {
  * @param flags The flags to use, if any.
  */
 inline void convert_xquery_re( zstring const &xq_re, zstring *lib_re,
-                               char const *flags = "" ) {
+                               char const *flags = "",
+                               bool *has_backref = nullptr ) {
   *lib_re = xq_re;                      // no converseion neeeded
+  if ( has_backref )
+    *has_backref = false;               // not needed: one engine for all
 }
 
 ////////// classes ////////////////////////////////////////////////////////////
@@ -74,6 +77,14 @@ public:
    * @param throws err:FORX0002 if the regular expression is invalid.
    */
   void compile( char const *pattern, char const *flags = "" ) ;
+
+  /**
+   * Compiles an XQuery regular expression (the same as compile() here: the
+   * engine takes XQuery syntax).
+   */
+  void compile_xquery( zstring const &xq_pattern, char const *flags = "" ) {
+    compile( xq_pattern.c_str(), flags );
+  }
 
   /**
    * Compiles a regular expression.  One of the compile functions must be

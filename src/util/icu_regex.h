@@ -35,9 +35,11 @@ namespace zorba {
  * @param xq_re The XQuery regular expression.
  * @param lib_re A pointer to the resuling library regular expression.
  * @param flags The flags to use, if any.
+ * @param has_backref If not \c nullptr, set to \c true only if the regular
+ * expression has a back-reference.
  */
 void convert_xquery_re( zstring const &xq_re, zstring *lib_re,
-                        char const *flags = "" );
+                        char const *flags = "", bool *has_backref = nullptr );
 
 ////////// classes ////////////////////////////////////////////////////////////
 
@@ -74,6 +76,20 @@ public:
   ~regex();
 
   ////////// compile pattern //////////////////////////////////////////////////
+
+  /**
+   * Compiles an XQuery regular expression: converts it with
+   * convert_xquery_re() and chooses the engine.  A pattern with a
+   * back-reference is matched by Zorba's own engine, since ICU does not
+   * implement XQuery F&O 3.0 5.6.1 for back-references to groups that did not
+   * participate in the match; every other pattern is matched by ICU.
+   *
+   * @param xq_pattern The XQuery regular expression.
+   * @param flags The XQuery regular expression flags, if any.
+   * @param throws err:FORX0001 for an invalid flag, err:FORX0002 if the
+   * regular expression is invalid.
+   */
+  void compile_xquery( zstring const &xq_pattern, char const *flags = "" );
 
   /**
    * Compiles a regular expression.  One of the compile functions must be
