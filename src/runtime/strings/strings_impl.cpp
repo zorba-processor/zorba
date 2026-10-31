@@ -2249,7 +2249,7 @@ bool FnAnalyzeStringIterator::nextImpl(
     rx.set_string("", 0);
     if (rx.next_match(&reachedEnd))
     {
-      throw XQUERY_EXCEPTION(err::FORX0003, ERROR_PARAMS(lib_pattern));
+      throw XQUERY_EXCEPTION(err::FORX0003, ERROR_PARAMS(xquery_pattern));
     }
 
     store::Item_t null_parent;

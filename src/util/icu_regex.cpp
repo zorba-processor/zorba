@@ -32,10 +32,13 @@
 #include "ascii_util.h"
 #include "regex.h"
 #include "stl_util.h"
+#include "utf8_util.h"
+#include "zorba_regex_engine.h"
 
 #define INVALID_RE_EXCEPTION(...) \
   XQUERY_EXCEPTION( err::FORX0002, ERROR_PARAMS( __VA_ARGS__ ) )
 
+#include <unicode/utf16.h>
 #include <unicode/uversion.h>
 U_NAMESPACE_USE
 
@@ -210,6 +213,12 @@ static void check_block_escape( zstring const &s_raw,
 
 //#define DEBUG_CONVERT_REGEX
 
+//
+// Start of the ICU comment that convert_xquery_re() puts in front of a
+// pattern with a back-reference; the hex-encoded XQuery pattern follows.
+//
+static char const backref_marker[] = "(?#zorba-backref:";
+
 #define IS_CHAR_RANGE_BEGIN (in_char_class && is_char_range_begin( xq_re, i ))
 #define PEEK_C              ztd::peek( xq_re, i )
 
@@ -260,14 +269,14 @@ void convert_xquery_re( zstring const &xq_re, zstring *icu_re,
   bool in_quantifier = false;           // within {n,m}
   int  closed_group = 0;                // previous char closed a (...)
 
+  bool got_backref = false;             // the RE has a back-reference
+
   // capture subgroup: true = open; false = closed
   vector<bool> cap_sub;                 // 0-based
-  unsigned cur_cap_sub = 0;             // 1-based
-  unsigned open_cap_subs = 0;
 
-  // parentheses balancing: true = is capture subgroup; false = non-capturing
-  vector<bool> paren;                   // 0-based
-  unsigned cur_paren = 0;               // 1-based
+  // open parentheses, innermost last: the 1-based capture subgroup number,
+  // or 0 for a non-capturing subgroup
+  vector<unsigned> open_parens;
 
   FOR_EACH( zstring, i, xq_re ) {
     c = c_cooked = *i;
@@ -310,6 +319,7 @@ void convert_xquery_re( zstring const &xq_re, zstring *icu_re,
             );
           }
           in_backref = true;
+          got_backref = true;
           [[fallthrough]];
 
         ////////// Single Character Escapes ///////////////////////////////////
@@ -505,7 +515,6 @@ void convert_xquery_re( zstring const &xq_re, zstring *icu_re,
           if ( q_flag || in_char_class )
             *icu_re += '\\';          // an ordinary character in a class
           else {
-            cur_paren = paren.size() + 1;
             zstring::const_iterator j = i;
             if ( ++j != xq_re.end() && *j == '?' && ++j != xq_re.end() ) {
               //
@@ -518,15 +527,13 @@ void convert_xquery_re( zstring const &xq_re, zstring *icu_re,
               //
               // Start of non-capturing subgroup.
               //
-              paren.push_back( false );
+              open_parens.push_back( 0 );
             } else {
               //
               // Start of capturing subgroup.
               //
-              paren.push_back( true );
-              ++open_cap_subs;
               cap_sub.push_back( true );
-              cur_cap_sub = cap_sub.size();
+              open_parens.push_back( static_cast<unsigned>( cap_sub.size() ) );
             }
           }
           break;
@@ -534,13 +541,11 @@ void convert_xquery_re( zstring const &xq_re, zstring *icu_re,
           if ( q_flag || in_char_class )
             *icu_re += '\\';
           else {
-            if ( !cur_paren )
+            if ( open_parens.empty() )
               goto unbalanced_char;
-            if ( paren[ --cur_paren ] ) {
-              if ( !open_cap_subs || !cur_cap_sub )
-                goto unbalanced_char;
-              cap_sub[ --cur_cap_sub ] = false;
-            }
+            if ( unsigned const closed = open_parens.back() )
+              cap_sub[ closed - 1 ] = false;
+            open_parens.pop_back();
             closed_group = 2;
           }
           break;
@@ -814,6 +819,26 @@ next:
     ascii::replace_all( *icu_re, "\\P{InPrivateUse}", 16, "\\P{Co}", 6 );
   } // q_flag
 
+  if ( got_backref ) {
+    //
+    // ICU makes a back-reference to a capturing group that did not
+    // participate in the match fail, and a group inside a repeated group keeps
+    // what it captured in an earlier iteration.  XQuery F&O 3.0 5.6.1 has such
+    // a back-reference match the empty string, so regex::compile() matches
+    // these patterns with Zorba's own engine.  It needs the XQuery pattern for
+    // that: put it, hex-encoded, in a leading ICU comment, which ICU ignores.
+    //
+    static char const hex[] = "0123456789abcdef";
+    zstring marker( backref_marker );
+    FOR_EACH( zstring, j, xq_re ) {
+      unsigned char const b = static_cast<unsigned char>( *j );
+      marker += hex[ b >> 4 ];
+      marker += hex[ b & 0x0F ];
+    }
+    marker += ')';
+    icu_re->insert( 0, marker );
+  }
+
 #ifdef DEBUG_CONVERT_REGEX
   cout << "XQ : " << xq_re   << endl;
   cout << "ICU: " << *icu_re << endl;
@@ -847,11 +872,46 @@ static void check_regex_status( UErrorCode status ) {
     );
 }
 
+/**
+ * Gets the XQuery pattern that convert_xquery_re() put in front of a pattern
+ * with a back-reference.
+ *
+ * @param pattern The converted pattern.
+ * @param xq_pattern Set to the XQuery pattern.
+ * @return Returns \c true only if \a pattern has one.
+ */
+static bool get_backref_xq_pattern( char const *pattern, zstring *xq_pattern ) {
+  size_t const marker_len = sizeof( backref_marker ) - 1;
+  if ( !pattern || std::strncmp( pattern, backref_marker, marker_len ) != 0 )
+    return false;
+  xq_pattern->clear();
+  for ( char const *p = pattern + marker_len; *p && *p != ')'; p += 2 ) {
+    if ( !ascii::is_xdigit( p[0] ) || !ascii::is_xdigit( p[1] ) )
+      return false;
+    unsigned char const hi = ascii::is_digit( p[0] ) ? p[0] - '0' : (p[0] | 0x20) - 'a' + 10;
+    unsigned char const lo = ascii::is_digit( p[1] ) ? p[1] - '0' : (p[1] | 0x20) - 'a' + 10;
+    *xq_pattern += static_cast<char>( (hi << 4) | lo );
+  }
+  return true;
+}
+
+regex::~regex() {
+  delete matcher_;
+  delete zre_;
+}
+
 void regex::compile( string const &u_pattern, char const *flags,
                      char const *pattern ) {
+  zstring xq_pattern;
+  bool const has_backref = get_backref_xq_pattern( pattern, &xq_pattern );
+  if ( has_backref )
+    pattern = xq_pattern.c_str();       // for error messages
+
   icu_flags_type const icu_flags =
     convert_xquery_flags( flags ) & ~UREGEX_LITERAL;
   delete matcher_;
+  delete zre_;
+  zre_ = nullptr;
   UErrorCode status = U_ZERO_ERROR;
   matcher_ = new RegexMatcher( u_pattern, icu_flags, status );
   if ( U_FAILURE( status ) ) {
@@ -866,20 +926,186 @@ void regex::compile( string const &u_pattern, char const *flags,
     throw INVALID_RE_EXCEPTION( pattern, icu_error_key );
   }
   matcher_->setTimeLimit( regex_time_limit, status );
+
+  if ( has_backref ) {
+    zre_flags_ = 0;
+    if ( icu_flags & UREGEX_CASE_INSENSITIVE )
+      zre_flags_ |= REGEX_ASCII_CASE_INSENSITIVE;
+    if ( icu_flags & UREGEX_DOTALL )
+      zre_flags_ |= REGEX_ASCII_DOTALL;
+    if ( icu_flags & UREGEX_MULTILINE )
+      zre_flags_ |= REGEX_ASCII_MULTILINE;
+    if ( icu_flags & UREGEX_COMMENTS )
+      zre_flags_ |= REGEX_ASCII_NO_WHITESPACE;
+    try {
+      regex_engine::CRegexXQuery_parser parser;
+      zre_ = parser.parse( xq_pattern.c_str(), zre_flags_ );
+    }
+    catch ( XQueryException const& ) {
+      //
+      // The pattern is valid (convert_xquery_re() and ICU accepted it), but
+      // Zorba's engine rejects a few valid constructs, e.g., a '^' that is not
+      // at the start of a branch: keep matching with ICU.
+      //
+      zre_ = nullptr;
+    }
+  }
+}
+
+void regex::z_set_subject( string const &s, size_type from ) {
+  //
+  // Convert from the character before "from" on: earlier text can not be
+  // part of a match, but the engine needs that character to know whether a
+  // '^' matches at "from" in multi-line mode.
+  //
+  size_type base = 0;
+  if ( from > 0 ) {
+    base = from - 1;
+    if ( base > 0 && U16_IS_TRAIL( s.charAt( base ) ) &&
+         U16_IS_LEAD( s.charAt( base - 1 ) ) )
+      --base;
+  }
+  z_s_.clear();
+  utf8::to_string( s.getBuffer() + base, s.length() - base, &z_s_ );
+  z_base_ = base;
+  z_off_byte_ = 0;
+  z_off_u16_ = base;
+  z_start_ = z_end_ = -1;
+  //
+  // The byte offset of "from".
+  //
+  int byte_off = 0;
+  for ( size_type u = base; u < from; ++byte_off )
+    if ( (z_s_[ byte_off ] & 0xC0) != 0x80 )
+      u += static_cast<unsigned char>( z_s_[ byte_off ] ) >= 0xF0 ? 2 : 1;
+  while ( byte_off < static_cast<int>( z_s_.size() ) &&
+          (z_s_[ byte_off ] & 0xC0) == 0x80 )
+    ++byte_off;
+  z_pos_ = byte_off;
+}
+
+bool regex::z_search( int from, bool whole ) {
+  int match_pos, matched_len;
+  unsigned flags = zre_flags_;
+  if ( whole )
+    flags |= REGEX_ASCII_WHOLE_MATCH;
+  if ( from > static_cast<int>( z_s_.size() ) ||
+       !zre_->search( z_s_.c_str(), from, flags, &match_pos, &matched_len ) ) {
+    z_start_ = z_end_ = -1;
+    return false;
+  }
+  z_start_ = match_pos;
+  z_end_ = match_pos + matched_len;
+  return true;
+}
+
+size_type regex::z_to_u16( int byte_off ) const {
+  if ( byte_off < z_off_byte_ ) {
+    z_off_byte_ = 0;
+    z_off_u16_ = z_base_;
+  }
+  for ( ; z_off_byte_ < byte_off; ++z_off_byte_ ) {
+    unsigned char const b = static_cast<unsigned char>( z_s_[ z_off_byte_ ] );
+    if ( (b & 0xC0) != 0x80 )
+      z_off_u16_ += b >= 0xF0 ? 2 : 1;
+  }
+  return z_off_u16_;
+}
+
+bool regex::z_replace_all( string const &in, string const &replacement,
+                           string *out ) {
+  z_set_subject( in, 0 );
+  zstring repl;
+  utf8::to_string( replacement.getBuffer(), replacement.length(), &repl );
+  int const groups = static_cast<int>( zre_->get_indexed_regex_count() );
+  char const *const s = z_s_.c_str();
+  int const s_len = static_cast<int>( z_s_.size() );
+  zstring result;
+  int copied = 0, from = 0;
+
+  while ( z_search( from ) ) {
+    result.append( s + copied, z_start_ - copied );
+    //
+    // The replacement uses the ICU syntax (FnReplaceIterator converted it):
+    // "\" escapes the next character; "$" and digits is a group, taking as
+    // many digits as still make a group number.
+    //
+    for ( zstring::size_type i = 0; i < repl.size(); ++i ) {
+      char const c = repl[i];
+      if ( c == '\\' && i + 1 < repl.size() ) {
+        result += repl[ ++i ];
+        continue;
+      }
+      if ( c == '$' && i + 1 < repl.size() && ascii::is_digit( repl[ i + 1 ] ) ) {
+        int group = repl[ ++i ] - '0';
+        while ( i + 1 < repl.size() && ascii::is_digit( repl[ i + 1 ] ) &&
+                group * 10 + (repl[ i + 1 ] - '0') <= groups )
+          group = group * 10 + (repl[ ++i ] - '0');
+        if ( !group )
+          result.append( s + z_start_, z_end_ - z_start_ );
+        else {
+          char const *g;
+          int g_len;
+          // a group that did not participate is the empty string
+          if ( group <= groups && zre_->get_indexed_match( group, &g, &g_len ) )
+            result.append( g, g_len );
+        }
+        continue;
+      }
+      result += c;
+    }
+    copied = from = z_end_;
+    if ( z_start_ == z_end_ ) {
+      // an empty match: the next search starts after the next character
+      if ( from == s_len )
+        break;
+      ++from;
+      while ( from < s_len && (s[ from ] & 0xC0) == 0x80 )
+        ++from;
+    }
+  }
+  result.append( s + copied, s_len - copied );
+  return to_string( result, out );
 }
 
 int regex::get_group_count() const {
+  if ( zre_ )
+    return static_cast<int>( zre_->get_indexed_regex_count() );
   ZORBA_ASSERT( matcher_ );
   return matcher_->groupCount();
 }
 
 int regex::get_group_start( int group ) const {
+  if ( zre_ ) {
+    if ( z_start_ < 0 )
+      return -1;
+    if ( !group )
+      return static_cast<int>( z_to_u16( z_start_ ) );
+    char const *g;
+    int g_len;
+    if ( !zre_->get_indexed_match( group, &g, &g_len ) )
+      return -1;
+    return static_cast<int>( z_to_u16( static_cast<int>( g - z_s_.c_str() ) ) );
+  }
   ZORBA_ASSERT( matcher_ );
   UErrorCode status = U_ZERO_ERROR;
   return matcher_->start( group, status );
 }
 
 int regex::get_group_end( int group ) const {
+  if ( zre_ ) {
+    if ( z_end_ < 0 )
+      return -1;
+    if ( !group )
+      return static_cast<int>( z_to_u16( z_end_ ) );
+    char const *g;
+    int g_len;
+    if ( !zre_->get_indexed_match( group, &g, &g_len ) )
+      return -1;
+    return static_cast<int>(
+      z_to_u16( static_cast<int>( g - z_s_.c_str() ) + g_len )
+    );
+  }
   ZORBA_ASSERT( matcher_ );
   UErrorCode status = U_ZERO_ERROR;
   return matcher_->end( group, status );
@@ -895,6 +1121,10 @@ bool regex::get_group_start_end( int *start, int *end, int group ) const {
 }
 
 bool regex::match_part( string const &s ) {
+  if ( zre_ ) {
+    z_set_subject( s, 0 );
+    return z_search( 0 );
+  }
   ZORBA_ASSERT( matcher_ );
   matcher_->reset( s );
   UErrorCode status = U_ZERO_ERROR;
@@ -904,6 +1134,10 @@ bool regex::match_part( string const &s ) {
 }
 
 bool regex::match_whole( string const &s ) {
+  if ( zre_ ) {
+    z_set_subject( s, 0 );
+    return z_search( 0, true );
+  }
   ZORBA_ASSERT( matcher_ );
   matcher_->reset( s );
   UErrorCode status = U_ZERO_ERROR;
@@ -918,14 +1152,27 @@ bool regex::next( re_type_t re_type, string const &s, size_type *pos,
   ZORBA_ASSERT( pos );
   unicode::size_type const s_len = s.length();
   if ( *pos < s_len ) {
-    matcher_->reset( s );
-    UErrorCode status = U_ZERO_ERROR;
-    bool const found = !!matcher_->find( *pos, status );
-    check_regex_status( status );
+    bool found;
+    size_type start = 0, end = 0;
+    if ( zre_ ) {
+      z_set_subject( s, *pos );
+      found = z_search( z_pos_ );
+      if ( found ) {
+        start = z_to_u16( z_start_ );
+        end = z_to_u16( z_end_ );
+      }
+    } else {
+      matcher_->reset( s );
+      UErrorCode status = U_ZERO_ERROR;
+      found = !!matcher_->find( *pos, status );
+      check_regex_status( status );
+      if ( found ) {
+        start = matcher_->start( status );
+        end = matcher_->end( status );
+      }
+    }
     if ( found ) {
-      size_type const end = matcher_->end( status );
       if ( substring ) {
-        size_type const start = matcher_->start( status );
         switch ( re_type ) {
           case re_is_match:
             substring->setTo( s, start, end - start );
@@ -965,6 +1212,22 @@ bool regex::next( re_type_t re_type, string const &s, size_type *pos,
 }
 
 bool regex::next_match( bool *reached_end ) {
+  if ( zre_ ) {
+    bool const found = z_search( z_pos_ );
+    if ( found ) {
+      z_pos_ = z_end_;
+      if ( z_start_ == z_end_ ) {
+        // an empty match: the next search starts after the next character
+        ++z_pos_;
+        while ( z_pos_ < static_cast<int>( z_s_.size() ) &&
+                (z_s_[ z_pos_ ] & 0xC0) == 0x80 )
+          ++z_pos_;
+      }
+    }
+    if ( reached_end )
+      *reached_end = zre_->get_reachedEnd();
+    return found;
+  }
   ZORBA_ASSERT( matcher_ );
   UErrorCode status = U_ZERO_ERROR;
   bool const found = !!matcher_->find( status );
@@ -981,8 +1244,10 @@ bool regex::next_match( bool *reached_end ) {
 
 bool regex::replace_all( string const &in, string const &replacement,
                          string *out ) {
-  ZORBA_ASSERT( matcher_ );
   ZORBA_ASSERT( out );
+  if ( zre_ )
+    return z_replace_all( in, replacement, out );
+  ZORBA_ASSERT( matcher_ );
   matcher_->reset( in );
   UErrorCode status = U_ZERO_ERROR;
   *out = matcher_->replaceAll( replacement, status );
@@ -999,6 +1264,15 @@ bool regex::replace_all( char const *in, char const *replacement,
 }
 
 void regex::set_string( char const *s, size_type s_len ) {
+  if ( zre_ ) {
+    z_s_.assign( s, s_len );
+    z_base_ = 0;
+    z_off_byte_ = 0;
+    z_off_u16_ = 0;
+    z_pos_ = 0;
+    z_start_ = z_end_ = -1;
+    return;
+  }
   ZORBA_ASSERT( matcher_ );
   to_string( s, s_len, &s_ );
   matcher_->reset( s_ );
