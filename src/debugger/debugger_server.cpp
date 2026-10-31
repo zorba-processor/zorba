@@ -17,6 +17,7 @@
 
 #include "debugger_server.h"
 
+#include <algorithm>
 #include <sstream>
 #ifndef WIN32
 # include <signal.h>
@@ -24,6 +25,8 @@
 
 #include <zorba/util/base64_util.h>
 #include <zorba/util/uri.h>
+
+#include <zorba/zorba_exception.h>
 
 #include "api/xqueryimpl.h"
 
@@ -440,8 +443,6 @@ DebuggerServer::processCommand(DebuggerCommand aCommand)
     case 'p':
 
       {
-        lResponse << ">";
-
         int lDepth;
         if (!aCommand.getArg("d", lDepth)) {
           lDepth = 0;
@@ -454,6 +455,7 @@ DebuggerServer::processCommand(DebuggerCommand aCommand)
         }
 
         if (aCommand.getName() == "property_get") {
+          lResponse << ">";
           // currently ignoring -p (page) option
 
           std::string lName = getVariableName(lFullName);
@@ -463,16 +465,30 @@ DebuggerServer::processCommand(DebuggerCommand aCommand)
         
         } else if (aCommand.getName() == "property_set") {
 
-          std::stringstream lSs;
-          lSs << "Unimplemented command: " << lCmdName;
-          return buildErrorResponse(lTransactionID, lCmdName, 4, lSs.str());
+          std::string lError;
+          int lErrorCode = setProperty(aCommand, lFullName, lDepth, lError);
+          if (lErrorCode != 0) {
+            return buildErrorResponse(lTransactionID, lCmdName, lErrorCode, lError);
+          }
+          lResponse << "success=\"1\">";
 
         } else if (aCommand.getName() == "property_value") {
 
+          std::string lValue;
+          std::size_t lSize = 0;
+          std::string lError;
+          int lErrorCode = getPropertyValue(aCommand, lFullName, lDepth, lValue, lSize, lError);
+          if (lErrorCode != 0) {
+            return buildErrorResponse(lTransactionID, lCmdName, lErrorCode, lError);
+          }
+          lResponse << "size=\"" << lSize << "\" encoding=\"base64\">";
+          String const lValueStr(lValue);
+          base64::encode(lValueStr, lResponse);
+
+        } else {
           std::stringstream lSs;
           lSs << "Unimplemented command: " << lCmdName;
           return buildErrorResponse(lTransactionID, lCmdName, 4, lSs.str());
-
         }
       }
       break;
@@ -612,6 +628,166 @@ DebuggerServer::processCommand(DebuggerCommand aCommand)
   }
 
   return "";
+}
+
+// number of children (sequence items) per page, the DBGP default for the
+// max_children feature (which this engine does not let the client change)
+static const int PROPERTY_PAGE_SIZE = 32;
+
+int
+DebuggerServer::checkPropertyContext(int aDepth, std::string& aError)
+{
+  if (aDepth != 0) {
+    std::stringstream lErrMsg;
+    lErrMsg << "Invalid stack depth: " << aDepth
+      << ". Currently we only support data commands for the top-most stack frame.";
+    aError = lErrMsg.str();
+    return 301;
+  }
+  if (theRuntime->getExecutionStatus() != QUERY_SUSPENDED) {
+    aError = "Command not available: the execution is not suspended.";
+    return 5;
+  }
+  return 0;
+}
+
+int
+DebuggerServer::getPropertyValue(
+  DebuggerCommand& aCommand,
+  std::string& aFullName,
+  int aDepth,
+  std::string& aValue,
+  std::size_t& aSize,
+  std::string& aError)
+{
+  int lCode = checkPropertyContext(aDepth, aError);
+  if (lCode != 0) {
+    return lCode;
+  }
+
+  std::string lName = getVariableName(aFullName);
+
+  std::list<std::pair<zstring, zstring> > lResults;
+  try {
+    // see buildProperty: the context item can not be evaluated
+    if (lName == ".") {
+      throw std::string("the context item can not be evaluated");
+    }
+    zstring lVar("$");
+    lVar.append(lName);
+    lResults = theRuntime->eval(lVar);
+  } catch (std::string& lErr) {
+    aError = "Can not get property " + lName + ": " + lErr;
+    return 300;
+  } catch (...) {
+    aError = "Can not get property " + lName;
+    return 300;
+  }
+
+  // -p: only return the items of the given page of the sequence
+  std::size_t lFirst = 0;
+  std::size_t lLast = lResults.size();
+  int lPage;
+  if (aCommand.getArg("p", lPage)) {
+    if (lPage < 0) {
+      std::stringstream lSs;
+      lSs << "Invalid options: invalid page " << lPage;
+      aError = lSs.str();
+      return 3;
+    }
+    lFirst = static_cast<std::size_t>(lPage) * PROPERTY_PAGE_SIZE;
+    lLast = std::min(lLast, lFirst + PROPERTY_PAGE_SIZE);
+  }
+
+  // the value is the serialization of the items, separated by a space
+  std::stringstream lValueSs;
+  std::list<std::pair<zstring, zstring> >::iterator lIter = lResults.begin();
+  for (std::size_t i = 0; lIter != lResults.end() && i < lLast; ++lIter, ++i) {
+    if (i < lFirst) {
+      continue;
+    }
+    if (i > lFirst) {
+      lValueSs << " ";
+    }
+    lValueSs << lIter->first.str();
+  }
+  aValue = lValueSs.str();
+  aSize = aValue.size();
+
+  // -m: send at most this many bytes of the value (0 means unlimited);
+  // never cut an UTF-8 encoded character in half
+  int lMaxData;
+  if (aCommand.getArg("m", lMaxData) && lMaxData > 0 &&
+      static_cast<std::size_t>(lMaxData) < aValue.size()) {
+    std::size_t lCut = static_cast<std::size_t>(lMaxData);
+    while (lCut > 0 && (static_cast<unsigned char>(aValue[lCut]) & 0xC0) == 0x80) {
+      --lCut;
+    }
+    aValue.resize(lCut);
+  }
+
+  return 0;
+}
+
+int
+DebuggerServer::setProperty(
+  DebuggerCommand& aCommand,
+  std::string& aFullName,
+  int aDepth,
+  std::string& aError)
+{
+  int lCode = checkPropertyContext(aDepth, aError);
+  if (lCode != 0) {
+    return lCode;
+  }
+
+  std::string lName = getVariableName(aFullName);
+
+  // the data is the base64 encoded XQuery expression whose result
+  // is assigned to the variable
+  String lDecodedData;
+  try {
+    String const lEncodedData(aCommand.getData());
+    base64::decode(lEncodedData, &lDecodedData);
+  } catch (...) {
+    aError = "Invalid options: the data of property_set is not valid base64";
+    return 3;
+  }
+  if (lDecodedData.empty()) {
+    aError = "Invalid options: missing data (the value to assign) for property_set";
+    return 3;
+  }
+
+  int lResult;
+  try {
+    zstring const lVarName(lName.c_str());
+    zstring const lExpr(lDecodedData.c_str());
+    lResult = theRuntime->setVariable(lVarName, lExpr);
+  } catch (std::string& lErr) {
+    aError = lErr;
+    return 206;
+  } catch (ZorbaException const& e) {
+    aError = "Error while evaluating the value: " + std::string(e.what());
+    return 206;
+  } catch (...) {
+    aError = "Error while evaluating the value.";
+    return 206;
+  }
+
+  switch (lResult) {
+  case DEBUGGER_SETVAR_OK:
+    return 0;
+  case DEBUGGER_SETVAR_NOT_FOUND:
+    aError = "Can not set property " + lName + ": no such variable in the current context";
+    return 300;
+  case DEBUGGER_SETVAR_NOT_ASSIGNABLE:
+    aError = "Can not set property " + lName + ": the variable is not assignable";
+    return 300;
+  case DEBUGGER_SETVAR_TYPE_MISMATCH:
+  default:
+    aError = "Can not set property " + lName + ": the value does not match the declared type of the variable";
+    return 206;
+  }
 }
 
 std::string
@@ -791,6 +967,24 @@ DebuggerServer::getEnvVar(const std::string& aName, std::string& aValue)
   return true;
 }
 
+// error messages may quote user input or engine diagnostics
+static std::string
+xmlEscape(const std::string& aText)
+{
+  std::string lResult;
+  lResult.reserve(aText.size());
+  for (std::string::size_type i = 0; i < aText.size(); ++i) {
+    switch (aText[i]) {
+    case '<': lResult += "&lt;"; break;
+    case '>': lResult += "&gt;"; break;
+    case '&': lResult += "&amp;"; break;
+    case '"': lResult += "&quot;"; break;
+    default: lResult += aText[i];
+    }
+  }
+  return lResult;
+}
+
 std::string
 DebuggerServer::buildErrorResponse(
   int aTransactionID,
@@ -801,7 +995,7 @@ DebuggerServer::buildErrorResponse(
   std::stringstream lResponse;
   lResponse << "<response command=\"" << aCommandName << "\" transaction_id=\"" << aTransactionID << "\">"
     << "<error code=\"" << aErrorCode << "\" apperr=\"" << aErrorCode << "\">"
-    << "<message>" << aErrorMessage << "</message>"
+    << "<message>" << xmlEscape(aErrorMessage) << "</message>"
     << "</error></response>";
 
   return lResponse.str();

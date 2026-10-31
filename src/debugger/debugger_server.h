@@ -81,6 +81,27 @@ class DebuggerServer {
     std::string
     getVariableName(std::string& aFullName);
 
+    // the following return 0 on success, otherwise a DBGP error code
+    // and the error message in aError
+    int
+    checkPropertyContext(int aDepth, std::string& aError);
+
+    int
+    getPropertyValue(
+      DebuggerCommand& aCommand,
+      std::string& aFullName,
+      int aDepth,
+      std::string& aValue,
+      std::size_t& aSize,
+      std::string& aError);
+
+    int
+    setProperty(
+      DebuggerCommand& aCommand,
+      std::string& aFullName,
+      int aDepth,
+      std::string& aError);
+
     void
     buildStackFrame(
       StackFrame& frame,

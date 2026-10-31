@@ -529,6 +529,21 @@ DebuggerRuntime::eval(zstring& aExpr)
 }
 
 
+int
+DebuggerRuntime::setVariable(const zstring& aName, const zstring& aExpr)
+{
+  if (theExecStatus != QUERY_SUSPENDED) {
+    std::string lMessage("I can only set variables if the execution is suspended.");
+    throw lMessage;
+  }
+
+  DebuggerCommons* lCommons = getDebbugerCommons();
+  std::vector<store::Item_t> lValue;
+  lCommons->evalItems(aExpr, lValue);
+  return lCommons->setVariable(aName, lValue);
+}
+
+
 std::string
 DebuggerRuntime::listSource(
   String& lFileName,

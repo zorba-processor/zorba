@@ -232,6 +232,21 @@ class DebuggerCommons : public serialization::SerializeBaseClass{
     std::list<std::pair<zstring, zstring> > 
       eval(const zstring& aExpr, Zorba_SerializerOptions& aSerOpts);
 
+    /**
+    * @brief Evaluates aExpr in the current context and returns the items.
+    */
+    void
+      evalItems(const zstring& aExpr, std::vector<store::Item_t>& aResult);
+
+    /**
+    * @brief Assigns aValue to the in-scope variable aName of the current
+    * (suspended) iterator.
+    *
+    * @returns one of the DEBUGGER_SETVAR_* codes.
+    */
+    int
+      setVariable(const zstring& aName, std::vector<store::Item_t>& aValue);
+
   public:
 
     unsigned int
