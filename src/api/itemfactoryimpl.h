@@ -23,14 +23,13 @@
 
 #include <zorba/api_shared_types.h>
 #include "common/shared_types.h"
-#include "util/singleton.h"
 
 namespace zorba {
   
   class ItemFactoryImpl : public ItemFactory
   {
     private:
-      friend struct Loki::CreateUsingNew<ItemFactoryImpl>;
+      friend class ItemFactorySingleton;
       ItemFactoryImpl();
 
       virtual ~ItemFactoryImpl();
@@ -302,9 +301,23 @@ namespace zorba {
 
   }; /* class ItemFactoryImpl */
 
-  typedef Loki::SingletonHolder<ItemFactoryImpl,
-                                Loki::CreateUsingNew,
-                                Loki::DeletableSingleton> ItemFactorySingleton;
+  /**
+   * Owns the ItemFactoryImpl returned by Zorba::getItemFactory().
+   *
+   * The instance wraps the store's item factory, so ZorbaImpl::shutdown()
+   * calls destroy() before it shuts the store down. A later Instance() call,
+   * after Zorba has been initialized again, creates a new instance. An
+   * instance still alive at program exit is deleted then.
+   */
+  class ItemFactorySingleton
+  {
+    public:
+      ItemFactorySingleton() = delete;
+
+      static ItemFactoryImpl& Instance();
+
+      static void destroy();
+  };
 
 } // namespace zorba
 
