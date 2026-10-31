@@ -188,6 +188,9 @@ char const* get_help_msg() {
 
     ////////// m //////////////////////////////////////////////////////////////
 
+    HELP_OPT( "--max-expr-depth <depth>" )
+      "Maximum nesting depth of expressions (default 1500; 0 = no limit other than the available stack). Deeper queries fail to compile with zerr:ZXQP0070.\n\n"
+
     HELP_OPT( "--max-udf-call-depth <depth>" )
       "Maximum depth of user-defined function calls (default 1024; 0 = no limit other than the available stack). Deeper calls raise zerr:ZXQP0069.\n\n"
 
@@ -612,6 +615,10 @@ int parse_args( int argc, char const *argv[] ) {
 
     ////////// m //////////////////////////////////////////////////////////////
 
+    else if ( IS_LONG_OPT( "--max-expr-depth" ) ) {
+      PARSE_ARG( "--max-expr-depth" );
+      SET_ZCPROP( max_expr_depth_ );
+    }
     else if ( IS_LONG_OPT( "--max-udf-call-depth" ) ) {
       PARSE_ARG( "--max-udf-call-depth" );
       SET_ZPROP( MaxUDFCallDepth );
