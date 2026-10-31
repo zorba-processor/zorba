@@ -1972,6 +1972,11 @@ bool str_down(
   zstring strval;
   aItem->getStringValue2(strval);
 
+  // xs:token and all types derived from it have whiteSpace="collapse" (XSD
+  // 1.1 Part 2, 3.4.2-3.4.9): collapse before checking the lexical form.
+  if (aTargetAtomicType != store::XS_NORMALIZED_STRING)
+    ascii::normalize_space(strval);
+
   switch(aTargetAtomicType)
   {
   case store::XS_NORMALIZED_STRING:
@@ -1995,11 +2000,6 @@ bool str_down(
   }
   case store::XS_TOKEN:
   {
-    // whiteSpace="collapse": tabs, line feeds and carriage returns become
-    // spaces, runs of spaces become one space, leading and trailing spaces
-    // are removed.
-    ascii::normalize_space(strval);
-
     factory->createToken(result, strval);
     return true;
   }
@@ -2014,8 +2014,6 @@ bool str_down(
   }
   case store::XS_NMTOKEN:
   {
-    ascii::trim_space(strval);
-
     if (GenericCast::instance()->castableToNMToken(strval))
     {
       factory->createNMTOKEN(result, strval);
@@ -2025,8 +2023,6 @@ bool str_down(
   }
   case store::XS_NAME:
   {
-    ascii::trim_space(strval);
-
     if (GenericCast::instance()->castableToName(strval))
     {
       factory->createName(result, strval);
@@ -2036,9 +2032,6 @@ bool str_down(
   }
   case store::XS_NCNAME:
   {
-    ascii::normalize_space(strval);
-    ascii::trim_space(strval);
-
     if (GenericCast::castableToNCName(strval))
     {
       factory->createNCName(result, strval);
