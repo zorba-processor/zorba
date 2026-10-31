@@ -17,15 +17,25 @@
 #include "stdafx.h"
 
 #include <cctype>
+#include <cstdint>
 #include <cstring>
+#include <type_traits>
+
+#include <zorba/diagnostic_list.h>
 
 #include "ascii_util.h"
 #include "diagnostics/xquery_diagnostics.h"
 #include "unicode_util.h"
 #include "utf8_string.h"
+#include "utf8_util.h"
 #include "zorba_regex_engine.h"
 #include "zorbatypes/chartype.h"
 #include <zorba/internal/unique_ptr.h>
+
+#ifndef ZORBA_NO_ICU
+#include <unicode/uchar.h>
+#include <unicode/uniset.h>
+#endif /* ZORBA_NO_ICU */
 
 namespace zorba {
   namespace regex_engine{
@@ -82,21 +92,47 @@ static bool compare_ascii_i(const char *str1, const char *str2)
   return true;
 }
 
-static bool compare_unicode_ni(const char *str1, const char *str2, int len)
+//
+// XQuery F&O 3.0 5.6.1.1: with the 'i' flag, two characters match if there is
+// a default case-insensitive match between them (The Unicode Standard 3.13):
+// their case foldings are equal.
+//
+static unicode::code_point fold_case(unicode::code_point c)
 {
-  while(len > 0)
-  {
-    const char *temp_str1 = str1;
-    const char *temp_str2 = str2;
-    unicode::code_point cp1 = unicode::to_upper(utf8::next_char(temp_str1));
-    unicode::code_point cp2 = unicode::to_upper(utf8::next_char(temp_str2));
-    if(cp1 != cp2)
-      return false;
-    len -= temp_str1-str1;
-    str1 = temp_str1;
-    str2 = temp_str2;
-  }
-  return true;
+#ifndef ZORBA_NO_ICU
+  return u_foldCase(c, U_FOLD_CASE_DEFAULT);
+#else
+  //
+  // Without ICU, Zorba's own case mappings: the lower case of the upper case
+  // is the simple case folding for all but a few characters (e.g., U+0130
+  // folds to itself but becomes 'i' here).
+  //
+  return unicode::to_lower(unicode::to_upper(c));
+#endif /* ZORBA_NO_ICU */
+}
+
+//
+// Whether c matches a character in [lo,hi] with the 'i' flag: a character of
+// the range that case-insensitively matches c.
+//
+static bool in_range_i(unicode::code_point c, unicode::code_point lo,
+                       unicode::code_point hi)
+{
+  if(c >= lo && c <= hi)
+    return true;
+#ifndef ZORBA_NO_ICU
+  U_NAMESPACE_QUALIFIER UnicodeSet closure(c, c);
+  closure.closeOver(USET_CASE_INSENSITIVE);
+  return closure.containsSome(lo, hi);
+#else
+  unicode::code_point const others[] = {
+    fold_case(c), unicode::to_upper(c), unicode::to_lower(c)
+  };
+  for(unicode::code_point o : others)
+    if(o >= lo && o <= hi)
+      return true;
+  return false;
+#endif /* ZORBA_NO_ICU */
 }
 static utf8::size_type myutf8len(const char *source)
 {
@@ -114,7 +150,41 @@ static utf8::size_type myutf8len(const char *source)
 CRegexXQuery_regex* CRegexXQuery_parser::parse(const char *pattern, unsigned int flags)
 {
   this->flags = flags;
-  
+
+  //
+  // XQuery F&O 3.0 5.6.1.1: with the 'x' flag, whitespace characters are
+  // removed from the regular expression prior to matching, except within
+  // character class expressions.
+  //
+  std::string stripped;
+  if((flags & REGEX_ASCII_NO_WHITESPACE) && !(flags & REGEX_ASCII_LITERAL))
+  {
+    int class_depth = 0;
+    for(const char *p = pattern; *p; ++p)
+    {
+      char const c = *p;
+      if(!class_depth && ascii::is_space(c))
+        continue;
+      stripped += c;
+      if(c == '\\')
+      {
+        const char *q = p + 1;
+        if(!class_depth)
+          while(ascii::is_space(*q))
+            ++q;
+        if(!*q)
+          break;
+        stripped += *q;
+        p = q;
+      }
+      else if(c == '[')
+        ++class_depth;
+      else if(c == ']' && class_depth)
+        --class_depth;
+    }
+    pattern = stripped.c_str();
+  }
+
   int   regex_len;
   CRegexXQuery_regex*  regex = parse_regexp(pattern, &regex_len);
   
@@ -131,11 +201,15 @@ CRegexXQuery_regex* CRegexXQuery_parser::parse_regexp(const char *pattern,
   std::unique_ptr<CRegexXQuery_regex>  regex(new CRegexXQuery_regex(current_regex));
   if(!current_regex)
     current_regex = regex.get();
+  regex->cap_first = current_regex->subregex.size();
   if(regex_depth >= 2)
   {
     //mark this as group if it does not start with ?:
     if(pattern[0] != '?' || pattern[1] != ':')
+    {
       current_regex->subregex.push_back(regex.get());
+      regex->capture_index = current_regex->subregex.size();
+    }
     else
       *regex_len = 2;
   }
@@ -164,6 +238,7 @@ CRegexXQuery_regex* CRegexXQuery_parser::parse_regexp(const char *pattern,
     (*regex_len)++;
   if(must_read_another_branch)
     regex->add_branch(new CRegexXQuery_branch(current_regex));//add empty branch
+  regex->cap_end = current_regex->subregex.size();
   regex->flags = 0;//finished initialization
   regex_depth--;
   return regex.release();
@@ -698,6 +773,8 @@ IRegexAtom* CRegexXQuery_parser::read_atom(const char *pattern, int *atom_len)
           else
             break;
         }
+        else
+          break;                        // the back-reference ends here
       }
       (*atom_len)++;
       return new CRegexXQuery_backref(current_regex, backref);
@@ -985,26 +1062,17 @@ CRegexXQuery_regex::CRegexXQuery_regex(CRegexXQuery_regex *topregex) : IRegexAto
 {
   matched_source = NULL;
   matched_len = 0;
-//  backup_matched_source = NULL;
-//  backup_matched_len = 0;
+  capture_index = 0;
+  cap_first = cap_end = 0;
+  source_start = NULL;
+  reachedEnd = false;
   flags = 128;//set to 0 after initialization
 }
 
 CRegexXQuery_regex::~CRegexXQuery_regex()
 {
-  std::list<CRegexXQuery_branch*>::iterator  branch_it;
-
-  for(branch_it = branch_list.begin(); branch_it != branch_list.end(); branch_it++)
-  {
-    delete (*branch_it);
-  }
-/*
-  std::vector<CRegexXQuery_regex*>::iterator   subregex_it;
-  for(subregex_it = subregex.begin(); subregex_it != subregex.end(); subregex_it++)
-  {
-    delete (*subregex_it);
-  }
-*/
+  for(CRegexXQuery_branch *branch : branch_list)
+    delete branch;
 }
 
 void CRegexXQuery_regex::add_branch(CRegexXQuery_branch *branch)
@@ -1039,12 +1107,8 @@ CRegexXQuery_branch::CRegexXQuery_branch(CRegexXQuery_regex* regex)
 
 CRegexXQuery_branch::~CRegexXQuery_branch()
 {
-  std::list<RegexAscii_pieceinfo>::iterator  piece_it;
-
-  for(piece_it = piece_list.begin(); piece_it != piece_list.end(); piece_it++)
-  {
-    delete (*piece_it).piece;
-  }
+  for(CRegexXQuery_piece *piece : piece_list)
+    delete piece;
 }
 
 void CRegexXQuery_branch::add_piece(CRegexXQuery_piece *piece)
@@ -1087,8 +1151,6 @@ void CRegexXQuery_piece::get_quantifier(int *min, int *max, bool *strict_max)
 }
 bool CRegexXQuery_piece::get_is_reluctant()
 {
-  if(atom->regex_intern->flags & REGEX_ASCII_MINIMAL_MATCH)
-    return true;
   return is_reluctant;
 }
 
@@ -1118,7 +1180,7 @@ CRegexXQuery_char_ascii::CRegexXQuery_char_ascii(CRegexXQuery_regex* regex, char
   this->c = c;
 }
 CRegexXQuery_char_ascii_i::CRegexXQuery_char_ascii_i(CRegexXQuery_regex* regex, char c) :
-    CRegexXQuery_char_ascii(regex, toupper(c))
+    CRegexXQuery_char_ascii(regex, static_cast<char>(fold_case(static_cast<unsigned char>(c))))
 {
 }
 CRegexXQuery_char_range_ascii::CRegexXQuery_char_range_ascii(CRegexXQuery_regex* regex, char c1, char c2) :
@@ -1127,7 +1189,7 @@ CRegexXQuery_char_range_ascii::CRegexXQuery_char_range_ascii(CRegexXQuery_regex*
   this->c1 = c1; this->c2 = c2;
 }
 CRegexXQuery_char_range_ascii_i::CRegexXQuery_char_range_ascii_i(CRegexXQuery_regex* regex, char c1, char c2) :
-    CRegexXQuery_char_range_ascii(regex, toupper(c1), toupper(c2))
+    CRegexXQuery_char_range_ascii(regex, c1, c2)
 {
 }
 CRegexXQuery_char_unicode::CRegexXQuery_char_unicode(CRegexXQuery_regex* regex, const char *source, int len) :
@@ -1142,7 +1204,7 @@ CRegexXQuery_char_unicode_cp::CRegexXQuery_char_unicode_cp(CRegexXQuery_regex* r
   this->c = c;
 }
 CRegexXQuery_char_unicode_i::CRegexXQuery_char_unicode_i(CRegexXQuery_regex* regex, unicode::code_point c) :
-    CRegexXQuery_char_unicode_cp(regex, unicode::to_upper(c))
+    CRegexXQuery_char_unicode_cp(regex, fold_case(c))
 {
 }
 CRegexXQuery_char_range_unicode::CRegexXQuery_char_range_unicode(CRegexXQuery_regex* regex, unicode::code_point c1, unicode::code_point c2) :
@@ -1151,7 +1213,7 @@ CRegexXQuery_char_range_unicode::CRegexXQuery_char_range_unicode(CRegexXQuery_re
   this->c1 = c1; this->c2 = c2;
 }
 CRegexXQuery_char_range_unicode_i::CRegexXQuery_char_range_unicode_i(CRegexXQuery_regex* regex, unicode::code_point c1, unicode::code_point c2) :
-    CRegexXQuery_char_range_unicode(regex, unicode::to_upper(c1), unicode::to_upper(c2))
+    CRegexXQuery_char_range_unicode(regex, c1, c2)
 {
 }
 CRegexXQuery_endline::CRegexXQuery_endline(CRegexXQuery_regex* regex) :
@@ -1236,742 +1298,311 @@ CRegexXQuery_parser::~CRegexXQuery_parser()
 //////////////////////////////////////////
 ////Matching the pattern on a string
 /////////////////////////////////////////
-static std::list<RegexAscii_pieceinfo> empty_pieces;//empty list of pieces
-/*
-std::list<RegexAscii_pieceinfo>::iterator  
-IRegexAtom::choose_next_piece(const char *source, int *matched_len, 
-                              std::list<RegexAscii_pieceinfo>::iterator this_piece,
-                              std::list<RegexAscii_pieceinfo>::iterator end_piece)
-{
-  //if this_piece is repetition, repeat until max, then go to next piece
-  int min, max;
-  bool strict_max;
-  while(this_piece != end_piece)
+namespace {
+
+/**
+ * A non-owning reference to a continuation: what remains to be matched after
+ * the current construct, given the position where the construct ended.
+ * The referenced callable lives in a caller's stack frame, which outlives
+ * every call made through the reference.
+ */
+class cont_ref {
+public:
+  template<class F,class = typename std::enable_if<
+    !std::is_same<typename std::decay<F>::type,cont_ref>::value>::type>
+  cont_ref( F const &f ) :
+    obj_( &f ),
+    fn_( []( void const *obj, char const *p ) {
+      return (*static_cast<F const*>( obj ))( p );
+    } )
   {
-    (*this_piece).piece->get_quantifier(&min, &max, &strict_max);
-    if(max <= ((*this_piece).nr_matches))//finished this piece
-    {
-      this_piece++;
-    }
-    else
-      break;
   }
-  return this_piece;
+
+  bool operator()( char const *p ) const {
+    return fn_( obj_, p );
+  }
+
+private:
+  void const *obj_;
+  bool (*fn_)( void const*, char const* );
+};
+
+//
+// Bound on the work for one search, in matching steps, so that catastrophic
+// backtracking in a user pattern raises an error instead of hanging (the ICU
+// matcher has a time limit for the same reason).
+//
+unsigned long const max_match_steps = 100000000ul;
+
+//
+// Bound on the stack the recursive matcher may use for one search: each
+// iteration of a repeated group nests a few calls.
+//
+std::uintptr_t const max_match_stack = 2u * 1024u * 1024u;
+
+} // anonymous namespace
+
+/**
+ * Backtracking matcher in continuation-passing style: every match_* function
+ * matches its construct at \a p in every possible way, in priority order, and
+ * calls \a k with the end of each way until \a k returns true.  Captures are
+ * stored in the groups (CRegexXQuery_regex::matched_source/matched_len) and
+ * restored when a way is abandoned.
+ */
+class CRegexXQuery_matcher {
+public:
+  CRegexXQuery_matcher( CRegexXQuery_regex *top ) : top_( top ), steps_( 0 ) {
+    char here;
+    stack_base_ = reinterpret_cast<std::uintptr_t>( &here );
+  }
+
+  bool match_group( CRegexXQuery_regex *re, char const *p, cont_ref k );
+
+private:
+  CRegexXQuery_regex *top_;
+  unsigned long steps_;
+  std::uintptr_t stack_base_;
+
+  typedef std::pair<char const*,int> capture;
+
+  void check_limits();
+  void save_and_clear( CRegexXQuery_regex const *re, std::vector<capture> *saved );
+  void restore( CRegexXQuery_regex const *re, std::vector<capture> const &saved );
+  bool match_seq( CRegexXQuery_branch const *b, size_t i, char const *p, cont_ref k );
+  bool match_piece( CRegexXQuery_piece const *piece, char const *p, cont_ref k );
+  bool match_repeat( CRegexXQuery_piece const *piece, char const *p, int n, cont_ref k );
+};
+
+void CRegexXQuery_matcher::check_limits() {
+  if ( ++steps_ > max_match_steps )
+    throw XQUERY_EXCEPTION(
+      zerr::ZXQP0001_DYNAMIC_RUNTIME_ERROR,
+      ERROR_PARAMS( "regular expression match exceeded the time limit" )
+    );
+  char here;
+  std::uintptr_t const sp = reinterpret_cast<std::uintptr_t>( &here );
+  std::uintptr_t const used = sp < stack_base_ ? stack_base_ - sp : sp - stack_base_;
+  if ( used > max_match_stack )
+    throw XQUERY_EXCEPTION(
+      zerr::ZXQP0001_DYNAMIC_RUNTIME_ERROR,
+      ERROR_PARAMS( "regular expression match too deeply nested" )
+    );
 }
-*/
 
-bool IRegexAtom::match(const char *source, int *start_from_branch, int *matched_len,
-                  std::list<RegexAscii_pieceinfo>::iterator this_piece,
-                  std::list<RegexAscii_pieceinfo>::iterator end_piece)
-{
-  *start_from_branch = 0;
-  bool retmatch;
-  retmatch = match_internal(source, start_from_branch, matched_len);
-  if(!retmatch)
-    return false;
+void CRegexXQuery_matcher::save_and_clear( CRegexXQuery_regex const *re,
+                                           std::vector<capture> *saved ) {
+  for ( int i = re->cap_first; i < re->cap_end; ++i ) {
+    CRegexXQuery_regex *const g = top_->subregex[i];
+    saved->push_back( capture( g->matched_source, g->matched_len ) );
+    g->matched_source = NULL;
+    g->matched_len = 0;
+  }
+}
 
-  if(this_piece == end_piece)
-    return true;
+void CRegexXQuery_matcher::restore( CRegexXQuery_regex const *re,
+                                    std::vector<capture> const &saved ) {
+  for ( int i = re->cap_first; i < re->cap_end; ++i ) {
+    CRegexXQuery_regex *const g = top_->subregex[i];
+    g->matched_source = saved[ i - re->cap_first ].first;
+    g->matched_len = saved[ i - re->cap_first ].second;
+  }
+}
 
-  (*this_piece).nr_matches++;
-  int min,max;
-  bool strict_max;
-  (*this_piece).piece->get_quantifier(&min, &max, &strict_max);
-  std::list<RegexAscii_pieceinfo>::iterator init_piece = this_piece;
-  if(((min == 1) && (max == 1)) || //the simple common case
-    ((*matched_len == 0) && ((*this_piece).nr_matches>=min)))//to avoid infinite loop
-  {
-    this_piece++;
-    if(this_piece == end_piece)
+bool CRegexXQuery_matcher::match_group( CRegexXQuery_regex *re, char const *p,
+                                        cont_ref k ) {
+  check_limits();
+  for ( CRegexXQuery_branch const *b : re->branch_list ) {
+    if ( re->capture_index ) {
+      auto const set_capture = [&]( char const *q ) -> bool {
+        char const *const old_source = re->matched_source;
+        int const old_len = re->matched_len;
+        re->matched_source = p;
+        re->matched_len = static_cast<int>( q - p );
+        if ( k( q ) )
+          return true;
+        re->matched_source = old_source;
+        re->matched_len = old_len;
+        return false;
+      };
+      if ( match_seq( b, 0, p, set_capture ) )
+        return true;
+    } else if ( match_seq( b, 0, p, k ) )
       return true;
   }
-  int matched_len2;
-  retmatch = (*this_piece).piece->match_piece(this_piece, end_piece, source + *matched_len, &matched_len2);
-  if(!retmatch)
-  {
-    (*init_piece).nr_matches--;
-    return false;
-  }
-  *matched_len += matched_len2;
-  return true;
+  return false;
 }
 
-//try every position in source to match the pattern
+bool CRegexXQuery_matcher::match_seq( CRegexXQuery_branch const *b, size_t i,
+                                      char const *p, cont_ref k ) {
+  if ( i == b->piece_list.size() )
+    return k( p );
+  auto const rest = [&]( char const *q ) -> bool {
+    return match_seq( b, i + 1, q, k );
+  };
+  return match_piece( b->piece_list[i], p, rest );
+}
+
+bool CRegexXQuery_matcher::match_piece( CRegexXQuery_piece const *piece,
+                                        char const *p, cont_ref k ) {
+  if ( piece->regex_atom )
+    return match_repeat( piece, p, 0, k );
+
+  check_limits();
+  IRegexAtom *const atom = piece->atom;
+  int const min = piece->min;
+  int const max = piece->max;
+  int len, unused;
+
+  if ( min == 1 && max == 1 ) {
+    unused = 0;
+    if ( !atom->match_internal( p, &unused, &len ) )
+      return false;
+    return k( p + len );
+  }
+
+  if ( piece->is_reluctant ) {
+    char const *q = p;
+    for ( int n = 0; ; ++n ) {
+      if ( n >= min && k( q ) )
+        return true;
+      if ( max >= 0 && n >= max )
+        return false;
+      unused = 0;
+      if ( !atom->match_internal( q, &unused, &len ) )
+        return false;
+      if ( !len ) {
+        //
+        // An empty match (e.g., a back-reference to an empty group) repeats
+        // without moving: the remaining minimum is met right here, and if it
+        // already was, k(q) has just failed.
+        //
+        return n < min && k( q );
+      }
+      q += len;
+      check_limits();
+    }
+  }
+
+  //
+  // Greedy: collect the end of each repetition, then try the longest first.
+  //
+  std::vector<char const*> ends( 1, p );
+  bool empty_match = false;
+  while ( max < 0 || static_cast<int>( ends.size() ) - 1 < max ) {
+    unused = 0;
+    if ( !atom->match_internal( ends.back(), &unused, &len ) )
+      break;
+    if ( !len ) {
+      empty_match = true;               // repeats any number of times
+      break;
+    }
+    ends.push_back( ends.back() + len );
+  }
+  int const count = static_cast<int>( ends.size() ) - 1;
+  if ( empty_match ) {
+    if ( k( ends.back() ) )             // also covers any n >= min
+      return true;
+    for ( int n = count - 1; n >= min; --n )
+      if ( k( ends[n] ) )
+        return true;
+    return false;
+  }
+  for ( int n = count; n >= min; --n )
+    if ( k( ends[n] ) )
+      return true;
+  return false;
+}
+
+bool CRegexXQuery_matcher::match_repeat( CRegexXQuery_piece const *piece,
+                                         char const *p, int n, cont_ref k ) {
+  check_limits();
+  CRegexXQuery_regex *const group = piece->regex_atom;
+  int const min = piece->min;
+  int const max = piece->max;
+
+  auto const iterate = [&]() -> bool {
+    if ( max >= 0 && n >= max )
+      return false;
+    //
+    // XQuery F&O 3.0 5.6.1: the groups inside a repeated group capture what
+    // they match in the current iteration; one that does not participate in
+    // it has no captured substring, so a back-reference to it matches the
+    // empty string.
+    //
+    std::vector<capture> saved;
+    save_and_clear( group, &saved );
+    auto const next = [&]( char const *q ) -> bool {
+      //
+      // Once the minimum is met, an iteration that matched the empty string
+      // can not lead anywhere new; repeating it would loop forever.
+      //
+      if ( q == p && n >= min )
+        return false;
+      return match_repeat( piece, q, n + 1, k );
+    };
+    if ( match_group( group, p, next ) )
+      return true;
+    restore( group, saved );
+    return false;
+  };
+
+  if ( piece->is_reluctant ) {
+    if ( n >= min && k( p ) )
+      return true;
+    return iterate();
+  }
+  if ( iterate() )
+    return true;
+  return n >= min && k( p );
+}
+
 bool CRegexXQuery_regex::match_anywhere(const char *source, unsigned int flags,
                                        int *match_pos, int *matched_len)
 {
-  *match_pos = 0;
-  reachedEnd = false;
-  return match_from(source, flags, match_pos, matched_len);
+  return search(source, 0, flags, match_pos, matched_len);
 }
 
-bool CRegexXQuery_regex::match_from(const char *source, unsigned int flags,
-                                       int *match_pos, int *matched_len)
+bool CRegexXQuery_regex::search(const char *subject, int from,
+                                unsigned int flags,
+                                int *match_pos, int *matched_len)
 {
   this->flags = flags;
-  this->source_start = source;
+  this->source_start = subject;
   reachedEnd = false;
 
-  std::vector<CRegexXQuery_regex*>::iterator regex_it;
-  for(regex_it = subregex.begin(); regex_it != subregex.end(); regex_it++)
-  {
-    (*regex_it)->matched_source = NULL;
-  }
+  bool const whole = (flags & REGEX_ASCII_WHOLE_MATCH) != 0;
+  char const *match_end = NULL;
+  auto const done = [&]( char const *q ) -> bool {
+    if ( whole && *q )
+      return false;
+    match_end = q;
+    return true;
+  };
 
-  std::vector<std::pair<const char*, int> >  saved_subregex;
-
-  if(*match_pos && (flags & REGEX_ASCII_WHOLE_MATCH))
-    return false;
-
-  do
-  {
-    int   start_from_branch = 0;
-    int   longest_match = -1;
-    while(1)
-    {
-      if(!match(source + *match_pos, &start_from_branch, matched_len, empty_pieces.begin(), empty_pieces.end()))
-        break;
-      if(longest_match < *matched_len)
-      {
-        longest_match = *matched_len;
-        if(start_from_branch && (flags & REGEX_ASCII_GET_LONGEST_BRANCH))
-          save_subregex_list(saved_subregex);
-      }
-      if(!start_from_branch || !(flags & REGEX_ASCII_GET_LONGEST_BRANCH))
-        break;
-      //else try the other branches to see which is longer
+  CRegexXQuery_matcher matcher( this );
+  char const *p = subject + from;
+  for ( ;; ) {
+    for ( CRegexXQuery_regex *g : subregex ) {
+      g->matched_source = NULL;
+      g->matched_len = 0;
     }
-    if(longest_match != -1)
-    {
-      *matched_len = longest_match;
-      if(saved_subregex.size())
-        load_subregex_list(saved_subregex);
-      if(flags & REGEX_ASCII_WHOLE_MATCH)
-      {
-        if(!source[*match_pos+*matched_len])
-          return true;
-        if((flags & REGEX_ASCII_MULTILINE) && 
-          ((source[*match_pos+*matched_len] == '\n') || (source[*match_pos+*matched_len] == '\r')))
-          return true;
-        return false;
-      }
+    if ( matcher.match_group( this, p, done ) ) {
+      *match_pos = static_cast<int>( p - subject );
+      *matched_len = static_cast<int>( match_end - p );
       return true;
     }
-
-    if(flags & REGEX_ASCII_WHOLE_MATCH)
-    {
-      if(flags & REGEX_ASCII_MULTILINE)
-      {
-        //go to next line
-        while(source[*match_pos] && (source[*match_pos] != '\n') && (source[*match_pos] != '\r'))
-          (*match_pos) += myutf8len(source);
-        if(source[*match_pos] == '\n')
-        {
-          (*match_pos)++;
-          if(source[*match_pos] == '\r')
-            (*match_pos)++;
-        }
-        else if(source[*match_pos] == '\r')
-        {
-          (*match_pos)++;
-          if(source[*match_pos] == '\n')
-            (*match_pos)++;
-        }
-        if(!source[*match_pos])
-          break;
-        continue;
-      }
+    if ( whole || !*p )
       break;
-    }
-    if(!source[*match_pos])
-      break;
-    (*match_pos) += myutf8len(source);
+    // next character (do not step over the terminating NUL)
+    ++p;
+    while ( (*p & 0xC0) == 0x80 )
+      ++p;
   }
-  while(source[*match_pos]);
-//  if(!source[*match_pos])
-//  {
-//    reachedEnd = true;
-//  }
-  return false;
-}
-
-void CRegexXQuery_regex::reset_match()
-{
-//  this->backup_matched_source = this->matched_source;
-//  this->backup_matched_len = this->matched_len;
-  this->matched_source = NULL;
-  this->matched_len = 0;
-  std::list<CRegexXQuery_branch*>::iterator  branch_it;
-  for(branch_it = branch_list.begin(); branch_it != branch_list.end(); branch_it++)
-  {
-    (*branch_it)->reset();
-  }
-}
-/*
-void CRegexXQuery_regex::restore_match()
-{
-  this->matched_source = this->backup_matched_source;
-  this->matched_len = this->backup_matched_len;
-  std::list<CRegexXQuery_branch*>::iterator  branch_it;
-  for(branch_it = branch_list.begin(); branch_it != branch_list.end(); branch_it++)
-  {
-    (*branch_it)->restore();
-  }
-}
-*/
-//match any of the branches
-bool CRegexXQuery_regex::match(const char *source, int *start_from_branch, int *matched_len,
-                              std::list<RegexAscii_pieceinfo>::iterator next_piece,
-                              std::list<RegexAscii_pieceinfo>::iterator end_piece)
-{
-  reachedEnd = false;
-  if(!(flags & REGEX_ASCII_GROUPING_LEN_WHOLE_PIECE) || 
-    (this->matched_source == NULL) || ((this->matched_source + this->matched_len) != source))
-    this->matched_source = source;
-  *matched_len = 0;
-  std::list<CRegexXQuery_branch*>::iterator  branch_it;
-
-  if(*start_from_branch == 0)
-  {
-    for(branch_it = branch_list.begin(); branch_it != branch_list.end(); branch_it++)
-    {
-      (*branch_it)->reset();
-    }
-  }
-
-  branch_it = branch_list.begin();
-  if(*start_from_branch)
-  {
-    for(int i=0;i<*start_from_branch;i++)
-      branch_it++;
-  }
-  (*start_from_branch)++;
-  for(; branch_it != branch_list.end(); branch_it++,(*start_from_branch)++)
-  {
-    if((*branch_it)->match(source, matched_len, this, next_piece, end_piece))
-    {
-      //matched_source = source;
-      //this->matched_len = *matched_len;
-      return true;
-    }
-  }
-  *start_from_branch = 0;
-  if(this->matched_source == source)
-    this->matched_source = NULL;
-  *matched_len = 0;
-  return false;
-}
-
-void CRegexXQuery_regex::save_subregex_list(std::vector<std::pair<const char*, int> > &saved_subregex)
-{
-  saved_subregex.resize(0);
-  saved_subregex.reserve(subregex.size());
-  std::vector<CRegexXQuery_regex*>::iterator   it;
-  for(it=subregex.begin(); it != subregex.end(); it++)
-  {
-    saved_subregex.push_back(std::pair<const char*, int>((*it)->matched_source, (*it)->matched_len));
-  }
-}
-
-void CRegexXQuery_regex::load_subregex_list(std::vector<std::pair<const char*, int> > &saved_subregex)
-{
-  std::vector<std::pair<const char*, int> >::iterator   it;
-  std::vector<CRegexXQuery_regex*>::iterator            subit;
-  for(it=saved_subregex.begin(), subit = subregex.begin(); it != saved_subregex.end(); it++, subit++)
-  {
-    (*subit)->matched_source = (*it).first;
-    (*subit)->matched_len = (*it).second;
-  }
-}
-
-void CRegexXQuery_branch::reset()
-{
-  std::list<RegexAscii_pieceinfo>::iterator  piece_it;
-  for(piece_it = piece_list.begin(); piece_it != piece_list.end(); piece_it++)
-  {
-    (*piece_it).piece->atom->reset_match();
-  }
-}
-/*
-void CRegexXQuery_branch::restore()
-{
-  std::list<RegexAscii_pieceinfo>::iterator  piece_it;
-  for(piece_it = piece_list.begin(); piece_it != piece_list.end(); piece_it++)
-  {
-    (*piece_it).piece->atom->restore_match();
-  }
-}
-*/
-//match all the pieces
-bool CRegexXQuery_branch::match(const char *source, int *matched_len,
-                              CRegexXQuery_regex* group_regex,
-                              std::list<RegexAscii_pieceinfo>::iterator next_piece,
-                              std::list<RegexAscii_pieceinfo>::iterator end_piece)
-{
-  std::list<RegexAscii_pieceinfo>::iterator  piece_it;
-
-  piece_it = piece_list.begin(); 
-  //if(piece_it == piece_list.end())
-    //if(!source[0])
-  //    return true;
-    //else
-    //  return false;
-  if(piece_it == piece_list.end())
-  {
-    piece_it = next_piece;
-    if(next_piece == end_piece)
-    {
-      group_regex->matched_len = 0;
-      return true;
-    }
-  }
-
-  std::list<RegexAscii_pieceinfo>   temp_pieces(piece_list);
-  temp_pieces.push_back(group_regex);//this will be used to store the group match
-  temp_pieces.insert(temp_pieces.end(), next_piece, end_piece);
-
-  return (*piece_it).piece->match_piece(temp_pieces.begin(), temp_pieces.end(), source, matched_len);
-}
-
-bool CRegexXQuery_piece::match_piece(std::list<RegexAscii_pieceinfo>::iterator piece_it,
-                                    std::list<RegexAscii_pieceinfo>::iterator end_it,
-                                    const char *source, int *matched_len)
-{
-  if((*piece_it).nr_matches < 0)
-  {
-    //special case, store the group match
-    (*piece_it).group_regex->matched_len = source - (*piece_it).group_regex->matched_source;
-    piece_it++;
-    if(piece_it == end_it)
-      return true;
-    else
-      return (*piece_it).piece->match_piece(piece_it, end_it, source, matched_len);
-  }
-
-  if(!get_is_reluctant())
-    return match_piece_iter_normal(piece_it, end_it, source, matched_len);
-  else
-    return match_piece_iter_reluctant(piece_it, end_it, source, matched_len);
-}
-
-int CRegexXQuery_piece::choose_another_branch(std::vector<std::pair<int,int> > &match_lens)
-{
-  int i = match_lens.size()-1;
-  i--;
-  while((i >= 0) && (match_lens.at(i).second == 0))
-    i--;
-  if(i < 0)
-    return -1;//no more branches
-  match_lens.resize(i+1);
-  i++;
-  return i;
-}
-
-bool CRegexXQuery_piece::is_regex_atom()
-{
-  return regex_atom != NULL;
-}
-
-//match as less as possible (shortest string)
-bool CRegexXQuery_piece::match_piece_iter_reluctant(
-                                        std::list<RegexAscii_pieceinfo>::iterator piece_it,
-                                        std::list<RegexAscii_pieceinfo>::iterator end_it,
-                                        const char *source, int *matched_len)
-{
-  *matched_len = 0;
-  if(piece_it == end_it)
-    return true;
-
-  int min, max;
-  bool  strict_max;
-  //std::vector<int>    match_lens;
-  (*piece_it).piece->get_quantifier(&min, &max, &strict_max);
-
-  std::vector<std::pair<const char*, int> >  saved_subregex;
-
-  if(is_regex_atom())
-  {
-    //recursive
-    bool retmatch;
-    atom->regex_intern->save_subregex_list(saved_subregex);
-    if((*piece_it).nr_matches >= min)
-    {
-      //go to next piece
-      std::list<RegexAscii_pieceinfo>::iterator next_it = piece_it;
-      next_it++;
-      if(next_it == end_it)
-        return true;
-      retmatch = (*next_it).piece->match_piece(next_it, end_it, source, matched_len);
-      if(retmatch)
-        return true;
-    }
-    if(((max == -1) || ((*piece_it).nr_matches < max)) &&//try further with this piece
-      (((*piece_it).nr_matches < min) || ((*piece_it).nr_matches == 0) || ((*piece_it).piece->regex_atom->matched_len)))//if matched_len is zero, avoid infinite loop
-    {
-      int start_from_branch = 0;
-      int shortest_len = -1;
-      bool branch_saved = false;
-      //try all branches to get the shortest len
-      (*piece_it).nr_matches++;
-      while(atom->match(source, &start_from_branch, matched_len, piece_it, end_it))
-      {
-        if((shortest_len == -1) || (shortest_len > *matched_len))
-        {
-          shortest_len = *matched_len;
-          if(start_from_branch && (atom->regex_intern->flags & REGEX_ASCII_GET_LONGEST_BRANCH))
-          {
-            atom->regex_intern->save_subregex_list(saved_subregex);
-            branch_saved = true;
-          }
-        }
-        if(!start_from_branch || !(atom->regex_intern->flags & REGEX_ASCII_GET_LONGEST_BRANCH))
-          break;
-      }
-      if(shortest_len != -1)
-      {
-        *matched_len = shortest_len;
-        if(branch_saved)
-          atom->regex_intern->load_subregex_list(saved_subregex);
-        return true;
-      }
-      else
-      {
-        (*piece_it).nr_matches--;
-        atom->regex_intern->load_subregex_list(saved_subregex);
-        return false;
-      }
-    }
-    else
-    {
-      atom->regex_intern->load_subregex_list(saved_subregex);
-      return false;
-    }
-  }
-
-  int i=0;
-  int shortest_len = -1;
-  int otherpieces_shortest = -1;
-  int i_shortest = -1;
-  std::list<RegexAscii_pieceinfo>::iterator next_it = piece_it;
-  std::vector<std::pair<int,int> >    match_lens;
-  next_it++;
-  int pieceslen = 0;
-  while(1)
-  {
-    int piecelen = 0;
-    bool retmatch;
-    retmatch = match_piece_times(source, &piecelen, i < min ? min : i, &match_lens);
-    i = match_lens.size()-1;//number of matches
-    if(i<0)
-      i = 0;
-    if((i>=min))
-    {
-      pieceslen = piecelen;
-      if((shortest_len >= 0) && (shortest_len <= pieceslen))//this branch is longer
-      {//try another branch
-        i = choose_another_branch(match_lens);
-        if(i >= 0)
-          continue;//try another branch
-        else
-          break;
-      }
-      int   otherpieces = 0;
-      if((next_it == end_it) ||
-        (*next_it).piece->match_piece(next_it, end_it, source+pieceslen, &otherpieces)
-        )
-      {
-        if((i == pieceslen) || (match_lens.at(0).second == 0) ||//minimum achieved already, cannot go lower than that
-            !(atom->regex_intern->flags & REGEX_ASCII_GET_LONGEST_BRANCH))
-        {
-          *matched_len = pieceslen + otherpieces;
-          return true;
-        }
-        if((shortest_len < 0) || (shortest_len > pieceslen))
-        {
-          shortest_len = pieceslen;
-          otherpieces_shortest = otherpieces;
-          i_shortest = i;
-          if(match_lens.at(0).second != 0)
-            atom->regex_intern->save_subregex_list(saved_subregex);
-        }
-        i = choose_another_branch(match_lens);
-        if(i >= 0)
-          continue;//try another branch
-        else
-          break;
-      }
-      else
-      {
-        //try further, unless the last repetition matched the empty string:
-        //repeating it again cannot get further, and with no maximum
-        //(e.g. a back-reference to an empty group under *?) it would loop
-        //forever
-        size_t const nlens = match_lens.size();
-        bool const empty_repetition = (nlens >= 2) &&
-          (match_lens[nlens-1].first == match_lens[nlens-2].first);
-        if(retmatch && !empty_repetition)
-        {
-          i++;
-          if((max < 0) || (i<=max))
-            continue;
-          i--;
-        }
-      }
-    }
-    
-    if(i==0)
-    {
-      break;
-    }
-    else
-    {
-      i = choose_another_branch(match_lens);
-      if(i >= 0)
-        continue;//try another branch
-      else
-        break;
-    }
-  }
-
-  if(shortest_len >= 0)
-  {
-    if(strict_max && (max>=0) && (i_shortest > max))
-      return false;
-    *matched_len = shortest_len + otherpieces_shortest;
-    if(saved_subregex.size())
-      atom->regex_intern->load_subregex_list(saved_subregex);
-    return true;
+  for ( CRegexXQuery_regex *g : subregex ) {
+    g->matched_source = NULL;
+    g->matched_len = 0;
   }
   return false;
-}
-
-//match as much as possible
-bool CRegexXQuery_piece::match_piece_iter_normal(
-                                        std::list<RegexAscii_pieceinfo>::iterator piece_it,
-                                        std::list<RegexAscii_pieceinfo>::iterator end_it,
-                                        const char *source, int *matched_len)
-{
-  *matched_len = 0;
-
-  int min, max;
-  bool  strict_max;
-  std::vector<std::pair<int,int> >    match_lens;
-  (*piece_it).piece->get_quantifier(&min, &max, &strict_max);
-  int   timeslen = 0;
-  std::vector<std::pair<const char*, int> >  saved_subregex;
-
-  if(is_regex_atom())
-  {
-    //recursive
-    bool retmatch;
-    atom->regex_intern->save_subregex_list(saved_subregex);
-    if(((max == -1) || ((*piece_it).nr_matches < max)) && //try further with this piece
-      (((*piece_it).nr_matches < min) || ((*piece_it).nr_matches == 0) || ((*piece_it).piece->regex_atom->matched_len)))//if matched_len is zero, avoid infinite loop
-    {
-      int start_from_branch = 0;
-      int longest_len = -1;
-      bool branch_saved = false;
-      //try all branches to get the longest len
-      (*piece_it).nr_matches++;
-      while(atom->match(source, &start_from_branch, matched_len, piece_it, end_it))
-      {
-        if((longest_len < *matched_len))
-        {
-          longest_len = *matched_len;
-          if(start_from_branch && (atom->regex_intern->flags & REGEX_ASCII_GET_LONGEST_BRANCH))
-          {
-            atom->regex_intern->save_subregex_list(saved_subregex);
-            branch_saved = true;
-          }
-        }
-        if(!start_from_branch || !(atom->regex_intern->flags & REGEX_ASCII_GET_LONGEST_BRANCH))
-          break;
-      }
-      if(longest_len != -1)
-      {
-        *matched_len = longest_len;
-        if(branch_saved)
-          atom->regex_intern->load_subregex_list(saved_subregex);
-        return true;
-      }
-      else
-      {
-        atom->regex_intern->load_subregex_list(saved_subregex);
-        (*piece_it).nr_matches--;
-      }
-    }
-    if((*piece_it).nr_matches >= min)
-    {
-      //go to next piece
-      std::list<RegexAscii_pieceinfo>::iterator next_it = piece_it;
-      next_it++;
-      if(next_it == end_it)
-        return true;
-      retmatch = (*next_it).piece->match_piece(next_it, end_it, source, matched_len);
-      if(!retmatch)
-        atom->regex_intern->load_subregex_list(saved_subregex);
-      return retmatch;
-    }
-    else
-    {
-    //  regex_atom->restore_match();
-      atom->regex_intern->load_subregex_list(saved_subregex);
-      return false;
-    }
-  }
-
-  int longest_len = -1;
-  int otherpieces_longest = -1;
-  int i_longest = -1;
-  int i = max;
-  std::list<RegexAscii_pieceinfo>::iterator next_it = piece_it;
-  next_it++;
-
-  bool retmatch;
-  while(1)
-  {
-    retmatch = match_piece_times(source, &timeslen, i, &match_lens);
-    i=match_lens.size()-1;//number of matches
-    if((i>=min))
-    {
-      if(timeslen < longest_len)
-      {//this branch is no use
-        i = choose_another_branch(match_lens);
-        if(i >= 0)
-        {
-          i = max;
-          continue;//try another branch
-        }
-        else
-          break;
-      }
-      //int piecelen = 0;
-      int   otherpieces = 0;
-      if((next_it == end_it) ||
-        (*next_it).piece->match_piece(next_it, end_it, source+timeslen, &otherpieces)
-        )
-      {
-        if(timeslen > longest_len)
-        {
-          longest_len = timeslen;
-          otherpieces_longest = otherpieces;
-          i_longest = i;
-          if(!(atom->regex_intern->flags & REGEX_ASCII_GET_LONGEST_BRANCH))
-          {
-            *matched_len = longest_len + otherpieces_longest;
-            return true;
-          }
-          else
-          {
-            if(match_lens.at(0).second)
-              atom->regex_intern->save_subregex_list(saved_subregex);
-          }
-        }
-      }
-      else
-      {
-        if(!match_lens.at(0).second)
-        {
-          match_lens.resize(match_lens.size()-1);
-          i--;
-          if(i >= 0)
-            continue;//try smaller 
-          else
-            break;
-        }
-        else
-        {
-          i = choose_another_branch(match_lens);
-          if(i >= 0)
-            continue;//try another branch
-          else
-            break;
-        }
-      }
-    }
-    //now try another branch
-    i = choose_another_branch(match_lens);
-    if(i >= 0)
-    {
-      i = max;
-      continue;//try another branch
-    }
-    else
-      break;
-  }//end while
-
-  if(longest_len >= 0)
-  {
-    *matched_len = longest_len + otherpieces_longest;
-    if(saved_subregex.size())
-      atom->regex_intern->load_subregex_list(saved_subregex);
-    return true;
-  }
-
-  return false;
-}
-
-bool CRegexXQuery_piece::match_piece_times(const char *source, 
-                                          int *piecelen, 
-                                          int times,
-                                          std::vector<std::pair<int,int> >    *match_lens)
-{
-  int i=0;
-  if(match_lens && match_lens->size())
-  {
-    i = match_lens->size()-1;
-  }
-  if(match_lens && match_lens->size())
-    *piecelen = match_lens->at(match_lens->size()-1).first;
-  else
-    *piecelen = 0;
-  if((times >= 0) && (i>=times))
-    return true;
-  for(;(times < 0) || (i<times);i++)
-  {
-    int   atomlen;
-    int   start_from_branch = 0;
-    if(match_lens && (i<(int)match_lens->size()))
-      start_from_branch = match_lens->at(i).second;
-    bool first_branch = (start_from_branch == 0);
-    if(!atom->match(source+*piecelen, &start_from_branch, &atomlen, empty_pieces.begin(), empty_pieces.end()))
-    {
-      if(match_lens)
-      {
-        if(i >= (int)match_lens->size())
-          match_lens->push_back(std::pair<int,int>(*piecelen, 0));
-        else
-          (*match_lens)[i] = std::pair<int,int>(*piecelen, 0);
-      }
-      return false;
-    }
-    if(match_lens)
-    {
-      if(i >= (int)match_lens->size())
-        match_lens->push_back(std::pair<int,int>(*piecelen, start_from_branch));
-      else
-        (*match_lens)[i] = std::pair<int,int>(*piecelen, start_from_branch);
-    }
-    *piecelen += atomlen;
-    if(!atomlen && !source[*piecelen])
-    {
-    //  atom->regex_intern->set_reachedEnd(source);
-      break;
-    }
-    if(first_branch && (atomlen == 0))//avoid infinite loop
-    {
-      break;
-    }
-  }
-  if(match_lens)
-  {
-  //  if(i >= match_lens->size())
-      match_lens->push_back(std::pair<int,int>(*piecelen, 0));
-  //  else
-  //    (*match_lens)[i] = std::pair<int,int>(*piecelen, 0);
-  }
-
-  return true;
 }
 
 bool CRegexXQuery_multicharP::match_internal(const char *source, int *start_from_branch, int *matched_len)
@@ -2260,14 +1891,12 @@ bool CRegexXQuery_char_ascii_i::match_internal(const char *source, int *start_fr
     regex_intern->set_reachedEnd(source);
     return false;
   }
-  char  sup = toupper(source[0]);
-  if(sup == c)
-  {
-    *matched_len = 1;
-    return true;
-  }
-  else
+  const char *temp_source = source;
+  unicode::code_point const sc = utf8::next_char(temp_source);
+  if(fold_case(sc) != static_cast<unsigned char>(c))
     return false;
+  *matched_len = static_cast<int>(temp_source - source);
+  return true;
 }
 
 bool CRegexXQuery_char_range_ascii::match_internal(const char *source, int *start_from_branch, int *matched_len)
@@ -2293,14 +1922,12 @@ bool CRegexXQuery_char_range_ascii_i::match_internal(const char *source, int *st
     regex_intern->set_reachedEnd(source);
     return false;
   }
-  char  sup = toupper(source[0]);
-  if((sup >= c1) && (sup <= c2))
-  {
-    *matched_len = 1;
-    return true;
-  }
-  else
+  const char *temp_source = source;
+  unicode::code_point const sc = utf8::next_char(temp_source);
+  if(!in_range_i(sc, static_cast<unsigned char>(c1), static_cast<unsigned char>(c2)))
     return false;
+  *matched_len = static_cast<int>(temp_source - source);
+  return true;
 }
 
 bool CRegexXQuery_char_unicode::match_internal(const char *source, int *start_from_branch, int *matched_len)
@@ -2345,14 +1972,11 @@ bool CRegexXQuery_char_unicode_i::match_internal(const char *source, int *start_
     return false;
   }
   const char *temp_source = source;
-  unicode::code_point  sup = unicode::to_upper(utf8::next_char(temp_source));
-  if(sup == c)
-  {
-    *matched_len = temp_source - source;
-    return true;
-  }
-  else
+  unicode::code_point const sc = utf8::next_char(temp_source);
+  if(fold_case(sc) != c)
     return false;
+  *matched_len = static_cast<int>(temp_source - source);
+  return true;
 }
 
 bool CRegexXQuery_char_range_unicode::match_internal(const char *source, int *start_from_branch, int *matched_len)
@@ -2381,14 +2005,11 @@ bool CRegexXQuery_char_range_unicode_i::match_internal(const char *source, int *
     return false;
   }
   const char *temp_source = source;
-  unicode::code_point  sup = unicode::to_upper(utf8::next_char(temp_source));
-  if((sup >= c1) && (sup <= c2))
-  {
-    *matched_len = temp_source - source;
-    return true;
-  }
-  else
+  unicode::code_point const sc = utf8::next_char(temp_source);
+  if(!in_range_i(sc, c1, c2))
     return false;
+  *matched_len = static_cast<int>(temp_source - source);
+  return true;
 }
 
 bool CRegexXQuery_endline::match_internal(const char *source, int *start_from_branch, int *matched_len)
@@ -2499,28 +2120,41 @@ bool CRegexXQuery_backref::match_internal(const char *source, int *start_from_br
     *matched_len = 0;
     return true;
   }
-  if(!source[0])
-  {
-    regex_intern->set_reachedEnd(source);
-    return false;
-  }
-  *matched_len = regex_intern->subregex.at(backref-1)->matched_len;
+  int const sub_len = regex_intern->subregex.at(backref-1)->matched_len;
+  char const *const sub_end = submatch + sub_len;
+  char const *s = source;
   if(regex_intern->flags & REGEX_ASCII_CASE_INSENSITIVE)
   {
-    if(compare_unicode_ni(source, submatch, *matched_len)) 
+    //
+    // Compare case foldings character by character: the matched text may
+    // have another length in bytes, e.g., KELVIN SIGN (3 bytes) for 'k'.
+    //
+    while(submatch < sub_end)
     {
-      return true;
+      if(!*s)
+      {
+        regex_intern->set_reachedEnd(s);
+        return false;
+      }
+      if(fold_case(utf8::next_char(s)) != fold_case(utf8::next_char(submatch)))
+        return false;
     }
   }
   else
   {
-    if(!memcmp(source, submatch, *matched_len))
+    for(; submatch < sub_end; ++submatch, ++s)
     {
-      return true;
+      if(!*s)
+      {
+        regex_intern->set_reachedEnd(s);
+        return false;
+      }
+      if(*s != *submatch)
+        return false;
     }
   }
-  *matched_len = 0;
-  return false;
+  *matched_len = static_cast<int>(s - source);
+  return true;
 }
 
 bool CRegexXQuery_pinstart::match_internal(const char *source, int *start_from_branch, int *matched_len)

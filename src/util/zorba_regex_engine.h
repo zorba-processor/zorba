@@ -18,6 +18,7 @@
 #define ZORBA_MINIMAL_REGULAR_EXPRESSIONS_14_MAY_2008
 
 #include <list>
+#include <string>
 #include <vector>
 #include <util/unicode_util.h>
 namespace zorba {
@@ -30,43 +31,28 @@ namespace zorba {
 #define REGEX_ASCII_NO_WHITESPACE       8   //x
 #define REGEX_ASCII_LITERAL             16  //q
 
-#define REGEX_ASCII_GET_LONGEST_BRANCH  32   //try all branches and get the longest match (or shortest for reluctant pieces)
-#define REGEX_ASCII_MINIMAL_MATCH       64   //consider all pieces as reluctant
 #define REGEX_ASCII_WHOLE_MATCH         128  //match only all string, like having "^regex$"
-#define REGEX_ASCII_GROUPING_LEN_WHOLE_PIECE    256  //compute the len of a grouping as for the whole piece ( for example (a)+ when matching "aa" and referred as $1 will get string len 2 instead of last 1)
 
 class CRegexXQuery_regex;
 class CRegexXQuery_piece;
-
-struct RegexAscii_pieceinfo
-{
-  union
-  {
-    CRegexXQuery_piece*  piece;
-    CRegexXQuery_regex*  group_regex;
-  };
-  int nr_matches;
-
-  RegexAscii_pieceinfo(CRegexXQuery_piece* piece) {nr_matches=0;this->piece=piece;}
-  RegexAscii_pieceinfo(CRegexXQuery_regex* group_regex) {nr_matches=-1;this->group_regex=group_regex;}
-};
+class CRegexXQuery_matcher;
 
 
 class IRegexAtom
 {
 protected:
   friend class CRegexXQuery_piece;
+  friend class CRegexXQuery_matcher;
   CRegexXQuery_regex *regex_intern;
 public:
   IRegexAtom(CRegexXQuery_regex* regex)  : regex_intern(regex) {}
   virtual ~IRegexAtom() {}
 
-  virtual bool match(const char *source, int *start_from_branch, int *matched_len,
-                    std::list<RegexAscii_pieceinfo>::iterator next_piece,
-                    std::list<RegexAscii_pieceinfo>::iterator end_piece);
+  /**
+   * Matches one occurrence of a character-level atom (not a group) at
+   * \a source and sets \a matched_len to its length in bytes.
+   */
   virtual bool match_internal(const char *source, int *start_from_branch, int *matched_len) = 0;
-  virtual void reset_match() {}
-//  virtual void restore_match() {}
 };
 
 class CRegexXQuery_branch;
@@ -74,6 +60,15 @@ class CRegexXQuery_piece;
 class CRegexXQuery_chargroup;
 class CRegexXQuery_parser;
 
+/**
+ * A parenthesized group, or the whole regular expression.
+ *
+ * Matching is backtracking, leftmost alternative first, greedy or reluctant
+ * quantifiers as written. Captured substrings follow XQuery F&O 3.0 5.6.1:
+ * a back-reference to a group that did not participate in the match matches
+ * the empty string, and a group inside a repeated group participates only if
+ * it matched in the current iteration.
+ */
 class CRegexXQuery_regex : public IRegexAtom
 {
   friend class CRegexXQuery_parser;
@@ -84,12 +79,23 @@ class CRegexXQuery_regex : public IRegexAtom
   friend class CRegexXQuery_wildchar;
   friend class CRegexXQuery_backref;
   friend class CRegexXQuery_pinstart;
+  friend class CRegexXQuery_matcher;
 public:
   CRegexXQuery_regex(CRegexXQuery_regex *);
   virtual ~CRegexXQuery_regex();
 
+  /**
+   * Finds the first match in \a source; \a match_pos is the byte offset of
+   * the match and \a matched_len its length in bytes.
+   */
   bool match_anywhere(const char *source, unsigned int flags, int *match_pos, int *matched_len);
-  bool match_from(const char *source, unsigned int flags, int *match_pos, int *matched_len);
+
+  /**
+   * Finds the first match in the NUL-terminated \a subject that starts at or
+   * after byte offset \a from. "^" still refers to the start of \a subject
+   * (or of a line with the 'm' flag). \a match_pos is relative to \a subject.
+   */
+  bool search(const char *subject, int from, unsigned int flags, int *match_pos, int *matched_len);
 
   //for replace $1, $2 ...
   bool  get_indexed_match(int index, const char **matched_source, int *matched_len);
@@ -99,28 +105,24 @@ public:
   void set_reachedEnd(const char *source) {if(source > source_start) reachedEnd = true;}
   unsigned int get_flags() {return flags;}
 public:
-  virtual bool match(const char *source, int *start_from_branch, int *matched_len,
-                    std::list<RegexAscii_pieceinfo>::iterator next_piece,
-                    std::list<RegexAscii_pieceinfo>::iterator end_piece);
-  virtual bool match_internal(const char *source, int *start_from_branch, int *matched_len) {return false;}//not impl
-  virtual void reset_match();
-//  virtual void restore_match();
+  virtual bool match_internal(const char *source, int *start_from_branch, int *matched_len) {return false;}//groups are matched by CRegexXQuery_matcher
 private:
   void add_branch(CRegexXQuery_branch *branch);
-
-  void save_subregex_list(std::vector<std::pair<const char*, int> > &saved_subregex);
-  void load_subregex_list(std::vector<std::pair<const char*, int> > &saved_subregex);
 private:
   unsigned int flags;
-  std::list<CRegexXQuery_branch*>   branch_list;
+  std::vector<CRegexXQuery_branch*>   branch_list;
 
   const char  *source_start;
 
-  const char  *matched_source;
+  const char  *matched_source;          // NULL: did not participate
   int         matched_len;
-//  const unicode::code_point  *backup_matched_source;
-//  int         backup_matched_len;
   std::vector<CRegexXQuery_regex*>    subregex;//for grouping
+
+  int         capture_index;            // 1-based; 0 for (?:...) and the top
+  // The capturing groups inside this one (itself included) are
+  // subregex[cap_first] .. subregex[cap_end - 1] of the top regex.
+  int         cap_first;
+  int         cap_end;
 
   bool        reachedEnd;
 };
@@ -128,27 +130,21 @@ private:
 class CRegexXQuery_branch
 {
   friend class CRegexXQuery_parser;
+  friend class CRegexXQuery_matcher;
 public:
   CRegexXQuery_branch(CRegexXQuery_regex* regex);
   ~CRegexXQuery_branch();
-
-  bool match(const char *source, int *matched_len,
-              CRegexXQuery_regex* group_regex,
-              std::list<RegexAscii_pieceinfo>::iterator next_piece,
-              std::list<RegexAscii_pieceinfo>::iterator end_piece);
-  void reset();
-//  void restore();
 private:
-  std::list<RegexAscii_pieceinfo>   piece_list;
+  std::vector<CRegexXQuery_piece*>   piece_list;
 private:
   void add_piece(CRegexXQuery_piece *piece);
- 
 };
 
-class CRegexXQuery_piece //: public IRegexMatcher
+class CRegexXQuery_piece
 {
   friend class CRegexXQuery_parser;
   friend class CRegexXQuery_branch;
+  friend class CRegexXQuery_matcher;
 
   IRegexAtom *atom;
   CRegexXQuery_regex *regex_atom;
@@ -168,23 +164,6 @@ public:
   void set_is_reluctant(bool is_reluctant);
   void get_quantifier(int *min, int *max, bool *strict_max);
   bool get_is_reluctant();
-//  bool match(const char *source, int *matched_len);
-  bool match_piece(std::list<RegexAscii_pieceinfo>::iterator next_piece,
-                   std::list<RegexAscii_pieceinfo>::iterator end_piece,
-                   const char *source, int *matched_len);
-protected:
-  bool match_piece_times(const char *source, 
-                         int *piecelen, 
-                         int times,
-                         std::vector<std::pair<int,int> >    *match_lens);
-  int  choose_another_branch(std::vector<std::pair<int,int> > &match_lens);
-  bool match_piece_iter_reluctant(std::list<RegexAscii_pieceinfo>::iterator next_piece,
-                        std::list<RegexAscii_pieceinfo>::iterator end_piece,
-                        const char *source, int *matched_len);
-  bool match_piece_iter_normal(std::list<RegexAscii_pieceinfo>::iterator next_piece,
-                        std::list<RegexAscii_pieceinfo>::iterator end_piece,
-                        const char *source, int *matched_len);
-  bool is_regex_atom();
 };
 
 

@@ -1621,9 +1621,9 @@ bool FnMatchesIterator::nextImpl(
 
   try
   {
-    zstring lib_pattern;
-    convert_xquery_re( xquery_pattern, &lib_pattern, flags.c_str() );
-    res = utf8::match_part(input, lib_pattern, flags.c_str());
+    unicode::regex re;
+    re.compile_xquery( xquery_pattern, flags.c_str() );
+    res = re.match_part( input );
   }
   catch(XQueryException& ex)
   {
@@ -1659,7 +1659,7 @@ bool FnReplaceIterator::nextImpl(
   zstring pattern;
   zstring replacement;
   zstring resStr;
-  zstring lib_pattern;
+  unicode::regex re;
   store::Item_t item;
   bool tmp;
 
@@ -1691,8 +1691,8 @@ bool FnReplaceIterator::nextImpl(
   {
     // Check the translated pattern: the raw one ignores the 'q' flag, so
     // "a?" with 'q' was taken to match the empty string.
-    convert_xquery_re( pattern, &lib_pattern, flags.c_str() );
-    tmp = utf8::match_part(zstring(), lib_pattern, flags.c_str());
+    re.compile_xquery( pattern, flags.c_str() );
+    tmp = re.match_part( zstring() );
   }
   catch(XQueryException& ex)
   {
@@ -1791,7 +1791,13 @@ bool FnReplaceIterator::nextImpl(
 
   try
   {
-    utf8::replace_all(input, lib_pattern, flags.c_str(), replacement, &resStr);
+#ifndef ZORBA_NO_ICU
+    unicode::string u_res;
+    if ( re.replace_all( input, replacement, &u_res ) )
+      utf8::to_string( u_res, &resStr );
+#else
+    re.replace_all( input, replacement, &resStr );
+#endif /* ZORBA_NO_ICU */
   }
   catch(XQueryException& ex)
   {
@@ -1859,9 +1865,11 @@ bool FnTokenizeIterator::nextImpl(
 
   try
   {
-    convert_xquery_re( pattern, &state->thePattern, state->theFlags.c_str() );
+    state->thePattern = pattern;        // the XQuery pattern
+    unicode::regex re;
+    re.compile_xquery( state->thePattern, state->theFlags.c_str() );
     static zstring const empty;
-    tmp = utf8::match_part( empty, state->thePattern, state->theFlags );
+    tmp = re.match_part( empty );
   }
   catch(XQueryException& ex)
   {
@@ -1883,7 +1891,7 @@ bool FnTokenizeIterator::nextImpl(
       //
       // The RE needs to be compiled every time due to the weird stack macros.
       //
-      re.compile( state->thePattern, state->theFlags );
+      re.compile_xquery( state->thePattern, state->theFlags.c_str() );
       unicode::string u_token;
       bool const got_next = re.next_token(
         state->theString, &state->start_pos, &u_token, &state->hasmatched
@@ -2196,9 +2204,6 @@ bool FnAnalyzeStringIterator::nextImpl(
 
   try
   {
-    zstring lib_pattern;
-    convert_xquery_re( xquery_pattern, &lib_pattern, flags.c_str() );
-
     if(is_input_stream)
     {
       streambuf.ptr = (char*)malloc(STREAMBUF_CHUNK_SIZE);
@@ -2239,7 +2244,7 @@ bool FnAnalyzeStringIterator::nextImpl(
     }
 
     unicode::regex    rx;
-    rx.compile(lib_pattern, flags.c_str());
+    rx.compile_xquery(xquery_pattern, flags.c_str());
     int   nr_pattern_groups = rx.get_group_count();
     std::vector<int>    group_parent;
     calc_group_parents(xquery_pattern, &group_parent);
@@ -2249,7 +2254,7 @@ bool FnAnalyzeStringIterator::nextImpl(
     rx.set_string("", 0);
     if (rx.next_match(&reachedEnd))
     {
-      throw XQUERY_EXCEPTION(err::FORX0003, ERROR_PARAMS(lib_pattern));
+      throw XQUERY_EXCEPTION(err::FORX0003, ERROR_PARAMS(xquery_pattern));
     }
 
     store::Item_t null_parent;
@@ -2555,7 +2560,7 @@ bool StringAnalyzeStringIterator::nextImpl( store::Item_t& result,
   int g_count;
   vector<int> g_parents;
   store::Item_t item;
-  zstring input, pattern, lib_pattern, flags;
+  zstring input, pattern, flags;
 #if STREAM_ANALYZE_STRING
   istream *is;
   istringstream iss;
@@ -2594,8 +2599,7 @@ bool StringAnalyzeStringIterator::nextImpl( store::Item_t& result,
   }
 
   try {
-    convert_xquery_re( pattern, &lib_pattern, flags.c_str() );
-    regex.compile( lib_pattern, flags );
+    regex.compile_xquery( pattern, flags.c_str() );
   }
   catch ( XQueryException &xe ) {
     set_source( xe, loc );
