@@ -16252,7 +16252,7 @@ void end_visit (const FTThesaurusID& v, void* /*visit_state*/) {
     theSctx->resolve_uri( uri, internal::EntityData::THESAURUS, error_msg )
   );
   if ( !rsrc.get() )
-    RAISE_ERROR(err::FTST0018, loc, ERROR_PARAMS( uri ));
+    RAISE_ERROR(err::FTST0018, loc, ERROR_PARAMS( uri, error_msg ));
 
   ftrange *levels;
   if ( v.get_levels() ) {

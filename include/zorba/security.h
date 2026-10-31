@@ -93,6 +93,26 @@ enum class Capability : uint32_t {
  *   query's behalf (module imports, eval, the zorba-query module) inherit it
  *   and can only narrow it (see narrowedBy()).
  *
+ * A resource that the policy denies is not available: the query gets the
+ * error the specification prescribes for a resource that cannot be
+ * retrieved, and the message says that the access was denied by the security
+ * policy and why, e.g. <code>access denied by security policy (requires
+ * capability RemoteImport)</code>:
+ * - module or schema import: \c err:XQST0059;
+ * - fn:doc: \c err:FODC0002 (fn:doc-available returns false);
+ * - fn:unparsed-text, fn:unparsed-text-lines: \c err:FOUT1170
+ *   (fn:unparsed-text-available returns false);
+ * - thesaurus: \c err:FTST0018; stop words: \c err:FTST0008;
+ * - JSound schema import: \c jse:SCHEMA_NOT_FOUND; the fetch module:
+ *   \c uri:URI_UNRESOLVED_OR_NOSTREAM;
+ * - the file module: \c file:FOFL9999; the http-client module: \c http:HTTP
+ *   (\c error:HC001 through the EXPath interface); the ftp-client module:
+ *   \c ftp:FTP_ERROR.
+ *
+ * \c zerr:ZXQP0029 is raised only for an external entity or DTD that the
+ * policy refuses while a document is parsed (where no other error applies)
+ * and for a URI that a URIMapper refuses (URIMapper::DENY_ACCESS).
+ *
  * \note Enforcement is being introduced in stages. Currently enforced: the
  *       XML parser (external entities); URI resolution by the built-in
  *       resolvers (documents, unparsed text, module, schema, thesaurus and

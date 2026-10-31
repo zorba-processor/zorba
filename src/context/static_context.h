@@ -826,7 +826,11 @@ public:
   void add_url_resolver(internal::URLResolver* aResolver);
 
   /**
-   * Given a URI, return a Resource for that URI.
+   * Given a URI, return a Resource for that URI, or null if none is
+   * available; oErrorMessage then says why, if known. A resource that the
+   * security policy denies is not available: the caller raises its own
+   * "not available" error, and oErrorMessage names the policy and the
+   * reason (see apply_url_resolvers()).
    * @param aEntityKind the expected kind of entity expected at this aUri
    */
   std::unique_ptr<internal::Resource> resolve_uri(
@@ -924,13 +928,15 @@ public:
 
   /**
    * Checks the security policy in effect for "this" sctx for an access to
-   * aUrl by a built-in URL resolver. Throws ZXQP0029 (naming aRequested, the
-   * URI the query asked for) if it is denied.
+   * aUrl by a built-in URL resolver. If it is denied, returns false and sets
+   * oErrorMessage to the denial message (naming aUrl if it is not
+   * aRequested, the URI the query asked for).
    */
-  void check_uri_access(
+  bool check_uri_access(
       const zstring& aUrl,
       internal::EntityData::Kind aEntityKind,
-      const zstring& aRequested) const;
+      const zstring& aRequested,
+      zstring& oErrorMessage) const;
 
   //
   // Validating Items
