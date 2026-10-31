@@ -77,10 +77,16 @@ DebugIterator::nextImpl(
   DebugIteratorState* lState = 0;
   DEFAULT_STACK_INIT(DebugIteratorState, lState, planState);
 
-  planState.theDebuggerCommons->setCurrentIterator(this);
+  // there is no debugger session if a debug-mode plan is executed normally
+  // (e.g. execute() instead of debug(), or a function called from an eval)
+  if (planState.theDebuggerCommons != NULL &&
+      planState.theDebuggerCommons->getRuntime() != NULL)
+  {
+    planState.theDebuggerCommons->setCurrentIterator(this);
 
-  // is there a breakpoint here?
-  checkBreak(&planState);
+    // is there a breakpoint here?
+    checkBreak(&planState);
+  }
 
   while (consumeNext(result, theChildren[0], planState)) {
     lState->notEmptySequence = true;
