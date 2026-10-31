@@ -29,6 +29,7 @@
 #include "store/api/item.h"
 #include "system/globalenv.h"
 #include <context/static_context.h>
+#include <cstring>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -94,9 +95,13 @@ HTTPURLResolver::resolveURL
     lStream->setStreamReleaser(nullptr);
     return lResource;
   } catch (ZorbaException const& e) {
-    // A denial is not a failure to load: report it as such.
-    if (e.diagnostic() == zerr::ZXQP0029_URI_ACCESS_DENIED)
-      throw;
+    // A denial is not a failure to load: report it as such. The http-client
+    // module reports a denied redirect or connection with its own error
+    // code (http:HTTP, HC001 through the EXPath interface), but always with
+    // a security::denial_message(), which names the policy.
+    if (e.diagnostic() == zerr::ZXQP0029_URI_ACCESS_DENIED ||
+        std::strstr(e.what(), "access denied by security policy"))
+      throw security::AccessDenied(e.what());
     throw os_error::exception("", aUrl.c_str(), "Could not create stream resource");
   } catch (...) {
     throw os_error::exception("", aUrl.c_str(), "Could not create stream resource");
@@ -143,10 +148,9 @@ FileURLResolver::resolveURL
         std::unique_ptr<std::istream> lChecked(security::open_file(
             lScope->policy(), lPath, lScope->use(), lScope->trustedDirs(),
             false, lVerdict));
-        if (!lVerdict.allowed) {
-          throw XQUERY_EXCEPTION(zerr::ZXQP0029_URI_ACCESS_DENIED,
-                                 ERROR_PARAMS(aUrl, lVerdict.reason.c_str()));
-        }
+        if (!lVerdict.allowed)
+          throw security::AccessDenied(
+              security::denial_message(aUrl.str(), lVerdict.reason));
         if (!lChecked)
           return NULL;
         return new StreamResource(

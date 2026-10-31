@@ -84,6 +84,13 @@ getFetchResource(
 
     if ( !lStreamRes.get() )
     {
+      // lErrorMessage says why if the security policy denied the resource.
+      if ( !lErrorMessage.empty() )
+        throw XQUERY_EXCEPTION(
+          zuri::URI_UNRESOLVED_OR_NOSTREAM,
+          ERROR_PARAMS( aUri->getStringValue(), lErrorMessage ),
+          ERROR_LOC( aLoc )
+        );
       throw XQUERY_EXCEPTION(
         zuri::URI_UNRESOLVED_OR_NOSTREAM,
         ERROR_PARAMS(
@@ -99,7 +106,7 @@ getFetchResource(
     return lStreamRes;
 
   } catch (ZorbaException const& e) {
-    // A denial by the security policy keeps its error code.
+    // A refusal by a URI mapper of the embedder keeps its error code.
     if (e.diagnostic() == zerr::ZXQP0029_URI_ACCESS_DENIED)
       throw;
     throw XQUERY_EXCEPTION(

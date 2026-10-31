@@ -679,6 +679,16 @@ thread_local const ResolutionScope* theCurrentScope = nullptr;
 } // anonymous namespace
 
 
+std::string denial_message(const std::string& aURI, const std::string& aReason)
+{
+  std::string lMessage;
+  if (!aURI.empty())
+    lMessage = "\"" + aURI + "\": ";
+  lMessage += "access denied by security policy (" + aReason + ")";
+  return lMessage;
+}
+
+
 std::string uri_scheme(const std::string& aURI)
 {
   std::string::size_type const lColon = aURI.find(':');

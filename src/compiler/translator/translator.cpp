@@ -2342,14 +2342,19 @@ void* import_schema(
          lIter != lCandidates.end();
          ++lIter)
     {
+      zstring lCandidateError;
       lSchema = theSctx->resolve_uri(*lIter, internal::EntityData::SCHEMA,
-                                     lErrorMessage);
+                                     lCandidateError);
 
       lStream = dynamic_cast<internal::StreamResource*>(lSchema.get());
       if (lStream != NULL)
       {
         break;
       }
+      // Report why the first candidate (e.g. the location hint the query
+      // gave, if the security policy denied it) could not be loaded.
+      if (lErrorMessage.empty())
+        lErrorMessage = lCandidateError;
     }
 
     if (lStream == NULL)
@@ -16256,7 +16261,7 @@ void end_visit (const FTThesaurusID& v, void* /*visit_state*/) {
     theSctx->resolve_uri( uri, internal::EntityData::THESAURUS, error_msg )
   );
   if ( !rsrc.get() )
-    RAISE_ERROR(err::FTST0018, loc, ERROR_PARAMS( uri ));
+    RAISE_ERROR(err::FTST0018, loc, ERROR_PARAMS( uri, error_msg ));
 
   ftrange *levels;
   if ( v.get_levels() ) {

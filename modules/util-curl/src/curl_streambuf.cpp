@@ -155,8 +155,9 @@ bool guard_allows( policy_guard *g, char const *address ) {
   if ( g->denied.empty() ) {
     g->denied = '"';
     g->denied += without_userinfo( url );
-    g->denied += "\": URI access not allowed: ";
+    g->denied += "\": access denied by security policy (";
     g->denied += reason.str();
+    g->denied += ')';
   }
   return false;
 }

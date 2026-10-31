@@ -50,13 +50,14 @@ protected:
                                        String const& ) const;
 
   /**
-   * Raises zerr:ZXQP0029 unless the security policy of the calling context
+   * Raises ftp:FTP_ERROR unless the security policy of the calling context
    * allows access to the URI.
    */
   void check_uri( StaticContext const*, String const &uri ) const;
 
   /**
-   * Raises zerr:ZXQP0029 with the given message.
+   * Raises ftp:FTP_ERROR with the given message, which says that the
+   * security policy denied the access and why.
    */
   [[noreturn]] void throw_access_denied( std::string const &message ) const;
 

@@ -195,15 +195,21 @@ bool failed_with(const Outcome& o, const char* aCode,
   return true;
 }
 
-bool denied(const Outcome& o, const std::string& aReason = std::string())
+// A denial by the security policy is reported with the error code the
+// function documents for a resource it cannot access (aCode); the message
+// names the policy and the reason.
+bool denied(const Outcome& o, const char* aCode,
+            const std::string& aReason = std::string())
 {
-  return failed_with(o, "ZXQP0029", aReason) &&
-         failed_with(o, "ZXQP0029", "URI access not allowed");
+  return failed_with(o, aCode, aReason) &&
+         failed_with(o, aCode, "access denied by security policy");
 }
 
 bool not_denied(const Outcome& o)
 {
-  if (!o.ok && (o.code == "ZXQP0029" || o.code == "ZXQP0067"))
+  if (!o.ok && (o.code == "ZXQP0029" || o.code == "ZXQP0067" ||
+                o.message.find("access denied by security policy") !=
+                  std::string::npos))
   {
     std::cerr << "  expected no denial, got " << o << std::endl;
     return false;
@@ -323,28 +329,28 @@ void test_file_module(Zorba* z, const Files& f)
   for (const char* lOut : {"outside/secret.txt", "data/../outside/secret.txt",
                            "data/link.txt", "data/ldir/secret.txt"})
   {
-    CHECK(denied(run(z, rd, READ, f.path(lOut)),
+    CHECK(denied(run(z, rd, READ, f.path(lOut)), "FOFL9999",
                  "outside the allowed read paths"));
-    CHECK(denied(run(z, rd, LINES, f.path(lOut))));
-    CHECK(denied(run(z, rd, BINARY, f.path(lOut))));
-    CHECK(denied(run(z, rd, EXISTS, f.path(lOut))));
-    CHECK(denied(run(z, rd, SIZE, f.path(lOut))));
+    CHECK(denied(run(z, rd, LINES, f.path(lOut)), "FOFL9999"));
+    CHECK(denied(run(z, rd, BINARY, f.path(lOut)), "FOFL9999"));
+    CHECK(denied(run(z, rd, EXISTS, f.path(lOut)), "FOFL9999"));
+    CHECK(denied(run(z, rd, SIZE, f.path(lOut)), "FOFL9999"));
   }
-  CHECK(denied(run(z, rd, LIST, f.path("outside"))));
-  CHECK(denied(run(z, rd, LIST, f.path("data/ldir"))));
+  CHECK(denied(run(z, rd, LIST, f.path("outside")), "FOFL9999"));
+  CHECK(denied(run(z, rd, LIST, f.path("data/ldir")), "FOFL9999"));
 
   // Writes need FileWrite and a write path.
-  CHECK(denied(run(z, rd, WRITE, f.path("data/new.txt")),
+  CHECK(denied(run(z, rd, WRITE, f.path("data/new.txt")), "FOFL9999",
                "requires capability FileWrite"));
   CHECK(!sfs::exists(f.root / "data" / "new.txt"));
   CHECK(allowed(run(z, wr, WRITE, f.path("data/new.txt")), "written"));
-  CHECK(denied(run(z, wr, WRITE, f.path("outside/new.txt")),
+  CHECK(denied(run(z, wr, WRITE, f.path("outside/new.txt")), "FOFL9999",
                "outside the allowed write paths"));
-  CHECK(denied(run(z, wr, WRITE, f.path("data/ldir/new.txt"))));
+  CHECK(denied(run(z, wr, WRITE, f.path("data/ldir/new.txt")), "FOFL9999"));
   CHECK(!sfs::exists(f.root / "outside" / "new.txt"));
   CHECK(allowed(run(z, wr, MKDIR, f.path("data/sub")), "true"));
-  CHECK(denied(run(z, wr, MKDIR, f.path("outside/sub"))));
-  CHECK(denied(run(z, wr, DELETE, f.path("outside/secret.txt"))));
+  CHECK(denied(run(z, wr, MKDIR, f.path("outside/sub")), "FOFL9999"));
+  CHECK(denied(run(z, wr, DELETE, f.path("outside/secret.txt")), "FOFL9999"));
   CHECK(sfs::exists(f.root / "outside" / "secret.txt"));
   CHECK(allowed(run(z, wr, DELETE, f.path("data/new.txt")), "false"));
 
@@ -379,8 +385,10 @@ void test_file_module(Zorba* z, const Files& f)
   };
   CHECK(allowed(lCopy(wr, f.path("data/in.txt"), f.path("data/copy.txt")),
                 "inside-text"));
-  CHECK(denied(lCopy(wr, f.path("data/link.txt"), f.path("data/copy2.txt"))));
-  CHECK(denied(lCopy(wr, f.path("data/in.txt"), f.path("outside/copy.txt"))));
+  CHECK(denied(lCopy(wr, f.path("data/link.txt"), f.path("data/copy2.txt")),
+               "FOFL9999"));
+  CHECK(denied(lCopy(wr, f.path("data/in.txt"), f.path("outside/copy.txt")),
+               "FOFL9999"));
   CHECK(!sfs::exists(f.root / "data" / "copy2.txt"));
   CHECK(!sfs::exists(f.root / "outside" / "copy.txt"));
 
@@ -526,9 +534,10 @@ void test_http_uri_resolution(Zorba* z)
   std::string const lRemote =
     "import module namespace r = \"http://example.test/r\" at "
     "\"http://8.8.8.8/r.xq\";\n1";
-  CHECK(denied(run(z, sctx, lRemote), "requires capability RemoteImport"));
+  CHECK(denied(run(z, sctx, lRemote),
+               "XQST0059", "requires capability RemoteImport"));
   // A child context (and so every query compiled with it) inherits it.
-  CHECK(denied(run(z, sctx->createChildContext(), lRemote),
+  CHECK(denied(run(z, sctx->createChildContext(), lRemote), "XQST0059",
                "requires capability RemoteImport"));
 
   // Enabling the option cannot widen the policy.
@@ -560,7 +569,7 @@ void test_wordnet(Zorba* z)
 #ifndef ZORBA_NO_FULL_TEXT
   const char QUERY[] =
     "<msg>affluent man</msg> contains text \"wealthy\" using thesaurus default";
-  CHECK(denied(run(z, context(z, SecurityPolicy::secure()), QUERY),
+  CHECK(denied(run(z, context(z, SecurityPolicy::secure()), QUERY), "FTST0018",
                "requires capability NativeModules"));
   // Allowed: no denial (the WordNet data may not be installed).
   CHECK(not_denied(run(z, context(z, SecurityPolicy::secure()
@@ -584,7 +593,7 @@ void test_zorba_query(Zorba* z, const Files& f)
     "variable $q := zq:prepare-main-module("
     "concat(\"fn:unparsed-text('\", $uri, \"')\"));\n"
     "zq:evaluate($q)";
-  CHECK(denied(run(z, zqOnly, lRead, f.uri("data/in.txt"))));
+  CHECK(denied(run(z, zqOnly, lRead, f.uri("data/in.txt")), "FOUT1170"));
   CHECK(allowed(run(z, context(z, SecurityPolicy::secure()
                                   .allow(Capability::NativeModules)
                                   .allow(Capability::FileRead)
@@ -628,6 +637,10 @@ void test_http_client(Zorba* z)
     "http:get-text($uri)(\"status\")";
   std::string const TEXT = std::string(URI_VAR) +
     "contains(fn:unparsed-text($uri), \"simpletest\")";
+  std::string const XGET =
+    "import module namespace xh = "
+    "\"http://www.zorba-xquery.com/modules/http-client\";\n" +
+    std::string(URI_VAR) + "string(xh:get-text($uri)[1]/@status)";
 
   StaticContext_t all = context(z, SecurityPolicy::unrestricted());
   Outcome const lProbe =
@@ -649,7 +662,7 @@ void test_http_client(Zorba* z)
       .allow(Capability::Network).allow(Capability::NativeModules);
 
   // The server is on a private address.
-  CHECK(denied(run(z, context(z, lNet), GET, lInside)));
+  CHECK(denied(run(z, context(z, lNet), GET, lInside), "HTTP"));
 
   // A redirect out of the allowed prefix is refused, for the http-client
   // module and for fn:doc (which uses it).
@@ -658,15 +671,18 @@ void test_http_client(Zorba* z)
       .addNetworkPrefix(lBase + "/http-test-data/"));
   CHECK(allowed(run(z, pre, GET, lInside), "200"));
   CHECK(allowed(run(z, pre, GET, lRedirect + lInside), "200"));
-  CHECK(denied(run(z, pre, GET, lRedirect + lOutside),
+  CHECK(denied(run(z, pre, GET, lRedirect + lOutside), "HTTP",
                "not under an allowed network prefix"));
-  CHECK(denied(run(z, pre, GET, lOutside)));
+  CHECK(denied(run(z, pre, GET, lOutside), "HTTP"));
   CHECK(allowed(run(z, pre, TEXT, lInside), "true"));
-  CHECK(denied(run(z, pre, TEXT, lRedirect + lOutside)));
+  // Through the EXPath interface, the denial is error:HC001.
+  CHECK(denied(run(z, pre, XGET, lRedirect + lOutside), "HC001",
+               "not under an allowed network prefix"));
+  CHECK(denied(run(z, pre, TEXT, lRedirect + lOutside), "FOUT1170"));
 
   // Other protocols are refused, also as redirect targets (curl refuses
-  // those: an error, but not necessarily ZXQP0029).
-  CHECK(denied(run(z, pre, GET, "file:///etc/hostname")));
+  // those: an error, but not necessarily a denial by the policy).
+  CHECK(denied(run(z, pre, GET, "file:///etc/hostname"), "HTTP"));
   Outcome const lToFile = run(z, pre, GET, lRedirect + "file:///etc/hostname");
   CHECK(!lToFile.ok);
   if (lToFile.ok)
@@ -701,6 +717,7 @@ void test_http_client(Zorba* z)
                     "200"));
       CHECK(denied(run(z, lit, GET,
                        lByIp + "/http-test-data/redirect.php?to=" + lInside),
+                   "HTTP",
                    "private or link-local address"));
       CHECK(allowed(run(z, context(z, SecurityPolicy(lNet)
                                       .setAllowPrivateAddresses(true)),

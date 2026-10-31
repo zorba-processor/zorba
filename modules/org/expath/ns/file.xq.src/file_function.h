@@ -59,13 +59,13 @@ protected:
    * Gets the argument on position pos as a normalised file system path, like
    * getPathArg(), and checks that the security policy of aSctx allows the
    * access (Capability::FileRead or Capability::FileWrite and the read or
-   * write paths). Raises zerr:ZXQP0029 if it does not.
+   * write paths). Raises file:FOFL9999 if it does not.
    */
   String getPathArg( ExternalFunction::Arguments_t const&, unsigned pos,
                      StaticContext const *aSctx, Access ) const;
 
   /**
-   * Raises zerr:ZXQP0029 unless the security policy of aSctx allows the
+   * Raises file:FOFL9999 unless the security policy of aSctx allows the
    * access to aPath.
    */
   void checkAccess( StaticContext const *aSctx, String const &aPath,
@@ -74,15 +74,15 @@ protected:
   /**
    * Opens aPath for reading under the security policy of aSctx, checking the
    * file actually opened (see SecurityPolicy::openFile()). Raises
-   * zerr:ZXQP0029 if the access is denied and file:FOFL9999 if the file
-   * cannot be opened.
+   * file:FOFL9999 if the access is denied or the file cannot be opened.
    */
   std::unique_ptr<std::istream> openForReading( StaticContext const *aSctx,
                                                 String const &aPath,
                                                 bool aBinary ) const;
 
   /**
-   * Raises zerr:ZXQP0029 for aPath with the given reason.
+   * Raises file:FOFL9999 for aPath, saying that the security policy denied
+   * the access, with the given reason.
    */
   [[noreturn]] void raiseAccessDenied( String const &aPath,
                                        String const &aReason ) const;
