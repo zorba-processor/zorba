@@ -34,6 +34,19 @@ namespace zorba {
 template<typename FloatType>
 class FloatImpl;
 
+/**
+ * Returns the hash code of a numeric value. xs:integer, xs:decimal, xs:float
+ * and xs:double values that are equal after numeric promotion must hash
+ * equal, since fn:distinct-values hashes items and compares them with
+ * promotion: integral values hash as the integer does (its low 32 bits, see
+ * IntegerImpl::hash() and Decimal::hash()), other values on their xs:float
+ * rounding.
+ *
+ * @param d The value.
+ * @return Its hash code.
+ */
+uint32_t hash_number( double d );
+
 namespace serialization {
   template<typename FloatType>
   void operator&( Archiver&, FloatImpl<FloatType>& );
@@ -952,7 +965,7 @@ inline int FloatImpl<F>::compare( FloatImpl<G> const &f ) const {
 
 template<typename F>
 inline uint32_t FloatImpl<F>::hash() const {
-  return static_cast<uint32_t>( value_ );
+  return hash_number( static_cast<double>( value_ ) );
 }
 
 template<typename F>

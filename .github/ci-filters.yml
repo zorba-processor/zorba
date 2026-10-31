@@ -1,0 +1,155 @@
+# Path filters for .github/workflows/ci.yml (dorny/paths-filter).
+# Mapping rationale and per-profile macros: see the comment block in ci.yml.
+# scripts/check-profile-filters.sh fails CI when a file that contains a
+# profile's guard macro is not matched by that profile's patterns, so keep
+# this file in sync when a guard moves to a new directory.
+
+# Required jobs (linux-*, macos-arm64): any code change.
+code:
+  - 'src/**'
+  - 'include/**'
+  - 'modules/**'
+  - 'bin/**'
+  - 'test/**'
+  - 'schemas/**'
+  - 'cmake/**'
+  - 'docker/**'
+  - '.clusterfuzzlite/**'
+  - '.github/codeql/**'
+  - 'CMakeLists.txt'
+  - 'CMake*.txt'
+  - 'CMake*.json'
+  - '*.cmake'
+  - '*.cmake.in'
+  - 'CTest*'
+  - 'CPack*'
+  - '.github/workflows/ci.yml'
+  - '.github/workflows/images.yml'
+  - '.github/actions/**'
+  - '.github/ci-filters.yml'
+
+# Build system, toolchain image and CI definition: every profile.
+build: &build
+  - 'CMakeLists.txt'
+  - 'CMake*.txt'
+  - 'CMake*.json'
+  - '**/CMakeLists.txt'
+  - '**/*.cmake'
+  - '**/*.cmake.in'
+  - 'cmake/**'
+  - 'CTest*'
+  - 'CPack*'
+  - 'docker/builder-latest/**'
+  - 'include/zorba/config.h.cmake'
+  - 'scripts/profile-size.sh'
+  - '.github/workflows/ci.yml'
+  - '.github/actions/**'
+  - '.github/ci-filters.yml'
+  - 'scripts/check-profile-filters.sh'
+  # Generators of the *pregenerated* sources (they contain the guards).
+  - 'src/runtime/spec/**'
+  - 'src/diagnostics/**'
+  # Unit tests carry guards for most options.
+  - 'src/unit_tests/**'
+
+# embedded: ZORBA_NO_FULL_TEXT, ZORBA_NO_XMLSCHEMA, ZORBA_WITH_DEBUGGER=OFF,
+# ZORBA_WITH_THESAURUS=OFF, ZORBA_SUPPRESS_CURL (no ZORBA_HAVE_CURL).
+embedded: &embedded
+  - *build
+  - 'include/**'
+  - 'src/api/**'
+  - 'src/capi/**'
+  - 'src/compiler/**'
+  - 'src/context/**'
+  - 'src/functions/**'
+  - 'src/runtime/**'
+  - 'src/store/**'
+  - 'src/system/**'
+  - 'src/types/**'
+  - 'src/zorbatypes/ft_token.*'
+  - 'src/zorbatypes/xerces_xmlcharray.h'
+  - 'src/util/http_util.*'
+  - 'bin/zorbacmd*'
+  - 'bin/CMakeLists.txt'
+  - 'modules/**/*.cpp'
+  - 'modules/**/*.h'
+  - 'modules/**/*.hpp'
+  - 'modules/full-text/**'
+  - 'schemas/**'
+  # Tests whose build or expected result depends on schema, full-text,
+  # thesaurus, curl or the debugger.
+  - 'test/api/**'
+  - 'test/unit/**'
+  - 'test/driver/**'
+  - 'test/rbkt/Queries/**/*schema*/**'
+  - 'test/rbkt/Queries/**/*fulltext*/**'
+  - 'test/rbkt/Queries/**/*full-text*/**'
+  - 'test/rbkt/Queries/**/*validat*/**'
+  - 'test/rbkt/modules/**'
+
+# embedded-noicu: everything in embedded plus ZORBA_NO_ICU (and the built-in
+# regex, UTF-8 and string code that replaces ICU).
+embedded-noicu:
+  - *embedded
+  - 'src/util/**'
+  - 'src/zorbautils/**'
+  - 'src/zorbatypes/**'
+  - 'src/zorbaserialization/**'
+  - 'src/api/serialization/**'
+  - 'test/rbkt/Queries/**/*regex*/**'
+  - 'test/rbkt/Queries/**/*string*/**'
+  - 'test/rbkt/Queries/**/*collat*/**'
+  - 'test/rbkt/Queries/**/*charset*/**'
+  - 'test/rbkt/Queries/**/*unicode*/**'
+  - 'test/rbkt/Queries/**/*date*/**'
+  - 'test/rbkt/Queries/**/*time*/**'
+
+# bigint: ZORBA_WITH_BIG_INTEGER (xs:integer / xs:decimal arithmetic).
+bigint:
+  - *build
+  - 'include/**'
+  - 'src/zorbatypes/**'
+  - 'src/system/globalenv.*'
+  - 'src/runtime/numerics/**'
+  - 'src/runtime/spec/numerics/**'
+  - 'src/types/**'
+  - 'src/store/**'
+  - 'src/api/**'
+  - 'test/api/**'
+  - 'test/unit/**'
+  - 'test/fots_driver/**'
+  - 'test/rbkt/Queries/**/*numeric*/**'
+  - 'test/rbkt/Queries/**/*integer*/**'
+  - 'test/rbkt/Queries/**/*decimal*/**'
+
+# full-nopch: ZORBA_USE_PCH=OFF (every header must compile on its own),
+# ZORBA_WITH_DEBUGGER=ON, ZORBA_XQUERYX=ON.
+full-nopch:
+  - *build
+  - 'include/**'
+  - 'src/**/*.h'
+  - 'src/**/*.hpp'
+  - 'src/**/*.tcc'
+  - 'src/precompiled/**'
+  - 'src/debugger/**'
+  - 'src/runtime/debug/**'
+  - 'src/compiler/xqueryx/**'
+  - 'src/compiler/api/**'
+  - 'src/compiler/expression/**'
+  - 'src/compiler/translator/**'
+  - 'src/compiler/codegen/**'
+  - 'src/runtime/visitors/**'
+  - 'src/runtime/eval/**'
+  - 'src/runtime/core/**'
+  - 'src/runtime/api/**'
+  - 'src/api/xquery*'
+  - 'src/system/globalenv.*'
+  - 'bin/debugger/**'
+  - 'bin/zorbacmd*'
+  - 'test/unit/**'
+  - 'test/api/**'
+  - 'test/driver/**'
+  - 'test/update/**'
+  - 'test/rbkt/Scripts/**'
+  - 'test/**/*.xqx'
+  - 'test/**/*XQueryX*/**'

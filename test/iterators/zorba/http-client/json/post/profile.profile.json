@@ -71,7 +71,7 @@
                         {
                           "kind": "SingletonIterator",
                           "value": "xs:string(http://$HTTP_TEST_SERVER/cgi-bin/test-text)",
-                          "prof-calls": 3,
+                          "prof-calls": 2,
                           "prof-next-calls": 4,
                           "prof-cpu": 0.004042,
                           "prof-wall": 0.002236,
@@ -80,7 +80,7 @@
                         {
                           "kind": "SingletonIterator",
                           "value": "xs:string(poststring)",
-                          "prof-calls": 3,
+                          "prof-calls": 2,
                           "prof-next-calls": 4,
                           "prof-cpu": 0.002651,
                           "prof-wall": 0.000916,
@@ -89,7 +89,7 @@
                         {
                           "kind": "SingletonIterator",
                           "value": "xs:string(text/plain)",
-                          "prof-calls": 3,
+                          "prof-calls": 2,
                           "prof-next-calls": 4,
                           "prof-cpu": 0.002723,
                           "prof-wall": 0.001023,
@@ -187,7 +187,7 @@
                                       "iterators": [
                                         {
                                           "kind": "JSONDirectObjectIterator",
-                                          "prof-calls": 3,
+                                          "prof-calls": 2,
                                           "prof-next-calls": 4,
                                           "prof-cpu": 0.163352,
                                           "prof-wall": 0.160827,
@@ -196,7 +196,7 @@
                                             {
                                               "kind": "SingletonIterator",
                                               "value": "xs:string(method)",
-                                              "prof-calls": 3,
+                                              "prof-calls": 2,
                                               "prof-next-calls": 2,
                                               "prof-cpu": 0.002598,
                                               "prof-wall": 0.001295,
@@ -205,7 +205,7 @@
                                             {
                                               "kind": "SingletonIterator",
                                               "value": "xs:string(href)",
-                                              "prof-calls": 3,
+                                              "prof-calls": 2,
                                               "prof-next-calls": 2,
                                               "prof-cpu": 0.002156,
                                               "prof-wall": 0.000818,
@@ -214,7 +214,7 @@
                                             {
                                               "kind": "SingletonIterator",
                                               "value": "xs:string(body)",
-                                              "prof-calls": 3,
+                                              "prof-calls": 2,
                                               "prof-next-calls": 2,
                                               "prof-cpu": 0.002081,
                                               "prof-wall": 0.000805,
@@ -223,7 +223,7 @@
                                             {
                                               "kind": "SingletonIterator",
                                               "value": "xs:string(POST)",
-                                              "prof-calls": 3,
+                                              "prof-calls": 2,
                                               "prof-next-calls": 2,
                                               "prof-cpu": 0.00194,
                                               "prof-wall": 0.000704,
@@ -232,7 +232,7 @@
                                             {
                                               "kind": "ForVarIterator",
                                               "varname": "href",
-                                              "prof-calls": 3,
+                                              "prof-calls": 2,
                                               "prof-next-calls": 2,
                                               "prof-cpu": 0.002188,
                                               "prof-wall": 0.000963,
@@ -240,7 +240,7 @@
                                             },
                                             {
                                               "kind": "JSONDirectObjectIterator",
-                                              "prof-calls": 3,
+                                              "prof-calls": 2,
                                               "prof-next-calls": 2,
                                               "prof-cpu": 0.107114,
                                               "prof-wall": 0.104609,
@@ -249,7 +249,7 @@
                                                 {
                                                   "kind": "SingletonIterator",
                                                   "value": "xs:string(media-type)",
-                                                  "prof-calls": 3,
+                                                  "prof-calls": 2,
                                                   "prof-next-calls": 2,
                                                   "prof-cpu": 0.002038,
                                                   "prof-wall": 0.000755,
@@ -258,7 +258,7 @@
                                                 {
                                                   "kind": "SingletonIterator",
                                                   "value": "xs:string(content)",
-                                                  "prof-calls": 3,
+                                                  "prof-calls": 2,
                                                   "prof-next-calls": 2,
                                                   "prof-cpu": 0.001974,
                                                   "prof-wall": 0.00068,
@@ -267,7 +267,7 @@
                                                 {
                                                   "kind": "ForVarIterator",
                                                   "varname": "content-type",
-                                                  "prof-calls": 3,
+                                                  "prof-calls": 2,
                                                   "prof-next-calls": 2,
                                                   "prof-cpu": 0.001952,
                                                   "prof-wall": 0.000725,
@@ -276,7 +276,7 @@
                                                 {
                                                   "kind": "ForVarIterator",
                                                   "varname": "body",
-                                                  "prof-calls": 3,
+                                                  "prof-calls": 2,
                                                   "prof-next-calls": 2,
                                                   "prof-cpu": 0.00184,
                                                   "prof-wall": 0.000626,
@@ -358,7 +358,7 @@
                                                                 {
                                                                   "kind": "ForVarIterator",
                                                                   "varname": "request",
-                                                                  "prof-calls": 3,
+                                                                  "prof-calls": 2,
                                                                   "prof-next-calls": 4,
                                                                   "prof-cpu": 0.002912,
                                                                   "prof-wall": 0.001184,
@@ -535,7 +535,7 @@
                                                                                                     {
                                                                                                       "kind": "ForVarIterator",
                                                                                                       "varname": "request",
-                                                                                                      "prof-calls": 3,
+                                                                                                      "prof-calls": 2,
                                                                                                       "prof-next-calls": 4,
                                                                                                       "prof-cpu": 0.003425,
                                                                                                       "prof-wall": 0.001694,
@@ -587,7 +587,7 @@
                                                                                                                     {
                                                                                                                       "kind": "ForVarIterator",
                                                                                                                       "varname": "i",
-                                                                                                                      "prof-calls": 3,
+                                                                                                                      "prof-calls": 2,
                                                                                                                       "prof-next-calls": 4,
                                                                                                                       "prof-cpu": 0.002852,
                                                                                                                       "prof-wall": 0.001116,
@@ -859,7 +859,7 @@
                                                                                                                                                         {
                                                                                                                                                           "kind": "ForVarIterator",
                                                                                                                                                           "varname": "v",
-                                                                                                                                                          "prof-calls": 3,
+                                                                                                                                                          "prof-calls": 2,
                                                                                                                                                           "prof-next-calls": 4,
                                                                                                                                                           "prof-cpu": 0.002749,
                                                                                                                                                           "prof-wall": 0.001005,
@@ -1885,7 +1885,7 @@
                                                                                                                 {
                                                                                                                   "kind": "ForVarIterator",
                                                                                                                   "varname": "request",
-                                                                                                                  "prof-calls": 3,
+                                                                                                                  "prof-calls": 2,
                                                                                                                   "prof-next-calls": 4,
                                                                                                                   "prof-cpu": 0.002954,
                                                                                                                   "prof-wall": 0.001156,
@@ -1937,7 +1937,7 @@
                                                                                                                                 {
                                                                                                                                   "kind": "ForVarIterator",
                                                                                                                                   "varname": "i",
-                                                                                                                                  "prof-calls": 3,
+                                                                                                                                  "prof-calls": 2,
                                                                                                                                   "prof-next-calls": 4,
                                                                                                                                   "prof-cpu": 0.002822,
                                                                                                                                   "prof-wall": 0.000998,
@@ -2209,7 +2209,7 @@
                                                                                                                                                                     {
                                                                                                                                                                       "kind": "ForVarIterator",
                                                                                                                                                                       "varname": "v",
-                                                                                                                                                                      "prof-calls": 3,
+                                                                                                                                                                      "prof-calls": 2,
                                                                                                                                                                       "prof-next-calls": 4,
                                                                                                                                                                       "prof-cpu": 0.00278,
                                                                                                                                                                       "prof-wall": 0.000995,
