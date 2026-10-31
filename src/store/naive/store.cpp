@@ -342,17 +342,11 @@ void Store::shutdown(bool soft)
       theNamespacePool = NULL;
     }
 
-    if (theIteratorFactory != NULL)
-    {
-      delete theIteratorFactory;
-      theIteratorFactory = NULL;
-    }
+    delete theIteratorFactory;
+    theIteratorFactory = NULL;
 
-    if (theNodeFactory != NULL)
-    {
-      delete theNodeFactory;
-      theNodeFactory = NULL;
-    }
+    delete theNodeFactory;
+    theNodeFactory = NULL;
 
     // do cleanup of the libxml2 library
     // however, after that, a user will have to call

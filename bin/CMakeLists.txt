@@ -152,7 +152,7 @@ IF(NOT ZORBA_NO_XMLSCHEMA)
   ZORBA_ADD_TEST(bin/zorba_disable_http_download zorbacmd
   -f -q "${_testdir}/uris/disable-http.xq" --disable-http-resolution)
   ZORBA_SET_TEST_PROPERTY(bin/zorba_disable_http_download
-  PASS_REGULAR_EXPRESSION "ZXQP0029")
+  PASS_REGULAR_EXPRESSION "XQST0059")
   ZORBA_SET_TEST_PROPERTY(bin/zorba_disable_http_download TIMEOUT 5)
 ENDIF(NOT ZORBA_NO_XMLSCHEMA)
 

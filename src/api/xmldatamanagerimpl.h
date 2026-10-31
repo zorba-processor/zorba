@@ -24,7 +24,6 @@
 #include "zorbautils/latch.h"
 
 #include "common/shared_types.h"
-#include "util/singleton.h"
 
 #ifndef ZORBA_NO_FULL_TEXT
 #include "stemmer_wrappers.h"

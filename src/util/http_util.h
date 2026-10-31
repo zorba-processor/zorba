@@ -17,6 +17,7 @@
 #include <zorba/security.h>
 #include <zorba/zorba.h>
 #include <zorba/item_sequence.h>
+#include <zorba/xquery.h>
 #include <zorba/static_context.h>
 #include <zorbatypes/zstring.h>
 
@@ -36,7 +37,7 @@ namespace zorba {
     StreamReleaser getStreamReleaser();
     void setStreamReleaser(StreamReleaser aReleaser);
   private:
-    ItemSequence_t theItemSequence;
+    XQuery_t theQuery;
     StaticContext_t theStaticContext;
     Item theStreamableString;
     Iterator_t theIterator;

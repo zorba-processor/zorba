@@ -232,10 +232,7 @@ curl::streambuf* function::require_connection( DynamicContext const *dctx,
 
 void function::throw_access_denied( std::string const &message ) const {
   throw USER_EXCEPTION(
-    module_->getItemFactory()->createQName(
-      "http://zorba.io/errors", "zerr", "ZXQP0029"
-    ),
-    message
+    module_->getItemFactory()->createQName( getURI(), "FTP_ERROR" ), message
   );
 }
 
@@ -247,8 +244,8 @@ void function::check_uri( StaticContext const *sctx,
   if ( !policy.checkURI( uri, EntityData::DOCUMENT, false, &reason ) ) {
     // The URI may carry a password: name only the host.
     throw_access_denied(
-      '"' + host_part( uri ).str() + "\": URI access not allowed: " +
-      reason.str()
+      '"' + host_part( uri ).str() + "\": access denied by security policy (" +
+      reason.str() + ')'
     );
   }
 }

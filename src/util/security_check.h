@@ -19,6 +19,7 @@
 
 #include <istream>
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -53,6 +54,28 @@ struct Verdict
 {
   bool        allowed = true;
   std::string reason;
+};
+
+/**
+ * The message for an access denied by the security policy:
+ * "\"aURI\": access denied by security policy (aReason)", without the URI
+ * part if aURI is empty. Every denial uses this form, whatever error code
+ * reports it, so that the policy and its reason can be told from the message.
+ */
+std::string denial_message(const std::string& aURI, const std::string& aReason);
+
+/**
+ * Thrown by a built-in URL resolver when the policy denies the resource it
+ * is about to read (the file actually opened, or a redirect or connection of
+ * an HTTP request). static_context::apply_url_resolvers() catches it: the
+ * resource is then not available, and what() (a denial_message()) is the
+ * error message the caller reports with its own error code.
+ */
+class AccessDenied : public std::runtime_error
+{
+public:
+  explicit AccessDenied(const std::string& aMessage)
+    : std::runtime_error(aMessage) {}
 };
 
 /**
