@@ -49,6 +49,17 @@ protected:
   curl::streambuf* require_connection( DynamicContext const*,
                                        String const& ) const;
 
+  /**
+   * Raises zerr:ZXQP0029 unless the security policy of the calling context
+   * allows access to the URI.
+   */
+  void check_uri( StaticContext const*, String const &uri ) const;
+
+  /**
+   * Raises zerr:ZXQP0029 with the given message.
+   */
+  [[noreturn]] void throw_access_denied( std::string const &message ) const;
+
   void throw_exception( char const*, char const*, char const*, int = 0 ) const;
 
   void throw_exception( char const *error_code, String const &s,

@@ -34,6 +34,7 @@
 #include "request_parser.h"
 #include "http_response_handler.h"
 #include "http_response_parser.h"
+#include "util/curl_streambuf.h"
 
 namespace zorba {
 
@@ -82,7 +83,8 @@ HttpClientModule::getExternalFunction(const String& aLocalname)
   return lFunc;
 }
 
-int HttpSendFunction::doRequest(Request& aRequest, ItemSequence_t& aResult) const
+int HttpSendFunction::doRequest(Request& aRequest, ItemSequence_t& aResult,
+                                const SecurityPolicy& aPolicy) const
 {
   ProfileWrapper lProfileWrapper(aRequest, theJSONProfileData, theXMLProfileData);
   CURL* lCURL = curl::create();
@@ -95,6 +97,9 @@ int HttpSendFunction::doRequest(Request& aRequest, ItemSequence_t& aResult) cons
   lHandler.reset(new HttpRequestHandler(lCURL));
 
   lHandler->sendRequest(aRequest);
+
+  // Every connection (redirects included) is checked against the policy.
+  curl::restrict_to_policy(lCURL, aPolicy);
 
 #ifdef WIN32
   std::string caCertPath;
@@ -109,6 +114,10 @@ int HttpSendFunction::doRequest(Request& aRequest, ItemSequence_t& aResult) cons
   std::unique_ptr<HttpResponseParser> lRespParser(new HttpResponseParser(lRespHandler, lCURL, lThrower,
       aRequest.theOptions.theOverrideContentType.c_str(), lStatusOnly));
   CURLcode lRetCode = lRespParser->parse();
+
+  std::string lDenied;
+  if (lRetCode && curl::policy_denied(lCURL, &lDenied))
+    lThrower.raiseException("http://zorba.io/errors", "ZXQP0029", lDenied);
 
   if (lRetCode == CURLE_OPERATION_TIMEDOUT)
     lThrower.raiseException("TIMEOUT", "A timeout occurred waiting for the response");
@@ -150,6 +159,21 @@ HttpSendFunction::evaluate(const ExternalFunction::Arguments_t& args,
 
   lParser.parseRequest(lRequestItem, lRequest);
 
+  // The URL must be allowed by the policy of the calling context; redirects
+  // and the addresses connected to are checked during the transfer.
+  SecurityPolicy const lPolicy = aStaticContext
+    ? aStaticContext->getSecurityPolicy()
+    : Zorba::getInstance(0)->getSecurityPolicy();
+  if (!lRequest.theHref.empty())
+  {
+    String lReason;
+    if (!lPolicy.checkURI(lRequest.theHref, EntityData::DOCUMENT, false,
+                          &lReason))
+      lThrower.raiseException("http://zorba.io/errors", "ZXQP0029",
+                              std::string("\"") + lRequest.theHref.str() +
+                              "\": URI access not allowed: " + lReason.str());
+  }
+
   RetrySpecification& lRetrySpec = lRequest.theOptions.theRetrySpec;
 
   if (lRetrySpec.theRetry)
@@ -160,7 +184,7 @@ HttpSendFunction::evaluate(const ExternalFunction::Arguments_t& args,
     {
       try
       {
-        int lStatus = doRequest(lRequest, lResult);
+        int lStatus = doRequest(lRequest, lResult, lPolicy);
 
         if (std::find(lRetrySpec.theRetryStatuses.begin(), lRetrySpec.theRetryStatuses.end(), lStatus) == lRetrySpec.theRetryStatuses.end())
           return lResult;
@@ -182,13 +206,13 @@ HttpSendFunction::evaluate(const ExternalFunction::Arguments_t& args,
       nanosleep(&lTs, 0);
 #endif
     }
-    doRequest(lRequest, lResult);
+    doRequest(lRequest, lResult, lPolicy);
     return lResult;
   }
   else
   {
     ItemSequence_t lResult;
-    doRequest(lRequest, lResult);
+    doRequest(lRequest, lResult, lPolicy);
     return lResult;
   }
 }

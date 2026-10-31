@@ -100,8 +100,7 @@ inline zstring Base64::str() const {
 }
 
 inline bool operator==( Base64 const &a, Base64 const &b ) {
-  return a.size() == b.size()
-      && std::strncmp( &a.data()[0], &b.data()[0], a.size() ) == 0;
+  return a.data() == b.data();
 }
 
 inline bool operator!=( Base64 const &a, Base64 const &b ) {
@@ -177,8 +176,7 @@ inline zstring Base16::str() const {
 }
 
 inline bool operator==( Base16 const &a, Base16 const &b ) {
-  return a.size() == b.size()
-      && std::strncmp( &a.data()[0], &b.data()[0], a.size() ) == 0;
+  return a.data() == b.data();
 }
 
 inline bool operator!=( Base16 const &a, Base16 const &b ) {

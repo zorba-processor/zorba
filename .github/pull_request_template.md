@@ -6,4 +6,5 @@
 
 ## Changelog
 
-Changelog: <one line for CHANGELOG.md under [Unreleased], or "none">
+Add a fragment `changelog.d/<branch-name>.md` (format: `changelog.d/README.md`), or write "Changelog: none".
+Do not edit `CHANGELOG.md`.

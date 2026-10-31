@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 #pragma once
+#include <zorba/security.h>
 #include <zorba/zorba.h>
 #include <zorba/item_sequence.h>
 #include <zorba/static_context.h>
@@ -22,7 +23,12 @@
 namespace zorba {
   class HttpStream {
   public:
-    HttpStream(const zstring& uri);
+    /**
+     * aPolicy: the policy of the context that asked for the URI, or null for
+     * the instance default. The request runs under it, so the URL, its
+     * redirects and the addresses connected to are checked against it.
+     */
+    HttpStream(const zstring& uri, const SecurityPolicy* aPolicy = nullptr);
     ~HttpStream();
   public:
     std::istream& getStream();
@@ -35,5 +41,6 @@ namespace zorba {
     Item theStreamableString;
     Iterator_t theIterator;
     const zstring& theUri;
+    std::unique_ptr<SecurityPolicy> thePolicy;
   };
 }

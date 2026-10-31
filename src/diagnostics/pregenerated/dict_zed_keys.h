@@ -115,6 +115,7 @@
 #define ZED_FOFD1340_NoGroupSepAtStart_4 "~FOFD1340_NoGroupSepAtStart_4"
 #define ZED_FOFD1340_NoGroupSepAtEnd_4 "~FOFD1340_NoGroupSepAtEnd_4"
 #define ZED_FOFD1340_NoOptDigitAfterMandatory "~FOFD1340_NoOptDigitAfterMandatory"
+#define ZED_FOFD1340_NoOptDigitBeforeMandatory "~FOFD1340_NoOptDigitBeforeMandatory"
 #define ZED_FTST0009_BadStopWordsLang "~FTST0009_BadStopWordsLang"
 #define ZED_FTST0009_BadStemmerLang "~FTST0009_BadStemmerLang"
 #define ZED_FTST0009_BadThesaurusLang "~FTST0009_BadThesaurusLang"

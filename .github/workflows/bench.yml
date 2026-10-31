@@ -89,8 +89,8 @@ jobs:
       - uses: actions/cache@v6
         with:
           path: .ccache
-          key: ccache-linux-amd64-latest-bench-${{ github.run_id }}
-          restore-keys: ccache-linux-amd64-latest-
+          key: ccache-v2-linux-amd64-latest-bench-${{ github.run_id }}
+          restore-keys: ccache-v2-linux-amd64-latest-
 
       - name: Build and measure A
         run: |

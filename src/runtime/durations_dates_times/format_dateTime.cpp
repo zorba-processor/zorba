@@ -23,6 +23,7 @@
 #include <iomanip>
 #include <iostream>
 #include <sstream>
+#include <vector>
 
 // Zorba
 #include "context/dynamic_context.h"
@@ -110,6 +111,7 @@ struct modifier {
 
   width_type min_width;
   width_type max_width;
+  bool has_width;                       // a width modifier was given
 
   //
   // This stuff isn't part of the "presentation modifier" as discussed in the
@@ -166,6 +168,7 @@ struct modifier {
     second.co = cardinal;
     second.at = no_second_at;
     min_width = max_width = 0;
+    has_width = false;
   };
 
   // default modifier(modifier const&) is fine
@@ -230,33 +233,107 @@ static void append_number( int n, modifier const &mod, zstring *dest ) {
 
 static void append_fractional_seconds( int n, modifier const &mod,
                                        zstring *dest ) {
-  switch ( mod.first.type ) {
-    case modifier::arabic:
-      if ( mod.min_width || mod.max_width ) {
-        if ( mod.max_width ) {
-          double const f = (double)n / DateTime::FRAC_SECONDS_UPPER_LIMIT;
-          double const p = ::pow( 10, mod.max_width );
-          n = (int)( f * p + 0.5 );
-        } else
-          n = (int)( n * 1000.0 / DateTime::FRAC_SECONDS_UPPER_LIMIT );
+  if ( mod.first.type != modifier::arabic ) {
+    n = (int)( n * 1000.0 / DateTime::FRAC_SECONDS_UPPER_LIMIT );
+    append_number( n, mod, dest );
+    return;
+  }
 
-        ascii::itoa_buf_type buf;
-        zstring tmp( ascii::itoa( n, buf ) );
+  //
+  // XQuery F&O 3.1 9.8.4.5 (Formatting Fractional Seconds), done directly
+  // rather than by reversing the picture and calling format-integer:
+  //
+  // The digits of the fraction, without insignificant trailing zeros.
+  //
+  zstring digits;
+  {
+    ascii::itoa_buf_type buf;
+    digits = ascii::itoa( n, buf );
+    zstring::size_type width = 0;       // digits of precision
+    for ( int l = DateTime::FRAC_SECONDS_UPPER_LIMIT; l > 1; l /= 10 )
+      ++width;
+    ascii::left_pad( &digits, width, '0' );
+    zstring::size_type const last = digits.find_last_not_of( '0' );
+    digits.erase( last == zstring::npos ? 1 : last + 1 );
+  }
 
-        if ( tmp.size() < mod.min_width )
-          ascii::right_pad( &tmp, mod.min_width, '0' );
-        else if ( mod.min_width > 0 )
-          while ( tmp.size() > mod.min_width &&
-                  tmp[ tmp.size() - 1 ] == '0' ) {
-            tmp = tmp.substr( 0, tmp.size() - 1 );
-          }
-        *dest += tmp;
-        break;
+  //
+  // The decimal digit pattern: mandatory-digit-signs, then optional-digit-
+  // signs, with grouping separators. The default is "1".
+  //
+  utf8_string<zstring const> const u_format( mod.first.format );
+  std::vector<unicode::code_point> pattern;
+  bool single_mandatory = true;
+  if ( u_format.empty() )
+    pattern.push_back( mod.first.zero );
+  else {
+    for ( utf8_string<zstring const>::const_iterator
+          i( u_format.begin() ); i != u_format.end(); ++i ) {
+      if ( !unicode::is_space( *i ) )
+        pattern.push_back( *i );
+    }
+    single_mandatory = pattern.size() == 1 && pattern[0] != '#';
+  }
+
+  unsigned mandatory = 0, optional = 0;
+  for ( std::vector<unicode::code_point>::const_iterator
+        i( pattern.begin() ); i != pattern.end(); ++i ) {
+    if ( *i == '#' )
+      ++optional;
+    else if ( unicode::is_Nd( *i ) )
+      ++mandatory;
+  }
+
+  if ( mod.has_width ) {
+    //
+    // Ibid: If a minimum width is specified and exceeds the number of
+    // mandatory-digit-signs, optional-digit-signs are replaced by mandatory-
+    // digit-signs from the left, then mandatory-digit-signs are appended.
+    //
+    for ( std::vector<unicode::code_point>::iterator i( pattern.begin() );
+          mandatory < mod.min_width && i != pattern.end(); ++i ) {
+      if ( *i == '#' ) {
+        *i = mod.first.zero;
+        ++mandatory, --optional;
       }
-      n = (int)( n * 1000.0 / DateTime::FRAC_SECONDS_UPPER_LIMIT );
-      [[fallthrough]];
-    default:
-      append_number( n, mod, dest );
+    }
+    for ( ; mandatory < mod.min_width; ++mandatory )
+      pattern.push_back( mod.first.zero );
+    //
+    // Ibid: If a maximum width is specified, optional-digit-signs are
+    // appended until there are at least that many digit signs.
+    //
+    for ( ; mandatory + optional < mod.max_width; ++optional )
+      pattern.push_back( '#' );
+  }
+  if ( single_mandatory && !mod.max_width ) {
+    //
+    // Ibid: A single mandatory-digit-sign (e.g., the default "1") with no
+    // maximum width is extended with as many optional-digit-signs as needed
+    // for the precision of the value.
+    //
+    for ( ; mandatory + optional < digits.size(); ++optional )
+      pattern.push_back( '#' );
+  }
+
+  //
+  // Pad to the number of mandatory-digit-signs, truncate (not round) to the
+  // number of digit signs, and output a grouping separator wherever the
+  // pattern has one between two output digits.
+  //
+  if ( digits.size() < mandatory )
+    ascii::right_pad( &digits, mandatory, '0' );
+  if ( digits.size() > mandatory + optional )
+    digits.erase( mandatory + optional );
+
+  utf8_string<zstring> u_dest( *dest );
+  zstring::size_type d = 0;
+  for ( std::vector<unicode::code_point>::const_iterator
+        i( pattern.begin() ); i != pattern.end() && d < digits.size(); ++i ) {
+    if ( *i == '#' || unicode::is_Nd( *i ) )
+      u_dest += mod.first.zero + (digits[ d++ ] - '0');
+    else if ( d )
+      u_dest += *i;
   }
 }
 
@@ -635,7 +712,8 @@ static void append_year( int year, modifier const &mod, zstring *s ) {
 
 static void parse_first_modifier( zstring const &picture_str,
                                   zstring::const_iterator *i,
-                                  modifier *mod, QueryLoc const &loc ) {
+                                  modifier *mod, char component,
+                                  QueryLoc const &loc ) {
   zstring::const_iterator &j = *i;
   ascii::skip_space( picture_str, &j );
   if ( j == picture_str.end() || *j == ',' ) {
@@ -688,12 +766,31 @@ static void parse_first_modifier( zstring const &picture_str,
   if ( cp == '#' || unicode::is_Nd( cp, &zero[0] ) ) {
     bool got_grouping_separator = false;
     bool got_mandatory_digit = cp != '#';
+    bool got_optional_digit = cp == '#';
+
+    if ( component == 'f' && got_optional_digit ) {
+      //
+      // XQuery F&O 3.1 9.8.4.5: for fractional seconds the decimal digit
+      // pattern is reversed, so optional-digit-signs must follow the
+      // mandatory-digit-signs.
+      //
+      throw XQUERY_EXCEPTION(
+        err::FOFD1340,
+        ERROR_PARAMS(
+          picture_str,
+          ZED( FOFD1340_Picture ),
+          ZED( FOFD1340_NoOptDigitBeforeMandatory )
+        ),
+        ERROR_LOC( loc )
+      );
+    }
 
     u_mod_format = *u;
     while ( ++u != u_picture_str.end() ) {
       cp = *u;
       if ( cp == '#' ) {
-        if ( got_mandatory_digit ) {
+        got_optional_digit = true;
+        if ( got_mandatory_digit && component != 'f' ) {
           //
           // Ibid: There may be zero or more optional-digit-signs, and (if
           // present) these must precede all mandatory-digit-signs.
@@ -710,6 +807,17 @@ static void parse_first_modifier( zstring const &picture_str,
         }
         got_grouping_separator = false;
       } else if ( unicode::is_Nd( cp, &zero[ got_mandatory_digit ] ) ) {
+        if ( component == 'f' && got_optional_digit ) {
+          throw XQUERY_EXCEPTION(
+            err::FOFD1340,
+            ERROR_PARAMS(
+              picture_str,
+              ZED( FOFD1340_Picture ),
+              ZED( FOFD1340_NoOptDigitBeforeMandatory )
+            ),
+            ERROR_LOC( loc )
+          );
+        }
         if ( got_mandatory_digit ) {
           if ( zero[1] != zero[0] ) {
             //
@@ -995,6 +1103,7 @@ static void parse_width_modifier( zstring const &picture_str,
   ascii::skip_space( picture_str, &++j );
   if ( j == picture_str.end() )
     goto bad_width_modifier;
+  mod->has_width = true;
   if ( *j == '*' ) {
     mod->min_width = 0;
     ++j;
@@ -1007,6 +1116,11 @@ static void parse_width_modifier( zstring const &picture_str,
     catch ( std::exception const& ) {
       goto bad_width_modifier;
     }
+    //
+    // XQuery F&O 3.0 9.8.4.2: min-width must be at least 1.
+    //
+    if ( !mod->min_width )
+      goto bad_width_modifier;
   }
 
   mod->max_width = 0;
@@ -1028,6 +1142,11 @@ static void parse_width_modifier( zstring const &picture_str,
     catch ( std::exception const& ) {
       goto bad_width_modifier;
     }
+    //
+    // Ibid: max-width must be at least 1 and not less than min-width.
+    //
+    if ( !mod->max_width || mod->max_width < mod->min_width )
+      goto bad_width_modifier;
   }
 
   return;
@@ -1257,7 +1376,7 @@ bool FnFormatDateTimeIterator::nextImpl( store::Item_t& result,
       mod.cal_is_fallback = cal_is_fallback;
 
       if ( *i != ']' ) {
-        parse_first_modifier( picture_str, &i, &mod, loc );
+        parse_first_modifier( picture_str, &i, &mod, component, loc );
         if ( i == picture_str.end() )
           goto eos;
         if ( *i != ']' ) {

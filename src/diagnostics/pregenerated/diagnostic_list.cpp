@@ -609,6 +609,12 @@ XQueryErrorCode SERE0015( "err:SERE0015" );
 XQueryErrorCode SEPM0016( "err:SEPM0016" );
 
 
+XQueryErrorCode SEPM0017( "err:SEPM0017" );
+
+
+XQueryErrorCode SEPM0019( "err:SEPM0019" );
+
+
 } // namespace err
 
 namespace zerr {

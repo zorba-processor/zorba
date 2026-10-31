@@ -35,7 +35,6 @@ jobs:
               - 'modules/**'
               - 'bin/**'
               - 'test/**'
-              - 'swig/**'
               - 'schemas/**'
               - 'config/**'
               - 'cmake/**'
@@ -113,12 +112,16 @@ jobs:
           cache-from: type=gha,scope=http-test-${{ matrix.cache }}
           cache-to: type=gha,mode=max,scope=http-test-${{ matrix.cache }}
 
+      # ccache runs in depend mode (CCACHE_DEPEND=1) in every workflow: its
+      # preprocessor-mode fallback serves stale precompiled headers when only
+      # a macro inside the PCH changes (see ZORBA_USE_PCH in src/CMakeLists.txt).
+      # "v2" drops the caches poisoned by that fallback.
       - uses: actions/cache@v6
         if: needs.changes.outputs.code == 'true'
         with:
           path: .ccache
-          key: ccache-${{ matrix.cache }}-${{ github.sha }}
-          restore-keys: ccache-${{ matrix.cache }}-
+          key: ccache-v2-${{ matrix.cache }}-${{ github.sha }}
+          restore-keys: ccache-v2-${{ matrix.cache }}-
 
       - name: Build and test
         if: needs.changes.outputs.code == 'true'
@@ -129,7 +132,7 @@ jobs:
             -e ZORBA_HTTP_TEST_SERVER=zorba-http-test:8080 \
             -e CC=${{ matrix.cc }} -e CXX=${{ matrix.cxx }} \
             -e CCACHE_DIR=/src/.ccache \
-            -e CCACHE_SLOPPINESS=pch_defines,time_macros \
+            -e CCACHE_SLOPPINESS=pch_defines,time_macros -e CCACHE_DEPEND=1 \
             -v "$PWD":/src -w /src zorba-builder:ci sh -ec '
               cmake --preset full-release
               cmake --build --preset full-release
@@ -152,7 +155,6 @@ jobs:
             bison --version | head -1
             flex --version
             cmake -S . -B build/regen -G Ninja \
-              -DZORBA_SUPPRESS_SWIG=ON \
               -DCMAKE_DISABLE_FIND_PACKAGE_Java=ON \
               -DCMAKE_DISABLE_FIND_PACKAGE_JNI=ON \
               -DZORBA_REGENERATE_PARSER=ON > /dev/null
@@ -210,8 +212,8 @@ jobs:
       - uses: actions/cache@v6
         with:
           path: .ccache
-          key: ccache-profile-${{ matrix.preset }}-${{ github.sha }}
-          restore-keys: ccache-profile-${{ matrix.preset }}-
+          key: ccache-v2-profile-${{ matrix.preset }}-${{ github.sha }}
+          restore-keys: ccache-v2-profile-${{ matrix.preset }}-
 
       # No HTTP test server here: the presets' test filters exclude the tests that need it.
       - name: Configure and build
@@ -220,7 +222,7 @@ jobs:
           mkdir -p build
           docker run --rm \
             -e CCACHE_DIR=/src/.ccache \
-            -e CCACHE_SLOPPINESS=pch_defines,time_macros \
+            -e CCACHE_SLOPPINESS=pch_defines,time_macros -e CCACHE_DEPEND=1 \
             -v "$PWD":/src -w /src zorba-builder:ci sh -ec '
               cmake --preset ${{ matrix.preset }}
               cmake --build --preset ${{ matrix.preset }} -- -k 0
@@ -269,6 +271,7 @@ jobs:
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
       CCACHE_SLOPPINESS: pch_defines,time_macros
+      CCACHE_DEPEND: "1"
     steps:
       - uses: actions/checkout@v7
 
@@ -280,8 +283,8 @@ jobs:
       - uses: actions/cache@v6
         with:
           path: .ccache
-          key: ccache-macos-arm64-${{ github.sha }}
-          restore-keys: ccache-macos-arm64-
+          key: ccache-v2-macos-arm64-${{ github.sha }}
+          restore-keys: ccache-v2-macos-arm64-
 
       - name: Configure
         run: >

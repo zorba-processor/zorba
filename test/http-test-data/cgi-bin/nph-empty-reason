@@ -1,0 +1,9 @@
+#!/bin/sh
+# Non-parsed-header script: a status line without a reason phrase (as with
+# HTTP/2) and a header with an empty value.
+printf 'HTTP/1.1 404 \r\n'
+printf 'Content-Type: text/plain\r\n'
+printf 'X-Empty:\r\n'
+printf 'Connection: close\r\n'
+printf '\r\n'
+printf 'not found\n'

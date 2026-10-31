@@ -3446,6 +3446,53 @@ void* begin_visit(const ModuleImport& v)
 }
 
 
+/*******************************************************************************
+  Modules whose functions reach the OS need the matching capability to be
+  imported at all (their functions also check each access). The check is on
+  the target namespace, so it applies whatever resolver provides the module.
+  Raises ZXQP0067 if the policy in effect does not allow the capability.
+********************************************************************************/
+void checkModuleImportCapability(const zstring& targetNS, const QueryLoc& loc)
+{
+  struct Requirement
+  {
+    const char* theNamespace;
+    Capability  theCapability;
+    Capability  theAlternative;
+  };
+  static const Requirement REQUIREMENTS[] =
+  {
+    // The file module reads and writes; either capability lets it in.
+    { "http://expath.org/ns/file",
+      Capability::FileRead, Capability::FileWrite },
+    { "http://zorba.io/modules/http-client",
+      Capability::Network, Capability::Network },
+    { "http://www.zorba-xquery.com/modules/http-client",
+      Capability::Network, Capability::Network },
+    { "http://zorba.io/modules/http-client-wrapper",
+      Capability::Network, Capability::Network },
+    { "http://expath.org/ns/http-client",
+      Capability::Network, Capability::Network },
+    { "http://zorba.io/modules/ftp-client",
+      Capability::Network, Capability::Network },
+  };
+
+  for (const Requirement& r : REQUIREMENTS)
+  {
+    if (targetNS != r.theNamespace)
+      continue;
+    if (theSctx->allows_capability(r.theCapability) ||
+        theSctx->allows_capability(r.theAlternative))
+      return;
+    const char* const lName =
+      r.theCapability == Capability::FileRead ? "FileRead or FileWrite" :
+      "Network";
+    RAISE_ERROR(zerr::ZXQP0067_CAPABILITY_NOT_ENABLED, loc,
+    ERROR_PARAMS(targetNS, lName));
+  }
+}
+
+
 void end_visit(const ModuleImport& v, void* /*visit_state*/)
 {
   TRACE_VISIT_OUT();
@@ -3456,6 +3503,8 @@ void end_visit(const ModuleImport& v, void* /*visit_state*/)
   // targetNS is the target ns *without* any version-declaration fragment.
   zstring targetNS = modVer.namespace_uri();
   zstring pfx = v.get_prefix();
+
+  checkModuleImportCapability(targetNS, loc);
 
   if (theSctx->xquery_version() < StaticContextConsts::xquery_version_3_0)
     bindModuleImportPrefix(targetNS, pfx, loc);

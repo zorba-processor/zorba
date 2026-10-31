@@ -1,12 +1,37 @@
 name: Images
 
-# Publishes to GHCR:
-#   ghcr.io/<owner>/zorba          command-line image (amd64 + arm64)
+# Publishes to GHCR from master (tag plan: docker/README.md):
+#   ghcr.io/<owner>/zorba          command-line image (amd64 + arm64), :edge and :sha-<short>
 #   ghcr.io/<owner>/zorba-builder  build environments (:latest-toolchain, :ubuntu-24.04)
+# Release tags (v*) are published by release.yml; master never moves :latest.
+# Master pushes publish only when code or image inputs change (same allowlist
+# as the `changes` job in ci.yml); docs-only pushes are skipped. This workflow
+# has no tag trigger, so `paths` cannot filter tag pushes; workflow_dispatch
+# is never filtered.
 on:
   push:
     branches: [master]
-    tags: ['v*']
+    paths:
+      - 'src/**'
+      - 'include/**'
+      - 'modules/**'
+      - 'bin/**'
+      - 'test/**'
+      - 'schemas/**'
+      - 'config/**'
+      - 'cmake/**'
+      - 'cmake_modules/**'
+      - 'docker/**'
+      - '.clusterfuzzlite/**'
+      - '.github/codeql/**'
+      - 'CMakeLists.txt'
+      - 'CMake*.txt'
+      - 'CMake*.json'
+      - '*.cmake'
+      - '*.cmake.in'
+      - 'CTest*'
+      - 'CPack*'
+      - '.github/workflows/images.yml'
   workflow_dispatch:
 
 permissions:
@@ -105,9 +130,9 @@ jobs:
         with:
           images: ${{ env.IMAGE }}
           tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=ref,event=tag
+            type=raw,value=edge,enable={{is_default_branch}}
             type=sha
+          flavor: latest=false
       - name: Create manifest list
         working-directory: /tmp/digests
         run: |
@@ -115,4 +140,4 @@ jobs:
             $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
             $(printf "${IMAGE}@sha256:%s " *)
       - name: Inspect
-        run: docker buildx imagetools inspect "${IMAGE}:${{ steps.meta.outputs.version }}"
+        run: docker buildx imagetools inspect "$(jq -r '.tags[0]' <<< "$DOCKER_METADATA_OUTPUT_JSON")"
