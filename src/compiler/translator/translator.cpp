@@ -9547,17 +9547,15 @@ expr* create_cast_expr(
         catch (ZorbaException& e)
         {
           if (isCast)
-          {
             throw;
-          }
-          else
-          {
-            if (e.diagnostic() == err::FORG0001)
-              throw;// XQUERY_EXCEPTION(err::XPST0003, ERROR_LOC(loc));
-            else
-              RAISE_ERROR(err::XPST0081, loc, 
-              ERROR_PARAMS(ce->get_val()->getStringValue()));
-          }
+
+          if (e.diagnostic() != err::FORG0001)
+            RAISE_ERROR(err::XPST0081, loc, 
+            ERROR_PARAMS(ce->get_val()->getStringValue()));
+
+          // A castable expression never raises a dynamic error for an
+          // invalid lexical form: it is false (XQuery 3.0 3.13.3).
+          return CREATE(const)(theRootSctx, theUDF, loc, false);
         }
 
         if (type->type_kind() == XQType::USER_DEFINED_KIND)
