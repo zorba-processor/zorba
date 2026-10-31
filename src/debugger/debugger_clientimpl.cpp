@@ -118,7 +118,7 @@ DebuggerClientImpl::~DebuggerClientImpl()
     delete theInStream;
 
     theOutStream->flush();
-    delete theInStream;
+    delete theOutStream;
 
     delete theOutStreamBuffer;
     delete theInStreamBuffer;
