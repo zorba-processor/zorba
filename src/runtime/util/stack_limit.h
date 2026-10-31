@@ -31,7 +31,7 @@ size_t remaining();
 
 /**
  * Returns the number of bytes of stack that must stay free when a new
- * function call level is entered: half of the thread's stack, at least
+ * function call level is entered: a third of the thread's stack, at least
  * 64 KiB. Each call level of a query uses some stack between two checks, the
  * error must still be raised and unwound, and closing the plan recurses
  * through all call levels again.

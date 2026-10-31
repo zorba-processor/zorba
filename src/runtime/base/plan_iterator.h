@@ -191,7 +191,7 @@ public:
 
   /**
    * Raises ZXQP0069 if a call at depth aDepth would exceed the call depth
-   * limit or leave too little machine stack (less than half of it; see
+   * limit or leave too little machine stack (less than a third of it; see
    * runtime/util/stack_limit.h).
    */
   void checkCallDepth(uint32_t aDepth, const QueryLoc& loc) const;

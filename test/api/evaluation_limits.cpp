@@ -282,8 +282,9 @@ void test_call_depth(Zorba* z)
 
   std::cout << "  higher limit" << std::endl;
   // A higher limit allows deeper recursion.
+  // (1500: sanitizer builds use about 5 KiB of stack per level.)
   p.setMaxCallDepth(5000);
-  CHECK(succeeded_with(run(z, p, depth_query(2000)), "2000"));
+  CHECK(succeeded_with(run(z, p, depth_query(1500)), "1500"));
 }
 
 // With no depth limit, deep recursion must still end with ZXQP0069 (the
