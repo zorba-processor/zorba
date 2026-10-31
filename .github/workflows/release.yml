@@ -240,8 +240,8 @@ jobs:
       - uses: actions/cache/restore@v6
         with:
           path: .ccache
-          key: ccache-linux-amd64-latest-${{ github.sha }}
-          restore-keys: ccache-linux-amd64-latest-
+          key: ccache-v2-linux-amd64-latest-${{ github.sha }}
+          restore-keys: ccache-v2-linux-amd64-latest-
 
       - name: Build and test
         run: |
@@ -251,7 +251,7 @@ jobs:
             -e ZORBA_HTTP_TEST_SERVER=zorba-http-test:8080 \
             -e CC=gcc -e CXX=g++ \
             -e CCACHE_DIR=/src/.ccache \
-            -e CCACHE_SLOPPINESS=pch_defines,time_macros \
+            -e CCACHE_SLOPPINESS=pch_defines,time_macros -e CCACHE_DEPEND=1 \
             -v "$PWD":/src -w /src zorba-builder:ci sh -ec '
               cmake --preset full-release
               cmake --build --preset full-release
