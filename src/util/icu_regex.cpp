@@ -351,9 +351,26 @@ void convert_xquery_re( zstring const &xq_re, zstring *icu_re,
         case 'P': // [^\p]
           if ( in_char_range || IS_CHAR_RANGE_BEGIN )
             goto not_single_char_esc;
-          if ( c == 'p' || c == 'P' )
-            check_block_escape( xq_re, i );
           *icu_re += '\\';
+          if ( c == 'p' || c == 'P' ) {
+            check_block_escape( xq_re, i );
+            //
+            // Copy the "{name}" as is: its braces are not a quantifier.
+            //
+            *icu_re += c;
+            zstring::const_iterator j = i;
+            if ( ++j != xq_re.end() && *j == '{' ) {
+              for ( ; j != xq_re.end(); ++j ) {
+                *icu_re += *j;
+                if ( *j == '}' )
+                  break;
+              }
+              if ( j == xq_re.end() )
+                throw INVALID_RE_EXCEPTION( xq_re, ZED( UnbalancedChar_3 ), '{' );
+              i = j;
+            }
+            goto next;
+          }
           break;
         case 'w': // word char
           if ( in_char_range || IS_CHAR_RANGE_BEGIN )
