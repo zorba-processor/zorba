@@ -400,9 +400,17 @@ DebuggerRuntime::getVariables(bool aLocals)
     zstring lLocalName = lNameItem->getLocalName();
 
     // correct the name of the context item
-    if (!aLocals && lLocalName == "$$dot")
+    if (lLocalName == static_context::DOT_VAR_NAME)
     {
-      lVarList.push_back(std::pair<std::string, std::string>(".", "item()*"));
+      if (!aLocals)
+        lVarList.push_back(std::pair<std::string, std::string>(".", "item()*"));
+      continue;
+    }
+
+    // the context position and size are not user variables
+    if (lLocalName == static_context::DOT_POS_VAR_NAME ||
+        lLocalName == static_context::DOT_SIZE_VAR_NAME)
+    {
       continue;
     }
 
@@ -526,6 +534,21 @@ DebuggerRuntime::eval(zstring& aExpr)
   // restore the initial omit xml declaration option
   theSerializerOptions.omit_xml_declaration = lOldOpt;
   return lResults;
+}
+
+
+int
+DebuggerRuntime::setVariable(const zstring& aName, const zstring& aExpr)
+{
+  if (theExecStatus != QUERY_SUSPENDED) {
+    std::string lMessage("I can only set variables if the execution is suspended.");
+    throw lMessage;
+  }
+
+  DebuggerCommons* lCommons = getDebbugerCommons();
+  std::vector<store::Item_t> lValue;
+  lCommons->evalItems(aExpr, lValue);
+  return lCommons->setVariable(aName, lValue);
 }
 
 

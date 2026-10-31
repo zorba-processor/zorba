@@ -129,6 +129,15 @@ class DebuggerRuntime : public Runnable {
     std::list<std::pair<zstring, zstring> >
     eval(zstring& expr);
 
+    /**
+     * Evaluates aExpr in the suspended context and assigns the result to the
+     * in-scope variable aName. Returns one of the DEBUGGER_SETVAR_* codes.
+     * Throws std::string if the execution is not suspended and propagates
+     * the error raised while evaluating aExpr.
+     */
+    int
+    setVariable(const zstring& aName, const zstring& aExpr);
+
     void runQuery();
 
     void

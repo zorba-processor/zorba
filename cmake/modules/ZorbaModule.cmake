@@ -731,7 +731,7 @@ ENDMACRO (ADD_ZORBA_MANIFEST_ENTRY)
 # dependencies. This macro will only have any effect when called by
 # the top-level project in a build.
 # Also, this function automatically generates a CMake projectConfig.cmake
-# file for the project, based on config/ExternalModuleConfig.cmake.in.
+# file for the project, based on cmake/config/ExternalModuleConfig.cmake.in.
 MACRO (DONE_DECLARING_ZORBA_URIS)
   IF (PROJECT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
     # Close out the zorba modules and schemas manifests

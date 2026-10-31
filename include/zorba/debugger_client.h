@@ -461,6 +461,32 @@ namespace zorba {
                                      int aContextId = -1,
                                      std::size_t aMaxDataSize = 0,
                                      const std::string& aPropertyAddress = "") = 0;
+
+    /**
+     * @brief Set a property to a value
+     *
+     * The value is an expression in the language of the debug engine (an
+     * XQuery expression for Zorba) that the engine evaluates in the
+     * suspended context; its result is assigned to the property. The
+     * engine answers with success="1" if the property was set, and
+     * success="0" if the property exists but can not take this value.
+     *
+     * The default implementation throws std::logic_error; the clients
+     * returned by createDebuggerClient() implement it.
+     *
+     * @param aPropertyLongName property long name (required)
+     * @param aValue the expression whose result is assigned (required)
+     * @param aStackDepth stack depth (optional)
+     * @param aContextId The context id for which to query.
+     * @param aPropertyAddress property address as retrieved in a
+     *                         property element (optional).
+     * @return The id of this request
+     */
+    virtual std::size_t property_set(const std::string& aPropertyLongName,
+                                     const std::string& aValue,
+                                     int aStackDepth = -1,
+                                     int aContextId = -1,
+                                     const std::string& aPropertyAddress = "");
     
     /**
      * @brief Get the value of a property

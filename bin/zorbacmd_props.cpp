@@ -41,7 +41,9 @@ ZorbaCmdProperties::ZorbaCmdProperties() {
   parse_only_ = false;
   print_errors_as_xml_ = false;
   print_query_ = false;
+  private_addresses_ = -1;
   save_plan_ = false;
+  secure_ = false;
   serialize_html_ = false;
   serialize_only_query_ = false;
   serialize_plan_ = false;

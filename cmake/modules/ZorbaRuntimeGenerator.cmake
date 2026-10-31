@@ -13,7 +13,7 @@
 # limitations under the License.
 
 # This is the script that will be run to generate a file.
-SET(GEN_SCRIPT "${CMAKE_SOURCE_DIR}/cmake_modules/GenZorbaRuntime.cmake")
+SET(GEN_SCRIPT "${CMAKE_SOURCE_DIR}/cmake/modules/GenZorbaRuntime.cmake")
 
 # This macro adds a custom rule to generate a source file.
 #
@@ -61,7 +61,7 @@ MACRO(ZORBA_RUNTIME_GENERATOR GEN_QUERY EXTVARS SPEC_FILES EXTRA_DEPS OUTPUT)
     -P "${GEN_SCRIPT}"
     MAIN_DEPENDENCY ${GEN_QUERY}
     DEPENDS ${ABSOLUTE_SPEC_FILES} ${EXTRA_DEPS} check_uris
-    ${GEN_SCRIPT} ${CMAKE_SOURCE_DIR}/cmake_modules/ZorbaRuntimeGenerator.cmake)
+    ${GEN_SCRIPT} ${CMAKE_SOURCE_DIR}/cmake/modules/ZorbaRuntimeGenerator.cmake)
 #MESSAGE(STATUS  "     ADD_CUSTOM_COMMAND(OUTPUT \"${OUTPUT}\" ")
 #MESSAGE(STATUS  "       COMMAND \"${CMAKE_COMMAND}\" ")
 #MESSAGE(STATUS  "       -D \"source_dir=${CMAKE_SOURCE_DIR}\" ")
@@ -74,7 +74,7 @@ MACRO(ZORBA_RUNTIME_GENERATOR GEN_QUERY EXTVARS SPEC_FILES EXTRA_DEPS OUTPUT)
 #MESSAGE(STATUS  "       -P \"${GEN_SCRIPT}\" ")
 #MESSAGE(STATUS  "       MAIN_DEPENDENCY ${GEN_QUERY} ")
 #MESSAGE(STATUS  "       DEPENDS ${ABSOLUTE_SPEC_FILES} ${EXTRA_DEPS} ")
-#MESSAGE(STATUS  "       ${GEN_SCRIPT} ${CMAKE_SOURCE_DIR}/cmake_modules/ZorbaRuntimeGenerator.cmake) ")
+#MESSAGE(STATUS  "       ${GEN_SCRIPT} ${CMAKE_SOURCE_DIR}/cmake/modules/ZorbaRuntimeGenerator.cmake) ")
 #MESSAGE(STATUS  "***************************************************************************************** ")
 
 # The generator scripts load the xml module, which needs XML Schema support.
@@ -118,7 +118,7 @@ MACRO(ZORBA_DIAGNOSTIC_GENERATOR GEN_QUERY EXTVARS SPEC_FILES EXTRA_DEPS OUTPUT)
     -P "${GEN_SCRIPT}"
     MAIN_DEPENDENCY ${GEN_QUERY}
     DEPENDS ${ABSOLUTE_SPEC_FILES} ${EXTRA_DEPS}
-    ${GEN_SCRIPT} ${CMAKE_SOURCE_DIR}/cmake_modules/ZorbaRuntimeGenerator.cmake)
+    ${GEN_SCRIPT} ${CMAKE_SOURCE_DIR}/cmake/modules/ZorbaRuntimeGenerator.cmake)
   # The generator scripts load the xml module, which needs XML Schema support.
   IF(NOT ZORBA_NO_XMLSCHEMA)
     ADD_TEST("RuntimeGeneratorTest-${TEST_NAME}" "${CMAKE_COMMAND}"
@@ -155,7 +155,7 @@ MACRO(ZORBA_AUDIT_GENERATOR GEN_QUERY EXTVARS EXTRA_DEPS OUTPUT)
     -P "${GEN_SCRIPT}"
     MAIN_DEPENDENCY ${GEN_QUERY}
     DEPENDS ${EXTRA_DEPS}
-    ${GEN_SCRIPT} ${CMAKE_SOURCE_DIR}/cmake_modules/ZorbaRuntimeGenerator.cmake)
+    ${GEN_SCRIPT} ${CMAKE_SOURCE_DIR}/cmake/modules/ZorbaRuntimeGenerator.cmake)
   # The generator scripts load the xml module, which needs XML Schema support.
   IF(NOT ZORBA_NO_XMLSCHEMA)
     ADD_TEST("RuntimeGeneratorTest-${TEST_NAME}" "${CMAKE_COMMAND}"
