@@ -336,14 +336,17 @@ def datetimes(rng, n):
         lex = dt_lexical(dtz)
         d = xq_string(lex)
         date_lex = xq_string("%04d-%02d-%02d" % (dt.year, dt.month, dt.day))
+        # Week numbering in the default calendar is implementation-defined
+        # (Zorba's AD calendar starts weeks on Sunday); the ISO calendar
+        # defines it (F&O 3.0 9.8.4.1).
         yield ("datetime", "weekday",
-               "format-date(xs:date(%s), '[F1]') eq '%d'" % (
+               "format-date(xs:date(%s), '[F1]', (), 'ISO', ()) eq '%d'" % (
                    date_lex, dt.isoweekday()))
         yield ("datetime", "day-in-year",
                "format-date(xs:date(%s), '[d]') eq '%d'" % (
                    date_lex, dt.timetuple().tm_yday))
         yield ("datetime", "iso-week",
-               "format-date(xs:date(%s), '[W]') eq '%d'" % (
+               "format-date(xs:date(%s), '[W]', (), 'ISO', ()) eq '%d'" % (
                    date_lex, dt.isocalendar()[1]))
         yield ("datetime", "format-roundtrip",
                "let $d := xs:dateTime(%s) return xs:dateTime(format-dateTime("
@@ -382,16 +385,19 @@ def datetimes(rng, n):
                    "return $b + ($a - $b) eq $a" % (
                        d, xq_string(dt_lexical(dtz2))))
         tz2 = rng.choice([0, 840, -840, 330, -600, 45])
-        yield ("datetime", "adjust-same-instant",
-               "let $d := xs:dateTime(%s) return "
-               "adjust-dateTime-to-timezone($d, xs:dayTimeDuration('%s')) eq $d"
-               % (d, dtd_micro(tz2 * 60 * 10 ** 6)))
-        yield ("datetime", "adjust-twice",
-               "let $d := xs:dateTime(%s) let $tz := xs:dayTimeDuration('%s') "
-               "return deep-equal(adjust-dateTime-to-timezone("
-               "adjust-dateTime-to-timezone($d, xs:dayTimeDuration('PT1H')), "
-               "$tz), adjust-dateTime-to-timezone($d, $tz))"
-               % (d, dtd_micro(tz2 * 60 * 10 ** 6)))
+        # Adjusting a dateTime without a timezone attaches the timezone
+        # instead of converting, so these hold only with a timezone.
+        if tz is not None:
+            yield ("datetime", "adjust-same-instant",
+                   "let $d := xs:dateTime(%s) return adjust-dateTime-to-"
+                   "timezone($d, xs:dayTimeDuration('%s')) eq $d"
+                   % (d, dtd_micro(tz2 * 60 * 10 ** 6)))
+            yield ("datetime", "adjust-twice",
+                   "let $d := xs:dateTime(%s) let $tz := xs:dayTimeDuration("
+                   "'%s') return deep-equal(adjust-dateTime-to-timezone("
+                   "adjust-dateTime-to-timezone($d, xs:dayTimeDuration("
+                   "'PT1H')), $tz), adjust-dateTime-to-timezone($d, $tz))"
+                   % (d, dtd_micro(tz2 * 60 * 10 ** 6)))
         if tz is not None and 2 <= dt.year <= 9998:
             u = dt - datetime.timedelta(minutes=tz)
             yield ("datetime", "adjust-utc-string",
@@ -514,9 +520,11 @@ def serialize_rt(rng, n):
         yield ("serialize", "attribute",
                "parse-xml(serialize(<a b='{%s}'/>))/a/@b/string() eq %s"
                % (lit, lit))
+        # A CR in a comment cannot be escaped and is normalized to LF when
+        # parsed again.
         yield ("serialize", "comment",
                "let $c := %s return if (contains($c, '--') or ends-with($c, "
-               "'-')) then true() else parse-xml(serialize(<a>{comment {$c}}"
+               "'-') or contains($c, codepoints-to-string(13))) then true() else parse-xml(serialize(<a>{comment {$c}}"
                "</a>))/a/comment()/string() eq $c" % lit)
         yield ("serialize", "text-node-string",
                "string(text {%s}) eq %s" % (lit, lit))
@@ -690,11 +698,12 @@ def arith(rng, n):
                    "xs:double(%s) * xs:double(%s) eq xs:double(%s)" % (
                        xq_string(repr(da)), xq_string(repr(db)),
                        xq_string(repr(pr))))
-        if db != 0:
+        if db != 0 and math.isfinite(da / db):
             yield ("arith", "double-div-oracle",
                    "xs:double(%s) div xs:double(%s) eq xs:double(%s)" % (
                        xq_string(repr(da)), xq_string(repr(db)),
                        xq_string(repr(da / db))))
+        if db != 0:
             fm = math.fmod(da, db)
             yield ("arith", "double-mod-oracle",
                    "let $r := xs:double(%s) mod xs:double(%s) return $r eq "
@@ -702,8 +711,12 @@ def arith(rng, n):
                                       xq_string(repr(fm))))
         r = rng.choice([0.5, 1.5, 2.5, -0.5, -1.5, -2.5, 0.49999999999999994,
                         1.25, -1.25, 2.675, 1e15 + 0.5])
+        # The literal is an xs:decimal, so the oracle rounds the decimal
+        # value (half up), not the nearest double.
+        rd = decimal.Decimal(repr(r))
         yield ("arith", "round-oracle",
-               "round(%r) eq %r" % (r, float(math.floor(r + 0.5))))
+               "round(%s) eq %d" % (dec_lit(rd),
+                                    math.floor(rd + decimal.Decimal("0.5"))))
         yield ("arith", "round-half-even-oracle",
                "round-half-to-even(%s) eq %s" % (
                    dec_lit(decimal.Decimal(repr(r))),
