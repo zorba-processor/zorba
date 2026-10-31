@@ -72,12 +72,16 @@ class XQueryDiagnostics;
   over to this obj and destroyed when the last function item that refers to
   it goes away.
 
-  Before checking, dispose() drops the variable values of the dynamic
-  context: a prolog variable (or an external variable set by the
-  application) may hold a function item created by the same query, which
-  would otherwise keep the state alive forever. Function items read the
-  global variables through the dynamic context of the query that invokes
-  them, so dropping these values does not change what they compute.
+  Before checking, dispose() drops the variable values and the external
+  function parameters of the dynamic context: a prolog variable (or an
+  external variable set by the application) may hold a function item created
+  by the same query, and so may an external function parameter (e.g. the
+  zorba-query module keeps the queries it prepares, with the URL resolver
+  function items passed to them, in one); either would otherwise keep the
+  state alive forever. Function items read the global variables through the
+  dynamic context of the query that invokes them, so dropping the variable
+  values does not change what they compute; the external function
+  parameters are destroyed at the same point as before.
 
   theParent:
   ----------

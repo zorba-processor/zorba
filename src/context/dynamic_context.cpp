@@ -158,10 +158,28 @@ dynamic_context::dynamic_context(dynamic_context* parent)
 ********************************************************************************/
 dynamic_context::~dynamic_context()
 {
-  if (keymap)
+  destroy_keymap();
+
+  delete theEnvironmentVariables;
+
+  delete theAvailableIndices;
+
+  delete theAvailableMaps;
+}
+
+
+/*******************************************************************************
+
+********************************************************************************/
+void dynamic_context::destroy_keymap()
+{
+  ValueMap* map = keymap;
+  keymap = NULL;
+
+  if (map)
   {
-    for (ValueMap::iterator lIter = keymap->begin();
-         lIter != keymap->end();
+    for (ValueMap::iterator lIter = map->begin();
+         lIter != map->end();
          ++lIter)
     {
       dctx_value_t lValue = lIter.getValue();
@@ -171,14 +189,22 @@ dynamic_context::~dynamic_context()
         static_cast<ExternalFunctionParameter*>(lValue.func_param)->destroy();
       }
     }
-    delete keymap;
+    delete map;
   }
+}
 
-  delete theEnvironmentVariables;
 
-  delete theAvailableIndices;
+/*******************************************************************************
+  See QueryResources::dispose(). Variable values and external function
+  parameters are released after they have been detached from "this", so a
+  value whose release reaches back into this dctx finds neither.
+********************************************************************************/
+void dynamic_context::release_values()
+{
+  std::vector<VarValue> values;
+  values.swap(theVarValues);
 
-  delete theAvailableMaps;
+  destroy_keymap();
 }
 
 

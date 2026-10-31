@@ -250,7 +250,7 @@ void QueryResources::dispose(
   // May release function items created by this query, and thereby references
   // to this obj (see the class comment).
   if (theDctx)
-    theDctx->clear_variables();
+    theDctx->release_values();
 
   if (getRefCount() > 1)
   {

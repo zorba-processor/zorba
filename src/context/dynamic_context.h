@@ -156,6 +156,10 @@ public:
 
   ~dynamic_context();
 
+protected:
+  void destroy_keymap();
+
+public:
   dynamic_context* getParent() { return theParent; }
 
   const dynamic_context* getParent() const { return theParent; }
@@ -206,14 +210,9 @@ public:
 
   const std::vector<VarValue>& get_variables() const { return theVarValues; }
 
-  // Drops all variable values (see QueryResources::dispose()). The values are
-  // released after theVarValues is empty, so a value whose release reaches
-  // back into this dctx sees no variables.
-  void clear_variables()
-  {
-    std::vector<VarValue> values;
-    values.swap(theVarValues);
-  }
+  // Drops all variable values and external function parameters (see
+  // QueryResources::dispose()).
+  void release_values();
 
   void add_variable(ulong varid, store::Item_t& value);
 
