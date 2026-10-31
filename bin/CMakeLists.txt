@@ -263,10 +263,14 @@ ZORBA_SECURITY_TEST(cwd_module_default "hello, v2"
   -f -q "${_testdir}/versioning/import1.xq")
 ZORBA_SET_TEST_PROPERTY(bin/zorba_security_cwd_module_default
   WORKING_DIRECTORY "${_uridir}")
-ZORBA_SECURITY_TEST(cwd_module_secure "XQST0059"
+# Not found locally, the import falls back to the network, which --secure
+# denies (module-not-found or policy denial, depending on the error mapping).
+ZORBA_SECURITY_TEST(cwd_module_secure "XQST0059|ZXQP0029"
   --secure -f -q "${_testdir}/versioning/import1.xq")
 ZORBA_SET_TEST_PROPERTY(bin/zorba_security_cwd_module_secure
   WORKING_DIRECTORY "${_uridir}")
+ZORBA_SET_TEST_PROPERTY(bin/zorba_security_cwd_module_secure
+  FAIL_REGULAR_EXPRESSION "hello, v2")
 
 # test the --disable-http-resolution flag (--deny remote-import), using the corresponding test query
 # from rbkt/zorba/uris/disable-http and a timeout.
