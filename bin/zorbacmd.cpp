@@ -715,10 +715,13 @@ int _tmain( int argc, _TCHAR const *argv[] ) {
 
   // The command-line tool runs trusted queries: grant every capability
   // explicitly so it is unaffected by the library default. The limits come
-  // from --timeout and --max-udf-call-depth.
+  // from --timeout, --max-udf-call-depth and --max-expr-depth.
   {
     SecurityPolicy policy( SecurityPolicy::unrestricted() );
     policy.setMaxCallDepth( Properties::instance().getMaxUDFCallDepth() );
+    if ( zc_props.max_expr_depth_ >= 0 )
+      policy.setMaxExprDepth(
+        static_cast<uint32_t>( zc_props.max_expr_depth_ ) );
     if ( zc_props.timeout_ > 0 )
       policy.setTimeout( std::chrono::seconds( zc_props.timeout_ ) );
     zorba->setSecurityPolicy( policy );
