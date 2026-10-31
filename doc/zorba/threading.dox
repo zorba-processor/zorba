@@ -1,0 +1,49 @@
+/** \page threading Threading Model
+
+As of Zorba 5.0, the engine is <b>not thread-safe</b>. Use it from one thread.
+
+\section threading_rule The rule
+
+- <b>One engine per process.</b> Zorba::getInstance() returns a process-wide
+  singleton that sits on a single global store. There is no way to create a
+  second, independent engine or store in the same process, so "one engine per
+  thread" is not possible inside one process.
+- <b>Use the engine from one thread at a time.</b> This covers the
+  Zorba object and everything created from it: XQuery objects, contexts,
+  iterators, Item and ItemFactory, the XmlDataManager and JsonDataManager,
+  and the collections and documents in the store. Do not call any of them
+  concurrently from several threads, not even on different XQuery objects,
+  because they all share the same store.
+- If an application must call Zorba from several threads, serialize <i>all</i>
+  Zorba calls (including destruction of items and queries, and iteration over
+  results) with one mutex of your own. Zorba itself does not guarantee
+  this arrangement, and it is not covered by tests.
+- <b>Separate processes are safe.</b> To run queries in parallel, run one
+  process per worker.
+
+\section threading_why Why
+
+The default build sets the CMake option ZORBA_FOR_ONE_THREAD_ONLY to ON. This
+compiles out all engine locks (the SYNC_CODE macro) and makes reference counts
+plain, non-atomic integers. ThreadSanitizer reports data races in the store
+item reference counts, the QName pool, plan iterators and rchandle when
+several threads share the engine.
+
+The one exception is decimal arithmetic: the state of the arbitrary-precision
+library (MAPM) behind xs:decimal, and xs:integer in builds with
+ZORBA_WITH_BIG_INTEGER, is per thread. That removes one source of races but
+does not make the engine thread-safe.
+
+\section threading_off ZORBA_FOR_ONE_THREAD_ONLY=OFF
+
+Configuring with -DZORBA_FOR_ONE_THREAD_ONLY=OFF compiles the engine locks
+in. That build is <b>unsupported</b>: it is not ThreadSanitizer-clean, and the
+rule above still applies.
+
+\section threading_future Future
+
+Making the engine thread-safe is planned for a 5.x release, before the C API
+promises multithreading. Until then, treat anything beyond the rule above as
+undefined behavior.
+
+*/

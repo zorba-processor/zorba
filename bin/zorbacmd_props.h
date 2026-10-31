@@ -95,6 +95,7 @@ struct ZorbaCmdProperties {
   bool          lib_module_;
   std::string   lib_path_;
   bool          load_plan_;
+  long          max_expr_depth_;        // < 0 = the policy default
   std::string   module_path_;
   unsigned long multiple_;
   std::vector<std::string> network_prefixes_;

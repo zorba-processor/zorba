@@ -34,7 +34,7 @@ namespace serialization
 /*******************************************************************************
 
 ********************************************************************************/
-const unsigned long ClassSerializer::g_zorba_classes_version = 26;
+const unsigned long ClassSerializer::g_zorba_classes_version = 27;
 
 
 /*******************************************************************************

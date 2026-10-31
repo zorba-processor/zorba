@@ -63,6 +63,14 @@ class ZORBA_DLL_PUBLIC Zorba
    * Thereby, it initializes all the libraries that are used in the system, i.e.
    * ICU, libxml2, xerces, and libcurl.
    *
+   * Threading: there is exactly one engine (and one store) per process, and
+   * it is not thread-safe. Call this function, and use the returned object
+   * and everything created from it (queries, contexts, items, collections),
+   * from one thread at a time. An application that uses Zorba from several
+   * threads must serialize all calls with its own mutex. To run queries in
+   * parallel, use separate processes. See the "Threading Model" page in the
+   * user documentation.
+   *
    * @return Zorba the singleton Zorba object
    *
    */

@@ -684,6 +684,8 @@ static SecurityPolicy make_security_policy() {
     policy.setAllowPrivateAddresses( zc_props.private_addresses_ == 1 );
 
   policy.setMaxCallDepth( Properties::instance().getMaxUDFCallDepth() );
+  if ( zc_props.max_expr_depth_ >= 0 )
+    policy.setMaxExprDepth( static_cast<uint32_t>( zc_props.max_expr_depth_ ) );
   if ( zc_props.timeout_ > 0 )
     policy.setTimeout( std::chrono::seconds( zc_props.timeout_ ) );
 
