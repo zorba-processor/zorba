@@ -11,9 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-INCLUDE(${CMAKE_SOURCE_DIR}/cmake_modules/CMakeUseBison.cmake)
-INCLUDE(${CMAKE_SOURCE_DIR}/cmake_modules/CMakeUseFlex.cmake)
-INCLUDE(${CMAKE_SOURCE_DIR}/cmake_modules/CMakeCompareVersionStrings.cmake)
+INCLUDE(${CMAKE_SOURCE_DIR}/cmake/modules/CMakeUseBison.cmake)
+INCLUDE(${CMAKE_SOURCE_DIR}/cmake/modules/CMakeUseFlex.cmake)
+INCLUDE(${CMAKE_SOURCE_DIR}/cmake/modules/CMakeCompareVersionStrings.cmake)
 
 SET(PARSER_SRCS
     ft_types.cpp
