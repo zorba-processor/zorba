@@ -27,6 +27,7 @@
 #include "diagnostics/xquery_diagnostics.h"
 #include "unicode_util.h"
 #include "utf8_string.h"
+#include "utf8_util.h"
 #include "zorba_regex_engine.h"
 #include "zorbatypes/chartype.h"
 #include <zorba/internal/unique_ptr.h>
