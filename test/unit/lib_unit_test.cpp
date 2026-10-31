@@ -16,6 +16,7 @@
 #include <iostream>
 
 #include <zorba/zorba.h>
+#include <zorba/security.h>
 #include <zorba/store_manager.h>
 #include <zorba/internal/unit_tests.h>
 
@@ -35,6 +36,11 @@ int main(int argc, char* argv[])
 
   void* lStore = zorba::StoreManager::getStore();
   Zorba* lZorba = Zorba::getInstance(lStore);
+
+  // The library default is SecurityPolicy::secure(); the lib-internal unit
+  // tests (thesauri, URI resolution) need file access. Tests of the policy
+  // itself set their own.
+  lZorba->setSecurityPolicy(SecurityPolicy::unrestricted());
 
   int res = UnitTests::runUnitTest(argc, argv + 1);
 

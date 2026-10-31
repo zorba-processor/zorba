@@ -261,9 +261,9 @@ void root_static_context::init()
   set_feature( feature::trace );
   set_feature( feature::http_resolution );
 
-  // Instance default security policy. Unrestricted until enforcement is in
-  // place; it becomes SecurityPolicy::secure() in 5.0.0.
-  set_security_policy(SecurityPolicy::unrestricted());
+  // Instance default security policy: no capability. Embedders widen it
+  // with Zorba::setSecurityPolicy() or StaticContext::setSecurityPolicy().
+  set_security_policy(SecurityPolicy::secure());
 
   // Directories from the environment. They used to be appended to the paths
   // above after those had been set, so they had no effect. They are kept

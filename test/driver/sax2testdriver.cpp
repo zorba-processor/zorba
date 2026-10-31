@@ -29,6 +29,7 @@
 #include "testdriverconfig.h" // SRC and BIN dir definitions
 
 #include <zorba/zorba.h>
+#include <zorba/security.h>
 #include <zorba/default_content_handler.h>
 #include <zorba/diagnostic_handler.h>
 #include <zorba/zorba_exception.h>
@@ -321,6 +322,10 @@ main(int argc, char** argv)
   std::cout << std::endl;
 
   zorba::Zorba *engine = zorba::Zorba::getInstance(zorba::StoreManager::getStore());
+
+  // The library default is SecurityPolicy::secure(); the test suite exercises
+  // files, the HTTP test server, native modules and the environment.
+  engine->setSecurityPolicy(zorba::SecurityPolicy::unrestricted());
 
   TestDiagnosticHandler errHandler;
   std::stringstream lResult;

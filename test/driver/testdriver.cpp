@@ -35,6 +35,7 @@
 #include "testdriver_common.h"
 
 #include <zorba/static_context.h>
+#include <zorba/security.h>
 #include <zorba/util/fs_util.h>
 #include <zorba/internal/unique_ptr.h>
 
@@ -100,6 +101,10 @@ main(int argc, char** argv)
 
   zorba::Zorba * engine = zorba::Zorba::getInstance(store);
   if (engine == NULL) return 21;
+
+  // The library default is SecurityPolicy::secure(); the test suite exercises
+  // files, the HTTP test server, native modules and the environment.
+  engine->setSecurityPolicy(zorba::SecurityPolicy::unrestricted());
 
   int i = 1;
   while (i < argc)
