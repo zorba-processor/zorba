@@ -29,6 +29,8 @@
 #include "store/api/item.h"
 #include "store/api/temp_seq.h"
 
+#include "compiler/api/compilercb.h"
+
 namespace zorba
 {
 
@@ -95,7 +97,12 @@ bool FunctionItemIterator::nextImpl(store::Item_t& result, PlanState& planState)
         theFunctionItemInfo->theQName = child->theFunctionItemInfo->theQName;
     }
 
-    result = new FunctionItem(theFunctionItemInfo, evalDctx.get());
+    // evalDctx is a child of the global dctx, which belongs to the query
+    // of planState.theCompilerCB.
+    result = new FunctionItem(theFunctionItemInfo,
+                              evalDctx.get(),
+                              planState.theCompilerCB ?
+                              planState.theCompilerCB->theResources : NULL);
     evalDctx.release();
   }
   else

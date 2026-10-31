@@ -178,6 +178,14 @@ public:
   if different from theResources (e.g. fn:function-lookup, evaluated by one
   query, of a UDF declared by another query). NULL otherwise.
 
+  theDctxResources:
+  -----------------
+  The QueryResources of the query that owns the parent of theClosureDctx (the
+  global dctx of the plan that created this item), if different from both of
+  the above. This happens for a closure created while a function item of
+  another query is invoked (e.g. the inner function of a nested closure).
+  NULL otherwise.
+
   theClosureDctxOwner:
   --------------------
   For a function item created by partial application (copy constructor): the
@@ -208,6 +216,7 @@ protected:
   // Declared first, so that they are released last.
   rchandle<QueryResources>        theResources;
   rchandle<QueryResources>        theFunctionResources;
+  rchandle<QueryResources>        theDctxResources;
   store::Item_t                   theClosureDctxOwner;
 
   FunctionItemInfo_t              theFunctionItemInfo;
@@ -231,7 +240,10 @@ public:
 public:
   FunctionItem(const FunctionItem& aFunctionItem);
 
-  FunctionItem(const FunctionItemInfo_t& fiInfo, dynamic_context* dctx);
+  FunctionItem(
+      const FunctionItemInfo_t& fiInfo,
+      dynamic_context* dctx,
+      QueryResources* dctxResources = NULL);
 
   ~FunctionItem();
 
@@ -268,7 +280,7 @@ public:
   zstring show() const;
 
 private:
-  void acquireResources();
+  void acquireResources(QueryResources* dctxResources);
 };
 
 

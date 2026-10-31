@@ -171,6 +171,7 @@ FunctionItem::FunctionItem(const FunctionItem& aFunctionItem)
   store::Item(store::Item::FUNCTION),
   theResources(aFunctionItem.theResources),
   theFunctionResources(aFunctionItem.theFunctionResources),
+  theDctxResources(aFunctionItem.theDctxResources),
   theFunctionItemInfo(aFunctionItem.theFunctionItemInfo),
   theArity(aFunctionItem.theArity),
   theClosureDctx(aFunctionItem.getDctx()),
@@ -191,7 +192,10 @@ FunctionItem::FunctionItem(const FunctionItem& aFunctionItem)
 /*******************************************************************************
 
 ********************************************************************************/
-FunctionItem::FunctionItem(const FunctionItemInfo_t& fiInfo, dynamic_context* dctx)
+FunctionItem::FunctionItem(
+    const FunctionItemInfo_t& fiInfo,
+    dynamic_context* dctx,
+    QueryResources* dctxResources)
   :
   store::Item(store::Item::FUNCTION),
   theFunctionItemInfo(fiInfo),
@@ -202,7 +206,7 @@ FunctionItem::FunctionItem(const FunctionItemInfo_t& fiInfo, dynamic_context* dc
   assert(theFunctionItemInfo->theFunction->isUdf());
   theArgValues.resize(theArity);
 
-  acquireResources();
+  acquireResources(dctx != NULL ? dctxResources : NULL);
 
 #if 0
   if (theFunctionItemInfo->theFunction->getName() != NULL)
@@ -217,9 +221,9 @@ FunctionItem::FunctionItem(const FunctionItemInfo_t& fiInfo, dynamic_context* dc
 
 
 /*******************************************************************************
-  See theResources and theFunctionResources.
+  See theResources, theFunctionResources and theDctxResources.
 ********************************************************************************/
-void FunctionItem::acquireResources()
+void FunctionItem::acquireResources(QueryResources* dctxResources)
 {
   CompilerCB* ccb = theFunctionItemInfo->theCCB;
 
@@ -231,6 +235,11 @@ void FunctionItem::acquireResources()
 
   if (udfCCB != NULL && udfCCB->theResources != theResources.getp())
     theFunctionResources = udfCCB->theResources;
+
+  if (dctxResources != NULL &&
+      dctxResources != theResources.getp() &&
+      dctxResources != theFunctionResources.getp())
+    theDctxResources = dctxResources;
 }
 
 
