@@ -17,7 +17,13 @@
 // Drives the DBGP debugger server over its socket with a scripted client and
 // checks the property_get, property_value and property_set commands.
 
+#include <chrono>
+#include <condition_variable>
+#include <cstdlib>
 #include <cstring>
+#include <deque>
+#include <memory>
+#include <mutex>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -25,6 +31,8 @@
 #include <thread>
 
 #include <zorba/config.h>
+#include <zorba/debugger_client.h>
+#include <zorba/debugger_event_handler.h>
 #include <zorba/zorba.h>
 #include <zorba/store_manager.h>
 #include <zorba/zorba_exception.h>
@@ -44,15 +52,17 @@ using namespace zorba;
 
 namespace {
 
-// the line numbers matter: the breakpoint is set on line 7
+// the line numbers matter: the breakpoint is set on line 8
 char const QUERY[] =
   "declare namespace ann = \"http://zorba.io/annotations\";\n"  // 1
   "declare variable $g as xs:integer := 1;\n"                    // 2
   "declare %ann:nonassignable variable $c := 2;\n"               // 3
-  "variable $l := \"local\";\n"                                  // 4
-  "variable $s := (1 to 40);\n"                                  // 5
-  "for $f in (1, 2)\n"                                           // 6
-  "return ($g * 10 + $f, $c, $l, count($s))\n";                  // 7
+  "declare variable $d as xs:double := 0.5e0;\n"                 // 4
+  "variable $l := \"local\";\n"                                  // 5
+  "variable $s := (1 to 40);\n"                                  // 6
+  "for $f in (1, 2)\n"                                           // 7
+  "return ($g * 10 + $f, $c, $l, count($s))\n";                  // 8
+char const BREAK_LINE[] = "8";
 
 int theFailures = 0;
 
@@ -184,7 +194,7 @@ void runClient(Client& aClient, std::string const& aQueryPath)
   std::string r = aClient.receive();
   check(contains(r, "<init "), "init message", r);
 
-  r = aClient.command("breakpoint_set", "-f \"" + aQueryPath + "\" -n 7");
+  r = aClient.command("breakpoint_set", "-f \"" + aQueryPath + "\" -n " + BREAK_LINE);
   check(contains(r, " id=\"") && !contains(r, "<error"), "breakpoint_set", r);
   std::string lBkpId;
   std::string::size_type lPos = r.find(" id=\"");
@@ -204,6 +214,24 @@ void runClient(Client& aClient, std::string const& aQueryPath)
   // property_get
   r = aClient.command("property_get", "-n g");
   check(propertyValue(r) == "1", "property_get g", r);
+
+  // property_get -m: truncated value, size of the full value
+  r = aClient.command("property_get", "-n l -m 3");
+  check(propertyValue(r) == "loc", "property_get l -m 3", r);
+  check(contains(r, "size=\"5\""), "property_get l -m 3 reports the full size", r);
+
+  // property_get -p: one page of children (32 per page)
+  r = aClient.command("property_get", "-n s");
+  check(contains(r, "numchildren=\"40\"") && contains(r, "page=\"0\"") &&
+        contains(r, "pagesize=\"32\""), "property_get s page attributes", r);
+  check(contains(r, "name=\"s[1]\"") && contains(r, "name=\"s[32]\"") &&
+        !contains(r, "name=\"s[33]\""), "property_get s returns the first page", r);
+
+  r = aClient.command("property_get", "-n s -p 1");
+  check(contains(r, "numchildren=\"40\"") && contains(r, "page=\"1\"") &&
+        contains(r, "pagesize=\"32\""), "property_get s -p 1 page attributes", r);
+  check(contains(r, "name=\"s[33]\"") && contains(r, "name=\"s[40]\"") &&
+        !contains(r, "name=\"s[32]\""), "property_get s -p 1 returns the second page", r);
 
   // property_value: the full value, -m max data, -p page
   r = aClient.command("property_value", "-n s");
@@ -243,18 +271,32 @@ void runClient(Client& aClient, std::string const& aQueryPath)
   r = aClient.command("property_value", "-n s");
   check(responseValue(r) == "1 2 3", "property_value s after property_set", r);
 
-  // property_set errors
+  // the value must match the declared type as in an assignment ($d := ...),
+  // which uses SequenceType matching: no promotion of xs:integer to xs:double
+  r = aClient.command("property_set", "-n d -- " + b64("2.5e0"));
+  check(contains(r, "success=\"1\""), "property_set d", r);
+  r = aClient.command("property_set", "-n d -- " + b64("1"));
+  check(contains(r, "success=\"0\"") && !contains(r, "<error"),
+        "property_set d with an xs:integer", r);
+  r = aClient.command("property_get", "-n d");
+  check(propertyValue(r) == "2.5", "property_get d after property_set", r);
+
+  // existing variables that can not take the value: success="0"
   r = aClient.command("property_set", "-n c -- " + b64("3"));
-  check(contains(r, "<error code=\"300\""), "property_set of a non-assignable variable", r);
+  check(contains(r, "success=\"0\"") && !contains(r, "<error"),
+        "property_set of a non-assignable variable", r);
 
   r = aClient.command("property_set", "-n f -- " + b64("3"));
-  check(contains(r, "<error code=\"300\""), "property_set of a FLWOR variable", r);
-
-  r = aClient.command("property_set", "-n nosuch -- " + b64("3"));
-  check(contains(r, "<error code=\"300\""), "property_set of an unknown variable", r);
+  check(contains(r, "success=\"0\"") && !contains(r, "<error"),
+        "property_set of a FLWOR variable", r);
 
   r = aClient.command("property_set", "-n g -- " + b64("\"text\""));
-  check(contains(r, "<error code=\"206\""), "property_set with a value of the wrong type", r);
+  check(contains(r, "success=\"0\"") && !contains(r, "<error"),
+        "property_set with a value of the wrong type", r);
+
+  // errors
+  r = aClient.command("property_set", "-n nosuch -- " + b64("3"));
+  check(contains(r, "<error code=\"300\""), "property_set of an unknown variable", r);
 
   r = aClient.command("property_set", "-n g -- " + b64("1 +"));
   check(contains(r, "<error code=\"206\""), "property_set with an invalid expression", r);
@@ -281,6 +323,141 @@ void runClient(Client& aClient, std::string const& aQueryPath)
 
   aClient.sendOnly("stop");
   aClient.receiveUntil("command=\"stop\"");
+}
+
+// collects the messages the DebuggerClient receives from the server
+class Handler : public DebuggerEventHandler
+{
+  std::mutex theMutex;
+  std::condition_variable theCondition;
+  std::deque<std::string> theMessages;
+
+public:
+  void parseMessage(const std::string& aMessage)
+  {
+    std::lock_guard<std::mutex> lLock(theMutex);
+    theMessages.push_back(aMessage);
+    theCondition.notify_all();
+  }
+
+  void error(unsigned int, const std::string& aMessage)
+  {
+    parseMessage("<client-error>" + aMessage + "</client-error>");
+  }
+
+  // the first message containing aNeedle (earlier messages are dropped)
+  std::string waitFor(std::string const& aNeedle)
+  {
+    std::unique_lock<std::mutex> lLock(theMutex);
+    auto lDeadline = std::chrono::steady_clock::now() + std::chrono::seconds(30);
+    while (true) {
+      while (!theMessages.empty()) {
+        std::string lMsg = theMessages.front();
+        theMessages.pop_front();
+        if (contains(lMsg, aNeedle))
+          return lMsg;
+      }
+      if (theCondition.wait_until(lLock, lDeadline) == std::cv_status::timeout)
+        return "";
+    }
+  }
+};
+
+unsigned short freePort()
+{
+  int lSocket = ::socket(AF_INET, SOCK_STREAM, 0);
+  sockaddr_in lAddr;
+  std::memset(&lAddr, 0, sizeof lAddr);
+  lAddr.sin_family = AF_INET;
+  lAddr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+  socklen_t lAddrLen = sizeof lAddr;
+  unsigned short lPort = 0;
+  if (lSocket >= 0 &&
+      ::bind(lSocket, reinterpret_cast<sockaddr*>(&lAddr), sizeof lAddr) == 0 &&
+      ::getsockname(lSocket, reinterpret_cast<sockaddr*>(&lAddr), &lAddrLen) == 0)
+    lPort = ntohs(lAddr.sin_port);
+  if (lSocket >= 0)
+    ::close(lSocket);
+  return lPort;
+}
+
+// the public DebuggerClient API: property_set with a value
+void runApiClient(Zorba* aZorba, std::string const& aQueryPath)
+{
+  unsigned short const lPort = freePort();
+  check(lPort != 0, "free local port", "");
+  if (lPort == 0)
+    return;
+
+  Handler lHandler;
+  std::unique_ptr<DebuggerClient> lClient(
+    DebuggerClient::createDebuggerClient(&lHandler, lPort, "127.0.0.1"));
+
+  XQuery_t lQuery = aZorba->createQuery();
+  lQuery->setFileName(aQueryPath);
+  lQuery->setDebugMode(true);
+  Zorba_CompilerHints_t lHints;
+  lHints.opt_level = ZORBA_OPT_LEVEL_O0;
+  std::ifstream lIn(aQueryPath.c_str());
+  lQuery->compile(lIn, lHints);
+
+  Zorba_SerializerOptions_t lSerOptions;
+  lSerOptions.omit_xml_declaration = ZORBA_OMIT_XML_DECLARATION_YES;
+  std::ostringstream lOutput;
+  std::string lServerError;
+  std::thread lServer([&]() {
+    try {
+      lQuery->debug(lOutput, lSerOptions, "127.0.0.1", lPort);
+    } catch (ZorbaException const& e) {
+      lServerError = e.what();
+    }
+  });
+
+  lClient->accept();
+  std::string r = lHandler.waitFor("<init ");
+  check(contains(r, "<init "), "client: init message", r);
+
+  lClient->breakpoint_set(DebuggerClient::Line, true, aQueryPath, 8);
+  r = lHandler.waitFor("breakpoint_set");
+  std::string lBkpId;
+  std::string::size_type lPos = r.find(" id=\"");
+  if (lPos != std::string::npos)
+    lBkpId = r.substr(lPos + 5, r.find('"', lPos + 5) - lPos - 5);
+  check(!lBkpId.empty(), "client: breakpoint_set", r);
+
+  lClient->run();
+  r = lHandler.waitFor("status=\"");
+  check(contains(r, "status=\"break\""), "client: run stops at the breakpoint", r);
+
+  if (contains(r, "status=\"break\"")) {
+    lClient->property_set("g", "7");
+    r = lHandler.waitFor("command=\"property_set\"");
+    check(contains(r, "success=\"1\""), "client: property_set g", r);
+
+    lClient->property_set("c", "7");
+    r = lHandler.waitFor("command=\"property_set\"");
+    check(contains(r, "success=\"0\""), "client: property_set c", r);
+
+    lClient->property_get("g");
+    r = lHandler.waitFor("command=\"property_get\"");
+    check(propertyValue(r) == "7", "client: property_get g after property_set", r);
+
+    lClient->breakpoint_remove(std::atoi(lBkpId.c_str()));
+    lHandler.waitFor("command=\"breakpoint_remove\"");
+    lClient->run();
+    r = lHandler.waitFor("status=\"stopping\"");
+    check(contains(r, "status=\"stopping\""), "client: run to the end of the query", r);
+  }
+
+  lClient->stop(true);
+  lHandler.waitFor("command=\"stop\"");
+  lServer.join();
+  lClient->quit();
+  lQuery->close();
+
+  check(lServerError.empty(), "client: debugger server error", lServerError);
+  check(lOutput.str() == "71 2 local 40 72 2 local 40",
+        "client: query result reflects property_set", lOutput.str());
 }
 
 } // namespace
@@ -366,6 +543,8 @@ debugger_property(int argc, char* argv[])
     check(lServerError.empty(), "debugger server error", lServerError);
     check(lOutput.str() == "51 2 changed 3 52 2 changed 3",
           "query result reflects property_set", lOutput.str());
+
+    runApiClient(lZorba, lQueryPath);
   } catch (ZorbaException const& e) {
     std::cerr << e << std::endl;
     lResult = 1;
