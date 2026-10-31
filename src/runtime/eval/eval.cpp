@@ -101,7 +101,8 @@ void EvalIteratorState::disposeQuery()
 #ifdef ZORBA_WITH_DEBUGGER
                           NULL,
 #endif
-                          theOuterResources.getp());
+                          theOuterResources.getp(),
+                          theOuterDctxResources.getp());
     theResources = NULL;
   }
   else
@@ -110,7 +111,8 @@ void EvalIteratorState::disposeQuery()
     theCCB.reset();
   }
 
-  theOuterResources = NULL;
+  QueryResources::release(theOuterResources);
+  QueryResources::release(theOuterDctxResources);
 }
 
 
@@ -303,6 +305,7 @@ void EvalIterator::init(
   state->theResources = new QueryResources();
   evalCCB->theResources = state->theResources.getp();
   state->theOuterResources = planState.theCompilerCB->theResources;
+  state->theOuterDctxResources = planState.getGlobalDynCtxResources();
 
   // Create the dynamic context for the eval query
   dynamic_context* evalDctx = new dynamic_context(planState.theGlobalDynCtx);

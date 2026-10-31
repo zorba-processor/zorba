@@ -39,12 +39,12 @@ class QueryResources;
   --------
   rchandle to the internal static_context obj that is wrapped by "this".
 
-  theCompilerCB, theResources :
-  ------------------------------
+  theCompilerCB, theXQueryDiagnostics, theResources :
+  ----------------------------------------------------
   If loadProlog() is called on "this": the ccb of the internal query that
-  compiled the prolog (it owns the UDFs the prolog declares), and the
-  QueryResources that keeps it alive for function items referring to those
-  UDFs (see compiler/api/compilercb.h).
+  compiled the prolog (it owns the UDFs the prolog declares), the diagnostics
+  that ccb reports to, and the QueryResources that keeps them alive for
+  function items referring to those UDFs (see compiler/api/compilercb.h).
 
   theMaxVarId :
   -------------
@@ -72,6 +72,8 @@ protected:
   static_context_t                      theCtx;
 
   CompilerCB                          * theCompilerCB;
+
+  XQueryDiagnostics                   * theXQueryDiagnostics;
 
   rchandle<QueryResources>              theResources;
 

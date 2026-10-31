@@ -35,6 +35,9 @@
 #include "functions/udf.h"
 
 #include "store/api/temp_seq.h"
+#include "store/api/iterator.h"
+
+#include <map>
 
 #include "zorbaserialization/serialize_template_types.h"
 #include "zorbaserialization/serialize_zorba_types.h"
@@ -171,11 +174,13 @@ FunctionItem::FunctionItem(const FunctionItem& aFunctionItem)
   store::Item(store::Item::FUNCTION),
   theResources(aFunctionItem.theResources),
   theFunctionResources(aFunctionItem.theFunctionResources),
-  theDctxResources(aFunctionItem.theDctxResources),
+  theGlobalResources(aFunctionItem.theGlobalResources),
   theFunctionItemInfo(aFunctionItem.theFunctionItemInfo),
   theArity(aFunctionItem.theArity),
   theClosureDctx(aFunctionItem.getDctx()),
-  theClosureDctxOwned(false)
+  theGlobalDctx(aFunctionItem.theGlobalDctx),
+  theClosureDctxOwned(false),
+  theInternalRefs(0)
 {
   theArgValues.insert(theArgValues.begin(), aFunctionItem.theArgValues.begin(), aFunctionItem.theArgValues.end());
 
@@ -194,19 +199,38 @@ FunctionItem::FunctionItem(const FunctionItem& aFunctionItem)
 ********************************************************************************/
 FunctionItem::FunctionItem(
     const FunctionItemInfo_t& fiInfo,
-    dynamic_context* dctx,
-    QueryResources* dctxResources)
+    dynamic_context* closureDctx,
+    const PlanState& planState)
   :
   store::Item(store::Item::FUNCTION),
   theFunctionItemInfo(fiInfo),
   theArity(fiInfo->theArity),
-  theClosureDctx(dctx),
-  theClosureDctxOwned(true)
+  theClosureDctx(closureDctx),
+  theGlobalDctx(NULL),
+  theClosureDctxOwned(true),
+  theInternalRefs(0)
 {
   assert(theFunctionItemInfo->theFunction->isUdf());
   theArgValues.resize(theArity);
 
-  acquireResources(dctx != NULL ? dctxResources : NULL);
+  // See theResources, theFunctionResources and theGlobalResources.
+  CompilerCB* ccb = theFunctionItemInfo->theCCB;
+
+  if (ccb != NULL)
+    theResources = ccb->theResources;
+
+  CompilerCB* udfCCB =
+  static_cast<user_function*>(theFunctionItemInfo->theFunction)->getCCB();
+
+  if (udfCCB != NULL && udfCCB->theResources != theResources.getp())
+    theFunctionResources = udfCCB->theResources;
+
+  // A global dctx that nothing keeps alive is not remembered (see
+  // theGlobalDctx).
+  theGlobalResources = planState.getGlobalDynCtxResources();
+
+  if (theGlobalResources != NULL && !planState.theGlobalDynCtxIsTemporary)
+    theGlobalDctx = planState.theGlobalDynCtx;
 
 #if 0
   if (theFunctionItemInfo->theFunction->getName() != NULL)
@@ -221,36 +245,15 @@ FunctionItem::FunctionItem(
 
 
 /*******************************************************************************
-  See theResources, theFunctionResources and theDctxResources.
-********************************************************************************/
-void FunctionItem::acquireResources(QueryResources* dctxResources)
-{
-  CompilerCB* ccb = theFunctionItemInfo->theCCB;
-
-  if (ccb != NULL)
-    theResources = ccb->theResources;
-
-  CompilerCB* udfCCB =
-  static_cast<user_function*>(theFunctionItemInfo->theFunction)->getCCB();
-
-  if (udfCCB != NULL && udfCCB->theResources != theResources.getp())
-    theFunctionResources = udfCCB->theResources;
-
-  if (dctxResources != NULL &&
-      dctxResources != theResources.getp() &&
-      dctxResources != theFunctionResources.getp())
-    theDctxResources = dctxResources;
-}
-
-
-/*******************************************************************************
 
 ********************************************************************************/
 FunctionItem::FunctionItem(::zorba::serialization::Archiver& ar)
   :
   store::Item(store::Item::FUNCTION),
   theClosureDctx(NULL),
-  theClosureDctxOwned(false)
+  theGlobalDctx(NULL),
+  theClosureDctxOwned(false),
+  theInternalRefs(0)
 {
 }
 
@@ -271,6 +274,362 @@ FunctionItem::~FunctionItem()
 #endif
   if (theClosureDctxOwned)
     delete theClosureDctx;
+
+  bool detached =
+    (theResources != NULL && theResources->isDetached()) ||
+    (theFunctionResources != NULL && theFunctionResources->isDetached()) ||
+    (theGlobalResources != NULL && theGlobalResources->isDetached());
+
+  if (detached)
+  {
+    // This item may have held the last reference from outside a cycle (see
+    // QueryResources::collectCycles()). Release everything else first: it
+    // may point into the state the QueryResources keep.
+    theArgValues.clear();
+    theFunctionItemInfo = NULL;
+    theClosureDctxOwner = NULL;
+
+    rchandle<QueryResources> held[3];
+    held[0].transfer(theResources);
+    held[1].transfer(theFunctionResources);
+    held[2].transfer(theGlobalResources);
+
+    QueryResources* heldPtrs[3] = { held[0].getp(), held[1].getp(), held[2].getp() };
+    QueryResources::collectCycles(heldPtrs, 3);
+  }
+}
+
+
+/*******************************************************************************
+  See theInternalRefs.
+********************************************************************************/
+void FunctionItem::collectCycles()
+{
+  rchandle<QueryResources> held[3];
+  held[0] = theResources;
+  held[1] = theFunctionResources;
+  held[2] = theGlobalResources;
+
+  // "this" may be destroyed by the collection: only the copies are used
+  // from here on.
+  QueryResources* heldPtrs[3] = { held[0].getp(), held[1].getp(), held[2].getp() };
+  QueryResources::collectCycles(heldPtrs, 3);
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
+//                                                                            //
+//  QueryResources::collectCycles()                                           //
+//                                                                            //
+////////////////////////////////////////////////////////////////////////////////
+
+
+/*******************************************************************************
+  Trial deletion over the graph of a detached QueryResources (see the class
+  comment of QueryResources in compiler/api/compilercb.h).
+
+  The nodes are QueryResources objs, function items and (eager) temp
+  sequences; the edges are the references among them that this class can
+  see:
+
+  - a detached QueryResources (or the root) refers to the values of its dctx
+    variables and to its parents;
+  - a function item refers to its QueryResources, to the item that owns its
+    closure dctx, and to the values of its closure dctx variables;
+  - an eager temp sequence refers to its items.
+
+  A node whose reference count is greater than the number of edges into it is
+  referenced from outside the graph, and so is every node reachable from it.
+  If the root is not, nothing outside the graph can reach it any more: the
+  graph consists of cycles only, and releasing the dctx variable values of the
+  unreachable QueryResources frees it. References this class cannot see (e.g.
+  items inside a lazy temp sequence or in partial-application arguments) only
+  make it conservative: they count as references from outside.
+********************************************************************************/
+class QueryResourcesCollector
+{
+public:
+  // Set while a graph is being built: the reference count changes it causes
+  // (temporary handles) must not start a collection.
+  static thread_local bool theIsBuilding;
+
+private:
+  enum Kind { RESOURCES, ITEM, SEQ };
+
+  struct Node
+  {
+    Kind                theKind;
+    const void        * thePtr;
+    long                theRefs;
+    long                theInternalRefs;
+    bool                theIsLive;
+    std::vector<Node*>  theOut;
+  };
+
+  QueryResources * const * theHeld;
+  csize                    theNumHeld;
+
+  std::map<const void*, Node*> theNodes;
+  std::vector<Node*>           theToVisit;
+
+public:
+  QueryResourcesCollector(QueryResources* const* held, csize numHeld)
+    :
+    theHeld(held),
+    theNumHeld(numHeld)
+  {
+  }
+
+  ~QueryResourcesCollector()
+  {
+    std::map<const void*, Node*>::iterator ite = theNodes.begin();
+    for (; ite != theNodes.end(); ++ite)
+      delete ite->second;
+  }
+
+  /*
+    Returns true if root is unreachable from outside its graph, after adding
+    to garbage the QueryResources objs of the graph whose dctx variables must
+    be released. Otherwise records in the function items of the graph how
+    many references the graph has to them (FunctionItem::theInternalRefs).
+  */
+  bool run(QueryResources* root, std::vector<QueryResources_t>& garbage)
+  {
+    theIsBuilding = true;
+
+    Node* rootNode = getNode(RESOURCES, root);
+
+    while (!theToVisit.empty())
+    {
+      Node* node = theToVisit.back();
+      theToVisit.pop_back();
+      visit(node);
+    }
+
+    // Mark everything reachable from a node referenced from outside.
+    std::vector<Node*> live;
+    std::map<const void*, Node*>::iterator ite = theNodes.begin();
+    for (; ite != theNodes.end(); ++ite)
+    {
+      Node* node = ite->second;
+      if (node->theRefs > node->theInternalRefs)
+      {
+        node->theIsLive = true;
+        live.push_back(node);
+      }
+    }
+
+    while (!live.empty())
+    {
+      Node* node = live.back();
+      live.pop_back();
+
+      std::vector<Node*>::iterator outIte = node->theOut.begin();
+      for (; outIte != node->theOut.end(); ++outIte)
+      {
+        if (!(*outIte)->theIsLive)
+        {
+          (*outIte)->theIsLive = true;
+          live.push_back(*outIte);
+        }
+      }
+    }
+
+    theIsBuilding = false;
+
+    if (rootNode->theIsLive)
+    {
+      for (ite = theNodes.begin(); ite != theNodes.end(); ++ite)
+      {
+        Node* node = ite->second;
+        if (node->theKind == ITEM)
+        {
+          FunctionItem* item = const_cast<FunctionItem*>(
+          static_cast<const FunctionItem*>(node->thePtr));
+          item->theInternalRefs = node->theInternalRefs;
+        }
+      }
+      return false;
+    }
+
+    for (ite = theNodes.begin(); ite != theNodes.end(); ++ite)
+    {
+      Node* node = ite->second;
+      if (node->theKind == RESOURCES && !node->theIsLive)
+      {
+        QueryResources* res = const_cast<QueryResources*>(
+        static_cast<const QueryResources*>(node->thePtr));
+        if (res == root || res->theIsDetached)
+          garbage.push_back(res);
+      }
+    }
+    return true;
+  }
+
+private:
+  Node* getNode(Kind kind, const void* ptr)
+  {
+    std::map<const void*, Node*>::iterator ite = theNodes.find(ptr);
+    if (ite != theNodes.end())
+      return ite->second;
+
+    Node* node = new Node;
+    node->theKind = kind;
+    node->thePtr = ptr;
+    node->theInternalRefs = 0;
+    node->theIsLive = false;
+
+    switch (kind)
+    {
+    case RESOURCES:
+    {
+      const QueryResources* res = static_cast<const QueryResources*>(ptr);
+      node->theRefs = res->getRefCount();
+      // The references held by the caller do not count.
+      for (csize i = 0; i < theNumHeld; ++i)
+      {
+        if (theHeld[i] == res)
+          --node->theRefs;
+      }
+      break;
+    }
+    case ITEM:
+      node->theRefs = static_cast<const FunctionItem*>(ptr)->getRefCount();
+      break;
+    case SEQ:
+      node->theRefs = static_cast<const store::TempSeq*>(ptr)->getRefCount();
+      break;
+    }
+
+    theNodes[ptr] = node;
+    theToVisit.push_back(node);
+    return node;
+  }
+
+  void addEdge(Node* from, Kind kind, const void* to)
+  {
+    Node* node = getNode(kind, to);
+    ++node->theInternalRefs;
+    from->theOut.push_back(node);
+  }
+
+  void addResources(Node* from, const QueryResources* res)
+  {
+    if (res != NULL)
+      addEdge(from, RESOURCES, res);
+  }
+
+  void addItem(Node* from, const store::Item* item)
+  {
+    if (item != NULL && item->isFunction())
+      addEdge(from, ITEM, static_cast<const FunctionItem*>(item));
+  }
+
+  void addVariables(Node* from, const dynamic_context* dctx)
+  {
+    if (dctx == NULL)
+      return;
+
+    const std::vector<dynamic_context::VarValue>& vars = dctx->get_variables();
+    std::vector<dynamic_context::VarValue>::const_iterator ite = vars.begin();
+    for (; ite != vars.end(); ++ite)
+    {
+      if (ite->hasItemValue())
+        addItem(from, ite->theValue.item);
+      else if (ite->hasSeqValue())
+        addEdge(from, SEQ, ite->theValue.temp_seq);
+    }
+  }
+
+  void visit(Node* node)
+  {
+    switch (node->theKind)
+    {
+    case RESOURCES:
+    {
+      const QueryResources* res = static_cast<const QueryResources*>(node->thePtr);
+      // An attached QueryResources is referenced by its owner: it is live,
+      // and what its dctx holds does not matter.
+      if (res->theIsDetached)
+      {
+        addVariables(node, res->theDctx);
+        addResources(node, res->theParent.getp());
+        addResources(node, res->theDctxParent.getp());
+      }
+      break;
+    }
+    case ITEM:
+    {
+      const FunctionItem* item = static_cast<const FunctionItem*>(node->thePtr);
+      addResources(node, item->theResources.getp());
+      addResources(node, item->theFunctionResources.getp());
+      addResources(node, item->theGlobalResources.getp());
+      addItem(node, item->theClosureDctxOwner.getp());
+      if (item->theClosureDctxOwned)
+        addVariables(node, item->theClosureDctx);
+      break;
+    }
+    case SEQ:
+    {
+      store::TempSeq* seq =
+      const_cast<store::TempSeq*>(static_cast<const store::TempSeq*>(node->thePtr));
+      if (!seq->isLazy())
+      {
+        store::Iterator_t iter = seq->getIterator();
+        iter->open();
+        store::Item_t item;
+        while (iter->next(item))
+        {
+          const store::Item* raw = item.getp();
+          item = NULL;
+          addItem(node, raw);
+        }
+        iter->close();
+      }
+      break;
+    }
+    }
+  }
+};
+
+
+thread_local bool QueryResourcesCollector::theIsBuilding = false;
+
+
+void QueryResources::collectCycles(QueryResources* const* held, csize numHeld)
+{
+  if (QueryResourcesCollector::theIsBuilding)
+    return;
+
+  for (csize i = 0; i < numHeld; ++i)
+  {
+    QueryResources* root = held[i];
+
+    if (root == NULL || !root->theIsDetached)
+      continue;
+
+    bool seen = false;
+    for (csize j = 0; j < i; ++j)
+      seen |= (held[j] == root);
+    if (seen)
+      continue;
+
+    std::vector<QueryResources_t> garbage;
+    {
+      QueryResourcesCollector collector(held, numHeld);
+      if (!collector.run(root, garbage))
+        continue;
+    }
+
+    // Releasing the values frees the cycles; the handles in garbage keep the
+    // QueryResources objs alive until all of them are done.
+    std::vector<QueryResources_t>::iterator ite = garbage.begin();
+    for (; ite != garbage.end(); ++ite)
+    {
+      if ((*ite)->theDctx)
+        (*ite)->theDctx->release_variables();
+    }
+  }
 }
 
 

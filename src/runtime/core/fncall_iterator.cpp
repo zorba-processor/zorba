@@ -90,6 +90,33 @@
 
 namespace zorba {
 
+/*******************************************************************************
+  A call is not cached if its arguments or its result contain function items.
+  The cache belongs to the function, which lives as long as the query (or the
+  module) that declares it, and a function item keeps the state of the query
+  that created it alive (see QueryResources in compiler/api/compilercb.h): a
+  cached function item would keep that query alive forever. probeCache()
+  leaves theCacheKey NULL when the arguments contain function items.
+********************************************************************************/
+static bool isCacheable(
+    const store::Item_t& aKey,
+    const std::vector<store::Item_t>& aResult)
+{
+  if (aKey == NULL)
+    return false;
+
+  for (std::vector<store::Item_t>::const_iterator ite = aResult.begin();
+       ite != aResult.end();
+       ++ite)
+  {
+    if ((*ite)->isFunction())
+      return false;
+  }
+
+  return true;
+}
+
+
 SERIALIZABLE_CLASS_VERSIONS(UDFunctionCallIterator)
 
 SERIALIZABLE_CLASS_VERSIONS(ExtFunctionCallIterator)
@@ -144,6 +171,19 @@ void UDFunctionCallIteratorState::open(
   // block vars, all of which have the same dynamic-context id, but they are
   // distinct vars.
 
+  // The body of a function item reads the prolog variables of the query that
+  // created it, which may not be the query that invokes it.
+  dynamic_context* globalDctx = planState.theGlobalDynCtx;
+  QueryResources* globalResources = planState.theGlobalDynCtxResources;
+
+  if (isDynamic &&
+      functionItem->getGlobalDctx() != NULL &&
+      functionItem->getGlobalDctx() != globalDctx)
+  {
+    globalDctx = functionItem->getGlobalDctx();
+    globalResources = functionItem->getGlobalResources();
+  }
+
   if (isDynamic && functionItem->getDctx() != NULL)
   {
     thePlan = udf->getPlan(thePlanStateSize, functionItem->getMaxInScopeVarId()).getp();
@@ -160,15 +200,20 @@ void UDFunctionCallIteratorState::open(
 
     thePlanStateSize = thePlan->getStateSizeOfSubtree();
 
-    theLocalDCtx = new dynamic_context(planState.theGlobalDynCtx);
+    theLocalDCtx = new dynamic_context(globalDctx);
 
     theIsLocalDCtxOwner = true;
   }
 
-  thePlanState = new PlanState(planState.theGlobalDynCtx,
+  thePlanState = new PlanState(globalDctx,
                                theLocalDCtx,
                                thePlanStateSize,
                                planState.theStackDepth + 1);
+
+  thePlanState->theGlobalDynCtxResources = globalResources;
+  thePlanState->theGlobalDynCtxIsTemporary =
+    (globalDctx == planState.theGlobalDynCtx &&
+     planState.theGlobalDynCtxIsTemporary);
 
   // Same call depth limit and deadline as the caller.
   thePlanState->inheritLimits(planState);
@@ -301,6 +346,7 @@ bool UDFunctionCallIterator::probeCache(
 
   std::vector<store::Iterator_t>::iterator lIte = aState->theArgWrappers.begin();
   std::vector<store::Item_t> lProbeKeys;
+  bool lHasFunctionItem = false;
   for (; lIte != aState->theArgWrappers.end(); ++lIte)
   {
     store::Iterator_t& lArgWrapper = (*lIte);
@@ -313,6 +359,7 @@ bool UDFunctionCallIterator::probeCache(
       while (lArgWrapper->next(lArgItemValue))
       {
         lArgItemValue->ensureSeekable();
+        lHasFunctionItem |= lArgItemValue->isFunction();
         lArgSeq.push_back(lArgItemValue);
         lKeySeq.push_back(lArgItemValue);
       }
@@ -320,6 +367,15 @@ bool UDFunctionCallIterator::probeCache(
 
     aArguments.push_back(lArgSeq);
     lProbeKeys.push_back(store::Item_t(new simplestore::ItemVector(lKeySeq)));
+  }
+
+  // See isCacheable().
+  if (lHasFunctionItem)
+  {
+    aState->theCacheKey = NULL;
+    aState->theCachedResult.clear();
+    ++aState->theCacheMisses;
+    return false;
   }
 
   aState->theCacheKey = store::Item_t(new simplestore::ItemVector(lProbeKeys));
@@ -347,6 +403,9 @@ void UDFunctionCallIterator::insertCacheEntry(
   std::vector<store::Item_t>& aResult) const
 {
   assert(aState->theCache);
+  if (!isCacheable(aState->theCacheKey, aResult))
+    return;
+
   if (isCacheAcrossSnapshots() || aState->theCacheKeySnapshot == aPlanState.theGlobalDynCtx->getSnapshotID())
   {
     aState->theCache->insert(aState->theCacheKey, aResult, aPlanState);
@@ -1380,6 +1439,7 @@ bool ExtFunctionCallIterator::probeCache(
   assert(aState->theCache);
 
   std::vector<store::Item_t> probeKeys;
+  bool lHasFunctionItem = false;
   for (unsigned int i=0; i< aState->m_extArgs.size(); ++i)
   {
     zorba::ItemSequence* lArgWrapper = aState->m_extArgs[i];
@@ -1394,6 +1454,7 @@ bool ExtFunctionCallIterator::probeCache(
     {
       lIntArgItem = Unmarshaller::getInternalItem(lArgItem);
       lIntArgItem->ensureSeekable();
+      lHasFunctionItem |= lIntArgItem->isFunction();
 
       lArgSeq.push_back(lArgItem);
       lIntArgSeq.push_back(lIntArgItem);
@@ -1402,6 +1463,15 @@ bool ExtFunctionCallIterator::probeCache(
 
     aArguments.push_back(zorba::VectorItemSequence(lArgSeq));
     probeKeys.push_back(new simplestore::ItemVector(lIntArgSeq));
+  }
+
+  // See isCacheable().
+  if (lHasFunctionItem)
+  {
+    aState->theCacheKey = NULL;
+    aState->theCachedResult.clear();
+    ++aState->theCacheMisses;
+    return false;
   }
 
   aState->theCacheKey = store::Item_t(new simplestore::ItemVector(probeKeys));
@@ -1430,6 +1500,9 @@ void ExtFunctionCallIterator::insertCacheEntry(
     std::vector<store::Item_t>& aResult) const
 {
   assert(aState->theCache);
+  if (!isCacheable(aState->theCacheKey, aResult))
+    return;
+
   if (isCacheAcrossSnapshots() || aState->theCacheKeySnapshot == aPlanState.theGlobalDynCtx->getSnapshotID())
   {
     aState->theCache->insert(aState->theCacheKey, aResult, aPlanState);

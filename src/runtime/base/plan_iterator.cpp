@@ -75,6 +75,8 @@ PlanState::PlanState(
   theQuery(0),
   theGlobalDynCtx(globalDctx),
   theLocalDynCtx(localDctx),
+  theGlobalDynCtxResources(NULL),
+  theGlobalDynCtxIsTemporary(false),
   theDebuggerCommons(NULL),
   theTimeout(0),
   theDeadlineCountdown(0),
@@ -94,6 +96,8 @@ PlanState::PlanState(PlanState& aPlanState):
       theQuery(aPlanState.theQuery),
       theGlobalDynCtx(aPlanState.theGlobalDynCtx),
       theLocalDynCtx(aPlanState.theLocalDynCtx),
+      theGlobalDynCtxResources(aPlanState.theGlobalDynCtxResources),
+      theGlobalDynCtxIsTemporary(aPlanState.theGlobalDynCtxIsTemporary),
       theNodeConstuctionPath(aPlanState.theNodeConstuctionPath),
       theDebuggerCommons(aPlanState.theDebuggerCommons),
       theDeadline(aPlanState.theDeadline),
@@ -103,6 +107,15 @@ PlanState::PlanState(PlanState& aPlanState):
       theBlockOwned(false)
 {
 }
+
+QueryResources* PlanState::getGlobalDynCtxResources() const
+{
+  if (theGlobalDynCtxResources != NULL)
+    return theGlobalDynCtxResources;
+
+  return (theCompilerCB != NULL ? theCompilerCB->theResources : NULL);
+}
+
 
 void PlanState::initLimits(const CompilerCB* ccb)
 {

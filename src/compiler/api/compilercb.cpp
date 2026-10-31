@@ -206,16 +206,17 @@ void CompilerCB::addAnonymousUDF(user_function* udf)
 
 
 /*******************************************************************************
-  class QueryResources
+  class QueryResources (collectCycles() is in runtime/hof/function_item.cpp)
 ********************************************************************************/
 QueryResources::QueryResources()
   :
   theCCB(NULL),
   theDctx(NULL),
-  theDiagnostics(NULL)
+  theDiagnostics(NULL),
 #ifdef ZORBA_WITH_DEBUGGER
-  , theDebuggerCommons(NULL)
+  theDebuggerCommons(NULL),
 #endif
+  theIsDetached(false)
 {
 }
 
@@ -223,6 +224,10 @@ QueryResources::QueryResources()
 QueryResources::~QueryResources()
 {
   destroy();
+
+  // The parents may now be reachable only through cycles.
+  release(theParent);
+  release(theDctxParent);
 }
 
 
@@ -234,9 +239,10 @@ void QueryResources::dispose(
 #ifdef ZORBA_WITH_DEBUGGER
     DebuggerCommons* debuggerCommons,
 #endif
-    QueryResources* parent)
+    QueryResources* parent,
+    QueryResources* dctxParent)
 {
-  assert(theCCB == NULL && theDctx == NULL);
+  assert(theCCB == NULL && theDctx == NULL && !theIsDetached);
 
   theCCB = ccb;
   theSctx = sctx;
@@ -247,20 +253,49 @@ void QueryResources::dispose(
   theDebuggerCommons = debuggerCommons;
 #endif
 
-  // May release function items created by this query, and thereby references
-  // to this obj (see the class comment).
+  // See the class comment. May release function items created by the query,
+  // and thereby references to this obj.
   if (theDctx)
-    theDctx->release_values();
+    theDctx->release_parameters();
 
   if (getRefCount() > 1)
   {
-    // Function items created by the query are still alive: keep the state
-    // until the last of them is destroyed.
+    // Function items created by the query may still be alive: keep the state
+    // until the last of them is destroyed, unless only cycles keep it.
     theParent = parent;
+    theDctxParent = (dctxParent != parent ? dctxParent : NULL);
+    theIsDetached = true;
+
+    // The caller's reference does not count.
+    QueryResources* held[1] = { this };
+    collectCycles(held, 1);
+  }
+
+  if (getRefCount() == 1)
+  {
+    theIsDetached = false;
+    theParent = NULL;
+    theDctxParent = NULL;
+    destroy();
+  }
+}
+
+
+void QueryResources::release(rchandle<QueryResources>& resources)
+{
+  if (resources == NULL)
+    return;
+
+  if (resources->theIsDetached && resources->getRefCount() > 1)
+  {
+    rchandle<QueryResources> hold;
+    hold.transfer(resources);
+    QueryResources* held[1] = { hold.getp() };
+    collectCycles(held, 1);
   }
   else
   {
-    destroy();
+    resources = NULL;
   }
 }
 

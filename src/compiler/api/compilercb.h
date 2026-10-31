@@ -53,47 +53,64 @@ class XQueryDiagnostics;
 
   Function items point into the state of the query that created them: the
   user_function objs (and the exprs of their bodies) owned by the query's
-  CompilerCB, the query's static contexts, and, through the closure dynamic
-  context, the query's global dynamic context. The application may keep a
-  function item from a query result after the query has been closed or
+  CompilerCB, the query's static contexts, and the query's global dynamic
+  context, which holds the values of the prolog variables their bodies read
+  and is the parent of their closure dynamic context. The application may
+  keep a function item from a query result after the query has been closed or
   destroyed, so that state must live as long as the function item.
 
-  The owner of the state (XQueryImpl, or the EvalIteratorState of an eval
-  query) creates one QueryResources obj, holds a reference to it, and stores a
-  raw pointer to it in its CompilerCB (CompilerCB::theResources). Each
-  FunctionItem holds a reference to the QueryResources of the ccb that
-  created it (and of the ccb that owns its user_function, if different).
-  Nothing else changes while the query is open: no state is moved, and
-  creating a function item costs one reference-count increment.
+  The owner of the state (XQueryImpl, the EvalIteratorState of an eval query,
+  or a StaticContextImpl after loadProlog()) creates one QueryResources obj,
+  holds a reference to it, and stores a raw pointer to it in its CompilerCB
+  (CompilerCB::theResources). Each FunctionItem holds a reference to the
+  QueryResources of the ccb that created it, of the ccb that owns its
+  user_function (if different), and of the query that owns its global dctx
+  (see FunctionItem). Nothing else changes while the query is open: no state
+  is moved, and creating a function item costs a few reference-count
+  increments.
 
   When the owner is done with the state, it calls dispose(). If no function
   item refers to it any more (the common case), dispose() destroys the state
   right away, in the order the owner used to. Otherwise the state is handed
-  over to this obj and destroyed when the last function item that refers to
-  it goes away.
+  over to this obj ("detached") and destroyed when the last reference goes
+  away.
 
-  Before checking, dispose() drops the variable values and the external
-  function parameters of the dynamic context: a prolog variable (or an
-  external variable set by the application) may hold a function item created
-  by the same query, and so may an external function parameter (e.g. the
-  zorba-query module keeps the queries it prepares, with the URL resolver
-  function items passed to them, in one); either would otherwise keep the
-  state alive forever. Function items read the global variables through the
-  dynamic context of the query that invokes them, so dropping the variable
-  values does not change what they compute; the external function
-  parameters are destroyed at the same point as before.
+  Cycles: a function item can be stored in a prolog variable of the query that
+  created it, and so in the dctx it keeps alive. Such cycles are collected by
+  collectCycles() (see runtime/hof/function_item.cpp): a trial deletion over
+  the graph of detached QueryResources, the function items stored in their
+  dctx variables (directly or in temp sequences, and transitively in closure
+  dctxs), and the references among them. If no reference from outside that
+  graph reaches this obj, the dctx variable values are released, which frees
+  the whole cycle. It runs when the obj is detached, and afterwards when a
+  reference that may have been the last outside one goes away: a reference to
+  a function item of the graph (FunctionItem::referenceDropped()), a function
+  item that refers to a detached obj, or a reference to a detached obj held
+  by another QueryResources or by an owner (release()).
+
+  The external function parameters of the dctx are destroyed by dispose() in
+  any case, as they were before: they are opaque (e.g. the zorba-query module
+  keeps the queries it prepares, with the URL resolver function items passed
+  to them, in one), so cycles through them could not be collected.
 
   theParent:
   ----------
-  For an eval query: the QueryResources of the query that runs the eval. The
-  eval's dynamic context is a child of that query's dynamic context, and the
-  eval ccb shares that query's XQueryDiagnostics (and DebuggerCommons).
+  For an eval query: the QueryResources of the query whose ccb the eval ccb
+  copies (it shares that query's XQueryDiagnostics and DebuggerCommons).
+
+  theDctxParent:
+  --------------
+  For an eval query: the QueryResources of the query that owns the parent of
+  the eval dctx, if different from theParent.
 
   Reference counting is atomic unless ZORBA_FOR_ONE_THREAD_ONLY is set; the
-  state itself is used by one thread at a time, as everything else in a query.
+  state itself, and the cycle collection, are used by one thread at a time, as
+  everything else in a query.
 ********************************************************************************/
 class QueryResources : public SyncedRCObject
 {
+  friend class QueryResourcesCollector;
+
 protected:
   CompilerCB                   * theCCB;
   static_context_t               theSctx;
@@ -103,6 +120,8 @@ protected:
   DebuggerCommons              * theDebuggerCommons;
 #endif
   rchandle<QueryResources>       theParent;
+  rchandle<QueryResources>       theDctxParent;
+  bool                           theIsDetached;
 
 public:
   QueryResources();
@@ -123,7 +142,24 @@ public:
 #ifdef ZORBA_WITH_DEBUGGER
       DebuggerCommons* debuggerCommons,
 #endif
-      QueryResources* parent);
+      QueryResources* parent,
+      QueryResources* dctxParent);
+
+  bool isDetached() const { return theIsDetached; }
+
+  /*
+    Releases the given reference; if it was to a detached obj that survives,
+    collects the cycles it may have been the last outside reference to.
+  */
+  static void release(rchandle<QueryResources>& resources);
+
+  /*
+    See the class comment. Collects the cycles through each detached obj in
+    held. held lists the references to QueryResources objs that the caller
+    holds until the call returns (with repetitions); they do not count as
+    references from outside the graph.
+  */
+  static void collectCycles(QueryResources* const* held, csize numHeld);
 
 private:
   void destroy();

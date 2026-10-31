@@ -166,10 +166,9 @@ public:
   theResources:
   -------------
   The QueryResources of theFunctionItemInfo->theCCB. It keeps alive the
-  compile-time and runtime state of the query that created this function item
-  (user_function objs, exprs, static contexts, and the dynamic context that
-  theClosureDctx is a child of) when the application keeps the item after
-  that query is closed or destroyed. See QueryResources in
+  compile-time state of the query that created this function item
+  (user_function objs, exprs, static contexts) when the application keeps the
+  item after that query is closed or destroyed. See QueryResources in
   compiler/api/compilercb.h.
 
   theFunctionResources:
@@ -178,13 +177,9 @@ public:
   if different from theResources (e.g. fn:function-lookup, evaluated by one
   query, of a UDF declared by another query). NULL otherwise.
 
-  theDctxResources:
-  -----------------
-  The QueryResources of the query that owns the parent of theClosureDctx (the
-  global dctx of the plan that created this item), if different from both of
-  the above. This happens for a closure created while a function item of
-  another query is invoked (e.g. the inner function of a nested closure).
-  NULL otherwise.
+  theGlobalResources:
+  -------------------
+  The QueryResources of the query that owns theGlobalDctx.
 
   theClosureDctxOwner:
   --------------------
@@ -204,19 +199,36 @@ public:
   The dynamic context obj to be used as the local dctx of the function, when the
   function item is dynamically invoked. This dctx is allocated during
   FunctionItemIterator::nextImpl(). At that time it is also populated with the
-  values of the outer variables.
+  values of the outer variables. Its parent is theGlobalDctx.
+
+  theGlobalDctx:
+  --------------
+  The global dctx of the plan that created this function item: the values of
+  the prolog variables that the function body reads, wherever the item is
+  invoked (XQuery 3.0: the non-local variable bindings of the function's
+  defining context). NULL if that dctx was temporary (e.g. constant folding),
+  in which case the body uses the global dctx of the invoking plan.
 
   theArgValues:
   -------------
 
+  theInternalRefs:
+  ----------------
+  Non-zero if this item is stored in the dctx of a detached QueryResources
+  (see QueryResources::collectCycles()): the number of references to it from
+  that graph when it was last examined. When its reference count drops to
+  that number or below, the cycles through it may have become unreachable.
+
 ********************************************************************************/
 class FunctionItem : public store::Item, public zorba::serialization::SerializeBaseClass
 {
+  friend class QueryResourcesCollector;
+
 protected:
   // Declared first, so that they are released last.
   rchandle<QueryResources>        theResources;
   rchandle<QueryResources>        theFunctionResources;
-  rchandle<QueryResources>        theDctxResources;
+  rchandle<QueryResources>        theGlobalResources;
   store::Item_t                   theClosureDctxOwner;
 
   FunctionItemInfo_t              theFunctionItemInfo;
@@ -225,9 +237,13 @@ protected:
 
   dynamic_context*                theClosureDctx;
 
+  dynamic_context*                theGlobalDctx;
+
   std::vector<PlanIter_t>         theArgValues;
 
   bool                            theClosureDctxOwned;
+
+  long                            theInternalRefs;
 
   SYNC_CODE(mutable RCLock        theRCLock;)
 
@@ -240,14 +256,26 @@ public:
 public:
   FunctionItem(const FunctionItem& aFunctionItem);
 
+  /*
+    closureDctx: see theClosureDctx (NULL if there are no outer variables).
+    planState: the state of the plan that creates the item.
+  */
   FunctionItem(
       const FunctionItemInfo_t& fiInfo,
-      dynamic_context* dctx,
-      QueryResources* dctxResources = NULL);
+      dynamic_context* closureDctx,
+      const PlanState& planState);
 
   ~FunctionItem();
 
   SYNC_CODE(RCLock* getRCLock() const { return &theRCLock; })
+
+  // Called by store::Item::removeReference() when the reference count has
+  // dropped to remaining (> 0).
+  void referenceDropped(long remaining)
+  {
+    if (theInternalRefs != 0 && remaining <= theInternalRefs)
+      collectCycles();
+  }
 
   bool isInline() const { return theFunctionItemInfo->theIsInline; }
   
@@ -262,6 +290,10 @@ public:
   const signature& getSignature() const;
 
   dynamic_context* getDctx() const { return theClosureDctx; }
+
+  dynamic_context* getGlobalDctx() const { return theGlobalDctx; }
+
+  QueryResources* getGlobalResources() const { return theGlobalResources.getp(); }
 
   ulong getMaxInScopeVarId() const;
 
@@ -280,7 +312,7 @@ public:
   zstring show() const;
 
 private:
-  void acquireResources(QueryResources* dctxResources);
+  void collectCycles();
 };
 
 

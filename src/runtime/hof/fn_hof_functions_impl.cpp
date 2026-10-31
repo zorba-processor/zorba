@@ -170,12 +170,12 @@ bool FunctionLookupIterator::nextImpl(
 
     if (fiInfo->numInScopeVars() > 0)
     {
-      result = new FunctionItem(fiInfo, fiDctx.get());
+      result = new FunctionItem(fiInfo, fiDctx.get(), planState);
       fiDctx.release();
     }
     else
     {
-      result = new FunctionItem(fiInfo, NULL);
+      result = new FunctionItem(fiInfo, NULL, planState);
     }
   }
   catch (const ZorbaException& e)

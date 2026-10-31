@@ -97,6 +97,10 @@ class ModuleInfo;
   so that function items the application still holds remain usable after
   the query is closed or destroyed.
 
+  - theOriginResources :
+  For a clone: the QueryResources of the query that compiled the plan the
+  clone shares; the plan points into that query's compiler state.
+
   - theDynamicContextWrapper :
 
   - theResultIterator :
@@ -195,6 +199,8 @@ class XQueryImpl : public XQuery , public ::zorba::serialization::SerializeBaseC
   mutable DynamicContextImpl       * theDynamicContextWrapper;
 
   rchandle<QueryResources>           theResources;
+
+  rchandle<QueryResources>           theOriginResources;
 
   ResultIteratorImpl               * theResultIterator;
 

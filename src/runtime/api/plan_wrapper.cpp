@@ -69,6 +69,8 @@ PlanWrapper::PlanWrapper(
   else
     thePlanState->initLimits(aCompilerCB);
 
+  thePlanState->theGlobalDynCtxIsTemporary = (theDynamicContext.get() != NULL);
+
   // set the compiler cb in the state
   thePlanState->theCompilerCB = aCompilerCB;
   thePlanState->theQuery = query;

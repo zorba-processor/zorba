@@ -77,6 +77,7 @@ namespace zorba {
 StaticContextImpl::StaticContextImpl(DiagnosticHandler* aDiagnosticHandler)
   :
   theCompilerCB(NULL),
+  theXQueryDiagnostics(NULL),
   theMaxVarId(dynamic_context::MAX_IDVARS_RESERVED),
   theDiagnosticHandler(aDiagnosticHandler),
   theUserDiagnosticHandler(true),
@@ -103,6 +104,7 @@ StaticContextImpl::StaticContextImpl(
   :
   theCtx(aCtx),
   theCompilerCB(NULL),
+  theXQueryDiagnostics(NULL),
   theMaxVarId(dynamic_context::MAX_IDVARS_RESERVED),
   theDiagnosticHandler(aDiagnosticHandler),
   theUserDiagnosticHandler(true),
@@ -126,6 +128,7 @@ StaticContextImpl::StaticContextImpl(const StaticContextImpl& aStaticContext)
   :
   StaticContext(),
   theCompilerCB(NULL),
+  theXQueryDiagnostics(NULL),
   theMaxVarId(dynamic_context::MAX_IDVARS_RESERVED),
   theDiagnosticHandler(aStaticContext.theDiagnosticHandler),
   theUserDiagnosticHandler(aStaticContext.theUserDiagnosticHandler),
@@ -163,16 +166,18 @@ StaticContextImpl::~StaticContextImpl()
     theResources->dispose(theCompilerCB,
                           noSctx,
                           NULL,
-                          NULL,
+                          theXQueryDiagnostics,
 #ifdef ZORBA_WITH_DEBUGGER
                           NULL,
 #endif
+                          NULL,
                           NULL);
     theResources = NULL;
   }
   else
   {
     delete theCompilerCB;
+    delete theXQueryDiagnostics;
   }
 }
 
@@ -1155,6 +1160,11 @@ void StaticContextImpl::loadProlog(
   //theSctxMap = impl.theCompilerCB->theSctxMap;
   theCompilerCB = impl.theCompilerCB;
   impl.theCompilerCB = NULL;
+
+  // The ccb reports to the diagnostics of impl (when the functions of the
+  // prolog are compiled, lazily, by the queries that call them).
+  theXQueryDiagnostics = impl.theXQueryDiagnostics;
+  impl.theXQueryDiagnostics = NULL;
 
   // The ccb no longer belongs to impl (whose QueryResources goes away with
   // it), but to "this".

@@ -101,6 +101,7 @@ class PlanIterVisitor;
 class dynamic_context;
 class DebuggerCommons;
 class XQueryImpl;
+class QueryResources;
 
 
 /*******************************************************************************
@@ -109,6 +110,15 @@ class XQueryImpl;
   theBlock        : Pointer to the memory block that stores the local state of
                     each individual plan iterator.
   theBlockSize    : Size (in bytes) of the block.
+
+  theGlobalDynCtxResources :
+                    The QueryResources of the query that owns theGlobalDynCtx,
+                    if it is not that of theCompilerCB (a function item of
+                    another query is being invoked; see FunctionItem). Use
+                    getGlobalDynCtxResources().
+  theGlobalDynCtxIsTemporary :
+                    True if theGlobalDynCtx is a temporary dctx (e.g. one used
+                    to fold an expression) that function items must not keep.
 
   theStackDepth   : Number of user-defined function calls (and eval levels)
                     between the query body and the plan run with this state.
@@ -144,6 +154,10 @@ public:
   dynamic_context         * theGlobalDynCtx;
 
   dynamic_context         * theLocalDynCtx;
+
+  QueryResources          * theGlobalDynCtxResources;
+
+  bool                      theGlobalDynCtxIsTemporary;
 
   std::stack<store::Item*>  theNodeConstuctionPath;
 
@@ -197,6 +211,12 @@ public:
   void checkCallDepth(uint32_t aDepth, const QueryLoc& loc) const;
 
   void checkDepth(const QueryLoc& loc) { checkCallDepth(theStackDepth, loc); }
+
+  /**
+   * The QueryResources of the query that owns theGlobalDynCtx (NULL if
+   * there is none).
+   */
+  QueryResources* getGlobalDynCtxResources() const;
 
   /**
    * Called by consumeNext every DEADLINE_CHECK_INTERVAL calls when there is a

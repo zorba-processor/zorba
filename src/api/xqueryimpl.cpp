@@ -711,6 +711,11 @@ XQuery_t XQueryImpl::clone() const
 
     clone->thePlanProxy = thePlanProxy;
 
+    // The shared plan points into the compiler state of the query that
+    // compiled it (user_function objs, exprs, static contexts).
+    clone->theOriginResources = (theOriginResources ? theOriginResources
+                                                     : theResources);
+
     /*
     std::cout << "Clone Query : " << std::hex << (ulong)clone << std::endl
               << "Clone ccb   : " << (ulong)clone->theCompilerCB << std::endl
@@ -1483,6 +1488,7 @@ void XQueryImpl::close()
 #ifdef ZORBA_WITH_DEBUGGER
                             theCompilerCB ? theCompilerCB->theDebuggerCommons : NULL,
 #endif
+                            NULL,
                             NULL);
       theResources = NULL;
     }
@@ -1501,6 +1507,8 @@ void XQueryImpl::close()
     theDynamicContext = NULL;
     theCompilerCB = NULL;
     theXQueryDiagnostics = NULL;
+
+    QueryResources::release(theOriginResources);
 
     delete theCollMgr;
     theCollMgr = NULL;

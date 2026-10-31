@@ -195,14 +195,19 @@ void Item::removeReference()
   {
     SYNC_CODE(static_cast<const FunctionItem*>(this)->getRCLock()->acquire());
 
-    if (--theRefCount == 0)
+    long remaining = --theRefCount;
+
+    SYNC_CODE(static_cast<const FunctionItem*>(this)->getRCLock()->release());
+
+    if (remaining == 0)
     {
-      SYNC_CODE(static_cast<const FunctionItem*>(this)->getRCLock()->release());
       free();
       return;
     }
 
-    SYNC_CODE(static_cast<const FunctionItem*>(this)->getRCLock()->release());
+    // May collect cycles through the state of a closed query (see
+    // QueryResources in compiler/api/compilercb.h).
+    static_cast<FunctionItem*>(this)->referenceDropped(remaining);
     return;
   }
   case  PUL:

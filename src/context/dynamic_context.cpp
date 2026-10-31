@@ -195,15 +195,19 @@ void dynamic_context::destroy_keymap()
 
 
 /*******************************************************************************
-  See QueryResources::dispose(). Variable values and external function
-  parameters are released after they have been detached from "this", so a
-  value whose release reaches back into this dctx finds neither.
+  See QueryResources. The values are released after they have been detached
+  from "this", so a value whose release reaches back into this dctx does not
+  find them.
 ********************************************************************************/
-void dynamic_context::release_values()
+void dynamic_context::release_variables()
 {
   std::vector<VarValue> values;
   values.swap(theVarValues);
+}
 
+
+void dynamic_context::release_parameters()
+{
   destroy_keymap();
 }
 

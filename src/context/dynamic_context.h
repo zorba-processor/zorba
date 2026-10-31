@@ -210,9 +210,11 @@ public:
 
   const std::vector<VarValue>& get_variables() const { return theVarValues; }
 
-  // Drops all variable values and external function parameters (see
-  // QueryResources::dispose()).
-  void release_values();
+  // Drop all variable values, resp. external function parameters (see
+  // QueryResources).
+  void release_variables();
+
+  void release_parameters();
 
   void add_variable(ulong varid, store::Item_t& value);
 
