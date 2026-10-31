@@ -185,11 +185,11 @@ void runClient(Client& aClient, std::string const& aQueryPath)
   check(contains(r, "<init "), "init message", r);
 
   r = aClient.command("breakpoint_set", "-f \"" + aQueryPath + "\" -n 7");
-  check(contains(r, "id=\"") && !contains(r, "<error"), "breakpoint_set", r);
+  check(contains(r, " id=\"") && !contains(r, "<error"), "breakpoint_set", r);
   std::string lBkpId;
-  std::string::size_type lPos = r.find("id=\"");
+  std::string::size_type lPos = r.find(" id=\"");
   if (lPos != std::string::npos)
-    lBkpId = r.substr(lPos + 4, r.find('"', lPos + 4) - lPos - 4);
+    lBkpId = r.substr(lPos + 5, r.find('"', lPos + 5) - lPos - 5);
 
   aClient.sendOnly("run");
   r = aClient.receiveUntil("status=\"");
