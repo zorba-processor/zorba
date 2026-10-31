@@ -30,6 +30,36 @@
 # include <sys/resource.h>
 #endif
 
+// TEMPORARY DIAGNOSTICS
+#if defined(__linux__)
+# include <csignal>
+# include <cstdlib>
+# include <execinfo.h>
+# include <unistd.h>
+static void segv_handler(int)
+{
+  void* frames[64];
+  int n = backtrace(frames, 64);
+  static const char msg[] = "SIGSEGV backtrace (innermost 64):\n";
+  ssize_t r = write(1, msg, sizeof msg - 1); (void)r;
+  backtrace_symbols_fd(frames, n, 1);
+  _exit(3);
+}
+static void install_segv_handler()
+{
+  static char altstack[1 << 16];
+  stack_t ss;
+  ss.ss_sp = altstack; ss.ss_size = sizeof altstack; ss.ss_flags = 0;
+  sigaltstack(&ss, nullptr);
+  struct sigaction sa = {};
+  sa.sa_handler = segv_handler;
+  sa.sa_flags = SA_ONSTACK;
+  sigaction(SIGSEGV, &sa, nullptr);
+}
+#else
+static void install_segv_handler() {}
+#endif
+
 #include <zorba/security.h>
 #include <zorba/store_manager.h>
 #include <zorba/xquery.h>
@@ -329,6 +359,7 @@ void test_stack_guard(Zorba* z)
 int
 evaluation_limits(int argc, char* argv[])
 {
+  install_segv_handler();
   void* lStore = StoreManager::getStore();
   Zorba* lZorba = Zorba::getInstance(lStore);
 
