@@ -742,6 +742,8 @@ IRegexAtom* CRegexXQuery_parser::read_atom(const char *pattern, int *atom_len)
           else
             break;
         }
+        else
+          break;                        // the back-reference ends here
       }
       (*atom_len)++;
       return new CRegexXQuery_backref(current_regex, backref);
