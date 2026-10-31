@@ -16,6 +16,7 @@
 
 #include "stdafx.h"
 
+#include <cstdlib>
 #include <cstring>
 #include <limits>
 
@@ -366,36 +367,15 @@ size_t Decimal::alloc_size() const {
 }
 
 uint32_t Decimal::hash( value_type const &value ) {
-  if ( value.is_integer() ) {
-    char buf[1024];
-    char *bufp = value.exponent() + 3 > 1024 ?
-      new char[ value.exponent() + 3 ] : buf;
+  // Integers beyond 2^53 are not exactly representable as xs:double, to which
+  // they are promoted when compared with one: all integers that round to the
+  // same xs:double must hash equal, so hash those on the xs:double.
+  static value_type const exact_limit( "9007199254740992" );   // 2^53
 
-    if ( value.sign() < 0 ) {
-      if ( value >= MAPM::getMinInt64() ) {
-        // hash it as int64
-        value.toIntegerString( bufp );
-        stringstream ss( bufp );
-        int64_t n;
-        ss >> n;
-        assert( ss.eof() );
-        if ( bufp != buf )
-          delete[] bufp;
-        return static_cast<uint32_t>( n & 0xFFFFFFFF );
-      }
-    } else if ( value <= MAPM::getMaxUInt64() ) {
-      // hash it as uint64
-      value.toIntegerString( bufp );
-      stringstream ss( bufp );
-      uint64_t n;
-      ss >> n;
-      assert( ss.eof() );
-      if ( bufp != buf )
-        delete[] bufp;
-      return static_cast<uint32_t>( n & 0xFFFFFFFF );
-    }
-    if ( bufp != buf )
-      delete[] bufp;
+  if ( value.is_integer() && value <= exact_limit && value >= -exact_limit ) {
+    char buf[64];
+    value.toIntegerString( buf );
+    return static_cast<uint32_t>( strtoll( buf, nullptr, 10 ) & 0xFFFFFFFF );
   }
 
   // In all other cases, hash it as the xs:double it is promoted to.
