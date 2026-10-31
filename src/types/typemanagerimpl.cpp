@@ -120,11 +120,8 @@ void TypeManagerImpl::initializeSchema()
 
 void TypeManagerImpl::terminateSchema()
 {
-  if ( m_schema != NULL )
-  {
-    delete m_schema;
-    m_schema = NULL;
-  }
+  delete m_schema;
+  m_schema = NULL;
 }
 
 
