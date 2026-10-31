@@ -969,6 +969,15 @@
       </entry>
     </diagnostic>
 
+    <diagnostic code="XQST0118">
+      <comment>
+        In a direct element constructor, the name used in the end tag must
+        exactly match the name used in the corresponding start tag, including
+        its prefix or absence of a prefix.
+      </comment>
+      <value>$1</value>
+    </diagnostic>
+
     <diagnostic code="XQST0120">
       <comment>
         It is a static error if a feature required by require-feature is not
