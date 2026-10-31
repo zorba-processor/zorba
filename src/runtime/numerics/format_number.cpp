@@ -32,6 +32,7 @@
 #include "types/casting.h"
 #include "types/typeops.h"
 #include "util/xml_util.h"
+#include "zorbatypes/decimal.h"
 #include "zorbatypes/float.h"
 #include "zorbatypes/integer.h"
 
