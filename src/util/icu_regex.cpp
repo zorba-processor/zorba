@@ -417,8 +417,17 @@ void convert_xquery_re( zstring const &xq_re, zstring *icu_re,
             //
             // To make ICU work as XQuery needs it to, substitute \z for $
             // outside a character class (when multi-line mode is not set).
+            // ICU does not accept a quantifier on \z ("alp$?ha" is valid
+            // XQuery), so a quantified $ becomes a non-capturing group.
             //
-            icu_re->append( "\\z" );
+            zstring::const_iterator j = i;
+            switch ( ztd::peek( xq_re, &j ) ) {
+              case '?': case '*': case '+': case '{':
+                icu_re->append( "(?:\\z)" );
+                break;
+              default:
+                icu_re->append( "\\z" );
+            }
             goto next;
           }
           break;

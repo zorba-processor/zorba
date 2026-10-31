@@ -1487,7 +1487,10 @@ bool NameCastIterator::nextImpl(store::Item_t& result, PlanState& planState) con
       zstring local;
       if (close != zstring::npos)
         local = name.substr(close + 1);
-      if (close == zstring::npos || !xml::is_NCName(local))
+      // BracedURILiteral ::= "Q" "{" [^{}]* "}"
+      if (close == zstring::npos ||
+          name.find('{', 2) < close ||
+          !xml::is_NCName(local))
       {
         RAISE_ERROR(err::XQDY0074, loc,
         ERROR_PARAMS(ZED(XQDY0074_NotCastToQName), name));
