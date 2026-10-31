@@ -51,6 +51,7 @@ void initializeTestList()
   libunittests["icu_streambuf"] = test_icu_streambuf;
 #endif /* ZORBA_NO_ICU */
 
+  libunittests["mapm_threads"] = test_mapm_threads;
   libunittests["mem_sizeof"] = test_mem_sizeof;
   libunittests["memory_manager"] = test_memory_manager;
   libunittests["mmap_file"] = test_mmap_file;

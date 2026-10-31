@@ -8,7 +8,7 @@
 
 ### Added
 
-- `test/unit/mapm_threads`, a multithreaded decimal/integer stress test, and
+- `test/libunit/mapm_threads`, a multithreaded decimal/integer stress test, and
   a ThreadSanitizer job (`tsan`, `tsan-bigint` presets) in the Sanitizers
   workflow.
 - `j8_decimal` benchmark query (decimal arithmetic).
