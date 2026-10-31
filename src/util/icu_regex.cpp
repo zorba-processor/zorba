@@ -561,13 +561,15 @@ void convert_xquery_re( zstring const &xq_re, zstring *icu_re,
           }
           break;
         case '.':
-          if ( !in_char_class && !s_flag ) {
+          if ( !in_char_class ) {
             //
             // XQuery 3.0 F&O 5.6.1: without the 's' flag, '.' matches any
-            // character except newline (#x0A) and carriage return (#x0D).
-            // ICU's '.' also excludes U+0085, U+2028 and U+2029.
+            // character except newline (#x0A) and carriage return (#x0D);
+            // with it, '.' matches any character.  ICU's '.' also excludes
+            // U+0085, U+2028 and U+2029, and with UREGEX_DOTALL it matches
+            // "\r\n" as a single character.
             //
-            icu_re->append( "[^\\n\\r]" );
+            icu_re->append( s_flag ? "[\\x{0}-\\x{10FFFF}]" : "[^\\n\\r]" );
             goto next;
           }
           [[fallthrough]];

@@ -5,4 +5,4 @@ matches("abcde", "(?:r?)*?r|(.{2,4})"),
 matches("abcde", "(?:r?)+?r|(.{2,4})"),
 matches("aab", "^(a?)*?b$"),
 matches("y", "^(x?)\1*?x$"),
-replace("aaa", "^((a?)*?)(a*)$", "[$1][$3]")
+replace("aaab", "^((a?)*?)(a*b)$", "[$1][$3]")
