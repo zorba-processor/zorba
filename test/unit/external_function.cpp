@@ -21,6 +21,7 @@
 #include <cassert>
 
 #include <zorba/zorba.h>
+#include <zorba/security.h>
 #include <zorba/store_manager.h>
 #include <zorba/external_module.h>
 #include <zorba/function.h>
@@ -436,6 +437,8 @@ external_function(int argc, char* argv[])
 {
   void* lStore = zorba::StoreManager::getStore();
   Zorba* lZorba = Zorba::getInstance(lStore);
+  // The query imports modules from files outside the trusted URI path.
+  lZorba->setSecurityPolicy(SecurityPolicy::secure().allow(Capability::FileRead));
 
   std::cout << "executing external_function_test_1" << std::endl;
   if (!external_function_test_1(lZorba))

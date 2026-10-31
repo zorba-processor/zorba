@@ -21,6 +21,7 @@
 #include <cassert>
 
 #include <zorba/zorba.h>
+#include <zorba/security.h>
 #include <zorba/store_manager.h>
 #include <zorba/external_module.h>
 #include <zorba/function.h>
@@ -77,6 +78,8 @@ no_folding(int argc, char* argv[])
 {
   void* lStore = zorba::StoreManager::getStore();
   Zorba* lZorba = Zorba::getInstance(lStore);
+  // The query imports modules from files outside the trusted URI path.
+  lZorba->setSecurityPolicy(SecurityPolicy::secure().allow(Capability::FileRead));
 
   try 
   {

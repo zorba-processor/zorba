@@ -19,6 +19,7 @@
 #include <sstream>
 
 #include <zorba/zorba.h>
+#include <zorba/security.h>
 #include <zorba/store_manager.h>
 #include <zorba/serialization_callback.h>
 #include <zorba/uri_resolvers.h>
@@ -147,6 +148,14 @@ resolver_example_2(Zorba* aZorba)
   MySchemaURIMapper lMapper;
 
   lContext->registerURIMapper(&lMapper);
+
+  // The mapper sends the schema import to a URL. Importing over the network
+  // needs Network and RemoteImport; the test server runs on a private
+  // address, which the secure policy otherwise refuses.
+  lContext->setSecurityPolicy(SecurityPolicy::secure()
+      .allow(Capability::Network)
+      .allow(Capability::RemoteImport)
+      .setAllowPrivateAddresses(true));
 
   try {
     XQuery_t lQuery = aZorba->compileQuery

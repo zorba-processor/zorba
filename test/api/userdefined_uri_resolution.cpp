@@ -18,6 +18,7 @@
 #include <sstream>
 #include <vector>
 #include <zorba/zorba.h>
+#include <zorba/security.h>
 #include <zorba/store_manager.h>
 #include <zorba/zorba_exception.h>
 #include <zorba/xquery_exception.h>
@@ -386,6 +387,9 @@ int userdefined_uri_resolution(int argc, char* argv[])
   }
   void* lStore = StoreManager::getStore();
   Zorba* lZorba = Zorba::getInstance(lStore); 
+  // URI mappers and resolvers send imports to the HTTP test server and to
+  // the file module; the tests check the mappers' own denials.
+  lZorba->setSecurityPolicy(SecurityPolicy::unrestricted());
 
   int retval = 0;
 
