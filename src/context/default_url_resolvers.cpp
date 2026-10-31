@@ -95,6 +95,7 @@ HTTPURLResolver::resolveURL
     lStream->setStreamReleaser(nullptr);
     return lResource;
   } catch (ZorbaException const& e) {
+    std::cerr << "DEBUG-HTTPRES ZorbaException code=" << e.diagnostic().qname().localname() << " what=[" << e.what() << "]" << std::endl;
     // A denial is not a failure to load: report it as such. The http-client
     // module reports a denied redirect or connection with its own error
     // code (http:HTTP, HC001 through the EXPath interface), but always with
@@ -103,7 +104,11 @@ HTTPURLResolver::resolveURL
         std::strstr(e.what(), "access denied by security policy"))
       throw security::AccessDenied(e.what());
     throw os_error::exception("", aUrl.c_str(), "Could not create stream resource");
+  } catch (std::exception const& e) {
+    std::cerr << "DEBUG-HTTPRES std::exception what=[" << e.what() << "]" << std::endl;
+    throw os_error::exception("", aUrl.c_str(), "Could not create stream resource");
   } catch (...) {
+    std::cerr << "DEBUG-HTTPRES unknown" << std::endl;
     throw os_error::exception("", aUrl.c_str(), "Could not create stream resource");
   }
 }

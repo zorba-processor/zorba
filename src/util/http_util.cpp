@@ -122,6 +122,8 @@ namespace zorba {
 #endif /* ZORBA_HAVE_CURL */
 
     if (!succeed)
+      std::cerr << "DEBUG-HTTPSTREAM status failure" << std::endl;
+    if (!succeed)
       throw os_error::exception("", theUri.c_str(), "Could not create stream resource");
     theIterator->next(theStreamableString);
   }
