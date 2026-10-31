@@ -86,6 +86,14 @@ Do not serialize (discard) result.
 
 --debug, -d
 Launch the Zorba debugger server and connect to a DBGP-enabled debugger client.
+The server evaluates property values and eval expressions in the suspended
+query. property_set (the "set" command of xqdb) takes an XQuery expression and
+assigns its result to a variable; only variables that an XQuery Scripting
+assignment could assign (mutable prolog and block-local variables) can be set,
+and the value must match the declared type of the variable, as for an
+assignment. Known limitation: queries run through an eval (including the
+expressions evaluated by the debugger) are not compiled in debug mode, so
+breakpoints can not be set inside them.
 
 --debug-host, -h
 The host where the DBGP-enabled debugger client listens for connections. Defaults to: 127.0.0.1

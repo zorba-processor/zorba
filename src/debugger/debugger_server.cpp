@@ -455,22 +455,38 @@ DebuggerServer::processCommand(DebuggerCommand aCommand)
         }
 
         if (aCommand.getName() == "property_get") {
+          int lPage;
+          if (!aCommand.getArg("p", lPage)) {
+            lPage = 0;
+          }
+          if (lPage < 0) {
+            std::stringstream lSs;
+            lSs << "Invalid options: invalid page " << lPage;
+            return buildErrorResponse(lTransactionID, lCmdName, 3, lSs.str());
+          }
+          int lMaxData;
+          if (!aCommand.getArg("m", lMaxData) || lMaxData < 0) {
+            lMaxData = 0;
+          }
+
           lResponse << ">";
-          // currently ignoring -p (page) option
 
           std::string lName = getVariableName(lFullName);
           // the type is not needed anymore here
           std::string lDummyType("");
-          buildProperty(lFullName, lName, lDummyType, lResponse);
+          buildProperty(lFullName, lName, lDummyType, lResponse, lPage, lMaxData);
         
         } else if (aCommand.getName() == "property_set") {
 
           std::string lError;
-          int lErrorCode = setProperty(aCommand, lFullName, lDepth, lError);
+          bool lSuccess = false;
+          int lErrorCode = setProperty(aCommand, lFullName, lDepth, lSuccess, lError);
           if (lErrorCode != 0) {
             return buildErrorResponse(lTransactionID, lCmdName, lErrorCode, lError);
           }
-          lResponse << "success=\"1\">";
+          // DBGP: an existing property that can not be set is reported
+          // with success="0", not with an error
+          lResponse << "success=\"" << (lSuccess ? 1 : 0) << "\">";
 
         } else if (aCommand.getName() == "property_value") {
 
@@ -634,6 +650,21 @@ DebuggerServer::processCommand(DebuggerCommand aCommand)
 // max_children feature (which this engine does not let the client change)
 static const int PROPERTY_PAGE_SIZE = 32;
 
+// DBGP max_data: keep at most aMaxData bytes of aValue (0 means unlimited);
+// never cut an UTF-8 encoded character in half
+static void
+truncateValue(std::string& aValue, int aMaxData)
+{
+  if (aMaxData <= 0 || static_cast<std::size_t>(aMaxData) >= aValue.size()) {
+    return;
+  }
+  std::size_t lCut = static_cast<std::size_t>(aMaxData);
+  while (lCut > 0 && (static_cast<unsigned char>(aValue[lCut]) & 0xC0) == 0x80) {
+    --lCut;
+  }
+  aValue.resize(lCut);
+}
+
 int
 DebuggerServer::checkPropertyContext(int aDepth, std::string& aError)
 {
@@ -714,16 +745,10 @@ DebuggerServer::getPropertyValue(
   aValue = lValueSs.str();
   aSize = aValue.size();
 
-  // -m: send at most this many bytes of the value (0 means unlimited);
-  // never cut an UTF-8 encoded character in half
+  // -m: send at most this many bytes of the value
   int lMaxData;
-  if (aCommand.getArg("m", lMaxData) && lMaxData > 0 &&
-      static_cast<std::size_t>(lMaxData) < aValue.size()) {
-    std::size_t lCut = static_cast<std::size_t>(lMaxData);
-    while (lCut > 0 && (static_cast<unsigned char>(aValue[lCut]) & 0xC0) == 0x80) {
-      --lCut;
-    }
-    aValue.resize(lCut);
+  if (aCommand.getArg("m", lMaxData)) {
+    truncateValue(aValue, lMaxData);
   }
 
   return 0;
@@ -734,8 +759,10 @@ DebuggerServer::setProperty(
   DebuggerCommand& aCommand,
   std::string& aFullName,
   int aDepth,
+  bool& aSuccess,
   std::string& aError)
 {
+  aSuccess = false;
   int lCode = checkPropertyContext(aDepth, aError);
   if (lCode != 0) {
     return lCode;
@@ -776,17 +803,16 @@ DebuggerServer::setProperty(
 
   switch (lResult) {
   case DEBUGGER_SETVAR_OK:
+    aSuccess = true;
     return 0;
   case DEBUGGER_SETVAR_NOT_FOUND:
     aError = "Can not set property " + lName + ": no such variable in the current context";
     return 300;
   case DEBUGGER_SETVAR_NOT_ASSIGNABLE:
-    aError = "Can not set property " + lName + ": the variable is not assignable";
-    return 300;
   case DEBUGGER_SETVAR_TYPE_MISMATCH:
   default:
-    aError = "Can not set property " + lName + ": the value does not match the declared type of the variable";
-    return 206;
+    // the variable exists but can not take this value
+    return 0;
   }
 }
 
@@ -866,7 +892,9 @@ DebuggerServer::buildProperty(
   std::string& aFullName,
   std::string& aName,
   std::string& aType,
-  std::ostream& aStream)
+  std::ostream& aStream,
+  int aPage,
+  int aMaxData)
 {
   bool lFetchChildren = aType == "";
   std::list<std::pair<zstring, zstring> > lResults;
@@ -886,12 +914,10 @@ DebuggerServer::buildProperty(
   }
 
   std::size_t lSize = lResults.size();
+  bool lPaged = aPage >= 0;
 
 /* not using the following property attributes */
 //  << "classname=\"name_of_object_class\" "
-//  << "size=\"9\" "
-//  << "page=\"{NUM}\" "
-//  << "pagesize=\"{NUM}\" "
 //  << "address=\"{NUM}\" "
 //  << "key=\"language_dependent_key\" "
 
@@ -904,14 +930,33 @@ DebuggerServer::buildProperty(
     << "children=\"" << (lSize > 1 ? 1 : 0) << "\" ";
   if (lSize > 1) {
     aStream << "numchildren=\"" << lSize << "\" ";
+    if (lPaged && lFetchChildren) {
+      aStream << "page=\"" << aPage << "\" "
+        << "pagesize=\"" << PROPERTY_PAGE_SIZE << "\" ";
+    }
+  }
+
+  std::string lValue;
+  if (lSize == 1) {
+    lValue = lResults.front().first.str();
+    if (lPaged) {
+      aStream << "size=\"" << lValue.size() << "\" ";
+      truncateValue(lValue, aMaxData);
+    }
   }
   aStream << ">";
 
   if (lFetchChildren && lSize > 1) {
-    buildChildProperties(aName, lResults, aStream);
-  } else if (lResults.size() == 1) {
-    String const lValue(lResults.front().first.c_str());
-    base64::encode( lValue, aStream );
+    std::size_t lFirst = 0;
+    std::size_t lCount = lSize;
+    if (lPaged) {
+      lFirst = static_cast<std::size_t>(aPage) * PROPERTY_PAGE_SIZE;
+      lCount = PROPERTY_PAGE_SIZE;
+    }
+    buildChildProperties(aName, lResults, aStream, lFirst, lCount, aMaxData);
+  } else if (lSize == 1) {
+    String const lValueStr(lValue);
+    base64::encode( lValueStr, aStream );
   }
 
   aStream << "</property>";
@@ -921,14 +966,25 @@ void
 DebuggerServer::buildChildProperties(
   std::string& aName,
   std::list<std::pair<zstring, zstring> >& aResults,
-  std::ostream& aStream)
+  std::ostream& aStream,
+  std::size_t aFirst,
+  std::size_t aCount,
+  int aMaxData)
 {
   std::list<std::pair<zstring, zstring> >::iterator lIter = aResults.begin();
-  for (int i = 1; lIter != aResults.end(); ++lIter, ++i) {
-    String lValue(lIter->first.c_str());
+  for (std::size_t i = 0; lIter != aResults.end(); ++lIter, ++i) {
+    if (i < aFirst) {
+      continue;
+    }
+    if (i - aFirst >= aCount) {
+      break;
+    }
+    std::string lValue(lIter->first.str());
+    std::size_t lValueSize = lValue.size();
+    truncateValue(lValue, aMaxData);
     std::stringstream lNameSs;
     if (aName != "") {
-      lNameSs << aName << "[" << i << "]";
+      lNameSs << aName << "[" << (i + 1) << "]";
     }
 
     aStream << "<property "
@@ -937,8 +993,13 @@ DebuggerServer::buildChildProperties(
       << "type=\"" << lIter->second << "\" "
       << "encoding=\"base64\" "
       << "constant=\"1\" "
-      << "children=\"0\">";
-    base64::encode( lValue, aStream );
+      << "children=\"0\" ";
+    if (aMaxData > 0) {
+      aStream << "size=\"" << lValueSize << "\" ";
+    }
+    aStream << ">";
+    String const lValueStr(lValue);
+    base64::encode( lValueStr, aStream );
     aStream << "</property>";
   }
 }

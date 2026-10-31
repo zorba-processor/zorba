@@ -1,7 +1,9 @@
 ### Added
 
 - Debugger server: DBGP `property_value` returns the full value of a variable in the top stack frame (`-m` limits the bytes sent, `-p` selects a page of 32 sequence items).
-- Debugger server: DBGP `property_set` assigns the result of an XQuery expression to an assignable prolog or block-local variable of the suspended query. Unknown and non-assignable variables return error 300; invalid expressions and values that do not match the declared type return error 206.
+- Debugger server: DBGP `property_set` assigns the result of an XQuery expression to an assignable prolog or block-local variable of the suspended query; the value must match the declared type as in an assignment. An existing variable that can not take the value answers `success="0"`, an unknown variable error 300, and an expression that fails to evaluate error 206.
+- Debugger server: DBGP `property_get` honours `-p` (pages of 32 children, with `page`, `pagesize` and `numchildren`) and `-m` (truncated value, with `size`).
+- Debugger client API: `DebuggerClient::property_set` overload that sends the value; xqdb command `set -n <name> -v <expression>`.
 
 ### Fixed
 
