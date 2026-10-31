@@ -1,9 +1,17 @@
 name: Sanitizers
 
 # Full test suite under AddressSanitizer, LeakSanitizer and UBSan (GCC, Arch
-# latest-toolchain builder). Non-blocking: it reports, it does not gate PRs.
+# latest-toolchain builder), and the thread-safety tests under ThreadSanitizer
+# (TSan cannot be combined with ASan, so it is a separate build).
+# Non-blocking: it reports, it does not gate PRs.
 on:
   workflow_dispatch:
+    inputs:
+      jobs:
+        description: "Which sanitizer jobs to run"
+        type: choice
+        options: [all, asan, tsan]
+        default: all
   schedule:
     - cron: '0 6 * * 1'
   push:
@@ -14,6 +22,7 @@ permissions:
 
 jobs:
   asan:
+    if: github.event_name != 'workflow_dispatch' || inputs.jobs != 'tsan'
     runs-on: ubuntu-24.04
     timeout-minutes: 240
     steps:
@@ -86,3 +95,90 @@ jobs:
             build/asan/sanitizer-logs
             build/asan/ctest.log
             build/asan/junit.xml
+
+  # ThreadSanitizer on the multithreaded tests (test/unit/mapm_threads runs
+  # concurrent decimal and integer arithmetic) plus a few existing tests, in
+  # the default and the big-integer configuration.
+  tsan:
+    if: github.event_name != 'workflow_dispatch' || inputs.jobs != 'asan'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        preset: [tsan, tsan-bigint]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Build the builder image
+        uses: docker/build-push-action@v7
+        with:
+          context: docker/builder-latest
+          load: true
+          tags: zorba-builder:ci
+          cache-from: type=gha,scope=builder-linux-amd64-latest
+          cache-to: type=gha,mode=max,scope=builder-linux-amd64-latest
+
+      - uses: actions/cache@v6
+        with:
+          path: .ccache
+          key: ccache-v2-${{ matrix.preset }}-${{ github.sha }}
+          restore-keys: ccache-v2-${{ matrix.preset }}-
+
+      # TSan's shadow memory layout does not fit the runner kernel's default
+      # mmap ASLR entropy.
+      - name: Reduce ASLR entropy for TSan
+        run: sudo sysctl -w vm.mmap_rnd_bits=28
+
+      - name: Build and test under ThreadSanitizer
+        env:
+          PRESET: ${{ matrix.preset }}
+        run: |
+          docker run --rm \
+            --security-opt seccomp=unconfined \
+            -e CCACHE_DIR=/src/.ccache \
+            -e CCACHE_SLOPPINESS=pch_defines,time_macros -e CCACHE_DEPEND=1 \
+            -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" -e PRESET \
+            -v "$PWD":/src -w /src zorba-builder:ci sh -c '
+              set -e
+              cmake --preset "$PRESET"
+              cmake --build --preset "$PRESET"
+              mkdir -p "build/$PRESET/sanitizer-logs"
+              rc=0
+              ctest --preset "$PRESET" -j2 --output-junit junit.xml \
+                > "build/$PRESET/ctest.log" 2>&1 || rc=$?
+              sed -n "/tests passed/,\$p" "build/$PRESET/ctest.log"
+              chown -R "$HOST_UID:$HOST_GID" "build/$PRESET/sanitizer-logs" \
+                "build/$PRESET/ctest.log" "build/$PRESET/junit.xml" .ccache || true
+              exit $rc'
+
+      - name: Summarize
+        if: always()
+        env:
+          PRESET: ${{ matrix.preset }}
+        run: |
+          logs="build/$PRESET/sanitizer-logs"
+          n=$(cat "$logs"/tsan.* 2>/dev/null | grep -c "^WARNING: ThreadSanitizer" || true)
+          m=$(cat "$logs"/tsan.* 2>/dev/null | grep -c "zorbatypes/m_apm\|zorbatypes/mapm/" || true)
+          {
+            echo "## ThreadSanitizer ($PRESET)"
+            echo "Reports: $n"
+            echo "Stack frames in MAPM (src/zorbatypes/m_apm*, mapm/): $m"
+            echo '```'
+            cat "$logs"/tsan.* 2>/dev/null | grep "^WARNING: ThreadSanitizer\|^SUMMARY: ThreadSanitizer" \
+              | sort | uniq -c | sort -rn | head -60
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+          # Races elsewhere are reported above; races involving MAPM fail the job.
+          test "$m" -eq 0
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: tsan-logs-${{ matrix.preset }}
+          path: |
+            build/${{ matrix.preset }}/sanitizer-logs
+            build/${{ matrix.preset }}/ctest.log
+            build/${{ matrix.preset }}/junit.xml

@@ -98,6 +98,7 @@ SET(UNIT_TESTS_SRCS
   xmldatamanager.cpp
   staticcollectionmanager.cpp
   test_static_context.cpp
+  mapm_threads.cpp
 )
 
 # multithread_simple.cpp
