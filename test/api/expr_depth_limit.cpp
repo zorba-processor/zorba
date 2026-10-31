@@ -345,20 +345,6 @@ void test_default_limit(Zorba* z)
 void test_unlimited(Zorba* z)
 {
   SecurityPolicy const p = SecurityPolicy::unrestricted().setMaxExprDepth(0);
-#if defined(__APPLE__)
-  {
-    pthread_t const self = pthread_self();
-    std::cout << "  main thread stack: top "
-              << pthread_get_stackaddr_np(self) << ", size "
-              << pthread_get_stacksize_np(self) << ", frame "
-              << __builtin_frame_address(0) << std::endl;
-  }
-#endif
-  for (uint64_t n : { 15000, 50000, 100000, 150000 })
-  {
-    Outcome const o = run(z, p, shapes()[0].make(n), false);
-    std::cout << "  " << n << ": " << o << std::endl;
-  }
   Outcome const o = run(z, p, shapes()[0].make(300000));
   CHECK(failed_with(o, "ZXQP0070"));
   CHECK(o.message.find("stack") != std::string::npos);
@@ -376,23 +362,40 @@ void test_syntax_error(Zorba* z)
 }
 
 
-// Long flat lists in the parse tree that the compiler chains: the clauses
-// of a FLWOR expression become a chain of iterators in a general FLWOR.
+// Flat lists in the parse tree whose items the compiler chains (FLWOR
+// clauses become a chain of iterators, predicates nest filters, typeswitch
+// and switch cases nest conditionals) count one level per item. Other long
+// lists stay flat and are not limited.
 void test_wide(Zorba* z)
 {
   SecurityPolicy const p = SecurityPolicy::unrestricted();
-  struct { const char* name; std::string query; } const cases[] = {
-    { "lets", repeat("let $v := 1 ", 15000) + "return $v" },
-    { "counts", "for $v in 1 " + repeat("count $c ", 15000) + "return $c" },
-    { "sequence", "count((" + repeat("1, ", 15000) + "1))" },
-    { "steps", "<a/>" + repeat("/a", 15000) },
+  struct { const char* name; std::string query; bool limited; } const cases[] = {
+    { "lets", repeat("let $v := 1 ", 100000) + "return $v", true },
+    { "counts", "for $v in 1 " + repeat("count $c ", 100000) + "return $c",
+      true },
+    { "predicates", "(1)" + repeat("[1]", 100000), true },
+    { "typeswitch", "typeswitch (1) " +
+      repeat("case xs:string return 0 ", 100000) + "default return 1", true },
+    { "switch", "switch (1) " + repeat("case 0 return 0 ", 100000) +
+      "default return 1", true },
+    { "catch", "try { 1 } " + repeat("catch err:XPTY0004 { 0 } ", 100000) +
+      "catch * { 2 }", true },
+    { "sequence", "count((" + repeat("1, ", 20000) + "1))", false },
+    { "arguments", "fn:concat(" + repeat("'a', ", 20000) + "'a') ! 1",
+      false },
   };
   for (auto const& c : cases)
   {
     Outcome const o = run(z, p, c.query);
     std::cout << "  " << c.name << ": " << o << std::endl;
-    CHECK(o.ok || o.code == "ZXQP0070");
+    if (c.limited)
+      CHECK(is_default_limit_error(o));
+    else
+      CHECK(o.ok);
   }
+
+  // Just under the limit, a long clause list compiles and runs.
+  CHECK(run(z, p, repeat("let $v := 1 ", 500) + "return $v").ok);
 }
 
 

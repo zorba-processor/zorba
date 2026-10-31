@@ -59,7 +59,7 @@ void *parsenode_visitor::no_state = (void *) &dummy;
   code generation) and the evaluation of the plan recurse once per level.
   Measured by test/api/expr_depth_limit (the deepest chains of + and of
   computed constructors): up to 2.2 KiB per level in release builds (GCC 16),
-  several times that with AddressSanitizer.
+  9.2 KiB with AddressSanitizer.
 ********************************************************************************/
 #if defined(__SANITIZE_ADDRESS__)
 # define ZORBA_EXPR_DEPTH_ASAN 1
@@ -70,7 +70,7 @@ void *parsenode_visitor::no_state = (void *) &dummy;
 #endif
 
 #ifdef ZORBA_EXPR_DEPTH_ASAN
-const size_t STACK_PER_EXPR_LEVEL = 8 * 1024;
+const size_t STACK_PER_EXPR_LEVEL = 12 * 1024;
 #else
 const size_t STACK_PER_EXPR_LEVEL = 3 * 1024;
 #endif
@@ -102,21 +102,25 @@ void parsenode_visitor::setMaxDepth(uint32_t aMaxDepth)
 }
 
 
-void parsenode_visitor::depthExceeded(const QueryLoc& loc, bool aStack)
+void parsenode_visitor::depthExceeded(
+    const QueryLoc& loc,
+    uint32_t aLevels,
+    bool aStack)
 {
-  --theDepth;
+  uint32_t const lDepth = theDepth;
+  theDepth -= aLevels;
   if (aStack || theMaxDepthFromStack)
     RAISE_ERROR(zerr::ZXQP0070_EXPR_DEPTH_EXCEEDED, loc,
-      ERROR_PARAMS(ZED(ZXQP0070_Stack_2), theDepth + 1));
+      ERROR_PARAMS(ZED(ZXQP0070_Stack_2), lDepth));
   RAISE_ERROR(zerr::ZXQP0070_EXPR_DEPTH_EXCEEDED, loc,
     ERROR_PARAMS(ZED(ZXQP0070_Limit_2), theMaxDepth));
 }
 
 
-void parsenode_visitor::checkStack(const QueryLoc& loc)
+void parsenode_visitor::checkStack(const QueryLoc& loc, uint32_t aLevels)
 {
   if (stack_limit::exhausted())
-    depthExceeded(loc, true);
+    depthExceeded(loc, aLevels, true);
 }
 
 
@@ -161,6 +165,7 @@ std::ostringstream __oss;
 #define UNDENT      printdepth--
 
 #define DEPTH_GUARD() parsenode_visitor::DepthGuard depth_guard(v, get_location())
+#define LIST_DEPTH_GUARD(n) parsenode_visitor::DepthGuard list_depth_guard(v, get_location(), (n))
 #define BEGIN_VISITOR() DEPTH_GUARD(); void* visitor_state; if (NULL == (visitor_state = v.begin_visit(*this))) return
 #define END_VISITOR() v.end_visit (*this, visitor_state)
 #define ACCEPT( m ) do { if ((m) != NULL) (m)->accept (v); } while (0)
@@ -1682,6 +1687,7 @@ FLWORClauseList::FLWORClauseList(const QueryLoc& loc)
 void FLWORClauseList::accept( parsenode_visitor &v ) const
 {
   BEGIN_VISITOR();
+  LIST_DEPTH_GUARD(theClauses.size());
   std::vector<rchandle<FLWORClause> >::const_iterator it = theClauses.begin();
   for (; it != theClauses.end(); ++it)
   {
@@ -2264,6 +2270,7 @@ SwitchCaseClauseList::SwitchCaseClauseList(
 void SwitchCaseClauseList::accept( parsenode_visitor &v ) const
 {
   BEGIN_VISITOR();
+  LIST_DEPTH_GUARD(clause_hv.size());
   std::vector<rchandle<SwitchCaseClause> >::const_reverse_iterator it = clause_hv.rbegin();
   for (; it!=clause_hv.rend(); ++it)
   {
@@ -2372,6 +2379,7 @@ CaseClauseList::CaseClauseList(const QueryLoc& loc)
 void CaseClauseList::accept(parsenode_visitor& v) const
 {
   BEGIN_VISITOR();
+  LIST_DEPTH_GUARD(theClauses.size());
 
   std::vector<rchandle<CaseClause> >::const_reverse_iterator it = theClauses.rbegin();
   for (; it != theClauses.rend(); ++it) 
@@ -3523,6 +3531,7 @@ PredicateList::PredicateList(const QueryLoc& loc) : parsenode(loc)
 void PredicateList::accept(parsenode_visitor& v) const
 {
   BEGIN_VISITOR();
+  LIST_DEPTH_GUARD(pred_hv.size());
 
   for (std::vector<rchandle<exprnode> >::const_iterator it = pred_hv.begin();
        it != pred_hv.end();
@@ -5207,6 +5216,7 @@ void TryExpr::accept( parsenode_visitor &v ) const
 void CatchListExpr::accept( parsenode_visitor &v ) const
 {
   BEGIN_VISITOR();
+  LIST_DEPTH_GUARD(theCatchExprs.size());
   std::vector<rchandle<CatchExpr> >::const_reverse_iterator it = theCatchExprs.rbegin();
   for (; it!=theCatchExprs.rend(); ++it)
   {

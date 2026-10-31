@@ -17,6 +17,7 @@
 #ifndef ZORBA_PARSENODE_VISITOR_H
 #define ZORBA_PARSENODE_VISITOR_H
 
+#include <cstddef>
 #include <cstdint>
 
 #include "common/shared_types.h"
@@ -65,20 +66,30 @@ public:
    * creates one before it calls begin_visit(). Besides the depth limit, it
    * refuses to go deeper when the thread's stack is nearly exhausted, so a
    * visitor never overflows the stack, whatever the limit.
+   *
+   * Lists whose items the compiler chains into nested expressions or
+   * iterators (FLWOR clauses, predicates, typeswitch, switch and catch
+   * clauses) also count each item as one level (aLevels).
    */
   class DepthGuard
   {
     parsenode_visitor& theVisitor;
+    uint32_t           theLevels;
 
   public:
-    DepthGuard(parsenode_visitor& v, const QueryLoc& loc) : theVisitor(v)
+    DepthGuard(parsenode_visitor& v, const QueryLoc& loc, size_t aLevels = 1)
+      :
+      theVisitor(v),
+      theLevels(aLevels > UINT32_MAX - v.theDepth ?
+                UINT32_MAX - v.theDepth : static_cast<uint32_t>(aLevels))
     {
-      if (++v.theDepth > v.theMaxDepth && v.theMaxDepth != 0)
-        v.depthExceeded(loc, false);
-      v.checkStack(loc);
+      v.theDepth += theLevels;
+      if (v.theDepth > v.theMaxDepth && v.theMaxDepth != 0)
+        v.depthExceeded(loc, theLevels, false);
+      v.checkStack(loc, theLevels);
     }
 
-    ~DepthGuard() { --theVisitor.theDepth; }
+    ~DepthGuard() { theVisitor.theDepth -= theLevels; }
 
     DepthGuard(const DepthGuard&) = delete;
     DepthGuard& operator=(const DepthGuard&) = delete;
@@ -87,8 +98,10 @@ public:
 private:
   // Both restore theDepth before they throw (the guard's destructor does not
   // run when its constructor throws).
-  [[noreturn]] void depthExceeded(const QueryLoc& loc, bool aStack);
-  void checkStack(const QueryLoc& loc);
+  [[noreturn]] void depthExceeded(const QueryLoc& loc,
+                                  uint32_t aLevels,
+                                  bool aStack);
+  void checkStack(const QueryLoc& loc, uint32_t aLevels);
 
 public:
 

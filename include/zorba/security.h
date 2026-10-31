@@ -325,7 +325,9 @@ public:
    * The depth is that of the query's syntax tree: each operand of a binary
    * operator in a chain (<code>1 + 1 + 1</code>), each parenthesized,
    * function call, constructor or FLWOR nesting level adds one or more
-   * levels. A query (or imported module, or eval'ed query) that nests
+   * levels, and so does each clause of a FLWOR expression, each predicate
+   * of a filter, and each case of a typeswitch or switch and each catch
+   * clause (the compiler chains them). A query (or imported module, or eval'ed query) that nests
    * deeper fails to compile with zerr:ZXQP0070.
    *
    * Compilation (and evaluation) recurse over the query, so the depth
