@@ -2,6 +2,7 @@
 #define __COM_ZORBA_WWW_MODULES_ZORBA_QUERY_H__
 
 #include <map>
+#include <vector>
 
 #include <zorba/zorba.h>
 #include <zorba/external_module.h>
@@ -112,6 +113,7 @@ private:
   XQuery_t      theQuery;
   URIMapper   * theURIMapper;
   URLResolver * theURLResolver;
+  bool          theReturnedFunctionItem;
   
 public:
   QueryData(XQuery_t aQuery, URIMapper* aMapper, URLResolver* aResolver);
@@ -119,6 +121,12 @@ public:
   virtual ~QueryData();
 
   XQuery_t getQuery() { return theQuery; }
+
+  // A function item refers to the function, plan and static context of the
+  // query that created it, so that query must outlive the item.
+  void setReturnedFunctionItem() { theReturnedFunctionItem = true; }
+
+  bool returnedFunctionItem() const { return theReturnedFunctionItem; }
 };
 
 
@@ -145,12 +153,18 @@ private:
 private:
   QueryMap_t  * theQueryMap;
 
+  // Deleted queries whose results included function items: kept until the
+  // outer query ends, since those items may still be in use there.
+  std::vector<QueryData_t> theKeptQueries;
+
 public:
   QueryMap();
 
   bool storeQuery(const String&, XQuery_t, URIMapper*, URLResolver*);
   
   XQuery_t getQuery(const String&);
+
+  QueryData_t getQueryData(const String&);
   
   bool deleteQuery(const String&);
   
@@ -175,6 +189,10 @@ protected:
   Item getItemArgument(const Arguments_t&, int) const;
 
   Iterator_t getIterArgument(const Arguments_t&, int) const;
+
+  QueryData_t getQueryData(
+      const zorba::DynamicContext* dctx,
+      const zorba::String& aIdent) const;
 
   XQuery_t getQuery(
       const zorba::DynamicContext* dctx,
@@ -427,15 +445,18 @@ protected:
   class EvaluateIterator : public Iterator
   {
   protected:
-    Iterator_t theIterator;
+    Iterator_t  theIterator;
 
-    String     theQueryID;
+    String      theQueryID;
+
+    QueryData_t theQueryData;
 
   public:
-    EvaluateIterator(Iterator_t& aIter, String aQueryID)
+    EvaluateIterator(Iterator_t& aIter, String aQueryID, QueryData_t aData)
       :
       theIterator(aIter),
-      theQueryID(aQueryID)
+      theQueryID(aQueryID),
+      theQueryData(aData)
     {
     }
 
@@ -456,9 +477,9 @@ protected:
   EvaluateIterator_t theIter; 
 
 public:
-  EvaluateItemSequence(Iterator_t& aIter, String& aQueryID)
+  EvaluateItemSequence(Iterator_t& aIter, String& aQueryID, QueryData_t aData)
     :
-    theIter(new EvaluateIterator(aIter, aQueryID))
+    theIter(new EvaluateIterator(aIter, aQueryID, aData))
   {
   }
   

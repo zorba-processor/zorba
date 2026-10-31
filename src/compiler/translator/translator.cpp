@@ -5074,6 +5074,42 @@ void end_visit(const AnnotationParsenode& v, void* /*visit_state*/)
 }
 
 
+/*******************************************************************************
+  Annotations of an inline function expression or a function test. They are
+  checked like those of a declaration (an annotation in a reserved namespace
+  must be a known one, XQST0045) and then ignored: Zorba gives them no
+  meaning there. %public and %private are not allowed on an inline function
+  (XQST0125). theAnnotations may hold the annotations of an enclosing
+  declaration (e.g. a function test in a parameter type), so it is saved and
+  restored.
+********************************************************************************/
+void check_expr_annotations(
+    AnnotationListParsenode* anns,
+    bool isInlineFunction,
+    const QueryLoc& loc)
+{
+  if (theSctx->xquery_version() < StaticContextConsts::xquery_version_3_0)
+  {
+    RAISE_ERROR(err::XPST0003, loc, ERROR_PARAMS(ZED(XPST0003_Annotations)));
+  }
+
+  std::unique_ptr<AnnotationList> saved(theAnnotations.release());
+
+  anns->accept(*this);
+
+  bool const visibility =
+    theAnnotations->contains(AnnotationInternal::fn_public) ||
+    theAnnotations->contains(AnnotationInternal::fn_private);
+
+  theAnnotations.reset(saved.release());
+
+  if (isInlineFunction && visibility)
+  {
+    RAISE_ERROR(err::XQST0125, loc, ERROR_PARAMS(ZED(XQST0125_InlineVisibility)));
+  }
+}
+
+
 void* begin_visit(const AnnotationLiteralListParsenode& v)
 {
   TRACE_VISIT();
@@ -7666,10 +7702,12 @@ void* begin_visit(const GroupByClause& v)
     
     if (varname == NULL)
     {
-      // If the varname is empty, then the GroupBy clause did not have a 
-      // variable. We'll create an automatic temporary one for the clause.
-      spec->set_var_name(new QName(v.get_location(), create_temp_var_name()));      
-      varname = spec->get_var_name();
+      // The parser accepts any ExprSingle as a grouping spec, but XQuery 3.0
+      // (GroupingSpec ::= GroupingVariable (TypeDeclaration? ":=" ExprSingle)?)
+      // and JSONiq (GroupByClause ::= 'group' 'by' VarRef ...) both require
+      // a grouping variable: "group by $x mod 10" is a syntax error.
+      RAISE_ERROR(err::XPST0003, spec->get_location(),
+      ERROR_PARAMS(ZED(XPST0003_GroupByVar)));
     }
 
     const var_expr* ve = NULL;
@@ -13050,6 +13088,9 @@ void* begin_visit(const InlineFunction& v)
 {
   TRACE_VISIT();
 
+  if (v.getAnnotations())
+    check_expr_annotations(v.getAnnotations(), true, loc);
+
   // Get the in-scope vars of the scope before opening the new scope for the
   // function devl
   std::vector<VarInfo*> scopedVars;
@@ -15134,14 +15175,17 @@ void end_visit(const PITest& v, void* /*visit_state*/)
 void* begin_visit(const AnyFunctionTest& v)
 {
   TRACE_VISIT();
-  //Nothing to do here
+
+  if (v.getAnnotations())
+    check_expr_annotations(v.getAnnotations(), false, loc);
+
   return no_state;
 }
 
 void end_visit(const AnyFunctionTest& v, void* /*visit_state*/)
 {
   TRACE_VISIT_OUT();
-  theTypeStack.push(GENV_TYPESYSTEM.ANY_FUNCTION_TYPE_STAR);
+  theTypeStack.push(GENV_TYPESYSTEM.ANY_FUNCTION_TYPE_ONE);
 }
 
 
@@ -15160,6 +15204,10 @@ void end_visit(const TypeList& v, void* /*visit_state*/)
 void* begin_visit(const TypedFunctionTest& v)
 {
   TRACE_VISIT();
+
+  if (v.getAnnotations())
+    check_expr_annotations(v.getAnnotations(), false, loc);
+
   return no_state;
 }
 

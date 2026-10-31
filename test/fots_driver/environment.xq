@@ -212,7 +212,7 @@ declare function env:decl-decimal-formats(
         $default,
         "decimal-format",
         if(exists($prefix) and empty($namespace))
-        then concat("%Q{", namespace-uri-from-QName($eqName), "}", local-name-from-QName($eqName))
+        then concat("Q{", namespace-uri-from-QName($eqName), "}", local-name-from-QName($eqName))
         else $name,
         env:set-properties($tmp),
         ";"
@@ -726,7 +726,9 @@ declare function env:mapper(
  :   <not-applicable schema-namespace="URI" reason="..."/>
  : makes every test-case whose query refers to the schema namespace URI not
  : applicable; it is used for test schemas that the XML Schema processor
- : (Xerces-C) cannot load.
+ : (Xerces-C) cannot load. An entry
+ :   <not-applicable test-case="NAME" reason="..."/>
+ : makes the test-case with that name not applicable.
  :
  : @param $testCase the test-case.
  : @param $zorbaManifest the Zorba manifest.
@@ -738,8 +740,10 @@ declare function env:check-not-applicable(
 ) as xs:string*
 {
   let $query := string-join($testCase/fots:test//text(), "")
-  for $na in $zorbaManifest//fots:not-applicable[@schema-namespace]
-  where contains($query, data($na/@schema-namespace))
+  for $na in $zorbaManifest//fots:not-applicable
+  where ($na/@schema-namespace and
+         contains($query, data($na/@schema-namespace))) or
+        $na/@test-case eq $testCase/@name
   return concat("Not applicable in Zorba: ", data($na/@reason), " ")
 };
 

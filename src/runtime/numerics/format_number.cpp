@@ -814,7 +814,16 @@ bool FormatNumberIterator::nextImpl( store::Item_t &result,
     zstring format_name( format_name_item->getStringValue() );
     ascii::trim_space( format_name );
     zstring prefix, local;
-    if ( !xml::split_qname( format_name, &prefix, &local ) ||
+    zstring::size_type const close = format_name.find( '}' );
+    if ( format_name.compare( 0, 2, "Q{" ) == 0 && close != zstring::npos ) {
+      //
+      // F&O 3.0 4.7.2: the name may be a URIQualifiedName, Q{uri}local.
+      //
+      GENV_ITEMFACTORY->createQName(
+        format_name_item, format_name.substr( 2, close - 2 ), "",
+        format_name.substr( close + 1 )
+      );
+    } else if ( !xml::split_qname( format_name, &prefix, &local ) ||
          prefix.empty() ) {
       GENV_ITEMFACTORY->createQName( format_name_item, "", "", format_name );
     } else {

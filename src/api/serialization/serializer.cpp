@@ -559,17 +559,10 @@ void serializer::emitter::emit_node(const store::Item* item, int depth)
 
     emit_text_node(item, text);
 
-    // Put a space between consecutive text nodes (or a text node and an
-    // atomic item), unless the text node contains whitespace only.
-    if (!ascii::is_space(text.c_str()))
-    {
-      thePreviousItemKind = PREVIOUS_ITEM_WAS_TEXT;
-    }
-    else
-    {
-      thePreviousItemKind = PREVIOUS_ITEM_WAS_NODE;
-    }
-
+    // Serialization 3.0 2 (sequence normalization): only adjacent atomic
+    // values are separated by a space; a text node is copied as is, so no
+    // space goes between it and an adjacent text node or atomic value.
+    thePreviousItemKind = PREVIOUS_ITEM_WAS_NODE;
     break;
   }
   case store::StoreConsts::commentNode:
@@ -1563,7 +1556,7 @@ void serializer::html_emitter::emit_node(
       tr << item->getStringValue();  // no character expansion
     }
 
-    thePreviousItemKind = PREVIOUS_ITEM_WAS_TEXT;
+    thePreviousItemKind = PREVIOUS_ITEM_WAS_NODE;  // see emitter::emit_node
     break;
   }
   case store::StoreConsts::commentNode:
@@ -2117,7 +2110,7 @@ void serializer::text_emitter::emit_node(const store::Item* item, int depth)
   else if (item->getNodeKind() == store::StoreConsts::textNode)
   {
     tr << item->getStringValue();
-    thePreviousItemKind = PREVIOUS_ITEM_WAS_TEXT;
+    thePreviousItemKind = PREVIOUS_ITEM_WAS_NODE;  // see emitter::emit_node
   }
   else if (item->getNodeKind() == store::StoreConsts::commentNode)
   {

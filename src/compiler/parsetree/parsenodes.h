@@ -4455,6 +4455,7 @@ private:
   rchandle<ParamList> theParamList;
   rchandle<SequenceTypeAST> theReturnType;
   rchandle<exprnode> theEnclosedExpr;
+  rchandle<AnnotationListParsenode> theAnnotations;
 
 public:
   InlineFunction(
@@ -4477,6 +4478,10 @@ public:
   rchandle<SequenceTypeAST> getReturnType() const { return theReturnType; }
 
   rchandle<exprnode> getEnclosedExpr() const { return theEnclosedExpr; }
+
+  void setAnnotations(AnnotationListParsenode* anns) { theAnnotations = anns; }
+
+  AnnotationListParsenode* getAnnotations() const { return theAnnotations.getp(); }
 
   void accept(parsenode_visitor&) const;
 };
@@ -5649,8 +5654,15 @@ public:
 ********************************************************************************/
 class AnyFunctionTest: public parsenode
 {
+protected:
+  rchandle<AnnotationListParsenode> theAnnotations;
+
 public:
   AnyFunctionTest(const QueryLoc& loc_) : parsenode(loc_) {}
+
+  void setAnnotations(AnnotationListParsenode* anns) { theAnnotations = anns; }
+
+  AnnotationListParsenode* getAnnotations() const { return theAnnotations.getp(); }
 
   void accept(parsenode_visitor&) const;
 };
@@ -5664,6 +5676,7 @@ class TypedFunctionTest : public parsenode
 protected:
   rchandle<TypeList>     theArgTypes;
   rchandle<SequenceTypeAST> theReturnType;
+  rchandle<AnnotationListParsenode> theAnnotations;
 
 public:
   TypedFunctionTest(
@@ -5690,6 +5703,10 @@ public:
   const rchandle<TypeList>& getArgumentTypes() const { return theArgTypes; }
 
   const rchandle<SequenceTypeAST>& getReturnType() const { return theReturnType; }
+
+  void setAnnotations(AnnotationListParsenode* anns) { theAnnotations = anns; }
+
+  AnnotationListParsenode* getAnnotations() const { return theAnnotations.getp(); }
 
   void accept(parsenode_visitor&) const;
 };

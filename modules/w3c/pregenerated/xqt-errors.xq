@@ -739,6 +739,15 @@ declare variable $err:XQST0123 as xs:QName := fn:QName($err:NS, "err:XQST0123");
 
 (:~
  :
+ : It is a static error if an inline function expression is annotated as
+ : %public or %private.
+ : 
+ : @see http://www.w3.org/2005/xqt-errors
+:)
+declare variable $err:XQST0125 as xs:QName := fn:QName($err:NS, "err:XQST0125");
+
+(:~
+ :
  : It is a static error if all-extensions appears in a require-feature option declaration.
  : 
  : @see http://www.w3.org/2005/xqt-errors

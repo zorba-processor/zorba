@@ -149,7 +149,7 @@ jobs:
       # src/compiler/parser/CMakeLists.txt). The regenerated files are
       # uploaded as the generated-parser artifact.
       - name: Check that the generated parsers and scanners are up to date
-        if: needs.changes.outputs.code == 'true' && matrix.cache == 'linux-amd64-latest'
+        if: always() && needs.changes.outputs.code == 'true' && matrix.cache == 'linux-amd64-latest'
         run: |
           docker run --rm -v "$PWD":/src -w /src zorba-builder:ci sh -ec '
             bison --version | head -1

@@ -1813,6 +1813,42 @@ void FnAvailableEnvironmentVariablesIteratorState::reset(PlanState& planState)
   14.8.5 fn:unparsed-text
 ********************************************************************************/
 /**
+  * Normalizes the $href of fn:unparsed-text() and fn:unparsed-text-lines() and
+  * checks that it has no fragment identifier. F&O 3.0 14.8.5: an invalid
+  * $href is FOUT1170 (fn:doc's FODC0005 does not apply here).
+  */
+static void normalizeUnparsedTextUri(
+  zstring const& aUri,
+  static_context* aSctx,
+  QueryLoc const& loc,
+  zstring* aNormUri)
+{
+  try
+  {
+    normalizeInputUri(aUri, aSctx, loc, aNormUri);
+  }
+  catch (ZorbaException const& e)
+  {
+    if (e.diagnostic() == err::FODC0005)
+      throw XQUERY_EXCEPTION(err::FOUT1170, ERROR_PARAMS(aUri), ERROR_LOC(loc));
+    throw;
+  }
+
+  // A fragment identifier is not allowed either.
+  bool lHasFragment;
+  try
+  {
+    lHasFragment = zorba::URI(*aNormUri).get_encoded_fragment() != "";
+  }
+  catch (ZorbaException const&)
+  {
+    lHasFragment = true;                // not a valid URI at all
+  }
+  if (lHasFragment)
+    throw XQUERY_EXCEPTION(err::FOUT1170, ERROR_PARAMS(aUri), ERROR_LOC(loc));
+}
+
+/**
   * Utility method for fn:unparsed-text() and fn:unparsed-text-available().
   */
 static void readDocument(
@@ -1825,15 +1861,7 @@ static void readDocument(
 {
   //Normalize input to handle filesystem paths, etc.
   zstring lNormUri;
-  normalizeInputUri(aUri, aSctx, loc, &lNormUri);
-
-  //Check for a fragment identifier
-  //Create a zorba::URI for validating if it contains a fragment  
-  std::unique_ptr<zorba::URI> lUri(new zorba::URI(lNormUri));
-  if (lUri->get_encoded_fragment() != "")
-  {
-    throw XQUERY_EXCEPTION(err::FOUT1170, ERROR_PARAMS(aUri), ERROR_LOC(loc));    
-  }
+  normalizeUnparsedTextUri(aUri, aSctx, loc, &lNormUri);
 
   //Resolve URI to stream
   zstring lErrorMessage;
@@ -1971,7 +1999,6 @@ bool FnUnparsedTextLinesIterator::nextImpl(store::Item_t& result, PlanState& pla
   zstring lErrorMessage;
   std::unique_ptr<internal::Resource> lResource;
   StreamReleaser lStreamReleaser;
-  std::unique_ptr<zorba::URI> lUri;
 
   FnUnparsedTextLinesIteratorState* state;
   DEFAULT_STACK_INIT(FnUnparsedTextLinesIteratorState, state, planState);
@@ -1987,15 +2014,7 @@ bool FnUnparsedTextLinesIterator::nextImpl(store::Item_t& result, PlanState& pla
 
     //Normalize input to handle filesystem paths, etc.
     uriItem->getStringValue2(uriString);
-    normalizeInputUri(uriString, theSctx, loc, &lNormUri);
-
-    //Check for a fragment identifier
-    //Create a zorba::URI for validating if it contains a fragment  
-    lUri.reset(new zorba::URI(lNormUri));
-    if (lUri->get_encoded_fragment() != "")
-    {
-      throw XQUERY_EXCEPTION(err::FOUT1170, ERROR_PARAMS(uriString), ERROR_LOC(loc));    
-    }
+    normalizeUnparsedTextUri(uriString, theSctx, loc, &lNormUri);
 
     //Resolve URI to stream
     lResource = theSctx->resolve_uri

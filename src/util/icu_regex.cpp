@@ -127,12 +127,49 @@ static icu_flags_type convert_xquery_flags( char const *xq_flags ) {
  */
 inline bool is_char_range_begin( zstring const &s,
   /* intentionally not const& */ zstring::const_iterator i ) {
-  return ztd::peek( s, &i ) == '-' && ztd::peek( s, &i ) != '[';
+  if ( ztd::peek( s, &i ) != '-' )
+    return false;
+  char const next = ztd::peek( s, &i );
+  return next != '[' && next != ']';
 }
 
-inline bool is_non_capturing_begin( zstring const &s,
-  /* intentionally not const& */    zstring::const_iterator i ) {
-  return ztd::peek_behind( s, &i ) == '?' && ztd::peek_behind( s, &i ) == '(';
+/**
+ * Checks the block name of a \p{IsX} or \P{IsX} block escape.  ICU matches
+ * property names loosely (ignoring case, spaces, hyphens and underscores), so
+ * it accepts names that are not XSD block names, e.g., "IsBasic-Latin".  An
+ * XSD block name is the Unicode block name with the spaces removed, so a '-'
+ * can only come from the Unicode name: either "Latin-1" or a single trailing
+ * letter as in "LatinExtended-A" or "ArabicPresentationForms-B".  Whether the
+ * block exists is left to ICU.
+ *
+ * @param s The XQuery regular expression.
+ * @param i The iterator positioned at the 'p' or 'P'.
+ */
+static void check_block_escape( zstring const &s,
+                                zstring::const_iterator i ) {
+  zstring::const_iterator const end = s.end();
+  if ( ++i == end || *i != '{' || ++i == end || *i != 'I' ||
+       ++i == end || *i != 's' )
+    return;
+  zstring name;
+  for ( ++i; i != end && *i != '}'; ++i )
+    name += *i;
+  if ( i == end )
+    return;                             // unbalanced: ICU reports it
+  for ( zstring::size_type n = 0; n < name.size(); ++n ) {
+    char const c = name[n];
+    if ( ascii::is_alnum( c ) )
+      continue;
+    if ( c == '-' ) {
+      bool const latin_1 = n >= 5 && name.compare( n - 5, 5, "Latin" ) == 0 &&
+        n + 1 < name.size() && name[ n + 1 ] == '1';
+      bool const trailing_letter = n > 0 && n + 2 == name.size() &&
+        ascii::is_alpha( name[ n + 1 ] );
+      if ( latin_1 || trailing_letter )
+        continue;
+    }
+    throw INVALID_RE_EXCEPTION( s, ZED( REGEX_UNKNOWN_PIs_CONSTRUCT ) );
+  }
 }
 
 //#define DEBUG_CONVERT_REGEX
@@ -151,6 +188,21 @@ void convert_xquery_re( zstring const &xq_re, zstring *icu_re,
   icu_re->clear();
   icu_re->reserve( xq_re.length() );    // approximate
 
+  if ( q_flag ) {
+    //
+    // XQuery 3.0 F&O 5.6.1.1: with the 'q' flag, all characters in the
+    // regular expression are treated as representing themselves.  ICU's own
+    // literal mode is not used (see regex::compile()), so escape every ASCII
+    // punctuation character; a lone "\" is then valid too.
+    //
+    FOR_EACH( zstring, i, xq_re ) {
+      if ( ascii::is_punct( *i ) )
+        *icu_re += '\\';
+      *icu_re += *i;
+    }
+    return;
+  }
+
   char c;                               // current (raw) XQuery char
   char c_cooked;                        // current cooked XQuery char
   char prev_c_cooked = 0;               // previous c_cooked
@@ -161,7 +213,8 @@ void convert_xquery_re( zstring const &xq_re, zstring *icu_re,
   int  got_quantifier = 0;
   int  in_char_class = 0;               // within [...]
   int  in_char_range = 0;               // within a-b within [...]
-  int  is_first_char = 1;               // to check ^ placement
+  int  char_group_start = 0;            // at first char of a char group
+  vector<bool> subtraction;             // char class at depth has -[...]
   bool put_close_bracket = false;       // put another ] for char class
 
   bool in_backref = false;              // '\'[1-9][0-9]*
@@ -261,6 +314,8 @@ void convert_xquery_re( zstring const &xq_re, zstring *icu_re,
         case 'S': // [^\s]
           if ( in_char_range || IS_CHAR_RANGE_BEGIN )
             goto not_single_char_esc;
+          if ( c == 'p' || c == 'P' )
+            check_block_escape( xq_re, i );
           *icu_re += '\\';
           break;
         case 'w': // word char
@@ -353,18 +408,26 @@ void convert_xquery_re( zstring const &xq_re, zstring *icu_re,
         case '$':
           if ( q_flag )
             *icu_re += '\\';
-          else if ( !m_flag && i + 1 == xq_re.end() ) {
+          else if ( !m_flag && !in_char_class ) {
             //
             // XQuery 3.0 F&O 5.6.1: By default, ... $ matches the end of the
             // entire string.  [Newlines are treated as any other character.]
             //
             // However, in ICU, $ always matches before any trailing newlines.
             //
-            // To make ICU work as XQuery needs it to, substitute \z for $ when
-            // it is the last character in the regular expression (and multi-
-            // line mode is not set).
+            // To make ICU work as XQuery needs it to, substitute \z for $
+            // outside a character class (when multi-line mode is not set).
+            // ICU does not accept a quantifier on \z ("alp$?ha" is valid
+            // XQuery), so a quantified $ becomes a non-capturing group.
             //
-            icu_re->append( "\\z" );
+            zstring::const_iterator j = i;
+            switch ( ztd::peek( xq_re, &j ) ) {
+              case '?': case '*': case '+': case '{':
+                icu_re->append( "(?:\\z)" );
+                break;
+              default:
+                icu_re->append( "\\z" );
+            }
             goto next;
           }
           break;
@@ -394,7 +457,6 @@ void convert_xquery_re( zstring const &xq_re, zstring *icu_re,
               ++open_cap_subs;
               cap_sub.push_back( true );
               cur_cap_sub = cap_sub.size();
-              is_first_char = 2;
             }
           }
           break;
@@ -409,16 +471,6 @@ void convert_xquery_re( zstring const &xq_re, zstring *icu_re,
                 goto unbalanced_char;
               cap_sub[ --cur_cap_sub ] = false;
             }
-          }
-          break;
-        case ':':
-          if ( is_non_capturing_begin( xq_re, i ) ) {
-            //
-            // This ':' is part of a "(?:" sequence, i.e., a non-capturing
-            // subgroup.  Therefore, the *next* character will be a "first
-            // character" for the purposes of '^'.
-            //
-            is_first_char = 2;
           }
           break;
         case '*':
@@ -455,18 +507,28 @@ void convert_xquery_re( zstring const &xq_re, zstring *icu_re,
               // XQuery [A-Z-[OI]] becomes ICU [A-Z--[OI]].
               //
               *icu_re += '-';
-            } else if ( char_range_possible &&
-                        prev_c_cooked != '[' && next_c != ']' ) {
+              if ( subtraction.size() <= (size_t)in_char_class )
+                subtraction.resize( in_char_class + 1 );
+              subtraction[ in_char_class ] = true;
+            } else if ( char_group_start || next_c == ']' ) {
               //
-              // The '-' is neither the first or last character within a
-              // character range (i.e., a literal '-') so therefore it's
-              // indicating a character range -- except if we just completed a
-              // character range.  For example, in "[a-h-o-z]", there are two
-              // ranges: a-h and o-z.  The '-' between the 'h' and the 'o' is a
-              // literal '-' and NOT a range h-o.
+              // A literal '-' as the first or last character of a character
+              // group.
+              //
+            } else if ( char_range_possible ) {
+              //
+              // The '-' indicates a character range.
               //
               char_range_begin_cooked = prev_c_cooked;
               in_char_range = 2;
+            } else {
+              //
+              // XSD 1.0 (Second Edition) F.1 / XSD 1.1 G.4.2.3: a literal '-'
+              // is allowed only at the beginning or end of a character group
+              // (or before a subtracted class), so "[a-h-o-z]" or
+              // "[0-9-.]" is invalid: the '-' after a range is neither.
+              //
+              goto unescaped_char;
             }
           }
           break;
@@ -499,7 +561,7 @@ void convert_xquery_re( zstring const &xq_re, zstring *icu_re,
               *icu_re += '[';
               put_close_bracket = true;
             }
-            is_first_char = 2;
+            char_group_start = 2;
           }
           break;
         case '\\':
@@ -519,22 +581,40 @@ void convert_xquery_re( zstring const &xq_re, zstring *icu_re,
             }
             --in_char_class;
             in_char_range = 0;
+            if ( (size_t)in_char_class < subtraction.size() &&
+                 subtraction[ in_char_class ] ) {
+              //
+              // XSD F.1 [12]: a subtracted class expression must be the last
+              // part of its character group, e.g., [a-[b] ] is invalid.
+              //
+              subtraction[ in_char_class ] = false;
+              if ( PEEK_C != ']' )
+                throw INVALID_RE_EXCEPTION(
+                  xq_re, ZED( REGEX_INVALID_USE_OF_SUBCLASS )
+                );
+            }
           }
           break;
         case '^':
-          if ( q_flag )
+          //
+          // XQuery 3.0 F&O 5.6.1: outside a character class, ^ is always an
+          // anchor (it is not a normal character there), so "^^" matches at
+          // the start of the string.  Inside a character class, ^ negates
+          // only as the first character; elsewhere it is an ordinary
+          // character (XSD XmlChar).
+          //
+          if ( in_char_class && !q_flag ) {
+            if ( char_group_start && prev_c_cooked == '[' )
+              char_group_start = 2;     // negative character group [^...]
+            else
+              *icu_re += '\\';
+          } else if ( q_flag )
             *icu_re += '\\';
-          else if ( !is_first_char ) {
-            if ( in_char_class )
-              goto unescaped_char;
-            *icu_re += '\\';
-          }
           break;
         case '|':
           if ( q_flag )
             *icu_re += '\\';
           else
-            is_first_char = 2;
           break;
         default:
           if ( x_flag && ascii::is_space( c ) ) {
@@ -562,7 +642,7 @@ void convert_xquery_re( zstring const &xq_re, zstring *icu_re,
 next:
     char_range_possible = !dec_limit( &in_char_range );
     dec_limit( &got_quantifier );
-    dec_limit( &is_first_char );
+    dec_limit( &char_group_start );
     prev_c_cooked = c_cooked;
   } // FOR_EACH
 

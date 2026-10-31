@@ -139,6 +139,8 @@
 %token <sval> PREFIX_WILDCARD               "'*:QName'"
 %token <sval> COMP_ELEMENT_QNAME_LBRACE     "'element QName {'"
 %token <sval> COMP_ATTRIBUTE_QNAME_LBRACE   "'attribute QName {'"
+%token <sval> COMP_ELEMENT_EQNAME_LBRACE    "'element EQName {'"
+%token <sval> COMP_ATTRIBUTE_EQNAME_LBRACE  "'attribute EQName {'"
 %token <sval> COMP_PI_NCNAME_LBRACE         "'processing-instruction NCName {'"
 %token <sval> COMP_NS_NCNAME_LBRACE         "'namespace NCName {'"
 %token <sval> QNAME_SVAL                    "'QName'"
@@ -4876,6 +4878,17 @@ InlineFunction :
                               $3);
       delete $2;
     }
+  |
+    AnnotationList FUNCTION FunctionSig EnclosedStatementsAndOptionalExpr
+    {
+      InlineFunction* f = new InlineFunction(LOC(@$),
+                                             $3->theParams.getp(),
+                                             $3->theReturnType.getp(),
+                                             $4);
+      f->setAnnotations(static_cast<AnnotationListParsenode*>($1));
+      $$ = f;
+      delete $3;
+    }
 ;
 
 
@@ -5285,6 +5298,10 @@ CompElemConstructor :
     {
       $$ = new CompElemConstructor(LOC(@$), new QName(LOC(@$), SYMTAB($1)), $2);
     }
+|   COMP_ELEMENT_EQNAME_LBRACE StatementsAndOptionalExpr RBRACE
+    {
+      $$ = new CompElemConstructor(LOC(@$), new QName(LOC(@$), SYMTAB($1), true), $2);
+    }
 |   ELEMENT LBRACE Expr RBRACE LBRACE StatementsAndOptionalExpr RBRACE
     {
       $$ = new CompElemConstructor( LOC(@$), $3, $6 );
@@ -5305,6 +5322,10 @@ CompAttrConstructor :
     COMP_ATTRIBUTE_QNAME_LBRACE StatementsAndOptionalExpr RBRACE
     {
       $$ = new CompAttrConstructor( LOC(@$), new QName(LOC(@$), SYMTAB($1)), $2 );
+    }
+|   COMP_ATTRIBUTE_EQNAME_LBRACE StatementsAndOptionalExpr RBRACE
+    {
+      $$ = new CompAttrConstructor( LOC(@$), new QName(LOC(@$), SYMTAB($1), true), $2 );
     }
 |   ATTRIBUTE LBRACE Expr RBRACE LBRACE StatementsAndOptionalExpr RBRACE
     {
@@ -5819,6 +5840,18 @@ FunctionTest :
   | TypedFunctionTest
     {
       $$ = $1;
+    }
+  | AnnotationList AnyFunctionTest
+    {
+      static_cast<AnyFunctionTest*>($2)->
+      setAnnotations(static_cast<AnnotationListParsenode*>($1));
+      $$ = $2;
+    }
+  | AnnotationList TypedFunctionTest
+    {
+      static_cast<TypedFunctionTest*>($2)->
+      setAnnotations(static_cast<AnnotationListParsenode*>($1));
+      $$ = $2;
     }
 ;
 

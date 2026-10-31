@@ -823,18 +823,13 @@ inline FloatImpl<F> FloatImpl<F>::abs() const {
 
 template<typename F>
 inline FloatImpl<F> FloatImpl<F>::acosh() const {
-  // formula from www.mathworks.com
-  return FloatImpl<F>(
-    std::log( value_ + std::sqrt( value_ * value_ - 1 ) )
-  );
+  return FloatImpl<F>( std::acosh( value_ ) );
 }
 
 template<typename F>
 inline FloatImpl<F> FloatImpl<F>::asinh() const {
-  // formula from www.mathworks.com
-  return FloatImpl<F>(
-    std::log( value_ + std::sqrt( value_ * value_ + 1 ) )
-  );
+  // std::asinh keeps the sign of zero (the log formula gave +0 for -0).
+  return FloatImpl<F>( std::asinh( value_ ) );
 }
 
 template<typename F>
@@ -844,8 +839,8 @@ inline FloatImpl<F> FloatImpl<F>::atan() const {
 
 template<typename F>
 inline FloatImpl<F> FloatImpl<F>::atanh() const {
-  // formula from www.mathworks.com
-  return FloatImpl<F>( 0.5 * std::log( (1 + value_) / (1 - value_) ) );
+  // std::atanh keeps the sign of zero (the log formula gave +0 for -0).
+  return FloatImpl<F>( std::atanh( value_ ) );
 }
 
 template<typename F>

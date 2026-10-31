@@ -157,7 +157,9 @@ class Runner:
             missing = [c for c in cases if c not in results]
             how = "set"
         else:
-            os.unlink(out)
+            # zorba deletes its -o file when the query fails.
+            if os.path.exists(out):
+                os.unlink(out)
             missing = list(cases)
             how = "per-case (%s)" % err
         # Fallback: run the missing cases one by one.

@@ -195,11 +195,13 @@ FOREACH(TESTFILE ${TESTFILES})
   IF (ZORBA_NO_ICU)
     # Without ICU there is no transcoding to or from legacy character sets, and
     # the built-in regular expression engine differs from ICU's in corner cases
-    # (a '^' that is not leading, replacement strings like $10) and fails
-    # fn:replace("foo", "f", "$", "q") with std::bad_alloc.
+    # (a '^' that is not leading, replacement strings like $10), accepts a
+    # literal '-' after a range in a character group, fails
+    # fn:replace("foo", "f", "$", "q") with std::bad_alloc and does not
+    # terminate on the "q" flag patterns of regex_q10.
     FILE(READ "${CMAKE_CURRENT_SOURCE_DIR}/${TESTFILE}" _icu_query_text)
     IF (_icu_query_text MATCHES "ISO-8859-|CP1252|windows-125"
-        OR TESTNAME MATCHES "^test/rbkt/zorba/(file/(cp1252|invalid_encoding)|string/Regex/regex_m5[45]|string/ReplaceFunc/replace(17|19|20)|functx/functx-x-call)$")
+        OR TESTNAME MATCHES "^test/rbkt/zorba/(file/(cp1252|invalid_encoding)|string/Regex/(regex_m5[45]|regex_err2[01]|regex_q10)|string/ReplaceFunc/replace(17|19|20)|functx/functx-x-call)$")
       SET (SKIP_TEST 1)
     ENDIF ()
   ENDIF (ZORBA_NO_ICU)
@@ -618,9 +620,6 @@ IF(NOT ZORBA_NO_ICU)
     EXPECTED_FAILURE(test/rbkt/zorba/string/Regex/regex_m11 866874)
     EXPECTED_FAILURE(test/rbkt/zorba/string/Regex/regex_m40 866874)
     EXPECTED_FAILURE(test/rbkt/zorba/string/Regex/regex_m41 866874)
-  ELSE ( ${ICU_VERSION} VERSION_LESS 4.0.0 )
-    EXPECTED_FAILURE(test/rbkt/zorba/string/Regex/regex_err10 994610)
-    EXPECTED_FAILURE(test/rbkt/zorba/string/Regex/regex_err15 866874)
   ENDIF ( ${ICU_VERSION} VERSION_LESS 4.0.0 )
 ENDIF(NOT ZORBA_NO_ICU)
 

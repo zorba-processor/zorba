@@ -132,7 +132,8 @@ QueryData::QueryData(XQuery_t aQuery, URIMapper *aMapper, URLResolver *aResolver
   :
   theQuery(aQuery),
   theURIMapper(aMapper),
-  theURLResolver(aResolver)
+  theURLResolver(aResolver),
+  theReturnedFunctionItem(false)
 {
 }
 
@@ -195,12 +196,29 @@ XQuery_t QueryMap::getQuery(const String& aKeyName)
 /*******************************************************************************
 
 ********************************************************************************/
+QueryData_t QueryMap::getQueryData(const String& aKeyName)
+{
+  QueryMap::QueryMap_t::iterator lIter = theQueryMap->find(aKeyName);
+
+  if (lIter == theQueryMap->end())
+    return NULL;
+
+  return lIter->second;
+}
+
+
+/*******************************************************************************
+
+********************************************************************************/
 bool QueryMap::deleteQuery(const String& aKeyName)
 {
   QueryMap::QueryMap_t::iterator lIter = theQueryMap->find(aKeyName);
 
   if (lIter == theQueryMap->end())
     return false;
+
+  if (lIter->second->returnedFunctionItem())
+    theKeptQueries.push_back(lIter->second);
 
   theQueryMap->erase(lIter);
   return true;
@@ -306,6 +324,29 @@ Iterator_t ZorbaQueryFunction::getIterArgument(const Arguments_t& aArgs, int aPo
 {
   Iterator_t args_iter = aArgs[aPos]->getIterator();
   return args_iter;
+}
+
+
+/*******************************************************************************
+
+********************************************************************************/
+QueryData_t ZorbaQueryFunction::getQueryData(
+    const zorba::DynamicContext* aDctx,
+    const zorba::String& aIdent) const
+{
+  QueryMap* lQueryMap;
+
+  if (!(lQueryMap =
+        dynamic_cast<QueryMap*>(aDctx->getExternalFunctionParameter("zqQueryMap"))))
+  {
+    throwError("NO_QUERY_MATCH", "No query with the given identifier was found");
+  }
+
+  QueryData_t lData;
+  if (!(lData = lQueryMap->getQueryData(aIdent)))
+    throwError("NO_QUERY_MATCH", "No query with the given identifier was found");
+
+  return lData;
 }
 
 
@@ -779,7 +820,13 @@ bool EvaluateItemSequence::EvaluateIterator::next(Item& aItem)
 {
   try
   {
-    return theIterator->next(aItem);
+    if (!theIterator->next(aItem))
+      return false;
+    // The public Item API has no isFunction(); an item that is neither
+    // atomic, a node nor a JSON item is a function item.
+    if (!aItem.isAtomic() && !aItem.isNode() && !aItem.isJSONItem())
+      theQueryData->setReturnedFunctionItem();
+    return true;
   }
   catch (XQueryException& xe)
   {
@@ -819,7 +866,8 @@ zorba::ItemSequence_t EvaluateFunction::evaluate(
 {
   String lQueryID = ZorbaQueryFunction::getOneStringArgument(aArgs,0);
 
-  XQuery_t lQuery = getQuery(aDctx, lQueryID);
+  QueryData_t lQueryData = getQueryData(aDctx, lQueryID);
+  XQuery_t lQuery = lQueryData->getQuery();
 
   if (lQuery->isUpdating())
   {
@@ -833,7 +881,7 @@ zorba::ItemSequence_t EvaluateFunction::evaluate(
       
   Iterator_t lIterQuery = lQuery->iterator();
 
-  return ItemSequence_t(new EvaluateItemSequence(lIterQuery, lQueryID));
+  return ItemSequence_t(new EvaluateItemSequence(lIterQuery, lQueryID, lQueryData));
 }
 
 
@@ -847,7 +895,8 @@ zorba::ItemSequence_t EvaluateUpdatingFunction::evaluate(
 {
   String lQueryID = ZorbaQueryFunction::getOneStringArgument(aArgs,0);
   
-  XQuery_t lQuery = getQuery(aDctx, lQueryID);
+  QueryData_t lQueryData = getQueryData(aDctx, lQueryID);
+  XQuery_t lQuery = lQueryData->getQuery();
     
   if (lQuery->isSequential())
   {
@@ -860,7 +909,7 @@ zorba::ItemSequence_t EvaluateUpdatingFunction::evaluate(
   }
   
   Iterator_t lIterQuery = lQuery->iterator();
-  return ItemSequence_t(new EvaluateItemSequence(lIterQuery, lQueryID));
+  return ItemSequence_t(new EvaluateItemSequence(lIterQuery, lQueryID, lQueryData));
 }
 
 
@@ -874,7 +923,8 @@ zorba::ItemSequence_t EvaluateSequentialFunction::evaluate(
 {
   String lQueryID = ZorbaQueryFunction::getOneStringArgument(aArgs, 0);
   
-  XQuery_t lQuery = getQuery(aDctx, lQueryID);
+  QueryData_t lQueryData = getQueryData(aDctx, lQueryID);
+  XQuery_t lQuery = lQueryData->getQuery();
 
   if(lQuery->isUpdating())
   {
@@ -887,7 +937,7 @@ zorba::ItemSequence_t EvaluateSequentialFunction::evaluate(
   }
 
   Iterator_t lIterQuery = lQuery->iterator();
-  return ItemSequence_t(new EvaluateItemSequence(lIterQuery, lQueryID));
+  return ItemSequence_t(new EvaluateItemSequence(lIterQuery, lQueryID, lQueryData));
 }
 
 

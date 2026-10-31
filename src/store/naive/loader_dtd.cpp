@@ -317,6 +317,18 @@ void FragmentXmlLoader::startParser()
     throw 0;
   }
 
+  // The input is an external parsed entity, whose optional text declaration
+  // is TextDecl ::= '<?xml' VersionInfo? EncodingDecl S? '?>' (XML 1.0
+  // 4.3.1): unlike an XML declaration, the encoding is mandatory.
+  if (has_decl && head.substr(0, decl_end).find("encoding") == std::string::npos)
+  {
+    theXQueryDiagnostics->add_error(theDocUri.empty() ?
+      NEW_ZORBA_EXCEPTION(zerr::ZSTR0021_LOADER_PARSING_ERROR, ERROR_PARAMS( ZED( ParseFragmentTextDeclNoEncoding ))) :
+      NEW_ZORBA_EXCEPTION(zerr::ZSTR0021_LOADER_PARSING_ERROR, ERROR_PARAMS( ZED( ParseFragmentTextDeclNoEncoding ), theDocUri))
+    );
+    throw 0;
+  }
+
   std::string::size_type const prolog_end = doctype_end ? doctype_end : decl_end;
   std::string prolog(head, 0, prolog_end);
   // A text declaration may omit the version; an XML declaration may not.

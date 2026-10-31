@@ -72,4 +72,11 @@
 
   <!-- Are these correct? -->
   <dependency type="limits" value="year_lt_0" satisfied="true"/>
+
+  <!-- XQuery 3.0 requires a non-empty function body; XQuery 3.1 allows an
+       empty one, and Zorba accepts it (its result is the empty sequence). -->
+  <not-applicable test-case="FunctionCall-044"
+                  reason="empty enclosed expression is valid XQuery 3.1; Zorba accepts it"/>
+  <not-applicable test-case="inline-fn-006"
+                  reason="empty enclosed expression is valid XQuery 3.1; Zorba accepts it"/>
 </test-suite-result>

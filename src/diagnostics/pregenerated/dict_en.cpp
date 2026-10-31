@@ -213,6 +213,7 @@ extern entry const dict_en[] = {
   { "err:XQST0120", "\"$1\": feature not supported" },
   { "err:XQST0122", "$1" },
   { "err:XQST0123", "$1" },
+  { "err:XQST0125", "$1" },
   { "err:XQST0126", "impossible to require all extension features" },
   { "err:XQST0127", "$1 : impossible to require and prohibit at the same time" },
   { "err:XQST0128", "\"$1\": unable to disable a supported feature" },
@@ -807,6 +808,7 @@ extern entry const dict_en[] = {
   { "~ParseFragmentDoctypeNotAllowedHere", "a DOCTYPE declaration must appear before any element or text node, and at most once" },
   { "~ParseFragmentInvalidOptions", "invalid options passed to the parse-xml:parse() function, the element must be in the schema target namespace" },
   { "~ParseFragmentOptionCombinationNotAllowed", "only one of the <schema-validate/>, <DTD-validate/> or <parse-external-parsed-entity/> options can be specified" },
+  { "~ParseFragmentTextDeclNoEncoding", "a text declaration must have an encoding declaration" },
   { "~PromotionImpossible", "promotion not possible" },
 #if defined(ZORBA_NO_ICU)
   { "~REGEX_BROKEN_PIs_CONSTRUCT", "broken \\\\p{Is} construct; valid characters are [a-zA-Z0-9-]" },
@@ -826,9 +828,7 @@ extern entry const dict_en[] = {
 #if defined(ZORBA_NO_ICU)
   { "~REGEX_INVALID_UNICODE_CODEPOINT_u", "invalid unicode hex, should be in form \\\\uXXXX or \\\\UXXXXXXXX" },
 #endif
-#if defined(ZORBA_NO_ICU)
   { "~REGEX_INVALID_USE_OF_SUBCLASS", "improper use of class subtraction: it must be the last construct in a class group [xxx-[yyy]]" },
-#endif
 #if defined(ZORBA_NO_ICU)
   { "~REGEX_MAX_LT_MIN", "in {min,max}, max is less than min" },
 #endif
@@ -850,9 +850,7 @@ extern entry const dict_en[] = {
 #if defined(ZORBA_NO_ICU)
   { "~REGEX_UNKNOWN_PC_CONSTRUCT", "unknown \\\\p{C?} category; supported categories: C, Cc, Cf, Co, Cn(for not assigned)" },
 #endif
-#if defined(ZORBA_NO_ICU)
   { "~REGEX_UNKNOWN_PIs_CONSTRUCT", "unknown \\\\p{Is} category block; see supported block escapes here: http://www.w3.org/TR/xmlschema-2/#charcter-classes" },
-#endif
 #if defined(ZORBA_NO_ICU)
   { "~REGEX_UNKNOWN_PL_CONSTRUCT", "unknown \\\\p{L?} category; supported categories: L, Lu, Ll, Lt, Lm, Lo" },
 #endif
@@ -969,6 +967,7 @@ extern entry const dict_en[] = {
   { "~XPST0003_CompNS", "computed namespace constructors only available in XQuery 3.0 or later" },
   { "~XPST0003_CountClause30", "\"count\" clause only available in XQuery 3.0 or later" },
   { "~XPST0003_ExternalVar", "initializing expressions for external variables only available in XQuery 3.0 or later" },
+  { "~XPST0003_GroupByVar", "a grouping specification must be a variable (\"group by $var\" or \"group by $var := expr\")" },
   { "~XPST0003_ModuleDeclNotInMain", "module declaration must not be in main module" },
   { "~XPST0003_OuterForClause30", "\"outer-for\" clause only available in XQuery 3.0 or later" },
   { "~XPST0003_PiTarget", "\"XML\" not allowed as target of a direct processing-instruction constructor" },
@@ -1037,6 +1036,7 @@ extern entry const dict_en[] = {
   { "~XQST0116_Requirement", "$2: annotation requires one of the following annotations: $3" },
   { "~XQST0123_UnrecognizedRequiredFeature_2", "\"$2\": unrecognized required feature" },
   { "~XQST0123_UnrecognizedXQueryOption_2", "\"$2\": unrecognized option in XQuery namespace" },
+  { "~XQST0125_InlineVisibility", "%public and %private are not allowed on an inline function expression" },
   { "~XUDY0021_AttributeName", "\"$3\": attribute with the same name already exists" },
   { "~XUST0001_CONCAT", "comma expression with updating and non-updating branches" },
   { "~XUST0001_Generic", "updating expression illegal here" },
