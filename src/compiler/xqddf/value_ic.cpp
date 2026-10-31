@@ -69,10 +69,7 @@ store::Iterator_t ValueIC::getIterator() const
   return new PlanWrapper(thePlan.getp(),
                          theCcb,
                          NULL, // dctx*
-                         NULL,
-                         0,
-                         theCcb->theHaveTimeout,
-                         theCcb->theTimeout);
+                         NULL);
 }
 
 

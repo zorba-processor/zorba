@@ -17,6 +17,7 @@
 #ifndef ZORBA_RUNTIME_PLAN_ITERATOR
 #define ZORBA_RUNTIME_PLAN_ITERATOR
 
+#include <chrono>
 #include <stack>
 
 #include "common/shared_types.h"
@@ -109,11 +110,21 @@ class XQueryImpl;
                     each individual plan iterator.
   theBlockSize    : Size (in bytes) of the block.
 
-  theHasToQuit    : Boolean that indicates if the query execution has to quit.
-                    Checking this value is done in each consumeNext call,
-                    i.e. between every two iterator next calls. This value is
-                    set by the StateWrapper class (see runtime/util/timeout.h)
-                    after a user-defined timeout value is exceeded.
+  theStackDepth   : Number of user-defined function calls (and eval levels)
+                    between the query body and the plan run with this state.
+  theMaxStackDepth: Maximum value of theStackDepth (security policy call depth;
+                    UINT32_MAX = no limit).
+
+  theDeadline     : Point in time after which the evaluation is aborted with
+                    ZXQP0068 (security policy timeout or XQuery::setTimeout).
+  theDeadlineCountdown :
+                    0 if there is no deadline. Otherwise, the number of
+                    consumeNext calls left before the clock is read again.
+                    Reading the clock on every call would cost more than the
+                    calls themselves; every DEADLINE_CHECK_INTERVAL calls it is
+                    negligible. Once the deadline has passed, it stays at 1 so
+                    that every further consumeNext call raises the error again
+                    (code that swallows the error cannot keep running).
 ********************************************************************************/
 class PlanState
 {
@@ -138,7 +149,11 @@ public:
 
   DebuggerCommons         * theDebuggerCommons;
 
-  bool                      theHasToQuit;
+  std::chrono::steady_clock::time_point theDeadline;
+
+  std::chrono::milliseconds theTimeout;   // for the error message only
+
+  uint32_t                  theDeadlineCountdown;
 
   bool const                theProfile;   // cache Properties::getProfile()
 
@@ -156,7 +171,38 @@ public:
 
   ~PlanState();
 
-  void checkDepth(const QueryLoc& loc);
+  static constexpr uint32_t DEADLINE_CHECK_INTERVAL = 1024;
+
+  /**
+   * Sets the call depth limit and the deadline from the security policy of
+   * ccb's root static context (or of the root static context if it has none);
+   * an XQuery::setTimeout() value stored in ccb overrides the policy timeout.
+   * The deadline starts now.
+   */
+  void initLimits(const CompilerCB* ccb);
+
+  /**
+   * Inherits the call depth limit and the deadline of aParent (nested plans,
+   * such as eval, share the limits of the query that runs them).
+   */
+  void inheritLimits(const PlanState& aParent);
+
+  void setDeadline(std::chrono::milliseconds aTimeout);
+
+  /**
+   * Raises ZXQP0069 if a call at depth aDepth would exceed the call depth
+   * limit or leave too little machine stack (less than a third of it; see
+   * runtime/util/stack_limit.h).
+   */
+  void checkCallDepth(uint32_t aDepth, const QueryLoc& loc) const;
+
+  void checkDepth(const QueryLoc& loc) { checkCallDepth(theStackDepth, loc); }
+
+  /**
+   * Called by consumeNext every DEADLINE_CHECK_INTERVAL calls when there is a
+   * deadline: raises ZXQP0068 if it has passed.
+   */
+  void checkDeadline(const QueryLoc& loc);
 };
 
 
@@ -612,11 +658,9 @@ public:
         const PlanIterator* iter,
         PlanState& planState)
   {
-    if (planState.theHasToQuit)
-    {
-      // Quit the execution
-      throw FlowCtlException(FlowCtlException::INTERRUPT);
-    }
+    if (planState.theDeadlineCountdown != 0 &&
+        --planState.theDeadlineCountdown == 0)
+      planState.checkDeadline(iter->loc);
 
     return iter->produceNext(result, planState);
   }

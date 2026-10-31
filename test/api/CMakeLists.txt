@@ -30,6 +30,7 @@ CREATE_TEST_SOURCELIST(APITests
   security_policy.cpp
   xml_parser_security.cpp
   uri_access_security.cpp
+  evaluation_limits.cpp
   module_security.cpp
 )
 

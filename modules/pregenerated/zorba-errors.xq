@@ -233,6 +233,10 @@ declare variable $zerr:ZXQP0067 as xs:QName := fn:QName($zerr:NS, "zerr:ZXQP0067
 declare variable $zerr:ZXQP0068 as xs:QName := fn:QName($zerr:NS, "zerr:ZXQP0068");
 
 (:~
+ :
+ : A function call (or eval) would exceed the maximum call depth of the
+ : security policy, or would leave too little machine stack.
+ : 
 :)
 declare variable $zerr:ZXQP0069 as xs:QName := fn:QName($zerr:NS, "zerr:ZXQP0069");
 

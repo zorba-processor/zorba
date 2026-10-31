@@ -140,7 +140,7 @@ LIST(APPEND RUNTIME_SRCS
   visitors/iterprinter.cpp
   update/update.cpp
   util/item_iterator.cpp
-  util/timeout.cpp
+  util/stack_limit.cpp
   util/flowctl_exception.cpp
   util/doc_uri_heuristics.cpp
   hof/function_item.cpp

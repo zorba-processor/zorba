@@ -39,9 +39,17 @@ class PlanIteratorWrapper : public store::Iterator
 private:
   const PlanIterator * theIterator;
   PlanState          * theStateBlock;
+  bool                 theCheckStack;
 
 public:
-  PlanIteratorWrapper(const PlanIterator* iter, PlanState& planState);
+  /**
+   * aCheckStack: check the machine stack on each next() call (see
+   * PlanState::checkDepth). Set for the arguments of user-defined function
+   * calls: lazily bound arguments of recursive calls are evaluated through
+   * a chain of such wrappers, one per call level.
+   */
+  PlanIteratorWrapper(const PlanIterator* iter, PlanState& planState,
+                      bool aCheckStack = false);
 
   virtual ~PlanIteratorWrapper();
 

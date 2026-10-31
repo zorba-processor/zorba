@@ -699,7 +699,10 @@ TryCatchIterator::nextImpl(store::Item_t& result, PlanState& planState) const
   }
   catch (ZorbaException const& e)
   {
-    if (!matchedCatch(e, state, planState))
+    // A timeout ends the query: a catch clause must not be able to resume it
+    // (for example inside an endless loop).
+    if (e.diagnostic() == zerr::ZXQP0068_QUERY_TIMEOUT ||
+        !matchedCatch(e, state, planState))
     {
       throw;
     }

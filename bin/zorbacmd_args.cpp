@@ -189,7 +189,7 @@ char const* get_help_msg() {
     ////////// m //////////////////////////////////////////////////////////////
 
     HELP_OPT( "--max-udf-call-depth <depth>" )
-      "Maximum stack depth of user-defined function calls.\n\n"
+      "Maximum depth of user-defined function calls (default 1024; 0 = no limit other than the available stack). Deeper calls raise zerr:ZXQP0069.\n\n"
 
     HELP_OPT( "--module-path <path>" )
       "Path (list of directories) to add to both the URI and Library paths.\n\n"
@@ -315,7 +315,7 @@ char const* get_help_msg() {
       "Print timing information. In case of multiple queries, the timing information is provided per query. Both wallclock time and user time (which excludes I/O, network delays and other kernel waits) are shown.\n\n"
 
     HELP_OPT( "--timeout <seconds>" )
-      "Specify a timeout in seconds. After the specified time, the execution of the query will be aborted.\n\n"
+      "Specify a timeout in seconds (0 = none, the default). After the specified time, the evaluation of the query is aborted with zerr:ZXQP0068.\n\n"
 
     HELP_OPT( "--trace-parsing" )
       "Trace parsing.\n\n"

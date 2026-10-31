@@ -25,10 +25,14 @@ namespace zorba
 /*******************************************************************************
   class PlanIteratorWrapper
 ********************************************************************************/
-PlanIteratorWrapper::PlanIteratorWrapper(const PlanIterator* iter, PlanState& state) 
+PlanIteratorWrapper::PlanIteratorWrapper(
+    const PlanIterator* iter,
+    PlanState& state,
+    bool aCheckStack)
   :
   theIterator(iter),
-  theStateBlock(&state)
+  theStateBlock(&state),
+  theCheckStack(aCheckStack)
 {
 }
 
@@ -40,6 +44,9 @@ PlanIteratorWrapper::~PlanIteratorWrapper()
   
 bool PlanIteratorWrapper::next(store::Item_t& result)
 {
+  if (theCheckStack)
+    theStateBlock->checkDepth(theIterator->loc);
+
   return PlanIterator::consumeNext(result, theIterator, *theStateBlock);
 }
 

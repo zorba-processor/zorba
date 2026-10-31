@@ -20,7 +20,6 @@
 
 #include "store/api/iterator.h"
 
-#include "zorbautils/mutex.h"
 
 #include <zorba/item.h>
 #include <api/serialization/serializable.h>
@@ -31,13 +30,18 @@ namespace zorba
 
 class PlanState;
 class DebuggerRuntime;
-class Timeout;
 class XQueryImpl;
 class dynamic_context;
 
 
 /*******************************************************************************
   Wrapper used to drive the evaluation of an iterator (sub)tree.
+
+  Execution limits: if parentState is given (a plan nested in a running query,
+  such as eval), the plan runs one call level deeper and shares the parent's
+  call depth limit and deadline. Otherwise, the limits come from the security
+  policy of the ccb's root static context (see PlanState::initLimits), and the
+  deadline starts when the plan is opened.
 
   The wrapper wraps the root iterator of the (sub)tree. It is responsible
   for allocating and deallocating the plan state that is shared by all
@@ -76,8 +80,7 @@ protected:
 
   bool                 theIsOpen;
 
-  Timeout            * theTimeout;
-  Mutex                theTimeoutMutex;
+  bool                 theHasParent;
 
   store::Iterator_t    theExitValue;
 
@@ -88,9 +91,7 @@ public:
         CompilerCB*       ccb,
         dynamic_context*  dynamicContext,
         XQueryImpl*       query,
-        uint32_t          stackDepth,
-        bool              haveTimeout,
-        unsigned long     timeout);
+        const PlanState*  parentState = NULL);
 
   ~PlanWrapper();
 

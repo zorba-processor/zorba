@@ -168,8 +168,10 @@ void UDFunctionCallIteratorState::open(
   thePlanState = new PlanState(planState.theGlobalDynCtx,
                                theLocalDCtx,
                                thePlanStateSize,
-                               planState.theStackDepth + 1,
-                               planState.theMaxStackDepth);
+                               planState.theStackDepth + 1);
+
+  // Same call depth limit and deadline as the caller.
+  thePlanState->inheritLimits(planState);
 
   thePlanState->theCompilerCB = planState.theCompilerCB;
 #ifdef ZORBA_WITH_DEBUGGER
@@ -374,12 +376,6 @@ void UDFunctionCallIterator::openImpl(PlanState& planState, uint32_t& offset)
     state->init(planState);
   }
 
-  if (planState.theStackDepth + 1 > planState.theMaxStackDepth)
-  {
-    RAISE_ERROR(zerr::ZXQP0003_INTERNAL_ERROR, loc,
-      ERROR_PARAMS(ZED(StackOverflow)));
-  }
-
   // Create the plan for the udf body (if not done already) and allocate
   // the plan state (but not the state block) and dynamic context.
   state->open(planState, theUDF, theIsDynamic, theFunctionItem);
@@ -409,7 +405,7 @@ void UDFunctionCallIterator::openImpl(PlanState& planState, uint32_t& offset)
     if (!argVarRefs.empty())
     {
       if ((*argWrapsIte) == NULL)
-        (*argWrapsIte) = new PlanIteratorWrapper((*argsIte), planState);
+        (*argWrapsIte) = new PlanIteratorWrapper((*argsIte), planState, true);
 
       // Cannot do the arg bind here because the state->thePlan has not been
       // opened yet, and as a result, state->thePlanState has not been
@@ -487,6 +483,11 @@ bool UDFunctionCallIterator::nextImplCache(store::Item_t& aResult, PlanState& aP
 
   UDFunctionCallIteratorState* lState;
   DEFAULT_STACK_INIT(UDFunctionCallIteratorState, lState, aPlanState);
+
+  // Each call: raise ZXQP0069 instead of overflowing the machine stack. Not
+  // in openImpl, which also runs for calls that are never made (the body of
+  // the deepest call of a recursion opens its recursive call).
+  aPlanState.checkCallDepth(aPlanState.theStackDepth + 1, loc);
 
   // Open the plan, if not done already. This cannot be done in the openImpl
   // method because in the case of recursive functions, we will get into an
@@ -624,6 +625,11 @@ bool UDFunctionCallIterator::nextImplNoCache(store::Item_t& aResult, PlanState& 
 {
   UDFunctionCallIteratorState* lState;
   DEFAULT_STACK_INIT(UDFunctionCallIteratorState, lState, aPlanState);
+
+  // Each call: raise ZXQP0069 instead of overflowing the machine stack. Not
+  // in openImpl, which also runs for calls that are never made (the body of
+  // the deepest call of a recursion opens its recursive call).
+  aPlanState.checkCallDepth(aPlanState.theStackDepth + 1, loc);
 
   // Open the plan, if not done already. This cannot be done in the openImpl
   // method because in the case of recursive functions, we will get into an
