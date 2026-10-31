@@ -183,6 +183,7 @@ void convert_xquery_re( zstring const &xq_re, zstring *icu_re,
   bool const i_flag = (icu_flags & UREGEX_CASE_INSENSITIVE) != 0;
   bool const m_flag = (icu_flags & UREGEX_MULTILINE) != 0;
   bool const q_flag = (icu_flags & UREGEX_LITERAL) != 0;
+  bool const s_flag = (icu_flags & UREGEX_DOTALL) != 0;
   bool const x_flag = (icu_flags & UREGEX_COMMENTS) != 0;
 
   icu_re->clear();
@@ -308,12 +309,22 @@ void convert_xquery_re( zstring const &xq_re, zstring *icu_re,
           *icu_re += '\\';
           c_cooked = '\t';
           break;
+        case 's': // whitespace
+        case 'S': // [^\s]
+          if ( in_char_range || IS_CHAR_RANGE_BEGIN )
+            goto not_single_char_esc;
+          //
+          // XSD 1.0 F.1.1 (Multi-Character Escapes): \s is [#x20\t\n\r].
+          // ICU's \s is \p{White_Space}, which also has U+00A0, U+0085,
+          // U+2028, etc.  Inside a character class, ICU takes a nested [...]
+          // as a union, so this works there too.
+          //
+          *icu_re += c == 's' ? "[\\x{20}\\t\\n\\r]" : "[^\\x{20}\\t\\n\\r]";
+          goto next;
         case 'd': // [0-9]
         case 'D': // [^\d]
         case 'p': // category escape
         case 'P': // [^\p]
-        case 's': // whitespace
-        case 'S': // [^\s]
           if ( in_char_range || IS_CHAR_RANGE_BEGIN )
             goto not_single_char_esc;
           if ( c == 'p' || c == 'P' )
@@ -550,6 +561,16 @@ void convert_xquery_re( zstring const &xq_re, zstring *icu_re,
           }
           break;
         case '.':
+          if ( !in_char_class && !s_flag ) {
+            //
+            // XQuery 3.0 F&O 5.6.1: without the 's' flag, '.' matches any
+            // character except newline (#x0A) and carriage return (#x0D).
+            // ICU's '.' also excludes U+0085, U+2028 and U+2029.
+            //
+            icu_re->append( "[^\\n\\r]" );
+            goto next;
+          }
+          [[fallthrough]];
         case '}':
           if ( q_flag )
             *icu_re += '\\';
