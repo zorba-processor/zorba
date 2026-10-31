@@ -18,10 +18,10 @@
  : Converts the XML parse tree printed by "zorba --print-ast" into a Graphviz
  : DOT graph. Replaces the removed C++ parsenode_print_dot_visitor.
  :
- : Usage (single module; "AST for ..." header line removed with grep):
+ : Usage (-f: -q names a file; single module; the "AST for ..." header line is removed with grep):
  :
- :   zorba --parse-only --print-ast -q query.xq | grep -v '^AST for ' > ast.xml
- :   zorba -q scripts/ast2dot.xq -e ast=ast.xml -z method=text > ast.dot
+ :   zorba -f --parse-only --print-ast -q query.xq | grep -v '^AST for ' > ast.xml
+ :   zorba -f -q scripts/ast2dot.xq -e ast=ast.xml -z method=text > ast.dot
  :   dot -Tsvg ast.dot -o ast.svg
  :
  : The external variable $ast is the parse tree as a document (or element)

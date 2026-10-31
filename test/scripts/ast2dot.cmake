@@ -4,7 +4,7 @@
 FILE(MAKE_DIRECTORY "${WORK_DIR}")
 
 EXECUTE_PROCESS(
-  COMMAND "${ZORBA_EXE}" --no-logo --parse-only --print-ast
+  COMMAND "${ZORBA_EXE}" --no-logo --parse-only --print-ast -f
           -q "${SRC_DIR}/test/scripts/ast2dot_query.xq"
   RESULT_VARIABLE rc
   OUTPUT_VARIABLE out
@@ -15,10 +15,11 @@ ENDIF()
 
 # drop the "AST for <file>" header line
 STRING(REGEX REPLACE "(^|\n)AST for [^\n]*" "\\1" out "${out}")
+STRING(STRIP "${out}" out)
 FILE(WRITE "${WORK_DIR}/ast.xml" "${out}")
 
 EXECUTE_PROCESS(
-  COMMAND "${ZORBA_EXE}" --no-logo -z method=text
+  COMMAND "${ZORBA_EXE}" --no-logo -f -z method=text
           -q "${SRC_DIR}/scripts/ast2dot.xq"
           -e "ast=${WORK_DIR}/ast.xml"
   RESULT_VARIABLE rc
