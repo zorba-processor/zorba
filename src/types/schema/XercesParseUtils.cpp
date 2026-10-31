@@ -25,6 +25,7 @@
 #undef WIN32
 #endif
 #include "StrX.h"
+#include "zorbatypes/xerces_xmlcharray.h"
 #include "LoadSchemaErrorHandler.h"
 #include "PrintSchema.h"
 
@@ -53,7 +54,7 @@ bool XercesParseUtils::parseXSBoolean(
     const zstring& textValue,
     store::Item_t& result)
 {
-  XMLCh* content = XMLString::transcode(textValue.c_str());    
+  XMLCh* content = xerces_utf8::from_utf8(textValue.c_str());    
   XSValue::DataType datatype = XSValue::dt_boolean;
   XSValue::Status status = XSValue::st_Init;;
 
@@ -81,7 +82,7 @@ bool XercesParseUtils::parseXSInteger(
     const zstring& textValue,
     store::Item_t &result)
 {
-  XMLCh* content = XMLString::transcode(textValue.c_str());    
+  XMLCh* content = xerces_utf8::from_utf8(textValue.c_str());    
   XSValue::DataType datatype = XSValue::dt_integer;
   XSValue::Status status = XSValue::st_Init;;
 
@@ -109,7 +110,7 @@ bool XercesParseUtils::parseXSPositiveInteger(
     const zstring& textValue,
     store::Item_t &result)
 {
-  XMLCh* content = XMLString::transcode(textValue.c_str());    
+  XMLCh* content = xerces_utf8::from_utf8(textValue.c_str());    
   XSValue::DataType datatype = XSValue::dt_positiveInteger;
   XSValue::Status status = XSValue::st_Init;;
 
@@ -137,7 +138,7 @@ bool XercesParseUtils::parseXSNonPositiveInteger(
     const zstring& textValue,
     store::Item_t &result)
 {
-  XMLCh* content = XMLString::transcode(textValue.c_str());    
+  XMLCh* content = xerces_utf8::from_utf8(textValue.c_str());    
   XSValue::DataType datatype = XSValue::dt_nonPositiveInteger;
   XSValue::Status status = XSValue::st_Init;;
 
@@ -165,7 +166,7 @@ bool XercesParseUtils::parseXSNegativeInteger(
     const zstring& textValue,
     store::Item_t &result)
 {
-  XMLCh* content = XMLString::transcode(textValue.c_str());    
+  XMLCh* content = xerces_utf8::from_utf8(textValue.c_str());    
   XSValue::DataType datatype = XSValue::dt_negativeInteger;
   XSValue::Status status = XSValue::st_Init;;
 
@@ -193,7 +194,7 @@ bool XercesParseUtils::parseXSNonNegativeInteger(
     const zstring& textValue,
     store::Item_t &result)
 {
-  XMLCh* content = XMLString::transcode(textValue.c_str());    
+  XMLCh* content = xerces_utf8::from_utf8(textValue.c_str());    
   XSValue::DataType datatype = XSValue::dt_nonNegativeInteger;
   XSValue::Status status = XSValue::st_Init;;
 
@@ -221,7 +222,7 @@ bool XercesParseUtils::parseXSUnsignedByte(
     const zstring& textValue,
     store::Item_t &result)
 {
-  XMLCh* content = XMLString::transcode(textValue.c_str());    
+  XMLCh* content = xerces_utf8::from_utf8(textValue.c_str());    
   XSValue::DataType datatype = XSValue::dt_unsignedByte;
   XSValue::Status status = XSValue::st_Init;;
 
@@ -249,7 +250,7 @@ bool XercesParseUtils::parseXSUnsignedShort(
     const zstring& textValue,
     store::Item_t &result)
 {
-  XMLCh* content = XMLString::transcode(textValue.c_str());    
+  XMLCh* content = xerces_utf8::from_utf8(textValue.c_str());    
   XSValue::DataType datatype = XSValue::dt_unsignedShort;
   XSValue::Status status = XSValue::st_Init;;
 
@@ -277,7 +278,7 @@ bool XercesParseUtils::parseXSUnsignedInt(
     const zstring& textValue,
     store::Item_t &result)
 {
-  XMLCh* content = XMLString::transcode(textValue.c_str());    
+  XMLCh* content = xerces_utf8::from_utf8(textValue.c_str());    
   XSValue::DataType datatype = XSValue::dt_unsignedInt;
   XSValue::Status status = XSValue::st_Init;;
 
@@ -305,7 +306,7 @@ bool XercesParseUtils::parseXSUnsignedLong(
     const zstring& textValue,
     store::Item_t &result)
 {
-  XMLCh* content = XMLString::transcode(textValue.c_str());    
+  XMLCh* content = xerces_utf8::from_utf8(textValue.c_str());    
   XSValue::DataType datatype = XSValue::dt_unsignedLong;
   XSValue::Status status = XSValue::st_Init;;
 
@@ -333,7 +334,7 @@ bool XercesParseUtils::parseXSByte(
     const zstring& textValue,
     store::Item_t &result)
 {
-  XMLCh* content = XMLString::transcode(textValue.c_str());    
+  XMLCh* content = xerces_utf8::from_utf8(textValue.c_str());    
   XSValue::DataType datatype = XSValue::dt_byte;
   XSValue::Status status = XSValue::st_Init;;
 
@@ -361,7 +362,7 @@ bool XercesParseUtils::parseXSShort(
     const zstring& textValue,
     store::Item_t &result)
 {
-  XMLCh* content = XMLString::transcode(textValue.c_str());    
+  XMLCh* content = xerces_utf8::from_utf8(textValue.c_str());    
   XSValue::DataType datatype = XSValue::dt_short;
   XSValue::Status status = XSValue::st_Init;;
 
@@ -389,7 +390,7 @@ bool XercesParseUtils::parseXSInt(
     const zstring& textValue,
     store::Item_t &result)
 {
-  XMLCh* content = XMLString::transcode(textValue.c_str());    
+  XMLCh* content = xerces_utf8::from_utf8(textValue.c_str());    
   XSValue::DataType datatype = XSValue::dt_int;
   XSValue::Status status = XSValue::st_Init;;
 
@@ -417,7 +418,7 @@ bool XercesParseUtils::parseXSLong(
     const zstring& textValue,
     store::Item_t &result)
 {
-  XMLCh* content = XMLString::transcode(textValue.c_str());    
+  XMLCh* content = xerces_utf8::from_utf8(textValue.c_str());    
   XSValue::DataType datatype = XSValue::dt_long;
   XSValue::Status status = XSValue::st_Init;;
 
@@ -445,7 +446,7 @@ bool XercesParseUtils::parseXSFloat(
     const zstring& textValue,
     store::Item_t &result)
 {
-  XMLCh* content = XMLString::transcode(textValue.c_str());    
+  XMLCh* content = xerces_utf8::from_utf8(textValue.c_str());    
   XSValue::DataType datatype = XSValue::dt_float;
   XSValue::Status status = XSValue::st_Init;;
 
@@ -484,7 +485,7 @@ bool XercesParseUtils::parseXSDouble(
     const zstring& textValue,
     store::Item_t &result)
 {
-  XMLCh* content = XMLString::transcode(textValue.c_str());    
+  XMLCh* content = xerces_utf8::from_utf8(textValue.c_str());    
   XSValue::DataType datatype = XSValue::dt_double;
   XSValue::Status status = XSValue::st_Init;;
 
@@ -522,7 +523,7 @@ bool XercesParseUtils::parseXSDecimal(
     const zstring& textValue,
     store::Item_t &result)
 {
-  XMLCh* content = XMLString::transcode(textValue.c_str());    
+  XMLCh* content = xerces_utf8::from_utf8(textValue.c_str());    
   XSValue::DataType datatype = XSValue::dt_decimal;
   XSValue::Status status = XSValue::st_Init;;
 
@@ -582,7 +583,7 @@ bool XercesParseUtils::parseXSToken(
 
   zstring textValue2;
   utf8::normalize_space(textValue, &textValue2);
-  XMLCh* content = XMLString::transcode(textValue2.c_str());    
+  XMLCh* content = xerces_utf8::from_utf8(textValue2.c_str());    
   XSValue::DataType datatype = XSValue::dt_token;
   XSValue::Status status = XSValue::st_Init;
 
@@ -610,7 +611,7 @@ bool XercesParseUtils::parseXSNMToken(
   zstring textValue2;
   utf8::normalize_space(textValue, &textValue2);
 
-  XMLCh* content = XMLString::transcode(textValue2.c_str());    
+  XMLCh* content = xerces_utf8::from_utf8(textValue2.c_str());    
   XSValue::DataType datatype = XSValue::dt_NMTOKEN;
   XSValue::Status status = XSValue::st_Init;
 
@@ -638,7 +639,7 @@ bool XercesParseUtils::parseXSName(
   zstring textValue2;
   utf8::normalize_space(textValue, &textValue2);
 
-  XMLCh* content = XMLString::transcode(textValue2.c_str());    
+  XMLCh* content = xerces_utf8::from_utf8(textValue2.c_str());    
   XSValue::DataType datatype = XSValue::dt_Name;
   XSValue::Status status = XSValue::st_Init;
 
@@ -667,7 +668,7 @@ bool XercesParseUtils::parseXSNCName(
   zstring textValue2;
   utf8::normalize_space(textValue, &textValue2);
 
-  XMLCh* content = XMLString::transcode(textValue2.c_str());    
+  XMLCh* content = xerces_utf8::from_utf8(textValue2.c_str());    
   XSValue::DataType datatype = XSValue::dt_NCName;
   XSValue::Status status = XSValue::st_Init;
 
@@ -695,7 +696,7 @@ bool XercesParseUtils::parseXSID(
   zstring textValue2;
   utf8::normalize_space(textValue, &textValue2);
 
-  XMLCh* content = XMLString::transcode(textValue.c_str());    
+  XMLCh* content = xerces_utf8::from_utf8(textValue.c_str());    
   XSValue::DataType datatype = XSValue::dt_ID;
   XSValue::Status status = XSValue::st_Init;
 
@@ -723,7 +724,7 @@ bool XercesParseUtils::parseXSIDRef(
   zstring textValue2;
   utf8::normalize_space(textValue, &textValue2);
 
-  XMLCh* content = XMLString::transcode(textValue.c_str());    
+  XMLCh* content = xerces_utf8::from_utf8(textValue.c_str());    
   XSValue::DataType datatype = XSValue::dt_IDREF;
   XSValue::Status status = XSValue::st_Init;
 
@@ -751,7 +752,7 @@ bool XercesParseUtils::parseXSEntity(
   zstring textValue2;
   utf8::normalize_space(textValue, &textValue2);
 
-  XMLCh* content = XMLString::transcode(textValue2.c_str());    
+  XMLCh* content = xerces_utf8::from_utf8(textValue2.c_str());    
   XSValue::DataType datatype = XSValue::dt_ENTITY;
   XSValue::Status status = XSValue::st_Init;
 
@@ -779,7 +780,7 @@ bool XercesParseUtils::parseXSNotation(
   zstring textValue2;
   utf8::normalize_space(textValue, &textValue2);
 
-  XMLCh* content = XMLString::transcode(textValue2.c_str());    
+  XMLCh* content = xerces_utf8::from_utf8(textValue2.c_str());    
   XSValue::DataType datatype = XSValue::dt_NOTATION;
   XSValue::Status status = XSValue::st_Init;
 
@@ -805,7 +806,7 @@ bool XercesParseUtils::parseXSDateTime(
     store::Item_t &result)
 {
   // Warning: timezones are automaticaly normalized to Z
-  XMLCh* content = XMLString::transcode(textValue.c_str());    
+  XMLCh* content = xerces_utf8::from_utf8(textValue.c_str());    
   XSValue::DataType datatype = XSValue::dt_dateTime;
   XSValue::Status status = XSValue::st_Init;
 
@@ -854,7 +855,7 @@ bool XercesParseUtils::parseXSDate(
     store::Item_t &result)
 {
   // Warning: timezones are automaticaly normalized to Z
-  XMLCh* content = XMLString::transcode(textValue.c_str());    
+  XMLCh* content = xerces_utf8::from_utf8(textValue.c_str());    
   XSValue::DataType datatype = XSValue::dt_date;
   XSValue::Status status = XSValue::st_Init;
 
@@ -894,7 +895,7 @@ bool XercesParseUtils::parseXSTime(
     store::Item_t &result)
 {
   // Warning: timezones are automaticaly normalized to Z
-  XMLCh* content = XMLString::transcode(textValue.c_str());    
+  XMLCh* content = xerces_utf8::from_utf8(textValue.c_str());    
   XSValue::DataType datatype = XSValue::dt_time;
   XSValue::Status status = XSValue::st_Init;
 
@@ -938,7 +939,7 @@ bool XercesParseUtils::parseXSGYearMonth(
     const zstring& textValue,
     store::Item_t &result)
 {
-  XMLCh* content = XMLString::transcode(textValue.c_str());    
+  XMLCh* content = xerces_utf8::from_utf8(textValue.c_str());    
   XSValue::DataType datatype = XSValue::dt_gYearMonth;
   XSValue::Status status = XSValue::st_Init;
 
@@ -973,7 +974,7 @@ bool XercesParseUtils::parseXSGYear(
     const zstring& textValue,
     store::Item_t &result)
 {
-  XMLCh* content = XMLString::transcode(textValue.c_str());    
+  XMLCh* content = xerces_utf8::from_utf8(textValue.c_str());    
   XSValue::DataType datatype = XSValue::dt_gYear;
   XSValue::Status status = XSValue::st_Init;
 
@@ -1007,7 +1008,7 @@ bool XercesParseUtils::parseXSGMonthDay(
     const zstring& textValue,
     store::Item_t &result)
 {
-  XMLCh* content = XMLString::transcode(textValue.c_str());    
+  XMLCh* content = xerces_utf8::from_utf8(textValue.c_str());    
   XSValue::DataType datatype = XSValue::dt_gMonthDay;
   XSValue::Status status = XSValue::st_Init;
 
@@ -1041,7 +1042,7 @@ bool XercesParseUtils::parseXSGDay(
    const zstring& textValue,
    store::Item_t &result)
 {
-  XMLCh* content = XMLString::transcode(textValue.c_str());    
+  XMLCh* content = xerces_utf8::from_utf8(textValue.c_str());    
   XSValue::DataType datatype = XSValue::dt_gDay;
   XSValue::Status status = XSValue::st_Init;
 
@@ -1074,7 +1075,7 @@ bool XercesParseUtils::parseXSGMonth(
     const zstring& textValue,
     store::Item_t &result)
 {
-  XMLCh* content = XMLString::transcode(textValue.c_str());    
+  XMLCh* content = xerces_utf8::from_utf8(textValue.c_str());    
   XSValue::DataType datatype = XSValue::dt_gMonth;
   XSValue::Status status = XSValue::st_Init;
 
@@ -1107,7 +1108,7 @@ bool XercesParseUtils::parseXSDuration(
     const zstring& textValue,
     store::Item_t &result)
 {
-  XMLCh* content = XMLString::transcode(textValue.c_str());    
+  XMLCh* content = xerces_utf8::from_utf8(textValue.c_str());    
   XSValue::DataType datatype = XSValue::dt_duration;
   XSValue::Status status = XSValue::st_Init;
 
@@ -1198,7 +1199,7 @@ bool XercesParseUtils::parseXSBase64Binary(
     const zstring& textValue,
     store::Item_t &result)
 {
-  XMLCh* content = XMLString::transcode(textValue.c_str());    
+  XMLCh* content = xerces_utf8::from_utf8(textValue.c_str());    
   XSValue::DataType datatype = XSValue::dt_base64Binary;
   XSValue::Status status = XSValue::st_Init;
 
@@ -1226,7 +1227,7 @@ bool XercesParseUtils::parseXSHexBinary(
     const zstring& textValue,
     store::Item_t &result)
 {
-  XMLCh* content = XMLString::transcode(textValue.c_str());    
+  XMLCh* content = xerces_utf8::from_utf8(textValue.c_str());    
   XSValue::DataType datatype = XSValue::dt_hexBinary;
   XSValue::Status status = XSValue::st_Init;
 
@@ -1252,7 +1253,7 @@ bool XercesParseUtils::parseXSAnyUri(
     const zstring& textValue,
     store::Item_t &result)
 {
-  XMLCh* content = XMLString::transcode(textValue.c_str());    
+  XMLCh* content = xerces_utf8::from_utf8(textValue.c_str());    
   XSValue::DataType datatype = XSValue::dt_anyURI;
   XSValue::Status status = XSValue::st_Init;
 
@@ -1278,7 +1279,7 @@ bool XercesParseUtils::parseXSQName(
     const zstring& textValue,
     store::Item_t &result)
 {
-  XMLCh* content = XMLString::transcode(textValue.c_str());    
+  XMLCh* content = xerces_utf8::from_utf8(textValue.c_str());    
   XSValue::DataType datatype = XSValue::dt_QName;
   XSValue::Status status = XSValue::st_Init;
 
