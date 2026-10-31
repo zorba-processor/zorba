@@ -101,6 +101,21 @@ ZORBA_SET_TEST_PROPERTY(bin/zorba_max_expr_depth PASS_REGULAR_EXPRESSION ".*ZXQP
 # refused connection, also FODC0002) does not pass as a denial. The network
 # tests use 127.0.0.1:9, where nothing listens: they need no server, and an
 # access the policy permits fails without the denial phrase.
+SET (_secdir "${CMAKE_CURRENT_SOURCE_DIR}/test/security")
+SET (_secwrite "${CMAKE_CURRENT_BINARY_DIR}/security-write")
+FILE (MAKE_DIRECTORY "${_secwrite}")
+
+MACRO (ZORBA_SECURITY_TEST NAME PASS)
+  ZORBA_ADD_TEST(bin/zorba_security_${NAME} zorbacmd ${ARGN})
+  ZORBA_SET_TEST_PROPERTY(bin/zorba_security_${NAME}
+    PASS_REGULAR_EXPRESSION "${PASS}")
+ENDMACRO (ZORBA_SECURITY_TEST)
+
+# A denial: the error code and the message, in either order.
+MACRO (ZORBA_SECURITY_DENIED NAME CODE PHRASE)
+  ZORBA_SECURITY_TEST(${NAME} "${CODE}.*${PHRASE}|${PHRASE}.*${CODE}" ${ARGN})
+ENDMACRO (ZORBA_SECURITY_DENIED)
+
 # file-read, --read-path
 ZORBA_SECURITY_TEST(read_default "cli-doc"
   -f -q "${_secdir}/read.xq" -e "dir:=${_secdir}")
