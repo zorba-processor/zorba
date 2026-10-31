@@ -103,7 +103,7 @@ Specify a timeout in seconds (0 = none, the default). After the specified time, 
 Maximum depth of user-defined function calls (default 1024; 0 = no limit other than the available stack). Deeper calls raise zerr:ZXQP0069.
 
 --secure
-Start from the secure policy, in which queries have no capability, instead of the unrestricted one; then apply --allow and --deny.
+Start from the secure policy, in which queries have no capability, instead of the unrestricted one; then apply --allow and --deny. The current directory is not added to the URI and library paths (pass it with --module-path . if needed).
 
 --allow <capability>[,<capability>...]
 Allow capabilities to queries. Applied in command-line order with --deny.

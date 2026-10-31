@@ -627,26 +627,31 @@ static void set_paths_on_sctx( StaticContext_t &sctx ) {
   ZorbaCmdProperties &zc_props = ZorbaCmdProperties::instance();
   vector<String> paths;
 
-  // Compute the current working directory to append to all paths.
-  string const cwd( fs::curdir() );
+  // Compute the current working directory to append to all paths. Under
+  // --secure it is not appended: a query could otherwise import any module
+  // that happens to be in the directory zorba is run from.
+  string const cwd( zc_props.secure_ ? string() : fs::curdir() );
 
   // setModulePaths() *overwrites* the URI path and lib path, so there's no
   // sense in calling both. So if --module-path exists, just use it.
 
   if ( !zc_props.module_path_.empty() ) {
     tokenize( zc_props.module_path_, fs::path_separator, &paths );
-    paths.push_back( cwd );
+    if ( !cwd.empty() )
+      paths.push_back( cwd );
     sctx->setModulePaths( paths );
   } else {
     // Compute and set URI path
     tokenize( zc_props.uri_path_, fs::path_separator, &paths );
-    paths.push_back( cwd );
+    if ( !cwd.empty() )
+      paths.push_back( cwd );
     sctx->setURIPath( paths );
     paths.clear();
 
     // Compute and set lib path
     tokenize( zc_props.lib_path_, fs::path_separator, &paths );
-    paths.push_back( cwd );
+    if ( !cwd.empty() )
+      paths.push_back( cwd );
     sctx->setLibPath( paths );
   }
 }
