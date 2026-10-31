@@ -19,6 +19,7 @@
   <p class="toc-title">Using Zorba</p>
   <ol>
     <li><a href="#cli">The command line</a></li>
+    <li><a href="#security">Restricting a query</a></li>
     <li><a href="#external">External variables</a></li>
     <li><a href="#modules">Built-in modules</a></li>
     <li><a href="#collections">Collections</a></li>
@@ -58,6 +59,25 @@
 </table>
 </div>
 <p><code>zorba --help</code> lists everything, including optimizer and debugging switches. By default the output method is <code>json-xml-hybrid</code>: XML nodes are serialized as XML, JSON items as JSON, and atomic values separated by spaces, which is what you see in the examples on this site.</p>
+
+<h2 id="security">Restricting a query</h2>
+<p>By default <code>zorba</code> trusts the query: it may read and write files, use the network, read environment variables, expand external entities in XML input and load modules implemented in C++. To run a query you do not trust, start from <code>--secure</code>, which allows none of that, and allow only what the query needs. The capabilities are <code>external-entities</code>, <code>file-read</code>, <code>file-write</code>, <code>network</code>, <code>remote-import</code> (module and schema import over the network), <code>environment</code>, <code>native-modules</code> (for example the file and http-client modules) and <code>all</code>.</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Option</th><th>Effect</th></tr></thead>
+  <tbody>
+    <tr><td><code>--secure</code></td><td>Start from a policy that allows no capability.</td></tr>
+    <tr><td><code>--allow &lt;caps&gt;</code>, <code>--deny &lt;caps&gt;</code></td><td>Allow or deny a comma-separated list of capabilities, applied in command-line order.</td></tr>
+    <tr><td><code>--read-path &lt;dir&gt;</code>, <code>--write-path &lt;dir&gt;</code></td><td>Limit file reads or writes to a directory (repeatable).</td></tr>
+    <tr><td><code>--network-prefix &lt;url&gt;</code></td><td>Limit network access to URLs under a prefix (repeatable).</td></tr>
+    <tr><td><code>--private-addresses allow|deny</code></td><td>Whether the network capability reaches loopback, private and link-local addresses; denied by default with <code>--secure</code>.</td></tr>
+    <tr><td><code>--timeout &lt;s&gt;</code>, <code>--max-call-depth &lt;n&gt;</code></td><td>Stop the query after a time (<code>zerr:ZXQP0068</code>) or a function call depth (<code>zerr:ZXQP0069</code>).</td></tr>
+  </tbody>
+</table>
+</div>
+<pre class="code shell"><code>zorba --secure --allow file-read --read-path /srv/data --timeout 10 -f -q report.xq</code></pre>
+<p>A denied file or network access raises <code>zerr:ZXQP0029</code>, and importing a module that needs a denied capability raises <code>zerr:ZXQP0067</code>; denied environment functions return the empty sequence. Modules and schemas in the URI and library paths (which include the current directory) can always be imported. The files named on the command line (queries, <code>--context-item</code>, <code>-e name=file</code>, <code>-o</code>) are opened by <code>zorba</code> itself and are not restricted.</p>
+<p class="why"><strong>Why it matters:</strong> a query from a user, a request or a file you did not write cannot read <code>/etc/passwd</code>, reach an internal service or run forever.</p>
 
 <h2 id="external">External variables</h2>
 <p>A query declares the inputs it expects with <code>declare variable ... external</code>, optionally with a type and a default. The command line or the C++ API supplies the values.</p>
