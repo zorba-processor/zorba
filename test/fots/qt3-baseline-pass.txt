@@ -18,6 +18,7 @@ app-CatalogCheck/Catalog013
 app-CatalogCheck/Catalog014
 app-Demos/RexParser
 app-Demos/currencysvg
+app-Demos/raytracer
 app-Demos/sudoku
 app-Duplicates/duplicates-filter-1
 app-Duplicates/duplicates-filter-2
@@ -6002,8 +6003,10 @@ fn-lower-case/fn-lower-case-14
 fn-lower-case/fn-lower-case-15
 fn-lower-case/fn-lower-case-16
 fn-lower-case/fn-lower-case-17
+fn-lower-case/fn-lower-case-18
 fn-lower-case/fn-lower-case-2
 fn-lower-case/fn-lower-case-20
+fn-lower-case/fn-lower-case-21
 fn-lower-case/fn-lower-case-3
 fn-lower-case/fn-lower-case-4
 fn-lower-case/fn-lower-case-5
@@ -10413,7 +10416,11 @@ fn-upper-case/fn-upper-case-14
 fn-upper-case/fn-upper-case-15
 fn-upper-case/fn-upper-case-16
 fn-upper-case/fn-upper-case-17
+fn-upper-case/fn-upper-case-18
 fn-upper-case/fn-upper-case-2
+fn-upper-case/fn-upper-case-20
+fn-upper-case/fn-upper-case-21
+fn-upper-case/fn-upper-case-22
 fn-upper-case/fn-upper-case-3
 fn-upper-case/fn-upper-case-4
 fn-upper-case/fn-upper-case-5
@@ -16964,6 +16971,7 @@ prod-CastExpr/CastAs671
 prod-CastExpr/CastAs672
 prod-CastExpr/CastAs673b
 prod-CastExpr/CastAs674a
+prod-CastExpr/CastAs676
 prod-CastExpr/CastAs677
 prod-CastExpr/CastAs678
 prod-CastExpr/CastAs679
