@@ -28,6 +28,12 @@
 #include <string>
 #include <vector>
 
+#if defined(__unix__) || defined(__APPLE__)
+# include <pthread.h>
+# include <sys/mman.h>
+# define ZORBA_TEST_MEASURE_STACK 1
+#endif
+
 #include <zorba/item.h>
 #include <zorba/iterator.h>
 #include <zorba/security.h>
@@ -157,6 +163,72 @@ const std::vector<Shape>& shapes()
 }
 
 
+#ifdef ZORBA_TEST_MEASURE_STACK
+// Runs aFn on a thread with a large stack painted with a pattern and
+// returns the number of bytes of stack it used.
+const unsigned char PAINT = 0xA5;
+const size_t MEASURE_STACK_SIZE = 256u * 1024 * 1024;
+
+void* measure_thread_main(void* aFn)
+{
+  (*static_cast<std::function<void()>*>(aFn))();
+  return nullptr;
+}
+
+#if defined(__clang__) || defined(__GNUC__)
+__attribute__((no_sanitize("address")))
+#endif
+size_t untouched(const unsigned char* aBase, size_t aSize)
+{
+  size_t i = 0;
+  while (i < aSize && aBase[i] == PAINT)
+    ++i;
+  return i;
+}
+
+size_t measure_stack(std::function<void()> aFn)
+{
+  void* lMem = mmap(nullptr, MEASURE_STACK_SIZE, PROT_READ | PROT_WRITE,
+                    MAP_PRIVATE | MAP_ANON, -1, 0);
+  if (lMem == MAP_FAILED)
+    return 0;
+  memset(lMem, PAINT, MEASURE_STACK_SIZE);
+
+  pthread_attr_t lAttr;
+  pthread_attr_init(&lAttr);
+  pthread_attr_setstack(&lAttr, lMem, MEASURE_STACK_SIZE);
+  pthread_t lThread;
+  size_t lUsed = 0;
+  if (pthread_create(&lThread, &lAttr, measure_thread_main, &aFn) == 0)
+  {
+    pthread_join(lThread, nullptr);
+    lUsed = MEASURE_STACK_SIZE -
+            untouched(static_cast<unsigned char*>(lMem), MEASURE_STACK_SIZE);
+  }
+  pthread_attr_destroy(&lAttr);
+  munmap(lMem, MEASURE_STACK_SIZE);
+  return lUsed;
+}
+#endif
+
+
+void test_policy()
+{
+  CHECK(SecurityPolicy::secure().getMaxExprDepth() == 5000);
+  CHECK(SecurityPolicy::unrestricted().getMaxExprDepth() == 5000);
+  CHECK(SecurityPolicy().setMaxExprDepth(0).getMaxExprDepth() == 0);
+
+  // Narrowing keeps the smaller non-zero limit.
+  SecurityPolicy a = SecurityPolicy::unrestricted().setMaxExprDepth(100);
+  SecurityPolicy b = SecurityPolicy::unrestricted().setMaxExprDepth(0);
+  CHECK(a.narrowedBy(b).getMaxExprDepth() == 100);
+  CHECK(b.narrowedBy(a).getMaxExprDepth() == 100);
+  CHECK(a.narrowedBy(SecurityPolicy::unrestricted()).getMaxExprDepth() == 100);
+  CHECK(!(a == b));
+  CHECK(a.isWithin(b));
+}
+
+
 // Every shape nested far beyond any limit fails cleanly.
 void test_very_deep(Zorba* z)
 {
@@ -166,7 +238,79 @@ void test_very_deep(Zorba* z)
     std::cout << "  " << s.name << std::endl;
     Outcome const o = run(z, p, s.make(100000));
     CHECK(failed_with(o, "ZXQP0070"));
+    CHECK(o.message.find("5000") != std::string::npos);
   }
+}
+
+
+// A small limit is enforced exactly for every shape: nesting depth n
+// compiles, n + 1 does not.
+void test_small_limit(Zorba* z)
+{
+  SecurityPolicy const p = SecurityPolicy::unrestricted().setMaxExprDepth(50);
+  for (Shape const& s : shapes())
+  {
+    uint64_t n = 0;
+    while (n < 60 && run(z, p, s.make(n + 1), false).ok)
+      ++n;
+    std::cout << "  " << s.name << ": " << n << " levels" << std::endl;
+    CHECK(n >= 10);
+    CHECK(n < 50);
+    Outcome const o = run(z, p, s.make(n + 1));
+    CHECK(failed_with(o, "ZXQP0070"));
+    CHECK(o.message.find("50") != std::string::npos);
+  }
+}
+
+
+// Finds, for each shape, the deepest nesting that the default limit allows,
+// and checks that it compiles and runs (also in sanitizer builds), and that
+// one more level fails with the limit error, not the stack check. Reports
+// the stack that compiling and running it takes.
+void test_default_limit(Zorba* z)
+{
+  SecurityPolicy const p = SecurityPolicy::unrestricted();
+  for (Shape const& s : shapes())
+  {
+    uint64_t lo = 1, hi = 5001;  // run(lo) compiles, run(hi) does not
+    CHECK(run(z, p, s.make(lo), false).ok);
+    CHECK(!run(z, p, s.make(hi), false).ok);
+    while (lo + 1 < hi)
+    {
+      uint64_t const mid = lo + (hi - lo) / 2;
+      if (run(z, p, s.make(mid), false).ok)
+        lo = mid;
+      else
+        hi = mid;
+    }
+
+    Outcome const ok = run(z, p, s.make(lo));
+    if (!ok.ok)
+      std::cerr << s.name << " at " << lo << " levels: " << ok << std::endl;
+    CHECK(ok.ok);
+    Outcome const over = run(z, p, s.make(lo + 1));
+    CHECK(failed_with(over, "ZXQP0070"));
+    CHECK(over.message.find("5000") != std::string::npos);
+
+    std::cout << "  " << s.name << ": " << lo << " levels";
+#ifdef ZORBA_TEST_MEASURE_STACK
+    std::string const q = s.make(lo);
+    size_t const lUsed = measure_stack([&] { run(z, p, q); });
+    std::cout << ", " << lUsed / 1024 << " KiB of stack";
+#endif
+    std::cout << std::endl;
+  }
+}
+
+
+// Without a limit, translating the parse tree stops before the stack runs
+// out; parse trees too deep to translate are destroyed without recursion.
+void test_unlimited(Zorba* z)
+{
+  SecurityPolicy const p = SecurityPolicy::unrestricted().setMaxExprDepth(0);
+  Outcome const o = run(z, p, shapes()[0].make(300000));
+  CHECK(failed_with(o, "ZXQP0070"));
+  CHECK(o.message.find("stack") != std::string::npos);
 }
 
 
@@ -181,6 +325,20 @@ void test_syntax_error(Zorba* z)
 }
 
 
+// eval'ed queries are compiled under the policy of the query that runs them.
+void test_eval(Zorba* z)
+{
+  SecurityPolicy const p = SecurityPolicy::unrestricted().setMaxExprDepth(50);
+  std::string const q =
+    "import module namespace r = \"http://zorba.io/modules/reflection\";\n"
+    "r:eval(\"" + repeat("(", 60) + "1" + repeat(")", 60) + "\")";
+  Outcome const o = run(z, p, q);
+  if (o.code == "XQST0059")
+    std::cout << "reflection module not built: eval case skipped" << std::endl;
+  else
+    CHECK(failed_with(o, "ZXQP0070"));
+}
+
 } // anonymous namespace
 
 
@@ -192,10 +350,20 @@ expr_depth_limit(int argc, char* argv[])
 
   try
   {
+    std::cout << "test_policy" << std::endl;
+    test_policy();
     std::cout << "test_very_deep" << std::endl;
     test_very_deep(lZorba);
+    std::cout << "test_small_limit" << std::endl;
+    test_small_limit(lZorba);
+    std::cout << "test_default_limit" << std::endl;
+    test_default_limit(lZorba);
+    std::cout << "test_unlimited" << std::endl;
+    test_unlimited(lZorba);
     std::cout << "test_syntax_error" << std::endl;
     test_syntax_error(lZorba);
+    std::cout << "test_eval" << std::endl;
+    test_eval(lZorba);
   }
   catch (ZorbaException const& e)
   {
