@@ -3,6 +3,7 @@
 - Regular expressions: patterns that are invalid in XSD/XPath but that ICU accepted now raise FORX0002: a literal `-` that is neither first nor last in a character group (`[a-h-o-z]`, `[0-9-.]`), a character class subtraction that is not last in its group (`[a-[b] ]`), and block escapes whose name cannot be an XSD block name (`\p{IsBasic-Latin}`).
 - `fn:parse-xml-fragment` (and the xml module's parse-external-parsed-entity option): a text declaration without an encoding declaration (`<?xml version='1.0'?>`) is FODC0006, as required for an external parsed entity.
 - `group by` requires a grouping variable in XQuery and JSONiq: `group by $x mod 10` is XPST0003; write `group by $k := $x mod 10`.
+- `function(*)` without an occurrence indicator matches exactly one function item, as in XQuery 3.0: `() instance of function(*)` is false and a sequence of function items no longer matches it.
 
 ### Fixed
 
@@ -14,3 +15,5 @@
 - zq:delete-query no longer frees a query whose function items are still in use by the outer query (crash in the QT3 FOTS driver, inline-fn-032/-033).
 - Annotations on inline function expressions and function tests are parsed (XQuery 3.0); `%public`/`%private` on an inline function raise XQST0125.
 - URIQualifiedNames (`Q{uri}local`) are accepted in computed element and attribute constructors, as literal names and as computed name strings.
+- `fn:format-number` accepts a URIQualifiedName (`Q{uri}local`) as the decimal format name.
+- Regular expressions with the `q` flag: the whole pattern is literal, so a lone `\` is accepted, and `fn:replace` no longer raises FORX0003 for a literal pattern such as `a?` that would match the empty string as a regular expression.
