@@ -1,0 +1,61 @@
+# Reviewed OS access in src/ and modules/ (see scripts/check-os-access.sh).
+#
+# Format: <file> <pattern> <lines> <reason>
+# <lines> is the exact number of lines of <file> that match <pattern>
+# (#include lines aside). Every entry needs a reason: why the access is
+# checked against the SecurityPolicy, or why it is not reachable from a query.
+
+# --- Policy implementation ---------------------------------------------------
+src/util/security_check.cpp ifstream 2 SecurityPolicy::openFile: opens, then checks the real path of the open file
+src/util/security_check.cpp open 1 SecurityPolicy::openFile: open(2) with O_NOCTTY before the real-path check
+src/util/security_check.h ifstream 1 comment describing openFile
+src/util/xml_parser_security.cpp xmlCtxtUseOptions 1 xml::configure_ctxt, the single place that sets libxml2 parser options
+
+# --- URI resolution (checked in static_context::apply_url_resolvers) --------
+src/context/default_url_resolvers.cpp ifstream 1 FileURLResolver: plain open only when the policy allows FileRead without read paths; otherwise SecurityPolicy::openFile
+src/context/default_url_resolvers.cpp HttpStream 3 HTTPURLResolver: URL checked by apply_url_resolvers; the policy is passed to HttpStream
+src/util/http_util.cpp HttpStream 6 HttpStream implementation; runs the http-client module under the caller's policy
+src/util/http_util.h HttpStream 3 HttpStream declaration
+src/runtime/full_text/thesauri/xqftts_thesaurus.cpp ifstream 1 reads the local file of an xqftts: URI already resolved and checked by the static context
+
+# --- XML parsing (options set through xml::configure_ctxt) ------------------
+src/store/naive/loader_dtd.cpp xmlCreateParserCtxt 2 DTD and fragment loaders; options and resource loader set by xml::configure_ctxt
+src/store/naive/loader_dtd.cpp xmlCtxtUseOptions 1 commented-out legacy call
+src/store/naive/loader_fast.cpp xmlCreateParserCtxt 1 fast loader; options and resource loader set by xml::configure_ctxt
+src/runtime/parsing_and_serializing/parse_fragment_impl.cpp xmlCreateParserCtxt 1 x:canonicalize; options set by xml::configure_ctxt
+src/runtime/parsing_and_serializing/parse_fragment_impl.cpp xmlRead 1 comment only
+src/compiler/xqueryx/xqueryx_to_xquery.cpp xmlParse 1 parses the built-in XQueryX stylesheet (compiled-in string, no external input)
+src/compiler/xqueryx/xqueryx_to_xquery.cpp xmlCreateParserCtxt 1 parses XQueryX query text; options set by xml::configure_ctxt
+
+# --- Module loading (NativeModules gate, trusted library paths) -------------
+src/context/dynamic_loader.cpp dlopen 1 loads external-function libraries; requires NativeModules, searches trusted lib paths only
+src/context/dynamic_loader.cpp LoadLibrary 1 Windows equivalent of dlopen above
+src/context/dynamic_loader.cpp ifstream 2 probes for the module library in the trusted lib paths (NativeModules checked first)
+
+# --- Environment -------------------------------------------------------------
+src/context/dynamic_context.cpp environ 3 fn:available-environment-variables; returns empty unless Environment is allowed
+src/context/root_static_context.cpp getenv 1 ZORBA_URI_PATH / ZORBA_LIB_PATH; honored only with Environment
+src/util/fs_util.cpp getenv 4 HOME and TMPDIR for fs::get_home_dir / fs::get_temp_dir (no query-controlled name)
+src/util/locale.cpp getenv 1 LANG for the default locale (no query-controlled name)
+
+# --- External modules (per-call policy checks) -------------------------------
+modules/org/expath/ns/file.xq.src/file_function.cpp ofstream 3 file:write*/append*: path checked by getPathArg(Access::Write)
+modules/org/expath/ns/file.xq.src/file.cpp ofstream 1 file:copy: destination checked by checkAccess(Access::Write) before the open
+modules/http-client/json/http-client.xq.src/http_request_handler.cpp CURLOPT_URL 1 URL checked in HttpSendFunction::evaluate; connections checked by the curl socket callback
+modules/ftp-client/ftp-client.xq.src/ftp_functions.cpp CURLOPT_URL 3 URL checked by check_uri before each request
+modules/util-curl/src/curl_streambuf.cpp CURLOPT_URL 1 URL set by the http/ftp clients after their policy checks
+modules/util-curl/src/curl_streambuf.cpp socket 3 curl open-socket callback, after SecurityPolicy::checkConnection; Windows dummy socket for select() and its error message
+
+# --- Not reachable from a query ----------------------------------------------
+src/compiler/parser/xquery_driver.cpp ifstream 1 parse_file: query files given by the embedder or the zorba CLI
+src/api/properties.cpp ofstream 1 Properties::setDebugFile (embedder/CLI setting)
+src/zorbaserialization/bin_archiver.cpp ofstream 1 plan.xml statistics dump, ZORBA_PLAN_SERIALIZER_STATISTICS builds only
+src/debugger/debugger_runtime.cpp ifstream 1 debugger (ZORBA_WITH_DEBUGGER, started by the embedder)
+src/debugger/debugger_server.cpp getenv 3 debugger (ZORBA_WITH_DEBUGGER, started by the embedder)
+src/debugger/profiler.h ofstream 1 profiler output file (developer tool)
+src/debugger/socket.cpp socket 2 debugger connection (ZORBA_WITH_DEBUGGER, started by the embedder)
+src/diagnostics/StackWalker.cpp LoadLibrary 5 Windows crash stack walker loads dbghelp/psapi
+src/unit_tests/test_mmap_file.cpp ifstream 1 unit test
+src/unit_tests/test_mmap_file.cpp ofstream 1 unit test
+src/util/fx/fxcharheap_test.cpp ifstream 1 standalone test program, not built into the library
+src/util/hashmap_test.cpp ifstream 1 standalone test program, not built into the library
