@@ -203,7 +203,7 @@ FOREACH(TESTFILE ${TESTFILES})
     # properties for the final sigma in fn:lower-case come from ICU.
     FILE(READ "${CMAKE_CURRENT_SOURCE_DIR}/${TESTFILE}" _icu_query_text)
     IF (_icu_query_text MATCHES "ISO-8859-|CP1252|windows-125"
-        OR TESTNAME MATCHES "^test/rbkt/zorba/(file/(cp1252|invalid_encoding)|string/Regex/(regex_m5[45]|regex_err2[01]|regex_q10)|string/ReplaceFunc/replace(17|19|20)|functx/functx-x-call|durationdatetime/FormatDateTimeFunc/format-timezone-table|string/LowerCaseFunc/lower-case-final-sigma)$")
+        OR TESTNAME MATCHES "^test/rbkt/zorba/(file/(cp1252|invalid_encoding)|string/Regex/(regex_m5[45]|regex_err2[01]|regex_q10|regex-xsd-syntax)|string/ReplaceFunc/replace(17|19|20)|functx/functx-x-call|durationdatetime/FormatDateTimeFunc/format-timezone-table|string/LowerCaseFunc/lower-case-final-sigma)$")
       SET (SKIP_TEST 1)
     ENDIF ()
   ENDIF (ZORBA_NO_ICU)

@@ -148,9 +148,32 @@ inline bool is_char_range_begin( zstring const &s,
 static void check_block_escape( zstring const &s,
                                 zstring::const_iterator i ) {
   zstring::const_iterator const end = s.end();
-  if ( ++i == end || *i != '{' || ++i == end || *i != 'I' ||
-       ++i == end || *i != 's' )
-    return;
+  if ( ++i == end || *i != '{' )
+    return;                             // ICU reports it
+  zstring::const_iterator const name_begin = i + 1;
+  if ( ++i == end || *i != 'I' || ++i == end || *i != 's' ) {
+    //
+    // XSD 1.0 F.1.1 [28] IsCategory: only these general categories (Cs is
+    // excluded).  ICU also accepts other property names, e.g.,
+    // \p{Alphabetic} or \p{L_}.
+    //
+    static char const *const categories[] = {
+      "L", "Lu", "Ll", "Lt", "Lm", "Lo",
+      "M", "Mn", "Mc", "Me",
+      "N", "Nd", "Nl", "No",
+      "P", "Pc", "Pd", "Ps", "Pe", "Pi", "Pf", "Po",
+      "Z", "Zs", "Zl", "Zp",
+      "S", "Sm", "Sc", "Sk", "So",
+      "C", "Cc", "Cf", "Co", "Cn"
+    };
+    zstring name;
+    for ( zstring::const_iterator j = name_begin; j != end && *j != '}'; ++j )
+      name += *j;
+    for ( char const *category : categories )
+      if ( name == category )
+        return;
+    throw INVALID_RE_EXCEPTION( s, ZED( REGEX_UNKNOWN_PIs_CONSTRUCT ) );
+  }
   zstring name;
   for ( ++i; i != end && *i != '}'; ++i )
     name += *i;
@@ -221,6 +244,7 @@ void convert_xquery_re( zstring const &xq_re, zstring *icu_re,
   bool in_backref = false;              // '\'[1-9][0-9]*
   unsigned backref_no = 0;              // 1-based
   bool after_backref = false;           // current char follows a backref
+  bool in_quantifier = false;           // within {n,m}
   int  closed_group = 0;                // previous char closed a (...)
 
   // capture subgroup: true = open; false = closed
@@ -382,7 +406,7 @@ void convert_xquery_re( zstring const &xq_re, zstring *icu_re,
         //
         bool prevent_multidigit_backref = false;
         if ( ascii::is_digit( c ) ) {
-          if ( digits( cap_sub.size() ) > digits( backref_no ) )
+          if ( backref_no * 10 + (c - '0') <= cap_sub.size() )
             backref_no = backref_no * 10 + (c - '0');
           else {
             in_backref = false;
@@ -494,7 +518,14 @@ void convert_xquery_re( zstring const &xq_re, zstring *icu_re,
         case '{':
           if ( q_flag )
             *icu_re += '\\';
-          else if ( !in_char_class ) {
+          else if ( in_char_class ) {
+            //
+            // Inside an ICU set, {...} is a multi-character string; in XSD,
+            // '{' is an ordinary character there, e.g., "ab[(?{1]".
+            //
+            if ( c == '{' )
+              *icu_re += '\\';
+          } else {
             //
             // ICU allows the multiple quantifiers *+, ++, and ?+, but XQuery
             // does not so we have to check for them.
@@ -504,6 +535,8 @@ void convert_xquery_re( zstring const &xq_re, zstring *icu_re,
                 xq_re, ZED( BadQuantifierHere_3 ), c
               );
             got_quantifier = 2;
+            if ( c == '{' )
+              in_quantifier = true;
             if ( (c == '*' || c == '+') && PEEK_C == '?' &&
                  (closed_group || after_backref) ) {
               //
@@ -574,8 +607,16 @@ void convert_xquery_re( zstring const &xq_re, zstring *icu_re,
           }
           [[fallthrough]];
         case '}':
-          if ( q_flag )
+          if ( q_flag || (c == '}' && in_char_class) )
             *icu_re += '\\';
+          else if ( c == '}' && in_quantifier ) {
+            //
+            // A quantifier {n,m} cannot be quantified again: ICU takes
+            // "a{1,5}+" as possessive, XQuery does not allow it.
+            //
+            in_quantifier = false;
+            got_quantifier = 2;
+          }
           break;
         case '[':
           if ( q_flag )
@@ -657,6 +698,14 @@ void convert_xquery_re( zstring const &xq_re, zstring *icu_re,
           else
           break;
         default:
+          if ( x_flag && c == '#' ) {
+            //
+            // The 'x' flag only removes whitespace in XQuery; in ICU's
+            // UREGEX_COMMENTS mode, '#' starts a comment.
+            //
+            *icu_re += '\\';
+            break;
+          }
           if ( x_flag && ascii::is_space( c ) ) {
             if ( !in_char_class )
               goto next;
