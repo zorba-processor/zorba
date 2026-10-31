@@ -31,6 +31,7 @@ ZorbaCmdProperties::ZorbaCmdProperties() {
   indent_ = false;
   jsoniq_ = false;
   lib_module_ = false;
+  max_expr_depth_ = -1;
   load_plan_ = false;
   multiple_ = 1;
   no_logo_ = false;
