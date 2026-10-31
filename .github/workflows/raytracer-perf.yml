@@ -99,16 +99,17 @@ jobs:
             zorba-builder:ci sh -ec '
               pacman -Sy --noconfirm --needed perf valgrind time >/dev/null
               Z=/src/${{ matrix.bin }}
-              for n in 16 24 32 48 64; do
+              for n in 24; do
                 /usr/bin/time -f "size=$n wall=%es user=%Us maxrss=%MkB" \
                   $Z -f -q rt$n.xq -o /out/rt$n.txt 2>&1 | tail -1 | tee -a /out/times.txt
               done
               tail -c 60 /out/rt64.txt; echo
-              T=/tools/test/rbkt/Queries/zorba/udf/udf-nested-arg-reset.xq
-              for d in 8 12 16 20 24; do
-                sed "s/(\$i, 1, 2), 24, /(\$i, 1, 2), $d, /" $T > /tmp/nested$d.xq
-                timeout 300 /usr/bin/time -f "nested depth=$d wall=%es maxrss=%MkB" \
-                  $Z -f -q /tmp/nested$d.xq -o /out/nested$d.txt 2>&1 | tail -1 | tee -a /out/times.txt || echo "nested depth=$d timeout" | tee -a /out/times.txt
+              for c in a b; do
+                for d in 4 6 8 10 12; do
+                  sed "s/DEPTH/$d/" /tools/.github/rtc/$c.xq > /tmp/$c$d.xq
+                  timeout 120 /usr/bin/time -f "cand=$c depth=$d wall=%es" \
+                    $Z -f -q /tmp/$c$d.xq -o /out/$c$d.txt 2>&1 | tail -1 | tee -a /out/times.txt
+                done
               done
               chmod -R a+rw /out'
           { echo '```'; cat out/times.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
