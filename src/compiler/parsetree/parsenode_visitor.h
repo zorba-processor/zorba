@@ -40,6 +40,7 @@ class parsenode_visitor
 private:
   uint32_t theDepth = 0;
   uint32_t theMaxDepth = 0;
+  bool     theMaxDepthFromStack = false;
 
 public:
   virtual ~parsenode_visitor() { }
@@ -52,8 +53,12 @@ public:
    * visited. The translator sets the limit of the security policy, so all
    * later compilation passes (which recurse over the expression tree) only
    * ever see bounded trees.
+   *
+   * Those passes need stack in proportion to the depth, so the limit is also
+   * capped by the stack left on the calling thread (see parsenodes.cpp),
+   * whatever aMaxDepth is, including 0.
    */
-  void setMaxDepth(uint32_t aMaxDepth) { theMaxDepth = aMaxDepth; }
+  void setMaxDepth(uint32_t aMaxDepth);
 
   /**
    * Counts the nesting depth of the node being visited. Every accept()

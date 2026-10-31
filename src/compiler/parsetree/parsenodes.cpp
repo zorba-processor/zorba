@@ -32,6 +32,7 @@
 #include "runtime/util/stack_limit.h"
 #include "zorbatypes/integer.h"
 
+#include <cstdint>
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
@@ -52,10 +53,59 @@ int dummy;
 void *parsenode_visitor::no_state = (void *) &dummy;
 
 
+/*******************************************************************************
+  Stack that compiling and evaluating one level of expression nesting may
+  take, at most: the passes after translation (normalization, optimization,
+  code generation) and the evaluation of the plan recurse once per level.
+  Measured by test/api/expr_depth_limit (the deepest chains of + and of
+  computed constructors): up to 2.2 KiB per level in release builds (GCC 16),
+  several times that with AddressSanitizer.
+********************************************************************************/
+#if defined(__SANITIZE_ADDRESS__)
+# define ZORBA_EXPR_DEPTH_ASAN 1
+#elif defined(__has_feature)
+# if __has_feature(address_sanitizer)
+#  define ZORBA_EXPR_DEPTH_ASAN 1
+# endif
+#endif
+
+#ifdef ZORBA_EXPR_DEPTH_ASAN
+const size_t STACK_PER_EXPR_LEVEL = 8 * 1024;
+#else
+const size_t STACK_PER_EXPR_LEVEL = 3 * 1024;
+#endif
+
+
+void parsenode_visitor::setMaxDepth(uint32_t aMaxDepth)
+{
+  theMaxDepth = aMaxDepth;
+  theMaxDepthFromStack = false;
+
+  // The stack below the reserve that the evaluator's call guard keeps free
+  // is what the deepest query may use.
+  size_t const lRemaining = stack_limit::remaining();
+  if (lRemaining == SIZE_MAX)
+    return;
+  size_t const lReserve = stack_limit::reserve();
+  size_t lCap = lRemaining > lReserve ?
+                (lRemaining - lReserve) / STACK_PER_EXPR_LEVEL : 0;
+  if (lCap < 1)
+    lCap = 1;
+  if (lCap > UINT32_MAX)
+    lCap = UINT32_MAX;
+
+  if (theMaxDepth == 0 || lCap < theMaxDepth)
+  {
+    theMaxDepth = static_cast<uint32_t>(lCap);
+    theMaxDepthFromStack = true;
+  }
+}
+
+
 void parsenode_visitor::depthExceeded(const QueryLoc& loc, bool aStack)
 {
   --theDepth;
-  if (aStack)
+  if (aStack || theMaxDepthFromStack)
     RAISE_ERROR(zerr::ZXQP0070_EXPR_DEPTH_EXCEEDED, loc,
       ERROR_PARAMS(ZED(ZXQP0070_Stack_2), theDepth + 1));
   RAISE_ERROR(zerr::ZXQP0070_EXPR_DEPTH_EXCEEDED, loc,

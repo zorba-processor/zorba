@@ -109,7 +109,7 @@ public:
   /**
    * \brief The secure policy: no capability, no allow-list entries, private
    *        network addresses denied, no timeout, call depth limited to
-   *        1024, expression nesting depth limited to 5000, libxml2's
+   *        1024, expression nesting depth limited to 1500, libxml2's
    *        default entity amplification limit.
    *
    * This will be the library default in Zorba 5.0.0.
@@ -119,7 +119,7 @@ public:
   /**
    * \brief The unrestricted policy: all capabilities, no allow-lists, private
    *        network addresses allowed, no timeout, call depth limited to 1024,
-   *        expression nesting depth limited to 5000, libxml2's default
+   *        expression nesting depth limited to 1500, libxml2's default
    *        entity amplification limit.
    *
    * This is the policy of the \c zorba command-line tool and the current
@@ -326,14 +326,16 @@ public:
    * operator in a chain (<code>1 + 1 + 1</code>), each parenthesized,
    * function call, constructor or FLWOR nesting level adds one or more
    * levels. A query (or imported module, or eval'ed query) that nests
-   * deeper fails to compile with zerr:ZXQP0070. So does a query whose
-   * syntax tree, while it is translated, takes the thread's stack below a
-   * third of its size (e.g. eval called from deep recursion).
+   * deeper fails to compile with zerr:ZXQP0070.
    *
-   * Compilation recurses over the query in several passes, so the limit
-   * bounds the stack they use. The default (5000) suits threads with the
-   * usual 8 MiB stack; lower it for threads with small stacks. Zero means no
-   * limit other than the stack check. Default: 5000.
+   * Compilation (and evaluation) recurse over the query, so the depth
+   * determines the stack they need. Whatever this limit, the depth is also
+   * capped by the stack left on the compiling thread: Zorba assumes a few
+   * KiB per level and keeps a third of the stack free, so a query on a
+   * thread with a small stack (or eval called from deep recursion) fails
+   * with zerr:ZXQP0070 instead of overflowing the stack. The default suits
+   * threads with the usual 8 MiB stack. Zero means no limit other than the
+   * stack. Default: 1500.
    */
   SecurityPolicy& setMaxExprDepth(uint32_t aDepth);
 

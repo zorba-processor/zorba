@@ -189,7 +189,7 @@ char const* get_help_msg() {
     ////////// m //////////////////////////////////////////////////////////////
 
     HELP_OPT( "--max-expr-depth <depth>" )
-      "Maximum nesting depth of expressions (default 5000; 0 = no limit other than the available stack). Deeper queries fail to compile with zerr:ZXQP0070.\n\n"
+      "Maximum nesting depth of expressions (default 1500; 0 = no limit other than the available stack). Deeper queries fail to compile with zerr:ZXQP0070.\n\n"
 
     HELP_OPT( "--max-udf-call-depth <depth>" )
       "Maximum depth of user-defined function calls (default 1024; 0 = no limit other than the available stack). Deeper calls raise zerr:ZXQP0069.\n\n"

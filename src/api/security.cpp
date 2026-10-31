@@ -45,10 +45,14 @@ const uint32_t FILE_CAPABILITIES =
 // Same default as Properties::max_udf_call_depth.
 const uint32_t DEFAULT_MAX_CALL_DEPTH = 1024;
 
-// Maximum nesting depth of a query's parse tree. Compilation recurses over
-// the tree in several passes; this bounds their stack use (see
-// SecurityPolicy::setMaxExprDepth()).
-const uint32_t DEFAULT_MAX_EXPR_DEPTH = 5000;
+// Maximum nesting depth of a query's parse tree (see
+// SecurityPolicy::setMaxExprDepth()). Compiling and running the deepest
+// chains takes up to 2.2 KiB of stack per level in release builds
+// (test/api/expr_depth_limit), so 1500 levels need about 3.3 MiB: within the
+// two thirds of the usual 8 MiB stack that the stack guards let a query use.
+// Real queries nest a few dozen levels; generated ones (long chains of "or"
+// or "+") can reach the hundreds.
+const uint32_t DEFAULT_MAX_EXPR_DEPTH = 1500;
 
 typedef bool (*covers_fn)(const std::string&, const std::string&);
 
