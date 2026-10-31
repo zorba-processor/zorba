@@ -4333,6 +4333,10 @@ fn-format-dateTime/format-dateTime-015
 fn-format-dateTime/format-dateTime-016
 fn-format-dateTime/format-dateTime-017
 fn-format-dateTime/format-dateTime-018
+fn-format-dateTime/format-dateTime-025b
+fn-format-dateTime/format-dateTime-025c
+fn-format-dateTime/format-dateTime-025d
+fn-format-dateTime/format-dateTime-025e
 fn-format-dateTime/format-dateTime-1340err
 fn-format-dateTime/format-dateTime-801err
 fn-format-dateTime/format-dateTime-en141
@@ -4427,10 +4431,12 @@ fn-format-number/cbcl-fn-format-number-013
 fn-format-number/cbcl-fn-format-number-014
 fn-format-number/cbcl-fn-format-number-015
 fn-format-number/cbcl-fn-format-number-016
+fn-format-number/cbcl-fn-format-number-017
 fn-format-number/cbcl-fn-format-number-018
 fn-format-number/cbcl-fn-format-number-019
 fn-format-number/cbcl-fn-format-number-020
 fn-format-number/cbcl-fn-format-number-021
+fn-format-number/cbcl-fn-format-number-022
 fn-format-number/cbcl-fn-format-number-023
 fn-format-number/cbcl-fn-format-number-024
 fn-format-number/cbcl-fn-format-number-025
@@ -4445,6 +4451,7 @@ fn-format-number/cbcl-fn-format-number-033
 fn-format-number/cbcl-fn-format-number-034
 fn-format-number/cbcl-fn-format-number-035
 fn-format-number/cbcl-fn-format-number-036
+fn-format-number/cbcl-fn-format-number-037
 fn-format-number/cbcl-fn-format-number-038
 fn-format-number/cbcl-fn-format-number-039
 fn-format-number/cbcl-fn-format-number-040
@@ -4568,6 +4575,7 @@ fn-format-number/numberformat90
 fn-format-number/numberformat901err
 fn-format-number/numberformat902err
 fn-format-number/numberformat905err
+fn-format-number/numberformat906InputErr
 fn-format-number/numberformat907InputErr
 fn-format-number/numberformat91
 fn-format-number/numberformat92
@@ -4611,6 +4619,8 @@ fn-format-time/format-time-024s
 fn-format-time/format-time-024t
 fn-format-time/format-time-024u
 fn-format-time/format-time-024v
+fn-format-time/format-time-025b
+fn-format-time/format-time-025c
 fn-format-time/format-time-1340err
 fn-format-time/format-time-809err
 fn-format-time/format-time-810err
@@ -20861,6 +20871,7 @@ prod-DirAttributeList/K2-DirectConElemAttr-66
 prod-DirAttributeList/K2-DirectConElemAttr-67
 prod-DirAttributeList/K2-DirectConElemAttr-68
 prod-DirAttributeList/K2-DirectConElemAttr-69
+prod-DirAttributeList/K2-DirectConElemAttr-6a
 prod-DirAttributeList/K2-DirectConElemAttr-7
 prod-DirAttributeList/K2-DirectConElemAttr-70
 prod-DirAttributeList/K2-DirectConElemAttr-71
@@ -20882,12 +20893,15 @@ prod-DirElemConstructor/Constr-elem-empty-2
 prod-DirElemConstructor/Constr-elem-empty-3
 prod-DirElemConstructor/Constr-elem-empty-4
 prod-DirElemConstructor/Constr-elem-empty-5
+prod-DirElemConstructor/Constr-elem-matchtag-1
+prod-DirElemConstructor/Constr-elem-matchtag-2a
 prod-DirElemConstructor/K2-DirectConElem-1
 prod-DirElemConstructor/K2-DirectConElem-10
 prod-DirElemConstructor/K2-DirectConElem-11
 prod-DirElemConstructor/K2-DirectConElem-12
 prod-DirElemConstructor/K2-DirectConElem-13
 prod-DirElemConstructor/K2-DirectConElem-14
+prod-DirElemConstructor/K2-DirectConElem-15
 prod-DirElemConstructor/K2-DirectConElem-16
 prod-DirElemConstructor/K2-DirectConElem-17
 prod-DirElemConstructor/K2-DirectConElem-18
@@ -21002,6 +21016,7 @@ prod-DirElemContent.namespace/K2-DirectConElemNamespace-16
 prod-DirElemContent.namespace/K2-DirectConElemNamespace-17
 prod-DirElemContent.namespace/K2-DirectConElemNamespace-18
 prod-DirElemContent.namespace/K2-DirectConElemNamespace-19
+prod-DirElemContent.namespace/K2-DirectConElemNamespace-2
 prod-DirElemContent.namespace/K2-DirectConElemNamespace-20
 prod-DirElemContent.namespace/K2-DirectConElemNamespace-21
 prod-DirElemContent.namespace/K2-DirectConElemNamespace-22
@@ -21012,6 +21027,7 @@ prod-DirElemContent.namespace/K2-DirectConElemNamespace-26
 prod-DirElemContent.namespace/K2-DirectConElemNamespace-27
 prod-DirElemContent.namespace/K2-DirectConElemNamespace-28
 prod-DirElemContent.namespace/K2-DirectConElemNamespace-29
+prod-DirElemContent.namespace/K2-DirectConElemNamespace-3
 prod-DirElemContent.namespace/K2-DirectConElemNamespace-30
 prod-DirElemContent.namespace/K2-DirectConElemNamespace-31
 prod-DirElemContent.namespace/K2-DirectConElemNamespace-32
@@ -21167,6 +21183,7 @@ prod-DirElemContent/Constr-cont-baseuri-2
 prod-DirElemContent/Constr-cont-baseuri-3
 prod-DirElemContent/Constr-cont-cdata-1
 prod-DirElemContent/Constr-cont-charref-1
+prod-DirElemContent/Constr-cont-charref-2
 prod-DirElemContent/Constr-cont-constrmod-1
 prod-DirElemContent/Constr-cont-constrmod-10
 prod-DirElemContent/Constr-cont-constrmod-2

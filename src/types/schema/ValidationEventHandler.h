@@ -56,18 +56,6 @@ public:
 };
 
 
-class TextValidationInfo
-{
-public:
-  zstring _value;
-
-public:          
-  TextValidationInfo(const XMLCh *chars, unsigned int length);
-  
-  ~TextValidationInfo(){}
-};
-
-
 /**
 * The ValidationEventHandler receives events from the SchemaValidatorFilter.
 * From these events it stores the attribute and text event info in order to 
@@ -80,10 +68,9 @@ class ValidationEventHandler
 {
 private:
   std::list<AttributeValidationInfo*>   _attributeList;
-  TextValidationInfo                  * _textInfo;
 
 public:
-  ValidationEventHandler() : _attributeList(), _textInfo() {}
+  ValidationEventHandler() : _attributeList() {}
 
   virtual ~ValidationEventHandler() {}
 
@@ -127,18 +114,11 @@ public:
   
   void resetAttList();
 
-  void resetTextInfo();
-  
   std::list<AttributeValidationInfo*>* getAttributeList()
   {
     return &_attributeList;
   }
-  
-  TextValidationInfo* getTextInfo()
-  {
-    return _textInfo;
-  }
-}; 
+  }; 
 
 }  // namespace zorba
 

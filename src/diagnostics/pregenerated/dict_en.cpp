@@ -210,6 +210,7 @@ extern entry const dict_en[] = {
   { "err:XQST0113", "context item declaration with initializing expression not allowed in library module" },
   { "err:XQST0114", "\"$1\": duplicate decimal format property" },
   { "err:XQST0116", "$1" },
+  { "err:XQST0118", "$1" },
   { "err:XQST0120", "\"$1\": feature not supported" },
   { "err:XQST0122", "$1" },
   { "err:XQST0123", "$1" },

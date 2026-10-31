@@ -145,12 +145,48 @@ inline bool is_char_range_begin( zstring const &s,
  * @param s The XQuery regular expression.
  * @param i The iterator positioned at the 'p' or 'P'.
  */
-static void check_block_escape( zstring const &s,
-                                zstring::const_iterator i ) {
+static void check_block_escape( zstring const &s_raw,
+                                zstring::const_iterator i_raw,
+                                bool x_flag ) {
+  //
+  // With the 'x' flag, whitespace inside the braces is removed too, e.g.,
+  // "\p{ I s BasicLatin }" (QT3 K2-MatchesFunc-6).
+  //
+  zstring s;
+  for ( zstring::const_iterator j = i_raw; j != s_raw.end(); ++j ) {
+    if ( !(x_flag && ascii::is_space( *j )) )
+      s += *j;
+    if ( *j == '}' )
+      break;
+  }
+  zstring::const_iterator i = s.begin();
   zstring::const_iterator const end = s.end();
-  if ( ++i == end || *i != '{' || ++i == end || *i != 'I' ||
-       ++i == end || *i != 's' )
-    return;
+  if ( ++i == end || *i != '{' )
+    return;                             // ICU reports it
+  zstring::const_iterator const name_begin = i + 1;
+  if ( ++i == end || *i != 'I' || ++i == end || *i != 's' ) {
+    //
+    // XSD 1.0 F.1.1 [28] IsCategory: only these general categories (Cs is
+    // excluded).  ICU also accepts other property names, e.g.,
+    // \p{Alphabetic} or \p{L_}.
+    //
+    static char const *const categories[] = {
+      "L", "Lu", "Ll", "Lt", "Lm", "Lo",
+      "M", "Mn", "Mc", "Me",
+      "N", "Nd", "Nl", "No",
+      "P", "Pc", "Pd", "Ps", "Pe", "Pi", "Pf", "Po",
+      "Z", "Zs", "Zl", "Zp",
+      "S", "Sm", "Sc", "Sk", "So",
+      "C", "Cc", "Cf", "Co", "Cn"
+    };
+    zstring name;
+    for ( zstring::const_iterator j = name_begin; j != end && *j != '}'; ++j )
+      name += *j;
+    for ( char const *category : categories )
+      if ( name == category )
+        return;
+    throw INVALID_RE_EXCEPTION( s_raw, ZED( REGEX_UNKNOWN_PIs_CONSTRUCT ) );
+  }
   zstring name;
   for ( ++i; i != end && *i != '}'; ++i )
     name += *i;
@@ -168,7 +204,7 @@ static void check_block_escape( zstring const &s,
       if ( latin_1 || trailing_letter )
         continue;
     }
-    throw INVALID_RE_EXCEPTION( s, ZED( REGEX_UNKNOWN_PIs_CONSTRUCT ) );
+    throw INVALID_RE_EXCEPTION( s_raw, ZED( REGEX_UNKNOWN_PIs_CONSTRUCT ) );
   }
 }
 
@@ -183,6 +219,7 @@ void convert_xquery_re( zstring const &xq_re, zstring *icu_re,
   bool const i_flag = (icu_flags & UREGEX_CASE_INSENSITIVE) != 0;
   bool const m_flag = (icu_flags & UREGEX_MULTILINE) != 0;
   bool const q_flag = (icu_flags & UREGEX_LITERAL) != 0;
+  bool const s_flag = (icu_flags & UREGEX_DOTALL) != 0;
   bool const x_flag = (icu_flags & UREGEX_COMMENTS) != 0;
 
   icu_re->clear();
@@ -219,6 +256,9 @@ void convert_xquery_re( zstring const &xq_re, zstring *icu_re,
 
   bool in_backref = false;              // '\'[1-9][0-9]*
   unsigned backref_no = 0;              // 1-based
+  bool after_backref = false;           // current char follows a backref
+  bool in_quantifier = false;           // within {n,m}
+  int  closed_group = 0;                // previous char closed a (...)
 
   // capture subgroup: true = open; false = closed
   vector<bool> cap_sub;                 // 0-based
@@ -306,17 +346,46 @@ void convert_xquery_re( zstring const &xq_re, zstring *icu_re,
           *icu_re += '\\';
           c_cooked = '\t';
           break;
-        case 'd': // [0-9]
-        case 'D': // [^\d]
-        case 'p': // category escape
-        case 'P': // [^\p]
         case 's': // whitespace
         case 'S': // [^\s]
           if ( in_char_range || IS_CHAR_RANGE_BEGIN )
             goto not_single_char_esc;
-          if ( c == 'p' || c == 'P' )
-            check_block_escape( xq_re, i );
+          //
+          // XSD 1.0 F.1.1 (Multi-Character Escapes): \s is [#x20\t\n\r].
+          // ICU's \s is \p{White_Space}, which also has U+00A0, U+0085,
+          // U+2028, etc.  Inside a character class, ICU takes a nested [...]
+          // as a union, so this works there too.
+          //
+          *icu_re += c == 's' ? "[\\x{20}\\t\\n\\r]" : "[^\\x{20}\\t\\n\\r]";
+          goto next;
+        case 'd': // [0-9]
+        case 'D': // [^\d]
+        case 'p': // category escape
+        case 'P': // [^\p]
+          if ( in_char_range || IS_CHAR_RANGE_BEGIN )
+            goto not_single_char_esc;
           *icu_re += '\\';
+          if ( c == 'p' || c == 'P' ) {
+            check_block_escape( xq_re, i, x_flag );
+            //
+            // Copy the "{name}" as is: its braces are not a quantifier.
+            //
+            *icu_re += c;
+            zstring::const_iterator j = i;
+            if ( ++j != xq_re.end() && *j == '{' ) {
+              for ( ; j != xq_re.end(); ++j ) {
+                if ( x_flag && ascii::is_space( *j ) )
+                  continue;
+                *icu_re += *j;
+                if ( *j == '}' )
+                  break;
+              }
+              if ( j == xq_re.end() )
+                throw INVALID_RE_EXCEPTION( xq_re, ZED( UnbalancedChar_3 ), '{' );
+              i = j;
+            }
+            goto next;
+          }
           break;
         case 'w': // word char
           if ( in_char_range || IS_CHAR_RANGE_BEGIN )
@@ -357,6 +426,7 @@ void convert_xquery_re( zstring const &xq_re, zstring *icu_re,
           throw INVALID_RE_EXCEPTION( xq_re, ZED( BadRegexEscape_3 ), c );
       }
     } else {
+      after_backref = in_backref;
       if ( in_backref ) {
         //
         // XQuery 3.0 F&O 5.6.1: The construct \N where N is a single digit is
@@ -368,7 +438,7 @@ void convert_xquery_re( zstring const &xq_re, zstring *icu_re,
         //
         bool prevent_multidigit_backref = false;
         if ( ascii::is_digit( c ) ) {
-          if ( digits( cap_sub.size() ) > digits( backref_no ) )
+          if ( backref_no * 10 + (c - '0') <= cap_sub.size() )
             backref_no = backref_no * 10 + (c - '0');
           else {
             in_backref = false;
@@ -432,8 +502,8 @@ void convert_xquery_re( zstring const &xq_re, zstring *icu_re,
           }
           break;
         case '(':
-          if ( q_flag )
-            *icu_re += '\\';
+          if ( q_flag || in_char_class )
+            *icu_re += '\\';          // an ordinary character in a class
           else {
             cur_paren = paren.size() + 1;
             zstring::const_iterator j = i;
@@ -461,7 +531,7 @@ void convert_xquery_re( zstring const &xq_re, zstring *icu_re,
           }
           break;
         case ')':
-          if ( q_flag )
+          if ( q_flag || in_char_class )
             *icu_re += '\\';
           else {
             if ( !cur_paren )
@@ -471,6 +541,7 @@ void convert_xquery_re( zstring const &xq_re, zstring *icu_re,
                 goto unbalanced_char;
               cap_sub[ --cur_cap_sub ] = false;
             }
+            closed_group = 2;
           }
           break;
         case '*':
@@ -479,7 +550,14 @@ void convert_xquery_re( zstring const &xq_re, zstring *icu_re,
         case '{':
           if ( q_flag )
             *icu_re += '\\';
-          else if ( !in_char_class ) {
+          else if ( in_char_class ) {
+            //
+            // Inside an ICU set, {...} is a multi-character string; in XSD,
+            // '{' is an ordinary character there, e.g., "ab[(?{1]".
+            //
+            if ( c == '{' )
+              *icu_re += '\\';
+          } else {
             //
             // ICU allows the multiple quantifiers *+, ++, and ?+, but XQuery
             // does not so we have to check for them.
@@ -489,6 +567,21 @@ void convert_xquery_re( zstring const &xq_re, zstring *icu_re,
                 xq_re, ZED( BadQuantifierHere_3 ), c
               );
             got_quantifier = 2;
+            if ( c == '{' )
+              in_quantifier = true;
+            if ( (c == '*' || c == '+') && PEEK_C == '?' &&
+                 (closed_group || after_backref) ) {
+              //
+              // ICU compiles the reluctant quantifiers *? and +? without a
+              // check that an iteration consumed input, so a group or back-
+              // reference that can match the empty string makes the match
+              // loop forever, e.g., "(?:r?)*?r" (QT3 fn-matches-50, test
+              // p1030).  ICU's counted loops {0,}? and {1,}? have that check
+              // and match the same strings in the same order, so use them.
+              //
+              icu_re->append( c == '*' ? "{0,}" : "{1,}" );
+              goto next;
+            }
           }
           break;
         case '-':
@@ -533,9 +626,29 @@ void convert_xquery_re( zstring const &xq_re, zstring *icu_re,
           }
           break;
         case '.':
+          if ( !in_char_class ) {
+            //
+            // XQuery 3.0 F&O 5.6.1: without the 's' flag, '.' matches any
+            // character except newline (#x0A) and carriage return (#x0D);
+            // with it, '.' matches any character.  ICU's '.' also excludes
+            // U+0085, U+2028 and U+2029, and with UREGEX_DOTALL it matches
+            // "\r\n" as a single character.
+            //
+            icu_re->append( s_flag ? "[\\x{0}-\\x{10FFFF}]" : "[^\\n\\r]" );
+            goto next;
+          }
+          [[fallthrough]];
         case '}':
-          if ( q_flag )
+          if ( q_flag || (c == '}' && in_char_class) )
             *icu_re += '\\';
+          else if ( c == '}' && in_quantifier ) {
+            //
+            // A quantifier {n,m} cannot be quantified again: ICU takes
+            // "a{1,5}+" as possessive, XQuery does not allow it.
+            //
+            in_quantifier = false;
+            got_quantifier = 2;
+          }
           break;
         case '[':
           if ( q_flag )
@@ -617,6 +730,14 @@ void convert_xquery_re( zstring const &xq_re, zstring *icu_re,
           else
           break;
         default:
+          if ( x_flag && c == '#' ) {
+            //
+            // The 'x' flag only removes whitespace in XQuery; in ICU's
+            // UREGEX_COMMENTS mode, '#' starts a comment.
+            //
+            *icu_re += '\\';
+            break;
+          }
           if ( x_flag && ascii::is_space( c ) ) {
             if ( !in_char_class )
               goto next;
@@ -642,6 +763,7 @@ void convert_xquery_re( zstring const &xq_re, zstring *icu_re,
 next:
     char_range_possible = !dec_limit( &in_char_range );
     dec_limit( &got_quantifier );
+    dec_limit( &closed_group );
     dec_limit( &char_group_start );
     prev_c_cooked = c_cooked;
   } // FOR_EACH
@@ -712,9 +834,8 @@ namespace unicode {
 
 //
 // Bound on the work ICU may do for one match operation, in ICU match-engine
-// steps (on the order of milliseconds each). Patterns with nested nullable
-// quantifiers, e.g. "(?:r?)*?r" (QT3 fn-matches-50, test p1030), otherwise
-// never return.
+// steps (on the order of milliseconds each), so that catastrophic
+// backtracking in a user pattern raises an error instead of hanging.
 //
 static int32_t const regex_time_limit = 10000;
 
