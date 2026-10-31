@@ -86,6 +86,118 @@ ZORBA_SET_TEST_PROPERTY(bin/zorba_timeout PASS_REGULAR_EXPRESSION ".*ZXQP0068.*"
 ZORBA_ADD_TEST(bin/zorba_max_call_depth zorbacmd --max-udf-call-depth 10 -q "let $f := function($f, $n) { if ($n le 0) then 0 else $f($f, $n - 1) } return $f($f, 20)")
 ZORBA_SET_TEST_PROPERTY(bin/zorba_max_call_depth PASS_REGULAR_EXPRESSION ".*ZXQP0069.*")
 
+# Security policy flags: --secure, --allow, --deny, --read-path, --write-path,
+# --network-prefix, --private-addresses. Each capability is shown denied and
+# permitted. The queries in test/security print a marker on success; denials
+# raise zerr:ZXQP0029 (zerr:ZXQP0067 for a module import). The network tests
+# use 127.0.0.1:9, where nothing listens: they need no server, and an access
+# the policy permits fails with another error than ZXQP0029.
+SET (_secdir "${CMAKE_CURRENT_SOURCE_DIR}/test/security")
+SET (_secwrite "${CMAKE_CURRENT_BINARY_DIR}/security-write")
+FILE (MAKE_DIRECTORY "${_secwrite}")
+
+MACRO (ZORBA_SECURITY_TEST NAME PASS)
+  ZORBA_ADD_TEST(bin/zorba_security_${NAME} zorbacmd ${ARGN})
+  ZORBA_SET_TEST_PROPERTY(bin/zorba_security_${NAME}
+    PASS_REGULAR_EXPRESSION "${PASS}")
+ENDMACRO (ZORBA_SECURITY_TEST)
+
+# file-read, --read-path
+ZORBA_SECURITY_TEST(read_default "cli-doc"
+  -f -q "${_secdir}/read.xq" -e "dir:=${_secdir}")
+ZORBA_SECURITY_TEST(read_deny "ZXQP0029"
+  --deny file-read -f -q "${_secdir}/read.xq" -e "dir:=${_secdir}")
+ZORBA_SECURITY_TEST(read_secure "ZXQP0029"
+  --secure -f -q "${_secdir}/read.xq" -e "dir:=${_secdir}")
+ZORBA_SECURITY_TEST(read_secure_allow "cli-doc"
+  --secure --allow file-read -f -q "${_secdir}/read.xq" -e "dir:=${_secdir}")
+ZORBA_SECURITY_TEST(read_deny_all_allow "cli-doc"
+  --deny all --allow file-read -f -q "${_secdir}/read.xq" -e "dir:=${_secdir}")
+ZORBA_SECURITY_TEST(read_path_in "cli-doc"
+  --secure --allow file-read --read-path "${_secdir}/data"
+  -f -q "${_secdir}/read.xq" -e "dir:=${_secdir}")
+ZORBA_SECURITY_TEST(read_path_out "ZXQP0029"
+  --read-path "${_secdir}/other"
+  -f -q "${_secdir}/read.xq" -e "dir:=${_secdir}")
+ZORBA_SECURITY_TEST(read_path_dotdot "ZXQP0029"
+  --read-path "${_secdir}/data/sub"
+  -f -q "${_secdir}/read.xq" -e "dir:=${_secdir}/data/sub/../..")
+ZORBA_SECURITY_TEST(read_path_warning "warning: --read-path has no effect"
+  --secure --read-path "${_secdir}/data"
+  -f -q "${_secdir}/read.xq" -e "dir:=${_secdir}")
+
+# external-entities
+ZORBA_SECURITY_TEST(xxe_default "cli-secret"
+  -f -q "${_secdir}/xxe.xq" -e "dir:=${_secdir}")
+ZORBA_SECURITY_TEST(xxe_deny "FODC0006"
+  --deny external-entities -f -q "${_secdir}/xxe.xq" -e "dir:=${_secdir}")
+ZORBA_SECURITY_TEST(xxe_secure "FODC0006"
+  --secure -f -q "${_secdir}/xxe.xq" -e "dir:=${_secdir}")
+ZORBA_SECURITY_TEST(xxe_secure_allow "cli-secret"
+  --secure --allow external-entities,file-read
+  -f -q "${_secdir}/xxe.xq" -e "dir:=${_secdir}")
+
+# environment
+ZORBA_SECURITY_TEST(env_default "env:true:true"
+  -f -q "${_secdir}/env.xq")
+ZORBA_SECURITY_TEST(env_deny "env:false:false"
+  --deny environment -f -q "${_secdir}/env.xq")
+ZORBA_SECURITY_TEST(env_secure "env:false:false"
+  --secure -f -q "${_secdir}/env.xq")
+ZORBA_SECURITY_TEST(env_secure_allow "env:true:true"
+  --secure --allow environment -f -q "${_secdir}/env.xq")
+
+# file-write, --write-path, native-modules (the file module is native)
+ZORBA_SECURITY_TEST(write_default "written"
+  -f -q "${_secdir}/write.xq" -e "path:=${_secwrite}/default.txt")
+ZORBA_SECURITY_TEST(write_deny "ZXQP0029"
+  --deny file-write
+  -f -q "${_secdir}/write.xq" -e "path:=${_secwrite}/deny.txt")
+ZORBA_SECURITY_TEST(write_secure "ZXQP0067"
+  --secure -f -q "${_secdir}/write.xq" -e "path:=${_secwrite}/secure.txt")
+ZORBA_SECURITY_TEST(write_no_native "ZXQP0067"
+  --deny native-modules
+  -f -q "${_secdir}/write.xq" -e "path:=${_secwrite}/no_native.txt")
+ZORBA_SECURITY_TEST(write_path_in "written"
+  --secure --allow file-write,native-modules --write-path "${_secwrite}"
+  -f -q "${_secdir}/write.xq" -e "path:=${_secwrite}/in.txt")
+ZORBA_SECURITY_TEST(write_path_out "ZXQP0029"
+  --secure --allow file-write,native-modules --write-path "${_secwrite}/sub"
+  -f -q "${_secdir}/write.xq" -e "path:=${_secwrite}/out.txt")
+
+# network, --network-prefix, --private-addresses
+ZORBA_SECURITY_TEST(network_deny "error:ZXQP0029"
+  --deny network
+  -f -q "${_secdir}/network.xq" -e "url:=http://127.0.0.1:9/doc.xml")
+ZORBA_SECURITY_TEST(network_private "error:ZXQP0029"
+  --secure --allow network,native-modules
+  -f -q "${_secdir}/network.xq" -e "url:=http://127.0.0.1:9/doc.xml")
+ZORBA_SECURITY_TEST(network_private_deny "error:ZXQP0029"
+  --private-addresses deny
+  -f -q "${_secdir}/network.xq" -e "url:=http://127.0.0.1:9/doc.xml")
+ZORBA_SECURITY_TEST(network_private_allow "error:"
+  --secure --allow network,native-modules --private-addresses allow
+  -f -q "${_secdir}/network.xq" -e "url:=http://127.0.0.1:9/doc.xml")
+ZORBA_SET_TEST_PROPERTY(bin/zorba_security_network_private_allow
+  FAIL_REGULAR_EXPRESSION "ZXQP0029")
+ZORBA_SECURITY_TEST(network_prefix_out "error:ZXQP0029"
+  --network-prefix "http://127.0.0.1:9/allowed/"
+  -f -q "${_secdir}/network.xq" -e "url:=http://127.0.0.1:9/doc.xml")
+ZORBA_SECURITY_TEST(network_prefix_in "error:"
+  --secure --allow network,native-modules
+  --network-prefix "http://127.0.0.1:9/allowed/"
+  -f -q "${_secdir}/network.xq" -e "url:=http://127.0.0.1:9/allowed/doc.xml")
+ZORBA_SET_TEST_PROPERTY(bin/zorba_security_network_prefix_in
+  FAIL_REGULAR_EXPRESSION "ZXQP0029")
+
+# --max-call-depth is --max-udf-call-depth
+ZORBA_SECURITY_TEST(max_call_depth "ZXQP0069"
+  --max-call-depth 10 -q "let $f := function($f, $n) { if ($n le 0) then 0 else $f($f, $n - 1) } return $f($f, 20)")
+
+# bad capability name
+ZORBA_SECURITY_TEST(bad_capability "comma-separated list of"
+  --deny file-read,bogus -q "1")
+
 IF (UNIX)
   ADD_TEST (NAME bin/shebang
     COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/test/shebang.xq"
@@ -142,7 +254,7 @@ ZORBA_ADD_TEST(bin/zorba_uri_path_3 zorbacmd
 ZORBA_SET_TEST_PROPERTY(bin/zorba_uri_path_3
   PASS_REGULAR_EXPRESSION "hello, v2")
 
-# test the --disable-http-resolution flag, using the corresponding test query
+# test the --disable-http-resolution flag (--deny remote-import), using the corresponding test query
 # from rbkt/zorba/uris/disable-http and a timeout.
 # (the test query imports a schema)
 IF(NOT ZORBA_NO_XMLSCHEMA)

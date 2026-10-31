@@ -651,6 +651,59 @@ static void set_paths_on_sctx( StaticContext_t &sctx ) {
   }
 }
 
+// The command-line tool runs trusted queries: it starts from the
+// unrestricted policy (set explicitly, so the tool is unaffected by the
+// library default) unless --secure is given, then applies --allow and --deny
+// in command-line order, the allow-lists and the limits.
+static SecurityPolicy make_security_policy() {
+  ZorbaCmdProperties const &zc_props = ZorbaCmdProperties::instance();
+
+  SecurityPolicy policy( zc_props.secure_ ?
+    SecurityPolicy::secure() : SecurityPolicy::unrestricted()
+  );
+
+  for ( capability_op const &op : zc_props.capability_ops_ ) {
+    for ( uint32_t bit = 1; bit != 0 && bit <= op.capabilities; bit <<= 1 ) {
+      if ( op.capabilities & bit ) {
+        Capability const cap = static_cast<Capability>( bit );
+        if ( op.allow )
+          policy.allow( cap );
+        else
+          policy.deny( cap );
+      }
+    }
+  }
+
+  for ( string const &dir : zc_props.read_paths_ )
+    policy.addReadPath( dir );
+  for ( string const &dir : zc_props.write_paths_ )
+    policy.addWritePath( dir );
+  for ( string const &prefix : zc_props.network_prefixes_ )
+    policy.addNetworkPrefix( prefix );
+  if ( zc_props.private_addresses_ >= 0 )
+    policy.setAllowPrivateAddresses( zc_props.private_addresses_ == 1 );
+
+  policy.setMaxCallDepth( Properties::instance().getMaxUDFCallDepth() );
+  if ( zc_props.timeout_ > 0 )
+    policy.setTimeout( std::chrono::seconds( zc_props.timeout_ ) );
+
+  // An allow-list without its capability allows nothing: say so rather than
+  // let the user believe the directory or prefix is accessible.
+  if ( !zc_props.read_paths_.empty() && !policy.allows( Capability::FileRead ) )
+    cerr << "warning: --read-path has no effect: file-read is not allowed"
+         << endl;
+  if ( !zc_props.write_paths_.empty() &&
+       !policy.allows( Capability::FileWrite ) )
+    cerr << "warning: --write-path has no effect: file-write is not allowed"
+         << endl;
+  if ( !zc_props.network_prefixes_.empty() &&
+       !policy.allows( Capability::Network ) )
+    cerr << "warning: --network-prefix has no effect: network is not allowed"
+         << endl;
+
+  return policy;
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 //                                                                           //
 //  Main                                                                     //
@@ -713,16 +766,7 @@ int _tmain( int argc, _TCHAR const *argv[] ) {
   void *const store = StoreManager::getStore();
   Zorba *const zorba = Zorba::getInstance( store );
 
-  // The command-line tool runs trusted queries: grant every capability
-  // explicitly so it is unaffected by the library default. The limits come
-  // from --timeout and --max-udf-call-depth.
-  {
-    SecurityPolicy policy( SecurityPolicy::unrestricted() );
-    policy.setMaxCallDepth( Properties::instance().getMaxUDFCallDepth() );
-    if ( zc_props.timeout_ > 0 )
-      policy.setTimeout( std::chrono::seconds( zc_props.timeout_ ) );
-    zorba->setSecurityPolicy( policy );
-  }
+  zorba->setSecurityPolicy( make_security_policy() );
 
 #ifdef DO_AUDIT
   audit::Provider* lAuditProvider = zorba->getAuditProvider();

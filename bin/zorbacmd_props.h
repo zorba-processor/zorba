@@ -20,6 +20,7 @@
 // standard
 #include <string>
 #include <vector>
+#include <cstdint>
 #include <utility>                      /* for pair */
 
 // Zorba
@@ -52,6 +53,15 @@ struct sctx_opt {
 
 typedef std::vector<sctx_opt> sctx_opts;
 
+// One --allow or --deny: a set of zorba::Capability bits. The operations are
+// applied in command-line order.
+struct capability_op {
+  bool          allow;
+  std::uint32_t capabilities;
+};
+
+typedef std::vector<capability_op> capability_ops;
+
 #ifndef ZORBA_NO_FULL_TEXT
 struct ft_mapping {
   std::string uri;
@@ -68,6 +78,7 @@ struct ZorbaCmdProperties {
   std::string   base_uri_;
   std::string   boundary_space_;
   bool          byte_order_mark_;
+  capability_ops capability_ops_;
   std::string   classpath_;
   bool          compile_only_;
   std::string   construction_mode_;
@@ -86,6 +97,7 @@ struct ZorbaCmdProperties {
   bool          load_plan_;
   std::string   module_path_;
   unsigned long multiple_;
+  std::vector<std::string> network_prefixes_;
   bool          no_logo_;
   bool          no_serializer_;
   bool          omit_xml_declaration_;
@@ -97,8 +109,11 @@ struct ZorbaCmdProperties {
   bool          parse_only_;
   bool          print_errors_as_xml_;
   bool          print_query_;
+  int           private_addresses_;     // -1 = policy default, 0 = deny, 1 = allow
+  std::vector<std::string> read_paths_;
   bool          save_plan_;
   sctx_opts     sctx_opts_;
+  bool          secure_;
   bool          serialize_html_;
   bool          serialize_only_query_;
   bool          serialize_plan_;
@@ -113,6 +128,7 @@ struct ZorbaCmdProperties {
   bool          timing_;
   bool          trailing_nl_;
   std::string   uri_path_;
+  std::vector<std::string> write_paths_;
 
   serialization_params      serialization_params_;
   std::vector<std::string>  queries_or_files_;
