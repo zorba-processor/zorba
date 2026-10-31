@@ -131,6 +131,9 @@
 <!-- example: zorba/embed -->
 <p class="why"><strong>Why it matters:</strong> a compiled query can be executed many times with different variables, which is how an application uses Zorba as its query engine. More examples are in <a href="https://github.com/zorba-processor/zorba/tree/master/doc/cxx/examples"><code>doc/cxx/examples</code></a>.</p>
 
+<h3 id="threading">Threading</h3>
+<p>Zorba 5.0 is not thread-safe, and there is one engine and one store per process (<code>Zorba::getInstance</code> returns a singleton). Use Zorba, and every object created from it, from one thread at a time; if several threads need it, serialize all calls with your own mutex. For parallel queries, run separate processes. Making the engine thread-safe is planned for a 5.x release.</p>
+
 <h2 id="limits">Limits</h2>
 <ul>
   <li>The store is in memory and not persistent: collections disappear when the process ends.</li>

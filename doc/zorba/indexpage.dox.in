@@ -38,6 +38,7 @@
   - \ref impl_dep_features
   - \ref memory_management
   - \ref memory_leaks
+  - \ref threading
 
 \section xqlib Modules
  - <a href="../modules/index.html">Module Library</a>
