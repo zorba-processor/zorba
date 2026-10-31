@@ -23,11 +23,6 @@ jobs:
             cmake: cmake --preset full-release && cmake --build --preset full-release
             bin: build/full-release/bin/zorba
             tdir: build/full-release
-          - name: head-bigint
-            ref: ''
-            cmake: cmake --preset bigint && cmake --build --preset bigint
-            bin: build/bigint/bin/zorba
-            tdir: build/bigint
     name: ${{ matrix.name }}
     steps:
       - uses: actions/checkout@v7
@@ -99,23 +94,15 @@ jobs:
             zorba-builder:ci sh -ec '
               pacman -Sy --noconfirm --needed perf valgrind time >/dev/null
               Z=/src/${{ matrix.bin }}
-              for n in 16 32 64; do
-                for i in 1 2; do
-                  /usr/bin/time -f "size=$n run=$i wall=%es user=%Us maxrss=%MkB" \
-                    $Z -f -q rt$n.xq -o /out/rt$n.txt 2>&1 | tail -1 | tee -a /out/times.txt
-                done
+              for n in 16 64; do
+                perf record -F 499 -g --call-graph dwarf,32768 -o /out/perf$n.data $Z -f -q rt$n.xq -o /out/rt$n.txt 2>&1 | tail -1
+                perf report -i /out/perf$n.data --no-children --percent-limit 0.5 --stdio -g none > /out/self$n.txt 2>/dev/null
+                perf report -i /out/perf$n.data --children --percent-limit 2 --stdio -g none > /out/children$n.txt 2>/dev/null
+                perf report -i /out/perf$n.data --no-children --percent-limit 3 --stdio -g caller,0.5,callee,function,percent --max-stack 40 > /out/callers$n.txt 2>/dev/null
+                rm -f /out/perf$n.data
               done
-              tail -c 200 /out/rt64.txt; echo
-              perf record -F 999 -g --call-graph dwarf,16384 -o /out/perf.data $Z -f -q rt16.xq -o /dev/null 2>&1 | tail -2
-              perf report -i /out/perf.data --no-children --percent-limit 0.7 --stdio -g none > /out/self.txt 2>/dev/null
-              perf report -i /out/perf.data --children --percent-limit 3 --stdio -g none > /out/children.txt 2>/dev/null
-              perf report -i /out/perf.data --no-children --percent-limit 2 --stdio -g caller,0.5,callee,function,percent --max-stack 25 > /out/callers.txt 2>/dev/null
-              rm -f /out/perf.data
-              valgrind --tool=callgrind --callgrind-out-file=/out/cg.out $Z -f -q rt16.xq -o /dev/null 2>&1 | tail -3
-              callgrind_annotate --inclusive=yes /out/cg.out 2>/dev/null | head -120 > /out/cg-incl.txt
-              callgrind_annotate /out/cg.out 2>/dev/null | head -80 > /out/cg-self.txt
               chmod -R a+rw /out'
-          { echo '```'; cat out/times.txt; echo; head -60 out/self.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          { echo '```'; head -40 out/self64.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/upload-artifact@v7
         if: always()
