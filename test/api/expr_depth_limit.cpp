@@ -36,6 +36,7 @@
 
 #include <zorba/item.h>
 #include <zorba/iterator.h>
+#include <zorba/options.h>
 #include <zorba/security.h>
 #include <zorba/store_manager.h>
 #include <zorba/xquery.h>
@@ -74,14 +75,17 @@ std::ostream& operator<<(std::ostream& os, const Outcome& o)
 
 // Compiles the query and, if aExecute, runs it.
 Outcome run(Zorba* z, const SecurityPolicy& p, const std::string& aQuery,
-            bool aExecute = true)
+            bool aExecute = true,
+            Zorba_opt_level_t aOptLevel = ZORBA_OPT_LEVEL_O1)
 {
   Outcome o;
   try
   {
     StaticContext_t sctx = z->createStaticContext();
     sctx->setSecurityPolicy(p);
-    XQuery_t q = z->compileQuery(aQuery, sctx);
+    Zorba_CompilerHints_t lHints;
+    lHints.opt_level = aOptLevel;
+    XQuery_t q = z->compileQuery(aQuery, sctx, lHints);
     if (aExecute)
     {
       Iterator_t it = q->iterator();
@@ -125,6 +129,34 @@ struct Shape
   const char* name;
   std::function<std::string(uint64_t)> make;
 };
+
+// The default limit.
+const uint64_t DEFAULT_DEPTH = 1500;
+
+// The limit is capped by the stack left on the thread, which is lower than
+// the default in AddressSanitizer builds (their frames are much larger), so
+// there the default limit may be reported as a stack error.
+#if defined(__SANITIZE_ADDRESS__)
+# define ZORBA_TEST_ASAN 1
+#elif defined(__has_feature)
+# if __has_feature(address_sanitizer)
+#  define ZORBA_TEST_ASAN 1
+# endif
+#endif
+
+bool is_default_limit_error(const Outcome& o)
+{
+  if (o.ok || o.code != "ZXQP0070")
+    return false;
+  if (o.message.find(std::to_string(DEFAULT_DEPTH)) != std::string::npos)
+    return true;
+#ifdef ZORBA_TEST_ASAN
+  if (o.message.find("stack") != std::string::npos)
+    return true;
+#endif
+  std::cerr << "expected the default limit error, got " << o << std::endl;
+  return false;
+}
 
 const char JSONIQ[] = "jsoniq version \"1.0\";\n";
 
@@ -214,8 +246,8 @@ size_t measure_stack(std::function<void()> aFn)
 
 void test_policy()
 {
-  CHECK(SecurityPolicy::secure().getMaxExprDepth() == 5000);
-  CHECK(SecurityPolicy::unrestricted().getMaxExprDepth() == 5000);
+  CHECK(SecurityPolicy::secure().getMaxExprDepth() == DEFAULT_DEPTH);
+  CHECK(SecurityPolicy::unrestricted().getMaxExprDepth() == DEFAULT_DEPTH);
   CHECK(SecurityPolicy().setMaxExprDepth(0).getMaxExprDepth() == 0);
 
   // Narrowing keeps the smaller non-zero limit.
@@ -236,9 +268,7 @@ void test_very_deep(Zorba* z)
   for (Shape const& s : shapes())
   {
     std::cout << "  " << s.name << std::endl;
-    Outcome const o = run(z, p, s.make(100000));
-    CHECK(failed_with(o, "ZXQP0070"));
-    CHECK(o.message.find("5000") != std::string::npos);
+    CHECK(is_default_limit_error(run(z, p, s.make(100000))));
   }
 }
 
@@ -272,7 +302,7 @@ void test_default_limit(Zorba* z)
   SecurityPolicy const p = SecurityPolicy::unrestricted();
   for (Shape const& s : shapes())
   {
-    uint64_t lo = 1, hi = 5001;  // run(lo) compiles, run(hi) does not
+    uint64_t lo = 1, hi = DEFAULT_DEPTH + 1;  // run(lo) compiles, run(hi) does not
     CHECK(run(z, p, s.make(lo), false).ok);
     CHECK(!run(z, p, s.make(hi), false).ok);
     while (lo + 1 < hi)
@@ -284,19 +314,26 @@ void test_default_limit(Zorba* z)
         hi = mid;
     }
 
+    // Element nesting is also limited by the store (node ids of at most 255
+    // bytes, zerr:ZSTR0030), a clean error.
     Outcome const ok = run(z, p, s.make(lo));
     if (!ok.ok)
-      std::cerr << s.name << " at " << lo << " levels: " << ok << std::endl;
-    CHECK(ok.ok);
-    Outcome const over = run(z, p, s.make(lo + 1));
-    CHECK(failed_with(over, "ZXQP0070"));
-    CHECK(over.message.find("5000") != std::string::npos);
+      std::cout << "  " << s.name << " at " << lo << " levels: " << ok
+                << std::endl;
+    CHECK(ok.ok || ok.code == "ZSTR0030");
+    CHECK(is_default_limit_error(run(z, p, s.make(lo + 1))));
 
     std::cout << "  " << s.name << ": " << lo << " levels";
 #ifdef ZORBA_TEST_MEASURE_STACK
+    // Stack taken by: translation and code generation; plus optimization;
+    // plus evaluation.
     std::string const q = s.make(lo);
-    size_t const lUsed = measure_stack([&] { run(z, p, q); });
-    std::cout << ", " << lUsed / 1024 << " KiB of stack";
+    size_t const lO0 = measure_stack([&] {
+      run(z, p, q, false, ZORBA_OPT_LEVEL_O0); });
+    size_t const lO1 = measure_stack([&] { run(z, p, q, false); });
+    size_t const lRun = measure_stack([&] { run(z, p, q); });
+    std::cout << ", KiB of stack: compile -O0 " << lO0 / 1024
+              << ", compile " << lO1 / 1024 << ", run " << lRun / 1024;
 #endif
     std::cout << std::endl;
   }
@@ -308,6 +345,20 @@ void test_default_limit(Zorba* z)
 void test_unlimited(Zorba* z)
 {
   SecurityPolicy const p = SecurityPolicy::unrestricted().setMaxExprDepth(0);
+#if defined(__APPLE__)
+  {
+    pthread_t const self = pthread_self();
+    std::cout << "  main thread stack: top "
+              << pthread_get_stackaddr_np(self) << ", size "
+              << pthread_get_stacksize_np(self) << ", frame "
+              << __builtin_frame_address(0) << std::endl;
+  }
+#endif
+  for (uint64_t n : { 15000, 50000, 100000, 150000 })
+  {
+    Outcome const o = run(z, p, shapes()[0].make(n), false);
+    std::cout << "  " << n << ": " << o << std::endl;
+  }
   Outcome const o = run(z, p, shapes()[0].make(300000));
   CHECK(failed_with(o, "ZXQP0070"));
   CHECK(o.message.find("stack") != std::string::npos);
@@ -322,6 +373,26 @@ void test_syntax_error(Zorba* z)
   CHECK(failed_with(run(z, p, "1" + repeat(" + 1", 100000) + " +)"),
                     "XPST0003"));
   CHECK(failed_with(run(z, p, repeat("(", 100000) + "1"), "XPST0003"));
+}
+
+
+// Long flat lists in the parse tree that the compiler chains: the clauses
+// of a FLWOR expression become a chain of iterators in a general FLWOR.
+void test_wide(Zorba* z)
+{
+  SecurityPolicy const p = SecurityPolicy::unrestricted();
+  struct { const char* name; std::string query; } const cases[] = {
+    { "lets", repeat("let $v := 1 ", 15000) + "return $v" },
+    { "counts", "for $v in 1 " + repeat("count $c ", 15000) + "return $c" },
+    { "sequence", "count((" + repeat("1, ", 15000) + "1))" },
+    { "steps", "<a/>" + repeat("/a", 15000) },
+  };
+  for (auto const& c : cases)
+  {
+    Outcome const o = run(z, p, c.query);
+    std::cout << "  " << c.name << ": " << o << std::endl;
+    CHECK(o.ok || o.code == "ZXQP0070");
+  }
 }
 
 
@@ -362,6 +433,8 @@ expr_depth_limit(int argc, char* argv[])
     test_unlimited(lZorba);
     std::cout << "test_syntax_error" << std::endl;
     test_syntax_error(lZorba);
+    std::cout << "test_wide" << std::endl;
+    test_wide(lZorba);
     std::cout << "test_eval" << std::endl;
     test_eval(lZorba);
   }
