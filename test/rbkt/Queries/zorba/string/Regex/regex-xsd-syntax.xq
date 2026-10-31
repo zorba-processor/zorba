@@ -17,5 +17,9 @@ string-join((
   (: \NN is a back-reference only if there are NN groups before it :)
   string(matches("abcdefghija1", "^(a)(b)(c)(d)(e)(f)(g)(h)(i)(j)\11$")),
   string(matches("abcdefghijj", "^(a)(b)(c)(d)(e)(f)(g)(h)(i)(j)\10$")),
-  string(matches("a", "\p{Lu}", "i"))
+  string(matches("a", "\p{Lu}", "i")),
+  (: with 'x', whitespace inside \p{...} is removed too :)
+  string(matches("hello world", "\p{ I s B a s i c L a t i n }+", "x")),
+  try { string(matches("hello world", "\p{ IsBasicLatin}+")) }
+  catch * { local-name-from-QName($err:code) }
 ), " ")

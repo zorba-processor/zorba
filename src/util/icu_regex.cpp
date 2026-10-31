@@ -145,8 +145,21 @@ inline bool is_char_range_begin( zstring const &s,
  * @param s The XQuery regular expression.
  * @param i The iterator positioned at the 'p' or 'P'.
  */
-static void check_block_escape( zstring const &s,
-                                zstring::const_iterator i ) {
+static void check_block_escape( zstring const &s_raw,
+                                zstring::const_iterator i_raw,
+                                bool x_flag ) {
+  //
+  // With the 'x' flag, whitespace inside the braces is removed too, e.g.,
+  // "\p{ I s BasicLatin }" (QT3 K2-MatchesFunc-6).
+  //
+  zstring s;
+  for ( zstring::const_iterator j = i_raw; j != s_raw.end(); ++j ) {
+    if ( !(x_flag && ascii::is_space( *j )) )
+      s += *j;
+    if ( *j == '}' )
+      break;
+  }
+  zstring::const_iterator i = s.begin();
   zstring::const_iterator const end = s.end();
   if ( ++i == end || *i != '{' )
     return;                             // ICU reports it
@@ -172,7 +185,7 @@ static void check_block_escape( zstring const &s,
     for ( char const *category : categories )
       if ( name == category )
         return;
-    throw INVALID_RE_EXCEPTION( s, ZED( REGEX_UNKNOWN_PIs_CONSTRUCT ) );
+    throw INVALID_RE_EXCEPTION( s_raw, ZED( REGEX_UNKNOWN_PIs_CONSTRUCT ) );
   }
   zstring name;
   for ( ++i; i != end && *i != '}'; ++i )
@@ -191,7 +204,7 @@ static void check_block_escape( zstring const &s,
       if ( latin_1 || trailing_letter )
         continue;
     }
-    throw INVALID_RE_EXCEPTION( s, ZED( REGEX_UNKNOWN_PIs_CONSTRUCT ) );
+    throw INVALID_RE_EXCEPTION( s_raw, ZED( REGEX_UNKNOWN_PIs_CONSTRUCT ) );
   }
 }
 
@@ -353,7 +366,7 @@ void convert_xquery_re( zstring const &xq_re, zstring *icu_re,
             goto not_single_char_esc;
           *icu_re += '\\';
           if ( c == 'p' || c == 'P' ) {
-            check_block_escape( xq_re, i );
+            check_block_escape( xq_re, i, x_flag );
             //
             // Copy the "{name}" as is: its braces are not a quantifier.
             //
@@ -361,6 +374,8 @@ void convert_xquery_re( zstring const &xq_re, zstring *icu_re,
             zstring::const_iterator j = i;
             if ( ++j != xq_re.end() && *j == '{' ) {
               for ( ; j != xq_re.end(); ++j ) {
+                if ( x_flag && ascii::is_space( *j ) )
+                  continue;
                 *icu_re += *j;
                 if ( *j == '}' )
                   break;
