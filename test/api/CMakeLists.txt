@@ -14,6 +14,12 @@
 
 ADD_DEFINITIONS(-DZORBA_HTTP_TEST_SERVER_DEFAULT="${ZORBA_HTTP_TEST_SERVER}")
 
+# schema_utf8 needs XML Schema support (Xerces-C)
+SET(SchemaTests)
+IF (NOT ZORBA_NO_XMLSCHEMA)
+  SET(SchemaTests schema_utf8.cpp)
+ENDIF (NOT ZORBA_NO_XMLSCHEMA)
+
 CREATE_TEST_SOURCELIST(APITests
   APITests.cpp
   itemfactory.cpp
@@ -34,7 +40,7 @@ CREATE_TEST_SOURCELIST(APITests
   expr_depth_limit.cpp
   module_security.cpp
   invoke_module_globals.cpp
-  schema_utf8.cpp
+  ${SchemaTests}
 )
 
 # add the executable
@@ -55,9 +61,11 @@ FOREACH (test ${TestsToRun})
 ENDFOREACH(test)
 
 # Schema import/validation with non-ASCII names must not depend on the process
-# locale: run it where the C locale cannot represent the characters.
-SET_TESTS_PROPERTIES("test/api/schema_utf8" PROPERTIES
-  ENVIRONMENT "LC_ALL=C;LANG=C")
+# locale (the test also switches LC_CTYPE to a non-UTF-8 locale if available).
+IF (NOT ZORBA_NO_XMLSCHEMA)
+  SET_TESTS_PROPERTIES("test/api/schema_utf8" PROPERTIES
+    ENVIRONMENT "LC_ALL=C;LANG=C")
+ENDIF (NOT ZORBA_NO_XMLSCHEMA)
 
 # Add importing schema for userdefined_uri_resolution test
 DECLARE_ZORBA_SCHEMA(FILE import-hello.xsd

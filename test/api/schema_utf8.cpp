@@ -17,10 +17,13 @@
 // Schema import and validation with non-ASCII element/attribute names,
 // enumeration facet values, namespace URI and schema location. Xerces hands
 // Zorba UTF-16 strings; Zorba must convert them to UTF-8 explicitly. The
-// CTest entry runs this under LC_ALL=C, where the process locale cannot
-// represent the characters (XMLString::transcode would mangle them).
+// CTest entry runs this with LC_ALL=C, and the test additionally switches
+// LC_CTYPE to a non-UTF-8 locale when the system has one (as an embedding
+// application may do with setlocale(LC_ALL, "")); under such a locale
+// XMLString::transcode() mangles the characters.
 
 #include <chrono>
+#include <clocale>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -188,6 +191,21 @@ void test_invalid(Zorba* z, SchemaFile const& aSchema)
 int
 schema_utf8(int argc, char* argv[])
 {
+  // An embedding application's locale must not matter: pick a single-byte
+  // locale if one is installed, else stay in the C locale.
+  static const char* const lLocales[] = {
+    "de_DE.ISO-8859-1", "de_DE.ISO8859-1", "de_DE.iso88591", "en_US.ISO-8859-1",
+    0
+  };
+  for (const char* const* l = lLocales; *l; ++l)
+  {
+    if (std::setlocale(LC_CTYPE, *l))
+    {
+      std::cout << "LC_CTYPE=" << *l << std::endl;
+      break;
+    }
+  }
+
   void* lStore = StoreManager::getStore();
   Zorba* lZorba = Zorba::getInstance(lStore);
 
