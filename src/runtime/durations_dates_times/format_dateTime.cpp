@@ -22,8 +22,18 @@
 #include <cstdlib>
 #include <iomanip>
 #include <iostream>
+#include <memory>
 #include <sstream>
+#include <string>
 #include <vector>
+
+#include <zorba/config.h>
+#ifndef ZORBA_NO_ICU
+# include <unicode/gregocal.h>
+# include <unicode/locid.h>
+# include <unicode/strenum.h>
+# include <unicode/timezone.h>
+#endif /* ZORBA_NO_ICU */
 
 // Zorba
 #include "context/dynamic_context.h"
@@ -418,10 +428,21 @@ static void append_month( unsigned mon, modifier const &mod, zstring *dest ) {
 }
 
 static void append_timezone( char component, TimeZone const &tz,
-                             modifier const &mod, zstring *dest ) {
+                             zstring const &tz_name, modifier const &mod,
+                             zstring *dest ) {
   ascii::itoa_buf_type buf;
   zstring format, tmp;
   bool has_grouping_separators;
+
+  if ( !tz && mod.first.type != modifier::military_tz ) {
+    //
+    // XQuery F&O 3.0 9.8.4.1: It is not an error to include a timezone
+    // component when the supplied value has no timezone. In these
+    // circumstances the timezone component will be ignored.  (The military
+    // format has its own letter for this case, J; see below.)
+    //
+    return;
+  }
 
   if ( mod.first.format.empty() ) {
     format = "01:01";
@@ -448,15 +469,28 @@ static void append_timezone( char component, TimeZone const &tz,
       // be identified, the timezone offset is output using the fallback format
       // +01:01.
       //
+      if ( !tz_name.empty() ) {
+        // The name found for the $place argument (see find_tz_name()).
+        tmp = tz_name;
+        goto append;
+      }
+      //
+      // Otherwise use the names conventional in North America, plus those in
+      // the F&O 3.0 9.8.4.2 examples (HST, IST).
+      //
       if ( !min )
         switch ( hour ) {
-          case  0: tmp += "GMT"; goto append;
-          case -5: tmp += "EST"; goto append;
-          case -6: tmp += "CST"; goto append;
-          case -7: tmp += "MST"; goto append;
-          case -8: tmp += "PST"; goto append;
+          case   0: tmp += "GMT"; goto append;
+          case  -5: tmp += "EST"; goto append;
+          case  -6: tmp += "CST"; goto append;
+          case  -7: tmp += "MST"; goto append;
+          case  -8: tmp += "PST"; goto append;
+          case -10: tmp += "HST"; goto append;
         }
-      // TODO: use Olson timezone names
+      else if ( hour == 5 && min == 30 ) {
+        tmp += "IST";
+        goto append;
+      }
       goto fallback;
 
     case modifier::military_tz:
@@ -1183,9 +1217,140 @@ static int get_data_type( char component ) {
   }
 }
 
+#ifndef ZORBA_NO_ICU
+/**
+ * Gets the timezone offset of an ICU timezone that applies to a value.
+ *
+ * @param itz The ICU timezone.
+ * @param when The instant of the value (ignored if \a is_time).
+ * @param is_time If \c true, the value is an xs:time: it has no date, so
+ * daylight saving time is not taken into account.
+ * @param dst Set to \c true only if daylight saving time is in effect.
+ * @return Returns the offset in seconds east of UTC, rounded to minutes.
+ */
+static int get_icu_offset( icu::TimeZone const &itz, UDate when, bool is_time,
+                           bool *dst ) {
+  int32_t raw = itz.getRawOffset(), dst_offset = 0;
+  if ( !is_time ) {
+    UErrorCode status = U_ZERO_ERROR;
+    itz.getOffset( when, false, raw, dst_offset, status );
+    if ( U_FAILURE( status ) )
+      raw = itz.getRawOffset(), dst_offset = 0;
+  }
+  *dst = dst_offset != 0;
+  // Local mean time offsets (before standard time) are not whole minutes.
+  return static_cast<int>( std::lround( (raw + dst_offset) / 60000.0 ) ) * 60;
+}
+
+/**
+ * Gets the abbreviated name of an ICU timezone, e.g., EST.
+ *
+ * @return Returns said name or the empty string if ICU only has a
+ * "GMT-5"-style name for it in the given locale.
+ */
+static zstring get_icu_short_name( icu::TimeZone const &itz, bool dst,
+                                   icu::Locale const &loc ) {
+  icu::UnicodeString u_name;
+  itz.getDisplayName( dst, icu::TimeZone::SHORT, loc, u_name );
+  std::string name;
+  u_name.toUTF8String( name );
+  if ( name.size() > 3 &&
+       (name.compare( 0, 3, "GMT" ) == 0 || name.compare( 0, 3, "UTC" ) == 0) )
+    return zstring();
+  return zstring( name.c_str() );
+}
+#endif /* ZORBA_NO_ICU */
+
+/**
+ * Applies the $place argument of the date formatting functions (F&O 3.0
+ * 9.8.4.3): for an Olson timezone name, the value is adjusted to the offset
+ * that timezone has at that instant and the timezone name is that zone's
+ * abbreviation; for a country code, the timezone name is the abbreviation of
+ * a timezone of that country that has the value's offset.
+ *
+ * @param place The $place argument.
+ * @param dt The value to format.  It may be adjusted.
+ * @param tz_name Set to the timezone name for [ZN], if one was found.
+ */
+static void apply_place( zstring const &place, DateTime *dt,
+                         zstring *tz_name ) {
+#ifndef ZORBA_NO_ICU
+  if ( place.empty() || !dt->hasTimezone() )
+    return;
+  bool const is_time = dt->getFacet() == DateTime::TIME_FACET;
+  UDate when = 0;
+  if ( !is_time ) {
+    UErrorCode status = U_ZERO_ERROR;
+    icu::GregorianCalendar cal( *icu::TimeZone::getGMT(), status );
+    if ( U_FAILURE( status ) )
+      return;
+    cal.clear();
+    cal.set(
+      dt->getYear(), dt->getMonth() - 1, dt->getDay(),
+      dt->getHours(), dt->getMinutes(), dt->getIntSeconds()
+    );
+    when = cal.getTime( status );
+    if ( U_FAILURE( status ) )
+      return;
+    when -= dt->getTimezone().gmtoff() * 1000.0;
+  }
+
+  bool dst;
+  if ( place.find( '/' ) != zstring::npos ) {
+    std::unique_ptr<icu::TimeZone> const itz(
+      icu::TimeZone::createTimeZone(
+        icu::UnicodeString::fromUTF8( place.c_str() )
+      )
+    );
+    if ( !itz || *itz == icu::TimeZone::getUnknown() )
+      return;                           // not a known Olson name: ignore
+    int const offset = get_icu_offset( *itz, when, is_time, &dst );
+    if ( offset < -14 * 3600 || offset > 14 * 3600 )
+      return;
+    std::unique_ptr<DateTime> const adjusted( dt->adjustToTimeZone( offset ) );
+    *dt = *adjusted;
+    *tz_name = get_icu_short_name( *itz, dst, icu::Locale( "en", "US" ) );
+    return;
+  }
+
+  if ( place.size() == 2 && ascii::is_alpha( place[0] ) &&
+       ascii::is_alpha( place[1] ) ) {
+    char const region[] = {
+      ascii::to_upper( place[0] ), ascii::to_upper( place[1] ), '\0'
+    };
+    UErrorCode status = U_ZERO_ERROR;
+    std::unique_ptr<icu::StringEnumeration> const ids(
+      icu::TimeZone::createTimeZoneIDEnumeration(
+        UCAL_ZONE_TYPE_CANONICAL_LOCATION, region, nullptr, status
+      )
+    );
+    if ( U_FAILURE( status ) || !ids )
+      return;
+    int const offset = dt->getTimezone().gmtoff();
+    icu::Locale const loc( "en", region );
+    while ( icu::UnicodeString const *const id = ids->snext( status ) ) {
+      if ( U_FAILURE( status ) )
+        break;
+      std::unique_ptr<icu::TimeZone> const itz(
+        icu::TimeZone::createTimeZone( *id )
+      );
+      if ( !itz || get_icu_offset( *itz, when, is_time, &dst ) != offset )
+        continue;
+      zstring const name( get_icu_short_name( *itz, dst, loc ) );
+      if ( !name.empty() ) {
+        *tz_name = name;
+        return;
+      }
+    }
+  }
+#else
+  (void)place; (void)dt; (void)tz_name;
+#endif /* ZORBA_NO_ICU */
+}
+
 bool FnFormatDateTimeIterator::nextImpl( store::Item_t& result,
                                          PlanState &planState ) const {
-  zstring picture_str, result_str, item_str;
+  zstring picture_str, place_str, result_str, item_str, tz_name;
   xs_dateTime dateTime;
   calendar::type cal = calendar::unknown;
   iso639_1::type lang = iso639_1::unknown;
@@ -1246,9 +1411,8 @@ bool FnFormatDateTimeIterator::nextImpl( store::Item_t& result,
         }
       }
 
-      if ( consumeNext( item, theChildren[4].getp(), planState ) ) {
-        // TODO: do something with place
-      }
+      if ( consumeNext( item, theChildren[4].getp(), planState ) )
+        item->getStringValue2( place_str );
     }
 
     if ( !cal ) {
@@ -1278,6 +1442,8 @@ bool FnFormatDateTimeIterator::nextImpl( store::Item_t& result,
         lang_is_fallback = true;
       }
     }
+
+    apply_place( place_str, &dateTime, &tz_name );
 
     char component;
     in_variable_marker = false;
@@ -1490,7 +1656,7 @@ bool FnFormatDateTimeIterator::nextImpl( store::Item_t& result,
         case 'Z':
         case 'z':
           append_timezone(
-            component, dateTime.getTimezone(), mod, &result_str
+            component, dateTime.getTimezone(), tz_name, mod, &result_str
           );
           break;
       } // switch
