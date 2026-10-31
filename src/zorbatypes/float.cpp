@@ -479,7 +479,7 @@ uint32_t hash_number( double d ) {
     // Beyond the xs:float range (or infinite): hash the double itself.
     uint64_t bits;
     std::memcpy( &bits, &d, sizeof bits );
-    return hashfun::h32( &bits, sizeof bits );
+    return hashfun::h32( &bits, sizeof bits, FNV_32_INIT );
   }
   // Hash on the xs:float rounding, so that an xs:double and the xs:float or
   // xs:decimal it is equal to after promotion hash equal.
@@ -488,7 +488,7 @@ uint32_t hash_number( double d ) {
     return h;
   uint32_t bits;
   std::memcpy( &bits, &f, sizeof bits );
-  return hashfun::h32( &bits, sizeof bits );
+  return hashfun::h32( &bits, sizeof bits, FNV_32_INIT );
 }
 
 ///////////////////////////////////////////////////////////////////////////////
