@@ -23,8 +23,9 @@ jobs:
             cmake: cmake --preset full-release && cmake --build --preset full-release
             bin: build/full-release/bin/zorba
             tdir: build/full-release
-          - name: master
-            ref: master
+          - name: no-planran
+            ref: ''
+            patch: sed -i 's/if (thePlanOpen \&\& thePlanRan)/if (thePlanOpen)/' src/runtime/core/fncall_iterator.cpp && grep -n "if (thePlanOpen)" src/runtime/core/fncall_iterator.cpp
             cmake: cmake --preset full-release && cmake --build --preset full-release
             bin: build/full-release/bin/zorba
             tdir: build/full-release
@@ -84,11 +85,16 @@ jobs:
           done
           grep -h "import module" $d/*.xq
 
+      - name: Patch
+        if: matrix.patch
+        working-directory: src
+        run: ${{ matrix.patch }}
+
       - name: Build
         run: |
           docker run --rm -e CCACHE_DIR=/src/.ccache \
             -e CCACHE_SLOPPINESS=pch_defines,time_macros -e CCACHE_DEPEND=1 \
-            -v "$PWD/src":/src -w /src zorba-builder:ci sh -ec '${{ matrix.cmake }}; ccache -s; ctest --test-dir ${{ matrix.tdir }} -R "libunit/numeric_hash|udf-nested-arg-reset" -V | tail -30 || true'
+            -v "$PWD/src":/src -w /src zorba-builder:ci sh -ec '${{ matrix.cmake }}; ccache -s; ctest --test-dir ${{ matrix.tdir }} -R "libunit/numeric_hash|udf-recursive-reset" -V | tail -30 || true'
 
       - name: Time and profile
         run: |
@@ -99,17 +105,15 @@ jobs:
             zorba-builder:ci sh -ec '
               pacman -Sy --noconfirm --needed perf valgrind time >/dev/null
               Z=/src/${{ matrix.bin }}
-              for n in 24; do
+              for n in 32 64; do
                 /usr/bin/time -f "size=$n wall=%es user=%Us maxrss=%MkB" \
                   $Z -f -q rt$n.xq -o /out/rt$n.txt 2>&1 | tail -1 | tee -a /out/times.txt
               done
-              for c in c d; do
-                for d in 4 6 8 10 12; do
-                  sed "s/DEPTH/$d/" /tools/.github/rtc/$c.xq > /tmp/$c$d.xq
-                  timeout 120 /usr/bin/time -f "cand=$c depth=$d wall=%es" \
-                    $Z -f -q /tmp/$c$d.xq -o /out/$c$d.txt 2>&1 | tail -1 | tee -a /out/times.txt; true
-                done
+              for i in 1 2 3; do
+                /usr/bin/time -f "udf-recursive-reset wall=%es" \
+                  $Z -f -q /tools/test/rbkt/Queries/zorba/udf/udf-recursive-reset.xq -o /out/urr.txt 2>&1 | tail -1 | tee -a /out/times.txt
               done
+              cat /out/urr.txt; echo
               chmod -R a+rw /out'
           { echo '```'; cat out/times.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
 
