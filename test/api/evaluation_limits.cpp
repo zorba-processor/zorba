@@ -26,6 +26,10 @@
 #include <sstream>
 #include <string>
 
+#if defined(__unix__) || defined(__APPLE__)
+# include <sys/resource.h>
+#endif
+
 #include <zorba/security.h>
 #include <zorba/store_manager.h>
 #include <zorba/xquery.h>
@@ -287,6 +291,17 @@ void test_call_depth(Zorba* z)
 void test_stack_guard(Zorba* z)
 {
   SecurityPolicy p = SecurityPolicy::unrestricted().setMaxCallDepth(0);
+
+#if defined(__unix__) || defined(__APPLE__)
+  struct rlimit rl;
+  if (getrlimit(RLIMIT_STACK, &rl) == 0)
+  {
+    if (rl.rlim_cur == RLIM_INFINITY)
+      std::cout << "  RLIMIT_STACK: unlimited" << std::endl;
+    else
+      std::cout << "  RLIMIT_STACK: " << rl.rlim_cur << std::endl;
+  }
+#endif
 
   Outcome o = run(z, p, depth_query(100000000));
   CHECK(failed_with(o, "ZXQP0069"));

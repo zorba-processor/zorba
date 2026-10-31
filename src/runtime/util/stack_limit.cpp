@@ -23,8 +23,13 @@
 # include <emscripten/stack.h>
 #elif defined(_WIN32)
 # include <windows.h>
-#elif defined(__APPLE__) || defined(__unix__)
+#elif defined(__APPLE__)
 # include <pthread.h>
+#elif defined(__unix__)
+# include <pthread.h>
+# include <sys/resource.h>
+# include <sys/syscall.h>
+# include <unistd.h>
 #endif
 
 namespace zorba {
@@ -67,6 +72,20 @@ Bounds query_bounds()
     {
       b.low = reinterpret_cast<uintptr_t>(addr);
       b.high = b.low + size;
+
+      // The main thread's stack grows on demand. glibc derives its size from
+      // RLIMIT_STACK; with an unlimited limit (common in containers) it
+      // reports the whole gap down to the next mapping, which the stack can
+      // never actually use. Assume 8 MiB then, the usual default.
+      if (getpid() == static_cast<pid_t>(syscall(SYS_gettid)))
+      {
+        size_t lLimit = 8 * 1024 * 1024;
+        struct rlimit rl;
+        if (getrlimit(RLIMIT_STACK, &rl) == 0 && rl.rlim_cur != RLIM_INFINITY)
+          lLimit = static_cast<size_t>(rl.rlim_cur);
+        if (size > lLimit)
+          b.low = b.high - lLimit;
+      }
     }
     pthread_attr_destroy(&attr);
   }
