@@ -116,7 +116,7 @@ public:
   {
   }
 
-  void reset() {}
+  void reset() override {}
 
   void resetArg() { PlanIteratorWrapper::reset(); }
 };
