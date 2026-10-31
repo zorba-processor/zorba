@@ -34,7 +34,8 @@ FOREACH(needle
     "digraph ast {"
     "label=\"ParseNodeTree\""
     "label=\"FLWORExpr\""
-    "label=\"VarDecl"
+    "label=\"GlobalVarDecl"
+    "val=1"
     "FunctionCall"
     "label=\"NumericLiteral"
     " -> n_")
