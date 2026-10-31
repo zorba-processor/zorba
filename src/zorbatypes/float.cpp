@@ -275,6 +275,23 @@ FloatImpl<F> FloatImpl<F>::round( Integer const &precision ) const {
 template<typename F>
 FloatImpl<F> FloatImpl<F>::roundHalfToEven( Integer const &precision ) const {
   FloatImpl result;
+  //
+  // A value has at most max_digits10 significant digits, so rounding to a
+  // precision at or beyond its last one leaves it unchanged. Short-cut that
+  // case: the decimal rounding below is limited to
+  // Decimal::round_precision_limit fractional digits and would flush a value
+  // like 4.9e-324 to zero (F&O 3.0 4.4.5).
+  //
+  if ( isFinite() && !isZero() ) {
+    MAPM const last_digit(
+      std::numeric_limits<F>::max_digits10 -
+      std::floor( std::log10( std::fabs( static_cast<double>( value_ ) ) ) )
+    );
+    if ( precision.itod() >= last_digit ) {
+      result.value_ = value_;
+      return result;
+    }
+  }
   if ( isFinite() && !isZero() ) {
     MAPM m(
       Decimal::roundHalfToEven2(
