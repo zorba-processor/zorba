@@ -17,6 +17,9 @@
 #ifndef ZORBA_PARSENODE_VISITOR_H
 #define ZORBA_PARSENODE_VISITOR_H
 
+#include <cstddef>
+#include <cstdint>
+
 #include "common/shared_types.h"
 
 // Any file that includes parsenode_visitor.h will need to access the
@@ -35,10 +38,72 @@ namespace zorba
 
 class parsenode_visitor
 {
+private:
+  uint32_t theDepth = 0;
+  uint32_t theMaxDepth = 0;
+  bool     theMaxDepthFromStack = false;
+
 public:
   virtual ~parsenode_visitor() { }
 
   static void *no_state;
+
+  /**
+   * Sets the maximum nesting depth of the parse tree that this visitor
+   * accepts; 0 means no limit. A deeper node raises zerr:ZXQP0070 when it is
+   * visited. The translator sets the limit of the security policy, so all
+   * later compilation passes (which recurse over the expression tree) only
+   * ever see bounded trees.
+   *
+   * Those passes need stack in proportion to the depth, so the limit is also
+   * capped by the stack left on the calling thread (see parsenodes.cpp),
+   * whatever aMaxDepth is, including 0.
+   */
+  void setMaxDepth(uint32_t aMaxDepth);
+
+  /**
+   * Counts the nesting depth of the node being visited. Every accept()
+   * creates one before it calls begin_visit(). Besides the depth limit, it
+   * refuses to go deeper when the thread's stack is nearly exhausted, so a
+   * visitor never overflows the stack, whatever the limit.
+   *
+   * Lists whose items the compiler chains into nested expressions or
+   * iterators (FLWOR clauses, predicates, typeswitch, switch and catch
+   * clauses) also count each item as one level (aLevels).
+   */
+  class DepthGuard
+  {
+    parsenode_visitor& theVisitor;
+    uint32_t           theLevels;
+
+  public:
+    DepthGuard(parsenode_visitor& v, const QueryLoc& loc, size_t aLevels = 1)
+      :
+      theVisitor(v),
+      theLevels(aLevels > UINT32_MAX - v.theDepth ?
+                UINT32_MAX - v.theDepth : static_cast<uint32_t>(aLevels))
+    {
+      v.theDepth += theLevels;
+      if (v.theDepth > v.theMaxDepth && v.theMaxDepth != 0)
+        v.depthExceeded(loc, theLevels, false);
+      v.checkStack(loc, theLevels);
+    }
+
+    ~DepthGuard() { theVisitor.theDepth -= theLevels; }
+
+    DepthGuard(const DepthGuard&) = delete;
+    DepthGuard& operator=(const DepthGuard&) = delete;
+  };
+
+private:
+  // Both restore theDepth before they throw (the guard's destructor does not
+  // run when its constructor throws).
+  [[noreturn]] void depthExceeded(const QueryLoc& loc,
+                                  uint32_t aLevels,
+                                  bool aStack);
+  void checkStack(const QueryLoc& loc, uint32_t aLevels);
+
+public:
 
 # define DECL_PARSENODE_VISITOR_VISIT_MEM_FNS( NODE )           \
   virtual void* begin_visit( NODE const& ) = 0;                 \

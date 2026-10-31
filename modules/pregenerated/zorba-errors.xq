@@ -250,6 +250,15 @@ declare variable $zerr:ZXQP0069 as xs:QName := fn:QName($zerr:NS, "zerr:ZXQP0069
 
 (:~
  :
+ : The expressions of a query are nested deeper than the maximum
+ : expression depth of the security policy, or too deep to compile with
+ : the machine stack that is left.
+ : 
+:)
+declare variable $zerr:ZXQP0070 as xs:QName := fn:QName($zerr:NS, "zerr:ZXQP0070");
+
+(:~
+ :
  : The version of the thesaurus is not the expected version.
  : 
 :)

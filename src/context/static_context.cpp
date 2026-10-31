@@ -2067,6 +2067,7 @@ void static_context::serialize_security_policy(serialization::Archiver& ar)
   bool lAllowPrivate = false;
   long long lTimeout = 0;
   uint32_t lMaxCallDepth = 0;
+  uint32_t lMaxExprDepth = 0;
   uint32_t lMaxAmplification = 0;
 
   if (ar.is_serializing_out())
@@ -2084,6 +2085,7 @@ void static_context::serialize_security_policy(serialization::Archiver& ar)
     lAllowPrivate = p.allowsPrivateAddresses();
     lTimeout = static_cast<long long>(p.getTimeout().count());
     lMaxCallDepth = p.getMaxCallDepth();
+    lMaxExprDepth = p.getMaxExprDepth();
     lMaxAmplification = p.getMaxEntityAmplification();
   }
 
@@ -2094,6 +2096,7 @@ void static_context::serialize_security_policy(serialization::Archiver& ar)
   ar & lAllowPrivate;
   ar & lTimeout;
   ar & lMaxCallDepth;
+  ar & lMaxExprDepth;
   ar & lMaxAmplification;
 
   if (!ar.is_serializing_out())
@@ -2111,6 +2114,7 @@ void static_context::serialize_security_policy(serialization::Archiver& ar)
     p.setAllowPrivateAddresses(lAllowPrivate);
     p.setTimeout(std::chrono::milliseconds(lTimeout));
     p.setMaxCallDepth(lMaxCallDepth);
+    p.setMaxExprDepth(lMaxExprDepth);
     p.setMaxEntityAmplification(lMaxAmplification);
     theSecurityPolicy.reset(new SecurityPolicy(p));
   }

@@ -29,8 +29,10 @@
 #include "compiler/parsetree/parsenodes.h"
 #include "compiler/parser/parse_constants.h"
 #include "compiler/parsetree/parsenode_visitor.h"
+#include "runtime/util/stack_limit.h"
 #include "zorbatypes/integer.h"
 
+#include <cstdint>
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
@@ -50,6 +52,110 @@ namespace zorba
 int dummy;
 void *parsenode_visitor::no_state = (void *) &dummy;
 
+
+/*******************************************************************************
+  Stack that compiling and evaluating one level of expression nesting may
+  take, at most: the passes after translation (normalization, optimization,
+  code generation) and the evaluation of the plan recurse once per level.
+  Measured by test/api/expr_depth_limit (the deepest chains of + and of
+  computed constructors): up to 2.2 KiB per level in release builds (GCC 16),
+  9.2 KiB with AddressSanitizer.
+********************************************************************************/
+#if defined(__SANITIZE_ADDRESS__)
+# define ZORBA_EXPR_DEPTH_ASAN 1
+#elif defined(__has_feature)
+# if __has_feature(address_sanitizer)
+#  define ZORBA_EXPR_DEPTH_ASAN 1
+# endif
+#endif
+
+#ifdef ZORBA_EXPR_DEPTH_ASAN
+const size_t STACK_PER_EXPR_LEVEL = 12 * 1024;
+#else
+const size_t STACK_PER_EXPR_LEVEL = 3 * 1024;
+#endif
+
+
+void parsenode_visitor::setMaxDepth(uint32_t aMaxDepth)
+{
+  theMaxDepth = aMaxDepth;
+  theMaxDepthFromStack = false;
+
+  // The stack below the reserve that the evaluator's call guard keeps free
+  // is what the deepest query may use.
+  size_t const lRemaining = stack_limit::remaining();
+  if (lRemaining == SIZE_MAX)
+    return;
+  size_t const lReserve = stack_limit::reserve();
+  size_t lCap = lRemaining > lReserve ?
+                (lRemaining - lReserve) / STACK_PER_EXPR_LEVEL : 0;
+  if (lCap < 1)
+    lCap = 1;
+  if (lCap > UINT32_MAX)
+    lCap = UINT32_MAX;
+
+  if (theMaxDepth == 0 || lCap < theMaxDepth)
+  {
+    theMaxDepth = static_cast<uint32_t>(lCap);
+    theMaxDepthFromStack = true;
+  }
+}
+
+
+void parsenode_visitor::depthExceeded(
+    const QueryLoc& loc,
+    uint32_t aLevels,
+    bool aStack)
+{
+  uint32_t const lDepth = theDepth;
+  theDepth -= aLevels;
+  if (aStack || theMaxDepthFromStack)
+    RAISE_ERROR(zerr::ZXQP0070_EXPR_DEPTH_EXCEEDED, loc,
+      ERROR_PARAMS(ZED(ZXQP0070_Stack_2), lDepth));
+  RAISE_ERROR(zerr::ZXQP0070_EXPR_DEPTH_EXCEEDED, loc,
+    ERROR_PARAMS(ZED(ZXQP0070_Limit_2), theMaxDepth));
+}
+
+
+void parsenode_visitor::checkStack(const QueryLoc& loc, uint32_t aLevels)
+{
+  if (stack_limit::exhausted())
+    depthExceeded(loc, aLevels, true);
+}
+
+
+/*******************************************************************************
+  Parse trees can be as deep as the query is long (1 + 1 + ... + 1 is a chain
+  of AdditiveExpr nodes), and they are built without recursion. Destroying a
+  node releases its children from its destructor, so plain recursive
+  destruction would overflow the stack for deep trees. Instead, a node whose
+  last reference goes away while another node is being destroyed is queued,
+  and the outermost free() destroys the queued nodes one after the other.
+********************************************************************************/
+void parsenode::free()
+{
+  thread_local std::vector<parsenode*> tPending;
+  thread_local bool tDestroying = false;
+
+  if (tDestroying)
+  {
+    tPending.push_back(this);
+    return;
+  }
+
+  tDestroying = true;
+  delete this;
+  while (!tPending.empty())
+  {
+    parsenode* lNode = tPending.back();
+    tPending.pop_back();
+    delete lNode;
+  }
+  if (tPending.capacity() > 4096)
+    std::vector<parsenode*>().swap(tPending);
+  tDestroying = false;
+}
+
 int printdepth = 0;
 std::ostringstream __oss;
 
@@ -58,7 +164,9 @@ std::ostringstream __oss;
 #define OUTDENT     std::string(printdepth--, ' ')
 #define UNDENT      printdepth--
 
-#define BEGIN_VISITOR() void* visitor_state; if (NULL == (visitor_state = v.begin_visit(*this))) return
+#define DEPTH_GUARD() parsenode_visitor::DepthGuard depth_guard(v, get_location())
+#define LIST_DEPTH_GUARD(n) parsenode_visitor::DepthGuard list_depth_guard(v, get_location(), (n))
+#define BEGIN_VISITOR() DEPTH_GUARD(); void* visitor_state; if (NULL == (visitor_state = v.begin_visit(*this))) return
 #define END_VISITOR() v.end_visit (*this, visitor_state)
 #define ACCEPT( m ) do { if ((m) != NULL) (m)->accept (v); } while (0)
 #define ACCEPT_CHK( m ) do { ZORBA_ASSERT ((m) != NULL);  (m)->accept (v); } while (0)
@@ -1579,6 +1687,7 @@ FLWORClauseList::FLWORClauseList(const QueryLoc& loc)
 void FLWORClauseList::accept( parsenode_visitor &v ) const
 {
   BEGIN_VISITOR();
+  LIST_DEPTH_GUARD(theClauses.size());
   std::vector<rchandle<FLWORClause> >::const_iterator it = theClauses.begin();
   for (; it != theClauses.end(); ++it)
   {
@@ -2141,6 +2250,8 @@ SwitchExpr::SwitchExpr(
 
 void SwitchExpr::accept( parsenode_visitor &v ) const
 {
+  // As for TypeswitchExpr.
+  LIST_DEPTH_GUARD(clause_list_h != NULL ? clause_list_h->size() : 0);
   BEGIN_VISITOR();
   ACCEPT_CHK(switch_expr_h);
   ACCEPT_CHK(default_expr_h);
@@ -2248,6 +2359,9 @@ TypeswitchExpr::TypeswitchExpr(
 
 void TypeswitchExpr::accept( parsenode_visitor &v ) const
 {
+  // The translator visits the cases itself (it nests them), so they are
+  // counted here rather than in CaseClauseList::accept().
+  LIST_DEPTH_GUARD(clause_list_h != NULL ? clause_list_h->size() : 0);
   BEGIN_VISITOR();
   ACCEPT_CHK (switch_expr_h);
   ACCEPT_CHK (default_clause_h);
@@ -2992,6 +3106,7 @@ PathExpr::PathExpr(
 
 void PathExpr::accept( parsenode_visitor &v ) const
 {
+  DEPTH_GUARD();
   void* visitor_state = v.begin_visit(*this);
   if (visitor_state != parsenode_visitor::no_state)
     return;
@@ -3078,6 +3193,7 @@ int RelativePathExpr::is_jsoniq_literal() const
 
 void RelativePathExpr::accept( parsenode_visitor &v ) const
 {
+  DEPTH_GUARD();
   void* visitor_state = v.begin_visit(*this);
 
   if (visitor_state == NULL)
@@ -3418,6 +3534,7 @@ PredicateList::PredicateList(const QueryLoc& loc) : parsenode(loc)
 void PredicateList::accept(parsenode_visitor& v) const
 {
   BEGIN_VISITOR();
+  LIST_DEPTH_GUARD(pred_hv.size());
 
   for (std::vector<rchandle<exprnode> >::const_iterator it = pred_hv.begin();
        it != pred_hv.end();
@@ -5102,6 +5219,7 @@ void TryExpr::accept( parsenode_visitor &v ) const
 void CatchListExpr::accept( parsenode_visitor &v ) const
 {
   BEGIN_VISITOR();
+  LIST_DEPTH_GUARD(theCatchExprs.size());
   std::vector<rchandle<CatchExpr> >::const_reverse_iterator it = theCatchExprs.rbegin();
   for (; it!=theCatchExprs.rend(); ++it)
   {

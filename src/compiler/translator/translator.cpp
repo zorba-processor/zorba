@@ -757,6 +757,10 @@ TranslatorImpl(
   op_concatenate = BUILTIN_FUNC(OP_CONCATENATE_N);
   assert(op_concatenate != NULL);
 
+  // The parse tree is visited before anything else recurses over the query:
+  // bounding its depth here bounds the stack used by all later passes.
+  setMaxDepth(rootSctx->get_security_policy().getMaxExprDepth());
+
   if (rootTranslator == NULL)
   {
     GENV_ITEMFACTORY->
