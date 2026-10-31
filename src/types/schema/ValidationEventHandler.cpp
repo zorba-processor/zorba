@@ -177,11 +177,8 @@ void ValidationEventHandler::resetAttList()
               
 void ValidationEventHandler::resetTextInfo()
 {
-  if ( _textInfo != NULL )
-  {   
-    delete _textInfo;
-    _textInfo = NULL;
-  }
+  delete _textInfo;
+  _textInfo = NULL;
 }
   
 }  // end namespace zorba

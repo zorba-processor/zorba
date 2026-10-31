@@ -1,2 +1,2 @@
 Options: {http://zorba.io/options/features}disable=http-uri-resolution
-Error: http://zorba.io/errors:ZXQP0029
+Error: http://www.w3.org/2005/xqt-errors:XQST0059

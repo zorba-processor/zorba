@@ -95,11 +95,7 @@ QNamePool::~QNamePool()
       delete theHashSet.theHashTab[i].key();
   }
 
-  if (theCache != NULL)
-  {
-    delete [] theCache;
-    theCache = NULL;
-  }
+  theCache.reset();
 }
 
 

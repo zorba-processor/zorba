@@ -104,7 +104,13 @@ declare %an:sequential function http-wrapper:http-sequential-request(
   } catch XPTY0004 {
     fn:error($error:HC005, "The input request element is not valid.")
   } catch json-http:HTTP {
-    fn:error($error:HC001, "An HTTP error occurred.")
+    (: A denial by the security policy keeps its message, which names the
+       policy and the reason. :)
+    fn:error($error:HC001,
+             if (fn:contains($err:description,
+                             "access denied by security policy"))
+             then $err:description
+             else "An HTTP error occurred.")
   } catch json-http:REQUEST {
     fn:error($error:HC005, "The input request element is not valid.")
   } catch json-http:TIMEOUT {
@@ -113,9 +119,6 @@ declare %an:sequential function http-wrapper:http-sequential-request(
     fn:error($error:HCV02, "Trying to follow a redirect of a POST, PUT, or DELETE request.")
   } catch json-http:CHARSET {
     fn:error($error:HC005, "The input request element is not valid: invalid charset specified.")
-  } catch zerr:ZXQP0029 {
-    (: A denial by the security policy keeps its code. :)
-    fn:error($err:code, $err:description, $err:value)
   } catch * {
     fn:error(fn:QName($error:errNS, fn:local-name-from-QName($err:code)),$err:description, $err:value)
   }
@@ -174,7 +177,13 @@ declare %an:nondeterministic function http-wrapper:http-nondeterministic-request
   } catch XPTY0004 {
     fn:error($error:HC005, "The input request element is not valid.")
   } catch json-http:HTTP {
-    fn:error($error:HC001, "An HTTP error occurred.")
+    (: A denial by the security policy keeps its message, which names the
+       policy and the reason. :)
+    fn:error($error:HC001,
+             if (fn:contains($err:description,
+                             "access denied by security policy"))
+             then $err:description
+             else "An HTTP error occurred.")
   } catch json-http:REQUEST {
     fn:error($error:HC005, "The input request element is not valid.")
   } catch json-http:TIMEOUT {
@@ -183,9 +192,6 @@ declare %an:nondeterministic function http-wrapper:http-nondeterministic-request
     fn:error($error:HCV02, "Trying to follow a redirect of a POST, PUT, or DELETE request.")
   } catch json-http:CHARSET {
     fn:error($error:HC005, "The input request element is not valid: invalid charset specified.")
-  } catch zerr:ZXQP0029 {
-    (: A denial by the security policy keeps its code. :)
-    fn:error($err:code, $err:description, $err:value)
   } catch * {
     fn:error(fn:QName($error:errNS, fn:local-name-from-QName($err:code)),$err:description, $err:value)
   }  

@@ -1614,19 +1614,15 @@ static void loadDocument(
   if (oResult != NULL)
   {
     zstring lSourceUrl;
-    if (cached_doc_source(lNormUri, oResult.getp(), lSourceUrl))
+    zstring lDenied;
+    if (cached_doc_source(lNormUri, oResult.getp(), lSourceUrl) &&
+        !aSctx->check_uri_access(lSourceUrl, internal::EntityData::DOCUMENT,
+                                 lNormUri, lDenied))
     {
-      try
-      {
-        aSctx->check_uri_access(lSourceUrl, internal::EntityData::DOCUMENT,
-                                aUri);
-      }
-      catch (XQueryException& e)
-      {
-        oResult = NULL;
-        set_source(e, loc);
-        throw;
-      }
+      // A denied document is not available.
+      oResult = NULL;
+      throw XQUERY_EXCEPTION(err::FODC0002, ERROR_PARAMS(aUri, lDenied),
+                             ERROR_LOC(loc));
     }
     return;
   }
@@ -1725,8 +1721,9 @@ bool FnDocAvailableIterator::nextImpl(store::Item_t& result, PlanState& planStat
     }
     catch (ZorbaException& e)
     {
-      // A denial by the security policy is reported, not turned into
-      // "not available".
+      // A document the security policy denies is not available (FODC0002):
+      // the function returns false. A refusal by a URI mapper of the
+      // embedder (ZXQP0029) is reported.
       if (e.diagnostic() == err::FODC0005 ||
           e.diagnostic() == zerr::ZXQP0029_URI_ACCESS_DENIED)
       {
@@ -1873,7 +1870,8 @@ static void readDocument(
 
   if (lStreamResource == NULL)
   {
-    throw XQUERY_EXCEPTION(err::FOUT1170, ERROR_PARAMS(aUri), ERROR_LOC(loc));
+    throw XQUERY_EXCEPTION(err::FOUT1170, ERROR_PARAMS(aUri, lErrorMessage),
+                           ERROR_LOC(loc));
   }
   StreamReleaser lStreamReleaser = lStreamResource->getStreamReleaser();
   std::unique_ptr<std::istream, StreamReleaser> lStream(lStreamResource->getStream(), lStreamReleaser);
@@ -1964,8 +1962,9 @@ bool FnUnparsedTextAvailableIterator::nextImpl(store::Item_t& result, PlanState&
     }
     catch (XQueryException const& e)
     {
-      // A denial by the security policy is reported, not turned into
-      // "not available".
+      // A resource the security policy denies is not available (FOUT1170):
+      // the function returns false. A refusal by a URI mapper of the
+      // embedder (ZXQP0029) is reported.
       if (e.diagnostic() == zerr::ZXQP0029_URI_ACCESS_DENIED)
         throw;
       unparsedText = NULL;
@@ -2024,7 +2023,9 @@ bool FnUnparsedTextLinesIterator::nextImpl(store::Item_t& result, PlanState& pla
       dynamic_cast<internal::StreamResource*>(lResource.get());
 
     if (state->theStreamResource == NULL)
-      throw XQUERY_EXCEPTION(err::FOUT1170, ERROR_PARAMS(uriString), ERROR_LOC(loc));
+      throw XQUERY_EXCEPTION(err::FOUT1170,
+                             ERROR_PARAMS(uriString, lErrorMessage),
+                             ERROR_LOC(loc));
 
     lStreamReleaser = state->theStreamResource->getStreamReleaser();
     state->theStream = new std::unique_ptr<std::istream, StreamReleaser> (state->theStreamResource->getStream(), lStreamReleaser);
