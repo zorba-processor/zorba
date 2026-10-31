@@ -167,6 +167,9 @@ XQueryImpl::XQueryImpl()
 
   theCompilerCB = new CompilerCB(theXQueryDiagnostics);
 
+  theResources = new QueryResources();
+  theCompilerCB->theResources = theResources.getp();
+
   theDynamicContext = new dynamic_context();
 }
 
@@ -211,6 +214,10 @@ void XQueryImpl::serialize(::zorba::serialization::Archiver& ar)
     theIsClosed = false;
 
     theCompilerCB->theXQueryDiagnostics = theXQueryDiagnostics;
+
+    if (!theResources)
+      theResources = new QueryResources();
+    theCompilerCB->theResources = theResources.getp();
   }
 
 #ifdef ZORBA_WITH_DEBUGGER
@@ -1450,9 +1457,6 @@ void XQueryImpl::close()
       thePlanProxy = NULL;
     }
 
-    delete theXQueryDiagnostics;
-    theXQueryDiagnostics = NULL;
-
     // see registerDiagnosticHandler
     if (!theUserDiagnosticHandler)
     {
@@ -1460,24 +1464,46 @@ void XQueryImpl::close()
       theDiagnosticHandler = NULL;
     }
 
-    delete theDynamicContext;
-
     delete theDynamicContextWrapper;
+    theDynamicContextWrapper = NULL;
 
     delete theStaticContextWrapper;
+    theStaticContextWrapper = NULL;
 
-    theStaticContext = NULL;
-
-    // theCompilerCB may be NULL if an error occured while serializing "this" in.
-    if (theCompilerCB)
+    // Destroys the compile-time and runtime state now, or, if function items
+    // created by this query are still referenced, when the last of them goes
+    // away (see QueryResources). theCompilerCB may be NULL if an error
+    // occured while serializing "this" in.
+    if (theResources)
     {
+      theResources->dispose(theCompilerCB,
+                            theStaticContext,
+                            theDynamicContext,
+                            theXQueryDiagnostics,
 #ifdef ZORBA_WITH_DEBUGGER
-      delete theCompilerCB->theDebuggerCommons;
+                            theCompilerCB ? theCompilerCB->theDebuggerCommons : NULL,
 #endif
+                            NULL);
+      theResources = NULL;
+    }
+    else
+    {
+      delete theDynamicContext;
+#ifdef ZORBA_WITH_DEBUGGER
+      if (theCompilerCB)
+        delete theCompilerCB->theDebuggerCommons;
+#endif
+      theStaticContext = NULL;
       delete theCompilerCB;
+      delete theXQueryDiagnostics;
     }
 
+    theDynamicContext = NULL;
+    theCompilerCB = NULL;
+    theXQueryDiagnostics = NULL;
+
     delete theCollMgr;
+    theCollMgr = NULL;
 
     theIsClosed = true;
   }

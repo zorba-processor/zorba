@@ -76,6 +76,41 @@ EvalIteratorState::~EvalIteratorState()
 {
   if (thePlanWrapper && Properties::instance().getCollectProfile())
     addQueryProfile(false);
+
+  disposeQuery();
+}
+
+
+/****************************************************************************//**
+  Releases the plan, ccb and dctx of the current eval query (if any). The ccb
+  and dctx are destroyed now, or later if function items created by the eval
+  query are still alive (see QueryResources).
+********************************************************************************/
+void EvalIteratorState::disposeQuery()
+{
+  thePlanWrapper = NULL;
+  thePlan = NULL;
+
+  if (theResources)
+  {
+    static_context_t noSctx;
+    theResources->dispose(theCCB.release(),
+                          noSctx,
+                          theDctx.release(),
+                          NULL,
+#ifdef ZORBA_WITH_DEBUGGER
+                          NULL,
+#endif
+                          theOuterResources.getp());
+    theResources = NULL;
+  }
+  else
+  {
+    theDctx.reset();
+    theCCB.reset();
+  }
+
+  theOuterResources = NULL;
 }
 
 
@@ -260,7 +295,14 @@ void EvalIterator::init(
   evalCCB->theConfig.for_serialization_only = !theDoNodeCopy;
   (evalCCB->theSctxMap)[1] = evalSctx;
 
+  // Release the previous eval query, if we are here after a reset. Function
+  // items it created may still be alive; they keep it (see disposeQuery()).
+  state->disposeQuery();
+
   state->theCCB.reset(evalCCB);
+  state->theResources = new QueryResources();
+  evalCCB->theResources = state->theResources.getp();
+  state->theOuterResources = planState.theCompilerCB->theResources;
 
   // Create the dynamic context for the eval query
   dynamic_context* evalDctx = new dynamic_context(planState.theGlobalDynCtx);

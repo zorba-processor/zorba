@@ -206,6 +206,15 @@ public:
 
   const std::vector<VarValue>& get_variables() const { return theVarValues; }
 
+  // Drops all variable values (see QueryResources::dispose()). The values are
+  // released after theVarValues is empty, so a value whose release reaches
+  // back into this dctx sees no variables.
+  void clear_variables()
+  {
+    std::vector<VarValue> values;
+    values.swap(theVarValues);
+  }
+
   void add_variable(ulong varid, store::Item_t& value);
 
   void add_variable(ulong varid, store::Iterator_t& value);

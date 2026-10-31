@@ -23,7 +23,9 @@
 #include "debugger/debugger_commons.h"
 #endif
 
+#include "context/dynamic_context.h"
 #include "context/static_context.h"
+#include "diagnostics/xquery_diagnostics.h"
 #include "functions/udf.h"
 
 #include <zorba/properties.h>
@@ -123,7 +125,8 @@ CompilerCB::CompilerCB(XQueryDiagnostics* errmgr, long timeout)
   theTimeout(timeout),
   theNextVisitId(1),
   theEM(new ExprManager(this)),
-  theCommonLanguageEnabled(false)
+  theCommonLanguageEnabled(false),
+  theResources(NULL)
 {
   if (timeout >= 0)
     theHaveTimeout = true;
@@ -153,7 +156,8 @@ CompilerCB::CompilerCB(const CompilerCB& cb)
   theNextVisitId(cb.theNextVisitId+1),
   theConfig(cb.theConfig),
   theEM(new ExprManager(this)),
-  theCommonLanguageEnabled(cb.theCommonLanguageEnabled)
+  theCommonLanguageEnabled(cb.theCommonLanguageEnabled),
+  theResources(NULL)
 {
 }
 
@@ -173,7 +177,8 @@ CompilerCB::CompilerCB(::zorba::serialization::Archiver& ar)
   theHasEval(false),
   theIsEval(false),
   theNextVisitId(1),
-  theEM(new ExprManager(this))
+  theEM(new ExprManager(this)),
+  theResources(NULL)
 {
 }
 
@@ -197,6 +202,86 @@ CompilerCB::~CompilerCB()
 void CompilerCB::addAnonymousUDF(user_function* udf)
 {
   theAnonymousUDFs.push_back(udf);
+}
+
+
+/*******************************************************************************
+  class QueryResources
+********************************************************************************/
+QueryResources::QueryResources()
+  :
+  theCCB(NULL),
+  theDctx(NULL),
+  theDiagnostics(NULL)
+#ifdef ZORBA_WITH_DEBUGGER
+  , theDebuggerCommons(NULL)
+#endif
+{
+}
+
+
+QueryResources::~QueryResources()
+{
+  destroy();
+}
+
+
+void QueryResources::dispose(
+    CompilerCB* ccb,
+    static_context_t& sctx,
+    dynamic_context* dctx,
+    XQueryDiagnostics* diagnostics,
+#ifdef ZORBA_WITH_DEBUGGER
+    DebuggerCommons* debuggerCommons,
+#endif
+    QueryResources* parent)
+{
+  assert(theCCB == NULL && theDctx == NULL);
+
+  theCCB = ccb;
+  theSctx = sctx;
+  sctx = NULL;
+  theDctx = dctx;
+  theDiagnostics = diagnostics;
+#ifdef ZORBA_WITH_DEBUGGER
+  theDebuggerCommons = debuggerCommons;
+#endif
+
+  // May release function items created by this query, and thereby references
+  // to this obj (see the class comment).
+  if (theDctx)
+    theDctx->clear_variables();
+
+  if (getRefCount() > 1)
+  {
+    // Function items created by the query are still alive: keep the state
+    // until the last of them is destroyed.
+    theParent = parent;
+  }
+  else
+  {
+    destroy();
+  }
+}
+
+
+void QueryResources::destroy()
+{
+  delete theDctx;
+  theDctx = NULL;
+
+  theSctx = NULL;
+
+#ifdef ZORBA_WITH_DEBUGGER
+  delete theDebuggerCommons;
+  theDebuggerCommons = NULL;
+#endif
+
+  delete theCCB;
+  theCCB = NULL;
+
+  delete theDiagnostics;
+  theDiagnostics = NULL;
 }
 
 

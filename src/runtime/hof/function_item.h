@@ -31,6 +31,7 @@ namespace zorba
 class signature;
 class function_item_expr;
 class FunctionItemInfo;
+class QueryResources;
 
 typedef rchandle<FunctionItemInfo> FunctionItemInfo_t;
 
@@ -40,6 +41,8 @@ typedef rchandle<FunctionItemInfo> FunctionItemInfo_t;
 
   theCCB :
   --------
+  The ccb of the query (or eval query) whose plan creates the function items.
+  Set by codegen (or by fn:function-lookup).
 
   theLoc:
   -------
@@ -160,6 +163,26 @@ public:
 /*******************************************************************************
   A FunctionItem is created during FunctionItemIterator::nextImpl().
 
+  theResources:
+  -------------
+  The QueryResources of theFunctionItemInfo->theCCB. It keeps alive the
+  compile-time and runtime state of the query that created this function item
+  (user_function objs, exprs, static contexts, and the dynamic context that
+  theClosureDctx is a child of) when the application keeps the item after
+  that query is closed or destroyed. See QueryResources in
+  compiler/api/compilercb.h.
+
+  theFunctionResources:
+  ---------------------
+  The QueryResources of the ccb that owns theFunctionItemInfo->theFunction,
+  if different from theResources (e.g. fn:function-lookup, evaluated by one
+  query, of a UDF declared by another query). NULL otherwise.
+
+  theClosureDctxOwner:
+  --------------------
+  For a function item created by partial application (copy constructor): the
+  function item that owns theClosureDctx, kept alive as long as this one.
+
   theFunctionItemInfo:
   --------------------
   The associated function-item info.
@@ -182,6 +205,11 @@ public:
 class FunctionItem : public store::Item, public zorba::serialization::SerializeBaseClass
 {
 protected:
+  // Declared first, so that they are released last.
+  rchandle<QueryResources>        theResources;
+  rchandle<QueryResources>        theFunctionResources;
+  store::Item_t                   theClosureDctxOwner;
+
   FunctionItemInfo_t              theFunctionItemInfo;
 
   csize                           theArity;
@@ -238,6 +266,9 @@ public:
   PlanIter_t getImplementation(CompilerCB* ccb);
 
   zstring show() const;
+
+private:
+  void acquireResources();
 };
 
 

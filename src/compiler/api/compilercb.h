@@ -42,7 +42,93 @@ namespace zorba
 class DebuggerCommons;
 #endif
 class static_context;
+class dynamic_context;
 class ExprManager;
+class XQueryDiagnostics;
+
+
+/*******************************************************************************
+  Deferred release of the compile-time and runtime state of a query (or of an
+  eval query).
+
+  Function items point into the state of the query that created them: the
+  user_function objs (and the exprs of their bodies) owned by the query's
+  CompilerCB, the query's static contexts, and, through the closure dynamic
+  context, the query's global dynamic context. The application may keep a
+  function item from a query result after the query has been closed or
+  destroyed, so that state must live as long as the function item.
+
+  The owner of the state (XQueryImpl, or the EvalIteratorState of an eval
+  query) creates one QueryResources obj, holds a reference to it, and stores a
+  raw pointer to it in its CompilerCB (CompilerCB::theResources). Each
+  FunctionItem holds a reference to the QueryResources of the ccb that
+  created it (and of the ccb that owns its user_function, if different).
+  Nothing else changes while the query is open: no state is moved, and
+  creating a function item costs one reference-count increment.
+
+  When the owner is done with the state, it calls dispose(). If no function
+  item refers to it any more (the common case), dispose() destroys the state
+  right away, in the order the owner used to. Otherwise the state is handed
+  over to this obj and destroyed when the last function item that refers to
+  it goes away.
+
+  Before checking, dispose() drops the variable values of the dynamic
+  context: a prolog variable (or an external variable set by the
+  application) may hold a function item created by the same query, which
+  would otherwise keep the state alive forever. Function items read the
+  global variables through the dynamic context of the query that invokes
+  them, so dropping these values does not change what they compute.
+
+  theParent:
+  ----------
+  For an eval query: the QueryResources of the query that runs the eval. The
+  eval's dynamic context is a child of that query's dynamic context, and the
+  eval ccb shares that query's XQueryDiagnostics (and DebuggerCommons).
+
+  Reference counting is atomic unless ZORBA_FOR_ONE_THREAD_ONLY is set; the
+  state itself is used by one thread at a time, as everything else in a query.
+********************************************************************************/
+class QueryResources : public SyncedRCObject
+{
+protected:
+  CompilerCB                   * theCCB;
+  static_context_t               theSctx;
+  dynamic_context              * theDctx;
+  XQueryDiagnostics            * theDiagnostics;
+#ifdef ZORBA_WITH_DEBUGGER
+  DebuggerCommons              * theDebuggerCommons;
+#endif
+  rchandle<QueryResources>       theParent;
+
+public:
+  QueryResources();
+
+  ~QueryResources();
+
+  /*
+    Ends the owner's use of the given state (any of which may be NULL); the
+    caller must release its reference to this obj afterwards. ccb, dctx,
+    diagnostics and debuggerCommons are owned by the callee from now on; sctx
+    is moved (set to NULL), so that it is released before the ccb is deleted.
+  */
+  void dispose(
+      CompilerCB* ccb,
+      static_context_t& sctx,
+      dynamic_context* dctx,
+      XQueryDiagnostics* diagnostics,
+#ifdef ZORBA_WITH_DEBUGGER
+      DebuggerCommons* debuggerCommons,
+#endif
+      QueryResources* parent);
+
+private:
+  void destroy();
+
+  QueryResources(const QueryResources&);
+  QueryResources& operator=(const QueryResources&);
+};
+
+typedef rchandle<QueryResources> QueryResources_t;
 
 
 /*******************************************************************************
@@ -236,6 +322,10 @@ public:
   // pointers (FunctionItemInfo::theFunction), and their bodies live in theEM,
   // so they share the lifetime of this ccb. Not copied, not serialized.
   std::vector<function_t>   theAnonymousUDFs;
+
+  // Not owned; set by the owner of this ccb (see QueryResources). NULL for a
+  // ccb whose function items cannot outlive it. Not copied, not serialized.
+  QueryResources          * theResources;
 
 public:
   SERIALIZABLE_CLASS(CompilerCB);

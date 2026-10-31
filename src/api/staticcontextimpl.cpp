@@ -157,7 +157,23 @@ StaticContextImpl::~StaticContextImpl()
 
   theCtx = NULL;
 
-  delete theCompilerCB;
+  if (theResources)
+  {
+    static_context_t noSctx;
+    theResources->dispose(theCompilerCB,
+                          noSctx,
+                          NULL,
+                          NULL,
+#ifdef ZORBA_WITH_DEBUGGER
+                          NULL,
+#endif
+                          NULL);
+    theResources = NULL;
+  }
+  else
+  {
+    delete theCompilerCB;
+  }
 }
 
 
@@ -1139,6 +1155,11 @@ void StaticContextImpl::loadProlog(
   //theSctxMap = impl.theCompilerCB->theSctxMap;
   theCompilerCB = impl.theCompilerCB;
   impl.theCompilerCB = NULL;
+
+  // The ccb no longer belongs to impl (whose QueryResources goes away with
+  // it), but to "this".
+  theResources = new QueryResources();
+  theCompilerCB->theResources = theResources.getp();
 }
 
 

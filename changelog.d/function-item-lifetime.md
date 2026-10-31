@@ -1,0 +1,3 @@
+### Fixed
+
+- C++ API: a function item taken from a query result stays usable after the query is closed or destroyed. Invoking it with `StaticContext::invoke()` or passing it to another query used freed memory; the creating query's compiled functions and contexts are now released when the last such function item goes away. The same applies to function items created by `reflection:eval` (which were freed when the eval was re-run), to function items referring to functions declared by `StaticContext::loadProlog()`, and to partially applied function items, whose closure could be freed with the original function item.

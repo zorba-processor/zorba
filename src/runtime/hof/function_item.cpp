@@ -67,6 +67,7 @@ FunctionItemInfo::FunctionItemInfo(
     bool isInline,
     bool isCoercion)
   :
+  theCCB(NULL),
   theLoc(loc),
   theClosureSctx(closureSctx),
   theFunction(func),
@@ -168,12 +169,23 @@ void FunctionItemInfo::add_variable(expr* var, var_expr* substVar)
 FunctionItem::FunctionItem(const FunctionItem& aFunctionItem)
   :
   store::Item(store::Item::FUNCTION),
+  theResources(aFunctionItem.theResources),
+  theFunctionResources(aFunctionItem.theFunctionResources),
   theFunctionItemInfo(aFunctionItem.theFunctionItemInfo),
   theArity(aFunctionItem.theArity),
   theClosureDctx(aFunctionItem.getDctx()),
   theClosureDctxOwned(false)
 {
   theArgValues.insert(theArgValues.begin(), aFunctionItem.theArgValues.begin(), aFunctionItem.theArgValues.end());
+
+  // The closure dctx is shared, not copied: keep its owner alive.
+  if (theClosureDctx != NULL)
+  {
+    if (aFunctionItem.theClosureDctxOwned)
+      theClosureDctxOwner = const_cast<FunctionItem*>(&aFunctionItem);
+    else
+      theClosureDctxOwner = aFunctionItem.theClosureDctxOwner;
+  }
 }
 
 /*******************************************************************************
@@ -190,6 +202,8 @@ FunctionItem::FunctionItem(const FunctionItemInfo_t& fiInfo, dynamic_context* dc
   assert(theFunctionItemInfo->theFunction->isUdf());
   theArgValues.resize(theArity);
 
+  acquireResources();
+
 #if 0
   if (theFunctionItemInfo->theFunction->getName() != NULL)
     std::cerr << "Allocated FunctionItem " << this << " for function: "
@@ -199,6 +213,24 @@ FunctionItem::FunctionItem(const FunctionItemInfo_t& fiInfo, dynamic_context* dc
     std::cerr << "Allocated FunctionItem " << this << " for anonymous function"
               << std::endl;
 #endif
+}
+
+
+/*******************************************************************************
+  See theResources and theFunctionResources.
+********************************************************************************/
+void FunctionItem::acquireResources()
+{
+  CompilerCB* ccb = theFunctionItemInfo->theCCB;
+
+  if (ccb != NULL)
+    theResources = ccb->theResources;
+
+  CompilerCB* udfCCB =
+  static_cast<user_function*>(theFunctionItemInfo->theFunction)->getCCB();
+
+  if (udfCCB != NULL && udfCCB->theResources != theResources.getp())
+    theFunctionResources = udfCCB->theResources;
 }
 
 
