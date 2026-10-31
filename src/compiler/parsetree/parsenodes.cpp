@@ -50,6 +50,39 @@ namespace zorba
 int dummy;
 void *parsenode_visitor::no_state = (void *) &dummy;
 
+
+/*******************************************************************************
+  Parse trees can be as deep as the query is long (1 + 1 + ... + 1 is a chain
+  of AdditiveExpr nodes), and they are built without recursion. Destroying a
+  node releases its children from its destructor, so plain recursive
+  destruction would overflow the stack for deep trees. Instead, a node whose
+  last reference goes away while another node is being destroyed is queued,
+  and the outermost free() destroys the queued nodes one after the other.
+********************************************************************************/
+void parsenode::free()
+{
+  thread_local std::vector<parsenode*> tPending;
+  thread_local bool tDestroying = false;
+
+  if (tDestroying)
+  {
+    tPending.push_back(this);
+    return;
+  }
+
+  tDestroying = true;
+  delete this;
+  while (!tPending.empty())
+  {
+    parsenode* lNode = tPending.back();
+    tPending.pop_back();
+    delete lNode;
+  }
+  if (tPending.capacity() > 4096)
+    std::vector<parsenode*>().swap(tPending);
+  tDestroying = false;
+}
+
 int printdepth = 0;
 std::ostringstream __oss;
 

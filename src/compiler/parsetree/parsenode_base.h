@@ -49,6 +49,9 @@ public:
   parsenode(const QueryLoc& loc_) : loc(loc_) { }
   virtual ~parsenode() {}
 
+  // Destroys the node without recursing into its subtree (see parsenodes.cpp).
+  void free() override;
+
 public:
   const QueryLoc& get_location() const { return loc; }
 
