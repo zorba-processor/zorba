@@ -238,6 +238,12 @@ OPTION(ZORBA_USE_PCH "Use a precompiled header for the Zorba library" ON)
 IF (ZORBA_USE_PCH)
   TARGET_PRECOMPILE_HEADERS(zorba_${ZORBA_STORE_NAME} PRIVATE
     "$<$<COMPILE_LANGUAGE:CXX>:${CMAKE_CURRENT_SOURCE_DIR}/precompiled/zorba_pch.h>")
+  # Clang embeds header mtimes in the .pch, so a fresh checkout produces a
+  # different .pch and ccache misses on every translation unit using it.
+  IF (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    TARGET_COMPILE_OPTIONS(zorba_${ZORBA_STORE_NAME} PRIVATE
+      "$<$<COMPILE_LANGUAGE:CXX>:SHELL:-Xclang -fno-pch-timestamp>")
+  ENDIF ()
 ENDIF (ZORBA_USE_PCH)
 TARGET_LINK_LIBRARIES(zorba_${ZORBA_STORE_NAME} ${requiredlibs})
 
