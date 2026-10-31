@@ -470,8 +470,8 @@ void convert_xquery_re( zstring const &xq_re, zstring *icu_re,
           }
           break;
         case '(':
-          if ( q_flag )
-            *icu_re += '\\';
+          if ( q_flag || in_char_class )
+            *icu_re += '\\';          // an ordinary character in a class
           else {
             cur_paren = paren.size() + 1;
             zstring::const_iterator j = i;
@@ -499,7 +499,7 @@ void convert_xquery_re( zstring const &xq_re, zstring *icu_re,
           }
           break;
         case ')':
-          if ( q_flag )
+          if ( q_flag || in_char_class )
             *icu_re += '\\';
           else {
             if ( !cur_paren )

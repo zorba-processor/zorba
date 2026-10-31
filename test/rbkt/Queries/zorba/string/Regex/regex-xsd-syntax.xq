@@ -9,6 +9,8 @@ string-join((
   (: '{' and '}' are ordinary characters in a character class :)
   string(matches("ab1", "ab[(?{1]")),
   string(matches("ab}", "^ab[}]$")),
+  (: ... and so are '(' and ')' :)
+  string(matches("ab(", "^ab[(?:]$")),
   (: the 'x' flag removes whitespace only; '#' is an ordinary character :)
   string(matches("a#b", "[#]", "x")),
   string(matches("a#b", "a # b", "x")),
