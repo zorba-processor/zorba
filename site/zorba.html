@@ -149,6 +149,7 @@
 <h2 id="embed">Embedding in C++</h2>
 <p>The C++ API is in <code>include/zorba</code>. The usual pattern: create a store and a <code>Zorba</code> instance, compile a query into an <code>XQuery</code> object, bind external variables on its dynamic context, iterate over the result, and shut down in reverse order. Compilation errors and runtime errors are thrown as <code>ZorbaException</code>. This program is compiled against the installed headers and linked with <code>libzorba_simplestore</code> as part of the site build.</p>
 <!-- example: zorba/embed -->
+<p>Unlike the command line, an embedded engine starts from the secure policy: queries cannot read or write files, use the network, expand external entities, load native modules or read environment variables until the application allows it, for example <code>engine-&gt;setSecurityPolicy(SecurityPolicy::secure().allow(Capability::FileRead).addReadPath("/srv/data"))</code>. <code>engine-&gt;setSecurityPolicy(SecurityPolicy::unrestricted())</code> restores the behavior of Zorba 4.x. The policy is declared in <code>include/zorba/security.h</code>.</p>
 <p class="why"><strong>Why it matters:</strong> a compiled query can be executed many times with different variables, which is how an application uses Zorba as its query engine. More examples are in <a href="https://github.com/zorba-processor/zorba/tree/master/doc/cxx/examples"><code>doc/cxx/examples</code></a>.</p>
 
 <h3 id="threading">Threading</h3>

@@ -181,7 +181,8 @@ Do not import modules or schemas over the network. Same as --deny remote-import.
 By default, the command line utility runs queries with every capability
 (SecurityPolicy::unrestricted()): a query may read and write files, use the
 network, read environment variables, expand external entities in XML input and
-load modules implemented in C++. To run a query you do not trust, start from
+load modules implemented in C++. This differs from the library, whose default
+is SecurityPolicy::secure() (see \ref security). To run a query you do not trust, start from
 <tt>--secure</tt> (SecurityPolicy::secure()) and allow only what it needs:
 
 \verbatim
