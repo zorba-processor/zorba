@@ -100,13 +100,15 @@ ft_stop_words_set::ptr
 ft_stop_words_set::construct( ftstop_word_option const &option,
                               iso639_1::type lang,
                               static_context const& sctx ) {
-  bool must_delete = false;
+  // Owns word_set when it is not a cached default set, so a stop-word URI
+  // that cannot be resolved (FTST0008) does not leak it.
+  std::unique_ptr<word_set_t> owned;
   word_set_t *word_set = nullptr;       // pointless init. to stifle warning
 
   switch ( option.get_mode() ) {
     case ft_stop_words_mode::with:
-      word_set = new word_set_t;
-      must_delete = true;
+      owned.reset( new word_set_t );
+      word_set = owned.get();
       break;
     case ft_stop_words_mode::with_default:
       if ( (word_set = get_default_word_set_for( lang )) )
@@ -121,9 +123,9 @@ ft_stop_words_set::construct( ftstop_word_option const &option,
     zstring const &uri = (*ftsw)->get_uri();
 
     if ( !uri.empty() ) {
-      if ( !must_delete ) {
-        word_set = new word_set_t( *word_set );
-        must_delete = true;
+      if ( !owned ) {
+        owned.reset( new word_set_t( *word_set ) );
+        word_set = owned.get();
       }
 
       zstring error_msg;
@@ -165,15 +167,17 @@ ft_stop_words_set::construct( ftstop_word_option const &option,
 
     ftstop_words::list_t const &word_list = (*ftsw)->get_list();
     if ( !word_list.empty() ) {
-      if ( !must_delete ) {
-        word_set = new word_set_t( *word_set );
-        must_delete = true;
+      if ( !owned ) {
+        owned.reset( new word_set_t( *word_set ) );
+        word_set = owned.get();
       }
       FOR_EACH( ftstop_words::list_t, word, word_list )
         apply_word( *word, *word_set, mode );
     }
   }
-  return ptr( new ft_stop_words_set( word_set, must_delete ) );
+  if ( owned )
+    return ptr( new ft_stop_words_set( owned.release(), true ) );
+  return ptr( new ft_stop_words_set( word_set, false ) );
 }
 
 ft_stop_words_set const*
