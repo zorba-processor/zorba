@@ -21,6 +21,7 @@
 #include "common/shared_types.h"
 #include "compiler/api/compilercb.h"
 #include "context/static_context.h"
+#include "diagnostics/util_macros.h"
 #include "diagnostics/xquery_diagnostics.h"
 #include "runtime/core/arithmetic_impl.h"
 #include "runtime/numerics/numerics.h"
@@ -209,6 +210,17 @@ static void format_fractional_part( zstring const &value,
   } // while
 }
 
+//
+// The number of fractional digits of an xs:decimal value that are formatted
+// (the precision of Zorba's xs:decimal to xs:string conversion).
+//
+static int const max_decimal_digits = ZORBA_FLOAT_POINT_PRECISION;
+
+static picture::sub_picture const& sub_pic_for( picture const &pic,
+                                                bool is_negative ) {
+  return is_negative ? pic.neg_subpicture : pic.pos_subpicture;
+}
+
 static void format_number( store::Item_t &number_item, picture const &pic,
                            TypeManager const *tm, QueryLoc const &loc,
                            zstring *dest ) {
@@ -221,60 +233,19 @@ static void format_number( store::Item_t &number_item, picture const &pic,
     return;
   }
 
-  store::Item_t double_item;
-  GenericCast::castToAtomic(
-    double_item, number_item, &*GENV_TYPESYSTEM.DOUBLE_TYPE_ONE, tm, nullptr,
-    loc
-  );
-
-  store::Item_t zero;
-  GENV_ITEMFACTORY->createDouble( zero, numeric_consts<xs_double>::zero() );
+  store::SchemaTypeCode const type_code = number_item->getTypeCode();
+  bool const is_float = type_code == store::XS_FLOAT;
+  bool const is_double = type_code == store::XS_DOUBLE;
 
   //
   // Ibid: [T]he positive sub-picture and its associated variables are used if
   // the input number is positive, and the negative sub-picture and its
   // associated variables are used otherwise.
   //
-  bool const is_negative = double_item->compare( zero ) < 0 ||
-    double_item->getDoubleValue().isNegZero();
-  picture::sub_picture const &sub_pic =
-    is_negative ? pic.neg_subpicture : pic.pos_subpicture;
-
-  if ( double_item->isPosOrNegInf() ) {
-    //
-    // Ibid: If the input number is positive or negative infinity, the result
-    // is the concatenation of the appropriate prefix, the infinity-symbol, and
-    // the appropriate suffix.
-    //
-    *dest  = sub_pic.prefix;
-    *dest += pic.VAR( infinity );
-    *dest += sub_pic.suffix;
-    return;
-  }
-
-  //
   // Ibid: If the sub-picture contains a percent-sign, the number is multiplied
   // by 100. If the sub-picture contains a per-mille-sign, the number is
   // multiplied by 1000. The resulting number is referred to ... as the
   // adjusted number.
-  //
-  xs_double adjusted_number( double_item->getDoubleValue().abs() );
-  if ( sub_pic.has_percent )
-    adjusted_number *= 100;
-  else if ( sub_pic.has_per_mille )
-    adjusted_number *= 1000;
-
-  if ( adjusted_number.isPosInf() ) {
-    //
-    // The adjusted number overflowed (e.g., 1e308 with a percent-sign): it
-    // is formatted as infinity.
-    //
-    *dest  = sub_pic.prefix;
-    *dest += pic.VAR( infinity );
-    *dest += sub_pic.suffix;
-    return;
-  }
-
   //
   // Ibid: This value is then rounded so that it uses no more than maximum-
   // fractional-part-size digits in its fractional part. The rounded number is
@@ -283,9 +254,92 @@ static void format_number( store::Item_t &number_item, picture const &pic,
   // fn:round-half-to-even with this converted number as the first argument and
   // the maximum-fractional-part-size as the second argument.
   //
-  adjusted_number = adjusted_number.roundHalfToEven(
-    xs_integer( sub_pic.fractional_part.maximum_size )
+  // An xs:float or xs:double is adjusted in its own type (so that it can
+  // overflow to infinity) and converted to xs:decimal through its shortest
+  // round-tripping digits; an xs:decimal or xs:integer is formatted exactly,
+  // without going through xs:double.
+  //
+  bool is_negative;
+  zstring adjusted_str;                 // the adjusted number, no exponent
+  bool adjusted_is_inf = false;
+
+  if ( is_float || is_double ) {
+    store::Item_t double_item;
+    if ( is_double )
+      double_item = number_item;
+    else
+      GenericCast::castToAtomic(
+        double_item, number_item, &*GENV_TYPESYSTEM.DOUBLE_TYPE_ONE, tm,
+        nullptr, loc
+      );
+    xs_double const d( double_item->getDoubleValue() );
+    is_negative = d < numeric_consts<xs_double>::zero() || d.isNegZero();
+    adjusted_is_inf = d.isPosInf() || d.isNegInf();
+    if ( !adjusted_is_inf ) {
+      if ( is_float ) {
+        xs_float f( number_item->getFloatValue().abs() );
+        if ( sub_pic_for( pic, is_negative ).has_percent )
+          f *= 100;
+        else if ( sub_pic_for( pic, is_negative ).has_per_mille )
+          f *= 1000;
+        adjusted_is_inf = f.isPosInf();
+        if ( !adjusted_is_inf )
+          adjusted_str = f.toString( true );
+      } else {
+        xs_double a( d.abs() );
+        if ( sub_pic_for( pic, is_negative ).has_percent )
+          a *= 100;
+        else if ( sub_pic_for( pic, is_negative ).has_per_mille )
+          a *= 1000;
+        adjusted_is_inf = a.isPosInf();
+        if ( !adjusted_is_inf )
+          adjusted_str = a.toString( true );
+      }
+    }
+  } else {
+    store::Item_t decimal_item;
+    GenericCast::castToAtomic(
+      decimal_item, number_item, &*GENV_TYPESYSTEM.DECIMAL_TYPE_ONE, tm,
+      nullptr, loc
+    );
+    xs_decimal d( decimal_item->getDecimalValue() );
+    is_negative = d.sign() < 0;
+    if ( is_negative )
+      d = -d;
+    if ( sub_pic_for( pic, is_negative ).has_percent )
+      d *= xs_decimal( 100 );
+    else if ( sub_pic_for( pic, is_negative ).has_per_mille )
+      d *= xs_decimal( 1000 );
+    adjusted_str = d.toString( max_decimal_digits );
+  }
+
+  picture::sub_picture const &sub_pic = sub_pic_for( pic, is_negative );
+
+  if ( adjusted_is_inf ) {
+    //
+    // Ibid: If the input number is positive or negative infinity, the result
+    // is the concatenation of the appropriate prefix, the infinity-symbol, and
+    // the appropriate suffix.  (An adjusted number that overflowed, e.g.,
+    // 1e308 with a percent-sign, is formatted the same way.)
+    //
+    *dest  = sub_pic.prefix;
+    *dest += pic.VAR( infinity );
+    *dest += sub_pic.suffix;
+    return;
+  }
+
+  int const max_frac = sub_pic.fractional_part.maximum_size;
+  xs_decimal const rounded(
+    xs_decimal( adjusted_str.c_str() ).roundHalfToEven( xs_integer( max_frac ) )
   );
+  //
+  // The rounded number has no more fractional digits than either the
+  // picture allows or the adjusted number has, so printing that many is
+  // exact (and bounds the size of the result).
+  //
+  zstring::size_type const adjusted_dot = adjusted_str.find( '.' );
+  int const adjusted_frac = adjusted_dot == zstring::npos ? 0 :
+    static_cast<int>( adjusted_str.size() - adjusted_dot - 1 );
 
   //
   // Ibid: If the number of digits to the left of the decimal-separator-sign is
@@ -296,7 +350,11 @@ static void format_number( store::Item_t &number_item, picture const &pic,
   // is less than minimum-fractional-part-size, trailing zero-digit-sign
   // characters are added to pad out to that size.
   //
-  zstring const number_str( adjusted_number.toString( true ) );
+  zstring const number_str(
+    rounded.toString(
+      std::max( std::min( max_frac, adjusted_frac ), max_decimal_digits )
+    )
+  );
   zstring::size_type const decimal_separator_pos = number_str.find( '.' );
   zstring integer_str, fractional_str;
   integer_str = number_str.substr( 0, decimal_separator_pos );
@@ -329,26 +387,6 @@ static void format_number( store::Item_t &number_item, picture const &pic,
     format_fractional_part( fractional_str, sub_pic, pic, dest );
   }
   *dest += sub_pic.suffix;
-}
-
-static bool is_allowed_type( store::Item const *type_qname ) {
-  RootTypeManager const &rtm = GENV_TYPESYSTEM;
-  return type_qname->equals( rtm.XS_FLOAT_QNAME )
-      || type_qname->equals( rtm.XS_DOUBLE_QNAME )
-      || type_qname->equals( rtm.XS_DECIMAL_QNAME )
-      || type_qname->equals( rtm.XS_INTEGER_QNAME )
-      || type_qname->equals( rtm.XS_INT_QNAME )
-      || type_qname->equals( rtm.XS_LONG_QNAME )
-      || type_qname->equals( rtm.XS_SHORT_QNAME )
-      || type_qname->equals( rtm.XS_BYTE_QNAME )
-      || type_qname->equals( rtm.XS_NON_NEGATIVE_INTEGER_QNAME )
-      || type_qname->equals( rtm.XS_NON_POSITIVE_INTEGER_QNAME )
-      || type_qname->equals( rtm.XS_NEGATIVE_INTEGER_QNAME )
-      || type_qname->equals( rtm.XS_POSITIVE_INTEGER_QNAME )
-      || type_qname->equals( rtm.XS_UNSIGNED_INT_QNAME )
-      || type_qname->equals( rtm.XS_UNSIGNED_LONG_QNAME )
-      || type_qname->equals( rtm.XS_UNSIGNED_SHORT_QNAME )
-      || type_qname->equals( rtm.XS_UNSIGNED_BYTE_QNAME );
 }
 
 static void parse_subpicture( picture::sub_picture *sub_pic,
@@ -788,17 +826,36 @@ bool FormatNumberIterator::nextImpl( store::Item_t &result,
 
   DEFAULT_STACK_INIT( PlanIteratorState, state, planState );
 
-  if ( !consumeNext( value, theChildren[0].getp(), planState ) ||
-       !is_allowed_type( value->getType() ) ) {
+  if ( !consumeNext( value, theChildren[0].getp(), planState ) ) {
     //
     // XQuery F&O 3.0 4.7.2: If the supplied value of the $value argument is an
     // empty sequence, the function behaves as if the supplied value were the
     // xs:double value NaN.
     //
-    // Ibid: The $value argument may be of any numeric data type (xs:double,
-    // xs:float, xs:decimal, or their subtypes including xs:integer).
-    //
     GENV_ITEMFACTORY->createDouble( value, xs_double::nan() );
+  } else if ( value->getTypeCode() == store::XS_UNTYPED_ATOMIC ) {
+    //
+    // Ibid: $value is numeric?, so the function conversion rules (XQuery 3.0
+    // 3.1.5.2) cast an xs:untypedAtomic value to xs:double.
+    //
+    store::Item_t untyped( value );
+    GenericCast::castToAtomic(
+      value, untyped, &*GENV_TYPESYSTEM.DOUBLE_TYPE_ONE,
+      theSctx->get_typemanager(), nullptr, loc
+    );
+  } else if ( !TypeOps::is_numeric( value->getTypeCode() ) ) {
+    //
+    // Ibid: The $value argument may be of any numeric data type (xs:double,
+    // xs:float, xs:decimal, or their subtypes including xs:integer); any
+    // other type is a type error.
+    //
+    RAISE_ERROR(
+      err::XPTY0004, loc,
+      ERROR_PARAMS(
+        ZED( XPTY0004_NoTypePromote_23 ),
+        value->getType()->getStringValue(), "xs:numeric?"
+      )
+    );
   }
 
   consumeNext( item, theChildren[1].getp(), planState );
