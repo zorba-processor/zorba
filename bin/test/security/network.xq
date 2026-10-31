@@ -17,6 +17,8 @@
 (: Fetches $url with fn:doc (Network) and prints the error code: the tests
  : use addresses where nothing listens, so an allowed access fails with
  : another error than zerr:ZXQP0029. :)
+declare namespace err = "http://www.w3.org/2005/xqt-errors";
+
 declare variable $url external;
 
 try {
