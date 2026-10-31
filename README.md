@@ -17,6 +17,9 @@ collections and indexes.
 Tutorial and reference for XQuery, JSONiq and Zorba, with examples verified
 against the current build: https://zorba-processor.github.io/zorba/
 
+Zorba 5.0 is not thread-safe: there is one engine per process, to be used from
+one thread at a time (see [doc/zorba/threading.dox](doc/zorba/threading.dox)).
+
 ## Docker
 
 ```bash
