@@ -318,6 +318,32 @@ static void set_serializer_opts( Zorba_SerializerOptions_t &ser_opts ) {
 
 
 /******************************************************************************
+  Applies the serialization parameters declared in the query prolog with
+  "declare option output:<name>" (XQuery 3.0 2.2.4). Called before the
+  command-line parameters are applied, so those override the prolog.
+ ******************************************************************************/
+
+static void set_prolog_serializer_opts( Zorba *zorba, XQuery_t const &query,
+                                        Zorba_SerializerOptions &ser_opts ) {
+  static char const output_ns[] =
+    "http://www.w3.org/2010/xslt-xquery-serialization";
+  static char const *const params[] = {
+    "byte-order-mark", "cdata-section-elements", "doctype-public",
+    "doctype-system", "encoding", "include-content-type", "indent",
+    "item-separator", "media-type", "method", "omit-xml-declaration",
+    "standalone", "undeclare-prefixes", "version"
+  };
+  StaticContext const *const sctx = query->getStaticContext();
+  for ( char const *param : params ) {
+    Item const name( zorba->getItemFactory()->createQName( output_ns, param ) );
+    String value;
+    if ( sctx->getOption( name, value ) )
+      ser_opts.set( param, value.c_str() );
+  }
+}
+
+
+/******************************************************************************
   Fullfills the command-line "as-file" (-f) switch, or if not requested, infers
   -f for file:// queries. Returns an URI or the empty string.
  ******************************************************************************/
@@ -409,6 +435,8 @@ static int compileAndExecute( Zorba *zorba,
   hints.for_serialization_only = zc_props.serialize_only_query_;
   hints.lib_module = zc_props.lib_module_;
 
+  // Check the command-line serialization parameters before compiling; they
+  // are applied on top of the prolog's ones when the query runs.
   Zorba_SerializerOptions ser_opts;
   try {
     ser_opts.set( zc_props.serialization_params_ );
@@ -525,8 +553,13 @@ static int compileAndExecute( Zorba *zorba,
           query->executeSAX();
         else if ( zc_props.save_plan_ )
           query->saveExecutionPlan( outputStream );
-        else
-          query->execute( outputStream, &ser_opts );
+        else {
+          Zorba_SerializerOptions exec_ser_opts;
+          set_prolog_serializer_opts( zorba, query, exec_ser_opts );
+          exec_ser_opts.set( zc_props.serialization_params_ );
+          set_serializer_opts( exec_ser_opts );
+          query->execute( outputStream, &exec_ser_opts );
+        }
 
         if ( zc_props.trailing_nl_ )
           outputStream << endl;
