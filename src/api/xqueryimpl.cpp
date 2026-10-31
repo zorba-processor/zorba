@@ -1485,9 +1485,7 @@ void XQueryImpl::close()
                             theStaticContext,
                             theDynamicContext,
                             theXQueryDiagnostics,
-#ifdef ZORBA_WITH_DEBUGGER
-                            theCompilerCB ? theCompilerCB->theDebuggerCommons : NULL,
-#endif
+                            true,
                             NULL,
                             NULL);
       theResources = NULL;

@@ -130,18 +130,17 @@ public:
 
   /*
     Ends the owner's use of the given state (any of which may be NULL); the
-    caller must release its reference to this obj afterwards. ccb, dctx,
-    diagnostics and debuggerCommons are owned by the callee from now on; sctx
-    is moved (set to NULL), so that it is released before the ccb is deleted.
+    caller must release its reference to this obj afterwards. ccb, dctx and
+    diagnostics are owned by the callee from now on, and so is the ccb's
+    DebuggerCommons if ownsDebuggerCommons; sctx is moved (set to NULL), so
+    that it is released before the ccb is deleted.
   */
   void dispose(
       CompilerCB* ccb,
       static_context_t& sctx,
       dynamic_context* dctx,
       XQueryDiagnostics* diagnostics,
-#ifdef ZORBA_WITH_DEBUGGER
-      DebuggerCommons* debuggerCommons,
-#endif
+      bool ownsDebuggerCommons,
       QueryResources* parent,
       QueryResources* dctxParent);
 

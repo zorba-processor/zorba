@@ -236,9 +236,7 @@ void QueryResources::dispose(
     static_context_t& sctx,
     dynamic_context* dctx,
     XQueryDiagnostics* diagnostics,
-#ifdef ZORBA_WITH_DEBUGGER
-    DebuggerCommons* debuggerCommons,
-#endif
+    bool ownsDebuggerCommons,
     QueryResources* parent,
     QueryResources* dctxParent)
 {
@@ -250,7 +248,10 @@ void QueryResources::dispose(
   theDctx = dctx;
   theDiagnostics = diagnostics;
 #ifdef ZORBA_WITH_DEBUGGER
-  theDebuggerCommons = debuggerCommons;
+  theDebuggerCommons =
+    (ownsDebuggerCommons && ccb != NULL ? ccb->theDebuggerCommons : NULL);
+#else
+  (void)ownsDebuggerCommons;
 #endif
 
   // See the class comment. May release function items created by the query,

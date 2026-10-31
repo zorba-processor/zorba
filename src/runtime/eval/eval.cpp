@@ -98,9 +98,7 @@ void EvalIteratorState::disposeQuery()
                           noSctx,
                           theDctx.release(),
                           NULL,
-#ifdef ZORBA_WITH_DEBUGGER
-                          NULL,
-#endif
+                          false,
                           theOuterResources.getp(),
                           theOuterDctxResources.getp());
     theResources = NULL;

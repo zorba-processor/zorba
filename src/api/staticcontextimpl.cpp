@@ -167,9 +167,7 @@ StaticContextImpl::~StaticContextImpl()
                           noSctx,
                           NULL,
                           theXQueryDiagnostics,
-#ifdef ZORBA_WITH_DEBUGGER
-                          NULL,
-#endif
+                          false,
                           NULL,
                           NULL);
     theResources = NULL;
