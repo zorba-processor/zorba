@@ -119,7 +119,7 @@
     },
     {
       "name": "bigint",
-      "displayName": "Full, arbitrary-precision xs:integer (MAPM; not thread-safe, see KNOWN_ISSUES.txt), Release",
+      "displayName": "Full, arbitrary-precision xs:integer (MAPM), Release",
       "inherits": "full-release",
       "cacheVariables": {
         "ZORBA_WITH_BIG_INTEGER": "ON"

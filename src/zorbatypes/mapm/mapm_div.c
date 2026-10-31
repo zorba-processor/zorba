@@ -64,13 +64,13 @@
 
 #include "m_apm_lc.h"
 
-static	M_APM	M_div_worka;
-static	M_APM	M_div_workb;
-static	M_APM	M_div_tmp7;
-static	M_APM	M_div_tmp8;
-static	M_APM	M_div_tmp9;
+static M_APM_TLS	M_APM	M_div_worka;
+static M_APM_TLS	M_APM	M_div_workb;
+static M_APM_TLS	M_APM	M_div_tmp7;
+static M_APM_TLS	M_APM	M_div_tmp8;
+static M_APM_TLS	M_APM	M_div_tmp9;
 
-static	int	M_div_firsttime = TRUE;
+static M_APM_TLS	int	M_div_firsttime = TRUE;
 
 /****************************************************************************/
 void	M_free_all_div()

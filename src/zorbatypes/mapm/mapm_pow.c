@@ -58,10 +58,10 @@
 
 #include "m_apm_lc.h"
 
-static	M_APM   M_last_xx_input;
-static	M_APM   M_last_xx_log;
-static	int     M_last_log_digits;
-static	int     M_size_flag = 0;
+static M_APM_TLS	M_APM   M_last_xx_input;
+static M_APM_TLS	M_APM   M_last_xx_log;
+static M_APM_TLS	int     M_last_log_digits;
+static M_APM_TLS	int     M_size_flag = 0;
 
 /****************************************************************************/
 void	M_free_all_pow()

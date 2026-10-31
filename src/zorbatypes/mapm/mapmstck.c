@@ -62,13 +62,13 @@
 
 #include "m_apm_lc.h"
 
-static	int	M_stack_ptr  = -1;
-static	int	M_last_init  = -1;
-static	int	M_stack_size = 0;
+static M_APM_TLS	int	M_stack_ptr  = -1;
+static M_APM_TLS	int	M_last_init  = -1;
+static M_APM_TLS	int	M_stack_size = 0;
 
 static  char* M_stack_err_msg = "\'M_get_stack_var\', Out of memory";
 
-static	M_APM* M_stack_array;
+static M_APM_TLS	M_APM* M_stack_array;
 
 /****************************************************************************/
 void	M_free_all_stck()

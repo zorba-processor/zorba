@@ -102,39 +102,39 @@
 
 #include "m_apm_lc.h"
 
-int	MM_lc_PI_digits = 0;
-int	MM_lc_log_digits = 0;
-int MM_cpp_min_precision = 0;       /* only used in C++ wrapper */
+M_APM_TLS int	MM_lc_PI_digits = 0;
+M_APM_TLS int	MM_lc_log_digits = 0;
+int MM_cpp_min_precision = 30;      /* only used in C++ wrapper */
 
-M_APM	MM_Zero          = NULL;
-M_APM	MM_One           = NULL;
-M_APM	MM_Two           = NULL;
-M_APM	MM_Three         = NULL;
-M_APM	MM_Four          = NULL;
-M_APM	MM_Five          = NULL;
-M_APM	MM_Ten           = NULL;
-M_APM	MM_0_5           = NULL;
-M_APM	MM_E             = NULL;
-M_APM	MM_PI            = NULL;
-M_APM	MM_HALF_PI       = NULL;
-M_APM	MM_2_PI          = NULL;
-M_APM	MM_lc_PI         = NULL;
-M_APM	MM_lc_HALF_PI    = NULL;
-M_APM	MM_lc_2_PI       = NULL;
-M_APM	MM_lc_log2       = NULL;
-M_APM	MM_lc_log10      = NULL;
-M_APM	MM_lc_log10R     = NULL;
-M_APM	MM_0_85          = NULL;
-M_APM	MM_5x_125R       = NULL;
-M_APM	MM_5x_64R        = NULL;
-M_APM	MM_5x_256R       = NULL;
-M_APM	MM_5x_Eight      = NULL;
-M_APM	MM_5x_Sixteen    = NULL;
-M_APM	MM_5x_Twenty     = NULL;
-M_APM	MM_LOG_E_BASE_10 = NULL;
-M_APM	MM_LOG_10_BASE_E = NULL;
-M_APM	MM_LOG_2_BASE_E  = NULL;
-M_APM	MM_LOG_3_BASE_E  = NULL;
+M_APM_TLS M_APM	MM_Zero          = NULL;
+M_APM_TLS M_APM	MM_One           = NULL;
+M_APM_TLS M_APM	MM_Two           = NULL;
+M_APM_TLS M_APM	MM_Three         = NULL;
+M_APM_TLS M_APM	MM_Four          = NULL;
+M_APM_TLS M_APM	MM_Five          = NULL;
+M_APM_TLS M_APM	MM_Ten           = NULL;
+M_APM_TLS M_APM	MM_0_5           = NULL;
+M_APM_TLS M_APM	MM_E             = NULL;
+M_APM_TLS M_APM	MM_PI            = NULL;
+M_APM_TLS M_APM	MM_HALF_PI       = NULL;
+M_APM_TLS M_APM	MM_2_PI          = NULL;
+M_APM_TLS M_APM	MM_lc_PI         = NULL;
+M_APM_TLS M_APM	MM_lc_HALF_PI    = NULL;
+M_APM_TLS M_APM	MM_lc_2_PI       = NULL;
+M_APM_TLS M_APM	MM_lc_log2       = NULL;
+M_APM_TLS M_APM	MM_lc_log10      = NULL;
+M_APM_TLS M_APM	MM_lc_log10R     = NULL;
+M_APM_TLS M_APM	MM_0_85          = NULL;
+M_APM_TLS M_APM	MM_5x_125R       = NULL;
+M_APM_TLS M_APM	MM_5x_64R        = NULL;
+M_APM_TLS M_APM	MM_5x_256R       = NULL;
+M_APM_TLS M_APM	MM_5x_Eight      = NULL;
+M_APM_TLS M_APM	MM_5x_Sixteen    = NULL;
+M_APM_TLS M_APM	MM_5x_Twenty     = NULL;
+M_APM_TLS M_APM	MM_LOG_E_BASE_10 = NULL;
+M_APM_TLS M_APM	MM_LOG_10_BASE_E = NULL;
+M_APM_TLS M_APM	MM_LOG_2_BASE_E  = NULL;
+M_APM_TLS M_APM	MM_LOG_3_BASE_E  = NULL;
 
 
 static char MM_cnst_PI[] = 
@@ -283,7 +283,6 @@ void	M_init_trig_globals()
 {
 MM_lc_PI_digits      = VALID_DECIMAL_PLACES;
 MM_lc_log_digits     = VALID_DECIMAL_PLACES;
-MM_cpp_min_precision = 30;
 
 MM_Zero          = m_apm_init();
 MM_One           = m_apm_init();
