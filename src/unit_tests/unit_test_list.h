@@ -42,6 +42,7 @@ namespace UnitTests {
 
   int test_json_parser( int, char*[] );
   int test_mem_sizeof( int, char*[] );
+  int test_mapm_threads( int, char*[] );
   int test_memory_manager( int, char*[] );
   int test_mmap_file( int, char*[] );
   int test_parameters( int, char*[] );

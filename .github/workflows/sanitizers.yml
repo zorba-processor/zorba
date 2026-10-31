@@ -96,7 +96,7 @@ jobs:
             build/asan/ctest.log
             build/asan/junit.xml
 
-  # ThreadSanitizer on the multithreaded tests (test/unit/mapm_threads runs
+  # ThreadSanitizer on the multithreaded tests (test/libunit/mapm_threads runs
   # concurrent decimal and integer arithmetic) plus a few existing tests, in
   # the default and the big-integer configuration.
   tsan:

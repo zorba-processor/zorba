@@ -230,7 +230,7 @@
       },
       "filter": {
         "include": {
-          "name": "test/unit/(mapm_threads|multiple_runs|datetime)$|numerics/"
+          "name": "test/libunit/mapm_threads$|test/unit/(multiple_runs|datetime)$|numerics/"
         }
       },
       "environment": {
@@ -249,7 +249,7 @@
       },
       "filter": {
         "include": {
-          "name": "test/unit/(mapm_threads|multiple_runs|datetime)$|numerics/"
+          "name": "test/libunit/mapm_threads$|test/unit/(multiple_runs|datetime)$|numerics/"
         }
       },
       "environment": {

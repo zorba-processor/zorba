@@ -23,6 +23,7 @@ SET(UNIT_TEST_SRCS
   test_hexbinary.cpp
   test_hexbinary_streambuf.cpp
   test_json_parser.cpp
+  test_mapm_threads.cpp
   test_mem_sizeof.cpp
   test_mmap_file.cpp
   test_parameters.cpp
