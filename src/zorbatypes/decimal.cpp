@@ -366,43 +366,40 @@ size_t Decimal::alloc_size() const {
 }
 
 uint32_t Decimal::hash( value_type const &value ) {
-  char buf[1024];
-  char *bufp = value.exponent() + 3 > 1024 ?
-    new char[ value.exponent() + 3 ] : buf;
+  if ( value.is_integer() ) {
+    char buf[1024];
+    char *bufp = value.exponent() + 3 > 1024 ?
+      new char[ value.exponent() + 3 ] : buf;
 
-  if ( value.sign() < 0 ) {
-    if ( value >= MAPM::getMinInt64() ) {
-      // hash it as int64
+    if ( value.sign() < 0 ) {
+      if ( value >= MAPM::getMinInt64() ) {
+        // hash it as int64
+        value.toIntegerString( bufp );
+        stringstream ss( bufp );
+        int64_t n;
+        ss >> n;
+        assert( ss.eof() );
+        if ( bufp != buf )
+          delete[] bufp;
+        return static_cast<uint32_t>( n & 0xFFFFFFFF );
+      }
+    } else if ( value <= MAPM::getMaxUInt64() ) {
+      // hash it as uint64
       value.toIntegerString( bufp );
       stringstream ss( bufp );
-      int64_t n;
+      uint64_t n;
       ss >> n;
       assert( ss.eof() );
       if ( bufp != buf )
         delete[] bufp;
       return static_cast<uint32_t>( n & 0xFFFFFFFF );
     }
-  } else if ( value <= MAPM::getMaxUInt64() ) {
-    // hash it as uint64
-    value.toIntegerString( bufp );
-    stringstream ss( bufp );
-    uint64_t n;
-    ss >> n;
-    assert( ss.eof() );
     if ( bufp != buf )
       delete[] bufp;
-    return static_cast<uint32_t>( n & 0xFFFFFFFF );
   }
 
-  // In all other cases, hash it as double
-  value.toFixPtString( bufp, ZORBA_FLOAT_POINT_PRECISION );
-  stringstream ss( bufp );
-  double n;
-  ss >> n;
-  assert( ss.eof() );
-  if ( bufp != buf )
-    delete[] bufp;
-  return static_cast<uint32_t>( n );
+  // In all other cases, hash it as the xs:double it is promoted to.
+  return hash_number( FloatImpl<double>( Decimal( value ) ).getNumber() );
 }
 
 zstring Decimal::toString( value_type const &value, bool minusZero,

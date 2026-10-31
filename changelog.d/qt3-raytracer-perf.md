@@ -1,0 +1,2 @@
+### Fixed
+- xs:double and xs:float values hashed to their integer part, so every value in (-1, 1) had the same hash code. Hash tables keyed on fractional numbers (the result cache of recursive functions, fn:distinct-values, grouping) degraded to linear lists: the QT3 test app-Demos/raytracer took about 105 s instead of a few seconds. Non-integral numbers now hash on their value; values equal after numeric promotion still hash equal.

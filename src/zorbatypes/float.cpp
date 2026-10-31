@@ -16,7 +16,10 @@
 
 #include "stdafx.h"
 
+#include <cmath>
+#include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <charconv>
 #include <cstdlib>
 #include <limits>
@@ -29,6 +32,7 @@
 #include "decimal.h"
 #include "float.h"
 #include "integer.h"
+#include "zorbautils/hashfun.h"
 
 #include "zorbaserialization/serialize_zorba_types.h"
 #include "zorbaserialization/serialize_template_types.h"
@@ -437,6 +441,54 @@ zstring FloatImpl<F>::toString( bool no_scientific_format ) const {
     result += ascii::itoa( exponent, buf );
   }
   return result;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+namespace {
+
+// Hashes an integral d like an xs:integer of the same value (low 32 bits of
+// the int64 or uint64 value). Returns false if d is not integral or does not
+// fit in 64 bits.
+bool hash_as_integer( double d, uint32_t *h ) {
+  if ( !(d == std::trunc( d )) )        // also NaN
+    return false;
+  if ( d >= -9223372036854775808.0 && d < 9223372036854775808.0 ) {
+    *h = static_cast<uint32_t>( static_cast<int64_t>( d ) );
+    return true;
+  }
+  if ( d >= 0 && d < 18446744073709551616.0 ) {
+    *h = static_cast<uint32_t>( static_cast<uint64_t>( d ) );
+    return true;
+  }
+  return false;
+}
+
+} // namespace
+
+uint32_t hash_number( double d ) {
+  // Truncating to an integer, as this used to do, sends every value in (-1, 1)
+  // to the same hash code: hash tables keyed on fractional numbers (e.g. the
+  // cache of a recursive function) degrade to linear lists.
+  uint32_t h;
+  if ( hash_as_integer( d, &h ) )
+    return h;
+  if ( d != d )
+    return 0x7FC00000u;                 // all NaNs alike
+  if ( std::fabs( d ) > std::numeric_limits<float>::max() ) {
+    // Beyond the xs:float range (or infinite): hash the double itself.
+    uint64_t bits;
+    std::memcpy( &bits, &d, sizeof bits );
+    return hashfun::h32( &bits, sizeof bits );
+  }
+  // Hash on the xs:float rounding, so that an xs:double and the xs:float or
+  // xs:decimal it is equal to after promotion hash equal.
+  float const f = static_cast<float>( d );
+  if ( hash_as_integer( f, &h ) )
+    return h;
+  uint32_t bits;
+  std::memcpy( &bits, &f, sizeof bits );
+  return hashfun::h32( &bits, sizeof bits );
 }
 
 ///////////////////////////////////////////////////////////////////////////////
