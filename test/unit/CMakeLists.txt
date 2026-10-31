@@ -178,5 +178,8 @@ IF(ZORBA_WITH_UNIT_TESTS)
     ZORBA_ADD_TEST("test/libunit/unordered_set" LibUnitTest unordered_set)
   ENDIF (NOT ZORBA_HAVE_UNORDERED_SET)
   ZORBA_ADD_TEST("test/libunit/utf8_streambuf" LibUnitTest utf8_streambuf)
+  IF (NOT ZORBA_NO_XMLSCHEMA)
+    ZORBA_ADD_TEST("test/libunit/xerces_utf8" LibUnitTest xerces_utf8)
+  ENDIF (NOT ZORBA_NO_XMLSCHEMA)
 ENDIF(ZORBA_WITH_UNIT_TESTS)
 # vim:set et sw=2 ts=2:
