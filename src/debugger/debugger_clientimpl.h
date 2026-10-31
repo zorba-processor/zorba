@@ -93,6 +93,11 @@ namespace zorba {
                                      int aContextId = -1,
                                      std::size_t aMaxDataSize = 0,
                                      const std::string& aPropertyAddress = "");
+    virtual std::size_t property_set(const std::string& aPropertyLongName,
+                                     const std::string& aValue,
+                                     int aStackDepth = -1,
+                                     int aContextId = -1,
+                                     const std::string& aPropertyAddress = "");
     virtual std::size_t property_value(const std::string& aPropertyLongName,
                                        int aStackDepth = -1,
                                        int aContextId = -1,

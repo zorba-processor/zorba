@@ -2315,14 +2315,48 @@ void end_visit(debugger_expr& v)
   std::vector<xqtref_t> varTypes(numVars);
   std::vector<int> isGlobalVar(numVars);
 
+  // for the DBGP property_set command: the declared type of each in-scope
+  // variable and, for the variables that XQuery Scripting allows to assign
+  // (mutable prolog and block-local variables), the id and the dynamic
+  // context (local or global) under which their value is stored
+  checked_vector<xqtref_t> declaredTypes(numVars);
+  std::vector<ulong> assignableVarIds(numVars, 0);
+  std::vector<int> assignableVarIsLocal(numVars, 0);
+
   //create the eval iterator children
   for (csize i = 0; i < numVars; i++)
   {
     varNames[i] = v.get_var(i)->get_name();
     varTypes[i] = v.get_var(i)->get_type();
     isGlobalVar[i] = (v.get_var(i)->get_kind() == var_expr::prolog_var);
+  }
 
-    argvEvalIter.push_back(pop_itstack());
+  // the argument iterators are on the stack in reverse order
+  for (csize i = numVars; i-- > 0; )
+  {
+    PlanIter_t argIter = pop_itstack();
+
+    wrapper_expr* argWrapper = dynamic_cast<wrapper_expr*>(v.get_arg(i));
+    var_expr* argVar = (argWrapper ?
+                        dynamic_cast<var_expr*>(argWrapper->get_input()) :
+                        NULL);
+    CtxVarIterator* ctxVarIter = dynamic_cast<CtxVarIterator*>(argIter.getp());
+
+    if (argVar)
+    {
+      declaredTypes[i] = argVar->get_type();
+
+      if (ctxVarIter &&
+          argVar->is_mutable() &&
+          (argVar->get_kind() == var_expr::prolog_var ||
+           argVar->get_kind() == var_expr::local_var))
+      {
+        assignableVarIds[i] = ctxVarIter->getVarId();
+        assignableVarIsLocal[i] = ctxVarIter->isLocal();
+      }
+    }
+
+    argvEvalIter.push_back(argIter);
   }
 
   argvEvalIter.push_back(new DebuggerSingletonIterator(sctx,
@@ -2363,7 +2397,8 @@ void end_visit(debugger_expr& v)
                                   true));
 
   lDebugIterator->setChildren(&argv);
-  lDebugIterator->setVariables(varNames, varTypes);
+  lDebugIterator->setVariables(varNames, declaredTypes);
+  lDebugIterator->setAssignableVariables(assignableVarIds, assignableVarIsLocal);
 
   // link all debugger iterators in the tree
   if (!theDebuggerStack.empty())

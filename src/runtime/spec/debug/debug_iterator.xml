@@ -34,6 +34,8 @@
     <zorba:member type="DebugIterator*" name="theDebuggerParent" brief=""/>
     <zorba:member type="bool" name="theIsVarDeclaration" brief=""
       getterName="isVarDeclaration" setterName="setVarDeclaration"/>
+    <zorba:member type="std::vector&lt;ulong&gt;" name="theAssignableVarIds" brief=""/>
+    <zorba:member type="std::vector&lt;int&gt;" name="theAssignableVarIsLocal" brief=""/>
 
     <zorba:method return="const DebugIterator*" name="getDebuggerParent" const="true"/>
     <zorba:method return="std::vector&lt;DebugIterator*&gt;" name="getDebuggerChildren" const="true"/>
@@ -46,6 +48,15 @@
       <zorba:param type="Zorba_SerializerOptions*" name="aSerOptions"/>
     </zorba:method>
 
+    <zorba:method return="void" name="evalItems" const="true">
+      <zorba:param type="PlanState*" name="aState"/>
+      <zorba:param type="std::vector&lt;store::Item_t&gt;&amp;" name="aResult"/>
+    </zorba:method>
+    <zorba:method return="int" name="setVariable" const="true">
+      <zorba:param type="PlanState*" name="aState"/>
+      <zorba:param type="const zstring&amp;" name="aName"/>
+      <zorba:param type="std::vector&lt;store::Item_t&gt;&amp;" name="aValue"/>
+    </zorba:method>
     <zorba:method return="void" name="checkBreak" const="true">
       <zorba:param type="PlanState*" name="aState"/>
     </zorba:method>
@@ -65,6 +76,10 @@
     <zorba:method return="void" name="setVariables">
       <zorba:param type="checked_vector&lt;store::Item_t&gt;" name="aVarNames"/>
       <zorba:param type="checked_vector&lt;xqtref_t&gt;" name="aVarTypes"/>
+    </zorba:method>
+    <zorba:method return="void" name="setAssignableVariables">
+      <zorba:param type="std::vector&lt;ulong&gt;" name="aVarIds"/>
+      <zorba:param type="std::vector&lt;int&gt;" name="aIsLocal"/>
     </zorba:method>
   </zorba:iterator>
 </zorba:iterators>
