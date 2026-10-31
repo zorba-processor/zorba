@@ -16,6 +16,8 @@
 #include "stdafx.h"
 
 #include <cmath>
+#include <cstdint>
+#include <limits>
 #include <string>
 
 #include "zorbatypes/datetime.h"
@@ -738,6 +740,20 @@ Duration* Duration::operator-(const Duration& d) const
     }                                                                      \
   }
 
+/**
+ * Raises FODT0002 (F&O 3.0 10.1.1) if a duration of the given number of
+ * seconds cannot be represented: the result of * and div is split into int32
+ * years and seconds, and anything larger (or NaN) would overflow there.
+ */
+static void check_duration_overflow(const xs_double& total_seconds)
+{
+  static double const limit =
+    static_cast<double>(std::numeric_limits<int32_t>::max()) * seconds_per_year;
+
+  if (!(std::fabs(total_seconds.getNumber()) < limit))
+    throw XQUERY_EXCEPTION(err::FODT0002);
+}
+
 Duration* Duration::operator*(const xs_double& value) const
 {
   xs_double result;
@@ -758,6 +774,7 @@ Duration* Duration::operator*(const xs_double& value) const
   } catch (std::range_error const&) {
     throw XQUERY_EXCEPTION(err::FODT0002);
   }
+  check_duration_overflow(result);
 
   if (result < 0)
   {
@@ -797,6 +814,7 @@ Duration* Duration::operator/(const xs_double& value) const
   } catch (std::range_error const&) {
     throw XQUERY_EXCEPTION(err::FODT0002);
   }
+  check_duration_overflow(result);
 
   if (result < 0)
   {
