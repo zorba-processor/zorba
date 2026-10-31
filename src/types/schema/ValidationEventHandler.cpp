@@ -66,12 +66,6 @@ AttributeValidationInfo::AttributeValidationInfo(
 }
 
 
-TextValidationInfo::TextValidationInfo(const XMLCh *chars, unsigned int length)
-{
-  _value = StrX(chars, length).localForm();
-}
-
-
 void ValidationEventHandler::startDocumentEvent(
     const XMLCh *documentURI,
     const XMLCh *encoding)
@@ -94,7 +88,6 @@ void ValidationEventHandler::startElementEvent(
   //cout << "   veh SElm: " << StrX(localName) << "\n";    
 
   resetAttList();
-  resetTextInfo();    
 }
 
 
@@ -115,7 +108,6 @@ void ValidationEventHandler::endElementEvent(
 {
   //cout << "   veh EElm: " << StrX(localName) << "  T:" << StrX(typeName) << "\n";
   resetAttList();
-  resetTextInfo();
 }
 
 
@@ -129,7 +121,6 @@ void ValidationEventHandler::textEvent(const XMLCh *chars, unsigned int length)
 {
   //cout << "     veh Text: " << StrX(chars) << "  length:" << length << "\n";
   resetAttList();
-  resetTextInfo();
 }
 
 
@@ -174,16 +165,6 @@ void ValidationEventHandler::resetAttList()
   }
 }
  
-              
-void ValidationEventHandler::resetTextInfo()
-{
-  if ( _textInfo != NULL )
-  {   
-    delete _textInfo;
-    _textInfo = NULL;
-  }
-}
-  
 }  // end namespace zorba
 
 #endif // ZORBA_NO_XMLSCHEMA
