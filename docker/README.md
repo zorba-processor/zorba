@@ -45,6 +45,15 @@ no per-release tags.
 | `latest-toolchain` | Arch Linux with the newest GCC, Clang, CMake and libraries (`builder-latest/`); the linux-amd64 CI jobs |
 | `ubuntu-24.04` | Ubuntu 24.04 with GCC 13 (`builder/`); the oldest supported toolchain, as in the linux-arm64 CI job |
 
+Both builder images and the `zorba` runtime image use Xerces-C from the
+[zorba-processor/xerces-c](https://github.com/zorba-processor/xerces-c) fork
+(branch `zorba-patches`, tag pinned to a commit in each Dockerfile; keep the
+three in sync), built from source into `/usr/local`, instead of the
+distribution package: stock Xerces-C 3.3.0 and earlier reject valid schemas
+that restrict a union type (see `KNOWN_ISSUES.txt`). The runtime image ships
+only `libxerces-c-3.3.so`. The macOS CI job (Homebrew) and the CodeQL workflow
+(Ubuntu packages) use stock Xerces-C.
+
 ## Attestations and SBOMs
 
 Release images carry:

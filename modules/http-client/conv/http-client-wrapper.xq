@@ -45,6 +45,7 @@ import schema namespace http-schema = "http://expath.org/ns/http-client";
 declare namespace an = "http://zorba.io/annotations";
 declare namespace ver = "http://zorba.io/options/versioning";
 declare namespace err = "http://www.w3.org/2005/xqt-errors";
+declare namespace zerr = "http://zorba.io/errors";
 declare namespace ser  = "http://www.w3.org/2010/xslt-xquery-serialization";
 declare namespace jn = "http://jsoniq.org/functions";
 
@@ -112,6 +113,9 @@ declare %an:sequential function http-wrapper:http-sequential-request(
     fn:error($error:HCV02, "Trying to follow a redirect of a POST, PUT, or DELETE request.")
   } catch json-http:CHARSET {
     fn:error($error:HC005, "The input request element is not valid: invalid charset specified.")
+  } catch zerr:ZXQP0029 {
+    (: A denial by the security policy keeps its code. :)
+    fn:error($err:code, $err:description, $err:value)
   } catch * {
     fn:error(fn:QName($error:errNS, fn:local-name-from-QName($err:code)),$err:description, $err:value)
   }
@@ -179,6 +183,9 @@ declare %an:nondeterministic function http-wrapper:http-nondeterministic-request
     fn:error($error:HCV02, "Trying to follow a redirect of a POST, PUT, or DELETE request.")
   } catch json-http:CHARSET {
     fn:error($error:HC005, "The input request element is not valid: invalid charset specified.")
+  } catch zerr:ZXQP0029 {
+    (: A denial by the security policy keeps its code. :)
+    fn:error($err:code, $err:description, $err:value)
   } catch * {
     fn:error(fn:QName($error:errNS, fn:local-name-from-QName($err:code)),$err:description, $err:value)
   }  

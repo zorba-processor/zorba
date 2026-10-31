@@ -64,16 +64,16 @@ jobs:
       - uses: actions/cache@v6
         with:
           path: .ccache
-          key: ccache-qt3-${{ github.sha }}
+          key: ccache-v2-qt3-${{ github.sha }}
           restore-keys: |
-            ccache-qt3-
-            ccache-linux-amd64-latest-
+            ccache-v2-qt3-
+            ccache-v2-linux-amd64-latest-
 
       - name: Build
         run: |
           docker run --rm \
             -e CCACHE_DIR=/src/.ccache \
-            -e CCACHE_SLOPPINESS=pch_defines,time_macros \
+            -e CCACHE_SLOPPINESS=pch_defines,time_macros -e CCACHE_DEPEND=1 \
             -v "$PWD":/src -w /src zorba-builder:ci sh -ec '
               cmake --preset full-release
               cmake --build --preset full-release

@@ -1759,7 +1759,12 @@ bool FnEnvironmentVariableIterator::nextImpl(store::Item_t& result, PlanState& p
   consumeNext(item, theChildren[0].getp(),planState);
 
   item->getStringValue2(varname);
-  result = planState.theLocalDynCtx->get_environment_variable(varname);
+  // Without the Environment capability the process environment is not
+  // visible: the variable does not exist (not an error).
+  if (theSctx->allows_capability(Capability::Environment))
+    result = planState.theLocalDynCtx->get_environment_variable(varname);
+  else
+    result = NULL;
   STACK_PUSH(result!=NULL, state);
 
   STACK_END(state);
@@ -1774,14 +1779,21 @@ bool FnAvailableEnvironmentVariablesIterator::nextImpl(store::Item_t& result, Pl
   FnAvailableEnvironmentVariablesIteratorState* state;
   DEFAULT_STACK_INIT(FnAvailableEnvironmentVariablesIteratorState, state, planState);
 
-  state->theIterator = planState.theLocalDynCtx->available_environment_variables();
+  // Without the Environment capability the process environment is not
+  // visible: there are no variables (not an error).
+  if (theSctx->allows_capability(Capability::Environment))
+    state->theIterator =
+      planState.theLocalDynCtx->available_environment_variables();
 
-  state->theIterator->open();
-  while (state->theIterator->next(result))
+  if (state->theIterator)
   {
-    STACK_PUSH(true, state);
+    state->theIterator->open();
+    while (state->theIterator->next(result))
+    {
+      STACK_PUSH(true, state);
+    }
+    state->theIterator->close();
   }
-  state->theIterator->close();
   STACK_END(state);
 }
 

@@ -235,6 +235,17 @@ DynamicLoader::getExternalModule(zstring const& aNsURI, static_context& aSctx)
 
   if (lLibPath.size() != 0)
   {
+    // Loading native code needs the NativeModules capability. Modules that
+    // the embedder registers (StaticContext::registerModule) never get
+    // here. The library path holds only trusted directories: the built-in
+    // ones, those set through the API and, only where the policy allows
+    // Environment, ZORBA_LIB_PATH.
+    if (!aSctx.allows_capability(Capability::NativeModules))
+    {
+      throw XQUERY_EXCEPTION(zerr::ZXQP0067_CAPABILITY_NOT_ENABLED,
+      ERROR_PARAMS(aNsURI, "NativeModules"));
+    }
+
     URI lURI(aNsURI);
 
     // Lookup version of the module

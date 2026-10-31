@@ -54,6 +54,8 @@ jobs:
       image_tags: ${{ steps.v.outputs.image_tags }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0  # the changelog assembler reads git history for PR numbers
 
       - name: Determine version, prerelease and image tags
         id: v
@@ -127,6 +129,30 @@ jobs:
             echo "| GitHub latest | $latest |"
             echo "| Image tags | \`$tags\` |"
           } >> "$GITHUB_STEP_SUMMARY"
+
+      # Fragments are assembled into CHANGELOG.md by the owner, in a pull
+      # request, before tagging (RELEASING.md). A real release refuses to run
+      # with fragments left over; a dry run assembles them in this runner's
+      # checkout only, so the notes show what the release will contain.
+      # Nothing is ever pushed.
+      - name: Check changelog fragments
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+          DRY_RUN: ${{ steps.v.outputs.dry_run }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          frags=()
+          for f in changelog.d/*.md; do
+            [ "$(basename "$f")" = README.md ] || frags+=("$f")
+          done
+          [ "${#frags[@]}" -eq 0 ] && exit 0
+          if [ "$DRY_RUN" != true ]; then
+            echo "::error::Unassembled changelog fragments: ${frags[*]}. Run 'python3 scripts/changelog_assemble.py --version ${VERSION%%-*} --date YYYY-MM-DD' in a pull request, merge it, and tag again (see RELEASING.md)."
+            exit 1
+          fi
+          echo "::warning::Dry run: assembling ${#frags[@]} changelog fragment(s) in memory (not committed)"
+          python3 scripts/changelog_assemble.py --version "${VERSION%%-*}"
 
       - name: Extract the release notes from CHANGELOG.md
         env:
@@ -366,6 +392,23 @@ jobs:
           out="$(docker run --rm "$REF" -q '1 + 1')"
           echo "$out"
           grep -Eq '(^|>)2$' <<< "$out"
+          # Xerces-C must be the patched build in /usr/local (KNOWN_ISSUES.txt):
+          # it loads a schema restricting a union-typed element to a
+          # restriction of the union, which stock Xerces-C 3.3.0 rejects.
+          libs="$(docker run --rm --entrypoint sh "$REF" -c 'ldd "$(command -v zorba)"')"
+          grep -i xerces <<< "$libs" | sort -u
+          grep -q 'libxerces-c-3.3.so => /usr/local/lib/' <<< "$libs"
+          mkdir -p xsd
+          printf '%s\n' '<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:u="urn:u" targetNamespace="urn:u" elementFormDefault="qualified">' \
+            '<xs:simpleType name="d"><xs:union memberTypes="xs:date xs:gYear"/></xs:simpleType>' \
+            '<xs:simpleType name="r"><xs:restriction base="u:d"><xs:pattern value="20.*"/></xs:restriction></xs:simpleType>' \
+            '<xs:complexType name="b"><xs:sequence><xs:element name="e" type="u:d"/></xs:sequence></xs:complexType>' \
+            '<xs:complexType name="c"><xs:complexContent><xs:restriction base="u:b"><xs:sequence><xs:element name="e" type="u:r"/></xs:sequence></xs:restriction></xs:complexContent></xs:complexType>' \
+            '<xs:element name="x" type="u:c"/>' \
+            '</xs:schema>' > xsd/u.xsd
+          out="$(docker run --rm -v "$PWD/xsd:/xsd:ro" "$REF" -q 'import schema namespace u = "urn:u" at "file:///xsd/u.xsd"; validate { <u:x><u:e>2024</u:e></u:x> } instance of element(u:x)')"
+          echo "$out"
+          grep -Eq '(^|>)true$' <<< "$out"
         env:
           REF: ${{ env.DRY_RUN == 'true' && 'zorba-release:local' || format('{0}@{1}', env.IMAGE, steps.build.outputs.digest) }}
 

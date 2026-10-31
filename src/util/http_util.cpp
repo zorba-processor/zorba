@@ -31,8 +31,9 @@
 
 namespace zorba {
   
-  HttpStream::HttpStream(const zstring& aUri)
-    : theUri(aUri)
+  HttpStream::HttpStream(const zstring& aUri, const SecurityPolicy* aPolicy)
+    : theUri(aUri),
+      thePolicy(aPolicy ? new SecurityPolicy(*aPolicy) : nullptr)
   {
   }
   
@@ -51,6 +52,16 @@ namespace zorba {
 #ifdef ZORBA_HAVE_CURL
     Zorba* lInstance = Zorba::getInstance(0);
     theStaticContext = lInstance->createStaticContext();
+    if (thePolicy)
+    {
+      // The inner query runs fixed engine code, so loading the native
+      // http-client library is allowed even where the caller's policy does
+      // not allow NativeModules; everything else is the caller's policy, so
+      // the http-client module checks the URL, every redirect and every
+      // connection against it.
+      theStaticContext->setSecurityPolicy(
+          SecurityPolicy(*thePolicy).allow(Capability::NativeModules));
+    }
     ItemFactory* lFactory = lInstance->getItemFactory();
     Item lNodeName = lFactory->createQName("http://expath.org/ns/http-client", "http", "request");
     Item lEmptyItem;

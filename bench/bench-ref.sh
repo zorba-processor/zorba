@@ -8,7 +8,7 @@ DIR=$1 LABEL=$2 NAME=$3
 mkdir -p out .ccache
 
 docker run --rm \
-  -e CCACHE_DIR=/ccache -e CCACHE_SLOPPINESS=pch_defines,time_macros \
+  -e CCACHE_DIR=/ccache -e CCACHE_SLOPPINESS=pch_defines,time_macros -e CCACHE_DEPEND=1 \
   -e LABEL="$LABEL" -e RUNS="${RUNS:-5}" -e QUERY_TIMEOUT="${QUERY_TIMEOUT:-300}" -e NAME="$NAME" \
   -v "$PWD/$DIR":/src -v "$PWD/.ccache":/ccache \
   -v "$PWD/bench":/bench:ro -v "$PWD/bench-data":/data:ro -v "$PWD/out":/out \
