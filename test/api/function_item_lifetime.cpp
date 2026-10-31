@@ -242,12 +242,15 @@ void test_returned_inner_closure(Zorba* z)
 }
 
 // A closure created by a second query that captures the first query's
-// function item outlives both queries.
+// function item outlives both queries. The item is captured through a local
+// variable: a function body reads prolog variables from the dynamic context
+// of the query that invokes it, not from that of the query that created it.
 void test_closure_over_function_item(Zorba* z)
 {
   Item lF = function_item(z, "function($x) { $x * 10 }");
   Item lG = function_item(z,
-      "declare variable $f external; function($y) { $f($y) * 2 }",
+      "declare variable $f external;\n"
+      "let $g := $f return function($y) { $g($y) * 2 }",
       std::vector<Item>(1, lF));
   lF = Item();
   CHECK_EQ(apply(z, "$f(3)", lG), "60");
