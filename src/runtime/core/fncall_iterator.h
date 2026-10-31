@@ -92,6 +92,16 @@ public:
   ------------
   Whether thePlan has been opened already or not.
 
+  thePlanRan:
+  -----------
+  Whether thePlan has been run (consumed from) since it was opened or last
+  reset. A plan that has not run is still in its reset state, so reset()
+  skips it. Resetting a plan walks its whole tree, including the states of the
+  function calls in it and, through them, the bodies of those functions (for
+  a recursive function, every level of the recursion reached so far); doing
+  that on every reset of the caller made each call pay for all the calls ever
+  opened below it, run or not.
+
   thePlanStateSize:
   -----------------
   The size of the plan state block.
@@ -124,6 +134,7 @@ public:
   PlanIter_t thePlan;
   PlanState* thePlanState;
   bool thePlanOpen;
+  bool thePlanRan;
   uint32_t thePlanStateSize;
 
   std::vector<ItemIterator_t> theArgValues;

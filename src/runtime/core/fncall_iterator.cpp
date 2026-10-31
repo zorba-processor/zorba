@@ -112,6 +112,7 @@ UDFunctionCallIteratorState::UDFunctionCallIteratorState():
   thePlan(NULL),
   thePlanState(NULL),
   thePlanOpen(false),
+  thePlanRan(false),
   thePlanStateSize(0)
 {
 }
@@ -516,6 +517,7 @@ bool UDFunctionCallIterator::nextImplCache(store::Item_t& aResult, PlanState& aP
     //Disable automatic caching
     //Try to evaluate the function as if no cache is present
     theUDF->disableAutomaticCaching();
+    lState->thePlanRan = true;
     bindArguments(lState, true);
 
     DEBUGGER_PUSH_FRAME;
@@ -565,6 +567,8 @@ bool UDFunctionCallIterator::nextImplCache(store::Item_t& aResult, PlanState& aP
 
     if (!lCacheHit)
     {
+      lState->thePlanRan = true;
+
       DEBUGGER_PUSH_FRAME;
 
       if (consumeNext(aResult, lState->thePlan, *lState->thePlanState))
@@ -641,6 +645,7 @@ bool UDFunctionCallIterator::nextImplNoCache(store::Item_t& aResult, PlanState& 
     lState->thePlanOpen = true;
   }
 
+  lState->thePlanRan = true;
   bindArguments(lState, false);
 
   DEBUGGER_PUSH_FRAME;
