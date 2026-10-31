@@ -2338,14 +2338,19 @@ void* import_schema(
          lIter != lCandidates.end();
          ++lIter)
     {
+      zstring lCandidateError;
       lSchema = theSctx->resolve_uri(*lIter, internal::EntityData::SCHEMA,
-                                     lErrorMessage);
+                                     lCandidateError);
 
       lStream = dynamic_cast<internal::StreamResource*>(lSchema.get());
       if (lStream != NULL)
       {
         break;
       }
+      // Report why the first candidate (e.g. the location hint the query
+      // gave, if the security policy denied it) could not be loaded.
+      if (lErrorMessage.empty())
+        lErrorMessage = lCandidateError;
     }
 
     if (lStream == NULL)
