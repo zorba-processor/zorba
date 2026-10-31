@@ -18,6 +18,8 @@
 #include "runtime/parsing_and_serializing/parsing_and_serializing.h"
 
 #include <iostream>
+#include <set>
+#include <utility>
 
 #include "zorbatypes/URI.h"
 #include "diagnostics/xquery_diagnostics.h"
@@ -123,37 +125,71 @@ FnSerializeIterator::setSerializationParams(
     const QueryLoc& aLoc
 )
 {
+  static char const lOutputNs[] =
+    "http://www.w3.org/2010/xslt-xquery-serialization";
+
   store::Item_t lElemName = aParamElem->getNodeName();
 
-  // make sure the user does not pass children of the serialization-parameters
-  // element which would pass the schema validation below but break the logic after
+  // $params is declared as element(output:serialization-parameters)?, so any
+  // other element is a type error (F&O 3.0, 14.9.2). The check also keeps
+  // children of the element, which would pass the schema validation below,
+  // from breaking the logic after it.
   if (lElemName->getLocalName() != "serialization-parameters")
   {
     ztd::string_builder lSb;
     lSb << lElemName->getLocalName();
 
-    RAISE_ERROR(err::XQDY0027, aLoc,
+    RAISE_ERROR(err::XPTY0004, aLoc,
       ERROR_PARAMS(ZED(XQDY0027_SerializationElementName_2), lSb));
   }
 
-  // the provided element must be in the correct namespace otherwise
-  // the user can pass a validated element from another namespace
-  // which would make the schema validation below fail
-  if (lElemName->getNamespace() != "http://www.w3.org/2010/xslt-xquery-serialization")
+  if (lElemName->getNamespace() != lOutputNs)
   {
-    ztd::string_builder lSb;
     zstring lFoundNs("");
     if (lElemName->getNamespace().size() > 0)
       lFoundNs += lElemName->getNamespace();
 
-    RAISE_ERROR(err::XQDY0027, aLoc,
+    RAISE_ERROR(err::XPTY0004, aLoc,
       ERROR_PARAMS(ZED(XQDY0027_SerializationElementNs_2), lFoundNs));
   }
 
 #ifndef ZORBA_NO_XMLSCHEMA
-  // this will throw an error if the validation fails
-  aSctx->validate(aParamElem, aParamElem, StaticContextConsts::strict_validation);
+  // An element that is not valid against the schema for serialization
+  // parameters is a serialization error, not a validate-expression error
+  // (Serialization 3.0, 3.1: SEPM0017).
+  try
+  {
+    aSctx->validate(aParamElem, aParamElem, StaticContextConsts::strict_validation);
+  }
+  catch (XQueryException const& e)
+  {
+    RAISE_ERROR(err::SEPM0017, aLoc, ERROR_PARAMS(e.what()));
+  }
 #endif
+
+  // Each parameter may be specified only once (SEPM0019). Elements in other
+  // namespaces (implementation-defined parameters of other processors) are
+  // allowed by the schema and ignored here, but are subject to the same rule.
+  {
+    std::set<std::pair<zstring, zstring> > lSeen;
+    store::Iterator_t lIter = aParamElem->getChildren();
+    lIter->open();
+    store::Item_t lChild;
+    while (lIter->next(lChild))
+    {
+      if (lChild->getNodeKind() != store::StoreConsts::elementNode)
+        continue;
+      store::Item_t lName = lChild->getNodeName();
+      if (!lSeen.insert(std::make_pair(lName->getNamespace(),
+                                       lName->getLocalName())).second)
+      {
+        lIter->close();
+        RAISE_ERROR(err::SEPM0019, aLoc,
+          ERROR_PARAMS(lName->getStringValue()));
+      }
+    }
+    lIter->close();
+  }
 
   // get the children iterator
   store::Iterator_t lElemIter = aParamElem->getChildren();
@@ -175,7 +211,11 @@ FnSerializeIterator::setSerializationParams(
       }
 
       store::Item_t lChildName = lChildElem->getNodeName();
-      if (lChildName->getLocalName() == "use-character-maps")
+      if (lChildName->getNamespace() != lOutputNs)
+      {
+        // not a standard serialization parameter: ignored
+      }
+      else if (lChildName->getLocalName() == "use-character-maps")
       {
         // TODO: once zorba the serializer supports character maps
       }

@@ -285,6 +285,16 @@ bool SecurityPolicy::checkURI(
     EntityData::Kind aKind,
     bool aWrite) const
 {
+  return checkURI(aURI, aKind, aWrite, nullptr);
+}
+
+
+bool SecurityPolicy::checkURI(
+    const String& aURI,
+    EntityData::Kind aKind,
+    bool aWrite,
+    String* aReason) const
+{
   security::Use lUse;
   switch (aKind)
   {
@@ -303,7 +313,38 @@ bool SecurityPolicy::checkURI(
       lUse = security::Use::Document;
       break;
   }
-  return security::check(*this, aURI.str(), lUse, aWrite).allowed;
+  security::Verdict const lVerdict =
+    security::check(*this, aURI.str(), lUse, aWrite);
+  if (!lVerdict.allowed && aReason)
+    *aReason = lVerdict.reason;
+  return lVerdict.allowed;
+}
+
+
+bool SecurityPolicy::checkConnection(
+    const String& aURL,
+    const String& aAddress,
+    String* aReason) const
+{
+  security::Verdict const lVerdict =
+    security::check_connection(*this, aURL.str(), aAddress.str());
+  if (!lVerdict.allowed && aReason)
+    *aReason = lVerdict.reason;
+  return lVerdict.allowed;
+}
+
+
+std::unique_ptr<std::istream> SecurityPolicy::openFile(
+    const String& aPath,
+    bool aBinary,
+    String* aReason) const
+{
+  security::Verdict lVerdict;
+  std::unique_ptr<std::istream> lStream = security::open_file(
+      *this, aPath.str(), security::Use::Document, nullptr, aBinary, lVerdict);
+  if (!lVerdict.allowed && aReason)
+    *aReason = lVerdict.reason;
+  return lStream;
 }
 
 

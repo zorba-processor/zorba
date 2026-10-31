@@ -6,6 +6,7 @@
 #include <zorba/user_exception.h>
 #include <zorba/uri_resolvers.h>
 #include <zorba/vector_item_sequence.h>
+#include <zorba/security.h>
 #include <zorba/serializer.h>
 #include <zorba/xquery.h>
 #include <zorba/internal/unique_ptr.h>
@@ -464,6 +465,9 @@ zorba::ItemSequence_t PrepareMainModuleFunction::evaluate(
 
   StaticContext_t ltempSctx = lZorba->createStaticContext();
   ltempSctx->setBaseURI(aSctx->getBaseURI());
+  // The prepared query runs under the policy of the calling query, never a
+  // wider one (the new context would otherwise get the instance default).
+  ltempSctx->setSecurityPolicy(aSctx->getSecurityPolicy());
 
   std::unique_ptr<ZorbaQueryURLResolver> lResolver;
   std::unique_ptr<ZorbaQueryURIMapper> lMapper;
@@ -548,9 +552,13 @@ zorba::ItemSequence_t PrepareLibraryModuleFunction::evaluate(
   Zorba_CompilerHints_t hints;
   hints.lib_module = true;
 
+  // Compiling resolves imports: do it under the policy of the calling query.
+  StaticContext_t lSctx = lZorba->createStaticContext();
+  lSctx->setSecurityPolicy(aSctx->getSecurityPolicy());
+
   try
   {
-    lZorba->compileQuery(lQueryString, hints);
+    lZorba->compileQuery(lQueryString, lSctx, hints);
   }
   catch (XQueryException& xe)
   {
@@ -1002,6 +1010,18 @@ zorba::ItemSequence_t LoadFromQueryPlanFunction::evaluate(
     const zorba::StaticContext* aSctx,
     const zorba::DynamicContext* aDctx) const 
 {
+  // A plan carries the security policy it was compiled under, and the plan
+  // comes from the calling query, so loading it could widen the caller's
+  // policy. Only a caller that may do everything anyway can load plans.
+  if (!SecurityPolicy::unrestricted().isWithin(aSctx->getSecurityPolicy()))
+  {
+    Item lErrQName = ZorbaQueryModule::getItemFactory()->createQName(
+        "http://zorba.io/errors", "zerr", "ZXQP0067");
+    throw USER_EXCEPTION(lErrQName,
+        "\"zq:load-from-query-plan\": requires capability \"all capabilities "
+        "(unrestricted policy)\"");
+  }
+
   Item lQueryPlanItem = ZorbaQueryFunction::getItemArgument(aArgs,0);
   std::istream& lQueryPlanStream = lQueryPlanItem.getStream();
 

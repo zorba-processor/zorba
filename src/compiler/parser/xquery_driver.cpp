@@ -79,6 +79,15 @@ void xquery_driver::addCommonLanguageWarning(const location &loc, const char* wa
 }
 
 // Error generators
+// The scanner can report several errors while the parser recovers; only the
+// last one is kept (the parser reads it in error()), so free the previous one.
+ZorbaParserError* xquery_driver::setParserError(ZorbaParserError* err)
+{
+  delete parserError;
+  parserError = err;
+  return err;
+}
+
 ZorbaParserError* xquery_driver::unrecognizedCharErr(const char* _error_token, const location& loc)
 {
   std::string token;
@@ -94,32 +103,27 @@ ZorbaParserError* xquery_driver::unrecognizedCharErr(const char* _error_token, c
   else
     token = _error_token;
 
-  parserError = new ZorbaParserError("syntax error: unexpected character \"" + token + "\"", loc);
-  return parserError;
+  return setParserError(new ZorbaParserError("syntax error: unexpected character \"" + token + "\"", loc));
 };
 
 ZorbaParserError* xquery_driver::unterminatedCommentErr(const location& loc)
 {
-  parserError = new ZorbaParserError("syntax error: unexpected end of file, unterminated comment", loc);
-  return parserError;
+  return setParserError(new ZorbaParserError("syntax error: unexpected end of file, unterminated comment", loc));
 }
 
 ZorbaParserError* xquery_driver::unterminatedElementConstructor(const location& loc)
 {
-  parserError = new ZorbaParserError("syntax error: unexpected end of file, unterminated direct element constructor", loc);
-  return parserError;
+  return setParserError(new ZorbaParserError("syntax error: unexpected end of file, unterminated direct element constructor", loc));
 }
 
 ZorbaParserError* xquery_driver::noClosingTagForElementConstructor(const location& loc)
 {
-  parserError = new ZorbaParserError("syntax error: unexpected end of file, no closing tag for direct element constructor", loc);
-  return parserError;
+  return setParserError(new ZorbaParserError("syntax error: unexpected end of file, no closing tag for direct element constructor", loc));
 }
 
 ZorbaParserError* xquery_driver::unrecognizedToken(const char* _error_token, const location& loc)
 {
-  parserError = new ZorbaParserError(std::string("syntax error: unexpected \"") + _error_token + "\"", loc);
-  return parserError;
+  return setParserError(new ZorbaParserError(std::string("syntax error: unexpected \"") + _error_token + "\"", loc));
 }
 
 ZorbaParserError* xquery_driver::invalidCharRef(const char* _message, const location& loc)
@@ -146,21 +150,18 @@ ZorbaParserError* xquery_driver::invalidCharRef(const char* _message, const loca
     ref += " ";
   }
 
-  parserError = new ZorbaParserError(std::string("syntax error: invalid character or entity reference "
-      + ref + "in the string literal ") + _message + ".", loc);
-  return parserError;
+  return setParserError(new ZorbaParserError(std::string("syntax error: invalid character or entity reference "
+      + ref + "in the string literal ") + _message + ".", loc));
 }
 
 ZorbaParserError* xquery_driver::parserErr(const std::string& _message, const location& loc, Error const &code)
 {
-  parserError = new ZorbaParserError(_message, loc, code);
-  return parserError;
+  return setParserError(new ZorbaParserError(_message, loc, code));
 }
 
 ZorbaParserError* xquery_driver::parserErr(const std::string& _message, const QueryLoc& loc, Error const &code)
 {
-  parserError = new ZorbaParserError(_message, loc, code);
-  return parserError;
+  return setParserError(new ZorbaParserError(_message, loc, code));
 }
 
 bool xquery_driver::parse_stream(std::istream& in, const zstring& aFilename)

@@ -17,6 +17,8 @@
 #ifndef ZORBA_SECURITY_CHECK_H
 #define ZORBA_SECURITY_CHECK_H
 
+#include <istream>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -62,14 +64,15 @@ struct Verdict
  *   current directory, with symbolic links of its existing part resolved.
  *   For Use::Import and Use::Data, a path under one of aTrustedDirs (which
  *   must be canonical, see canonical_path()) is allowed without capability.
- * - An http, https or ftp URL needs Network (and RemoteImport for
+ * - An http, https, ftp or ftps URL needs Network (and RemoteImport for
  *   Use::Import), must match a network prefix if there are any (same scheme,
  *   host and port; path on a segment boundary, after dot-segment removal),
  *   and must not resolve to a loopback, private or link-local address unless
  *   the policy allows private addresses or the matching prefix names that
  *   address literally (or "localhost").
- * - "xqftts:" thesaurus URIs are file: URIs; "wordnet:" thesauri come from
- *   the library path and are allowed.
+ * - "xqftts:" thesaurus URIs are file: URIs. "wordnet:" thesauri (and the
+ *   default thesaurus, "##default") are read from the library path, like
+ *   native modules, and need NativeModules.
  * - Any other scheme is allowed only if neither file nor network access is
  *   restricted at all.
  */
@@ -79,6 +82,91 @@ Verdict check(
     Use aUse,
     bool aWrite = false,
     const std::vector<std::string>* aTrustedDirs = nullptr);
+
+/**
+ * Checks a network connection made to fetch aURL (an http, https, ftp or
+ * ftps URL) to the numeric address aAddress (IPv4 or IPv6, as curl reports
+ * it). Used for every connection the HTTP and FTP clients make, including
+ * redirects, so that neither a redirect nor a DNS answer that differs from
+ * the one seen when the URI was resolved can reach a denied host.
+ *
+ * The URL must be allowed by the network rules of check() (Network, network
+ * prefixes); instead of resolving the host, the address actually connected
+ * to must not be a loopback, private or link-local address unless the policy
+ * allows private addresses or the matching prefix names a private host
+ * literally (or "localhost").
+ */
+Verdict check_connection(
+    const SecurityPolicy& aPolicy,
+    const std::string& aURL,
+    const std::string& aAddress);
+
+/**
+ * True if the policy lets file reads through unchecked: FileRead allowed
+ * with no read paths.
+ */
+bool file_reads_unrestricted(const SecurityPolicy& aPolicy);
+
+/**
+ * Opens a file for reading and checks the file actually opened.
+ *
+ * The file is opened first; then the real path of the open file (from the
+ * file descriptor: /proc/self/fd on Linux, F_GETPATH on macOS) is checked
+ * with check(aPolicy, path, aUse, false, aTrustedDirs). A symbolic link
+ * swapped between an earlier check and the open therefore cannot redirect
+ * the read outside the allowed paths. Where the real path of a descriptor is
+ * not available, the canonical path is checked and must name the same file
+ * (device and inode) as the descriptor. On Windows the path is checked and
+ * then opened (not race-free).
+ *
+ * If the policy does not restrict file reads (file_reads_unrestricted()),
+ * the file is opened with std::ifstream without any check, as before.
+ *
+ * aBinary selects binary mode where text mode differs (Windows); the
+ * descriptor-based stream used elsewhere is always binary.
+ *
+ * Returns the stream, or null if the file cannot be opened or the access is
+ * denied; oVerdict tells which.
+ */
+std::unique_ptr<std::istream> open_file(
+    const SecurityPolicy& aPolicy,
+    const std::string& aPath,
+    Use aUse,
+    const std::vector<std::string>* aTrustedDirs,
+    bool aBinary,
+    Verdict& oVerdict);
+
+/**
+ * The policy under which the built-in URL resolvers run on this thread.
+ * static_context::apply_url_resolvers() sets it around each call to a
+ * built-in resolver, so that a resolver can apply the policy of the context
+ * that asked (the file resolver checks the file it opens; the HTTP resolver
+ * runs its request under that policy). Scopes nest.
+ */
+class ResolutionScope
+{
+public:
+  ResolutionScope(const SecurityPolicy& aPolicy,
+                  Use aUse,
+                  const std::vector<std::string>* aTrustedDirs);
+  ~ResolutionScope();
+
+  ResolutionScope(const ResolutionScope&) = delete;
+  ResolutionScope& operator=(const ResolutionScope&) = delete;
+
+  /** The innermost scope of this thread, or null. */
+  static const ResolutionScope* current();
+
+  const SecurityPolicy& policy() const { return thePolicy; }
+  Use use() const { return theUse; }
+  const std::vector<std::string>* trustedDirs() const { return theTrustedDirs; }
+
+private:
+  const SecurityPolicy&            thePolicy;
+  Use                              theUse;
+  const std::vector<std::string>*  theTrustedDirs;
+  const ResolutionScope*           thePrevious;
+};
 
 /**
  * The canonical form of a path or file: URI: normalized, absolute against

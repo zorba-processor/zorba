@@ -1759,7 +1759,12 @@ bool FnEnvironmentVariableIterator::nextImpl(store::Item_t& result, PlanState& p
   consumeNext(item, theChildren[0].getp(),planState);
 
   item->getStringValue2(varname);
-  result = planState.theLocalDynCtx->get_environment_variable(varname);
+  // Without the Environment capability the process environment is not
+  // visible: the variable does not exist (not an error).
+  if (theSctx->allows_capability(Capability::Environment))
+    result = planState.theLocalDynCtx->get_environment_variable(varname);
+  else
+    result = NULL;
   STACK_PUSH(result!=NULL, state);
 
   STACK_END(state);
@@ -1774,14 +1779,21 @@ bool FnAvailableEnvironmentVariablesIterator::nextImpl(store::Item_t& result, Pl
   FnAvailableEnvironmentVariablesIteratorState* state;
   DEFAULT_STACK_INIT(FnAvailableEnvironmentVariablesIteratorState, state, planState);
 
-  state->theIterator = planState.theLocalDynCtx->available_environment_variables();
+  // Without the Environment capability the process environment is not
+  // visible: there are no variables (not an error).
+  if (theSctx->allows_capability(Capability::Environment))
+    state->theIterator =
+      planState.theLocalDynCtx->available_environment_variables();
 
-  state->theIterator->open();
-  while (state->theIterator->next(result))
+  if (state->theIterator)
   {
-    STACK_PUSH(true, state);
+    state->theIterator->open();
+    while (state->theIterator->next(result))
+    {
+      STACK_PUSH(true, state);
+    }
+    state->theIterator->close();
   }
-  state->theIterator->close();
   STACK_END(state);
 }
 
@@ -1873,20 +1885,19 @@ bool FnUnparsedTextIterator::nextImpl(store::Item_t& result, PlanState& planStat
   PlanIteratorState* state;
   DEFAULT_STACK_INIT(PlanIteratorState, state, planState);
 
-  if (!consumeNext(uriItem, theChildren[0].getp(), planState))
+  // An empty $href yields the empty sequence.
+  if (consumeNext(uriItem, theChildren[0].getp(), planState))
   {
-    STACK_PUSH(false, state);
-  }
+    if (theChildren.size() == 2)
+    {
+      consumeNext(encodingItem, theChildren[1].getp(), planState);
+      encodingItem->getStringValue2(encodingString);
+    }
 
-  if (theChildren.size() == 2)
-  {
-    consumeNext(encodingItem, theChildren[1].getp(), planState);
-    encodingItem->getStringValue2(encodingString);
+    uriItem->getStringValue2(uriString);
+    readDocument(uriString, encodingString, theSctx, planState, loc, result);
+    STACK_PUSH(true, state);
   }
-
-  uriItem->getStringValue2(uriString);
-  readDocument(uriString, encodingString, theSctx, planState, loc, result);
-  STACK_PUSH(true, state);
 
   STACK_END(state);
 }
@@ -1907,30 +1918,30 @@ bool FnUnparsedTextAvailableIterator::nextImpl(store::Item_t& result, PlanState&
   PlanIteratorState* state;
   DEFAULT_STACK_INIT(PlanIteratorState, state, planState);
 
-  if (!consumeNext(uriItem, theChildren[0].getp(), planState))
+  // An empty $href yields false. This must not fall through to the code
+  // below when the iterator is resumed: uriItem is null then.
+  if (consumeNext(uriItem, theChildren[0].getp(), planState))
   {
-    STACK_PUSH(GENV_ITEMFACTORY->createBoolean(result, false), state);
-  }
+    if (theChildren.size() == 2)
+    {
+      consumeNext(encodingItem, theChildren[1].getp(), planState);
+      encodingItem->getStringValue2(encodingString);
+    }
 
-  if (theChildren.size() == 2)
-  {
-    consumeNext(encodingItem, theChildren[1].getp(), planState);
-    encodingItem->getStringValue2(encodingString);
-  }
+    uriItem->getStringValue2(uriString);
 
-  uriItem->getStringValue2(uriString);
-
-  try
-  {
-    readDocument(uriString, encodingString, theSctx, planState, loc, unparsedText);
-  }
-  catch (XQueryException const& e)
-  {
-    // A denial by the security policy is reported, not turned into
-    // "not available".
-    if (e.diagnostic() == zerr::ZXQP0029_URI_ACCESS_DENIED)
-      throw;
-    unparsedText = NULL;
+    try
+    {
+      readDocument(uriString, encodingString, theSctx, planState, loc, unparsedText);
+    }
+    catch (XQueryException const& e)
+    {
+      // A denial by the security policy is reported, not turned into
+      // "not available".
+      if (e.diagnostic() == zerr::ZXQP0029_URI_ACCESS_DENIED)
+        throw;
+      unparsedText = NULL;
+    }
   }
 
   STACK_PUSH(GENV_ITEMFACTORY->createBoolean(result, !(unparsedText.isNull()) ), state);
@@ -1965,57 +1976,56 @@ bool FnUnparsedTextLinesIterator::nextImpl(store::Item_t& result, PlanState& pla
   FnUnparsedTextLinesIteratorState* state;
   DEFAULT_STACK_INIT(FnUnparsedTextLinesIteratorState, state, planState);
 
-  if (!consumeNext(uriItem, theChildren[0].getp(), planState))
+  // An empty $href yields the empty sequence.
+  if (consumeNext(uriItem, theChildren[0].getp(), planState))
   {
-    STACK_PUSH(false, state);
-  }
-
-  if (theChildren.size() == 2)
-  {
-    consumeNext(encodingItem, theChildren[1].getp(), planState);
-    encodingItem->getStringValue2(encodingString);
-  }
-
-  //Normalize input to handle filesystem paths, etc.
-  uriItem->getStringValue2(uriString);
-  normalizeInputUri(uriString, theSctx, loc, &lNormUri);
-
-  //Check for a fragment identifier
-  //Create a zorba::URI for validating if it contains a fragment  
-  lUri.reset(new zorba::URI(lNormUri));
-  if (lUri->get_encoded_fragment() != "")
-  {
-    throw XQUERY_EXCEPTION(err::FOUT1170, ERROR_PARAMS(uriString), ERROR_LOC(loc));    
-  }
-
-  //Resolve URI to stream
-  lResource = theSctx->resolve_uri
-    (lNormUri, internal::EntityData::SOME_CONTENT, lErrorMessage);
-
-  state->theStreamResource =
-    dynamic_cast<internal::StreamResource*>(lResource.get());
-
-  if (state->theStreamResource == NULL)
-    throw XQUERY_EXCEPTION(err::FOUT1170, ERROR_PARAMS(uriString), ERROR_LOC(loc));
-
-  lStreamReleaser = state->theStreamResource->getStreamReleaser();
-  state->theStream = new std::unique_ptr<std::istream, StreamReleaser> (state->theStreamResource->getStream(), lStreamReleaser);
-  state->theStreamResource->setStreamReleaser(nullptr);
-
-  //check if encoding is needed
-  if (transcode::is_necessary(encodingString.c_str()))
-  {
-    if (!transcode::is_supported(encodingString.c_str()))
+    if (theChildren.size() == 2)
     {
-      throw XQUERY_EXCEPTION(err::FOUT1190, ERROR_PARAMS(uriString), ERROR_LOC(loc));
+      consumeNext(encodingItem, theChildren[1].getp(), planState);
+      encodingItem->getStringValue2(encodingString);
     }
-    transcode::attach(*state->theStream->get(), encodingString.c_str());
-  }
 
-  while (state->theStream->get()->good())
-  {
-    getline(*state->theStream->get(), streamLine);
-    STACK_PUSH(GENV_ITEMFACTORY->createString(result, streamLine), state);
+    //Normalize input to handle filesystem paths, etc.
+    uriItem->getStringValue2(uriString);
+    normalizeInputUri(uriString, theSctx, loc, &lNormUri);
+
+    //Check for a fragment identifier
+    //Create a zorba::URI for validating if it contains a fragment  
+    lUri.reset(new zorba::URI(lNormUri));
+    if (lUri->get_encoded_fragment() != "")
+    {
+      throw XQUERY_EXCEPTION(err::FOUT1170, ERROR_PARAMS(uriString), ERROR_LOC(loc));    
+    }
+
+    //Resolve URI to stream
+    lResource = theSctx->resolve_uri
+      (lNormUri, internal::EntityData::SOME_CONTENT, lErrorMessage);
+
+    state->theStreamResource =
+      dynamic_cast<internal::StreamResource*>(lResource.get());
+
+    if (state->theStreamResource == NULL)
+      throw XQUERY_EXCEPTION(err::FOUT1170, ERROR_PARAMS(uriString), ERROR_LOC(loc));
+
+    lStreamReleaser = state->theStreamResource->getStreamReleaser();
+    state->theStream = new std::unique_ptr<std::istream, StreamReleaser> (state->theStreamResource->getStream(), lStreamReleaser);
+    state->theStreamResource->setStreamReleaser(nullptr);
+
+    //check if encoding is needed
+    if (transcode::is_necessary(encodingString.c_str()))
+    {
+      if (!transcode::is_supported(encodingString.c_str()))
+      {
+        throw XQUERY_EXCEPTION(err::FOUT1190, ERROR_PARAMS(uriString), ERROR_LOC(loc));
+      }
+      transcode::attach(*state->theStream->get(), encodingString.c_str());
+    }
+
+    while (state->theStream->get()->good())
+    {
+      getline(*state->theStream->get(), streamLine);
+      STACK_PUSH(GENV_ITEMFACTORY->createString(result, streamLine), state);
+    }
   }
 
   STACK_END(state);

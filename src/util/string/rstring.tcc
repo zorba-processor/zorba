@@ -297,10 +297,13 @@ rstring<Rep>::find_last_of( const_pointer s, size_type pos,
   if ( len && s_n ) {
     if ( --len > pos )
       len = pos;
+    // "len--" (not "--len"): index 0 must be examined too, and after it the
+    // loop must stop instead of wrapping around to npos and reading before
+    // the start of the buffer.
     do {
       if ( traits_type::find( s, s_n, data()[ len ] ) )
         return len;
-    } while ( --len );
+    } while ( len-- );
   }
   return npos;
 }

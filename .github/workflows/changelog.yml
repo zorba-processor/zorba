@@ -1,0 +1,46 @@
+name: Changelog tooling
+
+# Cheap checks for the changelog fragment tooling (changelog.d/,
+# scripts/changelog_assemble.py). Kept separate from ci.yml so these paths
+# never trigger the heavy builds.
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'changelog.d/**'
+      - 'scripts/changelog_assemble.py'
+      - 'scripts/tests/**'
+      - '.github/workflows/changelog.yml'
+  pull_request:
+    paths:
+      - 'changelog.d/**'
+      - 'scripts/changelog_assemble.py'
+      - 'scripts/tests/**'
+      - '.github/workflows/changelog.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: changelog-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  script-tests:
+    name: changelog script tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Unit tests
+        run: python3 -m unittest discover -s scripts/tests -v
+
+      - name: Validate fragments
+        run: python3 scripts/changelog_assemble.py --check
+
+      - name: Assemble (dry run)
+        run: python3 scripts/changelog_assemble.py --version 5.0.0 --dry-run > /dev/null

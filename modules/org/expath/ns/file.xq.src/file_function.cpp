@@ -28,6 +28,7 @@
 // Zorba
 #include <zorba/diagnostic_list.h>
 #include <zorba/empty_sequence.h>
+#include <zorba/security.h>
 #include <zorba/serializer.h>
 #include <zorba/singleton_item_sequence.h>
 #include <zorba/store_consts.h>
@@ -94,6 +95,64 @@ String FileFunction::getPathArg( ExternalFunction::Arguments_t const &args,
   }
 }
 
+String FileFunction::getPathArg( ExternalFunction::Arguments_t const &args,
+                                 unsigned pos, StaticContext const *aSctx,
+                                 Access aAccess ) const {
+  String const path( getPathArg( args, pos ) );
+  checkAccess( aSctx, path, aAccess );
+  return path;
+}
+
+namespace {
+
+SecurityPolicy policyOf( StaticContext const *aSctx ) {
+  return aSctx ? aSctx->getSecurityPolicy()
+               : Zorba::getInstance( nullptr )->getSecurityPolicy();
+}
+
+} // anonymous namespace
+
+void FileFunction::raiseAccessDenied( String const &aPath,
+                                      String const &aReason ) const {
+  Item const lQName(
+    module_->getItemFactory()->createQName(
+      "http://zorba.io/errors", "zerr", "ZXQP0029"
+    )
+  );
+  ostringstream lMessage;
+  lMessage << '"' << aPath << "\": URI access not allowed";
+  if ( !aReason.empty() )
+    lMessage << ": " << aReason;
+  throw USER_EXCEPTION( lQName, lMessage.str() );
+}
+
+void FileFunction::checkAccess( StaticContext const *aSctx,
+                                String const &aPath, Access aAccess ) const {
+  if ( aPath.empty() )
+    return;
+  String lReason;
+  if ( !policyOf( aSctx ).checkURI( aPath, EntityData::DOCUMENT,
+                                    aAccess == Access::Write, &lReason ) )
+    raiseAccessDenied( aPath, lReason );
+}
+
+std::unique_ptr<std::istream>
+FileFunction::openForReading( StaticContext const *aSctx,
+                              String const &aPath, bool aBinary ) const {
+  String lReason;
+  std::unique_ptr<std::istream> lStream(
+    policyOf( aSctx ).openFile( aPath, aBinary, &lReason )
+  );
+  if ( !lReason.empty() )
+    raiseAccessDenied( aPath, lReason );
+  if ( !lStream ) {
+    ostringstream oss;
+    oss << '"' << aPath << "\": can not open file for reading";
+    raiseFileError( "FOFL9999", oss.str().c_str(), aPath );
+  }
+  return lStream;
+}
+
 String FileFunction::getStringArg( ExternalFunction::Arguments_t const &args,
                                    unsigned pos ) const {
   String s;
@@ -135,10 +194,10 @@ WriteBinaryFunctionImpl::WriteBinaryFunctionImpl( FileModule const *m,
 
 ItemSequence_t WriteBinaryFunctionImpl::evaluate(
   ExternalFunction::Arguments_t const &args,
-  StaticContext const*,
+  StaticContext const *aSctx,
   DynamicContext const* ) const
 {
-  String const path( getPathArg( args, 0 ) );
+  String const path( getPathArg( args, 0, aSctx, Access::Write ) );
 
   fs::type const fs_type = fs::get_type( path );
   if ( fs_type && fs_type != fs::file )
@@ -190,10 +249,10 @@ WriteTextFunctionImpl::WriteTextFunctionImpl( FileModule const *m,
 
 ItemSequence_t WriteTextFunctionImpl::evaluate(
   ExternalFunction::Arguments_t const &args,
-  StaticContext const*,
+  StaticContext const *aSctx,
   DynamicContext const* ) const
 {
-  String const path( getPathArg( args, 0 ) );
+  String const path( getPathArg( args, 0, aSctx, Access::Write ) );
   String const encoding( getStringArg( args, 2 ) );
 
   fs::type const fs_type = fs::get_type( path );

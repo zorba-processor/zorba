@@ -772,8 +772,9 @@ declare %ann:sequential function driver:check-test-case(
   $usePlanSerializer    as xs:boolean
 ) as element(fots:test-case)?
 {
-  let $tcDepMet := env:check-dependencies($testCase/fots:dependency,
-                                          $FOTSZorbaManifest)
+  let $tcDepMet := (env:check-dependencies($testCase/fots:dependency,
+                                           $FOTSZorbaManifest),
+                    env:check-not-applicable($testCase, $FOTSZorbaManifest))
   return
   if (exists($expFailureTC[@notRun="true"])) then
   {

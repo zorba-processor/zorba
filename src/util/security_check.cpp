@@ -16,9 +16,13 @@
 #include "stdafx.h"
 
 #include <cctype>
+#include <cerrno>
+#include <climits>
 #include <cstdint>
+#include <cstdio>
 #include <cstring>
 #include <filesystem>
+#include <fstream>
 #include <stdexcept>
 #include <system_error>
 
@@ -27,9 +31,12 @@
 # include <ws2tcpip.h>
 #else
 # include <arpa/inet.h>
+# include <fcntl.h>
 # include <netdb.h>
 # include <netinet/in.h>
+# include <sys/param.h>
 # include <sys/socket.h>
+# include <sys/stat.h>
 # include <sys/types.h>
 # include <unistd.h>
 #endif
@@ -202,7 +209,7 @@ bool is_ipv6_literal(const std::string& aHost)
   return ::inet_pton(AF_INET6, aHost.c_str(), &lAddr) == 1;
 }
 
-// Parses an http, https or ftp URL. Anything ambiguous fails: control
+// Parses an http, https, ftp or ftps URL. Anything ambiguous fails: control
 // characters, backslashes, several '@', percent signs in the host.
 bool parse_net_url(const std::string& aURL, NetURL& u)
 {
@@ -223,6 +230,8 @@ bool parse_net_url(const std::string& aURL, NetURL& u)
     u.port = 443;
   else if (u.scheme == "ftp")
     u.port = 21;
+  else if (u.scheme == "ftps")
+    u.port = 990;
   else
     return false;
 
@@ -379,6 +388,25 @@ std::string address_string(const sockaddr* aAddr)
   return lBuf;
 }
 
+// True if aAddress (numeric IPv4 or IPv6, optionally in brackets or with an
+// IPv6 zone) is a loopback, private or link-local address. Anything that is
+// not a numeric address counts as private (fail closed).
+bool is_private_address(std::string aAddress)
+{
+  if (aAddress.size() > 2 && aAddress.front() == '[' && aAddress.back() == ']')
+    aAddress = aAddress.substr(1, aAddress.size() - 2);
+  std::string::size_type const lZone = aAddress.find('%');
+  if (lZone != std::string::npos)
+    aAddress.erase(lZone);
+  in_addr lV4;
+  if (::inet_pton(AF_INET, aAddress.c_str(), &lV4) == 1)
+    return is_private_ipv4(ntohl(lV4.s_addr));
+  in6_addr lV6;
+  if (::inet_pton(AF_INET6, aAddress.c_str(), &lV6) == 1)
+    return is_private_ipv6(reinterpret_cast<const unsigned char*>(&lV6));
+  return true;
+}
+
 // Resolves aHost and checks every address. Fails closed: a host that does
 // not resolve is denied.
 Verdict check_host_addresses(const std::string& aHost)
@@ -486,6 +514,34 @@ Verdict check_file(
               (aWrite ? "write" : "read") + " paths");
 }
 
+// Matches URL u against the network prefixes of aPolicy (if any). On a
+// match, oExplicitPrivate tells whether a matching prefix names a private
+// host explicitly, which allows that host without setAllowPrivateAddresses().
+Verdict match_prefixes(
+    const SecurityPolicy& aPolicy,
+    const NetURL& u,
+    bool& oExplicitPrivate)
+{
+  oExplicitPrivate = false;
+  const std::vector<String>& lPrefixes = aPolicy.getNetworkPrefixes();
+  if (lPrefixes.empty())
+    return Verdict();
+  bool lMatched = false;
+  for (const String& lPrefix : lPrefixes)
+  {
+    NetURL p;
+    if (parse_net_url(lPrefix.str(), p) && url_under(p, u))
+    {
+      lMatched = true;
+      if (!aPolicy.allowsPrivateAddresses() && names_private_host(p))
+        oExplicitPrivate = true;
+    }
+  }
+  if (!lMatched)
+    return deny("not under an allowed network prefix");
+  return Verdict();
+}
+
 Verdict check_network(
     const SecurityPolicy& aPolicy,
     const std::string& aURL,
@@ -496,8 +552,7 @@ Verdict check_network(
   if (!aPolicy.allows(Capability::Network))
     return needs_capability(Capability::Network);
 
-  const std::vector<String>& lPrefixes = aPolicy.getNetworkPrefixes();
-  if (lPrefixes.empty() && aPolicy.allowsPrivateAddresses())
+  if (aPolicy.getNetworkPrefixes().empty() && aPolicy.allowsPrivateAddresses())
     return Verdict();
 
   NetURL u;
@@ -505,27 +560,121 @@ Verdict check_network(
     return deny("malformed URL");
 
   bool lExplicitPrivate = false;
-  if (!lPrefixes.empty())
-  {
-    bool lMatched = false;
-    for (const String& lPrefix : lPrefixes)
-    {
-      NetURL p;
-      if (parse_net_url(lPrefix.str(), p) && url_under(p, u))
-      {
-        lMatched = true;
-        if (!aPolicy.allowsPrivateAddresses() && names_private_host(p))
-          lExplicitPrivate = true;
-      }
-    }
-    if (!lMatched)
-      return deny("not under an allowed network prefix");
-  }
+  Verdict const lMatch = match_prefixes(aPolicy, u, lExplicitPrivate);
+  if (!lMatch.allowed)
+    return lMatch;
 
   if (aPolicy.allowsPrivateAddresses() || lExplicitPrivate)
     return Verdict();
   return check_host_addresses(u.host);
 }
+
+#ifndef WIN32
+
+// The real path of an open file, if the system tells it.
+bool fd_real_path(int aFd, std::string& oPath)
+{
+#if defined(__linux__)
+  char lLink[64];
+  std::snprintf(lLink, sizeof lLink, "/proc/self/fd/%d", aFd);
+  char lBuf[PATH_MAX];
+  ssize_t const n = ::readlink(lLink, lBuf, sizeof lBuf - 1);
+  if (n <= 0 || n >= static_cast<ssize_t>(sizeof lBuf - 1) || lBuf[0] != '/')
+    return false;
+  oPath.assign(lBuf, static_cast<std::string::size_type>(n));
+  return true;
+#elif defined(__APPLE__)
+  char lBuf[MAXPATHLEN];
+  if (::fcntl(aFd, F_GETPATH, lBuf) == -1 || lBuf[0] != '/')
+    return false;
+  oPath = lBuf;
+  return true;
+#else
+  (void)aFd;
+  (void)oPath;
+  return false;
+#endif
+}
+
+// A read-only, seekable streambuf over a file descriptor it owns.
+class fd_streambuf : public std::streambuf
+{
+public:
+  explicit fd_streambuf(int aFd) : theFd(aFd)
+  {
+    setg(theBuf, theBuf, theBuf);
+  }
+
+  ~fd_streambuf() override
+  {
+    ::close(theFd);
+  }
+
+  fd_streambuf(const fd_streambuf&) = delete;
+  fd_streambuf& operator=(const fd_streambuf&) = delete;
+
+protected:
+  int_type underflow() override
+  {
+    if (gptr() < egptr())
+      return traits_type::to_int_type(*gptr());
+    ssize_t n;
+    do
+      n = ::read(theFd, theBuf, sizeof theBuf);
+    while (n < 0 && errno == EINTR);
+    if (n <= 0)
+      return traits_type::eof();
+    setg(theBuf, theBuf, theBuf + n);
+    return traits_type::to_int_type(*gptr());
+  }
+
+  pos_type seekoff(off_type aOff,
+                   std::ios_base::seekdir aDir,
+                   std::ios_base::openmode aWhich) override
+  {
+    if (!(aWhich & std::ios_base::in))
+      return pos_type(off_type(-1));
+    int lWhence = SEEK_SET;
+    if (aDir == std::ios_base::cur)
+    {
+      // The descriptor is ahead of the get pointer by the buffered bytes.
+      aOff -= static_cast<off_type>(egptr() - gptr());
+      lWhence = SEEK_CUR;
+    }
+    else if (aDir == std::ios_base::end)
+      lWhence = SEEK_END;
+    off_t const r = ::lseek(theFd, static_cast<off_t>(aOff), lWhence);
+    if (r < 0)
+      return pos_type(off_type(-1));
+    setg(theBuf, theBuf, theBuf);
+    return pos_type(static_cast<off_type>(r));
+  }
+
+  pos_type seekpos(pos_type aPos, std::ios_base::openmode aWhich) override
+  {
+    return seekoff(off_type(aPos), std::ios_base::beg, aWhich);
+  }
+
+private:
+  int  theFd;
+  char theBuf[8192];
+};
+
+class fd_istream : public std::istream
+{
+public:
+  explicit fd_istream(int aFd) : std::istream(nullptr), theBuf(aFd)
+  {
+    rdbuf(&theBuf);
+  }
+
+private:
+  fd_streambuf theBuf;
+};
+
+#endif /* WIN32 */
+
+thread_local const ResolutionScope* theCurrentScope = nullptr;
 
 } // anonymous namespace
 
@@ -597,16 +746,19 @@ Verdict check(
   if (aUse == Use::Collection)
     return Verdict();
 
-  // The default thesaurus (WordNet, from the library path).
+  // The default thesaurus is WordNet: data from the library path, which
+  // needs NativeModules like the libraries there.
   if (aUse == Use::Data && aURI == "##default")
-    return Verdict();
+    return aPolicy.allows(Capability::NativeModules)
+      ? Verdict() : needs_capability(Capability::NativeModules);
 
   std::string const lScheme = uri_scheme(aURI);
 
   if (lScheme.empty() || lScheme == "file")
     return check_file(aPolicy, aURI, aUse, aWrite, aTrustedDirs);
 
-  if (lScheme == "http" || lScheme == "https" || lScheme == "ftp")
+  if (lScheme == "http" || lScheme == "https" || lScheme == "ftp" ||
+      lScheme == "ftps")
     return check_network(aPolicy, aURI, aUse);
 
   if (lScheme == "xqftts")
@@ -614,7 +766,8 @@ Verdict check(
                       aTrustedDirs);
 
   if (lScheme == "wordnet")
-    return Verdict();
+    return aPolicy.allows(Capability::NativeModules)
+      ? Verdict() : needs_capability(Capability::NativeModules);
 
   if (aPolicy.allows(Capability::FileRead) &&
       aPolicy.getReadPaths().empty() &&
@@ -623,6 +776,147 @@ Verdict check(
       aPolicy.allowsPrivateAddresses())
     return Verdict();
   return deny("scheme \"" + lScheme + "\" is not allowed by the policy");
+}
+
+
+Verdict check_connection(
+    const SecurityPolicy& aPolicy,
+    const std::string& aURL,
+    const std::string& aAddress)
+{
+  if (!aPolicy.allows(Capability::Network))
+    return needs_capability(Capability::Network);
+  if (aPolicy.getNetworkPrefixes().empty() && aPolicy.allowsPrivateAddresses())
+    return Verdict();
+
+  NetURL u;
+  if (!parse_net_url(aURL, u))
+    return deny("malformed URL");
+
+  bool lExplicitPrivate = false;
+  Verdict const lMatch = match_prefixes(aPolicy, u, lExplicitPrivate);
+  if (!lMatch.allowed)
+    return lMatch;
+
+  if (aPolicy.allowsPrivateAddresses() || lExplicitPrivate)
+    return Verdict();
+  if (is_private_address(aAddress))
+    return deny("connection to the loopback, private or link-local address " +
+                aAddress + " for host \"" + u.host +
+                "\" is not allowed by the policy");
+  return Verdict();
+}
+
+
+bool file_reads_unrestricted(const SecurityPolicy& aPolicy)
+{
+  return aPolicy.allows(Capability::FileRead) && aPolicy.getReadPaths().empty();
+}
+
+
+std::unique_ptr<std::istream> open_file(
+    const SecurityPolicy& aPolicy,
+    const std::string& aPath,
+    Use aUse,
+    const std::vector<std::string>* aTrustedDirs,
+    bool aBinary,
+    Verdict& oVerdict)
+{
+  oVerdict = Verdict();
+  std::ios_base::openmode const lMode =
+    aBinary ? std::ios_base::in | std::ios_base::binary : std::ios_base::in;
+
+  std::string lPath;
+  try
+  {
+    std::string const lCwd = fs::curdir();
+    lPath = fs::normalize_path(aPath.c_str(), lCwd.c_str());
+  }
+  catch (const std::exception&)
+  {
+    oVerdict = deny("malformed path");
+    return nullptr;
+  }
+
+  if (file_reads_unrestricted(aPolicy))
+  {
+    std::unique_ptr<std::ifstream> lStream(new std::ifstream(lPath.c_str(), lMode));
+    if (!lStream->is_open())
+      return nullptr;
+    return lStream;
+  }
+
+#ifdef WIN32
+  oVerdict = check(aPolicy, lPath, aUse, false, aTrustedDirs);
+  if (!oVerdict.allowed)
+    return nullptr;
+  std::unique_ptr<std::ifstream> lStream(new std::ifstream(lPath.c_str(), lMode));
+  if (!lStream->is_open())
+    return nullptr;
+  return lStream;
+#else
+  int lFd;
+  do
+    lFd = ::open(lPath.c_str(), O_RDONLY | O_CLOEXEC | O_NOCTTY);
+  while (lFd < 0 && errno == EINTR);
+  if (lFd < 0)
+    return nullptr;
+
+  std::string lReal;
+  if (fd_real_path(lFd, lReal))
+    oVerdict = check(aPolicy, lReal, aUse, false, aTrustedDirs);
+  else
+  {
+    // No real path: check the canonical path, then make sure that it names
+    // the file that was opened.
+    try
+    {
+      lReal = canonical_path(lPath);
+      oVerdict = check(aPolicy, lReal, aUse, false, aTrustedDirs);
+    }
+    catch (const std::exception&)
+    {
+      oVerdict = deny("malformed path");
+    }
+    struct stat lOpened;
+    struct stat lNamed;
+    if (oVerdict.allowed &&
+        (::fstat(lFd, &lOpened) != 0 || ::stat(lReal.c_str(), &lNamed) != 0 ||
+         lOpened.st_dev != lNamed.st_dev || lOpened.st_ino != lNamed.st_ino))
+      oVerdict = deny("the file changed while it was opened");
+  }
+  if (!oVerdict.allowed)
+  {
+    ::close(lFd);
+    return nullptr;
+  }
+  return std::unique_ptr<std::istream>(new fd_istream(lFd));
+#endif
+}
+
+
+ResolutionScope::ResolutionScope(
+    const SecurityPolicy& aPolicy,
+    Use aUse,
+    const std::vector<std::string>* aTrustedDirs)
+  : thePolicy(aPolicy),
+    theUse(aUse),
+    theTrustedDirs(aTrustedDirs),
+    thePrevious(theCurrentScope)
+{
+  theCurrentScope = this;
+}
+
+
+ResolutionScope::~ResolutionScope()
+{
+  theCurrentScope = thePrevious;
+}
+
+
+const ResolutionScope* ResolutionScope::current()
+{
+  return theCurrentScope;
 }
 
 } // namespace security

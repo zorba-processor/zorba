@@ -108,10 +108,10 @@ CopyFileImplFunction::CopyFileImplFunction( FileModule const *m ) :
 ItemSequence_t
 CopyFileImplFunction::evaluate(
   ExternalFunction::Arguments_t const &args,
-  StaticContext const*,
+  StaticContext const *aSctx,
   DynamicContext const* ) const
 {
-  String const src_path( getPathArg( args, 0 ) );
+  String const src_path( getPathArg( args, 0, aSctx, Access::Read ) );
   String dst_path( getPathArg( args, 1 ) );
 
   fs::type const src_type = fs::get_type( src_path );
@@ -131,14 +131,16 @@ CopyFileImplFunction::evaluate(
   if ( src_path == dst_path )
     raiseFileError( "FOFL9999", "source and destination paths must not be equal", src_path );
 
+  // The destination is checked once it is final (inside a directory).
+  checkAccess( aSctx, dst_path, Access::Write );
+  std::unique_ptr<std::istream> const fin( openForReading( aSctx, src_path, true ) );
+
   try {
-    std::ifstream fin( src_path.c_str(), std::ios_base::binary );
     std::ofstream fout( dst_path.c_str(), std::ios_base::binary | std::ios_base::trunc );
-	std::string str = dst_path.c_str();
     char buf[ 8192 ];
-    while ( !fin.eof() ) {
-      fin.read( buf, sizeof buf );
-      fout.write( buf, fin.gcount() );
+    while ( !fin->eof() ) {
+      fin->read( buf, sizeof buf );
+      fout.write( buf, fin->gcount() );
     }  
   }
   catch ( std::exception const &e ) {
@@ -158,10 +160,10 @@ CreateDirectoryFunction::CreateDirectoryFunction( FileModule const *m ) :
 ItemSequence_t
 CreateDirectoryFunction::evaluate(
   ExternalFunction::Arguments_t const &args,
-  StaticContext const*,
+  StaticContext const *aSctx,
   DynamicContext const* ) const
 {
-  String const path( getPathArg( args, 0 ) );
+  String const path( getPathArg( args, 0, aSctx, Access::Write ) );
 
   fs::type const fs_type = fs::get_type( path );
   if ( !fs_type ) {
@@ -191,10 +193,10 @@ DeleteFileImplFunction::DeleteFileImplFunction( FileModule const *m ) :
 ItemSequence_t
 DeleteFileImplFunction::evaluate(
   ExternalFunction::Arguments_t const &args,
-  StaticContext const*,
+  StaticContext const *aSctx,
   DynamicContext const* ) const
 {
-  String const path( getPathArg( args, 0 ) );
+  String const path( getPathArg( args, 0, aSctx, Access::Write ) );
 
   if ( !fs::get_type( path, false ) )
     raiseFileError( "FOFL0001", "file not found", path );
@@ -261,10 +263,10 @@ ExistsFunction::ExistsFunction( FileModule const *m ) :
 ItemSequence_t
 ExistsFunction::evaluate(
   ExternalFunction::Arguments_t const &args,
-  StaticContext const*,
+  StaticContext const *aSctx,
   DynamicContext const* ) const
 {
-  String const path = getPathArg( args, 0 );
+  String const path = getPathArg( args, 0, aSctx, Access::Read );
   bool const follow_symlink = getItem( args, 1 ).getBooleanValue();
   bool const exists = !!fs::get_type( path, follow_symlink );
   return ItemSequence_t(
@@ -284,10 +286,10 @@ IsDirectoryFunction::IsDirectoryFunction( FileModule const *m ) :
 ItemSequence_t
 IsDirectoryFunction::evaluate(
   ExternalFunction::Arguments_t const &args,
-  StaticContext const*,
+  StaticContext const *aSctx,
   DynamicContext const* ) const
 {
-  String const path( getPathArg( args, 0 ) );
+  String const path( getPathArg( args, 0, aSctx, Access::Read ) );
   bool const is_directory = fs::get_type( path ) == fs::directory;
   return ItemSequence_t(
     new SingletonItemSequence(
@@ -306,10 +308,10 @@ IsFileFunction::IsFileFunction( FileModule const *m ) :
 ItemSequence_t
 IsFileFunction::evaluate(
   ExternalFunction::Arguments_t const &args,
-  StaticContext const*,
+  StaticContext const *aSctx,
   DynamicContext const* ) const
 {
-  String const path( getPathArg( args, 0 ) );
+  String const path( getPathArg( args, 0, aSctx, Access::Read ) );
   bool const is_file = fs::get_type( path ) == fs::file;
   return ItemSequence_t(
     new SingletonItemSequence(
@@ -328,10 +330,10 @@ IsSymlinkFunction::IsSymlinkFunction( FileModule const *m ) :
 ItemSequence_t
 IsSymlinkFunction::evaluate(
   ExternalFunction::Arguments_t const &args,
-  StaticContext const*,
+  StaticContext const *aSctx,
   DynamicContext const* ) const
 {
-  String const path( getPathArg( args, 0 ) );
+  String const path( getPathArg( args, 0, aSctx, Access::Read ) );
   bool const is_symlink = fs::get_type( path, false ) == fs::link;
   return ItemSequence_t(
     new SingletonItemSequence(
@@ -350,10 +352,10 @@ LastModifiedFunction::LastModifiedFunction( FileModule const *m ) :
 ItemSequence_t
 LastModifiedFunction::evaluate(
   ExternalFunction::Arguments_t const &args,
-  StaticContext const*,
+  StaticContext const *aSctx,
   DynamicContext const* ) const
 {
-  String const path( getPathArg( args, 0 ) );
+  String const path( getPathArg( args, 0, aSctx, Access::Read ) );
 
   fs::info info;
   if ( !fs::get_type( path, &info ) )
@@ -410,10 +412,10 @@ ListFunction::ListFunction( FileModule const *m ) :
 ItemSequence_t
 ListFunction::evaluate(
   ExternalFunction::Arguments_t const &args,
-  StaticContext const*,
+  StaticContext const *aSctx,
   DynamicContext const* ) const
 {
-  String const path( getPathArg( args, 0 ) );
+  String const path( getPathArg( args, 0, aSctx, Access::Read ) );
 
   if ( fs::get_type( path ) != fs::directory )
     raiseFileError( "FOFL0003", "path is not a directory", path );
@@ -483,10 +485,10 @@ ReadBinaryFunction::ReadBinaryFunction( FileModule const *m ) :
 ItemSequence_t
 ReadBinaryFunction::evaluate(
   ExternalFunction::Arguments_t const &args,
-  StaticContext const*,
+  StaticContext const *aSctx,
   DynamicContext const* ) const
 {
-  String const path( getPathArg( args, 0 ) );
+  String const path( getPathArg( args, 0, aSctx, Access::Read ) );
 
   fs::type const fs_type = fs::get_type( path );
   if ( !fs_type )
@@ -494,10 +496,8 @@ ReadBinaryFunction::evaluate(
   if ( fs_type != fs::file )
     raiseFileError( "FOFL0004", "not a plain file", path );
 
+  std::unique_ptr<std::istream> pin( openForReading( aSctx, path, true ) );
   try {
-    std::unique_ptr<std::ifstream> pin(
-      new std::ifstream( path.c_str(), std::ios_base::binary )
-    );
     Item item = module_->getItemFactory()->createStreamableBase64Binary(
       *pin, &FileModule::streamReleaser, true
     );
@@ -519,10 +519,10 @@ ReadTextFunction::ReadTextFunction( FileModule const *m ) :
 ItemSequence_t
 ReadTextFunction::evaluate(
   ExternalFunction::Arguments_t const &args,
-  StaticContext const*,
+  StaticContext const *aSctx,
   DynamicContext const* ) const
 {
-  String const path( getPathArg( args, 0 ) );
+  String const path( getPathArg( args, 0, aSctx, Access::Read ) );
   String lEncoding( "UTF-8" );
 
   fs::type const fs_type = fs::get_type( path );
@@ -536,18 +536,19 @@ ReadTextFunction::evaluate(
   
   zorba::Item lResult;
 
-  std::unique_ptr<std::ifstream> pin;
-  if ( transcode::is_necessary( lEncoding.c_str() ) ) {
+  bool const transcoding = transcode::is_necessary( lEncoding.c_str() );
+  if ( transcoding && !transcode::is_supported( lEncoding.c_str() ) )
+    raiseFileError( "FOFL0006", "encoding not supported", lEncoding.c_str() );
+
+  std::unique_ptr<std::istream> pin( openForReading( aSctx, path, false ) );
+  if ( transcoding ) {
     try {
-      pin.reset( new transcode::stream<std::ifstream>( lEncoding.c_str() ) );
+      transcode::attach( *pin, lEncoding.c_str() );
     }
     catch ( std::exception const &e ) {
       throw raiseFileError("FOFL0006", e.what(), lEncoding.c_str() );
     }
-  } else
-    pin.reset( new std::ifstream() );
-
-  pin->open( path.c_str() );
+  }
   skip_utf8_bom( *pin );
   lResult = module_->getItemFactory()->createStreamableString(
     *pin, &FileModule::streamReleaser, path.c_str(), true
@@ -567,10 +568,10 @@ ReadTextLinesFunction::ReadTextLinesFunction( FileModule const *m ) :
 ItemSequence_t
 ReadTextLinesFunction::evaluate(
   ExternalFunction::Arguments_t const &args,
-  StaticContext const*,
+  StaticContext const *aSctx,
   DynamicContext const* ) const
 {
-  String const path( getPathArg( args, 0 ) );
+  String const path( getPathArg( args, 0, aSctx, Access::Read ) );
   String const lEncoding( getEncodingArg( args, 1 ) );
 
   fs::type const fs_type = fs::get_type( path );
@@ -579,17 +580,23 @@ ReadTextLinesFunction::evaluate(
   if ( fs_type != fs::file )
     raiseFileError( "FOFL0004", "not a plain file", path );
 
-  return ItemSequence_t( new LinesItemSequence( path, lEncoding, this ) );
+  return ItemSequence_t(
+    new LinesItemSequence( path, lEncoding, this,
+                           aSctx ? aSctx->getSecurityPolicy()
+                                 : SecurityPolicy::unrestricted() )
+  );
 }
 
 ReadTextLinesFunction::LinesItemSequence::LinesItemSequence(
   String const &aFile,
   String const &aEncoding,
-  ReadTextLinesFunction const *aFunc
+  ReadTextLinesFunction const *aFunc,
+  SecurityPolicy const &aPolicy
 ) :
   theFile( aFile ),
   theEncoding( aEncoding ),
-  theFunc( aFunc )
+  theFunc( aFunc ),
+  thePolicy( aPolicy )
 {
 }
 
@@ -597,18 +604,20 @@ Iterator_t
 ReadTextLinesFunction::LinesItemSequence::getIterator()
 {
   return new ReadTextLinesFunction::LinesItemSequence::LinesIterator(
-    theFile, theEncoding, theFunc
+    theFile, theEncoding, theFunc, thePolicy
   );
 }
 
 ReadTextLinesFunction::LinesItemSequence::LinesIterator::LinesIterator(
   String const &aFile,
   String const &aEncoding,
-  ReadTextLinesFunction const *aFunc
+  ReadTextLinesFunction const *aFunc,
+  SecurityPolicy const &aPolicy
 ) :
   theFile(aFile),
   theEncoding(aEncoding),
   theFunc(aFunc),
+  thePolicy(aPolicy),
   theStream(0)
 {
 }
@@ -618,17 +627,33 @@ ReadTextLinesFunction::LinesItemSequence::LinesIterator::~LinesIterator() {
 }
 
 void ReadTextLinesFunction::LinesItemSequence::LinesIterator::open() {
-  if ( transcode::is_necessary( theEncoding.c_str() ) ) {
+  bool const transcoding = transcode::is_necessary( theEncoding.c_str() );
+  if ( transcoding && !transcode::is_supported( theEncoding.c_str() ) )
+    theFunc->raiseFileError( "FOFL0006", "encoding not supported",
+                             theEncoding.c_str() );
+
+  // The file is opened (and checked against the policy) when iteration
+  // starts, which may be after the function returned.
+  String lReason;
+  std::unique_ptr<std::istream> lStream(
+    thePolicy.openFile( theFile, false, &lReason )
+  );
+  if ( !lReason.empty() )
+    theFunc->raiseAccessDenied( theFile, lReason );
+  if ( !lStream ) {
+    // As before: a file that cannot be opened yields no lines.
+    lStream.reset( new std::istringstream() );
+    lStream->setstate( std::ios_base::failbit );
+  }
+  if ( transcoding ) {
     try {
-      theStream = new transcode::stream<std::ifstream>( theEncoding.c_str() );
+      transcode::attach( *lStream, theEncoding.c_str() );
     }
     catch ( std::invalid_argument const &e ) {
       theFunc->raiseFileError( "FOFL0006", e.what(), theEncoding.c_str() );
     }
-  } else
-    theStream = new std::ifstream();
-
-  theStream->open( theFile.c_str() );
+  }
+  theStream = lStream.release();
 }
 
 bool
@@ -764,10 +789,10 @@ SizeFunction::SizeFunction( FileModule const *m ) :
 ItemSequence_t
 SizeFunction::evaluate(
   ExternalFunction::Arguments_t const &args,
-  StaticContext const*,
+  StaticContext const *aSctx,
   DynamicContext const* ) const
 {
-  String const path( getPathArg( args, 0 ) );
+  String const path( getPathArg( args, 0, aSctx, Access::Read ) );
 
   fs::info info;
   if ( !fs::get_type( path, &info ) )
