@@ -11,9 +11,9 @@
       <ApplyIterator prof-calls="2" prof-next-calls="2" prof-cpu="17.0915" prof-wall="889.354" prof-name="ApplyIterator">
         <UDFunctionCallIterator function="http:post" prof-calls="2" prof-next-calls="4" prof-cpu="17.0595" prof-wall="889.32" prof-name="http:post">
           <UDFunctionArgs>
-            <SingletonIterator value="xs:string(http://$HTTP_TEST_SERVER/cgi-bin/test-text)" prof-calls="3" prof-next-calls="4" prof-cpu="0.006589" prof-wall="0.002816" prof-name="SingletonIterator"/>
-            <SingletonIterator value="xs:string(poststring)" prof-calls="3" prof-next-calls="4" prof-cpu="0.005236" prof-wall="0.001612" prof-name="SingletonIterator"/>
-            <SingletonIterator value="xs:string(text/plain)" prof-calls="3" prof-next-calls="4" prof-cpu="0.005437" prof-wall="0.001826" prof-name="SingletonIterator"/>
+            <SingletonIterator value="xs:string(http://$HTTP_TEST_SERVER/cgi-bin/test-text)" prof-calls="2" prof-next-calls="4" prof-cpu="0.006589" prof-wall="0.002816" prof-name="SingletonIterator"/>
+            <SingletonIterator value="xs:string(poststring)" prof-calls="2" prof-next-calls="4" prof-cpu="0.005236" prof-wall="0.001612" prof-name="SingletonIterator"/>
+            <SingletonIterator value="xs:string(text/plain)" prof-calls="2" prof-next-calls="4" prof-cpu="0.005437" prof-wall="0.001826" prof-name="SingletonIterator"/>
           </UDFunctionArgs>
           <UDFunctionBody>
             <FLWORIterator prof-calls="2" prof-next-calls="4" prof-cpu="16.5842" prof-wall="888.844" prof-name="FLWORIterator">
@@ -34,17 +34,17 @@
               <ReturnClause>
                 <UDFunctionCallIterator function="http:send-request" prof-calls="2" prof-next-calls="4" prof-cpu="16.3771" prof-wall="888.637" prof-name="http:send-request">
                   <UDFunctionArgs>
-                    <JSONDirectObjectIterator prof-calls="3" prof-next-calls="4" prof-cpu="0.243514" prof-wall="0.238516" prof-name="JSONDirectObjectIterator">
-                      <SingletonIterator value="xs:string(method)" prof-calls="3" prof-next-calls="2" prof-cpu="0.004784" prof-wall="0.002127" prof-name="SingletonIterator"/>
-                      <SingletonIterator value="xs:string(href)" prof-calls="3" prof-next-calls="2" prof-cpu="0.003772" prof-wall="0.001173" prof-name="SingletonIterator"/>
-                      <SingletonIterator value="xs:string(body)" prof-calls="3" prof-next-calls="2" prof-cpu="0.003929" prof-wall="0.001353" prof-name="SingletonIterator"/>
-                      <SingletonIterator value="xs:string(POST)" prof-calls="3" prof-next-calls="2" prof-cpu="0.003709" prof-wall="0.001138" prof-name="SingletonIterator"/>
-                      <ForVarIterator varname="href" prof-calls="3" prof-next-calls="2" prof-cpu="0.004145" prof-wall="0.001581" prof-name="ForVarIterator ($href)"/>
-                      <JSONDirectObjectIterator prof-calls="3" prof-next-calls="2" prof-cpu="0.146889" prof-wall="0.14233" prof-name="JSONDirectObjectIterator">
-                        <SingletonIterator value="xs:string(media-type)" prof-calls="3" prof-next-calls="2" prof-cpu="0.003683" prof-wall="0.001109" prof-name="SingletonIterator"/>
-                        <SingletonIterator value="xs:string(content)" prof-calls="3" prof-next-calls="2" prof-cpu="0.00367" prof-wall="0.001088" prof-name="SingletonIterator"/>
-                        <ForVarIterator varname="content-type" prof-calls="3" prof-next-calls="2" prof-cpu="0.003685" prof-wall="0.001085" prof-name="ForVarIterator ($content-type)"/>
-                        <ForVarIterator varname="body" prof-calls="3" prof-next-calls="2" prof-cpu="0.003509" prof-wall="0.000938" prof-name="ForVarIterator ($body)"/>
+                    <JSONDirectObjectIterator prof-calls="2" prof-next-calls="4" prof-cpu="0.243514" prof-wall="0.238516" prof-name="JSONDirectObjectIterator">
+                      <SingletonIterator value="xs:string(method)" prof-calls="2" prof-next-calls="2" prof-cpu="0.004784" prof-wall="0.002127" prof-name="SingletonIterator"/>
+                      <SingletonIterator value="xs:string(href)" prof-calls="2" prof-next-calls="2" prof-cpu="0.003772" prof-wall="0.001173" prof-name="SingletonIterator"/>
+                      <SingletonIterator value="xs:string(body)" prof-calls="2" prof-next-calls="2" prof-cpu="0.003929" prof-wall="0.001353" prof-name="SingletonIterator"/>
+                      <SingletonIterator value="xs:string(POST)" prof-calls="2" prof-next-calls="2" prof-cpu="0.003709" prof-wall="0.001138" prof-name="SingletonIterator"/>
+                      <ForVarIterator varname="href" prof-calls="2" prof-next-calls="2" prof-cpu="0.004145" prof-wall="0.001581" prof-name="ForVarIterator ($href)"/>
+                      <JSONDirectObjectIterator prof-calls="2" prof-next-calls="2" prof-cpu="0.146889" prof-wall="0.14233" prof-name="JSONDirectObjectIterator">
+                        <SingletonIterator value="xs:string(media-type)" prof-calls="2" prof-next-calls="2" prof-cpu="0.003683" prof-wall="0.001109" prof-name="SingletonIterator"/>
+                        <SingletonIterator value="xs:string(content)" prof-calls="2" prof-next-calls="2" prof-cpu="0.00367" prof-wall="0.001088" prof-name="SingletonIterator"/>
+                        <ForVarIterator varname="content-type" prof-calls="2" prof-next-calls="2" prof-cpu="0.003685" prof-wall="0.001085" prof-name="ForVarIterator ($content-type)"/>
+                        <ForVarIterator varname="body" prof-calls="2" prof-next-calls="2" prof-cpu="0.003509" prof-wall="0.000938" prof-name="ForVarIterator ($body)"/>
                       </JSONDirectObjectIterator>
                     </JSONDirectObjectIterator>
                   </UDFunctionArgs>
@@ -61,7 +61,7 @@
                           <IfThenElseIterator prof-calls="2" prof-next-calls="4" prof-cpu="15.7438" prof-wall="888.004" prof-name="IfThenElseIterator">
                             <UDFunctionCallIterator function="http:check-request" prof-calls="2" prof-next-calls="4" prof-cpu="4.80251" prof-wall="4.85552" prof-name="http:check-request">
                               <UDFunctionArgs>
-                                <ForVarIterator varname="request" prof-calls="3" prof-next-calls="4" prof-cpu="0.00574" prof-wall="0.002057" prof-name="ForVarIterator ($request)"/>
+                                <ForVarIterator varname="request" prof-calls="2" prof-next-calls="4" prof-cpu="0.00574" prof-wall="0.002057" prof-name="ForVarIterator ($request)"/>
                               </UDFunctionArgs>
                               <UDFunctionBody>
                                 <PromoteIterator type="xs:boolean" prof-calls="2" prof-next-calls="4" prof-cpu="4.26917" prof-wall="4.32259" prof-name="PromoteIterator">
@@ -92,7 +92,7 @@
                                             <MultiObjectLookupIterator prof-calls="2" prof-next-calls="4" prof-cpu="1.37617" prof-wall="1.3743" prof-name="op-zorba:multi-object-lookup">
                                               <UDFunctionCallIterator function="libjn:descendant-objects" prof-calls="2" prof-next-calls="6" prof-cpu="1.32825" prof-wall="1.32479" prof-name="libjn:descendant-objects">
                                                 <UDFunctionArgs>
-                                                  <ForVarIterator varname="request" prof-calls="3" prof-next-calls="4" prof-cpu="0.005405" prof-wall="0.001802" prof-name="ForVarIterator ($request)"/>
+                                                  <ForVarIterator varname="request" prof-calls="2" prof-next-calls="4" prof-cpu="0.005405" prof-wall="0.001802" prof-name="ForVarIterator ($request)"/>
                                                 </UDFunctionArgs>
                                                 <UDFunctionBody>
                                                   <FLWORIterator prof-calls="2" prof-next-calls="6" prof-cpu="1.13162" prof-wall="1.12886" prof-name="FLWORIterator">
@@ -102,7 +102,7 @@
                                                     <ReturnClause>
                                                       <UDFunctionCallIterator function="libjn:descendant-objects-priv" prof-calls="2" prof-next-calls="6" prof-cpu="1.08318" prof-wall="1.07929" prof-name="libjn:descendant-objects-priv">
                                                         <UDFunctionArgs>
-                                                          <ForVarIterator varname="i" prof-calls="3" prof-next-calls="4" prof-cpu="0.005568" prof-wall="0.001844" prof-name="ForVarIterator ($i)"/>
+                                                          <ForVarIterator varname="i" prof-calls="2" prof-next-calls="4" prof-cpu="0.005568" prof-wall="0.001844" prof-name="ForVarIterator ($i)"/>
                                                         </UDFunctionArgs>
                                                         <UDFunctionBody>
                                                           <TreatIterator type="[JSONXQType object]" quant="*" prof-calls="2" prof-next-calls="6" prof-cpu="0.751491" prof-wall="0.748361" prof-name="TreatIterator">
@@ -152,7 +152,7 @@
                                                                       <ReturnClause>
                                                                         <UDFunctionCallIterator function="libjn:descendant-objects-priv" prof-calls="2" prof-next-calls="4" prof-cpu="0.354748" prof-wall="0.351827" prof-name="libjn:descendant-objects-priv">
                                                                           <UDFunctionArgs>
-                                                                            <ForVarIterator varname="v" prof-calls="3" prof-next-calls="4" prof-cpu="0.0056" prof-wall="0.00181" prof-name="ForVarIterator ($v)"/>
+                                                                            <ForVarIterator varname="v" prof-calls="2" prof-next-calls="4" prof-cpu="0.0056" prof-wall="0.00181" prof-name="ForVarIterator ($v)"/>
                                                                           </UDFunctionArgs>
                                                                           <UDFunctionBody>
                                                                             <TreatIterator type="[JSONXQType object]" quant="*" prof-calls="2" prof-next-calls="4" prof-cpu="0.330208" prof-wall="0.327656" prof-name="TreatIterator">
@@ -353,7 +353,7 @@
                                                   <MultiObjectLookupIterator prof-calls="2" prof-next-calls="4" prof-cpu="1.00246" prof-wall="1.00048" prof-name="op-zorba:multi-object-lookup">
                                                     <UDFunctionCallIterator function="libjn:descendant-objects" prof-calls="2" prof-next-calls="6" prof-cpu="0.972479" prof-wall="0.96923" prof-name="libjn:descendant-objects">
                                                       <UDFunctionArgs>
-                                                        <ForVarIterator varname="request" prof-calls="3" prof-next-calls="4" prof-cpu="0.005439" prof-wall="0.001824" prof-name="ForVarIterator ($request)"/>
+                                                        <ForVarIterator varname="request" prof-calls="2" prof-next-calls="4" prof-cpu="0.005439" prof-wall="0.001824" prof-name="ForVarIterator ($request)"/>
                                                       </UDFunctionArgs>
                                                       <UDFunctionBody>
                                                         <FLWORIterator prof-calls="2" prof-next-calls="6" prof-cpu="0.945741" prof-wall="0.942812" prof-name="FLWORIterator">
@@ -363,7 +363,7 @@
                                                           <ReturnClause>
                                                             <UDFunctionCallIterator function="libjn:descendant-objects-priv" prof-calls="2" prof-next-calls="6" prof-cpu="0.89855" prof-wall="0.895027" prof-name="libjn:descendant-objects-priv">
                                                               <UDFunctionArgs>
-                                                                <ForVarIterator varname="i" prof-calls="3" prof-next-calls="4" prof-cpu="0.005652" prof-wall="0.001939" prof-name="ForVarIterator ($i)"/>
+                                                                <ForVarIterator varname="i" prof-calls="2" prof-next-calls="4" prof-cpu="0.005652" prof-wall="0.001939" prof-name="ForVarIterator ($i)"/>
                                                               </UDFunctionArgs>
                                                               <UDFunctionBody>
                                                                 <TreatIterator type="[JSONXQType object]" quant="*" prof-calls="2" prof-next-calls="6" prof-cpu="0.864966" prof-wall="0.861977" prof-name="TreatIterator">
@@ -413,7 +413,7 @@
                                                                             <ReturnClause>
                                                                               <UDFunctionCallIterator function="libjn:descendant-objects-priv" prof-calls="2" prof-next-calls="4" prof-cpu="0.361325" prof-wall="0.358363" prof-name="libjn:descendant-objects-priv">
                                                                                 <UDFunctionArgs>
-                                                                                  <ForVarIterator varname="v" prof-calls="3" prof-next-calls="4" prof-cpu="0.005507" prof-wall="0.001812" prof-name="ForVarIterator ($v)"/>
+                                                                                  <ForVarIterator varname="v" prof-calls="2" prof-next-calls="4" prof-cpu="0.005507" prof-wall="0.001812" prof-name="ForVarIterator ($v)"/>
                                                                                 </UDFunctionArgs>
                                                                                 <UDFunctionBody>
                                                                                   <TreatIterator type="[JSONXQType object]" quant="*" prof-calls="2" prof-next-calls="4" prof-cpu="0.333006" prof-wall="0.33046" prof-name="TreatIterator">
