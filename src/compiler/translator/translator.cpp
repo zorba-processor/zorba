@@ -2088,7 +2088,7 @@ QueryLoc expandQueryLoc(const QueryLoc& aLocationFrom, const QueryLoc& aLocation
   beginning (e.g. inside functions).
 ********************************************************************************/
 void wrap_in_debugger_expr(
-  expr* aExpr,
+  expr*& aExpr,
   const QueryLoc& aLoc,
   bool aIsMainModuleBreakable = false,
   bool aIsVarDeclaration = false)

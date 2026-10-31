@@ -147,7 +147,11 @@ std::string propertyValue(std::string const& aResponse)
   lStart = aResponse.find('>', lStart) + 1;
   std::string::size_type lEnd = aResponse.find("</property>", lStart);
   std::string lDecoded;
-  base64::decode(aResponse.substr(lStart, lEnd - lStart), &lDecoded);
+  try {
+    base64::decode(aResponse.substr(lStart, lEnd - lStart), &lDecoded);
+  } catch (base64::exception const&) {
+    return "<invalid base64>";
+  }
   return lDecoded;
 }
 
@@ -159,7 +163,11 @@ std::string responseValue(std::string const& aResponse)
   if (lEnd == std::string::npos)
     return "<no value>";
   std::string lDecoded;
-  base64::decode(aResponse.substr(lStart, lEnd - lStart), &lDecoded);
+  try {
+    base64::decode(aResponse.substr(lStart, lEnd - lStart), &lDecoded);
+  } catch (base64::exception const&) {
+    return "<invalid base64>";
+  }
   return lDecoded;
 }
 
@@ -184,8 +192,14 @@ void runClient(Client& aClient, std::string const& aQueryPath)
     lBkpId = r.substr(lPos + 4, r.find('"', lPos + 4) - lPos - 4);
 
   aClient.sendOnly("run");
-  r = aClient.receiveUntil("status=\"break\"");
+  r = aClient.receiveUntil("status=\"");
   check(contains(r, "status=\"break\""), "run stops at the breakpoint", r);
+  if (!contains(r, "status=\"break\"")) {
+    // nothing else can be checked
+    aClient.sendOnly("stop");
+    aClient.receiveUntil("command=\"stop\"");
+    return;
+  }
 
   // property_get
   r = aClient.command("property_get", "-n g");
