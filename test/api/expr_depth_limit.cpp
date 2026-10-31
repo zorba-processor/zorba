@@ -36,7 +36,6 @@
 
 #include <zorba/item.h>
 #include <zorba/iterator.h>
-#include <zorba/options.h>
 #include <zorba/security.h>
 #include <zorba/store_manager.h>
 #include <zorba/xquery.h>
@@ -75,17 +74,14 @@ std::ostream& operator<<(std::ostream& os, const Outcome& o)
 
 // Compiles the query and, if aExecute, runs it.
 Outcome run(Zorba* z, const SecurityPolicy& p, const std::string& aQuery,
-            bool aExecute = true,
-            Zorba_opt_level_t aOptLevel = ZORBA_OPT_LEVEL_O1)
+            bool aExecute = true)
 {
   Outcome o;
   try
   {
     StaticContext_t sctx = z->createStaticContext();
     sctx->setSecurityPolicy(p);
-    Zorba_CompilerHints_t lHints;
-    lHints.opt_level = aOptLevel;
-    XQuery_t q = z->compileQuery(aQuery, sctx, lHints);
+    XQuery_t q = z->compileQuery(aQuery, sctx);
     if (aExecute)
     {
       Iterator_t it = q->iterator();
@@ -199,7 +195,7 @@ const std::vector<Shape>& shapes()
 // Runs aFn on a thread with a large stack painted with a pattern and
 // returns the number of bytes of stack it used.
 const unsigned char PAINT = 0xA5;
-const size_t MEASURE_STACK_SIZE = 256u * 1024 * 1024;
+const size_t MEASURE_STACK_SIZE = 64u * 1024 * 1024;
 
 void* measure_thread_main(void* aFn)
 {
@@ -325,15 +321,11 @@ void test_default_limit(Zorba* z)
 
     std::cout << "  " << s.name << ": " << lo << " levels";
 #ifdef ZORBA_TEST_MEASURE_STACK
-    // Stack taken by: translation and code generation; plus optimization;
-    // plus evaluation.
+    // Stack taken by compiling and running it (measured on a thread with
+    // a 64 MiB stack, so the stack cap of the limit does not apply).
     std::string const q = s.make(lo);
-    size_t const lO0 = measure_stack([&] {
-      run(z, p, q, false, ZORBA_OPT_LEVEL_O0); });
-    size_t const lO1 = measure_stack([&] { run(z, p, q, false); });
-    size_t const lRun = measure_stack([&] { run(z, p, q); });
-    std::cout << ", KiB of stack: compile -O0 " << lO0 / 1024
-              << ", compile " << lO1 / 1024 << ", run " << lRun / 1024;
+    size_t const lUsed = measure_stack([&] { run(z, p, q); });
+    std::cout << ", " << lUsed / 1024 << " KiB of stack";
 #endif
     std::cout << std::endl;
   }
