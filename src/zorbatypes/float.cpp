@@ -100,16 +100,21 @@ void FloatImpl<F>::parse( char const *s ) {
         count_significant_digits( *s, &significant_digits, &trailing_zeros );
       } while ( ascii::is_digit( *++s ) );
     }
-    if ( *s == 'e' || *s == 'E' ) {
+    if ( got_digit && (*s == 'e' || *s == 'E') ) {
       ++s;
       if ( *s == '+' || *s == '-' )
         ++s;
-      if ( ascii::is_digit( *s ) ) {
-        got_digit = true;
-        while ( ascii::is_digit( *++s ) ) ;
-      }
+      if ( !ascii::is_digit( *s ) )     // an exponent needs a digit
+        got_digit = false;
+      while ( ascii::is_digit( *s ) )
+        ++s;
     }
-    if ( !got_digit )
+    //
+    // XSD 1.1 Part 2, 3.3.4-3.3.5: only trailing whitespace may follow; check
+    // it here since aton() (via strtod()) would also accept forms like "0x1A"
+    // or "1.5x" by parsing a prefix.
+    //
+    if ( !got_digit || *ascii::trim_start_space( s ) )
       throw std::invalid_argument(
         BUILD_STRING( '"', first_non_ws, "\": invalid floating-point literal" )
       );
