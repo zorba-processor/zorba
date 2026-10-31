@@ -34,6 +34,7 @@ CREATE_TEST_SOURCELIST(APITests
   expr_depth_limit.cpp
   module_security.cpp
   invoke_module_globals.cpp
+  schema_utf8.cpp
 )
 
 # add the executable
@@ -52,6 +53,11 @@ FOREACH (test ${TestsToRun})
   ZORBA_ADD_TEST(${TestName} APITests ${TName}
     "${CMAKE_BINARY_DIR}/TEST_URI_PATH")
 ENDFOREACH(test)
+
+# Schema import/validation with non-ASCII names must not depend on the process
+# locale: run it where the C locale cannot represent the characters.
+SET_TESTS_PROPERTIES("test/api/schema_utf8" PROPERTIES
+  ENVIRONMENT "LC_ALL=C;LANG=C")
 
 # Add importing schema for userdefined_uri_resolution test
 DECLARE_ZORBA_SCHEMA(FILE import-hello.xsd
