@@ -67,7 +67,7 @@ string dewey( OrdPath const &p ) {
 }
 
 string name( OrdPath const &p ) {
-  return dewey( p );
+  return string( p.show().c_str() );
 }
 
 void check_less( OrdPath const &a, OrdPath const &b, char const *what ) {
@@ -152,6 +152,8 @@ void test_insert() {
   for ( int i = 0; i < 30; ++i ) {
     OrdPath m;
     OrdPath::insertInto( parent, left, right, m );
+    cerr << "iteration " << i << ": left " << name( left ) << " right "
+         << name( right ) << " m " << name( m ) << endl;
     check_less( left, m, "repeated insertInto (left)" );
     check_less( m, right, "repeated insertInto (right)" );
     if ( i % 2 == 0 )
