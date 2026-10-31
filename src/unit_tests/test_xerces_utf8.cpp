@@ -54,17 +54,17 @@ const char SMILEY[] = "\xF0\x9F\x98\x80";
 
 void test_to_xmlch()
 {
-  XMLChArray lArr(zstring(GROESSE));
+  XMLChArray lArr(zstring(GROESSE).c_str());
   const XMLCh* p = lArr.get();
   check(p && p[0] == 'G' && p[1] == 'r' && p[2] == 0xF6 && p[3] == 0xDF &&
         p[4] == 'e' && p[5] == 0, "UTF-8 -> XMLCh keeps non-ASCII characters");
 
-  XMLChArray lSmiley(zstring(SMILEY));
+  XMLChArray lSmiley(zstring(SMILEY).c_str());
   p = lSmiley.get();
   check(p && p[0] == 0xD83D && p[1] == 0xDE00 && p[2] == 0,
         "UTF-8 -> XMLCh makes a surrogate pair");
 
-  XMLChArray lBad(zstring("a\xFF" "z"));
+  XMLChArray lBad(zstring("a\xFF" "z").c_str());
   p = lBad.get();
   check(p && p[0] == 'a' && p[1] == 0xFFFD && p[2] == 'z' && p[3] == 0,
         "invalid UTF-8 becomes U+FFFD");
@@ -73,7 +73,7 @@ void test_to_xmlch()
 void test_ostream()
 {
   // operator<< used to leak the buffer returned by XMLString::transcode
-  XMLChArray lArr(zstring(GROESSE));
+  XMLChArray lArr(zstring(GROESSE).c_str());
   std::ostringstream lOut;
   lOut << lArr;
   check(lOut.str() == GROESSE, "XMLChArray streams as UTF-8");
@@ -81,7 +81,7 @@ void test_ostream()
 
 void test_strx()
 {
-  XMLChArray lArr(zstring(GROESSE));
+  XMLChArray lArr(zstring(GROESSE).c_str());
   StrX lAll(lArr.get());
   check(lAll.localForm() && std::string(lAll.localForm()) == GROESSE,
         "StrX(str) is UTF-8");
@@ -91,7 +91,7 @@ void test_strx()
   check(lPrefix.localForm() && std::string(lPrefix.localForm()) == "Gr\xC3\xB6",
         "StrX(str, 3) is the UTF-8 form of the first 3 characters");
 
-  XMLChArray lSmiley(zstring(SMILEY));
+  XMLChArray lSmiley(zstring(SMILEY).c_str());
   StrX lS(lSmiley.get());
   check(lS.localForm() && std::string(lS.localForm()) == SMILEY,
         "surrogate pair round-trips to UTF-8");
