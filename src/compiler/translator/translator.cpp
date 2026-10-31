@@ -15138,7 +15138,7 @@ void* begin_visit(const AnyFunctionTest& v)
 void end_visit(const AnyFunctionTest& v, void* /*visit_state*/)
 {
   TRACE_VISIT_OUT();
-  theTypeStack.push(GENV_TYPESYSTEM.ANY_FUNCTION_TYPE_STAR);
+  theTypeStack.push(GENV_TYPESYSTEM.ANY_FUNCTION_TYPE_ONE);
 }
 
 
