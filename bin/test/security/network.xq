@@ -14,9 +14,11 @@
  : limitations under the License.
 :)
 
-(: Fetches $url with fn:doc (Network) and prints the error code: the tests
- : use addresses where nothing listens, so an allowed access fails with
- : another error than zerr:ZXQP0029. :)
+(: Fetches $url with fn:doc (Network) and prints the error code and
+ : description. The tests use addresses where nothing listens: a policy denial
+ : is FODC0002 with "access denied by security policy" in the description, an
+ : allowed access fails with FODC0002 too (connection refused) but without
+ : that phrase. :)
 declare namespace err = "http://www.w3.org/2005/xqt-errors";
 
 declare variable $url external;
@@ -24,5 +26,5 @@ declare variable $url external;
 try {
   doc($url)
 } catch * {
-  concat("error:", local-name-from-QName($err:code))
+  concat("error:", local-name-from-QName($err:code), ":", $err:description)
 }

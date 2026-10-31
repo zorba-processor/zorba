@@ -91,26 +91,22 @@ ZORBA_SET_TEST_PROPERTY(bin/zorba_max_expr_depth PASS_REGULAR_EXPRESSION ".*ZXQP
 
 # Security policy flags: --secure, --allow, --deny, --read-path, --write-path,
 # --network-prefix, --private-addresses. Each capability is shown denied and
-# permitted. The queries in test/security print a marker on success; denials
-# raise zerr:ZXQP0029 (zerr:ZXQP0067 for a module import). The network tests
-# use 127.0.0.1:9, where nothing listens: they need no server, and an access
-# the policy permits fails with another error than ZXQP0029.
-SET (_secdir "${CMAKE_CURRENT_SOURCE_DIR}/test/security")
-SET (_secwrite "${CMAKE_CURRENT_BINARY_DIR}/security-write")
-FILE (MAKE_DIRECTORY "${_secwrite}")
-
-MACRO (ZORBA_SECURITY_TEST NAME PASS)
-  ZORBA_ADD_TEST(bin/zorba_security_${NAME} zorbacmd ${ARGN})
-  ZORBA_SET_TEST_PROPERTY(bin/zorba_security_${NAME}
-    PASS_REGULAR_EXPRESSION "${PASS}")
-ENDMACRO (ZORBA_SECURITY_TEST)
-
+# permitted. The queries in test/security print a marker on success. A policy
+# denial is reported with the error code the failing function documents
+# (FODC0002 for fn:doc, FODC0006 for an external entity, FOFL9999 for the file
+# module, XQST0059 for an import) and the message "access denied by security
+# policy (requires capability X)"; a module import refused for lack of a
+# capability raises ZXQP0067. ZORBA_SECURITY_DENIED matches the code together
+# with the phrase, so a permitted access that fails for another reason (e.g. a
+# refused connection, also FODC0002) does not pass as a denial. The network
+# tests use 127.0.0.1:9, where nothing listens: they need no server, and an
+# access the policy permits fails without the denial phrase.
 # file-read, --read-path
 ZORBA_SECURITY_TEST(read_default "cli-doc"
   -f -q "${_secdir}/read.xq" -e "dir:=${_secdir}")
-ZORBA_SECURITY_TEST(read_deny "ZXQP0029"
+ZORBA_SECURITY_DENIED(read_deny FODC0002 "access denied by security policy"
   --deny file-read -f -q "${_secdir}/read.xq" -e "dir:=${_secdir}")
-ZORBA_SECURITY_TEST(read_secure "ZXQP0029"
+ZORBA_SECURITY_DENIED(read_secure FODC0002 "access denied by security policy"
   --secure -f -q "${_secdir}/read.xq" -e "dir:=${_secdir}")
 ZORBA_SECURITY_TEST(read_secure_allow "cli-doc"
   --secure --allow file-read -f -q "${_secdir}/read.xq" -e "dir:=${_secdir}")
@@ -119,10 +115,10 @@ ZORBA_SECURITY_TEST(read_deny_all_allow "cli-doc"
 ZORBA_SECURITY_TEST(read_path_in "cli-doc"
   --secure --allow file-read --read-path "${_secdir}/data"
   -f -q "${_secdir}/read.xq" -e "dir:=${_secdir}")
-ZORBA_SECURITY_TEST(read_path_out "ZXQP0029"
+ZORBA_SECURITY_DENIED(read_path_out FODC0002 "access denied by security policy"
   --read-path "${_secdir}/other"
   -f -q "${_secdir}/read.xq" -e "dir:=${_secdir}")
-ZORBA_SECURITY_TEST(read_path_dotdot "ZXQP0029"
+ZORBA_SECURITY_DENIED(read_path_dotdot FODC0002 "access denied by security policy"
   --read-path "${_secdir}/data/sub"
   -f -q "${_secdir}/read.xq" -e "dir:=${_secdir}/data/sub/../..")
 ZORBA_SECURITY_TEST(read_path_warning "warning: --read-path has no effect"
@@ -132,9 +128,9 @@ ZORBA_SECURITY_TEST(read_path_warning "warning: --read-path has no effect"
 # external-entities
 ZORBA_SECURITY_TEST(xxe_default "cli-secret"
   -f -q "${_secdir}/xxe.xq" -e "dir:=${_secdir}")
-ZORBA_SECURITY_TEST(xxe_deny "FODC0006"
+ZORBA_SECURITY_DENIED(xxe_deny FODC0006 "access denied by security policy"
   --deny external-entities -f -q "${_secdir}/xxe.xq" -e "dir:=${_secdir}")
-ZORBA_SECURITY_TEST(xxe_secure "FODC0006"
+ZORBA_SECURITY_DENIED(xxe_secure FODC0006 "access denied by security policy"
   --secure -f -q "${_secdir}/xxe.xq" -e "dir:=${_secdir}")
 ZORBA_SECURITY_TEST(xxe_secure_allow "cli-secret"
   --secure --allow external-entities,file-read
@@ -153,37 +149,37 @@ ZORBA_SECURITY_TEST(env_secure_allow "env:true:true"
 # file-write, --write-path, native-modules (the file module is native)
 ZORBA_SECURITY_TEST(write_default "written"
   -f -q "${_secdir}/write.xq" -e "path:=${_secwrite}/default.txt")
-ZORBA_SECURITY_TEST(write_deny "ZXQP0029"
+ZORBA_SECURITY_DENIED(write_deny FOFL9999 "access denied by security policy"
   --deny file-write
   -f -q "${_secdir}/write.xq" -e "path:=${_secwrite}/deny.txt")
-ZORBA_SECURITY_TEST(write_secure "ZXQP0067"
+ZORBA_SECURITY_DENIED(write_secure ZXQP0067 "requires capability"
   --secure -f -q "${_secdir}/write.xq" -e "path:=${_secwrite}/secure.txt")
-ZORBA_SECURITY_TEST(write_no_native "ZXQP0067"
+ZORBA_SECURITY_DENIED(write_no_native ZXQP0067 "requires capability"
   --deny native-modules
   -f -q "${_secdir}/write.xq" -e "path:=${_secwrite}/no_native.txt")
 ZORBA_SECURITY_TEST(write_path_in "written"
   --secure --allow file-write,native-modules --write-path "${_secwrite}"
   -f -q "${_secdir}/write.xq" -e "path:=${_secwrite}/in.txt")
-ZORBA_SECURITY_TEST(write_path_out "ZXQP0029"
+ZORBA_SECURITY_DENIED(write_path_out FOFL9999 "access denied by security policy"
   --secure --allow file-write,native-modules --write-path "${_secwrite}/sub"
   -f -q "${_secdir}/write.xq" -e "path:=${_secwrite}/out.txt")
 
 # network, --network-prefix, --private-addresses
-ZORBA_SECURITY_TEST(network_deny "error:ZXQP0029"
+ZORBA_SECURITY_TEST(network_deny "error:FODC0002:.*access denied by security policy"
   --deny network
   -f -q "${_secdir}/network.xq" -e "url:=http://127.0.0.1:9/doc.xml")
-ZORBA_SECURITY_TEST(network_private "error:ZXQP0029"
+ZORBA_SECURITY_TEST(network_private "error:FODC0002:.*access denied by security policy"
   --secure --allow network,native-modules
   -f -q "${_secdir}/network.xq" -e "url:=http://127.0.0.1:9/doc.xml")
-ZORBA_SECURITY_TEST(network_private_deny "error:ZXQP0029"
+ZORBA_SECURITY_TEST(network_private_deny "error:FODC0002:.*access denied by security policy"
   --private-addresses deny
   -f -q "${_secdir}/network.xq" -e "url:=http://127.0.0.1:9/doc.xml")
 ZORBA_SECURITY_TEST(network_private_allow "error:"
   --secure --allow network,native-modules --private-addresses allow
   -f -q "${_secdir}/network.xq" -e "url:=http://127.0.0.1:9/doc.xml")
 ZORBA_SET_TEST_PROPERTY(bin/zorba_security_network_private_allow
-  FAIL_REGULAR_EXPRESSION "ZXQP0029")
-ZORBA_SECURITY_TEST(network_prefix_out "error:ZXQP0029"
+  FAIL_REGULAR_EXPRESSION "access denied by security policy")
+ZORBA_SECURITY_TEST(network_prefix_out "error:FODC0002:.*access denied by security policy"
   --network-prefix "http://127.0.0.1:9/allowed/"
   -f -q "${_secdir}/network.xq" -e "url:=http://127.0.0.1:9/doc.xml")
 ZORBA_SECURITY_TEST(network_prefix_in "error:"
@@ -191,7 +187,7 @@ ZORBA_SECURITY_TEST(network_prefix_in "error:"
   --network-prefix "http://127.0.0.1:9/allowed/"
   -f -q "${_secdir}/network.xq" -e "url:=http://127.0.0.1:9/allowed/doc.xml")
 ZORBA_SET_TEST_PROPERTY(bin/zorba_security_network_prefix_in
-  FAIL_REGULAR_EXPRESSION "ZXQP0029")
+  FAIL_REGULAR_EXPRESSION "access denied by security policy")
 
 # --max-call-depth is --max-udf-call-depth
 ZORBA_SECURITY_TEST(max_call_depth "ZXQP0069"
@@ -264,8 +260,8 @@ ZORBA_SECURITY_TEST(cwd_module_default "hello, v2"
 ZORBA_SET_TEST_PROPERTY(bin/zorba_security_cwd_module_default
   WORKING_DIRECTORY "${_uridir}")
 # Not found locally, the import falls back to the network, which --secure
-# denies (module-not-found or policy denial, depending on the error mapping).
-ZORBA_SECURITY_TEST(cwd_module_secure "XQST0059|ZXQP0029"
+# denies: XQST0059 with the policy denial.
+ZORBA_SECURITY_DENIED(cwd_module_secure XQST0059 "access denied by security policy"
   --secure -f -q "${_testdir}/versioning/import1.xq")
 ZORBA_SET_TEST_PROPERTY(bin/zorba_security_cwd_module_secure
   WORKING_DIRECTORY "${_uridir}")
