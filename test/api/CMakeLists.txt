@@ -34,6 +34,7 @@ CREATE_TEST_SOURCELIST(APITests
   expr_depth_limit.cpp
   module_security.cpp
   invoke_module_globals.cpp
+  function_item_lifetime.cpp
 )
 
 # add the executable
