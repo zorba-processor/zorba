@@ -273,11 +273,8 @@ void FastXmlLoader::abortload()
       node->destroy(true);
   }
 
-  if (theTree != NULL)
-  {
-    delete theTree;
-    theTree = NULL;
-  }
+  delete theTree;
+  theTree = NULL;
 
   thePathStack.clear();
 

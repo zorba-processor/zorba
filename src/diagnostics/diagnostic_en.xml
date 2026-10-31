@@ -1346,7 +1346,7 @@
        found to contain a stop word option that refers to a stop word list that
        is not found in the statically known stop word lists.
       </comment>
-      <value>"$1": unknown stop-word list</value>
+      <value>"$1": unknown stop-word list${: 2}</value>
     </diagnostic>
 
     <diagnostic code="FTST0009" if="!defined(ZORBA_NO_FULL_TEXT)">
@@ -1396,7 +1396,7 @@
        found to contain a thesaurus option that refers to a thesaurus that is
        not found in the statically known thesauri.
       </comment>
-      <value>"$1": unknown thesaurus</value>
+      <value>"$1": unknown thesaurus${: 2}</value>
     </diagnostic>
 
     <diagnostic code="FTST0019" if="!defined(ZORBA_NO_FULL_TEXT)">
@@ -1819,7 +1819,7 @@
       <comment>
        Identifier cannot be used to retrive a resource containing text
       </comment>
-      <value>"$1": error retrieving resource containing text</value>
+      <value>"$1": error retrieving resource containing text${: 2}</value>
     </diagnostic>
 
     <diagnostic code="FOUT1190">
@@ -2428,6 +2428,14 @@
     </diagnostic>
 
     <diagnostic code="ZXQP0029" name="URI_ACCESS_DENIED">
+      <comment>
+       A URI mapper of the embedder refused the URI (URIMapper::DENY_ACCESS),
+       or the security policy refused an external entity or DTD while a
+       document was parsed. A resource that the security policy denies is
+       reported with the error the specification prescribes for a resource
+       that is not available (e.g. XQST0059, FODC0002, FOUT1170), not with
+       this code.
+      </comment>
       <value>"$1": URI access not allowed${: 2}</value>
     </diagnostic>
 

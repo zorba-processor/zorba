@@ -17,6 +17,9 @@
 
 #define  __STDC_LIMIT_MACROS
 
+#include <atomic>
+#include <mutex>
+
 #include <zorba/item.h>
 #include <zorba/zorba_string.h>
 
@@ -43,8 +46,62 @@
 
 #include "runtime/util/item_iterator.h"
 
+#include "common/common.h"
+
 
 namespace zorba {
+
+/*******************************************************************************
+  ItemFactorySingleton
+********************************************************************************/
+namespace {
+
+// The atomic and the mutex are constant-initialized, so Instance() is safe even
+// during the dynamic initialization of other statics. theExitCleanup deletes an
+// instance still alive at exit; it is registered when the library is loaded, so
+// it runs after the function-local ZorbaImpl instance has been destroyed (whose
+// destructor shuts Zorba down and normally destroys the instance already).
+std::atomic<ItemFactoryImpl*> theItemFactoryInstance{nullptr};
+
+SYNC_CODE(std::mutex theItemFactoryMutex;)
+
+struct ItemFactoryExitCleanup
+{
+  ~ItemFactoryExitCleanup() { ItemFactorySingleton::destroy(); }
+} theExitCleanup;
+
+} // namespace
+
+
+ItemFactoryImpl& ItemFactorySingleton::Instance()
+{
+  ItemFactoryImpl* instance =
+    theItemFactoryInstance.load(std::memory_order_acquire);
+
+  if (instance)
+    return *instance;
+
+  SYNC_CODE(std::lock_guard<std::mutex> lock(theItemFactoryMutex);)
+
+  instance = theItemFactoryInstance.load(std::memory_order_relaxed);
+
+  if (!instance)
+  {
+    instance = new ItemFactoryImpl();
+    theItemFactoryInstance.store(instance, std::memory_order_release);
+  }
+
+  return *instance;
+}
+
+
+void ItemFactorySingleton::destroy()
+{
+  SYNC_CODE(std::lock_guard<std::mutex> lock(theItemFactoryMutex);)
+
+  delete theItemFactoryInstance.exchange(nullptr, std::memory_order_acq_rel);
+}
+
 
 ItemFactoryImpl::ItemFactoryImpl()
 {

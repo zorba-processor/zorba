@@ -16,6 +16,7 @@
 #ifndef ZORBA_SIMPLE_STORE_QNAME_POOL
 #define ZORBA_SIMPLE_STORE_QNAME_POOL
 
+#include <memory>
 #include <vector>
 
 #include "zorbautils/hashfun.h"
@@ -101,7 +102,7 @@ public:
   static const ulong MAX_CACHE_SIZE = 32768;
 
 protected:
-  QNameItem         * theCache;
+  std::unique_ptr<QNameItem[]> theCache;
   ulong               theCacheSize;
 	ulong               theFirstFree;
   ulong               theNumFree;

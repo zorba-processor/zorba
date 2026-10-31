@@ -128,9 +128,9 @@ void ZorbaImpl::shutdownInternal(bool soft)
 
   if (theNumUsers == 0 || soft == false)
   {
-    Loki::DeletableSingleton<ItemFactoryImpl>::GracefulDelete();
-    Loki::DeletableSingleton<XmlDataManagerImpl>::GracefulDelete();
-    Loki::DeletableSingleton<JsonDataManagerImpl>::GracefulDelete();
+    // The API item factory wraps the store's item factory: destroy it before
+    // the store. It is created again on demand after a new init().
+    ItemFactorySingleton::destroy();
     void* store = &GENV_STORE;
     GlobalEnvironment::destroy();
     StoreManager::shutdownStore(store);

@@ -18,8 +18,6 @@
 #include <iostream>
 #include <sstream>
 
-#include <zorba/empty_sequence.h>
-#include <zorba/singleton_item_sequence.h>
 #include <zorba/util/error_util.h>
 
 #include "api/unmarshaller.h"
@@ -87,18 +85,21 @@ namespace zorba {
 
     lFactory->createAttributeNode(lRequestElement, lFactory->createQName("", "follow-redirect"), Item(), lFactory->createString("true"));
 
+    // A query, not StaticContext::invoke(): an invoke query does not
+    // initialize the global variables of the modules it calls into, and the
+    // http-client wrapper reads them (e.g. $error:HC001) when it reports an
+    // error, such as a redirect denied by the security policy.
     Zorba_CompilerHints_t lHints;
     lHints.opt_level = ZORBA_OPT_LEVEL_O1;
-    theStaticContext->loadProlog("import module namespace httpc = \"http://www.zorba-xquery.com/modules/http-client\";",
-                                 lHints);
-    Item lQName = lFactory->createQName("http://www.zorba-xquery.com/modules/http-client",
-                                        "httpc", "send-request");
-    std::vector<ItemSequence_t> lArgs;
-    lArgs.push_back(new SingletonItemSequence(lRequestElement));
-    lArgs.push_back(new EmptySequence());
-    lArgs.push_back(new EmptySequence());
-    theItemSequence = theStaticContext->invoke(lQName, lArgs);
-    theIterator = theItemSequence->getIterator();
+    theQuery = lInstance->createQuery();
+    theQuery->compile(
+        "import module namespace httpc = "
+        "\"http://www.zorba-xquery.com/modules/http-client\";\n"
+        "declare variable $request external;\n"
+        "httpc:send-request($request, (), ())",
+        theStaticContext, lHints);
+    theQuery->getDynamicContext()->setVariable("request", lRequestElement);
+    theIterator = theQuery->iterator();
     theIterator->open();
     Item lItem;
     theIterator->next(lItem);

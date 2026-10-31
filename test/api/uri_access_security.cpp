@@ -64,7 +64,7 @@ int theFailures = 0;
 const char SECRET[] = "SECRET-VALUE-4c91";
 
 // root/
-//   data/in.xml, data/in.txt, data/m.xq, data/s.xsd
+//   data/in.xml, data/in.txt, data/m.xq, data/s.xsd, data/stop.txt
 //   data/link.xml -> ../outside/secret.xml
 //   data/ldir -> ../outside
 //   data-evil/x.xml
@@ -99,6 +99,7 @@ struct Files
           "<xs:schema xmlns:xs=\"http://www.w3.org/2001/XMLSchema\" "
           "targetNamespace=\"http://example.test/s\">"
           "<xs:element name=\"e\" type=\"xs:string\"/></xs:schema>");
+    write("data/stop.txt", "foo");
     write("data-evil/x.xml", std::string("<x>") + SECRET + "</x>");
     write("outside/secret.xml", std::string("<s>") + SECRET + "</s>");
     write("outside/secret.txt", SECRET);
@@ -217,15 +218,20 @@ bool allowed(const Outcome& o, const std::string& aExpected)
   return true;
 }
 
-bool denied(const Outcome& o, const std::string& aReason = std::string())
+// A denial by the security policy is reported with the error the
+// specification prescribes for a resource that is not available (aCode); the
+// message names the policy and the reason.
+bool denied(const Outcome& o, const char* aCode,
+            const std::string& aReason = std::string())
 {
-  if (o.ok || o.code != "ZXQP0029" ||
-      o.message.find("URI access not allowed") == std::string::npos ||
+  if (o.ok || o.code != aCode ||
+      o.message.find("access denied by security policy") ==
+        std::string::npos ||
       o.message.find(aReason) == std::string::npos ||
       o.message.find(SECRET) != std::string::npos)
   {
-    std::cerr << "  expected a ZXQP0029 denial (" << aReason << "), got "
-              << o << std::endl;
+    std::cerr << "  expected a " << aCode << " denial (" << aReason
+              << "), got " << o << std::endl;
     return false;
   }
   return true;
@@ -233,7 +239,10 @@ bool denied(const Outcome& o, const std::string& aReason = std::string())
 
 bool not_denied(const Outcome& o)
 {
-  if (!o.ok && o.code == "ZXQP0029")
+  if (!o.ok &&
+      (o.code == "ZXQP0029" ||
+       o.message.find("access denied by security policy") !=
+         std::string::npos))
   {
     std::cerr << "  expected no denial, got " << o << std::endl;
     return false;
@@ -416,15 +425,17 @@ void test_check_network()
 void test_documents(Zorba* z, const Files& f)
 {
   StaticContext_t sec = context(z, SecurityPolicy::secure());
-  CHECK(denied(run(z, sec, DOC, f.uri("data/in.xml")),
+  CHECK(denied(run(z, sec, DOC, f.uri("data/in.xml")), "FODC0002",
                "requires capability FileRead"));
-  CHECK(denied(run(z, sec, DOC_AVAILABLE, f.uri("data/in.xml"))));
-  CHECK(denied(run(z, sec, TEXT, f.uri("data/in.txt"))));
-  CHECK(denied(run(z, sec, TEXT_LINES, f.uri("data/in.txt"))));
-  CHECK(denied(run(z, sec, TEXT_AVAILABLE, f.uri("data/in.txt"))));
-  CHECK(denied(run(z, sec, FETCH, f.uri("data/in.txt"))));
+  CHECK(allowed(run(z, sec, DOC_AVAILABLE, f.uri("data/in.xml")), "false"));
+  CHECK(denied(run(z, sec, TEXT, f.uri("data/in.txt")), "FOUT1170"));
+  CHECK(denied(run(z, sec, TEXT_LINES, f.uri("data/in.txt")), "FOUT1170"));
+  CHECK(allowed(run(z, sec, TEXT_AVAILABLE, f.uri("data/in.txt")), "false"));
+  CHECK(denied(run(z, sec, FETCH, f.uri("data/in.txt")),
+               "URI_UNRESOLVED_OR_NOSTREAM"));
   // A child context inherits the policy.
-  CHECK(denied(run(z, sec->createChildContext(), DOC, f.uri("data/in.xml"))));
+  CHECK(denied(run(z, sec->createChildContext(), DOC, f.uri("data/in.xml")),
+               "FODC0002"));
 
   StaticContext_t inData = context(z, SecurityPolicy::secure()
       .allow(Capability::FileRead).addReadPath(f.data.string()));
@@ -439,18 +450,22 @@ void test_documents(Zorba* z, const Files& f)
   CHECK(allowed(run(z, inData, TEXT_AVAILABLE, f.uri("data/in.txt")),
                 "true"));
   CHECK(allowed(run(z, inData, FETCH, f.uri("data/in.txt")), "inside-text"));
-  CHECK(denied(run(z, inData, DOC, f.uri("outside/secret.xml")),
+  CHECK(denied(run(z, inData, DOC, f.uri("outside/secret.xml")), "FODC0002",
                "outside the allowed read paths"));
-  CHECK(denied(run(z, inData, DOC, f.uri("data/link.xml"))));
-  CHECK(denied(run(z, inData, DOC, f.uri("data/ldir/secret.xml"))));
-  CHECK(denied(run(z, inData, DOC, f.uri("data/../outside/secret.xml"))));
-  CHECK(denied(run(z, inData, DOC, f.uri("data-evil/x.xml"))));
-  CHECK(denied(run(z, inData, TEXT, f.uri("outside/secret.txt"))));
-  CHECK(denied(run(z, inData, TEXT_AVAILABLE, f.uri("outside/secret.txt"))));
-  CHECK(denied(run(z, inData, FETCH, f.uri("outside/secret.txt"))));
+  CHECK(denied(run(z, inData, DOC, f.uri("data/link.xml")), "FODC0002"));
+  CHECK(denied(run(z, inData, DOC, f.uri("data/ldir/secret.xml")), "FODC0002"));
+  CHECK(denied(run(z, inData, DOC, f.uri("data/../outside/secret.xml")),
+               "FODC0002"));
+  CHECK(denied(run(z, inData, DOC, f.uri("data-evil/x.xml")), "FODC0002"));
+  CHECK(denied(run(z, inData, TEXT, f.uri("outside/secret.txt")), "FOUT1170"));
+  CHECK(allowed(run(z, inData, TEXT_AVAILABLE, f.uri("outside/secret.txt")),
+                "false"));
+  CHECK(denied(run(z, inData, FETCH, f.uri("outside/secret.txt")),
+               "URI_UNRESOLVED_OR_NOSTREAM"));
   // The entity kind chosen by the query does not matter: a file outside the
   // trusted paths is not a trusted module.
-  CHECK(denied(run(z, inData, FETCH_AS_MODULE, f.uri("outside/secret.txt"))));
+  CHECK(denied(run(z, inData, FETCH_AS_MODULE, f.uri("outside/secret.txt")),
+               "URI_UNRESOLVED_OR_NOSTREAM"));
 
   // Under unrestricted(), nothing changes.
   StaticContext_t all = context(z, SecurityPolicy::unrestricted());
@@ -468,9 +483,9 @@ void test_document_cache(Zorba* z, const Files& f)
       .allow(Capability::FileRead).addReadPath(f.data.string()));
 
   CHECK(allowed(run(z, all, DOC, lUri), SECRET));
-  CHECK(denied(run(z, sec, DOC, lUri)));
-  CHECK(denied(run(z, sec, DOC_AVAILABLE, lUri)));
-  CHECK(denied(run(z, inData, DOC, lUri)));
+  CHECK(denied(run(z, sec, DOC, lUri), "FODC0002"));
+  CHECK(allowed(run(z, sec, DOC_AVAILABLE, lUri), "false"));
+  CHECK(denied(run(z, inData, DOC, lUri), "FODC0002"));
   CHECK(allowed(run(z, all, DOC, lUri), SECRET));
   CHECK(allowed(run(z, z->createStaticContext(), DOC, lUri), SECRET));
 
@@ -496,11 +511,14 @@ void test_network(Zorba* z)
     "fn:doc($uri)/body/query/string()";
 
   CHECK(denied(run(z, context(z, SecurityPolicy::secure()), QUERY, lUrl),
+               "FODC0002",
                "requires capability Network"));
   CHECK(denied(run(z, context(z, SecurityPolicy::secure()), TEXT, lUrl),
+               "FOUT1170",
                "requires capability Network"));
   CHECK(denied(run(z, context(z, SecurityPolicy::secure()
-                                 .allow(Capability::Network)), QUERY, lUrl)));
+                                 .allow(Capability::Network)), QUERY, lUrl),
+               "FODC0002"));
   CHECK(not_denied(run(z, context(z, SecurityPolicy::secure()
                                      .allow(Capability::Network)
                                      .setAllowPrivateAddresses(true)),
@@ -509,7 +527,8 @@ void test_network(Zorba* z)
                                  .allow(Capability::Network)
                                  .setAllowPrivateAddresses(true)
                                  .addNetworkPrefix("http://example.test/")),
-                   QUERY, lUrl), "not under an allowed network prefix"));
+                   QUERY, lUrl),
+               "FODC0002", "not under an allowed network prefix"));
 }
 
 void test_imports(Zorba* z, const Files& f)
@@ -527,26 +546,58 @@ void test_imports(Zorba* z, const Files& f)
   std::string const lModule =
     "import module namespace m = \"http://example.test/m\" at \"" +
     f.uri("data/m.xq") + "\";\nm:f()";
-  CHECK(denied(run(z, sec, lModule), "requires capability FileRead"));
+  CHECK(denied(run(z, sec, lModule),
+               "XQST0059", "requires capability FileRead"));
   CHECK(allowed(run(z, inData, lModule), "42"));
 
   // A module over the network needs RemoteImport (and Network).
   std::string const lRemote =
     "import module namespace r = \"http://example.test/r\" at "
     "\"http://8.8.8.8/r.xq\";\n1";
-  CHECK(denied(run(z, sec, lRemote), "requires capability RemoteImport"));
+  CHECK(denied(run(z, sec, lRemote),
+               "XQST0059", "requires capability RemoteImport"));
   CHECK(denied(run(z, context(z, SecurityPolicy::secure()
                                  .allow(Capability::Network)), lRemote),
+               "XQST0059",
                "requires capability RemoteImport"));
 
 #ifndef ZORBA_NO_XMLSCHEMA
   std::string const lSchema =
     "import schema namespace s = \"http://example.test/s\" at \"" +
     f.uri("data/s.xsd") + "\";\n1";
-  CHECK(denied(run(z, sec, lSchema), "requires capability FileRead"));
+  CHECK(denied(run(z, sec, lSchema),
+               "XQST0059", "requires capability FileRead"));
   CHECK(allowed(run(z, inData, lSchema), "1"));
 #endif
 }
+
+#ifndef ZORBA_NO_FULL_TEXT
+// Stop-word lists and thesauri the policy denies are not available: FTST0008
+// and FTST0018.
+void test_full_text(Zorba* z, const Files& f)
+{
+  StaticContext_t sec = context(z, SecurityPolicy::secure());
+  StaticContext_t inData = context(z, SecurityPolicy::secure()
+      .allow(Capability::FileRead).addReadPath(f.data.string()));
+
+  std::string const lStop =
+    "\"inside text\" contains text \"inside\" using stop words at \"" +
+    f.uri("data/stop.txt") + "\"";
+  CHECK(denied(run(z, sec, lStop), "FTST0008",
+               "requires capability FileRead"));
+  CHECK(allowed(run(z, inData, lStop), "true"));
+  std::string const lOutsideStop =
+    "\"inside text\" contains text \"inside\" using stop words at \"" +
+    f.uri("outside/secret.txt") + "\"";
+  CHECK(denied(run(z, inData, lOutsideStop), "FTST0008",
+               "outside the allowed read paths"));
+
+  std::string const lThesaurus =
+    "\"inside\" contains text \"inside\" using thesaurus at \"" +
+    f.uri("outside/secret.xml") + "\"";
+  CHECK(denied(run(z, inData, lThesaurus), "FTST0018"));
+}
+#endif
 
 // ZORBA_URI_PATH (set before the instance is created) adds to the trusted
 // URI path only where the policy allows Environment.
@@ -599,6 +650,9 @@ uri_access_security(int argc, char* argv[])
     test_document_cache(lZorba, *lFiles);
     test_network(lZorba);
     test_imports(lZorba, *lFiles);
+#ifndef ZORBA_NO_FULL_TEXT
+    test_full_text(lZorba, *lFiles);
+#endif
 #ifndef WIN32
     test_env_uri_path(lZorba);
 #endif

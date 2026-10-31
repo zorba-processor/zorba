@@ -114,16 +114,10 @@ SecurityPolicy policyOf( StaticContext const *aSctx ) {
 
 void FileFunction::raiseAccessDenied( String const &aPath,
                                       String const &aReason ) const {
-  Item const lQName(
-    module_->getItemFactory()->createQName(
-      "http://zorba.io/errors", "zerr", "ZXQP0029"
-    )
-  );
+  // raiseFileError() prefixes the path.
   ostringstream lMessage;
-  lMessage << '"' << aPath << "\": URI access not allowed";
-  if ( !aReason.empty() )
-    lMessage << ": " << aReason;
-  throw USER_EXCEPTION( lQName, lMessage.str() );
+  lMessage << "access denied by security policy (" << aReason << ')';
+  throw raiseFileError( "FOFL9999", lMessage.str().c_str(), aPath );
 }
 
 void FileFunction::checkAccess( StaticContext const *aSctx,

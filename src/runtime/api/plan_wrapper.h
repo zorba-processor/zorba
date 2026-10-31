@@ -21,6 +21,8 @@
 #include "store/api/iterator.h"
 
 
+#include <memory>
+
 #include <zorba/item.h>
 #include <api/serialization/serializable.h>
 
@@ -59,10 +61,8 @@ class dynamic_context;
   ownership of the plan).
 
   - theDynamicContext : 
-  Most of the time this is NULL. It is non-NULL if a NULL dctx is given to the
-  constructor of "this", in which case the constructor will allocate a dctx and
-  store a pointer to it in theDynamicContext, so that it will be deallocated by
-  the destructor of "this".
+  Most of the time this is empty. If a NULL dctx is given to the constructor
+  of "this", the constructor allocates a dctx and theDynamicContext owns it.
 ********************************************************************************/
 class PlanWrapper : public store::Iterator
 {
@@ -74,7 +74,7 @@ protected:
 
   PlanIterator       * theIterator;
 
-  dynamic_context    * theDynamicContext;
+  std::unique_ptr<dynamic_context> theDynamicContext;
 
   PlanState          * thePlanState;
 
@@ -107,7 +107,7 @@ public:
 
   void checkDepth(const QueryLoc& loc);
 
-  dynamic_context* dctx() { return theDynamicContext; }
+  dynamic_context* dctx() { return theDynamicContext.get(); }
 
   void profile() const;
 
