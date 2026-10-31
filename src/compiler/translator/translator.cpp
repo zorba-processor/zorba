@@ -2088,7 +2088,7 @@ QueryLoc expandQueryLoc(const QueryLoc& aLocationFrom, const QueryLoc& aLocation
   beginning (e.g. inside functions).
 ********************************************************************************/
 void wrap_in_debugger_expr(
-  expr* aExpr,
+  expr*& aExpr,
   const QueryLoc& aLoc,
   bool aIsMainModuleBreakable = false,
   bool aIsVarDeclaration = false)
@@ -2124,7 +2124,13 @@ void wrap_in_debugger_expr(
 
       store::Item* lVarname = argVar->get_name();
 
-      if (lVarname->getStringValue() == "$$dot")
+      // the focus (context item, position, size) is not passed to the
+      // debugger eval: it may be undefined at this point and reading it
+      // would make every eval fail
+      const zstring& lVarnameStr = lVarname->getStringValue();
+      if (lVarnameStr == static_context::DOT_VAR_NAME ||
+          lVarnameStr == static_context::DOT_POS_VAR_NAME ||
+          lVarnameStr == static_context::DOT_SIZE_VAR_NAME)
       {
         continue;
       }

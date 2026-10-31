@@ -1326,6 +1326,8 @@ public:
 
   const var_expr* get_var(csize i) const { return theVars[i]; }
 
+  expr* get_arg(csize i) const { return theArgs[i]; }
+
   void add_var(var_expr* var, expr* arg);
 
   void compute_scripting_kind();

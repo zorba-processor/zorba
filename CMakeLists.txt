@@ -39,7 +39,7 @@ INCLUDE(CheckTypeSize)
 SET(CMAKE_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 SET(CMAKE_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
 
-INCLUDE(${CMAKE_SOURCE_DIR}/cmake_modules/CMakeCompareVersionStrings.cmake)
+INCLUDE(${CMAKE_SOURCE_DIR}/cmake/modules/CMakeCompareVersionStrings.cmake)
 
 
 IF("${CMAKE_SYSTEM_NAME}" MATCHES "Linux")
@@ -47,7 +47,7 @@ IF("${CMAKE_SYSTEM_NAME}" MATCHES "Linux")
 ENDIF("${CMAKE_SYSTEM_NAME}" MATCHES "Linux")
 
 # custom ctest options
-CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/CTestCustom.cmake ${CMAKE_CURRENT_BINARY_DIR}/CTestCustom.cmake)
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/CTestCustom.cmake ${CMAKE_CURRENT_BINARY_DIR}/CTestCustom.cmake)
 
 # prohibit in-source-builds
 IF(${CMAKE_BINARY_DIR} STREQUAL ${CMAKE_SOURCE_DIR})
@@ -174,7 +174,7 @@ SET(CMAKE_EXTRA_INCLUDE_FILES)
 ################################################################################
 # Various cmake macros
 
-SET (CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake_modules ${CMAKE_MODULE_PATH})
+SET (CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake/modules ${CMAKE_MODULE_PATH})
 IF (WIN32)
   # On Windows we use proxy modules that try to guess first the location
   # of the required third party libraries. This will search in order in:
@@ -182,7 +182,7 @@ IF (WIN32)
   # 2. the Program Files directory available on the users computer
   # 3. the PATH environment variable
   # The logic is implemented by the macros in the ProxyFindModule.cmake module.
-  SET (CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake_modules/Windows ${CMAKE_MODULE_PATH})
+  SET (CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake/modules/Windows ${CMAKE_MODULE_PATH})
   INCLUDE (ProxyFindModule)
 ENDIF (WIN32)
 
@@ -372,8 +372,8 @@ LIST(APPEND requiredlibs ${requiredlibs-store})
 # Setup Compiler Options
 # Note that this needs to be done after all packages are found because
 # it sets variables based on whether packages have been found or not.
-INCLUDE(CMakeConfiguration.txt)
-INCLUDE(CMakeCompiler.txt)
+INCLUDE(cmake/CMakeConfiguration.txt)
+INCLUDE(cmake/CMakeCompiler.txt)
 
 ###############################################################################
 
@@ -489,7 +489,7 @@ MARK_AS_ADVANCED(ZORBA_CORE_LIB_DIR)
 ADD_DEFINITIONS(${DEFINITIONS})
 
 # compiler/linker hardening flags (option ZORBA_HARDENING)
-INCLUDE(${CMAKE_SOURCE_DIR}/cmake_modules/ZorbaHardening.cmake)
+INCLUDE(${CMAKE_SOURCE_DIR}/cmake/modules/ZorbaHardening.cmake)
 
 
 ################################################################################
@@ -559,12 +559,12 @@ CHECK_CXX_SOURCE_COMPILES("
 ################################################################################
 
 ADD_SUBDIRECTORY(scripts)
-ADD_SUBDIRECTORY(cmake_modules)
+ADD_SUBDIRECTORY(cmake/modules)
 
 # Subdirectory ordering: We need to include "bin" before "test" so
 # that test/fots can add zorbacmd-based tests. We need to include
-# "test" before "config" so ZorbaConfig knows about testdriver. We
-# need to include "config" before "modules" so external modules will
+# "test" before "cmake/config" so ZorbaConfig knows about testdriver. We
+# need to include "cmake/config" before "modules" so external modules will
 # be able to find ZorbaConfig.cmake. We need to include "modules"
 # before "include" so config.h can know eg. whether we found CURL. We
 # need to include "modules" before "doc" so xqdoc can know what
@@ -572,7 +572,7 @@ ADD_SUBDIRECTORY(cmake_modules)
 
 ADD_SUBDIRECTORY(bin)
 ADD_SUBDIRECTORY(test)
-ADD_SUBDIRECTORY(config)
+ADD_SUBDIRECTORY(cmake/config)
 ADD_SUBDIRECTORY(schemas)
 ADD_SUBDIRECTORY(modules)
 ADD_SUBDIRECTORY(doc)
@@ -585,7 +585,7 @@ REMOVE_DEFINITIONS(-Dzorba_EXPORTS)
 # add the uninstall support
 # QQQ move to config/
 CONFIGURE_FILE(
-    "${CMAKE_CURRENT_SOURCE_DIR}/CMakeUninstall.cmake.in"
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/CMakeUninstall.cmake.in"
     "${CMAKE_CURRENT_BINARY_DIR}/CMakeUninstall.cmake"
     @ONLY)
 ADD_CUSTOM_TARGET(uninstall
@@ -595,8 +595,7 @@ SET(CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS_NO_WARNINGS ON)
 INCLUDE(InstallRequiredSystemLibraries)
 
 IF (NOT ZORBA_SKIP_CPACK)
-  # QQQ move to config/ ?
-  INCLUDE(CMakeCPack.cmake)
+  INCLUDE(cmake/CMakeCPack.cmake)
 ENDIF (NOT ZORBA_SKIP_CPACK)
 
 IF (APPLE AND UNIVERSAL)

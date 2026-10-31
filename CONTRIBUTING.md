@@ -3,7 +3,7 @@
 ## Building and testing
 
 Build with the CMake presets in `CMakePresets.json` (requirements and
-platform notes are in `Readme.md`):
+platform notes are in `README.md`):
 
 ```bash
 cmake --workflow --preset full-release-offline   # configure, build, test
@@ -39,4 +39,4 @@ or feature where feasible.
 Zorba is licensed under the Apache License 2.0 (`LICENSE.txt`). By
 submitting a contribution you agree to license it under the same terms.
 New source files start with the Apache 2.0 header used by the existing files
-(see any file in `src/`). Third-party code must be listed in `NOTICE.xml`.
+(see any file in `src/`). Third-party code must be listed in `doc/legal/NOTICE.xml`.

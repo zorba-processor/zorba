@@ -104,7 +104,11 @@ SET(UNIT_TESTS_SRCS
 # multithread_stress_test.cpp
 
 IF(ZORBA_WITH_DEBUGGER)
-  LIST(APPEND SPEC_FILES "debug_iter_serialization.cpp")
+  LIST(APPEND UNIT_TESTS_SRCS "debug_iter_serialization.cpp")
+  IF(NOT WIN32)
+    # drives the DBGP server over a POSIX socket
+    LIST(APPEND UNIT_TESTS_SRCS "debugger_property.cpp")
+  ENDIF(NOT WIN32)
 ENDIF(ZORBA_WITH_DEBUGGER)
 
 IF(WIN32)

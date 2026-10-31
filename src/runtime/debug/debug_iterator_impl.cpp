@@ -32,6 +32,10 @@
 #include "runtime/visitors/planiter_visitor.h"
 #include "runtime/core/item_iterator.h"
 #include "runtime/api/plan_iterator_wrapper.h"
+#include "runtime/util/item_iterator.h"
+
+#include "types/typeops.h"
+#include "types/typemanager.h"
 
 #include "api/serialization/serializer.h"
 #include "api/serializerimpl.h"
@@ -56,6 +60,15 @@ void DebugIterator::setVariables(
 }
 
 
+void DebugIterator::setAssignableVariables(
+    std::vector<ulong> aVarIds,
+    std::vector<int>   aIsLocal)
+{
+  theAssignableVarIds = aVarIds;
+  theAssignableVarIsLocal = aIsLocal;
+}
+
+
 bool
 DebugIterator::nextImpl(
     store::Item_t&  result,
@@ -64,10 +77,16 @@ DebugIterator::nextImpl(
   DebugIteratorState* lState = 0;
   DEFAULT_STACK_INIT(DebugIteratorState, lState, planState);
 
-  planState.theDebuggerCommons->setCurrentIterator(this);
+  // there is no debugger session if a debug-mode plan is executed normally
+  // (e.g. execute() instead of debug(), or a function called from an eval)
+  if (planState.theDebuggerCommons != NULL &&
+      planState.theDebuggerCommons->getRuntime() != NULL)
+  {
+    planState.theDebuggerCommons->setCurrentIterator(this);
 
-  // is there a breakpoint here?
-  checkBreak(&planState);
+    // is there a breakpoint here?
+    checkBreak(&planState);
+  }
 
   while (consumeNext(result, theChildren[0], planState)) {
     lState->notEmptySequence = true;
@@ -191,6 +210,103 @@ DebugIterator::eval(
   }
 
   return lResult;
+}
+
+
+void
+DebugIterator::evalItems(
+    PlanState*                   aPlanState,
+    std::vector<store::Item_t>&  aResult) const
+{
+  theChildren[1]->reset(*aPlanState);
+  store::Item_t lRes;
+  while (consumeNext(lRes, theChildren[1], *aPlanState)) {
+    aResult.push_back(lRes);
+  }
+}
+
+
+/*******************************************************************************
+  Assign aValue to the in-scope variable with the given lexical name (either
+  "local" or "prefix:local"). Only prolog and block-local variables that are
+  assignable in XQuery Scripting semantics (i.e. those a "$x := ..." statement
+  could assign) can be set. The value must match the declared type of the
+  variable; no function conversion rules are applied.
+********************************************************************************/
+int
+DebugIterator::setVariable(
+    PlanState*                   aPlanState,
+    const zstring&               aName,
+    std::vector<store::Item_t>&  aValue) const
+{
+  csize lIdx = varnames.size();
+  for (csize i = 0; i < varnames.size(); ++i) {
+    const store::Item* lName = varnames[i].getp();
+    zstring lLexical;
+    if (!lName->getPrefix().empty()) {
+      lLexical = lName->getPrefix();
+      lLexical += ':';
+    }
+    lLexical += lName->getLocalName();
+    // the innermost binding of a name wins
+    if (lLexical == aName) {
+      lIdx = i;
+    }
+  }
+
+  if (lIdx == varnames.size()) {
+    return DEBUGGER_SETVAR_NOT_FOUND;
+  }
+
+  if (lIdx >= theAssignableVarIds.size() || theAssignableVarIds[lIdx] == 0) {
+    return DEBUGGER_SETVAR_NOT_ASSIGNABLE;
+  }
+
+  if (lIdx < vartypes.size() && vartypes[lIdx] != NULL) {
+    const XQType& lType = *vartypes[lIdx];
+    TypeManager* lTM = getStaticContext()->get_typemanager();
+    csize lSize = aValue.size();
+
+    switch (lType.get_quantifier()) {
+    case SequenceType::QUANT_ONE:
+      if (lSize != 1) return DEBUGGER_SETVAR_TYPE_MISMATCH;
+      break;
+    case SequenceType::QUANT_QUESTION:
+      if (lSize > 1) return DEBUGGER_SETVAR_TYPE_MISMATCH;
+      break;
+    case SequenceType::QUANT_PLUS:
+      if (lSize < 1) return DEBUGGER_SETVAR_TYPE_MISMATCH;
+      break;
+    default:
+      break;
+    }
+
+    if (lSize > 0) {
+      xqtref_t lItemType = TypeOps::prime_type(lTM, lType);
+      for (csize i = 0; i < lSize; ++i) {
+        if (!TypeOps::is_subtype(lTM, aValue[i].getp(), *lItemType, loc)) {
+          return DEBUGGER_SETVAR_TYPE_MISMATCH;
+        }
+      }
+    }
+  }
+
+  ulong lVarId = theAssignableVarIds[lIdx];
+  dynamic_context* lDctx = (theAssignableVarIsLocal[lIdx] ?
+                            aPlanState->theLocalDynCtx :
+                            aPlanState->theGlobalDynCtx);
+
+  if (aValue.size() == 1) {
+    store::Item_t lItem = aValue[0];
+    lDctx->set_variable(lVarId, varnames[lIdx], loc, lItem);
+  } else {
+    store::Iterator_t lIter = new ItemIterator(aValue);
+    lDctx->set_variable(lVarId, varnames[lIdx], loc, lIter);
+  }
+
+  aPlanState->theGlobalDynCtx->changeSnapshot();
+
+  return DEBUGGER_SETVAR_OK;
 }
 
 
