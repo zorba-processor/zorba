@@ -27,6 +27,7 @@ SET(UNIT_TEST_SRCS
   test_mem_sizeof.cpp
   test_mmap_file.cpp
   test_numeric_hash.cpp
+  test_ordpath.cpp
   test_parameters.cpp
   test_security_policy.cpp
   test_string.cpp

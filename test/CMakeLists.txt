@@ -52,4 +52,3 @@ ADD_SUBDIRECTORY(fuzz)
 INSTALL(DIRECTORY fots_driver
         DESTINATION share/zorba-${ZORBA_MAJOR_NUMBER}.${ZORBA_MINOR_NUMBER}.${ZORBA_PATCH_NUMBER})
 
-#ZORBA_GENERATE_EXE("ordpath_test" "test_ordpath.cpp" "" "" "")
