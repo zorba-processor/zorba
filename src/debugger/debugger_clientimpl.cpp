@@ -17,6 +17,7 @@
 
 #include <iostream>
 #include <sstream>
+#include <stdexcept>
 #include <cassert>
 
 #include <zorba/debugger_event_handler.h>
@@ -26,6 +27,17 @@
 #include "debugger/socket_streambuf.h"
 
 namespace zorba {
+
+std::size_t
+DebuggerClient::property_set(
+  const std::string& /* aPropertyLongName */,
+  const std::string& /* aValue */,
+  int /* aStackDepth */,
+  int /* aContextId */,
+  const std::string& /* aPropertyAddress */)
+{
+  throw std::logic_error("DebuggerClient::property_set with a value is not implemented by this client");
+}
   
 DebuggerClient*
 DebuggerClient::createDebuggerClient(
@@ -458,6 +470,24 @@ DebuggerClientImpl::property_set(
   return id;
 }
   
+std::size_t
+DebuggerClientImpl::property_set(
+  const std::string& aPropertyLongName,
+  const std::string& aValue,
+  int aStackDepth,
+  int aContextId,
+  const std::string& aPropertyAddress)
+{
+  std::size_t id = property_x("property_set", aPropertyLongName, aStackDepth, aContextId, 0);
+  if (aPropertyAddress != "")
+    *theOutStream << " -a " << aPropertyAddress;
+  *theOutStream << " -- ";
+  base64::encode( aValue, *theOutStream );
+  *theOutStream << '\0';
+  theOutStream->flush();
+  return id;
+}
+
 std::size_t
 DebuggerClientImpl::property_value(
   const std::string& aPropertyLongName,
