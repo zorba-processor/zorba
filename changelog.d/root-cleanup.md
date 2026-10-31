@@ -4,3 +4,4 @@
 
 ### Removed
 - Unused `WIN32.cpack`, `zorba_install.nsi`, the empty `CPack.cmake` stub and the stale `README.txt`.
+- Incomplete copy of the Node.js binding (`binding.gyp`, `package.json`, `example.js`, `include/QueryManager.h`, `include/NodeDiagnosticHandler.h`, `include/helpers.h`); its sources were never committed here and the full project lives at github.com/Rod-O/zorba-node. A Node.js binding over the new C API is planned for 5.x.
