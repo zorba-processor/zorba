@@ -17,3 +17,4 @@
 - `fn:max`/`fn:min` return a NaN of the promoted type (`max((0e0, xs:float('NaN')))` is an `xs:double`).
 - `fn:format-integer` formats -9223372036854775808, and ordinals of 21, 22, 23 (and so on) end in st, nd, rd.
 - Casting a negative decimal, float or double at or below -1 to an unsigned integer type raises FORG0001 instead of FOCA0002.
+- The `zorba` command applies serialization parameters declared in the query prolog (`declare option output:method "text"`); `-z` and the `--serialize-*` options still override them.
