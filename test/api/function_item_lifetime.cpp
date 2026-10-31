@@ -23,6 +23,10 @@
 // stored in prolog variables, function items created by eval, prolog
 // variables read by escaped function items, cached functions returning
 // function items, query clones, and StaticContext::loadProlog().
+// Also checks that the cycles through the prolog variables of a closed query
+// are freed (counting the QueryResources objs alive, not only through
+// LeakSanitizer), and that the cycle collector does not walk the graph of a
+// closed query each time a function item of it is used or dropped.
 
 #include <iostream>
 #include <string>
@@ -42,6 +46,14 @@
 #include <zorba/zorba_exception.h>
 
 using namespace zorba;
+
+// Library hooks for tests (see QueryResources in
+// src/compiler/api/compilercb.h): the number of QueryResources objs alive,
+// and the number of graphs walked by the cycle collector.
+namespace zorba {
+ZORBA_DLL_PUBLIC long query_resources_alive();
+ZORBA_DLL_PUBLIC unsigned long query_resources_walks();
+}
 
 namespace {
 
@@ -64,6 +76,17 @@ int theFailures = 0;
     if (!(cond)) {                                                       \
       std::cerr << __FILE__ << ":" << __LINE__ << ": check failed: "     \
                 << #cond << std::endl;                                   \
+      ++theFailures;                                                     \
+    }                                                                    \
+  } while (0)
+
+#define CHECK_LE(actual, bound)                                          \
+  do {                                                                   \
+    long long const lActual = (actual);                                  \
+    long long const lBound = (bound);                                    \
+    if (lActual > lBound) {                                              \
+      std::cerr << __FILE__ << ":" << __LINE__ << ": expected " #actual  \
+                << " <= " << lBound << ", got " << lActual << std::endl; \
       ++theFailures;                                                     \
     }                                                                    \
   } while (0)
@@ -444,6 +467,83 @@ void test_load_prolog_diagnostics(Zorba* z)
   CHECK_EQ(apply(z, "$f()", lF), "2");
 }
 
+// A function item stored in a prolog variable of the query that created it
+// keeps that query's state alive through a cycle; dropping the item frees it.
+void test_cycle_freed(Zorba* z)
+{
+  long const lAlive = query_resources_alive();
+  {
+    Item lF = function_item(z,
+        "declare variable $g := function($x) { $x + 1 };\n"
+        "$g");
+    CHECK(query_resources_alive() > lAlive);
+    CHECK_EQ(apply(z, "$f(1)", lF), "2");
+  }
+  CHECK_EQ(std::to_string(query_resources_alive()), std::to_string(lAlive));
+}
+
+// The same cycle through a JSON object or array held by the prolog variable.
+void test_cycle_through_json(Zorba* z)
+{
+  long const lAlive = query_resources_alive();
+  {
+    Item lF = function_item(z,
+        "declare variable $m := { \"f\": function($x) { $x + 1 } };\n"
+        "$m(\"f\")");
+    CHECK_EQ(apply(z, "$f(1)", lF), "2");
+
+    Item lG = function_item(z,
+        "declare variable $a := [ [ function($x) { $x * 2 } ] ];\n"
+        "$a(1)(1)");
+    CHECK_EQ(apply(z, "$f(4)", lG), "8");
+  }
+  CHECK_EQ(std::to_string(query_resources_alive()), std::to_string(lAlive));
+}
+
+// An escaped function item that creates a function item on each call (which
+// refers to the closed query's state and is dropped right away) must not
+// make the collector walk the closed query's graph, with its large prolog
+// variable, for each of them.
+void test_walks_creating_items(Zorba* z)
+{
+  Item lF = function_item(z,
+      "declare variable $big := for $i in 1 to 10000 return string($i);\n"
+      "declare variable $g := function($x) { function() { $x + count($big) } };\n"
+      "$g");
+  unsigned long const lWalks = query_resources_walks();
+  CHECK_EQ(apply(z, "sum(for $i in 1 to 1000 return $f($i)())", lF),
+           "10500500");
+  CHECK_LE(query_resources_walks() - lWalks, 10);
+}
+
+// Nor for each read of a prolog variable holding a function item of the
+// closed query.
+void test_walks_reading_global(Zorba* z)
+{
+  Item lF = function_item(z,
+      "declare variable $h := function($x) { $x + 1 };\n"
+      "declare variable $g := function($x) { $h($x) };\n"
+      "$g");
+  unsigned long const lWalks = query_resources_walks();
+  CHECK_EQ(apply(z, "sum(for $i in 1 to 1000 return $f($i))", lF), "501500");
+  CHECK_LE(query_resources_walks() - lWalks, 10);
+}
+
+// Freeing a cycle that holds many function items must not walk the graph
+// again for each of them.
+void test_walks_releasing_garbage(Zorba* z)
+{
+  long const lAlive = query_resources_alive();
+  Item lF = function_item(z,
+      "declare variable $g := for $i in 1 to 1000 return function() { $i };\n"
+      "$g[1]");
+  CHECK_EQ(apply(z, "$f()", lF), "1");
+  unsigned long const lWalks = query_resources_walks();
+  lF = Item();
+  CHECK_LE(query_resources_walks() - lWalks, 10);
+  CHECK_EQ(std::to_string(query_resources_alive()), std::to_string(lAlive));
+}
+
 typedef void (*test_fn)(Zorba*);
 
 struct test_case
@@ -478,6 +578,11 @@ function_item_lifetime(int argc, char* argv[])
     { "test_cached_function_items", test_cached_function_items },
     { "test_clone", test_clone },
     { "test_load_prolog_diagnostics", test_load_prolog_diagnostics },
+    { "test_cycle_freed", test_cycle_freed },
+    { "test_cycle_through_json", test_cycle_through_json },
+    { "test_walks_creating_items", test_walks_creating_items },
+    { "test_walks_reading_global", test_walks_reading_global },
+    { "test_walks_releasing_garbage", test_walks_releasing_garbage },
   };
 
   for (test_case const& lTest : lTests)
