@@ -117,10 +117,19 @@ void Item::removeReference()
       return;
     }
   }
-  else if (!InterlockedDecrement(&theRefCount))
+  else
   {
-    free();
-    return;
+    long remaining = InterlockedDecrement(&theRefCount);
+
+    if (remaining == 0)
+    {
+      free();
+      return;
+    }
+
+    // See the FUNCTION case below.
+    if (getKind() == FUNCTION)
+      static_cast<FunctionItem*>(this)->referenceDropped(remaining);
   }
 
 #else
