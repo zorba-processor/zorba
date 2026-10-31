@@ -177,3 +177,4 @@ uint32_t Base16::hash() const {
 
 } // namespace zorba
 /* vim:set et sw=2 ts=2: */
+// demo
