@@ -33,6 +33,14 @@ Print the queries.
 --print-errors-as-xml, -x
 Print the errors as XML.
 
+--print-ast, -a
+Print the parse tree of the query as XML. To draw it with Graphviz, convert it with <tt>scripts/ast2dot.xq</tt>:
+<pre>
+zorba --parse-only --print-ast -q query.xq | grep -v '^AST for ' > ast.xml
+zorba -q scripts/ast2dot.xq -e ast=ast.xml -z method=text > ast.dot
+dot -Tsvg ast.dot -o ast.svg
+</pre>
+
 --byte-order-mark
 Set the byte-order-mark for the serializer.
 
