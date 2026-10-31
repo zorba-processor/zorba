@@ -256,9 +256,9 @@ static void format_number( store::Item_t &number_item, picture const &pic,
   // the maximum-fractional-part-size as the second argument.
   //
   // An xs:float or xs:double is adjusted in its own type (so that it can
-  // overflow to infinity) and converted to xs:decimal through its shortest
-  // round-tripping digits; an xs:decimal or xs:integer is formatted exactly,
-  // without going through xs:double.
+  // overflow to infinity) and converted to xs:decimal through the shortest
+  // round-tripping digits of the (widened) xs:double value; an xs:decimal or
+  // xs:integer is formatted exactly, without going through xs:double.
   //
   bool is_negative;
   zstring adjusted_str;                 // the adjusted number, no exponent
@@ -284,8 +284,11 @@ static void format_number( store::Item_t &number_item, picture const &pic,
         else if ( sub_pic_for( pic, is_negative ).has_per_mille )
           f *= 1000;
         adjusted_is_inf = f.isPosInf();
-        if ( !adjusted_is_inf )
-          adjusted_str = f.toString( true );
+        if ( !adjusted_is_inf ) {
+          // The xs:decimal closest to the xs:float value, not the float's
+          // shortest digits: 0.1f is 0.100000001490116...
+          adjusted_str = xs_double( static_cast<double>( f.getNumber() ) ).toString( true );
+        }
       } else {
         xs_double a( d.abs() );
         if ( sub_pic_for( pic, is_negative ).has_percent )
