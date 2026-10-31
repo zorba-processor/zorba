@@ -2,7 +2,7 @@
 Zorba 3.1.0
 -----------
 
-(Note: This file is generated automatically from NOTICE.xml.
+(Note: This file is generated automatically from doc/legal/NOTICE.xml.
 Please do not modify this file directly.)
 
 
@@ -137,7 +137,7 @@ Copyright: 1998 Paul J. Lucas
     
 ----------------------------------------------------
 
-cmake_modules/FindBoost.cmake
+cmake/modules/FindBoost.cmake
 
 Copyright: 
       2006-2008 Andreas Schneider <mail@cynapses.org>
@@ -152,7 +152,7 @@ Copyright:
     
 ----------------------------------------------------
 
-cmake_modules/FindJNI.cmake
+cmake/modules/FindJNI.cmake
 
 Copyright: 2001-2009 Kitware, Inc.
 

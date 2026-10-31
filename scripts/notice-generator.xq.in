@@ -23,7 +23,7 @@ declare variable $local:zorba-version := "${ZORBA_MAJOR_NUMBER}.${ZORBA_MINOR_NU
 
 declare %ann:nondeterministic function local:read-notice-file($dirname as xs:string) as node()?
 {
-  let $ftxt := fn:concat($dirname, "/NOTICE.xml")
+  let $ftxt := fn:concat($dirname, "/doc/legal/NOTICE.xml")
   return
     if(file:is-file($ftxt)) then
       fn:parse-xml(file:read-text($ftxt))
@@ -37,7 +37,7 @@ declare function local:header() as xs:string
     "-----------", "&#10;",
     "Zorba ", $local:zorba-version, "&#10;",
     "-----------", "&#10;&#10;",
-    "(Note: This file is generated automatically from NOTICE.xml.&#10;",
+    "(Note: This file is generated automatically from doc/legal/NOTICE.xml.&#10;",
     "Please do not modify this file directly.)&#10;&#10;"
   )
 };

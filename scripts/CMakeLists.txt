@@ -52,7 +52,7 @@ IF(ZORBA_WORKS)
   ADD_CUSTOM_COMMAND(OUTPUT "${CMAKE_SOURCE_DIR}/NOTICE.txt"
     COMMAND "${ZORBA_EXE}" "-q" "${CMAKE_CURRENT_BINARY_DIR}/notice-generator.xq" "-f" "--omit-xml-declaration"
     MAIN_DEPENDENCY "${CMAKE_CURRENT_BINARY_DIR}/notice-generator.xq" 
-    DEPENDS "${CMAKE_SOURCE_DIR}/NOTICE.xml"
+    DEPENDS "${CMAKE_SOURCE_DIR}/doc/legal/NOTICE.xml"
     "${CMAKE_SOURCE_DIR}/CMakeLists.txt"
     zorbacmd)
   ADD_CUSTOM_TARGET(NOTICE ALL

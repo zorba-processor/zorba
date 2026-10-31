@@ -51,7 +51,7 @@ void PrintSchema::printInfo(bool excludeBuiltIn, XMLGrammarPool* grammarPool)
       if (nameSpace && (XMLString::stringLen(nameSpace)>0))
       {
         std::cout << StrX(nameSpace);
-        char * nsCh = XMLString::transcode(nameSpace);
+        char * nsCh = xerces_utf8::to_utf8(nameSpace);
 	    if ( XMLString::equals(Schema::XSD_NAMESPACE, nsCh ) )
         {
           std::cout << std::endl;

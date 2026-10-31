@@ -124,7 +124,7 @@ MACRO (ZORBA_GENERATE_EXE_HELPERS_WIN32)
   FOREACH (VCFILE ${ZORBA_VC_PROJECT_FILE_LIST})
     # Do not overwrite old property files. The user might have adapted something.
     IF (NOT EXISTS ${VCFILE})
-      CONFIGURE_FILE (${CMAKE_SOURCE_DIR}/cmake_modules/VCProject.vcproj.in ${VCFILE})
+      CONFIGURE_FILE (${CMAKE_SOURCE_DIR}/cmake/modules/VCProject.vcproj.in ${VCFILE})
     ENDIF (NOT EXISTS ${VCFILE})
   ENDFOREACH(VCFILE)
 

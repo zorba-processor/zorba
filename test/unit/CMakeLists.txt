@@ -104,7 +104,11 @@ SET(UNIT_TESTS_SRCS
 # multithread_stress_test.cpp
 
 IF(ZORBA_WITH_DEBUGGER)
-  LIST(APPEND SPEC_FILES "debug_iter_serialization.cpp")
+  LIST(APPEND UNIT_TESTS_SRCS "debug_iter_serialization.cpp")
+  IF(NOT WIN32)
+    # drives the DBGP server over a POSIX socket
+    LIST(APPEND UNIT_TESTS_SRCS "debugger_property.cpp")
+  ENDIF(NOT WIN32)
 ENDIF(ZORBA_WITH_DEBUGGER)
 
 IF(WIN32)
@@ -178,5 +182,8 @@ IF(ZORBA_WITH_UNIT_TESTS)
     ZORBA_ADD_TEST("test/libunit/unordered_set" LibUnitTest unordered_set)
   ENDIF (NOT ZORBA_HAVE_UNORDERED_SET)
   ZORBA_ADD_TEST("test/libunit/utf8_streambuf" LibUnitTest utf8_streambuf)
+  IF (NOT ZORBA_NO_XMLSCHEMA)
+    ZORBA_ADD_TEST("test/libunit/xerces_utf8" LibUnitTest xerces_utf8)
+  ENDIF (NOT ZORBA_NO_XMLSCHEMA)
 ENDIF(ZORBA_WITH_UNIT_TESTS)
 # vim:set et sw=2 ts=2:

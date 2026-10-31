@@ -72,6 +72,10 @@ namespace UnitTests {
   int test_utf8_streambuf( int, char*[] );
   int test_uuid( int, char*[] );
 
+#ifndef ZORBA_NO_XMLSCHEMA
+  int test_xerces_utf8( int, char*[] );
+#endif /* ZORBA_NO_XMLSCHEMA */
+
   void initializeTestList();
 
 } // namespace UnitTests

@@ -230,6 +230,12 @@ void CommandLineHandler::handle<Eval>(tuple<bstring>& aTuple)
 }
 
 template<>
+void CommandLineHandler::handle<PropertySet>(tuple<bstring, bstring>& aTuple)
+{
+  theWaitFor = theClient->property_set(get<0>(aTuple).second, get<1>(aTuple).second);
+}
+
+template<>
 void
 CommandLineHandler::handle<StepIn>(ZORBA_TR1_NS::tuple<> &t)
 {
@@ -261,6 +267,7 @@ CommandLineHandler::addCommands()
   typedef tuple<bint, bint> TUPLE_INT_INT;
   typedef tuple<bstring, bstring, bint> TUPLE_STR_STR_INT;
   typedef tuple<bint, bint, bstring> TUPLE_INT_INT_STR;
+  typedef tuple<bstring, bstring> TUPLE_STR_STR;
 
   // DBGP: status
   *theCommandLine << createCommand<Status>(TUPLE(), "status", *this, "Gets the status of the server");
@@ -376,6 +383,17 @@ CommandLineHandler::addCommands()
     // - everything following the fist contiguous set of whitespaces are sent as string
     lCommand->addArgument(0, "c", createArgType<TUPLE_STR, std::string, 0>(TUPLE_STR()), "expression to evaluate", true);
       
+    *theCommandLine << lCommand;
+  }
+
+  // DBGP: property_set
+  {
+    Command<CommandLineHandler, TUPLE_STR_STR, PropertySet>* lCommand =
+      createCommand<PropertySet>(TUPLE_STR_STR(), "set", *this, "Assign the result of an expression to a variable");
+
+    lCommand->addArgument(0, "n", createArgType<TUPLE_STR_STR, std::string, 0>(TUPLE_STR_STR()), "variable name (without $)", true);
+    lCommand->addArgument(1, "v", createArgType<TUPLE_STR_STR, std::string, 1>(TUPLE_STR_STR()), "expression whose result is assigned", true);
+
     *theCommandLine << lCommand;
   }
 

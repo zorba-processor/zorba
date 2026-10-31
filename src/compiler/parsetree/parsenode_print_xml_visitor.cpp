@@ -377,7 +377,7 @@ void* begin_visit(const GlobalVarDecl &n)
 {
     INDENT;
 
-    os << "<VarDecl pos='" << n.get_location() << "' var='"
+    os << "<GlobalVarDecl pos='" << n.get_location() << "' var='"
        << n.get_var_name()->get_qname() << "' ptr='" << &n << "'";
 
     os << ">";

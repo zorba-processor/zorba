@@ -72,6 +72,8 @@ protected:
   std::vector<DebugIterator*> theDebuggerChildren; //
   DebugIterator* theDebuggerParent; //
   bool theIsVarDeclaration; //
+  std::vector<ulong> theAssignableVarIds; //
+  std::vector<int> theAssignableVarIsLocal; //
 public:
   SERIALIZABLE_CLASS(DebugIterator);
 
@@ -90,7 +92,9 @@ public:
     vartypes(),
     theDebuggerChildren(),
     theDebuggerParent(),
-    theIsVarDeclaration()
+    theIsVarDeclaration(),
+    theAssignableVarIds(),
+    theAssignableVarIsLocal()
   {}
 
   virtual ~DebugIterator();
@@ -107,11 +111,14 @@ public:
   const DebugIterator* getOverIterator() const;
   QueryLoc getQueryLocation() const;
   std::list<std::pair<zstring, zstring> > eval(PlanState* aState, Zorba_SerializerOptions* aSerOptions) const;
+  void evalItems(PlanState* aState, std::vector<store::Item_t>& aResult) const;
+  int setVariable(PlanState* aState, const zstring& aName, std::vector<store::Item_t>& aValue) const;
   void checkBreak(PlanState* aState) const;
   void setParent(DebugIterator* aParent);
   void addChild(DebugIterator* aChild);
   void setChildren(std::vector<PlanIter_t>* args);
   void setVariables(checked_vector<store::Item_t> aVarNames, checked_vector<xqtref_t> aVarTypes);
+  void setAssignableVariables(std::vector<ulong> aVarIds, std::vector<int> aIsLocal);
   void accept(PlanIterVisitor& v) const;
 
   bool nextImpl(store::Item_t& result, PlanState& aPlanState) const;

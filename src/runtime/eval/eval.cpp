@@ -293,6 +293,12 @@ void EvalIterator::init(
   // Create the ccb for the eval query
   CompilerCB* evalCCB = new CompilerCB(*planState.theCompilerCB);
   evalCCB->theIsEval = true;
+#ifdef ZORBA_WITH_DEBUGGER
+  // the eval query is not debuggable: compiling it in debug mode would wrap
+  // it in debugger exprs and register its locations as breakables of the
+  // outer query
+  evalCCB->theDebuggerCommons = NULL;
+#endif
   evalCCB->theRootSctx = evalSctx;
   evalCCB->theConfig.for_serialization_only = !theDoNodeCopy;
   (evalCCB->theSctxMap)[1] = evalSctx;
