@@ -860,6 +860,19 @@ class Stats:
                 self.splits[side] += 1
 
 
+def batch_command(side, path, text, args):
+    """The command that runs a batch query file on one processor."""
+    q = {"text": text, "spec": {"vars": []}}
+    if side == "saxon":
+        return saxon_command(args.java, args.saxon_classpath, path, q,
+                             args.rbkt)
+    # The zorba command line applies its own serialization defaults (method
+    # xml) over the output declarations of the query, which would escape
+    # < and & in the result lines.
+    return zorba_command(args.zorba, path, q, args.rbkt) + [
+        "-z", "method=text"]
+
+
 def run_side(side, cases, args, tag, stats):
     """Run cases on one processor; returns one result per case: the batch
     line ("<type>:<value> ...", "()" or "!<code>") or None for a timeout.
@@ -871,12 +884,7 @@ def run_side(side, cases, args, tag, stats):
     path = os.path.join(d, tag + ".xq")
     with open(path, "w", encoding="utf-8") as f:
         f.write(text)
-    q = {"text": text, "spec": {"vars": []}}
-    if side == "zorba":
-        cmd = zorba_command(args.zorba, path, q, args.rbkt)
-    else:
-        cmd = saxon_command(args.java, args.saxon_classpath, path, q,
-                            args.rbkt)
+    cmd = batch_command(side, path, text, args)
     single = len(cases) == 1
     res = run_process(cmd, args.timeout * (1 if single else 3), d)
     parsed = None
@@ -1025,22 +1033,17 @@ def run_batch(batch, index, args, stats):
 def batch_sanity_check(args, sides):
     """Every processor must run the batch format (prelude, try/catch,
     result lines); otherwise every case would be reported as an error."""
-    exprs = ["1 + 1", "xs:double('INF')", "()", "error(xs:QName('err:FOER0000'))"]
-    want = ["integer:2", "double:INF", "()", "!FOER0000"]
+    exprs = ["1 + 1", "xs:double('INF')", "()",
+             "error(xs:QName('err:FOER0000'))", "'<&amp;>'"]
+    want = ["integer:2", "double:INF", "()", "!FOER0000", "string:<&>"]
     d = os.path.join(args.out, "sanity")
     os.makedirs(d, exist_ok=True)
     path = os.path.join(d, "batch.xq")
     text = xqgen.batch_query(exprs)
     with open(path, "w", encoding="utf-8") as f:
         f.write(text)
-    q = {"text": text, "spec": {"vars": []}}
     for side in sides:
-        if side == "zorba":
-            cmd = zorba_command(args.zorba, path, q, args.rbkt)
-        else:
-            cmd = saxon_command(args.java, args.saxon_classpath, path, q,
-                                args.rbkt)
-        res = run_process(cmd, 120, d)
+        res = run_process(batch_command(side, path, text, args), 120, d)
         got = (xqgen.parse_batch_output(res["out"], len(exprs))
                if res["rc"] == 0 else None)
         if got != want:
