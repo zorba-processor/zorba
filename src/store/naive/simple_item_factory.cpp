@@ -2151,38 +2151,6 @@ store::PUL* BasicItemFactory::createPendingUpdateList(bool isTransform)
   return new PULImpl(isTransform);
 }
 
-#if 0
-/*******************************************************************************
-
-********************************************************************************/
-bool BasicItemFactory::createTuple(
-        store::Item_t& result,
-        std::vector<store::TupleField>& fields)
-{
-  result = new TupleItem(fields);
-  return true;
-}
-
-
-/*******************************************************************************
-
-********************************************************************************/
-bool BasicItemFactory::createTuple(
-        store::Item_t& result,
-        store::Item *inTuple,
-        std::vector<int>& permutation)
-{
-  ZORBA_ASSERT(inTuple->isTuple());
-  std::vector<zorba::store::TupleField> newFields;
-  int n = permutation.size();
-  for(int i = 0; i <= n; ++i) {
-    newFields.push_back(inTuple->getTupleField(permutation[i]));
-  }
-  result = new TupleItem(newFields);
-  return true;
-}
-#endif
-
 /*******************************************************************************
 
 ********************************************************************************/

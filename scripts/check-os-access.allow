@@ -57,5 +57,3 @@ src/debugger/socket.cpp socket 2 debugger connection (ZORBA_WITH_DEBUGGER, start
 src/diagnostics/StackWalker.cpp LoadLibrary 5 Windows crash stack walker loads dbghelp/psapi
 src/unit_tests/test_mmap_file.cpp ifstream 1 unit test
 src/unit_tests/test_mmap_file.cpp ofstream 1 unit test
-src/util/fx/fxcharheap_test.cpp ifstream 1 standalone test program, not built into the library
-src/util/hashmap_test.cpp ifstream 1 standalone test program, not built into the library
