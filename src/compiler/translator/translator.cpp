@@ -14126,12 +14126,16 @@ void end_visit(const CommonContent& v, void* /*visit_state*/)
 
     while (curRef < end)
     {
-      int d = xml::parse_entity(curRef, &content);
-      if (d < 0)
+      // XQuery 3.0 3.9.1.3 (and 3.1.1 for string literals): a character
+      // reference must identify a valid XML character, e.g. not &#x0;.
+      unicode::code_point cp;
+      int d = xml::parse_entity(curRef, &cp);
+      if (d < 0 || !xml::is_valid(cp))
       {
         RAISE_ERROR(err::XQST0090, loc,
         ERROR_PARAMS(curRef, theSctx->xquery_version()));
       }
+      utf8::encode(cp, &content);
       curRef += d;
 
       if (curRef >= end)

@@ -89,12 +89,6 @@ public:
   {
     return theValidationEventHandler.getAttributeList();
   }
-    
-  // Must be called only after text() has been called
-  TextValidationInfo* getTextInfo()
-  {
-    return theValidationEventHandler.getTextInfo();
-  }
 
   // for validating content of a schema type
   void startType(store::Item_t typeName);

@@ -23,6 +23,7 @@
 // Zorba
 #include <zorba/zorba.h>
 #include <zorba/properties.h>
+#include <zorba/security.h>
 
 // local
 #include "zorbacmd_props.h"
@@ -76,6 +77,9 @@ char const* get_help_msg() {
     HELP_OPT( "--abort" )
       "Call abort(3) when a ZorbaException is thrown.\n\n"
 #endif /* NDEBUG */
+
+    HELP_OPT( "--allow <capability>[,<capability>...]" )
+      "Allow the given capabilities to queries (see --secure for the names). Applied in command-line order with --deny, after the starting policy: \"--secure --allow file-read\" and \"--deny all --allow file-read\" are equivalent. Repeatable.\n\n"
 
     HELP_OPT( "--as-files, -f" )
       "Treat all -q arguments as file paths instead of URIs or inline queries. This option is deprecated and will be defaulted to true in the future, so any entry in the command line is going to be treated as files.\n\n"
@@ -133,7 +137,10 @@ char const* get_help_msg() {
       "Add the given collation and set the value of the default collation in the static context to the given collation.\n\n"
 
     HELP_OPT( "--disable-http-resolution" )
-      "Do not use HTTP to resolve URIs.\n\n"
+      "Do not import modules or schemas over the network. Same as --deny remote-import.\n\n"
+
+    HELP_OPT( "--deny <capability>[,<capability>...]" )
+      "Deny the given capabilities to queries (see --secure for the names). A denied file or network access raises zerr:ZXQP0029; importing a module that needs a denied capability raises zerr:ZXQP0067. Repeatable.\n\n"
 
     HELP_OPT( "--dump-lib" )
       "Dump function library.\n\n"
@@ -188,6 +195,9 @@ char const* get_help_msg() {
 
     ////////// m //////////////////////////////////////////////////////////////
 
+    HELP_OPT( "--max-call-depth <depth>" )
+      "Same as --max-udf-call-depth.\n\n"
+
     HELP_OPT( "--max-expr-depth <depth>" )
       "Maximum nesting depth of expressions (default 1500; 0 = no limit other than the available stack). Deeper queries fail to compile with zerr:ZXQP0070.\n\n"
 
@@ -199,6 +209,9 @@ char const* get_help_msg() {
 
     HELP_OPT( "--multiple, -m" )
       "Execute the given queries multiple times.\n\n"
+
+    HELP_OPT( "--network-prefix <url>" )
+      "Restrict the network capability to URLs under the given prefix (same scheme, host and port; the path equals the prefix path or continues it after a '/'), e.g. https://api.example.com/v1/. A prefix whose host is localhost or a private address literal also allows that host. Repeatable; without it, network access is not restricted by URL.\n\n"
 
     ////////// n //////////////////////////////////////////////////////////////
 
@@ -271,6 +284,9 @@ char const* get_help_msg() {
     HELP_OPT( "--print-translated" )
       "Print the normalized expression tree.\n\n"
 
+    HELP_OPT( "--private-addresses {allow|deny}" )
+      "Whether network access may reach loopback, private and link-local addresses (default: allow, or deny with --secure).\n\n"
+
     HELP_OPT( "--profile {dot|json|xml}" )
       "Print profiling information in the given format.\n\n"
 
@@ -279,7 +295,15 @@ char const* get_help_msg() {
     HELP_OPT( "--query, -q" )
       "Query test or file URI (file://...)\n\n"
 
+    ////////// r //////////////////////////////////////////////////////////////
+
+    HELP_OPT( "--read-path <dir>" )
+      "Restrict the file-read capability to files under the given directory (compared after resolving \"..\" and symbolic links). Repeatable; without it, reads are not restricted by path.\n\n"
+
     ////////// s //////////////////////////////////////////////////////////////
+
+    HELP_OPT( "--secure" )
+      "Start from the secure policy, in which queries have no capability, instead of the unrestricted one; then apply --allow and --deny. The capabilities are: external-entities (external DTDs and entities, XInclude), file-read, file-write, network (http, https, ftp), remote-import (module and schema import over the network; also needs network), environment (environment variables, ZORBA_URI_PATH and ZORBA_LIB_PATH), native-modules (modules implemented in C++, e.g. the file module), and all. Modules and schemas in the URI and library paths can always be imported; with --secure the current directory is not added to those paths (pass it with --module-path . if needed). The query files, --context-item, external variable files and --output-file are accessed by this tool, not by the query, and are not restricted.\n\n"
 
     HELP_OPT( "--serialization-parameter, -z <name>=<value>" )
       "Set serialization parameter (see http://www.w3.org/TR/xslt-xquery-serialization/#serparam, e.g.: -z method=xhtml -z doctype-system=DTD/xhtml1-strict.dtd -z indent=yes).\n\n"
@@ -353,6 +377,11 @@ char const* get_help_msg() {
     HELP_OPT( "--version, -v" )
       "Print the version number and exit.\n\n"
 
+    ////////// w //////////////////////////////////////////////////////////////
+
+    HELP_OPT( "--write-path <dir>" )
+      "Restrict the file-write capability to files under the given directory. Repeatable; without it, writes are not restricted by path.\n\n"
+
     ;
 }
 
@@ -391,6 +420,49 @@ static bool bool_of( char const *s ) {
   cerr << '"' << s << "\": invalid boolean value" << endl;
   exit( 1 );
 }
+
+// Parses a comma-separated list of capability names (see --secure) into
+// Capability bits.
+static bool parse_capabilities( char const *s, uint32_t *result ) {
+  static struct {
+    char const *name;
+    Capability cap;
+  } const caps[] = {
+    { "external-entities", Capability::ExternalEntities },
+    { "file-read",         Capability::FileRead },
+    { "file-write",        Capability::FileWrite },
+    { "network",           Capability::Network },
+    { "remote-import",     Capability::RemoteImport },
+    { "environment",       Capability::Environment },
+    { "native-modules",    Capability::NativeModules }
+  };
+  string list( s );
+  to_lower( list );
+  *result = 0;
+  string::size_type start = 0;
+  for ( ;; ) {
+    string::size_type const comma = list.find( ',', start );
+    string const name( list, start,
+                       comma == string::npos ? string::npos : comma - start );
+    bool found = false;
+    for ( auto const &c : caps ) {
+      if ( name == c.name || name == "all" ) {
+        *result |= static_cast<uint32_t>( c.cap );
+        found = true;
+      }
+    }
+    if ( !found )
+      return false;
+    if ( comma == string::npos )
+      return true;
+    start = comma + 1;
+  }
+}
+
+#define CAPABILITY_ERROR(OPT) \
+  OPT " argument must be a comma-separated list of: external-entities, " \
+  "file-read, file-write, network, remote-import, environment, " \
+  "native-modules, all.\n"
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -440,7 +512,17 @@ int parse_args( int argc, char const *argv[] ) {
       z_props.setAbort( true );
     else
 #endif /* NDEBUG */
-    if ( IS_OPT( "--as-files", "-f" ) ) {
+    if ( IS_LONG_OPT( "--allow" ) ) {
+      PARSE_ARG( "--allow" );
+      capability_op op;
+      op.allow = true;
+      if ( !parse_capabilities( ARG_VAL, &op.capabilities ) ) {
+        error = CAPABILITY_ERROR( "--allow" );
+        break;
+      }
+      zc_props.capability_ops_.push_back( op );
+    }
+    else if ( IS_OPT( "--as-files", "-f" ) ) {
       zc_props.as_files_ = true;
       got_as_files = true;
     }
@@ -514,11 +596,21 @@ int parse_args( int argc, char const *argv[] ) {
       PARSE_ARG( "--default-collation" );
       zc_props.default_collation_ = ARG_VAL;
     }
+    else if ( IS_LONG_OPT( "--deny" ) ) {
+      PARSE_ARG( "--deny" );
+      capability_op op;
+      op.allow = false;
+      if ( !parse_capabilities( ARG_VAL, &op.capabilities ) ) {
+        error = CAPABILITY_ERROR( "--deny" );
+        break;
+      }
+      zc_props.capability_ops_.push_back( op );
+    }
     else if ( IS_LONG_OPT( "--disable-http-resolution" ) ) {
-      sctx_opt opt;
-      opt.clark_qname = "{http://zorba.io/options/features}disable";
-      opt.value = "http-uri-resolution";
-      zc_props.sctx_opts_.push_back( opt );
+      capability_op op;
+      op.allow = false;
+      op.capabilities = static_cast<uint32_t>( Capability::RemoteImport );
+      zc_props.capability_ops_.push_back( op );
     }
     else if ( IS_LONG_OPT( "--dump-lib" ) )
       z_props.setDumpLib( true );
@@ -615,6 +707,10 @@ int parse_args( int argc, char const *argv[] ) {
 
     ////////// m //////////////////////////////////////////////////////////////
 
+    else if ( IS_LONG_OPT( "--max-call-depth" ) ) {
+      PARSE_ARG( "--max-call-depth" );
+      SET_ZPROP( MaxUDFCallDepth );
+    }
     else if ( IS_LONG_OPT( "--max-expr-depth" ) ) {
       PARSE_ARG( "--max-expr-depth" );
       SET_ZCPROP( max_expr_depth_ );
@@ -630,6 +726,10 @@ int parse_args( int argc, char const *argv[] ) {
     else if ( IS_OPT( "--multiple", "-m" ) ) {
       PARSE_ARG( "--multiple" );
       SET_ZCPROP( multiple_ );
+    }
+    else if ( IS_LONG_OPT( "--network-prefix" ) ) {
+      PARSE_ARG( "--network-prefix" );
+      zc_props.network_prefixes_.push_back( ARG_VAL );
     }
 
     ////////// n //////////////////////////////////////////////////////////////
@@ -709,6 +809,19 @@ int parse_args( int argc, char const *argv[] ) {
       z_props.setPrintStaticTypes( true );
     else if ( IS_LONG_OPT( "--print-translated" ) )
       z_props.setPrintTranslated( true );
+    else if ( IS_LONG_OPT( "--private-addresses" ) ) {
+      PARSE_ARG( "--private-addresses" );
+      string val( ARG_VAL );
+      to_lower( val );
+      if ( val == "allow" )
+        zc_props.private_addresses_ = 1;
+      else if ( val == "deny" )
+        zc_props.private_addresses_ = 0;
+      else {
+        error = "--private-addresses argument must be one of: allow, deny.\n";
+        break;
+      }
+    }
     else if ( IS_LONG_OPT( "--profile" ) )
     {
       PARSE_ARG( "--profile" );
@@ -744,7 +857,17 @@ int parse_args( int argc, char const *argv[] ) {
       zc_props.queries_or_files_.push_back( ARG_VAL );
     }
 
+    ////////// r //////////////////////////////////////////////////////////////
+
+    else if ( IS_LONG_OPT( "--read-path" ) ) {
+      PARSE_ARG( "--read-path" );
+      zc_props.read_paths_.push_back( ARG_VAL );
+    }
+
     ////////// s //////////////////////////////////////////////////////////////
+
+    else if ( IS_LONG_OPT( "--secure" ) )
+      zc_props.secure_ = true;
 
     else if ( IS_OPT( "--serialization-parameter", "-z" ) ) {
       PARSE_ARG( "--serialization-parameter" );
@@ -847,6 +970,13 @@ int parse_args( int argc, char const *argv[] ) {
       cout << "Zorba NoSQL Query Processor, Version: "
            << zorba::Zorba::version() << endl;
       exit( 1 ); // should be 0, but the old code returned 1
+    }
+
+    ////////// w //////////////////////////////////////////////////////////////
+
+    else if ( IS_LONG_OPT( "--write-path" ) ) {
+      PARSE_ARG( "--write-path" );
+      zc_props.write_paths_.push_back( ARG_VAL );
     }
 
     ////////// END ////////////////////////////////////////////////////////////

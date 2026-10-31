@@ -4918,10 +4918,13 @@ DirElemConstructor :
     {
       if (static_cast<QName*>($2)->get_qname() != static_cast<QName*>($6)->get_qname())
       {
-        error(@5, "syntax error, end tag </" +
-                  static_cast<QName*>($6)->get_qname().str() +
-                  "> does not match start tag <" +
-                  static_cast<QName*>($2)->get_qname().str() + ">");
+        // XQuery 3.0 3.9.1: XQST0118 if the end tag does not match.
+        driver.parserErr("end tag </" +
+                         static_cast<QName*>($6)->get_qname().str() +
+                         "> does not match start tag <" +
+                         static_cast<QName*>($2)->get_qname().str() + ">",
+                         @5, err::XQST0118);
+        error(@5, "");
         release_hack_all( $2, $6 );
         YYERROR;
       }
@@ -4944,10 +4947,13 @@ DirElemConstructor :
     {
       if (static_cast<QName*>($2)->get_qname() != static_cast<QName*>($7)->get_qname())
       {
-        error(@5, "syntax error, end tag </" +
-                  static_cast<QName*>($7)->get_qname().str() +
-                  "> does not match start tag <" +
-                  static_cast<QName*>($2)->get_qname().str() + ">");
+        // XQuery 3.0 3.9.1: XQST0118 if the end tag does not match.
+        driver.parserErr("end tag </" +
+                         static_cast<QName*>($7)->get_qname().str() +
+                         "> does not match start tag <" +
+                         static_cast<QName*>($2)->get_qname().str() + ">",
+                         @5, err::XQST0118);
+        error(@5, "");
         release_hack_all( $2, $3, $7 );
         YYERROR;
       }
@@ -4964,10 +4970,13 @@ DirElemConstructor :
     {
       if (static_cast<QName*>($2)->get_qname() != static_cast<QName*>($7)->get_qname())
       {
-        error(@5, "syntax error, end tag </" +
-                  static_cast<QName*>($7)->get_qname().str() +
-                  "> does not match start tag <" +
-                  static_cast<QName*>($2)->get_qname().str() + ">");
+        // XQuery 3.0 3.9.1: XQST0118 if the end tag does not match.
+        driver.parserErr("end tag </" +
+                         static_cast<QName*>($7)->get_qname().str() +
+                         "> does not match start tag <" +
+                         static_cast<QName*>($2)->get_qname().str() + ">",
+                         @5, err::XQST0118);
+        error(@5, "");
         release_hack_all( $2, $5, $7 );
         YYERROR;
       }
@@ -4984,10 +4993,13 @@ DirElemConstructor :
     {
       if (static_cast<QName*>($2)->get_qname() != static_cast<QName*>($8)->get_qname())
       {
-        error(@5, "syntax error, end tag </" +
-                  static_cast<QName*>($8)->get_qname().str() +
-                  "> does not match start tag <" +
-                  static_cast<QName*>($2)->get_qname().str() + ">");
+        // XQuery 3.0 3.9.1: XQST0118 if the end tag does not match.
+        driver.parserErr("end tag </" +
+                         static_cast<QName*>($8)->get_qname().str() +
+                         "> does not match start tag <" +
+                         static_cast<QName*>($2)->get_qname().str() + ">",
+                         @5, err::XQST0118);
+        error(@5, "");
         release_hack_all( $2, $3, $6, $8 );
         YYERROR;
       }
