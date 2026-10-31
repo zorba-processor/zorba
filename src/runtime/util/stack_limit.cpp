@@ -92,11 +92,14 @@ Bounds query_bounds()
 #endif
   if (b.high != 0)
   {
-    // A quarter of the stack, at least 64 KiB, at most 1 MiB.
-    size_t const KiB = 1024;
-    size_t const lQuarter = (b.high - b.low) / 4;
-    b.reserve = lQuarter < 64 * KiB ? 64 * KiB :
-                lQuarter > 1024 * KiB ? 1024 * KiB : lQuarter;
+    // Half of the stack, at least 64 KiB. Not only must the error be raised
+    // and unwound: closing the plan afterwards recurses through every call
+    // level again (UDF state -> body plan -> nested UDF state), starting near
+    // the top of the stack, and its frames per level can be larger than
+    // those of the calls (seen with GCC 16 -O2). Keeping half of the stack
+    // free lets the close use up to twice the stack of the calls.
+    size_t const lHalf = (b.high - b.low) / 2;
+    b.reserve = lHalf < 64 * 1024 ? 64 * 1024 : lHalf;
   }
   return b;
 }

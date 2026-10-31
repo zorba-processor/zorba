@@ -6,7 +6,7 @@
 ### Security
 
 - Enforce the security policy timeout during evaluation: a deadline checked every 1024 iterator calls aborts the query with `zerr:ZXQP0068`, which `try`/`catch` cannot catch; nested plans (`eval`, function bodies) share the deadline. No timeout by default. Replaces the unused timeout thread.
-- Deep recursion raises `zerr:ZXQP0069` instead of crashing: besides the call depth limit, a function call is refused when less than a quarter of the thread's stack (64 KiB to 1 MiB) is left.
+- Deep recursion raises `zerr:ZXQP0069` instead of crashing: besides the call depth limit, a function call is refused when less than half of the thread's stack is left (closing the plan afterwards recurses through all call levels again).
 
 ### Added
 
