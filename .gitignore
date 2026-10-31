@@ -5,3 +5,4 @@
 .DS_Store
 build
 *.swp
+__pycache__/

@@ -15,8 +15,21 @@
 
 """Differential testing of Zorba against Saxon-HE.
 
-Runs the plain XQuery 3.0 queries of the rbkt test suite
-(test/rbkt/Queries/zorba) on both processors and classifies each query:
+Three query sets (--set):
+
+  rbkt      the plain XQuery 3.0 queries of the rbkt test suite
+            (test/rbkt/Queries/zorba), run on both processors
+  boundary  generated boundary-value matrices (boundary.py), run on both
+            processors
+  property  generated property tests (property.py), run on Zorba only;
+            each case must return true()
+
+Generated cases run in batches (xqgen.py): one query evaluates many cases,
+each inside try/catch. If a batch does not complete on a processor (a
+static error, a crash, a timeout), it is split in halves until the failing
+cases run alone, so every case gets its own result.
+
+rbkt and boundary results are classified per query (case):
 
   agree             same canonical result, or both raised the same error
   zorba-error-only  Zorba raised an error, Saxon returned a result
@@ -27,6 +40,10 @@ Runs the plain XQuery 3.0 queries of the rbkt test suite
   harness-skip      not run: the query uses features outside the common
                     subset (JSONiq, Zorba modules, full-text, updates,
                     scripting, schema awareness, ...); the reason is recorded
+                    (rbkt only)
+
+property results are pass, fail (the invariant returned something other
+than true()), error or timeout.
 
 Disagreements are informational. The exit status is non-zero only for
 harness errors (a processor that cannot run a trivial query, bad
@@ -43,6 +60,7 @@ Python 3 standard library only.
 import argparse
 import collections
 import concurrent.futures
+import decimal
 import json
 import math
 import os
@@ -50,13 +68,19 @@ import re
 import signal
 import subprocess
 import sys
+import threading
 import time
 import urllib.parse
 import xml.etree.ElementTree as ET
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import xqgen  # noqa: E402
+
 CLASSES = ["agree", "zorba-error-only", "saxon-error-only",
            "different-error-code", "different-result", "timeout",
            "harness-skip"]
+PROPERTY_CLASSES = ["pass", "fail", "error", "timeout"]
+SETS = ["rbkt", "boundary", "property"]
 
 ERR_NS = "http://www.w3.org/2005/xqt-errors"
 OUTPUT_NS = "http://www.w3.org/2010/xslt-xquery-serialization"
@@ -632,7 +656,7 @@ def classify(zres, sres, text):
 # --------------------------------------------------------------------------
 
 TSV_FIELDS = ["id", "class", "note", "expected", "zorba", "saxon",
-              "zorba_s", "saxon_s"]
+              "zorba_s", "saxon_s", "query"]
 
 
 def clip(s, n=300):
@@ -678,7 +702,7 @@ def run_one(q, args):
             "saxon_s": "%.2f" % sres["seconds"]}
 
 
-def sanity_check(args):
+def sanity_check(args, sides=("zorba", "saxon")):
     """Both processors must evaluate a trivial query; otherwise the harness
     is broken and nothing it reports would mean anything."""
     d = os.path.join(args.out, "sanity")
@@ -688,10 +712,12 @@ def sanity_check(args):
     with open(path, "w", encoding="utf-8") as f:
         f.write(text)
     q = {"text": text, "spec": {"vars": []}}
-    for name, cmd in (
-            ("zorba", zorba_command(args.zorba, path, q, args.rbkt)),
-            ("saxon", saxon_command(args.java, args.saxon_classpath, path, q,
-                                    args.rbkt))):
+    for name in sides:
+        if name == "zorba":
+            cmd = zorba_command(args.zorba, path, q, args.rbkt)
+        else:
+            cmd = saxon_command(args.java, args.saxon_classpath, path, q,
+                                args.rbkt)
         res = run_process(cmd, 120, d)
         if res["rc"] != 0 or canonical(res["out"]) != '<r a="1">2</r>':
             raise HarnessError("%s sanity check failed (rc %s):\n%s\n%s" % (
@@ -713,6 +739,11 @@ def read_tsv(path):
 
 
 def cmd_select(args):
+    if args.set != "rbkt":
+        for c in generated_cases(args):
+            print("%s\t%s\t%s" % (c["id"], "solo" if c["solo"] else "batch",
+                                  c["expr"].replace("\n", " ")))
+        return 0
     for q in select(args.rbkt, split_prefixes(args.filter)):
         print("%s\t%s" % (q["id"], q["skip"] or "selected"))
     return 0
@@ -727,12 +758,19 @@ def cmd_run(args):
     args.zorba = os.path.abspath(args.zorba)
     if os.sep in args.java:
         args.java = os.path.abspath(args.java)
-    args.saxon_classpath = os.pathsep.join(
-        os.path.abspath(p) for p in args.saxon_classpath.split(os.pathsep))
+    if args.saxon_classpath:
+        args.saxon_classpath = os.pathsep.join(
+            os.path.abspath(p) for p in args.saxon_classpath.split(os.pathsep))
+    elif args.set != "property":
+        raise SystemExit("--saxon-classpath is required for --set %s"
+                         % args.set)
     args.rbkt = os.path.abspath(args.rbkt)
     args.out = os.path.abspath(args.out)
     os.makedirs(args.out, exist_ok=True)
-    status = {"ok": False, "shard": args.shard, "shards": args.shards}
+    if args.set != "rbkt":
+        return run_generated(args)
+    status = {"ok": False, "shard": args.shard, "shards": args.shards,
+              "set": "rbkt"}
     try:
         sanity_check(args)
         queries = [q for i, q in enumerate(
@@ -774,6 +812,300 @@ def cmd_run(args):
 
 
 # --------------------------------------------------------------------------
+# Generated query sets (boundary, property)
+# --------------------------------------------------------------------------
+
+def generated_cases(args):
+    """The cases of the generated set args.set, filtered by args.filter."""
+    if args.set == "boundary":
+        import boundary
+        cases = boundary.cases()
+    else:
+        import property as prop
+        cases = prop.cases(args.seed)
+    prefixes = split_prefixes(args.filter)
+    if prefixes:
+        cases = [c for c in cases
+                 if any(c["id"].startswith(p) for p in prefixes)]
+    return cases
+
+
+def make_batches(cases, size):
+    """Group cases into batches: solo cases alone, the others in runs of
+    up to size consecutive cases. The order is deterministic."""
+    batches, cur = [], []
+    for c in cases:
+        if c["solo"]:
+            batches.append([c])
+            continue
+        cur.append(c)
+        if len(cur) >= size:
+            batches.append(cur)
+            cur = []
+    if cur:
+        batches.append(cur)
+    return batches
+
+
+class Stats:
+    def __init__(self):
+        self.lock = threading.Lock()
+        self.processes = collections.Counter()
+        self.splits = collections.Counter()
+
+    def add(self, side, split):
+        with self.lock:
+            self.processes[side] += 1
+            if split:
+                self.splits[side] += 1
+
+
+def batch_command(side, path, text, args):
+    """The command that runs a batch query file on one processor."""
+    q = {"text": text, "spec": {"vars": []}}
+    if side == "saxon":
+        return saxon_command(args.java, args.saxon_classpath, path, q,
+                             args.rbkt)
+    # The zorba command line applies its own serialization defaults (method
+    # xml) over the output declarations of the query, which would escape
+    # < and & in the result lines.
+    return zorba_command(args.zorba, path, q, args.rbkt) + [
+        "-z", "method=text"]
+
+
+def run_side(side, cases, args, tag, stats):
+    """Run cases on one processor; returns one result per case: the batch
+    line ("<type>:<value> ...", "()" or "!<code>") or None for a timeout.
+    A batch that does not complete is split until the failing cases run
+    alone; a single case that fails gets the process's error code."""
+    text = xqgen.batch_query([c["expr"] for c in cases])
+    d = os.path.join(args.out, "queries", side)
+    os.makedirs(d, exist_ok=True)
+    path = os.path.join(d, tag + ".xq")
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(text)
+    cmd = batch_command(side, path, text, args)
+    single = len(cases) == 1
+    res = run_process(cmd, args.timeout * (1 if single else 3), d)
+    parsed = None
+    if not res["timeout"] and res["rc"] == 0:
+        parsed = xqgen.parse_batch_output(res["out"], len(cases))
+    stats.add(side, parsed is None and not single)
+    if parsed is not None or not single:
+        os.remove(path)
+    elif not res["timeout"]:
+        # Keep the diagnostics of a case that fails on its own.
+        with open(path[:-3] + ".err", "w", encoding="utf-8") as f:
+            f.write(res["err"][:4000])
+    if parsed is not None:
+        return parsed
+    if single:
+        if res["timeout"]:
+            return [None]
+        if res["rc"] == 0:
+            return ["?" + xqgen.esc_value(res["out"][:200])]
+        code = (zorba_error_code if side == "zorba" else
+                saxon_error_code)(res)
+        return ["!" + code]
+    mid = len(cases) // 2
+    return (run_side(side, cases[:mid], args, tag + "a", stats) +
+            run_side(side, cases[mid:], args, tag + "b", stats))
+
+
+NUMERIC_TYPES = {"integer", "decimal", "float", "double", "long", "int",
+                 "short", "byte", "unsignedLong", "unsignedInt",
+                 "unsignedShort", "unsignedByte", "nonNegativeInteger",
+                 "positiveInteger", "negativeInteger", "nonPositiveInteger"}
+
+
+def _num_value(v):
+    v = {"INF": "Infinity", "-INF": "-Infinity"}.get(v, v)
+    try:
+        return decimal.Decimal(v)
+    except decimal.InvalidOperation:
+        return None
+
+
+def compare_values(z, s):
+    """Compare two batch result lines that are not errors and not equal.
+    Returns (class, note)."""
+    zi, si = z.split(" "), s.split(" ")
+    if len(zi) != len(si):
+        return "different-result", ""
+    notes = set()
+    for a, b in zip(zi, si):
+        if a == b:
+            continue
+        ta, _, va = a.partition(":")
+        tb, _, vb = b.partition(":")
+        if ta != tb:
+            if va == vb:
+                notes.add("type-only")
+                continue
+            return "different-result", ""
+        if ta not in NUMERIC_TYPES:
+            return "different-result", ""
+        na, nb = _num_value(va), _num_value(vb)
+        if na is None or nb is None:
+            return "different-result", ""
+        if na.is_nan() and nb.is_nan():
+            notes.add("numeric-lexical")
+        elif na == nb:
+            notes.add("numeric-lexical")
+        elif (na.is_finite() and nb.is_finite() and
+              abs(na - nb) <= decimal.Decimal("1e-15") * max(abs(na),
+                                                              abs(nb))):
+            notes.add("numeric-precision")
+        else:
+            return "different-result", ""
+    if notes <= {"numeric-lexical"}:
+        return "agree", "numeric-lexical"
+    if "type-only" in notes:
+        return "different-result", "type-only"
+    return "different-result", "numeric-precision"
+
+
+def classify_case(z, s):
+    """Classify the two results of a boundary case (see run_side)."""
+    if z is None or s is None:
+        return "timeout", ("both" if z is None and s is None else
+                           "zorba" if z is None else "saxon")
+    ze, se = z.startswith("!"), s.startswith("!")
+    if ze and se:
+        if codes_match(z[1:], s[1:]):
+            return "agree", "both-error"
+        return "different-error-code", ""
+    if ze:
+        return "zorba-error-only", "crash" if z.startswith("!CRASH") else ""
+    if se:
+        return "saxon-error-only", "crash" if s.startswith("!CRASH") else ""
+    if z == s:
+        return "agree", ""
+    return compare_values(z, s)
+
+
+def classify_property(z):
+    if z is None:
+        return "timeout", ""
+    if z == "boolean:true":
+        return "pass", ""
+    if z.startswith("!"):
+        return "error", "crash" if z.startswith("!CRASH") else ""
+    return "fail", ""
+
+
+def result_summary(r):
+    if r is None:
+        return "TIMEOUT"
+    if r.startswith("!"):
+        return "ERROR " + r[1:]
+    return clip(r)
+
+
+def run_batch(batch, index, args, stats):
+    sides = ["zorba"] if args.set == "property" else ["zorba", "saxon"]
+    results = {}
+    seconds = {}
+    for side in sides:
+        start = time.monotonic()
+        results[side] = run_side(side, batch, args, "b%05d" % index, stats)
+        seconds[side] = time.monotonic() - start
+    rows = []
+    for i, c in enumerate(batch):
+        z = results["zorba"][i]
+        if args.set == "property":
+            s = ""
+            cls, note = classify_property(z)
+        else:
+            s = results["saxon"][i]
+            cls, note = classify_case(z, s)
+        row = {"id": c["id"], "class": cls, "note": note, "expected": "",
+               "zorba": result_summary(z),
+               "saxon": result_summary(s) if s != "" else "",
+               "zorba_s": "%.2f" % (seconds["zorba"] / len(batch)),
+               "saxon_s": ("%.2f" % (seconds["saxon"] / len(batch))
+                           if "saxon" in seconds else ""),
+               "query": clip(c["expr"], 2000)}
+        rows.append(row)
+    return rows
+
+
+def batch_sanity_check(args, sides):
+    """Every processor must run the batch format (prelude, try/catch,
+    result lines); otherwise every case would be reported as an error."""
+    exprs = ["1 + 1", "xs:double('INF')", "()",
+             "error(xs:QName('err:FOER0000'))", "'<&amp;>'"]
+    want = ["integer:2", "double:INF", "()", "!FOER0000", "string:<&>"]
+    d = os.path.join(args.out, "sanity")
+    os.makedirs(d, exist_ok=True)
+    path = os.path.join(d, "batch.xq")
+    text = xqgen.batch_query(exprs)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(text)
+    for side in sides:
+        res = run_process(batch_command(side, path, text, args), 120, d)
+        got = (xqgen.parse_batch_output(res["out"], len(exprs))
+               if res["rc"] == 0 else None)
+        if got != want:
+            raise HarnessError("%s batch sanity check failed (rc %s): got %r"
+                               "\n%s\n%s" % (side, res["rc"], got,
+                                              res["out"][-2000:],
+                                              res["err"][-2000:]))
+
+
+def run_generated(args):
+    status = {"ok": False, "shard": args.shard, "shards": args.shards,
+              "set": args.set}
+    if args.set == "property":
+        status["seed"] = args.seed
+        print("property seed: %s" % args.seed, flush=True)
+    stats = Stats()
+    try:
+        sides = ("zorba",) if args.set == "property" else ("zorba", "saxon")
+        sanity_check(args, sides)
+        batch_sanity_check(args, sides)
+        cases = generated_cases(args)
+        batches = make_batches(cases, args.batch_size)
+        mine = [(i, b) for i, b in enumerate(batches)
+                if i % args.shards == args.shard]
+        ncases = sum(len(b) for _, b in mine)
+        print("shard %d/%d: %d of %d %s cases in %d batches" % (
+            args.shard, args.shards, ncases, len(cases), args.set,
+            len(mine)), flush=True)
+        rows = []
+        done = 0
+        bad = ("agree", "pass")
+        with concurrent.futures.ThreadPoolExecutor(args.jobs) as ex:
+            futures = [ex.submit(run_batch, b, i, args, stats)
+                       for i, b in mine]
+            for fut in concurrent.futures.as_completed(futures):
+                batch_rows = fut.result()
+                rows.extend(batch_rows)
+                done += 1
+                for row in batch_rows:
+                    if args.verbose or row["class"] not in bad:
+                        print("%s %s %s" % (row["id"], row["class"],
+                                            row["note"]), flush=True)
+                if done % 20 == 0:
+                    print("[%d/%d batches]" % (done, len(mine)), flush=True)
+        rows.sort(key=lambda r: r["id"])
+        write_tsv(os.path.join(args.out, "results.tsv"), rows)
+        status["ok"] = True
+        status["counts"] = collections.Counter(r["class"] for r in rows)
+        status["cases"] = len(rows)
+        status["batches"] = len(mine)
+        status["processes"] = dict(stats.processes)
+        status["split_batches"] = dict(stats.splits)
+    except HarnessError as e:
+        status["error"] = str(e)
+        print("harness error: %s" % e, file=sys.stderr)
+    finally:
+        with open(os.path.join(args.out, "status.json"), "w") as f:
+            json.dump(status, f, indent=1, sort_keys=True)
+    return 0 if status["ok"] else 2
+
+
+# --------------------------------------------------------------------------
 # report subcommand
 # --------------------------------------------------------------------------
 
@@ -791,7 +1123,7 @@ def md_cell(s, n=80):
 
 
 def cmd_report(args):
-    rows, errors = [], []
+    rows, errors, statuses = [], [], []
     for d in args.shard_dirs:
         status_path = os.path.join(d, "status.json")
         if not os.path.exists(status_path):
@@ -802,6 +1134,7 @@ def cmd_report(args):
         if not status.get("ok"):
             errors.append("%s: %s" % (d, status.get("error", "failed")))
             continue
+        statuses.append(status)
         rows.extend(read_tsv(os.path.join(d, "results.tsv")))
     if args.expect_shards and len(args.shard_dirs) != args.expect_shards:
         errors.append("expected %d shard results, found %d" % (
@@ -812,18 +1145,45 @@ def cmd_report(args):
 
     counts = collections.Counter(r["class"] for r in rows)
     ran = len(rows) - counts["harness-skip"]
-    md = ["# Differential testing: Zorba vs Saxon-HE", ""]
-    if args.saxon_version:
-        md += ["Saxon-HE %s. " % args.saxon_version]
-    md += ["%d rbkt queries scanned, %d run on both processors, %d skipped."
-           % (len(rows), ran, counts["harness-skip"]), ""]
+    generated = args.set != "rbkt"
+    classes = (PROPERTY_CLASSES if args.set == "property" else
+               CLASSES[:-1] if generated else CLASSES)
+    if args.set == "property":
+        md = ["# Property tests: Zorba", ""]
+        seeds = sorted({str(s.get("seed")) for s in statuses})
+        md += ["Seed %s. %d cases. Reproduce a case with `difftest.py run "
+               "--set property --seed %s --filter <case id> ...`."
+               % (", ".join(seeds), len(rows), seeds[0] if seeds else "N"),
+               ""]
+    else:
+        md = ["# Differential testing (%s): Zorba vs Saxon-HE" % args.set, ""]
+        if args.saxon_version:
+            md += ["Saxon-HE %s. " % args.saxon_version]
+        if generated:
+            md += ["%d generated %s cases run on both processors."
+                   % (len(rows), args.set), ""]
+        else:
+            md += ["%d rbkt queries scanned, %d run on both processors, "
+                   "%d skipped." % (len(rows), ran, counts["harness-skip"]),
+                   ""]
+    if generated and statuses:
+        procs = collections.Counter()
+        splits = collections.Counter()
+        for s in statuses:
+            procs.update(s.get("processes", {}))
+            splits.update(s.get("split_batches", {}))
+        md += ["Batches: %d; processes: %s; split batches: %s." % (
+            sum(s.get("batches", 0) for s in statuses),
+            ", ".join("%s %d" % kv for kv in sorted(procs.items())),
+            ", ".join("%s %d" % kv for kv in sorted(splits.items())) or "0"),
+            ""]
     if errors:
         md += ["**Harness errors:**", ""] + ["- " + e for e in errors] + [""]
     md += ["## Classes", "",
-           table(["class", "queries", "% of run"],
+           table(["class", "cases" if generated else "queries", "% of run"],
                  [(c, counts[c], "-" if c == "harness-skip" else
                    "%.1f%%" % (100.0 * counts[c] / ran) if ran else "-")
-                  for c in CLASSES]), ""]
+                  for c in classes]), ""]
 
     notes = collections.Counter((r["class"], r["note"]) for r in rows
                                 if r["note"] and r["class"] != "harness-skip")
@@ -832,18 +1192,31 @@ def cmd_report(args):
                table(["class", "note", "queries"],
                      [(c, n, k) for (c, n), k in notes.most_common()]), ""]
 
-    skips = collections.Counter(r["note"] for r in rows
-                                if r["class"] == "harness-skip")
-    md += ["## Skip reasons", "",
-           table(["reason", "queries"], skips.most_common()), ""]
+    if not generated:
+        skips = collections.Counter(r["note"] for r in rows
+                                    if r["class"] == "harness-skip")
+        md += ["## Skip reasons", "",
+               table(["reason", "queries"], skips.most_common()), ""]
 
     by_dir = collections.defaultdict(collections.Counter)
     for r in rows:
         by_dir[r["id"].split("/", 1)[0]][r["class"]] += 1
-    md += ["## By directory", "",
-           table(["directory"] + CLASSES,
-                 [[d] + [by_dir[d][c] for c in CLASSES]
+    label = "family" if generated else "directory"
+    md += ["## By %s" % label, "",
+           table([label] + classes,
+                 [[d] + [by_dir[d][c] for c in classes]
                   for d in sorted(by_dir)]), ""]
+    if generated:
+        by_sub = collections.defaultdict(collections.Counter)
+        for r in rows:
+            by_sub[r["id"].rsplit("/", 1)[0]][r["class"]] += 1
+        bad = [k for k in sorted(by_sub)
+               if by_sub[k][classes[0]] != sum(by_sub[k].values())]
+        if bad:
+            md += ["## Disagreeing sub-families", "",
+                   table(["family/sub"] + classes,
+                         [[k] + [by_sub[k][c] for c in classes]
+                          for k in bad]), ""]
 
     def err_code(s):
         return s[len("ERROR "):] if s.startswith("ERROR ") else s
@@ -863,15 +1236,28 @@ def cmd_report(args):
             md += ["## %s: error codes" % cls, "",
                    table(["code", "queries"], c.most_common(30)), ""]
 
-    for cls in CLASSES[1:6]:
+    for cls in classes[1:6]:
         sel = [r for r in rows if r["class"] == cls]
         if not sel:
             continue
-        md += ["## %s (%d)" % (cls, len(sel)), "",
-               table(["query", "note", "expected", "zorba", "saxon"],
-                     [(r["id"], r["note"], r["expected"], md_cell(r["zorba"]),
-                       md_cell(r["saxon"])) for r in sel[:args.max_rows]]),
-               ""]
+        if args.set == "property":
+            md += ["## %s (%d)" % (cls, len(sel)), "",
+                   table(["case", "note", "zorba", "query"],
+                         [(r["id"], r["note"], md_cell(r["zorba"]),
+                           md_cell(r.get("query", ""), 160))
+                          for r in sel[:args.max_rows]]), ""]
+        elif generated:
+            md += ["## %s (%d)" % (cls, len(sel)), "",
+                   table(["case", "note", "query", "zorba", "saxon"],
+                         [(r["id"], r["note"], md_cell(r.get("query", ""), 100),
+                           md_cell(r["zorba"]), md_cell(r["saxon"]))
+                          for r in sel[:args.max_rows]]), ""]
+        else:
+            md += ["## %s (%d)" % (cls, len(sel)), "",
+                   table(["query", "note", "expected", "zorba", "saxon"],
+                         [(r["id"], r["note"], r["expected"],
+                           md_cell(r["zorba"]), md_cell(r["saxon"]))
+                          for r in sel[:args.max_rows]]), ""]
         if len(sel) > args.max_rows:
             md += ["%d more in results.tsv." % (len(sel) - args.max_rows), ""]
 
@@ -885,7 +1271,7 @@ def cmd_report(args):
             f.write(text[:900000])
     for e in errors:
         print("::error::%s" % e)
-    print("\n".join("%s: %d" % (c, counts[c]) for c in CLASSES))
+    print("\n".join("%s: %d" % (c, counts[c]) for c in classes))
     return 1 if errors else 0
 
 
@@ -895,6 +1281,10 @@ def main(argv=None):
     sub = ap.add_subparsers(dest="command", required=True)
 
     def common(p):
+        p.add_argument("--set", choices=SETS, default="rbkt",
+                       help="query set (default: rbkt)")
+        p.add_argument("--seed", default="1",
+                       help="property set: random seed (default: 1)")
         p.add_argument("--rbkt", default="test/rbkt",
                        help="rbkt source directory (default: test/rbkt)")
         p.add_argument("--filter", default="",
@@ -909,18 +1299,23 @@ def main(argv=None):
     common(p)
     p.add_argument("--zorba", required=True)
     p.add_argument("--java", default="java")
-    p.add_argument("--saxon-classpath", required=True)
+    p.add_argument("--saxon-classpath", default="",
+                   help="required except for --set property")
     p.add_argument("--shard", type=int, default=0)
     p.add_argument("--shards", type=int, default=1)
     p.add_argument("--jobs", type=int, default=os.cpu_count() or 2)
     p.add_argument("--timeout", type=float, default=30.0,
-                   help="per-query, per-processor timeout in seconds")
+                   help="per-query, per-processor timeout in seconds "
+                        "(a batch of generated cases gets three times this)")
+    p.add_argument("--batch-size", type=int, default=100,
+                   help="generated sets: cases per query (default: 100)")
     p.add_argument("--out", required=True)
     p.add_argument("--verbose", action="store_true")
     p.set_defaults(func=cmd_run)
 
     p = sub.add_parser("report", help="merge shard results")
     p.add_argument("shard_dirs", nargs="*")
+    p.add_argument("--set", choices=SETS, default="rbkt")
     p.add_argument("--expect-shards", type=int, default=0)
     p.add_argument("--saxon-version", default="")
     p.add_argument("--summary", help="append the report to this file")
