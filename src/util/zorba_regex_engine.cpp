@@ -32,6 +32,11 @@
 #include "zorbatypes/chartype.h"
 #include <zorba/internal/unique_ptr.h>
 
+#ifndef ZORBA_NO_ICU
+#include <unicode/uchar.h>
+#include <unicode/uniset.h>
+#endif /* ZORBA_NO_ICU */
+
 namespace zorba {
   namespace regex_engine{
 //ascii regular expression matching
@@ -87,21 +92,47 @@ static bool compare_ascii_i(const char *str1, const char *str2)
   return true;
 }
 
-static bool compare_unicode_ni(const char *str1, const char *str2, int len)
+//
+// XQuery F&O 3.0 5.6.1.1: with the 'i' flag, two characters match if there is
+// a default case-insensitive match between them (The Unicode Standard 3.13):
+// their case foldings are equal.
+//
+static unicode::code_point fold_case(unicode::code_point c)
 {
-  while(len > 0)
-  {
-    const char *temp_str1 = str1;
-    const char *temp_str2 = str2;
-    unicode::code_point cp1 = unicode::to_upper(utf8::next_char(temp_str1));
-    unicode::code_point cp2 = unicode::to_upper(utf8::next_char(temp_str2));
-    if(cp1 != cp2)
-      return false;
-    len -= temp_str1-str1;
-    str1 = temp_str1;
-    str2 = temp_str2;
-  }
-  return true;
+#ifndef ZORBA_NO_ICU
+  return u_foldCase(c, U_FOLD_CASE_DEFAULT);
+#else
+  //
+  // Without ICU, Zorba's own case mappings: the lower case of the upper case
+  // is the simple case folding for all but a few characters (e.g., U+0130
+  // folds to itself but becomes 'i' here).
+  //
+  return unicode::to_lower(unicode::to_upper(c));
+#endif /* ZORBA_NO_ICU */
+}
+
+//
+// Whether c matches a character in [lo,hi] with the 'i' flag: a character of
+// the range that case-insensitively matches c.
+//
+static bool in_range_i(unicode::code_point c, unicode::code_point lo,
+                       unicode::code_point hi)
+{
+  if(c >= lo && c <= hi)
+    return true;
+#ifndef ZORBA_NO_ICU
+  U_NAMESPACE_QUALIFIER UnicodeSet closure(c, c);
+  closure.closeOver(USET_CASE_INSENSITIVE);
+  return closure.containsSome(lo, hi);
+#else
+  unicode::code_point const others[] = {
+    fold_case(c), unicode::to_upper(c), unicode::to_lower(c)
+  };
+  for(unicode::code_point o : others)
+    if(o >= lo && o <= hi)
+      return true;
+  return false;
+#endif /* ZORBA_NO_ICU */
 }
 static utf8::size_type myutf8len(const char *source)
 {
@@ -1149,7 +1180,7 @@ CRegexXQuery_char_ascii::CRegexXQuery_char_ascii(CRegexXQuery_regex* regex, char
   this->c = c;
 }
 CRegexXQuery_char_ascii_i::CRegexXQuery_char_ascii_i(CRegexXQuery_regex* regex, char c) :
-    CRegexXQuery_char_ascii(regex, toupper(c))
+    CRegexXQuery_char_ascii(regex, static_cast<char>(fold_case(static_cast<unsigned char>(c))))
 {
 }
 CRegexXQuery_char_range_ascii::CRegexXQuery_char_range_ascii(CRegexXQuery_regex* regex, char c1, char c2) :
@@ -1158,7 +1189,7 @@ CRegexXQuery_char_range_ascii::CRegexXQuery_char_range_ascii(CRegexXQuery_regex*
   this->c1 = c1; this->c2 = c2;
 }
 CRegexXQuery_char_range_ascii_i::CRegexXQuery_char_range_ascii_i(CRegexXQuery_regex* regex, char c1, char c2) :
-    CRegexXQuery_char_range_ascii(regex, toupper(c1), toupper(c2))
+    CRegexXQuery_char_range_ascii(regex, c1, c2)
 {
 }
 CRegexXQuery_char_unicode::CRegexXQuery_char_unicode(CRegexXQuery_regex* regex, const char *source, int len) :
@@ -1173,7 +1204,7 @@ CRegexXQuery_char_unicode_cp::CRegexXQuery_char_unicode_cp(CRegexXQuery_regex* r
   this->c = c;
 }
 CRegexXQuery_char_unicode_i::CRegexXQuery_char_unicode_i(CRegexXQuery_regex* regex, unicode::code_point c) :
-    CRegexXQuery_char_unicode_cp(regex, unicode::to_upper(c))
+    CRegexXQuery_char_unicode_cp(regex, fold_case(c))
 {
 }
 CRegexXQuery_char_range_unicode::CRegexXQuery_char_range_unicode(CRegexXQuery_regex* regex, unicode::code_point c1, unicode::code_point c2) :
@@ -1182,7 +1213,7 @@ CRegexXQuery_char_range_unicode::CRegexXQuery_char_range_unicode(CRegexXQuery_re
   this->c1 = c1; this->c2 = c2;
 }
 CRegexXQuery_char_range_unicode_i::CRegexXQuery_char_range_unicode_i(CRegexXQuery_regex* regex, unicode::code_point c1, unicode::code_point c2) :
-    CRegexXQuery_char_range_unicode(regex, unicode::to_upper(c1), unicode::to_upper(c2))
+    CRegexXQuery_char_range_unicode(regex, c1, c2)
 {
 }
 CRegexXQuery_endline::CRegexXQuery_endline(CRegexXQuery_regex* regex) :
@@ -1860,14 +1891,12 @@ bool CRegexXQuery_char_ascii_i::match_internal(const char *source, int *start_fr
     regex_intern->set_reachedEnd(source);
     return false;
   }
-  char  sup = toupper(source[0]);
-  if(sup == c)
-  {
-    *matched_len = 1;
-    return true;
-  }
-  else
+  const char *temp_source = source;
+  unicode::code_point const sc = utf8::next_char(temp_source);
+  if(fold_case(sc) != static_cast<unsigned char>(c))
     return false;
+  *matched_len = static_cast<int>(temp_source - source);
+  return true;
 }
 
 bool CRegexXQuery_char_range_ascii::match_internal(const char *source, int *start_from_branch, int *matched_len)
@@ -1893,14 +1922,12 @@ bool CRegexXQuery_char_range_ascii_i::match_internal(const char *source, int *st
     regex_intern->set_reachedEnd(source);
     return false;
   }
-  char  sup = toupper(source[0]);
-  if((sup >= c1) && (sup <= c2))
-  {
-    *matched_len = 1;
-    return true;
-  }
-  else
+  const char *temp_source = source;
+  unicode::code_point const sc = utf8::next_char(temp_source);
+  if(!in_range_i(sc, static_cast<unsigned char>(c1), static_cast<unsigned char>(c2)))
     return false;
+  *matched_len = static_cast<int>(temp_source - source);
+  return true;
 }
 
 bool CRegexXQuery_char_unicode::match_internal(const char *source, int *start_from_branch, int *matched_len)
@@ -1945,14 +1972,11 @@ bool CRegexXQuery_char_unicode_i::match_internal(const char *source, int *start_
     return false;
   }
   const char *temp_source = source;
-  unicode::code_point  sup = unicode::to_upper(utf8::next_char(temp_source));
-  if(sup == c)
-  {
-    *matched_len = temp_source - source;
-    return true;
-  }
-  else
+  unicode::code_point const sc = utf8::next_char(temp_source);
+  if(fold_case(sc) != c)
     return false;
+  *matched_len = static_cast<int>(temp_source - source);
+  return true;
 }
 
 bool CRegexXQuery_char_range_unicode::match_internal(const char *source, int *start_from_branch, int *matched_len)
@@ -1981,14 +2005,11 @@ bool CRegexXQuery_char_range_unicode_i::match_internal(const char *source, int *
     return false;
   }
   const char *temp_source = source;
-  unicode::code_point  sup = unicode::to_upper(utf8::next_char(temp_source));
-  if((sup >= c1) && (sup <= c2))
-  {
-    *matched_len = temp_source - source;
-    return true;
-  }
-  else
+  unicode::code_point const sc = utf8::next_char(temp_source);
+  if(!in_range_i(sc, c1, c2))
     return false;
+  *matched_len = static_cast<int>(temp_source - source);
+  return true;
 }
 
 bool CRegexXQuery_endline::match_internal(const char *source, int *start_from_branch, int *matched_len)
@@ -2099,28 +2120,41 @@ bool CRegexXQuery_backref::match_internal(const char *source, int *start_from_br
     *matched_len = 0;
     return true;
   }
-  if(!source[0])
-  {
-    regex_intern->set_reachedEnd(source);
-    return false;
-  }
-  *matched_len = regex_intern->subregex.at(backref-1)->matched_len;
+  int const sub_len = regex_intern->subregex.at(backref-1)->matched_len;
+  char const *const sub_end = submatch + sub_len;
+  char const *s = source;
   if(regex_intern->flags & REGEX_ASCII_CASE_INSENSITIVE)
   {
-    if(compare_unicode_ni(source, submatch, *matched_len)) 
+    //
+    // Compare case foldings character by character: the matched text may
+    // have another length in bytes, e.g., KELVIN SIGN (3 bytes) for 'k'.
+    //
+    while(submatch < sub_end)
     {
-      return true;
+      if(!*s)
+      {
+        regex_intern->set_reachedEnd(s);
+        return false;
+      }
+      if(fold_case(utf8::next_char(s)) != fold_case(utf8::next_char(submatch)))
+        return false;
     }
   }
   else
   {
-    if(!memcmp(source, submatch, *matched_len))
+    for(; submatch < sub_end; ++submatch, ++s)
     {
-      return true;
+      if(!*s)
+      {
+        regex_intern->set_reachedEnd(s);
+        return false;
+      }
+      if(*s != *submatch)
+        return false;
     }
   }
-  *matched_len = 0;
-  return false;
+  *matched_len = static_cast<int>(s - source);
+  return true;
 }
 
 bool CRegexXQuery_pinstart::match_internal(const char *source, int *start_from_branch, int *matched_len)
