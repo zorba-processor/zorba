@@ -554,7 +554,7 @@ expr* expr::clone(user_function* udf, substitution_t& subst) const
                            udf,
                            theLoc,
                            e->range_->clone(udf, subst),
-                           e->ftselection_->clone(udf, subst).release(),
+                           e->ftselection_->clone(udf, subst),
                            (e->ftignore_ == NULL ? 0 : e->ftignore_->clone(udf, subst)));
 
     break;

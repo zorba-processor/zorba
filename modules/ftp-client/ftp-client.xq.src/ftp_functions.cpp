@@ -29,10 +29,12 @@
 #include <zorba/empty_sequence.h>
 #include <zorba/item_factory.h>
 #include <zorba/item_sequence.h>
+#include <zorba/security.h>
 #include <zorba/iterator.h>
 #include <zorba/singleton_item_sequence.h>
 #include <zorba/store_consts.h>
 #include <zorba/user_exception.h>
+#include <zorba/zorba.h>
 #include <zorba/util/base64_stream.h>
 #include <zorba/util/mem_streambuf.h>
 #include <zorba/util/transcode_stream.h>
@@ -228,6 +230,29 @@ curl::streambuf* function::require_connection( DynamicContext const *dctx,
   THROW_EXCEPTION( "NOT_CONNECTED", host_part( conn ), "not connnected" );
 }
 
+void function::throw_access_denied( std::string const &message ) const {
+  throw USER_EXCEPTION(
+    module_->getItemFactory()->createQName(
+      "http://zorba.io/errors", "zerr", "ZXQP0029"
+    ),
+    message
+  );
+}
+
+void function::check_uri( StaticContext const *sctx,
+                          String const &uri ) const {
+  SecurityPolicy const policy( sctx ? sctx->getSecurityPolicy()
+                                    : Zorba::getInstance( 0 )->getSecurityPolicy() );
+  String reason;
+  if ( !policy.checkURI( uri, EntityData::DOCUMENT, false, &reason ) ) {
+    // The URI may carry a password: name only the host.
+    throw_access_denied(
+      '"' + host_part( uri ).str() + "\": URI access not allowed: " +
+      reason.str()
+    );
+  }
+}
+
 void function::throw_exception( char const *error_code, char const *object,
                                 char const *message, int ftp_code ) const {
   string s;
@@ -261,7 +286,7 @@ get_function::get_function( module const *m, char const *local_name,
 
 ItemSequence_t
 get_function::evaluate( ExternalFunction::Arguments_t const &args,
-                        StaticContext const*,
+                        StaticContext const *sctx,
                         DynamicContext const *dctx ) const {
   String const conn( get_string_arg( args, 0 ) );
   String const path( get_string_arg( args, 1 ) );
@@ -273,6 +298,7 @@ get_function::evaluate( ExternalFunction::Arguments_t const &args,
     THROW_EXCEPTION( "INVALID_ARGUMENT", encoding, "unsupported encoding" );
   }
   String const uri( make_uri( conn, path ) );
+  check_uri( sctx, uri );
 
   curl::streambuf *const cbuf = require_connection( dctx, conn );
   CURL *const cobj = cbuf->curl();
@@ -312,7 +338,7 @@ put_function::put_function( module const *m, char const *local_name,
 
 ItemSequence_t
 put_function::evaluate( ExternalFunction::Arguments_t const &args,
-                        StaticContext const*,
+                        StaticContext const *sctx,
                         DynamicContext const *dctx ) const {
   String const conn( get_string_arg( args, 0 ) );
   Item put_item( get_item_arg( args, 1 ) );
@@ -325,6 +351,7 @@ put_function::evaluate( ExternalFunction::Arguments_t const &args,
     THROW_EXCEPTION( "INVALID_ARGUMENT", encoding, "unsupported encoding" );
   }
   String const uri( make_uri( conn, path ) );
+  check_uri( sctx, uri );
 
   curl::streambuf *const cbuf = require_connection( dctx, conn );
   CURL *const cobj = cbuf->curl();
@@ -389,7 +416,7 @@ connect_function::connect_function( module const *m ) :
 
 ItemSequence_t
 connect_function::evaluate( ExternalFunction::Arguments_t const &args,
-                            StaticContext const*,
+                            StaticContext const *sctx,
                             DynamicContext const *dctx ) const {
   String const uri( get_string_arg( args, 0 ) );
   String conn( uri );
@@ -463,6 +490,10 @@ connect_function::evaluate( ExternalFunction::Arguments_t const &args,
     }
   }
 
+  check_uri( sctx, conn );
+  SecurityPolicy const policy( sctx ? sctx->getSecurityPolicy()
+                                    : Zorba::getInstance( 0 )->getSecurityPolicy() );
+
   connections &conns = get_connections( dctx );
   curl::streambuf *cbuf = conns.get_buf( conn );
   if ( cbuf )
@@ -474,6 +505,9 @@ connect_function::evaluate( ExternalFunction::Arguments_t const &args,
   try {
     cbuf->open( conn.c_str() );
     CURL *const cobj = cbuf->curl();
+    // Every connection of this handle (all later transfers on it too) is
+    // checked against the policy of the context that connected.
+    curl::restrict_to_policy( cobj, policy );
 
     if ( trace )
       cbuf->curl_verbose( true );
@@ -489,6 +523,9 @@ connect_function::evaluate( ExternalFunction::Arguments_t const &args,
     return ItemSequence_t( new SingletonItemSequence( result ) );
   }
   catch ( std::exception const &e ) {
+    std::string denied;
+    if ( curl::policy_denied( cbuf->curl(), &denied ) )
+      throw_access_denied( denied );
     THROW_EXCEPTION( "FTP_ERROR", uri, e.what() );
   }
 }
@@ -762,11 +799,12 @@ list_function::list_function( module const *m ) :
 
 ItemSequence_t
 list_function::evaluate( ExternalFunction::Arguments_t const &args,
-                         StaticContext const*,
+                         StaticContext const *sctx,
                          DynamicContext const *dctx ) const {
   String const conn( get_string_arg( args, 0 ) );
   String const path( get_string_arg( args, 1 ) );
   String const uri( make_uri( conn, path, true ) );
+  check_uri( sctx, uri );
 
   curl::streambuf *const cbuf = require_connection( dctx, conn );
   CURL *const cobj = cbuf->curl();

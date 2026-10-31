@@ -18,6 +18,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <istream>
 #include <memory>
 #include <vector>
 
@@ -45,7 +46,7 @@ enum class Capability : uint32_t {
   FileRead         = 1u << 1,
   /** Writing to the file system: file module writes, deletes, mkdir. */
   FileWrite        = 1u << 2,
-  /** http, https and ftp access for documents, unparsed text and the
+  /** http, https, ftp and ftps access for documents, unparsed text and the
    *  http-client and ftp-client modules. */
   Network          = 1u << 3,
   /** Module and schema import over the network (formerly the
@@ -54,7 +55,9 @@ enum class Capability : uint32_t {
   /** fn:environment-variable, fn:available-environment-variables, and the
    *  ZORBA_URI_PATH / ZORBA_LIB_PATH environment variables. */
   Environment      = 1u << 5,
-  /** Loading native libraries that implement external functions. */
+  /** Loading native libraries that implement external functions, and the
+   *  WordNet thesaurus data that is installed with them in the library
+   *  path. */
   NativeModules    = 1u << 6
 };
 
@@ -91,10 +94,14 @@ enum class Capability : uint32_t {
  *   and can only narrow it (see narrowedBy()).
  *
  * \note Enforcement is being introduced in stages. Currently enforced: the
- *       XML parser (external entities) and URI resolution by the built-in
+ *       XML parser (external entities); URI resolution by the built-in
  *       resolvers (documents, unparsed text, module, schema, thesaurus and
- *       stop-word loading, the fetch module). The instance default is
- *       currently unrestricted(); it will become secure() in Zorba 5.0.0.
+ *       stop-word loading, the fetch module); module import (the file,
+ *       http-client and ftp-client modules need their capabilities, native
+ *       libraries need Capability::NativeModules); the file, http-client
+ *       and ftp-client modules (every path, URL, redirect and connection);
+ *       the environment functions. The instance default is currently
+ *       unrestricted(); it will become secure() in Zorba 5.0.0.
  */
 class ZORBA_DLL_PUBLIC SecurityPolicy
 {
@@ -195,7 +202,8 @@ public:
    *   <code>..</code> nor a symbolic link can escape a directory. The
    *   comparison is case-insensitive where the file system is (Windows,
    *   case-insensitive macOS volumes).
-   * - \c http, \c https and \c ftp URLs need Capability::Network, and for
+   * - \c http, \c https, \c ftp and \c ftps URLs need Capability::Network,
+   *   and for
    *   EntityData::MODULE and EntityData::SCHEMA also
    *   Capability::RemoteImport. If there are network prefixes, the URL must
    *   lie under one of them: same scheme, host (case-insensitive) and port
@@ -219,6 +227,62 @@ public:
   bool checkURI(const String& aURI,
                 EntityData::Kind aKind,
                 bool aWrite = false) const;
+
+  /**
+   * \brief Like checkURI(const String&, EntityData::Kind, bool), and if the
+   *        access is denied, stores the reason (e.g. "requires capability
+   *        FileRead") in \p *aReason (if not null).
+   */
+  bool checkURI(const String& aURI,
+                EntityData::Kind aKind,
+                bool aWrite,
+                String* aReason) const;
+
+  /**
+   * \brief Returns true if the policy allows a network connection to the
+   *        numeric address \p aAddress, made to fetch \p aURL.
+   *
+   * This is the check the HTTP and FTP clients apply to every connection,
+   * including connections for redirects: the URL must be allowed by the
+   * network rules of checkURI() (Capability::Network, network prefixes), and
+   * unless allowsPrivateAddresses() or a matching prefix names a private host
+   * explicitly, \p aAddress must not be a loopback, private, link-local,
+   * multicast or reserved address. Unlike checkURI(), it does not resolve
+   * the host of the URL: \p aAddress is the address actually connected to.
+   *
+   * @param aURL an http, https, ftp or ftps URL.
+   * @param aAddress a numeric IPv4 or IPv6 address.
+   * @param aReason if not null and the connection is denied, receives the
+   *        reason.
+   */
+  bool checkConnection(const String& aURL,
+                       const String& aAddress,
+                       String* aReason = nullptr) const;
+
+  /**
+   * \brief Opens a file for reading if the policy allows it.
+   *
+   * Applies the rule of checkURI() for EntityData::DOCUMENT to the file that
+   * is actually opened: the file is opened first, then the real path of the
+   * open file is checked. A symbolic link that is swapped between an earlier
+   * check and the open therefore cannot redirect the read outside the read
+   * paths. (On Windows, the path is checked and then opened.)
+   *
+   * If the policy allows Capability::FileRead without read paths, the file
+   * is opened without any check.
+   *
+   * @param aPath a path or \c file: URI. A relative path is relative to the
+   *        current directory.
+   * @param aBinary true to open the file in binary mode, false for text mode
+   *        (the modes differ only on Windows).
+   * @param aReason if not null and the access is denied, receives the
+   *        reason; it is left empty if the file merely cannot be opened.
+   * @return the open stream, or null if the file cannot be opened or the
+   *         access is denied.
+   */
+  std::unique_ptr<std::istream> openFile(const String& aPath,
+                                         bool aBinary,
+                                         String* aReason = nullptr) const;
 
   /**
    * \brief Sets whether network access may reach loopback, private

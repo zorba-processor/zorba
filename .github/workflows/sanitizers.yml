@@ -43,8 +43,8 @@ jobs:
       - uses: actions/cache@v6
         with:
           path: .ccache
-          key: ccache-asan-${{ github.sha }}
-          restore-keys: ccache-asan-
+          key: ccache-v2-asan-${{ github.sha }}
+          restore-keys: ccache-v2-asan-
 
       # LeakSanitizer needs ptrace, which Docker's default seccomp profile blocks.
       - name: Build and test under sanitizers
@@ -55,6 +55,7 @@ jobs:
             --cap-add SYS_PTRACE --security-opt seccomp=unconfined \
             -e ZORBA_HTTP_TEST_SERVER=zorba-http-test:8080 \
             -e CCACHE_DIR=/src/.ccache \
+            -e CCACHE_SLOPPINESS=pch_defines,time_macros -e CCACHE_DEPEND=1 \
             -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" \
             -v "$PWD":/src -w /src zorba-builder:ci sh -c '
               set -e

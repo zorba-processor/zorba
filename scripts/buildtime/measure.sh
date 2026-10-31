@@ -26,7 +26,7 @@ grep -m1 'model name' /proc/cpuinfo >> "$T" 2>/dev/null
 free -m >> "$T" 2>/dev/null
 gcc --version | head -1 >> "$T"; clang --version | head -1 >> "$T"
 B=build/full-release
-export CCACHE_SLOPPINESS=pch_defines,time_macros
+export CCACHE_SLOPPINESS=pch_defines,time_macros CCACHE_DEPEND=1
 
 case $MODE in
 gcc)

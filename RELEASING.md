@@ -16,12 +16,23 @@ tags.
 1. On master, set the version in `CMakeLists.txt` (`ZORBA_MAJOR_NUMBER`,
    `ZORBA_MINOR_NUMBER`, `ZORBA_PATCH_NUMBER`) to `X.Y.Z`. The workflow fails
    if it does not match the tag.
-2. In `CHANGELOG.md`, make sure the `## [X.Y.Z]` section is complete: move
-   the `[Unreleased]` entries into it, resolve entries marked **(open PR)**,
-   and for a stable release replace `Unreleased` with the date
-   (`## [X.Y.Z] - YYYY-MM-DD`). Prereleases use the same `[X.Y.Z]` section
-   and may keep `Unreleased`. The release notes are taken from this section.
-3. Merge these changes and wait for CI to pass on master.
+2. Assemble the changelog. Pull requests add fragments in `changelog.d/`
+   instead of editing `CHANGELOG.md` (see `changelog.d/README.md`). In a pull
+   request, run:
+
+   ```bash
+   python3 scripts/changelog_assemble.py --version X.Y.Z --date YYYY-MM-DD
+   ```
+
+   This appends every fragment, with its pull request link, to the matching
+   section of `## [X.Y.Z]` (created if missing), and deletes the fragments.
+   Use `--dry-run` first to print the result. For a prerelease pass
+   `X.Y.Z-pre`; it uses the `[X.Y.Z]` section, and you may omit `--date` to
+   keep `Unreleased`. Then edit `CHANGELOG.md` by hand: update the "At a
+   glance" table, resolve entries marked **(open PR)**, and for a stable
+   release make sure the heading is `## [X.Y.Z] - YYYY-MM-DD`. The release
+   notes are taken from this section.
+3. Merge this pull request (and the version change) and wait for CI to pass on master.
 4. Optional: rehearse with a dry run, which pushes nothing:
 
    ```bash
@@ -30,7 +41,9 @@ tags.
 
    The dry run uploads the would-be release (tarball, SBOMs, `SHA256SUMS`,
    notes) as the `release-assets` artifact of the run. Pull requests that
-   change `release.yml` run the same dry run automatically.
+   change `release.yml` run the same dry run automatically. A dry run
+   assembles any remaining fragments in the runner only, so the notes preview
+   shows them; nothing is pushed to master.
 
 5. Tag the master commit and push the tag:
 
@@ -48,6 +61,10 @@ tags.
 
 ## If something fails
 
+- `release.yml` fails on a tag push with "Unassembled changelog fragments"
+  when `changelog.d/` still holds fragments (a pull request merged after step
+  2, or step 2 skipped). Delete the tag (`git push origin :refs/tags/vX.Y.Z`),
+  run step 2 again, merge, and re-tag.
 - Before publishing, fix the problem on master, delete the draft release and
   the tag (`git push origin :refs/tags/vX.Y.Z-pre`), and tag again. Image tags
   already pushed for that version are overwritten by the next run.

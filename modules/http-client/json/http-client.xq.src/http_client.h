@@ -18,6 +18,7 @@
 #include "zorba/zorba.h"
 #include "zorba/external_module.h"
 #include "zorba/function.h"
+#include "zorba/security.h"
 #include "zorba/util/timer.h"
 
 #include "structures.h"
@@ -236,7 +237,8 @@ public:
       const StaticContext* aStaticContext, const DynamicContext* aDynamicContext)
   const;
 
-  int doRequest(Request& aRequest, ItemSequence_t& aResult) const;
+  int doRequest(Request& aRequest, ItemSequence_t& aResult,
+                const SecurityPolicy& aPolicy) const;
 
   zorba::ProfileDataMap*
   getProfilingData() const
