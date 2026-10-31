@@ -54,6 +54,17 @@ jobs:
         if: github.event_name != 'pull_request'
         run: echo "code=true" >> "$GITHUB_OUTPUT"
 
+  # Every call in src/ and modules/ that reaches the file system, the
+  # network, the environment, native libraries or the XML parser must be in
+  # the reviewed allow-list (see scripts/check-os-access.sh), so that new OS
+  # access cannot bypass the security policy unnoticed.
+  os-access-audit:
+    name: OS access audit
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - run: scripts/check-os-access.sh
+
   linux:
     # Gating is per step, not per job: a skipped matrix job reports its name
     # as a literal "matrix.name", which would leave the required checks pending.
