@@ -24,6 +24,24 @@
 #include <zorba/config.h>
 
 #ifdef __cplusplus
+#include <atomic>
+#endif
+
+/*
+ * Zorba: MAPM keeps its mutable internal state (work buffers, caches, the
+ * lazily initialized constants below) in file-scope variables. They are
+ * declared with M_APM_TLS so that every thread gets its own copy and MAPM can
+ * be used from several threads concurrently without a global lock.
+ */
+#if defined(__cplusplus)
+#define M_APM_TLS thread_local
+#elif defined(_MSC_VER)
+#define M_APM_TLS __declspec(thread)
+#else
+#define M_APM_TLS _Thread_local
+#endif
+
+#ifdef __cplusplus
 /* Comment this line out if you've compiled the library as C++. */
 #define APM_CONVERT_FROM_C
 #endif
@@ -58,25 +76,30 @@ typedef M_APM_struct *M_APM;
 
 /*
  * convienient predefined constants
+ *
+ * Zorba: these are per-thread (see M_APM_TLS) and are only used inside the
+ * MAPM C library; the C++ wrapper below must not use them directly.
  */
+#ifndef __cplusplus
 
-extern  M_APM MM_Zero;
-extern  M_APM MM_One;
-extern  M_APM MM_Two;
-extern  M_APM MM_Three;
-extern  M_APM MM_Four;
-extern  M_APM MM_Five;
-extern  M_APM MM_Ten;
+extern  M_APM_TLS M_APM MM_Zero;
+extern  M_APM_TLS M_APM MM_One;
+extern  M_APM_TLS M_APM MM_Two;
+extern  M_APM_TLS M_APM MM_Three;
+extern  M_APM_TLS M_APM MM_Four;
+extern  M_APM_TLS M_APM MM_Five;
+extern  M_APM_TLS M_APM MM_Ten;
 
-extern  M_APM MM_PI;
-extern  M_APM MM_HALF_PI;
-extern  M_APM MM_2_PI;
-extern  M_APM MM_E;
+extern  M_APM_TLS M_APM MM_PI;
+extern  M_APM_TLS M_APM MM_HALF_PI;
+extern  M_APM_TLS M_APM MM_2_PI;
+extern  M_APM_TLS M_APM MM_E;
 
-extern  M_APM MM_LOG_E_BASE_10;
-extern  M_APM MM_LOG_10_BASE_E;
-extern  M_APM MM_LOG_2_BASE_E;
-extern  M_APM MM_LOG_3_BASE_E;
+extern  M_APM_TLS M_APM MM_LOG_E_BASE_10;
+extern  M_APM_TLS M_APM MM_LOG_10_BASE_E;
+extern  M_APM_TLS M_APM MM_LOG_2_BASE_E;
+extern  M_APM_TLS M_APM MM_LOG_3_BASE_E;
+#endif
 
 
 /*
@@ -179,12 +202,6 @@ extern  void  m_apm_cpp_precision(int);   /* only for C++ wrapper */
     Added 3/24/2000 by Orion Sky Lawlor, olawlor@acm.org
 */
 
-#ifndef ZORBA_FOR_ONE_THREAD_ONLY
-#include "zorbautils/mutex.h"
-#include "common/common.h"
-#endif
-
-
 extern 
 #ifdef APM_CONVERT_FROM_C
 "C" 
@@ -256,9 +273,28 @@ int MM_cpp_min_precision;
 class MAPM 
 {
 protected:
-#ifndef ZORBA_FOR_ONE_THREAD_ONLY
-  static zorba::Mutex theMAPMMutex;
-#endif
+  /**
+   * Per-thread MAPM state. MAPM's internal work buffers and constants are
+   * thread_local (see M_APM_TLS); constructing this object initializes them
+   * for the current thread, and destroying it (at thread exit) frees them.
+   */
+  struct ThreadState
+  {
+    ThreadState() { m_apm_free(m_apm_init()); }
+    ~ThreadState() { m_apm_free_all_mem(); }
+  };
+
+  /**
+   * Must be called before MAPM C functions are used in the current thread.
+   */
+  static void threadInit()
+  {
+    thread_local ThreadState theThreadState;
+    (void)theThreadState;
+  }
+
+  static_assert(std::atomic_ref<int>::required_alignment <= alignof(int),
+                "M_APM_struct::m_apm_refcount must be usable with atomic_ref");
 
 protected:
 
@@ -311,21 +347,24 @@ protected:
 
   static M_APM makeNew(void) 
   {
+    threadInit();
     // Allocate M_APM_struct plus 84 bytes of "data" within this struct.
     // Initialize refcount to 1.
     M_APM val = m_apm_init();
     return val;  
   }
 
+  // M_APM_structs may be shared by MAPM objects that live in different
+  // threads (e.g. static constants, or decimal items shared through the
+  // store), so the reference count is updated atomically.
   static void ref(M_APM val) 
   {
-    val->m_apm_refcount++;
+    std::atomic_ref<int>(val->m_apm_refcount).fetch_add(1, std::memory_order_relaxed);
   }
 
   static void unref(M_APM val) 
   {
-    val->m_apm_refcount--;
-    if (val->m_apm_refcount == 0)
+    if (std::atomic_ref<int>(val->m_apm_refcount).fetch_sub(1, std::memory_order_acq_rel) == 1)
       m_apm_free(val);
   }
 
@@ -355,7 +394,7 @@ protected:
    */
   M_APM val(void) 
   {
-    if (myVal->m_apm_refcount == 1) 
+    if (std::atomic_ref<int>(myVal->m_apm_refcount).load(std::memory_order_acquire) == 1) 
       return myVal;
 
     M_APM oldVal = myVal;
@@ -440,28 +479,28 @@ public:
    */
   MAPM(const char* s) 
   { 
-    SYNC_CODE(zorba::AutoMutex lock(&theMAPMMutex));
+    threadInit();
     create();
     m_apm_set_string(val(), (char*)s);
   }
 
   MAPM(double d)
   {
-    SYNC_CODE(zorba::AutoMutex lock(&theMAPMMutex));
+    threadInit();
     create();
     m_apm_set_double(val(), d);
   }
 
   MAPM(int l) 
   { 
-    SYNC_CODE(zorba::AutoMutex lock(&theMAPMMutex));
+    threadInit();
     create();
     m_apm_set_long(val(), l);
   }
 
   MAPM(long l) 
   {
-    SYNC_CODE(zorba::AutoMutex lock(&theMAPMMutex));
+    threadInit();
     create(); 
     m_apm_set_long(val(), l); 
   }
@@ -474,31 +513,31 @@ public:
   /* Extracting string descriptions: */
   void toString(char* dest, int decimalPlaces) const
   {
-    SYNC_CODE(zorba::AutoMutex lock(&theMAPMMutex));
+    threadInit();
     m_apm_to_string(dest, decimalPlaces, cval());
   }
 
   void toFixPtString(char* dest, int decimalPlaces) const
   {
-    SYNC_CODE(zorba::AutoMutex lock(&theMAPMMutex));
+    threadInit();
     m_apm_to_fixpt_string(dest, decimalPlaces, cval());
   }
 
   void toFixPtStringEx(char* dest, int dp, char a, char b, int c) const
   {
-    SYNC_CODE(zorba::AutoMutex lock(&theMAPMMutex));
+    threadInit();
     m_apm_to_fixpt_stringex(dest, dp, cval(), a, b, c);
   }
 
   char* toFixPtStringExp(int dp,char a,char b,int c) const
   {
-    SYNC_CODE(zorba::AutoMutex lock(&theMAPMMutex));
+    threadInit();
     return (m_apm_to_fixpt_stringexp(dp, cval(), a, b, c));
   }
 
   void toIntegerString(char* dest) const
   {
-    SYNC_CODE(zorba::AutoMutex lock(&theMAPMMutex));
+    threadInit();
     m_apm_to_integer_string(dest, cval());
   }
 
@@ -511,40 +550,40 @@ public:
 
   MAPM& operator=(const char* s) /* Assigment operator */
   {
-    SYNC_CODE(zorba::AutoMutex lock(&theMAPMMutex));
+    threadInit();
     m_apm_set_string(val(), (char *)s);
     return *this;
   }
 
   MAPM& operator=(double d) /* Assigment operator */
   {
-    SYNC_CODE(zorba::AutoMutex lock(&theMAPMMutex));
+    threadInit();
     m_apm_set_double(val(),d);
     return *this;
   }
 
   MAPM& operator=(int l) /* Assigment operator */
   {
-    SYNC_CODE(zorba::AutoMutex lock(&theMAPMMutex));
+    threadInit();
     m_apm_set_long(val(),l);
     return *this;
   }
 
   MAPM& operator=(long l) /* Assigment operator */
   {
-    SYNC_CODE(zorba::AutoMutex lock(&theMAPMMutex));
+    threadInit();
     m_apm_set_long(val(),l);
     return *this;
   }
 
   MAPM operator++() /* Prefix increment operator */
   {
-    return *this = *this + MM_One;
+    return *this = *this + MAPM(1);
   }
 
   MAPM operator--() /* Prefix decrement operator */
   {
-    return *this = *this - MM_One;
+    return *this = *this - MAPM(1);
   }
 
   const MAPM operator++(int)  /* Postfix increment operator */
@@ -602,7 +641,7 @@ public:
   /* Basic arithmetic operators */
   friend MAPM operator+(const MAPM& a, const MAPM& b)
   {
-    SYNC_CODE(zorba::AutoMutex lock(&theMAPMMutex));
+    threadInit();
     MAPM ret;
     m_apm_add(ret.val(),a.cval(),b.cval());
     return ret;
@@ -610,7 +649,7 @@ public:
 
   friend MAPM operator-(const MAPM& a, const MAPM& b)
   {
-    SYNC_CODE(zorba::AutoMutex lock(&theMAPMMutex));
+    threadInit();
     MAPM ret;
     m_apm_subtract(ret.val(), a.cval(), b.cval());
     return ret;
@@ -618,7 +657,7 @@ public:
 
   friend MAPM operator*(const MAPM &a,const MAPM &b)
   {
-    SYNC_CODE(zorba::AutoMutex lock(&theMAPMMutex));
+    threadInit();
     MAPM ret;
     m_apm_multiply(ret.val(),a.cval(),b.cval());
     return ret;
@@ -626,7 +665,7 @@ public:
 
   friend MAPM operator%(const MAPM& a, const MAPM& b)
   {
-    SYNC_CODE(zorba::AutoMutex lock(&theMAPMMutex));
+    threadInit();
     MAPM quot,ret;
     m_apm_integer_div_rem(quot.val(), ret.val(), a.cval(), b.cval());
     return ret;
@@ -641,7 +680,7 @@ public:
   
   MAPM divide(const MAPM& m, int toDigits) const
   {
-    SYNC_CODE(zorba::AutoMutex lock(&theMAPMMutex));
+    threadInit();
     MAPM ret;
     m_apm_divide(ret.val(), toDigits,cval(), m.cval());
     return ret;
@@ -676,14 +715,14 @@ public:
 
   int is_odd(void) const { return m_apm_is_odd(cval()); }
 
-  int is_zero(void) const { return (m_apm_compare(cval(), MM_Zero) == 0); }
+  int is_zero(void) const { return (m_apm_sign(cval()) == 0); }
 
-  int is_one(void) const { return (m_apm_compare(cval(), MM_One) == 0); }
+  int is_one(void) const { return (m_apm_compare(cval(), MAPM(1).cval()) == 0); }
 
   /* Functions: */
   MAPM abs(void) const
   {
-    SYNC_CODE(zorba::AutoMutex lock(&theMAPMMutex));
+    threadInit();
     MAPM ret;
     m_apm_absolute_value(ret.val(),cval());
     return ret;
@@ -691,7 +730,7 @@ public:
 
   MAPM neg(void) const
   {
-    SYNC_CODE(zorba::AutoMutex lock(&theMAPMMutex));
+    threadInit();
     MAPM ret;
     m_apm_negate(ret.val(),cval());
     return ret;
@@ -699,7 +738,7 @@ public:
 
   MAPM round(int toDigits) const
   {
-    SYNC_CODE(zorba::AutoMutex lock(&theMAPMMutex));
+    threadInit();
     MAPM ret;
     m_apm_round(ret.val(),toDigits,cval());
     return ret;
@@ -719,7 +758,7 @@ public:
 #define MAPM_1aryFunc(func)                                       \
   MAPM func(int toDigits) const                                   \
   {                                                               \
-    SYNC_CODE(zorba::AutoMutex lock(&theMAPMMutex));                       \
+    threadInit();                                                 \
     MAPM ret;                                                     \
     m_apm_##func(ret.val(), toDigits, cval());                    \
     return ret;                                                   \
@@ -748,7 +787,7 @@ public:
   
   void sincos(MAPM& sinR, MAPM& cosR, int toDigits)
   {
-    SYNC_CODE(zorba::AutoMutex lock(&theMAPMMutex));
+    threadInit();
     m_apm_sin_cos(sinR.val(), cosR.val(), toDigits,cval());
   }
 
@@ -759,7 +798,7 @@ public:
 
   MAPM pow(const MAPM &m,int toDigits) const
   {
-    SYNC_CODE(zorba::AutoMutex lock(&theMAPMMutex));
+    threadInit();
     MAPM ret;
     m_apm_pow(ret.val(), toDigits,cval(), m.cval());
     return ret;
@@ -772,7 +811,7 @@ public:
 
   MAPM atan2(const MAPM &x,int toDigits) const
   {
-    SYNC_CODE(zorba::AutoMutex lock(&theMAPMMutex));
+    threadInit();
     MAPM ret;
     m_apm_arctan2(ret.val(),toDigits,cval(), x.cval());
     return ret;
@@ -785,7 +824,7 @@ public:
 
   MAPM gcd(const MAPM &m) const
   {
-    SYNC_CODE(zorba::AutoMutex lock(&theMAPMMutex));
+    threadInit();
     MAPM ret;
     m_apm_gcd(ret.val(),cval(),m.cval());
     return ret;
@@ -793,7 +832,7 @@ public:
 
   MAPM lcm(const MAPM &m) const
   {
-    SYNC_CODE(zorba::AutoMutex lock(&theMAPMMutex));
+    threadInit();
     MAPM ret;
     m_apm_lcm(ret.val(),cval(),m.cval());
     return ret;
@@ -801,7 +840,7 @@ public:
 
   static MAPM random(void)
   {
-    SYNC_CODE(zorba::AutoMutex lock(&theMAPMMutex));
+    threadInit();
     MAPM ret;
     m_apm_get_random(ret.val());
     return ret;
@@ -809,7 +848,7 @@ public:
 
   MAPM floor(void) const
   {
-    SYNC_CODE(zorba::AutoMutex lock(&theMAPMMutex));
+    threadInit();
     MAPM ret;
     m_apm_floor(ret.val(),cval());
     return ret;
@@ -817,7 +856,7 @@ public:
 
   MAPM ceil(void) const
   {
-    SYNC_CODE(zorba::AutoMutex lock(&theMAPMMutex));
+    threadInit();
     MAPM ret;
     m_apm_ceil(ret.val(),cval());
     return ret;
@@ -826,7 +865,7 @@ public:
   /* Functions defined only on integers: */
   MAPM factorial(void) const
   {
-    SYNC_CODE(zorba::AutoMutex lock(&theMAPMMutex));
+    threadInit();
     MAPM ret;
     m_apm_factorial(ret.val(),cval());
     return ret;
@@ -834,7 +873,7 @@ public:
 
   MAPM ipow_nr(int p) const
   {
-    SYNC_CODE(zorba::AutoMutex lock(&theMAPMMutex));
+    threadInit();
     MAPM ret;
     m_apm_integer_pow_nr(ret.val(), cval(), p);
     return ret;
@@ -842,7 +881,7 @@ public:
 
   MAPM ipow(int p, int toDigits) const
   {
-    SYNC_CODE(zorba::AutoMutex lock(&theMAPMMutex));
+    threadInit();
     MAPM ret;
     m_apm_integer_pow(ret.val(), toDigits,cval(),p);
     return ret;
@@ -855,7 +894,7 @@ public:
 
   MAPM integer_divide(const MAPM &denom) const
   {
-    SYNC_CODE(zorba::AutoMutex lock(&theMAPMMutex));
+    threadInit();
     MAPM ret;
     m_apm_integer_divide(ret.val(),cval(), denom.cval());
     return ret;
@@ -863,7 +902,7 @@ public:
 
   void integer_div_rem(const MAPM &denom, MAPM &quot, MAPM &rem) const
   {
-    SYNC_CODE(zorba::AutoMutex lock(&theMAPMMutex));
+    threadInit();
     m_apm_integer_div_rem(quot.val(),rem.val(),cval(), denom.cval());
   }
 

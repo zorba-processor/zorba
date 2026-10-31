@@ -62,6 +62,28 @@
       }
     },
     {
+      "name": "tsan",
+      "displayName": "Full, ThreadSanitizer (Linux)",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "ZORBA_HARDENING": "OFF",
+        "CMAKE_C_FLAGS_RELWITHDEBINFO": "-O1 -g -fsanitize=thread -fno-omit-frame-pointer",
+        "CMAKE_CXX_FLAGS_RELWITHDEBINFO": "-O1 -g -fsanitize=thread -fno-omit-frame-pointer",
+        "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=thread",
+        "CMAKE_SHARED_LINKER_FLAGS": "-fsanitize=thread",
+        "CMAKE_MODULE_LINKER_FLAGS": "-fsanitize=thread"
+      }
+    },
+    {
+      "name": "tsan-bigint",
+      "displayName": "Full, ThreadSanitizer, arbitrary-precision xs:integer (Linux)",
+      "inherits": "tsan",
+      "cacheVariables": {
+        "ZORBA_WITH_BIG_INTEGER": "ON"
+      }
+    },
+    {
       "name": "embedded",
       "displayName": "Embedded (no Full-Text, no XML Schema, no debugger, no thesaurus, no network, no unit tests), Release",
       "inherits": "base",
@@ -97,7 +119,7 @@
     },
     {
       "name": "bigint",
-      "displayName": "Full, arbitrary-precision xs:integer (MAPM; not thread-safe, see KNOWN_ISSUES.txt), Release",
+      "displayName": "Full, arbitrary-precision xs:integer (MAPM), Release",
       "inherits": "full-release",
       "cacheVariables": {
         "ZORBA_WITH_BIG_INTEGER": "ON"
@@ -123,6 +145,14 @@
       "environment": {
         "ASAN_OPTIONS": "detect_leaks=0"
       }
+    },
+    {
+      "name": "tsan",
+      "configurePreset": "tsan"
+    },
+    {
+      "name": "tsan-bigint",
+      "configurePreset": "tsan-bigint"
     },
     {
       "name": "embedded",
@@ -186,6 +216,44 @@
         "ASAN_OPTIONS": "detect_leaks=1:log_path=${sourceDir}/build/asan/sanitizer-logs/asan",
         "LSAN_OPTIONS": "suppressions=${sourceDir}/test/sanitizers/lsan.supp",
         "UBSAN_OPTIONS": "print_stacktrace=1:log_path=${sourceDir}/build/asan/sanitizer-logs/ubsan"
+      }
+    },
+    {
+      "name": "tsan",
+      "displayName": "Thread-safety tests under ThreadSanitizer",
+      "configurePreset": "tsan",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "timeout": 1200
+      },
+      "filter": {
+        "include": {
+          "name": "test/libunit/mapm_threads$|test/unit/(multiple_runs|datetime)$|numerics/"
+        }
+      },
+      "environment": {
+        "TSAN_OPTIONS": "halt_on_error=0:exitcode=0:second_deadlock_stack=1:history_size=4:log_path=${sourceDir}/build/tsan/sanitizer-logs/tsan"
+      }
+    },
+    {
+      "name": "tsan-bigint",
+      "displayName": "Thread-safety tests under ThreadSanitizer",
+      "configurePreset": "tsan-bigint",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "timeout": 1200
+      },
+      "filter": {
+        "include": {
+          "name": "test/libunit/mapm_threads$|test/unit/(multiple_runs|datetime)$|numerics/"
+        }
+      },
+      "environment": {
+        "TSAN_OPTIONS": "halt_on_error=0:exitcode=0:second_deadlock_stack=1:history_size=4:log_path=${sourceDir}/build/tsan-bigint/sanitizer-logs/tsan"
       }
     },
     {

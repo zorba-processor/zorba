@@ -309,27 +309,27 @@ extern   void   memory_free(void *);
 
 #define	VALID_DECIMAL_PLACES 128
 
-extern  int     MM_lc_PI_digits;
-extern  int     MM_lc_log_digits;
+extern  M_APM_TLS int     MM_lc_PI_digits;
+extern  M_APM_TLS int     MM_lc_log_digits;
 
 /*
  *   constants not in m_apm.h
  */
 
-extern	M_APM	MM_0_5;
-extern	M_APM	MM_0_85;
-extern	M_APM	MM_5x_125R;
-extern	M_APM	MM_5x_64R;
-extern	M_APM	MM_5x_256R;
-extern	M_APM	MM_5x_Eight;
-extern	M_APM	MM_5x_Sixteen;
-extern	M_APM	MM_5x_Twenty;
-extern	M_APM	MM_lc_PI;
-extern	M_APM	MM_lc_HALF_PI;
-extern	M_APM	MM_lc_2_PI;
-extern	M_APM	MM_lc_log2;
-extern	M_APM	MM_lc_log10;
-extern	M_APM	MM_lc_log10R;
+extern	M_APM_TLS M_APM	MM_0_5;
+extern	M_APM_TLS M_APM	MM_0_85;
+extern	M_APM_TLS M_APM	MM_5x_125R;
+extern	M_APM_TLS M_APM	MM_5x_64R;
+extern	M_APM_TLS M_APM	MM_5x_256R;
+extern	M_APM_TLS M_APM	MM_5x_Eight;
+extern	M_APM_TLS M_APM	MM_5x_Sixteen;
+extern	M_APM_TLS M_APM	MM_5x_Twenty;
+extern	M_APM_TLS M_APM	MM_lc_PI;
+extern	M_APM_TLS M_APM	MM_lc_HALF_PI;
+extern	M_APM_TLS M_APM	MM_lc_2_PI;
+extern	M_APM_TLS M_APM	MM_lc_log2;
+extern	M_APM_TLS M_APM	MM_lc_log10;
+extern	M_APM_TLS M_APM	MM_lc_log10R;
 
 /*
  *   prototypes for internal functions

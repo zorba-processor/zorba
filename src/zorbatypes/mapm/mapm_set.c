@@ -94,8 +94,8 @@ static  char* M_set_string_error_msg = "\'m_apm_set_string\', Out of memory";
             because the string may be written upon during the casting (see the
             m_apm_set_string function below).
 *******************************************************************************/
-static	char* M_buf  = NULL;
-static  int M_lbuf = 0;
+static M_APM_TLS	char* M_buf  = NULL;
+static M_APM_TLS  int M_lbuf = 0;
 
 
 /******************************************************************************

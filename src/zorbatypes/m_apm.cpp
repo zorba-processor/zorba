@@ -15,14 +15,10 @@
  */
 #include <zorba/config.h>
 
-
-#ifndef ZORBA_FOR_ONE_THREAD_ONLY
-
 #include "zorbatypes/m_apm.h"
 
-zorba::Mutex MAPM::theMAPMMutex;
-
-#endif // ZORBA_FOR_ONE_THREAD_ONLY
+// MAPM has no global lock: its internal state is per-thread (see M_APM_TLS
+// and MAPM::threadInit() in m_apm.h).
 
 
 #if 0

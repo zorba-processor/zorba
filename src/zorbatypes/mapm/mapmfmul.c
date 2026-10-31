@@ -140,7 +140,7 @@
 
 #include "m_apm_lc.h"
 
-static int M_firsttimef = TRUE;
+static M_APM_TLS int M_firsttimef = TRUE;
 
 /*
  *      specify the max size the FFT routine can handle 
@@ -211,20 +211,20 @@ static int M_firsttimef = TRUE;
 #define M_ISTACK_SIZE 72
 #endif
 
-static int    exp_stack[M_ISTACK_SIZE];
-static int    exp_stack_ptr;
+static M_APM_TLS int    exp_stack[M_ISTACK_SIZE];
+static M_APM_TLS int    exp_stack_ptr;
 
-static UCHAR  *mul_stack_data[M_STACK_SIZE];
-static int    mul_stack_data_size[M_STACK_SIZE];
-static int    M_mul_stack_ptr;
+static M_APM_TLS UCHAR  *mul_stack_data[M_STACK_SIZE];
+static M_APM_TLS int    mul_stack_data_size[M_STACK_SIZE];
+static M_APM_TLS int    M_mul_stack_ptr;
 
-static UCHAR  *fmul_a1, *fmul_a0, *fmul_a9, *fmul_b1, *fmul_b0, 
+static M_APM_TLS UCHAR  *fmul_a1, *fmul_a0, *fmul_a9, *fmul_b1, *fmul_b0, 
 	      *fmul_b9, *fmul_t0;
 
-static int    size_flag, bit_limit, stmp, itmp, mii;
+static M_APM_TLS int    size_flag, bit_limit, stmp, itmp, mii;
 
-static M_APM  M_ain;
-static M_APM  M_bin;
+static M_APM_TLS M_APM  M_ain;
+static M_APM_TLS M_APM  M_bin;
 
 static char   *M_stack_ptr_error_msg = "\'M_get_stack_ptr\', Out of memory";
 

@@ -82,13 +82,13 @@ extern  void	M_get_microsec(unsigned long *, long *);
 extern  void	M_reverse_string(char *);
 extern  void    M_get_rnd_seed(M_APM);
 
-static	M_APM   M_rnd_aa;
-static  M_APM   M_rnd_mm;
-static  M_APM   M_rnd_XX;
-static  M_APM   M_rtmp0;
-static  M_APM   M_rtmp1;
+static M_APM_TLS	M_APM   M_rnd_aa;
+static M_APM_TLS  M_APM   M_rnd_mm;
+static M_APM_TLS  M_APM   M_rnd_XX;
+static M_APM_TLS  M_APM   M_rtmp0;
+static M_APM_TLS  M_APM   M_rtmp1;
 
-static  int     M_firsttime2 = TRUE;
+static M_APM_TLS  int     M_firsttime2 = TRUE;
 
 /*
         Used Knuth's The Art of Computer Programming, Volume 2 as

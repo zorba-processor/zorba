@@ -115,20 +115,20 @@
 
   Each of these array is dynamically allocated to hold 10,000 entries
 *******************************************************************************/
-static  UCHAR* M_mul_div = NULL;
-static  UCHAR* M_mul_rem = NULL;
+static M_APM_TLS  UCHAR* M_mul_div = NULL;
+static M_APM_TLS  UCHAR* M_mul_rem = NULL;
 
 /******************************************************************************
    M_mul_div_10[i] = the result of i div 10
    M_mul_rem_10[i] = the result of i mod 10
 *******************************************************************************/
-static  UCHAR  M_mul_div_10[100];
-static	UCHAR  M_mul_rem_10[100];
+static M_APM_TLS  UCHAR  M_mul_div_10[100];
+static M_APM_TLS	UCHAR  M_mul_rem_10[100];
 
-static	int	M_util_firsttime = TRUE;
-static	int M_firsttime3 = TRUE;
+static M_APM_TLS	int	M_util_firsttime = TRUE;
+static M_APM_TLS	int M_firsttime3 = TRUE;
 
-static	M_APM	M_work_0_5;
+static M_APM_TLS	M_APM	M_work_0_5;
 
 static  char* M_init_error_msg = "\'m_apm_init\', Out of memory";
 

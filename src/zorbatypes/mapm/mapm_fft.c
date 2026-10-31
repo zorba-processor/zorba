@@ -92,8 +92,8 @@ extern void   M_rftbsub(int, double *);
 extern void   M_cft1st(int, double *);
 extern void   M_cftmdl(int, int, double *);
 
-static double *M_aa_array, *M_bb_array;
-static int    M_size = -1;
+static M_APM_TLS double *M_aa_array, *M_bb_array;
+static M_APM_TLS int    M_size = -1;
 
 static char   *M_fft_error_msg = "\'M_fast_mul_fft\', Out of memory";
 

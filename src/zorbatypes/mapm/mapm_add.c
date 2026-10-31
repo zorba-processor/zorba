@@ -42,9 +42,9 @@
 
 #include "m_apm_lc.h"
 
-static	M_APM	M_work1 = NULL;
-static	M_APM	M_work2 = NULL;
-static	int	M_add_firsttime = TRUE;
+static M_APM_TLS	M_APM	M_work1 = NULL;
+static M_APM_TLS	M_APM	M_work2 = NULL;
+static M_APM_TLS	int	M_add_firsttime = TRUE;
 
 /****************************************************************************/
 void	M_free_all_add()

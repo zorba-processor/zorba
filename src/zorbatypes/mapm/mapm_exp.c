@@ -141,9 +141,9 @@
 
 #include "m_apm_lc.h"
 
-static  M_APM  MM_exp_log2R;
-static  M_APM  MM_exp_512R;
-static	int    MM_firsttime1 = TRUE;
+static M_APM_TLS  M_APM  MM_exp_log2R;
+static M_APM_TLS  M_APM  MM_exp_512R;
+static M_APM_TLS	int    MM_firsttime1 = TRUE;
 
 /****************************************************************************/
 void	M_free_all_exp()

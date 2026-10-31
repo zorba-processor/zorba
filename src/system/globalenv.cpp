@@ -196,7 +196,9 @@ void GlobalEnvironment::destroyStatics()
 {
   // release resources aquired by the mapm library
   // this will force zorba users to reinit mapm
-  // if they shutdown zorba but want to use mapm beyond
+  // if they shutdown zorba but want to use mapm beyond.
+  // MAPM's state is per-thread: this frees the calling thread's state; other
+  // threads free theirs when they exit (see MAPM::threadInit()).
   m_apm_free_all_mem();
 }
 

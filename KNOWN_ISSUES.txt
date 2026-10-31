@@ -13,12 +13,6 @@ Zorba Version 2.0
   For details, see the following bug:
   - 3323548 <https://bugs.launchpad.net/zorba/+bug/sf-3323548>
 
-* MAPM, the arbitrary-precision library behind xs:decimal (and xs:integer when
-  built with ZORBA_WITH_BIG_INTEGER=ON, the "bigint" preset), keeps working
-  buffers in static variables (e.g. src/zorbatypes/mapm/mapmutil.c) and is not
-  thread-safe. Concurrent queries doing decimal (or, with big integers,
-  integer) arithmetic in one process can corrupt results.
-
 * Zorba uses ICU for regular expressions that does not support range
   subtraction.  For details, see the following bug:
   - 3150856 <https://bugs.launchpad.net/zorba/+bug/sf-3150856>
