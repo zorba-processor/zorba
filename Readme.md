@@ -33,6 +33,9 @@ for all image tags.
 Requirements: a C++23 compiler (GCC 13+, Clang 17+ or Apple Clang 16+),
 CMake 3.28+, Ninja, ICU, libxml2, libcurl, and Xerces-C 3.2+ for XML Schema
 support. libxslt is optional (XQueryX).
+Stock Xerces-C (3.3.0 and earlier) rejects some valid schemas that restrict
+a union type; the Linux CI and container images build Xerces-C from a patched
+fork, see `KNOWN_ISSUES.txt`.
 
 CI builds and tests Linux x86_64 (GCC and Clang), Linux arm64, and macOS
 arm64. macOS x86_64 should build but is not tested in CI. Windows is not
