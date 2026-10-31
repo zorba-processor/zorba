@@ -14,7 +14,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
  && rm -rf /var/lib/apt/lists/*
 # Xerces-C from the patched zorba-processor fork, as in docker/builder (keep
 # the tag and commit in sync): stock Xerces-C <= 3.3.0 rejects valid schemas
-# that restrict a union type (see KNOWN_ISSUES.txt).
+# that restrict a union type (see doc/KNOWN_ISSUES.txt).
 ARG XERCES_REPO=https://github.com/zorba-processor/xerces-c.git
 ARG XERCES_TAG=v3.3.0-zorba.4
 ARG XERCES_COMMIT=90e9babe7d84e08cbdde55e4e27392f5a5a6b095

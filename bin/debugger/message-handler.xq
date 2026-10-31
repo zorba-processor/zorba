@@ -123,6 +123,16 @@ declare function local:eval($resp as element())
     concat("Eval failed", ":", $resp/error/message/text())
 };
 
+declare function local:property_set($resp as element())
+{
+  if ($resp/error) then
+    concat("Set failed: ", $resp/error/message/text())
+  else if (data($resp/@success) eq "1") then
+    "Variable set"
+  else
+    "Variable not set: it can not be assigned or the value does not match its type"
+};
+
 declare function local:process-response($resp as element())
 {
   if (data($resp/@command) eq "") then

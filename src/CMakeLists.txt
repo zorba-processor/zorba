@@ -20,7 +20,7 @@ INCLUDE_DIRECTORIES(BEFORE ${CMAKE_CURRENT_SOURCE_DIR})
 # generated files if they exist!
 INCLUDE_DIRECTORIES(BEFORE ${CMAKE_CURRENT_BINARY_DIR})
 
-INCLUDE(${CMAKE_SOURCE_DIR}/cmake_modules/ZorbaRuntimeGenerator.cmake)
+INCLUDE(${CMAKE_SOURCE_DIR}/cmake/modules/ZorbaRuntimeGenerator.cmake)
 
 # Look for all spec files and generate the header and cpp files if out
 # of date.  The cpp files and the according _impl.cpp files are added

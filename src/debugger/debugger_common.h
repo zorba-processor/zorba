@@ -36,4 +36,10 @@ const SuspensionCause CAUSE_BREAKPOINT         = 0x02;
 const SuspensionCause CAUSE_STEP               = 0x03;
 const SuspensionCause CAUSE_ERROR              = 0x04;
 
+/* Result of assigning a variable from the debugger (DBGP property_set) */
+const int DEBUGGER_SETVAR_OK             = 0;
+const int DEBUGGER_SETVAR_NOT_FOUND      = 1;
+const int DEBUGGER_SETVAR_NOT_ASSIGNABLE = 2;
+const int DEBUGGER_SETVAR_TYPE_MISMATCH  = 3;
+
 #endif //ZORBA_DEBUGGER_COMMON_H

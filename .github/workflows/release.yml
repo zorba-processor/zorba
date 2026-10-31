@@ -392,7 +392,7 @@ jobs:
           out="$(docker run --rm "$REF" -q '1 + 1')"
           echo "$out"
           grep -Eq '(^|>)2$' <<< "$out"
-          # Xerces-C must be the patched build in /usr/local (KNOWN_ISSUES.txt):
+          # Xerces-C must be the patched build in /usr/local (doc/KNOWN_ISSUES.txt):
           # it loads a schema restricting a union-typed element to a
           # restriction of the union, which stock Xerces-C 3.3.0 rejects.
           libs="$(docker run --rm --entrypoint sh "$REF" -c 'ldd "$(command -v zorba)"')"

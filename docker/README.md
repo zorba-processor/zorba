@@ -50,7 +50,7 @@ Both builder images and the `zorba` runtime image use Xerces-C from the
 (branch `zorba-patches`, tag pinned to a commit in each Dockerfile; keep the
 three in sync), built from source into `/usr/local`, instead of the
 distribution package: stock Xerces-C 3.3.0 and earlier reject valid schemas
-that restrict a union type (see `KNOWN_ISSUES.txt`). The runtime image ships
+that restrict a union type (see `doc/KNOWN_ISSUES.txt`). The runtime image ships
 only `libxerces-c-3.3.so`. The macOS CI job (Homebrew) and the CodeQL workflow
 (Ubuntu packages) use stock Xerces-C.
 
