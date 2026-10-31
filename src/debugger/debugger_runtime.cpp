@@ -400,9 +400,17 @@ DebuggerRuntime::getVariables(bool aLocals)
     zstring lLocalName = lNameItem->getLocalName();
 
     // correct the name of the context item
-    if (!aLocals && lLocalName == "$$dot")
+    if (lLocalName == static_context::DOT_VAR_NAME)
     {
-      lVarList.push_back(std::pair<std::string, std::string>(".", "item()*"));
+      if (!aLocals)
+        lVarList.push_back(std::pair<std::string, std::string>(".", "item()*"));
+      continue;
+    }
+
+    // the context position and size are not user variables
+    if (lLocalName == static_context::DOT_POS_VAR_NAME ||
+        lLocalName == static_context::DOT_SIZE_VAR_NAME)
+    {
       continue;
     }
 

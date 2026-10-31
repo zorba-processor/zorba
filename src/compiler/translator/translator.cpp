@@ -2124,7 +2124,13 @@ void wrap_in_debugger_expr(
 
       store::Item* lVarname = argVar->get_name();
 
-      if (lVarname->getStringValue() == "$$dot")
+      // the focus (context item, position, size) is not passed to the
+      // debugger eval: it may be undefined at this point and reading it
+      // would make every eval fail
+      const zstring& lVarnameStr = lVarname->getStringValue();
+      if (lVarnameStr == static_context::DOT_VAR_NAME ||
+          lVarnameStr == static_context::DOT_POS_VAR_NAME ||
+          lVarnameStr == static_context::DOT_SIZE_VAR_NAME)
       {
         continue;
       }
