@@ -2250,6 +2250,8 @@ SwitchExpr::SwitchExpr(
 
 void SwitchExpr::accept( parsenode_visitor &v ) const
 {
+  // As for TypeswitchExpr.
+  LIST_DEPTH_GUARD(clause_list_h != NULL ? clause_list_h->size() : 0);
   BEGIN_VISITOR();
   ACCEPT_CHK(switch_expr_h);
   ACCEPT_CHK(default_expr_h);
@@ -2270,7 +2272,6 @@ SwitchCaseClauseList::SwitchCaseClauseList(
 void SwitchCaseClauseList::accept( parsenode_visitor &v ) const
 {
   BEGIN_VISITOR();
-  LIST_DEPTH_GUARD(clause_hv.size());
   std::vector<rchandle<SwitchCaseClause> >::const_reverse_iterator it = clause_hv.rbegin();
   for (; it!=clause_hv.rend(); ++it)
   {
@@ -2358,6 +2359,9 @@ TypeswitchExpr::TypeswitchExpr(
 
 void TypeswitchExpr::accept( parsenode_visitor &v ) const
 {
+  // The translator visits the cases itself (it nests them), so they are
+  // counted here rather than in CaseClauseList::accept().
+  LIST_DEPTH_GUARD(clause_list_h != NULL ? clause_list_h->size() : 0);
   BEGIN_VISITOR();
   ACCEPT_CHK (switch_expr_h);
   ACCEPT_CHK (default_clause_h);
@@ -2379,7 +2383,6 @@ CaseClauseList::CaseClauseList(const QueryLoc& loc)
 void CaseClauseList::accept(parsenode_visitor& v) const
 {
   BEGIN_VISITOR();
-  LIST_DEPTH_GUARD(theClauses.size());
 
   std::vector<rchandle<CaseClause> >::const_reverse_iterator it = theClauses.rbegin();
   for (; it != theClauses.rend(); ++it) 
