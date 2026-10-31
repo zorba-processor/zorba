@@ -141,6 +141,18 @@ FnMinMaxIterator::nextImpl(store::Item_t& result, PlanState& planState) const
           // It must be checked if the sequence contains any
           // xs:double("NaN") [xs:double("NaN") is returned] or
           // only xs:float("NaN")'s [xs:float("NaN") is returned]'.
+          //
+          // The NaN takes the type the values seen so far were promoted to:
+          // max((0e0, xs:float('NaN'))) is xs:double NaN (F&O 3.0 15.4.3).
+          if (result != 0)
+          {
+            store::Item_t lPromoted;
+            if (GenericCast::promote(lPromoted, runningItem, maxType, NULL, tm, loc))
+            {
+              runningItem.transfer(lPromoted);
+              runningType = runningItem->getTypeCode();
+            }
+          }
 
           result = runningItem;
           if (TypeOps::is_subtype(runningType, store::XS_DOUBLE))
