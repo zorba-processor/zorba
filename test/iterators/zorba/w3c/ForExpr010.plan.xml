@@ -52,6 +52,7 @@
 </iterator-tree>
 <iterator-tree description="main query">
   <SequentialIterator>
+    <FnConcatIterator/>
     <CtxVarDeclareIterator varid="4" varname="xxx-func-name"/>
     <TreatIterator type="xs:QName" quant="">
       <CtxVarIterator varid="4" varname="xxx-func-name" varkind="global"/>
