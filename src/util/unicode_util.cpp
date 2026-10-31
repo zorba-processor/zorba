@@ -2156,6 +2156,31 @@ code_point to_case( code_point c ) {
   return result.first == result.second ? c : (*result.first)[1];
 }
 
+struct full_case_entry {
+  code_point c;
+  code_point mapping[3];                // unused trailing ones are 0
+};
+
+#include "unicode_full_case.h"
+
+template<size_t N>
+int to_case_full( full_case_entry const (&table)[N], code_point c,
+                  code_point *out ) {
+  full_case_entry const *const end = table + N;
+  full_case_entry const *const found = std::lower_bound(
+    table, end, c,
+    []( full_case_entry const &e, code_point cp ) { return e.c < cp; }
+  );
+  if ( found == end || found->c != c ) {
+    out[0] = c;
+    return 1;
+  }
+  int n = 0;
+  for ( ; n < 3 && found->mapping[n]; ++n )
+    out[n] = found->mapping[n];
+  return n;
+}
+
 } // anonymous namespace
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -2231,6 +2256,14 @@ code_point to_lower( code_point c ) {
 
 code_point to_upper( code_point c ) {
   return to_case<upper>( c );
+}
+
+int to_lower_full( code_point c, code_point out[3] ) {
+  return to_case_full( full_lower, c, out );
+}
+
+int to_upper_full( code_point c, code_point out[3] ) {
+  return to_case_full( full_upper, c, out );
 }
 
 #ifndef ZORBA_NO_ICU
