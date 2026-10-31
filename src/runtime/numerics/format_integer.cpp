@@ -16,6 +16,7 @@
 #include "stdafx.h"
 
 // standard
+#include <cstdlib>
 #include <sstream>
 #include <vector>
 
@@ -157,25 +158,23 @@ static bool get_one_range( unicode::code_point cp, int *min, int *max ) {
 }
 
 static char const* ordinal( xs_integer const &i ) {
-  xs_integer a( i );
-  if ( a.sign() < 0 )
-    a = -a;
-  static xs_integer const ten( 10 );
-  xs_integer const a_mod_10( a % ten );
-  switch ( to_xs_int( a_mod_10 ) ) {
+  //
+  // Work on |i % 100| rather than |i| % 100: negating the smallest 64-bit
+  // integer overflows.
+  //
+  static xs_integer const hundred( 100 );
+  int const a_mod_100 = std::abs( to_xs_int( i % hundred ) );
+  switch ( a_mod_100 ) {
     case 11:
     case 12:
     case 13:
       break;
-    default: {
-      static xs_integer const hundred( 100 );
-      xs_integer const a_mod_100( a % hundred );
-      switch ( to_xs_int( a_mod_100 ) ) {
+    default:
+      switch ( a_mod_100 % 10 ) {
         case 1: return "st";
         case 2: return "nd";
         case 3: return "rd";
       }
-    }
   }
   return "th";
 }
@@ -216,11 +215,11 @@ static void format_integer( xs_integer const &xs_n, picture const &pic,
       break;
 
     case picture::arabic: {
-      xs_integer xs_n2( xs_n );
-      if ( xs_n2.sign() < 0 )
-        xs_n2 = -xs_n2;
-
-      zstring const s( xs_n2.toString() );
+      // Strip the sign from the digits rather than negating: -xs_n overflows
+      // for the smallest 64-bit integer.
+      zstring const s(
+        xs_n.sign() < 0 ? xs_n.toString().substr( 1 ) : xs_n.toString()
+      );
       zstring::const_reverse_iterator n_i( s.rbegin() );
       zstring::const_reverse_iterator const n_end( s.rend() );
 

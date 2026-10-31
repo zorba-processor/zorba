@@ -978,6 +978,21 @@ long CompareIterator::compare(
   store::SchemaTypeCode type0 = item0->getTypeCode();
   store::SchemaTypeCode type1 = item1->getTypeCode();
 
+  // xs:gYearMonth, xs:gYear, xs:gMonthDay, xs:gDay and xs:gMonth have
+  // equality but no order: F&O 3.0 10.4.13-10.4.17 define only the -equal
+  // operators, so lt/gt/le/ge (XQuery 3.0 3.7.1, B.2) raise XPTY0004.
+  auto const is_gregorian = [](store::SchemaTypeCode t) {
+    return t >= store::XS_GYEAR_MONTH && t <= store::XS_GMONTH;
+  };
+  if (is_gregorian(type0) || is_gregorian(type1))
+  {
+    xqtref_t type0 = tm->create_value_type(item0.getp());
+    xqtref_t type1 = tm->create_value_type(item1.getp());
+
+    RAISE_ERROR(err::XPTY0004, loc,
+    ERROR_PARAMS(ZED(BadType_23o), *type0, ZED(NoCompareWithType_4), *type1));
+  }
+
   try
   {
     if (TypeOps::is_subtype(type0, store::XS_DURATION) &&

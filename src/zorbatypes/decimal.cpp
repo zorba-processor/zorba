@@ -51,15 +51,23 @@ void Decimal::parse( char const *s, value_type *result, int parse_options ) {
 
   if ( *s == '+' || *s == '-' )
     ++s;
+  char const *const first_digit = s;
   while ( ascii::is_digit( *s ) )
     ++s;
+  bool got_digit = s != first_digit;
   if ( parse_options & parse_decimal ) {
     if ( *s == '.' ) {
       ++s;
+      char const *const first_frac_digit = s;
       while ( ascii::is_digit( *s ) )
         ++s;
+      got_digit = got_digit || s != first_frac_digit;
     }
   }
+  if ( !got_digit )                     // e.g., "", " ", "+", "."
+    throw range_error(
+      BUILD_STRING( '"', first_non_ws, "\": no digits" )
+    );
   char const *first_trailing_ws = nullptr;
   while ( ascii::is_space( *s ) ) {
     if ( !first_trailing_ws )

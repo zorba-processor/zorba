@@ -103,6 +103,15 @@ ZORBA_SET_TEST_PROPERTY(bin/zorba_compilechk3 PASS_REGULAR_EXPRESSION ".*XQST004
 ZORBA_ADD_TEST(bin/zorba_option zorbacmd -q "${CMAKE_CURRENT_SOURCE_DIR}/test/option.xq" -f --option "{http://zorba.io/}option=value")
 ZORBA_SET_TEST_PROPERTY(bin/zorba_option PASS_REGULAR_EXPRESSION "value")
 
+# a serialization parameter declared in the query prolog applies
+# (XQuery 3.0 2.2.4)
+ZORBA_ADD_TEST(bin/zorba_output_method zorbacmd -q "${CMAKE_CURRENT_SOURCE_DIR}/test/output_method.xq" -f)
+ZORBA_SET_TEST_PROPERTY(bin/zorba_output_method PASS_REGULAR_EXPRESSION "^x")
+ZORBA_SET_TEST_PROPERTY(bin/zorba_output_method FAIL_REGULAR_EXPRESSION "<a>|error")
+# ... unless the command line sets it
+ZORBA_ADD_TEST(bin/zorba_output_method_cli zorbacmd -q "${CMAKE_CURRENT_SOURCE_DIR}/test/output_method.xq" -f -z method=xml)
+ZORBA_SET_TEST_PROPERTY(bin/zorba_output_method_cli PASS_REGULAR_EXPRESSION "<a>x</a>")
+
 # test the --uri-path, --lib-path, and --module-path args.
 # Use the versioning tests as they utilize test modules already.
 SET (_testdir

@@ -33,12 +33,13 @@ namespace utf8 {
 template<class StringType> back_html_uri_insert_iterator<StringType>&
 back_html_uri_insert_iterator<StringType>::operator=( value_type c ) {
   char const dec2hex[] = "0123456789ABCDEF";
-  unsigned u = c & 0xFFu;
-  if ( !ascii::is_print( u ) ) {
+  // F&O 3.0 6.4.4: escape everything outside the printable ASCII range
+  // 32-126; testing only the low byte let most non-ASCII characters through.
+  if ( c < 0x20 || c > 0x7E ) {
     utf8::encoded_char_type ec;
     utf8::size_type const bytes = utf8::encode( c, ec );
     for ( size_type i = 0; i < bytes; ++i ) {
-      u = ec[i] & 0xFFu;
+      unsigned const u = ec[i] & 0xFFu;
       buf_[1] = dec2hex[ u >> 4 ];
       buf_[2] = dec2hex[ u & 0x0F ];
       this->container->append( buf_, 3 );

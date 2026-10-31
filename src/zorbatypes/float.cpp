@@ -100,16 +100,21 @@ void FloatImpl<F>::parse( char const *s ) {
         count_significant_digits( *s, &significant_digits, &trailing_zeros );
       } while ( ascii::is_digit( *++s ) );
     }
-    if ( *s == 'e' || *s == 'E' ) {
+    if ( got_digit && (*s == 'e' || *s == 'E') ) {
       ++s;
       if ( *s == '+' || *s == '-' )
         ++s;
-      if ( ascii::is_digit( *s ) ) {
-        got_digit = true;
-        while ( ascii::is_digit( *++s ) ) ;
-      }
+      if ( !ascii::is_digit( *s ) )     // an exponent needs a digit
+        got_digit = false;
+      while ( ascii::is_digit( *s ) )
+        ++s;
     }
-    if ( !got_digit )
+    //
+    // XSD 1.1 Part 2, 3.3.4-3.3.5: only trailing whitespace may follow; check
+    // it here since aton() (via strtod()) would also accept forms like "0x1A"
+    // or "1.5x" by parsing a prefix.
+    //
+    if ( !got_digit || *ascii::trim_start_space( s ) )
       throw std::invalid_argument(
         BUILD_STRING( '"', first_non_ws, "\": invalid floating-point literal" )
       );
@@ -275,6 +280,23 @@ FloatImpl<F> FloatImpl<F>::round( Integer const &precision ) const {
 template<typename F>
 FloatImpl<F> FloatImpl<F>::roundHalfToEven( Integer const &precision ) const {
   FloatImpl result;
+  //
+  // A value has at most max_digits10 significant digits, so rounding to a
+  // precision at or beyond its last one leaves it unchanged. Short-cut that
+  // case: the decimal rounding below is limited to
+  // Decimal::round_precision_limit fractional digits and would flush a value
+  // like 4.9e-324 to zero (F&O 3.0 4.4.5).
+  //
+  if ( isFinite() && !isZero() ) {
+    MAPM const last_digit(
+      std::numeric_limits<F>::max_digits10 -
+      std::floor( std::log10( std::fabs( static_cast<double>( value_ ) ) ) )
+    );
+    if ( precision.itod() >= last_digit ) {
+      result.value_ = value_;
+      return result;
+    }
+  }
   if ( isFinite() && !isZero() ) {
     MAPM m(
       Decimal::roundHalfToEven2(

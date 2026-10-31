@@ -298,6 +298,28 @@ code_point to_lower( code_point c );
  */
 code_point to_upper( code_point c );
 
+/**
+ * Gets the full lower-case mapping of the given character: its simple mapping
+ * (UnicodeData.txt) or an unconditional multi-character mapping
+ * (SpecialCasing.txt), e.g., U+0130 maps to U+0069 U+0307.
+ *
+ * @param c The character to map.
+ * @param out Receives the mapping: 1 to 3 code points.
+ * @return Returns the number of code points stored in \a out.
+ */
+int to_lower_full( code_point c, code_point out[3] );
+
+/**
+ * Gets the full upper-case mapping of the given character: its simple mapping
+ * (UnicodeData.txt) or an unconditional multi-character mapping
+ * (SpecialCasing.txt), e.g., U+00DF maps to "SS".
+ *
+ * @param c The character to map.
+ * @param out Receives the mapping: 1 to 3 code points.
+ * @return Returns the number of code points stored in \a out.
+ */
+int to_upper_full( code_point c, code_point out[3] );
+
 ////////// normalization //////////////////////////////////////////////////////
 
 #ifndef ZORBA_NO_ICU

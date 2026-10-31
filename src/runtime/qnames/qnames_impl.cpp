@@ -86,7 +86,12 @@ ResolveQNameIterator::nextImpl(store::Item_t& result, PlanState& planState) cons
       }
     }
 
-    if (consumeNext(itemElem, theChild1, planState ))
+    if (resPre == "xml")
+    {
+      // The xml prefix is bound in every element (XQuery 3.0 2.1.1).
+      resNs = static_context::W3C_XML_NS;
+    }
+    else if (consumeNext(itemElem, theChild1, planState ))
     {
       itemElem->getNamespaceBindings(NamespaceBindings);
 
@@ -302,6 +307,12 @@ bool NamespaceUriForPrefixIterator::nextImpl(
   {
     ZORBA_ASSERT(false);
   }
+  else if (prefix == "xml")
+  {
+    // The xml prefix is bound in every element (XQuery 3.0 2.1.1).
+    resNs = static_context::W3C_XML_NS;
+    found = true;
+  }
   else
   {
     itemElem->getNamespaceBindings(NamespaceBindings);
@@ -322,7 +333,7 @@ bool NamespaceUriForPrefixIterator::nextImpl(
 
   if (found)
   {
-    STACK_PUSH( GENV_ITEMFACTORY->createString(result, resNs), state );
+    STACK_PUSH( GENV_ITEMFACTORY->createAnyURI(result, resNs), state );
   }
 
   STACK_END (state);

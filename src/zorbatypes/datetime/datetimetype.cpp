@@ -852,13 +852,24 @@ int DateTime::parse_time(
 
   if (position < len && str[position] == '.')
   {
-    double temp_frac_seconds;
     position++;
 
-    if ((err = parse_frac(str, len, position, temp_frac_seconds)))
-      return err;
+    if (position == len || !ascii::is_digit(str[position]))
+      return 1;
 
-    frac_seconds = round(temp_frac_seconds * FRAC_SECONDS_UPPER_LIMIT);
+    // Keep the first 6 fractional digits and truncate the rest: rounding
+    // could carry into the seconds field (.9999999 would become 1000000
+    // microseconds and print as ".1").
+    frac_seconds = 0;
+    long scale = FRAC_SECONDS_UPPER_LIMIT;
+    for (; position < len && ascii::is_digit(str[position]); ++position)
+    {
+      if (scale > 1)
+      {
+        scale /= 10;
+        frac_seconds += (str[position] - '0') * scale;
+      }
+    }
   }
   else
   {

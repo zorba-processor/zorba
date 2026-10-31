@@ -1400,13 +1400,17 @@ void URI::resolve(const URI* base_uri)
   zstring base_path = base_uri->get_encoded_path();
   zstring path;
 
-  if ( base_uri->is_set(Path) ) 
+  if ( base_uri->is_set(Path) && !base_path.empty() )
   {
     zstring::size_type last_slash = base_path.rfind("/");
     if ( last_slash != zstring::npos )
       path = base_path.substr(0, last_slash+1);
-//  else
-//    path = "/";
+  }
+  else if ( base_uri->is_set(Host) || base_uri->is_set(RegBasedAuthority) )
+  {
+    // RFC 3986 5.2.3: if the base URI has an authority and an empty path,
+    // the merged path is "/" followed by the reference's path.
+    path = "/";
   }
 
   // 6b - append the relative URI path

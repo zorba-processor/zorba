@@ -47,6 +47,7 @@
 #include "util/oseparator.h"
 #include "util/regex.h"
 #include "util/string_util.h"
+#include "util/unicode_util.h"
 #include "util/uri_util.h"
 #include "util/utf8_string.h"
 #include "util/utf8_util.h"
@@ -889,6 +890,30 @@ bool NormalizeUnicodeIterator::nextImpl(
 
 
 /**
+ * Maps \a in to \a out with a full Unicode case mapping, in which one
+ * character may map to several (F&O 3.0 5.4.7, 5.4.8): fn:upper-case("&#xDF;")
+ * is "SS".
+ */
+static void to_case_full(
+    zstring const &in,
+    zstring *out,
+    int (*map)( unicode::code_point, unicode::code_point* ))
+{
+  utf8_string<zstring const> const u_in( in );
+  utf8_string<zstring> u_out( *out );
+  unicode::code_point mapped[3];
+
+  for ( utf8_string<zstring const>::const_iterator i = u_in.begin();
+        i != u_in.end(); ++i )
+  {
+    int const n = map( *i, mapped );
+    for ( int k = 0; k < n; ++k )
+      u_out += mapped[k];
+  }
+}
+
+
+/**
   *______________________________________________________________________
   *
   *  7.4.7 fn:upper-case
@@ -910,7 +935,7 @@ bool UpperCaseIterator::nextImpl(
   {
     item->getStringValue2(strval);
 
-    utf8::to_upper(strval, &resStr);
+    to_case_full(strval, &resStr, unicode::to_upper_full);
 
     STACK_PUSH(GENV_ITEMFACTORY->createString(result, resStr), state);
   }
@@ -944,7 +969,7 @@ bool LowerCaseIterator::nextImpl(
   {
     item->getStringValue2(strval);
 
-    utf8::to_lower(strval, &resStr);
+    to_case_full(strval, &resStr, unicode::to_lower_full);
 
     STACK_PUSH(GENV_ITEMFACTORY->createString(result, resStr), state);
   }
@@ -1000,11 +1025,15 @@ bool TranslateIterator::nextImpl(
         trans_i   = u_trans_string.begin(),
         trans_end = u_trans_string.end  ();
 
+      // F&O 3.0 5.4.9: if a character occurs more than once in $mapString,
+      // the first occurrence determines the action, hence try_emplace().
       for ( ; map_i != map_end && trans_i != trans_end; ++map_i, ++trans_i )
-        trans_map[ *map_i ] = *trans_i;
+        trans_map.try_emplace( *map_i, *trans_i );
 
       for ( ; map_i != map_end; ++map_i )
-        trans_map[ *map_i ] = static_cast<unicode::code_point>( ~0 );
+        trans_map.try_emplace(
+          *map_i, static_cast<unicode::code_point>( ~0 )
+        );
     }
 
     utf8_string<zstring> u_result_string( result_string );

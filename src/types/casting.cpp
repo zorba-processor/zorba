@@ -1845,8 +1845,38 @@ T1_TO_T2(uA, uint)
 }
 
 
+/**
+ * F&O 3.0 19.2: a numeric value cast to a type derived from xs:integer is
+ * first cast to xs:integer, which truncates any fraction. So a negative value
+ * above -1 casts to 0, and one at or below -1 is outside the
+ * xs:nonNegativeInteger branch: FORG0001 (not FOCA0002).
+ */
+static bool negative_to_uint(
+    store::Item_t& result,
+    const store::Item* aItem,
+    bool at_most_minus_one,
+    store::ItemFactory* aFactory,
+    const ErrorInfo& errInfo,
+    bool throw_on_error)
+{
+  if (at_most_minus_one)
+  {
+    if ( throw_on_error )
+      throwFORG0001Exception(aItem->getStringValue(), errInfo);
+    return false;
+  }
+  aFactory->createNonNegativeInteger(
+    result, numeric_consts<xs_nonNegativeInteger>::zero());
+  return true;
+}
+
+
 T1_TO_T2(flt, uint)
 {
+  xs_float const f(aItem->getFloatValue());
+  if (f.isFinite() && f < 0.0)
+    return negative_to_uint(result, aItem, f <= -1.0, aFactory, errInfo,
+                            throw_on_error);
   try 
   {
     xs_nonNegativeInteger const n(aItem->getFloatValue());
@@ -1903,6 +1933,10 @@ T1_TO_T2(uint, int)
 
 T1_TO_T2(dbl, uint)
 {
+  xs_double const d(aItem->getDoubleValue());
+  if (d.isFinite() && d < 0.0)
+    return negative_to_uint(result, aItem, d <= -1.0, aFactory, errInfo,
+                            throw_on_error);
   try 
   {
     xs_nonNegativeInteger const n(aItem->getDoubleValue());
@@ -1920,6 +1954,11 @@ T1_TO_T2(dbl, uint)
 
 T1_TO_T2(dec, uint)
 {
+  xs_decimal const d(aItem->getDecimalValue());
+  if (d.sign() < 0)
+    return negative_to_uint(result, aItem,
+                            d <= numeric_consts<xs_decimal>::neg_one(),
+                            aFactory, errInfo, throw_on_error);
   try
   {
     xs_nonNegativeInteger const n(aItem->getDecimalValue());
@@ -1972,6 +2011,11 @@ bool str_down(
   zstring strval;
   aItem->getStringValue2(strval);
 
+  // xs:token and all types derived from it have whiteSpace="collapse" (XSD
+  // 1.1 Part 2, 3.4.2-3.4.9): collapse before checking the lexical form.
+  if (aTargetAtomicType != store::XS_NORMALIZED_STRING)
+    ascii::normalize_space(strval);
+
   switch(aTargetAtomicType)
   {
   case store::XS_NORMALIZED_STRING:
@@ -1995,40 +2039,6 @@ bool str_down(
   }
   case store::XS_TOKEN:
   {
-    char ch;
-    zstring::size_type sz = strval.size();
-
-    ascii::trim_space(strval);
-
-    bool spaceSeen = false;
-
-    for (zstring::size_type i = 0; i < sz; ++i)
-    {
-      ch = strval[i];
-
-      if (ch == '\r' || ch == '\n' || ch == '\t')
-      {
-        strval[i] = ' ';
-        ch = ' ';
-      }
-
-      if (ch == ' ')
-      {
-        if (spaceSeen)
-        {
-          strval.erase(i, 1);
-          --i;
-          --sz;
-        }
-
-        spaceSeen = true;
-      }
-      else
-      {
-        spaceSeen = false;
-      }
-    }
-
     factory->createToken(result, strval);
     return true;
   }
@@ -2043,8 +2053,6 @@ bool str_down(
   }
   case store::XS_NMTOKEN:
   {
-    ascii::trim_space(strval);
-
     if (GenericCast::instance()->castableToNMToken(strval))
     {
       factory->createNMTOKEN(result, strval);
@@ -2054,8 +2062,6 @@ bool str_down(
   }
   case store::XS_NAME:
   {
-    ascii::trim_space(strval);
-
     if (GenericCast::instance()->castableToName(strval))
     {
       factory->createName(result, strval);
@@ -2065,9 +2071,6 @@ bool str_down(
   }
   case store::XS_NCNAME:
   {
-    ascii::normalize_space(strval);
-    ascii::trim_space(strval);
-
     if (GenericCast::castableToNCName(strval))
     {
       factory->createNCName(result, strval);
