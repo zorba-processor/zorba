@@ -103,12 +103,11 @@ jobs:
                 /usr/bin/time -f "size=$n wall=%es user=%Us maxrss=%MkB" \
                   $Z -f -q rt$n.xq -o /out/rt$n.txt 2>&1 | tail -1 | tee -a /out/times.txt
               done
-              tail -c 60 /out/rt64.txt; echo
               for c in a b; do
                 for d in 4 6 8 10 12; do
                   sed "s/DEPTH/$d/" /tools/.github/rtc/$c.xq > /tmp/$c$d.xq
                   timeout 120 /usr/bin/time -f "cand=$c depth=$d wall=%es" \
-                    $Z -f -q /tmp/$c$d.xq -o /out/$c$d.txt 2>&1 | tail -1 | tee -a /out/times.txt
+                    $Z -f -q /tmp/$c$d.xq -o /out/$c$d.txt 2>&1 | tail -1 | tee -a /out/times.txt; true
                 done
               done
               chmod -R a+rw /out'
