@@ -427,6 +427,26 @@ static void append_month( unsigned mon, modifier const &mod, zstring *dest ) {
   }
 }
 
+/**
+ * Gets the default name of a timezone offset for [ZN]: the names conventional
+ * in North America, plus those in the F&O 3.0 9.8.4.2 examples (HST, IST).
+ *
+ * @param gmtoff The offset in seconds east of UTC.
+ * @return Returns said name or the empty string if there is none.
+ */
+static char const* default_tz_name( int gmtoff ) {
+  switch ( gmtoff / 60 ) {
+    case       0: return "GMT";
+    case  -5 * 60: return "EST";
+    case  -6 * 60: return "CST";
+    case  -7 * 60: return "MST";
+    case  -8 * 60: return "PST";
+    case -10 * 60: return "HST";
+    case 5 * 60 + 30: return "IST";
+    default      : return "";
+  }
+}
+
 static void append_timezone( char component, TimeZone const &tz,
                              zstring const &tz_name, modifier const &mod,
                              zstring *dest ) {
@@ -474,23 +494,9 @@ static void append_timezone( char component, TimeZone const &tz,
         tmp = tz_name;
         goto append;
       }
-      //
-      // Otherwise use the names conventional in North America, plus those in
-      // the F&O 3.0 9.8.4.2 examples (HST, IST).
-      //
-      if ( !min )
-        switch ( hour ) {
-          case   0: tmp += "GMT"; goto append;
-          case  -5: tmp += "EST"; goto append;
-          case  -6: tmp += "CST"; goto append;
-          case  -7: tmp += "MST"; goto append;
-          case  -8: tmp += "PST"; goto append;
-          case -10: tmp += "HST"; goto append;
-        }
-      else if ( hour == 5 && min == 30 ) {
-        tmp += "IST";
+      tmp = default_tz_name( tz.gmtoff() );
+      if ( !tmp.empty() )
         goto append;
-      }
       goto fallback;
 
     case modifier::military_tz:
@@ -1327,6 +1333,7 @@ static void apply_place( zstring const &place, DateTime *dt,
     if ( U_FAILURE( status ) || !ids )
       return;
     int const offset = dt->getTimezone().gmtoff();
+    zstring const default_name( default_tz_name( offset ) );
     icu::Locale const loc( "en", region );
     while ( icu::UnicodeString const *const id = ids->snext( status ) ) {
       if ( U_FAILURE( status ) )
@@ -1337,10 +1344,17 @@ static void apply_place( zstring const &place, DateTime *dt,
       if ( !itz || get_icu_offset( *itz, when, is_time, &dst ) != offset )
         continue;
       zstring const name( get_icu_short_name( *itz, dst, loc ) );
-      if ( !name.empty() ) {
+      if ( name.empty() )
+        continue;
+      //
+      // Several zones of a country may have the offset, e.g., Honolulu (HST)
+      // and Adak (HAST) for -10:00 in a US winter: prefer the default name if
+      // one of them has it.
+      //
+      if ( tz_name->empty() || name == default_name )
         *tz_name = name;
-        return;
-      }
+      if ( name == default_name )
+        break;
     }
   }
 #else
