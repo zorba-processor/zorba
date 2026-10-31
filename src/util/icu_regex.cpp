@@ -219,6 +219,8 @@ void convert_xquery_re( zstring const &xq_re, zstring *icu_re,
 
   bool in_backref = false;              // '\'[1-9][0-9]*
   unsigned backref_no = 0;              // 1-based
+  bool after_backref = false;           // current char follows a backref
+  int  closed_group = 0;                // previous char closed a (...)
 
   // capture subgroup: true = open; false = closed
   vector<bool> cap_sub;                 // 0-based
@@ -357,6 +359,7 @@ void convert_xquery_re( zstring const &xq_re, zstring *icu_re,
           throw INVALID_RE_EXCEPTION( xq_re, ZED( BadRegexEscape_3 ), c );
       }
     } else {
+      after_backref = in_backref;
       if ( in_backref ) {
         //
         // XQuery 3.0 F&O 5.6.1: The construct \N where N is a single digit is
@@ -471,6 +474,7 @@ void convert_xquery_re( zstring const &xq_re, zstring *icu_re,
                 goto unbalanced_char;
               cap_sub[ --cur_cap_sub ] = false;
             }
+            closed_group = 2;
           }
           break;
         case '*':
@@ -489,6 +493,19 @@ void convert_xquery_re( zstring const &xq_re, zstring *icu_re,
                 xq_re, ZED( BadQuantifierHere_3 ), c
               );
             got_quantifier = 2;
+            if ( (c == '*' || c == '+') && PEEK_C == '?' &&
+                 (closed_group || after_backref) ) {
+              //
+              // ICU compiles the reluctant quantifiers *? and +? without a
+              // check that an iteration consumed input, so a group or back-
+              // reference that can match the empty string makes the match
+              // loop forever, e.g., "(?:r?)*?r" (QT3 fn-matches-50, test
+              // p1030).  ICU's counted loops {0,}? and {1,}? have that check
+              // and match the same strings in the same order, so use them.
+              //
+              icu_re->append( c == '*' ? "{0,}" : "{1,}" );
+              goto next;
+            }
           }
           break;
         case '-':
@@ -642,6 +659,7 @@ void convert_xquery_re( zstring const &xq_re, zstring *icu_re,
 next:
     char_range_possible = !dec_limit( &in_char_range );
     dec_limit( &got_quantifier );
+    dec_limit( &closed_group );
     dec_limit( &char_group_start );
     prev_c_cooked = c_cooked;
   } // FOR_EACH
@@ -712,9 +730,8 @@ namespace unicode {
 
 //
 // Bound on the work ICU may do for one match operation, in ICU match-engine
-// steps (on the order of milliseconds each). Patterns with nested nullable
-// quantifiers, e.g. "(?:r?)*?r" (QT3 fn-matches-50, test p1030), otherwise
-// never return.
+// steps (on the order of milliseconds each), so that catastrophic
+// backtracking in a user pattern raises an error instead of hanging.
 //
 static int32_t const regex_time_limit = 10000;
 
