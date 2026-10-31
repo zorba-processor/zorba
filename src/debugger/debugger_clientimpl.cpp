@@ -468,7 +468,7 @@ DebuggerClientImpl::property_value(
   const std::string& aPropertyKey,
   const std::string& aPropertyAddress)
 {
-  std::size_t id = property_x("property_get", aPropertyLongName, aStackDepth, aContextId, aMaxDataSize);
+  std::size_t id = property_x("property_value", aPropertyLongName, aStackDepth, aContextId, aMaxDataSize);
   if (aDatapage >= 0)
     *theOutStream << " -p " << aDatapage;
   if (aPropertyKey != "")

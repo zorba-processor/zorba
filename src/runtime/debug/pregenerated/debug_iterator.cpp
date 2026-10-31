@@ -47,6 +47,8 @@ void DebugIterator::serialize(::zorba::serialization::Archiver& ar)
     ar & theDebuggerChildren;
     ar & theDebuggerParent;
     ar & theIsVarDeclaration;
+    ar & theAssignableVarIds;
+    ar & theAssignableVarIsLocal;
 }
 
 
