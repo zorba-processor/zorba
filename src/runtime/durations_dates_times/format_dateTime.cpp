@@ -959,6 +959,15 @@ static void parse_first_modifier( zstring const &picture_str,
     mod->first.zero = zero[0];
     j = u.base();
   } else {
+    if ( cp >= 0x80 ) {
+      //
+      // Ibid: an unsupported numbering sequence means a format token of 1.
+      // Skip the whole UTF-8 character, not just its first byte (the rest
+      // was then decoded as invalid UTF-8, a ZXQP0003 found by fuzzing).
+      //
+      mod->first.type = modifier::arabic;
+      j = (++u).base();
+    } else
     switch ( *j++ ) {
       case 'A':
         mod->first.type = modifier::ALPHA;
