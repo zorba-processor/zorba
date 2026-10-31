@@ -600,27 +600,27 @@ xs_double Duration::getTotalSeconds() const
 {
   return (is_negative ?
       numeric_consts<xs_double>::neg_one() : numeric_consts<xs_double>::one())
-      * ((((((((xs_double(data[YEAR_DATA]) * 12
+      * (((((((((xs_double(data[YEAR_DATA]) * 12
       + xs_double(data[MONTH_DATA])) * 30)
       + xs_double(data[DAY_DATA])) * 24)
       + xs_double(data[HOUR_DATA])) * 60)
       + xs_double(data[MINUTE_DATA])) * 60)
       + xs_double(data[SECONDS_DATA])
-      + xs_double(double(data[FRACSECONDS_DATA]) / FRAC_SECONDS_UPPER_LIMIT);
+      + xs_double(double(data[FRACSECONDS_DATA]) / FRAC_SECONDS_UPPER_LIMIT));
 }
 
 
 long Duration::getTotalMilliseconds() const
 {
   return (is_negative? -1 : 1)
-      * (((((((((data[YEAR_DATA] * 12
+      * ((((((((((data[YEAR_DATA] * 12
         + data[MONTH_DATA]) * 30)
         + data[DAY_DATA]) * 24)
         + data[HOUR_DATA]) * 60)
         + data[MINUTE_DATA]) * 60)
         + data[SECONDS_DATA])
       * 1000
-      + round(data[FRACSECONDS_DATA]/(FRAC_SECONDS_UPPER_LIMIT / 1000.0));
+      + round(data[FRACSECONDS_DATA]/(FRAC_SECONDS_UPPER_LIMIT / 1000.0)));
 }
 
 
