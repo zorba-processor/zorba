@@ -4,7 +4,7 @@
 #
 # Xerces-C is built from the zorba-processor fork (tag pinned to a commit)
 # instead of the distribution package: stock Xerces-C <= 3.3.0 rejects valid
-# schemas that restrict a union type (see KNOWN_ISSUES.txt). It is built in
+# schemas that restrict a union type (see doc/KNOWN_ISSUES.txt). It is built in
 # the layer it is installed in, against the image's own ICU and curl, and
 # only its headers and libraries are kept, in /usr/local.
 ARG BASE=ubuntu:24.04

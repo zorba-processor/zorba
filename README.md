@@ -35,7 +35,7 @@ CMake 3.28+, Ninja, ICU, libxml2, libcurl, and Xerces-C 3.2+ for XML Schema
 support. libxslt is optional (XQueryX).
 Stock Xerces-C (3.3.0 and earlier) rejects some valid schemas that restrict
 a union type; the Linux CI and container images build Xerces-C from a patched
-fork, see `KNOWN_ISSUES.txt`.
+fork, see `doc/KNOWN_ISSUES.txt`.
 
 CI builds and tests Linux x86_64 (GCC and Clang), Linux arm64, and macOS
 arm64. macOS x86_64 should build but is not tested in CI. Windows is not
@@ -81,7 +81,7 @@ are parsed as `xs:decimal`. The `bigint` preset
 (`ZORBA_WITH_BIG_INTEGER=ON`) makes `xs:integer` arbitrary precision instead,
 using the bundled MAPM library that already backs `xs:decimal`. MAPM keeps
 static working buffers and is not thread-safe, so do not run queries
-concurrently in one process with that build (see `KNOWN_ISSUES.txt`).
+concurrently in one process with that build (see `doc/KNOWN_ISSUES.txt`).
 
 `docker/builder` (Ubuntu 24.04) and `docker/builder-latest` (Arch Linux,
 latest toolchain and libraries) provide ready-made build environments.
@@ -104,7 +104,7 @@ ctest --preset full-release -j8
 `docker/test-with-http-server.sh` runs the whole suite in a builder container
 against that server.
 
-## Documentation
+## Source documentation
 
 Doxygen and XQDoc sources are in `doc/`.
 

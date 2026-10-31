@@ -121,7 +121,7 @@
     </foreign-notice>
   </foreign-files>
   <foreign-files>
-    <file>cmake_modules/FindBoost.cmake</file>
+    <file>cmake/modules/FindBoost.cmake</file>
     <copyright>
       2006-2008 Andreas Schneider &lt;mail@cynapses.org&gt;
       2007      Wengo
@@ -134,7 +134,7 @@
     </foreign-notice>
   </foreign-files>
   <foreign-files>
-    <file>cmake_modules/FindJNI.cmake</file>
+    <file>cmake/modules/FindJNI.cmake</file>
     <copyright>2001-2009 Kitware, Inc.</copyright>
     <foreign-notice>
       Distributed under the OSI-approved BSD License (the "License");

@@ -48,7 +48,7 @@ SET(Zorba_INCLUDE_DIRS "${CMAKE_SOURCE_DIR}/include"
                        "${CMAKE_BINARY_DIR}/include"
 )
 SET(Zorba_LIBRARY_DIRS "${CMAKE_BINARY_DIR}/src")
-SET(Zorba_CMAKE_MODULES_DIR "${CMAKE_SOURCE_DIR}/cmake_modules")
+SET(Zorba_CMAKE_MODULES_DIR "${CMAKE_SOURCE_DIR}/cmake/modules")
 SET(Zorba_USE_FILE     "${CMAKE_CURRENT_SOURCE_DIR}/ZorbaUse.cmake")
 ZORBA_TARGET_LOCATION(Zorba_TESTDRIVER testdriver)
 
