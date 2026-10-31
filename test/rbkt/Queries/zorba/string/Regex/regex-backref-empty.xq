@@ -14,5 +14,5 @@ matches("abab", "^(ab)\1$"),
 matches("abac", "^(ab)\1$"),
 replace("xa", "(?:(b)|x)a\1", "[$1]"),
 string-join(tokenize("1-2--3", "(x)?-\1"), "|"),
-string-join(analyze-string("cab", "(c)?(a)b\1")//fn:group/@nr, "|"),
+string-join(analyze-string("cab", "(c)?(a)b\1")//fn:group/@nr/string(), "|"),
 string(analyze-string("cab", "(c)?(a)b\1")/fn:match)
