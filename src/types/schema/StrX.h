@@ -30,6 +30,7 @@
 
 #include <xercesc/util/XercesDefs.hpp>
 #include <xercesc/util/XMLString.hpp>
+#include "zorbatypes/xerces_xmlcharray.h"
 
 #ifdef __GNUC__
 #  pragma GCC diagnostic warning "-Wctor-dtor-privacy"
@@ -54,21 +55,19 @@ namespace zorba
 
 // ---------------------------------------------------------------------------
 //  This is a simple class that lets us do easy (though not terribly efficient)
-//  trancoding of XMLCh data to local code page for display.
+//  transcoding of XMLCh data to UTF-8 for display.
 // ---------------------------------------------------------------------------
 class StrX
 {
 public :
   StrX(const XMLCh* const toTranscode, unsigned int length)
-    : theLocalForm(0)
+    : theLocalForm(xerces_utf8::to_utf8(toTranscode, length))
   {
-    XERCES_CPP_NAMESPACE::XMLString::transcode(toTranscode, theLocalForm, length);
   }
 
   StrX(const XMLCh* const toTranscode)
   {
-    // Call the private transcoding method
-    theLocalForm = XERCES_CPP_NAMESPACE::XMLString::transcode(toTranscode);
+    theLocalForm = xerces_utf8::to_utf8(toTranscode);
   }
 
   ~StrX()
@@ -94,7 +93,7 @@ private :
   //  Private data members
   //
   //  fLocalForm
-  //      This is the local code page form of the string.
+  //      This is the UTF-8 form of the string (not the locale's code page).
   // -----------------------------------------------------------------------
   char* theLocalForm;
 };

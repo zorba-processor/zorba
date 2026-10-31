@@ -92,7 +92,7 @@ const char* Schema::XSD_NAMESPACE = static_context::W3C_XML_SCHEMA_NS;
 
 static void transcode(const XMLCh* const str, zstring& res)
 {
-  char* trStr = XMLString::transcode(str);
+  char* trStr = xerces_utf8::to_utf8(str);
   res = zstring(trStr);
   XMLString::release(&trStr);
 }
@@ -292,7 +292,7 @@ private:
               (lStream->getStream(), lStream->getStreamReleaser());
           lStream->setStreamReleaser(nullptr);
           
-          XMLCh * lResolvedXMLCh = XMLString::transcode(lResolved.c_str());
+          XMLCh * lResolvedXMLCh = xerces_utf8::from_utf8(lResolved.c_str());
           if (isSystemId)
             lRetval->setSystemId(lResolvedXMLCh);
           
@@ -344,7 +344,7 @@ public:
     theStreamReleaser = aStreamResource->getStreamReleaser();
     aStreamResource->setStreamReleaser(nullptr);
     // Take memory ownership of the translated system ID
-    thePhysicalURI = XERCES_CPP_NAMESPACE::XMLString::transcode
+    thePhysicalURI = xerces_utf8::from_utf8
       (aStreamResource->getStreamUrl().c_str());
   }
 
