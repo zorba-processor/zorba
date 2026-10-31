@@ -90,6 +90,40 @@
 
 namespace zorba {
 
+namespace {
+
+/*******************************************************************************
+  The wrapper over the subplan of an argument of a (non-dynamic) UDF call that
+  is bound to the param var(s) of the body. Its reset() does nothing.
+
+  The body resets its param vars, and with them their source (this wrapper),
+  whenever the body plan is reset, which happens only when the call iterator
+  is reset. The call iterator resets its argument subplans itself (see
+  NaryBaseIterator::resetImpl), so resetting them through the body as well
+  walked every argument subplan twice per reset. An argument subplan contains
+  the calls nested in the argument (f(g(h($x)))), whose resets in turn reset
+  their own arguments twice: the work doubled at every level of nesting and
+  of recursion.
+
+  Dynamic calls (function items) keep a plain wrapper: their call iterator
+  does not reset its arguments.
+********************************************************************************/
+class UDFArgWrapper : public PlanIteratorWrapper
+{
+public:
+  UDFArgWrapper(const PlanIterator* iter, PlanState& planState)
+    : PlanIteratorWrapper(iter, planState, true)
+  {
+  }
+
+  void reset() {}
+
+  void resetArg() { PlanIteratorWrapper::reset(); }
+};
+
+} // namespace
+
+
 SERIALIZABLE_CLASS_VERSIONS(UDFunctionCallIterator)
 
 SERIALIZABLE_CLASS_VERSIONS(ExtFunctionCallIterator)
@@ -406,7 +440,12 @@ void UDFunctionCallIterator::openImpl(PlanState& planState, uint32_t& offset)
     if (!argVarRefs.empty())
     {
       if ((*argWrapsIte) == NULL)
-        (*argWrapsIte) = new PlanIteratorWrapper((*argsIte), planState, true);
+      {
+        if (theIsDynamic)
+          (*argWrapsIte) = new PlanIteratorWrapper((*argsIte), planState, true);
+        else
+          (*argWrapsIte) = new UDFArgWrapper((*argsIte), planState);
+      }
 
       // Cannot do the arg bind here because the state->thePlan has not been
       // opened yet, and as a result, state->thePlanState has not been
@@ -680,7 +719,12 @@ void UDFunctionCallIterator::bindArguments(UDFunctionCallIteratorState* aState, 
       {
         lArgWrapper = lArgWraps[i];
         if (aReset)
-          lArgWrapper->reset();
+        {
+          if (theIsDynamic)
+            lArgWrapper->reset();
+          else
+            static_cast<UDFArgWrapper*>(lArgWrapper.getp())->resetArg();
+        }
       }
 
       ArgVarRefs::const_iterator lArgVarRefsIte = lArgVarRefs.begin();
