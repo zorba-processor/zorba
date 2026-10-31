@@ -3,4 +3,4 @@
 - `README.txt` and `Readme.md` merged into `README.md`.
 
 ### Removed
-- Unused `WIN32.cpack`, `zorba_install.nsi`, `binding.gyp`, `package.json`, `example.js`, the Node.js binding headers `include/QueryManager.h`, `include/NodeDiagnosticHandler.h` and `include/helpers.h`, the empty `CPack.cmake` stub and the stale `README.txt`.
+- Unused `WIN32.cpack`, `zorba_install.nsi`, the empty `CPack.cmake` stub and the stale `README.txt`.
