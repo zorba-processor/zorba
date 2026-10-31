@@ -395,6 +395,8 @@ public:
   */
   bool run(QueryResources* root, std::vector<QueryResources_t>& garbage)
   {
+    ++QueryResources::theNumWalks;
+
     theIsBuilding = true;
 
     Node* rootNode = getNode(RESOURCES, root);

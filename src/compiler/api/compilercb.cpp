@@ -208,6 +208,23 @@ void CompilerCB::addAnonymousUDF(user_function* udf)
 /*******************************************************************************
   class QueryResources (collectCycles() is in runtime/hof/function_item.cpp)
 ********************************************************************************/
+std::atomic<long> QueryResources::theNumAlive(0);
+
+std::atomic<unsigned long> QueryResources::theNumWalks(0);
+
+
+long query_resources_alive()
+{
+  return QueryResources::theNumAlive.load();
+}
+
+
+unsigned long query_resources_walks()
+{
+  return QueryResources::theNumWalks.load();
+}
+
+
 QueryResources::QueryResources()
   :
   theCCB(NULL),
@@ -218,6 +235,7 @@ QueryResources::QueryResources()
 #endif
   theIsDetached(false)
 {
+  ++theNumAlive;
 }
 
 
@@ -228,6 +246,8 @@ QueryResources::~QueryResources()
   // The parents may now be reachable only through cycles.
   release(theParent);
   release(theDctxParent);
+
+  --theNumAlive;
 }
 
 

@@ -17,6 +17,7 @@
 #ifndef ZORBA_COMPILER_API_COMPILERCB
 #define ZORBA_COMPILER_API_COMPILERCB
 
+#include <atomic>
 #include <vector>
 #include <map>
 
@@ -124,6 +125,12 @@ protected:
   bool                           theIsDetached;
 
 public:
+  // For tests: the number of QueryResources objs alive, and the number of
+  // graphs walked by collectCycles().
+  static std::atomic<long>          theNumAlive;
+  static std::atomic<unsigned long> theNumWalks;
+
+public:
   QueryResources();
 
   ~QueryResources();
@@ -168,6 +175,13 @@ private:
 };
 
 typedef rchandle<QueryResources> QueryResources_t;
+
+
+// For tests (test/api/function_item_lifetime.cpp): see
+// QueryResources::theNumAlive and QueryResources::theNumWalks.
+ZORBA_DLL_PUBLIC long query_resources_alive();
+
+ZORBA_DLL_PUBLIC unsigned long query_resources_walks();
 
 
 /*******************************************************************************
