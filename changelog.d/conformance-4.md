@@ -10,5 +10,5 @@
 
 - Regular expressions: a reluctant quantifier (`*?`, `+?`) on a group or back-reference that can match the empty string no longer loops until the time limit (QT3 fn-matches-50, `"(?:r?)*?r"`), also without ICU.
 - `fn:format-date`, `fn:format-dateTime` and `fn:format-time`: `[Z]`, `[z]` and `[ZN]` output nothing for a value without a timezone (`[ZZ]` still gives `J`); `[ZN]` uses the timezone abbreviation for an Olson name or country code in `$place` (CDT for -05:00 in a US summer) and knows HST and IST.
-- `fn:format-number` formats `xs:decimal` and `xs:integer` values exactly instead of through `xs:double`, and `xs:double` values through their shortest digits (`format-number(1E25, '#')` gave rounding noise).
+- `fn:format-number` formats `xs:decimal` and `xs:integer` values exactly instead of through `xs:double` (`format-number(xs:decimal("79228162514264337593543950335"), "0%")` gave `7922816251426434000000000000000%`).
 - `fn:lower-case` maps a word-final capital sigma to the final sigma U+03C2 (Unicode Final_Sigma; needs ICU).
