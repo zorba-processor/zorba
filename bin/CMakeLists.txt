@@ -93,9 +93,10 @@ ZORBA_SET_TEST_PROPERTY(bin/zorba_max_expr_depth PASS_REGULAR_EXPRESSION ".*ZXQP
 # --network-prefix, --private-addresses. Each capability is shown denied and
 # permitted. The queries in test/security print a marker on success. A policy
 # denial is reported with the error code the failing function documents
-# (FODC0002 for fn:doc, FODC0006 for an external entity, FOFL9999 for the file
-# module, XQST0059 for an import) and the message "access denied by security
-# policy (requires capability X)"; a module import refused for lack of a
+# (FODC0002 for fn:doc, FOFL9999 for the file module, XQST0059 for an import)
+# and the message "access denied by security policy (requires capability X)";
+# a refused external entity is reported as FODC0006 by fn:parse-xml with
+# "URI access not allowed"; a module import refused for lack of a
 # capability raises ZXQP0067. ZORBA_SECURITY_DENIED matches the code together
 # with the phrase, so a permitted access that fails for another reason (e.g. a
 # refused connection, also FODC0002) does not pass as a denial. The network
@@ -143,9 +144,9 @@ ZORBA_SECURITY_TEST(read_path_warning "warning: --read-path has no effect"
 # external-entities
 ZORBA_SECURITY_TEST(xxe_default "cli-secret"
   -f -q "${_secdir}/xxe.xq" -e "dir:=${_secdir}")
-ZORBA_SECURITY_DENIED(xxe_deny FODC0006 "access denied by security policy"
+ZORBA_SECURITY_DENIED(xxe_deny FODC0006 "URI access not allowed"
   --deny external-entities -f -q "${_secdir}/xxe.xq" -e "dir:=${_secdir}")
-ZORBA_SECURITY_DENIED(xxe_secure FODC0006 "access denied by security policy"
+ZORBA_SECURITY_DENIED(xxe_secure FODC0006 "URI access not allowed"
   --secure -f -q "${_secdir}/xxe.xq" -e "dir:=${_secdir}")
 ZORBA_SECURITY_TEST(xxe_secure_allow "cli-secret"
   --secure --allow external-entities,file-read
