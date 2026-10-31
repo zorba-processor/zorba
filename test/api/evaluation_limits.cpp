@@ -153,9 +153,12 @@ const char ENDLESS_EVAL[] =
   "import module namespace r = \"http://zorba.io/modules/reflection\";\n"
   "r:eval(\"(1 to 9223372036854775807)[. lt 0]\")";
 
-// A finite query that takes some time (well over 50 ms on any machine).
+// A finite query that takes some time (well over 50 ms on any machine). It
+// runs 8 times, and its cost depends a lot on the build: with
+// ZORBA_WITH_BIG_INTEGER, 5000000 items took 4.5 s per run on a CI runner,
+// which together with the other cases ran into the 60 s ctest timeout.
 const char SLOW[] =
-  "declare variable $max as xs:integer external := 5000000;\n"
+  "declare variable $max as xs:integer external := 1000000;\n"
   "count((1 to $max)[. mod 2 eq 0])";
 
 const char DEPTH[] =
@@ -223,9 +226,12 @@ void test_set_timeout_override(Zorba* z)
   SecurityPolicy p = SecurityPolicy::unrestricted().setTimeout(milliseconds(50));
   q = z->compileQuery(SLOW, context(z, p));
   q->setTimeout(0);
-  CHECK(succeeded_with(execute(q), "2500000"));
+  CHECK(succeeded_with(execute(q), "500000"));
 
-  // -1 restores the policy timeout.
+  // -1 restores the policy timeout. (On a query that never ends, so that
+  // the check does not depend on how fast SLOW runs.)
+  q = z->compileQuery(ENDLESS, context(z, p));
+  q->setTimeout(0);
   q->setTimeout(-1);
   CHECK(failed_with(execute(q), "ZXQP0068"));
 }
@@ -235,7 +241,7 @@ void test_no_timeout_by_default(Zorba* z)
   CHECK(SecurityPolicy::secure().getTimeout() == milliseconds(0));
   CHECK(SecurityPolicy::unrestricted().getTimeout() == milliseconds(0));
   CHECK(succeeded_with(run(z, SecurityPolicy::unrestricted(), SLOW),
-                       "2500000"));
+                       "500000"));
 }
 
 // Reports the cost of the deadline checks: the same query with no timeout
@@ -309,9 +315,20 @@ void test_stack_guard(Zorba* z)
   CHECK(failed_with(o, "ZXQP0069"));
   CHECK(o.message.find("stack") != std::string::npos);
 
+  // The default limit must be reachable before the stack runs out.
+  CHECK(succeeded_with(run(z, p, depth_query(1024)), "1024"));
+
+  // Each failing run recurses until the guard fires, which is slow in some
+  // builds: double from the default limit until a run fails, then bisect
+  // only to within 1%.
   std::cout << "  measuring" << std::endl;
-  uint64_t lo = 1, hi = 100000000;
-  while (lo + 1 < hi)
+  uint64_t lo = 1024, hi = 2048;
+  while (hi < 100000000 && run(z, p, depth_query(hi)).ok)
+  {
+    lo = hi;
+    hi *= 2;
+  }
+  while (hi - lo > lo / 100)
   {
     uint64_t const mid = lo + (hi - lo) / 2;
     if (run(z, p, depth_query(mid)).ok)
@@ -320,9 +337,18 @@ void test_stack_guard(Zorba* z)
       hi = mid;
   }
   std::cout << "stack guard: local:depth() reaches depth " << lo
-            << " with an unlimited call depth" << std::endl;
-  // The default limit must be reachable before the stack runs out.
-  CHECK(lo >= 1024);
+            << " (within 1%) with an unlimited call depth" << std::endl;
+}
+
+// Runs one group of checks and reports how long it took, so that a test
+// that gets close to the ctest timeout shows where the time goes.
+void section(Zorba* z, const char* aName, void (*aTest)(Zorba*))
+{
+  std::cout << aName << std::endl;
+  steady_clock::time_point const start = steady_clock::now();
+  aTest(z);
+  std::cout << aName << ": " << std::chrono::duration_cast<milliseconds>(
+      steady_clock::now() - start).count() << " ms" << std::endl;
 }
 
 } // anonymous namespace
@@ -336,18 +362,12 @@ evaluation_limits(int argc, char* argv[])
 
   try
   {
-    std::cout << "test_timeout" << std::endl;
-    test_timeout(lZorba);
-    std::cout << "test_set_timeout_override" << std::endl;
-    test_set_timeout_override(lZorba);
-    std::cout << "test_no_timeout_by_default" << std::endl;
-    test_no_timeout_by_default(lZorba);
-    std::cout << "report_timeout_overhead" << std::endl;
-    report_timeout_overhead(lZorba);
-    std::cout << "test_call_depth" << std::endl;
-    test_call_depth(lZorba);
-    std::cout << "test_stack_guard" << std::endl;
-    test_stack_guard(lZorba);
+    section(lZorba, "test_timeout", test_timeout);
+    section(lZorba, "test_set_timeout_override", test_set_timeout_override);
+    section(lZorba, "test_no_timeout_by_default", test_no_timeout_by_default);
+    section(lZorba, "report_timeout_overhead", report_timeout_overhead);
+    section(lZorba, "test_call_depth", test_call_depth);
+    section(lZorba, "test_stack_guard", test_stack_guard);
   }
   catch (ZorbaException const& e)
   {
