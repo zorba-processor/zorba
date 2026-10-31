@@ -24,6 +24,8 @@ code:
   - 'CTest*'
   - 'CPack*'
   - '.github/workflows/ci.yml'
+  - '.github/workflows/images.yml'
+  - '.github/actions/**'
   - '.github/ci-filters.yml'
 
 # Build system, toolchain image and CI definition: every profile.
@@ -41,6 +43,7 @@ build: &build
   - 'include/zorba/config.h.cmake'
   - 'scripts/profile-size.sh'
   - '.github/workflows/ci.yml'
+  - '.github/actions/**'
   - '.github/ci-filters.yml'
   - 'scripts/check-profile-filters.sh'
   # Generators of the *pregenerated* sources (they contain the guards).

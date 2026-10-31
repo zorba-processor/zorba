@@ -136,36 +136,39 @@ jobs:
             runner: ubuntu-24.04
             builder: docker/builder-latest
             cache: linux-amd64-latest
+            suffix: ''
             cc: gcc
             cxx: g++
           - name: linux-arm64 (Ubuntu 24.04)
             runner: ubuntu-24.04-arm
             builder: docker/builder
             cache: linux-arm64-ubuntu
+            suffix: -arm64
             cc: gcc
             cxx: g++
           - name: linux-amd64-clang (Arch, Clang + libstdc++)
             runner: ubuntu-24.04
             builder: docker/builder-latest
             cache: linux-amd64-clang
+            suffix: ''
             cc: clang
             cxx: clang++
     steps:
       - uses: actions/checkout@v7
         if: needs.changes.outputs.code == 'true'
 
-      - uses: docker/setup-buildx-action@v4
-        if: needs.changes.outputs.code == 'true'
-
-      - name: Build the builder image
-        uses: docker/build-push-action@v7
+      - name: Builder image
+        uses: ./.github/actions/builder-image
         if: needs.changes.outputs.code == 'true'
         with:
           context: ${{ matrix.builder }}
-          load: true
-          tags: zorba-builder:ci
-          cache-from: type=gha,scope=builder-${{ matrix.cache }}
-          cache-to: type=gha,mode=max,scope=builder-${{ matrix.cache }}
+          suffix: ${{ matrix.suffix }}
+          cache-scope: ${{ matrix.cache }}
+
+      # The HTTP test server image needs buildx even when the builder image
+      # was pulled.
+      - uses: docker/setup-buildx-action@v4
+        if: needs.changes.outputs.code == 'true'
 
       - name: Build the HTTP test server image
         uses: docker/build-push-action@v7
@@ -266,16 +269,11 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: docker/setup-buildx-action@v4
-
-      - name: Build the builder image
-        uses: docker/build-push-action@v7
+      - name: Builder image
+        uses: ./.github/actions/builder-image
         with:
           context: docker/builder-latest
-          load: true
-          tags: zorba-builder:ci
-          cache-from: type=gha,scope=builder-linux-amd64-latest
-          cache-to: type=gha,mode=max,scope=builder-linux-amd64-latest
+          cache-scope: linux-amd64-latest
 
       - uses: actions/cache@v6
         with:
