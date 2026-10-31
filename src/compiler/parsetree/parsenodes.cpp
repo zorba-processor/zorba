@@ -29,6 +29,7 @@
 #include "compiler/parsetree/parsenodes.h"
 #include "compiler/parser/parse_constants.h"
 #include "compiler/parsetree/parsenode_visitor.h"
+#include "runtime/util/stack_limit.h"
 #include "zorbatypes/integer.h"
 
 #include <iostream>
@@ -49,6 +50,24 @@ namespace zorba
 
 int dummy;
 void *parsenode_visitor::no_state = (void *) &dummy;
+
+
+void parsenode_visitor::depthExceeded(const QueryLoc& loc, bool aStack)
+{
+  --theDepth;
+  if (aStack)
+    RAISE_ERROR(zerr::ZXQP0070_EXPR_DEPTH_EXCEEDED, loc,
+      ERROR_PARAMS(ZED(ZXQP0070_Stack_2), theDepth + 1));
+  RAISE_ERROR(zerr::ZXQP0070_EXPR_DEPTH_EXCEEDED, loc,
+    ERROR_PARAMS(ZED(ZXQP0070_Limit_2), theMaxDepth));
+}
+
+
+void parsenode_visitor::checkStack(const QueryLoc& loc)
+{
+  if (stack_limit::exhausted())
+    depthExceeded(loc, true);
+}
 
 
 /*******************************************************************************
@@ -91,7 +110,8 @@ std::ostringstream __oss;
 #define OUTDENT     std::string(printdepth--, ' ')
 #define UNDENT      printdepth--
 
-#define BEGIN_VISITOR() void* visitor_state; if (NULL == (visitor_state = v.begin_visit(*this))) return
+#define DEPTH_GUARD() parsenode_visitor::DepthGuard depth_guard(v, get_location())
+#define BEGIN_VISITOR() DEPTH_GUARD(); void* visitor_state; if (NULL == (visitor_state = v.begin_visit(*this))) return
 #define END_VISITOR() v.end_visit (*this, visitor_state)
 #define ACCEPT( m ) do { if ((m) != NULL) (m)->accept (v); } while (0)
 #define ACCEPT_CHK( m ) do { ZORBA_ASSERT ((m) != NULL);  (m)->accept (v); } while (0)
@@ -3025,6 +3045,7 @@ PathExpr::PathExpr(
 
 void PathExpr::accept( parsenode_visitor &v ) const
 {
+  DEPTH_GUARD();
   void* visitor_state = v.begin_visit(*this);
   if (visitor_state != parsenode_visitor::no_state)
     return;
@@ -3111,6 +3132,7 @@ int RelativePathExpr::is_jsoniq_literal() const
 
 void RelativePathExpr::accept( parsenode_visitor &v ) const
 {
+  DEPTH_GUARD();
   void* visitor_state = v.begin_visit(*this);
 
   if (visitor_state == NULL)

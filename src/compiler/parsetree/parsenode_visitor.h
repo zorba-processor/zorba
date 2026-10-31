@@ -17,6 +17,8 @@
 #ifndef ZORBA_PARSENODE_VISITOR_H
 #define ZORBA_PARSENODE_VISITOR_H
 
+#include <cstdint>
+
 #include "common/shared_types.h"
 
 // Any file that includes parsenode_visitor.h will need to access the
@@ -35,10 +37,55 @@ namespace zorba
 
 class parsenode_visitor
 {
+private:
+  uint32_t theDepth = 0;
+  uint32_t theMaxDepth = 0;
+
 public:
   virtual ~parsenode_visitor() { }
 
   static void *no_state;
+
+  /**
+   * Sets the maximum nesting depth of the parse tree that this visitor
+   * accepts; 0 means no limit. A deeper node raises zerr:ZXQP0070 when it is
+   * visited. The translator sets the limit of the security policy, so all
+   * later compilation passes (which recurse over the expression tree) only
+   * ever see bounded trees.
+   */
+  void setMaxDepth(uint32_t aMaxDepth) { theMaxDepth = aMaxDepth; }
+
+  /**
+   * Counts the nesting depth of the node being visited. Every accept()
+   * creates one before it calls begin_visit(). Besides the depth limit, it
+   * refuses to go deeper when the thread's stack is nearly exhausted, so a
+   * visitor never overflows the stack, whatever the limit.
+   */
+  class DepthGuard
+  {
+    parsenode_visitor& theVisitor;
+
+  public:
+    DepthGuard(parsenode_visitor& v, const QueryLoc& loc) : theVisitor(v)
+    {
+      if (++v.theDepth > v.theMaxDepth && v.theMaxDepth != 0)
+        v.depthExceeded(loc, false);
+      v.checkStack(loc);
+    }
+
+    ~DepthGuard() { --theVisitor.theDepth; }
+
+    DepthGuard(const DepthGuard&) = delete;
+    DepthGuard& operator=(const DepthGuard&) = delete;
+  };
+
+private:
+  // Both restore theDepth before they throw (the guard's destructor does not
+  // run when its constructor throws).
+  [[noreturn]] void depthExceeded(const QueryLoc& loc, bool aStack);
+  void checkStack(const QueryLoc& loc);
+
+public:
 
 # define DECL_PARSENODE_VISITOR_VISIT_MEM_FNS( NODE )           \
   virtual void* begin_visit( NODE const& ) = 0;                 \

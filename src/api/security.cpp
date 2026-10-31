@@ -45,6 +45,11 @@ const uint32_t FILE_CAPABILITIES =
 // Same default as Properties::max_udf_call_depth.
 const uint32_t DEFAULT_MAX_CALL_DEPTH = 1024;
 
+// Maximum nesting depth of a query's parse tree. Compilation recurses over
+// the tree in several passes; this bounds their stack use (see
+// SecurityPolicy::setMaxExprDepth()).
+const uint32_t DEFAULT_MAX_EXPR_DEPTH = 5000;
+
 typedef bool (*covers_fn)(const std::string&, const std::string&);
 
 bool is_separator(char c)
@@ -166,6 +171,7 @@ public:
   bool                      theAllowPrivateAddresses = false;
   std::chrono::milliseconds theTimeout{0};
   uint32_t                  theMaxCallDepth = DEFAULT_MAX_CALL_DEPTH;
+  uint32_t                  theMaxExprDepth = DEFAULT_MAX_EXPR_DEPTH;
   uint32_t                  theMaxEntityAmplification = 0;
 };
 
@@ -388,6 +394,19 @@ uint32_t SecurityPolicy::getMaxCallDepth() const
 }
 
 
+SecurityPolicy& SecurityPolicy::setMaxExprDepth(uint32_t aDepth)
+{
+  theImpl->theMaxExprDepth = aDepth;
+  return *this;
+}
+
+
+uint32_t SecurityPolicy::getMaxExprDepth() const
+{
+  return theImpl->theMaxExprDepth;
+}
+
+
 SecurityPolicy& SecurityPolicy::setMaxEntityAmplification(uint32_t aFactor)
 {
   theImpl->theMaxEntityAmplification = aFactor;
@@ -421,6 +440,7 @@ SecurityPolicy SecurityPolicy::narrowedBy(const SecurityPolicy& aOther) const
     r.theTimeout = std::min(a.theTimeout, b.theTimeout);
 
   r.theMaxCallDepth = min_limit(a.theMaxCallDepth, b.theMaxCallDepth);
+  r.theMaxExprDepth = min_limit(a.theMaxExprDepth, b.theMaxExprDepth);
   r.theMaxEntityAmplification =
     min_limit(a.theMaxEntityAmplification, b.theMaxEntityAmplification);
 
@@ -450,6 +470,7 @@ bool SecurityPolicy::operator==(const SecurityPolicy& aOther) const
          a.theAllowPrivateAddresses == b.theAllowPrivateAddresses &&
          a.theTimeout == b.theTimeout &&
          a.theMaxCallDepth == b.theMaxCallDepth &&
+         a.theMaxExprDepth == b.theMaxExprDepth &&
          a.theMaxEntityAmplification == b.theMaxEntityAmplification &&
          minimize(a.theReadPaths, dir_covers) ==
            minimize(b.theReadPaths, dir_covers) &&

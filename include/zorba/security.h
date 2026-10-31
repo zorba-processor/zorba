@@ -109,7 +109,8 @@ public:
   /**
    * \brief The secure policy: no capability, no allow-list entries, private
    *        network addresses denied, no timeout, call depth limited to
-   *        1024, libxml2's default entity amplification limit.
+   *        1024, expression nesting depth limited to 5000, libxml2's
+   *        default entity amplification limit.
    *
    * This will be the library default in Zorba 5.0.0.
    */
@@ -118,11 +119,13 @@ public:
   /**
    * \brief The unrestricted policy: all capabilities, no allow-lists, private
    *        network addresses allowed, no timeout, call depth limited to 1024,
-   *        libxml2's default entity amplification limit.
+   *        expression nesting depth limited to 5000, libxml2's default
+   *        entity amplification limit.
    *
    * This is the policy of the \c zorba command-line tool and the current
-   * library default. The call depth limit is kept so that runaway recursion
-   * still raises an error instead of overflowing the stack.
+   * library default. The call depth and expression nesting limits are kept
+   * so that runaway recursion and pathologically nested queries still raise
+   * an error instead of overflowing the stack.
    *
    * In builds without file access (ZORBA_WITH_FILE_ACCESS off),
    * Capability::FileRead and Capability::FileWrite are not included.
@@ -315,6 +318,28 @@ public:
 
   /** \brief Returns the maximum call depth; zero means no limit. */
   uint32_t getMaxCallDepth() const;
+
+  /**
+   * \brief Sets the maximum nesting depth of expressions in a query.
+   *
+   * The depth is that of the query's syntax tree: each operand of a binary
+   * operator in a chain (<code>1 + 1 + 1</code>), each parenthesized,
+   * function call, constructor or FLWOR nesting level adds one or more
+   * levels. A query (or imported module, or eval'ed query) that nests
+   * deeper fails to compile with zerr:ZXQP0070. So does a query whose
+   * syntax tree, while it is translated, takes the thread's stack below a
+   * third of its size (e.g. eval called from deep recursion).
+   *
+   * Compilation recurses over the query in several passes, so the limit
+   * bounds the stack they use. The default (5000) suits threads with the
+   * usual 8 MiB stack; lower it for threads with small stacks. Zero means no
+   * limit other than the stack check. Default: 5000.
+   */
+  SecurityPolicy& setMaxExprDepth(uint32_t aDepth);
+
+  /** \brief Returns the maximum expression nesting depth; zero means no
+   *         limit. */
+  uint32_t getMaxExprDepth() const;
 
   /**
    * \brief Sets the maximum entity amplification factor of the XML parser.

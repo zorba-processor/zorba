@@ -529,6 +529,7 @@ extern entry const dict_en[] = {
   { "zerr:ZXQP0067", "\"$1\": requires capability \"$2\"" },
   { "zerr:ZXQP0068", "query timeout exceeded${: 1}" },
   { "zerr:ZXQP0069", "$1" },
+  { "zerr:ZXQP0070", "$1" },
 #if !defined(ZORBA_NO_FULL_TEXT)
   { "zerr:ZXQP8401", "\"$1\": wrong WordNet file version; should be \"$2\"" },
 #endif
@@ -1094,6 +1095,8 @@ extern entry const dict_en[] = {
   { "~ZXQP0065_NO_ARGUMENTS", "function has no arguments" },
   { "~ZXQP0069_Limit_2", "maximum function call depth of $2 exceeded" },
   { "~ZXQP0069_Stack_2", "not enough stack space left for a function call at depth $2" },
+  { "~ZXQP0070_Limit_2", "maximum expression nesting depth of $2 exceeded" },
+  { "~ZXQP0070_Stack_2", "not enough stack space left to compile an expression nested $2 levels deep" },
   { "~ZeroLenURI", "zero-length URI (and no base URI given)" },
   { "~dynamic error", "dynamic error" },
   { "~dynamic warning", "dynamic warning" },
