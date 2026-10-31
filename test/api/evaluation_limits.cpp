@@ -43,6 +43,18 @@ static void segv_handler(int)
   static const char msg[] = "SIGSEGV backtrace (innermost 64):\n";
   ssize_t r = write(1, msg, sizeof msg - 1); (void)r;
   backtrace_symbols_fd(frames, n, 1);
+  // Resolve the first 16 frames (unsafe in a signal handler; diagnostics).
+  char** syms = backtrace_symbols(frames, n);
+  for (int i = 0; syms && i < n && i < 16; ++i)
+  {
+    std::string sym(syms[i]);
+    size_t lp = sym.find('('), plus = sym.find("(+"), rp = sym.find(')');
+    if (lp == std::string::npos || plus == std::string::npos || rp == std::string::npos)
+      continue;
+    std::string cmd = "addr2line -C -f -e " + sym.substr(0, lp) + " " +
+                      sym.substr(plus + 2, rp - plus - 2) + " | head -1";
+    int rc = system(cmd.c_str()); (void)rc;
+  }
   _exit(3);
 }
 static void install_segv_handler()
