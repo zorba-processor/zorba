@@ -1995,39 +1995,10 @@ bool str_down(
   }
   case store::XS_TOKEN:
   {
-    char ch;
-    zstring::size_type sz = strval.size();
-
-    ascii::trim_space(strval);
-
-    bool spaceSeen = false;
-
-    for (zstring::size_type i = 0; i < sz; ++i)
-    {
-      ch = strval[i];
-
-      if (ch == '\r' || ch == '\n' || ch == '\t')
-      {
-        strval[i] = ' ';
-        ch = ' ';
-      }
-
-      if (ch == ' ')
-      {
-        if (spaceSeen)
-        {
-          strval.erase(i, 1);
-          --i;
-          --sz;
-        }
-
-        spaceSeen = true;
-      }
-      else
-      {
-        spaceSeen = false;
-      }
-    }
+    // whiteSpace="collapse": tabs, line feeds and carriage returns become
+    // spaces, runs of spaces become one space, leading and trailing spaces
+    // are removed.
+    ascii::normalize_space(strval);
 
     factory->createToken(result, strval);
     return true;
