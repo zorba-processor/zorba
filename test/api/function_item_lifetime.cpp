@@ -20,7 +20,9 @@
 // must work (and must not touch freed memory; run under ASan to check).
 // Covers inline functions with and without closures, named UDF and builtin
 // function references, nested closures, partial application, function items
-// stored in prolog variables, and function items created by eval.
+// stored in prolog variables, function items created by eval, prolog
+// variables read by escaped function items, cached functions returning
+// function items, query clones, and StaticContext::loadProlog().
 
 #include <iostream>
 #include <string>
@@ -242,9 +244,7 @@ void test_returned_inner_closure(Zorba* z)
 }
 
 // A closure created by a second query that captures the first query's
-// function item outlives both queries. The item is captured through a local
-// variable: a function body reads prolog variables from the dynamic context
-// of the query that invokes it, not from that of the query that created it.
+// function item outlives both queries.
 void test_closure_over_function_item(Zorba* z)
 {
   Item lF = function_item(z, "function($x) { $x * 10 }");
@@ -331,6 +331,119 @@ void test_drop_without_use(Zorba* z)
   (void)lG;
 }
 
+// A function body reads the prolog variables of the query that created the
+// function item (XQuery 3.0: the non-local variable bindings of its defining
+// context), even after that query is closed, and even when the invoking query
+// declares a variable with the same name.
+void test_creator_globals(Zorba* z)
+{
+  Item lF = function_item(z,
+      "declare variable $k := 5;\n"
+      "function($x) { $x + $k }");
+  CHECK_EQ(apply(z, "$f(1)", lF), "6");
+  CHECK_EQ(apply(z, "declare variable $k := 100;\n$f(1)", lF), "6");
+  CHECK_EQ(invoke(z, lF, 2), "7");
+
+  Item lG = function_item(z,
+      "declare variable $k := 5;\n"
+      "declare function local:times($x) { $x * $k };\n"
+      "local:times#1");
+  CHECK_EQ(apply(z, "declare variable $k := 100;\n$f(2)", lG), "10");
+  CHECK_EQ(invoke(z, lG, 3), "15");
+
+  // A prolog variable holding another function item of the same query.
+  Item lH = function_item(z,
+      "declare variable $g := function($x) { $x * 2 };\n"
+      "function($y) { $g($y) + 1 }");
+  CHECK_EQ(apply(z,
+      "declare variable $g := function($x) { 0 };\n$f(5)", lH), "11");
+
+  // The function item is itself the value of the prolog variable it reads.
+  Item lI = function_item(z,
+      "declare variable $n := 3;\n"
+      "declare variable $g := function($x) { $x * $n };\n"
+      "$g");
+  CHECK_EQ(apply(z, "declare variable $n := 1000;\n$f(4)", lI), "12");
+}
+
+// %an:cache and %an:strictlydeterministic functions do not cache calls whose
+// arguments or results contain function items: the cache lives as long as
+// the query and would keep the items (and through them the query) alive.
+// LeakSanitizer reports the leak this would cause.
+void test_cached_function_items(Zorba* z)
+{
+  CHECK_EQ(to_string(run(z,
+      "declare namespace an = 'http://zorba.io/annotations';\n"
+      "declare %an:cache function local:mk($n as xs:integer) {\n"
+      "  function() { $n }\n"
+      "};\n"
+      "declare %an:strictlydeterministic function local:mk2($n as xs:integer) {\n"
+      "  function() { $n * 10 }\n"
+      "};\n"
+      "declare %an:cache function local:call($f) { $f() };\n"
+      "local:mk(1)(), local:mk(1)(), local:mk2(2)(), local:mk2(2)(),\n"
+      "local:call(function() { 7 })")), "1 1 20 20 7");
+
+  Item lF = function_item(z,
+      "declare namespace an = 'http://zorba.io/annotations';\n"
+      "declare %an:cache function local:mk($n as xs:integer) {\n"
+      "  function($x) { $x + $n }\n"
+      "};\n"
+      "local:mk(3)");
+  CHECK_EQ(apply(z, "$f(1)", lF), "4");
+}
+
+// A clone shares the plan of the original query, which points into the
+// original's compiler state; the clone keeps it alive.
+void test_clone(Zorba* z)
+{
+  XQuery_t lClone;
+  {
+    XQuery_t lOrig = z->compileQuery(
+        "declare function local:f($x) { $x * 3 };\n"
+        "let $k := 2\n"
+        "return local:f($k) + (function($y) { $y * $k })(5)");
+    lClone = lOrig->clone();
+    lOrig->close();
+  }
+  std::vector<Item> lItems;
+  {
+    Iterator_t lIter = lClone->iterator();
+    lItems = drain(lIter);
+  }
+  lClone->close();
+  CHECK_EQ(to_string(lItems), "16");
+}
+
+// The functions declared by StaticContext::loadProlog() are compiled lazily,
+// by the queries that call them, with the ccb of the internal query that
+// loaded the prolog; compiling local:f here reports a warning (caching a
+// non-deterministic function) to that ccb's diagnostics.
+void test_load_prolog_diagnostics(Zorba* z)
+{
+  StaticContext_t lSctx = z->createStaticContext();
+  Zorba_CompilerHints_t lHints;
+  lSctx->loadProlog(
+      "declare namespace an = 'http://zorba.io/annotations';\n"
+      "declare %an:cache %an:nondeterministic function local:g() { 1 };\n"
+      "declare function local:f() { local:g() + 1 };\n",
+      lHints);
+
+  Item lF;
+  {
+    XQuery_t lQuery = z->compileQuery("local:f#0", lSctx);
+    Iterator_t lIter = lQuery->iterator();
+    std::vector<Item> lItems = drain(lIter);
+    CHECK(lItems.size() == 1);
+    if (lItems.size() == 1)
+      lF = lItems[0];
+    lQuery->close();
+  }
+  CHECK_EQ(apply(z, "$f()", lF), "2");
+  lSctx = StaticContext_t();
+  CHECK_EQ(apply(z, "$f()", lF), "2");
+}
+
 typedef void (*test_fn)(Zorba*);
 
 struct test_case
@@ -361,6 +474,10 @@ function_item_lifetime(int argc, char* argv[])
     { "test_prolog_variable", test_prolog_variable },
     { "test_eval", test_eval },
     { "test_drop_without_use", test_drop_without_use },
+    { "test_creator_globals", test_creator_globals },
+    { "test_cached_function_items", test_cached_function_items },
+    { "test_clone", test_clone },
+    { "test_load_prolog_diagnostics", test_load_prolog_diagnostics },
   };
 
   for (test_case const& lTest : lTests)
