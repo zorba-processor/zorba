@@ -59,7 +59,7 @@ jobs:
           d=qt3/app/Demos
           # Location hints instead of URI resolution (module prefix == file name).
           sed -i -E 's|import module namespace ([a-z]+)="(http://www.xqsharp.com/raytracer[a-z/]*)";|import module namespace \1="\2" at "\1.xq";|' $d/*.xq
-          for n in 64 32 16; do
+          for n in 64 48 32 24 16; do
             cat > $d/rt$n.xq <<EOF
           import module namespace raytracer="http://www.xqsharp.com/raytracer" at "raytracer.xq";
           import module namespace scene="http://www.xqsharp.com/raytracer/scene" at "scene.xq";
@@ -94,15 +94,17 @@ jobs:
             zorba-builder:ci sh -ec '
               pacman -Sy --noconfirm --needed perf valgrind time >/dev/null
               Z=/src/${{ matrix.bin }}
-              for n in 16 64; do
-                perf record -F 499 -g --call-graph dwarf,32768 -o /out/perf$n.data $Z -f -q rt$n.xq -o /out/rt$n.txt 2>&1 | tail -1
-                perf report -i /out/perf$n.data --no-children --percent-limit 0.5 --stdio -g none > /out/self$n.txt 2>/dev/null
-                perf report -i /out/perf$n.data --children --percent-limit 2 --stdio -g none > /out/children$n.txt 2>/dev/null
-                perf report -i /out/perf$n.data --no-children --percent-limit 3 --stdio -g caller,0.5,callee,function,percent --max-stack 40 > /out/callers$n.txt 2>/dev/null
-                rm -f /out/perf$n.data
+              for n in 16 24 32 48 64; do
+                /usr/bin/time -f "size=$n wall=%es user=%Us maxrss=%MkB" \
+                  $Z -f -q rt$n.xq -o /out/rt$n.txt 2>&1 | tail -1 | tee -a /out/times.txt
               done
+              tail -c 60 /out/rt64.txt; echo
+              perf record -F 499 -g --call-graph dwarf,32768 -o /out/perf.data $Z -f -q rt48.xq -o /dev/null 2>&1 | tail -1
+              perf report -i /out/perf.data --no-children --percent-limit 0.5 --stdio -g none > /out/self48.txt 2>/dev/null
+              perf report -i /out/perf.data --children --percent-limit 1 --stdio -g none > /out/children48.txt 2>/dev/null
+              rm -f /out/perf.data
               chmod -R a+rw /out'
-          { echo '```'; head -40 out/self64.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          { echo '```'; cat out/times.txt; head -40 out/self48.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/upload-artifact@v7
         if: always()
