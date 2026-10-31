@@ -23,6 +23,11 @@ jobs:
             cmake: cmake --preset full-release && cmake --build --preset full-release
             bin: build/full-release/bin/zorba
             tdir: build/full-release
+          - name: master
+            ref: master
+            cmake: cmake --preset full-release && cmake --build --preset full-release
+            bin: build/full-release/bin/zorba
+            tdir: build/full-release
     name: ${{ matrix.name }}
     steps:
       - uses: actions/checkout@v7
@@ -83,14 +88,14 @@ jobs:
         run: |
           docker run --rm -e CCACHE_DIR=/src/.ccache \
             -e CCACHE_SLOPPINESS=pch_defines,time_macros -e CCACHE_DEPEND=1 \
-            -v "$PWD/src":/src -w /src zorba-builder:ci sh -ec '${{ matrix.cmake }}; ccache -s; ctest --test-dir ${{ matrix.tdir }} -R "libunit/numeric_hash" -V | tail -15'
+            -v "$PWD/src":/src -w /src zorba-builder:ci sh -ec '${{ matrix.cmake }}; ccache -s; ctest --test-dir ${{ matrix.tdir }} -R "libunit/numeric_hash|udf-nested-arg-reset" -V | tail -30 || true'
 
       - name: Time and profile
         run: |
           sudo sysctl -w kernel.perf_event_paranoid=-1 kernel.kptr_restrict=0
           mkdir -p out
           docker run --rm --privileged \
-            -v "$PWD/src":/src -v "$PWD/qt3":/qt3 -v "$PWD/out":/out -w /qt3/app/Demos \
+            -v "$PWD/src":/src -v "$PWD/tools":/tools -v "$PWD/qt3":/qt3 -v "$PWD/out":/out -w /qt3/app/Demos \
             zorba-builder:ci sh -ec '
               pacman -Sy --noconfirm --needed perf valgrind time >/dev/null
               Z=/src/${{ matrix.bin }}
@@ -99,12 +104,14 @@ jobs:
                   $Z -f -q rt$n.xq -o /out/rt$n.txt 2>&1 | tail -1 | tee -a /out/times.txt
               done
               tail -c 60 /out/rt64.txt; echo
-              perf record -F 499 -g --call-graph dwarf,32768 -o /out/perf.data $Z -f -q rt48.xq -o /dev/null 2>&1 | tail -1
-              perf report -i /out/perf.data --no-children --percent-limit 0.5 --stdio -g none > /out/self48.txt 2>/dev/null
-              perf report -i /out/perf.data --children --percent-limit 1 --stdio -g none > /out/children48.txt 2>/dev/null
-              rm -f /out/perf.data
+              T=/tools/test/rbkt/Queries/zorba/udf/udf-nested-arg-reset.xq
+              for d in 8 12 16 20 24; do
+                sed "s/(\$i, 1, 2), 24, /(\$i, 1, 2), $d, /" $T > /tmp/nested$d.xq
+                timeout 300 /usr/bin/time -f "nested depth=$d wall=%es maxrss=%MkB" \
+                  $Z -f -q /tmp/nested$d.xq -o /out/nested$d.txt 2>&1 | tail -1 | tee -a /out/times.txt || echo "nested depth=$d timeout" | tee -a /out/times.txt
+              done
               chmod -R a+rw /out'
-          { echo '```'; cat out/times.txt; head -40 out/self48.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          { echo '```'; cat out/times.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/upload-artifact@v7
         if: always()
