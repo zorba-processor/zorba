@@ -48,6 +48,9 @@ bool normalize( std::string *dir, std::string *error ) {
 void apply_policy( SecurityPolicy &policy, std::string const &dir ) {
   policy.allow( Capability::FileRead );
   policy.allow( Capability::NativeModules );
+  // The directory module is written in XQuery; of the modules it imports,
+  // only the file module is implemented by a native library.
+  policy.addNativeModule( "http://expath.org/ns/file" );
   policy.addReadPath( dir );
 }
 

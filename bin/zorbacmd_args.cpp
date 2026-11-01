@@ -150,7 +150,7 @@ char const* get_help_msg() {
       "Add the given collation and set the value of the default collation in the static context to the given collation.\n\n"
 
     HELP_OPT( "--directory <dir>" )
-      "Query the documents under the given directory: the query runs under the secure policy (see --secure) with only file-read, restricted to <dir>, and native-modules allowed; the variable $dir:root of the directory module (http://zorba.io/modules/directory) is bound to <dir>; and the result is serialized as JSON, one item per line (method=json, item-separator newline; -z overrides). Cannot be combined with --allow, --read-path, --write-path, --network-prefix or --private-addresses allow; --deny and the limits apply.\n\n"
+      "Query the documents under the given directory: the query runs under the secure policy (see --secure) with only file-read, restricted to <dir>, and native-modules, restricted to the file module (http://expath.org/ns/file), allowed; the variable $dir:root of the directory module (http://zorba.io/modules/directory) is bound to <dir>; and the result is serialized as JSON, one item per line (method=json, item-separator newline; -z overrides). Cannot be combined with --allow, --read-path, --write-path, --network-prefix or --private-addresses allow; --deny and the limits apply.\n\n"
 
     HELP_OPT( "--disable-http-resolution" )
       "Do not import modules or schemas over the network. Same as --deny remote-import.\n\n"

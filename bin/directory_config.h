@@ -47,8 +47,9 @@ bool normalize( std::string *dir, std::string *error = nullptr );
 
 /**
  * Narrows \a policy to reading \a dir: allows file-read, restricted to
- * \a dir, and native modules (the directory module reads through the file
- * module). Start from SecurityPolicy::secure() so nothing else is allowed.
+ * \a dir, and native modules, restricted to the file module (the directory
+ * module reads through it). Start from SecurityPolicy::secure() so nothing
+ * else is allowed.
  */
 void apply_policy( SecurityPolicy &policy, std::string const &dir );
 
