@@ -8,7 +8,8 @@
 Zorba is an embeddable XQuery and JSONiq processor written in C++. It
 implements XQuery 3.0, XQuery Update Facility, XQuery Full Text, XQuery
 Scripting and JSONiq, with XML Schema validation and an in-memory store with
-collections and indexes.
+collections and indexes. It also runs as an MCP server (`zorba-mcp`), so an AI
+agent can query a folder of mixed-format files.
 
 [![CI](https://github.com/zorba-processor/zorba/actions/workflows/ci.yml/badge.svg)](https://github.com/zorba-processor/zorba/actions/workflows/ci.yml)
 
@@ -27,12 +28,14 @@ docker run --rm ghcr.io/zorba-processor/zorba:edge -q '1 + 1'
 docker run --rm -v "$PWD":/work ghcr.io/zorba-processor/zorba:edge -f -q query.xq
 ```
 
-`edge` is the latest master build; releases are tagged by version, and
-`latest` is the newest stable release. See [docker/README.md](docker/README.md)
+`edge` is the latest master build and releases are tagged by version (for
+example `5.0.0-alpha.1`). Until the first stable 5.x release, `latest` is an
+older master build, not a release. See [docker/README.md](docker/README.md)
 for all image tags.
 
 The image also runs `zorba-mcp`, an MCP server that lets an AI agent query a
-folder of XML, JSON and CSV files, read-only and confined to the folder:
+folder of XML, JSON, CSV and HTML files (`.geojson` is read as JSON),
+read-only and confined to the folder:
 
 ```bash
 docker run -i --rm -v "$PWD:/data:ro" ghcr.io/zorba-processor/zorba:edge zorba-mcp --root /data
