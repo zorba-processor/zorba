@@ -646,7 +646,7 @@ MapInsertIterator::nextImpl(
       {
         // the index took the ownership over the key if the index
         // did _not_ already contain an entry with the same key
-        k.release();
+        (void)k.release();
       }
     }
   }

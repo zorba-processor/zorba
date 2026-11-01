@@ -39,7 +39,8 @@ Mutex::Mutex()
 
   ret = pthread_mutex_init(&theMutex, &attr);
 
-  pthread_mutexattr_destroy(&attr);
+  // Cannot fail on an initialized attributes object (POSIX, glibc).
+  (void)pthread_mutexattr_destroy(&attr);
 
   ZORBA_FATAL(!ret, "Failed to initialize mutex. Error code = " << ret << " message = " << strerror(ret));
 
@@ -51,7 +52,8 @@ Mutex::Mutex()
 Mutex::~Mutex()
 {
 #ifdef ZORBA_HAVE_PTHREAD_H
-  pthread_mutex_destroy(&theMutex);
+  int ret = pthread_mutex_destroy(&theMutex);
+  ZORBA_FATAL(!ret, "Failed to destroy mutex. Error code = " << ret);
 #endif
 }
 

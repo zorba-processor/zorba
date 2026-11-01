@@ -104,7 +104,8 @@ int HttpSendFunction::doRequest(Request& aRequest, ItemSequence_t& aResult,
   // later when appropriate; therefore we should NOT let unique_ptr delete it
   // now.
   if ( ! lRespParser->selfContained())
-    lRespParser.release();
+    // The parser is owned by the stream it was attached to.
+    (void)lRespParser.release();
 
   aResult = lRespHandler.releaseResult();
   return lStatus;

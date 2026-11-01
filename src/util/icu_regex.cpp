@@ -860,7 +860,9 @@ void regex::compile_xquery( zstring const &xq_pattern, char const *flags ) {
   bool has_backref;
   convert_xquery_re( xq_pattern, &icu_pattern, flags, &has_backref );
   string u_pattern;
-  to_string( icu_pattern, &u_pattern );
+  // Patterns are valid UTF-8, so the conversion cannot fail.
+  bool const converted = to_string( icu_pattern, &u_pattern );
+  ZORBA_ASSERT( converted );
   //
   // Compile with ICU also when Zorba's engine will match: ICU's errors for an
   // invalid pattern stay the same, and ICU matches if that engine rejects a
@@ -937,7 +939,11 @@ void regex::z_set_subject( string const &s, size_type from ) {
       --base;
   }
   z_s_.clear();
-  utf8::to_string( s.getBuffer() + base, s.length() - base, &z_s_ );
+  // The subject comes from a valid UTF-8 string, so the conversion back
+  // cannot fail.
+  bool const converted =
+    utf8::to_string( s.getBuffer() + base, s.length() - base, &z_s_ );
+  ZORBA_ASSERT( converted );
   z_base_ = base;
   z_off_byte_ = 0;
   z_off_u16_ = base;
@@ -987,7 +993,11 @@ bool regex::z_replace_all( string const &in, string const &replacement,
                            string *out ) {
   z_set_subject( in, 0 );
   zstring repl;
-  utf8::to_string( replacement.getBuffer(), replacement.length(), &repl );
+  // The replacement comes from a valid UTF-8 string, so the conversion back
+  // cannot fail.
+  bool const converted =
+    utf8::to_string( replacement.getBuffer(), replacement.length(), &repl );
+  ZORBA_ASSERT( converted );
   int const groups = static_cast<int>( zre_->get_indexed_regex_count() );
   char const *const s = z_s_.c_str();
   int const s_len = static_cast<int>( z_s_.size() );
@@ -1245,7 +1255,9 @@ void regex::set_string( char const *s, size_type s_len ) {
     return;
   }
   ZORBA_ASSERT( matcher_ );
-  to_string( s, s_len, &s_ );
+  // Subjects are valid UTF-8, so the conversion cannot fail.
+  bool const converted = to_string( s, s_len, &s_ );
+  ZORBA_ASSERT( converted );
   matcher_->reset( s_ );
 }
 

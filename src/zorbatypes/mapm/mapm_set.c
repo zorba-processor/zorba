@@ -461,9 +461,9 @@ void m_apm_to_string(char* s, int places, M_APM mtmp)
 
   i = ctmp->m_apm_exponent - 1;
   if (i >= 0)
-    sprintf(cp,"E+%d",i);
+    (void)sprintf(cp,"E+%d",i);   /* room reserved by the caller */
   else
-    sprintf(cp,"E%d",i);
+    (void)sprintf(cp,"E%d",i);    /* room reserved by the caller */
   
   M_restore_stack(1);
 }

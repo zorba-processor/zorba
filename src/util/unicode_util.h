@@ -325,7 +325,7 @@ int to_upper_full( code_point c, code_point out[3] );
  * @param out The normalized string.  It is overwritten.
  * @return Returns \c true only if the normalization succeeded.
  */
-bool normalize( string const &in, normalization::type n, string *out );
+[[nodiscard]] bool normalize( string const &in, normalization::type n, string *out );
 
 /**
  * Strips all diacritical marks from all characters converting them to their
@@ -335,7 +335,7 @@ bool normalize( string const &in, normalization::type n, string *out );
  * @param out The output string.
  * @return Returns \c true only if the strip succeeded.
  */
-bool strip_diacritics( string const &in, string *out );
+[[nodiscard]] bool strip_diacritics( string const &in, string *out );
 
 #endif /* ZORBA_NO_ICU */
 
@@ -349,7 +349,7 @@ bool strip_diacritics( string const &in, string *out );
  * @param out The address of the result.
  * @return Returns \c true only if the conversion succeeded.
  */
-bool to_char( char const *in, char_type *out );
+[[nodiscard]] bool to_char( char const *in, char_type *out );
 #endif /* ZORBA_NO_ICU */
 
 /**
@@ -362,7 +362,7 @@ bool to_char( char const *in, char_type *out );
  * @param out_len The number of characters (not bytes) of the result.
  * @return Returns \c true only if the conversion succeeded.
  */
-bool to_string( char const *in, size_type in_len, char_type **out,
+[[nodiscard]] bool to_string( char const *in, size_type in_len, char_type **out,
                 size_type *out_len );
 
 /**
@@ -374,10 +374,10 @@ bool to_string( char const *in, size_type in_len, char_type **out,
  * @return Returns \c true only if the conversion succeeded.
  */
 #ifndef ZORBA_NO_ICU
-ZORBA_DLL_PUBLIC
+[[nodiscard]] ZORBA_DLL_PUBLIC
 bool to_string( char const *in, size_type in_len, string *out );
 #else
-inline bool to_string( char const *in, size_type in_len, string *out ) {
+[[nodiscard]] inline bool to_string( char const *in, size_type in_len, string *out ) {
   out->assign( in, in_len );
   return true;
 }
@@ -390,7 +390,7 @@ inline bool to_string( char const *in, size_type in_len, string *out ) {
  * @param out The Unicode string result.
  * @return Returns \c true only if the conversion succeeded.
  */
-inline bool to_string( char const *in, string *out ) {
+[[nodiscard]] inline bool to_string( char const *in, string *out ) {
   return to_string( in, (size_type)std::strlen( in ), out );
 }
 
@@ -404,7 +404,7 @@ inline bool to_string( char const *in, string *out ) {
  * @param out The Unicode string result.
  * @return Returns \c true only if the conversion succeeded.
  */
-bool to_string( wchar_t const *in, size_type in_len, string *out );
+[[nodiscard]] bool to_string( wchar_t const *in, size_type in_len, string *out );
 
 /**
  * Converts a wide-character string to a Unicode string.
@@ -413,7 +413,7 @@ bool to_string( wchar_t const *in, size_type in_len, string *out );
  * @param out The Unicode string result.
  * @return Returns \c true only if the conversion succeeded.
  */
-inline bool to_string( wchar_t const *in, string *out ) {
+[[nodiscard]] inline bool to_string( wchar_t const *in, string *out ) {
   return to_string( in, static_cast<size_type>( std::wcslen( in ) ), out );
 }
 
@@ -427,7 +427,7 @@ inline bool to_string( wchar_t const *in, string *out ) {
  * @param out The Unicode string result.
  * @return Returns \c true only if the conversion succeeded.
  */
-template<class StringType> inline
+template<class StringType> [[nodiscard]] inline
 typename std::enable_if<ZORBA_IS_STRING(StringType),bool>::type
 to_string( StringType const &in, string *out ) {
   return to_string( in.data(), static_cast<size_type>( in.size() ), out );

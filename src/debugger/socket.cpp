@@ -83,7 +83,9 @@ Socket::~Socket() {
 
 void
 Socket::close() {
-  ::close(theDescriptor);
+  // Also called by the destructor, which must not throw; nothing a caller
+  // could recover is lost when closing a socket fails.
+  (void)::close(theDescriptor);
 }
 
 std::string Socket::getLocalAddress() {
@@ -114,7 +116,9 @@ void Socket::setLocalPort(unsigned short localPort) {
   localAddr.sin_addr.s_addr = htonl(INADDR_ANY);
   localAddr.sin_port = htons(localPort);
   int opt = 1;
-  setsockopt(theDescriptor, SOL_SOCKET,SO_REUSEADDR, (char *)&opt, (socklen_t)sizeof(opt)); 
+  if (setsockopt(theDescriptor, SOL_SOCKET, SO_REUSEADDR, (char *)&opt, (socklen_t)sizeof(opt)) < 0) {
+    throw DebuggerSocketException("Set of socket option failed (setsockopt())", true);
+  }
   if (bind(theDescriptor, (sockaddr *) &localAddr, sizeof(sockaddr_in)) < 0) {
     std::stringstream lMsg;
     lMsg << "Set of local port failed: " << localPort;
@@ -128,7 +132,9 @@ void Socket::setLocalAddressAndPort(const std::string &localAddress,
   sockaddr_in localAddr;
   fillAddr(localAddress, localPort, localAddr);
   int opt = 1;
-  setsockopt(theDescriptor, SOL_SOCKET,SO_REUSEADDR, (char *)&opt, (socklen_t)sizeof(opt)); 
+  if (setsockopt(theDescriptor, SOL_SOCKET, SO_REUSEADDR, (char *)&opt, (socklen_t)sizeof(opt)) < 0) {
+    throw DebuggerSocketException("Set of socket option failed (setsockopt())", true);
+  }
   if (bind(theDescriptor, (sockaddr *) &localAddr, sizeof(sockaddr_in)) < 0) {
     throw DebuggerSocketException("Set of local address and port failed (bind())", true);
   }

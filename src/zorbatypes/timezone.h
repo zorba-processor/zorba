@@ -49,7 +49,7 @@ public:
    * @return Returns 0 on success, 1 for an invalid format, 2 for out-of-range
    * values.
    */
-  static int parse( char const *s, size_t s_len, TimeZone *tz );
+  [[nodiscard]] static int parse( char const *s, size_t s_len, TimeZone *tz );
 
   /**
    * Constructs a %TimeZone.

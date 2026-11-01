@@ -424,7 +424,7 @@ void GroupByIterator::matVarsAndGroupBy(
     }
 
     groupMap->insert(groupTuple.get(), nonGroupTuple);
-    groupTuple.release();
+    (void)groupTuple.release(); // owned by groupMap now
   }
 }
 

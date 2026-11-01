@@ -140,7 +140,8 @@ void append_json_string( std::string &out, std::string const &s ) {
       default:
         if ( u < 0x20 || u == 0x7F ) {
           char buf[8];
-          std::snprintf( buf, sizeof buf, "\\u%04x", static_cast<unsigned>( u ) );
+          // Always 6 characters: fits in buf.
+          (void)std::snprintf( buf, sizeof buf, "\\u%04x", static_cast<unsigned>( u ) );
           out += buf;
         } else {
           out += c;

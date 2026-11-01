@@ -115,7 +115,10 @@ int main( int argc, char const *argv[] ) {
     return 1;
   }
   // A client that goes away makes writes fail instead of killing us.
-  std::signal( SIGPIPE, SIG_IGN );
+  if ( std::signal( SIGPIPE, SIG_IGN ) == SIG_ERR ) {
+    std::perror( "zorba-mcp: signal" );
+    return 1;
+  }
 
   void *const store = StoreManager::getStore();
   Zorba *const zorba = Zorba::getInstance( store );
@@ -143,7 +146,10 @@ int main( int argc, char const *argv[] ) {
       }
     }
   }
-  std::fclose( out );
+  if ( std::fclose( out ) == EOF && status == 0 ) {
+    std::cerr << "zorba-mcp: cannot write to stdout" << std::endl;
+    status = 1;
+  }
   zorba->shutdown();
   StoreManager::shutdownStore( store );
   return status;

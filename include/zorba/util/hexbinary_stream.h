@@ -17,6 +17,8 @@
 #ifndef ZORBA_HEXBINARY_STREAM_API_H
 #define ZORBA_HEXBINARY_STREAM_API_H
 
+#include <ios>
+#include <locale>
 #include <streambuf>
 
 #include <zorba/config.h>

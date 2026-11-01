@@ -1981,7 +1981,7 @@ void type::load_constraints( store::Item_t const &constraints_item,
     try {
       unique_ptr<constraint> c( new constraint( constraint_str, *s.sctx_ ) );
       constraints_.push_back( c.get() );
-      c.release();
+      (void)c.release(); // owned by constraints_ now
     }
     catch ( ZorbaException const &e ) {
       ascii::replace_all( constraint_str, '\n', ' ' );

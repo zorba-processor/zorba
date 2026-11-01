@@ -4283,7 +4283,7 @@ void preprocessVFOList(const VFO_DeclList& v)
     }
 
     func->setAnnotations(theAnnotations.get());
-    theAnnotations.release(); // important to reset
+    (void)theAnnotations.release(); // owned by func now; important to reset
 
     // Create bindings between (function qname item, arity) and function obj
     // in the current sctx of this module and, if this is a lib module, in its
@@ -5291,7 +5291,7 @@ void end_visit(const CollectionDecl& v, void* /*visit_state*/)
                                             lOrderMode,
                                             lNodeModifier);
 
-  theAnnotations.release(); // important to reset
+  (void)theAnnotations.release(); // owned by the new node now; important to reset
 
   theSctx->bind_collection(lColl, loc);
 
@@ -13088,7 +13088,7 @@ expr* generate_literal_function(
   if (isAnonymousUDF)
     theCCB->addAnonymousUDF(udf.release());
   else
-    udf.release();
+    (void)udf.release(); // owned by the function item expression
 
   return fiExpr;
 }

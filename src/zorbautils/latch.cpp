@@ -42,25 +42,31 @@ namespace zorba {
 Latch::Latch()
 {
   pthread_rwlockattr_t attr;
-  pthread_rwlockattr_init(&attr);
+  int ret = pthread_rwlockattr_init(&attr);
+  ZORBA_FATAL(!ret, "Failed to initialize latch attributes. Error code = " << ret);
 
 #ifndef NDEBUG
   int pshared;
-  pthread_rwlockattr_getpshared(&attr, &pshared);
+  ret = pthread_rwlockattr_getpshared(&attr, &pshared);
+  ZORBA_FATAL(!ret, "Failed to get latch pshared attribute. Error code = " << ret);
   ZORBA_FATAL(pshared == PTHREAD_PROCESS_PRIVATE,
               "rwlock pshared = " << pshared);
 #endif
 
-  pthread_rwlock_init(&theLatch, &attr);
+  ret = pthread_rwlock_init(&theLatch, &attr);
 
-  pthread_rwlockattr_destroy(&attr);
+  // Cannot fail on an initialized attributes object (POSIX, glibc).
+  (void)pthread_rwlockattr_destroy(&attr);
+
+  ZORBA_FATAL(!ret, "Failed to initialize latch. Error code = " << ret);
 }
 
 
 
 Latch::~Latch()
 {
-  pthread_rwlock_destroy(&theLatch);
+  int ret = pthread_rwlock_destroy(&theLatch);
+  ZORBA_FATAL(!ret, "Failed to destroy latch. Error code = " << ret);
 }
 
 

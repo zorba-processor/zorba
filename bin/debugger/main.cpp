@@ -174,7 +174,10 @@ processArguments(
 int
 main(int argc, char* argv[])
 {
-  signal(SIGINT, ctrlC_Handler);
+  if (signal(SIGINT, ctrlC_Handler) == SIG_ERR) {
+    std::cerr << "Failed to install the Ctrl-C handler" << std::endl;
+    return 1;
+  }
 
   // **************************************************************************
   // processing arguments

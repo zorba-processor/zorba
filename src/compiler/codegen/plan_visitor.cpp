@@ -582,7 +582,7 @@ void end_visit(function_trace_expr& v)
   lDummyIter->setFunctionLocation(v.getFunctionLocation());
   lDummyIter->setFunctionCallLocation(v.getFunctionCallLocation());
   push_itstack(lDummyIter.get());
-  lDummyIter.release();
+  (void)lDummyIter.release(); // owned by the iterator stack now
 }
 
 bool begin_visit(wrapper_expr& v)
@@ -2046,9 +2046,10 @@ void flwor_codegen(const flwor_expr& flworExpr)
                                        orderClause.get(),
                                        materializeClause.get(),
                                        returnIter);
-  groupClause.release();
-  orderClause.release();
-  materializeClause.release();
+  // Owned by flworIter now.
+  (void)groupClause.release();
+  (void)orderClause.release();
+  (void)materializeClause.release();
   push_itstack(flworIter);
 }
 
@@ -2407,7 +2408,7 @@ void end_visit(debugger_expr& v)
   }
 
   push_itstack(lDebugIterator.get());
-  lDebugIterator.release();
+  (void)lDebugIterator.release(); // owned by the iterator stack now
 }
 #endif
 

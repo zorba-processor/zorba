@@ -270,7 +270,9 @@ SerializeURIIterator::nextImpl(store::Item_t& result, PlanState& planState) cons
           uri.set_host(lStrValue);
           lHasNotOpaqueField = true;
         } else if(lStrKey == PORT_NAME){
-          sscanf(lStrValue.str().c_str(), "%d", &lIntPort);
+          // A port that is not a number is ignored, like port 0.
+          if(sscanf(lStrValue.str().c_str(), "%d", &lIntPort) != 1)
+            lIntPort = 0;
           if(lIntPort != 0){
             uri.set_port(lIntPort);
             lHasNotOpaqueField = true;

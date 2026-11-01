@@ -534,16 +534,17 @@ void test_binary( Fixture const &f ) {
     return;
   }
   if ( pid == 0 ) {
-    dup2( to_child[0], STDIN_FILENO );
-    dup2( from_child[1], STDOUT_FILENO );
-    close( to_child[0] ); close( to_child[1] );
-    close( from_child[0] ); close( from_child[1] );
+    if ( dup2( to_child[0], STDIN_FILENO ) < 0 ||
+         dup2( from_child[1], STDOUT_FILENO ) < 0 ||
+         close( to_child[0] ) != 0 || close( to_child[1] ) != 0 ||
+         close( from_child[0] ) != 0 || close( from_child[1] ) != 0 )
+      _exit( 127 );
     execl( f.binary.c_str(), f.binary.c_str(), "--root", f.tree.c_str(),
            "--queries", f.queries.c_str(), static_cast<char*>( nullptr ) );
     _exit( 127 );
   }
-  close( to_child[0] );
-  close( from_child[1] );
+  check( close( to_child[0] ) == 0, "close the child's input end" );
+  check( close( from_child[1] ) == 0, "close the child's output end" );
   std::size_t written = 0;
   while ( written < input.size() ) {
     ssize_t const n = write( to_child[1], input.data() + written,
@@ -552,7 +553,7 @@ void test_binary( Fixture const &f ) {
       break;
     written += static_cast<std::size_t>( n );
   }
-  close( to_child[1] );
+  check( close( to_child[1] ) == 0, "close the child's input" );
   std::string output;
   char buf[4096];
   for ( ;; ) {
@@ -561,9 +562,9 @@ void test_binary( Fixture const &f ) {
       break;
     output.append( buf, static_cast<std::size_t>( n ) );
   }
-  close( from_child[0] );
+  check( close( from_child[0] ) == 0, "close the child's output" );
   int status = 0;
-  waitpid( pid, &status, 0 );
+  check( waitpid( pid, &status, 0 ) == pid, "wait for zorba-mcp" );
   check( WIFEXITED( status ) && WEXITSTATUS( status ) == 0,
          "zorba-mcp exits with 0 at end of input",
          std::to_string( status ) );

@@ -175,6 +175,9 @@ DebuggerCommunicator::ResponseQueue::run()
     // release the lock before trying to send one more sessage
     theLock.unlock();
   }
+  // Locked at the start for the condition variable: a mutex must not be
+  // destroyed while locked.
+  theMutex.unlock();
 }
 
 void
