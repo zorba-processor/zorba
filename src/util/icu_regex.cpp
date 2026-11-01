@@ -860,7 +860,9 @@ void regex::compile_xquery( zstring const &xq_pattern, char const *flags ) {
   bool has_backref;
   convert_xquery_re( xq_pattern, &icu_pattern, flags, &has_backref );
   string u_pattern;
-  to_string( icu_pattern, &u_pattern );
+  // Patterns are valid UTF-8, so the conversion cannot fail.
+  bool const converted = to_string( icu_pattern, &u_pattern );
+  ZORBA_ASSERT( converted );
   //
   // Compile with ICU also when Zorba's engine will match: ICU's errors for an
   // invalid pattern stay the same, and ICU matches if that engine rejects a
@@ -1253,7 +1255,9 @@ void regex::set_string( char const *s, size_type s_len ) {
     return;
   }
   ZORBA_ASSERT( matcher_ );
-  to_string( s, s_len, &s_ );
+  // Subjects are valid UTF-8, so the conversion cannot fail.
+  bool const converted = to_string( s, s_len, &s_ );
+  ZORBA_ASSERT( converted );
   matcher_->reset( s_ );
 }
 

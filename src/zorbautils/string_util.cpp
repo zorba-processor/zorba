@@ -17,6 +17,7 @@
 #include <cstring>
 #include <unicode/stsearch.h>
 
+#include "diagnostics/assert.h"
 #include "util/unicode_util.h"
 #include "zorbautils/string_util.h"
 #include "zorbatypes/zstring.h"

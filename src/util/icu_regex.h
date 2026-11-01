@@ -19,6 +19,8 @@
 
 #include <zorba/internal/cxx_util.h>
 
+#include "diagnostics/assert.h"
+
 #include "unicode_util.h"
 #include "zorbatypes/zstring.h"
 
@@ -101,7 +103,9 @@ public:
    */
   void compile( char const *pattern, char const *flags = "" ) {
     string u_pattern;
-    to_string( pattern, &u_pattern );
+    // Patterns are valid UTF-8, so the conversion cannot fail.
+    bool const converted = to_string( pattern, &u_pattern );
+    ZORBA_ASSERT( converted );
     compile( u_pattern, flags, pattern );
   }
 
@@ -117,7 +121,9 @@ public:
   template<class StringType>
   void compile( StringType const &pattern, char const *flags = "" ) {
     string u_pattern;
-    to_string( pattern, &u_pattern );
+    // Patterns are valid UTF-8, so the conversion cannot fail.
+    bool const converted = to_string( pattern, &u_pattern );
+    ZORBA_ASSERT( converted );
     compile( u_pattern, flags, pattern.c_str() );
   }
 

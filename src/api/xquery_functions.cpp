@@ -17,6 +17,7 @@
 #include <zorba/xquery_functions.h>
 #include <zorba/zorba_string.h>
 
+#include "diagnostics/assert.h"
 #include "util/regex.h"
 #include "util/uri_util.h"
 #include "util/utf8_util.h"

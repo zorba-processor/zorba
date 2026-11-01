@@ -24,6 +24,8 @@
 
 #include <zorba/internal/cxx_util.h>
 
+#include "diagnostics/assert.h"
+
 #include "ascii_util.h"
 #include "string_util.h"
 #include "unicode_util.h"
