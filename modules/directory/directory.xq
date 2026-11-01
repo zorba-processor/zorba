@@ -58,9 +58,7 @@ module namespace dir = "http://zorba.io/modules/directory";
 import module namespace file = "http://expath.org/ns/file";
 import module namespace jn = "http://jsoniq.org/functions";
 import module namespace csv = "http://zorba.io/modules/json-csv";
-(: Declared, not imported: the xml module imports a schema, which builds
- : without XML Schema support lack, while x:parse-html is a built-in function. :)
-declare namespace x = "http://zorba.io/modules/xml";
+import module namespace x = "http://zorba.io/modules/xml";
 
 declare namespace an = "http://zorba.io/annotations";
 declare namespace err = "http://www.w3.org/2005/xqt-errors";
