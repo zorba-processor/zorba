@@ -48,6 +48,7 @@ IF (ZORBA_WITH_DEBUGGER)
 ENDIF (ZORBA_WITH_DEBUGGER)
 
 SET(SRCS
+  directory_config.cpp
   zorbacmd_args.cpp
   zorbacmd_props.cpp
   timers.cpp

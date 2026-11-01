@@ -26,9 +26,9 @@
 #include <zorba/zorba.h>
 #include <zorba/properties.h>
 #include <zorba/security.h>
-#include <zorba/util/fs_util.h>
 
 // local
+#include "directory_config.h"
 #include "zorbacmd_props.h"
 
 using namespace std;
@@ -1016,26 +1016,16 @@ int parse_args( int argc, char const *argv[] ) {
   if ( !error && !zc_props.directory_.empty() ) {
     // The directory is both the read path and the value of $dir:root, so use
     // one absolute, normalized spelling for both.
-    string dir( zc_props.directory_ );
-    try {
-      fs::make_absolute( &dir );
-      dir = fs::normalize_path( dir );
-    }
-    catch ( std::invalid_argument const& ) {
-    }
-    while ( dir.size() > 1 && dir.back() == '/' )
-      dir.pop_back();
-    if ( fs::get_type( dir ) != fs::directory ) {
-      directory_error = "--directory: not a directory: " + zc_props.directory_;
+    string why;
+    if ( !directory_config::normalize( &zc_props.directory_, &why ) ) {
+      directory_error = "--directory: " + why;
       error = directory_error.c_str();
     } else {
-      zc_props.directory_ = dir;
       // JSON, one item per line, unless -z says otherwise (later parameters
       // win, so these go first).
+      serialization_params const params( directory_config::serialization_params() );
       zc_props.serialization_params_.insert(
-        zc_props.serialization_params_.begin(),
-        { serialization_param( "method", "json" ),
-          serialization_param( "item-separator", "\n" ) } );
+        zc_props.serialization_params_.begin(), params.begin(), params.end() );
       zc_props.trailing_nl_ = true;
     }
   }
