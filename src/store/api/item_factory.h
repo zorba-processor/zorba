@@ -35,7 +35,6 @@ namespace store {
 
 class CopyMode;
 class PUL;
-class TupleField;
 
 
 class ItemFactory

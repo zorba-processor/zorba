@@ -13,14 +13,6 @@
 # limitations under the License.
 #
 
-IF (NOT WIN32)
-
-  CONFIGURE_FILE (${CMAKE_CURRENT_SOURCE_DIR}/create-doc-tar.sh.in ${CMAKE_CURRENT_BINARY_DIR}/create-doc-tar.sh)
-  MESSAGE (STATUS "configured ${CMAKE_CURRENT_SOURCE_DIR}/create-doc-tar.sh.in -> ${CMAKE_CURRENT_BINARY_DIR}/create-doc-tar.sh") 
-
-ENDIF(NOT WIN32)
-
-
 CONFIGURE_FILE(
   "${CMAKE_CURRENT_SOURCE_DIR}/notice-generator.xq.in"
   "${CMAKE_CURRENT_BINARY_DIR}/notice-generator.xq"
@@ -65,10 +57,5 @@ IF(ZORBA_WORKS)
     "${ZORBA_EXE}" -f -q "${CMAKE_CURRENT_SOURCE_DIR}/check_apache_license.xq"
     -e "path-to-zorba:=${CMAKE_SOURCE_DIR}"
     -e "path-to-modules:=${ZORBA_MODULES_DIR}")
-
-  #  manual target to check links on the zorba page
-  ADD_CUSTOM_TARGET(check_links COMMAND
-    "${ZORBA_EXE}" -f -q "${CMAKE_CURRENT_SOURCE_DIR}/link_crawler.xq"
-    -e "result-file:=${CMAKE_CURRENT_BINARY_DIR}/link_crawler_result.xml")
 
 ENDIF(ZORBA_WORKS)
