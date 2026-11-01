@@ -733,6 +733,7 @@ void test_cache_hit( Fixture const &f ) {
   t.write( "b.xml", "<r><v>2</v></r>" );
   ServerConfig config;
   config.root = t.root;
+  config.cache_bytes = 256u << 20;
   Server server( f.zorba, config, std::cerr );
 
   std::string v = open_value( server, "a.json" );
@@ -792,6 +793,7 @@ void test_cache_invalidate( Fixture const &f ) {
   t.write( "b.json", "{ \"v\" : 5 }" );
   ServerConfig config;
   config.root = t.root;
+  config.cache_bytes = 256u << 20;
   Server server( f.zorba, config, std::cerr );
 
   std::string v = open_value( server, "a.json" );
@@ -904,6 +906,7 @@ void test_cache_policy( Fixture const &f ) {
   t.write( "../outside/secret.json", "{ \"v\" : \"TOP-" "SECRET\" }" );
   ServerConfig config;
   config.root = t.root;
+  config.cache_bytes = 256u << 20;
   Server server( f.zorba, config, std::cerr );
 
   SecurityPolicy expected( SecurityPolicy::secure() );
@@ -947,6 +950,7 @@ void test_cache_inject( Fixture const &f ) {
   t.write( "b.json", "{ \"v\" : 2 }" );
   ServerConfig config;
   config.root = t.root;
+  config.cache_bytes = 256u << 20;
   Server server( f.zorba, config, std::cerr );
 
   std::string const dc(

@@ -48,7 +48,7 @@ struct ServerConfig {
   /** The maximum size of a tool's text output, in bytes. */
   std::size_t max_output = 128 * 1024;
   /** The byte budget of the document cache (0: no cache). */
-  std::size_t cache_bytes = 256u * 1024 * 1024;
+  std::size_t cache_bytes = 0;
 };
 
 /**

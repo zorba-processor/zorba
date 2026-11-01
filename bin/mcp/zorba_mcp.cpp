@@ -53,7 +53,7 @@ char const usage[] =
   "  --max-output <bytes> output size limit of one tool call (default\n"
   "                       131072); longer output is cut with a marker\n"
   "  --cache-mb <MiB>     memory budget of the parsed documents kept across\n"
-  "                       calls (default 256, 0: no cache); a document is\n"
+  "                       calls (default 0: no cache); a document is\n"
   "                       served from the cache only while its file is\n"
   "                       unchanged\n";
 
