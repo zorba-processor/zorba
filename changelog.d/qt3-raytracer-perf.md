@@ -1,3 +1,0 @@
-### Fixed
-- Resetting a user-defined function call reset each argument subplan twice: directly, and through the parameters of the callee. Calls nested in arguments do the same with their own arguments, so the work doubled at every level of nesting and recursion. The QT3 test app-Demos/raytracer took 105-158 s (over the 60 s per-test timeout) and now takes about 2 s.
-- xs:double and xs:float values hashed to their integer part, so every value in (-1, 1) had the same hash code and hash tables keyed on fractional numbers (the result cache of recursive functions, fn:distinct-values, grouping) degraded to linear lists. Non-integral numbers now hash on their value; values equal after numeric promotion still hash equal.
