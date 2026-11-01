@@ -74,14 +74,6 @@ void CsvParseIteratorState::init(PlanState& planState) {
   skip_called_ = false;
 }
 
-void CsvParseIteratorState::reset(PlanState& planState) {
-  PlanIteratorState::reset(planState);
-  cast_unquoted_ = true;
-  line_no_ = 1;
-  missing_ = missing::null;
-  skip_called_ = false;
-}
-
 zstring CsvParseIterator::getNameAsString() const {
   return "fn-zorba-csv:parse";
 }

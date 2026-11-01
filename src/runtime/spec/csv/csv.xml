@@ -28,7 +28,7 @@
       <zorba:output>object()*</zorba:output>
     </zorba:signature>
   </zorba:function>
-  <zorba:state generateInit="true" generateReset="true">
+  <zorba:state generateInit="true" generateReset="false">
     <zorba:member type="bool" name="cast_unquoted_" defaultValue="true"/>
     <zorba:member type="csv_parser" name="csv_"/>
     <zorba:member type="zstring" name="extra_name_"/>
