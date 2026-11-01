@@ -17,6 +17,7 @@
 
 #include <atomic>
 
+#include <libxml/HTMLparser.h>
 #include <libxml/parserInternals.h>
 #include <libxml/xmlIO.h>
 #include <libxml/xmlerror.h>
@@ -147,6 +148,24 @@ void ParserSecurity::configure(xmlParserCtxtPtr aCtxt, int aRequested) const
     xmlCtxtSetMaxAmplification(aCtxt, lMax);
 #endif
 
+#if LIBXML_VERSION >= 21400
+  xmlCtxtSetResourceLoader(aCtxt, &resource_loader, nullptr);
+#else
+  install_entity_loader();
+#endif
+}
+
+
+void ParserSecurity::configureHtml(xmlParserCtxtPtr aCtxt, int aRequested) const
+{
+  int lOptions = aRequested;
+  lOptions |= HTML_PARSE_NONET;
+  // HTML_PARSE_HUGE (not declared before libxml2 2.10) is XML_PARSE_HUGE.
+  lOptions &= ~XML_PARSE_HUGE;
+  htmlCtxtUseOptions(aCtxt, lOptions);
+
+  // HTML has no entity declarations, so no amplification limit; the
+  // resource loader refuses whatever the parser might still try to load.
 #if LIBXML_VERSION >= 21400
   xmlCtxtSetResourceLoader(aCtxt, &resource_loader, nullptr);
 #else

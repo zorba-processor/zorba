@@ -68,6 +68,11 @@ private:
                                 // the document node. This is used by the parse-fragment
                                 // functions.
 
+  bool theParseHtml;            // Parse the input as HTML (libxml2's HTML
+                                // parser in recovery mode) instead of XML.
+  bool theIgnoreDeclaredEncoding; // The input is UTF-8 whatever encoding it
+                                // declares (HTML: a meta charset).
+
   // The security policy the parser runs under. NULL: the policy of the Zorba
   // instance (root static context). Callers that have a static context set
   // its policy. Not cleared by reset(), so that a reset can never widen it.
@@ -97,7 +102,9 @@ public:
     theNoCDATA(false),
     theNoXIncludeNodes(false),
     theNoNetworkAccess (false),
-    theCreateDocParentLink(true)
+    theCreateDocParentLink(true),
+    theParseHtml(false),
+    theIgnoreDeclaredEncoding(false)
   {
   }
 
@@ -126,6 +133,8 @@ public:
     theNoCDATA = false;
     theNoXIncludeNodes = false;
     theNoNetworkAccess  = false;
+    theParseHtml = false;
+    theIgnoreDeclaredEncoding = false;
   }
 
   /**
@@ -356,6 +365,26 @@ public:
   bool getNoNetworkAccess() const
   {
     return theNoNetworkAccess ;
+  }
+
+  // theParseHtml
+  void setParseHtml(bool aParseHtml)
+  {
+    theParseHtml = aParseHtml;
+  }
+  bool getParseHtml() const
+  {
+    return theParseHtml;
+  }
+
+  // theIgnoreDeclaredEncoding
+  void setIgnoreDeclaredEncoding(bool aIgnore)
+  {
+    theIgnoreDeclaredEncoding = aIgnore;
+  }
+  bool getIgnoreDeclaredEncoding() const
+  {
+    return theIgnoreDeclaredEncoding;
   }
 
   // theSecurityPolicy

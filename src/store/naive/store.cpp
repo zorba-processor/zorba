@@ -367,7 +367,13 @@ XmlLoader* Store::getXmlLoader(
     XQueryDiagnostics* aXQueryDiagnostics,
     const store::LoadProperties& loadProperties)
 {
-  if (loadProperties.getParseExternalParsedEntity())
+  if (loadProperties.getParseHtml())
+    return new HtmlXmlLoader(theItemFactory,
+                             aXQueryDiagnostics,
+                             loadProperties,
+                             false);
+
+  else if (loadProperties.getParseExternalParsedEntity())
     return new FragmentXmlLoader(theItemFactory,
                                  aXQueryDiagnostics,
                                  loadProperties,

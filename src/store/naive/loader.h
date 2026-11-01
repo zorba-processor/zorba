@@ -340,6 +340,47 @@ protected:
 };
 
 /*******************************************************************************
+  HtmlXmlLoader parses HTML with libxml2's HTML parser (recovery mode, no
+  network) and builds the tree with the FastXmlLoader callbacks: the HTML
+  parser's SAX1 events are adapted to them. Element and attribute names are
+  in no namespace (the parser lowercases them); namespace declaration
+  attributes are dropped. Element nesting is limited to MAX_DEPTH levels.
+********************************************************************************/
+class HtmlXmlLoader : public FastXmlLoader
+{
+public:
+  static constexpr csize MAX_DEPTH = 256;
+
+protected:
+  csize theDepth;
+
+public:
+  HtmlXmlLoader(
+      store::ItemFactory* factory,
+      XQueryDiagnostics* xqueryDiagnostics,
+      const store::LoadProperties& loadProperties,
+      bool dataguide);
+
+  store::Item_t loadXml(
+      const zstring& baseUri,
+      const zstring& uri,
+      std::istream& xmlStream);
+
+protected:
+  static void htmlStartElement(
+      void * ctx,
+      const xmlChar * name,
+      const xmlChar ** atts);
+
+  static void htmlEndElement(void * ctx, const xmlChar * name);
+
+  static void htmlCharacters(void * ctx, const xmlChar * ch, int len);
+
+  static void htmlError(void * ctx, ZORBA_XML_ERROR_PTR error);
+};
+
+
+/*******************************************************************************
 
   DtdXmlLoader - implements XmlLoader interface as FastXmlLoader but it uses
                  libxml2's tree parser to be able identify ID, IDREF and IDREFS
