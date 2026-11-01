@@ -30,6 +30,7 @@
 #include <sstream>
 #include <string>
 
+#include <sys/resource.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -604,8 +605,8 @@ void test_binary( Fixture const &f ) {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// Document cache. Each test works on a fresh tree in a temporary directory:
-// <tmp>/root (the server's root) and <tmp>/outside.
+// Tests on a fresh tree in a temporary directory: <tmp>/root (the server's
+// root) and <tmp>/outside.
 
 struct TempTree {
   std::string base;
@@ -613,7 +614,7 @@ struct TempTree {
 
   TempTree() {
     std::string tmpl(
-      ( std::filesystem::temp_directory_path() / "mcp-cache-XXXXXX" ).string() );
+      ( std::filesystem::temp_directory_path() / "mcp-tree-XXXXXX" ).string() );
     char *const made = mkdtemp( &tmpl[0] );
     // The canonical spelling: the policy compares real paths.
     base = std::filesystem::canonical( made ? made : "." ).string();
@@ -639,6 +640,64 @@ struct TempTree {
                                std::chrono::seconds( seconds ) );
   }
 };
+
+// The peak resident set size of this process so far, in bytes.
+long long peak_rss() {
+  struct rusage u;
+  getrusage( RUSAGE_SELF, &u );
+#ifdef __APPLE__
+  return static_cast<long long>( u.ru_maxrss );
+#else
+  return static_cast<long long>( u.ru_maxrss ) * 1024;
+#endif
+}
+
+// dir:documents parses a document when the caller asks for it, and a
+// document the caller is done with can be freed: a scan of the whole tree
+// keeps one parsed document in memory, not all of them. A parsed JSON
+// document takes about 22 bytes per byte of file (bench/directory), so
+// holding all 60 MB of this tree raises the peak RSS by more than 1.2 GiB.
+// The bound, 10 bytes per byte of file, leaves room for a few parsed
+// documents plus a sanitizer's quarantine of freed memory (256 MiB by
+// default in AddressSanitizer).
+void test_documents_stream( Fixture const &f ) {
+  TempTree t;
+  int const files = 30;
+  std::string content( "{ \"rs\" : [" );
+  for ( int i = 0; content.size() < 2000000; ++i ) {
+    if ( i )
+      content += ",";
+    content += "{\"id\":" + std::to_string( i ) + ",\"cat\":\"c" +
+      std::to_string( i % 4 ) + "\",\"v\":" + std::to_string( i % 100 ) +
+      ",\"n\":\"name" + std::to_string( i ) + "\"}";
+  }
+  content += "] }";
+  for ( int i = 0; i < files; ++i )
+    t.write( "d" + std::to_string( 100 + i ) + ".json", content );
+  long long const tree_bytes =
+    static_cast<long long>( content.size() ) * files;
+  content.clear();
+  content.shrink_to_fit();
+
+  ServerConfig config;
+  config.root = t.root;
+  config.timeout = std::chrono::milliseconds( 0 );
+  config.cache_bytes = 0;               // the module alone, no cache
+  Server server( f.zorba, config, std::cerr );
+
+  long long const before = peak_rss();
+  Json const r = call_tool( server, "run_query", Json::object( { { "query",
+    "import module namespace dir = \"http://zorba.io/modules/directory\";\n"
+    "count(for $d in dir:documents($dir:root)\n"
+    "      where exists($d(\"content\")(\"rs\")) return $d)" } } ) );
+  long long const growth = peak_rss() - before;
+  check( !is_tool_error( r ) && result_text( r ) == std::to_string( files ),
+         "dir:documents parses every document", r.dump() );
+  check( growth < 10 * tree_bytes,
+         "a scan with dir:documents does not hold every parsed document",
+         "peak RSS grew by " + std::to_string( growth >> 20 ) + " MiB for " +
+         std::to_string( tree_bytes >> 20 ) + " MiB of files" );
+}
 
 std::string const dir_import(
   "import module namespace dir = \"http://zorba.io/modules/directory\";\n" );
@@ -944,7 +1003,8 @@ Test const tests[] = {
   { "cache_evict", test_cache_evict },
   { "cache_off", test_cache_off },
   { "cache_policy", test_cache_policy },
-  { "cache_inject", test_cache_inject }
+  { "cache_inject", test_cache_inject },
+  { "documents_stream", test_documents_stream }
 };
 
 } // namespace
