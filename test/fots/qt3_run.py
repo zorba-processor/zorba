@@ -25,6 +25,15 @@ as errors.
 Output: <out>/results.tsv with one line per test case:
   test-set <TAB> test-case <TAB> status <TAB> detail
 status is one of: pass, fail, wrongError, n/a, skip, error.
+
+--policy secure runs zorba with --secure, so the driver and every query it
+evaluates (the test-case queries inherit the driver's policy through the
+zorba-query module) have only the capabilities the harness needs:
+file-read, limited to the directories of the catalog, the driver, the Zorba
+manifest and the expected-failures file, and native-modules (the driver
+imports the zorba-query and file modules). Environment variables, external
+entities, network access and file writes are denied. The default policy is
+the zorba tool's (unrestricted).
 """
 
 import argparse
@@ -108,8 +117,12 @@ class Runner:
              "-e", "verbose:=" + ("true" if verbose else "false"),
              "-e", "ctestMode:=false",
              "-e", "usePlanSerializer:=false",
-             "--disable-http-resolution",
-             "-o", out_file]
+             "--disable-http-resolution"]
+        if a.policy == "secure":
+            c += ["--secure", "--allow", "file-read,native-modules"]
+            for d in a.read_paths:
+                c += ["--read-path", d]
+        c += ["-o", out_file]
         if test_case is not None:
             c[c.index("-o"):c.index("-o")] = ["-e", "testCaseName:=" + test_case]
         return c
@@ -220,10 +233,16 @@ def main():
     ap.add_argument("--verbose", action="store_true",
                     help="keep the query and actual result of failing cases "
                          "in the per-set XML")
+    ap.add_argument("--policy", choices=("unrestricted", "secure"),
+                    default="unrestricted",
+                    help="security policy of the driver and the test-case "
+                         "queries (see above)")
     a = ap.parse_args()
     a.deadline = time.monotonic() + a.budget
     for attr in ("zorba", "driver", "manifest", "expected_failures", "catalog", "out"):
         setattr(a, attr, os.path.abspath(getattr(a, attr)))
+    a.read_paths = sorted({os.path.dirname(getattr(a, attr)) for attr in
+                           ("catalog", "driver", "manifest", "expected_failures")})
     os.makedirs(os.path.join(a.out, "xml"), exist_ok=True)
     a.tmp = tempfile.mkdtemp(prefix="qt3-")
 

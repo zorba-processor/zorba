@@ -20,6 +20,14 @@ on:
         description: Number of parallel shards
         required: false
         default: '2'
+      policy:
+        description: >-
+          Security policy of the driver and the test-case queries
+          (secure = file-read under the suite and driver directories only;
+          see test/fots/qt3_run.py)
+        type: choice
+        options: [unrestricted, secure]
+        default: unrestricted
   schedule:
     - cron: '17 4 * * 1'
 
@@ -149,6 +157,7 @@ jobs:
                 --jobs "$(nproc)" \
                 --case-timeout 60 \
                 --budget 17400 \
+                --policy "${{ inputs.policy || 'unrestricted' }}" \
                 --verbose \
                 --out qt3-out'
 
