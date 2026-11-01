@@ -55,9 +55,10 @@ enum class Capability : uint32_t {
   /** fn:environment-variable, fn:available-environment-variables, and the
    *  ZORBA_URI_PATH / ZORBA_LIB_PATH environment variables. */
   Environment      = 1u << 5,
-  /** Loading native libraries that implement external functions, and the
-   *  WordNet thesaurus data that is installed with them in the library
-   *  path. */
+  /** Loading native libraries that implement external functions, and
+   *  WordNet thesaurus data in the library path named by a wordnet: URI.
+   *  The built-in thesaurus ("using thesaurus default") needs no
+   *  capability. */
   NativeModules    = 1u << 6
 };
 
