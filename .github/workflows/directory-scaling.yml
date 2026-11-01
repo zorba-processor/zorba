@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       trees:
-        description: "Space-separated trees FILES:KB (files of ~KB KB each)"
+        description: "Space-separated trees FILES:KB[:FORMATS] (files of ~KB KB each; FORMATS e.g. xml,json)"
         required: false
         default: "100:2 1000:2 10000:2 100:200 1000:200"
       calls:
