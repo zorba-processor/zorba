@@ -226,9 +226,15 @@ IF (ZORBA_WITH_FILE_ACCESS)
   ZORBA_SECURITY_TEST(dir_join
     "{ \"order\" : \"o1\", \"file\" : \"orders/2026/q1.xml\", \"total\" : 100, \"status\" : \"paid\" }\n{ \"order\" : \"o2\""
     --directory "${_dirtree}" -f -q "${_dirq}/join.xq")
-  ZORBA_SECURITY_TEST(dir_html
-    "html-html-true-HTML report"
-    --directory "${_dirtree}" -f -q "${_dirq}/html.xq")
+  IF (ZORBA_NO_XMLSCHEMA)
+    ZORBA_SECURITY_TEST(dir_html_unsupported
+      "html-html-false-UNSUPPORTED_FORMAT"
+      --directory "${_dirtree}" -f -q "${_dirq}/html-unsupported.xq")
+  ELSE (ZORBA_NO_XMLSCHEMA)
+    ZORBA_SECURITY_TEST(dir_html
+      "html-html-true-HTML report"
+      --directory "${_dirtree}" -f -q "${_dirq}/html.xq")
+  ENDIF (ZORBA_NO_XMLSCHEMA)
   ZORBA_SECURITY_DENIED(dir_doc_escape FODC0002 "access denied by security policy"
     --directory "${_dirtree}" -f -q "${_dirq}/doc-escape.xq")
   ZORBA_SECURITY_DENIED(dir_symlink_escape FOFL9999 "access denied by security policy"

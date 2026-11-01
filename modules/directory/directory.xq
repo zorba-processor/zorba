@@ -33,7 +33,9 @@ xquery version "3.0";
  : <pre>{ "path" : "orders/2026/q1.xml", "format" : "xml", "content" : ... }</pre>
  : where the content is a document node for XML and for HTML (parsed leniently
  : as by <code>x:parse-html</code>, so that markup that is not well-formed
- : still yields a document), the parsed item for JSON
+ : still yields a document; HTML needs a build with XML Schema support, in
+ : other builds an HTML file yields the <code>UNSUPPORTED_FORMAT</code> error
+ : record), the parsed item for JSON
  : (an array of the items if the file holds several top-level items, as in
  : JSON Lines) and an array of row objects for CSV (the first line holds the
  : column names, see <code>csv:parse</code>). If the file cannot be read or
@@ -58,7 +60,9 @@ module namespace dir = "http://zorba.io/modules/directory";
 import module namespace file = "http://expath.org/ns/file";
 import module namespace jn = "http://jsoniq.org/functions";
 import module namespace csv = "http://zorba.io/modules/json-csv";
+(: BEGIN-HTML-IMPORT :)
 import module namespace x = "http://zorba.io/modules/xml";
+(: END-HTML-IMPORT :)
 
 declare namespace an = "http://zorba.io/annotations";
 declare namespace err = "http://www.w3.org/2005/xqt-errors";
@@ -330,7 +334,9 @@ declare %private %an:nondeterministic function dir:parse(
   case "csv" return
     [ csv:parse( file:read-text( $full ) ) ]
   case "html" return
+    (: BEGIN-HTML-BRANCH :)
     x:parse-html( file:read-text( $full ) )
+    (: END-HTML-BRANCH :)
   default return
     error( xs:QName( "dir:UNSUPPORTED_FORMAT" ),
       "no parser for this file extension" )
