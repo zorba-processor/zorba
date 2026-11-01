@@ -19,11 +19,14 @@
 #include <cstdlib>
 #include <cctype>
 #include <iostream>
+#include <stdexcept>
+#include <string>
 
 // Zorba
 #include <zorba/zorba.h>
 #include <zorba/properties.h>
 #include <zorba/security.h>
+#include <zorba/util/fs_util.h>
 
 // local
 #include "zorbacmd_props.h"
@@ -57,6 +60,16 @@ static char const* check_args() {
   if (zc_props.timezone_set_ &&
       (zc_props.timezone_ > 14*60 || zc_props.timezone_ < -14*60))
     return "Invalid timezone specified: valid timezones are in the range [-14*60, 14*60]";
+
+  // --directory sets the policy itself: nothing may widen it.
+  if ( !zc_props.directory_.empty() ) {
+    bool widens = !zc_props.read_paths_.empty() || !zc_props.write_paths_.empty() ||
+      !zc_props.network_prefixes_.empty() || zc_props.private_addresses_ == 1;
+    for ( capability_op const &op : zc_props.capability_ops_ )
+      widens = widens || op.allow;
+    if ( widens )
+      return "--directory cannot be combined with --allow, --read-path, --write-path, --network-prefix or --private-addresses allow: it sets the security policy itself";
+  }
 
   if ( zc_props.queries_or_files_.empty() )
     return "No queries submitted\nUsage: zorba -q '1 + 1' execute an inline query \n zorba file.xq execute a query from a file";
@@ -135,6 +148,9 @@ char const* get_help_msg() {
 
     HELP_OPT( "--default-collation <collation>" )
       "Add the given collation and set the value of the default collation in the static context to the given collation.\n\n"
+
+    HELP_OPT( "--directory <dir>" )
+      "Query the documents under the given directory: the query runs under the secure policy (see --secure) with only file-read, restricted to <dir>, and native-modules allowed; the variable $dir:root of the directory module (http://zorba.io/modules/directory) is bound to <dir>; and the result is serialized as JSON, one item per line (method=json, item-separator newline; -z overrides). Cannot be combined with --allow, --read-path, --write-path, --network-prefix or --private-addresses allow; --deny and the limits apply.\n\n"
 
     HELP_OPT( "--disable-http-resolution" )
       "Do not import modules or schemas over the network. Same as --deny remote-import.\n\n"
@@ -606,6 +622,11 @@ int parse_args( int argc, char const *argv[] ) {
       }
       zc_props.capability_ops_.push_back( op );
     }
+    else if ( IS_LONG_OPT( "--directory" ) ) {
+      PARSE_ARG( "--directory" );
+      zc_props.directory_ = ARG_VAL;
+      zc_props.secure_ = true;
+    }
     else if ( IS_LONG_OPT( "--disable-http-resolution" ) ) {
       capability_op op;
       op.allow = false;
@@ -990,6 +1011,34 @@ int parse_args( int argc, char const *argv[] ) {
       zc_props.queries_or_files_.push_back( *argv );
     }
   } // for
+
+  static string directory_error;
+  if ( !error && !zc_props.directory_.empty() ) {
+    // The directory is both the read path and the value of $dir:root, so use
+    // one absolute, normalized spelling for both.
+    string dir( zc_props.directory_ );
+    try {
+      fs::make_absolute( &dir );
+      dir = fs::normalize_path( dir );
+    }
+    catch ( std::invalid_argument const& ) {
+    }
+    while ( dir.size() > 1 && dir.back() == '/' )
+      dir.pop_back();
+    if ( fs::get_type( dir ) != fs::directory ) {
+      directory_error = "--directory: not a directory: " + zc_props.directory_;
+      error = directory_error.c_str();
+    } else {
+      zc_props.directory_ = dir;
+      // JSON, one item per line, unless -z says otherwise (later parameters
+      // win, so these go first).
+      zc_props.serialization_params_.insert(
+        zc_props.serialization_params_.begin(),
+        { serialization_param( "method", "json" ),
+          serialization_param( "item-separator", "\n" ) } );
+      zc_props.trailing_nl_ = true;
+    }
+  }
 
   if ( !error )
     error = check_args();

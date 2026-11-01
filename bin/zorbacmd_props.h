@@ -89,6 +89,7 @@ struct ZorbaCmdProperties {
   unsigned      debug_port_;
 #endif /* ZORBA_WITH_DEBUGGER */
   std::string   default_collation_;
+  std::string   directory_;             // --directory; absolute after parsing
   external_vars external_vars_;
   bool          indent_;
   bool          jsoniq_;
