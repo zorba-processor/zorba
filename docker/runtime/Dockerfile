@@ -16,8 +16,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # the tag and commit in sync): stock Xerces-C <= 3.3.0 rejects valid schemas
 # that restrict a union type (see doc/KNOWN_ISSUES.txt).
 ARG XERCES_REPO=https://github.com/zorba-processor/xerces-c.git
-ARG XERCES_TAG=v3.3.0-zorba.4
-ARG XERCES_COMMIT=90e9babe7d84e08cbdde55e4e27392f5a5a6b095
+ARG XERCES_TAG=v3.3.0-zorba.5
+ARG XERCES_COMMIT=c35c28f192a28d9ae1ddde635294f43536dccffd
 RUN git clone --depth 1 --branch "${XERCES_TAG}" "${XERCES_REPO}" /tmp/xerces \
  && test "$(git -C /tmp/xerces rev-parse HEAD)" = "${XERCES_COMMIT}" \
  && cmake -S /tmp/xerces -B /tmp/xerces/build -G Ninja -DCMAKE_BUILD_TYPE=Release \
