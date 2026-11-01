@@ -1,10 +1,11 @@
 (: Generates a synthetic document tree for the directory scaling benchmark
  : (.github/workflows/directory-scaling.yml).
  :
- :   zorba -f -q gen_tree.xq -e out:=DIR -e files:=N -e kb:=K
+ :   zorba -f -q gen_tree.xq -e out:=DIR -e files:=N -e kb:=K [-e formats:=F]
  :
  : writes N files of about K KB each under DIR, in nested directories
- : (DIR/dNN/eN/), cycling through XML, JSON and CSV. Every file holds records
+ : (DIR/dNN/eN/), cycling through XML, JSON and CSV (or through the formats
+ : listed in F, separated by commas, e.g. "json"). Every file holds records
  : with the fields id, cat (c0..c9), v (an integer) and n; the content only
  : depends on N, K and the file number, so trees are reproducible. :)
 import module namespace file = "http://expath.org/ns/file";
@@ -13,6 +14,7 @@ declare namespace an = "http://zorba.io/annotations";
 declare variable $out as xs:string external;
 declare variable $files as xs:string external;
 declare variable $kb as xs:string external;
+declare variable $formats as xs:string external := "xml,json,csv";
 
 declare function local:records( $i as xs:integer, $bytes as xs:integer,
                                 $len as xs:integer ) as xs:integer*
@@ -71,8 +73,9 @@ declare %an:sequential function local:write( $dir as xs:string,
 
 (
   let $bytes := xs:integer( $kb ) * 1024
+  let $cycle := tokenize( $formats, "," )
   for $i in 0 to xs:integer( $files ) - 1
-  let $format := ( "xml", "json", "csv" )[ $i mod 3 + 1 ]
+  let $format := $cycle[ $i mod count( $cycle ) + 1 ]
   let $dir := concat( $out, "/d", format-integer( $i mod 32, "00" ), "/e",
                       ( $i idiv 32 ) mod 8 )
   let $path := concat( $dir, "/f", format-integer( $i, "00000" ), ".",
