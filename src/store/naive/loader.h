@@ -134,6 +134,17 @@ public:
    * returns true.
    */
   bool reportDeniedResource();
+
+  /**
+   * The URI libxml2 resolves relative system identifiers (external entities,
+   * the external DTD subset, XInclude targets) against: the URI the stream
+   * was opened from, else the document URI, else the base URI (for
+   * fn:parse-xml, the static base URI). Empty if none of them is known.
+   */
+  static char const* parserInputUri(
+      std::istream& aStream,
+      const zstring& aDocUri,
+      const zstring& aBaseUri);
 };
 
 

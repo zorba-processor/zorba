@@ -108,6 +108,19 @@ bool XmlLoader::reportDeniedResource()
 }
 
 
+char const* XmlLoader::parserInputUri(
+    std::istream& aStream,
+    const zstring& aDocUri,
+    const zstring& aBaseUri)
+{
+  if (char const* const lStreamUri = get_uri(aStream))
+    return lStreamUri;
+  if (!aDocUri.empty())
+    return aDocUri.c_str();
+  return aBaseUri.c_str();
+}
+
+
 /*******************************************************************************
 
 ********************************************************************************/
@@ -382,11 +395,8 @@ store::Item_t FastXmlLoader::loadXml(
 
   theBaseUri = baseUri;
 
-  char const *doc_uri;
-  if ( char const *const stream_uri = get_uri( stream ) )
-    doc_uri = stream_uri;
-  else
-    doc_uri = docUri.c_str();
+  // Relative external entities resolve against this URI.
+  char const *const doc_uri = parserInputUri(stream, docUri, baseUri);
 
   if (docUri.empty())
   {
