@@ -689,14 +689,14 @@ void test_cache_hit( Fixture const &f ) {
     "return $d(\"path\"), \",\")" );
   v = query_text( server, docs );
   s = server.cache_stats();
-  check( v == "a.json,b.xml" && s.hits == 2 && s.misses == 2 &&
+  check( v == "\"a.json,b.xml\"" && s.hits == 2 && s.misses == 2 &&
          s.entries == 2,
          "dir:documents uses the cache and stores the other document",
          v + " / " + stats_text( s ) );
 
   v = query_text( server, docs );
   s = server.cache_stats();
-  check( v == "a.json,b.xml" && s.hits == 4 && s.misses == 2,
+  check( v == "\"a.json,b.xml\"" && s.hits == 4 && s.misses == 2,
          "a repeated dir:documents is served from the cache",
          v + " / " + stats_text( s ) );
 
@@ -706,7 +706,7 @@ void test_cache_hit( Fixture const &f ) {
   v = query_text( server, dir_import +
     "dir:open($dir:root, \"sub/c.json\")(\"path\"), "
     "dir:open(concat($dir:root, \"/sub\"), \"c.json\")(\"path\")" );
-  check( v == "sub/c.json\nc.json",
+  check( v == "\"sub/c.json\"\n\"c.json\"",
          "a record keeps the path relative to the root it was opened with", v );
 
   // A query that can apply updates does not use the cache.
@@ -777,7 +777,7 @@ void test_cache_evict( Fixture const &f ) {
     "string-join(for $d in dir:documents($dir:root) "
     "return string($d(\"content\")(\"v\")), \",\")" );
   DocumentCache::Stats s = server.cache_stats();
-  check( v == "1,2,3,4" && s.stores == 4 && s.evictions == 2 &&
+  check( v == "\"1,2,3,4\"" && s.stores == 4 && s.evictions == 2 &&
          s.entries == 2 && s.bytes <= config.cache_bytes,
          "the cache stays within its budget, evicting the oldest entries",
          v + " / " + stats_text( s ) );
