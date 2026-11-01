@@ -487,7 +487,8 @@ void test_document_cache(Zorba* z, const Files& f)
   CHECK(allowed(run(z, sec, DOC_AVAILABLE, lUri), "false"));
   CHECK(denied(run(z, inData, DOC, lUri), "FODC0002"));
   CHECK(allowed(run(z, all, DOC, lUri), SECRET));
-  CHECK(allowed(run(z, z->createStaticContext(), DOC, lUri), SECRET));
+  // The instance default is secure(): no cache hit for it either.
+  CHECK(denied(run(z, z->createStaticContext(), DOC, lUri), "FODC0002"));
 
   // Documents the embedder puts into the store are not subject to the
   // policy: the embedder chose to make them available.

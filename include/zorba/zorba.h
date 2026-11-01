@@ -352,9 +352,10 @@ class ZORBA_DLL_PUBLIC Zorba
    * Call this before compiling or executing queries; changing the policy
    * while queries run on other threads is not synchronized.
    *
-   * The default is currently SecurityPolicy::unrestricted(); it will become
-   * SecurityPolicy::secure() in Zorba 5.0.0. Applications that need the old
-   * behavior should set SecurityPolicy::unrestricted() explicitly.
+   * The default is SecurityPolicy::secure(): no file, network, external
+   * entity, native module or environment access. Before Zorba 5.0.0 the
+   * default was SecurityPolicy::unrestricted(); applications that need that
+   * behavior set it explicitly.
    *
    * @param aPolicy the new default policy.
    */

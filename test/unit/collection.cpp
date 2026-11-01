@@ -19,6 +19,7 @@
 
 #include <zorba/store_manager.h>
 #include <zorba/zorba.h>
+#include <zorba/security.h>
 #include <zorba/xquery.h>
 #include <zorba/xquery_exception.h>
 
@@ -27,6 +28,8 @@ int collection(int argc, char* argv[])
 {
   void* store = zorba::StoreManager::getStore();
   zorba::Zorba* z = zorba::Zorba::getInstance(store);
+  // The query imports modules from files outside the trusted URI path.
+  z->setSecurityPolicy(zorba::SecurityPolicy::secure().allow(zorba::Capability::FileRead));
 
   std::ifstream lIn("collection1.xq");
   assert(lIn.good());

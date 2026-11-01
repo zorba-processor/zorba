@@ -120,8 +120,14 @@ enum class Capability : uint32_t {
  *       http-client and ftp-client modules need their capabilities, native
  *       libraries need Capability::NativeModules); the file, http-client
  *       and ftp-client modules (every path, URL, redirect and connection);
- *       the environment functions. The instance default is currently
- *       unrestricted(); it will become secure() in Zorba 5.0.0.
+ *       the environment functions.
+ *
+ * The instance default is secure() (since Zorba 5.0.0; earlier versions
+ * behaved like unrestricted()). An embedder that needs files, the network,
+ * external entities, native modules or the environment allows them
+ * explicitly, or calls
+ * <code>zorba->setSecurityPolicy(SecurityPolicy::unrestricted())</code> to
+ * restore the behavior of earlier versions.
  */
 class ZORBA_DLL_PUBLIC SecurityPolicy
 {
@@ -132,7 +138,8 @@ public:
    *        1024, expression nesting depth limited to 1500, libxml2's
    *        default entity amplification limit.
    *
-   * This will be the library default in Zorba 5.0.0.
+   * This is the library default: the policy of a Zorba instance on which
+   * Zorba::setSecurityPolicy() was not called.
    */
   static SecurityPolicy secure();
 
@@ -142,8 +149,10 @@ public:
    *        expression nesting depth limited to 1500, libxml2's default
    *        entity amplification limit.
    *
-   * This is the policy of the \c zorba command-line tool and the current
-   * library default. The call depth and expression nesting limits are kept
+   * This is the policy of the \c zorba command-line tool (unless
+   * <code>--secure</code> is given) and the behavior of Zorba versions before
+   * 5.0.0. Embedders that relied on that behavior set it explicitly with
+   * Zorba::setSecurityPolicy(). The call depth and expression nesting limits are kept
    * so that runaway recursion and pathologically nested queries still raise
    * an error instead of overflowing the stack.
    *

@@ -546,7 +546,9 @@ void test_http_uri_resolution(Zorba* z)
 
   // Other contexts are not affected (the option used to switch the feature
   // off for the whole process).
-  CHECK(z->createStaticContext()->getSecurityPolicy()
+  CHECK(z->createStaticContext()->getSecurityPolicy() ==
+        z->getSecurityPolicy());
+  CHECK(context(z, SecurityPolicy::unrestricted())->getSecurityPolicy()
         .allows(Capability::RemoteImport));
 
   // Queries cannot set it.

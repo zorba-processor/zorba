@@ -22,6 +22,7 @@
 // Zorba
 #include <zorba/store_manager.h>
 #include <zorba/zorba.h>
+#include <zorba/security.h>
 
 using namespace zorba;
 
@@ -82,6 +83,8 @@ plan_serializer(int argc, char* argv[])
 {
   void* lStore = zorba::StoreManager::getStore();
   Zorba* lZorba = Zorba::getInstance(lStore);
+  // The query imports modules from files outside the trusted URI path.
+  lZorba->setSecurityPolicy(SecurityPolicy::secure().allow(Capability::FileRead));
 
   std::cout << "executing test 1" << std::endl;
   if (!plan_serializer1(lZorba))

@@ -22,6 +22,7 @@
 #include <string.h>
 
 #include <zorba/zorba.h>
+#include <zorba/security.h>
 #include <zorba/zorba_exception.h>
 #include <zorba/external_module.h>
 #include <zorba/function.h>
@@ -217,6 +218,8 @@ int test2(const char* module_filename)
 {
   void* lStore = zorba::StoreManager::getStore();
   Zorba* lZorba = Zorba::getInstance(lStore);
+  // The query imports its module from a file outside the trusted URI path.
+  lZorba->setSecurityPolicy(SecurityPolicy::secure().allow(Capability::FileRead));
 
   try
   {

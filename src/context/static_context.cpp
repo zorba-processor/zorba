@@ -2169,7 +2169,7 @@ SecurityPolicy static_context::get_security_policy() const
   }
 
   SecurityPolicy lPolicy =
-    lBase ? *lBase : SecurityPolicy::unrestricted();
+    lBase ? *lBase : SecurityPolicy::secure();
   if (lNarrowing)
     lPolicy = lPolicy.narrowedBy(*lNarrowing);
   return lPolicy;
@@ -2185,6 +2185,7 @@ SecurityPolicy static_context::get_security_policy() const
 bool static_context::allows_capability(Capability aCap) const
 {
   bool lNarrowedLists = false;
+  bool lFoundBase = false;
   for (const static_context* sctx = this; sctx != NULL; sctx = sctx->theParent)
   {
     const SecurityPolicy* p = sctx->theSecurityPolicy.get();
@@ -2193,11 +2194,18 @@ bool static_context::allows_capability(Capability aCap) const
     if (!p->allows(aCap))
       return false;
     if (!sctx->theSecurityPolicyNarrows)
+    {
+      lFoundBase = true;
       break;
+    }
     if (!p->getReadPaths().empty() || !p->getWritePaths().empty() ||
         !p->getNetworkPrefixes().empty())
       lNarrowedLists = true;
   }
+  // Without an explicit policy on the chain the base is
+  // SecurityPolicy::secure(), which allows no capability.
+  if (!lFoundBase)
+    return false;
   return lNarrowedLists ? get_security_policy().allows(aCap) : true;
 }
 

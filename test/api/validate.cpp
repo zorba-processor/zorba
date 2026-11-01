@@ -21,6 +21,7 @@
 #include <sstream>
 
 #include <zorba/zorba.h>
+#include <zorba/security.h>
 #include <zorba/store_manager.h>
 #include <zorba/uri_resolvers.h>
 #include <zorba/iterator.h>
@@ -170,6 +171,8 @@ int
 validate(int argc, char* argv[]) 
 {
   Zorba* lZorba = Zorba::getInstance(zorba::StoreManager::getStore());
+  // The schemas are imported from the HTTP test server.
+  lZorba->setSecurityPolicy(SecurityPolicy::unrestricted());
 
   int retval = 0;
 

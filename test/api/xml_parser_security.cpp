@@ -251,9 +251,9 @@ void test_unrestricted(Zorba* z, const Files& f)
 #endif
   CHECK(expanded(parse_xml(z, sctx, INTERNAL_ENTITY), "hello"));
 
-  // Also with the instance default.
+  // The instance default is secure(): external entities are refused.
   StaticContext_t dflt = z->createStaticContext();
-  CHECK(expanded(parse_xml(z, dflt, xxe_system(f)), SECRET));
+  CHECK(denied(parse_xml(z, dflt, xxe_system(f)), "FODC0006", f.secretURI));
 }
 
 void test_secure_context(Zorba* z, const Files& f)

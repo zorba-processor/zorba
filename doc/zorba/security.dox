@@ -1,0 +1,85 @@
+/** \page security Security Policy
+
+\section security_default Secure by default
+
+Since Zorba 5.0.0 a Zorba instance runs queries under
+<tt>zorba::SecurityPolicy::secure()</tt> unless the application says
+otherwise. Under the secure policy a query cannot:
+
+- read or write files (<tt>fn:doc</tt>, <tt>fn:unparsed-text</tt>, stop
+  words, thesauri and the EXPath file module on files);
+- use the network (http, https, ftp and ftps documents and text, the
+  http-client and ftp-client modules);
+- import modules or schemas over the network;
+- expand external entities, an external DTD subset or XInclude in XML input;
+- load native libraries that implement external functions;
+- read environment variables (<tt>fn:environment-variable</tt> and
+  <tt>fn:available-environment-variables</tt> return the empty sequence, and
+  <tt>ZORBA_URI_PATH</tt> / <tt>ZORBA_LIB_PATH</tt> are ignored).
+
+Queries can still use everything that does not leave the process: the
+in-memory store and collections, documents and items the application passes
+in, the built-in modules, and modules and schemas found in the trusted URI
+and library paths (the built-in paths and the ones set with
+<tt>StaticContext::setURIPath()</tt>, <tt>setLibPath()</tt> and
+<tt>setModulePaths()</tt>). Recursion depth (1024 calls) and expression
+nesting depth (1500) are limited. There is no default timeout.
+
+Zorba 4.x and earlier ran every query with all of these capabilities.
+
+\section security_allow Allowing capabilities
+
+The application grants capabilities through the C++ API; a query can never
+widen the policy it runs under. Set the instance default with
+<tt>Zorba::setSecurityPolicy()</tt>, or a policy for one static context (and
+the queries compiled with it) with <tt>StaticContext::setSecurityPolicy()</tt>:
+
+\code
+Zorba* z = Zorba::getInstance(StoreManager::getStore());
+
+// Read documents from one directory, give up after 10 seconds.
+z->setSecurityPolicy(SecurityPolicy::secure()
+    .allow(Capability::FileRead).addReadPath("/srv/data")
+    .setTimeout(std::chrono::seconds(10)));
+
+// One context may also call one web service.
+StaticContext_t sctx = z->createStaticContext();
+sctx->setSecurityPolicy(SecurityPolicy::secure()
+    .allow(Capability::FileRead).addReadPath("/srv/data")
+    .allow(Capability::Network).addNetworkPrefix("https://api.example.com/v1/")
+    .allow(Capability::NativeModules));   // the http-client module
+XQuery_t q = z->compileQuery(query, sctx);
+\endcode
+
+The capabilities are listed in <tt>zorba::Capability</tt>. Network access to
+loopback, private and link-local addresses is denied unless a network prefix
+names such a host or <tt>SecurityPolicy::setAllowPrivateAddresses(true)</tt>
+is called.
+
+\section security_optout Restoring the old behavior
+
+An application that trusts its queries and needs the behavior of Zorba 4.x
+sets the unrestricted policy once, before compiling queries:
+
+\code
+z->setSecurityPolicy(SecurityPolicy::unrestricted());
+\endcode
+
+\section security_errors Errors
+
+A resource the policy denies is reported with the error the specification
+prescribes for a resource that cannot be retrieved (for example
+<tt>err:FODC0002</tt> for <tt>fn:doc</tt>, <tt>err:XQST0059</tt> for a module
+import), and the message says that the security policy denied it and which
+capability is missing. Importing a module that needs a capability the policy
+does not allow (the file, http-client and ftp-client modules, native
+modules) raises <tt>zerr:ZXQP0067</tt>. See the documentation of
+<tt>zorba::SecurityPolicy</tt> for the complete list.
+
+\section security_cli Command line
+
+The <tt>zorba</tt> command-line tool keeps running queries with the
+unrestricted policy; <tt>--secure</tt>, <tt>--allow</tt> and <tt>--deny</tt>
+restrict it (see \ref commandLineSecurity).
+
+*/
