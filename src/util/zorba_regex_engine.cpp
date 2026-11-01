@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-#include "stdafx.h"
-
 #include <cctype>
 #include <cstdint>
 #include <cstring>

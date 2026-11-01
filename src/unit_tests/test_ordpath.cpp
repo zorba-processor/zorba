@@ -22,8 +22,6 @@
 //   neighbours, also when applied repeatedly;
 // - getRelativePosition() classifies ancestor/descendant/preceding/following.
 
-#include "stdafx.h"
-
 #include <iostream>
 #include <sstream>
 #include <string>

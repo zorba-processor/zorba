@@ -17,8 +17,6 @@
 #ifndef ZORBA_COMPILER_REWRITER_FOLD_RULES
 #define ZORBA_COMPILER_REWRITER_FOLD_RULES
 
-#include "stdafx.h"
-
 #include "compiler/rewriter/framework/rule_driver.h"
 #include "compiler/rewriter/rules/ruleset.h"
 

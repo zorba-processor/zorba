@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-#include "stdafx.h"
 #include <cstring>                      /* for memcpy(3) */
 
 #include <zorba/util/mem_streambuf.h>

@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-#include "stdafx.h"
-
 #include "diagnostics/xquery_exception.h"
 #include "runtime/jsound/jsound.h"
 #include "store/api/item_factory.h"

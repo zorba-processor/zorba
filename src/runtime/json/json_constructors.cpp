@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "stdafx.h"
 
 #include "store/api/item_factory.h"
 #include "store/api/copymode.h"

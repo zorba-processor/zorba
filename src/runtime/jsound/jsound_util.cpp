@@ -15,7 +15,6 @@
  */
 
 #include <zorba/internal/ztd.h>
-#include "stdafx.h"
 #include <cstring>
 #include <iostream>
 #include <sstream>

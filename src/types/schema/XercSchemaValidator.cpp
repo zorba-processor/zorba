@@ -22,7 +22,6 @@
 // ---------------------------------------------------------------------------
 //  Includes
 // ---------------------------------------------------------------------------
-#include "stdafx.h"
 
 #include <xercesc/util/Janitor.hpp>
 #include <xercesc/framework/XMLDocumentHandler.hpp>

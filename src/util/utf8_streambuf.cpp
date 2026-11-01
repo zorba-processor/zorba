@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-#include "stdafx.h"
-
 //#define ZORBA_DEBUG_UTF8_STREAMBUF
 #ifdef ZORBA_DEBUG_UTF8_STREAMBUF
 # include <stdio.h>

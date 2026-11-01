@@ -23,7 +23,6 @@
 
 
 
-#include "stdafx.h"
 #include "runtime/parsing_and_serializing/parse_fragment.h"
 #include "functions/func_parse_fragment.h"
 

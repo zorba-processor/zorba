@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 #include <zorba/internal/ztd.h>
-#include "stdafx.h"
 
 #define DEBUG_FT_THESAURUS 0
 

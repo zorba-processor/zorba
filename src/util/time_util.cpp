@@ -15,7 +15,6 @@
  */
 
 #include <zorba/internal/ztd.h>
-#include "stdafx.h"
 
 #include <algorithm>
 #include <cassert>

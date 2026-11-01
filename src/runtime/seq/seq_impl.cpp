@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-#include "stdafx.h"
-
 #include <zorba/config.h>
 #include <zorba/internal/cxx_util.h>
 

@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-#include "stdafx.h"
-
 #include <cstring>
 
 #include "util/fs_util.h"

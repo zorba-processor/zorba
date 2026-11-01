@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 #include <zorba/internal/ztd.h>
-#include "stdafx.h"
 
 #include <algorithm>                    /* for lower_bound() */
 #include <cstring>

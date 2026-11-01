@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-#include "stdafx.h"
 #include "api/unmarshaller.h"
 
 #include "ft_module_util.h"

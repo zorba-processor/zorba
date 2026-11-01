@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-#include "stdafx.h"
-
 #include "util/unicode_util.h"
 
 namespace zorba {

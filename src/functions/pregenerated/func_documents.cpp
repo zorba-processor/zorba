@@ -23,7 +23,6 @@
 
 
 
-#include "stdafx.h"
 #include "runtime/store/documents.h"
 #include "functions/func_documents.h"
 

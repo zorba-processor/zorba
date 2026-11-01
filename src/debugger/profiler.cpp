@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-#include "stdafx.h"
-
 #include "debugger/profiler.h"
 
 #include <string>

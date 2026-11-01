@@ -23,7 +23,6 @@
 
 
 
-#include "stdafx.h"
 #include "runtime/item/item.h"
 #include "functions/func_item.h"
 
