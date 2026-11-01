@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Querying a folder from an AI agent (MCP)</title>
-<meta name="description" content="zorba-mcp lets an AI agent query a folder of XML, JSON and CSV files with JSONiq and XQuery over MCP, read-only and confined to the folder. How to run it with Docker, register it with an MCP client, and what it exposes.">
+<meta name="description" content="zorba-mcp lets an AI agent query a folder of XML, JSON, CSV and HTML files with JSONiq and XQuery over MCP, read-only and confined to the folder. How to run it with Docker, register it with an MCP client, and what it exposes.">
 <link rel="icon" href="assets/zorba-mark.svg" type="image/svg+xml">
 <link rel="icon" href="assets/favicon-32.png" type="image/png" sizes="32x32">
 <link rel="apple-touch-icon" href="assets/favicon-180.png">
@@ -32,7 +32,7 @@
 
 <main>
 <h1>Querying a folder from an AI agent (MCP)</h1>
-<p class="lede">Point <code>zorba-mcp</code> at a folder of XML, JSON and CSV files and an AI agent can ask questions across all of them with JSONiq, without you converting or loading anything.</p>
+<p class="lede">Point <code>zorba-mcp</code> at a folder of XML, JSON, CSV and HTML files and an AI agent can ask questions across all of them with JSONiq, without you converting or loading anything.</p>
 
 <h2 id="what">What it is</h2>
 <p><code>zorba-mcp</code> is a <a href="https://modelcontextprotocol.io">Model Context Protocol</a> server that speaks JSON-RPC over standard input and output. The agent's client starts it, and the agent gets tools to list the files in the folder and to run JSONiq or XQuery over them. The files stay where they are: every call reads them as they are on disk, nothing is indexed or cached.</p>
