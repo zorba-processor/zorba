@@ -87,7 +87,7 @@ jobs:
             mkdir -p build/tidy
             rc=0
             run-clang-tidy -p build/full-release -j"$(nproc)" -quiet \
-              -source-filter "^/src/(src|modules|bin)/(?!.*/pregenerated/)(?!.*/compiler/parser/(xquery|jsoniq)_(parser|scanner)[.]cpp$)" \
+              -source-filter "^/src/(src|modules|bin)/(?!(.*/)?pregenerated/)(?!(.*/)?compiler/parser/(xquery|jsoniq)_(parser|scanner)[.]cpp$)" \
               > build/tidy/clang-tidy.log 2>&1 || rc=$?
             sed -nE "/: (warning|error): .*\[[a-z0-9.,-]+\]$/p" build/tidy/clang-tidy.log \
               | sort -u > build/tidy/findings.txt
