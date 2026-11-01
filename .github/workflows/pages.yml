@@ -13,6 +13,11 @@ on:
       - 'site/**'
       - 'scripts/site/**'
       - '.github/workflows/pages.yml'
+  pull_request:
+    paths:
+      - 'site/**'
+      - 'scripts/site/**'
+      - '.github/workflows/pages.yml'
   workflow_dispatch:
     inputs:
       record:
@@ -95,6 +100,24 @@ jobs:
 
       - name: Build the site
         run: python3 scripts/site/build.py site _site $([ "$RECORD" = true ] || echo --strict)
+
+      - name: Install pandoc
+        env:
+          PANDOC_VERSION: '3.12.1'
+          PANDOC_SHA256: d0c90410e90204c9ca83b8539fac5c7aed01fd537207e4585849f8abc5df20b8
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/pandoc.tar.gz" \
+            "https://github.com/jgm/pandoc/releases/download/$PANDOC_VERSION/pandoc-$PANDOC_VERSION-linux-amd64.tar.gz"
+          echo "$PANDOC_SHA256  $RUNNER_TEMP/pandoc.tar.gz" | sha256sum -c -
+          mkdir "$RUNNER_TEMP/pandoc"
+          tar -xzf "$RUNNER_TEMP/pandoc.tar.gz" -C "$RUNNER_TEMP/pandoc" --strip-components=1
+          echo "$RUNNER_TEMP/pandoc/bin" >> "$GITHUB_PATH"
+
+      - name: Generate the Markdown pages
+        run: scripts/site/make_markdown.sh _site
+
+      - name: Verify the Markdown pages and llms.txt
+        run: scripts/site/check_markdown.sh _site
 
       - uses: actions/upload-pages-artifact@v5
         if: github.ref == 'refs/heads/master' && env.RECORD != 'true'
