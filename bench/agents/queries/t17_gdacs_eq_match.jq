@@ -3,9 +3,6 @@
  : since the epoch. :)
 import module namespace dir = "http://zorba.io/modules/directory";
 import module namespace jn = "http://jsoniq.org/functions";
-(: dir:format() does not know the .geojson extension, so dir:open() reports
- : the GeoJSON file as unsupported: it is read and parsed explicitly. :)
-import module namespace file = "http://expath.org/ns/file";
 declare namespace math = "http://www.w3.org/2005/xpath-functions/math";
 declare namespace gdacs = "http://www.gdacs.org";
 declare namespace georss = "http://www.georss.org/georss";
@@ -36,8 +33,7 @@ declare function local:rfc822($s as xs:string) as xs:decimal
 
 let $quakes :=
   for $f in jn:members(
-    jn:parse-json(file:read-text(
-    concat($dir:root, "/earthquakes/usgs_m2.5_week.geojson")))("features"))
+    dir:open($dir:root, "earthquakes/usgs_m2.5_week.geojson")("content")("features"))
   where $f("properties")("mag") ge 4.5
   let $c := $f("geometry")("coordinates")
   return { "id" : $f("id"), "lat" : xs:double($c[[2]]),

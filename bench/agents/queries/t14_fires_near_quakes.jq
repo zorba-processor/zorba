@@ -3,10 +3,6 @@
  : be within 100 km. :)
 import module namespace dir = "http://zorba.io/modules/directory";
 import module namespace jn = "http://jsoniq.org/functions";
-(: dir:format() does not know the .geojson extension, so dir:open() reports
- : the GeoJSON file as unsupported: it is read and parsed explicitly. :)
-import module namespace file = "http://expath.org/ns/file";
-import module namespace csv = "http://zorba.io/modules/json-csv";
 declare namespace math = "http://www.w3.org/2005/xpath-functions/math";
 
 declare function local:km($la1 as xs:double, $lo1 as xs:double,
@@ -21,22 +17,15 @@ declare function local:km($la1 as xs:double, $lo1 as xs:double,
 
 let $quakes :=
   for $f in jn:members(
-    jn:parse-json(file:read-text(
-    concat($dir:root, "/earthquakes/usgs_m2.5_week.geojson")))("features"))
+    dir:open($dir:root, "earthquakes/usgs_m2.5_week.geojson")("content")("features"))
   where $f("properties")("mag") ge 4.5
   let $c := $f("geometry")("coordinates")
   return { "id" : $f("id"), "lat" : xs:double($c[[2]]),
            "lon" : xs:double($c[[1]]) }
-(: csv:parse() keeps the field names of its first input when the same call
- : site parses a second file (e.g. dir:documents($dir:root, "csv") in a
- : FLWOR), so each fire file is parsed by its own csv:parse() call. :)
-let $fires := (
-  { "path" : "fires/firms_modis_americas_24h.csv",
-    "rows" : [ csv:parse(file:read-text(
-      concat($dir:root, "/fires/firms_modis_americas_24h.csv"))) ] },
-  { "path" : "fires/firms_modis_asia_pacific_24h.csv",
-    "rows" : [ csv:parse(file:read-text(
-      concat($dir:root, "/fires/firms_modis_asia_pacific_24h.csv"))) ] })
+let $fires :=
+  for $d in dir:documents($dir:root, "csv")
+  where starts-with($d("path"), "fires/")
+  return { "path" : $d("path"), "rows" : $d("content") }
 let $pairs :=
   for $d in $fires
   for $r at $n in jn:members($d("rows"))

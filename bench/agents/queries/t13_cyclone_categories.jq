@@ -1,12 +1,9 @@
-(: Ground truth of t13_cyclone_categories (see tasks/tasks.json). The HTML
- : page is read as in t12_saffir_bounds.jq. :)
+(: Ground truth of t13_cyclone_categories (see tasks/tasks.json). :)
 import module namespace dir = "http://zorba.io/modules/directory";
-import module namespace file = "http://expath.org/ns/file";
-import module namespace x = "http://zorba.io/modules/xml";
 declare namespace gdacs = "http://www.gdacs.org";
 
-let $page := x:parse-html(file:read-text(
-  concat($dir:root, "/reference/nhc_saffir_simpson_scale.html")))
+let $page :=
+  dir:open($dir:root, "reference/nhc_saffir_simpson_scale.html")("content")
 let $bounds :=
   for $tr in ($page//table)[1]//tr
   let $cat := normalize-space(string($tr/td[1]))
