@@ -21,6 +21,11 @@
 #                                 An if statement whose only purpose is to
 #                                 skip a delete of a null pointer (delete of
 #                                 a null pointer does nothing).
+#   modernize-make-unique         A std::unique_ptr built from a new
+#                                 expression (constructor or reset) instead
+#                                 of std::make_unique.
+#   modernize-make-shared         The same for std::shared_ptr and
+#                                 std::make_shared.
 #
 # Generated code is excluded: the Bison/Flex output in src/compiler/parser,
 # the */pregenerated/* sources and headers, and everything under build/
@@ -31,12 +36,16 @@ Checks: >-
   cert-err33-c,
   bugprone-unused-return-value,
   clang-diagnostic-unused-result,
-  readability-delete-null-pointer
+  readability-delete-null-pointer,
+  modernize-make-unique,
+  modernize-make-shared
 WarningsAsErrors: >-
   cert-err33-c,
   bugprone-unused-return-value,
   clang-diagnostic-unused-result,
-  readability-delete-null-pointer
+  readability-delete-null-pointer,
+  modernize-make-unique,
+  modernize-make-shared
 HeaderFilterRegex: '.*'
 ExcludeHeaderFilterRegex: '(/build/|/pregenerated/|/compiler/parser/(xquery|jsoniq)_(parser\.hpp|scanner\.h)$|/compiler/parser/(location\.hh|FlexLexer\.h)$)'
 SystemHeaders: false
