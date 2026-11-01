@@ -76,7 +76,8 @@ class XQueryDiagnostics;
   collectCycles() (see runtime/hof/function_item.cpp): a trial deletion over
   the graph of detached QueryResources, the function items stored in their
   dctx variables (directly or in temp sequences, and transitively in closure
-  dctxs), and the references among them. If no reference from outside that
+  dctxs and in the applied arguments of partially applied function items),
+  and the references among them. If no reference from outside that
   graph reaches this obj, the dctx variable values are released, which frees
   the whole cycle. It runs when the obj is detached, and afterwards when a
   reference that may have been the last outside one goes away: a reference to
@@ -160,6 +161,10 @@ public:
   static std::atomic<long>          theNumAlive;
   static std::atomic<unsigned long> theNumWalks;
 
+  // For tests: if not 0, the next walk throws std::bad_alloc when it adds its
+  // theFailWalkAtEdge-th edge, and this is reset to 0.
+  static std::atomic<unsigned long> theFailWalkAtEdge;
+
 public:
   QueryResources();
 
@@ -226,10 +231,14 @@ typedef rchandle<QueryResources> QueryResources_t;
 
 
 // For tests (test/api/function_item_lifetime.cpp): see
-// QueryResources::theNumAlive and QueryResources::theNumWalks.
+// QueryResources::theNumAlive, QueryResources::theNumWalks and
+// QueryResources::theFailWalkAtEdge.
 ZORBA_DLL_PUBLIC long query_resources_alive();
 
 ZORBA_DLL_PUBLIC unsigned long query_resources_walks();
+
+// For tests: see QueryResources::theFailWalkAtEdge.
+ZORBA_DLL_PUBLIC void query_resources_fail_walk(unsigned long edge);
 
 
 /*******************************************************************************

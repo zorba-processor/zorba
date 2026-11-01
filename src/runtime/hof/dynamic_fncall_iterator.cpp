@@ -218,10 +218,8 @@ bool SingleDynamicFnCallIterator::nextImpl(
             argValues.push_back(tempItem);
 
           store::TempSeq_t argSeq = GENV_STORE.createTempSeq(argValues);
-          store::Iterator_t argSeqIter = argSeq->getIterator();
-          PlanIter_t value = new PlanStateIteratorWrapper(argSeqIter);
-                    
-          fnItem->setArgumentValue(pos, value);
+
+          fnItem->setArgumentValue(pos, argSeq);
         }
         else
         {

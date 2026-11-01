@@ -25,9 +25,12 @@
 // function items, query clones, and StaticContext::loadProlog().
 // Also checks that the cycles through the prolog variables of a closed query
 // are freed (counting the QueryResources objs alive, not only through
-// LeakSanitizer), and that the cycle collector does not walk the graph of a
-// closed query each time a function item of it is used or dropped.
+// LeakSanitizer), also through the arguments of partially applied function
+// items, that the cycle collector does not walk the graph of a closed query
+// each time a function item of it is used or dropped, and that a walk that
+// fails (fault injected by a library test hook) leaves the collector usable.
 
+#include <exception>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -53,6 +56,7 @@ using namespace zorba;
 namespace zorba {
 ZORBA_DLL_PUBLIC long query_resources_alive();
 ZORBA_DLL_PUBLIC unsigned long query_resources_walks();
+ZORBA_DLL_PUBLIC void query_resources_fail_walk(unsigned long aEdge);
 }
 
 namespace {
@@ -544,6 +548,79 @@ void test_walks_releasing_garbage(Zorba* z)
   CHECK_EQ(std::to_string(query_resources_alive()), std::to_string(lAlive));
 }
 
+// A cycle through the argument of a partially applied function item stored in
+// a prolog variable: the applied argument is a function item of the same
+// query.
+void test_cycle_through_partial_application(Zorba* z)
+{
+  long const lAlive = query_resources_alive();
+  {
+    Item lF = function_item(z,
+        "declare variable $call := function($h, $x) { $h($x) };\n"
+        "declare variable $p := $call(function($y) { $y + 1 }, ?);\n"
+        "$p");
+    CHECK(query_resources_alive() > lAlive);
+    CHECK_EQ(apply(z, "$f(1)", lF), "2");
+  }
+  CHECK_EQ(std::to_string(query_resources_alive()), std::to_string(lAlive));
+}
+
+// A cycle referenced from outside only through the argument of a partially
+// applied function item that a second query created: the cycle stays alive
+// while that item is referenced and is freed when it is dropped.
+void test_cycle_held_by_partial_application(Zorba* z)
+{
+  long const lAlive = query_resources_alive();
+  {
+    Item lP;
+    {
+      Item lF = function_item(z,
+          "declare variable $g := function($x) { $x + 1 };\n"
+          "$g");
+      lP = function_item(z,
+          "declare variable $f external;\n"
+          "function($h, $x) { $h($x) }($f, ?)",
+          std::vector<Item>(1, lF));
+    }
+    CHECK(query_resources_alive() > lAlive);
+    CHECK_EQ(apply(z, "$f(5)", lP), "6");
+  }
+  CHECK_EQ(std::to_string(query_resources_alive()), std::to_string(lAlive));
+}
+
+// The walk that runs when the query is closed fails (the test hook throws
+// std::bad_alloc while the walk iterates over the members of the array):
+// the cycle is kept, its function items stay usable, and the next
+// collection frees it.
+void test_failed_walk(Zorba* z)
+{
+  long const lAlive = query_resources_alive();
+  {
+    query_resources_fail_walk(3);
+    unsigned long const lWalks = query_resources_walks();
+    Item lF = function_item(z,
+        "declare variable $a := [ function($x) { $x + 1 },\n"
+        "                         function($x) { $x * 2 },\n"
+        "                         function($x) { $x - 1 } ];\n"
+        "$a(1)");
+    query_resources_fail_walk(0);
+    CHECK(query_resources_walks() > lWalks);
+    CHECK(query_resources_alive() > lAlive);
+    CHECK_EQ(apply(z, "$f(1)", lF), "2");
+    CHECK_EQ(invoke(z, lF, 2), "3");
+  }
+  CHECK_EQ(std::to_string(query_resources_alive()), std::to_string(lAlive));
+
+  // Collections of other graphs still work.
+  {
+    Item lG = function_item(z,
+        "declare variable $g := function($x) { $x + 1 };\n"
+        "$g");
+    CHECK_EQ(apply(z, "$f(1)", lG), "2");
+  }
+  CHECK_EQ(std::to_string(query_resources_alive()), std::to_string(lAlive));
+}
+
 typedef void (*test_fn)(Zorba*);
 
 struct test_case
@@ -583,6 +660,11 @@ function_item_lifetime(int argc, char* argv[])
     { "test_walks_creating_items", test_walks_creating_items },
     { "test_walks_reading_global", test_walks_reading_global },
     { "test_walks_releasing_garbage", test_walks_releasing_garbage },
+    { "test_cycle_through_partial_application",
+      test_cycle_through_partial_application },
+    { "test_cycle_held_by_partial_application",
+      test_cycle_held_by_partial_application },
+    { "test_failed_walk", test_failed_walk },
   };
 
   for (test_case const& lTest : lTests)
@@ -595,6 +677,12 @@ function_item_lifetime(int argc, char* argv[])
     catch (ZorbaException const& e)
     {
       std::cerr << lTest.name << ": unexpected exception: " << e << std::endl;
+      ++theFailures;
+    }
+    catch (std::exception const& e)
+    {
+      std::cerr << lTest.name << ": unexpected exception: " << e.what()
+                << std::endl;
       ++theFailures;
     }
   }
