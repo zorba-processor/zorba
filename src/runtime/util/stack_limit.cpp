@@ -79,7 +79,8 @@ Bounds query_bounds()
           b.low = b.high - lLimit;
       }
     }
-    pthread_attr_destroy(&attr);
+    // Cannot fail on an attributes object filled by pthread_getattr_np.
+    (void)pthread_attr_destroy(&attr);
   }
 #endif
   if (b.high != 0)

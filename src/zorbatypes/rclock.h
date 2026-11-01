@@ -91,33 +91,33 @@ class RCLock
 {
   mutable pthread_mutex_t  theLock;
 
+  // PTHREAD_PROCESS_PRIVATE is the default pshared attribute, not a mutex type
+  // (or-ing it into the type made settype fail where it is non-zero).
+  void init()
+  {
+    pthread_mutexattr_t attr;
+    if (0 != pthread_mutexattr_init(&attr) ||
+        0 != pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_ERRORCHECK) ||
+        0 != pthread_mutex_init(&theLock, &attr))
+    {
+      std::cerr << "Failed to initialize RCLock" << std::endl;
+      abort();
+    }
+    // Cannot fail on an initialized attributes object (POSIX, glibc).
+    (void)pthread_mutexattr_destroy(&attr);
+  }
+
 public:
 
 RCLock()
 {
-  pthread_mutexattr_t attr;
-  pthread_mutexattr_init(&attr);
-  pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_ERRORCHECK | PTHREAD_PROCESS_PRIVATE);
-  if (0 != pthread_mutex_init(&theLock, &attr))
-  {
-    std::cerr << "Failed to initialize RCLock" << std::endl; 
-    abort();
-  }
-  pthread_mutexattr_destroy(&attr);
+  init();
 } 
 
 
 RCLock(const RCLock&)
 {
-  pthread_mutexattr_t attr;
-  pthread_mutexattr_init(&attr);
-  pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_ERRORCHECK | PTHREAD_PROCESS_PRIVATE);
-  if (0 != pthread_mutex_init(&theLock, &attr))
-  {
-    std::cerr << "Failed to initialize RCLock" << std::endl; 
-    abort();
-  }
-  pthread_mutexattr_destroy(&attr);
+  init();
 } 
 
 

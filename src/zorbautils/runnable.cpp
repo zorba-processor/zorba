@@ -20,6 +20,7 @@
 #include <errno.h>
 
 #include "diagnostics/assert.h"
+#include "zorbautils/fatal.h"
 
 #ifdef ZORBA_HAVE_PTHREAD_H
 #include <unistd.h>
@@ -85,7 +86,8 @@ retry:
 #endif
 
   if (theStatus == SUSPENDED) {
-    pthread_cancel(theThread);
+    int ret = pthread_cancel(theThread);
+    ZORBA_FATAL(!ret, "Failed to cancel thread. Error code = " << ret);
     theCondition.signal();
   } else if (theStatus == TERMINATED) {
     theMutex.unlock();
@@ -151,8 +153,10 @@ zorba::Runnable::suspend(unsigned long aTimeInMs /*= 0*/)
 
   theMutex.lock();
 
-  pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
-  pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
+  int ret = pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
+  ZORBA_FATAL(!ret, "Failed to enable thread cancellation. Error code = " << ret);
+  ret = pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
+  ZORBA_FATAL(!ret, "Failed to set thread cancellation type. Error code = " << ret);
   pthread_cleanup_push(mutexCleanupHandler, &theCondition);
 
   theStatus = SUSPENDED;
@@ -169,7 +173,8 @@ zorba::Runnable::suspend(unsigned long aTimeInMs /*= 0*/)
   theStatus = RUNNING;
 
   pthread_testcancel();
-  pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL);
+  ret = pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL);
+  ZORBA_FATAL(!ret, "Failed to disable thread cancellation. Error code = " << ret);
   pthread_cleanup_pop(1);
   theMutex.unlock();
 }
@@ -249,7 +254,8 @@ zorba::Runnable::finishImpl()
   theStatus = TERMINATED;
 
   if (!theCalledTerminate) {
-    pthread_detach(theThread);
+    int ret = pthread_detach(theThread);
+    ZORBA_FATAL(!ret, "Failed to detach thread. Error code = " << ret);
   }
 
   // the last thing to do is to signal a possible join waiting
