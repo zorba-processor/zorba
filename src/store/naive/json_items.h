@@ -212,11 +212,10 @@ protected:
   typedef std::vector<std::pair<store::Item*, store::Item*> > Pairs;
   typedef Pairs::size_type size_type;
 
-  typedef std::unordered_map<
-    const char*,
-    size_type,
-    ztd::hash<char const*>,
-    ztd::equal_to<char const*> > Keys;
+  // The map owns its keys: a zstring copy shares the key item's
+  // representation when that one is sharable and is a deep clone otherwise,
+  // so a key never refers to memory the object does not hold.
+  typedef std::unordered_map<zstring, size_type> Keys;
 
   class KeyIterator : public store::Iterator
   {
