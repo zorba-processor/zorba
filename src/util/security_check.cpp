@@ -756,11 +756,15 @@ Verdict check(
   if (aUse == Use::Collection)
     return Verdict();
 
-  // The default thesaurus is WordNet: data from the library path, which
-  // needs NativeModules like the libraries there.
-  if (aUse == Use::Data && aURI == "##default")
-    return aPolicy.allows(Capability::NativeModules)
-      ? Verdict() : needs_capability(Capability::NativeModules);
+  // The built-in thesaurus ("##default", which the thesaurus resolver maps
+  // to its WordNet URL) is engine data read from the library directory
+  // (wordnet::provider does not leave it), like the native http-client
+  // library that fn:doc loads for http URIs (src/util/http_util.cpp): it
+  // needs no capability. Other wordnet: URIs
+  // still need NativeModules (below).
+  if (aUse == Use::Data &&
+      (aURI == "##default" || aURI == "wordnet://wordnet.princeton.edu/"))
+    return Verdict();
 
   std::string const lScheme = uri_scheme(aURI);
 

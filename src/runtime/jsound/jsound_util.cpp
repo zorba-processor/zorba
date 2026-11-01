@@ -73,7 +73,7 @@ namespace jsound {
 struct constraint {
   zstring const query_;
 
-  constraint( zstring const &query );
+  constraint( zstring const &query, static_context const &caller_sctx );
   // default destructor is fine
 
   bool validate( dynamic_context& ) const;
@@ -157,7 +157,7 @@ protected:
     return obj ? static_cast<T const*>( obj->find_facet( facet ) ) : nullptr;
   }
   virtual void load_baseType( store::Item_t const&, schema const& );
-  void load_constraints( store::Item_t const& );
+  void load_constraints( store::Item_t const&, schema const& );
   void load_enumeration( store::Item_t const& );
   virtual void load_type( store::Item_t const&, schema& ) = 0;
   void load_name( store::Item_t const&, schema const& );
@@ -969,11 +969,15 @@ inline int to_xs_int( store::Item_t const &item ) {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-constraint::constraint( zstring const &query ) :
+constraint::constraint( zstring const &query,
+                        static_context const &caller_sctx ) :
   query_( query ),
   sctx_( GENV_ROOT_STATIC_CONTEXT.create_child_context() ),
   ccb_( get_shared_diagnostics() )
 {
+  // The constraint comes from the caller's data, so it runs under the
+  // caller's security policy, not under the instance policy of the root.
+  sctx_->set_security_policy( caller_sctx.get_security_policy() );
   ccb_.theRootSctx = sctx_.get();
   ccb_.theCommonLanguageEnabled = true;
 
@@ -1062,7 +1066,7 @@ void array_type::load_type( store::Item_t const &type_item, schema &s ) {
     if ( ZSTREQ( key_str, "$baseType" ) )
       /* already handled */;
     else if ( ZSTREQ( key_str, "$constraints" ) )
-      load_constraints( value_item );
+      load_constraints( value_item, s );
     else if ( ZSTREQ( key_str, "$content" ) )
       load_content( value_item, s );
     else if ( ZSTREQ( key_str, "$enumeration" ) )
@@ -1426,7 +1430,7 @@ void atomic_type::load_type( store::Item_t const &type_item, schema &s ) {
     else if ( ZSTREQ( key_str, "$baseType" ) )
       /* already handled */;
     else if ( ZSTREQ( key_str, "$constraints" ) )
-      load_constraints( value_item );
+      load_constraints( value_item, s );
     else if ( ZSTREQ( key_str, "$enumeration" ) )
       load_enumeration( value_item );
     else if ( ZSTREQ( key_str, "$explicitTimezone" ) )
@@ -1764,7 +1768,7 @@ void object_type::load_type( store::Item_t const &type_item, schema &s ) {
     if ( ZSTREQ( key_str, "$baseType" ) )
       /* already handled */;
     else if ( ZSTREQ( key_str, "$constraints" ) )
-      load_constraints( value_item );
+      load_constraints( value_item, s );
     else if ( ZSTREQ( key_str, "$content" ) )
       load_content( value_item, s );
     else if ( ZSTREQ( key_str, "$enumeration" ) )
@@ -1966,7 +1970,8 @@ void type::load_baseType( store::Item_t const &baseType_item,
   baseType_ = baseType;
 }
 
-void type::load_constraints( store::Item_t const &constraints_item ) {
+void type::load_constraints( store::Item_t const &constraints_item,
+                             schema const &s ) {
   ASSERT_KIND( constraints_item, "$constraints", ARRAY );
   store::Iterator_t it( constraints_item->getArrayValues() );
   store::Item_t item;
@@ -1975,7 +1980,7 @@ void type::load_constraints( store::Item_t const &constraints_item ) {
     ASSERT_TYPE( item, "constraint", XS_STRING );
     zstring constraint_str( item->getStringValue() );
     try {
-      unique_ptr<constraint> c( new constraint( constraint_str ) );
+      unique_ptr<constraint> c( new constraint( constraint_str, *s.sctx_ ) );
       constraints_.push_back( c.get() );
       c.release();
     }
@@ -2210,7 +2215,7 @@ void union_type::load_type( store::Item_t const &type_item, schema &s ) {
     zstring const key_str( item->getStringValue() );
     store::Item_t const value_item( type_item->getObjectValue( item ) );
     if ( ZSTREQ( key_str, "$constraints" ) )
-      load_constraints( value_item );
+      load_constraints( value_item, s );
     else if ( ZSTREQ( key_str, "$content" ) )
       load_content( value_item, s );
     else if ( ZSTREQ( key_str, "$enumeration" ) )
@@ -2267,7 +2272,10 @@ bool union_type::validate( store::Item_t const &validate_item, bool do_cast,
 
 ///////////////////////////////////////////////////////////////////////////////
 
-schema::schema( store::Item_t const &jsd_item ) {
+schema::schema( store::Item_t const &jsd_item,
+                static_context const *sctx ) :
+  sctx_( sctx )
+{
   try {
     ASSERT_KIND( jsd_item, "JSound", OBJECT );
     load_namespace( require_value( jsd_item, "$namespace" ) );
@@ -2361,7 +2369,8 @@ void schema::load_import( store::Item_t const &import_item ) {
 
   // I'm not sure if this is correct, but not using the root context doesn't
   // work: base URI resolution beheves differently and URIs for JSound schemas
-  // aren't found.
+  // aren't found.  The resolution itself (below) goes through the caller's
+  // context so that its security policy applies.
   static_context const *const sctx = &GENV_ROOT_STATIC_CONTEXT;
 
   store::Item_t const ns_item( require_value( import_item, "$namespace" ) );
@@ -2427,10 +2436,15 @@ void schema::load_import( store::Item_t const &import_item ) {
   internal::StreamResource *stream_rsrc = nullptr;
   zstring error_msg;
   FOR_EACH( vector<zstring>, i, schema_uris ) {
-    rsrc = sctx->resolve_uri( *i, internal::EntityData::SCHEMA, error_msg );
+    zstring candidate_msg;
+    rsrc = sctx_->resolve_uri( *i, internal::EntityData::SCHEMA, candidate_msg );
     stream_rsrc = dynamic_cast<internal::StreamResource*>( rsrc.get() );
     if ( stream_rsrc )
       break;
+    // Report why the first candidate ($location, if given) failed: that is
+    // the URI named in the error.
+    if ( error_msg.empty() )
+      error_msg = candidate_msg;
   }
   if ( !stream_rsrc )
     throw XQUERY_EXCEPTION(
@@ -2445,7 +2459,7 @@ void schema::load_import( store::Item_t const &import_item ) {
         jse::ILLEGAL_SCHEMA,
         ERROR_PARAMS( ns_str, location_str )
       );
-    schema schema_to_import( jsd );
+    schema schema_to_import( jsd, sctx_ );
     import( ns_str, &schema_to_import );
   }
   catch ( ZorbaException const &e ) {
