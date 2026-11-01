@@ -1,1 +1,1 @@
-broken/bad.json:error:true:true:true broken/bad.xml:error:true:true:true customers.csv:ok orders/2026/q1.xml:ok orders/2026/q2.xml:ok payments/late.json:ok payments/payments.json:ok report.html:error:true:true:true
+broken/bad.json:error:true:true:true broken/bad.xml:error:true:true:true customers.csv:ok orders/2026/q1.xml:ok orders/2026/q2.xml:ok payments/late.json:ok payments/payments.json:ok report.html:ok
