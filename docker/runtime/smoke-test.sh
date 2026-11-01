@@ -11,8 +11,6 @@ here=$(cd "$(dirname "$0")" && pwd)
 out=$(mktemp)
 trap 'rm -f "$out"' EXIT
 
-query='import module namespace dir = "http://zorba.io/modules/directory"; for $o in dir:open($dir:root, "orders/q1.xml")("content")/orders/order let $p := (for $d in dir:open($dir:root, "payments.json")("content")() where $d("order") eq string($o/@id) return $d)[1] order by string($o/@id) return { "order": string($o/@id), "total": xs:integer($o/total), "status": $p("status") }'
-
 meta='{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}}'
 
 {
@@ -20,7 +18,11 @@ meta='{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextpr
   jq -cn '{jsonrpc:"2.0",id:1,method:"initialize",params:{protocolVersion:"2025-11-25",capabilities:{},clientInfo:{name:"smoke",version:"0"}}}'
   jq -cn '{jsonrpc:"2.0",method:"notifications/initialized"}'
   jq -cn '{jsonrpc:"2.0",id:2,method:"tools/list"}'
-  jq -cn --arg q "$query" '{jsonrpc:"2.0",id:3,method:"tools/call",params:{name:"run_query",arguments:{query:$q}}}'
+  # The three queries of the documentation page, over the same folder layout.
+  for n in 3:revenue 9:unpaid 10:by-country; do
+    jq -cn --rawfile q "$here/smoke/examples/${n#*:}.jq" --argjson id "${n%%:*}" \
+      '{jsonrpc:"2.0",id:$id,method:"tools/call",params:{name:"run_query",arguments:{query:$q}}}'
+  done
   jq -cn '{jsonrpc:"2.0",id:4,method:"tools/call",params:{name:"list_documents"}}'
   jq -cn '{jsonrpc:"2.0",id:5,method:"tools/call",params:{name:"customer_name",arguments:{id:"globex"}}}'
   jq -cn '{jsonrpc:"2.0",id:6,method:"tools/call",params:{name:"run_query",arguments:{query:"doc(\"http://example.com/\")"}}}'
@@ -47,8 +49,11 @@ check() { # <description> <request id> <jq filter that must be true>
 
 check "initialize"          1 '.result.serverInfo.name == "zorba-mcp"'
 check "tools/list (legacy)" 2 '[.result.tools[].name] | contains(["list_documents","run_query","customer_name"])'
-check "run_query"           3 '.result.isError == false and (.result.content[0].text | split("\n") | map(select(. != "") | fromjson) == [{"order":"o1","total":100,"status":"paid"},{"order":"o2","total":250,"status":"pending"}])'
-check "list_documents"      4 '.result.isError == false and (.result.content[0].text | split("\n") | map(select(. != "") | fromjson.path) == ["customers.csv","orders/q1.xml","payments.json"])'
+lines='.result.isError == false and (.result.content[0].text | split("\n") | map(select(. != "") | fromjson)'
+check "run_query: revenue"    3 "$lines"' == [{"customer":"acme","orders":2,"total":175},{"customer":"globex","orders":1,"total":250}])'
+check "run_query: unpaid"     9 "$lines"' == [{"order":"o2","customer":"globex","total":250}])'
+check "run_query: by-country" 10 "$lines"' == [{"customer":"Acme Corp","country":"MX","total":175},{"customer":"Globex","country":"US","total":250}])'
+check "list_documents"      4 '.result.isError == false and (.result.content[0].text | split("\n") | map(select(. != "") | fromjson.path) == ["customers.csv","orders/2026/q1.xml","orders/2026/q2.xml","payments/payments.json","report.html"])'
 check "predefined query"    5 '.result.isError == false and (.result.content[0].text | fromjson) == "Globex"'
 check "network denied"      6 '.result.isError == true and (.result.content[0].text | contains("access denied by security policy"))'
 check "server/discover"     7 '.result.resultType == "complete" and (.result.supportedVersions | index("2026-07-28") != null) and (.result.capabilities | has("tools"))'
