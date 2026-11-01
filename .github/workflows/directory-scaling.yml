@@ -3,6 +3,10 @@ name: Directory scaling
 # How zorba --directory and zorba-mcp scale with the number and size of the
 # files under the root (bench/directory/). Measures only; manual runs only.
 on:
+  # TEMPORARY (removed before the pull request): a workflow can only be
+  # dispatched once it is on the default branch.
+  push:
+    branches: [directory-cache]
   workflow_dispatch:
     inputs:
       trees:
@@ -30,7 +34,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 300
     env:
-      TREES: ${{ inputs.trees || '100:2 1000:2 10000:2 100:200 1000:200' }}
+      TREES: ${{ inputs.trees || '1000:2 10000:2 100:200 1000:200 300:200:xml 300:200:json 300:200:csv' }}
       CALLS: ${{ inputs.calls || '10' }}
       RUNS: ${{ inputs.runs || '3' }}
     steps:
