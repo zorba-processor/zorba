@@ -467,10 +467,8 @@ bool CsvParseIterator::nextImpl( store::Item_t &result,
             // Read the character through c_str(): the non-const operator[]
             // would make value_'s representation unsharable, and the next
             // values (possibly the field names of the next input) would then
-            // be created from an unsharable representation.
-            // SimpleJSONObject::add() keeps a pointer into a copy of each key
-            // that it assumes shares the key item's representation; with an
-            // unsharable one, that pointer dangles.
+            // be created from an unsharable representation, which costs a
+            // copy per value instead of a shared reference.
             //
             GENV_ITEMFACTORY->createBoolean( item, value->c_str()[0] == 't' );
             break;
