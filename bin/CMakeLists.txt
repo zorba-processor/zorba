@@ -282,7 +282,8 @@ IF (ZORBA_WITH_FILE_ACCESS)
     SET (_mcpq "${CMAKE_CURRENT_SOURCE_DIR}/test/mcp/queries")
     FOREACH (_t json protocol legacy tools_list list_documents join
              syntax_error escape network native_modules predefined limits binary
-             cache_hit cache_invalidate cache_evict cache_off cache_policy)
+             cache_hit cache_invalidate cache_evict cache_off cache_policy
+             cache_inject)
       ADD_TEST (NAME bin/mcp/${_t}
         COMMAND "mcp_tests${_mcp_suffix}" ${_t} "${_dirtree}" "${_mcpq}"
           "${_dirq}/join.xq" "$<TARGET_FILE:zorba_mcp${_mcp_suffix}>")

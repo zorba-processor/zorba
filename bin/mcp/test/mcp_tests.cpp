@@ -875,6 +875,51 @@ void test_cache_policy( Fixture const &f ) {
          stats_text( s ) );
 }
 
+// A user query that imports the hook module cannot change what dir:open
+// returns to later queries: the hook has no function that takes a record.
+void test_cache_inject( Fixture const &f ) {
+  TempTree t;
+  t.write( "a.json", "{ \"v\" : 1 }" );
+  t.write( "b.json", "{ \"v\" : 2 }" );
+  ServerConfig config;
+  config.root = t.root;
+  Server server( f.zorba, config, std::cerr );
+
+  std::string const dc(
+    "import module namespace dc = "
+    "\"http://zorba.io/modules/directory-cache\";\n" );
+  std::string const forged(
+    "{ \"path\" : \"a.json\", \"format\" : \"json\", "
+    "\"content\" : { \"v\" : \"FORGED\" } }" );
+
+  std::string v = open_value( server, "a.json" );
+  check( v == "1", "a.json is cached", v );
+
+  v = query_text( server, dir_import + dc +
+    "dc:put($dir:root, \"a.json\", " + forged + ")" );
+  check( contains( v, "error" ) && contains( v, "XPST0017" ),
+         "the hook module has no dc:put", v );
+
+  v = query_text( server,
+    "declare namespace dc = \"http://zorba.io/modules/directory-cache\";\n"
+    "declare function dc:put($root as xs:string, $path as xs:string, "
+    "$record as object()) as object() external;\n"
+    "dc:put(\"" + t.root + "\", \"b.json\", " + forged + ")" );
+  check( contains( v, "error" ) && !contains( v, "FORGED" ),
+         "an external dc:put declared by the query has no implementation", v );
+
+  v = query_text( server, dir_import + dc +
+    "dc:get($dir:root, \"a.json\")(\"content\")(\"v\"), "
+    "dc:get($dir:root, \"b.json\")(\"content\")(\"v\")" );
+  check( v == "1\n2", "dc:get returns what dir:open builds", v );
+
+  v = open_value( server, "a.json" ) + "," + open_value( server, "b.json" );
+  DocumentCache::Stats const s = server.cache_stats();
+  check( v == "1,2" && s.entries == 2 && s.stores == 2,
+         "dir:open still returns the files' content", v + " / " +
+         stats_text( s ) );
+}
+
 struct Test {
   char const *name;
   void (*fn)( Fixture const& );
@@ -898,7 +943,8 @@ Test const tests[] = {
   { "cache_invalidate", test_cache_invalidate },
   { "cache_evict", test_cache_evict },
   { "cache_off", test_cache_off },
-  { "cache_policy", test_cache_policy }
+  { "cache_policy", test_cache_policy },
+  { "cache_inject", test_cache_inject }
 };
 
 } // namespace
