@@ -63,9 +63,5 @@ Zorba Version 2.0
   see the following bug:
   - <https://bugs.launchpad.net/zorba/+bug/sf-3371525>
 
-* Generating the XQDoc documentation on Windows using nmake is broken,
-  see the following bug:
-  - <https://bugs.launchpad.net/zorba/+bug/sf-3393173>
-
 * The Scripting Extension's features break and continue are not
   implemented if used within a FLWOR Statement.

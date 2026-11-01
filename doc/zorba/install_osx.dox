@@ -33,7 +33,7 @@ $ sudo port upgrade outdated
 
 \section zosx_pkg a) Install Zorba binary from .pkg file
 
-The zorba-2.9.1.pkg file contains only Zorba installation files but not it's dependecies. Unlike Linux and Windows distributions, it contains both Zorba runtime with core modules and most of the external modules. It does not contain the folowing external modules: image, schema-tools, read-pdf and email, due to lack of macports of these modules dependencies. If one of these modules is required, then Zorba must be installed from source.
+The zorba-2.9.1.pkg file contains only Zorba installation files but not it's dependecies. Unlike Linux distributions, it contains both Zorba runtime with core modules and most of the external modules. It does not contain the folowing external modules: image, schema-tools, read-pdf and email, due to lack of macports of these modules dependencies. If one of these modules is required, then Zorba must be installed from source.
 
 Make sure you have MacPorts installed and up to date. Since .pkg contains only Zorba installation files, it's dependecies need to be installed too.
 
