@@ -646,15 +646,16 @@ long long peak_rss() {
 
 // dir:documents parses a document when the caller asks for it, and a
 // document the caller is done with can be freed: a scan of the whole tree
-// keeps one parsed document in memory, not all of them. A parsed JSON
-// document takes about 22 bytes per byte of file (bench/directory), so
-// holding all 60 MB of this tree raises the peak RSS by more than 1.2 GiB.
-// The bound, 10 bytes per byte of file, leaves room for a few parsed
-// documents plus a sanitizer's quarantine of freed memory (256 MiB by
-// default in AddressSanitizer).
+// keeps one parsed document in memory, not all of them. The test scans a
+// tree of 8 files of 2 MB, adds 32 more and scans again. Holding every
+// document, the second scan raises the peak RSS by 4 times what the first
+// one did (a parsed JSON document takes about 22 bytes per byte of file);
+// streaming, it does not raise it by as much as the first scan did. The
+// first scan's growth is the scale, so allocator overhead and a
+// sanitizer's quarantine of freed memory (256 MiB in AddressSanitizer,
+// filled by the first scan) count on both sides.
 void test_documents_stream( Fixture const &f ) {
   TempTree t;
-  int const files = 30;
   std::string content( "{ \"rs\" : [" );
   for ( int i = 0; content.size() < 2000000; ++i ) {
     if ( i )
@@ -664,30 +665,34 @@ void test_documents_stream( Fixture const &f ) {
       ",\"n\":\"name" + std::to_string( i ) + "\"}";
   }
   content += "] }";
-  for ( int i = 0; i < files; ++i )
-    t.write( "d" + std::to_string( 100 + i ) + ".json", content );
-  long long const tree_bytes =
-    static_cast<long long>( content.size() ) * files;
-  content.clear();
-  content.shrink_to_fit();
-
   ServerConfig config;
   config.root = t.root;
   config.timeout = std::chrono::milliseconds( 0 );
   Server server( f.zorba, config, std::cerr );
-
-  long long const before = peak_rss();
-  Json const r = call_tool( server, "run_query", Json::object( { { "query",
+  std::string const scan(
     "import module namespace dir = \"http://zorba.io/modules/directory\";\n"
     "count(for $d in dir:documents($dir:root)\n"
-    "      where exists($d(\"content\")(\"rs\")) return $d)" } } ) );
-  long long const growth = peak_rss() - before;
-  check( !is_tool_error( r ) && result_text( r ) == std::to_string( files ),
-         "dir:documents parses every document", r.dump() );
-  check( growth < 10 * tree_bytes,
+    "      where exists($d(\"content\")(\"rs\")) return $d)" );
+
+  int files = 0;
+  long long peak[3];
+  peak[0] = peak_rss();
+  for ( int step = 1; step <= 2; ++step ) {
+    for ( int const target = step == 1 ? 8 : 40; files < target; ++files )
+      t.write( "d" + std::to_string( 100 + files ) + ".json", content );
+    Json const r = call_tool( server, "run_query",
+                              Json::object( { { "query", scan } } ) );
+    peak[step] = peak_rss();
+    check( !is_tool_error( r ) && result_text( r ) == std::to_string( files ),
+           "dir:documents parses all " + std::to_string( files ) +
+           " documents", r.dump() );
+  }
+  long long const first = peak[1] - peak[0], second = peak[2] - peak[1];
+  check( second < first,
          "a scan with dir:documents does not hold every parsed document",
-         "peak RSS grew by " + std::to_string( growth >> 20 ) + " MiB for " +
-         std::to_string( tree_bytes >> 20 ) + " MiB of files" );
+         "peak RSS grew by " + std::to_string( first >> 20 ) +
+         " MiB scanning 8 files, then by " + std::to_string( second >> 20 ) +
+         " MiB scanning 40" );
 }
 
 struct Test {
