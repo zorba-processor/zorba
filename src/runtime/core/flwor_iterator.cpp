@@ -1524,7 +1524,7 @@ void FLWORIterator::materializeGroupTuple(
     }
 
     groupMap->insert(groupTuple.get(), nongroupVarSequences);
-    groupTuple.release();
+    (void)groupTuple.release(); // owned by groupMap now
   }
 }
 

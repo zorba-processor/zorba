@@ -295,7 +295,7 @@ FnSerializeIterator::nextImpl(store::Item_t& aResult, PlanState& aPlanState) con
       std::unique_ptr<std::stringstream> lResultStream(new std::stringstream());
       lSerializer.serialize(lIterWrapper, *lResultStream.get());
       GENV_ITEMFACTORY->createStreamableString(aResult, *lResultStream.get(), FnSerializeIterator::streamReleaser, true);
-      lResultStream.release();
+      (void)lResultStream.release(); // owned by the streamable item now
     }
   }
   STACK_PUSH(true, lState);

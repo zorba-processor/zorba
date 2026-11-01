@@ -169,7 +169,7 @@ bool FunctionLookupIterator::nextImpl(
     if (fiInfo->numInScopeVars() > 0)
     {
       result = new FunctionItem(fiInfo, fiDctx.get(), planState);
-      fiDctx.release();
+      (void)fiDctx.release(); // owned by the function item now
     }
     else
     {

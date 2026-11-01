@@ -906,7 +906,7 @@ CRegexXQuery_chargroup* CRegexXQuery_parser::readchargroup(const char *pattern, 
       }
       //chargroup->addMultiChar(c1, multichar_type);
       chargroup->addCharMatch(charmatch.get());
-      charmatch.release();
+      (void)charmatch.release(); // owned by chargroup now
       *chargroup_len += c1_len;
       continue;
     }
@@ -918,7 +918,7 @@ CRegexXQuery_chargroup* CRegexXQuery_parser::readchargroup(const char *pattern, 
         //chargroup->addOneChar(c1);
         //chargroup->addOneChar('-');
         chargroup->addCharMatch(charmatch.get());
-        charmatch.release();
+        (void)charmatch.release(); // owned by chargroup now
         chargroup->addCharMatch(new CRegexXQuery_char_ascii(current_regex, '-'));
         (*chargroup_len)++;
         continue;
@@ -965,7 +965,7 @@ CRegexXQuery_chargroup* CRegexXQuery_parser::readchargroup(const char *pattern, 
     }
     //chargroup->addOneChar(c1);
     chargroup->addCharMatch(charmatch.get());
-    charmatch.release();
+    (void)charmatch.release(); // owned by chargroup now
   }
   if(pattern[*chargroup_len])
     (*chargroup_len)++;

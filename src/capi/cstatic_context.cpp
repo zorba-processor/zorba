@@ -655,7 +655,7 @@ namespace zorbac {
       XQC_Error lErr = lModule->registerFunction(lFunc.get());
       if (lErr == XQC_NO_ERROR) {
         // deletion is done when releasing the static context
-        lFunc.release();
+        (void)lFunc.release();
       } else {
         return lErr;
       }

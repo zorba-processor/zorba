@@ -95,7 +95,7 @@ bool FunctionItemIterator::nextImpl(store::Item_t& result, PlanState& planState)
     }
 
     result = new FunctionItem(theFunctionItemInfo, evalDctx.get(), planState);
-    evalDctx.release();
+    (void)evalDctx.release(); // owned by the function item now
   }
   else
   {

@@ -158,8 +158,8 @@ namespace zorbac {
     // the UserItemSequence.
     std::unique_ptr<CSequence> lSeq (new CSequence(lItemSeq.get(), true, NULL));
 
-    lItemSeq.release();
-    data.release();
+    (void)lItemSeq.release(); // owned by lSeq now
+    (void)data.release(); // owned by lItemSeq now
     (*seq) = lSeq.release()->getXQC();
   }
 
@@ -379,7 +379,7 @@ namespace zorbac {
     // the SingleItemSequence.
     std::unique_ptr<CSequence> lSeq(new CSequence(lItemSeq.get(), true, NULL));
 
-    lItemSeq.release();
+    (void)lItemSeq.release(); // owned by lSeq now
     (*seq) = lSeq.release()->getXQC();
     return XQC_NO_ERROR;
   }

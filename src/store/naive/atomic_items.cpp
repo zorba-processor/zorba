@@ -1986,7 +1986,7 @@ FTTokenIterator_t StringItem::getTokens(
     );
 
   FTTokenIterator *const temp = new NaiveFTTokenIterator( tokens.get() );
-  tokens.release();
+  (void)tokens.release(); // owned by temp now
   return FTTokenIterator_t( temp );
 }
 #endif /* ZORBA_NO_FULL_TEXT */

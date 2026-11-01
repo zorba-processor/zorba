@@ -493,7 +493,7 @@ ReadBinaryFunction::evaluate(
     Item item = module_->getItemFactory()->createStreamableBase64Binary(
       *pin, &FileModule::streamReleaser, true
     );
-    pin.release();
+    (void)pin.release(); // owned by the streamable item now
     return ItemSequence_t( new SingletonItemSequence( item ) );
   }
   catch ( std::exception const &e ) {
@@ -545,7 +545,7 @@ ReadTextFunction::evaluate(
   lResult = module_->getItemFactory()->createStreamableString(
     *pin, &FileModule::streamReleaser, path.c_str(), true
   );
-  pin.release();
+  (void)pin.release(); // owned by the streamable item now
 
   return ItemSequence_t( new SingletonItemSequence( lResult ) );
 }

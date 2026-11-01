@@ -1899,7 +1899,7 @@ static void readDocument(
     *lStream.get(),
     lStream.get_deleter()
   );
-  lStream.release();
+  (void)lStream.release(); // owned by the streamable item now
 
   if (oResult.isNull())
   {

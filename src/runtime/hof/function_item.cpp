@@ -673,7 +673,7 @@ private:
 
     Node* raw = node.get();
     theNodes[ptr] = raw;
-    node.release();
+    (void)node.release(); // owned by theNodes now
     theToVisit.push_back(raw);
     return raw;
   }

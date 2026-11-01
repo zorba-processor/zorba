@@ -471,8 +471,7 @@ bool BasicItemFactory::createDateTime(
   int err = DateTime::createDateTime(date, time, dtin->theValue);
   if (err == 0)
   {
-    result = dtin.get();
-    dtin.release();
+    result = dtin.release();
     return true;
   }
   else
@@ -600,8 +599,7 @@ bool BasicItemFactory::createDateTimeStamp(
   int err = DateTime::createDateTime(date, time, dtin->theValue);
   if (err == 0 && time->hasTimezone())
   {
-    result = dtin.get();
-    dtin.release();
+    result = dtin.release();
     return true;
   }
   else

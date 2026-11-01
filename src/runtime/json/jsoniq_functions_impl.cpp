@@ -658,7 +658,7 @@ JSONEncodeForRoundtripIterator::encodeNode(
     GENV_ITEMFACTORY->createStreamableString(
         values.at(1), *lResultStream.get(),
         FnSerializeIterator::streamReleaser, true);
-    lResultStream.release();
+    (void)lResultStream.release(); // owned by the streamable item now
   }
 
   GENV_ITEMFACTORY->createJSONObject(aResult, names, values);

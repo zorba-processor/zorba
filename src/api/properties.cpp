@@ -72,7 +72,7 @@ Properties::Properties() {
 
 Properties::~Properties() {
   if ( !owns_debug_stream_ )
-    debug_stream_.release();
+    (void)debug_stream_.release(); // not owned: must not be deleted
 }
 
 Properties& Properties::instance() {
@@ -89,7 +89,7 @@ void Properties::setDebugFile( char const *file ) {
 
 void Properties::setDebugStream( ostream &os, bool take_ownership ) {
   if ( !owns_debug_stream_ )
-    debug_stream_.release();
+    (void)debug_stream_.release(); // not owned: must not be deleted
   if ( take_ownership && (&os == &cout || &os == &cerr) )
     take_ownership = false;
   owns_debug_stream_ = take_ownership;
