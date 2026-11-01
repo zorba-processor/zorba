@@ -213,6 +213,47 @@ ZORBA_SECURITY_TEST(max_call_depth "ZXQP0069"
 ZORBA_SECURITY_TEST(bad_capability "comma-separated list of"
   --deny file-read,bogus -q "1")
 
+# --directory <dir>: the query runs under the secure policy with file-read
+# (restricted to <dir>) and native-modules only, $dir:root of the directory
+# module is bound to <dir>, and the result is written as JSON, one item per
+# line. The fixture tree is shared with the rbkt tests of the module.
+IF (ZORBA_WITH_FILE_ACCESS)
+  SET (_dirq "${CMAKE_CURRENT_SOURCE_DIR}/test/directory")
+  SET (_dirtree "${CMAKE_SOURCE_DIR}/test/rbkt/Queries/zorba/directory/tree")
+
+  ZORBA_SECURITY_TEST(dir_list
+    "{ \"path\" : \"broken/bad.json\", \"format\" : \"json\"[^\n]*\n{ \"path\" : \"broken/bad.xml\""
+    --directory "${_dirtree}" -f -q "${_dirq}/list.jq")
+  ZORBA_SECURITY_TEST(dir_join
+    "{ \"order\" : \"o1\", \"file\" : \"orders/2026/q1.xml\", \"total\" : 100, \"status\" : \"paid\" }\n{ \"order\" : \"o2\""
+    --directory "${_dirtree}" -f -q "${_dirq}/join.xq")
+  ZORBA_SECURITY_DENIED(dir_doc_escape FODC0002 "access denied by security policy"
+    --directory "${_dirtree}" -f -q "${_dirq}/doc-escape.xq")
+  ZORBA_SECURITY_DENIED(dir_symlink_escape FOFL9999 "access denied by security policy"
+    --directory "${_dirtree}" -f -q "${_dirq}/symlink-escape.xq")
+  ZORBA_SECURITY_TEST(dir_module_escape "INVALID_PATH"
+    --directory "${_dirtree}" -f -q "${_dirq}/module-escape.xq")
+  ZORBA_SECURITY_DENIED(dir_network FODC0002 "access denied by security policy"
+    --directory "${_dirtree}" -f -q "${_dirq}/network.xq")
+  ZORBA_SECURITY_DENIED(dir_remote_import XQST0059 "access denied by security policy"
+    --directory "${_dirtree}" -f -q "${_dirq}/remote-import.xq")
+  ZORBA_SECURITY_DENIED(dir_write FOFL9999 "access denied by security policy"
+    --directory "${_dirtree}"
+    -f -q "${_secdir}/write.xq" -e "path:=${_secwrite}/directory.txt")
+  ZORBA_SECURITY_TEST(dir_env "env:false:false"
+    --directory "${_dirtree}" -f -q "${_secdir}/env.xq")
+  ZORBA_SECURITY_TEST(dir_widen "--directory cannot be combined with"
+    --directory "${_dirtree}" --allow network -q "1")
+  ZORBA_SECURITY_TEST(dir_not_directory "--directory: not a directory"
+    --directory "${_dirtree}/customers.csv" -q "1")
+  ZORBA_SET_TEST_PROPERTY(bin/zorba_security_dir_list FAIL_REGULAR_EXPRESSION
+    "link-out|link-dir|hidden|TOP-SECRET|HIDDEN-SECRET|access denied")
+  FOREACH (_t dir_join dir_module_escape dir_env)
+    ZORBA_SET_TEST_PROPERTY(bin/zorba_security_${_t}
+      FAIL_REGULAR_EXPRESSION "TOP-SECRET|HIDDEN-SECRET|access denied")
+  ENDFOREACH (_t)
+ENDIF (ZORBA_WITH_FILE_ACCESS)
+
 IF (UNIX)
   ADD_TEST (NAME bin/shebang
     COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/test/shebang.xq"

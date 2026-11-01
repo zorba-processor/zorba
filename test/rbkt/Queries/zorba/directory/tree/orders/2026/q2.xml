@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<orders quarter="2026-Q2">
+  <order id="o3" customer="acme"><total>75</total></order>
+</orders>
