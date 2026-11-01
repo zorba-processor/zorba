@@ -11,6 +11,10 @@
 name: Agent benchmark
 
 on:
+  # TEMPORARY: runs the dry-run job on pushes to the branch before the pull
+  # request exists; removed before the pull request is opened.
+  push:
+    branches: [agent-benchmark]
   pull_request:
     paths:
       - bench/agents/**
