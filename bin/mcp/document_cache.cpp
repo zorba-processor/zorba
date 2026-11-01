@@ -190,8 +190,10 @@ void DocumentCache::set_active( bool active ) {
   // the files it opens).
   for ( auto i = theEntries.begin(); i != theEntries.end(); ) {
     auto const next = std::next( i );
+    std::string full( i->first );
+    full[ full.find( '\0' ) ] = '/';
     Signature now;
-    if ( !signature_of( i->first, &now ) || !( now == i->second.sig ) )
+    if ( !signature_of( full, &now ) || !( now == i->second.sig ) )
       erase( i );
     i = next;
   }
@@ -238,9 +240,9 @@ bool DocumentCache::key_of( std::string const &root, std::string const &path,
   if ( root.empty() || path.empty() )
     return false;
   // The record carries the path relative to the root it was opened with,
-  // so the key is the path as the module spells it.
-  *key = root + "/" + path;
-  return signature_of( *key, sig );
+  // so the key is the root and the path as the module spells them.
+  *key = root + '\0' + path;
+  return signature_of( root + "/" + path, sig );
 }
 
 bool DocumentCache::signature_of( std::string const &full,
