@@ -17,7 +17,7 @@ xquery version "3.0";
  :)
 
 (:~
- : Read-only access to a directory tree of XML, JSON and CSV documents.
+ : Read-only access to a directory tree of XML, JSON, CSV and HTML documents.
  : <p/>
  : The documents stay ordinary files. Every call walks the tree again and
  : parses only the documents it returns, so the result always reflects the
@@ -31,7 +31,9 @@ xquery version "3.0";
  : <p/>
  : A document is returned as a record:
  : <pre>{ "path" : "orders/2026/q1.xml", "format" : "xml", "content" : ... }</pre>
- : where the content is a document node for XML, the parsed item for JSON
+ : where the content is a document node for XML and for HTML (parsed leniently
+ : as by <code>x:parse-html</code>, so that markup that is not well-formed
+ : still yields a document), the parsed item for JSON
  : (an array of the items if the file holds several top-level items, as in
  : JSON Lines) and an array of row objects for CSV (the first line holds the
  : column names, see <code>csv:parse</code>). If the file cannot be read or
@@ -56,6 +58,7 @@ module namespace dir = "http://zorba.io/modules/directory";
 import module namespace file = "http://expath.org/ns/file";
 import module namespace jn = "http://jsoniq.org/functions";
 import module namespace csv = "http://zorba.io/modules/json-csv";
+import module namespace x = "http://zorba.io/modules/xml";
 
 declare namespace an = "http://zorba.io/annotations";
 declare namespace err = "http://www.w3.org/2005/xqt-errors";
@@ -327,11 +330,7 @@ declare %private %an:nondeterministic function dir:parse(
   case "csv" return
     [ csv:parse( file:read-text( $full ) ) ]
   case "html" return
-    (: HOOK(parse-html): parse with parse-html() once it is available, e.g.
-     : parse-html( file:read-text( $full ) ). Until then HTML files are
-     : listed and reported as unsupported. :)
-    error( xs:QName( "dir:UNSUPPORTED_FORMAT" ),
-      "HTML documents are not parsed yet (parse-html() is not available)" )
+    x:parse-html( file:read-text( $full ) )
   default return
     error( xs:QName( "dir:UNSUPPORTED_FORMAT" ),
       "no parser for this file extension" )
