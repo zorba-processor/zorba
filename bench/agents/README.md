@@ -194,7 +194,8 @@ python3 bench/agents/harness.py --backend api --dry-run          # no credential
 python3 bench/agents/harness.py --backend claude-code --dry-run  # no credentials
 
 # claude-code: a Claude subscription and Claude Code installed on the host
-# (npm install -g @anthropic-ai/claude-code@2.1.302). `claude setup-token`
+# (npm install -g --allow-scripts=@anthropic-ai/claude-code
+# @anthropic-ai/claude-code@2.1.302). `claude setup-token`
 # prints a token; the harness passes it to claude in both configurations
 # (in B claude runs in the container, where your login is not available).
 CLAUDE_CODE_OAUTH_TOKEN=... python3 bench/agents/harness.py \

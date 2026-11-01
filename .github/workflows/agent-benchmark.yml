@@ -145,7 +145,8 @@ jobs:
       - name: Install Claude Code
         if: github.event_name == 'workflow_dispatch' && env.BACKEND == 'claude-code'
         run: |
-          npm install --global "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}"
+          npm install --global --allow-scripts=@anthropic-ai/claude-code \
+            "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}"
           claude --version
 
       - name: Run the harness

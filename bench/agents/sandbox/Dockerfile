@@ -28,11 +28,15 @@ CMD ["sleep", "infinity"]
 # the sandbox, so Node.js is not one of the tools the agent can use.
 FROM node:24-trixie-slim AS claude-code
 ARG CLAUDE_CODE_VERSION
+# The package's postinstall script puts the native binary in place; recent
+# npm releases run it only when allowed explicitly.
 RUN test -n "$CLAUDE_CODE_VERSION" \
- && npm install --global "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}" \
+ && npm install --global --allow-scripts=@anthropic-ai/claude-code \
+      "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}" \
+ && mkdir /opt/claude \
  && cp "$(npm root --global)/@anthropic-ai/claude-code/bin/claude.exe" \
-       /usr/local/bin/claude \
- && /usr/local/bin/claude --version
+       /opt/claude/claude \
+ && /opt/claude/claude --version
 
 FROM sandbox AS sandbox-claude
-COPY --from=claude-code /usr/local/bin/claude /usr/local/bin/claude
+COPY --from=claude-code /opt/claude/claude /usr/local/bin/claude
