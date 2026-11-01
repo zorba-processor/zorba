@@ -41,15 +41,36 @@
   "count": 58
  },
  "t05_geojson_vs_csv": {
-  "only_in_geojson": [],
-  "only_in_csv": []
+  "only_in_geojson": [
+   "us6000u4u2",
+   "us6000u4u9",
+   "us6000u4ua",
+   "us6000u4ue"
+  ],
+  "only_in_csv": [
+   "ci41570832",
+   "nc75460847",
+   "pr71538228",
+   "pr71538243",
+   "us7000tup9",
+   "us7000tupi",
+   "us7000tupl",
+   "us7000tupp",
+   "us7000tupq"
+  ]
  },
  "t06_mag_revisions": {
   "events": []
  },
  "t07_quakeml_coverage": {
-  "geojson_m45_not_in_quakeml": [],
-  "quakeml_not_in_geojson_m45": []
+  "geojson_m45_not_in_quakeml": [
+   "us6000u4u2"
+  ],
+  "quakeml_not_in_geojson_m45": [
+   "us7000tupl",
+   "us7000tupp",
+   "us7000tupq"
+  ]
  },
  "t08_deepest_quakeml": {
   "id": "us6000u4yr",

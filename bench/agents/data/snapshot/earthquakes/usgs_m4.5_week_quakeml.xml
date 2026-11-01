@@ -1,6 +1,180 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <q:quakeml xmlns="http://quakeml.org/xmlns/bed/1.2" xmlns:anss="http://anss.org/xmlns/event/0.1" xmlns:catalog="http://anss.org/xmlns/catalog/0.1" xmlns:q="http://quakeml.org/xmlns/quakeml/1.2">
  <eventParameters publicID="quakeml:earthquake.usgs.gov/earthquakes/feed/v1.0/summary/4.5_week.quakeml">
+  <event catalog:datasource="us" catalog:eventsource="us" catalog:eventid="7000tupq" publicID="quakeml:earthquake.usgs.gov/earthquakes/feed/v1.0/detail/us7000tupq.quakeml">
+   <description>
+    <type>earthquake name</type>
+    <text>203 km NW of Port-Olry, Vanuatu</text>
+   </description>
+   <origin catalog:datasource="us" catalog:dataid="us7000tupq" catalog:eventsource="us" catalog:eventid="7000tupq" publicID="quakeml:earthquake.usgs.gov/pdl/products/origin/us7000tupq/us/1793535967040">
+    <time>
+     <value>2026-11-01T12:08:30.561Z</value>
+    </time>
+    <longitude>
+     <value>165.6199</value>
+    </longitude>
+    <latitude>
+     <value>-13.8667</value>
+    </latitude>
+    <depth>
+     <value>10000</value>
+     <uncertainty>1891</uncertainty>
+    </depth>
+    <originUncertainty>
+     <horizontalUncertainty>11100</horizontalUncertainty>
+     <preferredDescription>horizontal uncertainty</preferredDescription>
+    </originUncertainty>
+    <quality>
+     <usedPhaseCount>40</usedPhaseCount>
+     <usedStationCount>40</usedStationCount>
+     <standardError>0.76</standardError>
+     <azimuthalGap>121</azimuthalGap>
+     <minimumDistance>6.768</minimumDistance>
+    </quality>
+    <evaluationMode>manual</evaluationMode>
+    <creationInfo>
+     <agencyID>us</agencyID>
+     <creationTime>2026-11-01T12:26:07.040Z</creationTime>
+    </creationInfo>
+   </origin>
+   <magnitude catalog:datasource="us" catalog:dataid="us7000tupq" catalog:eventsource="us" catalog:eventid="7000tupq" publicID="quakeml:earthquake.usgs.gov/pdl/products/origin/us7000tupq/us/1793535967040#magnitude">
+    <mag>
+     <value>4.8</value>
+     <uncertainty>0.068</uncertainty>
+    </mag>
+    <type>mb</type>
+    <stationCount>66</stationCount>
+    <originID>quakeml:earthquake.usgs.gov/pdl/products/origin/us7000tupq/us/1793535967040</originID>
+    <evaluationMode>manual</evaluationMode>
+    <creationInfo>
+     <agencyID>us</agencyID>
+     <creationTime>2026-11-01T12:26:07.040Z</creationTime>
+    </creationInfo>
+   </magnitude>
+   <preferredOriginID>quakeml:earthquake.usgs.gov/pdl/products/origin/us7000tupq/us/1793535967040</preferredOriginID>
+   <preferredMagnitudeID>quakeml:earthquake.usgs.gov/pdl/products/origin/us7000tupq/us/1793535967040#magnitude</preferredMagnitudeID>
+   <type>earthquake</type>
+   <creationInfo>
+    <agencyID>us</agencyID>
+    <creationTime>2026-11-01T12:26:07.040Z</creationTime>
+   </creationInfo>
+  </event>
+  <event catalog:datasource="us" catalog:eventsource="us" catalog:eventid="7000tupp" publicID="quakeml:earthquake.usgs.gov/earthquakes/feed/v1.0/detail/us7000tupp.quakeml">
+   <description>
+    <type>earthquake name</type>
+    <text>176 km NW of Port-Olry, Vanuatu</text>
+   </description>
+   <origin catalog:datasource="us" catalog:dataid="us7000tupp" catalog:eventsource="us" catalog:eventid="7000tupp" publicID="quakeml:earthquake.usgs.gov/pdl/products/origin/us7000tupp/us/1793535326040">
+    <time>
+     <value>2026-11-01T11:56:51.778Z</value>
+    </time>
+    <longitude>
+     <value>165.767</value>
+    </longitude>
+    <latitude>
+     <value>-14.0776</value>
+    </latitude>
+    <depth>
+     <value>10000</value>
+     <uncertainty>1896</uncertainty>
+    </depth>
+    <originUncertainty>
+     <horizontalUncertainty>11060</horizontalUncertainty>
+     <preferredDescription>horizontal uncertainty</preferredDescription>
+    </originUncertainty>
+    <quality>
+     <usedPhaseCount>34</usedPhaseCount>
+     <usedStationCount>34</usedStationCount>
+     <standardError>0.91</standardError>
+     <azimuthalGap>124</azimuthalGap>
+     <minimumDistance>6.59</minimumDistance>
+    </quality>
+    <evaluationMode>manual</evaluationMode>
+    <creationInfo>
+     <agencyID>us</agencyID>
+     <creationTime>2026-11-01T12:15:26.040Z</creationTime>
+    </creationInfo>
+   </origin>
+   <magnitude catalog:datasource="us" catalog:dataid="us7000tupp" catalog:eventsource="us" catalog:eventid="7000tupp" publicID="quakeml:earthquake.usgs.gov/pdl/products/origin/us7000tupp/us/1793535326040#magnitude">
+    <mag>
+     <value>4.8</value>
+     <uncertainty>0.101</uncertainty>
+    </mag>
+    <type>mb</type>
+    <stationCount>30</stationCount>
+    <originID>quakeml:earthquake.usgs.gov/pdl/products/origin/us7000tupp/us/1793535326040</originID>
+    <evaluationMode>manual</evaluationMode>
+    <creationInfo>
+     <agencyID>us</agencyID>
+     <creationTime>2026-11-01T12:15:26.040Z</creationTime>
+    </creationInfo>
+   </magnitude>
+   <preferredOriginID>quakeml:earthquake.usgs.gov/pdl/products/origin/us7000tupp/us/1793535326040</preferredOriginID>
+   <preferredMagnitudeID>quakeml:earthquake.usgs.gov/pdl/products/origin/us7000tupp/us/1793535326040#magnitude</preferredMagnitudeID>
+   <type>earthquake</type>
+   <creationInfo>
+    <agencyID>us</agencyID>
+    <creationTime>2026-11-01T12:15:26.040Z</creationTime>
+   </creationInfo>
+  </event>
+  <event catalog:datasource="us" catalog:eventsource="us" catalog:eventid="7000tupl" publicID="quakeml:earthquake.usgs.gov/earthquakes/feed/v1.0/detail/us7000tupl.quakeml">
+   <description>
+    <type>earthquake name</type>
+    <text>165 km NW of Port-Olry, Vanuatu</text>
+   </description>
+   <origin catalog:datasource="us" catalog:dataid="us7000tupl" catalog:eventsource="us" catalog:eventid="7000tupl" publicID="quakeml:earthquake.usgs.gov/pdl/products/origin/us7000tupl/us/1793534506040">
+    <time>
+     <value>2026-11-01T11:47:03.778Z</value>
+    </time>
+    <longitude>
+     <value>165.8242</value>
+    </longitude>
+    <latitude>
+     <value>-14.1689</value>
+    </latitude>
+    <depth>
+     <value>10000</value>
+     <uncertainty>1871</uncertainty>
+    </depth>
+    <originUncertainty>
+     <horizontalUncertainty>9440</horizontalUncertainty>
+     <preferredDescription>horizontal uncertainty</preferredDescription>
+    </originUncertainty>
+    <quality>
+     <usedPhaseCount>65</usedPhaseCount>
+     <usedStationCount>65</usedStationCount>
+     <standardError>0.68</standardError>
+     <azimuthalGap>67</azimuthalGap>
+     <minimumDistance>6.514</minimumDistance>
+    </quality>
+    <evaluationMode>manual</evaluationMode>
+    <creationInfo>
+     <agencyID>us</agencyID>
+     <creationTime>2026-11-01T12:01:46.040Z</creationTime>
+    </creationInfo>
+   </origin>
+   <magnitude catalog:datasource="us" catalog:dataid="us7000tupl" catalog:eventsource="us" catalog:eventid="7000tupl" publicID="quakeml:earthquake.usgs.gov/pdl/products/origin/us7000tupl/us/1793534506040#magnitude">
+    <mag>
+     <value>6</value>
+     <uncertainty>0.046</uncertainty>
+    </mag>
+    <type>mww</type>
+    <stationCount>45</stationCount>
+    <originID>quakeml:earthquake.usgs.gov/pdl/products/origin/us7000tupl/us/1793534506040</originID>
+    <evaluationMode>manual</evaluationMode>
+    <creationInfo>
+     <agencyID>us</agencyID>
+     <creationTime>2026-11-01T12:01:46.040Z</creationTime>
+    </creationInfo>
+   </magnitude>
+   <preferredOriginID>quakeml:earthquake.usgs.gov/pdl/products/origin/us7000tupl/us/1793534506040</preferredOriginID>
+   <preferredMagnitudeID>quakeml:earthquake.usgs.gov/pdl/products/origin/us7000tupl/us/1793534506040#magnitude</preferredMagnitudeID>
+   <type>earthquake</type>
+   <creationInfo>
+    <agencyID>us</agencyID>
+    <creationTime>2026-11-01T12:07:14.175Z</creationTime>
+   </creationInfo>
+  </event>
   <event catalog:datasource="us" catalog:eventsource="us" catalog:eventid="7000tunq" publicID="quakeml:earthquake.usgs.gov/earthquakes/feed/v1.0/detail/us7000tunq.quakeml">
    <description>
     <type>earthquake name</type>
@@ -56,7 +230,7 @@
    <type>earthquake</type>
    <creationInfo>
     <agencyID>us</agencyID>
-    <creationTime>2026-11-01T11:16:36.205Z</creationTime>
+    <creationTime>2026-11-01T12:03:34.163Z</creationTime>
    </creationInfo>
   </event>
   <event catalog:datasource="us" catalog:eventsource="us" catalog:eventid="7000tung" publicID="quakeml:earthquake.usgs.gov/earthquakes/feed/v1.0/detail/us7000tung.quakeml">
@@ -7773,66 +7947,8 @@
     <creationTime>2026-10-26T14:36:33.040Z</creationTime>
    </creationInfo>
   </event>
-  <event catalog:datasource="us" catalog:eventsource="us" catalog:eventid="6000u4u2" publicID="quakeml:earthquake.usgs.gov/earthquakes/feed/v1.0/detail/us6000u4u2.quakeml">
-   <description>
-    <type>earthquake name</type>
-    <text>155 km WSW of Ternate, Indonesia</text>
-   </description>
-   <origin catalog:datasource="us" catalog:dataid="us6000u4u2" catalog:eventsource="us" catalog:eventid="6000u4u2" publicID="quakeml:earthquake.usgs.gov/pdl/products/origin/us6000u4u2/us/1793007250040">
-    <time>
-     <value>2026-10-25T12:09:05.522Z</value>
-    </time>
-    <longitude>
-     <value>126.1478</value>
-    </longitude>
-    <latitude>
-     <value>0.1306</value>
-    </latitude>
-    <depth>
-     <value>43812</value>
-     <uncertainty>7860</uncertainty>
-    </depth>
-    <originUncertainty>
-     <horizontalUncertainty>11060</horizontalUncertainty>
-     <preferredDescription>horizontal uncertainty</preferredDescription>
-    </originUncertainty>
-    <quality>
-     <usedPhaseCount>32</usedPhaseCount>
-     <usedStationCount>32</usedStationCount>
-     <standardError>0.84</standardError>
-     <azimuthalGap>103</azimuthalGap>
-     <minimumDistance>6.916</minimumDistance>
-    </quality>
-    <evaluationMode>manual</evaluationMode>
-    <creationInfo>
-     <agencyID>us</agencyID>
-     <creationTime>2026-10-26T09:34:10.040Z</creationTime>
-    </creationInfo>
-   </origin>
-   <magnitude catalog:datasource="us" catalog:dataid="us6000u4u2" catalog:eventsource="us" catalog:eventid="6000u4u2" publicID="quakeml:earthquake.usgs.gov/pdl/products/origin/us6000u4u2/us/1793007250040#magnitude">
-    <mag>
-     <value>4.6</value>
-     <uncertainty>0.114</uncertainty>
-    </mag>
-    <type>mb</type>
-    <stationCount>23</stationCount>
-    <originID>quakeml:earthquake.usgs.gov/pdl/products/origin/us6000u4u2/us/1793007250040</originID>
-    <evaluationMode>manual</evaluationMode>
-    <creationInfo>
-     <agencyID>us</agencyID>
-     <creationTime>2026-10-26T09:34:10.040Z</creationTime>
-    </creationInfo>
-   </magnitude>
-   <preferredOriginID>quakeml:earthquake.usgs.gov/pdl/products/origin/us6000u4u2/us/1793007250040</preferredOriginID>
-   <preferredMagnitudeID>quakeml:earthquake.usgs.gov/pdl/products/origin/us6000u4u2/us/1793007250040#magnitude</preferredMagnitudeID>
-   <type>earthquake</type>
-   <creationInfo>
-    <agencyID>us</agencyID>
-    <creationTime>2026-10-26T09:34:10.040Z</creationTime>
-   </creationInfo>
-  </event>
   <creationInfo>
-   <creationTime>2026-11-01T11:55:16.000Z</creationTime>
+   <creationTime>2026-11-01T12:59:04.000Z</creationTime>
   </creationInfo>
  </eventParameters>
 </q:quakeml>

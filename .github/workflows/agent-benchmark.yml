@@ -98,32 +98,6 @@ jobs:
               cmake --build --preset full-release
               ccache -s'
 
-      - name: TEMPORARY gap probes
-        run: |
-          mkdir -p probe/tree
-          printf 'a,b\n1,2\n' > probe/tree/one.csv
-          printf 'x,y,z\n3,4,5\n' > probe/tree/two.csv
-          printf '{"type":"FeatureCollection","features":[]}' > probe/tree/q.geojson
-          printf '<table><tr><td>1</td></tr></table>' > probe/tree/t.html
-          printf 'sat,dn,t\nT,N,0005\n' > probe/tree/b.csv
-          cat > probe/csv.jq <<'EOF'
-          import module namespace csv = "http://zorba.io/modules/json-csv";
-          for $s in ("a,b\n1,2\n", "x,y,z\n3,4,5\n") return [ csv:parse($s) ]
-          EOF
-          cat > probe/dirs.jq <<'EOF'
-          import module namespace dir = "http://zorba.io/modules/directory";
-          for $d in dir:documents($dir:root, "csv") return $d
-          EOF
-          cat > probe/geo.jq <<'EOF'
-          import module namespace dir = "http://zorba.io/modules/directory";
-          dir:list($dir:root), dir:open($dir:root, "q.geojson"), dir:open($dir:root, "t.html")
-          EOF
-          for q in csv dirs geo; do
-            echo "== $q"
-            docker run --rm -v "$PWD":/src -w /src zorba-builder:ci sh -c \
-              "build/full-release/bin/zorba --directory probe/tree -f -q probe/$q.jq; echo; echo exit status \$?"
-          done
-
       - name: Ground truth (JSONiq queries == Python reference)
         run: |
           docker run --rm -v "$PWD":/src -w /src zorba-builder:ci \
