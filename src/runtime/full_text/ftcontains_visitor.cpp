@@ -357,7 +357,8 @@ ft_visit_result::type V::begin_visit( ftprimary_with_options &pwo ) {
   ftmatch_options const *const older_options = options_stack_.empty() ?
     static_ctx_.get_match_options() : TOP( options_stack_ );
 
-  unique_ptr<ftmatch_options> newer_options = std::make_unique<ftmatch_options>( *pwo.get_match_options() );
+  unique_ptr<ftmatch_options> newer_options =
+      std::make_unique<ftmatch_options>( *pwo.get_match_options() );
 
   if ( older_options )
     replace_match_options( *older_options, newer_options.get() );

@@ -765,7 +765,8 @@ XQueryImpl::getStaticCollectionManager() const
     {
       // this object is only need to construct the StaticCollectionManagerImpl
       // but it's not used after the construction anymore
-      std::unique_ptr<StaticContextImpl> lCtx = std::make_unique<StaticContextImpl>(lIter->second.getp(), theDiagnosticHandler);
+      std::unique_ptr<StaticContextImpl> lCtx =
+          std::make_unique<StaticContextImpl>(lIter->second.getp(), theDiagnosticHandler);
 
       lMgrs.push_back(new StaticCollectionManagerImpl(lCtx.get(),
                                                       lFactory,

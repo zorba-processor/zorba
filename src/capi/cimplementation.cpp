@@ -149,7 +149,8 @@ namespace zorbac {
   (std::unique_ptr<CrSeqData> data, XQC_Sequence** seq)
   {
     // Create a UserItemSequence to return the data in order as items.
-    std::unique_ptr<UserItemSequence> lItemSeq = std::make_unique<UserItemSequence>(nullptr, 0, &crseq_init, &crseq_next, &crseq_free,
+    std::unique_ptr<UserItemSequence> lItemSeq =
+        std::make_unique<UserItemSequence>(nullptr, 0, &crseq_init, &crseq_next, &crseq_free,
         data.get(), theZorba->getItemFactory(), nullptr);
 
     // Wrap in a CSequence to produce an XQC_Sequence. We pass "true"
@@ -469,7 +470,8 @@ namespace zorbac {
   {
     CIMPL_TRY {
       // Create a CrSeqData to hold the user's data.
-      std::unique_ptr<CrSeqData> lData = std::make_unique<CrSeqData>(count, XQC_DECIMAL_TYPE, false);
+      std::unique_ptr<CrSeqData> lData =
+          std::make_unique<CrSeqData>(count, XQC_DECIMAL_TYPE, false);
       lData->theInts = values;
       me->create_sequence(std::move(lData), seq);
     }

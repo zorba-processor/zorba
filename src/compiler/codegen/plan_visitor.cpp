@@ -575,7 +575,8 @@ void end_visit(function_trace_expr& v)
   CODEGEN_TRACE_OUT("");
   std::vector<PlanIter_t> argv;
   argv.push_back(pop_itstack());
-  std::unique_ptr<FunctionTraceIterator> lDummyIter = std::make_unique<FunctionTraceIterator>(sctx, qloc, argv);
+  std::unique_ptr<FunctionTraceIterator> lDummyIter =
+      std::make_unique<FunctionTraceIterator>(sctx, qloc, argv);
   lDummyIter->setFunctionName(v.getFunctionName());
   lDummyIter->setFunctionArity(v.getFunctionArity());
   lDummyIter->setFunctionLocation(v.getFunctionLocation());

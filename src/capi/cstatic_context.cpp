@@ -647,7 +647,8 @@ namespace zorbac {
         me->theContext.get()->registerModule(lModule);
       }
 
-      std::unique_ptr<CExternalFunction> lFunc = std::make_unique<CExternalFunction>(uri, localname, init_fn, next_fn, free_fn,
+      std::unique_ptr<CExternalFunction> lFunc =
+          std::make_unique<CExternalFunction>(uri, localname, init_fn, next_fn, free_fn,
           function_user_data, me->theZorba->getItemFactory(),
           me->theErrorHandler);
 
