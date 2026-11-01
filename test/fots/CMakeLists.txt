@@ -172,7 +172,6 @@ EXPECTED_FOTS_FAILURE (fn-in-scope-prefixes K2-InScopePrefixesFunc-25 1200498)
 EXPECTED_FOTS_FAILURE (fn-matches cbcl-matches-038 1131304)
 EXPECTED_FOTS_FAILURE (fn-normalize-space fn-normalize-space-23 1187802)
 EXPECTED_FOTS_FAILURE (fn-normalize-space fn-normalize-space-25 1187802)
-EXPECTED_FOTS_FAILURE (fn-parse-xml parse-xml-010 1189927)
 EXPECTED_FOTS_FAILURE (fn-parse-xml parse-xml-011 1188260)
 
 ##

@@ -315,6 +315,39 @@ void test_allow_lists(Zorba* z, const Files& f)
                f.secretURI));
 }
 
+// fn:parse-xml resolves a relative system identifier against the static base
+// URI, and the resolved URI is what the policy checks: the entity is expanded
+// when the policy allows it and refused with zerr:ZXQP0029 naming the
+// resolved URI otherwise, never silently dropped.
+void test_relative_entity(Zorba* z, const Files& f)
+{
+  std::string const lDoc =
+    "<?xml version=\"1.0\"?>\n"
+    "<!DOCTYPE r [<!ENTITY xxe SYSTEM \"secret.txt\">]>\n"
+    "<r>&xxe;</r>";
+  std::string const lBase = "file://" + f.dir.generic_string() + "/";
+
+  StaticContext_t open = context(z, SecurityPolicy::unrestricted());
+  open->setBaseURI(lBase);
+  CHECK(expanded(parse_xml(z, open, lDoc), SECRET));
+
+  StaticContext_t inDir = context(z, SecurityPolicy::secure()
+      .allow(Capability::ExternalEntities)
+      .allow(Capability::FileRead)
+      .addReadPath(f.dir.string()));
+  inDir->setBaseURI(lBase);
+  CHECK(expanded(parse_xml(z, inDir, lDoc), SECRET));
+
+  StaticContext_t secure = context(z, SecurityPolicy::secure());
+  secure->setBaseURI(lBase);
+  CHECK(denied(parse_xml(z, secure, lDoc), "FODC0006", f.secretURI));
+
+  StaticContext_t noFile = context(z, SecurityPolicy::secure()
+      .allow(Capability::ExternalEntities));
+  noFile->setBaseURI(lBase);
+  CHECK(denied(parse_xml(z, noFile, lDoc), "FODC0006", f.secretURI));
+}
+
 void test_instance_default(Zorba* z, const Files& f)
 {
   z->setSecurityPolicy(SecurityPolicy::secure());
@@ -465,6 +498,7 @@ xml_parser_security(int argc, char* argv[])
     test_secure_context(lZorba, lFiles);
     test_allow_lists(lZorba, lFiles);
     test_unrestricted(lZorba, lFiles);
+    test_relative_entity(lZorba, lFiles);
     test_instance_default(lZorba, lFiles);
 #ifdef ZORBA_XQUERYX
     test_xqueryx(lZorba, lFiles);
