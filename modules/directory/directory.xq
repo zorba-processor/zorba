@@ -160,9 +160,14 @@ declare %an:nondeterministic function dir:documents(
   $formats as xs:string* ) as object()*
 {
   let $r := dir:check-root( $root )
-  for $path in dir:walk( $r, "" )
-  where dir:format( $path ) = $formats
-  order by $path
+  (: Sort the paths before loading: an order by over the loaded records
+   : would hold every parsed document until the last one is parsed. :)
+  let $paths :=
+    for $path in dir:walk( $r, "" )
+    where dir:format( $path ) = $formats
+    order by $path
+    return $path
+  for $path in $paths
   return dir:load( $r, $path )
 };
 

@@ -22,11 +22,15 @@
 // where <test> is one of the names in the table at the end; the "binary"
 // test runs the zorba-mcp executable given as the last argument.
 
+#include <chrono>
+#include <cstdlib>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <sstream>
 #include <string>
 
+#include <sys/resource.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -601,6 +605,97 @@ void test_binary( Fixture const &f ) {
          std::to_string( n ) + "\n" + output );
 }
 
+///////////////////////////////////////////////////////////////////////////////
+// Tests on a fresh tree in a temporary directory: <tmp>/root (the server's
+// root) and <tmp>/outside.
+
+struct TempTree {
+  std::string base;
+  std::string root;
+
+  TempTree() {
+    std::string tmpl(
+      ( std::filesystem::temp_directory_path() / "mcp-tree-XXXXXX" ).string() );
+    char *const made = mkdtemp( &tmpl[0] );
+    // The canonical spelling: the policy compares real paths.
+    base = std::filesystem::canonical( made ? made : "." ).string();
+    root = base + "/root";
+    std::filesystem::create_directories( root );
+    std::filesystem::create_directories( base + "/outside" );
+  }
+  ~TempTree() {
+    std::error_code ec;
+    std::filesystem::remove_all( base, ec );
+  }
+
+  void write( std::string const &rel, std::string const &content ) const {
+    std::ofstream out( ( root + "/" + rel ).c_str(), std::ios::binary );
+    out << content;
+  }
+};
+
+// The peak resident set size of this process so far, in bytes.
+long long peak_rss() {
+  struct rusage u;
+  getrusage( RUSAGE_SELF, &u );
+#ifdef __APPLE__
+  return static_cast<long long>( u.ru_maxrss );
+#else
+  return static_cast<long long>( u.ru_maxrss ) * 1024;
+#endif
+}
+
+// dir:documents parses a document when the caller asks for it, and a
+// document the caller is done with can be freed: a scan of the whole tree
+// keeps one parsed document in memory, not all of them. The test scans a
+// tree of 8 files of 2 MB, adds 32 more and scans again. Holding every
+// document, the second scan raises the peak RSS by 4 times what the first
+// one did (a parsed JSON document takes about 22 bytes per byte of file);
+// streaming, it does not raise it by as much as the first scan did. The
+// first scan's growth is the scale, so allocator overhead and a
+// sanitizer's quarantine of freed memory (256 MiB in AddressSanitizer,
+// filled by the first scan) count on both sides.
+void test_documents_stream( Fixture const &f ) {
+  TempTree t;
+  std::string content( "{ \"rs\" : [" );
+  for ( int i = 0; content.size() < 2000000; ++i ) {
+    if ( i )
+      content += ",";
+    content += "{\"id\":" + std::to_string( i ) + ",\"cat\":\"c" +
+      std::to_string( i % 4 ) + "\",\"v\":" + std::to_string( i % 100 ) +
+      ",\"n\":\"name" + std::to_string( i ) + "\"}";
+  }
+  content += "] }";
+  ServerConfig config;
+  config.root = t.root;
+  config.timeout = std::chrono::milliseconds( 0 );
+  Server server( f.zorba, config, std::cerr );
+  std::string const scan(
+    "import module namespace dir = \"http://zorba.io/modules/directory\";\n"
+    "count(for $d in dir:documents($dir:root)\n"
+    "      where exists($d(\"content\")(\"rs\")) return $d)" );
+
+  int files = 0;
+  long long peak[3];
+  peak[0] = peak_rss();
+  for ( int step = 1; step <= 2; ++step ) {
+    for ( int const target = step == 1 ? 8 : 40; files < target; ++files )
+      t.write( "d" + std::to_string( 100 + files ) + ".json", content );
+    Json const r = call_tool( server, "run_query",
+                              Json::object( { { "query", scan } } ) );
+    peak[step] = peak_rss();
+    check( !is_tool_error( r ) && result_text( r ) == std::to_string( files ),
+           "dir:documents parses all " + std::to_string( files ) +
+           " documents", r.dump() );
+  }
+  long long const first = peak[1] - peak[0], second = peak[2] - peak[1];
+  check( second < first,
+         "a scan with dir:documents does not hold every parsed document",
+         "peak RSS grew by " + std::to_string( first >> 20 ) +
+         " MiB scanning 8 files, then by " + std::to_string( second >> 20 ) +
+         " MiB scanning 40" );
+}
+
 struct Test {
   char const *name;
   void (*fn)( Fixture const& );
@@ -619,7 +714,8 @@ Test const tests[] = {
   { "native_modules", test_native_modules },
   { "predefined", test_predefined },
   { "limits", test_limits },
-  { "binary", test_binary }
+  { "binary", test_binary },
+  { "documents_stream", test_documents_stream }
 };
 
 } // namespace
