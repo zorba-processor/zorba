@@ -956,9 +956,13 @@ void serializer::json_emitter::emit_item(store::Item *item)
 {
   // This is called by serializer for each top-level item. Therefore it's the
   // right place to check for multiple items in the sequence.
-  if (theMultipleItems && ser->jsoniq_multiple_items == PARAMETER_VALUE_NO)
+  if (theMultipleItems)
   {
-    throw ZORBA_EXCEPTION(jerr::JNSE0012);
+    if (ser->jsoniq_multiple_items == PARAMETER_VALUE_NO)
+      throw ZORBA_EXCEPTION(jerr::JNSE0012);
+    // e.g. a newline, to write one JSON item per line
+    if (ser->item_separator_is_set)
+      tr << ser->item_separator;
   }
   emit_json_item(item, 0);
   theMultipleItems = true;
