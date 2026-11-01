@@ -14,9 +14,13 @@ code:
   - 'test/**'
   - 'schemas/**'
   - 'cmake/**'
-  # The tree builds doc/ (C and C++ examples, doxygen inputs) and configures
-  # scripts/*.in; CI runs scripts/check-hardening.sh.
-  - 'doc/**'
+  # The tree compiles and tests the doc examples and configures doc/**/*.in
+  # (CMake files and *.in are matched by the patterns below). Doxygen does
+  # not run in CI: .dox, .md, html and images under doc/ are not consumed.
+  # CI also configures scripts/*.in and runs scripts/check-hardening.sh.
+  - 'doc/c/examples/**'
+  - 'doc/cxx/examples/**'
+  - 'doc/**/*.in'
   - 'scripts/CMakeLists.txt'
   - 'scripts/*.in'
   - 'scripts/check-hardening.sh'
