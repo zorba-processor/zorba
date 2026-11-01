@@ -174,7 +174,9 @@ DocumentCache::~DocumentCache() {
 void DocumentCache::attach( StaticContext_t const &sctx ) {
   if ( !enabled() )
     return;
-  (void)sctx;
+  sctx->registerURIMapper( theMapper.get() );
+  sctx->registerURLResolver( theResolver.get() );
+  sctx->registerModule( theModule.get() );
 }
 
 void DocumentCache::set_active( bool active ) {
