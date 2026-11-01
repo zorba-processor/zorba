@@ -21,7 +21,6 @@
 #include "shared_types.h"
 
 #include "store/api/item_factory.h"
-//#include "store/api/tuples.h"
 
 #include "zorbatypes/schema_types.h"
 

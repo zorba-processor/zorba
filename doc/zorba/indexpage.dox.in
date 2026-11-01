@@ -32,6 +32,7 @@
   - \ref dlzorbastore
   - \ref schema_lifecycle
   - \ref uriresolvers
+  - \ref security
   - \ref data_converters
   - \ref ft_intro
   - \ref errors_warnings

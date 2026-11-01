@@ -50,7 +50,6 @@
 #include "node_iterators.h"
 #include "simple_item_factory.h"
 #include "simple_iterator_factory.h"
-#include "query_context.h"
 #include "item_iterator.h"
 #include "node_factory.h"
 #include "name_iterator.h"

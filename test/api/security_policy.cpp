@@ -211,28 +211,31 @@ void test_narrowing()
 
 void test_instance_default(Zorba* z)
 {
-  // Part 1 of the secure-by-default work keeps the old behavior.
-  CHECK(z->getSecurityPolicy() == SecurityPolicy::unrestricted());
+  // The library default is secure().
+  CHECK(z->getSecurityPolicy() == SecurityPolicy::secure());
 
   StaticContext_t inheriting = z->createStaticContext();
-  CHECK(inheriting->getSecurityPolicy() == SecurityPolicy::unrestricted());
+  CHECK(inheriting->getSecurityPolicy() == SecurityPolicy::secure());
 
+  SecurityPolicy const lExplicit =
+    SecurityPolicy::secure().allow(Capability::Environment);
   StaticContext_t explicitCtx = z->createStaticContext();
-  explicitCtx->setSecurityPolicy(SecurityPolicy::unrestricted());
+  explicitCtx->setSecurityPolicy(lExplicit);
 
   // Changing the instance default affects contexts that inherit it, not
   // contexts with an explicit policy.
-  z->setSecurityPolicy(SecurityPolicy::secure());
-  CHECK(z->getSecurityPolicy() == SecurityPolicy::secure());
-  CHECK(inheriting->getSecurityPolicy() == SecurityPolicy::secure());
-  CHECK(inheriting->createChildContext()->getSecurityPolicy() ==
-        SecurityPolicy::secure());
-  CHECK(z->createStaticContext()->getSecurityPolicy() ==
-        SecurityPolicy::secure());
-  CHECK(explicitCtx->getSecurityPolicy() == SecurityPolicy::unrestricted());
-
   z->setSecurityPolicy(SecurityPolicy::unrestricted());
+  CHECK(z->getSecurityPolicy() == SecurityPolicy::unrestricted());
   CHECK(inheriting->getSecurityPolicy() == SecurityPolicy::unrestricted());
+  CHECK(inheriting->createChildContext()->getSecurityPolicy() ==
+        SecurityPolicy::unrestricted());
+  CHECK(z->createStaticContext()->getSecurityPolicy() ==
+        SecurityPolicy::unrestricted());
+  CHECK(explicitCtx->getSecurityPolicy() == lExplicit);
+
+  z->setSecurityPolicy(SecurityPolicy::secure());
+  CHECK(inheriting->getSecurityPolicy() == SecurityPolicy::secure());
+  CHECK(explicitCtx->getSecurityPolicy() == lExplicit);
 }
 
 void test_inheritance(Zorba* z)

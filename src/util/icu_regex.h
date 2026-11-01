@@ -35,11 +35,17 @@ namespace zorba {
  * @param xq_re The XQuery regular expression.
  * @param lib_re A pointer to the resuling library regular expression.
  * @param flags The flags to use, if any.
+ * @param has_backref If not \c nullptr, set to \c true only if the regular
+ * expression has a back-reference.
  */
 void convert_xquery_re( zstring const &xq_re, zstring *lib_re,
-                        char const *flags = "" );
+                        char const *flags = "", bool *has_backref = nullptr );
 
 ////////// classes ////////////////////////////////////////////////////////////
+
+namespace regex_engine {
+class CRegexXQuery_regex;
+}
 
 namespace unicode {
 
@@ -51,16 +57,39 @@ public:
   /**
    * Constructs a %regex.
    */
-  regex() : matcher_( nullptr ) { }
+  regex() :
+    matcher_( nullptr ),
+    zre_( nullptr ),
+    zre_flags_( 0 ),
+    z_base_( 0 ),
+    z_pos_( 0 ),
+    z_start_( -1 ),
+    z_end_( -1 ),
+    z_off_byte_( 0 ),
+    z_off_u16_( 0 )
+  {
+  }
 
   /**
    * Destroys a %regex.
    */
-  ~regex() {
-    delete matcher_;
-  }
+  ~regex();
 
   ////////// compile pattern //////////////////////////////////////////////////
+
+  /**
+   * Compiles an XQuery regular expression: converts it with
+   * convert_xquery_re() and chooses the engine.  A pattern with a
+   * back-reference is matched by Zorba's own engine, since ICU does not
+   * implement XQuery F&O 3.0 5.6.1 for back-references to groups that did not
+   * participate in the match; every other pattern is matched by ICU.
+   *
+   * @param xq_pattern The XQuery regular expression.
+   * @param flags The XQuery regular expression flags, if any.
+   * @param throws err:FORX0001 for an invalid flag, err:FORX0002 if the
+   * regular expression is invalid.
+   */
+  void compile_xquery( zstring const &xq_pattern, char const *flags = "" );
 
   /**
    * Compiles a regular expression.  One of the compile functions must be
@@ -489,6 +518,26 @@ public:
 private:
   U_NAMESPACE_QUALIFIER RegexMatcher *matcher_;
   string s_;
+
+  //
+  // A pattern with a back-reference is matched by Zorba's own engine rather
+  // than ICU (see convert_xquery_re()).  It works on UTF-8; positions given
+  // to and returned by this class remain in UTF-16 code units.
+  //
+  regex_engine::CRegexXQuery_regex *zre_;
+  unsigned zre_flags_;
+  zstring z_s_;                         // the UTF-8 subject
+  size_type z_base_;                    // UTF-16 position of z_s_[0]
+  int z_pos_;                           // where next_match() continues
+  int z_start_, z_end_;                 // the current match, in bytes
+  mutable int z_off_byte_;              // a known byte offset in z_s_ ...
+  mutable size_type z_off_u16_;         // ... and its UTF-16 position
+
+  void z_set_subject( string const &s, size_type from );
+  bool z_search( int from, bool whole = false );
+  size_type z_to_u16( int byte_off ) const;
+  bool z_replace_all( string const &in, string const &replacement,
+                      string *out );
 
   enum re_type_t {
     re_is_match,                        // RE specifies what to match

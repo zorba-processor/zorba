@@ -1313,11 +1313,6 @@ inline int IntegerImpl<T>::compare( IntegerImpl<T> const &i ) const {
 }
 
 template<class T>
-inline uint32_t IntegerImpl<T>::hash() const {
-  return static_cast<uint32_t>( value_ );
-}
-
-template<class T>
 inline bool IntegerImpl<T>::is_cxx_long() const {
   return ZORBA_IN_RANGE( value_, long );
 }

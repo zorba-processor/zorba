@@ -56,6 +56,7 @@ void initializeTestList()
   libunittests["memory_manager"] = test_memory_manager;
   libunittests["mmap_file"] = test_mmap_file;
   libunittests["numeric_hash"] = test_numeric_hash;
+  libunittests["ordpath"] = test_ordpath;
 
   libunittests["json_parser"] = test_json_parser;
   libunittests["parameters"] = test_parameters;

@@ -897,7 +897,7 @@ public:
   /**
    * Returns the policy in effect for "this" sctx: the nearest explicit policy
    * up the chain, intersected with the narrowing policies below it. If the
-   * chain has no explicit policy, SecurityPolicy::unrestricted() is the base.
+   * chain has no explicit policy, SecurityPolicy::secure() is the base.
    */
   SecurityPolicy get_security_policy() const;
 

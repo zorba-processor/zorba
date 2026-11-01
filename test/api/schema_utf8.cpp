@@ -36,6 +36,7 @@
 #include <zorba/store_manager.h>
 #include <zorba/xquery.h>
 #include <zorba/zorba.h>
+#include <zorba/security.h>
 #include <zorba/zorba_exception.h>
 
 using namespace zorba;
@@ -208,6 +209,8 @@ schema_utf8(int argc, char* argv[])
 
   void* lStore = StoreManager::getStore();
   Zorba* lZorba = Zorba::getInstance(lStore);
+  // The schema is imported from a temporary file.
+  lZorba->setSecurityPolicy(SecurityPolicy::secure().allow(Capability::FileRead));
 
   try
   {

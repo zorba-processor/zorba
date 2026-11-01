@@ -47,11 +47,14 @@ IF (ZORBA_WITH_FILE_ACCESS)
   LIST(APPEND UTIL_SRCS mmap_file.cpp)
 ENDIF (ZORBA_WITH_FILE_ACCESS)
 
+# Zorba's own regular expression engine: all patterns without ICU; with ICU,
+# the patterns with a back-reference (see convert_xquery_re()).
+LIST(APPEND UTIL_SRCS zorba_regex_engine.cpp)
+
 IF (ZORBA_NO_ICU)
   LIST(APPEND UTIL_SRCS
     passthru_streambuf.cpp
-    zorba_regex.cpp
-    zorba_regex_engine.cpp)
+    zorba_regex.cpp)
 ELSE (ZORBA_NO_ICU)
   LIST(APPEND UTIL_SRCS
     icu_regex.cpp

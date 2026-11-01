@@ -78,11 +78,11 @@ bool regex::next_match( char const *s, size_type *pos, zstring *match )
   int   match_pos;
   int   matched_len;
 
-  retval = regex_matcher->match_anywhere(s+*pos, parsed_flags, &match_pos, &matched_len);
+  retval = regex_matcher->search(s, *pos, parsed_flags, &match_pos, &matched_len);
   if(retval)
   {
-    match->assign(s+*pos+match_pos, matched_len);
-    *pos += match_pos + matched_len;
+    match->assign(s+match_pos, matched_len);
+    *pos = match_pos + matched_len;
   }
   return retval;
 }
@@ -96,12 +96,12 @@ bool regex::next_token( char const *s, size_type *pos, zstring *token,
   int   match_pos;
   int   matched_len;
 
-  retval = regex_matcher->match_anywhere(s+*pos, parsed_flags, &match_pos, &matched_len);
+  retval = regex_matcher->search(s, *pos, parsed_flags, &match_pos, &matched_len);
   if(retval)
   {
     if(token)
-      token->assign(s+*pos, match_pos);
-    *pos += match_pos + matched_len;
+      token->assign(s+*pos, match_pos-*pos);
+    *pos = match_pos + matched_len;
     if(matched)
       *matched = true;
     return true;
@@ -134,14 +134,16 @@ bool regex::replace_all( char const *in, char const *replacement, zstring *resul
   int   match_pos;
   int   matched_len;
 
-  const char  *start_str = in;
+  int  copied = 0;                      // in[0..copied) is in *result
+  int  from = 0;
+  int  const in_len = static_cast<int>(strlen(in));
   int  subregex_count = regex_matcher->get_indexed_regex_count();
   bool retval = false;
 
-  while(regex_matcher->match_anywhere(start_str, parsed_flags, &match_pos, &matched_len))
+  while(from <= in_len &&
+        regex_matcher->search(in, from, parsed_flags, &match_pos, &matched_len))
   {
-    if(match_pos)
-      result->append(start_str , match_pos);
+    result->append(in + copied, match_pos - copied);
     retval = true;
     const char *temprepl = replacement;
     const char *submatched_source;
@@ -152,14 +154,14 @@ bool regex::replace_all( char const *in, char const *replacement, zstring *resul
       //look for dollars
       if(*temprepl == '\\')
       {
-        if(!(parsed_flags & REGEX_ASCII_LITERAL))
-        {
+        //
+        // The caller (fn:replace) has checked the XQuery replacement string
+        // and turned it into this syntax, the ICU one: "\" escapes any
+        // character, e.g., "$1\0" is group 1 followed by "0".  With the 'q'
+        // flag, it has escaped every "\" and "$".
+        //
+        if(temprepl[1])
           temprepl++;
-          if(!*temprepl) 
-            temprepl--;
-          else if((*temprepl != '\\') && (*temprepl != '$'))//Invalid replacement string.
-            throw XQUERY_EXCEPTION( err::FORX0004, ERROR_PARAMS( replacement ) );
-        }
         result->append(1, *temprepl);
         temprepl++;
         continue;
@@ -181,7 +183,7 @@ bool regex::replace_all( char const *in, char const *replacement, zstring *resul
           throw XQUERY_EXCEPTION( err::FORX0004, ERROR_PARAMS( replacement ) );
         else if(!index)
         {
-          result->append(start_str+match_pos, matched_len);
+          result->append(in+match_pos, matched_len);
         }
         else if(regex_matcher->get_indexed_match(index, &submatched_source, &submatched_len))
         {
@@ -195,9 +197,19 @@ bool regex::replace_all( char const *in, char const *replacement, zstring *resul
         temprepl++;
       }
     }
-    start_str += match_pos + matched_len;
+    copied = match_pos + matched_len;
+    from = copied;
+    if(!matched_len)
+    {
+      // an empty match: the next search starts after the next character
+      if(from == in_len)
+        break;
+      ++from;
+      while(from < in_len && (in[from] & 0xC0) == 0x80)
+        ++from;
+    }
   }
-  result->append(start_str);
+  result->append(in + copied);
 
   return retval;
 }
@@ -214,11 +226,20 @@ bool regex::next_match( bool *reachedEnd )
 {
   bool  retval;
 
-  retval = regex_matcher->match_anywhere(s_in_.c_str()+m_pos, parsed_flags, &m_match_pos, &m_matched_len);
+  if(m_pos > (int)s_in_.length())
+    retval = false;
+  else
+    retval = regex_matcher->search(s_in_.c_str(), m_pos, parsed_flags, &m_match_pos, &m_matched_len);
   if(retval)
   {
-    m_match_pos += m_pos;
     m_pos = m_match_pos + m_matched_len;
+    if(!m_matched_len)
+    {
+      // an empty match: the next search starts after the next character
+      ++m_pos;
+      while(m_pos < (int)s_in_.length() && (s_in_[m_pos] & 0xC0) == 0x80)
+        ++m_pos;
+    }
   }
   else
   {

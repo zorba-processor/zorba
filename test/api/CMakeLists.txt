@@ -34,6 +34,7 @@ CREATE_TEST_SOURCELIST(APITests
   userdefined_uri_resolution.cpp
   validate.cpp
   security_policy.cpp
+  secure_default.cpp
   xml_parser_security.cpp
   uri_access_security.cpp
   evaluation_limits.cpp

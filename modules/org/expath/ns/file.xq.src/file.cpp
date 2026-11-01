@@ -583,7 +583,8 @@ ReadTextLinesFunction::evaluate(
   return ItemSequence_t(
     new LinesItemSequence( path, lEncoding, this,
                            aSctx ? aSctx->getSecurityPolicy()
-                                 : SecurityPolicy::unrestricted() )
+                                 : Zorba::getInstance( nullptr )
+                                     ->getSecurityPolicy() )
   );
 }
 

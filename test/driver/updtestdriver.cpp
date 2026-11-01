@@ -31,6 +31,7 @@
 #include "common/common.h"
 
 #include <zorba/zorba.h>
+#include <zorba/security.h>
 #include <zorba/diagnostic_handler.h>
 #include <zorba/zorba_exception.h>
 #include <zorba/zorba_string.h>
@@ -231,6 +232,10 @@ main(int argc, char** argv)
   }
 
   zorba::Zorba* engine = zorba::Zorba::getInstance(zorba::StoreManager::getStore());
+
+  // The library default is SecurityPolicy::secure(); the test suite exercises
+  // files, the HTTP test server, native modules and the environment.
+  engine->setSecurityPolicy(zorba::SecurityPolicy::unrestricted());
 
   zorba::XmlDataManager_t xmlDataMgr = engine->getXmlDataManager();
 

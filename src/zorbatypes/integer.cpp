@@ -550,6 +550,18 @@ bool IntegerImpl<T>::is_xs_unsignedShort() const {
 }
 #endif /* ZORBA_WITH_BIG_INTEGER */
 
+#ifndef ZORBA_WITH_BIG_INTEGER
+template<class T>
+uint32_t IntegerImpl<T>::hash() const {
+  // Beyond 2^53 an integer is not exactly representable as xs:double, to which
+  // it is promoted when compared with one: hash it like Decimal::hash() does.
+  long long const exact_limit = 1LL << 53;
+  if ( value_ >= -exact_limit && value_ <= exact_limit )
+    return static_cast<uint32_t>( value_ );
+  return hash_number( static_cast<double>( value_ ) );
+}
+#endif /* ZORBA_WITH_BIG_INTEGER */
+
 template<class T>
 zstring IntegerImpl<T>::toString() const {
 #ifdef ZORBA_WITH_BIG_INTEGER

@@ -18,6 +18,7 @@
 
 #include <zorba/store_manager.h>
 #include <zorba/zorba.h>
+#include <zorba/security.h>
 #include <zorba/xquery.h>
 #include <zorba/xquery_exception.h>
 #include <zorba/serializer.h>
@@ -531,6 +532,8 @@ staticcollectionmanager(int argc, char* argv[])
 {
   void* store = zorba::StoreManager::getStore();
   zorba::Zorba* z = zorba::Zorba::getInstance(store);
+  // The query imports modules from files outside the trusted URI path.
+  z->setSecurityPolicy(SecurityPolicy::secure().allow(Capability::FileRead));
 
   std::cout << "executing example 1" << std::endl;
   if (!staticcollectionamanger1(z))
