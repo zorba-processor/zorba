@@ -233,13 +233,6 @@ FOREACH(TESTFILE ${TESTFILES})
       SET (SKIP_TEST 1)
     ENDIF ()
   ENDIF (ZORBA_WITH_BIG_INTEGER)
-  IF(WIN32)
-    #this test fails on Windows because cannot find ourlib.dll
-    #bug 908062
-    IF(${TESTNAME} MATCHES "test/rbkt/zorba/versioning/link1")
-      SET(SKIP_TEST 1)
-    ENDIF(${TESTNAME} MATCHES "test/rbkt/zorba/versioning/link1")
-  ENDIF(WIN32)
 
   # If WordNet thesaurus not found, skip ft-thesaurus-true tests
   IF (NOT ZORBA_WITH_THESAURUS)
@@ -593,15 +586,9 @@ ENDIF()
 # this condition.
 IF(XVERMAJ EQUAL 2)
   EXPECTED_FAILURE(test/rbkt/zorba/schemas/any 3137594)
-  IF(NOT WIN32)
-    EXPECTED_FAILURE(test/rbkt/zorba/eval/eval_schema2 3137594)
-  ENDIF(NOT WIN32)
+  EXPECTED_FAILURE(test/rbkt/zorba/eval/eval_schema2 3137594)
 ENDIF(XVERMAJ EQUAL 2)
 
-IF(WIN32)
-  EXPECTED_FAILURE(test/rbkt/zorba/file/createWriteReadDeleteSeries 866969)
-  EXPECTED_FAILURE(test/rbkt/zorba/file/dirname_basename-03 1201635)
-ENDIF(WIN32)
 
 EXPECTED_FAILURE(test/rbkt/zorba/modules/schema 3131554)
 

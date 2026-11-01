@@ -175,52 +175,6 @@ SET(CMAKE_EXTRA_INCLUDE_FILES)
 # Various cmake macros
 
 SET (CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake/modules ${CMAKE_MODULE_PATH})
-IF (WIN32)
-  # On Windows we use proxy modules that try to guess first the location
-  # of the required third party libraries. This will search in order in:
-  # 1. the path pointed by ZORBA_THIRD_PARTY_REQUIREMENTS
-  # 2. the Program Files directory available on the users computer
-  # 3. the PATH environment variable
-  # The logic is implemented by the macros in the ProxyFindModule.cmake module.
-  SET (CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake/modules/Windows ${CMAKE_MODULE_PATH})
-  INCLUDE (ProxyFindModule)
-ENDIF (WIN32)
-
-################################################################################
-# This section is used for batch script and Visual Studio Project file generation. 
-# Each executable on Windows needs a bat script and in the Visual Studio build a \
-# pre-generated Visual Studio Project file in order to set the PATH to the required DLLs.
-# For this we use CACHE variables to gather all the information generated
-# throughout the cmake execution (required DLLs, list of scripts to generate).
-# The generation occurs only at the end of CMake execution (through the macro
-# ZORBA_GENERATE_EXE_HELPERS_WIN32) when ALL the requirements have been found.
-# E.g. zorba.exe needs in PATH all the DLLs of all external modules, etc.
-IF (WIN32)
-  # Clear all the variables because they are used only for this build.
-  SET (ZORBA_REQUIRED_DLLS ""
-    CACHE STRING "List of DLLs that must be installed" FORCE
-  )
-  SET (ZORBA_REQUIRED_DLL_PATHS ""
-    CACHE STRING "List of paths executable require in order to find the required DLLs" FORCE
-  )
-  SET (ZORBA_EXE_SCRIPT_LIST ""
-    CACHE STRING "List of Windows batch scripts to be generated, one for each executable" FORCE
-  )
-  IF (MSVC_IDE)
-    SET (ZORBA_VC_PROJECT_FILE_LIST ""
-      CACHE STRING "List of Visual Studio project files to be generated, one for each executable" FORCE
-    )
-  ENDIF(MSVC_IDE)
-
-  # Moreover, mark it as advanced since the CMake GUI user should not see this.
-  MARK_AS_ADVANCED (FORCE ZORBA_REQUIRED_DLLS)
-  MARK_AS_ADVANCED (FORCE ZORBA_REQUIRED_DLL_PATHS)
-  MARK_AS_ADVANCED (FORCE ZORBA_EXE_SCRIPT_LIST)
-  IF (MSVC_IDE)
-    MARK_AS_ADVANCED (FORCE ZORBA_VC_PROJECT_FILE_LIST)
-  ENDIF(MSVC_IDE)
-ENDIF (WIN32)
-################################################################################
 
 
 # ZorbaModule includes a number of generally-useful utility functions,
@@ -319,23 +273,6 @@ IF(ZORBA_HAVE_PTHREAD_H AND NOT ZORBA_FOR_ONE_THREAD_ONLY)
 ENDIF(ZORBA_HAVE_PTHREAD_H AND NOT ZORBA_FOR_ONE_THREAD_ONLY)
 
 #
-# Iconv
-#
-IF(WIN32)
-  MESSAGE(STATUS "Looking for Iconv")
-  FIND_PACKAGE(Iconv REQUIRED)
-
-  IF(ICONV_FOUND)
-    MESSAGE(STATUS "Found Iconv library -- " ${ICONV_LIBRARY})
-    INCLUDE_DIRECTORIES(${ICONV_INCLUDE_DIR})
-    SET(requiredlibs ${requiredlibs} ${ICONV_LIBRARY})
-  ELSE(ICONV_FOUND)
-    MESSAGE(STATUS "The Iconv library was not found.")
-  ENDIF(ICONV_FOUND)
-  MESSAGE(STATUS "")
-ENDIF(WIN32)
-
-#
 # ICU
 #
 MESSAGE(STATUS "Looking for ICU")
@@ -357,14 +294,6 @@ MESSAGE(STATUS "")
 MESSAGE (STATUS "Looking for Xerces-C")
 FIND_PACKAGE (XercesC)
 MESSAGE (STATUS "")
-
-#
-# shlwapi
-#
-IF(WIN32)
-    SET(requiredlibs ${requiredlibs} "shlwapi")
-ENDIF(WIN32)
-
 
 LIST(APPEND requiredlibs ${requiredlibs-store})
 
@@ -426,16 +355,6 @@ ELSE (NOT ZORBA_NO_XMLSCHEMA)
   MESSAGE(STATUS "ZORBA_NO_XMLSCHEMA: ${ZORBA_NO_XMLSCHEMA}"
     " - build without XMLSchema support")
 ENDIF (NOT ZORBA_NO_XMLSCHEMA)
-
-IF(WIN32)
-  SET(requiredlibs ${requiredlibs} wsock32)
-  
-  # Clear those variables because this is used only for this build.
-  # A cache variable is needed since this must be modified by subdirectories
-  # and be visible at this level when ZORBA_GENERATE_EXE_HELPERS_WIN32 is called
-  SET(ZORBA_EXE_SCRIPT_LIST "" CACHE STRING "List of bat scripts" FORCE)
-  SET(ZORBA_VC_PROJECT_FILE_LIST "" CACHE STRING "List of VC project files" FORCE)
-ENDIF(WIN32)
 
 ################################################################################
 # Variables
@@ -518,13 +437,8 @@ SET (ZORBA_MODULES_DIR "${CMAKE_SOURCE_DIR}/../zorba_modules"
 
 # Subdir of the installation directory for CMake files, relative to
 # CMAKE_INSTALL_PREFIX.
-IF (WIN32)
-  SET(ZORBA_CMAKE_DIR "cmake" CACHE STRING
-    "Relative path to CMake files in Zorba installation")
-ELSE (WIN32)
-  SET(ZORBA_CMAKE_DIR "share/cmake/zorba-${ZORBA_VERSION}" CACHE STRING
-    "Relative path to CMake files in Zorba installation")
-ENDIF (WIN32)
+SET(ZORBA_CMAKE_DIR "share/cmake/zorba-${ZORBA_VERSION}" CACHE STRING
+  "Relative path to CMake files in Zorba installation")
 
 ################################################################################
 
@@ -607,9 +521,6 @@ IF (APPLE AND UNIVERSAL)
   MESSAGE ("Building Apple universal binaries")
 ENDIF (APPLE AND UNIVERSAL)
 
-IF (WIN32)
-  ZORBA_GENERATE_EXE_HELPERS_WIN32 ()
-ENDIF (WIN32)
 
 # This must be done last! Create the one top-level target which
 # depends on all generated (copied) module/schema files.

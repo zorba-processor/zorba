@@ -15,14 +15,9 @@
 
 # Calculate ZORBA_ROOT, which is the base dir of the Zorba installation.
 # Zorba_DIR will be set to the directory containing ZorbaConfig.cmake,
-# which is in a different place on Windows than Unix, so work from there.
-IF (WIN32)
-  # ZORBA_ROOT/cmake/ZorbaConfig.cmake
-  SET (ZORBA_ROOT "\${Zorba_DIR}/..")
-ELSE (WIN32)
-  # ZORBA_ROOT/share/zorba-VERSION/cmake/ZorbaConfig.cmake
-  SET (ZORBA_ROOT "\${Zorba_DIR}/../../..")
-ENDIF (WIN32)
+# which is under share/zorba-VERSION/cmake, so work from there.
+# ZORBA_ROOT/share/zorba-VERSION/cmake/ZorbaConfig.cmake
+SET (ZORBA_ROOT "\${Zorba_DIR}/../../..")
 
 # Create ZorbaConfig.cmake file for projects that wish to build
 # against the installed Zorba project.
@@ -52,12 +47,6 @@ SET(Zorba_CMAKE_MODULES_DIR "${CMAKE_SOURCE_DIR}/cmake/modules")
 SET(Zorba_USE_FILE     "${CMAKE_CURRENT_SOURCE_DIR}/ZorbaUse.cmake")
 ZORBA_TARGET_LOCATION(Zorba_TESTDRIVER testdriver)
 
-IF (WIN32)
-  IF (MSVC_IDE)
-    STRING (REPLACE "/${CMAKE_CFG_INTDIR}" "" Zorba_TESTDRIVER ${Zorba_TESTDRIVER})
-  ENDIF (MSVC_IDE)
-  STRING (REPLACE ".exe" ".bat" Zorba_TESTDRIVER ${Zorba_TESTDRIVER})
-ENDIF (WIN32)
 
 SET(Zorba_EXE_PATH "${ZORBA_EXE}")
 SET(Zorba_EXTERNALMODULECONFIG_FILE
