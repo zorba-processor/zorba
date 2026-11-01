@@ -82,6 +82,8 @@ void test_round_trip() {
   static char const *const ids[] = {
     "1", "1.1", "1.3", "1.5.7", "1.2.1", "1.4.2.1", "1.-1", "1.-3.1",
     "1.31.33", "1.33.1", "1.1000001", "1.3215639", "1.1.1.1.1.1.1.1.1.1.1.1",
+    // several components packed into the last byte of the encoding
+    "1.2.0.0.0.1", "1.2.0.0.-1", "1.0.0.0.0.0.1", "1.2.0.0.0.0.0.0.0.1",
     nullptr
   };
   for ( char const *const *s = ids; *s; ++s ) {
@@ -123,6 +125,49 @@ void test_ordering() {
   }
 }
 
+// An id produced by an insertion must decode to a dewey id that compresses
+// back to the same bytes, and must be a child of the given parent.
+void check_valid_child( OrdPath const &parent, OrdPath const &p,
+                        char const *what ) {
+  string const d = dewey( p );
+  check( make( d ) == p, what, "round trip: " + name( p ) );
+  check( parent.getRelativePosition( p ) == OrdPath::DESCENDANT, what,
+         "descendant of " + name( parent ) + ": " + name( p ) );
+}
+
+enum Side { ALTERNATE, KEEP_LEFT, KEEP_RIGHT };
+
+// Insert repeatedly into the gap between two siblings. ALTERNATE narrows the
+// gap from both sides; KEEP_LEFT always inserts right after the left sibling,
+// KEEP_RIGHT always right before the right sibling.
+void test_repeated_insert_into( char const *parent_id, char const *left_id,
+                                char const *right_id ) {
+  static int const rounds = 200;
+  OrdPath const parent = make( parent_id );
+  for ( Side side : { ALTERNATE, KEEP_LEFT, KEEP_RIGHT } ) {
+    string const what = string( "repeated insertInto below " ) + parent_id +
+      ( side == ALTERNATE ? " (alternate)" :
+        side == KEEP_LEFT ? " (keep left)" : " (keep right)" );
+    OrdPath left = make( left_id ), right = make( right_id );
+    for ( int i = 0; i < rounds; ++i ) {
+      OrdPath m;
+      OrdPath::insertInto( parent, left, right, m );
+      int const before = failures;
+      check_less( left, m, what.c_str() );
+      check_less( m, right, what.c_str() );
+      check_valid_child( parent, m, what.c_str() );
+      if ( failures != before ) {
+        cerr << "  at round " << i << endl;
+        break;
+      }
+      if ( side == KEEP_LEFT || ( side == ALTERNATE && i % 2 == 0 ) )
+        right = m;
+      else
+        left = m;
+    }
+  }
+}
+
 void test_insert() {
   OrdPath const parent = make( "1" );
   OrdPath const a = make( "1.1" );
@@ -147,20 +192,11 @@ void test_insert() {
   check( parent.getRelativePosition( after ) == OrdPath::DESCENDANT,
          "insertAfter: stays a child of the parent", name( after ) );
 
-  // Repeated insertion into the same gap, alternating sides, keeps the order.
-  // Limited to 6 rounds: the 7th insertInto between 1.2.0.0.-1 and 1.2.0.0.1
-  // returns 1.2.0.0.0, which is not between them and not a valid id.
-  OrdPath left = a, right = b;
-  for ( int i = 0; i < 6; ++i ) {
-    OrdPath m;
-    OrdPath::insertInto( parent, left, right, m );
-    check_less( left, m, "repeated insertInto (left)" );
-    check_less( m, right, "repeated insertInto (right)" );
-    if ( i % 2 == 0 )
-      right = m;
-    else
-      left = m;
-  }
+  // Repeated insertion into the same gap.
+  test_repeated_insert_into( "1", "1.1", "1.3" );
+  test_repeated_insert_into( "1.3", "1.3.1", "1.3.3" );
+  test_repeated_insert_into( "1.3.5.7", "1.3.5.7.1", "1.3.5.7.3" );
+  test_repeated_insert_into( "1.2.1", "1.2.1.-1", "1.2.1.1" );
 
   // Repeated insertBefore/insertAfter at the ends.
   OrdPath first = a, last = b;
