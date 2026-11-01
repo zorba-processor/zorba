@@ -20,6 +20,8 @@
 #include <zorba/store_manager.h>
 #include <zorba/internal/unit_tests.h>
 
+#include "../driver/test_security_policy.h"
+
 using namespace std;
 using namespace zorba;
 
@@ -38,9 +40,11 @@ int main(int argc, char* argv[])
   Zorba* lZorba = Zorba::getInstance(lStore);
 
   // The library default is SecurityPolicy::secure(); the lib-internal unit
-  // tests (thesauri, URI resolution) need file access. Tests of the policy
-  // itself set their own.
-  lZorba->setSecurityPolicy(SecurityPolicy::unrestricted());
+  // tests (thesauri, URI resolution) need file access, so this runs with
+  // unrestricted() unless ZORBA_TEST_SECURITY_POLICY says otherwise (see
+  // test/driver/test_security_policy.h). Tests of the policy itself set their
+  // own.
+  if (!zorba_test::applyTestSecurityPolicy(lZorba)) return 1;
 
   int res = UnitTests::runUnitTest(argc, argv + 1);
 

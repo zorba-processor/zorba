@@ -26,6 +26,7 @@
 
 #include <zorba/zorba.h>
 #include <zorba/security.h>
+#include "test_security_policy.h"
 #include <zorba/diagnostic_handler.h>
 #include <zorba/zorba_exception.h>
 #include <zorba/internal/unique_ptr.h>
@@ -1145,9 +1146,8 @@ _tmain(int argc, _TCHAR* argv[])
 
   zorba::Zorba* zorba = zorba::Zorba::getInstance(store);
 
-  // The library default is SecurityPolicy::secure(); the test suite exercises
-  // files, the HTTP test server, native modules and the environment.
-  zorba->setSecurityPolicy(zorba::SecurityPolicy::unrestricted());
+  // See test_security_policy.h (ZORBA_TEST_SECURITY_POLICY).
+  if (!zorba_test::applyTestSecurityPolicy(zorba)) return 1;
 
   //
   // Create and start the threads, then wait for all the threads to finish
