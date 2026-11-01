@@ -562,7 +562,8 @@ bool fd_real_path(int aFd, std::string& oPath)
 {
 #if defined(__linux__)
   char lLink[64];
-  std::snprintf(lLink, sizeof lLink, "/proc/self/fd/%d", aFd);
+  // An int fits in lLink.
+  (void)std::snprintf(lLink, sizeof lLink, "/proc/self/fd/%d", aFd);
   char lBuf[PATH_MAX];
   ssize_t const n = ::readlink(lLink, lBuf, sizeof lBuf - 1);
   if (n <= 0 || n >= static_cast<ssize_t>(sizeof lBuf - 1) || lBuf[0] != '/')
@@ -593,7 +594,8 @@ public:
 
   ~fd_streambuf() override
   {
-    ::close(theFd);
+    // Read-only descriptor: a failing close() cannot lose data.
+    (void)::close(theFd);
   }
 
   fd_streambuf(const fd_streambuf&) = delete;
@@ -877,7 +879,8 @@ std::unique_ptr<std::istream> open_file(
   }
   if (!oVerdict.allowed)
   {
-    ::close(lFd);
+    // Read-only descriptor being discarded: a failing close() cannot lose data.
+    (void)::close(lFd);
     return nullptr;
   }
   return std::unique_ptr<std::istream>(new fd_istream(lFd));

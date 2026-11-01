@@ -174,7 +174,8 @@ void create( char const *path ) {
   int const fd = ::creat( path, 0644 );
   if ( fd == -1 )
     throw fs::exception( "creat()", path );
-  ::close( fd );
+  if ( ::close( fd ) != 0 )
+    throw fs::exception( "close()", path );
 }
 
 #endif /* ZORBA_WITH_FILE_ACCESS */
@@ -305,7 +306,7 @@ void iterator::ctor_impl() {
 iterator::~iterator() {
   // A destructor must not throw (it would call std::terminate), so a failure of
   // closedir() can only be ignored here.
-  ::closedir( dir_ );
+  (void)::closedir( dir_ );
 }
 
 bool iterator::next() {

@@ -1792,8 +1792,11 @@ bool FnReplaceIterator::nextImpl(
   {
 #ifndef ZORBA_NO_ICU
     unicode::string u_res;
-    if ( re.replace_all( input, replacement, &u_res ) )
-      utf8::to_string( u_res, &resStr );
+    if ( re.replace_all( input, replacement, &u_res ) ) {
+      // ICU output from valid UTF-8 input converts back without failure.
+      bool const converted = utf8::to_string( u_res, &resStr );
+      ZORBA_ASSERT( converted );
+    }
 #else
     re.replace_all( input, replacement, &resStr );
 #endif /* ZORBA_NO_ICU */
@@ -1895,7 +1898,9 @@ bool FnTokenizeIterator::nextImpl(
       bool const got_next = re.next_token(
         state->theString, &state->start_pos, &u_token, &state->hasmatched
       );
-      utf8::to_string( u_token, &token );
+      // ICU output from valid UTF-8 input converts back without failure.
+      bool const converted = utf8::to_string( u_token, &token );
+      ZORBA_ASSERT( converted );
       if ( !got_next )
         break;
     }
@@ -2056,7 +2061,7 @@ static void addGroupElement(store::Item_t &parent,
     store::Item_t group_elem;
     GENV_ITEMFACTORY->createElementNode(group_elem, parent, group_element_name, untyped_type_name, false, false, ns_binding, baseURI);
     char strid[40];
-    snprintf(strid, sizeof(strid), "%d", i+1);
+    (void)snprintf(strid, sizeof(strid), "%d", i+1); // an int fits in strid
     zstring zstrid(strid);
     store::Item_t strid_item;
     GENV_ITEMFACTORY->createString(strid_item, zstrid);

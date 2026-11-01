@@ -310,7 +310,7 @@ void M_long_2_ascii(char* output, long input)
   // problems at 'LONG_MIN', etc
   if ((m > t) || (m < -t))
   {
-    sprintf(p, "%ld", m);
+    (void)sprintf(p, "%ld", m);   /* room reserved by the caller */
   }
   else
   {

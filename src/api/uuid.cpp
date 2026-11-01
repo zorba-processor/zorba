@@ -74,7 +74,8 @@ uuid::version uuid::get_version() const {
 
 ostream& operator<<( ostream &os, uuid const &u ) {
   char buf[37];
-  snprintf(                             // verbose & tedious, but fast
+  // Always 36 characters: fits in buf.
+  (void)snprintf(                       // verbose & tedious, but fast
     buf, sizeof( buf ),
     "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x",
     u.data[ 0], u.data[ 1], u.data[ 2], u.data[ 3],
