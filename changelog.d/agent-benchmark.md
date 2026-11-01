@@ -1,0 +1,3 @@
+### Added
+
+- Agent benchmark (`bench/agents/`): the same model answers 20 situational-awareness tasks over a frozen, multi-format snapshot of public geospatial feeds (USGS earthquakes as GeoJSON, CSV and QuakeML; CelesTrak OMM XML and CSV; GDACS RSS; Open-Meteo JSON; NASA FIRMS CSV; an NHC HTML table; one deliberately truncated JSON file) with either the `zorba-mcp` tools or a sandboxed bash tool, measuring correctness, tool calls, tokens, cost, wall time and repeatability. The ground truth is computed twice, by a Python reference and by JSONiq queries run with `zorba --directory`, and the `Agent benchmark` workflow checks that both agree and runs the harness with a scripted model on pull requests; the real benchmark runs from `workflow_dispatch`.

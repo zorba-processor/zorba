@@ -1,0 +1,298 @@
+{
+ "t01_largest_quake": {
+  "id": "us7000ttxz",
+  "mag": 6.4,
+  "place": "southeast of Easter Island"
+ },
+ "t02_magtype_counts": {
+  "counts": [
+   {
+    "magType": "mb",
+    "count": 156
+   },
+   {
+    "magType": "md",
+    "count": 36
+   },
+   {
+    "magType": "ml",
+    "count": 104
+   },
+   {
+    "magType": "mw",
+    "count": 1
+   },
+   {
+    "magType": "mwr",
+    "count": 3
+   },
+   {
+    "magType": "mww",
+    "count": 31
+   }
+  ]
+ },
+ "t03_m45_stats": {
+  "count": 135,
+  "mean_mag": 4.92
+ },
+ "t04_busiest_day": {
+  "date": "2026-10-27",
+  "count": 58
+ },
+ "t05_geojson_vs_csv": {
+  "only_in_geojson": [],
+  "only_in_csv": []
+ },
+ "t06_mag_revisions": {
+  "events": []
+ },
+ "t07_quakeml_coverage": {
+  "geojson_m45_not_in_quakeml": [],
+  "quakeml_not_in_geojson_m45": []
+ },
+ "t08_deepest_quakeml": {
+  "id": "us6000u4yr",
+  "depth_km": 641.812
+ },
+ "t09_highest_apogee": {
+  "norad_cat_id": 49271,
+  "object_name": "FREGAT DEB",
+  "apogee_km": 2217.5
+ },
+ "t10_low_inclination": {
+  "object_names": [
+   "CSS (MENGTIAN)",
+   "CSS (TIANHE)",
+   "CSS (WENTIAN)",
+   "SHENZHOU-23 (SZ-23)",
+   "SZ-21 MODULE",
+   "TIANZHOU-10"
+  ]
+ },
+ "t11_gdacs_counts": {
+  "by_type": [
+   {
+    "eventtype": "DR",
+    "count": 9
+   },
+   {
+    "eventtype": "EQ",
+    "count": 11
+   },
+   {
+    "eventtype": "FL",
+    "count": 13
+   },
+   {
+    "eventtype": "TC",
+    "count": 4
+   },
+   {
+    "eventtype": "WF",
+    "count": 205
+   }
+  ],
+  "red_alerts": 2
+ },
+ "t12_saffir_bounds": {
+  "lower_bounds_kmh": [
+   119,
+   154,
+   178,
+   209,
+   252
+  ]
+ },
+ "t13_cyclone_categories": {
+  "cyclones": [
+   {
+    "eventid": "1001341",
+    "name": "VANCE-26",
+    "wind_kmh": 138.9,
+    "category": 1
+   },
+   {
+    "eventid": "1001343",
+    "name": "IN-FA-26",
+    "wind_kmh": 240.7,
+    "category": 4
+   },
+   {
+    "eventid": "1001345",
+    "name": "ARNAB-26",
+    "wind_kmh": 222.2,
+    "category": 4
+   },
+   {
+    "eventid": "1001346",
+    "name": "FOUR-26",
+    "wind_kmh": 120.4,
+    "category": 1
+   }
+  ]
+ },
+ "t14_fires_near_quakes": {
+  "fire_detections": 15,
+  "quake_ids": [
+   "us6000u4xp",
+   "us6000u4y1",
+   "us7000ttbh",
+   "us7000ttdt",
+   "us7000tth4",
+   "us7000ttpe",
+   "us7000ttt2",
+   "us7000tu6f",
+   "us7000tu83",
+   "us7000tufp"
+  ]
+ },
+ "t15_city_nearest_quake": {
+  "cities": [
+   {
+    "city": "Ambon",
+    "quake_id": "us7000ttua",
+    "distance_km": 381.5
+   },
+   {
+    "city": "Anchorage",
+    "quake_id": "us7000tu3j",
+    "distance_km": 1153.0
+   },
+   {
+    "city": "Bushehr",
+    "quake_id": "us7000tukm",
+    "distance_km": 112.3
+   },
+   {
+    "city": "Davao",
+    "quake_id": "us7000ttkk",
+    "distance_km": 161.9
+   },
+   {
+    "city": "Kupang",
+    "quake_id": "us6000u4xp",
+    "distance_km": 41.8
+   },
+   {
+    "city": "Lima",
+    "quake_id": "us6000u4v1",
+    "distance_km": 592.6
+   },
+   {
+    "city": "Luganville",
+    "quake_id": "us7000tu4f",
+    "distance_km": 46.6
+   },
+   {
+    "city": "Manila",
+    "quake_id": "us7000tth4",
+    "distance_km": 425.7
+   },
+   {
+    "city": "Port Vila",
+    "quake_id": "us7000tu4z",
+    "distance_km": 60.7
+   },
+   {
+    "city": "Santiago",
+    "quake_id": "us7000ttc8",
+    "distance_km": 142.6
+   },
+   {
+    "city": "Tokyo",
+    "quake_id": "us7000ttt2",
+    "distance_km": 86.7
+   }
+  ]
+ },
+ "t16_malformed_weather": {
+  "city": "Bushehr",
+  "temperature_c": 32.5,
+  "unreadable_files": [
+   "weather/anchorage.json"
+  ]
+ },
+ "t17_gdacs_eq_match": {
+  "matches": [
+   {
+    "eventid": "1574251",
+    "usgs_id": "us7000ttld"
+   },
+   {
+    "eventid": "1574265",
+    "usgs_id": "us7000ttlm"
+   },
+   {
+    "eventid": "1574271",
+    "usgs_id": "us7000ttlt"
+   },
+   {
+    "eventid": "1574329",
+    "usgs_id": "us7000ttnc"
+   },
+   {
+    "eventid": "1574369",
+    "usgs_id": "us7000ttpe"
+   },
+   {
+    "eventid": "1574426",
+    "usgs_id": "us7000ttua"
+   },
+   {
+    "eventid": "1574466",
+    "usgs_id": "us7000ttw3"
+   },
+   {
+    "eventid": "1574467",
+    "usgs_id": "us7000ttw5"
+   },
+   {
+    "eventid": "1574517",
+    "usgs_id": "us7000ttxz"
+   },
+   {
+    "eventid": "1574623",
+    "usgs_id": "us7000tu4f"
+   },
+   {
+    "eventid": "1574997",
+    "usgs_id": "us7000tuku"
+   }
+  ]
+ },
+ "t18_hot_cities_near_alerts": {
+  "cities": [
+   {
+    "city": "Ambon",
+    "alerts_within_500km": 1
+   },
+   {
+    "city": "Davao",
+    "alerts_within_500km": 1
+   }
+  ]
+ },
+ "t19_firms_summary": {
+  "files": [
+   {
+    "file": "fires/firms_modis_americas_24h.csv",
+    "detections": 2999,
+    "high_confidence": 992,
+    "total_frp": 100641.4
+   },
+   {
+    "file": "fires/firms_modis_asia_pacific_24h.csv",
+    "detections": 2015,
+    "high_confidence": 498,
+    "total_frp": 64527.4
+   }
+  ]
+ },
+ "t20_missing_magerror": {
+  "count": 1,
+  "ids": [
+   "nc75458907"
+  ]
+ }
+}
