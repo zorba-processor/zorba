@@ -14,7 +14,24 @@
 
 # The directory module reads through the EXPath file module.
 IF (ZORBA_WITH_FILE_ACCESS)
-  DECLARE_ZORBA_MODULE (FILE directory.xq VERSION 1.0
+  SET (_dir_xq "${CMAKE_CURRENT_SOURCE_DIR}/directory.xq")
+  IF (ZORBA_NO_XMLSCHEMA)
+    # HTML is parsed with x:parse-html, and the xml module is not built without
+    # XML Schema support (it imports a schema). Build the module without that
+    # import, with HTML files reported as an unsupported format.
+    SET_PROPERTY (DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${_dir_xq}")
+    FILE (READ "${_dir_xq}" _dir_text)
+    STRING (REGEX REPLACE
+      "\\(: BEGIN-HTML-IMPORT :\\).*\\(: END-HTML-IMPORT :\\)" ""
+      _dir_text "${_dir_text}")
+    STRING (REGEX REPLACE
+      "\\(: BEGIN-HTML-BRANCH :\\).*\\(: END-HTML-BRANCH :\\)"
+      "error( xs:QName( \"dir:UNSUPPORTED_FORMAT\" ), \"HTML documents need a build with XML Schema support\" )"
+      _dir_text "${_dir_text}")
+    SET (_dir_xq "${CMAKE_CURRENT_BINARY_DIR}/directory.xq")
+    FILE (WRITE "${_dir_xq}" "${_dir_text}")
+  ENDIF (ZORBA_NO_XMLSCHEMA)
+  DECLARE_ZORBA_MODULE (FILE "${_dir_xq}" VERSION 1.0
     URI "http://zorba.io/modules/directory")
 ENDIF (ZORBA_WITH_FILE_ACCESS)
 
