@@ -34,7 +34,7 @@ return
   <lang>{ string($doc/html/@lang) }</lang>
   <rows>{ count($doc//tr) }</rows>
   <cells>{ count($doc//td) }</cells>
-  <south>{ normalize-space($doc//tr[3]/td[2]) }</south>
+  <south>{ normalize-space(($doc//tr)[3]/td[2]) }</south>
   <headers>{ string-join($doc//th, "|") }</headers>
   <h1-nbsp>{ string-to-codepoints(string($doc//h1))[3] }</h1-nbsp>
   <amp>{ string(($doc//p)[1]/text()[1]) }</amp>

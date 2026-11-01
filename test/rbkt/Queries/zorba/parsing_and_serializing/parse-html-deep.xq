@@ -1,6 +1,7 @@
 (: Element nesting is limited (256 levels, as for XML documents): a deeper
    HTML document is an error, not a crash. :)
 import module namespace x = "http://zorba.io/modules/xml";
+declare namespace err = "http://www.w3.org/2005/xqt-errors";
 
 declare function local:nest($n as xs:integer) as xs:string
 {
