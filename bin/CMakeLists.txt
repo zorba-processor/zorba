@@ -245,6 +245,10 @@ IF (ZORBA_WITH_FILE_ACCESS)
   # is on the policy's list.
   ZORBA_SECURITY_TEST(dir_native_allowed "\"native-1\""
     --directory "${_dirtree}" -f -q "${_dirq}/native-allowed.xq")
+  # A wordnet: thesaurus other than the built-in one reads a data file in the
+  # library path, outside the directory.
+  ZORBA_SECURITY_DENIED(dir_wordnet_denied FTST0018 "access denied by security policy"
+    --directory "${_dirtree}" -f -q "${_dirq}/wordnet-denied.xq")
   ZORBA_SECURITY_DENIED(dir_native_denied ZXQP0067 "http://zorba.io/modules/sleep"
     --directory "${_dirtree}" -f -q "${_dirq}/native-denied.xq")
   ZORBA_SET_TEST_PROPERTY(bin/zorba_security_dir_native_denied
