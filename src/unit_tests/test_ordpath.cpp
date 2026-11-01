@@ -148,8 +148,8 @@ void test_insert() {
          "insertAfter: stays a child of the parent", name( after ) );
 
   // Repeated insertion into the same gap, alternating sides, keeps the order.
-  // (Not pushed further: the 7th insertion gives 1.2.0.0.0 instead of a
-  // valid id between 1.2.0.0.-1 and 1.2.0.0.1, see the PR description.)
+  // Limited to 6 rounds: the 7th insertInto between 1.2.0.0.-1 and 1.2.0.0.1
+  // returns 1.2.0.0.0, which is not between them and not a valid id.
   OrdPath left = a, right = b;
   for ( int i = 0; i < 6; ++i ) {
     OrdPath m;
