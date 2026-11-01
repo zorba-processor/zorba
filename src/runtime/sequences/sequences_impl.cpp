@@ -302,7 +302,7 @@ bool FnDistinctValuesIterator::nextImpl(
   }
 
   // theValueCompare managed by state->theAlreadySeenMap
-  state->theAlreadySeenMap.reset(new AtomicItemHandleHashSet(valueCompare));
+  state->theAlreadySeenMap = std::make_unique<AtomicItemHandleHashSet>(valueCompare);
 
   while (consumeNext(result, theChildren[0].getp(), planState))
   {

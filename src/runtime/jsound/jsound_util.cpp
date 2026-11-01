@@ -1979,7 +1979,7 @@ void type::load_constraints( store::Item_t const &constraints_item,
     ASSERT_TYPE( item, "constraint", XS_STRING );
     zstring constraint_str( item->getStringValue() );
     try {
-      unique_ptr<constraint> c( new constraint( constraint_str, *s.sctx_ ) );
+      unique_ptr<constraint> c = std::make_unique<constraint>( constraint_str, *s.sctx_ );
       constraints_.push_back( c.get() );
       (void)c.release(); // owned by constraints_ now
     }
@@ -2521,10 +2521,10 @@ type* schema::new_type( store::Item_t const &kind_item ) {
   zstring const kind_str( kind_item->getStringValue() );
   unique_ptr<type> t;
   switch ( find_kind( kind_str ) ) {
-    case k_atomic: t.reset( new atomic_type ); break;
-    case k_array : t.reset( new array_type  ); break;
-    case k_object: t.reset( new object_type ); break;
-    case k_union : t.reset( new union_type  ); break;
+    case k_atomic: t = std::make_unique<atomic_type>(); break;
+    case k_array : t = std::make_unique<array_type>(); break;
+    case k_object: t = std::make_unique<object_type>(); break;
+    case k_union : t = std::make_unique<union_type>(); break;
     default:
       throw XQUERY_EXCEPTION(
         jse::ILLEGAL_FACET_VALUE,

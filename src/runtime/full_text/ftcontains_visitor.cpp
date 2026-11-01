@@ -294,7 +294,7 @@ void V::end_visit( ftand& ) {
       PUSH( matches_stack_, am_right );
       break;
     }
-    unique_ptr<ft_all_matches> result( new ft_all_matches );
+    unique_ptr<ft_all_matches> result = std::make_unique<ft_all_matches>();
     apply_ftand( *am_left, *am_right, *result );
     PUSH( matches_stack_, result );
   }
@@ -318,7 +318,7 @@ void V::end_visit( ftmild_not &mn ) {
       break;
     }
     try {
-      unique_ptr<ft_all_matches> result( new ft_all_matches );
+      unique_ptr<ft_all_matches> result = std::make_unique<ft_all_matches>();
       apply_ftmild_not( *am_left, *am_right, *result );
       PUSH( matches_stack_, result );
     }
@@ -344,7 +344,7 @@ void V::end_visit( ftor& ) {
       PUSH( matches_stack_, am_right );
       break;
     }
-    unique_ptr<ft_all_matches> result( new ft_all_matches );
+    unique_ptr<ft_all_matches> result = std::make_unique<ft_all_matches>();
     apply_ftor( *am_left, *am_right, *result );
     PUSH( matches_stack_, result );
   }
@@ -357,9 +357,7 @@ ft_visit_result::type V::begin_visit( ftprimary_with_options &pwo ) {
   ftmatch_options const *const older_options = options_stack_.empty() ?
     static_ctx_.get_match_options() : TOP( options_stack_ );
 
-  unique_ptr<ftmatch_options> newer_options(
-    new ftmatch_options( *pwo.get_match_options() )
-  );
+  unique_ptr<ftmatch_options> newer_options = std::make_unique<ftmatch_options>( *pwo.get_match_options() );
 
   if ( older_options )
     replace_match_options( *older_options, newer_options.get() );
@@ -434,7 +432,7 @@ void V::end_visit( ftwords &w ) {
       //
       // Now that we have the query tokens, evaluate the full-text expression.
       //
-      unique_ptr<ft_all_matches> result( new ft_all_matches );
+      unique_ptr<ft_all_matches> result = std::make_unique<ft_all_matches>();
       apply_ftwords(
         query_items, ++query_pos_, ignore_item_, w.get_mode(), options, *result
       );
@@ -455,7 +453,7 @@ void V::end_visit( ftwords_times &wt ) {
       ft_int at_least, at_most;
       eval_ftrange( *range, &at_least, &at_most );
       unique_ptr<ft_all_matches> const am( POP( matches_stack_ ) );
-      unique_ptr<ft_all_matches> result( new ft_all_matches );
+      unique_ptr<ft_all_matches> result = std::make_unique<ft_all_matches>();
       apply_fttimes( *am, range->get_mode(), at_least, at_most, *result );
       PUSH( matches_stack_, result );
     }
@@ -483,7 +481,7 @@ void V::end_visit( ftdistance_filter &f ) {
   ft_int at_least, at_most;
   eval_ftrange( *f.get_range(), &at_least, &at_most );
   unique_ptr<ft_all_matches> const am( POP( matches_stack_ ) );
-  unique_ptr<ft_all_matches> result( new ft_all_matches );
+  unique_ptr<ft_all_matches> result = std::make_unique<ft_all_matches>();
   apply_ftdistance( *am, at_least, at_most, f.get_unit(), *result );
   PUSH( matches_stack_, result );
   END_VISIT( ftdistance_filter );
@@ -492,7 +490,7 @@ void V::end_visit( ftdistance_filter &f ) {
 DEF_FTNODE_VISITOR_BEGIN_VISIT( V, ftorder_filter )
 void V::end_visit( ftorder_filter& ) {
   unique_ptr<ft_all_matches> const am( POP( matches_stack_ ) );
-  unique_ptr<ft_all_matches> result( new ft_all_matches );
+  unique_ptr<ft_all_matches> result = std::make_unique<ft_all_matches>();
   apply_ftorder( *am, *result );
   PUSH( matches_stack_, result );
   END_VISIT( ftorder_filter );
@@ -501,7 +499,7 @@ void V::end_visit( ftorder_filter& ) {
 DEF_FTNODE_VISITOR_BEGIN_VISIT( V, ftscope_filter )
 void V::end_visit( ftscope_filter &f ) {
   unique_ptr<ft_all_matches> const am( POP( matches_stack_ ) );
-  unique_ptr<ft_all_matches> result( new ft_all_matches );
+  unique_ptr<ft_all_matches> result = std::make_unique<ft_all_matches>();
   apply_ftscope( *am, f.get_scope(), f.get_unit(), *result );
   PUSH( matches_stack_, result );
   END_VISIT( ftscope_filter );
@@ -510,7 +508,7 @@ void V::end_visit( ftscope_filter &f ) {
 DEF_FTNODE_VISITOR_BEGIN_VISIT( V, ftwindow_filter )
 void V::end_visit( ftwindow_filter &f ) {
   unique_ptr<ft_all_matches> const am( POP( matches_stack_ ) );
-  unique_ptr<ft_all_matches> result( new ft_all_matches );
+  unique_ptr<ft_all_matches> result = std::make_unique<ft_all_matches>();
   apply_ftwindow( *am, get_int( f.get_window_iter() ), f.get_unit(), *result );
   PUSH( matches_stack_, result );
   END_VISIT( ftwindow_filter );

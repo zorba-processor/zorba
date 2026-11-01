@@ -287,7 +287,7 @@ public:
   {
     ValueCompareParam* valueCompare =
         new ValueCompareParam(QueryLoc::null, dctx, sctx);
-    map_.reset(new AtomicItemHandleHashSet(valueCompare));
+    map_ = std::make_unique<AtomicItemHandleHashSet>(valueCompare);
   }
 
   // inherited

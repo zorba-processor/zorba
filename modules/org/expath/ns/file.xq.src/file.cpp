@@ -635,7 +635,7 @@ void ReadTextLinesFunction::LinesItemSequence::LinesIterator::open() {
     theFunc->raiseAccessDenied( theFile, lReason );
   if ( !lStream ) {
     // As before: a file that cannot be opened yields no lines.
-    lStream.reset( new std::istringstream() );
+    lStream = std::make_unique<std::istringstream>();
     lStream->setstate( std::ios_base::failbit );
   }
   if ( transcoding ) {

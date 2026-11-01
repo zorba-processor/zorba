@@ -114,11 +114,11 @@ void external_function::serialize(::zorba::serialization::Archiver& ar)
 
   if (!ar.is_serializing_out())
   {
-    theCache.reset(new FunctionCache(
+    theCache = std::make_unique<FunctionCache>(
       theModuleSctx,
       theExcludeFromCacheKey,
       theCompareWithDeepEqual,
-      theCacheAcrossSnapshots));
+      theCacheAcrossSnapshots);
   }
 }
 

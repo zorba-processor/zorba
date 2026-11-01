@@ -106,7 +106,7 @@ ft_stop_words_set::construct( ftstop_word_option const &option,
 
   switch ( option.get_mode() ) {
     case ft_stop_words_mode::with:
-      owned.reset( new word_set_t );
+      owned = std::make_unique<word_set_t>();
       word_set = owned.get();
       break;
     case ft_stop_words_mode::with_default:
@@ -123,7 +123,7 @@ ft_stop_words_set::construct( ftstop_word_option const &option,
 
     if ( !uri.empty() ) {
       if ( !owned ) {
-        owned.reset( new word_set_t( *word_set ) );
+        owned = std::make_unique<word_set_t>( *word_set );
         word_set = owned.get();
       }
 
@@ -167,7 +167,7 @@ ft_stop_words_set::construct( ftstop_word_option const &option,
     ftstop_words::list_t const &word_list = (*ftsw)->get_list();
     if ( !word_list.empty() ) {
       if ( !owned ) {
-        owned.reset( new word_set_t( *word_set ) );
+        owned = std::make_unique<word_set_t>( *word_set );
         word_set = owned.get();
       }
       FOR_EACH( ftstop_words::list_t, word, word_list )

@@ -663,7 +663,7 @@ private:
     if (ite != theNodes.end())
       return ite->second;
 
-    std::unique_ptr<Node> node(new Node);
+    std::unique_ptr<Node> node = std::make_unique<Node>();
     node->theKind = kind;
     node->thePtr = ptr;
     node->theRefs = refCount(kind, ptr, theHeld, theNumHeld);

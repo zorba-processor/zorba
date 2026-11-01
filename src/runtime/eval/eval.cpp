@@ -151,7 +151,7 @@ void EvalIteratorState::addQueryProfile(bool aTrackProfilingTime)
     EvalProfile& lProfile = theEvalProfiles[theEvalProfiles.size()-1];
     std::unique_ptr<ProfilingTimeWrapper> lPTWrapper;
     if (aTrackProfilingTime)
-      lPTWrapper.reset(new ProfilingTimeWrapper(*this));
+      lPTWrapper = std::make_unique<ProfilingTimeWrapper>(*this);
 
     Zorba_profile_format_t const lFormat = Properties::instance().getProfileFormat();
     switch ( lFormat )

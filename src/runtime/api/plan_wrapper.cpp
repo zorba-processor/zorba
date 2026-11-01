@@ -51,7 +51,7 @@ PlanWrapper::PlanWrapper(
   {
     // aDynamicContext is NULL when we try to execute the plan of an expression
     // that is being folded by the optimizer. 
-    theDynamicContext.reset(new dynamic_context());
+    theDynamicContext = std::make_unique<dynamic_context>();
     aDynamicContext = theDynamicContext.get();
   }
 
@@ -203,13 +203,13 @@ void PlanWrapper::profile() const {
     unique_ptr<IterPrinter> printer;
     switch ( format ) {
       case PROFILE_FORMAT_DOT:
-        printer.reset( new DOTIterPrinter( os ) );
+        printer = std::make_unique<DOTIterPrinter>( os );
         break;
       case PROFILE_FORMAT_JSON:
-        printer.reset( new JSONIterPrinter( os ) );
+        printer = std::make_unique<JSONIterPrinter>( os );
         break;
       case PROFILE_FORMAT_XML:
-        printer.reset( new XMLIterPrinter( os ) );
+        printer = std::make_unique<XMLIterPrinter>( os );
         break;
       default: // to silence warning
         break;

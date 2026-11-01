@@ -695,7 +695,7 @@ bool DivideOperation::compute<store::XS_YM_DURATION,store::XS_DOUBLE>(
 
   if( i1->getDoubleValue().isPosInf() || i1->getDoubleValue().isNegInf() )
   {
-    d = std::unique_ptr<Duration>(new Duration(Duration::YEARMONTHDURATION_FACET));
+    d = std::make_unique<Duration>(Duration::YEARMONTHDURATION_FACET);
   }
   else if ( i1->getDoubleValue().isZero() )
     throw XQUERY_EXCEPTION( err::FODT0002, ERROR_LOC( loc ) );
@@ -725,7 +725,7 @@ bool DivideOperation::compute<store::XS_DT_DURATION,store::XS_DOUBLE>
 
   if( i1->getDoubleValue().isPosInf() || i1->getDoubleValue().isNegInf() )
   {
-    d.reset(new Duration());
+    d = std::make_unique<Duration>();
   }
   else if ( i1->getDoubleValue().isZero() )
     throw XQUERY_EXCEPTION( err::FODT0002, ERROR_LOC( loc ) );

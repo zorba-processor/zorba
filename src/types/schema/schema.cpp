@@ -1830,8 +1830,7 @@ bool Schema::parseUserAtomicTypes(
   try
   {
     // Create grammar resolver and string pool that we pass to the scanner
-    std::unique_ptr<GrammarResolver> fGrammarResolver(
-        new GrammarResolver(theGrammarPool));
+    std::unique_ptr<GrammarResolver> fGrammarResolver = std::make_unique<GrammarResolver>(theGrammarPool);
 
     fGrammarResolver->useCachedGrammarInParse(true);
 

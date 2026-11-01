@@ -149,14 +149,13 @@ namespace zorbac {
   (std::unique_ptr<CrSeqData> data, XQC_Sequence** seq)
   {
     // Create a UserItemSequence to return the data in order as items.
-    std::unique_ptr<UserItemSequence> lItemSeq
-      (new UserItemSequence(NULL, 0, &crseq_init, &crseq_next, &crseq_free,
-        data.get(), theZorba->getItemFactory(), NULL));
+    std::unique_ptr<UserItemSequence> lItemSeq = std::make_unique<UserItemSequence>(nullptr, 0, &crseq_init, &crseq_next, &crseq_free,
+        data.get(), theZorba->getItemFactory(), nullptr);
 
     // Wrap in a CSequence to produce an XQC_Sequence. We pass "true"
     // to make CSequence assume memory-management responsibility for
     // the UserItemSequence.
-    std::unique_ptr<CSequence> lSeq (new CSequence(lItemSeq.get(), true, NULL));
+    std::unique_ptr<CSequence> lSeq = std::make_unique<CSequence>(lItemSeq.get(), true, nullptr);
 
     (void)lItemSeq.release(); // owned by lSeq now
     (void)data.release(); // owned by lItemSeq now
@@ -377,7 +376,7 @@ namespace zorbac {
     // Wrap in a CSequence to produce an XQC_Sequence. We pass "true"
     // to make CSequence assume memory-management responsibility for
     // the SingleItemSequence.
-    std::unique_ptr<CSequence> lSeq(new CSequence(lItemSeq.get(), true, NULL));
+    std::unique_ptr<CSequence> lSeq = std::make_unique<CSequence>(lItemSeq.get(), true, nullptr);
 
     (void)lItemSeq.release(); // owned by lSeq now
     (*seq) = lSeq.release()->getXQC();
@@ -431,7 +430,7 @@ namespace zorbac {
   {
     CIMPL_TRY {
       // Create a CrSeqData representing no data at all.
-      std::unique_ptr<CrSeqData> lData (new CrSeqData(0, XQC_DOUBLE_TYPE, false));
+      std::unique_ptr<CrSeqData> lData = std::make_unique<CrSeqData>(0, XQC_DOUBLE_TYPE, false);
       lData->theDoubles = NULL;
       me->create_sequence(std::move(lData), seq);
     }
@@ -444,7 +443,7 @@ namespace zorbac {
   {
     CIMPL_TRY {
       // Create a CrSeqData to hold the user's data.
-      std::unique_ptr<CrSeqData> lData(new CrSeqData(1, type, true));
+      std::unique_ptr<CrSeqData> lData = std::make_unique<CrSeqData>(1, type, true);
       lData->theString = value;
       me->create_sequence(std::move(lData), seq);
     }
@@ -457,8 +456,7 @@ namespace zorbac {
   {
     CIMPL_TRY {
       // Create a CrSeqData to hold the user's data.
-      std::unique_ptr<CrSeqData> lData
-        (new CrSeqData(count, XQC_STRING_TYPE, false));
+      std::unique_ptr<CrSeqData> lData = std::make_unique<CrSeqData>(count, XQC_STRING_TYPE, false);
       lData->theStrings = values;
       me->create_sequence(std::move(lData), seq);
     }
@@ -471,8 +469,7 @@ namespace zorbac {
   {
     CIMPL_TRY {
       // Create a CrSeqData to hold the user's data.
-      std::unique_ptr<CrSeqData> lData
-        (new CrSeqData(count, XQC_DECIMAL_TYPE, false));
+      std::unique_ptr<CrSeqData> lData = std::make_unique<CrSeqData>(count, XQC_DECIMAL_TYPE, false);
       lData->theInts = values;
       me->create_sequence(std::move(lData), seq);
     }
@@ -485,8 +482,7 @@ namespace zorbac {
   {
     CIMPL_TRY {
       // Create a CrSeqData to hold the user's data.
-      std::unique_ptr<CrSeqData> lData
-        (new CrSeqData(count, XQC_DOUBLE_TYPE, false));
+      std::unique_ptr<CrSeqData> lData = std::make_unique<CrSeqData>(count, XQC_DOUBLE_TYPE, false);
       lData->theDoubles = values;
       me->create_sequence(std::move(lData), seq);
     }

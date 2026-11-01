@@ -85,8 +85,7 @@ HTTPURLResolver::resolveURL
   security::ResolutionScope const* const lScope =
     security::ResolutionScope::current();
   try {
-    std::unique_ptr<HttpStream> lStream(
-        new HttpStream(aUrl, lScope ? &lScope->policy() : nullptr));
+    std::unique_ptr<HttpStream> lStream = std::make_unique<HttpStream>(aUrl, lScope ? &lScope->policy() : nullptr);
     lStream->init();
     // Take ownership of the istream and pass it to the StreamResource
     StreamResource* lResource =

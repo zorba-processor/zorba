@@ -239,7 +239,7 @@ DynamicLoader::getExternalModule(zstring const& aNsURI, static_context& aSctx)
 
       if (!modfile->good()) 
       {
-        modfile.reset(new std::ifstream(potentialModuleFileDebug.c_str()));
+        modfile = std::make_unique<std::ifstream>(potentialModuleFileDebug.c_str());
         potentialModuleFile = potentialModuleFileDebug;
       }
 

@@ -765,8 +765,7 @@ XQueryImpl::getStaticCollectionManager() const
     {
       // this object is only need to construct the StaticCollectionManagerImpl
       // but it's not used after the construction anymore
-      std::unique_ptr<StaticContextImpl> lCtx(
-      new StaticContextImpl(lIter->second.getp(), theDiagnosticHandler));
+      std::unique_ptr<StaticContextImpl> lCtx = std::make_unique<StaticContextImpl>(lIter->second.getp(), theDiagnosticHandler);
 
       lMgrs.push_back(new StaticCollectionManagerImpl(lCtx.get(),
                                                       lFactory,
@@ -1587,9 +1586,9 @@ void XQueryImpl::printPlan(std::ostream& aStream, bool aDotFormat) const
 
     std::unique_ptr<IterPrinter> lPrinter;
     if (aDotFormat)
-      lPrinter.reset(new DOTIterPrinter(aStream));
+      lPrinter = std::make_unique<DOTIterPrinter>(aStream);
     else
-      lPrinter.reset(new XMLIterPrinter(aStream));
+      lPrinter = std::make_unique<XMLIterPrinter>(aStream);
     print_iter_plan(*(lPrinter.get()),
         static_cast<PlanIterator*>(thePlanProxy->theRootIter.getp()));
   }
@@ -1679,13 +1678,13 @@ void XQueryImpl::printPlan(std::ostream& aStream, Zorba_plan_format_t format) co
       case PLAN_FORMAT_NONE:
         return;
       case PLAN_FORMAT_XML:
-        lPrinter.reset(new XMLIterPrinter(aStream));
+        lPrinter = std::make_unique<XMLIterPrinter>(aStream);
         break;
       case PLAN_FORMAT_JSON:
-        lPrinter.reset(new JSONIterPrinter(aStream));
+        lPrinter = std::make_unique<JSONIterPrinter>(aStream);
         break;
       case PLAN_FORMAT_DOT:
-        lPrinter.reset(new DOTIterPrinter(aStream));
+        lPrinter = std::make_unique<DOTIterPrinter>(aStream);
         break;
     }
     print_iter_plan(*(lPrinter.get()),

@@ -549,7 +549,7 @@ bool MultiDynamicFnCallIterator::nextImpl(
       if (targetItem->isObject())
       {
         if (!state->theKeysSet.get())
-          state->theKeysSet.reset(new HashSet<zstring, HashMapZStringCmp>(64, false));
+          state->theKeysSet = std::make_unique<HashSet<zstring, HashMapZStringCmp>>(64, false);
 
         state->theIterator = targetItem->getObjectKeys();
 

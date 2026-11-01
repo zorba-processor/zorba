@@ -101,7 +101,7 @@ ZorbaException& ZorbaException::operator=( ZorbaException const &from ) {
 }
 
 unique_ptr<ZorbaException> ZorbaException::clone() const {
-  return unique_ptr<ZorbaException>( new ZorbaException( *this ) );
+  return std::make_unique<ZorbaException>( *this );
 }
 
 int ZorbaException::get_ios_format_index() {

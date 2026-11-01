@@ -73,7 +73,7 @@ NonSeeakableStreamableStringFunction::evaluate(
 {
   zorba::ItemFactory* lFactory = zorba::Zorba::getInstance(0)->getItemFactory();
 
-  std::unique_ptr<std::stringstream> lResultStream(new std::stringstream());
+  std::unique_ptr<std::stringstream> lResultStream = std::make_unique<std::stringstream>();
   (*lResultStream.get()) << "streamable";
 
   return zorba::ItemSequence_t(
@@ -209,7 +209,7 @@ UtilTestsModule::test04(const Arguments_t& aArgs,
 
   std::vector<zorba::Item> lResult;
 
-  std::unique_ptr<std::stringstream> lResultStream(new std::stringstream());
+  std::unique_ptr<std::stringstream> lResultStream = std::make_unique<std::stringstream>();
   (*lResultStream.get()) << "streamable";
   zorba::Item lString = lFactory->createStreamableString(
       *lResultStream.release(),
@@ -220,7 +220,7 @@ UtilTestsModule::test04(const Arguments_t& aArgs,
   //{"key" : debug:non-seeakable-streamable-string()},
   std::vector<std::pair<zorba::Item, zorba::Item> > lObjectPairs;
   zorba::Item lFieldName = lFactory->createString("key");
-  std::unique_ptr<std::stringstream> lResultStream2(new std::stringstream());
+  std::unique_ptr<std::stringstream> lResultStream2 = std::make_unique<std::stringstream>();
   (*lResultStream2.get()) << "streamable";
   zorba::Item lFieldValue = lFactory->createStreamableString(
       *lResultStream2.release(),
@@ -233,7 +233,7 @@ UtilTestsModule::test04(const Arguments_t& aArgs,
 
   //[debug:non-seeakable-streamable-string()],
   std::vector<zorba::Item> lStackArray;
-  std::unique_ptr<std::stringstream> lResultStream3(new std::stringstream());
+  std::unique_ptr<std::stringstream> lResultStream3 = std::make_unique<std::stringstream>();
       (*lResultStream3.get()) << "streamable";
   zorba::Item lArrayValue = lFactory->createStreamableString(
       *lResultStream3.release(),
@@ -253,7 +253,7 @@ UtilTestsModule::test04(const Arguments_t& aArgs,
 
   zorba::Item lAQName = lFactory->createQName("http://www.w3.org/2001/XMLSchema", "b");
   zorba::Item lATypeName = lFactory->createQName("http://www.w3.org/2001/XMLSchema", "untyped");
-  std::unique_ptr<std::stringstream> lResultStream4(new std::stringstream());
+  std::unique_ptr<std::stringstream> lResultStream4 = std::make_unique<std::stringstream>();
         (*lResultStream4.get()) << "streamable";
   zorba::Item lAttrValue = lFactory->createStreamableString(
         *lResultStream4.release(),
