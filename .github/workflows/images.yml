@@ -4,8 +4,8 @@ name: Images
 #   ghcr.io/<owner>/zorba          command-line image (amd64 + arm64), :edge and :sha-<short>
 #   ghcr.io/<owner>/zorba-builder  build environments (:latest-toolchain, :ubuntu-24.04)
 # Release tags (v*) are published by release.yml; master never moves :latest.
-# Master pushes publish only when code or image inputs change (same allowlist
-# as the `changes` job in ci.yml); docs-only pushes are skipped. This workflow
+# Master pushes publish only when code or image inputs change (allowlist
+# below); docs-only pushes are skipped. This workflow
 # has no tag trigger, so `paths` cannot filter tag pushes; workflow_dispatch
 # is never filtered.
 on:

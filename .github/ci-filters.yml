@@ -4,7 +4,8 @@
 # profile's guard macro is not matched by that profile's patterns, so keep
 # this file in sync when a guard moves to a new directory.
 
-# Required jobs (linux-*, macos-arm64): any code change.
+# Required jobs (linux-*, macos-arm64): anything their build, tests or
+# scripts consume.
 code:
   - 'src/**'
   - 'include/**'
@@ -13,18 +14,32 @@ code:
   - 'test/**'
   - 'schemas/**'
   - 'cmake/**'
-  - 'docker/**'
-  - '.clusterfuzzlite/**'
-  - '.github/codeql/**'
+  # The tree compiles and tests the doc examples and configures doc/**/*.in
+  # (CMake files and *.in are matched by the patterns below). Doxygen does
+  # not run in CI: .dox, .md, html and images under doc/ are not consumed.
+  # CI also configures scripts/*.in and runs scripts/check-hardening.sh.
+  - 'doc/c/examples/**'
+  - 'doc/cxx/examples/**'
+  - 'doc/**/*.in'
+  - 'scripts/CMakeLists.txt'
+  - 'scripts/*.in'
+  - 'scripts/check-hardening.sh'
+  # Only the images CI builds: the two toolchains and the HTTP test server
+  # (docker/runtime and the docker docs are not used by ci.yml).
+  - 'docker/builder/**'
+  - 'docker/builder-latest/**'
+  - 'docker/http-test-server/**'
   - 'CMakeLists.txt'
   - 'CMake*.txt'
   - 'CMake*.json'
+  - '**/CMakeLists.txt'
   - '*.cmake'
+  - '**/*.cmake'
   - '*.cmake.in'
+  - '**/*.cmake.in'
   - 'CTest*'
   - 'CPack*'
   - '.github/workflows/ci.yml'
-  - '.github/workflows/images.yml'
   - '.github/actions/**'
   - '.github/ci-filters.yml'
 

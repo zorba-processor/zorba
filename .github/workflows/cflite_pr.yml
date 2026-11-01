@@ -5,24 +5,28 @@ name: ClusterFuzzLite PR fuzzing
 # the batch workflow is reused through the default GitHub artifacts store.
 on:
   pull_request:
+    # The ClusterFuzzLite image copies the repository and builds the `fuzzers`
+    # target (libzorba without Xerces/curl, and test/fuzz); code-change mode
+    # fuzzes the targets the diff affects. Consumed: core C++ sources, CMake
+    # files, test/fuzz (targets, dictionaries, regression inputs, seed
+    # script) and the seed corpora's source files under test/rbkt.
     paths:
       - 'src/**'
       - 'include/**'
-      - 'modules/**'
-      - 'bin/**'
-      - 'test/**'
-      - 'schemas/**'
+      - 'modules/**/*.c'
+      - 'modules/**/*.cpp'
+      - 'modules/**/*.h'
+      - 'modules/**/*.hpp'
+      - 'test/fuzz/**'
       - 'cmake/**'
-      - 'docker/**'
-      - '.clusterfuzzlite/**'
-      - '.github/codeql/**'
-      - 'CMakeLists.txt'
+      - '**/CMakeLists.txt'
+      - '**/*.cmake'
+      - '**/*.cmake.in'
       - 'CMake*.txt'
       - 'CMake*.json'
-      - '*.cmake'
-      - '*.cmake.in'
       - 'CTest*'
       - 'CPack*'
+      - '.clusterfuzzlite/**'
       - '.github/workflows/cflite_pr.yml'
   workflow_dispatch:
 
