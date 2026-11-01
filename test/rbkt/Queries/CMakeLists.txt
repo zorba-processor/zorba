@@ -603,6 +603,15 @@ IF(WIN32)
   EXPECTED_FAILURE(test/rbkt/zorba/file/dirname_basename-03 1201635)
 ENDIF(WIN32)
 
+# Stock Xerces-C (Homebrew on macOS) lacks the fixes of the zorba-processor
+# fork (see doc/KNOWN_ISSUES.txt): XERCESC-2243 (xs:choice with an empty
+# xs:sequence branch) and XERCESC-2115 (whiteSpace facet of union members).
+# Linux CI and the builder images use the fork, so these only fail on APPLE.
+IF(APPLE)
+  EXPECTED_FAILURE(test/rbkt/zorba/schemas/choice-empty-sequence XERCESC-2243)
+  EXPECTED_FAILURE(test/rbkt/zorba/schemas/union-whitespace XERCESC-2115)
+ENDIF(APPLE)
+
 EXPECTED_FAILURE(test/rbkt/zorba/modules/schema 3131554)
 
 EXPECTED_FAILURE(test/rbkt/zorba/xqddf/ic-uniqueKey-err2 2935047)

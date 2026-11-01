@@ -37,15 +37,20 @@ Zorba Version 2.0
   only and never walks the base chain of the derived type.
   Zorba's Linux CI, builder and runtime images (docker/builder,
   docker/builder-latest, docker/runtime) build Xerces-C from the patched fork
-  https://github.com/zorba-processor/xerces-c (tag v3.3.0-zorba.4), so the
+  https://github.com/zorba-processor/xerces-c (tag v3.3.0-zorba.5), so the
   QT3 test-cases importing prod/SchemaImport/unionListDefined.xsd run there.
   Builds against a stock Xerces-C (Homebrew on macOS, distribution packages)
   still have the bug until it is fixed upstream (XERCESC-2269,
   https://github.com/apache/xerces-c/pull/67).
-  The fork also carries two schema facet fixes missing from stock Xerces-C:
-  NaN is rejected by minInclusive/maxInclusive (XERCESC-2263), and the
+  The fork also carries four schema fixes missing from stock Xerces-C:
+  NaN is rejected by minInclusive/maxInclusive (XERCESC-2263), the
   length, minLength and maxLength facets count characters instead of UTF-16
-  code units (XERCESC-2063).
+  code units (XERCESC-2063), an xs:choice with an empty xs:sequence branch
+  accepts empty content (XERCESC-2243), and a union type applies the
+  whiteSpace facet of the member type that accepts the value instead of
+  always collapsing whitespace (XERCESC-2115). On stock Xerces-C builds
+  (macOS CI) the rbkt tests zorba/schemas/choice-empty-sequence and
+  zorba/schemas/union-whitespace are expected to fail.
 
 * XQuery Full-Text is mostly, but not completely, implemented.
   For details, see following bugs:

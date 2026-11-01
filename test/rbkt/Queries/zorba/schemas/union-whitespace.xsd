@@ -1,0 +1,23 @@
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           xmlns="urn:zorba:test:union-whitespace"
+           targetNamespace="urn:zorba:test:union-whitespace"
+           elementFormDefault="qualified">
+
+  <xs:simpleType name="preservedString">
+    <xs:restriction base="xs:string">
+      <xs:whiteSpace value="preserve"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="intOrString">
+    <xs:union memberTypes="xs:integer preservedString"/>
+  </xs:simpleType>
+
+  <xs:element name="item" type="intOrString"/>
+
+  <xs:element name="holder">
+    <xs:complexType>
+      <xs:attribute name="v" type="intOrString"/>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>
