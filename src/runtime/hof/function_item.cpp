@@ -1076,7 +1076,9 @@ PlanIter_t FunctionItem::getImplementation(
   {
     if (*ite != NULL)
     {
+      // The wrapper is not opened by the plan that consumes it.
       store::Iterator_t seqIter = (*ite)->getIterator();
+      seqIter->open();
       *argsIte = new PlanStateIteratorWrapper(seqIter);
     }
     else
