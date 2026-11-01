@@ -106,8 +106,10 @@ getFetchResource(
     return lStreamRes;
 
   } catch (ZorbaException const& e) {
-    // A refusal by a URI mapper of the embedder keeps its error code.
-    if (e.diagnostic() == zerr::ZXQP0029_URI_ACCESS_DENIED)
+    // A refusal by a URI mapper of the embedder keeps its error code, and
+    // the errors thrown above are not wrapped a second time.
+    if (e.diagnostic() == zerr::ZXQP0029_URI_ACCESS_DENIED ||
+        e.diagnostic() == zuri::URI_UNRESOLVED_OR_NOSTREAM)
       throw;
     throw XQUERY_EXCEPTION(
       zuri::URI_UNRESOLVED_OR_NOSTREAM,
