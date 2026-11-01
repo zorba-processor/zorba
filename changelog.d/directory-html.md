@@ -3,4 +3,6 @@
 - The directory module (`dir:open`, `dir:documents`, `zorba --directory`,
   `zorba-mcp`) parses `.html` and `.htm` files with `x:parse-html` and returns
   the document node as `content`; a file that cannot be parsed yields the
-  per-file error record.
+  per-file error record. Builds without XML Schema support report HTML files
+  as an unsupported format.
+- The directory module reads `.geojson` files as JSON.

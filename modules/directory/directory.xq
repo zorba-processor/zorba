@@ -169,6 +169,7 @@ declare %an:nondeterministic function dir:documents(
 (:~
  : Returns the format of a path, by extension (case-insensitive):
  : <code>xml</code> for .xml and .xhtml, <code>json</code> for .json,
+ : .geojson,
  : .jsonl and .ndjson, <code>csv</code> for .csv, <code>html</code> for
  : .html and .htm.
  :
@@ -185,7 +186,7 @@ declare function dir:format( $path as xs:string ) as xs:string?
   return
     switch ( $ext )
     case "xml" case "xhtml" return "xml"
-    case "json" case "jsonl" case "ndjson" return "json"
+    case "json" case "jsonl" case "ndjson" case "geojson" return "json"
     case "csv" return "csv"
     case "html" case "htm" return "html"
     default return ()

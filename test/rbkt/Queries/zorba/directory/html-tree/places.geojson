@@ -1,0 +1,1 @@
+{ "type" : "Feature", "properties" : { "name" : "Plaza" }, "geometry" : { "type" : "Point", "coordinates" : [ -99.13, 19.43 ] } }
