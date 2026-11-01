@@ -211,6 +211,11 @@ public:
 
   theArgValues:
   -------------
+  One entry per argument of the function: NULL if the argument is not applied
+  (yet), otherwise the eager temp sequence holding its value, set by partial
+  application (setArgumentValue()). A copy shares the temp sequences of the
+  original. Each invocation reads them through iterators of its own. The
+  cycle collector follows them (see QueryResources::collectCycles()).
 
   theInternalRefs:
   ----------------
@@ -245,7 +250,7 @@ protected:
 
   dynamic_context*                theGlobalDctx;
 
-  std::vector<PlanIter_t>         theArgValues;
+  std::vector<store::TempSeq_t>   theArgValues;
 
   bool                            theClosureDctxOwned;
 
@@ -301,9 +306,7 @@ public:
 
   ulong getMaxInScopeVarId() const;
 
-  const std::vector<PlanIter_t>& getArgValues() const { return theArgValues; }
-
-  void setArgumentValue(csize pos, const PlanIter_t& value);
+  void setArgumentValue(csize pos, const store::TempSeq_t& value);
 
   bool isArgumentApplied(csize pos) const;
 

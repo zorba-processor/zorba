@@ -76,7 +76,8 @@ class XQueryDiagnostics;
   collectCycles() (see runtime/hof/function_item.cpp): a trial deletion over
   the graph of detached QueryResources, the function items stored in their
   dctx variables (directly or in temp sequences, and transitively in closure
-  dctxs), and the references among them. If no reference from outside that
+  dctxs and in the applied arguments of partially applied function items),
+  and the references among them. If no reference from outside that
   graph reaches this obj, the dctx variable values are released, which frees
   the whole cycle. It runs when the obj is detached, and afterwards when a
   reference that may have been the last outside one goes away: a reference to

@@ -36,6 +36,9 @@
 #include "store/api/temp_seq.h"
 #include "store/api/iterator.h"
 
+#include "diagnostics/assert.h"
+
+#include <exception>
 #include <map>
 #include <memory>
 #include <new>
@@ -377,7 +380,8 @@ void FunctionItem::collectCycles()
   - a detached QueryResources (or the root) refers to the values of its dctx
     variables and to its parents;
   - a function item refers to its QueryResources, to the item that owns its
-    closure dctx, and to the values of its closure dctx variables;
+    closure dctx, to the values of its closure dctx variables, and to the
+    temp sequences holding its applied arguments (partial application);
   - a JSON object or array refers to its members;
   - an eager temp sequence refers to its items.
 
@@ -386,8 +390,14 @@ void FunctionItem::collectCycles()
   If the root is not, nothing outside the graph can reach it any more: the
   graph consists of cycles only, and releasing the dctx variable values of the
   unreachable QueryResources frees it. References this class cannot see (e.g.
-  items inside a lazy temp sequence or in partial-application arguments) only
-  make it conservative: they count as references from outside.
+  items inside a lazy temp sequence, which a dctx variable never holds: its
+  values are materialized eagerly) only make it conservative: they count as
+  references from outside.
+
+  If the walk fails (e.g. std::bad_alloc), the graph is treated as referenced
+  from outside: nothing is released and no witness is recorded, so the next
+  trigger walks it again. The guards restore the thread-local state and close
+  the iterators the walk opened.
 ********************************************************************************/
 class QueryResourcesCollector
 {
@@ -775,6 +785,14 @@ private:
       addItem(node, item->theClosureDctxOwner.getp());
       if (item->theClosureDctxOwned)
         addVariables(node, item->theClosureDctx);
+
+      std::vector<store::TempSeq_t>::const_iterator argIte =
+        item->theArgValues.begin();
+      for (; argIte != item->theArgValues.end(); ++argIte)
+      {
+        if (*argIte != NULL)
+          addEdge(node, SEQ, argIte->getp());
+      }
       break;
     }
     case JSON:
@@ -882,10 +900,17 @@ void QueryResources::collectCycles(QueryResources* const* held, csize numHeld)
       continue;
 
     std::vector<QueryResources_t> garbage;
+    try
     {
       QueryResourcesCollector collector(held, numHeld);
       if (!collector.run(root, garbage))
         continue;
+    }
+    catch (const std::exception&)
+    {
+      // See the class comment of QueryResourcesCollector. The triggers run
+      // in destructors (reference releases), so the failure must not escape.
+      continue;
     }
 
     // Releasing the values frees the cycles; the handles in garbage keep the
@@ -936,7 +961,21 @@ void FunctionItem::serialize(::zorba::serialization::Archiver& ar)
 {
   ar & theFunctionItemInfo;
   ar & theArity;
-  ar & theArgValues;
+
+  // Partially applied items are created at runtime; their applied arguments
+  // are not serialized (one null entry per argument).
+  std::vector<PlanIter_t> argValues(theArgValues.size());
+
+  if (ar.is_serializing_out())
+  {
+    for (csize i = 0; i < theArgValues.size(); ++i)
+      ZORBA_ASSERT(theArgValues[i] == NULL);
+  }
+
+  ar & argValues;
+
+  if (!ar.is_serializing_out())
+    theArgValues.resize(argValues.size());
 }
 
 
@@ -981,7 +1020,7 @@ bool FunctionItem::isArgumentApplied(csize pos) const
 /*******************************************************************************
 
 ********************************************************************************/
-void FunctionItem::setArgumentValue(csize pos, const PlanIter_t& value)
+void FunctionItem::setArgumentValue(csize pos, const store::TempSeq_t& value)
 {
   theArity--;
 
@@ -1029,7 +1068,7 @@ PlanIter_t FunctionItem::getImplementation(
   args.resize(theArgValues.size());
 
   std::vector<PlanIter_t>::iterator argsIte = args.begin();
-  std::vector<PlanIter_t>::iterator ite = theArgValues.begin();
+  std::vector<store::TempSeq_t>::const_iterator ite = theArgValues.begin();
   std::vector<PlanIter_t>::const_iterator ite2 = dynChildren.begin();
   ++ite2; // skip the first child because it's the function item
 
@@ -1037,8 +1076,8 @@ PlanIter_t FunctionItem::getImplementation(
   {
     if (*ite != NULL)
     {
-      *argsIte = *ite;
-      static_cast<PlanStateIteratorWrapper*>(ite->getp())->reset();
+      store::Iterator_t seqIter = (*ite)->getIterator();
+      *argsIte = new PlanStateIteratorWrapper(seqIter);
     }
     else
     {
