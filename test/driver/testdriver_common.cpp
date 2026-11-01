@@ -128,11 +128,6 @@ void slurp_file (
     zorba::ascii::replace_all(rbkt_src_uri, "%3A", ":");
 #endif
     zorba::ascii::replace_all(sstr, "$RBKT_SRC_DIR", rbkt_src_uri);
-#ifdef MY_D_WIN32
-    zorba::ascii::replace_all(sstr,
-                           "w3c_testsuite/Queries/w3c_testsuite",
-                           "w3c_testsuite/Queries");
-#endif
   }
 
   expand_http_test_server(sstr);
@@ -381,9 +376,6 @@ void createDynamicContext(
     if (spec.hasInputQuery())
     {
       std::string inputqueryfile = spec.getInputQueryFile ();
-#ifdef MY_D_WIN32
-      zorba::ascii::replace_all(inputqueryfile, "rbkt/Queries/w3c_testsuite/", "w3c_testsuite/Queries/");
-#endif
 
       std::ifstream inputquery ( inputqueryfile.c_str() );
 
@@ -447,10 +439,6 @@ void set_var(
     std::string val,
     bool enableDtd)
 {
-#ifdef MY_D_WIN32
-  zorba::ascii::replace_all(val, "rbkt/Queries/w3c_testsuite/", "w3c_testsuite/Queries/");
-  //zorba::ascii::replace_all(val, "/", "\\");
-#endif
   //std::cout << "Setting variable " << name << " to value '" << val <<"'" << std::endl;
   if (!inlineFile)
   {
@@ -462,9 +450,6 @@ void set_var(
   }
   else
   {
-#ifdef MY_D_WIN32
-    std::cout << "Load xml " << val << std::endl;
-#endif
 
     zorba::DocumentManager* lDocMgr = driverCtx.theXmlDataMgr->getDocumentManager();
 
@@ -484,11 +469,7 @@ void set_var(
       zorba::XmlDataManager::ParseOptions lOptions;
       lOptions.setDtdValidation(enableDtd);
 
-#ifndef WIN32
       std::string file_scheme = "file://";
-#else
-      std::string file_scheme = "file:///";
-#endif
       zorba::ItemSequence_t lSeq =
       driverCtx.theXmlDataMgr->parseXML(ifile, file_scheme + val, lOptions);
 
@@ -625,11 +606,7 @@ void setModulePaths(std::string paths, zorba::StaticContext_t& sctx)
 {
   std::vector<zorba::String> lModulePaths;
   std::string lPath;
-#ifdef WIN32
-  char lDelim = ',';
-#else
   char lDelim = ':';
-#endif
 
   while (zorba::ztd::split(paths, lDelim, &lPath, &paths))
   {

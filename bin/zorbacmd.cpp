@@ -25,9 +25,6 @@
 #include <string>
 #include <vector>
 
-#ifdef WIN32
-#include <windows.h>
-#endif /* WIN32 */
 
 // Zorba
 #include <zorba/audit.h>
@@ -351,32 +348,11 @@ static void set_prolog_serializer_opts( Zorba *zorba, XQuery_t const &query,
  ******************************************************************************/
 
 static string parse_file_uri( string const &uri ) {
-#ifdef WIN32
-  // file:///c:/ returns c:<backslash>
-  // file://localhost returns \\localhost
-  // BUG: it seems that <a>/x returns <a>\x
-  static const char *file3 = "file:///";
-  static const char *file2 = "file://";
-  string fpath;
-  if ( uri.compare( 0, strlen( file3 ), file3 ) == 0 ) {
-    fpath = uri.substr( strlen( file3 ) );
-  } else if ( uri.compare( 0, strlen( file2 ), file2 ) == 0 ) {
-    fpath = fs::dir_separator;
-    fpath += uri.substr( strlen( file2 ) );
-  }
-  // replace all slash with backslash
-  string::size_type off=0;
-  while ( (off = fpath.find( '/', off )) != string::npos )
-    fpath.replace( off, 1, 1, fs::dir_separator );
-  return fpath;
-
-#else /* for UNIX */
   static const char pfx[] = "file://";
   if ( uri.compare( 0, 7, pfx ) == 0 )
     return uri.substr( 7 );
   else
     return "";
-#endif /* WIN32 */
 }
 
 static void remove_output_file() {
@@ -717,11 +693,7 @@ static SecurityPolicy make_security_policy() {
 //                                                                           //
 ///////////////////////////////////////////////////////////////////////////////
 
-#ifndef _WIN32_WCE
 int main( int argc, char const *argv[] ) {
-#else
-int _tmain( int argc, _TCHAR const *argv[] ) {
-#endif
   int const optind = parse_args( argc, argv );
   argc -= optind;
   argv += optind;

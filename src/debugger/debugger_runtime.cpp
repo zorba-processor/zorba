@@ -44,10 +44,6 @@
 #include "debugger/debugger_communicator.h"
 #include "debugger/debugger_commons.h"
 
-#ifdef WIN32
-#include <windows.h>
-#define sleep(s) Sleep(s*1000)
-#endif
 
 namespace zorba {
 
@@ -565,15 +561,11 @@ DebuggerRuntime::listSource(
   if (lFileName == "") {
     // if not started, than it's the main module
     if (theExecStatus != QUERY_SUSPENDED) {
-#ifdef WIN32
-      lFileName = theQuery->getFileName();
-#else
       // TODO: under Linux, when trying to get the file name of the query
       //       the call fails because getFileName tries to get a lock that
       //       is already taken. Therefore the assertion in mutex.cpp:63
       //       terminates the execution
       lFileName = "";
-#endif
     }
     // else, the file pointed by the top-most stack frame
     else {
@@ -595,10 +587,6 @@ DebuggerRuntime::listSource(
     }
   }
 
-#ifdef WIN32
-  // TODO: tolower all the file names/URIs on Windows
-  // This must be implemented also in the breakable/breakpoint logic
-#endif
 
   // normalize file uri and file name
   String lPrefix = lFileName.substr(0, 7);

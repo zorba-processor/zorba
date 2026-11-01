@@ -18,7 +18,7 @@
 #ifndef ZORBA_SCHEMA_TYPES_BASE_H
 #define ZORBA_SCHEMA_TYPES_BASE_H
 
-#include "zorbamisc/config/stdint.h"
+#include <stdint.h>
 
 #include "zstring.h"
 

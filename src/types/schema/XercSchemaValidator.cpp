@@ -46,9 +46,6 @@
 #else
 #include <xercesc/internal/XMLGrammarPoolImpl.hpp>
 #endif
-#ifdef CYGWIN
-#undef WIN32
-#endif
 
 
 #include "diagnostics/assert.h"

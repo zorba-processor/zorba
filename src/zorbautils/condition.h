@@ -51,27 +51,6 @@ class  Condition
   void broadcast();
 };
 
-#elif defined WIN32 || defined WINCE
-
-class  Condition
-{
-protected:
-  HANDLE           cond_event[2];
-  Mutex          & theMutex;
-  int              waiters;
-  HANDLE           cond_door;
-  HANDLE           cond_broadcast;
-  CRITICAL_SECTION  cond_cs;
-public:
-  Condition(Mutex& m);
-
-  ~Condition();
-
-  void wait();
-  void signal();
-  void broadcast();
-};
-
 #else
 
 class  Condition

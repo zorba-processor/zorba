@@ -300,7 +300,7 @@ void createPath(const fs::path& filePath, std::ofstream& fileStream)
     {
       fs::create_directories(dirPath.file_string());
 
-      // clear the bad flag on windows, which for some unknown reason doesn't
+      // clear the bad flag, which does not
       // reset when opening a file again
       fileStream.clear(); 
 
@@ -328,7 +328,7 @@ void createPath(const fs::path& filePath, std::ofstream& fileStream)
     {
       fs::create_directories(dirPath.generic_string());
 
-      // clear the bad flag on windows, which for some unknown reason doesn't
+      // clear the bad flag, which does not
       // reset when opening a file again
       fileStream.clear(); 
       fileStream.open(filePath.generic_string().c_str());
@@ -386,11 +386,7 @@ bool checkErrors(
 /*******************************************************************************
 
 ********************************************************************************/
-#ifndef WIN32
 void* thread_main(void* param)
-#else
-DWORD WINAPI thread_main(LPVOID param)
-#endif
 {
   ThreadParams* params = (ThreadParams*)param;
 
@@ -480,11 +476,7 @@ DWORD WINAPI thread_main(LPVOID param)
     queries->theQueryLocks[queryNo]->lock();
     queries->theGlobalLock.unlock();
 
-#ifndef WIN32
     sched_yield();
-#else
-    // SwitchToThread();
-#endif
 
     // Form the full pathname for the .spec file that may be associated
     // with this query. If the .spec file exists, read its contents to
@@ -853,11 +845,7 @@ void usage()
 
 ********************************************************************************/
 int
-#ifdef _WIN32_WCE
-_tmain(int argc, _TCHAR* argv[])
-#else
   main(int argc, char** argv)
-#endif
 {
   std::string bucketName;
   std::string bucketPath;
@@ -975,11 +963,7 @@ _tmain(int argc, _TCHAR* argv[])
   // better to fix those than take this heavy-handed approach.
   if (quiet) 
   {
-#ifndef WIN32
     close(2);
-#else
-    fclose(stderr);
-#endif
   }
 
   //
@@ -1152,7 +1136,6 @@ _tmain(int argc, _TCHAR* argv[])
   //
   // Create and start the threads, then wait for all the threads to finish
   //
-#ifndef WIN32
   pthread_t* threads = new pthread_t[numThreads];
   ThreadParams* params[numThreads];
 
@@ -1174,24 +1157,6 @@ _tmain(int argc, _TCHAR* argv[])
   {
     delete params[i];
   }
-#else  
-
-  // Windows code
-  HANDLE* threads = new HANDLE[numThreads]; // pthread_t* threads = new pthread_t[numThreads];
-  DWORD* thread_ids = new DWORD[numThreads];
-
-  for (long i = 0; i < numThreads; i++)
-  {
-    ThreadParams* params = new ThreadParams(zorba, &queries, i);
-    CreateThread(NULL, 0, thread_main, (void*)params, 0, &thread_ids[i]);
-  }
-
-  WaitForMultipleObjects(numThreads, threads, TRUE, INFINITE);
-  
-  // shutdown
-  delete[] threads;
-  delete[] thread_ids;
-#endif
 
   queries.theOutput << std::endl
                     << "***********************************************************************"

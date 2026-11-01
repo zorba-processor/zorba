@@ -232,8 +232,7 @@ public:
    *   form: absolute, with <code>.</code> and <code>..</code> resolved and
    *   symbolic links of the existing part of the path followed, so neither
    *   <code>..</code> nor a symbolic link can escape a directory. The
-   *   comparison is case-insensitive where the file system is (Windows,
-   *   case-insensitive macOS volumes).
+   *   comparison is case-insensitive on case-insensitive macOS volumes.
    * - \c http, \c https, \c ftp and \c ftps URLs need Capability::Network,
    *   and for
    *   EntityData::MODULE and EntityData::SCHEMA also
@@ -298,7 +297,7 @@ public:
    * is actually opened: the file is opened first, then the real path of the
    * open file is checked. A symbolic link that is swapped between an earlier
    * check and the open therefore cannot redirect the read outside the read
-   * paths. (On Windows, the path is checked and then opened.)
+   * paths.
    *
    * If the policy allows Capability::FileRead without read paths, the file
    * is opened without any check.
@@ -306,7 +305,7 @@ public:
    * @param aPath a path or \c file: URI. A relative path is relative to the
    *        current directory.
    * @param aBinary true to open the file in binary mode, false for text mode
-   *        (the modes differ only on Windows).
+   *        (the modes do not differ on the supported platforms).
    * @param aReason if not null and the access is denied, receives the
    *        reason; it is left empty if the file merely cannot be opened.
    * @return the open stream, or null if the file cannot be opened or the

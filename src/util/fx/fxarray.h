@@ -18,17 +18,11 @@
 #define ZORBA_FXARRAY_H
 #include "common/common.h"
 
-#ifndef WIN32
 #include <sys/mman.h>
-#endif
 
-#ifndef _WIN32_WCE
   #include <sys/types.h>
   #include <errno.h>
   #include <fcntl.h>
-#else
-  #include <types.h>
-#endif
 
 
 #include <string>

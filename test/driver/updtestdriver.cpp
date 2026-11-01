@@ -219,11 +219,7 @@ int save_load_plan(
 #endif//ZORBA_TEST_PLAN_SERIALIZATION
 
 int
-#ifdef _WIN32_WCE
-_tmain(int argc, _TCHAR* argv[])
-#else
 main(int argc, char** argv)
-#endif
 {
   if (argc != 2)
   {

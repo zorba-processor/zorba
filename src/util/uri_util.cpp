@@ -21,9 +21,6 @@
 
 #include <zorba/config.h>
 
-#ifdef WIN32
-#include "system/globalenv.h"
-#endif /* WIN32 */
 
 #include "diagnostics/xquery_diagnostics.h"
 #include "zorbatypes/zstring.h"

@@ -20,8 +20,6 @@
 
 #if defined(__EMSCRIPTEN__)
 # include <emscripten/stack.h>
-#elif defined(_WIN32)
-# include <windows.h>
 #elif defined(__APPLE__)
 # include <pthread.h>
 #elif defined(__unix__)
@@ -49,11 +47,6 @@ Bounds query_bounds()
 #if defined(__EMSCRIPTEN__)
   b.low = emscripten_stack_get_end();
   b.high = emscripten_stack_get_base();
-#elif defined(_WIN32)
-  ULONG_PTR lLow, lHigh;
-  GetCurrentThreadStackLimits(&lLow, &lHigh);
-  b.low = lLow;
-  b.high = lHigh;
 #elif defined(__APPLE__)
   pthread_t const self = pthread_self();
   uintptr_t const top =

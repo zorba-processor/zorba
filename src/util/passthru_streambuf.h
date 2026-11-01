@@ -32,14 +32,6 @@ namespace zorba {
  */
 class passthru_streambuf : public internal::proxy_streambuf {
 public:
-#ifdef WIN32
-  // These typedefs are needed (but shouldn't be) when using MSVC++.
-  typedef std::streambuf::char_type char_type;
-  typedef std::streambuf::int_type int_type;
-  typedef std::streambuf::off_type off_type;
-  typedef std::streambuf::pos_type pos_type;
-  typedef std::streambuf::traits_type traits_type;
-#endif /* WIN32 */
 
   /**
    * Constructs an %passthru_streambuf.

@@ -30,8 +30,6 @@
 
 #if defined(ZORBA_HAVE_CLOCKGETTIME)
 #include <time.h>
-#elif defined(WIN32)
-#include <sys/timeb.h>
 #else /* not Windows, and no clock_gettime() */
 #include <time.h>
 #include <sys/time.h>
@@ -155,35 +153,6 @@ inline void get_current_walltime( walltime &t ) {
 
 inline msec_type get_walltime_in_millis( walltime const &t ) {
   return t.tv_sec * (msec_type)1000 + t.tv_nsec / 1000000;
-}
-
-#elif defined(WIN32)
-
-// TODO: Should maybe use QueryPerformanceCounter() or
-// GetSystemTimeAsFileTime() for this, rather than ftime(), but I
-// don't know enough about any of these alternatives to choose
-// one. See http://msdn.microsoft.com/en-us/magazine/cc163996.aspx .
-
-#ifdef WINCE
-typedef struct timeb walltime;
-#else
-typedef struct _timeb walltime;
-#endif /* WINCE */
-
-inline double get_walltime_elapsed(walltime const &t0, walltime const &t1 ) {
-  return ((t1.time - t0.time) * 1000.0) + (t1.millitm - t0.millitm);
-}
-
-inline void get_current_walltime( walltime &t ) {
-#ifdef WINCE
-  ftime( &t );
-#else
-  _ftime_s( &t );
-#endif /* WINCE */
-}
-
-inline msec_type get_walltime_in_millis( walltime const &t ) {
-  return t.time * (msec_type)1000 + t.millitm;
 }
 
 #else /* not Windows, and no clock_gettime() */

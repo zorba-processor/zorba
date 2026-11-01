@@ -32,13 +32,8 @@
 #include "diagnostics/zorba_exception.h"
 
 
-#ifndef WIN32
-# include <unistd.h>
-# define msleep(s) usleep(1000*s);
-#else
-# include <windows.h>
-# define msleep(s) Sleep(s)
-#endif
+#include <unistd.h>
+#define msleep(s) usleep(1000*s);
 
 namespace zorba {
 

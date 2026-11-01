@@ -25,20 +25,15 @@
 #include <stdexcept>
 #include <system_error>
 
-#ifdef WIN32
-# include <winsock2.h>
-# include <ws2tcpip.h>
-#else
-# include <arpa/inet.h>
-# include <fcntl.h>
-# include <netdb.h>
-# include <netinet/in.h>
-# include <sys/param.h>
-# include <sys/socket.h>
-# include <sys/stat.h>
-# include <sys/types.h>
-# include <unistd.h>
-#endif
+#include <arpa/inet.h>
+#include <fcntl.h>
+#include <netdb.h>
+#include <netinet/in.h>
+#include <sys/param.h>
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 #include <zorba/util/fs_util.h>
 
@@ -79,11 +74,7 @@ Verdict needs_capability(Capability aCap)
 
 bool is_separator(char c)
 {
-#ifdef WIN32
-  return c == '/' || c == '\\';
-#else
   return c == '/';
-#endif
 }
 
 std::string to_lower(std::string s)
@@ -95,10 +86,7 @@ std::string to_lower(std::string s)
 
 bool case_insensitive_fs(const std::string& aDir)
 {
-#if defined(WIN32)
-  (void)aDir;
-  return true;
-#elif defined(__APPLE__) && defined(_PC_CASE_SENSITIVE)
+#if defined(__APPLE__) && defined(_PC_CASE_SENSITIVE)
   // 0: case-insensitive; 1: case-sensitive; -1: unknown, assume the more
   // restrictive case-sensitive comparison.
   return ::pathconf(aDir.c_str(), _PC_CASE_SENSITIVE) == 0;
@@ -568,7 +556,6 @@ Verdict check_network(
   return check_host_addresses(u.host);
 }
 
-#ifndef WIN32
 
 // The real path of an open file, if the system tells it.
 bool fd_real_path(int aFd, std::string& oPath)
@@ -671,7 +658,6 @@ private:
   fd_streambuf theBuf;
 };
 
-#endif /* WIN32 */
 
 thread_local const ResolutionScope* theCurrentScope = nullptr;
 
@@ -855,15 +841,6 @@ std::unique_ptr<std::istream> open_file(
     return lStream;
   }
 
-#ifdef WIN32
-  oVerdict = check(aPolicy, lPath, aUse, false, aTrustedDirs);
-  if (!oVerdict.allowed)
-    return nullptr;
-  std::unique_ptr<std::ifstream> lStream(new std::ifstream(lPath.c_str(), lMode));
-  if (!lStream->is_open())
-    return nullptr;
-  return lStream;
-#else
   int lFd;
   do
     lFd = ::open(lPath.c_str(), O_RDONLY | O_CLOEXEC | O_NOCTTY);
@@ -900,7 +877,6 @@ std::unique_ptr<std::istream> open_file(
     return nullptr;
   }
   return std::unique_ptr<std::istream>(new fd_istream(lFd));
-#endif
 }
 
 

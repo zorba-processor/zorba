@@ -14,13 +14,7 @@
  * limitations under the License.
  */
 
-#ifdef WIN32
-# include <windows.h>
-# include <string.h>
-# include <strsafe.h>
-#else
 #include <unistd.h>
-#endif
 
 #include <vector>
 
@@ -38,22 +32,11 @@ using namespace zorba::debugger;
 std::unique_ptr<XqdbClient> theClient;
 
 // this will make sure the xqdb process will not quit when Ctrl-C is pressed
-#ifdef WIN32
-BOOL WINAPI
-ctrlC_Handler(DWORD aCtrlType)
-{
-  if (CTRL_C_EVENT == aCtrlType) {
-    return true;
-  }
-  return false;
-}
-#else
 void
 ctrlC_Handler(int lParam)
 {
   // an empty sugnal handler on Linux should do the job
 }
-#endif
 
 
 // this handler function is passed the the zorba process listener and will
@@ -62,9 +45,7 @@ void
 onExitProcess(ExitCode aExitCode) {
   std::cout << std::endl << "Terminating debugger client." << std::endl;
 
-#ifndef WIN32
   theClient.reset();
-#endif
 
   exit(aExitCode);
 }
@@ -73,102 +54,6 @@ onExitProcess(ExitCode aExitCode) {
 int
 startZorba(std::string& aExec, std::vector<std::string>& aArgs, std::unique_ptr<ProcessListener>& aProcessListener) 
 {
-#ifdef WIN32
-  // **************************
-  // start a process on Windows
-
-  DWORD iReturnVal = 0;
-
-  std::wstring lExec;
-  std::wstring lArgs;
-
-  lExec.assign(aExec.begin(), aExec.end());
-
-  // the executable must be the first in the list of arguments
-  lArgs.append(L"\"");
-  lArgs.append(lExec);
-  lArgs.append(L"\"");
-
-  for (std::vector<std::string>::size_type j = 0; j < aArgs.size(); j++) {
-    std::string lArg(aArgs.at(j));
-    std::wstring lArgW;
-    lArgW.assign(lArg.begin(), lArg.end());
-    lArgs.append(L" ");
-    lArgs.append(lArgW);
-  }
-
-  // CreateProcessW can modify Parameters thus we allocate needed memory
-  wchar_t * pwszParam = new wchar_t[lArgs.size() + 1];
-  if (pwszParam == 0) {
-    return 1;
-  }
-  const wchar_t* pchrTemp = lArgs.c_str();
-  wcscpy_s(pwszParam, lArgs.size() + 1, pchrTemp); 
-
-  // CreateProcess API initialization
-  STARTUPINFOW siStartupInfo;
-  PROCESS_INFORMATION piProcessInfo;
-  memset(&siStartupInfo, 0, sizeof(siStartupInfo));
-  memset(&piProcessInfo, 0, sizeof(piProcessInfo));
-  siStartupInfo.cb = sizeof(siStartupInfo);
-
-  BOOL lResult = CreateProcessW(
-    const_cast<LPCWSTR>(lExec.c_str()),
-    pwszParam, 0, 0, false,
-    CREATE_DEFAULT_ERROR_MODE, 0, 0,
-    &siStartupInfo, &piProcessInfo);
-
-  if (lResult) {
-    // Watch the process
-    aProcessListener.reset(new ProcessListener(piProcessInfo.dwProcessId, &onExitProcess));
-  }
-  else {
-    // CreateProcess failed
-    iReturnVal = GetLastError();
-    LPVOID lpMsgBuf;
-    LPVOID lpDisplayBuf;
-
-    FormatMessage(
-      FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
-      NULL,
-      iReturnVal,
-      MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-      (LPTSTR) &lpMsgBuf,
-      0, NULL);
-
-    // Display the error message and exit the process
-
-    lpDisplayBuf = (LPVOID)LocalAlloc(
-      LMEM_ZEROINIT,
-      (lstrlen((LPCTSTR)lpMsgBuf) + 40) * sizeof(TCHAR));
-
-    StringCchPrintf(
-      (LPTSTR)lpDisplayBuf,
-      LocalSize(lpDisplayBuf) / sizeof(TCHAR),
-      TEXT("Error (%d) when starting zorba: %s"),
-      iReturnVal,
-      lpMsgBuf);
-
-    std::wstring lErrorW((wchar_t*)lpDisplayBuf);
-    std::string lError;
-    lError.assign(lErrorW.begin(), lErrorW.end());
-    std::cout << lError << std::endl;
-
-    LocalFree(lpMsgBuf);
-    LocalFree(lpDisplayBuf);
-  }
-
-  // Free memory
-  delete[]pwszParam;
-  pwszParam = 0;
-
-  // Release handles
-  CloseHandle(piProcessInfo.hProcess);
-  CloseHandle(piProcessInfo.hThread);
-
-  return iReturnVal; 
-
-#else
   // ************************
   // start a process on Linux
 
@@ -196,7 +81,6 @@ startZorba(std::string& aExec, std::vector<std::string>& aArgs, std::unique_ptr<
 
     return 0;
   }
-#endif
 }
 
 void printUsage(std::string& aProgram)
@@ -221,11 +105,7 @@ processArguments(
   // find the path to Zorba and this executable name
   aProgram = argv[0];
 
-#ifdef WIN32
-  char lSep = '\\';
-#else
   char lSep = '/';
-#endif
   std::string::size_type lPos = aProgram.find_last_of(lSep);
 
   std::stringstream lZs;
@@ -237,9 +117,6 @@ processArguments(
     aProgram = aProgram.substr(lPos + 1);
   }
   lZs << "zorba";
-#ifdef WIN32
-  lZs << ".exe";
-#endif
   aZorba = lZs.str();
 
 
@@ -294,19 +171,10 @@ processArguments(
   return true;
 }
 
-#ifndef _WIN32_WCE
 int
 main(int argc, char* argv[])
-#else
-int
-_tmain(int argc, _TCHAR* argv[])
-#endif
 {
-#ifdef WIN32
-  SetConsoleCtrlHandler(ctrlC_Handler, TRUE);
-#else
   signal(SIGINT, ctrlC_Handler);
-#endif
 
   // **************************************************************************
   // processing arguments
@@ -362,9 +230,7 @@ _tmain(int argc, _TCHAR* argv[])
     return -1;
   }
 
-#ifndef WIN32
   theClient.reset();
-#endif
 
   return 0;
 }

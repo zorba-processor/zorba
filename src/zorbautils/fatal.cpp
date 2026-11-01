@@ -19,9 +19,6 @@
 
 #include "fatal.h"
 
-#ifdef WINCE
-# define abort() exit(1)
-#endif
 
 using namespace std;
 

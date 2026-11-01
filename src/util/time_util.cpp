@@ -19,18 +19,8 @@
 #include <algorithm>
 #include <cassert>
 #include <cstring>
-#ifdef WIN32
-# include <windows.h>
-# include <time.h>                      /* for gmtime_s() */
-# if defined(_MSC_VER) || defined(_MSC_EXTENSIONS)
-#   define DELTA_EPOCH_IN_USEC 11644473600000000Ui64
-# else
-#   define DELTA_EPOCH_IN_USEC 11644473600000000ULL
-# endif
-#else
-# include <ctime>
-# include <sys/time.h>
-#endif /* WIN32 */
+#include <ctime>
+#include <sys/time.h>
 
 // local
 #include "time_util.h"
@@ -324,63 +314,35 @@ int days_in_month( unsigned mon, unsigned year ) {
 }
 
 void get_epoch( sec_type *sec, usec_type *usec ) {
-#ifdef WIN32
-  FILETIME ft;
-  ::GetSystemTimeAsFileTime( &ft );
-  unsigned __int64 temp = ((__int64)ft.dwHighDateTime << 32) | ft.dwLowDateTime;
-  temp /= 10;                           // nanosec -> usec
-  temp -= DELTA_EPOCH_IN_USEC;          // 1601 -> 1970
-  *sec = (sec_type)(temp / 1000000L);  // usec -> sec
-  if ( usec )
-    *usec = (usec_type)(temp % 1000000L);
-#else
   timeval tv;
   ::gettimeofday( &tv, nullptr );
   *sec = tv.tv_sec;
   if ( usec )
     *usec = tv.tv_usec;
-#endif /* WIN32 */
 }
 
 void get_gmtime( ztm *tm, sec_type when ) {
   if ( !when )
     get_epoch( &when );
-#ifdef WIN32
-  time_t time = static_cast<time_t>(when);
-  ::gmtime_s( tm, &time );  
-#else
   ::gmtime_r( &when, tm );
-#endif /* WIN32 */
   tm->ZTM_GMTOFF = 0;
 }
 
 void get_localtime( ztm *tm, sec_type when ) {
   if ( !when )
     get_epoch( &when );
-#ifdef WIN32
-  time_t time = static_cast<time_t>(when);
-  ::localtime_s( tm, &time );
-  tm->ZTM_GMTOFF = - _timezone;         // seconds west -> east
-#else
   ::localtime_r( &when, tm );
 #if !defined(ZORBA_HAVE_STRUCT_TM_TM_GMTOFF) && \
     !defined(ZORBA_HAVE_STRUCT_TM___TM_GMTOFF)
   tm->ZTM_GMTOFF = ::timegm( tm ) - when;
 #endif
-#endif /* WIN32 */
 }
 
 long get_gmt_offset() {
-#ifdef WIN32
-  TIME_ZONE_INFORMATION tz;
-  ::GetTimeZoneInformation( &tz );
-  return tz.Bias * -60;                 // minutes west -> seconds east
-#else
   sec_type const now = ::time( nullptr );
   ztm tm;
   ::localtime_r( &now, &tm );
   return ::timegm( &tm ) - now;
-#endif /* WIN32 */
 }
 
 char get_military_tz( int hour ) {

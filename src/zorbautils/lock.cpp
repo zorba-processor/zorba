@@ -38,10 +38,6 @@ Lock::Lock()
 
 Lock::~Lock()
 {
-#ifdef WIN32
-  if(ZorbaImpl::ctrl_c_signaled)
-    return;
-#endif
   assert(theMode == NOLOCK);
   assert(theNumWaiters == 0);
   assert(theHolders.empty());
@@ -54,10 +50,6 @@ Lock::~Lock()
 ********************************************************************************/
 void Lock::rlock()
 {
-#ifdef WIN32
-  if(ZorbaImpl::ctrl_c_signaled)
-    return;
-#endif
   theMutex.lock();
 
   ThreadId thisThread = Runnable::self();
@@ -139,10 +131,6 @@ retry:
 ********************************************************************************/
 void Lock::wlock()
 {
-#ifdef WIN32
-  if(ZorbaImpl::ctrl_c_signaled)
-    return;
-#endif
   theMutex.lock();
 
   ThreadId thisThread = Runnable::self();
@@ -235,10 +223,6 @@ retry:
 ********************************************************************************/
 void Lock::unlock()
 {
-#ifdef WIN32
-  if(ZorbaImpl::ctrl_c_signaled)
-    return;
-#endif
   theMutex.lock();
 
   ThreadId thisThread = Runnable::self();

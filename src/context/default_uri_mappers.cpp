@@ -178,11 +178,7 @@ AutoFSURIMapper::mapURI
   for (std::vector<zstring>::const_iterator lIter = lModulePaths.begin();
        lIter != lModulePaths.end(); lIter++)
   {
-#ifndef WIN32
     zstring lCandidateURI("file://");
-#else
-    zstring lCandidateURI("file:///");
-#endif
     // If module-path entry is relative, normalize it against the
     // static context's base URI.
     if (!fs::is_absolute(*lIter)) {

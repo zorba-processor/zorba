@@ -16,11 +16,7 @@
 
 #include <sstream>
 
-#ifndef WIN32
-# include <cstdio>
-#else
-# include <windows.h>
-#endif /* WIN32 */
+#include <cstdio>
 
 #include <zorba/internal/unique_ptr.h>
 #include <zorba/util/error_util.h>
@@ -97,7 +93,6 @@ string format_err_string( char const *function, code_type code,
   return result;
 }
 
-#ifndef WIN32
 // strerror_r() comes in two flavors: the XSI one returns an int and fills the
 // buffer; the GNU one returns a char* that may or may not be the buffer.
 inline char const* strerror_result( int rc, char const *buf ) {
@@ -107,28 +102,11 @@ inline char const* strerror_result( int rc, char const *buf ) {
 inline char const* strerror_result( char const *result, char const* ) {
   return result;
 }
-#endif /* WIN32 */
 
 string get_err_string( char const *function, code_type code ) {
-#ifndef WIN32
   char err_buf[ 128 ];
   char const *const err_string =
     strerror_result( ::strerror_r( code, err_buf, sizeof err_buf ), err_buf );
-#else
-  LPWSTR werr_string;
-  FormatMessage(
-    FORMAT_MESSAGE_ALLOCATE_BUFFER
-    | FORMAT_MESSAGE_FROM_SYSTEM
-    | FORMAT_MESSAGE_IGNORE_INSERTS,
-    NULL, code, MAKELANGID( LANG_NEUTRAL, SUBLANG_DEFAULT ),
-    reinterpret_cast<LPWSTR>( &werr_string ), 0, NULL
-  );
-  int const err_size = ::wcslen( werr_string ) * 3;
-  unique_ptr<char[]> const err_buf( new char[ err_size ] );
-  char *const err_string = err_buf.get();
-  win32::wtoa( werr_string, err_string, err_size );
-  LocalFree( werr_string );
-#endif /* WIN32 */
   return format_err_string( function, code, err_string );
 }
 

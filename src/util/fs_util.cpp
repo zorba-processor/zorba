@@ -14,17 +14,13 @@
  * limitations under the License.
  */
 
-# include <cstdlib>                     /* for getenv(3), _dupenv_s() */
-#ifndef WIN32
-# include <climits>                     /* for PATH_MAX */
-# include <cstdio>
-# include <fcntl.h>                     /* for creat(2) */
-# include <sys/stat.h>
-# include <sys/types.h>
-# include <unistd.h>                    /* for chdir(2) */
-#else
-# include <shlwapi.h>
-#endif /* WIN32 */
+#include <cstdlib>                     /* for getenv(3), _dupenv_s() */
+#include <climits>                     /* for PATH_MAX */
+#include <cstdio>
+#include <fcntl.h>                     /* for creat(2) */
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>                    /* for chdir(2) */
 
 #include <zorba/internal/cxx_util.h>
 
@@ -62,14 +58,6 @@ ostream& operator<<( ostream &o, type t ) {
 ////////// helper functions ///////////////////////////////////////////////////
 
 static void canonicalize( string *path ) {
-#ifdef WIN32
-  // Temporarily remove the drive letter and ':' to make the code simpler.
-  string drive;
-  if ( is_absolute( *path ) ) {
-    drive = path->substr( 0, 2 );
-    path->erase( 0, 2 );
-  }
-#endif /* WIN32 */
 
   bool added_sentinel;
   if ( !ascii::ends_with( *path, dir_separator ) ) {
@@ -121,29 +109,16 @@ static void canonicalize( string *path ) {
 
   if ( added_sentinel && path->size() > 1 )
     path->erase( path->size() - 1 );    // remove sentinel
-#ifdef WIN32
-  path->insert( 0, drive );
-#endif /* WIN32 */
 }
 
-#ifndef WIN32
 inline bool is_dots( char const *s ) {
   return s[0] == '.' && (!s[1] || (s[1] == '.' && !s[2]));
 }
-#else
-inline bool is_dots( LPCWSTR s ) {
-  return s[0] == TEXT('.') && (!s[1] || (s[1] == TEXT('.') && !s[2]));
-}
-#endif /* WIN32 */
 
 template<class PathStringType> inline
 typename std::enable_if<ZORBA_IS_STRING(PathStringType),void>::type
 replace_foreign( PathStringType *path ) {
-#ifdef WIN32
-  ascii::replace_all( *path, '/', '\\' );
-#else
   ascii::replace_all( *path, '\\', '/' );
-#endif /* WIN32 */
 }
 
 static bool parse_file_uri( char const *uri, string *result ) {
@@ -169,70 +144,10 @@ static bool parse_file_uri( char const *uri, string *result ) {
         )
       );
   }
-#ifdef WIN32
-  ++slash;                              // skip leading '/' in "/C:/file.txt"
-#endif /* WIN32 */
   *result = result->substr( slash );
   uri::decode( *result );
-#ifdef WIN32
-  replace_foreign( result );
-  if ( !is_absolute( *result ) )
-    throw invalid_argument(
-      BUILD_STRING(
-        '"', result, "\": ", dict::lookup( ZED( NoDriveSpecification ) )
-      )
-    );
-#endif /* WIN32 */
   return true;
 }
-
-////////// Windows functions //////////////////////////////////////////////////
-
-#ifdef WIN32
-
-#ifdef ZORBA_WITH_FILE_ACCESS
-
-static type win32_map_type( DWORD dwFileAttributes ) {
-  if ( dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY )
-    return directory;
-  if ( dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT )
-    return link;
-  return file;
-}
-
-static type win32_get_type( LPCWSTR wpath, info *pinfo = nullptr ) {
-  WIN32_FILE_ATTRIBUTE_DATA data;
-  if ( ::GetFileAttributesEx( wpath, GetFileExInfoStandard, (void*)&data ) ) {
-    fs::type const type = win32_map_type( data.dwFileAttributes );
-    if ( pinfo ) {
-      FILETIME const &ft = data.ftLastWriteTime;
-      pinfo->mtime = ((time_t)ft.dwHighDateTime << 32) | ft.dwLowDateTime;
-      pinfo->size = ((size_type)data.nFileSizeHigh << 32) | data.nFileSizeLow;
-      pinfo->type = type;
-    }
-    return type;
-  }
-  return non_existent;
-}
-
-#endif /* ZORBA_WITH_FILE_ACCESS */
-
-void win32_make_absolute( char const *path, char *abs_path ) {
-#ifndef WINCE
-  WCHAR wpath[ MAX_PATH ];
-  win32::atow( path, wpath, MAX_PATH );
-  WCHAR wfull_path[ MAX_PATH ];
-  DWORD const result = ::GetFullPathName( wpath, MAX_PATH, wfull_path, NULL );
-  if ( !result )
-    throw ZORBA_IO_EXCEPTION( "GetFullPathName()", path );
-  win32::wtoa( wfull_path, abs_path, MAX_PATH );
-#else
-  if ( abs_path != path )
-    ::strcpy( abs_path, path );
-#endif /* WINCE */
-}
-
-#endif /* WIN32 */
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -251,56 +166,24 @@ void append( char *path1, char const *path2 ) {
 #ifdef ZORBA_WITH_FILE_ACCESS
 
 void chdir( char const *path ) {
-#ifndef WIN32
   if ( ::chdir( path ) != 0 )
     throw fs::exception( "chdir()", path );
-#else
-  WCHAR wpath[ MAX_PATH ];
-  win32::atow( path, wpath, MAX_PATH );
-  if ( ::_wchdir( wpath ) != 0 )
-    throw fs::exception( "_wchdir()", path );
-#endif /* WIN32 */
 }
 
 void create( char const *path ) {
-#ifndef WIN32
   int const fd = ::creat( path, 0644 );
   if ( fd == -1 )
     throw fs::exception( "creat()", path );
   ::close( fd );
-#else
-  WCHAR wpath[ MAX_PATH ];
-  win32::atow( path, wpath, MAX_PATH );
-  HANDLE fd = ::CreateFile(
-    wpath,
-    GENERIC_READ | GENERIC_WRITE,
-    FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
-    CREATE_ALWAYS, 0, NULL
-  );
-  if ( fd == INVALID_HANDLE_VALUE )
-    throw fs::exception( "CreateFile()", path );
-  ::CloseHandle( fd );
-#endif /* WIN32 */
 }
 
 #endif /* ZORBA_WITH_FILE_ACCESS */
 
 string configdir() {
-#if defined( WINCE )
-  return "";
-#elif defined( WIN32 )
-  char *buf;
-  if ( _dupenv_s( &buf, nullptr, "APPDATA" ) != 0 )
-    throw ZORBA_IO_EXCEPTION( "_dupenv_s()", "" );
-  unique_ptr<char[]> const buf_ptr( buf );
-  return buf;
-#else
   return getenv( "HOME" );
-#endif
 }
 
 string curdir() {
-#ifndef WIN32
   static size_t dir_buf_len = PATH_MAX;
   static unique_ptr<char[]> dir_buf( new char[ dir_buf_len ] );
 
@@ -315,25 +198,11 @@ string curdir() {
     dir_buf.reset( new char[ dir_buf_len *= 2 ] );
   }
   return dir_buf.get();
-#else
-  WCHAR wpath[ MAX_PATH ];
-  if ( !::GetCurrentDirectory( MAX_PATH, wpath ) )
-    throw ZORBA_IO_EXCEPTION( "GetCurrentDirectory()", "" );
-  char path[ MAX_PATH ];
-  win32::wtoa( wpath, path, MAX_PATH );
-  string dir( path );
-  if ( !is_absolute( dir ) ) {
-    // GetCurrentDirectory() sometimes misses the drive letter.
-    make_absolute( &dir );
-  }
-  return dir;
-#endif /* WIN32 */
 }
 
 #ifdef ZORBA_WITH_FILE_ACCESS
 
 zstring get_temp_file() {
-#ifndef WIN32
   char const *const env_tmp_dir = ::getenv( "TMPDIR" );
   std::string buf( env_tmp_dir && *env_tmp_dir ? env_tmp_dir : "/tmp" );
   if ( buf.back() != dir_separator )
@@ -342,20 +211,6 @@ zstring get_temp_file() {
   if ( !::mkdtemp( buf.data() ) )
     throw fs::exception( "mkdtemp()", buf.c_str() );
   return zstring( buf.c_str() );
-#else
-  WCHAR wtemp[ MAX_PATH ];
-  // GetTempFileName() needs a 14-character cushion.
-  DWORD const wtemp_len = ::GetTempPath( MAX_PATH - 14, wtemp );
-  if ( !wtemp_len || wtemp_len > MAX_PATH - 14 )
-    throw fs::exception( "GetTempPath()", nullptr );
-  WCHAR wpath[ MAX_PATH ];
-  UINT const u_result = ::GetTempFileName( wtemp, TEXT("zxq"), 0, wpath );
-  if ( !u_result )
-    throw fs::exception( "GetTempFileName()", nullptr );
-  char path[ MAX_PATH ];
-  win32::wtoa( wpath, path, MAX_PATH );
-  return path;
-#endif /* WIN32 */
 }
 
 #endif /* ZORBA_WITH_FILE_ACCESS */
@@ -363,7 +218,6 @@ zstring get_temp_file() {
 type get_type( char const *path, bool follow_symlink, info *pinfo ) {
   if ( pinfo )
     ::memset( pinfo, 0, sizeof( info ) );
-#ifndef WIN32
   struct stat st_buf;
   int const status = follow_symlink ?
     ::stat( path, &st_buf ) : ::lstat( path, &st_buf );
@@ -397,29 +251,15 @@ type get_type( char const *path, bool follow_symlink, info *pinfo ) {
     pinfo->type = type;
   }
   return type;
-#else
-  WCHAR wpath[ MAX_PATH ];
-  win32::atow( path, wpath, MAX_PATH );
-  return win32_get_type( wpath, pinfo );
-#endif /* WIN32 */
 }
 
 #ifdef ZORBA_WITH_FILE_ACCESS
 
 void mkdir_impl( char const *path, bool ignore_exists = false ) {
-#ifndef WIN32
   if ( ::mkdir( path, 0755 ) != 0 &&
        !(ignore_exists && (errno == EEXIST || errno == EISDIR)) ) {
     throw fs::exception( "mkdir()", path );
   }
-#else
-  WCHAR wpath[ MAX_PATH ];
-  win32::atow( path, wpath, MAX_PATH );
-  if ( !::CreateDirectory( wpath, NULL ) &&
-       !(ignore_exists && ::GetLastError() == ERROR_ALREADY_EXISTS) ) {
-    throw fs::exception( "CreateDirectory()", path );
-  }
-#endif /* WIN32 */
 }
 
 void mkdir( char const *path, bool intermediate ) {
@@ -458,28 +298,18 @@ string normalize_path( char const *path, char const *base ) {
 
 void iterator::ctor_impl() {
   make_absolute( &dir_path_ );
-#ifndef WIN32
   if ( !(dir_ = ::opendir( dir_path_.c_str() )) )
     throw fs::exception( "iterator()", dir_path_.c_str() );
-#else
-  win32_opendir( dir_path_.c_str() );
-  entry_.name = entry_name_buf_;
-#endif /* WIN32 */
 }
 
 iterator::~iterator() {
-#ifndef WIN32
   // A destructor must not throw (it would call std::terminate), so a failure of
   // closedir() can only be ignored here.
   ::closedir( dir_ );
-#else
-  win32_closedir();
-#endif /* WIN32 */
 }
 
 bool iterator::next() {
   while ( true ) {
-#ifndef WIN32
     if ( dirent const *const entry = ::readdir( dir_ ) ) {
       entry_.name = entry->d_name;
       switch ( entry->d_type ) {
@@ -514,101 +344,26 @@ bool iterator::next() {
       }
       return true;
     }
-#else
-    if ( !dir_is_empty_ ) {
-      if ( use_first_ )
-        use_first_ = false;
-      else
-        if ( !::FindNextFile( dir_, &ent_data_ ) ) {
-          if ( ::GetLastError() != ERROR_NO_MORE_FILES )
-            throw fs::exception( "FindNextFile()", path() );
-          return false;
-        }
-
-      if ( is_dots( ent_data_.cFileName ) )
-        continue;                       // skip "." and ".." entries
-      win32::wtoa( ent_data_.cFileName, entry_name_buf_, MAX_PATH );
-      entry_.type = win32_map_type( ent_data_.dwFileAttributes );
-      return true;
-    }
-#endif /* WIN32 */
     return false;
   } // while
 }
 
 void iterator::reset() {
-#ifndef WIN32
   ::rewinddir( dir_ );
-#else
-  win32_closedir();
-  win32_opendir( dir_path_.c_str() );
-#endif /* WIN32 */
 }
 
-#ifdef WIN32
-void iterator::win32_closedir() {
-  if ( dir_ != INVALID_HANDLE_VALUE && !::FindClose( dir_ ) )
-    throw fs::exception( "FindClose()", path() );
-}
-
-void iterator::win32_opendir( char const *path ) {
-  WCHAR wpath[ MAX_PATH ];
-  win32::atow( path, wpath, MAX_PATH );
-  WCHAR wpattern[ MAX_PATH ];
-  ::wcscpy( wpattern, wpath );
-  ::PathAppend( wpattern, TEXT("*") );
-  dir_ = ::FindFirstFile( wpattern, &ent_data_ );
-  if ( dir_ == INVALID_HANDLE_VALUE ) {
-    if ( ::GetLastError() != ERROR_FILE_NOT_FOUND )
-      throw fs::exception( "FindFirstFile()", path );
-    dir_is_empty_ = true;
-  } else {
-    dir_is_empty_ = false;
-    use_first_ = true;
-  }
-}
-#endif /* WIN32 */
 
 bool remove( char const *path, bool ignore_not_found ) {
-#ifndef WIN32
   if ( ::remove( path ) == 0 )
     return true;
   if ( ignore_not_found && errno == ENOENT )
     return false;
   throw fs::exception( "remove()", path );
-#else
-  WCHAR wpath[ MAX_PATH ];
-  win32::atow( path, wpath, MAX_PATH );
-  char const *win32_fn_name;
-
-  switch ( win32_get_type( wpath ) ) {
-    case directory:
-      win32_fn_name = "RemoveDirectory()";
-      if ( ::RemoveDirectory( wpath ) )
-        return true;
-      break;
-    default:
-      win32_fn_name = "DeleteFile()";
-      if ( ::DeleteFile( wpath ) )
-        return true;
-  }
-  if ( ignore_not_found && ::GetLastError() == ERROR_FILE_NOT_FOUND )
-    return false;
-  throw fs::exception( win32_fn_name, path );
-#endif /* WIN32 */
 }
 
 void rename( char const *from, char const *to ) {
-#ifndef WIN32
   if ( ::rename( from, to ) != 0 )
     throw fs::exception( "rename()", from );
-#else
-  WCHAR wfrom[ MAX_PATH ], wto[ MAX_PATH ];
-  win32::atow( from, wfrom, MAX_PATH );
-  win32::atow( to, wto, MAX_PATH );
-  if ( !::MoveFile( wfrom, wto ) )
-    throw fs::exception( "MoveFile()", from );
-#endif /* WIN32 */
 }
 
 #endif /* ZORBA_WITH_FILE_ACCESS */

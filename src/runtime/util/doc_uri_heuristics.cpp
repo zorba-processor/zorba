@@ -60,9 +60,6 @@ void normalizeInputUri(
         }
         else
         {
-  #ifdef WIN32
-          ascii::replace_all(lNormalizedPath, '\\', '/');
-  #endif
           *aResult = aSctx->resolve_relative_uri(lNormalizedPath, true);
         }
       }

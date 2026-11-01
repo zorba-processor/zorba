@@ -25,8 +25,6 @@
 #include "testuriresolver.h"
 #include <zorba/uri_resolvers.h>
 
-#undef WIN32_LEAN_AND_MEAN
-
 /**
  * Represents the contents of a testdriver-style .spec file.
  */

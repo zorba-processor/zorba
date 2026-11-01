@@ -43,11 +43,6 @@ using namespace std;
 
 namespace zorba {
 
-#ifdef WIN32
-// Windows annoyingly defines these as macros.
-#undef max
-#undef min
-#endif
 
 ////////// Local functions ////////////////////////////////////////////////////
 

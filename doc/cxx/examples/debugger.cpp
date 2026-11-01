@@ -29,12 +29,7 @@
 #  include <sys/time.h>
 #endif
 
-#ifdef WIN32
-#include <windows.h>
-#define sleep(s) Sleep(s*1000)
-#else
 #include <limits.h>
-#endif
 #ifdef ZORBA_HAVE_PTHREAD_H
 #include <pthread.h>
 #define ZORBA_THREAD_RETURN void *
@@ -46,9 +41,6 @@ using namespace zorba;
 
 unsigned int getSeed()
 {
-#ifdef WIN32
-  return GetTickCount();
-#else
   struct timeval tv;
   gettimeofday(&tv, NULL);
   unsigned long long sec = tv.tv_sec;
@@ -56,7 +48,6 @@ unsigned int getSeed()
   unsigned long long value = 1000000*sec + usec;
 
   return (unsigned int)(value & UINT_MAX);
-#endif
 }
 
 std::pair<short, short> getRandomPorts() 

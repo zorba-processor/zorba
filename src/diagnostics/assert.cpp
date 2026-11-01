@@ -27,9 +27,6 @@
 #include "diagnostic.h"
 #include "zorba_exception.h"
 
-#ifdef WIN32
-# include "StackWalker.h"
-#endif /* WIN32 */
 
 using namespace std;
 
@@ -50,10 +47,6 @@ static void print_stack_trace( ostream &o ) {
     o << "allocation of backtrace symbols failed" << endl;
   }
 #endif /* ZORBA_HAVE_EXECINFO_H */
-#ifdef WIN32
-  StackWalker sw;
-  sw.ShowCallstack();
-#endif /* WIN32 */
 }
 
 ///////////////////////////////////////////////////////////////////////////////

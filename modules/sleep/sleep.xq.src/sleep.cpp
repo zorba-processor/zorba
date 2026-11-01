@@ -15,11 +15,7 @@
  */
 #include "sleep.h"
 
-#ifdef WIN32
-# include <windows.h>
-#else
-# include <time.h>
-#endif
+#include <time.h>
 #include <stdlib.h>
 #include <limits>
 #include <zorba/item_factory.h>
@@ -69,15 +65,11 @@ MillisFunction::evaluate(
     throw USER_EXCEPTION(lQName, lMsg.str());
   }
 
-#ifdef WIN32
-  Sleep(lMillis);
-#else
   const int32_t lFactor = 1000000;
   struct timespec lTs;
   lTs.tv_sec = lMillis / 1000;
   lTs.tv_nsec = (lMillis % 1000) * lFactor;
   nanosleep(&lTs, 0);
-#endif
 
   return zorba::ItemSequence_t(new zorba::EmptySequence());
 }

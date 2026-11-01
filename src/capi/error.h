@@ -21,10 +21,6 @@
 #include <zorba/zorbac.h>
 #include <zorba/xquery_exception.h>
 
-#if defined(_MSC_VER)
-#include <BaseTsd.h>
-#define ssize_t SSIZE_T
-#endif
 
 /**
  * Useful #defines for most C API methods. Provides a consistent

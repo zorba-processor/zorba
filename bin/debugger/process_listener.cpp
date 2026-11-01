@@ -18,9 +18,7 @@
 
 #include <iostream>
 
-#ifndef WIN32
 #include <unistd.h>
-#endif
 
 #ifdef ZORBA_HAVE_PTHREAD_H
 # include <cassert>
@@ -32,13 +30,9 @@ namespace zorba { namespace debugger {
 ProcessListener::ProcessListener(ProcessId aProcessID, ExitCallbackType aCallback)
   : theProcessID(aProcessID), theCallback(aCallback)
 {
-#ifdef WIN32
-  theThread = CreateThread(NULL, 0, &run, (void*) this, 0, &theThreadId);
-#else
   if (pthread_create(&theThread, NULL, &run, (void*) this)) {
     assert(false);
   }
-#endif
 }
 
 ProcessListener::~ProcessListener()
@@ -65,22 +59,6 @@ ProcessListener::run(void* params)
   ExitCode lExitCode = -1;
   ProcessId lPid = lThis->getProcessID();
 
-#ifdef WIN32
-  HANDLE lProcessHandle = OpenProcess(SYNCHRONIZE, false, lPid);
-  if (lProcessHandle != NULL) {
-    // wait for the process to exit
-    DWORD lResult = WaitForSingleObject(lProcessHandle, INFINITE);
- 
-    // find out the process exit code if possible
-    if (!GetExitCodeProcess(lProcessHandle, &lExitCode)) {
-      lExitCode = -1;
-    }
-    DWORD dw = GetLastError();
- 
-    // wait a little for zorba to dump the garbage
-    Sleep(1000);
-  }
-#else
   int lChildExitStatus;
 
   // wait for the process to exit
@@ -93,7 +71,6 @@ ProcessListener::run(void* params)
 
   // wait a little for zorba to dump the garbage
   sleep(1);
-#endif
 
   // and call the callback when this happened
   ExitCallbackType lCallback = lThis->getCallback();

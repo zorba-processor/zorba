@@ -581,7 +581,6 @@ void ThesaurusLookupIterator::resetImpl( PlanState &plan_state ) const {
   );
 }
 
-#ifndef WIN32
 #ifdef GCC_PRAGMA_DIAGNOSTIC_PUSH
 # pragma GCC diagnostic pop
 #else
@@ -589,7 +588,6 @@ void ThesaurusLookupIterator::resetImpl( PlanState &plan_state ) const {
 # pragma GCC diagnostic warning "-Wunknown-pragmas"
 # pragma GCC diagnostic warning "-Wpragmas"
 #endif /* GCC_PRAGMA_DIAGNOSTIC_PUSH */
-#endif /* WIN32 */
 
 ///////////////////////////////////////////////////////////////////////////////
 

@@ -27,9 +27,6 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
-#ifdef WIN32
-# include <windows.h>
-#endif /* WIN32 */
 
 // Zorba
 #include <zorba/internal/cxx_util.h>
@@ -39,11 +36,6 @@
 #include "stl_util.h"
 #include "zorbatypes/zstring.h"
 
-#ifdef WIN32
-// Windows annoyingly defines these as macros.
-#undef max
-#undef min
-#endif /* WIN32 */
 
 namespace zorba {
 namespace ztd {
@@ -1125,54 +1117,6 @@ char const* ordinal( long long n );
 ///////////////////////////////////////////////////////////////////////////////
 
 } // namespace ztd
-
-////////// Windows /////////////////////////////////////////////////////////////
-
-#ifdef WIN32
-namespace win32 {
-
-/**
- * Converts a wide-character (UTF-16) string to a multi-byte (UTF-8) string.
- *
- * @param ws The wide-character string to convert.
- * @param s The string buffer to convert \a ws into.
- * @param s_len The size of \a s (in bytes).
- * @return Returns \c true only if the conversion succeeded.
- */
-inline bool wtoa( LPCWSTR ws, char *s, int s_len ) {
-  return !!::WideCharToMultiByte( CP_UTF8, 0, ws, -1, s, s_len, NULL, NULL );
-}
-
-/**
- * Converts a wide character (UTF-16) string to a multi-byte (UTF-8) string.
- *
- * @param ws The wide string to convert.
- * @return Returns the equivalent multi-byte string.
- */
-inline std::unique_ptr<char[]> wtoa( LPCWSTR ws ) {
-  int const s_len =
-    ::WideCharToMultiByte( CP_UTF8, 0, ws, -1, NULL, 0, NULL, NULL );
-  std::unique_ptr<char[]> s( new char[ s_len ] );
-  wtoa( ws, s.get(), s_len );
-  return s;
-}
-
-/**
- * Converts a multi-byte (UTF-8) string to a wide-character (UTF-16) string.
- *
- * @param s The string to convert.
- * @param ws The wide-character string buffer to convert \a s into.
- * @param ws_len The size of \a ws (in characters).
- * @return Returns \c true only if the conversion succeeded.
- */
-inline bool atow( char const *s, LPWSTR ws, int ws_len ) {
-  if ( ::MultiByteToWideChar( CP_UTF8, 0, s, -1, ws, ws_len ) )
-    return true;
-  return !!::MultiByteToWideChar( CP_ACP, 0, s, -1, ws, ws_len );
-}
-
-} // namespace win32
-#endif /* WIN32 */
 
 ///////////////////////////////////////////////////////////////////////////////
 

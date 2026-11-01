@@ -21,9 +21,6 @@
 #include "LoadSchemaErrorHandler.h"
 #include "StrX.h"
 #include <xercesc/sax/SAXParseException.hpp>
-#ifdef CYGWIN
-#undef WIN32
-#endif
 
 #include "compiler/parser/query_loc.h"
 #include "diagnostics/xquery_diagnostics.h"

@@ -21,11 +21,6 @@
 
 #include <xercesc/util/XMLString.hpp>
 #include <xercesc/util/XercesDefs.hpp>
-//daniel: this is to make cygwin work; xerces defines WIN32 in case of cygwin, which is wrong
-#ifdef CYGWIN
-#undef WIN32
-#endif // ifdef CYGWIN
-
 
 #include <cstddef>
 #include <ostream>

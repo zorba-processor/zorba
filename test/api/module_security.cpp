@@ -31,14 +31,9 @@
 #include <sstream>
 #include <string>
 
-#ifdef WIN32
-# include <winsock2.h>
-# include <ws2tcpip.h>
-#else
-# include <arpa/inet.h>
-# include <netdb.h>
-# include <sys/socket.h>
-#endif
+#include <arpa/inet.h>
+#include <netdb.h>
+#include <sys/socket.h>
 
 #include <zorba/config.h>
 #include <zorba/item.h>
@@ -750,11 +745,7 @@ module_security(int argc, char* argv[])
     return 1;
   }
 
-#ifdef WIN32
-  _putenv_s(ENV_NAME, SECRET);
-#else
   ::setenv(ENV_NAME, SECRET, 1);
-#endif
 
   void* lStore = StoreManager::getStore();
   Zorba* lZorba = Zorba::getInstance(lStore);

@@ -21,11 +21,7 @@
 
 #include <stddef.h>
 #include <stdlib.h>
-#ifndef WIN32
 # include <strings.h>
-#else
-# include <string.h>
-#endif
 #include <string>
 #include <iostream>
 

@@ -26,10 +26,6 @@
 #define PARSER_CLASS jsoniq_parser
 #endif
 
-#if defined (WIN32)
-#pragma warning(disable: 4786)
-#endif
-
 #include <zorba/diagnostic_list.h>
 
 #include "zorbatypes/schema_types.h"

@@ -22,7 +22,7 @@
 #include <cstddef>                              /* for ptrdiff_t */
 #include <iterator>
 
-#include "zorbamisc/config/stdint.h"
+#include <stdint.h>
 
 // local
 #include "common/common.h"

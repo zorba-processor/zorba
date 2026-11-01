@@ -21,11 +21,7 @@
 #include <string>
 #include <stdio.h>
 #include <stdlib.h>
-#ifndef WIN32
 #include <sys/time.h>
-#else
-#include <time.h>
-#endif
 
 //#define ZORBA_TEST_PLAN_SERIALIZATION
 
@@ -79,11 +75,7 @@ int analyzeError (const Specification &lSpec, const TestDiagnosticHandler& errHa
 
 
 int
-#ifdef _WIN32_WCE
-_tmain(int argc, _TCHAR* argv[])
-#else
 main(int argc, char** argv)
-#endif
 {
   if ( argc < 2 )
   {
@@ -186,11 +178,7 @@ main(int argc, char** argv)
 
     if ( isW3Ctest ) 
     {
-  #ifndef MY_D_WIN32
       std::string w3cDataDir = "/Queries/w3c_testsuite/TestSources/";
-  #else
-      std::string w3cDataDir = "/Queries/TestSources/";
-  #endif
       std::string uri_map_file = rbkt_src_dir + w3cDataDir + "uri.txt";
       std::string mod_map_file = rbkt_src_dir + w3cDataDir + "module.txt";
       std::string col_map_file = rbkt_src_dir + w3cDataDir + "collection.txt";
@@ -332,13 +320,8 @@ main(int argc, char** argv)
 
     // Stopwatch starts now
     // QQQ this should use util/time.h
-#ifndef WIN32
     struct timeval start_time, end_time;
     gettimeofday(&start_time, NULL);
-#else
-    clock_t   start_time, end_time;
-    start_time = clock();
-#endif
 
 #ifndef ZORBA_TEST_PLAN_SERIALIZATION_EXECUTION_ONLY
     // create and compile the query
@@ -478,11 +461,7 @@ main(int argc, char** argv)
       }
 
       // Stopwatch ends here
-#ifndef WIN32
       gettimeofday(&end_time, NULL);
-#else
-      end_time = clock();
-#endif
       
       if (! lRefFileExists )
       {
@@ -608,12 +587,8 @@ main(int argc, char** argv)
 
     // Check timing
     // QQQ only do this if .spec file says to
-#ifndef WIN32
     long mstime = ( (end_time.tv_sec - start_time.tv_sec) * 1000000
       + (end_time.tv_usec - start_time.tv_usec) );
-#else
-    long mstime = (long)(((double)(end_time - start_time)) / CLOCKS_PER_SEC * 1000000);
-#endif
     std::cout << "testdriver: test runtime was " << mstime << "us" << std::endl;
 
 #endif//ifndef ZORBA_TEST_PLAN_SERIALIZATION_COMPILE_ONLY

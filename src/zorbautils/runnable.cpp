@@ -25,16 +25,9 @@
 #include <unistd.h>
 #include <pthread.h>
 #define ZORBA_THREAD_RETURN void *
-#else
-#include <Windows.h>
-#define ZORBA_THREAD_RETURN DWORD WINAPI
 #endif
 
-#ifdef WIN32
-#define THREAD_ID " theThreadID: " << theThreadId
-#else
 #define THREAD_ID ""
-#endif
 
 
 /*******************************************************************************
@@ -73,12 +66,8 @@ void
 zorba::Runnable::start()
 {
   theStatus = RUNNING;
-#ifdef WIN32
-  theThread = CreateThread(NULL, 0, &startImpl, (void *) this, 0, &theThreadId);
-#else
   if (pthread_create(&theThread, NULL, &startImpl, (void *) this))
     assert(false);
-#endif
 }
 
 
@@ -96,12 +85,8 @@ retry:
 #endif
 
   if (theStatus == SUSPENDED) {
-#ifdef WIN32
-    TerminateThread(theThread, 0);
-#else
     pthread_cancel(theThread);
     theCondition.signal();
-#endif
   } else if (theStatus == TERMINATED) {
     theMutex.unlock();
     return;
@@ -109,11 +94,7 @@ retry:
   else if (theStatus == RUNNING) {
     // busy wait until the child thread terminates or suspends itself.
     theMutex.unlock();
-#ifndef WIN32
     usleep(1000);
-#else
-    Sleep(1);
-#endif
     goto retry;
   } else {
     assert(theStatus == IDLE);
@@ -150,19 +131,12 @@ zorba::Runnable::join()
 
   theMutex.lock();
   // wait for the real thread to terminate
-#ifdef WIN32
-  DWORD lExitCode;
-  if (GetExitCodeThread(theThread, &lExitCode) && lExitCode == STILL_ACTIVE) {
-    WaitForSingleObject(theThread, INFINITE);
-  }
-#else
   if (!theFinishCalled) {
     int status = pthread_join(theThread, 0);
     if (status != EINVAL && status != 0) {
        assert(false);
     }
   }
-#endif
   theMutex.unlock();
 }
 
@@ -174,15 +148,6 @@ zorba::Runnable::join()
 void
 zorba::Runnable::suspend(unsigned long aTimeInMs /*= 0*/)
 {
-#ifdef WIN32
-  theStatus = SUSPENDED;
-  if (aTimeInMs != 0) {
-    DWORD lTime = aTimeInMs;
-    WaitForSingleObject(theThread, lTime);
-  } else {
-    SuspendThread(theThread);
-  }
-#else
 
   theMutex.lock();
 
@@ -207,7 +172,6 @@ zorba::Runnable::suspend(unsigned long aTimeInMs /*= 0*/)
   pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL);
   pthread_cleanup_pop(1);
   theMutex.unlock();
-#endif
 }
 
 
@@ -234,15 +198,11 @@ zorba::Runnable::resume()
 {
   theMutex.lock();
 
-#ifdef WIN32
-  ResumeThread(theThread);
-#else
 
   assert (theStatus == SUSPENDED);
 
   theCondition.signal();
 
-#endif
   theStatus = RUNNING;
 
   theMutex.unlock();
@@ -288,11 +248,9 @@ zorba::Runnable::finishImpl()
   theFinishCalled = true;
   theStatus = TERMINATED;
 
-#ifndef WIN32
   if (!theCalledTerminate) {
     pthread_detach(theThread);
   }
-#endif
 
   // the last thing to do is to signal a possible join waiting
   // for this Runnable to terminate
@@ -304,11 +262,7 @@ zorba::Runnable::finishImpl()
 
 void
 zorba::Runnable::sleep_(unsigned long useconds) {
-#ifdef WIN32
-  Sleep(useconds);
-#else
   usleep(useconds);
-#endif
 }
 
 /*******************************************************************************

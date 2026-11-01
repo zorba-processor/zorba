@@ -20,9 +20,6 @@
 #include "xercesIncludes.h"
 #include <xercesc/util/XMLString.hpp>
 #include "XercesParseUtils.h"
-#ifdef CYGWIN
-#undef WIN32
-#endif
 #include "StrX.h"
 #include "zorbatypes/xerces_xmlcharray.h"
 #include "LoadSchemaErrorHandler.h"

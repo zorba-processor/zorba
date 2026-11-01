@@ -604,11 +604,7 @@ int runUriTest(int argc, char* argv[])
       "",
       "",
       "",
-#ifndef WIN32
       "/d:/a/b/c",
-#else
-      "d:/a/b/c",
-#endif      
       "",
       "",
       "/d:/a/b/c", // path notation
@@ -623,11 +619,7 @@ int runUriTest(int argc, char* argv[])
       "",
       "localhost",
       "",
-#ifndef WIN32
       "/d:/a/b/c",
-#else
-      "d:/a/b/c",
-#endif
       "",
       "",
       "localhost/d:/a/b/c", // path notation

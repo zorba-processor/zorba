@@ -21,9 +21,6 @@
 
 #ifndef ZORBA_NO_XMLSCHEMA
 #include <xercesc/sax/EntityResolver.hpp>
-#ifdef CYGWIN
-#undef WIN32
-#endif
 #include <iostream>
 #endif // ZORBA_NO_XMLSCHEMA
 

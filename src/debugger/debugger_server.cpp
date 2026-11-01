@@ -18,9 +18,7 @@
 
 #include <algorithm>
 #include <sstream>
-#ifndef WIN32
-# include <signal.h>
-#endif
+#include <signal.h>
 
 #include <zorba/util/base64_util.h>
 #include <zorba/util/uri.h>
@@ -45,23 +43,11 @@ bool theInterruptBreak = false;
 // will not terminate when Ctrl-C is pressed but trigger a query interruption
 // break through the theInterruptBreak variable that is continuously monitored
 // by the debugger commons through the debugger runtime
-#ifdef WIN32
-BOOL WINAPI
-DebuggerServer::ctrlC_Handler(DWORD aCtrlType)
-{
-  if (CTRL_C_EVENT == aCtrlType) {
-    theInterruptBreak = true;
-    return true;
-  }
-  return false;
-}
-#else
 void
 DebuggerServer::ctrlC_Handler(int lParam)
 {
   theInterruptBreak = true;
 }
-#endif
 
 
 DebuggerServer::DebuggerServer(
@@ -79,15 +65,11 @@ DebuggerServer::DebuggerServer(
     aQuery, aOstream, aSerializerOptions,
     theCommunicator, aHandler, aCallbackData,
     &theInterruptBreak);
-#ifdef WIN32
-  theFileName = aQuery->getFileName().str();
-#else
   // TODO: under Linux, when trying to get the file name of the query
   //       the call fails because getFileName tries to get a lock that
   //       is already taken. Therefore the assertion in mutex.cpp:63
   //       terminates the execution 
   theFileName = "";
-#endif
 }
 
 
@@ -102,11 +84,7 @@ bool
 DebuggerServer::run()
 {
   // add the interrupt handlers to catch Ctrl-C
-  #ifdef WIN32
-    SetConsoleCtrlHandler(DebuggerServer::ctrlC_Handler, TRUE);
-  #else
     signal(SIGINT, ctrlC_Handler);
-  #endif
 
   theCommunicator->connect();
 
@@ -1010,11 +988,6 @@ DebuggerServer::getEnvVar(const std::string& aName, std::string& aValue)
     
 #ifdef __unix__
   lValue = getenv(aName.c_str()); 
-#elif defined WINCE
-  lValue = NULL;
-#elif defined WIN32
-  size_t len;
-  _dupenv_s(&lValue, &len, aName.c_str());
 #else
   lValue = getenv(aName.c_str());
 #endif

@@ -21,9 +21,6 @@
 #ifndef ZORBA_NO_XMLSCHEMA
 
 #include <xercesc/sax2/DefaultHandler.hpp>
-#ifdef CYGWIN
-#undef WIN32
-#endif
 
 
 

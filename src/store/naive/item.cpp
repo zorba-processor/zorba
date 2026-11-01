@@ -106,23 +106,6 @@ void Item::addReference() const
 
 void Item::removeReference()
 {
-#if defined WIN32 && !defined CYGWIN && !defined ZORBA_FOR_ONE_THREAD_ONLY
-  if (isNode())
-  {
-    InterlockedDecrement(&theRefCount);
-    if (!InterlockedDecrement(theUnion.treeRCPtr))
-    {
-      free();
-      return;
-    }
-  }
-  else if (!InterlockedDecrement(&theRefCount))
-  {
-    free();
-    return;
-  }
-
-#else
 
   switch (getKind())
   {
@@ -216,7 +199,6 @@ void Item::removeReference()
     ZORBA_ASSERT(false);
   }
   }
-#endif
 }
 
 

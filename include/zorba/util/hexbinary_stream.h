@@ -299,14 +299,7 @@ public:
    * http://llvm.org/bugs/show_bug.cgi?id=15337
    */
   stream() :
-#ifdef WIN32
-# pragma warning( push )
-# pragma warning( disable : 4355 )
-#endif /* WIN32 */
     hb_buf_( this->rdbuf() )
-#ifdef WIN32
-# pragma warning( pop )
-#endif /* WIN32 */
   {
     init();
   }
@@ -322,14 +315,7 @@ public:
   template<typename StreamArgType>
   stream( StreamArgType stream_arg ) :
     StreamType( stream_arg ),
-#ifdef WIN32
-# pragma warning( push )
-# pragma warning( disable : 4355 )
-#endif /* WIN32 */
     hb_buf_( this->rdbuf() )
-#ifdef WIN32
-# pragma warning( pop )
-#endif /* WIN32 */
   {
     init();
   }
@@ -346,14 +332,7 @@ public:
   template<typename StreamArgType>
   stream( StreamArgType stream_arg, std::ios_base::openmode mode ) :
     StreamType( stream_arg, mode ),
-#ifdef WIN32
-# pragma warning( push )
-# pragma warning( disable : 4355 )
-#endif /* WIN32 */
     hb_buf_( this->rdbuf() )
-#ifdef WIN32
-# pragma warning( pop )
-#endif /* WIN32 */
   {
     init();
   }

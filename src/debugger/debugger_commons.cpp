@@ -692,12 +692,6 @@ DebuggerCommons::adjustLocationFilePath(QueryLoc& aLocation)
   zstring lPrefix = lOldFilename.substr(0, 7);
 
   if (lPrefix == "file://") {
-#ifdef WIN32
-    // decode and encode back to solve the driver column encoding: C:, D:, etc.
-    const String lNewFilename = URIHelper::decodeFileURI(lOldFilename.str());
-    const String lNewURI = URIHelper::encodeFileURI(lNewFilename);
-    aLocation.setFilename(lNewURI.str());
-#endif
     return;
   }
 

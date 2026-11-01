@@ -49,11 +49,6 @@
 #include "ftcontains_visitor.h"
 #include "thesaurus.h"
 
-#ifdef WIN32
-// Windows annoyingly defines these as macros.
-# undef max
-# undef min
-#endif /* WIN32 */
 
 using namespace std;
 using namespace zorba::locale;

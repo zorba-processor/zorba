@@ -264,7 +264,6 @@ bool to_string( unicode::char_type const *in, unicode::size_type in_len,
   return true;
 }
 
-#ifndef WIN32
 bool to_string( wchar_t const *in, size_type in_len, storage_type **out,
                 size_type *out_len ) {
   unicode::string temp;
@@ -272,7 +271,6 @@ bool to_string( wchar_t const *in, size_type in_len, storage_type **out,
     return false;
   return utf8::to_string( temp.getBuffer(), temp.length(), out, out_len );
 }
-#endif /* WIN32 */
 
 bool to_wchar_t( storage_type const *in, size_type in_len, wchar_t **out,
                  unicode::size_type *out_len ) {

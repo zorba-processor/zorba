@@ -14,12 +14,10 @@
  * limitations under the License.
  */
 
-#ifndef WIN32
-# include <fcntl.h>                     /* for open(2) */
-# include <sys/mman.h>                  /* for mmap(2) */
-# include <sys/stat.h>                  /* for stat(2) */
-# include <unistd.h>                    /* for close(2) */
-#endif /* WIN32 */
+#include <fcntl.h>                     /* for open(2) */
+#include <sys/mman.h>                  /* for mmap(2) */
+#include <sys/stat.h>                  /* for stat(2) */
+#include <unistd.h>                    /* for close(2) */
 
 #include <zorba/internal/cxx_util.h>
 #include <zorba/util/error_util.h>
@@ -34,29 +32,15 @@ using namespace std;
 namespace zorba {
 
 void mmap_file::close() {
-#ifndef WIN32
   if ( addr_ && ::munmap( static_cast<char*>( addr_ ), size_ ) == -1 )
     throw ZORBA_IO_EXCEPTION( "munmap()", path_ );
   if ( fd_ != -1 )
     ::close( fd_ );
-#else /* WIN32 */
-  if ( addr_ && !::UnmapViewOfFile( addr_ ) )
-    throw ZORBA_IO_EXCEPTION( "UnmapViewOfFile()", path_ );
-  if ( mapping_ )
-    ::CloseHandle( mapping_ );
-  if ( fd_ != INVALID_HANDLE_VALUE )
-    ::CloseHandle( fd_ );
-#endif /* WIN32 */
   init();
 }
 
 void mmap_file::init() {
-#ifndef WIN32
   fd_ = -1;
-#else
-  fd_ = INVALID_HANDLE_VALUE;
-  mapping_ = NULL;
-#endif /* WIN32 */
   size_ = 0;
   addr_ = nullptr;
 }
@@ -65,7 +49,6 @@ void mmap_file::open( char const *path, ios::openmode mode ) {
   close();
   path_ = path;
 
-#ifndef WIN32
 
   // O_RDONLY, O_WRONLY and O_RDWR are values, not bits (O_RDONLY is 0), so
   // they cannot be OR'd together. And mmap(2) needs a descriptor open for
@@ -93,49 +76,6 @@ void mmap_file::open( char const *path, ios::openmode mode ) {
     throw ZORBA_IO_EXCEPTION( "mmap()", path_ );
   }
 
-#else /* WIN32 */
-
-#ifdef UNICODE
-  WCHAR wPath[ MAX_PATH ];
-  win32::atow( path, wPath, MAX_PATH );
-#else
-  char const *const wPath = path;
-#endif /* UNICODE */
-
-  DWORD createAccess = 0;
-  DWORD protect      = 0;
-  DWORD shareMode    = 0;
-  DWORD mapAccess    = 0;
-
-  if ( mode & ios::in ) {
-    createAccess |= GENERIC_READ;
-    shareMode    |= FILE_SHARE_READ;
-    mapAccess    |= FILE_MAP_READ;
-    protect       = PAGE_READONLY;
-  }
-  if ( mode & ios::out ) {
-    // A PAGE_READWRITE mapping needs a handle with read access too.
-    createAccess |= GENERIC_READ | GENERIC_WRITE;
-    shareMode    |= FILE_SHARE_WRITE;
-    mapAccess    |= FILE_MAP_WRITE;
-    protect       = PAGE_READWRITE;
-  }
-
-  fd_ = ::CreateFile(
-    wPath, createAccess, shareMode, NULL, OPEN_EXISTING, 0, NULL
-  );
-  if ( fd_ == INVALID_HANDLE_VALUE )
-    throw ZORBA_IO_EXCEPTION( "CreateFile()", path_ );
-
-  if ( (size_ = ::GetFileSize( fd_, NULL )) == -1 )
-    throw ZORBA_IO_EXCEPTION( "GetFileSize()", path_ );
-
-  if ( !(mapping_ = ::CreateFileMapping( fd_, NULL, protect, 0, 0, NULL )) )
-    throw ZORBA_IO_EXCEPTION( "CreateFileMapping()", path_ );
-
-  if ( !(addr_ = ::MapViewOfFile( mapping_, mapAccess, 0, 0, 0 )) )
-    throw ZORBA_IO_EXCEPTION( "MapViewOfFile()", path_ );
-#endif /* WIN32 */
 }
 
 } // namespace zorba

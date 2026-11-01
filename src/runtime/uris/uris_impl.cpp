@@ -44,9 +44,6 @@
 #define QUERY_NAME       "query"
 #define FRAGMENT_NAME    "fragment"
 
-#ifdef _MSC_VER
-#pragma warning ( disable: 4800 )
-#endif
 
 using namespace std;
 

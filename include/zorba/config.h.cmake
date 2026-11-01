@@ -24,21 +24,9 @@
 // Platform
 #cmakedefine APPLE
 #cmakedefine LINUX
-#cmakedefine MINGW
 #cmakedefine UNIX
-#ifndef WIN32
-#cmakedefine WIN32
-#endif
-#cmakedefine CYGWIN
-#ifdef CYGWIN
-# undef WIN32
-#endif /* CYGWIN */
 #cmakedefine ZORBA_BIG_ENDIAN @ZORBA_BIG_ENDIAN@
 #cmakedefine ZORBA_LITTLE_ENDIAN @ZORBA_LITTLE_ENDIAN@
-
-#ifdef WIN32
-# pragma warning( disable: 4251 )
-#endif /* WIN32 */
 
 // Platform headers
 #cmakedefine ZORBA_HAVE_COLL_H
@@ -69,8 +57,6 @@
 // Platform types
 #cmakedefine ZORBA_HAVE_INT32_T
 #cmakedefine ZORBA_HAVE_INT64_T
-#cmakedefine ZORBA_HAVE_MS_INT32
-#cmakedefine ZORBA_HAVE_MS_UINT32
 #cmakedefine ZORBA_HAVE_UINT32_T
 #cmakedefine ZORBA_HAVE_STRUCT_TM_TM_GMTOFF
 #cmakedefine ZORBA_HAVE_STRUCT_TM___TM_GMTOFF
@@ -97,29 +83,8 @@
 # include <inttypes.h>
 #endif
 
-#ifndef ZORBA_HAVE_INT32_T
-# ifdef ZORBA_HAVE_MS_INT32
-    typedef __int32 int32_t;
-# endif
-#endif
-
-#ifndef ZORBA_HAVE_UINT32_T
-# ifdef ZORBA_HAVE_MS_UINT32
-    typedef unsigned __int32 uint32_t;
-# endif
-#endif /* ZORBA_HAVE_UINT32_T */
-
-#ifndef ZORBA_HAVE_INT64_T
-typedef __int64 int64_t;
-#endif /* ZORBA_HAVE_INT64_T */
-
 // Compiler
 #cmakedefine CLANG
-#cmakedefine MSVC
-#cmakedefine MSVC60
-#cmakedefine MSVC70
-#cmakedefine MSVC71
-#cmakedefine MSVC80
 
 // C++11 language features
 #cmakedefine ZORBA_CXX_NULLPTR
@@ -195,29 +160,12 @@ typedef __int64 int64_t;
 ////////// Building Zorba /////////////////////////////////////////////////////
 
 #ifndef BUILDING_ZORBA_STATIC
-# if defined WIN32 || defined CYGWIN
-#   ifdef zorba_EXPORTS
-#     ifdef __GNUC__
-#       define ZORBA_DLL_PUBLIC __attribute__((dllexport))
-#     else
-#       define ZORBA_DLL_PUBLIC __declspec(dllexport)
-#     endif /* __GNUC__ */
-#   else /* zorba_EXPORTS */
-#     ifdef __GNUC__
-#       define ZORBA_DLL_PUBLIC __attribute__((dllimport))
-#     else
-#       define ZORBA_DLL_PUBLIC __declspec(dllimport)
-#     endif /* __GNUC__ */
-#   endif /* zorba_EXPORTS */
-#   define ZORBA_DLL_LOCAL
+# if __GNUC__ >= 4
+#   define ZORBA_DLL_PUBLIC __attribute__ ((visibility("default")))
+#   define ZORBA_DLL_LOCAL  __attribute__ ((visibility("hidden")))
 # else
-#   if __GNUC__ >= 4
-#     define ZORBA_DLL_PUBLIC __attribute__ ((visibility("default")))
-#     define ZORBA_DLL_LOCAL  __attribute__ ((visibility("hidden")))
-#   else
-#     define ZORBA_DLL_PUBLIC
-#     define ZORBA_DLL_LOCAL
-#   endif
+#   define ZORBA_DLL_PUBLIC
+#   define ZORBA_DLL_LOCAL
 # endif
 #else /* BUILDING_ZORBA_STATIC */
 # define ZORBA_DLL_PUBLIC
