@@ -64,7 +64,7 @@ int HttpSendFunction::doRequest(Request& aRequest, ItemSequence_t& aResult,
   zorba::String lUri = getURI();
   ErrorThrower lThrower(theFactory, &lHeaderList, lUri);
 
-  lHandler.reset(new HttpRequestHandler(lCURL));
+  lHandler = std::make_unique<HttpRequestHandler>(lCURL);
 
   lHandler->sendRequest(aRequest);
 

@@ -133,7 +133,7 @@ public:
 
     zorba::Item lProfile = lFactory->createJSONObject(lPairs);
     if (!theJSONProfileData.get())
-      theJSONProfileData.reset(new std::vector<Item>());
+      theJSONProfileData = std::make_unique<std::vector<Item>>();
 
     theJSONProfileData->push_back(lProfile);
   }
@@ -259,9 +259,9 @@ private:
   getJSONProfilingData() const
   {
     if (!theJSONProfileData.get())
-      theJSONProfileData.reset(new std::vector<Item>);
+      theJSONProfileData = std::make_unique<std::vector<Item>>();
 
-    theProfileMap.reset(new ProfileDataMap());
+    theProfileMap = std::make_unique<ProfileDataMap>();
     (*theProfileMap)["prof-requests"] = theFactory->createJSONArray(*theJSONProfileData);
     return theProfileMap.get();
   }
@@ -280,7 +280,7 @@ private:
                                                         std::vector<std::pair<zorba::String, zorba::String> >());
     }
 
-    theProfileMap.reset(new ProfileDataMap());
+    theProfileMap = std::make_unique<ProfileDataMap>();
     (*theProfileMap)["prof-requests"] = theXMLProfileData;
     return theProfileMap.get();
   }

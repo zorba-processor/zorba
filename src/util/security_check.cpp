@@ -841,7 +841,7 @@ std::unique_ptr<std::istream> open_file(
 
   if (file_reads_unrestricted(aPolicy))
   {
-    std::unique_ptr<std::ifstream> lStream(new std::ifstream(lPath.c_str(), lMode));
+    std::unique_ptr<std::ifstream> lStream = std::make_unique<std::ifstream>(lPath.c_str(), lMode);
     if (!lStream->is_open())
       return nullptr;
     return lStream;

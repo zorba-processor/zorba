@@ -200,14 +200,12 @@ void parse_content_type( std::string const &media_type, std::string *mime_type,
         if ( !theCurrentCharset.empty() &&
             transcode::is_necessary( theCurrentCharset.c_str() ) )
         {
-          lStream.reset(
-              new transcode::stream<std::istream>(
-                  theCurrentCharset.c_str(), theStreamBuffer
-              )
+          lStream = std::make_unique<transcode::stream<std::istream>>(
+              theCurrentCharset.c_str(), theStreamBuffer
           );
         }
         else
-          lStream.reset(new std::istream(theStreamBuffer));
+          lStream = std::make_unique<std::istream>(theStreamBuffer);
       }
       catch ( std::invalid_argument const &e )
       {

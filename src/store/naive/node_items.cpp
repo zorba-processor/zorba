@@ -2541,7 +2541,7 @@ XmlNode* ElementNode::copyInternal(
       // default namespace declaration in scope.
       ZORBA_ASSERT(prefix.empty() || found);
 
-      std::unique_ptr<NsBindingsContext> ctx(new NsBindingsContext);
+      std::unique_ptr<NsBindingsContext> ctx = std::make_unique<NsBindingsContext>();
 
       if (found)
       {

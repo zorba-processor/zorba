@@ -5011,7 +5011,7 @@ void* begin_visit(const AnnotationListParsenode& v)
 
   assert(theAnnotations.get() == NULL);
 
-  theAnnotations.reset(new AnnotationList());
+  theAnnotations = std::make_unique<AnnotationList>();
 
   return no_state;
 }
@@ -5205,7 +5205,7 @@ void end_visit(const CollectionDecl& v, void* /*visit_state*/)
 
   if (theAnnotations.get() == NULL)
   {
-    theAnnotations.reset(new AnnotationList());
+    theAnnotations = std::make_unique<AnnotationList>();
   }
 
   theAnnotations->
@@ -12823,12 +12823,12 @@ expr* generate_literal_function(
     udfArgs[0] = argVar;
     expr* body = CREATE(cast)(theRootSctx, theUDF, loc, argVar, type, false);
 
-    udf.reset(new user_function(loc,
+    udf = std::make_unique<user_function>(loc,
                                 theRootSctx,
                                 signature(qnameItem, theRTM.ITEM_TYPE_QUESTION, type),
                                 body,
                                 SIMPLE_EXPR,
-                                theCCB));
+                                theCCB);
 
     udf->setArgVars(udfArgs);
     func = udf.get();
@@ -12858,12 +12858,12 @@ expr* generate_literal_function(
     {
       FunctionConsts::FunctionKind fkind = func->getKind();
 
-      udf.reset(new user_function(loc,
+      udf = std::make_unique<user_function>(loc,
                                   theRootSctx,
                                   func->getSignature(),
-                                  NULL, // no body for now
+                                  nullptr, // no body for now
                                   func->getScriptingKind(),
-                                  theCCB));
+                                  theCCB);
 
       std::vector<expr*> foArgs(arity);
       std::vector<var_expr*> udfArgs(arity);
@@ -16539,13 +16539,13 @@ expr* translate_aux(
     bool isLibModule,
     StaticContextConsts::xquery_version_t maxLibModuleVersion)
 {
-  std::unique_ptr<TranslatorImpl> t(new TranslatorImpl(rootTranslator,
+  std::unique_ptr<TranslatorImpl> t = std::make_unique<TranslatorImpl>(rootTranslator,
                                                      rootSctx,
                                                      rootSctxId,
                                                      minfo,
                                                      modulesStack,
                                                      isLibModule,
-                                                     maxLibModuleVersion));
+                                                     maxLibModuleVersion);
 
   root.accept(*t);
 
@@ -16596,13 +16596,13 @@ expr* Translator::translate_literal_function(
   
   ModulesInfo minfo(ccb);
   
-  std::unique_ptr<TranslatorImpl> t(new TranslatorImpl(NULL,
+  std::unique_ptr<TranslatorImpl> t = std::make_unique<TranslatorImpl>(nullptr,
                                                      sctx,
                                                      ccb->theSctxMap.size(),
                                                      &minfo,
                                                      modulesStack,
                                                      false,
-                                                     StaticContextConsts::xquery_version_unknown));
+                                                     StaticContextConsts::xquery_version_unknown);
   
   return t->generate_literal_function(qname, arity, loc);
 }

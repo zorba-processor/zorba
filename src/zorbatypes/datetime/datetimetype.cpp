@@ -1242,9 +1242,9 @@ DateTime* DateTime::adjustToTimeZone(int tz_seconds) const
     throw InvalidTimezoneException( tz_seconds );
 
   // If $timezone is not specified, then $timezone is the value of the implicit timezone in the dynamic context.
-  context_tz = std::unique_ptr<Duration>(new Duration(Duration::DAYTIMEDURATION_FACET, (tz_seconds<0), 0, 0, 0, 0, 0, tz_seconds, 0));
+  context_tz = std::make_unique<Duration>(Duration::DAYTIMEDURATION_FACET, (tz_seconds<0), 0, 0, 0, 0, 0, tz_seconds, 0);
 
-  dt = std::unique_ptr<DateTime>(new DateTime(*this));
+  dt = std::make_unique<DateTime>(*this);
 
   // If $arg does not have a timezone component and $timezone is not the empty sequence,
   // then the result is $arg with $timezone as the timezone component.
@@ -1259,13 +1259,13 @@ DateTime* DateTime::adjustToTimeZone(int tz_seconds) const
   {
     // If $arg has a timezone component and $timezone is not the empty sequence, then
     // the result is an xs:dateTime value with a timezone component of $timezone that is equal to $arg.
-    dtduration = std::unique_ptr<Duration>(new Duration(Duration::DAYTIMEDURATION_FACET,
+    dtduration = std::make_unique<Duration>(Duration::DAYTIMEDURATION_FACET,
                                                       the_time_zone < 0,
                                                       0, 0, 0,
                                                       the_time_zone.getHours(),
                                                       the_time_zone.getMinutes(),
                                                       0,
-                                                      0));
+                                                      0);
 
     dtduration = std::unique_ptr<Duration>(*context_tz - *dtduration);
     dt = std::unique_ptr<DateTime>(dt->addDuration(*dtduration));
@@ -1288,7 +1288,7 @@ DateTime* DateTime::adjustToTimeZone(const Duration* d) const
   // A dynamic error is raised [err:FODT0003] if $timezone is less than -PT14H
   // or greater than PT14H or if does not contain an integral number of minutes.
 
-  dt = std::unique_ptr<DateTime>(new DateTime(*this));
+  dt = std::make_unique<DateTime>(*this);
 
   if (d == NULL)
   {
@@ -1316,15 +1316,15 @@ DateTime* DateTime::adjustToTimeZone(const Duration* d) const
     {
       // If $arg has a timezone component and $timezone is not the empty sequence, then
       // the result is an xs:dateTime value with a timezone component of $timezone that is equal to $arg.
-      dtduration.reset(new Duration(Duration::DAYTIMEDURATION_FACET,
+      dtduration = std::make_unique<Duration>(Duration::DAYTIMEDURATION_FACET,
                                     the_time_zone < 0,
                                     0, 0, 0,
                                     the_time_zone.getHours(),
                                     the_time_zone.getMinutes(),
                                     0,
-                                    0));
+                                    0);
 
-      context_tz.reset(new Duration(*d));
+      context_tz = std::make_unique<Duration>(*d);
       if (context_tz.get() == NULL)
         assert(0);
 

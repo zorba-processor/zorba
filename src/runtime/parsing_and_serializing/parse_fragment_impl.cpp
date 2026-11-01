@@ -554,7 +554,7 @@ bool FnZorbaParseHtmlIterator::nextImpl(
     // The string is already decoded: the parser takes it as UTF-8 whatever
     // charset a meta element in it declares.
     result->getStringValue2(lHtml);
-    lStream.reset(new std::istringstream(lHtml.str()));
+    lStream = std::make_unique<std::istringstream>(lHtml.str());
     lBaseUri = theSctx->get_base_uri();
 
     try

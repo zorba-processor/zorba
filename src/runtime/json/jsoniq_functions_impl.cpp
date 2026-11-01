@@ -649,7 +649,7 @@ JSONEncodeForRoundtripIterator::encodeNode(
     }
 
     // and now serialize
-    std::unique_ptr<std::stringstream> lResultStream(new std::stringstream());
+    std::unique_ptr<std::stringstream> lResultStream = std::make_unique<std::stringstream>();
     lItemIt->open();
     lSerializer.serialize(lItemIt, *lResultStream.get());
     lItemIt->close();
@@ -906,7 +906,7 @@ bool JSONParseIterator::nextImpl(
 void MultiObjectKeysIteratorState::init(PlanState& planState)
 {
   PlanIteratorState::init(planState);
-  theUniqueKeys.reset(new HashSet<zstring, HashMapZStringCmp>(64, false));
+  theUniqueKeys = std::make_unique<HashSet<zstring, HashMapZStringCmp>>(64, false);
 }
 
 

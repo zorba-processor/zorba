@@ -647,10 +647,10 @@ namespace zorbac {
         me->theContext.get()->registerModule(lModule);
       }
 
-      std::unique_ptr<CExternalFunction> lFunc
-        (new CExternalFunction(uri, localname, init_fn, next_fn, free_fn,
+      std::unique_ptr<CExternalFunction> lFunc =
+          std::make_unique<CExternalFunction>(uri, localname, init_fn, next_fn, free_fn,
           function_user_data, me->theZorba->getItemFactory(),
-          me->theErrorHandler));
+          me->theErrorHandler);
 
       XQC_Error lErr = lModule->registerFunction(lFunc.get());
       if (lErr == XQC_NO_ERROR) {

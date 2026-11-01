@@ -531,7 +531,7 @@ ft_visit_result::type ftmatch_options::accept( ftnode_visitor &v ) {
 }
 
 ftnode* ftmatch_options::clone(user_function* udf,  expr::substitution_t &s ) const {
-  unique_ptr<ftmatch_options> p( new ftmatch_options( get_loc() ) );
+  unique_ptr<ftmatch_options> p = std::make_unique<ftmatch_options>( get_loc() );
   if ( case_option_ )
     p->set_case_option( clone_ptr( case_option_, udf, s ) );
   if ( diacritics_option_ )
@@ -722,9 +722,7 @@ ft_visit_result::type ftprimary_with_options::accept( ftnode_visitor &v ) {
 }
 
 ftnode* ftprimary_with_options::clone(user_function* udf,  expr::substitution_t &s ) const {
-  unique_ptr<ftprimary_with_options> p(
-    new ftprimary_with_options( get_loc() )
-  );
+  unique_ptr<ftprimary_with_options> p = std::make_unique<ftprimary_with_options>( get_loc() );
   p->set_match_options( clone_ptr( match_options_, udf, s ) );
   p->set_primary( clone_ptr( primary_, udf, s ) );
   if ( weight_ )

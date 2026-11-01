@@ -196,7 +196,7 @@ CRegexXQuery_regex* CRegexXQuery_parser::parse_regexp(const char *pattern,
   *regex_len = 0;
   int   branch_len;
   regex_depth++;
-  std::unique_ptr<CRegexXQuery_regex>  regex(new CRegexXQuery_regex(current_regex));
+  std::unique_ptr<CRegexXQuery_regex>  regex = std::make_unique<CRegexXQuery_regex>(current_regex);
   if(!current_regex)
     current_regex = regex.get();
   regex->cap_first = current_regex->subregex.size();
@@ -246,7 +246,7 @@ CRegexXQuery_branch* CRegexXQuery_parser::parse_branch(const char *pattern, int 
 {
   int piece_len;
 
-  std::unique_ptr<CRegexXQuery_branch>    branch(new CRegexXQuery_branch(current_regex));
+  std::unique_ptr<CRegexXQuery_branch>    branch = std::make_unique<CRegexXQuery_branch>(current_regex);
   CRegexXQuery_piece     *piece;
   *branch_len = 0;
   while(pattern[*branch_len] && (pattern[*branch_len] != '|') && (pattern[*branch_len] != ')'))
@@ -272,7 +272,7 @@ CRegexXQuery_branch* CRegexXQuery_parser::parse_branch(const char *pattern, int 
 //piece = atom + quantifier
 CRegexXQuery_piece* CRegexXQuery_parser::parse_piece(const char *pattern, int *piece_len)
 {
-  std::unique_ptr<CRegexXQuery_piece>  piece(new CRegexXQuery_piece);
+  std::unique_ptr<CRegexXQuery_piece>  piece = std::make_unique<CRegexXQuery_piece>();
   IRegexAtom  *atom;
   *piece_len = 0;
 
@@ -868,10 +868,10 @@ CRegexXQuery_chargroup* CRegexXQuery_parser::readchargroup(const char *pattern, 
   if(pattern[*chargroup_len] == '^')//negative group
   {
     (*chargroup_len)++;
-    chargroup.reset(new CRegexXQuery_negchargroup(current_regex));
+    chargroup = std::make_unique<CRegexXQuery_negchargroup>(current_regex);
   }
   else
-    chargroup.reset(new CRegexXQuery_chargroup(current_regex));
+    chargroup = std::make_unique<CRegexXQuery_chargroup>(current_regex);
   while(pattern[*chargroup_len] && (pattern[*chargroup_len]!=']'))
   {
     //char  c1, c2;

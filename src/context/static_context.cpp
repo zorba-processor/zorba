@@ -1936,7 +1936,7 @@ void static_context::apply_url_resolvers(
           if (lAllowed < 0)
           {
             if (!lPolicy)
-              lPolicy.reset(new SecurityPolicy(get_security_policy()));
+              lPolicy = std::make_unique<SecurityPolicy>(get_security_policy());
             // Trusted directories matter only where file reads are
             // restricted.
             if (!lTrusted &&
@@ -1945,7 +1945,7 @@ void static_context::apply_url_resolvers(
                 !(lPolicy->allows(Capability::FileRead) &&
                   lPolicy->getReadPaths().empty()))
             {
-              lTrusted.reset(new std::vector<std::string>());
+              lTrusted = std::make_unique<std::vector<std::string>>();
               get_trusted_dirs(*lTrusted);
             }
             security::Verdict const lVerdict = security::check(
@@ -2115,7 +2115,7 @@ void static_context::serialize_security_policy(serialization::Archiver& ar)
     p.setMaxCallDepth(lMaxCallDepth);
     p.setMaxExprDepth(lMaxExprDepth);
     p.setMaxEntityAmplification(lMaxAmplification);
-    theSecurityPolicy.reset(new SecurityPolicy(p));
+    theSecurityPolicy = std::make_unique<SecurityPolicy>(p);
   }
 }
 
@@ -2125,7 +2125,7 @@ void static_context::serialize_security_policy(serialization::Archiver& ar)
 ********************************************************************************/
 void static_context::set_security_policy(const SecurityPolicy& aPolicy)
 {
-  theSecurityPolicy.reset(new SecurityPolicy(aPolicy));
+  theSecurityPolicy = std::make_unique<SecurityPolicy>(aPolicy);
   theSecurityPolicyNarrows = false;
 }
 
@@ -2138,11 +2138,10 @@ void static_context::narrow_security_policy(const SecurityPolicy& aPolicy)
   // If a policy is already attached, narrow it in place and keep its kind:
   // an explicit policy stays the base, so ancestors still do not apply.
   if (theSecurityPolicy)
-    theSecurityPolicy.reset(
-        new SecurityPolicy(theSecurityPolicy->narrowedBy(aPolicy)));
+    theSecurityPolicy = std::make_unique<SecurityPolicy>(theSecurityPolicy->narrowedBy(aPolicy));
   else
   {
-    theSecurityPolicy.reset(new SecurityPolicy(aPolicy));
+    theSecurityPolicy = std::make_unique<SecurityPolicy>(aPolicy);
     theSecurityPolicyNarrows = true;
   }
 }
@@ -2168,9 +2167,9 @@ SecurityPolicy static_context::get_security_policy() const
       break;
     }
     if (lNarrowing)
-      lNarrowing.reset(new SecurityPolicy(lNarrowing->narrowedBy(*p)));
+      lNarrowing = std::make_unique<SecurityPolicy>(lNarrowing->narrowedBy(*p));
     else
-      lNarrowing.reset(new SecurityPolicy(*p));
+      lNarrowing = std::make_unique<SecurityPolicy>(*p);
   }
 
   SecurityPolicy lPolicy =

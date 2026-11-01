@@ -575,8 +575,8 @@ void end_visit(function_trace_expr& v)
   CODEGEN_TRACE_OUT("");
   std::vector<PlanIter_t> argv;
   argv.push_back(pop_itstack());
-  std::unique_ptr<FunctionTraceIterator> lDummyIter(
-      new FunctionTraceIterator(sctx, qloc, argv));
+  std::unique_ptr<FunctionTraceIterator> lDummyIter =
+      std::make_unique<FunctionTraceIterator>(sctx, qloc, argv);
   lDummyIter->setFunctionName(v.getFunctionName());
   lDummyIter->setFunctionArity(v.getFunctionArity());
   lDummyIter->setFunctionLocation(v.getFunctionLocation());
@@ -1651,7 +1651,7 @@ PlanIter_t gflwor_codegen(flwor_expr& flworExpr, int currentClause)
 
     if (NULL == (cond = wc->get_win_stop()))
     {
-      end_clause.reset(new flwor::EndClause);
+      end_clause = std::make_unique<flwor::EndClause>();
     }
     else
     {
@@ -1660,7 +1660,7 @@ PlanIter_t gflwor_codegen(flwor_expr& flworExpr, int currentClause)
       flwor::WindowVars wvars(*wcv.inCurr, *wcv.inPrev, *wcv.inNext, *wcv.inPos,
                               *wcv.outCurr, *wcv.outPrev, *wcv.outNext, *wcv.outPos);
 
-      end_clause.reset(new flwor::EndClause(pop_itstack(), wvars, cond->is_only()));
+      end_clause = std::make_unique<flwor::EndClause>(pop_itstack(), wvars, cond->is_only());
     }
 
     if (NULL != (cond = wc->get_win_start()))
@@ -1670,7 +1670,7 @@ PlanIter_t gflwor_codegen(flwor_expr& flworExpr, int currentClause)
       flwor::WindowVars wvars(*wcv.inCurr, *wcv.inPrev, *wcv.inNext, *wcv.inPos,
                               *wcv.outCurr, *wcv.outPrev, *wcv.outNext, *wcv.outPos);
 
-      start_clause.reset(new flwor::StartClause(pop_itstack(), wvars));
+      start_clause = std::make_unique<flwor::StartClause>(pop_itstack(), wvars);
     }
 
     PlanIter_t winIter =
@@ -1882,11 +1882,11 @@ void flwor_codegen(const flwor_expr& flworExpr)
       inputLetVars.resize(numLetVars);
       outputLetVarsRefs.resize(numLetVars);
 
-      materializeClause.reset(new flwor::MaterializeClause(c.get_loc(),
+      materializeClause = std::make_unique<flwor::MaterializeClause>(c.get_loc(),
                                                            inputForVars,
                                                            inputLetVars,
                                                            outputForVarsRefs,
-                                                           outputLetVarsRefs));
+                                                           outputLetVarsRefs);
 
       break;
     }
@@ -1914,9 +1914,9 @@ void flwor_codegen(const flwor_expr& flworExpr)
                                          modifiers[i].theCollation);
       }
 
-      orderClause.reset(new flwor::OrderByClause(obc->get_loc(),
+      orderClause = std::make_unique<flwor::OrderByClause>(obc->get_loc(),
                                                  orderSpecs,
-                                                 obc->is_stable()));
+                                                 obc->is_stable());
       break;
     }
 
@@ -1930,7 +1930,7 @@ void flwor_codegen(const flwor_expr& flworExpr)
 
       generate_groupby(clauseVarMap, gspecs, ngspecs);
 
-      groupClause.reset(new flwor::GroupByClause(c.get_loc(), gspecs, ngspecs));
+      groupClause = std::make_unique<flwor::GroupByClause>(c.get_loc(), gspecs, ngspecs);
 
       break;
     }
@@ -3867,13 +3867,13 @@ PlanIter_t codegen(
     unique_ptr<IterPrinter> printer;
     switch ( format ) {
       case PLAN_FORMAT_DOT:
-        printer.reset( new DOTIterPrinter( os, descr ) );
+        printer = std::make_unique<DOTIterPrinter>( os, descr );
         break;
       case PLAN_FORMAT_JSON:
-        printer.reset( new JSONIterPrinter( os, descr ) );
+        printer = std::make_unique<JSONIterPrinter>( os, descr );
         break;
       case PLAN_FORMAT_XML:
-        printer.reset( new XMLIterPrinter( os, descr ) );
+        printer = std::make_unique<XMLIterPrinter>( os, descr );
         break;
       default: // to silence warning
         break;

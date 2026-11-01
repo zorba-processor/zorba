@@ -1976,7 +1976,7 @@ FTTokenIterator_t StringItem::getTokens(
     bool wildcards ) const
 {
   typedef NaiveFTTokenIterator::container_type tokens_t;
-  unique_ptr<tokens_t> tokens( new tokens_t );
+  unique_ptr<tokens_t> tokens = std::make_unique<tokens_t>();
   AtomicItemTokenizerCallback callback( *tokens );
 
   Tokenizer::ptr tokenizer;

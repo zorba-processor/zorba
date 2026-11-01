@@ -77,7 +77,7 @@ startZorba(std::string& aExec, std::vector<std::string>& aArgs, std::unique_ptr<
     }
     
     // Watch the process
-    aProcessListener.reset(new ProcessListener(pID, &onExitProcess));
+    aProcessListener = std::make_unique<ProcessListener>(pID, &onExitProcess);
 
     return 0;
   }
@@ -226,7 +226,7 @@ main(int argc, char* argv[])
     // **************************************************************************
     // start the debugger command line
 
-    theClient.reset(new XqdbClient(lPort));
+    theClient = std::make_unique<XqdbClient>(lPort);
     theClient->start();
 
   } catch (...) {

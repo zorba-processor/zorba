@@ -111,7 +111,7 @@ bool FunctionLookupIterator::nextImpl(
     ccb->theSctxMap[ccb->theSctxMap.size() + 1] = impSctx;
 
     std::unique_ptr<dynamic_context> fiDctx;
-    fiDctx.reset(new dynamic_context(planState.theGlobalDynCtx));
+    fiDctx = std::make_unique<dynamic_context>(planState.theGlobalDynCtx);
 
     if (ctxItem)
     {

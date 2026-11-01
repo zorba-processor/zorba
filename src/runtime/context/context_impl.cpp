@@ -101,7 +101,7 @@ ImplicitTimezoneIterator::nextImpl(store::Item_t& result, PlanState& planState) 
   neg = secs < 0;
   if (neg)
     secs = -secs;
-  dur = std::unique_ptr<Duration>(new Duration(Duration::DAYTIMEDURATION_FACET, neg, 0, 0, 0, 0, 0 , secs));
+  dur = std::make_unique<Duration>(Duration::DAYTIMEDURATION_FACET, neg, 0, 0, 0, 0, 0 , secs);
 
   STACK_PUSH( GENV_ITEMFACTORY->createDayTimeDuration(result, dur.get()), state );
 

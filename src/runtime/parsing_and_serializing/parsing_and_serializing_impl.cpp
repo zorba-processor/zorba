@@ -77,7 +77,7 @@ bool FnParseXmlIterator::nextImpl(store::Item_t& result, PlanState& planState) c
     else
     {
       result->getStringValue2(docString);
-      iss.reset(new std::istringstream(docString.c_str()));
+      iss = std::make_unique<std::istringstream>(docString.c_str());
       is = iss.get();
     }
 
@@ -292,7 +292,7 @@ FnSerializeIterator::nextImpl(store::Item_t& aResult, PlanState& aPlanState) con
 
     {
       // and now serialize
-      std::unique_ptr<std::stringstream> lResultStream(new std::stringstream());
+      std::unique_ptr<std::stringstream> lResultStream = std::make_unique<std::stringstream>();
       lSerializer.serialize(lIterWrapper, *lResultStream.get());
       GENV_ITEMFACTORY->createStreamableString(aResult, *lResultStream.get(), FnSerializeIterator::streamReleaser, true);
       (void)lResultStream.release(); // owned by the streamable item now
