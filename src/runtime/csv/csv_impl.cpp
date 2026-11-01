@@ -244,8 +244,8 @@ void CsvParseIteratorState::reset( PlanState &state ) {
   line_no_ = 1;
   missing_ = missing::null;
   skip_called_ = false;
-  string_.clear();
-  value_.clear();
+  string_ = zstring();
+  value_ = zstring();
 }
 
 void CsvParseIterator::set_input( store::Item_t const &item,
@@ -463,7 +463,16 @@ bool CsvParseIterator::nextImpl( store::Item_t &result,
         json::token t;
         switch ( parse_json( *value, state->parse_json_state_, &t ) ) {
           case json::boolean:
-            GENV_ITEMFACTORY->createBoolean( item, (*value)[0] == 't' );
+            //
+            // Read the character through c_str(): the non-const operator[]
+            // would make value_'s representation unsharable, and the next
+            // values (possibly the field names of the next input) would then
+            // be created from an unsharable representation.
+            // SimpleJSONObject::add() keeps a pointer into a copy of each key
+            // that it assumes shares the key item's representation; with an
+            // unsharable one, that pointer dangles.
+            //
+            GENV_ITEMFACTORY->createBoolean( item, value->c_str()[0] == 't' );
             break;
           case json::null:
             GENV_ITEMFACTORY->createJSONNull( item );
