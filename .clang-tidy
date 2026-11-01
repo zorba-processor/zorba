@@ -38,7 +38,8 @@ Checks: >-
   clang-diagnostic-unused-result,
   readability-delete-null-pointer,
   modernize-make-unique,
-  modernize-make-shared
+  modernize-make-shared,
+  cppcoreguidelines-owning-memory
 WarningsAsErrors: >-
   cert-err33-c,
   bugprone-unused-return-value,
