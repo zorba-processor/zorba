@@ -1,0 +1,2 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<result><root>html</root><document>true</document><namespace></namespace><title>Q3 Report</title><lang>en</lang><rows>3</rows><cells>4</cells><south>900</south><headers>Region|Revenue</headers><h1-nbsp>160</h1-nbsp><amp>Revenue &amp; costs</amp><br>1</br><img>chart</img><checked>true</checked><script>if (a &lt; b &amp;&amp; c &gt; 0) { x = "&amp;nbsp;"; }</script><style>td &gt; b { color: red }</style><entities>169 true</entities></result>

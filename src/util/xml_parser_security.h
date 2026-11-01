@@ -77,6 +77,13 @@ public:
    */
   void configure(xmlParserCtxtPtr aCtxt, int aRequested) const;
 
+  /**
+   * The same for a context of libxml2's HTML parser: aRequested are
+   * HTML_PARSE_* options. Network access is always off and HTML_PARSE_HUGE
+   * never set.
+   */
+  void configureHtml(xmlParserCtxtPtr aCtxt, int aRequested) const;
+
   /** True if the policy refused a resource during a parse. */
   bool denied() const { return theDenied; }
 

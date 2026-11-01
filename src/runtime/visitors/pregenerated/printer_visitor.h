@@ -771,6 +771,12 @@ namespace zorba {
     void beginVisit( const FnParseXmlFragmentIterator& );
     void endVisit  ( const FnParseXmlFragmentIterator& );
 
+    void beginVisit( const FnZorbaParseHtmlIterator& );
+    void endVisit  ( const FnZorbaParseHtmlIterator& );
+
+    void beginVisit( const FnZorbaHtmlDocIterator& );
+    void endVisit  ( const FnZorbaHtmlDocIterator& );
+
     void beginVisit( const FnParseXmlIterator& );
     void endVisit  ( const FnParseXmlIterator& );
 

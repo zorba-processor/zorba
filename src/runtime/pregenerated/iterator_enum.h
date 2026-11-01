@@ -247,6 +247,8 @@
   TYPE_FnZorbaParseXmlFragmentIterator,
   TYPE_FnZorbaCanonicalizeIterator,
   TYPE_FnParseXmlFragmentIterator,
+  TYPE_FnZorbaParseHtmlIterator,
+  TYPE_FnZorbaHtmlDocIterator,
   TYPE_FnParseXmlIterator,
   TYPE_FnSerializeIterator,
   TYPE_ResolveQNameIterator,

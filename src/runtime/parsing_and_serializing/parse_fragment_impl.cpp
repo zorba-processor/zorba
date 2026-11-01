@@ -17,6 +17,8 @@
 #include "runtime/parsing_and_serializing/parse_fragment.h"
 
 #include <iostream>
+#include <memory>
+#include <sstream>
 
 #include "zorbatypes/URI.h"
 #include "context/static_context.h"
@@ -26,6 +28,7 @@
 #include "store/api/item_factory.h"
 #include "store/api/load_properties.h"
 
+#include "runtime/sequences/load_document.h"
 #include "system/globalenv.h"
 #include "util/xml_parser_security.h"
 
@@ -529,6 +532,80 @@ void FnParseXmlFragmentIteratorState::reset(PlanState& planState)
   baseUri = "";
   docUri = "";
 }
+
+/*******************************************************************************
+  14.9.3 fn-zorba-xml:parse-html
+********************************************************************************/
+bool FnZorbaParseHtmlIterator::nextImpl(
+    store::Item_t& result,
+    PlanState& planState) const
+{
+  store::Store& lStore = GENV.getStore();
+  zstring lHtml;
+  zstring lBaseUri;
+  zstring lDocUri;
+  std::unique_ptr<std::istringstream> lStream;
+
+  PlanIteratorState* state;
+  DEFAULT_STACK_INIT(PlanIteratorState, state, planState);
+
+  if (consumeNext(result, theChildren[0].getp(), planState))
+  {
+    // The string is already decoded: the parser takes it as UTF-8 whatever
+    // charset a meta element in it declares.
+    result->getStringValue2(lHtml);
+    lStream.reset(new std::istringstream(lHtml.str()));
+    lBaseUri = theSctx->get_base_uri();
+
+    try
+    {
+      store::LoadProperties lProps;
+      lProps.setStoreDocument(false);
+      lProps.setUseCachedDocument(false);
+      lProps.setParseHtml(true);
+      lProps.setIgnoreDeclaredEncoding(true);
+      lProps.setSecurityPolicy(theSctx->get_security_policy());
+      result = lStore.loadDocument(lBaseUri, lDocUri, *lStream, lProps);
+    }
+    catch (const ZorbaException& e)
+    {
+      XQueryException xe(XQUERY_EXCEPTION(err::FODC0006,
+      ERROR_PARAMS("x:parse-html()", e.what()), ERROR_LOC(loc)));
+
+      set_data(xe, e);
+      throw xe;
+    }
+
+    STACK_PUSH(result != NULL, state);
+  }
+
+  STACK_END(state);
+}
+
+
+/*******************************************************************************
+  14.9.4 fn-zorba-xml:html-doc
+********************************************************************************/
+bool FnZorbaHtmlDocIterator::nextImpl(
+    store::Item_t& result,
+    PlanState& planState) const
+{
+  store::Item_t lUriItem;
+  zstring lUri;
+
+  PlanIteratorState* state;
+  DEFAULT_STACK_INIT(PlanIteratorState, state, planState);
+
+  if (consumeNext(lUriItem, theChildren[0].getp(), planState))
+  {
+    lUriItem->getStringValue2(lUri);
+    load_document_from_uri(lUri, theSctx, planState, loc, result, true);
+    STACK_PUSH(true, state);
+  }
+
+  STACK_END(state);
+}
+
 
 } // namespace zorba
 /* vim:set et sw=2 ts=2: */

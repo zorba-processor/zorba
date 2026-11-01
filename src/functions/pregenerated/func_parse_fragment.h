@@ -88,6 +88,44 @@ theXQueryVersion = StaticContextConsts::xquery_version_3_0;
 };
 
 
+//fn-zorba-xml:parse-html
+class fn_zorba_xml_parse_html : public function
+{
+public:
+  fn_zorba_xml_parse_html(const signature& sig, FunctionConsts::FunctionKind kind)
+    : 
+    function(sig, kind)
+  {
+
+  }
+
+  bool accessesDynCtx() const { return true; }
+
+  bool isSource() const { return true; }
+
+  CODEGEN_DECL();
+};
+
+
+//fn-zorba-xml:html-doc
+class fn_zorba_xml_html_doc : public function
+{
+public:
+  fn_zorba_xml_html_doc(const signature& sig, FunctionConsts::FunctionKind kind)
+    : 
+    function(sig, kind)
+  {
+
+  }
+
+  bool accessesDynCtx() const { return true; }
+
+  bool isSource() const { return true; }
+
+  CODEGEN_DECL();
+};
+
+
 } //namespace zorba
 
 

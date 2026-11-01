@@ -25,6 +25,7 @@ SET(ZORBA_STORE_IMPL_SRCS
     item_iterator.cpp
     item_vector.cpp
     loader_fast.cpp
+    loader_html.cpp
     loader_dtd.cpp
     node_factory.cpp
     node_items.cpp

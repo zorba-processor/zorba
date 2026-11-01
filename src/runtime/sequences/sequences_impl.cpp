@@ -41,6 +41,7 @@
 #include <compiler/api/compilercb.h>
 
 #include <runtime/sequences/sequences.h>
+#include <runtime/sequences/load_document.h>
 #include <runtime/core/arithmetic_impl.h>
 #include <runtime/util/iterator_impl.h>
 #include <runtime/visitors/planiter_visitor.h>
@@ -1588,21 +1589,25 @@ bool cached_doc_source(
 } // anonymous namespace
 
 
-static void loadDocument(
+void load_document_from_uri(
     zstring const& aUri,
     static_context* aSctx,
     PlanState& aPlanState,
     QueryLoc const& loc,
-    store::Item_t& oResult)
+    store::Item_t& oResult,
+    bool aHtml)
 {
   // Normalize input to handle filesystem paths, etc.
   zstring lNormUri;
   normalizeInputUri(aUri, aSctx, loc, &lNormUri);
 
-  // See if this (normalized) URI is already loaded in the store.
+  // See if this (normalized) URI is already loaded in the store. HTML
+  // documents are neither looked up nor added there: the store holds what
+  // fn:doc returns for the URI.
   try 
   {
-    oResult = GENV_STORE.getDocument(lNormUri);
+    if (!aHtml)
+      oResult = GENV_STORE.getDocument(lNormUri);
   }
   catch (XQueryException& e)
   {
@@ -1628,8 +1633,9 @@ static void loadDocument(
 
   // Prepare a LoadProperties for loading the stream into the store
   store::LoadProperties lLoadProperties;
-  lLoadProperties.setStoreDocument(true);
-  lLoadProperties.setDTDValidate( aSctx->is_feature_set( feature::dtd ) );
+  lLoadProperties.setStoreDocument(!aHtml);
+  lLoadProperties.setDTDValidate(!aHtml && aSctx->is_feature_set(feature::dtd));
+  lLoadProperties.setParseHtml(aHtml);
   lLoadProperties.setBaseUri(lNormUri);
   lLoadProperties.setSecurityPolicy(aSctx->get_security_policy());
 
@@ -1679,7 +1685,8 @@ static void loadDocument(
     throw XQUERY_EXCEPTION(err::FODC0002, ERROR_PARAMS( aUri ), ERROR_LOC(loc));
   }
 
-  remember_doc_source(lNormUri, oResult.getp(), *lStreamResource);
+  if (!aHtml)
+    remember_doc_source(lNormUri, oResult.getp(), *lStreamResource);
 }
 
 
@@ -1693,7 +1700,7 @@ bool FnDocIterator::nextImpl(store::Item_t& result, PlanState& planState) const
   if (consumeNext(uriItem, theChildren[0].getp(), planState))
   {
     uriItem->getStringValue2(uriString);
-    loadDocument(uriString, theSctx, planState, loc, result);
+    load_document_from_uri(uriString, theSctx, planState, loc, result);
     STACK_PUSH(true, state);
   } // return empty sequence if input is the empty sequence
 
@@ -1716,7 +1723,7 @@ bool FnDocAvailableIterator::nextImpl(store::Item_t& result, PlanState& planStat
     {
       zstring uriString;
       uriItem->getStringValue2(uriString);
-      loadDocument(uriString, theSctx, planState, loc, doc);
+      load_document_from_uri(uriString, theSctx, planState, loc, doc);
     }
     catch (ZorbaException& e)
     {

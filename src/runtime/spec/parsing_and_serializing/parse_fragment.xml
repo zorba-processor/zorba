@@ -100,4 +100,50 @@
   </zorba:iterator>  
 
 
+<!--
+/*******************************************************************************
+ * 14.9.3 fn-zorba-xml:parse-html
+********************************************************************************/
+-->
+  <zorba:iterator name="FnZorbaParseHtmlIterator">
+
+    <zorba:description author="Zorba Team">fn-zorba-xml:parse-html</zorba:description>
+
+    <zorba:function>
+      <zorba:signature localname="parse-html" prefix="fn-zorba-xml">
+        <zorba:param>xs:string?</zorba:param>
+        <zorba:output>document-node()?</zorba:output>
+      </zorba:signature>
+
+      <zorba:methods>
+        <zorba:accessesDynCtx returnValue="true"/>
+        <zorba:isSource returnValue="true"/>
+      </zorba:methods>
+    </zorba:function>
+
+  </zorba:iterator>
+
+<!--
+/*******************************************************************************
+ * 14.9.4 fn-zorba-xml:html-doc
+********************************************************************************/
+-->
+  <zorba:iterator name="FnZorbaHtmlDocIterator">
+
+    <zorba:description author="Zorba Team">fn-zorba-xml:html-doc</zorba:description>
+
+    <zorba:function>
+      <zorba:signature localname="html-doc" prefix="fn-zorba-xml">
+        <zorba:param>xs:string?</zorba:param>
+        <zorba:output>document-node()?</zorba:output>
+      </zorba:signature>
+
+      <zorba:methods>
+        <zorba:accessesDynCtx returnValue="true"/>
+        <zorba:isSource returnValue="true"/>
+      </zorba:methods>
+    </zorba:function>
+
+  </zorba:iterator>
+
 </zorba:iterators>  
