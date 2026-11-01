@@ -64,12 +64,13 @@ int theFailures = 0;
 const char SECRET[] = "SECRET-VALUE-4c91";
 
 // root/
-//   data/in.xml, data/in.txt, data/m.xq, data/s.xsd, data/stop.txt
+//   data/in.xml, data/in.txt, data/in.html, data/m.xq, data/s.xsd,
+//   data/stop.txt
 //   data/link.xml -> ../outside/secret.xml
 //   data/ldir -> ../outside
 //   data-evil/x.xml
 //   datalink -> data
-//   outside/secret.xml, outside/secret.txt
+//   outside/secret.xml, outside/secret.txt, outside/secret.html
 //   cache/cached.xml
 //   env/test/example/envmod.module
 struct Files
@@ -92,6 +93,7 @@ struct Files
 
     write("data/in.xml", "<in>inside</in>");
     write("data/in.txt", "inside-text");
+    write("data/in.html", "<title>t</title><p>inside-html");
     write("data/m.xq",
           "module namespace m = \"http://example.test/m\";\n"
           "declare function m:f() { 42 };\n");
@@ -103,6 +105,7 @@ struct Files
     write("data-evil/x.xml", std::string("<x>") + SECRET + "</x>");
     write("outside/secret.xml", std::string("<s>") + SECRET + "</s>");
     write("outside/secret.txt", SECRET);
+    write("outside/secret.html", std::string("<p>") + SECRET);
     write("cache/cached.xml", std::string("<c>") + SECRET + "</c>");
     write("env/test/example/envmod.module",
           "module namespace e = \"http://example.test/envmod\";\n"
@@ -194,6 +197,9 @@ const char TEXT_LINES[] =
 const char TEXT_AVAILABLE[] =
   "declare variable $uri as xs:string external; "
   "fn:unparsed-text-available($uri)";
+const char HTML_DOC[] =
+  "import module namespace x = \"http://zorba.io/modules/xml\";\n"
+  "declare variable $uri as xs:string external; x:html-doc($uri)//p/string()";
 const char FETCH[] =
   "import module namespace f = \"http://zorba.io/modules/fetch\";\n"
   "declare variable $uri as xs:string external; f:content($uri)";
@@ -467,9 +473,23 @@ void test_documents(Zorba* z, const Files& f)
   CHECK(denied(run(z, inData, FETCH_AS_MODULE, f.uri("outside/secret.txt")),
                "URI_UNRESOLVED_OR_NOSTREAM"));
 
+#ifndef ZORBA_NO_XMLSCHEMA
+  // x:html-doc reads through the same checks as fn:doc. (The xml module
+  // imports the parse options schema.)
+  CHECK(denied(run(z, sec, HTML_DOC, f.uri("data/in.html")), "FODC0002",
+               "requires capability FileRead"));
+  CHECK(allowed(run(z, inData, HTML_DOC, f.uri("data/in.html")),
+                "inside-html"));
+  CHECK(denied(run(z, inData, HTML_DOC, f.uri("outside/secret.html")),
+               "FODC0002", "outside the allowed read paths"));
+#endif
+
   // Under unrestricted(), nothing changes.
   StaticContext_t all = context(z, SecurityPolicy::unrestricted());
   CHECK(allowed(run(z, all, TEXT, f.uri("outside/secret.txt")), SECRET));
+#ifndef ZORBA_NO_XMLSCHEMA
+  CHECK(allowed(run(z, all, HTML_DOC, f.uri("outside/secret.html")), SECRET));
+#endif
 }
 
 // fn:doc caches documents in the store, which all queries share. A document
