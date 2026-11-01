@@ -26,6 +26,10 @@ xquery version "3.0";
  : validation of the input documents. 
  : </p>
  :
+ : <p>It also parses HTML, as found in practice, into XDM documents with
+ : <code>x:parse-html()</code> (from a string) and <code>x:html-doc()</code>
+ : (from a URI).</p>
+ :
  : <p>The following example parses a sequence of XML elements and returns
  : them in a streaming fashion - each at a time:</p>
  :
@@ -234,6 +238,92 @@ declare option ver:module-version "1.0";
 declare function x:parse(
   $xml-string as xs:string?,
   $options as element(opt:options)?) as node()* external;
+
+
+(:~
+ : <p>Parses a string of HTML into a document node, with the HTML parser
+ : of libxml2.</p>
+ :
+ : <p>The input is HTML as found in practice: elements whose end tag is
+ : omitted or that have none (<code>br</code>, <code>img</code>,
+ : <code>input</code>, ...), HTML entities (<code>&amp;nbsp;</code>,
+ : <code>&amp;copy;</code>, ...), unescaped <code>&lt;</code> and
+ : <code>&amp;</code> in <code>script</code> and <code>style</code>,
+ : missing <code>html</code>, <code>head</code> or <code>body</code>
+ : elements, misnested elements. The parser recovers from malformed markup
+ : instead of raising an error: it closes elements implicitly, adds the
+ : <code>html</code> and <code>body</code> elements if they are missing and
+ : drops stray end tags and duplicate attributes.</p>
+ :
+ : <p>The result is an untyped XDM document:</p>
+ : <ul>
+ : <li>Element and attribute names are lowercase and in no namespace, also
+ : for XHTML input that declares the XHTML namespace: a path is written
+ : <code>$doc//table/tr/td</code>, without a namespace prefix. Namespace
+ : declaration attributes (<code>xmlns</code>, <code>xmlns:*</code>) are
+ : dropped; other names that contain a colon are kept as they are.</li>
+ : <li>Character and entity references are replaced by the characters they
+ : stand for; the content of <code>script</code> and <code>style</code>
+ : elements is text, taken literally.</li>
+ : <li>An attribute written without a value (<code>&lt;input
+ : checked&gt;</code>) has the empty string as its value.</li>
+ : <li>Comments are kept. The document type declaration and whitespace
+ : outside the root element are not.</li>
+ : </ul>
+ :
+ : <p>The string is already made of characters, so the charset that a
+ : <code>meta</code> element in it declares is ignored. To decode bytes
+ : according to that charset, use <code>x:html-doc()</code>.</p>
+ :
+ : <p>The parser never accesses the network and loads no external resource.
+ : Element nesting is limited to 256 levels, as for XML documents.</p>
+ :
+ : @param $html The HTML to parse.
+ : @return The document node, or the empty sequence if $html is the empty
+ :         sequence. The empty string gives a document node without
+ :         children.
+ :
+ : @error err:FODC0006 If the elements are nested more than 256 levels deep,
+ :                     or the parser runs out of memory.
+ :
+ : @example test/rbkt/Queries/zorba/parsing_and_serializing/parse-html-report.xq
+ : @example test/rbkt/Queries/zorba/parsing_and_serializing/parse-html-malformed.xq
+ :)
+declare function x:parse-html(
+  $html as xs:string?) as document-node()? external;
+
+
+(:~
+ : <p>Reads the resource at a URI and parses it as HTML, as
+ : <code>x:parse-html()</code> does.</p>
+ :
+ : <p>The URI is resolved as for <code>fn:doc()</code>: relative to the
+ : static base URI, through the URI resolvers and mappers of the static
+ : context, and subject to its security policy (reading a file requires the
+ : FileRead capability and, if the policy has read paths, a file under one
+ : of them).</p>
+ :
+ : <p>The bytes are decoded according to their byte order mark or the
+ : charset a <code>meta</code> element declares (<code>&lt;meta
+ : charset="..."&gt;</code> or <code>&lt;meta http-equiv="Content-Type"
+ : content="text/html; charset=..."&gt;</code>), as browsers do.</p>
+ :
+ : <p>Unlike <code>fn:doc()</code>, the document is not kept in the store:
+ : each call returns a new document node, and <code>fn:doc()</code> on the
+ : same URI is not affected.</p>
+ :
+ : @param $uri The URI of the HTML resource.
+ : @return The document node, with the resolved URI as its document URI, or
+ :         the empty sequence if $uri is the empty sequence.
+ :
+ : @error err:FODC0002 If the resource cannot be retrieved or parsed, or the
+ :                     security policy denies access to it ("access denied by
+ :                     security policy").
+ :
+ : @example test/rbkt/Queries/zorba/parsing_and_serializing/parse-html-charset.xq
+ :)
+declare function x:html-doc(
+  $uri as xs:string?) as document-node()? external;
   
 
 (:~

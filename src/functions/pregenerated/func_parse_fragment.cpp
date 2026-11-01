@@ -62,6 +62,26 @@ PlanIter_t fn_parse_xml_fragment_3_0::codegen(
   return new FnParseXmlFragmentIterator(sctx, loc, argv);
 }
 
+PlanIter_t fn_zorba_xml_parse_html::codegen(
+  CompilerCB*,
+  static_context* sctx,
+  const QueryLoc& loc,
+  std::vector<PlanIter_t>& argv,
+  expr& ann) const
+{
+  return new FnZorbaParseHtmlIterator(sctx, loc, argv);
+}
+
+PlanIter_t fn_zorba_xml_html_doc::codegen(
+  CompilerCB*,
+  static_context* sctx,
+  const QueryLoc& loc,
+  std::vector<PlanIter_t>& argv,
+  expr& ann) const
+{
+  return new FnZorbaHtmlDocIterator(sctx, loc, argv);
+}
+
 void populate_context_parse_fragment(static_context* sctx)
 {
 
@@ -85,6 +105,30 @@ void populate_context_parse_fragment(static_context* sctx)
         GENV_TYPESYSTEM.STRING_TYPE_QUESTION, 
         GENV_TYPESYSTEM.ANY_NODE_TYPE_STAR),
         FunctionConsts::FN_PARSE_XML_FRAGMENT_1);
+
+  }
+
+
+
+
+      {
+    DECL_WITH_KIND(sctx, fn_zorba_xml_parse_html,
+        (createQName("http://zorba.io/modules/xml","","parse-html"), 
+        GENV_TYPESYSTEM.STRING_TYPE_QUESTION, 
+        GENV_TYPESYSTEM.DOCUMENT_TYPE_QUESTION),
+        FunctionConsts::FN_ZORBA_XML_PARSE_HTML_1);
+
+  }
+
+
+
+
+      {
+    DECL_WITH_KIND(sctx, fn_zorba_xml_html_doc,
+        (createQName("http://zorba.io/modules/xml","","html-doc"), 
+        GENV_TYPESYSTEM.STRING_TYPE_QUESTION, 
+        GENV_TYPESYSTEM.DOCUMENT_TYPE_QUESTION),
+        FunctionConsts::FN_ZORBA_XML_HTML_DOC_1);
 
   }
 

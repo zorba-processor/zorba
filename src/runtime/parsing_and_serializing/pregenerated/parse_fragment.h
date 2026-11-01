@@ -177,6 +177,70 @@ public:
 };
 
 
+/**
+ * fn-zorba-xml:parse-html
+ * Author: Zorba Team
+ */
+class FnZorbaParseHtmlIterator : public NaryBaseIterator<FnZorbaParseHtmlIterator, PlanIteratorState>
+{ 
+public:
+  SERIALIZABLE_CLASS(FnZorbaParseHtmlIterator);
+
+  SERIALIZABLE_CLASS_CONSTRUCTOR2T(FnZorbaParseHtmlIterator,
+    NaryBaseIterator<FnZorbaParseHtmlIterator, PlanIteratorState>);
+
+  void serialize( ::zorba::serialization::Archiver& ar);
+
+  FnZorbaParseHtmlIterator(
+    static_context* sctx,
+    const QueryLoc& loc,
+    std::vector<PlanIter_t>& children)
+    : 
+    NaryBaseIterator<FnZorbaParseHtmlIterator, PlanIteratorState>(sctx, loc, children)
+  {}
+
+  virtual ~FnZorbaParseHtmlIterator();
+
+  zstring getNameAsString() const;
+
+  void accept(PlanIterVisitor& v) const;
+
+  bool nextImpl(store::Item_t& result, PlanState& aPlanState) const;
+};
+
+
+/**
+ * fn-zorba-xml:html-doc
+ * Author: Zorba Team
+ */
+class FnZorbaHtmlDocIterator : public NaryBaseIterator<FnZorbaHtmlDocIterator, PlanIteratorState>
+{ 
+public:
+  SERIALIZABLE_CLASS(FnZorbaHtmlDocIterator);
+
+  SERIALIZABLE_CLASS_CONSTRUCTOR2T(FnZorbaHtmlDocIterator,
+    NaryBaseIterator<FnZorbaHtmlDocIterator, PlanIteratorState>);
+
+  void serialize( ::zorba::serialization::Archiver& ar);
+
+  FnZorbaHtmlDocIterator(
+    static_context* sctx,
+    const QueryLoc& loc,
+    std::vector<PlanIter_t>& children)
+    : 
+    NaryBaseIterator<FnZorbaHtmlDocIterator, PlanIteratorState>(sctx, loc, children)
+  {}
+
+  virtual ~FnZorbaHtmlDocIterator();
+
+  zstring getNameAsString() const;
+
+  void accept(PlanIterVisitor& v) const;
+
+  bool nextImpl(store::Item_t& result, PlanState& aPlanState) const;
+};
+
+
 }
 #endif
 /*

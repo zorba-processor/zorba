@@ -162,6 +162,76 @@ zstring FnParseXmlFragmentIterator::getNameAsString() const {
 // </FnParseXmlFragmentIterator>
 
 
+// <FnZorbaParseHtmlIterator>
+SERIALIZABLE_CLASS_VERSIONS(FnZorbaParseHtmlIterator)
+
+void FnZorbaParseHtmlIterator::serialize(::zorba::serialization::Archiver& ar)
+{
+  serialize_baseclass(ar,
+  (NaryBaseIterator<FnZorbaParseHtmlIterator, PlanIteratorState>*)this);
+}
+
+
+void FnZorbaParseHtmlIterator::accept(PlanIterVisitor& v) const
+{
+  if (!v.hasToVisit(this))
+    return;
+
+  v.beginVisit(*this);
+
+  std::vector<PlanIter_t>::const_iterator lIter = theChildren.begin();
+  std::vector<PlanIter_t>::const_iterator lEnd = theChildren.end();
+  for ( ; lIter != lEnd; ++lIter ){
+    (*lIter)->accept(v);
+  }
+
+  v.endVisit(*this);
+}
+
+FnZorbaParseHtmlIterator::~FnZorbaParseHtmlIterator() {}
+
+
+zstring FnZorbaParseHtmlIterator::getNameAsString() const {
+  return "fn-zorba-xml:parse-html";
+}
+// </FnZorbaParseHtmlIterator>
+
+
+// <FnZorbaHtmlDocIterator>
+SERIALIZABLE_CLASS_VERSIONS(FnZorbaHtmlDocIterator)
+
+void FnZorbaHtmlDocIterator::serialize(::zorba::serialization::Archiver& ar)
+{
+  serialize_baseclass(ar,
+  (NaryBaseIterator<FnZorbaHtmlDocIterator, PlanIteratorState>*)this);
+}
+
+
+void FnZorbaHtmlDocIterator::accept(PlanIterVisitor& v) const
+{
+  if (!v.hasToVisit(this))
+    return;
+
+  v.beginVisit(*this);
+
+  std::vector<PlanIter_t>::const_iterator lIter = theChildren.begin();
+  std::vector<PlanIter_t>::const_iterator lEnd = theChildren.end();
+  for ( ; lIter != lEnd; ++lIter ){
+    (*lIter)->accept(v);
+  }
+
+  v.endVisit(*this);
+}
+
+FnZorbaHtmlDocIterator::~FnZorbaHtmlDocIterator() {}
+
+
+zstring FnZorbaHtmlDocIterator::getNameAsString() const {
+  return "fn-zorba-xml:html-doc";
+}
+// </FnZorbaHtmlDocIterator>
+
+
 
 }
 
