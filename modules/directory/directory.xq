@@ -21,7 +21,10 @@ xquery version "3.0";
  : <p/>
  : The documents stay ordinary files. Every call walks the tree again and
  : parses only the documents it returns, so the result always reflects the
- : files as they are on disk; nothing is cached or indexed.
+ : files as they are on disk; nothing is indexed. An application can keep
+ : parsed documents across queries through the hook module
+ : <code>http://zorba.io/modules/directory-cache</code>, which serves a
+ : document only while its file is unchanged; by default nothing is cached.
  : <p/>
  : Paths are relative to a root directory and use <code>/</code> as the
  : separator. A path must stay inside the root: absolute paths,
@@ -56,6 +59,7 @@ module namespace dir = "http://zorba.io/modules/directory";
 import module namespace file = "http://expath.org/ns/file";
 import module namespace jn = "http://jsoniq.org/functions";
 import module namespace csv = "http://zorba.io/modules/json-csv";
+import module namespace dc = "http://zorba.io/modules/directory-cache";
 
 declare namespace an = "http://zorba.io/annotations";
 declare namespace err = "http://www.w3.org/2005/xqt-errors";
@@ -153,9 +157,14 @@ declare %an:nondeterministic function dir:documents(
   $formats as xs:string* ) as object()*
 {
   let $r := dir:check-root( $root )
-  for $path in dir:walk( $r, "" )
-  where dir:format( $path ) = $formats
-  order by $path
+  (: Sort the paths before loading: an order by over the loaded records
+   : would hold every parsed document until the last one is parsed. :)
+  let $paths :=
+    for $path in dir:walk( $r, "" )
+    where dir:format( $path ) = $formats
+    order by $path
+    return $path
+  for $path in $paths
   return dir:load( $r, $path )
 };
 
@@ -287,9 +296,20 @@ declare %private function dir:format-or-null( $path as xs:string ) as item()
 };
 
 (:~
- : The record of the document at $root/$path (already resolved).
+ : The record of the document at $root/$path (already resolved), from the
+ : document cache hook if it has one.
  :)
 declare %private %an:nondeterministic function dir:load(
+  $root as xs:string,
+  $path as xs:string ) as object()
+{
+  let $cached := dc:get( $root, $path )
+  return
+    if ( exists( $cached ) ) then $cached
+    else dir:read( $root, $path )
+};
+
+declare %private %an:nondeterministic function dir:read(
   $root as xs:string,
   $path as xs:string ) as object()
 {

@@ -1,0 +1,365 @@
+/*
+ * Copyright 2006-2016 zorba.io
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#include "document_cache.h"
+
+#include <algorithm>
+#include <cctype>
+#include <climits>
+#include <cstdlib>
+#include <iterator>
+#include <sstream>
+#include <vector>
+
+#include <sys/stat.h>
+
+#include <zorba/dynamic_context.h>
+#include <zorba/empty_sequence.h>
+#include <zorba/external_module.h>
+#include <zorba/function.h>
+#include <zorba/item_factory.h>
+#include <zorba/iterator.h>
+#include <zorba/singleton_item_sequence.h>
+#include <zorba/uri_resolvers.h>
+#include <zorba/zorba_exception.h>
+
+namespace zorba {
+namespace mcp {
+
+namespace {
+
+char const cache_ns[] = "http://zorba.io/modules/directory-cache";
+char const cache_url[] = "urn:zorba-mcp:directory-cache";
+
+// The module text served instead of the installed (non-caching) module:
+// the same function, implemented by DocumentCache.
+char const cache_module_source[] =
+  "module namespace dc = \"http://zorba.io/modules/directory-cache\";\n"
+  "declare namespace an = \"http://zorba.io/annotations\";\n"
+  "declare namespace ver = \"http://zorba.io/options/versioning\";\n"
+  "declare option ver:module-version \"1.0\";\n"
+  "declare %an:nondeterministic function dc:get(\n"
+  "  $root as xs:string, $path as xs:string ) as object()? external;\n";
+
+// The query that builds a record on a miss. Its static context does not
+// attach the cache, so the directory module's hook is the installed one and
+// dir:open reads and parses the file itself, with every check it applies to
+// a user's dir:open, under the server's policy.
+char const reader_source[] =
+  "import module namespace dir = \"http://zorba.io/modules/directory\";\n"
+  "declare variable $root as xs:string external;\n"
+  "declare variable $path as xs:string external;\n"
+  "dir:open( $root, $path )\n";
+
+void release_stream( std::istream *s ) {
+  delete s;
+}
+
+std::string string_arg( ExternalFunction::Arguments_t const &args,
+                        std::size_t i ) {
+  Item item;
+  Iterator_t it( args[i]->getIterator() );
+  it->open();
+  it->next( item );
+  it->close();
+  return item.isNull() ? std::string() : item.getStringValue().str();
+}
+
+std::int64_t nanoseconds( struct timespec const &t ) {
+  return static_cast<std::int64_t>( t.tv_sec ) * 1000000000 + t.tv_nsec;
+}
+
+} // namespace
+
+///////////////////////////////////////////////////////////////////////////////
+
+class DocumentCache::Module : public ExternalModule {
+public:
+  explicit Module( DocumentCache *cache ) : theGet( cache ) { }
+
+  String getURI() const override { return cache_ns; }
+
+  ExternalFunction* getExternalFunction( String const &name ) override {
+    if ( name == "get" )
+      return &theGet;
+    return nullptr;
+  }
+
+private:
+  class Get : public NonContextualExternalFunction {
+  public:
+    explicit Get( DocumentCache *cache ) : theCache( cache ) { }
+    String getURI() const override { return cache_ns; }
+    String getLocalName() const override { return "get"; }
+    ItemSequence_t evaluate( Arguments_t const &args ) const override {
+      Item const record(
+        theCache->get( string_arg( args, 0 ), string_arg( args, 1 ) ) );
+      if ( record.isNull() )
+        return ItemSequence_t( new EmptySequence() );
+      return ItemSequence_t( new SingletonItemSequence( record ) );
+    }
+  private:
+    DocumentCache *const theCache;
+  };
+
+  Get theGet;
+};
+
+class DocumentCache::Mapper : public URIMapper {
+public:
+  void mapURI( String const aUri, EntityData const *aEntityData,
+               std::vector<String> &oUris ) override {
+    if ( aEntityData->getKind() == EntityData::MODULE && aUri == cache_ns )
+      oUris.push_back( cache_url );
+  }
+};
+
+class DocumentCache::Resolver : public URLResolver {
+public:
+  Resource* resolveURL( String const &aUrl,
+                        EntityData const *aEntityData ) override {
+    if ( aEntityData->getKind() != EntityData::MODULE || aUrl != cache_url )
+      return nullptr;
+    return StreamResource::create(
+      new std::istringstream( cache_module_source ), &release_stream );
+  }
+};
+
+///////////////////////////////////////////////////////////////////////////////
+
+DocumentCache::DocumentCache( Zorba *zorba, std::string const &root,
+                              std::size_t budget,
+                              SecurityPolicy const *policy ) :
+  theZorba( zorba ),
+  theBudget( budget ),
+  thePolicy( policy ),
+  theModule( new Module( this ) ),
+  theMapper( new Mapper() ),
+  theResolver( new Resolver() ) {
+  char buf[ PATH_MAX ];
+  theRoot = realpath( root.c_str(), buf ) ? buf : root;
+  if ( theRoot.empty() || theRoot.back() != '/' )
+    theRoot += '/';
+}
+
+DocumentCache::~DocumentCache() {
+  clear();
+}
+
+void DocumentCache::attach( StaticContext_t const &sctx ) {
+  if ( !enabled() )
+    return;
+  sctx->registerURIMapper( theMapper.get() );
+  sctx->registerURLResolver( theResolver.get() );
+  sctx->registerModule( theModule.get() );
+}
+
+void DocumentCache::set_active( bool active ) {
+  std::lock_guard<std::mutex> lock( theMutex );
+  theActive = active;
+  ++theQuery;
+  if ( !active )
+    return;
+  // Drop the entries of deleted or modified files (a query only looks up
+  // the files it opens).
+  for ( auto i = theEntries.begin(); i != theEntries.end(); ) {
+    auto const next = std::next( i );
+    std::string full( i->first );
+    full[ full.find( '\0' ) ] = '/';
+    Signature now;
+    if ( !signature_of( full, &now ) || !( now == i->second.sig ) )
+      erase( i );
+    i = next;
+  }
+}
+
+void DocumentCache::clear() {
+  std::lock_guard<std::mutex> lock( theMutex );
+  theEntries.clear();
+  theLru.clear();
+  theStats.entries = 0;
+  theStats.bytes = 0;
+  if ( theReader ) {
+    theReader->close();
+    theReader = nullptr;
+  }
+}
+
+DocumentCache::Stats DocumentCache::stats() const {
+  std::lock_guard<std::mutex> lock( theMutex );
+  return theStats;
+}
+
+// Bytes of memory per byte of file, measured with bench/directory (peak RSS
+// of a query holding every parsed document, over the size of the files).
+std::size_t DocumentCache::estimate( std::string const &path,
+                                     std::uintmax_t size ) {
+  std::string ext;
+  std::string::size_type const dot = path.rfind( '.' );
+  if ( dot != std::string::npos && path.find( '/', dot ) == std::string::npos )
+    ext = path.substr( dot + 1 );
+  std::transform( ext.begin(), ext.end(), ext.begin(),
+                  []( unsigned char c ) { return std::tolower( c ); } );
+  // Measured: XML 19.6, JSON 22.0, CSV 31.7 (records of four short fields).
+  std::uintmax_t factor = 32;
+  if ( ext == "xml" || ext == "xhtml" )
+    factor = 20;
+  else if ( ext == "json" || ext == "jsonl" || ext == "ndjson" )
+    factor = 22;
+  else if ( ext == "csv" )
+    factor = 32;
+  // Every record also has a fixed part (the record object, its path).
+  return static_cast<std::size_t>( 1024 + size * factor );
+}
+
+bool DocumentCache::key_of( std::string const &root, std::string const &path,
+                            std::string *key, Signature *sig ) const {
+  if ( root.empty() || path.empty() )
+    return false;
+  // The record carries the path relative to the root it was opened with,
+  // so the key is the root and the path as the module spells them.
+  *key = root + '\0' + path;
+  return signature_of( root + "/" + path, sig );
+}
+
+bool DocumentCache::signature_of( std::string const &full,
+                                  Signature *sig ) const {
+  char buf[ PATH_MAX ];
+  if ( !realpath( full.c_str(), buf ) )
+    return false;
+  sig->canonical = buf;
+  // Only files under the root: the server's policy reads nothing else.
+  if ( sig->canonical.compare( 0, theRoot.size(), theRoot ) != 0 )
+    return false;
+  struct stat st;
+  if ( stat( buf, &st ) != 0 || !S_ISREG( st.st_mode ) )
+    return false;
+  sig->dev = static_cast<std::uintmax_t>( st.st_dev );
+  sig->ino = static_cast<std::uintmax_t>( st.st_ino );
+  sig->size = static_cast<std::uintmax_t>( st.st_size );
+#ifdef __APPLE__
+  sig->mtime_ns = nanoseconds( st.st_mtimespec );
+  sig->ctime_ns = nanoseconds( st.st_ctimespec );
+#else
+  sig->mtime_ns = nanoseconds( st.st_mtim );
+  sig->ctime_ns = nanoseconds( st.st_ctim );
+#endif
+  return true;
+}
+
+void DocumentCache::erase( std::unordered_map<std::string,Entry>::iterator i ) {
+  theStats.bytes -= i->second.bytes;
+  theLru.erase( i->second.lru );
+  theEntries.erase( i );
+  theStats.entries = theEntries.size();
+}
+
+Item DocumentCache::get( std::string const &root, std::string const &path ) {
+  std::string key;
+  Signature sig;
+  bool const ok = key_of( root, path, &key, &sig );
+  {
+    std::lock_guard<std::mutex> lock( theMutex );
+    if ( !theActive || key.empty() )
+      return Item();
+    auto const i = theEntries.find( key );
+    if ( !ok ) {
+      // Deleted, or not a regular file under the root.
+      if ( i != theEntries.end() )
+        erase( i );
+      return Item();
+    }
+    if ( i != theEntries.end() ) {
+      if ( i->second.sig == sig ) {
+        ++theStats.hits;
+        i->second.query = theQuery;
+        theLru.splice( theLru.begin(), theLru, i->second.lru );
+        return i->second.record;
+      }
+      erase( i );                       // the file changed
+    }
+    ++theStats.misses;
+  }
+  Item const record( read( root, path ) );
+  // Stored under the signature seen before the read, and only if the file
+  // still has it: a file modified while it is read is parsed again next time.
+  Signature now;
+  if ( !record.isNull() && key_of( root, path, &key, &now ) && now == sig ) {
+    std::lock_guard<std::mutex> lock( theMutex );
+    store( key, path, sig, record );
+  }
+  return record;
+}
+
+Item DocumentCache::read( std::string const &root, std::string const &path ) {
+  try {
+    if ( !theReader ) {
+      StaticContext_t sctx = theZorba->createStaticContext();
+      sctx->setSecurityPolicy( *thePolicy );
+      XQuery_t reader = theZorba->createQuery();
+      std::istringstream qs( reader_source );
+      Zorba_CompilerHints_t hints;
+      reader->compile( qs, sctx, hints );
+      theReader = reader;
+    }
+    DynamicContext *const dctx = theReader->getDynamicContext();
+    ItemFactory *const f = theZorba->getItemFactory();
+    dctx->setVariable( "", "root", f->createString( root ) );
+    dctx->setVariable( "", "path", f->createString( path ) );
+    Item record;
+    Iterator_t it( theReader->iterator() );
+    it->open();
+    if ( !it->next( record ) )
+      record = Item();
+    it->close();
+    return record;
+  }
+  catch ( ZorbaException const& ) {
+    return Item();
+  }
+}
+
+void DocumentCache::store( std::string const &key, std::string const &path,
+                           Signature const &sig, Item const &record ) {
+  if ( !theActive )
+    return;
+  std::size_t const bytes = estimate( path, sig.size );
+  if ( bytes > theBudget )
+    return;
+  auto const old = theEntries.find( key );
+  if ( old != theEntries.end() )
+    erase( old );
+  // Evict least recently used first, but never an entry that the current
+  // query used: a query that reads more than the budget keeps the documents
+  // it cached first instead of evicting each one before the next call.
+  while ( theStats.bytes + bytes > theBudget && !theLru.empty() ) {
+    auto const victim = theEntries.find( theLru.back() );
+    if ( victim->second.query == theQuery )
+      return;
+    erase( victim );
+    ++theStats.evictions;
+  }
+  theLru.push_front( key );
+  theEntries.emplace( key,
+    Entry{ sig, record, bytes, theQuery, theLru.begin() } );
+  theStats.bytes += bytes;
+  theStats.entries = theEntries.size();
+  ++theStats.stores;
+}
+
+} // namespace mcp
+} // namespace zorba
+/* vim:set et sw=2 ts=2: */

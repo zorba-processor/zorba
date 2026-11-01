@@ -268,7 +268,8 @@ IF (ZORBA_WITH_FILE_ACCESS)
       SET (_mcp_suffix "_${ZORBA_STORE_NAME}")
     ENDIF (NOT ${ZORBA_STORE_NAME} STREQUAL "simplestore")
 
-    SET (MCP_COMMON_SRCS mcp/json.cpp mcp/mcp_server.cpp directory_config.cpp)
+    SET (MCP_COMMON_SRCS mcp/json.cpp mcp/mcp_server.cpp mcp/document_cache.cpp
+      directory_config.cpp)
     ZORBA_GENERATE_EXE("zorba_mcp" "mcp/zorba_mcp.cpp;${MCP_COMMON_SRCS}"
       "" "zorba-mcp" "bin")
     ZORBA_GENERATE_EXE("mcp_tests" "mcp/test/mcp_tests.cpp;${MCP_COMMON_SRCS}"
@@ -280,7 +281,10 @@ IF (ZORBA_WITH_FILE_ACCESS)
     # tree (see mcp/test/mcp_tests.cpp); "binary" runs zorba-mcp itself.
     SET (_mcpq "${CMAKE_CURRENT_SOURCE_DIR}/test/mcp/queries")
     FOREACH (_t json protocol legacy tools_list list_documents join
-             syntax_error escape network native_modules predefined limits binary)
+             syntax_error escape network native_modules predefined limits binary
+             cache_hit cache_invalidate cache_evict cache_off cache_policy
+             cache_inject
+             documents_stream)
       ADD_TEST (NAME bin/mcp/${_t}
         COMMAND "mcp_tests${_mcp_suffix}" ${_t} "${_dirtree}" "${_mcpq}"
           "${_dirq}/join.xq" "$<TARGET_FILE:zorba_mcp${_mcp_suffix}>")
