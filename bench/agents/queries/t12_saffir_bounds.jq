@@ -1,13 +1,8 @@
-(: Ground truth of t12_saffir_bounds (see tasks/tasks.json).
- : dir:open() reports HTML files as unsupported (the directory module's
- : HOOK(parse-html) is not wired to x:parse-html yet), so the page is read
- : with the file module and parsed with x:parse-html(). :)
+(: Ground truth of t12_saffir_bounds (see tasks/tasks.json). :)
 import module namespace dir = "http://zorba.io/modules/directory";
-import module namespace file = "http://expath.org/ns/file";
-import module namespace x = "http://zorba.io/modules/xml";
 
-let $page := x:parse-html(file:read-text(
-  concat($dir:root, "/reference/nhc_saffir_simpson_scale.html")))
+let $page :=
+  dir:open($dir:root, "reference/nhc_saffir_simpson_scale.html")("content")
 let $table := ($page//table)[1]
 return {
   "lower_bounds_kmh" : [
