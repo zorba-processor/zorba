@@ -173,7 +173,16 @@ jobs:
 
       - name: Report and compare against the baseline
         run: |
-          python3 test/fots/qt3_report.py shards/*/results.tsv \
+          # With several matching artifacts download-artifact creates
+          # shards/<name>/; with exactly one it extracts straight into
+          # shards/. Find results.tsv in both layouts.
+          mapfile -t results < <(find shards -name results.tsv | sort)
+          if [ "${#results[@]}" -eq 0 ]; then
+            echo "::error::no results.tsv found under shards/"
+            find shards || true
+            exit 1
+          fi
+          python3 test/fots/qt3_report.py "${results[@]}" \
             --baseline test/fots/qt3-baseline-pass.txt \
             --qt3-commit "$QT3_COMMIT" \
             --summary "$GITHUB_STEP_SUMMARY" \
