@@ -37,7 +37,7 @@
 <h2 id="what">What it is</h2>
 <p><code>zorba-mcp</code> is a <a href="https://modelcontextprotocol.io">Model Context Protocol</a> server that speaks JSON-RPC over standard input and output. The agent's client starts it, and the agent gets tools to list the files in the folder and to run JSONiq or XQuery over them. The files stay where they are: every call reads them as they are on disk, nothing is indexed or cached.</p>
 <p>The same engine and the same restrictions are available without an agent as <code>zorba --directory</code> (see <a href="#cli">below</a>). The server implements MCP 2026-07-28 (<code>server/discover</code>) and also answers clients that start with the earlier <code>initialize</code> handshake (2025-11-25, 2025-06-18, 2025-03-26).</p>
-<p>The folder is read through the <a href="zorba.html#modules">directory module</a>, <code>http://zorba.io/modules/directory</code>. A file is a record <code>{ "path", "format", "content" }</code>: <code>content</code> is a document node for XML, the parsed value for JSON (an array if a file holds several top-level values, as in JSON Lines) and an array of row objects for CSV, with the first line as column names. A file that does not parse yields <code>{ "path", "format", "error" }</code> instead, so one bad file does not stop a query over the whole folder. HTML files are listed with the format <code>html</code> but are not parsed yet.</p>
+<p>The folder is read through the <a href="zorba.html#modules">directory module</a>, <code>http://zorba.io/modules/directory</code>. A file is a record <code>{ "path", "format", "content" }</code>: <code>content</code> is a document node for XML, the parsed value for JSON (an array if a file holds several top-level values, as in JSON Lines) and an array of row objects for CSV, with the first line as column names. A file that does not parse yields <code>{ "path", "format", "error" }</code> instead, so one bad file does not stop a query over the whole folder. HTML files (<code>.html</code>, <code>.htm</code>) are parsed with <code>x:parse-html</code> and <code>content</code> is the document node; a build without XML Schema support reports them as an unsupported format.</p>
 
 <h2 id="docker">Try it with Docker</h2>
 <p>No build is needed. The container image includes <code>zorba-mcp</code>; mount the folder you want to query at <code>/data</code>, read-only:</p>
@@ -178,7 +178,7 @@ return {
   <li>Output longer than <code>--max-output</code> bytes (default 131072) is cut and ends with a line saying that the output was truncated.</li>
   <li>A single JSON-RPC message larger than 4 MB is refused.</li>
   <li>Every call re-reads and re-parses the files it touches, so a query over a large folder costs time proportional to the files it opens. Filter by path or format with <code>dir:list</code> or the <code>$formats</code> argument before opening documents.</li>
-  <li>HTML files are listed but not parsed yet. Zorba 5.0 is not thread-safe, so the server handles one request at a time.</li>
+  <li>Zorba 5.0 is not thread-safe, so the server handles one request at a time.</li>
 </ul>
 
 <h2 id="cli">From the command line: <code>--directory</code></h2>
