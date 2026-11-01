@@ -26,6 +26,7 @@
 #include <zorba/security.h>
 #include <zorba/zorba.h>
 
+#include "document_cache.h"
 #include "json.h"
 
 namespace zorba {
@@ -46,6 +47,8 @@ struct ServerConfig {
   std::chrono::milliseconds timeout{ std::chrono::seconds( 30 ) };
   /** The maximum size of a tool's text output, in bytes. */
   std::size_t max_output = 128 * 1024;
+  /** The byte budget of the document cache (0: no cache). */
+  std::size_t cache_bytes = 256u * 1024 * 1024;
 };
 
 /**
@@ -75,6 +78,9 @@ public:
 
   /** The policy every query runs under. */
   SecurityPolicy const& policy() const { return thePolicy; }
+
+  /** The counters of the document cache. */
+  DocumentCache::Stats cache_stats() const { return theCache.stats(); }
 
 private:
   struct Param {
@@ -110,6 +116,7 @@ private:
   std::ostream &theLog;
   SecurityPolicy thePolicy;
   std::vector<Predefined> thePredefined;
+  DocumentCache theCache;
   std::string theLegacyVersion;         // set by initialize
 };
 

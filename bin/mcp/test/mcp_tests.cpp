@@ -22,6 +22,9 @@
 // where <test> is one of the names in the table at the end; the "binary"
 // test runs the zorba-mcp executable given as the last argument.
 
+#include <chrono>
+#include <cstdlib>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -600,6 +603,266 @@ void test_binary( Fixture const &f ) {
          std::to_string( n ) + "\n" + output );
 }
 
+///////////////////////////////////////////////////////////////////////////////
+// Document cache. Each test works on a fresh tree in a temporary directory:
+// <tmp>/root (the server's root) and <tmp>/outside.
+
+struct TempTree {
+  std::string base;
+  std::string root;
+
+  TempTree() {
+    std::string tmpl(
+      ( std::filesystem::temp_directory_path() / "mcp-cache-XXXXXX" ).string() );
+    char *const made = mkdtemp( &tmpl[0] );
+    // The canonical spelling: the policy compares real paths.
+    base = std::filesystem::canonical( made ? made : "." ).string();
+    root = base + "/root";
+    std::filesystem::create_directories( root );
+    std::filesystem::create_directories( base + "/outside" );
+  }
+  ~TempTree() {
+    std::error_code ec;
+    std::filesystem::remove_all( base, ec );
+  }
+
+  void write( std::string const &rel, std::string const &content ) const {
+    std::ofstream out( ( root + "/" + rel ).c_str(), std::ios::binary );
+    out << content;
+  }
+
+  // Moves the modification time of a file by \a seconds.
+  void touch( std::string const &rel, int seconds ) const {
+    namespace stdfs = std::filesystem;
+    stdfs::path const p( root + "/" + rel );
+    stdfs::last_write_time( p, stdfs::last_write_time( p ) +
+                               std::chrono::seconds( seconds ) );
+  }
+};
+
+std::string const dir_import(
+  "import module namespace dir = \"http://zorba.io/modules/directory\";\n" );
+
+std::string query_text( Server &server, std::string const &query ) {
+  Json const r = call_tool( server, "run_query",
+                            Json::object( { { "query", query } } ) );
+  if ( is_tool_error( r ) )
+    return "error: " + r.dump();
+  return result_text( r );
+}
+
+std::string open_value( Server &server, std::string const &file ) {
+  return query_text( server, dir_import + "dir:open($dir:root, \"" + file +
+                             "\")(\"content\")(\"v\")" );
+}
+
+std::string stats_text( DocumentCache::Stats const &s ) {
+  return "hits " + std::to_string( s.hits ) + ", misses " +
+    std::to_string( s.misses ) + ", stores " + std::to_string( s.stores ) +
+    ", evictions " + std::to_string( s.evictions ) + ", entries " +
+    std::to_string( s.entries ) + ", bytes " + std::to_string( s.bytes );
+}
+
+void test_cache_hit( Fixture const &f ) {
+  TempTree t;
+  t.write( "a.json", "{ \"v\" : 1 }" );
+  t.write( "b.xml", "<r><v>2</v></r>" );
+  ServerConfig config;
+  config.root = t.root;
+  Server server( f.zorba, config, std::cerr );
+
+  std::string v = open_value( server, "a.json" );
+  DocumentCache::Stats s = server.cache_stats();
+  check( v == "1" && s.misses == 1 && s.stores == 1 && s.hits == 0 &&
+         s.entries == 1,
+         "first dir:open parses and stores the document",
+         v + " / " + stats_text( s ) );
+
+  v = open_value( server, "a.json" );
+  s = server.cache_stats();
+  check( v == "1" && s.hits == 1 && s.misses == 1 && s.stores == 1,
+         "second dir:open is served from the cache",
+         v + " / " + stats_text( s ) );
+
+  std::string const docs( dir_import +
+    "string-join(for $d in dir:documents($dir:root) "
+    "return $d(\"path\"), \",\")" );
+  v = query_text( server, docs );
+  s = server.cache_stats();
+  check( v == "a.json,b.xml" && s.hits == 2 && s.misses == 2 &&
+         s.entries == 2,
+         "dir:documents uses the cache and stores the other document",
+         v + " / " + stats_text( s ) );
+
+  v = query_text( server, docs );
+  s = server.cache_stats();
+  check( v == "a.json,b.xml" && s.hits == 4 && s.misses == 2,
+         "a repeated dir:documents is served from the cache",
+         v + " / " + stats_text( s ) );
+
+  // Opened under another root, the record carries another relative path.
+  std::filesystem::create_directories( t.root + "/sub" );
+  t.write( "sub/c.json", "{ \"v\" : 3 }" );
+  v = query_text( server, dir_import +
+    "dir:open($dir:root, \"sub/c.json\")(\"path\"), "
+    "dir:open(concat($dir:root, \"/sub\"), \"c.json\")(\"path\")" );
+  check( v == "sub/c.json\nc.json",
+         "a record keeps the path relative to the root it was opened with", v );
+
+  // A query that can apply updates does not use the cache.
+  DocumentCache::Stats const before = server.cache_stats();
+  v = query_text( server, dir_import +
+    "declare namespace an = \"http://zorba.io/annotations\";\n"
+    "declare %an:sequential function local:f() "
+    "{ dir:open($dir:root, \"a.json\")(\"content\")(\"v\") };\n"
+    "local:f()" );
+  s = server.cache_stats();
+  check( v == "1" && s.hits == before.hits && s.misses == before.misses,
+         "a sequential query bypasses the cache",
+         v + " / " + stats_text( s ) );
+}
+
+void test_cache_invalidate( Fixture const &f ) {
+  TempTree t;
+  t.write( "a.json", "{ \"v\" : 1 }" );
+  t.write( "b.json", "{ \"v\" : 5 }" );
+  ServerConfig config;
+  config.root = t.root;
+  Server server( f.zorba, config, std::cerr );
+
+  std::string v = open_value( server, "a.json" );
+  check( v == "1", "initial content", v );
+  open_value( server, "b.json" );
+
+  t.write( "a.json", "{ \"v\" : 22 }" );
+  v = open_value( server, "a.json" );
+  check( v == "22", "a file of another size is parsed again", v );
+
+  t.write( "a.json", "{ \"v\" : 33 }" );
+  t.touch( "a.json", 10 );
+  v = open_value( server, "a.json" );
+  check( v == "33", "a file of the same size, modified, is parsed again", v );
+
+  v = open_value( server, "a.json" );
+  DocumentCache::Stats s = server.cache_stats();
+  check( v == "33" && s.hits == 1 && s.entries == 2,
+         "the new content is cached", v + " / " + stats_text( s ) );
+
+  std::filesystem::remove( t.root + "/a.json" );
+  v = open_value( server, "a.json" );
+  s = server.cache_stats();
+  check( contains( v, "NOT_FOUND" ) && s.entries == 1,
+         "a deleted file is not served and its entry is dropped",
+         v + " / " + stats_text( s ) );
+
+  v = query_text( server, dir_import +
+    "count(dir:documents($dir:root))" );
+  check( v == "1", "dir:documents no longer returns the deleted file", v );
+}
+
+void test_cache_evict( Fixture const &f ) {
+  TempTree t;
+  std::string const pad( 1000, ' ' );
+  for ( int i = 1; i <= 4; ++i )
+    t.write( "f" + std::to_string( i ) + ".json",
+             "{ \"v\" : " + std::to_string( i ) + " }" + pad );
+  std::size_t const one = DocumentCache::estimate(
+    "f1.json", std::filesystem::file_size( t.root + "/f1.json" ) );
+  ServerConfig config;
+  config.root = t.root;
+  config.cache_bytes = one * 5 / 2;
+  Server server( f.zorba, config, std::cerr );
+
+  std::string v = query_text( server, dir_import +
+    "string-join(for $d in dir:documents($dir:root) "
+    "return string($d(\"content\")(\"v\")), \",\")" );
+  DocumentCache::Stats s = server.cache_stats();
+  check( v == "1,2,3,4" && s.stores == 4 && s.evictions == 2 &&
+         s.entries == 2 && s.bytes <= config.cache_bytes,
+         "the cache stays within its budget, evicting the oldest entries",
+         v + " / " + stats_text( s ) );
+
+  v = open_value( server, "f4.json" );
+  s = server.cache_stats();
+  check( v == "4" && s.hits == 1, "a recent entry is kept",
+         v + " / " + stats_text( s ) );
+
+  v = open_value( server, "f1.json" );
+  s = server.cache_stats();
+  check( v == "1" && s.hits == 1 && s.misses == 5,
+         "an evicted entry is parsed again", v + " / " + stats_text( s ) );
+
+  ServerConfig small;
+  small.root = t.root;
+  small.cache_bytes = one / 2;
+  Server tiny( f.zorba, small, std::cerr );
+  v = open_value( tiny, "f2.json" );
+  s = tiny.cache_stats();
+  check( v == "2" && s.entries == 0 && s.bytes == 0,
+         "a document over the budget is not cached",
+         v + " / " + stats_text( s ) );
+}
+
+void test_cache_off( Fixture const &f ) {
+  TempTree t;
+  t.write( "a.json", "{ \"v\" : 1 }" );
+  ServerConfig config;
+  config.root = t.root;
+  config.cache_bytes = 0;
+  Server server( f.zorba, config, std::cerr );
+
+  std::string const v1 = open_value( server, "a.json" );
+  std::string const v2 = open_value( server, "a.json" );
+  t.write( "a.json", "{ \"v\" : 2 }" );
+  std::string const v3 = open_value( server, "a.json" );
+  DocumentCache::Stats const s = server.cache_stats();
+  check( v1 == "1" && v2 == "1" && v3 == "2" && s.hits == 0 &&
+         s.misses == 0 && s.entries == 0,
+         "with a budget of 0 nothing is cached",
+         v1 + v2 + v3 + " / " + stats_text( s ) );
+}
+
+void test_cache_policy( Fixture const &f ) {
+  TempTree t;
+  t.write( "a.json", "{ \"v\" : 1 }" );
+  t.write( "../outside/secret.json", "{ \"v\" : \"TOP-" "SECRET\" }" );
+  ServerConfig config;
+  config.root = t.root;
+  Server server( f.zorba, config, std::cerr );
+
+  SecurityPolicy expected( SecurityPolicy::secure() );
+  directory_config::apply_policy( expected, t.root );
+  expected.setTimeout( config.timeout );
+  check( server.policy() == expected,
+         "the policy is the directory policy, cache or not" );
+
+  // Warm the cache, then try to reach the file outside the root.
+  open_value( server, "a.json" );
+  std::string v = open_value( server, "../outside/secret.json" );
+  check( contains( v, "INVALID_PATH" ) && !contains( v, "SECRET" ),
+         "dir:open outside the root: INVALID_PATH", v );
+
+  std::string const dc(
+    "import module namespace dc = "
+    "\"http://zorba.io/modules/directory-cache\";\n" );
+  v = query_text( server, dir_import + dc +
+    "count(dc:get($dir:root, \"../outside/secret.json\")), "
+    "count(dc:get(\"" + t.base + "/outside\", \"secret.json\"))" );
+  check( v == "0\n0",
+         "the cache serves nothing outside the root", v );
+  check( !contains( v, "SECRET" ), "no content outside the root", v );
+
+  v = query_text( server,
+    "import module namespace file = \"http://expath.org/ns/file\";\n"
+    "file:read-text(\"" + t.base + "/outside/secret.json\")" );
+  check( contains( v, "error" ) && !contains( v, "SECRET" ),
+         "file:read-text outside the root: still denied", v );
+
+  DocumentCache::Stats const s = server.cache_stats();
+  check( s.entries == 1, "only the document under the root is cached",
+         stats_text( s ) );
+}
+
 struct Test {
   char const *name;
   void (*fn)( Fixture const& );
@@ -618,7 +881,12 @@ Test const tests[] = {
   { "native_modules", test_native_modules },
   { "predefined", test_predefined },
   { "limits", test_limits },
-  { "binary", test_binary }
+  { "binary", test_binary },
+  { "cache_hit", test_cache_hit },
+  { "cache_invalidate", test_cache_invalidate },
+  { "cache_evict", test_cache_evict },
+  { "cache_off", test_cache_off },
+  { "cache_policy", test_cache_policy }
 };
 
 } // namespace
