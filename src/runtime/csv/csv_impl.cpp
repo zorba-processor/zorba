@@ -228,6 +228,26 @@ static void emit_csv_value(const store::Item_t& item,
 
 ///////////////////////////////////////////////////////////////////////////////
 
+void CsvParseIteratorState::reset( PlanState &state ) {
+  PlanIteratorState::reset( state );
+  //
+  // Every member that set_options() or a previous parse may have changed has
+  // to be restored: when the iterator is reset to parse another input (e.g.,
+  // in each iteration of a FLWOR expression), the field names of the previous
+  // input's header must not be reused, nor options that this call does not
+  // give.
+  //
+  cast_unquoted_ = true;
+  csv_ = csv_parser();
+  extra_name_.clear();
+  keys_.clear();
+  line_no_ = 1;
+  missing_ = missing::null;
+  skip_called_ = false;
+  string_.clear();
+  value_.clear();
+}
+
 void CsvParseIterator::set_input( store::Item_t const &item,
                                   CsvParseIteratorState *state ) const {
   if ( item->isStreamable() )
