@@ -145,8 +145,8 @@ FOREACH(TESTFILE ${TESTFILES})
   ENDIF(NOT CURL_FOUND)
 
   IF(NOT ZORBA_WITH_FILE_ACCESS)
-    #these tests require the file module
-    STRING(REGEX MATCH "file/" NEEDS_FILE "${TESTNAME}")
+    #these tests require the file module (the directory module imports it)
+    STRING(REGEX MATCH "file/|zorba/directory/" NEEDS_FILE "${TESTNAME}")
     IF(NEEDS_FILE)
       SET(SKIP_TEST 1)
     ENDIF(NEEDS_FILE)

@@ -1,0 +1,1 @@
+broken/bad.json:json:true:true broken/bad.xml:xml:true:true customers.csv:csv:true:true notes.txt:-:true:true orders/2026/q1.xml:xml:true:true orders/2026/q2.xml:xml:true:true payments/late.json:json:true:true payments/payments.json:json:true:true report.html:html:true:true
