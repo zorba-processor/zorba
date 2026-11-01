@@ -38,6 +38,7 @@
 
 #include <map>
 #include <memory>
+#include <new>
 
 #include "zorbaserialization/serialize_template_types.h"
 #include "zorbaserialization/serialize_zorba_types.h"
@@ -433,6 +434,10 @@ private:
   QueryResources * const * theHeld;
   csize                    theNumHeld;
 
+  // See QueryResources::theFailWalkAtEdge.
+  unsigned long            theFailAtEdge;
+  unsigned long            theNumEdges;
+
   std::map<const void*, Node*> theNodes;
   std::vector<Node*>           theToVisit;
 
@@ -440,7 +445,9 @@ public:
   QueryResourcesCollector(QueryResources* const* held, csize numHeld)
     :
     theHeld(held),
-    theNumHeld(numHeld)
+    theNumHeld(numHeld),
+    theFailAtEdge(QueryResources::theFailWalkAtEdge.load(std::memory_order_relaxed)),
+    theNumEdges(0)
   {
   }
 
@@ -680,6 +687,12 @@ private:
 
   void addEdge(Node* from, Kind kind, const void* to)
   {
+    if (++theNumEdges == theFailAtEdge)
+    {
+      QueryResources::theFailWalkAtEdge.store(0);
+      throw std::bad_alloc();
+    }
+
     Node* node = getNode(kind, to);
     ++node->theInternalRefs;
     from->theOut.push_back(node);
