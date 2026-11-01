@@ -15,6 +15,7 @@
   made the call fail.
 - Fix undefined behavior in full-text tokenization when converting the text
   between UTF-8 and UTF-16 fails; it now raises an internal error.
+- Fix the debugger's response queue destroying its mutex while still locked.
 - The public `hexbinary_stream.h`, `base64_stream.h` and
   `transcode_stream.h` headers include the standard headers they use, so
   they compile on their own with Clang.

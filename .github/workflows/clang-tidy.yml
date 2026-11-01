@@ -34,9 +34,6 @@ on:
       - '.clang-tidy'
       - '.github/workflows/clang-tidy.yml'
   workflow_dispatch:
-  # TEMPORARY (removed before the PR): dispatch needs the file on master.
-  push:
-    branches: [clang-tidy-returns]
 
 concurrency:
   group: clang-tidy-${{ github.ref }}
