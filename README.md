@@ -31,6 +31,16 @@ docker run --rm -v "$PWD":/work ghcr.io/zorba-processor/zorba:edge -f -q query.x
 `latest` is the newest stable release. See [docker/README.md](docker/README.md)
 for all image tags.
 
+The image also runs `zorba-mcp`, an MCP server that lets an AI agent query a
+folder of XML, JSON and CSV files, read-only and confined to the folder:
+
+```bash
+docker run -i --rm -v "$PWD:/data:ro" ghcr.io/zorba-processor/zorba:edge zorba-mcp --root /data
+```
+
+See [Querying a folder from an AI agent (MCP)](https://zorba-processor.github.io/zorba/mcp.html)
+for registering it with Claude Code or another MCP client.
+
 ## Building
 
 Requirements: a C++23 compiler (GCC 13+, Clang 17+ or Apple Clang 16+),

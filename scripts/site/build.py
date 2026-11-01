@@ -106,7 +106,8 @@ REPO = "https://github.com/zorba-processor/zorba"
 
 PAGES = [("index", "Overview"), ("map", "The big picture"),
          ("xquery", "XQuery"), ("jsoniq", "JSONiq"),
-         ("zorba", "Using Zorba"), ("cheatsheet", "Cheat sheet")]
+         ("zorba", "Using Zorba"), ("mcp", "AI agents (MCP)"),
+         ("cheatsheet", "Cheat sheet")]
 
 LOGO = ('<picture>'
         '<source srcset="assets/zorba-logo-dark.svg" '

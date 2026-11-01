@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Querying a folder from an AI agent (MCP)</title>
+<meta name="description" content="zorba-mcp lets an AI agent query a folder of XML, JSON and CSV files with JSONiq and XQuery over MCP, read-only and confined to the folder. How to run it with Docker, register it with an MCP client, and what it exposes.">
+<link rel="icon" href="assets/zorba-mark.svg" type="image/svg+xml">
+<link rel="icon" href="assets/favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="assets/favicon-180.png">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+<!-- header: mcp -->
+
+<div class="layout">
+<details class="toc">
+  <summary>On this page</summary>
+  <p class="toc-title">Querying a folder from an AI agent</p>
+  <ol>
+    <li><a href="#what">What it is</a></li>
+    <li><a href="#docker">Try it with Docker</a></li>
+    <li><a href="#source">Build from source</a></li>
+    <li><a href="#register">Register it with a client</a></li>
+    <li><a href="#tools">The tools</a></li>
+    <li><a href="#queries">Example queries</a></li>
+    <li><a href="#security">Security model</a></li>
+    <li><a href="#limits">Limits and timeouts</a></li>
+    <li><a href="#cli">From the command line: <code>--directory</code></a></li>
+  </ol>
+</details>
+
+<main>
+<h1>Querying a folder from an AI agent (MCP)</h1>
+<p class="lede">Point <code>zorba-mcp</code> at a folder of XML, JSON and CSV files and an AI agent can ask questions across all of them with JSONiq, without you converting or loading anything.</p>
+
+<h2 id="what">What it is</h2>
+<p><code>zorba-mcp</code> is a <a href="https://modelcontextprotocol.io">Model Context Protocol</a> server that speaks JSON-RPC over standard input and output. The agent's client starts it, and the agent gets tools to list the files in the folder and to run JSONiq or XQuery over them. The files stay where they are: every call reads them as they are on disk, nothing is indexed or cached.</p>
+<p>The same engine and the same restrictions are available without an agent as <code>zorba --directory</code> (see <a href="#cli">below</a>). The server implements MCP 2026-07-28 (<code>server/discover</code>) and also answers clients that start with the earlier <code>initialize</code> handshake (2025-11-25, 2025-06-18, 2025-03-26).</p>
+<p>The folder is read through the <a href="zorba.html#modules">directory module</a>, <code>http://zorba.io/modules/directory</code>. A file is a record <code>{ "path", "format", "content" }</code>: <code>content</code> is a document node for XML, the parsed value for JSON (an array if a file holds several top-level values, as in JSON Lines) and an array of row objects for CSV, with the first line as column names. A file that does not parse yields <code>{ "path", "format", "error" }</code> instead, so one bad file does not stop a query over the whole folder. HTML files are listed with the format <code>html</code> but are not parsed yet.</p>
+
+<h2 id="docker">Try it with Docker</h2>
+<p>No build is needed. The container image includes <code>zorba-mcp</code>; mount the folder you want to query at <code>/data</code>, read-only:</p>
+<pre class="code shell"><code>docker run -i --rm -v "$PWD:/data:ro" ghcr.io/zorba-processor/zorba:edge zorba-mcp --root /data</code></pre>
+<p><code>-i</code> keeps standard input open, which is how the client talks to the server. The command waits silently for JSON-RPC messages, so you normally start it from an MCP client (next sections) rather than by hand. To check it by hand, send one request:</p>
+<pre class="code shell"><code>echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25"}}' \
+  | docker run -i --rm -v "$PWD:/data:ro" ghcr.io/zorba-processor/zorba:edge zorba-mcp --root /data</code></pre>
+<p>The <code>edge</code> tag is the latest master build. The <code>latest</code> tag moves only on stable releases and does not include <code>zorba-mcp</code> until the first one that does; see <a href="https://github.com/zorba-processor/zorba/blob/master/docker/README.md">docker/README.md</a> for all tags. Any other arguments to the image still go to <code>zorba</code>, so <code>docker run --rm ghcr.io/zorba-processor/zorba:edge -q '1 + 1'</code> works as before.</p>
+
+<h2 id="source">Build from source</h2>
+<p>On Linux or macOS with the <a href="https://github.com/zorba-processor/zorba#building">prerequisites</a> installed, the <code>full-release</code> preset builds <code>zorba-mcp</code> along with <code>zorba</code>:</p>
+<pre class="code shell"><code>cmake --preset full-release
+cmake --build --preset full-release
+cmake --install build/full-release --prefix "$HOME/zorba"
+"$HOME/zorba/bin/zorba-mcp" --root /path/to/folder</code></pre>
+<p>Install it rather than running it from the build directory: the installed tree is what puts the directory module and the file and CSV modules where the server finds them.</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Option</th><th>Effect</th></tr></thead>
+  <tbody>
+    <tr><td><code>--root &lt;dir&gt;</code></td><td>The folder to query. Required.</td></tr>
+    <tr><td><code>--queries &lt;dir&gt;</code></td><td>Each <code>&lt;name&gt;.jq</code> file in this folder becomes a tool, see <a href="#tools">the tools</a>.</td></tr>
+    <tr><td><code>--timeout &lt;seconds&gt;</code></td><td>Time limit of one tool call. Default 30; 0 means no limit.</td></tr>
+    <tr><td><code>--max-output &lt;bytes&gt;</code></td><td>Output size limit of one tool call. Default 131072.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="register">Register it with a client</h2>
+<h3 id="claude-code">Claude Code</h3>
+<p>Use an absolute path for the folder. Everything after <code>--</code> is the command that starts the server:</p>
+<pre class="code shell"><code>claude mcp add --transport stdio zorba -- \
+  docker run -i --rm -v /abs/path/to/folder:/data:ro \
+  ghcr.io/zorba-processor/zorba:edge zorba-mcp --root /data</code></pre>
+<p>Without Docker, give the installed binary instead: <code>claude mcp add --transport stdio zorba -- "$HOME/zorba/bin/zorba-mcp" --root /abs/path/to/folder</code>. <code>claude mcp list</code> shows whether the server connected, and <code>/mcp</code> inside Claude Code lists its tools. By default the server is added for you in the current project; <code>--scope project</code> writes it to a <code>.mcp.json</code> you can commit, and <code>--scope user</code> makes it available in every project. Claude Code's <a href="https://code.claude.com/docs/en/mcp">MCP documentation</a> has the details.</p>
+
+<h3 id="generic">Any other MCP client</h3>
+<p>Clients that read an <code>mcpServers</code> block (Claude Desktop, Cursor and others; the file name and location differ) take the same command as JSON:</p>
+<pre class="code"><code>{
+  "mcpServers": {
+    "zorba": {
+      "command": "docker",
+      "args": ["run", "-i", "--rm",
+               "-v", "/abs/path/to/folder:/data:ro",
+               "ghcr.io/zorba-processor/zorba:edge",
+               "zorba-mcp", "--root", "/data"]
+    }
+  }
+}</code></pre>
+
+<h2 id="tools">The tools</h2>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Tool</th><th>What it does</th></tr></thead>
+  <tbody>
+    <tr><td><code>list_documents</code></td><td>Lists the files under the folder, recursively and sorted by path, one JSON object per line: <code>{ "path", "format", "size", "modified" }</code>. The format (<code>xml</code>, <code>json</code>, <code>csv</code>, <code>html</code> or <code>null</code>) says how the directory module would parse the file.</td></tr>
+    <tr><td><code>run_query</code></td><td>Runs a JSONiq or XQuery main module, given as the argument <code>query</code>, and returns the result as JSON, one item per line. On failure the result is an error object with the Zorba error code, the message and the line and column of the failing expression, which is what lets an agent correct its query.</td></tr>
+    <tr><td>Predefined queries</td><td>With <code>--queries &lt;dir&gt;</code>, each <code>&lt;name&gt;.jq</code> file becomes a tool <code>&lt;name&gt;</code>. Its leading comment is the tool's description and its external variables (<code>declare variable $id external;</code>) are its string parameters. Use them for the questions you want answered the same way every time.</td></tr>
+  </tbody>
+</table>
+</div>
+<p>A predefined query is an ordinary query. With the folder from the next section, this file as <code>queries/customer_name.jq</code> gives the agent a tool <code>customer_name</code> with one parameter, <code>id</code> (mount the folder with <code>-v /abs/path/to/queries:/queries:ro</code> and add <code>--queries /queries</code>):</p>
+<pre class="code"><code>(: Returns the name of the customer with the given id. :)
+import module namespace dir = "http://zorba.io/modules/directory";
+
+declare variable $id external;
+
+for $row in dir:open($dir:root, "customers.csv")("content")()
+where $row("id") eq $id
+return $row("name")</code></pre>
+
+<h2 id="queries">Example queries</h2>
+<p>A query sees the folder through <code>$dir:root</code> and these functions of the directory module: <code>dir:list($dir:root)</code>, <code>dir:open($dir:root, $path)</code> for one file and <code>dir:documents($dir:root, $formats)</code> for all files of the given formats (default: all). The examples use a folder with this layout, which the project's image tests also use:</p>
+<pre class="code"><code>customers.csv            id,name,country  (acme: Acme Corp, MX; globex: Globex, US)
+orders/2026/q1.xml       orders o1 (acme, 100) and o2 (globex, 250)
+orders/2026/q2.xml       order o3 (acme, 75)
+payments/payments.json   [ {"order": "o1", ...}, {"order": "o3", ...} ], both "paid"</code></pre>
+
+<h3>Revenue per customer, from XML</h3>
+<pre class="code"><code>import module namespace dir = "http://zorba.io/modules/directory";
+
+for $o in dir:documents($dir:root, "xml")("content")//order
+let $customer := string($o/@customer)
+group by $customer
+order by $customer
+return {
+  "customer" : $customer,
+  "orders" : count($o),
+  "total" : sum(for $t in $o/total return xs:integer($t))
+}</code></pre>
+<pre class="output"><code>{ "customer" : "acme", "orders" : 2, "total" : 175 }
+{ "customer" : "globex", "orders" : 1, "total" : 250 }</code></pre>
+
+<h3>Orders with no payment, joining XML with JSON</h3>
+<pre class="code"><code>import module namespace dir = "http://zorba.io/modules/directory";
+
+let $paid :=
+  for $p in dir:open($dir:root, "payments/payments.json")("content")()
+  where $p("status") eq "paid"
+  return $p("order")
+for $o in dir:documents($dir:root, "xml")("content")//order
+where not(string($o/@id) = $paid)
+return {
+  "order" : string($o/@id),
+  "customer" : string($o/@customer),
+  "total" : xs:integer($o/total)
+}</code></pre>
+<pre class="output"><code>{ "order" : "o2", "customer" : "globex", "total" : 250 }</code></pre>
+
+<h3>Order totals per customer name, joining XML with CSV</h3>
+<pre class="code"><code>import module namespace dir = "http://zorba.io/modules/directory";
+
+let $orders := dir:documents($dir:root, "xml")("content")//order
+for $c in dir:open($dir:root, "customers.csv")("content")()
+return {
+  "customer" : $c("name"),
+  "country" : $c("country"),
+  "total" : sum(for $t in $orders[@customer = $c("id")]/total
+                return xs:integer($t))
+}</code></pre>
+<pre class="output"><code>{ "customer" : "Acme Corp", "country" : "MX", "total" : 175 }
+{ "customer" : "Globex", "country" : "US", "total" : 250 }</code></pre>
+<p>Results should be JSON objects, arrays or atomic values; convert XML nodes with <code>string()</code> or <code>data()</code> before returning them.</p>
+
+<h2 id="security">Security model</h2>
+<p>The agent writes the queries, so the server treats every query as untrusted. Queries run under Zorba's <a href="zorba.html#security">secure policy</a> with exactly two capabilities added back:</p>
+<ul>
+  <li><strong>Read-only.</strong> File writes are denied, and so are environment variables.</li>
+  <li><strong>Confined to the root.</strong> Reads are limited to files under <code>--root</code>. Absolute paths, <code>..</code> segments and paths through symbolic links are rejected, symbolic links are not listed, and entries whose name starts with <code>.</code> are not listed.</li>
+  <li><strong>No network.</strong> <code>fn:doc</code> on a URL, the HTTP client, external XML entities and importing modules or schemas over the network are all denied.</li>
+  <li><strong>Native modules limited to the file module.</strong> Importing any other module implemented in C++ (for example the sleep or query-evaluation modules) raises <code>zerr:ZXQP0067</code>. The file module stays available because the directory module reads through it, and its reads are still confined to the root.</li>
+</ul>
+<p>The server writes only protocol messages to standard output; its log goes to standard error. With Docker, mounting the folder with <code>:ro</code> adds a second, independent barrier. The project's tests exercise each denial above.</p>
+
+<h2 id="limits">Limits and timeouts</h2>
+<ul>
+  <li>A tool call stops after <code>--timeout</code> seconds (default 30) with the Zorba error <code>zerr:ZXQP0068</code>; <code>--timeout 0</code> removes the limit.</li>
+  <li>Output longer than <code>--max-output</code> bytes (default 131072) is cut and ends with a line saying that the output was truncated.</li>
+  <li>A single JSON-RPC message larger than 4 MB is refused.</li>
+  <li>Every call re-reads and re-parses the files it touches, so a query over a large folder costs time proportional to the files it opens. Filter by path or format with <code>dir:list</code> or the <code>$formats</code> argument before opening documents.</li>
+  <li>HTML files are listed but not parsed yet. Zorba 5.0 is not thread-safe, so the server handles one request at a time.</li>
+</ul>
+
+<h2 id="cli">From the command line: <code>--directory</code></h2>
+<p><code>zorba --directory &lt;dir&gt;</code> runs a query under the same policy as <code>zorba-mcp</code>: reads confined to <code>&lt;dir&gt;</code>, no writes, network or environment, only the file module among the native modules. <code>$dir:root</code> is bound to the folder, and the result is written as JSON, one item per line. It is the quickest way to write and test a query before giving it to an agent or saving it as a predefined query:</p>
+<pre class="code shell"><code>zorba --directory shop -f -q revenue.jq
+docker run --rm -v "$PWD:/work" ghcr.io/zorba-processor/zorba:edge --directory shop -f -q revenue.jq</code></pre>
+<p><code>--directory</code> cannot be combined with <code>--allow</code> or the other options that would widen the policy.</p>
+
+<div class="pager"><a href="zorba.html">Using Zorba</a><a href="cheatsheet.html">Next: Cheat sheet</a></div>
+</main>
+</div>
+
+<!-- footer -->
+<script src="assets/site.js"></script>
+</body>
+</html>

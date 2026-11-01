@@ -4,6 +4,8 @@
 # Run:
 #   docker run --rm zorba -q '1 + 1'
 #   docker run --rm -v "$PWD":/work zorba -f -q query.xq
+# MCP server over a folder of XML, JSON and CSV files (stdio):
+#   docker run -i --rm -v "$PWD":/data:ro zorba zorba-mcp --root /data
 
 FROM ubuntu:24.04 AS build
 ENV DEBIAN_FRONTEND=noninteractive
@@ -45,6 +47,7 @@ COPY --from=build /usr/local/lib/libxerces-c-3.3.so /usr/local/lib/
 COPY --from=build /opt/zorba /opt/zorba
 RUN echo /opt/zorba/lib > /etc/ld.so.conf.d/zorba.conf && ldconfig
 ENV PATH=/opt/zorba/bin:$PATH
+COPY docker/runtime/entrypoint.sh /usr/local/bin/zorba-entrypoint
 WORKDIR /work
-ENTRYPOINT ["zorba"]
+ENTRYPOINT ["zorba-entrypoint"]
 CMD ["--help"]

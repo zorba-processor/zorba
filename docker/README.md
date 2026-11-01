@@ -20,6 +20,17 @@ docker run --rm ghcr.io/zorba-processor/zorba:edge -q '1 + 1'
 docker run --rm -v "$PWD":/work ghcr.io/zorba-processor/zorba:edge -f -q query.xq
 ```
 
+The image also contains the MCP server `zorba-mcp`. The entrypoint runs it when
+the first argument is `zorba-mcp`; any other arguments go to `zorba`:
+
+```bash
+docker run -i --rm -v "$PWD:/data:ro" ghcr.io/zorba-processor/zorba:edge zorba-mcp --root /data
+```
+
+`images.yml` smoke-tests it (`docker/runtime/smoke-test.sh`) before it pushes.
+A run of that workflow on a branch other than `master` builds and tests the
+image and publishes nothing.
+
 | Tag | Points to | Moves? |
 |---|---|---|
 | `<version>`, e.g. `5.0.0`, `5.0.0-alpha.1` | That release | No |

@@ -7,7 +7,8 @@ name: Images
 # Master pushes publish only when code or image inputs change (allowlist
 # below); docs-only pushes are skipped. This workflow
 # has no tag trigger, so `paths` cannot filter tag pushes; workflow_dispatch
-# is never filtered.
+# is never filtered. Only master publishes: a dispatch on another branch
+# builds the runtime image and runs the smoke test, and pushes nothing.
 on:
   push:
     branches: [master]
@@ -42,6 +43,7 @@ env:
 
 jobs:
   builders:
+    if: github.ref == 'refs/heads/master'
     runs-on: ${{ matrix.runner }}
     strategy:
       matrix:
@@ -112,7 +114,24 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      # Build for the runner's own platform, load it into the local Docker
+      # and smoke-test the MCP server before anything is pushed.
+      - name: Build for the smoke test
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: docker/runtime/Dockerfile
+          platforms: ${{ matrix.platform }}
+          load: true
+          tags: zorba-smoke:test
+          cache-from: type=gha,scope=runtime-${{ matrix.runner }}
+          cache-to: type=gha,mode=max,scope=runtime-${{ matrix.runner }}
+      - name: Smoke test zorba-mcp
+        run: docker/runtime/smoke-test.sh zorba-smoke:test
+      - name: Smoke test the zorba entrypoint
+        run: test "$(docker run --rm zorba-smoke:test -r -q '1 + 1')" = "2"
       - id: build
+        if: github.ref == 'refs/heads/master'
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -122,18 +141,21 @@ jobs:
           cache-from: type=gha,scope=runtime-${{ matrix.runner }}
           cache-to: type=gha,mode=max,scope=runtime-${{ matrix.runner }}
       - name: Export digest
+        if: github.ref == 'refs/heads/master'
         run: |
           mkdir -p /tmp/digests
           touch "/tmp/digests/${DIGEST#sha256:}"
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
       - uses: actions/upload-artifact@v7
+        if: github.ref == 'refs/heads/master'
         with:
           name: digest-${{ matrix.runner }}
           path: /tmp/digests/*
           retention-days: 1
 
   runtime-manifest:
+    if: github.ref == 'refs/heads/master'
     needs: runtime
     runs-on: ubuntu-24.04
     steps:
