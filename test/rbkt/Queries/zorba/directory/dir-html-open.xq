@@ -16,5 +16,5 @@ return string-join((
   string-join(for $h in $c//th return normalize-space($h), "|"),
   string-join(for $r in $c//tr[td] return normalize-space($r/td[2]), "|"),
   string($c/html/head/title),
-  string(contains(string(($c//p)[1]), "Revenue & costs"))
+  string(contains(string(($c//p)[1]), "Revenue &amp; costs"))
 ), " ")
