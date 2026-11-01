@@ -183,6 +183,7 @@ void DocumentCache::set_active( bool active ) {
   std::lock_guard<std::mutex> lock( theMutex );
   theActive = active;
   thePending.clear();
+  ++theQuery;
   if ( !active )
     return;
   // Drop the entries of deleted or modified files (a query only looks up
@@ -220,13 +221,14 @@ std::size_t DocumentCache::estimate( std::string const &path,
     ext = path.substr( dot + 1 );
   std::transform( ext.begin(), ext.end(), ext.begin(),
                   []( unsigned char c ) { return std::tolower( c ); } );
-  std::uintmax_t factor = 25;
+  // Measured: XML 19.6, JSON 22.0, CSV 31.7 (records of four short fields).
+  std::uintmax_t factor = 32;
   if ( ext == "xml" || ext == "xhtml" )
-    factor = 25;
+    factor = 20;
   else if ( ext == "json" || ext == "jsonl" || ext == "ndjson" )
-    factor = 25;
+    factor = 22;
   else if ( ext == "csv" )
-    factor = 25;
+    factor = 32;
   // Every record also has a fixed part (the record object, its path).
   return static_cast<std::size_t>( 1024 + size * factor );
 }
@@ -290,6 +292,7 @@ Item DocumentCache::get( std::string const &root, std::string const &path ) {
   if ( i != theEntries.end() ) {
     if ( i->second.sig == sig ) {
       ++theStats.hits;
+      i->second.query = theQuery;
       theLru.splice( theLru.begin(), theLru, i->second.lru );
       return i->second.record;
     }
@@ -323,12 +326,19 @@ Item DocumentCache::put( std::string const &root, std::string const &path,
   auto const old = theEntries.find( key );
   if ( old != theEntries.end() )
     erase( old );
+  // Evict least recently used first, but never an entry that the current
+  // query used: a query that reads more than the budget keeps the documents
+  // it cached first instead of evicting each one before the next call.
   while ( theStats.bytes + bytes > theBudget && !theLru.empty() ) {
-    erase( theEntries.find( theLru.back() ) );
+    auto const victim = theEntries.find( theLru.back() );
+    if ( victim->second.query == theQuery )
+      return record;
+    erase( victim );
     ++theStats.evictions;
   }
   theLru.push_front( key );
-  theEntries.emplace( key, Entry{ sig, record, bytes, theLru.begin() } );
+  theEntries.emplace( key,
+    Entry{ sig, record, bytes, theQuery, theLru.begin() } );
   theStats.bytes += bytes;
   theStats.entries = theEntries.size();
   ++theStats.stores;

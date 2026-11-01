@@ -777,19 +777,31 @@ void test_cache_evict( Fixture const &f ) {
     "string-join(for $d in dir:documents($dir:root) "
     "return string($d(\"content\")(\"v\")), \",\")" );
   DocumentCache::Stats s = server.cache_stats();
-  check( v == "\"1,2,3,4\"" && s.stores == 4 && s.evictions == 2 &&
-         s.entries == 2 && s.bytes <= config.cache_bytes,
-         "the cache stays within its budget, evicting the oldest entries",
-         v + " / " + stats_text( s ) );
-
-  v = open_value( server, "f4.json" );
-  s = server.cache_stats();
-  check( v == "4" && s.hits == 1, "a recent entry is kept",
+  check( v == "\"1,2,3,4\"" && s.misses == 4 && s.stores == 2 &&
+         s.evictions == 0 && s.entries == 2 && s.bytes <= config.cache_bytes,
+         "a query over the budget keeps the first documents it cached",
          v + " / " + stats_text( s ) );
 
   v = open_value( server, "f1.json" );
   s = server.cache_stats();
-  check( v == "1" && s.hits == 1 && s.misses == 5,
+  check( v == "1" && s.hits == 1, "a cached document is served",
+         v + " / " + stats_text( s ) );
+
+  v = open_value( server, "f3.json" );
+  s = server.cache_stats();
+  check( v == "3" && s.misses == 5 && s.evictions == 1 && s.entries == 2 &&
+         s.bytes <= config.cache_bytes,
+         "a later query evicts the least recently used entry (f2)",
+         v + " / " + stats_text( s ) );
+
+  v = open_value( server, "f1.json" );
+  s = server.cache_stats();
+  check( v == "1" && s.hits == 2, "a recently used entry is kept",
+         v + " / " + stats_text( s ) );
+
+  v = open_value( server, "f2.json" );
+  s = server.cache_stats();
+  check( v == "2" && s.misses == 6 && s.evictions == 2,
          "an evicted entry is parsed again", v + " / " + stats_text( s ) );
 
   ServerConfig small;

@@ -51,7 +51,9 @@ namespace mcp {
  * the query's security policy. Records are bounded by a byte budget, each
  * accounted by an estimate of its in-memory size (the file size times a
  * per-format factor measured with bench/directory), and evicted least
- * recently used first.
+ * recently used first; an entry used by the current query is not evicted
+ * (a record that does not fit then is not stored), so a query that reads
+ * more than the budget keeps the documents cached first.
  */
 class DocumentCache {
 public:
@@ -115,6 +117,7 @@ private:
     Signature sig;
     Item record;
     std::size_t bytes;
+    std::uint64_t query;                // the last query that used it
     std::list<std::string>::iterator lru;
   };
 
@@ -126,6 +129,7 @@ private:
   std::string theRoot;                  // canonical, with a trailing '/'
   std::size_t const theBudget;
   bool theActive = true;
+  std::uint64_t theQuery = 0;           // incremented by set_active()
 
   mutable std::mutex theMutex;
   std::unordered_map<std::string,Entry> theEntries;
