@@ -51,6 +51,7 @@
 #endif
 
 // local
+#include "directory_config.h"
 #include "timers.h"
 #include "util.h"
 #include "zorbacmd_props.h"
@@ -245,8 +246,7 @@ bool populateDynamicContext( Zorba *zorba, DynamicContext *dctx ) {
   // --directory binds the root of the directory module (a no-op if the query
   // does not import it).
   if ( !zc_props.directory_.empty() )
-    dctx->setVariable( "http://zorba.io/modules/directory", "root",
-      zorba->getItemFactory()->createString( zc_props.directory_ ) );
+    directory_config::bind_root( zorba, dctx, zc_props.directory_ );
 
   // sort vars: x:=1 y:=foo x:=2 --> x:=1 x:=2 y:=foo
   stable_sort( zc_props.external_vars_.begin(), zc_props.external_vars_.end() );
@@ -652,11 +652,8 @@ static SecurityPolicy make_security_policy() {
   // --directory (which also sets secure_): read the directory, and run the
   // file module that the directory module reads through. check_args()
   // rejected anything that would widen this.
-  if ( !zc_props.directory_.empty() ) {
-    policy.allow( Capability::FileRead );
-    policy.allow( Capability::NativeModules );
-    policy.addReadPath( zc_props.directory_ );
-  }
+  if ( !zc_props.directory_.empty() )
+    directory_config::apply_policy( policy, zc_props.directory_ );
 
   for ( capability_op const &op : zc_props.capability_ops_ ) {
     for ( uint32_t bit = 1; bit != 0 && bit <= op.capabilities; bit <<= 1 ) {

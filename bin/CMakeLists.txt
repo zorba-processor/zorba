@@ -46,6 +46,7 @@ IF (ZORBA_WITH_DEBUGGER)
 ENDIF (ZORBA_WITH_DEBUGGER)
 
 SET(SRCS
+  directory_config.cpp
   zorbacmd_args.cpp
   zorbacmd_props.cpp
   timers.cpp
@@ -250,6 +251,36 @@ IF (ZORBA_WITH_FILE_ACCESS)
     ZORBA_SET_TEST_PROPERTY(bin/zorba_security_${_t}
       FAIL_REGULAR_EXPRESSION "TOP-SECRET|HIDDEN-SECRET|access denied")
   ENDFOREACH (_t)
+
+  # zorba-mcp: an MCP server (JSON-RPC over stdio) that runs queries over a
+  # directory like --directory does (directory_config.cpp is shared).
+  IF (UNIX)
+    SET (_mcp_suffix)
+    IF (NOT ${ZORBA_STORE_NAME} STREQUAL "simplestore")
+      SET (_mcp_suffix "_${ZORBA_STORE_NAME}")
+    ENDIF (NOT ${ZORBA_STORE_NAME} STREQUAL "simplestore")
+
+    SET (MCP_COMMON_SRCS mcp/json.cpp mcp/mcp_server.cpp directory_config.cpp)
+    ZORBA_GENERATE_EXE("zorba_mcp" "mcp/zorba_mcp.cpp;${MCP_COMMON_SRCS}"
+      "" "zorba-mcp" "bin")
+    ZORBA_GENERATE_EXE("mcp_tests" "mcp/test/mcp_tests.cpp;${MCP_COMMON_SRCS}"
+      "" "" "")
+    TARGET_INCLUDE_DIRECTORIES ("mcp_tests${_mcp_suffix}"
+      PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/mcp")
+
+    # Scripted JSON-RPC exchanges against the directory module's fixture
+    # tree (see mcp/test/mcp_tests.cpp); "binary" runs zorba-mcp itself.
+    SET (_mcpq "${CMAKE_CURRENT_SOURCE_DIR}/test/mcp/queries")
+    FOREACH (_t json protocol legacy tools_list list_documents join
+             syntax_error escape network predefined limits binary)
+      ADD_TEST (NAME bin/mcp/${_t}
+        COMMAND "mcp_tests${_mcp_suffix}" ${_t} "${_dirtree}" "${_mcpq}"
+          "${_dirq}/join.xq" "$<TARGET_FILE:zorba_mcp${_mcp_suffix}>")
+      SET_TESTS_PROPERTIES (bin/mcp/${_t} PROPERTIES
+        PASS_REGULAR_EXPRESSION "PASSED: ${_t}"
+        FAIL_REGULAR_EXPRESSION "FAILED|TOP-SECRET|HIDDEN-SECRET")
+    ENDFOREACH (_t)
+  ENDIF (UNIX)
 ENDIF (ZORBA_WITH_FILE_ACCESS)
 
 IF (UNIX)
