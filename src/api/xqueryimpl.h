@@ -44,6 +44,7 @@ class StaticContextImpl;
 class ResultIteratorImpl;
 class dynamic_context;
 class CompilerCB;
+class QueryResources;
 class StaticCollectionManagerSetImpl;
 class ModuleInfo;
 
@@ -88,6 +89,17 @@ class ModuleInfo;
   - theDynamicContext :
   The dynamic context for this query. Always belongs to the query. It is created
   by the XQueryImpl constructor.
+
+  - theResources :
+  Counts the function items created by this query (see QueryResources in
+  src/compiler/api/compilercb.h). close() hands theCompilerCB,
+  theStaticContext, theDynamicContext and theXQueryDiagnostics over to it,
+  so that function items the application still holds remain usable after
+  the query is closed or destroyed.
+
+  - theOriginResources :
+  For a clone: the QueryResources of the query that compiled the plan the
+  clone shares; the plan points into that query's compiler state.
 
   - theDynamicContextWrapper :
 
@@ -185,6 +197,10 @@ class XQueryImpl : public XQuery , public ::zorba::serialization::SerializeBaseC
   dynamic_context                  * theDynamicContext;
 
   mutable DynamicContextImpl       * theDynamicContextWrapper;
+
+  rchandle<QueryResources>           theResources;
+
+  rchandle<QueryResources>           theOriginResources;
 
   ResultIteratorImpl               * theResultIterator;
 

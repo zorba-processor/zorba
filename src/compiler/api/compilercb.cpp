@@ -22,7 +22,9 @@
 #include "debugger/debugger_commons.h"
 #endif
 
+#include "context/dynamic_context.h"
 #include "context/static_context.h"
+#include "diagnostics/xquery_diagnostics.h"
 #include "functions/udf.h"
 
 #include <zorba/properties.h>
@@ -122,7 +124,8 @@ CompilerCB::CompilerCB(XQueryDiagnostics* errmgr, long timeout)
   theTimeout(timeout),
   theNextVisitId(1),
   theEM(new ExprManager(this)),
-  theCommonLanguageEnabled(false)
+  theCommonLanguageEnabled(false),
+  theResources(NULL)
 {
   if (timeout >= 0)
     theHaveTimeout = true;
@@ -152,7 +155,8 @@ CompilerCB::CompilerCB(const CompilerCB& cb)
   theNextVisitId(cb.theNextVisitId+1),
   theConfig(cb.theConfig),
   theEM(new ExprManager(this)),
-  theCommonLanguageEnabled(cb.theCommonLanguageEnabled)
+  theCommonLanguageEnabled(cb.theCommonLanguageEnabled),
+  theResources(NULL)
 {
 }
 
@@ -172,7 +176,8 @@ CompilerCB::CompilerCB(::zorba::serialization::Archiver& ar)
   theHasEval(false),
   theIsEval(false),
   theNextVisitId(1),
-  theEM(new ExprManager(this))
+  theEM(new ExprManager(this)),
+  theResources(NULL)
 {
 }
 
@@ -196,6 +201,151 @@ CompilerCB::~CompilerCB()
 void CompilerCB::addAnonymousUDF(user_function* udf)
 {
   theAnonymousUDFs.push_back(udf);
+}
+
+
+/*******************************************************************************
+  class QueryResources (collectCycles() is in runtime/hof/function_item.cpp)
+********************************************************************************/
+std::atomic<unsigned long> QueryResources::theGraphGeneration(1);
+
+std::atomic<long> QueryResources::theNumAlive(0);
+
+std::atomic<unsigned long> QueryResources::theNumWalks(0);
+
+
+long query_resources_alive()
+{
+  return QueryResources::theNumAlive.load();
+}
+
+
+unsigned long query_resources_walks()
+{
+  return QueryResources::theNumWalks.load();
+}
+
+
+QueryResources::QueryResources()
+  :
+  theCCB(NULL),
+  theDctx(NULL),
+  theDiagnostics(NULL),
+#ifdef ZORBA_WITH_DEBUGGER
+  theDebuggerCommons(NULL),
+#endif
+  theIsDetached(false),
+  theWitnessGeneration(0),
+  theNumWitnesses(0)
+{
+  ++theNumAlive;
+}
+
+
+QueryResources::~QueryResources()
+{
+  destroy();
+
+  // The parents may now be reachable only through cycles.
+  release(theParent);
+  release(theDctxParent);
+
+  --theNumAlive;
+}
+
+
+void QueryResources::dispose(
+    CompilerCB* ccb,
+    static_context_t& sctx,
+    dynamic_context* dctx,
+    XQueryDiagnostics* diagnostics,
+    bool ownsDebuggerCommons,
+    QueryResources* parent,
+    QueryResources* dctxParent)
+{
+  assert(theCCB == NULL && theDctx == NULL && !theIsDetached);
+
+  theCCB = ccb;
+  theSctx = sctx;
+  sctx = NULL;
+  theDctx = dctx;
+  theDiagnostics = diagnostics;
+#ifdef ZORBA_WITH_DEBUGGER
+  theDebuggerCommons =
+    (ownsDebuggerCommons && ccb != NULL ? ccb->theDebuggerCommons : NULL);
+#else
+  (void)ownsDebuggerCommons;
+#endif
+
+  // See the class comment. May release function items created by the query,
+  // and thereby references to this obj.
+  if (theDctx)
+    theDctx->release_parameters();
+
+  if (getRefCount() > 1)
+  {
+    // Function items created by the query may still be alive: keep the state
+    // until the last of them is destroyed, unless only cycles keep it.
+    theParent = parent;
+    theDctxParent = (dctxParent != parent ? dctxParent : NULL);
+    theIsDetached = true;
+
+    // From now on the dctx variables are edges of a graph.
+    if (theDctx)
+      theDctx->track_writes();
+    graphChanged();
+
+    // The caller's reference does not count.
+    QueryResources* held[1] = { this };
+    collectCycles(held, 1);
+  }
+
+  if (getRefCount() == 1)
+  {
+    theIsDetached = false;
+    theParent = NULL;
+    theDctxParent = NULL;
+    destroy();
+  }
+}
+
+
+void QueryResources::release(rchandle<QueryResources>& resources)
+{
+  if (resources == NULL)
+    return;
+
+  if (resources->theIsDetached && resources->getRefCount() > 1)
+  {
+    rchandle<QueryResources> hold;
+    hold.transfer(resources);
+    QueryResources* held[1] = { hold.getp() };
+    collectCycles(held, 1);
+  }
+  else
+  {
+    resources = NULL;
+  }
+}
+
+
+void QueryResources::destroy()
+{
+  delete theDctx;
+  theDctx = NULL;
+
+  theSctx = NULL;
+
+#ifdef ZORBA_WITH_DEBUGGER
+  delete theDebuggerCommons;
+  theDebuggerCommons = NULL;
+#endif
+
+  delete theCCB;
+  theCCB = NULL;
+
+  delete theDiagnostics;
+  theDiagnostics = NULL;
 }
 
 

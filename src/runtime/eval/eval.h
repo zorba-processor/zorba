@@ -29,6 +29,7 @@
 namespace zorba {
 
 class IterPrinter;
+class QueryResources;
 
 struct EvalProfile
 {
@@ -81,6 +82,13 @@ public:
   PlanWrapper_t                    thePlanWrapper;
   std::unique_ptr<CompilerCB>      theCCB;
   std::unique_ptr<dynamic_context> theDctx;
+  // Keep theCCB and theDctx alive for function items created by the eval
+  // query (see QueryResources in compiler/api/compilercb.h), and the outer
+  // state they depend on: the query whose ccb theCCB copies, and the owner
+  // of theDctx's parent.
+  rchandle<QueryResources>         theResources;
+  rchandle<QueryResources>         theOuterResources;
+  rchandle<QueryResources>         theOuterDctxResources;
 
   std::vector<EvalProfile>         theEvalProfiles;
   double                           theCompilationsCPUTime;
@@ -94,6 +102,8 @@ public:
   ~EvalIteratorState();
 
   void reset(PlanState& planState);
+
+  void disposeQuery();
 
   void addQuery(const std::string& aQuery, const double aCompilationCPUTime,
       const double aCompilationWallTime);

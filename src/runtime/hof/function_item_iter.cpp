@@ -94,12 +94,12 @@ bool FunctionItemIterator::nextImpl(store::Item_t& result, PlanState& planState)
         theFunctionItemInfo->theQName = child->theFunctionItemInfo->theQName;
     }
 
-    result = new FunctionItem(theFunctionItemInfo, evalDctx.get());
+    result = new FunctionItem(theFunctionItemInfo, evalDctx.get(), planState);
     evalDctx.release();
   }
   else
   {
-    result = new FunctionItem(theFunctionItemInfo, NULL);
+    result = new FunctionItem(theFunctionItemInfo, NULL, planState);
   }
 
   STACK_PUSH(result != NULL, state);

@@ -17,6 +17,7 @@
 #ifndef ZORBA_COMPILER_API_COMPILERCB
 #define ZORBA_COMPILER_API_COMPILERCB
 
+#include <atomic>
 #include <vector>
 #include <map>
 
@@ -37,7 +38,198 @@ namespace zorba
 class DebuggerCommons;
 #endif
 class static_context;
+class dynamic_context;
 class ExprManager;
+class XQueryDiagnostics;
+
+
+/*******************************************************************************
+  Deferred release of the compile-time and runtime state of a query (or of an
+  eval query).
+
+  Function items point into the state of the query that created them: the
+  user_function objs (and the exprs of their bodies) owned by the query's
+  CompilerCB, the query's static contexts, and the query's global dynamic
+  context, which holds the values of the prolog variables their bodies read
+  and is the parent of their closure dynamic context. The application may
+  keep a function item from a query result after the query has been closed or
+  destroyed, so that state must live as long as the function item.
+
+  The owner of the state (XQueryImpl, the EvalIteratorState of an eval query,
+  or a StaticContextImpl after loadProlog()) creates one QueryResources obj,
+  holds a reference to it, and stores a raw pointer to it in its CompilerCB
+  (CompilerCB::theResources). Each FunctionItem holds a reference to the
+  QueryResources of the ccb that created it, of the ccb that owns its
+  user_function (if different), and of the query that owns its global dctx
+  (see FunctionItem). Nothing else changes while the query is open: no state
+  is moved, and creating a function item costs a few reference-count
+  increments.
+
+  When the owner is done with the state, it calls dispose(). If no function
+  item refers to it any more (the common case), dispose() destroys the state
+  right away, in the order the owner used to. Otherwise the state is handed
+  over to this obj ("detached") and destroyed when the last reference goes
+  away.
+
+  Cycles: a function item can be stored in a prolog variable of the query that
+  created it, and so in the dctx it keeps alive. Such cycles are collected by
+  collectCycles() (see runtime/hof/function_item.cpp): a trial deletion over
+  the graph of detached QueryResources, the function items stored in their
+  dctx variables (directly or in temp sequences, and transitively in closure
+  dctxs), and the references among them. If no reference from outside that
+  graph reaches this obj, the dctx variable values are released, which frees
+  the whole cycle. It runs when the obj is detached, and afterwards when a
+  reference that may have been the last outside one goes away: a reference to
+  a function item of the graph (FunctionItem::referenceDropped()), a function
+  item that refers to a detached obj, or a reference to a detached obj held
+  by another QueryResources or by an owner (release()).
+
+  Cost: a collection walks the whole graph, including the members of the
+  eager temp sequences and JSON items held by the dctx variables. So that the
+  collections triggered by the references a function item gains and drops
+  while it is used (e.g. a function item of the graph read from a prolog
+  variable, or a function item created and dropped by an escaped function)
+  do not walk the graph each time, a collection that finds the graph
+  referenced from outside remembers a few of the nodes referenced from
+  outside from which the root is reachable ("witnesses"), together with the
+  graph generation (graphGeneration()). The generation changes whenever an
+  edge of any graph may have changed: a QueryResources is detached, a
+  variable of a detached dctx or of a closure dctx is set, a JSON item is
+  updated, or garbage is released. As long as it has not changed, the edges
+  into a witness still exist (so it is alive), and while a witness still has
+  more references than edges into it, the root is still referenced from
+  outside, and the walk is skipped. While the dctx variables of garbage are
+  released, the collections started by the function items and
+  QueryResources objs that are destroyed are deferred until the release is
+  done, and run once per QueryResources.
+
+  The external function parameters of the dctx are destroyed by dispose() in
+  any case, as they were before: they are opaque (e.g. the zorba-query module
+  keeps the queries it prepares, with the URL resolver function items passed
+  to them, in one), so cycles through them could not be collected.
+
+  theParent:
+  ----------
+  For an eval query: the QueryResources of the query whose ccb the eval ccb
+  copies (it shares that query's XQueryDiagnostics and DebuggerCommons).
+
+  theDctxParent:
+  --------------
+  For an eval query: the QueryResources of the query that owns the parent of
+  the eval dctx, if different from theParent.
+
+  Reference counting is atomic unless ZORBA_FOR_ONE_THREAD_ONLY is set; the
+  state itself, and the cycle collection, are used by one thread at a time, as
+  everything else in a query.
+********************************************************************************/
+class QueryResources : public SyncedRCObject
+{
+  friend class QueryResourcesCollector;
+
+protected:
+  CompilerCB                   * theCCB;
+  static_context_t               theSctx;
+  dynamic_context              * theDctx;
+  XQueryDiagnostics            * theDiagnostics;
+#ifdef ZORBA_WITH_DEBUGGER
+  DebuggerCommons              * theDebuggerCommons;
+#endif
+  rchandle<QueryResources>       theParent;
+  rchandle<QueryResources>       theDctxParent;
+  bool                           theIsDetached;
+
+  // See "Cost" in the class comment.
+  struct Witness
+  {
+    const void * thePtr;
+    int          theKind;
+    long         theInternalRefs;
+  };
+
+  enum { MAX_WITNESSES = 4 };
+
+  unsigned long                  theWitnessGeneration;
+  csize                          theNumWitnesses;
+  Witness                        theWitnesses[MAX_WITNESSES];
+
+  static std::atomic<unsigned long> theGraphGeneration;
+
+public:
+  // For tests: the number of QueryResources objs alive, and the number of
+  // graphs walked by collectCycles().
+  static std::atomic<long>          theNumAlive;
+  static std::atomic<unsigned long> theNumWalks;
+
+public:
+  QueryResources();
+
+  ~QueryResources();
+
+  /*
+    Ends the owner's use of the given state (any of which may be NULL); the
+    caller must release its reference to this obj afterwards. ccb, dctx and
+    diagnostics are owned by the callee from now on, and so is the ccb's
+    DebuggerCommons if ownsDebuggerCommons; sctx is moved (set to NULL), so
+    that it is released before the ccb is deleted.
+  */
+  void dispose(
+      CompilerCB* ccb,
+      static_context_t& sctx,
+      dynamic_context* dctx,
+      XQueryDiagnostics* diagnostics,
+      bool ownsDebuggerCommons,
+      QueryResources* parent,
+      QueryResources* dctxParent);
+
+  bool isDetached() const { return theIsDetached; }
+
+  /*
+    Releases the given reference; if it was to a detached obj that survives,
+    collects the cycles it may have been the last outside reference to.
+  */
+  static void release(rchandle<QueryResources>& resources);
+
+  /*
+    See the class comment. Collects the cycles through each detached obj in
+    held. held lists the references to QueryResources objs that the caller
+    holds until the call returns (with repetitions); they do not count as
+    references from outside the graph.
+  */
+  static void collectCycles(QueryResources* const* held, csize numHeld);
+
+  /*
+    Returns false if the last collection of each detached obj in roots found
+    it referenced from outside its graph, and that still holds (see "Cost" in
+    the class comment); collectCycles() would then do nothing.
+  */
+  static bool mayCollect(QueryResources* const* roots, csize numRoots);
+
+  // See "Cost" in the class comment.
+  static void graphChanged()
+  {
+    theGraphGeneration.fetch_add(1, std::memory_order_relaxed);
+  }
+
+  static unsigned long graphGeneration()
+  {
+    return theGraphGeneration.load(std::memory_order_relaxed);
+  }
+
+private:
+  void destroy();
+
+  QueryResources(const QueryResources&);
+  QueryResources& operator=(const QueryResources&);
+};
+
+typedef rchandle<QueryResources> QueryResources_t;
+
+
+// For tests (test/api/function_item_lifetime.cpp): see
+// QueryResources::theNumAlive and QueryResources::theNumWalks.
+ZORBA_DLL_PUBLIC long query_resources_alive();
+
+ZORBA_DLL_PUBLIC unsigned long query_resources_walks();
 
 
 /*******************************************************************************
@@ -231,6 +423,10 @@ public:
   // pointers (FunctionItemInfo::theFunction), and their bodies live in theEM,
   // so they share the lifetime of this ccb. Not copied, not serialized.
   std::vector<function_t>   theAnonymousUDFs;
+
+  // Not owned; set by the owner of this ccb (see QueryResources). NULL for a
+  // ccb whose function items cannot outlive it. Not copied, not serialized.
+  QueryResources          * theResources;
 
 public:
   SERIALIZABLE_CLASS(CompilerCB);

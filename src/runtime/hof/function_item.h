@@ -31,6 +31,7 @@ namespace zorba
 class signature;
 class function_item_expr;
 class FunctionItemInfo;
+class QueryResources;
 
 typedef rchandle<FunctionItemInfo> FunctionItemInfo_t;
 
@@ -40,6 +41,8 @@ typedef rchandle<FunctionItemInfo> FunctionItemInfo_t;
 
   theCCB :
   --------
+  The ccb of the query (or eval query) whose plan creates the function items.
+  Set by codegen (or by fn:function-lookup).
 
   theLoc:
   -------
@@ -160,6 +163,29 @@ public:
 /*******************************************************************************
   A FunctionItem is created during FunctionItemIterator::nextImpl().
 
+  theResources:
+  -------------
+  The QueryResources of theFunctionItemInfo->theCCB. It keeps alive the
+  compile-time state of the query that created this function item
+  (user_function objs, exprs, static contexts) when the application keeps the
+  item after that query is closed or destroyed. See QueryResources in
+  compiler/api/compilercb.h.
+
+  theFunctionResources:
+  ---------------------
+  The QueryResources of the ccb that owns theFunctionItemInfo->theFunction,
+  if different from theResources (e.g. fn:function-lookup, evaluated by one
+  query, of a UDF declared by another query). NULL otherwise.
+
+  theGlobalResources:
+  -------------------
+  The QueryResources of the query that owns theGlobalDctx.
+
+  theClosureDctxOwner:
+  --------------------
+  For a function item created by partial application (copy constructor): the
+  function item that owns theClosureDctx, kept alive as long as this one.
+
   theFunctionItemInfo:
   --------------------
   The associated function-item info.
@@ -173,24 +199,59 @@ public:
   The dynamic context obj to be used as the local dctx of the function, when the
   function item is dynamically invoked. This dctx is allocated during
   FunctionItemIterator::nextImpl(). At that time it is also populated with the
-  values of the outer variables.
+  values of the outer variables. Its parent is theGlobalDctx.
+
+  theGlobalDctx:
+  --------------
+  The global dctx of the plan that created this function item: the values of
+  the prolog variables that the function body reads, wherever the item is
+  invoked (XQuery 3.0: the non-local variable bindings of the function's
+  defining context). NULL if that dctx was temporary (e.g. constant folding),
+  in which case the body uses the global dctx of the invoking plan.
 
   theArgValues:
   -------------
 
+  theInternalRefs:
+  ----------------
+  theInternalRefsGeneration:
+  --------------------------
+  If this item was part of the graph of a detached QueryResources the last
+  time such a graph was found referenced from outside (see
+  QueryResources::collectCycles()): the number of references to it from that
+  graph, and the graph generation then. While the generation is unchanged and
+  the reference count stays above that number, the item is still referenced
+  from outside the graph and dropping a reference to it does not start a
+  collection. Otherwise (stale generation) any dropped reference does, if the
+  item refers to a detached QueryResources.
+
 ********************************************************************************/
 class FunctionItem : public store::Item, public zorba::serialization::SerializeBaseClass
 {
+  friend class QueryResourcesCollector;
+
 protected:
+  // Declared first, so that they are released last.
+  rchandle<QueryResources>        theResources;
+  rchandle<QueryResources>        theFunctionResources;
+  rchandle<QueryResources>        theGlobalResources;
+  store::Item_t                   theClosureDctxOwner;
+
   FunctionItemInfo_t              theFunctionItemInfo;
 
   csize                           theArity;
 
   dynamic_context*                theClosureDctx;
 
+  dynamic_context*                theGlobalDctx;
+
   std::vector<PlanIter_t>         theArgValues;
 
   bool                            theClosureDctxOwned;
+
+  long                            theInternalRefs;
+
+  unsigned long                   theInternalRefsGeneration;
 
   SYNC_CODE(mutable RCLock        theRCLock;)
 
@@ -203,11 +264,22 @@ public:
 public:
   FunctionItem(const FunctionItem& aFunctionItem);
 
-  FunctionItem(const FunctionItemInfo_t& fiInfo, dynamic_context* dctx);
+  /*
+    closureDctx: see theClosureDctx (NULL if there are no outer variables).
+    planState: the state of the plan that creates the item.
+  */
+  FunctionItem(
+      const FunctionItemInfo_t& fiInfo,
+      dynamic_context* closureDctx,
+      const PlanState& planState);
 
   ~FunctionItem();
 
   SYNC_CODE(RCLock* getRCLock() const { return &theRCLock; })
+
+  // Called by store::Item::removeReference() when the reference count has
+  // dropped to remaining (> 0).
+  void referenceDropped(long remaining);
 
   bool isInline() const { return theFunctionItemInfo->theIsInline; }
   
@@ -222,6 +294,10 @@ public:
   const signature& getSignature() const;
 
   dynamic_context* getDctx() const { return theClosureDctx; }
+
+  dynamic_context* getGlobalDctx() const { return theGlobalDctx; }
+
+  QueryResources* getGlobalResources() const { return theGlobalResources.getp(); }
 
   ulong getMaxInScopeVarId() const;
 
@@ -238,6 +314,11 @@ public:
   PlanIter_t getImplementation(CompilerCB* ccb);
 
   zstring show() const;
+
+private:
+  bool refersToDetached() const;
+
+  void collectCycles();
 };
 
 

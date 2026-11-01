@@ -167,6 +167,8 @@ public:
 
   void setOptimized(bool v) { theIsOptimized = v; }
 
+  CompilerCB* getCCB() const { return theCCB; }
+
   bool isOptimized() const { return theIsOptimized; }
 
   void optimize();
