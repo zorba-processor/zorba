@@ -59,13 +59,8 @@ class DebuggerServer {
 
   private:
 
-#ifdef WIN32
-    static BOOL WINAPI
-    ctrlC_Handler(DWORD aCtrlType);
-#else
     static void
     ctrlC_Handler(int lParam);
-#endif
 
 
     std::string

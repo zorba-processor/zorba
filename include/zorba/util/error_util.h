@@ -15,9 +15,6 @@
  */
 
 #pragma once
-#if WIN32
-#pragma warning(disable:4275)
-#endif
 #ifndef ZORBA_API_ERROR_UTIL_H
 #define ZORBA_API_ERROR_UTIL_H
 
@@ -27,22 +24,14 @@
 #include <zorba/internal/ztd.h>
 
 #include <stdexcept>
-#ifndef WIN32
 # include <cerrno>
-#else
-# include <windows.h>
-#endif /* WIN32 */
 
 namespace zorba {
 namespace os_error {
 
 ////////// types //////////////////////////////////////////////////////////////
 
-#ifdef WIN32
-typedef DWORD code_type;
-#else
 typedef int code_type;
-#endif /* WIN32 */
 
 ////////// Exceptions /////////////////////////////////////////////////////////
 
@@ -127,11 +116,7 @@ std::string format_err_string( char const *function, code_type code,
  * @return Returns said error code.
  */
 inline code_type get_err_code() {
-#ifdef WIN32
-  return ::GetLastError();
-#else
   return errno;
-#endif /* WIN32 */
 }
 
 /**

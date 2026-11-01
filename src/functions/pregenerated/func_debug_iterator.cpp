@@ -23,7 +23,6 @@
 
 
 
-#include "stdafx.h"
 #include "runtime/debug/debug_iterator.h"
 #include "functions/func_debug_iterator.h"
 

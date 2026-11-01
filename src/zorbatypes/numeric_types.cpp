@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-#include "stdafx.h"
-
 // local
 #include "decimal.h"
 #include "float.h"

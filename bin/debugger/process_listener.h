@@ -26,12 +26,6 @@
   typedef pid_t ProcessId;
   typedef int ExitCode;
 # define ZORBA_THREAD_RETURN void *
-#else
-# include <windows.h>
-  typedef DWORD ThreadId;
-  typedef DWORD ProcessId;
-  typedef DWORD ExitCode;
-# define ZORBA_THREAD_RETURN DWORD WINAPI
 #endif
 
 typedef void (*ExitCallbackType)(ExitCode);

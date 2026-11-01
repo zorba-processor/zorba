@@ -14,21 +14,15 @@
  * limitations under the License.
  */
 #include <zorba/internal/ztd.h>
-#include "stdafx.h"
 
 // standard
 #include <algorithm>
 #include <cstring>
 #include <stdexcept>
-#ifdef WIN32
-# include <windows.h>
-# include "zorbautils/fatal.h"
-#else
-# include <clocale>
-# include <cstdlib>                     /* for getenv(3) */
-# include <langinfo.h>                  /* for nl_langinfo(3) */
-# include <locale.h>                    /* for newlocale(3) */
-#endif /* WIN32 */
+#include <clocale>
+#include <cstdlib>                     /* for getenv(3) */
+#include <langinfo.h>                  /* for nl_langinfo(3) */
+#include <locale.h>                    /* for newlocale(3) */
 
 // Zorba
 #include <zorba/internal/cxx_util.h>
@@ -55,11 +49,7 @@ using namespace std;
 namespace zorba {
 namespace locale {
 
-#ifdef WIN32
-typedef LCTYPE locale_index_type;
-#else
 typedef nl_item locale_index_type;
-#endif /* WIN32 */
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -73,130 +63,6 @@ inline int find_index( char const *const *begin, char const *const *end,
   return entry != end && ::strcmp( s, *entry ) == 0 ? entry - begin : 0;
 }
 
-#ifdef WIN32
-
-/**
- * Gets the name of the locale for the given language and country in the format
- * that Windows expects.
- *
- * @param lang The language to use.
- * @param country The country to use, if any.
- * @return Returns a pointre to the UTF-16 buffer containing the locale name.
- */
-static unique_ptr<WCHAR[]> get_wlocale_name( iso639_1::type lang,
-                                             iso3166_1::type country ) {
-  assert( lang );
-
-  zstring locale_name( iso639_1::str( lang ) );
-  if ( country ) {
-    locale_name += '-';
-    locale_name += iso3166_1::str( country );
-  }
-
-  unique_ptr<WCHAR[]> wlocale_name( new WCHAR[ LOCALE_NAME_MAX_LENGTH ] );
-  win32::atow(
-    locale_name.c_str(), wlocale_name.get(), LOCALE_NAME_MAX_LENGTH
-  );
-  return wlocale_name;
-}
-
-/**
- * Gets a particular piece of information from the user's default locale.
- *
- * @param constant The constant specifying which piece of locale information to
- * get.
- * @return Returns said information or an emptr string.
- */
-static zstring get_locale_info( int constant ) {
-  int wlen = ::GetLocaleInfo( LOCALE_USER_DEFAULT, constant, NULL, 0 );
-  if ( !wlen )
-    return zstring();
-  unique_ptr<WCHAR[]> winfo( new WCHAR[ wlen ] );
-  wlen = ::GetLocaleInfo( LOCALE_USER_DEFAULT, constant, winfo.get(), wlen );
-  ZORBA_FATAL( wlen, "GetLocaleInfo() failed" );
-  unique_ptr<char[]> const info( win32::wtoa( winfo.get() ) );
-  return zstring( info.get() );
-}
-
-/**
- * GetLocaleInfoEx() is available only on Windows Vista and later so we can't
- * call it directly since we might be running on Windows XP.  Hence, check to
- * see if it's available and call it indirectly if so.
- */
-static int Zorba_GetLocaleInfoEx( LPCWSTR lpLocaleName, LCTYPE LCType,
-                                  LPWSTR lpLCData, int cchData ) {
-  typedef int (WINAPI *GetLocaleInfoEx_type)( LPCWSTR, LCTYPE, LPWSTR, int );
-
-  static GetLocaleInfoEx_type GetLocaleInfoEx_ptr;
-  static bool init;
-
-  if ( !init ) {
-    GetLocaleInfoEx_ptr = (GetLocaleInfoEx_type)::GetProcAddress(
-      ::GetModuleHandle( TEXT( "kernel32.dll" ) ), "GetLocaleInfoEx"
-    );
-    init = true;
-  }
-
-  return GetLocaleInfoEx_ptr ?
-    GetLocaleInfoEx_ptr( lpLocaleName, LCType, lpLCData, cchData ) : 0;
-}
-
-/**
- * Gets a particular piece of information from a locale.
- *
- * @param constant The constant specifying which piece of locale information to
- * get.
- * @param lang The language to use, if any.
- * @param country The country to use, if any.
- * @return Returns said information or an empty string.
- */
-static zstring get_locale_info( int constant, iso639_1::type lang,
-                                iso3166_1::type country ) {
-  LPCWSTR wlocale_name;
-  unique_ptr<WCHAR[]> wlocale_name_ptr;
-
-  if ( !country )
-    country = iso3166_1::get_default( lang );
-  if ( lang && country ) {
-    wlocale_name_ptr = get_wlocale_name( lang, country );
-    wlocale_name = wlocale_name_ptr.get();
-  } else
-    wlocale_name = LOCALE_NAME_USER_DEFAULT;
-
-  int wlen = Zorba_GetLocaleInfoEx( wlocale_name, constant, NULL, 0 );
-  if ( !wlen )
-    return zstring();
-  unique_ptr<WCHAR[]> winfo( new WCHAR[ wlen ] );
-  wlen = Zorba_GetLocaleInfoEx( wlocale_name, constant, winfo.get(), wlen );
-  ZORBA_FATAL( wlen, "GetLocaleInfoEx() failed" );
-
-  unique_ptr<char[]> const info( win32::wtoa( winfo.get() ) );
-  return zstring( info.get() );
-}
-
-/**
- * IsValidLocaleName() is available only on Windows Vista and later so we can't
- * call it directly since we might be running on Windows XP.  Hence, check to
- * see if it's available and call it indirectly if so.
- */
-static bool Zorba_IsValidLocaleName( LPCWSTR lpLocaleName ) {
-  typedef int (WINAPI *IsValidLocaleName_type)( LPCWSTR );
-
-  static IsValidLocaleName_type IsValidLocaleName_ptr;
-  static bool init;
-
-  if ( !init ) {
-    IsValidLocaleName_ptr = (IsValidLocaleName_type)::GetProcAddress(
-      ::GetModuleHandle( TEXT( "kernel32.dll" ) ), "IsValidLocaleName"
-    );
-    init = true;
-  }
-
-  return IsValidLocaleName_ptr ?
-    !!IsValidLocaleName_ptr( lpLocaleName ) : false;
-}
-
-#else /* WIN32 */
 
 /**
  * Checks for and filters-out "useless" locales.
@@ -283,7 +149,6 @@ static zstring get_locale_info( nl_item item, iso639_1::type lang,
   return nl_langinfo( item );
 }
 
-#endif /* WIN32 */
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -1240,107 +1105,24 @@ iso639_1::type find_lang( char const *lang ) {
 }
 
 zstring get_date_format( iso639_1::type lang, iso3166_1::type country ) {
-#ifdef WIN32
-  zstring const w32_format(
-    get_locale_info( LOCALE_SSHORTDATE, lang, country )
-  );
-  zstring format;
-  //
-  // Convert Windows' date format for that used by strptime(3); see:
-  // http://msdn.microsoft.com/en-us/library/windows/desktop/dd317787(v=vs.85).aspx
-  //
-  for ( char const *i = w32_format.c_str(); *i; ++i ) {
-    switch ( *i ) {
-
-      case 'd':
-        if ( i[1] == 'd' )
-          if ( i[2] == 'd' )
-            if ( i[3] == 'd' )
-              format += "%A", i += 3;   // dddd = full weekday name
-            else
-              format += "%a", i += 2;   // ddd = abbreviated weekday name
-          else
-            format += "%d", i += 1;     // dd = day of month: 01-31
-        else
-          format += "%e";               // d = day of month: 1-31
-        break;
-
-      case 'g':                         // period/era
-        //
-        // There's no equivalent strftime(3) conversion specification: just
-        // ignore it and hope for the best.
-        //
-        if ( i[1] == 'g' )
-          ++i;                          // gg = same as g
-        break;
-
-      case 'M':
-        if ( i[1] == 'M' )
-          if ( i[2] == 'M' )
-            if ( i[3] == 'M' )
-              format += "%B", i += 3;   // MMMM = full month name
-            else
-              format += "%b", i += 2;   // MMM = abbreviated month name
-          else
-            format += "%m", i += 1;     // MM = month: 01-12
-        else
-          format += "%m";               // M = month: 1-12
-        break;
-
-      case 'y':
-        if ( i[1] == 'y' )
-          if ( i[2] == 'y' )
-            if ( i[3] == 'y' ) {
-              format += "%Y", i += 3;   // yyyy = 4-digit year
-              if ( i[3] == 'y' )
-                ++i;                    // yyyyy = same as yyyy
-            } else
-              ;
-          else
-            format += "%y", i += 1;     // yy = 2-digit year
-        else
-          format += "%y";               // y = 1-digit year
-        break;
-
-      default:
-        format += *i;
-    } // switch
-  } // for
-  return format;
-#else
   zstring fmt( get_locale_info( D_FMT, lang, country ) );
   if ( fmt.empty() && lang == iso639_1::en )
     fmt = "%d-%b-%Y";                   // dd-Mon-yyyy
   return fmt;
-#endif /* WIN32 */
 }
 
 zstring get_date_time_format( iso639_1::type lang, iso3166_1::type country ) {
-#ifdef WIN32
-  //
-  // Windows has no equivalent for both date and time, so glue its date and
-  // time together and hope for the best.
-  //
-  return get_date_format( lang, country ) + ' ' +
-         get_time_format( lang, country );
-#else
   zstring fmt( get_locale_info( D_T_FMT, lang, country ) );
   if ( fmt.empty() && lang == iso639_1::en )
     fmt = "%a %b %e %X %Y";
   return fmt;
-#endif /* WIN32 */
 }
 
 iso3166_1::type get_host_country() {
   iso3166_1::type country = iso3166_1::unknown;
 
-#ifdef WIN32
-  zstring const name( get_locale_info( LOCALE_SISO3166CTRYNAME ) );
-  country = iso3166_1::find( name );
-#else
   zstring const loc_info( get_unix_locale() );
   parse( loc_info, nullptr, &country );
-#endif /* WIN32 */
 
   return country;
 }
@@ -1352,13 +1134,8 @@ iso639_1::type get_host_lang() {
   //
   iso639_1::type lang = iso639_1::unknown;
 
-#ifdef WIN32
-  zstring const name( get_locale_info( LOCALE_SISO639LANGNAME ) );
-  lang = find_lang( name );
-#else
   zstring const loc_info( get_unix_locale() );
   parse( loc_info, &lang );
-#endif /* WIN32 */
   if ( !lang )
     lang = iso639_1::en;              // default to English
   
@@ -1368,17 +1145,8 @@ iso639_1::type get_host_lang() {
 zstring get_month_abbr( unsigned month_index, iso639_1::type lang,
                         iso3166_1::type country ) {
   static locale_index_type const month_abbr[] = {
-#ifdef WIN32
-    LOCALE_SABBREVMONTHNAME1, LOCALE_SABBREVMONTHNAME2,
-    LOCALE_SABBREVMONTHNAME3, LOCALE_SABBREVMONTHNAME4,
-    LOCALE_SABBREVMONTHNAME5, LOCALE_SABBREVMONTHNAME6,
-    LOCALE_SABBREVMONTHNAME7, LOCALE_SABBREVMONTHNAME8,
-    LOCALE_SABBREVMONTHNAME9, LOCALE_SABBREVMONTHNAME10,
-    LOCALE_SABBREVMONTHNAME11, LOCALE_SABBREVMONTHNAME12
-#else
     ABMON_1, ABMON_2, ABMON_3, ABMON_4, ABMON_5, ABMON_6,
     ABMON_7, ABMON_8, ABMON_9, ABMON_10, ABMON_11, ABMON_12
-#endif /* WIN32 */
   };
 
   if ( month_index > 11 )
@@ -1397,15 +1165,8 @@ zstring get_month_abbr( unsigned month_index, iso639_1::type lang,
 zstring get_month_name( unsigned month_index, iso639_1::type lang,
                         iso3166_1::type country ) {
   static locale_index_type const month_name[] = {
-#ifdef WIN32
-    LOCALE_SMONTHNAME1, LOCALE_SMONTHNAME2, LOCALE_SMONTHNAME3,
-    LOCALE_SMONTHNAME4, LOCALE_SMONTHNAME5, LOCALE_SMONTHNAME6,
-    LOCALE_SMONTHNAME7, LOCALE_SMONTHNAME8, LOCALE_SMONTHNAME9,
-    LOCALE_SMONTHNAME10, LOCALE_SMONTHNAME11, LOCALE_SMONTHNAME12
-#else
     MON_1, MON_2, MON_3, MON_4, MON_5, MON_6,
     MON_7, MON_8, MON_9, MON_10, MON_11, MON_12
-#endif /* WIN32 */
   };
 
   if ( month_index > 11 )
@@ -1423,11 +1184,7 @@ zstring get_month_name( unsigned month_index, iso639_1::type lang,
 
 zstring get_time_ampm( bool pm, iso639_1::type lang, iso3166_1::type country ) {
   static locale_index_type const ampm[] = {
-#ifdef WIN32
-    LOCALE_S1159, LOCALE_S2359
-#else
     AM_STR, PM_STR
-#endif /* WIN32 */
   };
   zstring s( get_locale_info( ampm[ pm ], lang, country ) );
   if ( s.empty() && lang == iso639_1::en )
@@ -1436,77 +1193,16 @@ zstring get_time_ampm( bool pm, iso639_1::type lang, iso3166_1::type country ) {
 }
 
 zstring get_time_format( iso639_1::type lang, iso3166_1::type country ) {
-#ifdef WIN32
-  zstring const w32_format(
-    get_locale_info( LOCALE_STIMEFORMAT, lang, country )
-  );
-  zstring format;
-  //
-  // Convert Windows' time format for that used by strptime(3); see:
-  // http://msdn.microsoft.com/en-us/library/windows/desktop/dd318148(v=vs.85).aspx
-  //
-  for ( char const *i = w32_format.c_str(); *i; ++i ) {
-    switch ( *i ) {
-
-      case 'h':
-        if ( i[1] == 'h' )
-          format += "%I", ++i;
-        else
-          format += "%l";
-        break;
-
-      case 'H':
-        if ( i[1] == 'H' )
-          format += "%H", ++i;
-        else
-          format += "%k";
-        break;
-
-      case 'm':
-        format += "%M";
-        if ( i[1] == 'm' )
-          ++i;
-        break;
-
-      case 's':
-        format += "%S";
-        if ( i[1] == 's' )
-          ++i;
-        break;
-
-      case 't':
-        format += "%p";
-        if ( i[1] == 't' )
-          ++i;
-        break;
-
-      default:
-        format += *i;
-    } // switch
-  } // for
-  return format;
-#else
   zstring fmt( get_locale_info( T_FMT, lang, country ) );
   if ( fmt.empty() && lang == iso639_1::en )
     fmt = "%H:%M:%S";
   return fmt;
-#endif /* WIN32 */
 }
 
 zstring get_weekday_abbr( unsigned day_index, iso639_1::type lang,
                           iso3166_1::type country ) {
   static locale_index_type const weekday_abbr[] = {
-#ifdef WIN32
-    LOCALE_SABBREVDAYNAME7 /* Sun */,
-    LOCALE_SABBREVDAYNAME1 /* Mon */,
-    LOCALE_SABBREVDAYNAME2 /* Tue */,
-    LOCALE_SABBREVDAYNAME3 /* Wed */,
-    LOCALE_SABBREVDAYNAME4 /* Thu */,
-    LOCALE_SABBREVDAYNAME5 /* Fri */,
-    LOCALE_SABBREVDAYNAME6 /* Sat */
-#else
     ABDAY_1, ABDAY_2, ABDAY_3, ABDAY_4, ABDAY_5, ABDAY_6, ABDAY_7
-#endif /* WIN32 */
   };
 
   if ( day_index > 6 )
@@ -1524,17 +1220,7 @@ zstring get_weekday_abbr( unsigned day_index, iso639_1::type lang,
 zstring get_weekday_name( unsigned day_index, iso639_1::type lang,
                           iso3166_1::type country ) {
   static locale_index_type const weekday_name[] = {
-#ifdef WIN32
-    LOCALE_SDAYNAME7 /* Sun */,
-    LOCALE_SDAYNAME1 /* Mon */,
-    LOCALE_SDAYNAME2 /* Tue */,
-    LOCALE_SDAYNAME3 /* Wed */,
-    LOCALE_SDAYNAME4 /* Thu */,
-    LOCALE_SDAYNAME5 /* Fri */,
-    LOCALE_SDAYNAME6 /* Sat */
-#else
     DAY_1, DAY_2, DAY_3, DAY_4, DAY_5, DAY_6, DAY_7
-#endif /* WIN32 */
   };
 
   if ( day_index > 6 )
@@ -1553,10 +1239,6 @@ zstring get_weekday_name( unsigned day_index, iso639_1::type lang,
 bool is_supported( iso639_1::type lang, iso3166_1::type country ) {
   if ( !country )
     country = iso3166_1::get_default( lang );
-#ifdef WIN32
-  unique_ptr<WCHAR[]> const wlocale_name( get_wlocale_name( lang, country ) );
-  return Zorba_IsValidLocaleName( wlocale_name.get() );
-#else
   if ( lang == iso639_1::en )
     return true;                        // Always support English
   if ( locale_t const loc = get_unix_locale_t( lang, country ) ) {
@@ -1564,7 +1246,6 @@ bool is_supported( iso639_1::type lang, iso3166_1::type country ) {
     return true;
   }
   return false;
-#endif /* WIN32 */
 }
 
 bool parse( char const *locale_str, iso639_1::type *lang,

@@ -12,11 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-IF (WIN32)
-  SET (PATH_SEP ",")
-ELSE (WIN32)
-  SET (PATH_SEP ":")
-ENDIF (WIN32)
+SET (PATH_SEP ":")
 
 # Probably should have separate URI and LIB paths here someday; will
 # require testdriver to accept --uri-path and --lib-path args

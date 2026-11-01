@@ -16,7 +16,6 @@
 #ifndef ZORBA_RUNTIME_UTIL_DOC_URI_HEURISTICS_H
 #define ZORBA_RUNTIME_UTIL_DOC_URI_HEURISTICS_H
 
-#include "stdafx.h"
 #include <zorba/config.h>
 
 #include <zorbatypes/zstring.h>

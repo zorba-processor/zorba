@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-#include "stdafx.h"
-
 #include "simple_iterator_factory.h"
 #include "node_iterators.h"
 #include "simple_temp_seq.h"

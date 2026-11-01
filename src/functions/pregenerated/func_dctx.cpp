@@ -23,7 +23,6 @@
 
 
 
-#include "stdafx.h"
 #include "runtime/dctx/dctx.h"
 #include "functions/func_dctx.h"
 

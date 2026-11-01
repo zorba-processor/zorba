@@ -21,16 +21,8 @@
 
 #include <zorba/debugger_exception.h>
 
-#ifdef _WIN64
-  typedef unsigned __int64 SOCKET;
-#else
-#ifdef _WIN32
-  typedef unsigned int __w64 SOCKET;
-#else
 # define INVALID_SOCKET -1
 typedef int SOCKET;
-#endif
-#endif
 
 namespace zorba {
 
@@ -85,17 +77,8 @@ public:
     unsigned short localPort = 0);
 
   /**
-   *   If WinSock, unload the WinSock DLLs; otherwise do nothing.  We ignore
-   *   this in our sample client code but include it in the library for
-   *   completeness.  If you are running on Windows and you are concerned
-   *   about DLL resource consumption, call this after you are done with all
-   *   Socket instances.  If you execute this on Windows while some instance of
-   *   Socket exists, you are toast.  For portability of client code, this is 
-   *   an empty function on non-Windows platforms so you can always include it.
-   *   @param buffer buffer to receive the data
-   *   @param bufferLen maximum number of bytes to read into buffer
-   *   @return number of bytes read, 0 for EOF, and -1 for error
-   *   @exception DebuggerSocketException thrown WinSock clean up fails
+   *   Does nothing on POSIX systems; kept so that client code can always
+   *   call it after it is done with all Socket instances.
    */
   static void cleanUp();
 

@@ -175,7 +175,6 @@ to_string( unicode::char_type const *in, size_type in_len, StringType *out ) {
   return false;
 }
 
-#ifndef WIN32
 template<class StringType>
 typename std::enable_if<ZORBA_IS_STRING(StringType),bool>::type
 to_string( wchar_t const *in, size_type in_len, StringType *out ) {
@@ -189,7 +188,6 @@ to_string( wchar_t const *in, size_type in_len, StringType *out ) {
   }
   return false;
 }
-#endif /* WIN32 */
 
 #endif /* ZORBA_NO_ICU */
 

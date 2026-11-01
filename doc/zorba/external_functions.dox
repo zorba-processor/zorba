@@ -160,8 +160,8 @@ result of this step on the example URI is "com/example/www/modules/libutils_1.2"
 </li>
 
 <li>
-Finally, the appropriate suffix is appended to the file name: ".so" for Unix, 
-".dll" for Windows, or ".dylib" for MacOS. The result of this step on the 
+Finally, the appropriate suffix is appended to the file name: ".so" for Linux,
+or ".dylib" for MacOS. The result of this step on the 
 example URI is "com/example/www/modules/libutils_1.2.so".
 </li>
 

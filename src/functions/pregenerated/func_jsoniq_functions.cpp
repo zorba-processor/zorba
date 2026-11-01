@@ -23,7 +23,6 @@
 
 
 
-#include "stdafx.h"
 #include "runtime/json/jsoniq_functions.h"
 #include "functions/func_jsoniq_functions.h"
 

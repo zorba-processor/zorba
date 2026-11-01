@@ -698,10 +698,8 @@ uri_access_security(int argc, char* argv[])
     return 1;
   }
 
-#ifndef WIN32
   // Read by the root static context when the instance is created.
   ::setenv("ZORBA_URI_PATH", lFiles->path("env").c_str(), 1);
-#endif
 
   void* lStore = StoreManager::getStore();
   Zorba* lZorba = Zorba::getInstance(lStore);
@@ -718,9 +716,7 @@ uri_access_security(int argc, char* argv[])
 #ifndef ZORBA_NO_FULL_TEXT
     test_full_text(lZorba, *lFiles);
 #endif
-#ifndef WIN32
     test_env_uri_path(lZorba);
-#endif
   }
   catch (ZorbaException const& e)
   {

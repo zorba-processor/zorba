@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-#include "stdafx.h"
 #include <zorba/internal/streambuf.h>
 
 using namespace std;

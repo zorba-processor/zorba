@@ -17,14 +17,11 @@
 # -helper macro to add a "doc" target with CMake build system. 
 # and configure doxy.config.in to doxy.config
 #
-# target "doc" allows building the documentation with doxygen/dot on WIN32 and Linux
-# Creates .chm windows help file if MS HTML help workshop 
-# (available from http://msdn.microsoft.com/workshop/author/htmlhelp)
-# is installed with its DLLs in PATH.
+# target "doc" allows building the documentation with doxygen/dot.
 #
 #
 # Please note, that the tools, e.g.:
-# doxygen, dot, latex, dvips, makeindex, gswin32, etc.
+# doxygen, dot, latex, dvips, makeindex, etc.
 # must be in path.
 #
 # Note about Visual Studio Projects: 
@@ -118,53 +115,5 @@ MACRO (ZORBA_DOXYGEN DOXYGEN_SOURCE DOXYGEN_BINARY DOXYGEN_TARGET_NAME)
       FOLDER "Docs"
     )
 
-    # create a windows help .chm file using hhc.exe
-    # HTMLHelp DLL must be in path!
-    # fallback: use hhw.exe interactively
-    IF (WIN32)
-      FIND_PACKAGE (HTMLHelp)
-      IF (HTML_HELP_COMPILER)      
-        SET (TMP "${DOXYGEN_BINARY}\\Doc\\html\\index.hhp")
-        STRING (REGEX REPLACE "[/]" "\\\\" HHP_FILE ${TMP} )
-        ADD_CUSTOM_TARGET (winhelp_${DOXYGEN_TARGET_NAME} ${HTML_HELP_COMPILER} ${HHP_FILE})
-        ADD_DEPENDENCIES (winhelp_${DOXYGEN_TARGET_NAME} ${DOXYGEN_TARGET_NAME})
-        SET_TARGET_PROPERTIES(winhelp_${DOXYGEN_TARGET_NAME} PROPERTIES
-          FOLDER "Docs"
-        )
-
-        IF (NOT TARGET_DOC_SKIP_INSTALL)
-        # install windows help?
-        # determine useful name for output file 
-        # should be project and version unique to allow installing 
-        # multiple projects into one global directory      
-        IF (EXISTS "${PROJECT_BINARY_DIR}/Doc/html/index.chm")
-          IF (PROJECT_NAME)
-            SET (OUT "${PROJECT_NAME}")
-          ELSE (PROJECT_NAME)
-            SET (OUT "Documentation") # default
-          ENDIF (PROJECT_NAME)
-          IF (${PROJECT_NAME}_VERSION_MAJOR)
-            SET (OUT "${OUT}-${${PROJECT_NAME}_VERSION_MAJOR}")
-            IF (${PROJECT_NAME}_VERSION_MINOR)
-              SET (OUT  "${OUT}.${${PROJECT_NAME}_VERSION_MINOR}")
-              IF (${PROJECT_NAME}_VERSION_PATCH)
-                SET(OUT "${OUT}.${${PROJECT_NAME}_VERSION_PATCH}")      
-              ENDIF (${PROJECT_NAME}_VERSION_PATCH)
-            ENDIF (${PROJECT_NAME}_VERSION_MINOR)
-          ENDIF (${PROJECT_NAME}_VERSION_MAJOR)
-          # keep suffix
-          SET (OUT  "${OUT}.chm")
-
-          # create target used by install and package commands 
-          INSTALL (
-            FILES "${PROJECT_BINARY_DIR}/Doc/html/index.chm"
-            DESTINATION "doc"
-            RENAME "${OUT}"
-          )
-        ENDIF (EXISTS "${PROJECT_BINARY_DIR}/Doc/html/index.chm")
-        ENDIF (NOT TARGET_DOC_SKIP_INSTALL)
-
-      ENDIF (HTML_HELP_COMPILER)
-    ENDIF (WIN32) 
   ENDIF (DOXYGEN_FOUND)
 ENDMACRO (ZORBA_DOXYGEN)

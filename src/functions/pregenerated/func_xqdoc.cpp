@@ -23,7 +23,6 @@
 
 
 
-#include "stdafx.h"
 #include "runtime/xqdoc/xqdoc.h"
 #include "functions/func_xqdoc.h"
 

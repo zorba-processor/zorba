@@ -22,7 +22,6 @@
 // ******************************************
 
 
-#include "stdafx.h"
 #include "zorbatypes/rchandle.h"
 #include "zorbatypes/zstring.h"
 #include "runtime/visitors/planiter_visitor.h"

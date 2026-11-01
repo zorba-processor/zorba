@@ -13,9 +13,7 @@ of \c virtual functions.
 You then provide Zorba with instances of your derived classes.
 
 However,
-there are two problems:
-one general
-and one that's Windows-specific.
+there is a problem with instance ownership.
 
 \section memory_management_general_problem The General Problem
 
@@ -70,30 +68,9 @@ whether to call \c delete on it or not.
 to determine whether a pointer points to an object
 that is statically allocated or was dynamically allocated.)
 
-\section memory_management_windows_problem The Windows-Specific Problem
+\section memory_management_solution The Solution
 
-A further complication is that,
-on the Windows platform,
-there is an issue with dynamically allocating instances in your executable
-and deallocating them in a library
-(or vice versa).
-This has to do with the Windows C Runtime Library
-that's used by the executable and library:
-if they don't match
-and you dynamically allocate an instance in your executable
-and it's deallocated in the library
-(or vice versa),
-your program will crash.
-
-The only way to avoid this problem
-is to ensure that all instances
-that are dynamically allocated in your executable
-are also deallocated in your executable;
-and the same goes for the library.
-
-\section memory_management_solution The Solution to Both Problems
-
-A solution to both problems
+A solution
 is to replace what would have been a call to \c delete
 with a call to a \c virtual member function \c destroy().
 The API for the full-text \c Stemmer would now be

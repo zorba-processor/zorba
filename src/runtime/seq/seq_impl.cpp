@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-#include "stdafx.h"
-
 #include <zorba/config.h>
 #include <zorba/internal/cxx_util.h>
 
@@ -36,11 +34,7 @@ namespace zorba {
 inline Item_set_type* new_Item_set( TypeManager const *tm, long tz,
                                     XQPCollator *coll, QueryLoc const &loc ) {
   int lBucketCount =
-#ifdef WIN32
-        11
-#else
         ztd::prime_rehash_policy::default_bucket_count
-#endif /* WIN32 */
   ;
 
   return new Item_set_type(

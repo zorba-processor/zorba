@@ -13,24 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "stdafx.h"
 
 #include "util/fx/fxcharheap.h"
 
-#ifndef _WIN32_WCE
   #include <sys/types.h>
   #include <errno.h>
-#else
-  #include <windows.h>
-  #include <types.h>
-#endif
 
-#ifdef WIN32
-  
-#else
   #include <sys/mman.h>
   #include <unistd.h>
-#endif
 
 #include <string>
 #include <sstream>

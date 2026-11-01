@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-#include "stdafx.h"
-
 #include <cstring>
 
 #include "util/fs_util.h"
@@ -83,41 +81,24 @@ void test_normalize_path( int no, char const *path, char const *expected ) {
 ///////////////////////////////////////////////////////////////////////////////}
 
 static test const base_name_tests[] = {
-#ifndef WIN32
   /* 0 */ { "/a/b", "b" },
   /* 1 */ { "/a"  , "a" },
   /* 2 */ { "/"   , "/" },
   /* 3 */ { "a/b" , "b" },
   /* 4 */ { "a"   , "a" },
-#else
-  /* 0 */ { "C:\\a\\b", "b"    },
-  /* 1 */ { "C:\\a"   , "a"    },
-  /* 2 */ { "C:\\"    , "C:\\" },
-  /* 3 */ { "a\\b"    , "b"    },
-  /* 4 */ { "a"       , "a"    },
-#endif /* WIN32 */
   { 0, 0 }
 };
 
 static test const dir_name_tests[] = {
-#ifndef WIN32
   /* 0 */ { "/a/b", "/a" },
   /* 1 */ { "/a"  , "/"  },
   /* 2 */ { "/"   , "/"  },
   /* 3 */ { "a/b" , "a"  },
   /* 4 */ { "a"   , "."  },
-#else
-  /* 0 */ { "C:\\a\\b", "C:\\a" },
-  /* 1 */ { "C:\\a"   , "C:\\"  },
-  /* 2 */ { "C:\\"    , "C:\\"  },
-  /* 3 */ { "a\\b"    , "a"     },
-  /* 4 */ { "a"       , "."     },
-#endif /* WIN32 */
   { 0, 0 }
 };
 
 static test normalize_path_tests[] = {
-#ifndef WIN32
   /*  0 */ { "/a//b"                , "/a/b" },
   /*  1 */ { "/a///b"               , "/a/b" },
   /*  2 */ { "/a/./b"               , "/a/b" },
@@ -131,20 +112,6 @@ static test normalize_path_tests[] = {
   /* 10 */ { "file://localhost/a/b" , "/a/b" },
   /* 11 */ { "\\a\\b"               , "/a/b" },
   /* 12 */ { "a/../b"               , "b"    },
-#else
-  /*  0 */ { "C:\\a\\\\b"                 , "C:\\a\\b" },
-  /*  1 */ { "C:\\a\\\\\\b"               , "C:\\a\\b" },
-  /*  2 */ { "C:\\a\\.\\b"                , "C:\\a\\b" },
-  /*  3 */ { "C:\\a\\.\\.\\b"             , "C:\\a\\b" },
-  /*  4 */ { "C:\\a\\b\\."                , "C:\\a\\b" },
-  /*  5 */ { "C:\\a\\..\\b"               , "C:\\b"    },
-  /*  6 */ { "C:\\a\\b\\..\\..\\c"        , "C:\\c"    },
-  /*  7 */ { "C:\\a\\b\\..\\c\\..\\d"     , "C:\\a\\d" },
-  /*  8 */ { "C:\\a\\b\\.."               , "C:\\a"    },
-  /*  9 */ { "file:///C%3A/a/b"           , "C:\\a\\b" },
-  /* 10 */ { "file://localhost/C%3A/a/b"  , "C:\\a\\b" },
-  /* 11 */ { "C:/a/b"                     , "C:\\a\\b" },
-#endif /* WIN32 */
   { 0, 0 }
 };
 

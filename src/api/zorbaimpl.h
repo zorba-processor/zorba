@@ -60,9 +60,6 @@ protected:
   ulong           theNumUsers;
 
 public:
-#ifdef WIN32
-  static bool ctrl_c_signaled;
-#endif
 
 public:
 

@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "stdafx.h"
 #include "functions/function.h"
 #include "functions/func_parsing_and_serializing.h"
 

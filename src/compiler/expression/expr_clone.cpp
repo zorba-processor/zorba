@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-#include "stdafx.h"
 #include "compiler/expression/expr_base.h"
 #include "compiler/expression/update_exprs.h"
 #include "compiler/expression/expr.h"

@@ -18,12 +18,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <sstream>
-#ifdef WIN32
-#include <windows.h>
-#include <direct.h>
-#else
 #include <unistd.h>
-#endif /* WIN32 */
 
 // Zorba
 #include <zorba/diagnostic_list.h>

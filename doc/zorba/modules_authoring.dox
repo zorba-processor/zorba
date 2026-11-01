@@ -83,7 +83,7 @@ developing an entire stand-alone application which uses Zorba as a
 library.)
 
 Assuming that you have cmake installed (it is available in most Linux
-distributions, and installers are available for Windows and MacOS - it
+distributions, and installers are available for MacOS - it
 is also part of MacPorts), creating a project for a Zorba module is
 very easy. First, in a new directory, copy the <tt>mymod.xq</tt> file
 from above, and create a file named <tt>CMakeLists.txt</tt>:
@@ -171,13 +171,11 @@ all the necessary build system rules and targets.
 You have created a small but complete Zorba module CMake project.
 Now, the project must be built. One of the great things about CMake is
 that it is capable of creating build environments for a number of
-different tools. On Unix systems (include Windows with Cygwin), it can
+different tools. On Unix systems, it can
 create a Makefile-based environment.  It can also create projects for
 the KDevelop, Code::Blocks, and QtCreator IDEs, among others, and has
 some support for Eclipse as well. On MacOS, it can create Xcode
-projects.  On Windows, it can create Visual Studio projects, and it
-can also create a Makefile-based environment for use with Visual
-Studio's nmake utility. See CMake's documentation for more details and
+projects.  See CMake's documentation for more details and
 other supported build environments.
 
 This guide will focus on a Makefile environment, but it should be
@@ -214,16 +212,16 @@ cmake -DCMAKE_PREFIX_PATH=/path/to/zorbaroot ..
 \endcode
 
 "zorbaroot" is the root directory of a Zorba installation; it should
-contain <tt>bin/zorba</tt> (<tt>bin/zorba.exe</tt> on Windows) among
+contain <tt>bin/zorba</tt> among
 other files.
 
 The default build configuration for CMake is "Unix Makefiles". If you
 are building using a different tool set, you must provide the
 <tt>-G</tt> option to <tt>cmake</tt>. For example, if you wish to
-create a Visual Studio 10 project, use:
+create an Xcode project, use:
 
 \code
-cmake -G"Visual Studio 10" ..
+cmake -GXcode ..
 \endcode
 
 No matter what your eventual <tt>cmake</tt> command line ends up

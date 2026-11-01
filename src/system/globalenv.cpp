@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "stdafx.h"
 
 #include "common/common.h"
 
@@ -236,38 +235,6 @@ void GlobalEnvironment::init_icu()
   // see http://www.icu-project.org/userguide/design.html#Init_and_Termination
   // and http://www.icu-project.org/apiref/icu4c/uclean_8h.html
 #ifndef ZORBA_NO_ICU
-#  if defined U_STATIC_IMPLEMENTATION && (defined WIN32 || defined WINCE)
-  {
-    TCHAR    self_path[1024];
-    GetModuleFileName(NULL, self_path, sizeof(self_path));
-        //PathRemoveFileSpec(self_path);
-    TCHAR  *filename;
-    filename = _tcsrchr(self_path, _T('\\'));
-    if(filename)
-      filename[1] = 0;
-    else
-      self_path[0] = 0;
-        //strcat(self_path, "\\");
-        //_tcscat(self_path, _T(U_ICUDATA_NAME));//icudt39l.dat");
-    _tcscat(self_path, _T("icudt") _T(U_ICU_VERSION_SHORT) _T(U_ICUDATA_TYPE_LETTER));//icudt39l.dat");
-    _tcscat(self_path, _T(".dat"));
-        //unsigned char *icu_data;
-    HANDLE    hfile;
-    hfile = CreateFile(self_path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
-    ZORBA_ASSERT(hfile != INVALID_HANDLE_VALUE);
-    DWORD   icusize;
-    icusize = GetFileSize(hfile, NULL);
-    icu_appdata = new unsigned char[icusize];
-    DWORD   nr_read;
-    ReadFile(hfile, icu_appdata, icusize, &nr_read, NULL);
-    CloseHandle(hfile);
-    UErrorCode    data_err = U_ZERO_ERROR;
-    udata_setCommonData(icu_appdata, &data_err);
-    ZORBA_ASSERT(data_err == U_ZERO_ERROR);
-  
-    // u_setDataDirectory(self_path);
-  }
-#  endif
   UErrorCode lICUInitStatus = U_ZERO_ERROR;
   u_init(&lICUInitStatus);
   ZORBA_ASSERT(lICUInitStatus == U_ZERO_ERROR);
@@ -285,9 +252,6 @@ void GlobalEnvironment::cleanup_icu()
   // see http://www.icu-project.org/apiref/icu4c/uclean_8h.html#93f27d0ddc7c196a1da864763f2d8920
 #ifndef ZORBA_NO_ICU
   u_cleanup();
-# if defined U_STATIC_IMPLEMENTATION && (defined WIN32 || defined WINCE)
-  delete[] icu_appdata;
-# endif
 #endif /* ZORBA_NO_ICU */
 }
 

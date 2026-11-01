@@ -20,8 +20,6 @@
 //   values in (-1, 1) became quadratic);
 // - values equal after numeric promotion must hash equal.
 
-#include "stdafx.h"
-
 #include <iostream>
 #include <limits>
 #include <set>

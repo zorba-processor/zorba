@@ -207,9 +207,6 @@
  */
 
 #ifndef MSDOS
-#ifdef _MSC_VER
-#define MSDOS
-#endif
 #endif
 
 /* 
@@ -227,9 +224,6 @@
  */
 
 #ifndef MSDOS
-#ifdef __MINGW_H
-#define MSDOS
-#endif
 #endif
 
 /* 
@@ -256,10 +250,8 @@
  *   this supports National Instruments LabWindows CVI
  */
 
-#ifndef _HAVE_NI_LABWIN_CVI_
 #ifdef _CVI_
 #define _HAVE_NI_LABWIN_CVI_
-#endif
 #endif
 
 /*

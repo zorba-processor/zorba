@@ -271,11 +271,7 @@ slurp_file (const char *fname, std::string &result) {
 }
 
 int
-#ifdef _WIN32_WCE
-_tmain(int argc, _TCHAR* argv[])
-#else
 main(int argc, char** argv)
-#endif
 {
   // do initial stuff
   if ( argc != 2 ) {

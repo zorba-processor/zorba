@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "stdafx.h"
 
 #include "debugger_communicator.h"
 #include "socket_streambuf.h"
@@ -33,13 +32,8 @@
 #include "diagnostics/zorba_exception.h"
 
 
-#ifndef WIN32
-# include <unistd.h>
-# define msleep(s) usleep(1000*s);
-#else
-# include <windows.h>
-# define msleep(s) Sleep(s)
-#endif
+#include <unistd.h>
+#define msleep(s) usleep(1000*s);
 
 namespace zorba {
 

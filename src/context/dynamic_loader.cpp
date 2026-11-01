@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "stdafx.h"
 
 #include "dynamic_loader.h"
 #include "static_context.h"
@@ -25,9 +24,6 @@
 #  include <dlfcn.h>
 #endif
 
-#ifdef WIN32
-#  include <strsafe.h>
-#endif
 #include <fstream>
 
 #include "diagnostics/xquery_diagnostics.h"
@@ -105,26 +101,12 @@ static zstring computeLibraryName(
   }
 
   // create the name of the file
-  // win32: module.dll
   // apple: libmodule.dylib
   // other unix: libmodule.so
   // If version number is not blank, insert it into the path before the extension
   std::ostringstream lLibraryName;
   lLibraryName << lBranchPath;
 
-#ifdef WIN32
-  if (aUseDebugDir) 
-  {
-#ifndef NDEBUG
-    lLibraryName << "Debug\\";
-#else
-    lLibraryName << "Release\\";
-#endif
-  }
-  lLibraryName << lFileName << get_current_lib_suffix()
-               << computeVersionInfix(aImportedVersion) << ".dll";
-
-#else // !WIN32
 
   if (aUseDebugDir) 
   {
@@ -136,7 +118,6 @@ static zstring computeLibraryName(
 #else
   lLibraryName << "lib" << lFileName << get_current_lib_suffix()
                << computeVersionInfix(aImportedVersion) << ".so";
-#endif
 #endif
 
   return lLibraryName.str();
@@ -156,24 +137,11 @@ DynamicLoader::loadModule(const zstring& aFile) const
     return createModule(handle, aFile);
   }
 
-#ifdef WIN32
-  WCHAR wpath_str[ MAX_PATH ];
-  win32::atow( aFile.c_str(), wpath_str, MAX_PATH );
-  SetErrorMode(SEM_NOOPENFILEERRORBOX|SEM_FAILCRITICALERRORS);
-  handle = LoadLibraryW(wpath_str);
-  SetErrorMode(0);
-  if (!handle)
-    throw ZORBA_EXCEPTION(
-      zerr::ZOSE0005_DLL_LOAD_FAILED,
-      ERROR_PARAMS( aFile, os_error::get_err_string() )
-    );
-#else
   handle = dlopen(aFile.c_str(), RTLD_NOW);
   if (!handle)
     throw ZORBA_EXCEPTION(
       zerr::ZOSE0005_DLL_LOAD_FAILED, ERROR_PARAMS( aFile, zstring(dlerror()) )
     );
-#endif
 
   theLibraries[aFile] = handle;
   return createModule(handle, aFile);
@@ -186,14 +154,6 @@ DynamicLoader::createModule(handle_t handle, const zstring& aFile) const
   // function pointer to create a module
   ExternalModule* (*createModuleFunction)() = NULL;
 
-#ifdef WIN32
-  createModuleFunction = (ExternalModule* (*)())GetProcAddress(handle, "createModule");
-  if (createModuleFunction == NULL)
-    throw ZORBA_EXCEPTION(
-      zerr::ZAPI0015_CREATEMODULE_NOT_FOUND,
-      ERROR_PARAMS( aFile, os_error::get_err_string() )
-    );
-#else
   createModuleFunction = (ExternalModule* (*)()) dlsym(handle, "createModule");
   if (createModuleFunction == NULL)
   {
@@ -203,7 +163,6 @@ DynamicLoader::createModule(handle_t handle, const zstring& aFile) const
           ERROR_PARAMS( aFile, dlerror() )
           );
   }
-#endif
   return createModuleFunction();
 }
 
@@ -218,9 +177,7 @@ DynamicLoader::~DynamicLoader()
   for (LibraryMap_t::const_iterator lIter = theLibraries.begin();
        lIter != theLibraries.end(); ++lIter)
   {
-#ifdef WIN32
-    FreeLibrary(lIter->second);
-#elif !defined(ZORBA_SANITIZER_BUILD)
+#if !defined(ZORBA_SANITIZER_BUILD)
     dlclose(lIter->second);
 #endif
   }

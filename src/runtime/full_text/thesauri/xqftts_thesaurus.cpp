@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "stdafx.h"
 
 #define DEBUG_THESAURUS 0
 #define DEBUG_READ_THESAURUS 0

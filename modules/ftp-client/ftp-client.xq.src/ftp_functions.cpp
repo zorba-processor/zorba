@@ -729,13 +729,9 @@ bool list_iterator::next( Item &result ) {
       } // switch
 
       struct tm* tm;
-#ifdef WIN32
-	  tm = gmtime( &ftp_file.mtime );
-#else
 	  struct tm tm_struct;
 	  tm = &tm_struct;
 	  gmtime_r( &ftp_file.mtime, tm );
-#endif
       int const year = tm->tm_year + 1900;
       switch ( ftp_file.mtimetype ) {
         case FTPPARSE_MTIME_REMOTEDAY:
@@ -743,20 +739,14 @@ bool list_iterator::next( Item &result ) {
           [[fallthrough]];
         case FTPPARSE_MTIME_REMOTEMINUTE:
           tm->tm_sec = 0;
-#ifndef WIN32
           tm->tm_gmtoff = 0;
-#endif
           [[fallthrough]];
         case FTPPARSE_MTIME_LOCAL: {
           Item const mtime_value (
             factory_->createDateTime(
               year, tm->tm_mon, tm->tm_mday,
               tm->tm_hour, tm->tm_min, tm->tm_sec, 
-#ifdef WIN32
-			  0
-#else
 			  (int)tm->tm_gmtoff
-#endif
             )
           );
           kv.push_back( make_pair( mtime_key, mtime_value ) );

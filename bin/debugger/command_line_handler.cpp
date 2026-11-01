@@ -15,13 +15,8 @@
  */
 #include "command_line_handler.h"
 
-#ifndef WIN32
-# include <unistd.h>
-# define msleep(x) usleep(1000*x)
-#else
-# include <Windows.h>
-# define msleep Sleep
-#endif
+#include <unistd.h>
+#define msleep(x) usleep(1000*x)
 
 #include "command_prompt.h"
 

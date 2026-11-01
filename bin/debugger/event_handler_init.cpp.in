@@ -21,11 +21,7 @@ namespace zorba { namespace debugclient {
   std::istream* EventHandler::getCurrentDirectory() {
     const char* build_dir = "@CMAKE_BINARY_DIR@/bin/message-handler.xq";
     const char* install_dir = 
-#ifndef WIN32
     "@CMAKE_INSTALL_PREFIX@/bin/";
-#else
-    "C:/Program Files/Zorba XQuery Processor @ZORBA_MAJOR_NUMBER@.@ZORBA_MINOR_NUMBER@.@ZORBA_PATCH_NUMBER@/bin/";
-#endif
     std::unique_ptr<std::ifstream> stream(new std::ifstream(build_dir));
     if (stream->good()) {
       return stream.release();

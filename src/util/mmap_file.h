@@ -26,9 +26,6 @@
 #include <string>
 #include <sys/types.h>                  /* needed by FreeBSD systems */
 
-#ifdef WIN32
-# include <windows.h>                   /* for HANDLE */
-#endif /* WIN32 */
 
 #include "fs_util.h"
 
@@ -284,12 +281,7 @@ public:
 
 private:
   std::string path_;
-#ifdef WIN32
-  HANDLE      fd_;
-  HANDLE      mapping_;
-#else
   int         fd_;
-#endif /* WIN32 */
   size_type   size_;
   void        *addr_;
 

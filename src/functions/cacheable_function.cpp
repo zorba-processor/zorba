@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-#include "stdafx.h"
 #include "functions/cacheable_function.h"
 #include "functions/function_impl.h"
 

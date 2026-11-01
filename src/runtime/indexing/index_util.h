@@ -16,8 +16,6 @@
 #ifndef ZORBA_INDEX_UTIL_H
 #define ZORBA_INDEX_UTIL_H
 
-#include "stdafx.h"
-
 #include "context/namespace_context.h"
 
 #include "store/api/pul.h"

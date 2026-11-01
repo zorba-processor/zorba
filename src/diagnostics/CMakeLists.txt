@@ -30,9 +30,6 @@ SET(DIAGNOSTICS_SRCS
    dict_zed_keys.h
    )
 
-IF (WIN32)
-  SET( DIAGNOSTICS_SRCS ${DIAGNOSTICS_SRCS} StackWalker.cpp )
-ENDIF (WIN32)
 
 ###############################################################################
 

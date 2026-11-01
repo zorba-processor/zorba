@@ -109,11 +109,7 @@ void TestSchemaURIMapper::initialize()
     path.erase ( slash );
   }
   path += "/";
-#ifndef WIN32
   std::string url ( "file://" );
-#else
-  std::string url ( "file:///" );
-#endif
   url += path;
   std::ifstream urifile ( map_file.c_str() );
   if ( urifile.good () == false ) return;
@@ -199,9 +195,7 @@ void TestModuleURIMapper::initialize()
     }
     else
     {
-#ifndef MY_D_WIN32
       return;
-#endif
     }
 
     pfx = theTest.substr(0, pos) + "/";
@@ -231,11 +225,7 @@ void TestModuleURIMapper::initialize()
 
     std::string::size_type eq = uris.find('=');
     std::string uri(uris.substr(0, eq));
-#ifdef WIN32
-    std::string file("file:///");
-#else
     std::string file("file://");
-#endif
     file.append(path);
     file = file.append("/");
     file = file.append(uris.substr(eq+1).c_str());

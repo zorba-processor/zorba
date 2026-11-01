@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "stdafx.h"
 
 #include "common/common.h"
 #ifndef ZORBA_NO_XMLSCHEMA
@@ -21,9 +20,6 @@
 #include "xercesIncludes.h"
 #include <xercesc/util/XMLString.hpp>
 #include "XercesParseUtils.h"
-#ifdef CYGWIN
-#undef WIN32
-#endif
 #include "StrX.h"
 #include "zorbatypes/xerces_xmlcharray.h"
 #include "LoadSchemaErrorHandler.h"

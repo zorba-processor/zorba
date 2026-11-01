@@ -23,7 +23,6 @@
 
 
 
-#include "stdafx.h"
 #include "runtime/sequences/sequences.h"
 #include "functions/func_sequences.h"
 #include "system/globalenv.h"

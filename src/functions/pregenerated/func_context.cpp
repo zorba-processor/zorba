@@ -23,7 +23,6 @@
 
 
 
-#include "stdafx.h"
 #include "runtime/context/context.h"
 #include "functions/func_context.h"
 

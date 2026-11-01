@@ -58,7 +58,7 @@ contents), or
   cmake -Doutdir=../zorba_modules -Dallmodules=1 -P modules/DownloadModules.cmake
 \endcode
 
-to download all the modules. (On Windows, you will need to use backslashes instead of forward slashes in the above paths.)
+to download all the modules.
 
 This will place the downloaded module source code in the directory
 <tt>../zorba_modules</tt>, which is where the Zorba build will look
