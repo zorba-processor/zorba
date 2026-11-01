@@ -32,6 +32,7 @@
 
 #include <zorba/zorba.h>
 #include <zorba/security.h>
+#include "test_security_policy.h"
 #include <zorba/diagnostic_handler.h>
 #include <zorba/zorba_exception.h>
 #include <zorba/zorba_string.h>
@@ -219,11 +220,7 @@ int save_load_plan(
 #endif//ZORBA_TEST_PLAN_SERIALIZATION
 
 int
-#ifdef _WIN32_WCE
-_tmain(int argc, _TCHAR* argv[])
-#else
 main(int argc, char** argv)
-#endif
 {
   if (argc != 2)
   {
@@ -233,9 +230,8 @@ main(int argc, char** argv)
 
   zorba::Zorba* engine = zorba::Zorba::getInstance(zorba::StoreManager::getStore());
 
-  // The library default is SecurityPolicy::secure(); the test suite exercises
-  // files, the HTTP test server, native modules and the environment.
-  engine->setSecurityPolicy(zorba::SecurityPolicy::unrestricted());
+  // See test_security_policy.h (ZORBA_TEST_SECURITY_POLICY).
+  if (!zorba_test::applyTestSecurityPolicy(engine)) return 1;
 
   zorba::XmlDataManager_t xmlDataMgr = engine->getXmlDataManager();
 

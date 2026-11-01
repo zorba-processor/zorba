@@ -22,7 +22,7 @@
 
 #include <zorba/config.h>
 
-#include "zorbamisc/config/stdint.h"
+#include <stdint.h>
 #include "iso2788.h"
 
 namespace zorba {

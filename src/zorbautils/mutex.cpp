@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "stdafx.h"
 
 #include "zorbautils/fatal.h"
 #include "zorbautils/mutex.h"
@@ -44,9 +43,6 @@ Mutex::Mutex()
 
   ZORBA_FATAL(!ret, "Failed to initialize mutex. Error code = " << ret << " message = " << strerror(ret));
 
-#elif defined WIN32
-  //threads can acquire same mutex multiple times
-  theMutex = CreateMutex(NULL, FALSE, _T(""));
 #endif
 }
 
@@ -56,8 +52,6 @@ Mutex::~Mutex()
 {
 #ifdef ZORBA_HAVE_PTHREAD_H
   pthread_mutex_destroy(&theMutex);
-#elif defined WIN32
-  CloseHandle(theMutex);
 #endif
 }
 
@@ -67,8 +61,6 @@ void Mutex::lock()
 #ifdef ZORBA_HAVE_PTHREAD_H
   int ret= pthread_mutex_lock(&theMutex);
   ZORBA_FATAL(!ret, "Failed to acquire mutex. Error code = " << ret << " message = " << strerror(ret));
-#elif defined WIN32
-  WaitForSingleObject(theMutex, INFINITE);
 #endif
 }
 
@@ -78,8 +70,6 @@ void Mutex::unlock()
 #ifdef ZORBA_HAVE_PTHREAD_H
   int ret= pthread_mutex_unlock(&theMutex);
   ZORBA_FATAL(!ret, "Failed to release mutex. Error code = " << ret);
-#elif defined WIN32
-  ReleaseMutex(theMutex);
 #endif
 }
 

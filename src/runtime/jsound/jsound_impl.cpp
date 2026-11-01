@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-#include "stdafx.h"
-
 #include "diagnostics/xquery_exception.h"
 #include "runtime/jsound/jsound.h"
 #include "store/api/item_factory.h"
@@ -77,7 +75,7 @@ bool JSoundAnnotateIterator::nextImpl( store::Item_t &result,
 
   try {
     get_bool_opt( options_item, "cast-atomic-values", &cast );
-    jsound::schema const schema( jsd_item );
+    jsound::schema const schema( jsd_item, theSctx );
     schema.validate( json_item, type_item->getStringValue(), cast, &result );
   }
   catch ( ZorbaException &e ) {
@@ -104,7 +102,7 @@ bool JSoundValidateIterator::nextImpl( store::Item_t &result,
 
   try {
     get_bool_opt( options_item, "cast-atomic-values", &cast );
-    jsound::schema const schema( jsd_item );
+    jsound::schema const schema( jsd_item, theSctx );
     GENV_ITEMFACTORY->createBoolean(
       result, schema.validate( json_item, type_item->getStringValue(), cast )
     );

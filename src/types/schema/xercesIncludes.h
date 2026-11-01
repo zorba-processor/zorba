@@ -75,12 +75,6 @@
 #  pragma GCC diagnostic warning "-Wparentheses"
 #endif
 
-
-//daniel: this is to make cygwin work; xerces defines WIN32 in case of cygwin, which is wrong
-#ifdef CYGWIN
-#undef WIN32
-#endif
-
 #endif //ZORBA_NO_XMLSCHEMA
 
 #endif /*ZORBA_XERCESINCLUDES_H_*/

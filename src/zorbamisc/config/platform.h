@@ -19,10 +19,6 @@
 
 #include <zorba/config.h>
 
-#if (defined (WIN32) || defined (WINCE)) && ! defined (CYGWIN)
-# include "zorbamisc/config/win32.h"
-#endif
-
 #if defined (APPLE)
 # include "zorbamisc/config/apple.h"
 #endif
@@ -33,10 +29,6 @@
 
 #if defined (UNIX)
 # include "zorbamisc/config/unix.h"
-#endif
-
-#if defined (CYGWIN)
-# include "zorbamisc/config/cygwin.h"
 #endif
 
 #endif /* ZORBA_PLATFORM_H */

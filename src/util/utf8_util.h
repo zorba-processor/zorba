@@ -461,12 +461,6 @@ to_string( unicode::string const &in, StringType *out ) {
 
 #ifndef ZORBA_NO_ICU
 
-//
-// On Windows, UChar == wchar_t, so these functions would multiply define those
-// previously.
-//
-#ifndef WIN32
-
 /**
  * Converts a wide-character string into a UTF-8 encoded string.
  *
@@ -523,7 +517,6 @@ to_string( wchar_t const *in, StringType *out ) {
   return to_string( in, std::wcslen( in ), out );
 }
 
-#endif /* WIN32 */
 
 /**
  * Converts a wide-character string into a UTF-8 encoded string.

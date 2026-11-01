@@ -21,9 +21,6 @@
 #include <xercesc/util/XMLDouble.hpp>
 #include "../ourlib/ourlib.h"
 
-#ifdef _MSC_VER
-#pragma warning ( disable: 4005 )
-#endif
 
 XERCES_CPP_NAMESPACE_USE
 
@@ -101,11 +98,7 @@ OurFuncFunction::evaluate(Arguments_t const& aArgs,
 } /* namespace linkmodule */
 } /* namespace zorba */
 
-#ifdef WIN32
-#  define DLL_EXPORT __declspec(dllexport)
-#else
-#  define DLL_EXPORT __attribute__ ((visibility("default")))
-#endif
+#define DLL_EXPORT __attribute__ ((visibility("default")))
 
 extern "C" DLL_EXPORT zorba::ExternalModule* createModule() {
   return new zorba::linkmodule::LinkModule();

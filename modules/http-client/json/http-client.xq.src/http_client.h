@@ -24,10 +24,6 @@
 #include "structures.h"
 #include "http_request_handler.h"
 
-#ifdef WIN32
-# include <Windows.h>
-# define MAX_BUF_SIZE 2048
-#endif
 
 namespace zorba
 {
@@ -319,11 +315,7 @@ public:
 } // namespace http_request
 } // namespace zorba
 
-#ifdef WIN32
-#  define DLL_EXPORT __declspec(dllexport)
-#else
-#  define DLL_EXPORT __attribute__ ((visibility("default")))
-#endif
+#define DLL_EXPORT __attribute__ ((visibility("default")))
 
 extern "C" DLL_EXPORT zorba::ExternalModule* createModule() {
   return new zorba::http_client::HttpClientModule();

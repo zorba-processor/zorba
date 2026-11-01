@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-#include "stdafx.h"
 #include "compiler/parser/query_loc.h"
 #include "compiler/parser/location.hh"
 

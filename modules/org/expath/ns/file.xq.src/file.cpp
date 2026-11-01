@@ -38,19 +38,11 @@
 // Reentrant localtime()/gmtime(): external functions may be evaluated by
 // several threads at once, and the C versions return a shared static buffer.
 static bool local_time( std::time_t t, struct tm *result ) {
-#ifdef WIN32
-  return ::localtime_s( result, &t ) == 0;
-#else
   return ::localtime_r( &t, result ) != nullptr;
-#endif /* WIN32 */
 }
 
 static bool gm_time( std::time_t t, struct tm *result ) {
-#ifdef WIN32
-  return ::gmtime_s( result, &t ) == 0;
-#else
   return ::gmtime_r( &t, result ) != nullptr;
-#endif /* WIN32 */
 }
 
 namespace zorba {
@@ -834,11 +826,7 @@ WriteTextLinesFunction::WriteTextLinesFunction( FileModule const *m ) :
 } // namespace filemodule
 } // namespace zorba
 
-#ifdef WIN32
-#  define DLL_EXPORT __declspec(dllexport)
-#else
-#  define DLL_EXPORT __attribute__ ((visibility("default")))
-#endif
+#define DLL_EXPORT __attribute__ ((visibility("default")))
 
 extern "C" DLL_EXPORT zorba::ExternalModule* createModule() {
   return new zorba::filemodule::FileModule();

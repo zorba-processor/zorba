@@ -22,10 +22,6 @@
 #include <exception>
 #include <streambuf>
 #include <string>
-#ifdef WIN32
-#define _WINSOCKAPI_
-#include <windows.h>
-#endif /* WIN32 */
 
 // libcurl
 #include <curl/curl.h>
@@ -341,9 +337,6 @@ private:
   // forbid
   streambuf( streambuf const& );
   streambuf& operator=( streambuf const& );
-#ifdef WIN32
-  SOCKET dummy_socket_;
-#endif /* WIN32 */
 };
 
 ///////////////////////////////////////////////////////////////////////////////

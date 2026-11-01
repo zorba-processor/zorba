@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "stdafx.h"
 
 #ifndef ZORBA_RUNTIME_JSON_SNELSON_H
 #define ZORBA_RUNTIME_JSON_SNELSON_H

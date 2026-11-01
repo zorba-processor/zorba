@@ -120,12 +120,7 @@ if(ICU_INCLUDE AND ICU_LIBRARY)
     set(ICU_I18N_LIBRARIES)
   endif (ICU_I18N_LIBRARY)
 
-  # On cygwin, the data library is called icudt
-  if (CYGWIN OR MSVC)
-    SET (ICU_DATA_NAMES icudt cygicudt cygicudt38)
-  else (CYGWIN OR MSVC)
-    SET (ICU_DATA_NAMES icudata)
-  endif (CYGWIN OR MSVC)
+  SET (ICU_DATA_NAMES icudata)
 
   # Look for ICU data library
   find_library(

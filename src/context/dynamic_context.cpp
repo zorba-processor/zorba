@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "stdafx.h"
 
 #include <assert.h>
 
@@ -273,44 +272,6 @@ void dynamic_context::set_environment_variables()
   if (!theEnvironmentVariables)
     theEnvironmentVariables = new EnvVarMap();
 
-#if defined (WIN32)
-    LPTCH envVarsCH = GetEnvironmentStrings();
-    LPTSTR envVarsSTR = (LPTSTR) envVarsCH;
-
-    while (*envVarsSTR)
-    {
-      int size = lstrlen(envVarsSTR);
-
-      char * envVar = new char[size+1];
-
-      WideCharToMultiByte( CP_ACP,
-                           WC_NO_BEST_FIT_CHARS|WC_COMPOSITECHECK|WC_DEFAULTCHAR,
-                           envVarsSTR,
-                           size+1,
-                           envVar,
-                           size+1,
-                           NULL,
-                           NULL);
-
-      zstring envVarZS(envVar);
-
-      int eqPos = envVarZS.find_first_of("=");
-
-      if (eqPos > 0)
-      {
-        zstring varname(envVarZS.substr(0, eqPos));
-        zstring varvalue(envVarZS.substr(eqPos+1, size));
-
-        if (!varname.empty() || !varvalue.empty())
-          theEnvironmentVariables->insert(std::pair<zstring, zstring>(varname,varvalue));
-      }
-
-      delete envVar;
-      envVarsSTR += lstrlen(envVarsSTR) + 1;
-    }
-
-    FreeEnvironmentStrings(envVarsCH);
-#else
     const char* invalid_char;
     for (char **env = environ; *env; ++env)
     {
@@ -344,7 +305,6 @@ void dynamic_context::set_environment_variables()
       }
     }
 
-#endif
 
 }
 /*******************************************************************************

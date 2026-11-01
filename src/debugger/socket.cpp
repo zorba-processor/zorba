@@ -13,22 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-//#include "stdafx.h"
 
 #include "debugger/socket.h"
 
 #include <sstream>
 
 
-#if defined WIN32 || defined WINCE
-#include <winsock2.h>
-  typedef int socklen_t;
-  typedef char raw_type;
-
-#ifdef WIN32
-static bool initialized = false;
-#endif
-#else
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
@@ -40,7 +30,6 @@ static bool initialized = false;
 #include <cstdlib>
 
   typedef void raw_type;
-#endif
 
 #include <errno.h>
 
@@ -75,18 +64,6 @@ static void fillAddr(const std::string &address, unsigned short port,
 
 Socket::Socket(int aType, int aProtocol)
 {
-#ifdef WIN32
-  if (!initialized) {
-    WORD wVersionRequested;
-    WSADATA wsaData;
-
-    wVersionRequested = MAKEWORD(2, 0);              // Request WinSock v2.0
-    if (WSAStartup(wVersionRequested, &wsaData) != 0) {  // Load WinSock DLL
-      throw DebuggerSocketException("Unable to load WinSock DLL");
-    }
-    initialized = true;
-  }
-#endif
 
   // Make a new socket
   theDescriptor = socket(PF_INET, aType, aProtocol);
@@ -106,11 +83,7 @@ Socket::~Socket() {
 
 void
 Socket::close() {
-#ifdef WIN32
-  ::closesocket(theDescriptor);
-#else
   ::close(theDescriptor);
-#endif
 }
 
 std::string Socket::getLocalAddress() {
@@ -162,11 +135,6 @@ void Socket::setLocalAddressAndPort(const std::string &localAddress,
 }
 
 void Socket::cleanUp() {
-#ifdef WIN32
-    if (WSACleanup() != 0) {
-      throw DebuggerSocketException("WSACleanup() failed");
-    }
-#endif
 }
 
 unsigned short Socket::resolveService(const std::string &service,

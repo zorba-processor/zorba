@@ -38,17 +38,15 @@
 #include <zorba/zorba_exception.h>
 #include <zorba/util/base64_util.h>
 
-#ifndef WIN32
-# include <arpa/inet.h>
-# include <netinet/in.h>
-# include <sys/socket.h>
-# include <sys/time.h>
-# include <unistd.h>
-#endif
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <sys/time.h>
+#include <unistd.h>
 
 using namespace zorba;
 
-#if defined(ZORBA_WITH_DEBUGGER) && !defined(WIN32)
+#if defined(ZORBA_WITH_DEBUGGER)
 
 namespace {
 

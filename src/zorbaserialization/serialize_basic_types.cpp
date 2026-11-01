@@ -16,8 +16,6 @@
 
 #include <cstdio>
 
-#include "stdafx.h"
-
 #include "zorbaserialization/serialize_basic_types.h"
 #include "zorbaserialization/archiver.h"
 

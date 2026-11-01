@@ -88,11 +88,7 @@ String module::getURI() const {
 } // namespace ftp_client
 } // namespace zorba
 
-#ifdef WIN32
-# define DLL_EXPORT __declspec(dllexport)
-#else
-# define DLL_EXPORT __attribute__ ((visibility("default")))
-#endif /* WIN32 */
+#define DLL_EXPORT __attribute__ ((visibility("default")))
 
 extern "C" DLL_EXPORT zorba::ExternalModule* createModule() {
   return new zorba::ftp_client::module();

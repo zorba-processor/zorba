@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "stdafx.h"
 
 #include <cmath>                        /* for fabs(3) */
 #include <limits>
@@ -44,11 +43,6 @@ using namespace std;
 
 namespace zorba {
 
-#ifdef WIN32
-// Windows annoyingly defines these as macros.
-#undef max
-#undef min
-#endif
 
 ////////// Local functions ////////////////////////////////////////////////////
 

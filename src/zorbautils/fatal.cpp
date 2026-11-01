@@ -13,16 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "stdafx.h"
 
 #include <iostream>
 #include <stdlib.h>                     /* for abort */
 
 #include "fatal.h"
 
-#ifdef WINCE
-# define abort() exit(1)
-#endif
 
 using namespace std;
 

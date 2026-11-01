@@ -22,7 +22,6 @@
 // ******************************************
 
 
-#include "stdafx.h"
 #include "runtime/access/access.h"
 #include "functions/func_access.h"
 

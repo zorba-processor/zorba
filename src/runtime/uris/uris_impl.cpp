@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "stdafx.h"
 
 #include <algorithm>
 
@@ -45,9 +44,6 @@
 #define QUERY_NAME       "query"
 #define FRAGMENT_NAME    "fragment"
 
-#ifdef _MSC_VER
-#pragma warning ( disable: 4800 )
-#endif
 
 using namespace std;
 

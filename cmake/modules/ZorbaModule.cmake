@@ -27,9 +27,6 @@ FUNCTION(ZORBA_TARGET_LOCATION var tgt)
     SET(_outprop LIBRARY_OUTPUT_DIRECTORY)
     SET(_pre "${CMAKE_SHARED_LIBRARY_PREFIX}")
     SET(_suf "${CMAKE_SHARED_LIBRARY_SUFFIX}")
-    IF (WIN32)
-      SET(_outprop RUNTIME_OUTPUT_DIRECTORY)
-    ENDIF (WIN32)
   ELSEIF (_type STREQUAL "MODULE_LIBRARY")
     SET(_outprop LIBRARY_OUTPUT_DIRECTORY)
     SET(_pre "${CMAKE_SHARED_MODULE_PREFIX}")
@@ -319,26 +316,8 @@ MACRO (DECLARE_ZORBA_MODULE)
       SET(SUFFIX "_${ZORBA_STORE_NAME}")
     ENDIF (NOT ${ZORBA_STORE_NAME} STREQUAL "simplestore")
 
-#    IF(WIN32 AND MODULE_VERSION)
-#      # configure_file doesn't replace variable with parameters; they
-#      # have to be defined in the macro
-#      SET(MODULE_VERSION ${MODULE_VERSION})
-#      SET(MODULE_NAME ${module_name})
-#      # set the rc file for the windows dll version
-#      CONFIGURE_FILE("${Zorba_CMAKE_MODULES_DIR}/Windows/WindowsDLLVersion.rc.in"
-#                      "${CMAKE_CURRENT_BINARY_DIR}/${module_name}.xq.src/version.rc"
-#                      @ONLY)
-#      LIST(APPEND SRC_FILES
-#        "${CMAKE_CURRENT_BINARY_DIR}/${module_name}.xq.src/version.rc")
-#    ENDIF(WIN32)
 
-    # Shared libraries are considered RUNTIME targets on Win32
-    # platforms and LIBRARY targets elsewhere
-    IF (WIN32)
-      SET (target_type RUNTIME)
-    ELSE (WIN32)
-      SET (target_type LIBRARY)
-    ENDIF (WIN32)
+    SET (target_type LIBRARY)
 
     # Add the library target. Ensure that the output name is based on
     # the module *URI*'s final component.
@@ -855,21 +834,10 @@ ENDMACRO(expected_failure)
 # ${PROJECT_NAME}/<filename>, where <filename> is the path relative to
 # the Queries/ subdirectory.
 # 
-# The optional second argument exists for Windows. Normally,
-# EXPECTED_FAILURE() can be used even for tests that crash
-# (segfault). However, on Windows, when a test crashes, it pops up a
-# dialog box. This prevents tests running unattended.  Since it is not
-# possible with CMake to remove a test once added,
-# ADD_TEST_DIRECTORY() needs to be told not to add the test at all on
-# Windows platforms. Therefore, after the directory name, you may
-# additional arguments in the form (testname bugnumber testname
-# bugnumber ...) to ADD_TEST_DIRECTORY().  On Windows, the named tests
-# will be skipped entirely. On other platforms, they will be passed to
-# EXPECTED_FAILURE() with the corresponding bug number.
-#
-# This second argument should only be used for test cases that are 
-# currently *crashing* on Windows. If the test is simply failing, then
-# you should use EXPECTED_FAILURE() after calling ADD_TEST_DIRECTORY().
+# The optional additional arguments (testname bugnumber testname
+# bugnumber ...) name tests that are known to crash. They are passed to
+# EXPECTED_FAILURE() with the corresponding bug number. If the test is
+# simply failing, use EXPECTED_FAILURE() after calling ADD_TEST_DIRECTORY().
 #
 # Parameters:
 #   TEST_DIR - all the .xq files in this directory will be added as tests
@@ -893,11 +861,7 @@ MACRO (ADD_TEST_DIRECTORY TEST_DIR)
     MATH (EXPR num_crashes "${num_crashes} - 2")
   ENDWHILE (num_crashes GREATER 0)
 
-  IF(WIN32)
-    SET(PATH_SEP ",")
-  ELSE(WIN32)
-    SET(PATH_SEP ":")
-  ENDIF(WIN32)
+  SET(PATH_SEP ":")
   SET(TESTCOUNTER 0)
   FOREACH(TESTFILE ${TESTFILES})
     SET(TESTNAME "${PROJECT_NAME}/${TESTFILE}")
@@ -912,39 +876,34 @@ MACRO (ADD_TEST_DIRECTORY TEST_DIR)
       LIST (REMOVE_AT crash_tests ${_crash_idx})
     ENDIF (${_crash_idx} GREATER -1)
 
-    # On Windows, skip calling ADD_TEST() for any known crashing tests
-    IF (WIN32 AND (${_crash_idx} GREATER -1) )
-      MESSAGE (STATUS "WARNING: Skipping test case ${TESTNAME} which is expected to crash - bug ${_crash_bugid}")
-    ELSE (WIN32 AND (${_crash_idx} GREATER -1) )
-      # DEPENDENCY_MODULE_PATH will always start with an appropriate
-      # path separator
-      ADD_TEST(${TESTNAME} "${Zorba_TESTDRIVER}"
+    # DEPENDENCY_MODULE_PATH will always start with an appropriate
+    # path separator
+    ADD_TEST(${TESTNAME} "${Zorba_TESTDRIVER}"
 	"--rbkt-src" "${TEST_DIR}"
 	"--rbkt-bin" "${PROJECT_BINARY_DIR}/test/rbkt"
 	"--module-path"
 	"${CMAKE_BINARY_DIR}/URI_PATH/${PATH_SEP}${DEPENDENCY_MODULE_PATH}"
 	"${TESTFILE}")
-      # Create test results output directory, if it doesn't exist
-      GET_FILENAME_COMPONENT(_bucket_path "${TESTFILE}" PATH)
-      SET (_full_bucket_path
+    # Create test results output directory, if it doesn't exist
+    GET_FILENAME_COMPONENT(_bucket_path "${TESTFILE}" PATH)
+    SET (_full_bucket_path
 	"${PROJECT_BINARY_DIR}/test/rbkt/QueryResults/${_bucket_path}")
-      IF (NOT EXISTS "${_full_bucket_path}")
+    IF (NOT EXISTS "${_full_bucket_path}")
 	FILE (MAKE_DIRECTORY "${_full_bucket_path}")
-      ENDIF (NOT EXISTS "${_full_bucket_path}")
+    ENDIF (NOT EXISTS "${_full_bucket_path}")
 
-      # On non-Windows, call EXPECTED_FAILURE() for known crashes
-      IF (${_crash_idx} GREATER -1)
+    # Call EXPECTED_FAILURE() for known crashes
+    IF (${_crash_idx} GREATER -1)
 	MESSAGE (STATUS "Marking test case ${TESTNAME} as expected to crash - bug ${bugid}")
 	EXPECTED_FAILURE (${TESTNAME} ${_bugid})
-      ENDIF (${_crash_idx} GREATER -1)
+    ENDIF (${_crash_idx} GREATER -1)
 
-      MATH(EXPR TESTCOUNTER ${TESTCOUNTER}+1)
-      MATH(EXPR TESTMOD "${TESTCOUNTER}%100")
-      IF (${TESTMOD} EQUAL 0)
+    MATH(EXPR TESTCOUNTER ${TESTCOUNTER}+1)
+    MATH(EXPR TESTMOD "${TESTCOUNTER}%100")
+    IF (${TESTMOD} EQUAL 0)
 	MESSAGE(STATUS "Adding another 100 Tests")
-      ENDIF (${TESTMOD} EQUAL 0)
+    ENDIF (${TESTMOD} EQUAL 0)
 
-    ENDIF (WIN32 AND (${_crash_idx} GREATER -1) )
 
   ENDFOREACH(TESTFILE)
 
@@ -975,12 +934,6 @@ ENDMACRO (ADD_TEST_DIRECTORY)
 #
 MACRO(ZORBA_ADD_TEST NAME TARGET ...)
   ZORBA_TARGET_LOCATION (TARGET_LOCATION "${TARGET}")
-  IF (WIN32)
-    IF (MSVC_IDE)
-      STRING (REPLACE "/${CMAKE_CFG_INTDIR}" "" TARGET_LOCATION ${TARGET_LOCATION})
-    ENDIF (MSVC_IDE)
-    STRING (REPLACE ".exe" ".bat" TARGET_LOCATION ${TARGET_LOCATION})
-  ENDIF(WIN32)
 
   #We cannot just use ARGN, as this will not work with arguments that contain ;, even if escaped
   #A more recent version of CMake contains a $<SEMICOLON> special token, but this version of cmake
@@ -1029,7 +982,7 @@ ENDMACRO(ZORBA_SET_TEST_PROPERTY)
 # ZORBA_XQDOC_HTML_XQ - points to file xqdoc-html.xq
 # ZORBA_XQDOC_OUTPUT_DIR - points to the output dir for xml and html
 # ZORBA_XHTML_REQUISITES_PATH - points to the dir containing the html requisites (images, lib, styles, templates dirs)
-# Zorba_EXE - points to zorba.exe (or zorba.bat)
+# Zorba_EXE - points to the zorba executable
 MACRO (ADD_XQDOC_TARGETS)
   MESSAGE(STATUS "ADD_XQDOC_TARGETS")
 
@@ -1083,23 +1036,10 @@ ENDMACRO(ADD_XQDOC_TARGETS)
 
 
 # Macro that takes care of the CMake module path in a project. This will prepend
-# "cmake_modules" and "cmake_modules/Windows" to the existing CMAKE_MODULE_PATH
+# "cmake_modules" to the existing CMAKE_MODULE_PATH
 MACRO (SET_CMAKE_MODULE_PATH)
 
   # first we prepend the "cmake_modules" directory in the project root
   SET (CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake_modules ${CMAKE_MODULE_PATH})
 
-  # now we prepend the "cmake_modules/Windows" directory in the project root
-  # this takes care about the finding and installing DLL for these libraries
-  IF (WIN32)
-    # Since the user can install libraries on Windows at any location we use
-    # proxy modules that try to guess first the location of the required third
-    # party libraries. This will search in order in:
-    # 1. the path pointed by ZORBA_THIRD_PARTY_REQUIREMENTS
-    # 2. the Program Files directory available on the users computer
-    # 3. the PATH environment variable
-    # The logic is implemented by the macros in the ProxyFindModule.cmake module.
-    SET (CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake_modules/Windows ${CMAKE_MODULE_PATH})
-  ENDIF (WIN32)
-  
 ENDMACRO (SET_CMAKE_MODULE_PATH)

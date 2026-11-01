@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "stdafx.h"
 
 #include "runtime/misc/materialize.h"
 #include "runtime/visitors/planiter_visitor.h"

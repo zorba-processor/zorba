@@ -17,8 +17,6 @@
 #include <iostream>
 #include <stdexcept>
 
-#include "stdafx.h"
-
 #include <zorba/internal/diagnostic.h>
 
 using namespace std;

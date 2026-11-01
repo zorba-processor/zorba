@@ -23,7 +23,6 @@
 
 
 
-#include "stdafx.h"
 #include "runtime/qnames/qnames.h"
 #include "functions/func_qnames.h"
 

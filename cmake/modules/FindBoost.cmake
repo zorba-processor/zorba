@@ -64,9 +64,6 @@
 #  Boost_MAJOR_VERSION                  major version number of boost
 #  Boost_MINOR_VERSION                  minor version number of boost
 #  Boost_SUBMINOR_VERSION               subminor version number of boost
-#  Boost_LIB_DIAGNOSTIC_DEFINITIONS     Only set on windows. Can be used with add_definitions 
-#                                       to print diagnostic information about the automatic 
-#                                       linking done on windows.
 
 # For each component you list the following variables are set.
 # ATTENTION: The component names need to be in lower case, just as the boost
@@ -193,22 +190,6 @@ IF (_boost_IN_CACHE)
 ELSE (_boost_IN_CACHE)
   # Need to search for boost
 
-  IF(WIN32)
-    # In windows, automatic linking is performed, so you do not have to specify the libraries.
-    # If you are linking to a dynamic runtime, then you can choose to link to either a static or a
-    # dynamic Boost library, the default is to do a static link.  You can alter this for a specific
-    # library "whatever" by defining BOOST_WHATEVER_DYN_LINK to force Boost library "whatever" to
-    # be linked dynamically.  Alternatively you can force all Boost libraries to dynamic link by
-    # defining BOOST_ALL_DYN_LINK.
-  
-    # This feature can be disabled for Boost library "whatever" by defining BOOST_WHATEVER_NO_LIB,
-    # or for all of Boost by defining BOOST_ALL_NO_LIB.
-  
-    # If you want to observe which libraries are being linked against then defining
-    # BOOST_LIB_DIAGNOSTIC will cause the auto-linking code to emit a #pragma message each time
-    # a library is selected for linking.
-    SET(Boost_LIB_DIAGNOSTIC_DEFINITIONS "-DBOOST_LIB_DIAGNOSTIC" CACHE STRING "Boost diagnostic define")
-  ENDIF(WIN32)
 
 
   SET(_boost_INCLUDE_SEARCH_DIRS
@@ -240,29 +221,16 @@ ELSE (_boost_IN_CACHE)
   ENDIF( NOT $ENV{BOOST_LIBRARYDIR} STREQUAL "" )
 
   IF( BOOST_ROOT )
-    IF (WIN32 OR CYGWIN)
-      SET(_boost_INCLUDE_SEARCH_DIRS ${BOOST_ROOT} ${_boost_INCLUDE_SEARCH_DIRS})
-      SET(_boost_LIBRARIES_SEARCH_DIRS ${BOOST_ROOT}/lib ${_boost_LIBRARIES_SEARCH_DIRS})
-    ELSE (WIN32 OR CYGWIN)
-      SET(_boost_INCLUDE_SEARCH_DIRS ${BOOST_ROOT}/include ${_boost_INCLUDE_SEARCH_DIRS})
-      SET(_boost_LIBRARIES_SEARCH_DIRS ${BOOST_ROOT}/lib ${_boost_LIBRARIES_SEARCH_DIRS})
-    ENDIF (WIN32 OR CYGWIN)
+    SET(_boost_INCLUDE_SEARCH_DIRS ${BOOST_ROOT}/include ${_boost_INCLUDE_SEARCH_DIRS})
+    SET(_boost_LIBRARIES_SEARCH_DIRS ${BOOST_ROOT}/lib ${_boost_LIBRARIES_SEARCH_DIRS})
   ENDIF( BOOST_ROOT )
 
   IF( BOOST_INCLUDEDIR )
-    IF (WIN32)
-      SET(_boost_INCLUDE_SEARCH_DIRS ${BOOST_INCLUDEDIR} ${_boost_INCLUDE_SEARCH_DIRS})
-    ELSE (WIN32)
-      SET(_boost_INCLUDE_SEARCH_DIRS ${BOOST_INCLUDEDIR}/include ${_boost_INCLUDE_SEARCH_DIRS})
-    ENDIF (WIN32)
+    SET(_boost_INCLUDE_SEARCH_DIRS ${BOOST_INCLUDEDIR}/include ${_boost_INCLUDE_SEARCH_DIRS})
   ENDIF( BOOST_INCLUDEDIR )
 
   IF( BOOST_LIBRARYDIR )
-    IF (WIN32)
-      SET(_boost_LIBRARIES_SEARCH_DIRS ${BOOST_LIBRARYDIR} ${_boost_LIBRARIES_SEARCH_DIRS})
-    ELSE (WIN32)
-      SET(_boost_LIBRARIES_SEARCH_DIRS ${BOOST_LIBRARYDIR}/include ${_boost_LIBRARIES_SEARCH_DIRS})
-    ENDIF (WIN32)
+    SET(_boost_LIBRARIES_SEARCH_DIRS ${BOOST_LIBRARYDIR}/include ${_boost_LIBRARIES_SEARCH_DIRS})
   ENDIF( BOOST_LIBRARYDIR )
 
   MESSAGE(STATUS "Boost_INCLUDE_DIR = ${Boost_INCLUDE_DIR}" )
@@ -350,25 +318,7 @@ ELSE (_boost_IN_CACHE)
 
   #Setting some more suffixes for the library
   SET (Boost_LIB_PREFIX "")
-  IF ( WIN32 AND NOT CYGWIN)
-    SET (Boost_LIB_PREFIX "lib")
-  ENDIF ( WIN32 AND NOT CYGWIN )
   SET (_boost_COMPILER "-gcc")
-  IF (MSVC71)
-    SET (_boost_COMPILER "-vc71")
-  ENDIF(MSVC71)
-  IF (MSVC80)
-    SET (_boost_COMPILER "-vc80")
-  ENDIF(MSVC80)
-  IF (MSVC90)
-    SET (_boost_COMPILER "-vc90")
-  ENDIF (MSVC90)
-  IF (MINGW)
-    SET (_boost_COMPILER "-mgw")
-  ENDIF(MINGW)
-  IF (CYGWIN)
-    SET (_boost_COMPILER "-gcc")
-  ENDIF (CYGWIN)
   IF (UNIX)
     IF (APPLE)
         SET (_boost_COMPILER "")
@@ -377,7 +327,6 @@ ELSE (_boost_IN_CACHE)
         # This is for the intel compiler
         SET (_boost_COMPILER "-il")
       ELSE (NOT CMAKE_COMPILER_IS_GNUCC)
-        IF (NOT CYGWIN)
         #find out the version of gcc being used.
         EXECUTE_PROCESS(COMMAND ${CMAKE_CXX_COMPILER} --version
             OUTPUT_VARIABLE _boost_COMPILER_VERSION
@@ -385,8 +334,7 @@ ELSE (_boost_IN_CACHE)
         )
         STRING(REGEX REPLACE ".* ([0-9])\\.([0-9])\\.[0-9] .*" "\\1\\2"
                _boost_COMPILER_VERSION ${_boost_COMPILER_VERSION})
-          SET (_boost_COMPILER "-gcc${_boost_COMPILER_VERSION}")
-        ENDIF (NOT CYGWIN)
+        SET (_boost_COMPILER "-gcc${_boost_COMPILER_VERSION}")
       ENDIF (NOT CMAKE_COMPILER_IS_GNUCC)
     ENDIF (APPLE)
   ENDIF(UNIX)
@@ -398,10 +346,6 @@ ELSE (_boost_IN_CACHE)
   ENDIF( NOT Boost_USE_MULTITHREADED )
 
   SET( _boost_STATIC_TAG "")
-  IF (WIN32)
-    SET (_boost_ABI_TAG "g")
-    SET( _boost_STATIC_TAG "-s")
-  ENDIF(WIN32)
   SET (_boost_ABI_TAG "${_boost_ABI_TAG}d")
 
   # ------------------------------------------------------------------------
@@ -417,11 +361,7 @@ ELSE (_boost_IN_CACHE)
     # Support preference of static libs by adjusting CMAKE_FIND_LIBRARY_SUFFIXES
     IF( Boost_USE_STATIC_LIBS )
       SET( _boost_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
-      IF(WIN32)
-        SET(CMAKE_FIND_LIBRARY_SUFFIXES .lib .a ${CMAKE_FIND_LIBRARY_SUFFIXES})
-      ELSE(WIN32)
-        SET(CMAKE_FIND_LIBRARY_SUFFIXES .a ${CMAKE_FIND_LIBRARY_SUFFIXES})
-      ENDIF(WIN32)
+      SET(CMAKE_FIND_LIBRARY_SUFFIXES .a ${CMAKE_FIND_LIBRARY_SUFFIXES})
     ENDIF( Boost_USE_STATIC_LIBS )
     
 #    MESSAGE(STATUS "look for sufixes ${CMAKE_FIND_LIBRARY_SUFFIXES}")
@@ -575,11 +515,6 @@ ELSE (_boost_IN_CACHE)
         MESSAGE(FATAL_ERROR "Couldn't find the Boost libraries and/or include directory, or the version found is too old. Please install the Boost libraries AND development packages. You can set BOOST_ROOT, BOOST_INCLUDEDIR and BOOST_LIBRARYDIR to help find Boost.")
       ENDIF(Boost_FIND_REQUIRED)
   ENDIF(Boost_FOUND)
-
-  # Under Windows, automatic linking is performed, so no need to specify the libraries.
-  IF (WIN32)
-      SET(Boost_LIBRARIES "")
-  ENDIF(WIN32)
 
   # show the Boost_INCLUDE_DIRS AND Boost_LIBRARIES variables only in the advanced view
   MARK_AS_ADVANCED(Boost_INCLUDE_DIRS

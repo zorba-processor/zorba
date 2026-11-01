@@ -16,7 +16,6 @@
 
 #include <stdexcept>
 
-#include "stdafx.h"
 #include "passthru_streambuf.h"
 
 using namespace std;

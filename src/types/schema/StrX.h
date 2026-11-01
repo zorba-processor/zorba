@@ -37,9 +37,6 @@
 #  pragma GCC diagnostic warning "-Wparentheses"
 #endif
 
-#ifdef CYGWIN
-#  undef WIN32
-#endif
 
 
 #if defined(XERCES_NEW_IOSTREAMS)

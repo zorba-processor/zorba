@@ -61,11 +61,7 @@ FuncFunction::evaluate(Arguments_t const& aArgs,
 } /* namespace extmodule */
 } /* namespace zorba */
 
-#ifdef WIN32
-#  define DLL_EXPORT __declspec(dllexport)
-#else
-#  define DLL_EXPORT __attribute__ ((visibility("default")))
-#endif
+#define DLL_EXPORT __attribute__ ((visibility("default")))
 
 extern "C" DLL_EXPORT zorba::ExternalModule* createModule() {
   return new zorba::extmodule::ExtModule();

@@ -23,11 +23,6 @@
 
 #include <algorithm>
 
-#ifdef WIN32
-// Windows annoyingly defines these as macros.
-#undef min
-#undef max
-#endif
 
 namespace zorba {
 

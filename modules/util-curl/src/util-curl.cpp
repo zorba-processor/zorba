@@ -46,11 +46,7 @@ String module::getURI() const {
 } // namespace util_curl
 } // namespace zorba
 
-#ifdef WIN32
-# define DLL_EXPORT __declspec(dllexport)
-#else
-# define DLL_EXPORT __attribute__ ((visibility("default")))
-#endif
+#define DLL_EXPORT __attribute__ ((visibility("default")))
 
 extern "C" DLL_EXPORT zorba::ExternalModule* createModule() {
   return new zorba::util_curl::module();

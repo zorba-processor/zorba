@@ -20,7 +20,6 @@
   */
 
 
-#include "stdafx.h"
 #include <zorba/diagnostic_list.h>
 
 namespace zorba {

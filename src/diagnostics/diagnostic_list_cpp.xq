@@ -53,7 +53,6 @@ declare function local:declare-diagnostics( $doc ) as xs:string*
 string-join(
   ( util:copyright(), 
     '',
-    '#include "stdafx.h"',
     '#include &lt;zorba/diagnostic_list.h>',
     '',
     'namespace zorba {',

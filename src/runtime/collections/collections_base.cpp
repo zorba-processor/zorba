@@ -15,8 +15,6 @@
  */
 
 
-#include "stdafx.h"
-
 #include "runtime/collections/collections_base.h"
 #include "runtime/collections/collections.h"
 

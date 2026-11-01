@@ -35,8 +35,6 @@
  */
 #if defined(__cplusplus)
 #define M_APM_TLS thread_local
-#elif defined(_MSC_VER)
-#define M_APM_TLS __declspec(thread)
 #else
 #define M_APM_TLS _Thread_local
 #endif

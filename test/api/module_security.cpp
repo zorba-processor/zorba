@@ -31,14 +31,9 @@
 #include <sstream>
 #include <string>
 
-#ifdef WIN32
-# include <winsock2.h>
-# include <ws2tcpip.h>
-#else
-# include <arpa/inet.h>
-# include <netdb.h>
-# include <sys/socket.h>
-#endif
+#include <arpa/inet.h>
+#include <netdb.h>
+#include <sys/socket.h>
 
 #include <zorba/config.h>
 #include <zorba/item.h>
@@ -560,25 +555,41 @@ void test_http_uri_resolution(Zorba* z)
 
 ////////////////////////////////////////////////////////////////////////////////
 
-// WordNet data comes from the library path, like native libraries.
-void test_wordnet(Zorba* z)
+// The built-in thesaurus (WordNet data in the library path, "##default" or
+// its URL) is engine data: it needs no capability. Other wordnet: URIs need
+// NativeModules, and a thesaurus the query names by file path needs FileRead.
+void test_wordnet(Zorba* z, const Files& f)
 {
-  CHECK(!SecurityPolicy::secure().checkURI("wordnet://wordnet.princeton.edu/",
+  CHECK(SecurityPolicy::secure().checkURI("##default",
+                                          EntityData::THESAURUS));
+  CHECK(SecurityPolicy::secure().checkURI("wordnet://wordnet.princeton.edu/",
+                                          EntityData::THESAURUS));
+  CHECK(!SecurityPolicy::secure().checkURI("wordnet://other.example/",
                                            EntityData::THESAURUS));
   CHECK(SecurityPolicy::secure().allow(Capability::NativeModules)
-        .checkURI("wordnet://wordnet.princeton.edu/", EntityData::THESAURUS));
+        .checkURI("wordnet://other.example/", EntityData::THESAURUS));
 
 #ifndef ZORBA_NO_FULL_TEXT
   const char QUERY[] =
     "<msg>affluent man</msg> contains text \"wealthy\" using thesaurus default";
-  CHECK(denied(run(z, context(z, SecurityPolicy::secure()), QUERY), "FTST0018",
-               "requires capability NativeModules"));
-  // Allowed: no denial (the WordNet data may not be installed).
-  CHECK(not_denied(run(z, context(z, SecurityPolicy::secure()
-                                     .allow(Capability::NativeModules)),
-                       QUERY)));
+  // No denial (the WordNet data may not be installed).
+  CHECK(not_denied(run(z, context(z, SecurityPolicy::secure()), QUERY)));
+  CHECK(not_denied(run(z, context(z, SecurityPolicy::secure()),
+      "<msg>affluent man</msg> contains text \"wealthy\" using thesaurus at "
+      "\"wordnet://wordnet.princeton.edu/\"")));
+
+  std::string const lUserThesaurus =
+    "<msg>affluent man</msg> contains text \"wealthy\" using thesaurus at \"" +
+    f.uri("outside/secret.txt") + "\"";
+  CHECK(denied(run(z, context(z, SecurityPolicy::secure()), lUserThesaurus),
+               "FTST0018", "requires capability FileRead"));
+  CHECK(denied(run(z, context(z, SecurityPolicy::secure()),
+      "<msg>affluent man</msg> contains text \"wealthy\" using thesaurus at "
+      "\"wordnet://other.example/\""),
+               "FTST0018", "requires capability NativeModules"));
 #else
   (void)z;
+  (void)f;
 #endif
 }
 
@@ -750,11 +761,7 @@ module_security(int argc, char* argv[])
     return 1;
   }
 
-#ifdef WIN32
-  _putenv_s(ENV_NAME, SECRET);
-#else
   ::setenv(ENV_NAME, SECRET, 1);
-#endif
 
   void* lStore = StoreManager::getStore();
   Zorba* lZorba = Zorba::getInstance(lStore);
@@ -767,7 +774,7 @@ module_security(int argc, char* argv[])
     test_file_module(lZorba, *lFiles);
     test_environment(lZorba);
     test_http_uri_resolution(lZorba);
-    test_wordnet(lZorba);
+    test_wordnet(lZorba, *lFiles);
     test_zorba_query(lZorba, *lFiles);
     test_http_client(lZorba);
   }

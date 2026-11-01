@@ -139,13 +139,12 @@ bool file_reads_unrestricted(const SecurityPolicy& aPolicy);
  * swapped between an earlier check and the open therefore cannot redirect
  * the read outside the allowed paths. Where the real path of a descriptor is
  * not available, the canonical path is checked and must name the same file
- * (device and inode) as the descriptor. On Windows the path is checked and
- * then opened (not race-free).
+ * (device and inode) as the descriptor.
  *
  * If the policy does not restrict file reads (file_reads_unrestricted()),
  * the file is opened with std::ifstream without any check, as before.
  *
- * aBinary selects binary mode where text mode differs (Windows); the
+ * aBinary selects binary mode where text mode differs; the
  * descriptor-based stream used elsewhere is always binary.
  *
  * Returns the stream, or null if the file cannot be opened or the access is
@@ -200,14 +199,14 @@ std::string canonical_path(const std::string& aPathOrFileURI);
 
 /**
  * True if canonical path aPath equals canonical directory aDir or lies below
- * it. Case-insensitive where the file system of aDir is (Windows; macOS
+ * it. Case-insensitive where the file system of aDir is (macOS
  * volumes that report so).
  */
 bool path_within(const std::string& aDir, const std::string& aPath);
 
 /**
  * The lower-cased scheme of a URI, or "" if it has none (a single letter
- * before ':' is a Windows drive, not a scheme).
+ * before ':' is a drive letter, not a scheme).
  */
 std::string uri_scheme(const std::string& aURI);
 

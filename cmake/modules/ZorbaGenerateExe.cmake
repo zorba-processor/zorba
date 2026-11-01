@@ -66,67 +66,6 @@ MACRO(ZORBA_GENERATE_EXE EXE_NAME SRCS DEPEND_LIBS NEW_NAME INSTALL_DESTINATION)
     INSTALL (TARGETS ${EXE_NAME}${SUFFIX} DESTINATION ${INSTALL_DESTINATION})
   ENDIF (NOT ${INSTALL_DESTINATION} STREQUAL "")
 
-  IF (WIN32)
-    # generate list of bat scripts to set the PATH variable for the executables
-    IF (NOT ${NEW_NAME} STREQUAL "")
-      SET (ZORBA_EXE_NAME "${NEW_NAME}${SUFFIX}")
-    ELSE (NOT ${NEW_NAME} STREQUAL "")
-      SET (ZORBA_EXE_NAME "${EXE_NAME}${SUFFIX}")
-    ENDIF (NOT ${NEW_NAME} STREQUAL "")
-
-    SET (ZORBA_EXE_SCRIPT_LIST "${ZORBA_EXE_SCRIPT_LIST}${CMAKE_CURRENT_BINARY_DIR}/${ZORBA_EXE_NAME}.bat;"
-      CACHE STRING "List of Windows batch scripts to be generated, one for each executable" FORCE
-    )
-
-
-    # generate list of Visual Studio project files to set the PATH variable
-    IF (MSVC_IDE)
-      SET (SYSTEM_NAME $ENV{USERDOMAIN})
-      SET (USER_NAME $ENV{USERNAME})
-      SET (ZORBA_VC_PROJECT_FILE_LIST "${ZORBA_VC_PROJECT_FILE_LIST}${EXE_NAME}.vcproj.${SYSTEM_NAME}.${USER_NAME}.user"
-        CACHE STRING "List of Visual Studio project files to be generated, one for each executable" FORCE
-      )
-    ENDIF (MSVC_IDE)
-  ENDIF (WIN32)
   
 ENDMACRO (ZORBA_GENERATE_EXE)
 
-
-# This macro will read the ZORBA_EXE_SCRIPT_LIST and ZORBA_VC_PROJECT_CONFIG_FILE 
-# environment variables and will generate them near each corresponding executable.
-# This macro must be invoked AFTER all the required libraries have been searched
-# for (both Zorba and external modules) in order to set a correct path in the
-# scripts.
-MACRO (ZORBA_GENERATE_EXE_HELPERS_WIN32)
-
-  IF (NOT WIN32)
-    MESSAGE (FATAL_ERROR "This macro is intended only for Windows platforms.")
-  ENDIF (NOT WIN32)
-
-  FOREACH (SCRIPT ${ZORBA_EXE_SCRIPT_LIST})
-
-    MESSAGE (STATUS "Adding exe script: ${SCRIPT}")
-
-    # used to make a difference between VS and NMake
-    IF (MSVC_IDE)
-      SET (IDE "MSVC")
-    ENDIF (MSVC_IDE)
-    # used to know where zorba_simplestore.dll is
-    FILE (TO_NATIVE_PATH "${CMAKE_BINARY_DIR}" CMAKE_BINARY_DIR_NATIVE)
-    # used to find out the original executable name
-    FILE (TO_NATIVE_PATH "${SCRIPT}" SCRIPT_NATIVE)
-
-    # ZORBA_REQUIRED_DLL_PATHS is also needed and picked from the CACHE
-    CONFIGURE_FILE ("${CMAKE_SOURCE_DIR}/scripts/win_exec.bat.in" ${SCRIPT} @ONLY)
-
-  ENDFOREACH (SCRIPT)
-
-  FOREACH (VCFILE ${ZORBA_VC_PROJECT_FILE_LIST})
-    # Do not overwrite old property files. The user might have adapted something.
-    IF (NOT EXISTS ${VCFILE})
-      CONFIGURE_FILE (${CMAKE_SOURCE_DIR}/cmake/modules/VCProject.vcproj.in ${VCFILE})
-    ENDIF (NOT EXISTS ${VCFILE})
-  ENDFOREACH(VCFILE)
-
-
-ENDMACRO (ZORBA_GENERATE_EXE_HELPERS_WIN32)

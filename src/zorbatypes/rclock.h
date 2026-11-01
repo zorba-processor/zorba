@@ -151,27 +151,11 @@ void release()
 };
 
 
-#elif defined WIN32 || defined WINCE
-
-class RCLock 
-{
-public:
-  RCLock() { }
-  
-  RCLock(const RCLock& ) { }
-
-  ~RCLock() { } 
-
-  void acquire() { }
-
-  void release() { }
-};
-
 #else
 
-#error must have pthread mutex or phread spinlock, or windows OS
+#error must have pthread mutex or pthread spinlock
 
-#endif // ZORBA_HAVE_PTHREAD or WIN32
+#endif // ZORBA_HAVE_PTHREAD
 
 #endif // ZORBA_FOR_ONE_THREAD_ONLY
 

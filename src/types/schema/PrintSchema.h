@@ -35,9 +35,6 @@
 #  pragma GCC diagnostic warning "-Wparentheses"
 #endif
 
-#ifdef CYGWIN
-#  undef WIN32
-#endif
 
 #include <string>
 

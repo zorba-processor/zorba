@@ -19,9 +19,6 @@
 
 #include <zorba/config.h>
 
-#ifdef _MSC_VER
-#pragma warning( disable : 4996 )
-#endif
 
 #include <memory>                       /* for allocator */
 #include <string>                       /* for char_traits */
@@ -321,9 +318,6 @@ protected:
 } // namespace rstring_classes
 } // namespace zorba
 
-#ifdef _MSC_VER
-#pragma warning( disable : 4996 )
-#endif
 
 #endif /* ZORBA_RSTRING_REP_BASE_H */
 /*

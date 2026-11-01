@@ -23,7 +23,6 @@
 
 
 
-#include "stdafx.h"
 #include "runtime/accessors/accessors.h"
 #include "functions/func_accessors.h"
 

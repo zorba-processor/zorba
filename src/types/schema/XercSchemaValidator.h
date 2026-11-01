@@ -23,9 +23,6 @@
 #include <xercesc/validators/common/ContentSpecNode.hpp>
 #include <xercesc/validators/schema/SchemaGrammar.hpp>
 #include <xercesc/validators/schema/XSDErrorReporter.hpp>
-#ifdef CYGWIN
-#undef WIN32
-#endif
 
 // TODO remove
 using namespace XERCES_CPP_NAMESPACE;

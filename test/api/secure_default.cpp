@@ -235,10 +235,8 @@ void test_unrestricted_opt_in(Zorba* z, const Files& f)
   CHECK(z->getSecurityPolicy() == SecurityPolicy::unrestricted());
   CHECK(returns(run(z, DOC, f.uri("secret.xml")), SECRET));
   CHECK(returns(run(z, TEXT_AVAILABLE, f.uri("secret.txt")), "true"));
-#ifndef WIN32
   CHECK(returns(run(z, env_query()), "1"));
   CHECK(returns(run(z, env_listed_query()), "true"));
-#endif
 
   // Back to the default: denied again.
   z->setSecurityPolicy(SecurityPolicy::secure());
@@ -263,9 +261,7 @@ void test_single_capability(Zorba* z, const Files& f)
 int
 secure_default(int argc, char* argv[])
 {
-#ifndef WIN32
   ::setenv(ENV_VAR, "1", 1);
-#endif
 
   std::unique_ptr<Files> lFiles;
   try

@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-#include "stdafx.h"
-
 // standard
 #include <cerrno>
 #include <cstdlib>

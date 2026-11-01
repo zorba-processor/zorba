@@ -26,64 +26,10 @@ ELSE ()
   SET (CLANG 0)
 ENDIF ()
 
-#-----------------------------------------------------------------------------
-# Let's use the highest warning level.
-#-----------------------------------------------------------------------------
-MESSAGE(STATUS "CMAKE_BUILD_TOOL = ${CMAKE_BUILD_TOOL}")
-IF(NOT CLANG AND CMAKE_BUILD_TOOL MATCHES "(msdev|devenv|nmake|MSBuild)")
-  # Use only the second highest warning level for the Visual Studio
-  # compiler: /W3. This is because /W4 is too strict and generates too many
-  # warnings. This would make much of the code non-portable or too many
-  # ifdef pragma expressions would be necessary.
-  # See: http://digipen1.xmmg.com:8181/dpweb/docs/CompilingWarningLevel4.html
-
-  # for C++
-  IF(CMAKE_CXX_FLAGS MATCHES "/W[0-2]")
-    STRING(REGEX REPLACE "/W[0-2]" "/W3" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
-  ELSE(CMAKE_CXX_FLAGS MATCHES "/W[0-2]")
-    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /W3")
-  ENDIF(CMAKE_CXX_FLAGS MATCHES "/W[0-2]")
-  # and for C
-  IF(CMAKE_C_FLAGS MATCHES "/W[0-2]")
-    STRING(REGEX REPLACE "/W[0-2]" "/W3" CMAKE_C_FLAGS "${CMAKE_C_FLAGS}")
-  ELSE(CMAKE_C_FLAGS MATCHES "/W[0-2]")
-    SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /W3")
-  ENDIF(CMAKE_C_FLAGS MATCHES "/W[0-2]")
-  MESSAGE(STATUS "Increased the warning level to level 3: /W3. New flags:")
-  MESSAGE(STATUS "CMAKE_C_FLAGS:            ${CMAKE_C_FLAGS}")
-  MESSAGE(STATUS "CMAKE_CXX_FLAGS:          ${CMAKE_CXX_FLAGS}")
-
-  # For the same reasons mentioned above, disable deprecation warnings for standard C functions
-  ADD_DEFINITIONS(-D_CRT_SECURE_NO_DEPRECATE -D_CRT_NONSTDC_NO_DEPRECATE -D_PREFIX_ -D_SCL_SECURE_NO_WARNINGS -D_UNICODE -DUNICODE)
-
-  IF(NOT CMAKE_CXX_FLAGS MATCHES "/DNOMINMAX")
-    # avoid the min/max name clash between std versions and the
-    # ones defined in Windef.h on Windows. Disable the latter.
-    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /DNOMINMAX")
-    MESSAGE(STATUS "Added /DNOMINMAX compiler flag to CMAKE_CXX_FLAGS. New flags:")
-    MESSAGE(STATUS "CMAKE_CXX_FLAGS:          ${CMAKE_CXX_FLAGS}")
-  ENDIF(NOT CMAKE_CXX_FLAGS MATCHES "/DNOMINMAX")
-
-   SET(ZORBA_PROCESSORS_FOR_COMPILE $ENV{NUMBER_OF_PROCESSORS} CACHE STRING "Number of processors for compiling") 
-   MESSAGE(STATUS "Number of processors/cores used for compiling ZORBA_PROCESSORS_FOR_COMPILE = ${ZORBA_PROCESSORS_FOR_COMPILE}")
-   SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /MP${ZORBA_PROCESSORS_FOR_COMPILE}")
-   GET_FILENAME_COMPONENT(COMPILER_FULL_PATH ${CMAKE_C_COMPILER} PROGRAM)
-IF(COMPILER_FULL_PATH MATCHES "Visual Studio 8")
-   #to detect 64 bit portability issues
-   SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /Wp64")
-ENDIF(COMPILER_FULL_PATH MATCHES "Visual Studio 8")
-
-ENDIF(NOT CLANG AND CMAKE_BUILD_TOOL MATCHES "(msdev|devenv|nmake|MSBuild)")
-
 # Flex 2.6.4 (e.g. macOS's) emits 'register' in generated scanners, which
 # Clang rejects in C++17 and later.
 IF(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-register")
-ENDIF()
-
-IF(CLANG AND WIN32)
-  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -no-integrated-as")
-  SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -no-integrated-as")
 ENDIF()
 
 SET(ZORBA_GNUCOMPILER_VERSION)
@@ -163,9 +109,9 @@ IF(CMAKE_COMPILER_IS_GNUCXX)
     SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-parameter")
   ENDIF(NOT CMAKE_CXX_FLAGS MATCHES "-Wno-unused-parameter")
   IF(NOT CMAKE_CXX_FLAGS MATCHES "-fPIC")
-    IF (UNIX AND NOT APPLE AND NOT CYGWIN) # not for mach libraries
+    IF (UNIX AND NOT APPLE) # not for mach libraries
       SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC") 
-    ENDIF (UNIX AND NOT APPLE AND NOT CYGWIN)
+    ENDIF (UNIX AND NOT APPLE)
   ENDIF(NOT CMAKE_CXX_FLAGS MATCHES "-fPIC")
   IF ( ZORBA_GNUCOMPILER_MAJOR_VERSION GREATER 3 )
     IF (NOT CMAKE_CXX_FLAGS MATCHES "-fvisibility")
@@ -232,9 +178,9 @@ IF(CMAKE_COMPILER_IS_GNUCC)
     ENDIF (NOT CMAKE_SHARED_LINKER_FLAGS MATCHES "as-needed")
   ENDIF (UNIX AND NOT APPLE)
   IF(NOT CMAKE_C_FLAGS MATCHES "-fPIC")
-    IF (UNIX AND NOT APPLE AND NOT CYGWIN) # not for mach libraries
+    IF (UNIX AND NOT APPLE) # not for mach libraries
       SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC") 
-    ENDIF (UNIX AND NOT APPLE AND NOT CYGWIN)
+    ENDIF (UNIX AND NOT APPLE)
   ENDIF(NOT CMAKE_C_FLAGS MATCHES "-fPIC")
   IF ( ZORBA_GNUCOMPILER_MAJOR_VERSION GREATER 3 )
     IF (NOT CMAKE_C_FLAGS MATCHES "-fvisibility")
@@ -246,9 +192,6 @@ ENDIF(CMAKE_COMPILER_IS_GNUCC)
 IF (APPLE)
   # Needed for CFUUID*() functions in util/uuid.c.
   SET(CMAKE_SHARED_LINKER_FLAGS "-framework CoreFoundation ${CMAKE_SHARED_LINKER_FLAGS}")
-ELSEIF (WIN32)
-  # Needed for UuidCreateSequential() function in util/uuid.c.
-  SET(requiredlibs ${requiredlibs} "Rpcrt4")
 ELSEIF (ZORBA_HAVE_UUID_H)
   # Needed for uuid_generate() function in util/uuid.c.
   SET(requiredlibs ${requiredlibs} "uuid")
@@ -258,7 +201,7 @@ ELSEIF (ZORBA_HAVE_UUID_H)
     MESSAGE (FATAL_ERROR "Could not find libuuid - required on Linux!")
   ENDIF (NOT LIBUUID_EXISTS)
 ELSE (APPLE)
-  # We're not Apple or Win32, and we didn't find uuid.h - can't compile
+  # We are not Apple, and we didn't find uuid.h - can't compile
   MESSAGE (FATAL_ERROR "Could not find uuid/uuid.h header, which is "
     "required on Linux. On Ubuntu, the 'uuid-dev' package is required; "
     "look for similar packages on other platforms.")

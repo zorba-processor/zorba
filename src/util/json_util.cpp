@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-#include "stdafx.h"
 #include <iomanip>
 #include <iostream>
 
