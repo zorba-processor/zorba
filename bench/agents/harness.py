@@ -756,6 +756,10 @@ def run_task_claude(task, cfg, args, network, mcp_tools, log_dir):
         stop = "tool_set_mismatch"
     elif result.get("stop_reason") == "refusal":
         stop = "refusal"
+    elif result.get("is_error") and sub == "success":
+        # For example "Not logged in": Claude Code ends with is_error and
+        # the message as the result text.
+        stop = "claude_error: " + str(result.get("result"))[:200]
     elif sub == "success":
         so = result.get("structured_output")
         if isinstance(so, dict) and "answer" in so:
@@ -818,8 +822,21 @@ def check_cli(args, tasks):
             bool(CLI_ERRORS.search(text))
         print(f"claude command line of {cfg}: "
               f"{'REJECTED' if rejected else 'accepted'} "
-              f"(exit {proc.returncode if proc else None}): "
-              f"{text.strip()[-400:]}")
+              f"(exit {proc.returncode if proc else None})")
+        init = parse_stream(text.splitlines())["init"]
+        if init is None:
+            print(f"  no init event; output: {text.strip()[-400:]}")
+            rejected = True
+        else:
+            # The MCP server of this check is `true`, which offers no tools.
+            tools = set(init.get("tools") or [])
+            other = {t for t in tools
+                     if not t.startswith(f"mcp__{MCP_SERVER_NAME}__")}
+            want = expected_tools(cfg, [])
+            print(f"  tools offered: {sorted(tools)}; "
+                  f"{'as expected' if other == want else 'UNEXPECTED'} "
+                  f"(expected {sorted(want)} besides mcp__zorba__*)")
+            rejected = rejected or other != want
         bad += rejected
     return bad
 
