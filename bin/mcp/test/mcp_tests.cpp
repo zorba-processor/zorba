@@ -92,7 +92,7 @@ std::string request( Json id, std::string const &method,
   } ).dump();
 }
 
-Json exchange( Server &server, std::string const &message ) {
+Json roundtrip( Server &server, std::string const &message ) {
   std::string const response( server.handle( message ) );
   Json r;
   std::string why;
@@ -109,7 +109,7 @@ Json exchange( Server &server, std::string const &message ) {
 
 Json call_tool( Server &server, std::string const &tool, Json args,
                 int id = 100 ) {
-  return exchange( server, request( id, "tools/call", Json::object( {
+  return roundtrip( server, request( id, "tools/call", Json::object( {
     { "name", tool }, { "arguments", args } } ) ) );
 }
 
@@ -189,17 +189,17 @@ void test_protocol( Fixture const &f ) {
   config.root = f.tree;
   Server server( f.zorba, config, std::cerr );
 
-  Json r = exchange( server, "{not json" );
+  Json r = roundtrip( server, "{not json" );
   check( error_code( r ) == -32700 && r.find( "id" ) && r.find( "id" )->is_null(),
          "parse error: -32700 with id null", r.dump() );
 
-  r = exchange( server, "[" + request( 1, "tools/list" ) + "]" );
+  r = roundtrip( server, "[" + request( 1, "tools/list" ) + "]" );
   check( error_code( r ) == -32600, "batch: -32600", r.dump() );
 
-  r = exchange( server, "{\"jsonrpc\":\"2.0\",\"id\":null,\"method\":\"tools/list\"}" );
+  r = roundtrip( server, "{\"jsonrpc\":\"2.0\",\"id\":null,\"method\":\"tools/list\"}" );
   check( error_code( r ) == -32600, "null id: -32600", r.dump() );
 
-  r = exchange( server, "{\"jsonrpc\":\"1.0\",\"id\":2,\"method\":\"tools/list\"}" );
+  r = roundtrip( server, "{\"jsonrpc\":\"1.0\",\"id\":2,\"method\":\"tools/list\"}" );
   check( error_code( r ) == -32600 && field( r, "id" ) == "2",
          "wrong jsonrpc version: -32600, id echoed", r.dump() );
 
@@ -209,13 +209,13 @@ void test_protocol( Fixture const &f ) {
   check( server.handle( "{\"jsonrpc\":\"2.0\",\"method\":\"bogus/notification\"}" ).empty(),
          "unknown notification: no response" );
 
-  r = exchange( server, request( 3, "tools/list", Json::object(), false ) );
+  r = roundtrip( server, request( 3, "tools/list", Json::object(), false ) );
   check( error_code( r ) == -32602 && contains( r.dump(), "2026-07-28" ),
          "request without _meta before initialize: -32602 naming the version",
          r.dump() );
 
   // Modern (per-request _meta) requests.
-  r = exchange( server, request( "d1", "server/discover" ) );
+  r = roundtrip( server, request( "d1", "server/discover" ) );
   Json const *res = r.find( "result" );
   check( res && field( *res, "resultType" ) == "complete" &&
          contains( r.dump(), "\"supportedVersions\":[\"2026-07-28\"]" ) &&
@@ -226,7 +226,7 @@ void test_protocol( Fixture const &f ) {
 
   Json old_meta( meta() );
   old_meta.set( "io.modelcontextprotocol/protocolVersion", "1900-01-01" );
-  r = exchange( server, Json::object( {
+  r = roundtrip( server, Json::object( {
     { "jsonrpc", "2.0" }, { "id", 4 }, { "method", "tools/list" },
     { "params", Json::object( { { "_meta", old_meta } } ) } } ).dump() );
   check( error_code( r ) == -32022 &&
@@ -236,26 +236,26 @@ void test_protocol( Fixture const &f ) {
 
   Json no_caps( Json::object( {
     { "io.modelcontextprotocol/protocolVersion", protocol_version } } ) );
-  r = exchange( server, Json::object( {
+  r = roundtrip( server, Json::object( {
     { "jsonrpc", "2.0" }, { "id", 5 }, { "method", "tools/list" },
     { "params", Json::object( { { "_meta", no_caps } } ) } } ).dump() );
   check( error_code( r ) == -32602, "missing clientCapabilities: -32602",
          r.dump() );
 
-  r = exchange( server, request( 6, "resources/list" ) );
+  r = roundtrip( server, request( 6, "resources/list" ) );
   check( error_code( r ) == -32601, "unknown method: -32601", r.dump() );
 
-  r = exchange( server, request( 7, "tools/call", Json::object( {
+  r = roundtrip( server, request( 7, "tools/call", Json::object( {
     { "name", "no_such_tool" }, { "arguments", Json::object() } } ) ) );
   check( error_code( r ) == -32602 && contains( r.dump(), "no_such_tool" ),
          "unknown tool: -32602", r.dump() );
 
-  r = exchange( server, request( 8, "tools/call", Json::object( {
+  r = roundtrip( server, request( 8, "tools/call", Json::object( {
     { "name", "run_query" }, { "arguments", "1+1" } } ) ) );
   check( error_code( r ) == -32602, "arguments not an object: -32602",
          r.dump() );
 
-  r = exchange( server, request( 9, "ping" ) );
+  r = roundtrip( server, request( 9, "ping" ) );
   check( r.find( "result" ) != nullptr && !r.find( "error" ), "ping",
          r.dump() );
 
@@ -271,7 +271,7 @@ void test_legacy( Fixture const &f ) {
   config.root = f.tree;
   Server server( f.zorba, config, std::cerr );
 
-  Json r = exchange( server, request( 1, "initialize", Json::object( {
+  Json r = roundtrip( server, request( 1, "initialize", Json::object( {
     { "protocolVersion", "2025-11-25" },
     { "capabilities", Json::object() },
     { "clientInfo", Json::object( { { "name", "legacy" }, { "version", "1" } } ) }
@@ -286,16 +286,16 @@ void test_legacy( Fixture const &f ) {
   check( server.handle( "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}" ).empty(),
          "notifications/initialized: no response" );
 
-  r = exchange( server, request( 2, "ping", Json::object(), false ) );
+  r = roundtrip( server, request( 2, "ping", Json::object(), false ) );
   check( r.find( "result" ) && r.find( "result" )->is_object(), "legacy ping",
          r.dump() );
 
-  r = exchange( server, request( 3, "tools/list", Json::object(), false ) );
+  r = roundtrip( server, request( 3, "tools/list", Json::object(), false ) );
   check( contains( r.dump(), "\"name\":\"list_documents\"" ) &&
          contains( r.dump(), "\"name\":\"run_query\"" ),
          "legacy tools/list", r.dump() );
 
-  r = exchange( server, request( 4, "initialize", Json::object( {
+  r = roundtrip( server, request( 4, "initialize", Json::object( {
     { "protocolVersion", "2024-11-05" }, { "capabilities", Json::object() },
     { "clientInfo", Json::object( { { "name", "old" }, { "version", "1" } } ) }
   } ), false ) );
@@ -311,7 +311,7 @@ void test_tools_list( Fixture const &f ) {
   config.queries_dir = f.queries;
   Server server( f.zorba, config, std::cerr );
 
-  Json r = exchange( server, request( 1, "tools/list" ) );
+  Json r = roundtrip( server, request( 1, "tools/list" ) );
   Json const *const res = r.find( "result" );
   Json const *const tools = res ? res->find( "tools" ) : nullptr;
   check( tools && tools->is_array() && tools->items().size() == 3,
