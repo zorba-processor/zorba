@@ -271,6 +271,13 @@ SecurityPolicy& SecurityPolicy::addNetworkPrefix(const String& aUrlPrefix)
 }
 
 
+SecurityPolicy& SecurityPolicy::addNativeModule(const String& aNamespaceURI)
+{
+  (void)aNamespaceURI;
+  return *this;
+}
+
+
 const std::vector<String>& SecurityPolicy::getReadPaths() const
 {
   return theImpl->theReadPaths;
@@ -286,6 +293,13 @@ const std::vector<String>& SecurityPolicy::getWritePaths() const
 const std::vector<String>& SecurityPolicy::getNetworkPrefixes() const
 {
   return theImpl->theNetworkPrefixes;
+}
+
+
+const std::vector<String>& SecurityPolicy::getNativeModules() const
+{
+  static const std::vector<String> lNone;
+  return lNone;
 }
 
 

@@ -69,6 +69,7 @@ void test_defaults()
   CHECK(s.getReadPaths().empty());
   CHECK(s.getWritePaths().empty());
   CHECK(s.getNetworkPrefixes().empty());
+  CHECK(s.getNativeModules().empty());
   CHECK(!s.allowsPrivateAddresses());
   CHECK(s.getTimeout() == milliseconds(0));
   CHECK(s.getMaxCallDepth() == 1024);
@@ -88,6 +89,7 @@ void test_defaults()
   CHECK(u.getReadPaths().empty());
   CHECK(u.getWritePaths().empty());
   CHECK(u.getNetworkPrefixes().empty());
+  CHECK(u.getNativeModules().empty());
   CHECK(u.allowsPrivateAddresses());
   CHECK(u.getTimeout() == milliseconds(0));
   CHECK(u.getMaxCallDepth() == 1024);
@@ -130,6 +132,12 @@ void test_modifiers()
   CHECK(p.getWritePaths().size() == 1 && p.getWritePaths()[0] == "/srv/out");
   CHECK(p.getNetworkPrefixes().size() == 1 &&
         p.getNetworkPrefixes()[0] == "https://api.example.com/v1/");
+
+  p.addNativeModule("http://expath.org/ns/file")
+   .addNativeModule("http://zorba.io/modules/sleep");
+  CHECK(p.getNativeModules().size() == 2 &&
+        p.getNativeModules()[0] == "http://expath.org/ns/file" &&
+        p.getNativeModules()[1] == "http://zorba.io/modules/sleep");
 }
 
 void test_copy_semantics()
@@ -149,6 +157,25 @@ void test_copy_semantics()
   CHECK(c == a);
   c.setTimeout(seconds(1));
   CHECK(a.getTimeout() == milliseconds(0));
+
+  // The native module list is copied and compared like the other lists;
+  // order and duplicates do not matter.
+  SecurityPolicy m1 = SecurityPolicy::secure()
+    .allow(Capability::NativeModules)
+    .addNativeModule("http://expath.org/ns/file");
+  SecurityPolicy m2(m1);
+  CHECK(m2 == m1);
+  CHECK(m2.getNativeModules().size() == 1);
+  m2.addNativeModule("http://zorba.io/modules/sleep");
+  CHECK(m1.getNativeModules().size() == 1);
+  CHECK(m2 != m1);
+  CHECK(m1 != SecurityPolicy::secure().allow(Capability::NativeModules));
+  SecurityPolicy m3 = SecurityPolicy::secure()
+    .allow(Capability::NativeModules)
+    .addNativeModule("http://zorba.io/modules/sleep")
+    .addNativeModule("http://expath.org/ns/file")
+    .addNativeModule("http://zorba.io/modules/sleep");
+  CHECK(m3 == m2);
 
   SecurityPolicy& cref = c;
   c = cref; // self-assignment
@@ -192,6 +219,32 @@ void test_narrowing()
   SecurityPolicy n3 = SecurityPolicy::unrestricted()
     .addNetworkPrefix("https://other.example/");
   CHECK(!n1.narrowedBy(n3).allows(Capability::Network));
+
+  // Native modules: an empty list is taken from the other policy, two lists
+  // keep the URIs in both (whole URIs, not prefixes), and no common URI
+  // denies NativeModules.
+  SecurityPolicy m1 = SecurityPolicy::unrestricted()
+    .addNativeModule("http://expath.org/ns/file")
+    .addNativeModule("http://zorba.io/modules/sleep");
+  SecurityPolicy m2 = SecurityPolicy::unrestricted()
+    .addNativeModule("http://zorba.io/modules/sleep")
+    .addNativeModule("http://zorba.io/modules/zorba-query");
+  SecurityPolicy m3 = SecurityPolicy::unrestricted()
+    .addNativeModule("http://zorba.io/modules/sleep-more");
+  CHECK(m1.narrowedBy(u) == m1);
+  CHECK(u.narrowedBy(m1) == m1);
+  CHECK(m1.narrowedBy(u).getNativeModules().size() == 2);
+  SecurityPolicy m12 = m1.narrowedBy(m2);
+  CHECK(m12 == m2.narrowedBy(m1));
+  CHECK(m12.allows(Capability::NativeModules));
+  CHECK(m12.getNativeModules().size() == 1 &&
+        m12.getNativeModules()[0] == "http://zorba.io/modules/sleep");
+  CHECK(m12.isWithin(m1));
+  CHECK(m1.isWithin(u));
+  CHECK(!u.isWithin(m1));
+  CHECK(!m1.isWithin(m2));
+  CHECK(!m1.narrowedBy(m3).allows(Capability::NativeModules));
+  CHECK(m1.narrowedBy(m3).allows(Capability::Network));
 
 #ifdef ZORBA_WITH_FILE_ACCESS
   // Directories match on path components, not on string prefixes.
@@ -320,6 +373,8 @@ void test_plan_serialization(Zorba* z)
     .allow(Capability::Network)
     .allow(Capability::Environment)
     .addNetworkPrefix("https://api.example.com/v1/")
+    .allow(Capability::NativeModules)
+    .addNativeModule("http://zorba.io/modules/http-client")
     .setAllowPrivateAddresses(true)
     .setTimeout(seconds(7))
     .setMaxCallDepth(99)
@@ -337,6 +392,8 @@ void test_plan_serialization(Zorba* z)
   XQuery_t q = z->createQuery();
   q->loadExecutionPlan(lIn);
   CHECK(q->getStaticContext()->getSecurityPolicy() == p);
+  CHECK(q->getStaticContext()->getSecurityPolicy().getNativeModules().size()
+        == 1);
 }
 
 } // anonymous namespace
