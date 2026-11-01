@@ -440,6 +440,27 @@ void test_network( Fixture const &f ) {
          "fn:doc over HTTP: denied", r.dump() );
 }
 
+void test_native_modules( Fixture const &f ) {
+  ServerConfig config;
+  config.root = f.tree;
+  Server server( f.zorba, config, std::cerr );
+
+  Json r = call_tool( server, "run_query", Json::object( {
+    { "query", "import module namespace sleep = \"http://zorba.io/modules/sleep\";\n"
+               "\"native-loaded\"" } } ) );
+  check( is_tool_error( r ) &&
+         contains( field( tool_error( r ), "code" ), "ZXQP0067" ) &&
+         contains( r.dump(), "http://zorba.io/modules/sleep" ) &&
+         !contains( r.dump(), "native-loaded" ),
+         "native module not on the policy's list: ZXQP0067", r.dump() );
+
+  r = call_tool( server, "run_query", Json::object( {
+    { "query", "import module namespace file = \"http://expath.org/ns/file\";\n"
+               "concat(\"native-\", string-length(file:directory-separator()))" } } ) );
+  check( !is_tool_error( r ) && contains( result_text( r ), "native-1" ),
+         "file module (on the policy's list): loads", r.dump() );
+}
+
 void test_predefined( Fixture const &f ) {
   ServerConfig config;
   config.root = f.tree;
@@ -594,6 +615,7 @@ Test const tests[] = {
   { "syntax_error", test_syntax_error },
   { "escape", test_escape },
   { "network", test_network },
+  { "native_modules", test_native_modules },
   { "predefined", test_predefined },
   { "limits", test_limits },
   { "binary", test_binary }

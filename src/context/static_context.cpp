@@ -2057,6 +2057,7 @@ void static_context::serialize_security_policy(serialization::Archiver& ar)
   std::vector<zstring> lReadPaths;
   std::vector<zstring> lWritePaths;
   std::vector<zstring> lNetworkPrefixes;
+  std::vector<zstring> lNativeModules;
   bool lAllowPrivate = false;
   long long lTimeout = 0;
   uint32_t lMaxCallDepth = 0;
@@ -2075,6 +2076,8 @@ void static_context::serialize_security_policy(serialization::Archiver& ar)
       lWritePaths.push_back(zstring(s.c_str()));
     for (const String& s : p.getNetworkPrefixes())
       lNetworkPrefixes.push_back(zstring(s.c_str()));
+    for (const String& s : p.getNativeModules())
+      lNativeModules.push_back(zstring(s.c_str()));
     lAllowPrivate = p.allowsPrivateAddresses();
     lTimeout = static_cast<long long>(p.getTimeout().count());
     lMaxCallDepth = p.getMaxCallDepth();
@@ -2086,6 +2089,7 @@ void static_context::serialize_security_policy(serialization::Archiver& ar)
   ar & lReadPaths;
   ar & lWritePaths;
   ar & lNetworkPrefixes;
+  ar & lNativeModules;
   ar & lAllowPrivate;
   ar & lTimeout;
   ar & lMaxCallDepth;
@@ -2104,6 +2108,8 @@ void static_context::serialize_security_policy(serialization::Archiver& ar)
       p.addWritePath(String(s.c_str()));
     for (const zstring& s : lNetworkPrefixes)
       p.addNetworkPrefix(String(s.c_str()));
+    for (const zstring& s : lNativeModules)
+      p.addNativeModule(String(s.c_str()));
     p.setAllowPrivateAddresses(lAllowPrivate);
     p.setTimeout(std::chrono::milliseconds(lTimeout));
     p.setMaxCallDepth(lMaxCallDepth);
@@ -2179,7 +2185,8 @@ SecurityPolicy static_context::get_security_policy() const
   Intersection can only clear capabilities, so any policy on the way to (and
   including) the nearest explicit one that denies the capability denies it.
   If all allow it, allow-list intersections may still clear FileRead,
-  FileWrite or Network; only get_security_policy() computes those.
+  FileWrite, Network or NativeModules; only get_security_policy() computes
+  those.
 ********************************************************************************/
 bool static_context::allows_capability(Capability aCap) const
 {
@@ -2198,7 +2205,7 @@ bool static_context::allows_capability(Capability aCap) const
       break;
     }
     if (!p->getReadPaths().empty() || !p->getWritePaths().empty() ||
-        !p->getNetworkPrefixes().empty())
+        !p->getNetworkPrefixes().empty() || !p->getNativeModules().empty())
       lNarrowedLists = true;
   }
   // Without an explicit policy on the chain the base is

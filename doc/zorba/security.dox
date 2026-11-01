@@ -47,7 +47,8 @@ StaticContext_t sctx = z->createStaticContext();
 sctx->setSecurityPolicy(SecurityPolicy::secure()
     .allow(Capability::FileRead).addReadPath("/srv/data")
     .allow(Capability::Network).addNetworkPrefix("https://api.example.com/v1/")
-    .allow(Capability::NativeModules));   // the http-client module
+    .allow(Capability::NativeModules)     // the http-client module
+    .addNativeModule("http://zorba.io/modules/http-client"));
 XQuery_t q = z->compileQuery(query, sctx);
 \endcode
 
@@ -55,6 +56,30 @@ The capabilities are listed in <tt>zorba::Capability</tt>. Network access to
 loopback, private and link-local addresses is denied unless a network prefix
 names such a host or <tt>SecurityPolicy::setAllowPrivateAddresses(true)</tt>
 is called.
+
+\section security_native Native modules
+
+<tt>Capability::NativeModules</tt> lets a query load the native libraries
+that implement external functions of modules in the library path (e.g. the
+file, http-client and zorba-query modules). By itself it applies to every
+such module. <tt>SecurityPolicy::addNativeModule()</tt> restricts it to the
+modules whose target namespace URIs are added, in the same way
+<tt>addReadPath()</tt> restricts <tt>FileRead</tt>:
+
+\code
+// The file module may be loaded; zorba-query, sleep, etc. may not.
+sctx->setSecurityPolicy(SecurityPolicy::secure()
+    .allow(Capability::FileRead).addReadPath("/srv/data")
+    .allow(Capability::NativeModules)
+    .addNativeModule("http://expath.org/ns/file"));
+\endcode
+
+Importing a native module that is not in the list raises
+<tt>zerr:ZXQP0067</tt>, and the message names the module. Modules written
+entirely in XQuery or JSONiq and the built-in modules need no entry; a module
+written in XQuery that imports a native module needs an entry for that native
+module. <tt>zorba --directory</tt> and <tt>zorba-mcp</tt> allow only the file
+module, which the directory module reads through.
 
 \section security_optout Restoring the old behavior
 

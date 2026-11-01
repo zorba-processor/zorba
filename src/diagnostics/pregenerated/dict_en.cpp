@@ -526,7 +526,7 @@ extern entry const dict_en[] = {
   { "zerr:ZXQP0064", "\"$1\": is not a valid argument index for function \"$2\", valid indexes are in the range [1-$3]" },
   { "zerr:ZXQP0065", "\"$1\": is not a valid annotation for function \"$2\", $3" },
   { "zerr:ZXQP0066", "\"$1\": is not a valid annotation literal for annotation \"$2\", $3" },
-  { "zerr:ZXQP0067", "\"$1\": requires capability \"$2\"" },
+  { "zerr:ZXQP0067", "\"$1\": requires capability \"$2\"${: 3}" },
   { "zerr:ZXQP0068", "query timeout exceeded${: 1}" },
   { "zerr:ZXQP0069", "$1" },
   { "zerr:ZXQP0070", "$1" },

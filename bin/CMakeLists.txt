@@ -213,9 +213,9 @@ ZORBA_SECURITY_TEST(bad_capability "comma-separated list of"
   --deny file-read,bogus -q "1")
 
 # --directory <dir>: the query runs under the secure policy with file-read
-# (restricted to <dir>) and native-modules only, $dir:root of the directory
-# module is bound to <dir>, and the result is written as JSON, one item per
-# line. The fixture tree is shared with the rbkt tests of the module.
+# (restricted to <dir>) and native-modules (restricted to the file module)
+# only, $dir:root of the directory module is bound to <dir>, and the result
+# is written as JSON, one item per line. The fixture tree is shared with the rbkt tests of the module.
 IF (ZORBA_WITH_FILE_ACCESS)
   SET (_dirq "${CMAKE_CURRENT_SOURCE_DIR}/test/directory")
   SET (_dirtree "${CMAKE_SOURCE_DIR}/test/rbkt/Queries/zorba/directory/tree")
@@ -241,6 +241,14 @@ IF (ZORBA_WITH_FILE_ACCESS)
     -f -q "${_secdir}/write.xq" -e "path:=${_secwrite}/directory.txt")
   ZORBA_SECURITY_TEST(dir_env "env:false:false"
     --directory "${_dirtree}" -f -q "${_secdir}/env.xq")
+  # Native modules: only the file module (which the directory module uses)
+  # is on the policy's list.
+  ZORBA_SECURITY_TEST(dir_native_allowed "\"native-1\""
+    --directory "${_dirtree}" -f -q "${_dirq}/native-allowed.xq")
+  ZORBA_SECURITY_DENIED(dir_native_denied ZXQP0067 "http://zorba.io/modules/sleep"
+    --directory "${_dirtree}" -f -q "${_dirq}/native-denied.xq")
+  ZORBA_SET_TEST_PROPERTY(bin/zorba_security_dir_native_denied
+    FAIL_REGULAR_EXPRESSION "native-loaded")
   ZORBA_SECURITY_TEST(dir_widen "--directory cannot be combined with"
     --directory "${_dirtree}" --allow network -q "1")
   ZORBA_SECURITY_TEST(dir_not_directory "--directory: not a directory"
@@ -272,7 +280,7 @@ IF (ZORBA_WITH_FILE_ACCESS)
     # tree (see mcp/test/mcp_tests.cpp); "binary" runs zorba-mcp itself.
     SET (_mcpq "${CMAKE_CURRENT_SOURCE_DIR}/test/mcp/queries")
     FOREACH (_t json protocol legacy tools_list list_documents join
-             syntax_error escape network predefined limits binary)
+             syntax_error escape network native_modules predefined limits binary)
       ADD_TEST (NAME bin/mcp/${_t}
         COMMAND "mcp_tests${_mcp_suffix}" ${_t} "${_dirtree}" "${_mcpq}"
           "${_dirq}/join.xq" "$<TARGET_FILE:zorba_mcp${_mcp_suffix}>")

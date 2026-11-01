@@ -2536,7 +2536,7 @@
     </diagnostic>
 
     <diagnostic code="ZXQP0067" name="CAPABILITY_NOT_ENABLED">
-      <value>"$1": requires capability "$2"</value>
+      <value>"$1": requires capability "$2"${: 3}</value>
     </diagnostic>
 
     <diagnostic code="ZXQP0068" name="QUERY_TIMEOUT">

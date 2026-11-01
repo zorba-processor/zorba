@@ -284,6 +284,58 @@ void test_import_gate(Zorba* z)
 
 ////////////////////////////////////////////////////////////////////////////////
 
+// A policy that lists native modules loads native libraries only for the
+// modules in the list; an empty list allows every native module.
+void test_native_module_list(Zorba* z)
+{
+  std::string const lFile = std::string(FILE_NS) + "file:directory-separator()";
+  std::string const lZq = std::string(ZQ_NS) +
+    "variable $q := zq:prepare-main-module(\"1 + 1\");\nzq:evaluate($q)";
+  std::string const lSep(1, sfs::path::preferred_separator);
+
+  SecurityPolicy const lFileOnly = SecurityPolicy::secure()
+    .allow(Capability::FileRead)
+    .allow(Capability::NativeModules)
+    .addNativeModule("http://expath.org/ns/file");
+  CHECK(allowed(run(z, context(z, lFileOnly), lFile), lSep));
+  CHECK(failed_with(run(z, context(z, lFileOnly), lZq), "ZXQP0067",
+                    "http://zorba.io/modules/zorba-query"));
+  CHECK(failed_with(run(z, context(z, lFileOnly), lZq), "ZXQP0067",
+                    "NativeModules"));
+
+  // The list does not grant NativeModules by itself.
+  CHECK(failed_with(run(z, context(z, SecurityPolicy::secure()
+                                      .allow(Capability::FileRead)
+                                      .addNativeModule(
+                                          "http://expath.org/ns/file")),
+                        lFile), "ZXQP0067", "NativeModules"));
+
+  // Both modules listed: both load.
+  StaticContext_t lBoth = context(z, SecurityPolicy(lFileOnly)
+      .addNativeModule("http://zorba.io/modules/zorba-query"));
+  CHECK(allowed(run(z, lBoth, lFile), lSep));
+  CHECK(allowed(run(z, lBoth, lZq), "2"));
+
+  // A query prepared through zorba-query inherits the list: the inner query
+  // cannot load a native module that the caller's policy does not list.
+  std::string const lInner = std::string(ZQ_NS) +
+    "variable $q := zq:prepare-main-module("
+    "\"import module namespace s = 'http://zorba.io/modules/sleep'; 1\");\n"
+    "zq:evaluate($q)";
+  CHECK(failed_with(run(z, lBoth, lInner), "ZXQP0067",
+                    "http://zorba.io/modules/sleep"));
+
+  // Empty list: every native module (backward compatible).
+  StaticContext_t lAny = context(z, SecurityPolicy::secure()
+                                      .allow(Capability::FileRead)
+                                      .allow(Capability::NativeModules));
+  CHECK(allowed(run(z, lAny, lFile), lSep));
+  CHECK(allowed(run(z, lAny, lZq), "2"));
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
+
 void test_file_module(Zorba* z, const Files& f)
 {
   SecurityPolicy const lBase =
@@ -771,6 +823,7 @@ module_security(int argc, char* argv[])
     test_check_connection();
     test_open_file(*lFiles);
     test_import_gate(lZorba);
+    test_native_module_list(lZorba);
     test_file_module(lZorba, *lFiles);
     test_environment(lZorba);
     test_http_uri_resolution(lZorba);
