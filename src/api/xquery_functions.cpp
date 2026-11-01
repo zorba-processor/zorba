@@ -74,7 +74,9 @@ public:
   tokenize_iterator( String const &input, char const *pattern,
                      char const *flags ) {
     re_.compile_xquery( zstring( pattern ), flags );
-    unicode::to_string( input, &u_input_ );
+    // A String is valid UTF-8, so the conversion cannot fail.
+    bool const converted = unicode::to_string( input, &u_input_ );
+    ZORBA_ASSERT( converted );
     pos_ = 0;
   }
 
@@ -82,7 +84,9 @@ public:
     unicode::string u_token;
     if ( re_.next_token( u_input_, &pos_, &u_token ) ) {
       string token;
-      utf8::to_string( u_token, &token );
+      // ICU output from valid UTF-8 input converts back without failure.
+      bool const converted = utf8::to_string( u_token, &token );
+      ZORBA_ASSERT( converted );
       *result = String( token );
       return true;
     }

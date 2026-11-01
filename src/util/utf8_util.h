@@ -381,7 +381,7 @@ storage_type* itou( unsigned long long n, storage_type *buf,
  * the UTF-8 string are put here.
  * @return Returns \c true only if the conversion succeeded.
  */
-bool to_string( unicode::char_type const *in, unicode::size_type in_len,
+[[nodiscard]] bool to_string( unicode::char_type const *in, unicode::size_type in_len,
                 storage_type **out, size_type *out_len = nullptr );
 
 /**
@@ -394,7 +394,7 @@ bool to_string( unicode::char_type const *in, unicode::size_type in_len,
  * the UTF-8 string are put here.
  * @return Returns \c true only if the conversion succeeded.
  */
-inline bool to_string( unicode::char_type const *in, storage_type **out,
+[[nodiscard]] inline bool to_string( unicode::char_type const *in, storage_type **out,
                        size_type *out_len = nullptr ) {
   return to_string( in, u_strlen( in ), out, out_len );
 }
@@ -409,7 +409,7 @@ inline bool to_string( unicode::char_type const *in, storage_type **out,
  * the UTF-8 string are put here.
  * @return Returns \c true only if the conversion succeeded.
  */
-inline bool to_string( unicode::string const &in, storage_type **out,
+[[nodiscard]] inline bool to_string( unicode::string const &in, storage_type **out,
                        size_type *out_len = nullptr ) {
   return to_string( in.getBuffer(), in.length(), out, out_len );
 }
@@ -422,7 +422,7 @@ inline bool to_string( unicode::string const &in, storage_type **out,
  * @param out A pointer to the result string.
  * @return Returns \c true only if the conversion succeeded.
  */
-template<class StringType>
+template<class StringType> [[nodiscard]]
 typename std::enable_if<ZORBA_IS_STRING(StringType),bool>::type
 to_string( unicode::char_type const *in, size_type in_len, StringType *out );
 
@@ -433,7 +433,7 @@ to_string( unicode::char_type const *in, size_type in_len, StringType *out );
  * @param out A pointer to the result string.
  * @return Returns \c true only if the conversion succeeded.
  */
-template<class StringType> inline
+template<class StringType> [[nodiscard]] inline
 typename std::enable_if<ZORBA_IS_STRING(StringType),bool>::type
 to_string( unicode::char_type const *in, StringType *out ) {
   return to_string( in, u_strlen( in ), out );
@@ -448,7 +448,7 @@ to_string( unicode::char_type const *in, StringType *out ) {
  * @param out A pointer to the result string.
  * @return Returns \c true only if the conversion succeeded.
  */
-template<class StringType> inline
+template<class StringType> [[nodiscard]] inline
 typename std::enable_if<ZORBA_IS_STRING(StringType),bool>::type
 to_string( unicode::string const &in, StringType *out ) {
 #ifndef ZORBA_NO_ICU
@@ -472,7 +472,7 @@ to_string( unicode::string const &in, StringType *out ) {
  * the UTF-8 string are put here.
  * @return Returns \c true only if the conversion succeeded.
  */
-bool to_string( wchar_t const *in, size_type in_len, storage_type **out,
+[[nodiscard]] bool to_string( wchar_t const *in, size_type in_len, storage_type **out,
                 size_type *out_len = nullptr );
 
 /**
@@ -485,7 +485,7 @@ bool to_string( wchar_t const *in, size_type in_len, storage_type **out,
  * the UTF-8 string are put here.
  * @return Returns \c true only if the conversion succeeded.
  */
-inline bool to_string( wchar_t const *in, storage_type **out,
+[[nodiscard]] inline bool to_string( wchar_t const *in, storage_type **out,
                        size_type *out_len = nullptr ) {
   return to_string( in, std::wcslen( in ), out, out_len );
 }
@@ -499,7 +499,7 @@ inline bool to_string( wchar_t const *in, storage_type **out,
  * @param out A pointer to the result string.
  * @return Returns \c true only if the conversion succeeded.
  */
-template<class StringType>
+template<class StringType> [[nodiscard]]
 typename std::enable_if<ZORBA_IS_STRING(StringType),bool>::type
 to_string( wchar_t const *in, size_type in_len, StringType *out );
 
@@ -511,7 +511,7 @@ to_string( wchar_t const *in, size_type in_len, StringType *out );
  * @param out A pointer to the result string.
  * @return Returns \c true only if the conversion succeeded.
  */
-template<class StringType> inline
+template<class StringType> [[nodiscard]] inline
 typename std::enable_if<ZORBA_IS_STRING(StringType),bool>::type
 to_string( wchar_t const *in, StringType *out ) {
   return to_string( in, std::wcslen( in ), out );
@@ -526,7 +526,7 @@ to_string( wchar_t const *in, StringType *out ) {
  * @param out A pointer to the result string.
  * @return Returns \c true only if the conversion succeeded.
  */
-template<class StringType> inline
+template<class StringType> [[nodiscard]] inline
 typename std::enable_if<ZORBA_IS_STRING(StringType),bool>::type
 to_string( std::wstring const &in, StringType *out ) {
   return to_string( in.data(), in.size(), out );
@@ -543,7 +543,7 @@ to_string( std::wstring const &in, StringType *out ) {
  * the wchar_t string are put here.
  * @return Returns \c true only if the conversion succeeded.
  */
-bool to_wchar_t( storage_type const *in, size_type in_len, wchar_t **out,
+[[nodiscard]] bool to_wchar_t( storage_type const *in, size_type in_len, wchar_t **out,
                  unicode::size_type *out_len );
 
 /**
@@ -556,7 +556,7 @@ bool to_wchar_t( storage_type const *in, size_type in_len, wchar_t **out,
  * the \c wchar_t string are put here.
  * @return Returns \c true only if the conversion succeeded.
  */
-inline bool to_wchar_t( storage_type const *in, wchar_t **out,
+[[nodiscard]] inline bool to_wchar_t( storage_type const *in, wchar_t **out,
                         unicode::size_type *out_len ) {
   return to_wchar_t( in, std::strlen( in ), out, out_len );
 }
@@ -572,7 +572,7 @@ inline bool to_wchar_t( storage_type const *in, wchar_t **out,
  * the \c wchar_t string are put here.
  * @return Returns \c true only if the conversion succeeded.
  */
-template<class StringType> inline
+template<class StringType> [[nodiscard]] inline
 typename std::enable_if<ZORBA_IS_STRING(StringType),bool>::type
 to_wchar_t( StringType const &in, wchar_t **out, unicode::size_type *out_len ) {
   return to_wchar_t( in.data(), in.size(), out, out_len );
@@ -757,7 +757,7 @@ iri_to_uri( StringType &s ) {
  * @param in The input string.
  * @param out The output String (which may be the same as \a in).
  */
-template<class InputStringType,class OutputStringType>
+template<class InputStringType,class OutputStringType> [[nodiscard]]
 typename std::enable_if<ZORBA_IS_STRING(InputStringType)
                      && ZORBA_IS_STRING(OutputStringType),
                         bool>::type
@@ -888,7 +888,7 @@ reverse( InputStringType const &in, OutputStringType *out ) {
  * @param out The output string.
  * @return Returns \c true only if the strip succeeded.
  */
-template<class InputStringType,class OutputStringType>
+template<class InputStringType,class OutputStringType> [[nodiscard]]
 typename std::enable_if<ZORBA_IS_STRING(InputStringType)
                      && ZORBA_IS_STRING(OutputStringType),
                         bool>::type
@@ -911,8 +911,10 @@ compare(const StringType1 &s1, const StringType2 &s2,
   unicode::string us1;
   unicode::string us2;
 
-  unicode::to_string(s1, &us1);
-  unicode::to_string(s2, &us2);
+  // Zorba strings are valid UTF-8, so the conversion cannot fail.
+  bool const converted =
+    unicode::to_string(s1, &us1) && unicode::to_string(s2, &us2);
+  ZORBA_ASSERT( converted );
 
   return static_cast<U_NAMESPACE_QUALIFIER Collator*>( collation->getCollator() )->compare(us1, us2);
 #else
@@ -951,7 +953,9 @@ hash(const StringType& s, const XQPCollator* collation = NULL)
   UErrorCode status = U_ZERO_ERROR;
 
   unicode::string uni_s;
-  unicode::to_string(s, &uni_s);
+  // Zorba strings are valid UTF-8, so the conversion cannot fail.
+  bool const converted = unicode::to_string(s, &uni_s);
+  ZORBA_ASSERT( converted );
 
   static_cast<U_NAMESPACE_QUALIFIER Collator*>(collation->getCollator())->
   getCollationKey(uni_s, collKey, status);

@@ -43,8 +43,11 @@ size_t find( char const *s, size_t s_len, char const *ss, size_t ss_len,
   }
 
   unicode::string u_s, u_ss;
-  unicode::to_string( s, (unicode::size_type)s_len, &u_s );
-  unicode::to_string( ss, (unicode::size_type)ss_len, &u_ss );
+  // Zorba strings are valid UTF-8, so the conversions cannot fail.
+  bool const converted =
+    unicode::to_string( s, (unicode::size_type)s_len, &u_s ) &&
+    unicode::to_string( ss, (unicode::size_type)ss_len, &u_ss );
+  ZORBA_ASSERT( converted );
 
   UErrorCode err = U_ZERO_ERROR;
   StringSearch search(
@@ -76,8 +79,11 @@ size_t rfind( char const *s, size_t s_len, char const *ss, size_t ss_len,
   }
 
   unicode::string u_s, u_ss;
-  unicode::to_string( s, (unicode::size_type)s_len, &u_s );
-  unicode::to_string( ss, (unicode::size_type)ss_len, &u_ss );
+  // Zorba strings are valid UTF-8, so the conversions cannot fail.
+  bool const converted =
+    unicode::to_string( s, (unicode::size_type)s_len, &u_s ) &&
+    unicode::to_string( ss, (unicode::size_type)ss_len, &u_ss );
+  ZORBA_ASSERT( converted );
 
   UErrorCode err = U_ZERO_ERROR;
 

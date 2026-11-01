@@ -139,9 +139,12 @@ FTToken::string_t const& FTToken::value_impl( int selector,
   string_t &mod_value_ref = get_mod_value( selector );
   if ( mod_value_ref.empty() ) {
     switch ( selector ) {
-      case ascii:
-        utf8::strip_diacritics( value_, &mod_value_ref );
+      case ascii: {
+        // Token values are valid UTF-8, so the strip cannot fail.
+        bool const stripped = utf8::strip_diacritics( value_, &mod_value_ref );
+        ZORBA_ASSERT( stripped );
         break;
+      }
       case lower:
         utf8::to_lower( value_, &mod_value_ref );
         break;

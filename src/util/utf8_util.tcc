@@ -143,7 +143,8 @@ strip_diacritics( InputStringType const &in, OutputStringType *out ) {
   if ( !unicode::to_string( in, &u_in ) )
     return false;
   unicode::string u_out;
-  unicode::strip_diacritics( u_in, &u_out );
+  if ( !unicode::strip_diacritics( u_in, &u_out ) )
+    return false;
   storage_type *temp;
   size_type temp_len;
   if ( !utf8::to_string( u_out.getBuffer(), u_out.length(), &temp, &temp_len ) )

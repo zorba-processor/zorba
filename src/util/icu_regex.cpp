@@ -937,7 +937,11 @@ void regex::z_set_subject( string const &s, size_type from ) {
       --base;
   }
   z_s_.clear();
-  utf8::to_string( s.getBuffer() + base, s.length() - base, &z_s_ );
+  // The subject comes from a valid UTF-8 string, so the conversion back
+  // cannot fail.
+  bool const converted =
+    utf8::to_string( s.getBuffer() + base, s.length() - base, &z_s_ );
+  ZORBA_ASSERT( converted );
   z_base_ = base;
   z_off_byte_ = 0;
   z_off_u16_ = base;
@@ -987,7 +991,11 @@ bool regex::z_replace_all( string const &in, string const &replacement,
                            string *out ) {
   z_set_subject( in, 0 );
   zstring repl;
-  utf8::to_string( replacement.getBuffer(), replacement.length(), &repl );
+  // The replacement comes from a valid UTF-8 string, so the conversion back
+  // cannot fail.
+  bool const converted =
+    utf8::to_string( replacement.getBuffer(), replacement.length(), &repl );
+  ZORBA_ASSERT( converted );
   int const groups = static_cast<int>( zre_->get_indexed_regex_count() );
   char const *const s = z_s_.c_str();
   int const s_len = static_cast<int>( z_s_.size() );
