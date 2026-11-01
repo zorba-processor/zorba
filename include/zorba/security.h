@@ -119,7 +119,8 @@ enum class Capability : uint32_t {
  *       resolvers (documents, unparsed text, module, schema, thesaurus and
  *       stop-word loading, the fetch module); module import (the file,
  *       http-client and ftp-client modules need their capabilities, native
- *       libraries need Capability::NativeModules); the file, http-client
+ *       libraries need Capability::NativeModules and, if the policy lists
+ *       native modules, an entry for the module); the file, http-client
  *       and ftp-client modules (every path, URL, redirect and connection);
  *       the environment functions.
  *
@@ -211,6 +212,22 @@ public:
    */
   SecurityPolicy& addNetworkPrefix(const String& aUrlPrefix);
 
+  /**
+   * \brief Adds a native module that Capability::NativeModules applies to.
+   *
+   * If the list is empty, Capability::NativeModules (when allowed) applies
+   * to every native module in the library path. Otherwise a native library
+   * is loaded only for a module whose target namespace URI is in the list;
+   * importing any other module that is implemented by a native library
+   * raises \c zerr:ZXQP0067. URIs are compared as strings, without the
+   * version fragment of the import (e.g. "http://expath.org/ns/file").
+   * Modules written entirely in XQuery or JSONiq, and the built-in modules,
+   * do not need an entry.
+   *
+   * @param aNamespaceURI the target namespace URI of a native module.
+   */
+  SecurityPolicy& addNativeModule(const String& aNamespaceURI);
+
   /** \brief Returns the directories added with addReadPath(). */
   const std::vector<String>& getReadPaths() const;
 
@@ -219,6 +236,9 @@ public:
 
   /** \brief Returns the prefixes added with addNetworkPrefix(). */
   const std::vector<String>& getNetworkPrefixes() const;
+
+  /** \brief Returns the namespace URIs added with addNativeModule(). */
+  const std::vector<String>& getNativeModules() const;
 
   /**
    * \brief Returns true if the policy allows a URI to be accessed for the
@@ -395,8 +415,9 @@ public:
    *   or for the amplification factor, the parser's default);
    * - an allow-list that is empty in one policy is taken from the other; if
    *   both are non-empty, the result keeps each entry of one list that lies
-   *   within an entry of the other. If that leaves no entry, the matching
-   *   capability (FileRead, FileWrite or Network) is denied.
+   *   within an entry of the other (for native modules: each entry that
+   *   is in both). If that leaves no entry, the matching capability
+   *   (FileRead, FileWrite, Network or NativeModules) is denied.
    *
    * The operation is commutative and the result is never wider than either
    * operand.

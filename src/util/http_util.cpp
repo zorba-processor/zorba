@@ -55,9 +55,13 @@ namespace zorba {
       // http-client library is allowed even where the caller's policy does
       // not allow NativeModules; everything else is the caller's policy, so
       // the http-client module checks the URL, every redirect and every
-      // connection against it.
-      theStaticContext->setSecurityPolicy(
-          SecurityPolicy(*thePolicy).allow(Capability::NativeModules));
+      // connection against it. If the caller's policy lists native modules,
+      // the http-client library is added to the list for the same reason.
+      SecurityPolicy lPolicy(*thePolicy);
+      lPolicy.allow(Capability::NativeModules);
+      if (!lPolicy.getNativeModules().empty())
+        lPolicy.addNativeModule("http://zorba.io/modules/http-client");
+      theStaticContext->setSecurityPolicy(lPolicy);
     }
     ItemFactory* lFactory = lInstance->getItemFactory();
     Item lNodeName = lFactory->createQName("http://expath.org/ns/http-client", "http", "request");

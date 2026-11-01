@@ -24,13 +24,17 @@
 #  include <dlfcn.h>
 #endif
 
+#include <algorithm>
 #include <fstream>
+#include <string>
+#include <vector>
 
 #include "diagnostics/xquery_diagnostics.h"
 #include "util/string_util.h"
 #include "zorbatypes/URI.h"
 
 #include <zorba/external_module.h>
+#include <zorba/security.h>
 #include <zorba/zorba_string.h>
 #include <context/get_current_lib_suffix.h>
 #include <zorba/util/error_util.h>
@@ -201,6 +205,23 @@ DynamicLoader::getExternalModule(zstring const& aNsURI, static_context& aSctx)
     {
       throw XQUERY_EXCEPTION(zerr::ZXQP0067_CAPABILITY_NOT_ENABLED,
       ERROR_PARAMS(aNsURI, "NativeModules"));
+    }
+
+    // If the policy lists native modules, NativeModules applies only to
+    // the modules in the list.
+    {
+      const SecurityPolicy lPolicy = aSctx.get_security_policy();
+      const std::vector<String>& lAllowed = lPolicy.getNativeModules();
+      const std::string lNs = aNsURI.str();
+      if (!lAllowed.empty() &&
+          std::none_of(lAllowed.begin(), lAllowed.end(),
+                       [&lNs](const String& s) { return s.str() == lNs; }))
+      {
+        throw XQUERY_EXCEPTION(zerr::ZXQP0067_CAPABILITY_NOT_ENABLED,
+        ERROR_PARAMS(aNsURI, "NativeModules",
+                     "the module is not in the native modules allowed by the "
+                     "security policy"));
+      }
     }
 
     URI lURI(aNsURI);

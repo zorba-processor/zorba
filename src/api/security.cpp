@@ -82,6 +82,12 @@ bool dir_covers(const std::string& aOuter, const std::string& aInner)
   return is_separator(lOuter.back()) || is_separator(lInner[lOuter.size()]);
 }
 
+// Native modules are named by their whole namespace URI.
+bool same_uri(const std::string& aOuter, const std::string& aInner)
+{
+  return aOuter == aInner;
+}
+
 bool prefix_covers(const std::string& aOuter, const std::string& aInner)
 {
   return aInner.size() >= aOuter.size() &&
@@ -171,6 +177,7 @@ public:
   std::vector<String>       theReadPaths;
   std::vector<String>       theWritePaths;
   std::vector<String>       theNetworkPrefixes;
+  std::vector<String>       theNativeModules;
   bool                      theAllowPrivateAddresses = false;
   std::chrono::milliseconds theTimeout{0};
   uint32_t                  theMaxCallDepth = DEFAULT_MAX_CALL_DEPTH;
@@ -271,6 +278,13 @@ SecurityPolicy& SecurityPolicy::addNetworkPrefix(const String& aUrlPrefix)
 }
 
 
+SecurityPolicy& SecurityPolicy::addNativeModule(const String& aNamespaceURI)
+{
+  theImpl->theNativeModules.push_back(aNamespaceURI);
+  return *this;
+}
+
+
 const std::vector<String>& SecurityPolicy::getReadPaths() const
 {
   return theImpl->theReadPaths;
@@ -286,6 +300,12 @@ const std::vector<String>& SecurityPolicy::getWritePaths() const
 const std::vector<String>& SecurityPolicy::getNetworkPrefixes() const
 {
   return theImpl->theNetworkPrefixes;
+}
+
+
+const std::vector<String>& SecurityPolicy::getNativeModules() const
+{
+  return theImpl->theNativeModules;
 }
 
 
@@ -454,6 +474,9 @@ SecurityPolicy SecurityPolicy::narrowedBy(const SecurityPolicy& aOther) const
   if (!intersect(a.theNetworkPrefixes, b.theNetworkPrefixes, prefix_covers,
                  r.theNetworkPrefixes))
     r.theCapabilities &= ~static_cast<uint32_t>(Capability::Network);
+  if (!intersect(a.theNativeModules, b.theNativeModules, same_uri,
+                 r.theNativeModules))
+    r.theCapabilities &= ~static_cast<uint32_t>(Capability::NativeModules);
 
   return lResult;
 }
@@ -480,7 +503,9 @@ bool SecurityPolicy::operator==(const SecurityPolicy& aOther) const
          minimize(a.theWritePaths, dir_covers) ==
            minimize(b.theWritePaths, dir_covers) &&
          minimize(a.theNetworkPrefixes, prefix_covers) ==
-           minimize(b.theNetworkPrefixes, prefix_covers);
+           minimize(b.theNetworkPrefixes, prefix_covers) &&
+         minimize(a.theNativeModules, same_uri) ==
+           minimize(b.theNativeModules, same_uri);
 }
 
 } // namespace zorba
