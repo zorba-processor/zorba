@@ -306,7 +306,7 @@ declare %private %an:nondeterministic function dir:load(
   let $cached := dc:get( $root, $path )
   return
     if ( exists( $cached ) ) then $cached
-    else dc:put( $root, $path, dir:read( $root, $path ) )
+    else dir:read( $root, $path )
 };
 
 declare %private %an:nondeterministic function dir:read(

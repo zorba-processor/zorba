@@ -26,12 +26,15 @@
 
 #include <sys/stat.h>
 
+#include <zorba/dynamic_context.h>
 #include <zorba/empty_sequence.h>
 #include <zorba/external_module.h>
 #include <zorba/function.h>
+#include <zorba/item_factory.h>
 #include <zorba/iterator.h>
 #include <zorba/singleton_item_sequence.h>
 #include <zorba/uri_resolvers.h>
+#include <zorba/zorba_exception.h>
 
 namespace zorba {
 namespace mcp {
@@ -42,17 +45,24 @@ char const cache_ns[] = "http://zorba.io/modules/directory-cache";
 char const cache_url[] = "urn:zorba-mcp:directory-cache";
 
 // The module text served instead of the installed (non-caching) module:
-// the same functions, implemented by DocumentCache.
+// the same function, implemented by DocumentCache.
 char const cache_module_source[] =
   "module namespace dc = \"http://zorba.io/modules/directory-cache\";\n"
   "declare namespace an = \"http://zorba.io/annotations\";\n"
   "declare namespace ver = \"http://zorba.io/options/versioning\";\n"
   "declare option ver:module-version \"1.0\";\n"
   "declare %an:nondeterministic function dc:get(\n"
-  "  $root as xs:string, $path as xs:string ) as object()? external;\n"
-  "declare %an:nondeterministic function dc:put(\n"
-  "  $root as xs:string, $path as xs:string, $record as object() )\n"
-  "  as object() external;\n";
+  "  $root as xs:string, $path as xs:string ) as object()? external;\n";
+
+// The query that builds a record on a miss. Its static context does not
+// attach the cache, so the directory module's hook is the installed one and
+// dir:open reads and parses the file itself, with every check it applies to
+// a user's dir:open, under the server's policy.
+char const reader_source[] =
+  "import module namespace dir = \"http://zorba.io/modules/directory\";\n"
+  "declare variable $root as xs:string external;\n"
+  "declare variable $path as xs:string external;\n"
+  "dir:open( $root, $path )\n";
 
 void release_stream( std::istream *s ) {
   delete s;
@@ -68,15 +78,6 @@ std::string string_arg( ExternalFunction::Arguments_t const &args,
   return item.isNull() ? std::string() : item.getStringValue().str();
 }
 
-Item item_arg( ExternalFunction::Arguments_t const &args, std::size_t i ) {
-  Item item;
-  Iterator_t it( args[i]->getIterator() );
-  it->open();
-  it->next( item );
-  it->close();
-  return item;
-}
-
 std::int64_t nanoseconds( struct timespec const &t ) {
   return static_cast<std::int64_t>( t.tv_sec ) * 1000000000 + t.tv_nsec;
 }
@@ -87,15 +88,13 @@ std::int64_t nanoseconds( struct timespec const &t ) {
 
 class DocumentCache::Module : public ExternalModule {
 public:
-  explicit Module( DocumentCache *cache ) : theGet( cache ), thePut( cache ) { }
+  explicit Module( DocumentCache *cache ) : theGet( cache ) { }
 
   String getURI() const override { return cache_ns; }
 
   ExternalFunction* getExternalFunction( String const &name ) override {
     if ( name == "get" )
       return &theGet;
-    if ( name == "put" )
-      return &thePut;
     return nullptr;
   }
 
@@ -116,22 +115,7 @@ private:
     DocumentCache *const theCache;
   };
 
-  class Put : public NonContextualExternalFunction {
-  public:
-    explicit Put( DocumentCache *cache ) : theCache( cache ) { }
-    String getURI() const override { return cache_ns; }
-    String getLocalName() const override { return "put"; }
-    ItemSequence_t evaluate( Arguments_t const &args ) const override {
-      return ItemSequence_t( new SingletonItemSequence(
-        theCache->put( string_arg( args, 0 ), string_arg( args, 1 ),
-                       item_arg( args, 2 ) ) ) );
-    }
-  private:
-    DocumentCache *const theCache;
-  };
-
   Get theGet;
-  Put thePut;
 };
 
 class DocumentCache::Mapper : public URIMapper {
@@ -156,8 +140,12 @@ public:
 
 ///////////////////////////////////////////////////////////////////////////////
 
-DocumentCache::DocumentCache( std::string const &root, std::size_t budget ) :
+DocumentCache::DocumentCache( Zorba *zorba, std::string const &root,
+                              std::size_t budget,
+                              SecurityPolicy const *policy ) :
+  theZorba( zorba ),
   theBudget( budget ),
+  thePolicy( policy ),
   theModule( new Module( this ) ),
   theMapper( new Mapper() ),
   theResolver( new Resolver() ) {
@@ -182,7 +170,6 @@ void DocumentCache::attach( StaticContext_t const &sctx ) {
 void DocumentCache::set_active( bool active ) {
   std::lock_guard<std::mutex> lock( theMutex );
   theActive = active;
-  thePending.clear();
   ++theQuery;
   if ( !active )
     return;
@@ -203,9 +190,12 @@ void DocumentCache::clear() {
   std::lock_guard<std::mutex> lock( theMutex );
   theEntries.clear();
   theLru.clear();
-  thePending.clear();
   theStats.entries = 0;
   theStats.bytes = 0;
+  if ( theReader ) {
+    theReader->close();
+    theReader = nullptr;
+  }
 }
 
 DocumentCache::Stats DocumentCache::stats() const {
@@ -281,50 +271,74 @@ Item DocumentCache::get( std::string const &root, std::string const &path ) {
   std::string key;
   Signature sig;
   bool const ok = key_of( root, path, &key, &sig );
-  std::lock_guard<std::mutex> lock( theMutex );
-  if ( !theActive || key.empty() )
-    return Item();
-  auto const i = theEntries.find( key );
-  if ( !ok ) {
-    // Deleted, or not a regular file under the root.
-    if ( i != theEntries.end() )
-      erase( i );
-    return Item();
-  }
-  if ( i != theEntries.end() ) {
-    if ( i->second.sig == sig ) {
-      ++theStats.hits;
-      i->second.query = theQuery;
-      theLru.splice( theLru.begin(), theLru, i->second.lru );
-      return i->second.record;
+  {
+    std::lock_guard<std::mutex> lock( theMutex );
+    if ( !theActive || key.empty() )
+      return Item();
+    auto const i = theEntries.find( key );
+    if ( !ok ) {
+      // Deleted, or not a regular file under the root.
+      if ( i != theEntries.end() )
+        erase( i );
+      return Item();
     }
-    erase( i );                         // the file changed
+    if ( i != theEntries.end() ) {
+      if ( i->second.sig == sig ) {
+        ++theStats.hits;
+        i->second.query = theQuery;
+        theLru.splice( theLru.begin(), theLru, i->second.lru );
+        return i->second.record;
+      }
+      erase( i );                       // the file changed
+    }
+    ++theStats.misses;
   }
-  ++theStats.misses;
-  // put() stores the record under the signature seen before the read, so a
-  // file modified while it is read is parsed again next time.
-  thePending[ key ] = sig;
-  return Item();
+  Item const record( read( root, path ) );
+  // Stored under the signature seen before the read, and only if the file
+  // still has it: a file modified while it is read is parsed again next time.
+  Signature now;
+  if ( !record.isNull() && key_of( root, path, &key, &now ) && now == sig ) {
+    std::lock_guard<std::mutex> lock( theMutex );
+    store( key, path, sig, record );
+  }
+  return record;
 }
 
-Item DocumentCache::put( std::string const &root, std::string const &path,
-                         Item const &record ) {
-  std::string key;
-  Signature now;
-  bool const ok = key_of( root, path, &key, &now );
-  std::lock_guard<std::mutex> lock( theMutex );
-  if ( !theActive || !ok || record.isNull() )
+Item DocumentCache::read( std::string const &root, std::string const &path ) {
+  try {
+    if ( !theReader ) {
+      StaticContext_t sctx = theZorba->createStaticContext();
+      sctx->setSecurityPolicy( *thePolicy );
+      XQuery_t reader = theZorba->createQuery();
+      std::istringstream qs( reader_source );
+      Zorba_CompilerHints_t hints;
+      reader->compile( qs, sctx, hints );
+      theReader = reader;
+    }
+    DynamicContext *const dctx = theReader->getDynamicContext();
+    ItemFactory *const f = theZorba->getItemFactory();
+    dctx->setVariable( "", "root", f->createString( root ) );
+    dctx->setVariable( "", "path", f->createString( path ) );
+    Item record;
+    Iterator_t it( theReader->iterator() );
+    it->open();
+    if ( !it->next( record ) )
+      record = Item();
+    it->close();
     return record;
-  auto const p = thePending.find( key );
-  if ( p == thePending.end() )
-    return record;
-  Signature const sig( p->second );
-  thePending.erase( p );
-  if ( !( sig == now ) )
-    return record;                      // modified while it was read
+  }
+  catch ( ZorbaException const& ) {
+    return Item();
+  }
+}
+
+void DocumentCache::store( std::string const &key, std::string const &path,
+                           Signature const &sig, Item const &record ) {
+  if ( !theActive )
+    return;
   std::size_t const bytes = estimate( path, sig.size );
   if ( bytes > theBudget )
-    return record;
+    return;
   auto const old = theEntries.find( key );
   if ( old != theEntries.end() )
     erase( old );
@@ -334,7 +348,7 @@ Item DocumentCache::put( std::string const &root, std::string const &path,
   while ( theStats.bytes + bytes > theBudget && !theLru.empty() ) {
     auto const victim = theEntries.find( theLru.back() );
     if ( victim->second.query == theQuery )
-      return record;
+      return;
     erase( victim );
     ++theStats.evictions;
   }
@@ -344,7 +358,6 @@ Item DocumentCache::put( std::string const &root, std::string const &path,
   theStats.bytes += bytes;
   theStats.entries = theEntries.size();
   ++theStats.stores;
-  return record;
 }
 
 } // namespace mcp

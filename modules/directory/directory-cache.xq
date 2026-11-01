@@ -21,12 +21,13 @@ xquery version "3.0";
  : (<code>http://zorba.io/modules/directory</code>).
  : <p/>
  : The directory module asks <code>dc:get</code> for the record of a
- : document before it reads and parses the file, and passes every record it
- : builds to <code>dc:put</code>. This implementation caches nothing: every
- : call reads the file again. An application that keeps a Zorba instance
- : across queries (e.g. <code>zorba-mcp</code>) can resolve this module to
- : external functions of its own that keep the records, validated against
- : the file's size and modification time.
+ : document before it reads and parses the file itself. This implementation
+ : caches nothing: every call reads the file again. An application that
+ : keeps a Zorba instance across queries (e.g. <code>zorba-mcp</code>) can
+ : resolve this module to an external function of its own that keeps the
+ : records it builds itself, validated against the file's metadata. The hook
+ : has no function to store a record: a query cannot hand the cache content
+ : that later queries would receive.
  :
  : @author Zorba contributors
  : @project Zorba/Data Converters/Directory
@@ -38,7 +39,7 @@ declare namespace ver = "http://zorba.io/options/versioning";
 declare option ver:module-version "1.0";
 
 (:~
- : Returns the cached record of a document, if any.
+ : Returns the record of a document, if the hook provides one.
  :
  : @param $root the root directory the document is opened under.
  : @param $path the path of the document relative to <code>$root</code>.
@@ -49,20 +50,4 @@ declare %an:nondeterministic function dc:get(
   $path as xs:string ) as object()?
 {
   ()
-};
-
-(:~
- : Offers the record of a document to the cache.
- :
- : @param $root the root directory the document was opened under.
- : @param $path the path of the document relative to <code>$root</code>.
- : @param $record the document record.
- : @return <code>$record</code>.
- :)
-declare %an:nondeterministic function dc:put(
-  $root as xs:string,
-  $path as xs:string,
-  $record as object() ) as object()
-{
-  $record
 };

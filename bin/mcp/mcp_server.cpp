@@ -293,7 +293,7 @@ Server::Server( Zorba *zorba, ServerConfig config, std::ostream &log ) :
   theConfig( std::move( config ) ),
   theLog( log ),
   thePolicy( SecurityPolicy::secure() ),
-  theCache( theConfig.root, theConfig.cache_bytes ) {
+  theCache( zorba, theConfig.root, theConfig.cache_bytes, &thePolicy ) {
   directory_config::apply_policy( thePolicy, theConfig.root );
   if ( theConfig.timeout.count() > 0 )
     thePolicy.setTimeout( theConfig.timeout );

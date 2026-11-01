@@ -20,14 +20,16 @@
 #include <cstddef>
 #include <cstdint>
 #include <list>
-#include <map>
 #include <memory>
 #include <mutex>
 #include <string>
 #include <unordered_map>
 
 #include <zorba/item.h>
+#include <zorba/security.h>
 #include <zorba/static_context.h>
+#include <zorba/xquery.h>
+#include <zorba/zorba.h>
 
 namespace zorba {
 namespace mcp {
@@ -38,17 +40,20 @@ namespace mcp {
  * zorba-mcp server.
  *
  * The directory module asks the module http://zorba.io/modules/directory-cache
- * for a record before it reads and parses a file, and hands it every record
- * it builds. By default that module caches nothing; attach() makes a static
- * context resolve it to external functions backed by this cache.
+ * (dc:get) for the record of a file before it reads and parses the file
+ * itself. By default that module returns nothing; attach() makes a static
+ * context resolve it to an external function backed by this cache. On a
+ * miss, the cache builds the record by running dir:open in a query of its
+ * own, compiled under the server's security policy with the installed
+ * (non-caching) hook, and stores what that query returns. Records only
+ * enter the cache that way: a user query cannot hand the cache a record.
  *
  * A record is keyed by the root and the path it was opened with, and is
  * valid while the canonical path of its file and the file's device, inode,
  * size, modification time and change time stay the same: the file is
  * stat()ed on every lookup, so a modified or deleted file is never served
- * from the cache (and its entry is dropped). Only files under the root are cached, and a record is only
- * stored after the module has read the file through the file module, under
- * the query's security policy. Records are bounded by a byte budget, each
+ * from the cache (and its entry is dropped). Only files under the root are
+ * cached. Records are bounded by a byte budget, each
  * accounted by an estimate of its in-memory size (the file size times a
  * per-format factor measured with bench/directory), and evicted least
  * recently used first; an entry used by the current query is not evicted
@@ -67,10 +72,14 @@ public:
   };
 
   /**
+   * @param zorba the engine.
    * @param root the root directory (absolute, normalized).
    * @param budget the byte budget; 0 disables the cache.
+   * @param policy the policy the records are read under (read when the
+   * first record is built, so it may be set up after construction).
    */
-  DocumentCache( std::string const &root, std::size_t budget );
+  DocumentCache( Zorba *zorba, std::string const &root, std::size_t budget,
+                 SecurityPolicy const *policy );
   ~DocumentCache();
 
   DocumentCache( DocumentCache const& ) = delete;
@@ -92,7 +101,10 @@ public:
    */
   void set_active( bool active );
 
-  /** Drops every entry (the items must go before the store shuts down). */
+  /**
+   * Drops every entry and the reading query (the items must go before the
+   * store shuts down).
+   */
   void clear();
 
   Stats stats() const;
@@ -100,10 +112,14 @@ public:
   /** The estimated in-memory size of a parsed file of \a size bytes. */
   static std::size_t estimate( std::string const &path, std::uintmax_t size );
 
-  // Called by the external functions.
+  /**
+   * The record of \a path under \a root (dc:get): the cached record if its
+   * file is unchanged, else the record dir:open builds, stored if the file
+   * did not change while it was read. Null if the file is not a regular
+   * file under the root, or if dir:open fails (the directory module then
+   * reads the file itself and reports the error).
+   */
   Item get( std::string const &root, std::string const &path );
-  Item put( std::string const &root, std::string const &path,
-            Item const &record );
 
 private:
   struct Signature {
@@ -125,16 +141,21 @@ private:
                std::string *key, Signature *sig ) const;
   bool signature_of( std::string const &full, Signature *sig ) const;
   void erase( std::unordered_map<std::string,Entry>::iterator i );
+  Item read( std::string const &root, std::string const &path );
+  void store( std::string const &key, std::string const &path,
+              Signature const &sig, Item const &record );
 
+  Zorba *const theZorba;
   std::string theRoot;                  // canonical, with a trailing '/'
   std::size_t const theBudget;
+  SecurityPolicy const *const thePolicy;
+  XQuery_t theReader;                   // dir:open($root, $path)
   bool theActive = true;
   std::uint64_t theQuery = 0;           // incremented by set_active()
 
   mutable std::mutex theMutex;
   std::unordered_map<std::string,Entry> theEntries;
   std::list<std::string> theLru;        // most recently used first
-  std::map<std::string,Signature> thePending;   // looked up, not stored yet
   Stats theStats;
 
   class Module;
