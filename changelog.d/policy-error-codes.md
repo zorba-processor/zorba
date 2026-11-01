@@ -1,5 +1,0 @@
-### Breaking changes
-
-- A resource that the security policy denies is reported with the error the specification prescribes for a resource that is not available, instead of `zerr:ZXQP0029`: `err:XQST0059` for module and schema import, `err:FODC0002` for `fn:doc`, `err:FOUT1170` for `fn:unparsed-text` and `fn:unparsed-text-lines`, `err:FTST0018` for thesauri, `err:FTST0008` for stop-word lists, `jse:SCHEMA_NOT_FOUND` for JSound schema import and `uri:URI_UNRESOLVED_OR_NOSTREAM` for the fetch module. `fn:doc-available` and `fn:unparsed-text-available` return false for a denied resource instead of raising an error. The message still says that the security policy denied the access and why, e.g. `access denied by security policy (requires capability RemoteImport)`.
-- The file, http-client and ftp-client modules report a denied access with their documented error codes: `file:FOFL9999`, `http:HTTP` (`error:HC001` through the EXPath interface) and `ftp:FTP_ERROR`, with the same message.
-- `zerr:ZXQP0029` remains only for external entities and DTDs refused while a document is parsed and for URIs refused by a `URIMapper` (`URIMapper::DENY_ACCESS`).
