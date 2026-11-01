@@ -745,8 +745,7 @@ Verdict check(
   // to its WordNet URL) is engine data read from the library directory
   // (wordnet::provider does not leave it), like the native http-client
   // library that fn:doc loads for http URIs (src/util/http_util.cpp): it
-  // needs no capability. Other wordnet: URIs
-  // still need NativeModules (below).
+  // needs no capability. Other wordnet: URIs need FileRead (below).
   if (aUse == Use::Data &&
       (aURI == "##default" || aURI == "wordnet://wordnet.princeton.edu/"))
     return Verdict();
@@ -764,9 +763,18 @@ Verdict check(
     return check_file(aPolicy, "file" + aURI.substr(6), aUse, aWrite,
                       aTrustedDirs);
 
+  // A wordnet: URI names a data file ("wordnet-en.zth") in a directory of
+  // the library path; it loads no native code. That directory is not under
+  // any read path, so the URI needs FileRead with no read-path list.
   if (lScheme == "wordnet")
-    return aPolicy.allows(Capability::NativeModules)
-      ? Verdict() : needs_capability(Capability::NativeModules);
+  {
+    if (!aPolicy.allows(Capability::FileRead))
+      return needs_capability(Capability::FileRead);
+    if (!aPolicy.getReadPaths().empty())
+      return deny("wordnet thesaurus data is read from the library path, "
+                  "outside the permitted read paths");
+    return Verdict();
+  }
 
   if (aPolicy.allows(Capability::FileRead) &&
       aPolicy.getReadPaths().empty() &&
