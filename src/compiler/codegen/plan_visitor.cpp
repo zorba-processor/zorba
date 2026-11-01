@@ -2408,7 +2408,7 @@ void end_visit(debugger_expr& v)
   }
 
   push_itstack(lDebugIterator.get());
-  lDebugIterator.release();
+  (void)lDebugIterator.release(); // owned by the iterator stack now
 }
 #endif
 

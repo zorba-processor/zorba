@@ -33,6 +33,9 @@ HeaderFilterRegex: '.*'
 ExcludeHeaderFilterRegex: '(/build/|/pregenerated/|/compiler/parser/(xquery|jsoniq)_(parser\.hpp|scanner\.h)$|/compiler/parser/(location\.hh|FlexLexer\.h)$)'
 SystemHeaders: false
 CheckOptions:
+  # A result is ignored on purpose with a (void) cast and a comment saying
+  # why (as cert-err33-c already allows).
+  bugprone-unused-return-value.AllowCastToVoid: true
   # The first block is clang-tidy's default list (setting the option replaces
   # it); the second block adds the calls Zorba makes.
   bugprone-unused-return-value.CheckedFunctions: >-
