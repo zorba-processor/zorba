@@ -68,6 +68,7 @@ jobs:
       # The build produces the headers that CMake configures or generates.
       # ZORBA_USE_PCH=OFF: compile_commands.json must not reference a
       # precompiled header that clang-tidy would have to load.
+      # ZORBA_WITH_DEBUGGER=ON: src/debugger and bin/debugger are analyzed too.
       - name: Configure and build (Clang)
         run: |
           docker run --rm \
@@ -75,7 +76,7 @@ jobs:
             -e CCACHE_DIR=/src/.ccache \
             -e CCACHE_SLOPPINESS=pch_defines,time_macros -e CCACHE_DEPEND=1 \
             -v "$PWD":/src -w /src zorba-builder:ci sh -ec '
-              cmake --preset full-release -DZORBA_USE_PCH=OFF
+              cmake --preset full-release -DZORBA_USE_PCH=OFF -DZORBA_WITH_DEBUGGER=ON
               cmake --build --preset full-release -- -k 0
               ccache -s'
 

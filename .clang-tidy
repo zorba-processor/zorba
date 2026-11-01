@@ -9,6 +9,12 @@
 #                                 socket calls made in src/, modules/ and bin/
 #                                 (stdio calls are covered by cert-err33-c and
 #                                 not repeated here).
+#   clang-diagnostic-unused-result
+#                                 The compiler's warning for a discarded
+#                                 [[nodiscard]] (or warn_unused_result)
+#                                 result, so that the status-returning Zorba
+#                                 functions marked [[nodiscard]] are checked
+#                                 here too (the build does not use -Werror).
 #
 # Generated code is excluded: the Bison/Flex output in src/compiler/parser,
 # the */pregenerated/* sources and headers, and everything under build/
@@ -17,10 +23,12 @@
 Checks: >-
   -*,
   cert-err33-c,
-  bugprone-unused-return-value
+  bugprone-unused-return-value,
+  clang-diagnostic-unused-result
 WarningsAsErrors: >-
   cert-err33-c,
-  bugprone-unused-return-value
+  bugprone-unused-return-value,
+  clang-diagnostic-unused-result
 HeaderFilterRegex: '.*'
 ExcludeHeaderFilterRegex: '(/build/|/pregenerated/|/compiler/parser/(xquery|jsoniq)_(parser\.hpp|scanner\.h)$|/compiler/parser/(location\.hh|FlexLexer\.h)$)'
 SystemHeaders: false
