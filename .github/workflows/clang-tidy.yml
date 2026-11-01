@@ -76,7 +76,7 @@ jobs:
             -e CCACHE_SLOPPINESS=pch_defines,time_macros -e CCACHE_DEPEND=1 \
             -v "$PWD":/src -w /src zorba-builder:ci sh -ec '
               cmake --preset full-release -DZORBA_USE_PCH=OFF
-              cmake --build --preset full-release
+              cmake --build --preset full-release -- -k 0
               ccache -s'
 
       # -source-filter keeps the analyzed translation units: src/, modules/

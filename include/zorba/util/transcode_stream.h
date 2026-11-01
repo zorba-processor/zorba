@@ -17,6 +17,11 @@
 #ifndef ZORBA_TRANSCODE_STREAM_API_H
 #define ZORBA_TRANSCODE_STREAM_API_H
 
+#include <ios>
+#include <locale>
+#include <stdexcept>
+#include <streambuf>
+
 #include <zorba/config.h>
 #include <zorba/internal/cxx_util.h>
 #include <zorba/internal/streambuf.h>
