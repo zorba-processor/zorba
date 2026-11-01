@@ -14,6 +14,7 @@ on:
   pull_request:
     paths:
       - 'changelog.d/**'
+      - 'CHANGELOG.md'
       - 'scripts/changelog_assemble.py'
       - 'scripts/tests/**'
       - '.github/workflows/changelog.yml'

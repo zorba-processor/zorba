@@ -69,6 +69,8 @@ jobs:
     outputs:
       code: ${{ steps.f.outputs.code || steps.all.outputs.code }}
       profiles: ${{ steps.profiles.outputs.list }}
+      profile_filters: ${{ steps.c.outputs.profile_filters || steps.all.outputs.profile_filters }}
+      os_access: ${{ steps.c.outputs.os_access || steps.all.outputs.os_access }}
     steps:
       - uses: actions/checkout@v7
       - id: f
@@ -78,7 +80,41 @@ jobs:
           filters: .github/ci-filters.yml
       - id: all
         if: github.event_name != 'pull_request'
-        run: echo "code=true" >> "$GITHUB_OUTPUT"
+        run: |
+          {
+            echo "code=true"
+            echo "profile_filters=true"
+            echo "os_access=true"
+          } >> "$GITHUB_OUTPUT"
+      # Inputs of the two cheap audit jobs below (not required checks, so
+      # they are skipped as whole jobs).
+      - id: c
+        if: github.event_name == 'pull_request'
+        uses: dorny/paths-filter@v4
+        with:
+          filters: |
+            profile_filters:
+              - 'src/**'
+              - 'include/**'
+              - 'modules/**'
+              - 'bin/**'
+              - 'test/**'
+              - 'schemas/**'
+              - 'cmake/**'
+              - 'scripts/**'
+              - 'docker/**'
+              - 'CMake*'
+              - '*.cmake'
+              - '*.cmake.in'
+              - 'CTest*'
+              - 'CPack*'
+              - '.github/ci-filters.yml'
+              - '.github/workflows/ci.yml'
+            os_access:
+              - 'src/**'
+              - 'modules/**'
+              - 'scripts/check-os-access.*'
+              - '.github/workflows/ci.yml'
       - id: profiles
         env:
           EVENT: ${{ github.event_name }}
@@ -100,10 +136,13 @@ jobs:
           echo "profiles: $list"
           echo "list=$list" >> "$GITHUB_OUTPUT"
 
-  # Cheap and always on: keeps .github/ci-filters.yml in step with the guard
-  # macros of the profiles (see the comment above).
+  # Cheap: keeps .github/ci-filters.yml in step with the guard macros of the
+  # profiles (see the comment above). Runs when a file it scans or its own
+  # inputs change.
   profile-filters:
     name: profile filters
+    needs: changes
+    if: needs.changes.outputs.profile_filters == 'true'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
@@ -115,6 +154,8 @@ jobs:
   # access cannot bypass the security policy unnoticed.
   os-access-audit:
     name: OS access audit
+    needs: changes
+    if: needs.changes.outputs.os_access == 'true'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7

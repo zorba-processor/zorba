@@ -4,24 +4,33 @@ on:
   push:
     branches: [master]
   pull_request:
+    # Only what the build on the runner compiles or configures: C/C++ sources
+    # and headers, CMake files, and the CodeQL configuration. Docker files
+    # (CodeQL uses apt packages, not the images), schemas, .xq/.jq/.xml/.res
+    # data and docs do not change the analysis.
     paths:
       - 'src/**'
       - 'include/**'
-      - 'modules/**'
       - 'bin/**'
-      - 'test/**'
-      - 'schemas/**'
+      - 'modules/**/*.c'
+      - 'modules/**/*.cpp'
+      - 'modules/**/*.h'
+      - 'modules/**/*.hpp'
+      - 'test/**/*.c'
+      - 'test/**/*.cc'
+      - 'test/**/*.cpp'
+      - 'test/**/*.h'
+      - 'test/**/*.hpp'
+      - 'test/**/*.tcc'
       - 'cmake/**'
-      - 'docker/**'
-      - '.clusterfuzzlite/**'
-      - '.github/codeql/**'
-      - 'CMakeLists.txt'
+      - '**/CMakeLists.txt'
+      - '**/*.cmake'
+      - '**/*.cmake.in'
       - 'CMake*.txt'
       - 'CMake*.json'
-      - '*.cmake'
-      - '*.cmake.in'
       - 'CTest*'
       - 'CPack*'
+      - '.github/codeql/**'
       - '.github/workflows/codeql.yml'
   schedule:
     - cron: '0 5 * * 1'
