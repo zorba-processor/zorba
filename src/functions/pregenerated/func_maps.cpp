@@ -23,7 +23,6 @@
 
 
 
-#include "stdafx.h"
 #include "runtime/store/maps.h"
 #include "functions/func_maps.h"
 

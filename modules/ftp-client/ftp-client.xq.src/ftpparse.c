@@ -57,11 +57,7 @@ static void initbase(void)
 
   base = 0;
   /* reentrant gmtime(): the static result of gmtime() is shared by threads */
-#ifdef _WIN32
-  t = gmtime_s(&tm_buf, &base) == 0 ? &tm_buf : 0;
-#else
   t = gmtime_r(&base, &tm_buf);
-#endif
   if (!t) return;
   base = -(totai(t->tm_year + 1900,t->tm_mon,t->tm_mday) + t->tm_hour * 3600 + t->tm_min * 60 + t->tm_sec);
   /* assumes the right time_t, counting seconds. */

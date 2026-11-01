@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-#include "stdafx.h"
-
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -496,11 +494,6 @@ uint32_t hash_number( double d ) {
 template class FloatImpl<double>;
 template class FloatImpl<float>;
 
-#ifdef WIN32
-// exported for testing only
-template class ZORBA_DLL_PUBLIC FloatImpl<double>;
-template class ZORBA_DLL_PUBLIC FloatImpl<float>;
-#endif /* WIN32 */
 
 } // namespace zorba
 /* vim:set et sw=2 ts=2: */

@@ -18,7 +18,6 @@
 #ifndef ZORBA_TRACER_H
 #define ZORBA_TRACER_H
 
-#if !defined( WIN32 ) && !defined( WINCE )
 
 #define TRACE \
   __PRETTY_FUNCTION__ << " (" << __FILE__ << ':' << std::dec << __LINE__ << ')'
@@ -28,27 +27,6 @@
   __oss << __FILE__ << ':' << std::dec << __LINE__ << "::" << __PRETTY_FUNCTION__, \
   __oss.str())
 
-#elif defined( WIN32 )
-
-#define TRACE \
-  __FUNCSIG__ << " (" << __FILE__ << ':' << std::dec << __LINE__ << ')'
-
-#define LOCATION \
-  (__oss.str(""), \
-  __oss << __FILE__ << ":" << std::dec << __LINE__ << "::" <<__FUNCTION__, \
-  __oss.str())
-
-#else
-
-#define TRACE \
-  __FILE__ << ':' << std::dec << __LINE__ << "::" << __FUNCTION__
-
-#define LOCATION \
-  (__oss.str(""), \
-  __oss << __FILE__ << ':' << std::dec << __LINE__ << "::" << __FUNCTION__, \
-  __oss.str())
-
-#endif
 
 #endif /* ZORBA_TRACER_H */
 /* vim:set et sw=2 ts=2: */

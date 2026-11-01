@@ -63,7 +63,6 @@
 
 #include "m_apm_lc.h"
 
-#ifndef _HAVE_NI_LABWIN_CVI_
 #ifdef MSDOS
 #include <time.h>
 #include <sys/timeb.h>
@@ -71,13 +70,7 @@
 #include <sys/time.h>
 extern  void	M_get_microsec(unsigned long *, long *);
 #endif
-#endif
 
-#ifdef _HAVE_NI_LABWIN_CVI_
-#include <time.h>
-#include <utility.h>
-#include <ansi/math.h>
-#endif
 
 extern  void	M_reverse_string(char *);
 extern  void    M_get_rnd_seed(M_APM);
@@ -236,7 +229,6 @@ while (TRUE)
 }
 /****************************************************************************/
 
-#ifndef _HAVE_NI_LABWIN_CVI_
 
 #ifdef MSDOS
 
@@ -331,67 +323,7 @@ gettimeofday(&time_now, &time_zone);                  /* get current time */
 /****************************************************************************/
 
 #endif
-#endif
 
-#ifdef _HAVE_NI_LABWIN_CVI_
-
-/****************************************************************************/
-/*
- *  for National Instruments LabWindows CVI
- */
-
-void	M_get_rnd_seed(M_APM mm)
-{
-double		 timer0;
-int		 millisec;
-char             *cvi_time, *cvi_date, buf1[64], buf2[32];
-M_APM		 atmp;
-
-atmp = M_get_stack_var();
-
-cvi_date = DateStr();
-cvi_time = TimeStr();
-timer0   = Timer();
-
-/*
- *  note that Timer() is not syncronized to TimeStr(),
- *  but we don't care here since we are just looking
- *  for a random source of digits.
- */
-
-millisec = (int)(0.01 + 1000.0 * (timer0 - floor(timer0)));
-
-sprintf(buf1, "%d", millisec);
-
-buf2[0]  = cvi_time[6];	/* time format: "HH:MM:SS" */
-buf2[1]  = cvi_time[7];
-buf2[2]  = cvi_time[3];
-buf2[3]  = cvi_time[4];
-buf2[4]  = cvi_time[0];
-buf2[5]  = cvi_time[1];
-
-buf2[6]  = cvi_date[3];	/* date format: "MM-DD-YYYY" */
-buf2[7]  = cvi_date[4];
-buf2[8]  = cvi_date[0];
-buf2[9]  = cvi_date[1];
-buf2[10] = cvi_date[8];
-buf2[11] = cvi_date[9];
-buf2[12] = cvi_date[7];
-
-buf2[13] = '4';
-buf2[14] = '7';
-buf2[15] = '\0';
-
-strcat(buf1, buf2);
-
-m_apm_set_string(atmp, buf1);
-atmp->m_apm_exponent = 15;
-m_apm_integer_divide(mm, atmp, MM_One);
-
-M_restore_stack(1);
-}
-
-#endif
 
 /****************************************************************************/
 

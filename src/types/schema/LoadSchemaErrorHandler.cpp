@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "stdafx.h"
 
 #include <zorba/config.h>
 #include <sstream>
@@ -22,9 +21,6 @@
 #include "LoadSchemaErrorHandler.h"
 #include "StrX.h"
 #include <xercesc/sax/SAXParseException.hpp>
-#ifdef CYGWIN
-#undef WIN32
-#endif
 
 #include "compiler/parser/query_loc.h"
 #include "diagnostics/xquery_diagnostics.h"

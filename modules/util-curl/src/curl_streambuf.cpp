@@ -19,16 +19,11 @@
 #include <cstdlib>
 #include <cstring>                      /* for memcpy(3) */
 #include <iostream>
-#ifdef WIN32
-#include <winsock2.h>
-#include <ws2tcpip.h>
-#else
 #include <arpa/inet.h>
 #include <cerrno>
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <sys/time.h>
-#endif /* WIN32 */
 
 // libcurl
 #include <curl/multi.h>
@@ -280,9 +275,6 @@ streambuf::streambuf( CURL *curl ) {
 
 streambuf::~streambuf() {
   close();
-#ifdef WIN32
-  closesocket( dummy_socket_ );
-#endif /* WIN32 */
   if ( listener_owner_ )
     delete listener_;
 }
@@ -323,13 +315,6 @@ void streambuf::curl_io( size_t *len_ptr ) {
     FD_ZERO( &fd_write );
     FD_ZERO( &fd_except );
     int max_fd = -1;
-#ifdef WIN32
-    //
-    // Windows does not like a call to select where all arguments are 0, so we
-    // just add a dummy socket to make the call to select happy.
-    //
-    FD_SET( dummy_socket_, &fd_read );
-#endif /* WIN32 */
     ZORBA_CURLM_ASSERT(
       curl_multi_fdset( curlm_, &fd_read, &fd_write, &fd_except, &max_fd )
     );
@@ -361,13 +346,7 @@ void streambuf::curl_io( size_t *len_ptr ) {
 
     switch ( select( max_fd + 1, &fd_read, &fd_write, &fd_except, &timeout ) ) {
       case -1:                          // select error
-#ifdef WIN32
-        char err_buf[8];
-        sprintf( err_buf, "%d", WSAGetLastError() );
-        throw exception( "select()", "", err_buf );
-#else
         throw exception( "select()", "", strerror( errno ) );
-#endif /* WIN32 */
       case 0:                           // timeout
         // no break;
       default:
@@ -419,11 +398,6 @@ void streambuf::init() {
   curl_ = 0;
   curlm_ = 0;
   curl_running_ = 0;
-#ifdef WIN32
-  dummy_socket_ = socket( AF_INET, SOCK_DGRAM, 0 );
-  if ( dummy_socket_ == CURL_SOCKET_BAD || dummy_socket_ == INVALID_SOCKET )
-    throw exception( "socket()", "" );
-#endif /* WIN32 */
   listener_ = 0;
   listener_owner_ = false;
   verbose_ = false;

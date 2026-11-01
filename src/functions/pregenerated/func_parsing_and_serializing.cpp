@@ -23,7 +23,6 @@
 
 
 
-#include "stdafx.h"
 #include "runtime/parsing_and_serializing/parsing_and_serializing.h"
 #include "functions/func_parsing_and_serializing.h"
 

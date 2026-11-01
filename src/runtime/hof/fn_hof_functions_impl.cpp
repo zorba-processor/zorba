@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-#include "stdafx.h"
-
 #include "compiler/expression/function_item_expr.h"
 #include "compiler/api/compilercb.h"
 #include "compiler/translator/translator.h"

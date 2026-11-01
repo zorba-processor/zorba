@@ -22,7 +22,6 @@
 // ---------------------------------------------------------------------------
 //  Includes
 // ---------------------------------------------------------------------------
-#include "stdafx.h"
 
 #include <xercesc/util/Janitor.hpp>
 #include <xercesc/framework/XMLDocumentHandler.hpp>
@@ -46,9 +45,6 @@
 #include <xercesc/framework/psvi/XSAnnotation.hpp>
 #else
 #include <xercesc/internal/XMLGrammarPoolImpl.hpp>
-#endif
-#ifdef CYGWIN
-#undef WIN32
 #endif
 
 

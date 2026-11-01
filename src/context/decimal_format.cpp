@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "stdafx.h"
 
 #include <zorba/api_shared_types.h>
 #include "common/shared_types.h"

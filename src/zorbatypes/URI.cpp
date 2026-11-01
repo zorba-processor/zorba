@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "stdafx.h"
 
 #include "schema_types.h"
 
@@ -92,27 +91,6 @@ bool URI::is_reservered_or_unreserved_char(uint32_t c)
 void URI::decode_file_URI(const zstring& uri, zstring& filepath)
 {
   // TODO: file://localhost/
-#ifdef WIN32
-  if (uri.compare(0, 8, "file:///") == 0 && 
-      ((uri.compare(9, 1, ":") == 0) || (uri.compare(9, 4, "%3A/") == 0))) 
-  {
-    zstring tmp(uri.c_str() + 8);
-    uri::decode(tmp, &filepath);
-  }
-  else if (uri.compare(0, 6, "file:/") == 0 && //JAVA Exception for File URIs without Authority
-          ((uri.compare(7, 1, ":") == 0) || (uri.compare(7, 4, "%3A/") == 0))) 
-  {
-    zstring tmp(uri.c_str() + 6);
-    uri::decode(tmp, &filepath);
-  }
-  else if (uri.compare(0, 17, "file://localhost/") == 0 && 
-      ((uri.compare(18, 1, ":") == 0) || (uri.compare(18, 4, "%3A/") == 0))) 
-  {
-    zstring tmp(uri.c_str() + 17);
-    uri::decode(tmp, &filepath);
-  }
-  else
-#endif
     if (uri.compare(0, 8, "file:///") == 0) 
     {
       zstring tmp(uri.c_str() + 7);
@@ -129,9 +107,6 @@ void URI::decode_file_URI(const zstring& uri, zstring& filepath)
       filepath = uri;
     }
 
-#ifdef WIN32
-  ascii::replace_all(filepath, '/', '\\');
-#endif
 }
 
 
@@ -148,18 +123,6 @@ void URI::encode_file_URI(const zstring& filepath, zstring& uri)
     return;
   }
 
-#ifdef WIN32
-  uri = "file:///";
-
-  zstring tmp1( filepath );
-  ascii::replace_all( tmp1, '\\', '/' );
-
-  zstring tmp2;
-  uri::encode(tmp1, &tmp2, false);
-
-  uri.append(tmp2);
-
-#else
   if (!filepath.empty() && filepath[0] == '/')
     uri = "file://";
   else
@@ -169,7 +132,6 @@ void URI::encode_file_URI(const zstring& filepath, zstring& uri)
   uri::encode(filepath, &tmp, false);
 
   uri.append(tmp);
-#endif
 }
 
 
@@ -588,27 +550,12 @@ void URI::initialize(const zstring& uri, bool have_base)
   zstring::size_type lQueryIdx    = lTrimmedURI.find("?");
   zstring::size_type lFragmentIdx = lTrimmedURI.find("#");
 
-#ifdef WIN32
-  // on WIN32 we might have a drive specification ("C:")
-  // and we don't want to consider this as scheme
-  char lLetter = lTrimmedURI[0];
-  bool lIsDrive = false;
-  if (lColonIdx == 1 &&
-     ((lLetter >= 65 && 90 >= lLetter) || (lLetter >= 97 && 122 >= lLetter)))
-  {
-    lIsDrive = true;
-  }
-#endif
 
   /**
    * Scheme
    * must be before `/', '?' or '#'.  
    */
   if ((lColonIdx == 0 || lColonIdx == zstring::npos) ||
-#ifdef WIN32
-      // avoid interpreting the drive as a scheme
-      lIsDrive ||
-#endif
       (lColonIdx > lSlashIdx && lSlashIdx != zstring::npos) ||
       (lColonIdx > lQueryIdx && lQueryIdx != zstring::npos) ||
       (lColonIdx > lFragmentIdx && lFragmentIdx != zstring::npos)) 
@@ -980,13 +927,6 @@ void URI::initializePath(const zstring& uri)
         }
         ++lIndex;
       }
-    #ifdef WIN32
-      if (ZSTREQ(theScheme, "file") &&
-          (lCodepoints[lStart] == '/') &&
-          (lEnd > (lStart+2)) &&
-          ((lCodepoints[lStart+2] == ':') || !uri.compare(lStart+2, 4, "%3A/")))//jump over first '/' of path
-        lStart++;
-    #endif
     }
     else
     {
@@ -1723,10 +1663,6 @@ void URI::build_full_text() const
 
     if ( is_set(Path) )
     {
-    #ifdef WIN32
-      if(ZSTREQ(theScheme, "file") && !thePath.empty() && (thePath[0] != '/'))
-          lURI << "/";
-    #endif
       lURI << thePath;
     }
 
@@ -1782,10 +1718,6 @@ void URI::build_ascii_full_text() const
 
     if ( is_set(Path) )
     {
-    #ifdef WIN32
-      if(ZSTREQ(theScheme, "file") && !thePath.empty() && (thePath[0] != '/'))
-          lURI << "/";
-    #endif
       lURI << thePath;
     }
 

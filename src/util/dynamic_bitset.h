@@ -19,7 +19,7 @@
 
 #include <vector>
 
-#include "zorbamisc/config/stdint.h"
+#include <stdint.h>
 #include "zorbamisc/config/platform.h"
 
 #include "store/api/shared_types.h"

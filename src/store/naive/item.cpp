@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "stdafx.h"
 
 #include <typeinfo>
 
@@ -107,32 +106,6 @@ void Item::addReference() const
 
 void Item::removeReference()
 {
-#if defined WIN32 && !defined CYGWIN && !defined ZORBA_FOR_ONE_THREAD_ONLY
-  if (isNode())
-  {
-    InterlockedDecrement(&theRefCount);
-    if (!InterlockedDecrement(theUnion.treeRCPtr))
-    {
-      free();
-      return;
-    }
-  }
-  else
-  {
-    long remaining = InterlockedDecrement(&theRefCount);
-
-    if (remaining == 0)
-    {
-      free();
-      return;
-    }
-
-    // See the FUNCTION case below.
-    if (getKind() == FUNCTION)
-      static_cast<FunctionItem*>(this)->referenceDropped(remaining);
-  }
-
-#else
 
   switch (getKind())
   {
@@ -231,7 +204,6 @@ void Item::removeReference()
     ZORBA_ASSERT(false);
   }
   }
-#endif
 }
 
 

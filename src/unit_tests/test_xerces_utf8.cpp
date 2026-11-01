@@ -17,8 +17,6 @@
 // depend on the process locale, and XMLChArray / StrX must not leak or write
 // through a null buffer.
 
-#include "stdafx.h"
-
 #ifndef ZORBA_NO_XMLSCHEMA
 
 #include <iostream>

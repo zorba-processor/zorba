@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 #include <zorba/internal/ztd.h>
-#include "stdafx.h"
 
 #include <algorithm>                    /* for equal_range() */
 #include <cstring>

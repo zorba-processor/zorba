@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "stdafx.h"
 
 #include <iostream>
 
@@ -96,9 +95,8 @@ namespace zorba
 
 // clear static initializer state
 
-// dummy function to tell the windows linker to keep the library.obj
-// even though it contains no public objects or functions
-// this is called at initializeZorba
+// Dummy function that keeps this translation unit linked even though it
+// contains no public objects or functions. It is called at initializeZorba
 void library_init()
 {
 }

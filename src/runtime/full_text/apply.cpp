@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "stdafx.h"
 
 #include <limits>
 #include <set>
@@ -50,11 +49,6 @@
 #include "ftcontains_visitor.h"
 #include "thesaurus.h"
 
-#ifdef WIN32
-// Windows annoyingly defines these as macros.
-# undef max
-# undef min
-#endif /* WIN32 */
 
 using namespace std;
 using namespace zorba::locale;

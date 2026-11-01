@@ -105,16 +105,10 @@ SET(UNIT_TESTS_SRCS
 
 IF(ZORBA_WITH_DEBUGGER)
   LIST(APPEND UNIT_TESTS_SRCS "debug_iter_serialization.cpp")
-  IF(NOT WIN32)
-    # drives the DBGP server over a POSIX socket
-    LIST(APPEND UNIT_TESTS_SRCS "debugger_property.cpp")
-  ENDIF(NOT WIN32)
+  # drives the DBGP server over a POSIX socket
+  LIST(APPEND UNIT_TESTS_SRCS "debugger_property.cpp")
 ENDIF(ZORBA_WITH_DEBUGGER)
 
-IF(WIN32)
-  # SF#3191791
-  LIST(REMOVE_ITEM UNIT_TESTS_SRCS "string_test.cpp")
-ENDIF(WIN32)
 
 IF(ZORBA_NO_XMLSCHEMA)
   # main_sequential imports the http-client schema, staticcollectionmanager
@@ -151,10 +145,8 @@ IF(ZORBA_WITH_UNIT_TESTS)
   # ADD NEW UNIT TESTS HERE
   ZORBA_ADD_TEST("test/libunit/base64" LibUnitTest base64)
   ZORBA_ADD_TEST("test/libunit/base64_streambuf" LibUnitTest base64_streambuf)
-  IF (NOT WIN32)
-    # disabled because of bug lp:867271
-    ZORBA_ADD_TEST("test/libunit/string" LibUnitTest string)
-  ENDIF (NOT WIN32)
+  # disabled because of bug lp:867271
+  ZORBA_ADD_TEST("test/libunit/string" LibUnitTest string)
   ZORBA_ADD_TEST("test/libunit/uri" LibUnitTest uri)
   EXPECTED_FAILURE(test/libunit/uri 3118348)
   IF (NOT ZORBA_NO_ICU)

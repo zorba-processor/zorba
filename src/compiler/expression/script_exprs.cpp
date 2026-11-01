@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "stdafx.h"
 
 #include "compiler/expression/script_exprs.h"
 #include "compiler/expression/var_expr.h"

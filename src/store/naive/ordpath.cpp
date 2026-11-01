@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "stdafx.h"
 
 #include <cassert>
 #include <limits>
@@ -1690,15 +1689,23 @@ void OrdPath::decompress(
                deweyid, compOffsets, numComps);
   }
 
-  // Treat the last byte
+  // Treat the last byte. decodeByte() may leave complete components in the
+  // byte undecoded (e.g. 001 001 01 yields 0.0 and leaves 01), so decode until
+  // only the zero padding after the final component remains.
   if (byteIndex == byteLen - 1)
   {
-    unsigned char lastByte = data[byteIndex];
-    ZORBA_FATAL(lastByte != 0, "");
-    lastByte <<= bitIndex;
-    if (lastByte != 0)
+    ZORBA_FATAL(data[byteIndex] != 0, "");
+
+    while (byteIndex == byteLen - 1)
+    {
+      unsigned char lastByte =
+        static_cast<unsigned char>(data[byteIndex] << bitIndex);
+      if (lastByte == 0)
+        break;
+
       decodeByte(data, bitLen, byteIndex, bitIndex, lastByte,
                  deweyid, compOffsets, numComps);
+    }
   }
 }
 

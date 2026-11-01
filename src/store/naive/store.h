@@ -29,12 +29,6 @@
 #include "zorbautils/hashmap_itemp.h"
 #include "zorbautils/hashmap_zstring.h"
 
-#if (defined (WIN32) || defined (WINCE))
-#include "node_items.h"
-#include "store/api/collection.h"
-#include "store/api/index.h"
-#include "store/api/ic.h"
-#endif
 
 using namespace zorba;
 

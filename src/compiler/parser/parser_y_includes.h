@@ -57,10 +57,6 @@ typedef std::pair<zorba::zstring,zorba::zstring> string_pair_t;
 
 #include "common/common.h"
 
-#ifdef WIN32
-#pragma warning(disable: 4786)
-#endif
-
 #include "compiler/api/compilercb.h"
 #include "compiler/parser/parse_constants.h"
 #include "compiler/parser/parser_helpers.h"

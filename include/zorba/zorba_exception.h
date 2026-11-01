@@ -15,9 +15,6 @@
  */
 
 #pragma once
-#if WIN32
-#pragma warning(disable:4275)
-#endif
 #ifndef ZORBA_ZORBA_EXCEPTION_API_H
 #define ZORBA_ZORBA_EXCEPTION_API_H
 

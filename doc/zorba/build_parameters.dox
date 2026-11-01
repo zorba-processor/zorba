@@ -79,13 +79,5 @@ noncore_download for more information.
 If you wish to build non-core modules from a different location,
 configure with <tt>-D ZORBA_MODULES_DIR=/path/to/modules</tt>.
 
-\subsection ZORBA_THIRD_PARTY_REQUIREMENTS Specifying the Location of Third-Party Requirements on Windows
-
-On Windows, you should configure with <tt>-D
-ZORBA_THIRD_PARTY_REQUIREMENTS=/path1;/path2</tt> to indicate the
-path(s) to third-party libraries, instead of \c
-CMAKE_PREFIX_PATH. This is described in detail at \ref
-windows_autodll.
-
 */
 /* vim:set et sw=2 ts=2: */

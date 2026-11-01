@@ -10,8 +10,7 @@ have been performed.
 The instructions in this section are based on executing commands at
 the command line. It is also possible configure Zorba using CMake's
 GUI configuration utility if you prefer. On Linux distributions, this
-is often a separate package named <b>"cmake-gui"</b>. On Windows, the
-GUI is installed by default and can be started via the Start menu.  On
+is often a separate package named <b>"cmake-gui"</b>. On
 MacOS, it is available as the <b>"gui"</b> variant of the
 <a href="http://www.cmake.org/">CMake</a> package.
 
@@ -50,15 +49,15 @@ necessary to specify \c -G / \c -D every time.
 \section configure_generator CMake Generators (the -G argument)
 
 CMake is a meta build system. It is able to generate both native
-makefiles (e.g. GNU Make or NMake) and IDE workspaces (e.g. Visual
-Studio or KDevelop Projects), depending on which CMake \a generator is
+makefiles (e.g. GNU Make or Ninja) and IDE workspaces (e.g. Xcode
+or KDevelop Projects), depending on which CMake \a generator is
 selected. By default it will generate a UNIX-style Makefile-based
 project.
 
 You specify the generator to use with the \c -G arguments to \c cmake.
-For example, on Windows, you can create a Visual Studio 10 solution by
-executing the following command in the \c {ZORBASRC} directory: \code
-cmake -G "Visual Studio 10" {ZORBASRC} \endcode
+For example, you can create an Xcode project by executing the following
+command in the \c {ZORBASRC} directory: \code
+cmake -G Xcode {ZORBASRC} \endcode
 
 The list of available Generators for your CMake installation
 can be seen by typing \code cmake --help \endcode.
@@ -89,17 +88,11 @@ of the most common:
 \code
 cmake -D CMAKE_PREFIX_PATH=/opt {ZORBASRC}
 \endcode
-  \par On Linux and MacOS:
+  \par Note:
   In command lines, the semicolon is
   interpretted by the shell as a command separator. In order to pass a
   semicolon-separated list of paths for this parameter, be sure to
   enlose the list in single- or double-quotes.
-  \par On Windows:
-  Zorba uses a custom mechanism for specifying the paths to
-  third-party dependencies on Windows, which handles some additional
-  features such as collecting the runtime DLLs for installation.  You
-  should use this mechanism instead of \c CMAKE_PREFIX_PATH on Windows. See
-  \ref windows_autodll for more information.
 
 -# After you build Zorba, you will likely want to install it into a
   final location. You specify this location with the \c
@@ -107,10 +100,8 @@ cmake -D CMAKE_PREFIX_PATH=/opt {ZORBASRC}
   \c {ZORBABUILD}/dist, which is not likely to be a useful location.
   \par Note:
   After installation, the directory specified here will contain
-  subdirectories such as \c bin/, \c lib/, and \c share/. On Unix and
-  MacOS installations, a common value for \c CMAKE_INSTALL_PREFIX is
-  \c /usr/local. On Windows, something like <tt>C:\\Program
-  Files\\Zorba</tt> is suggested.
+  subdirectories such as \c bin/, \c lib/, and \c share/. A common value for \c CMAKE_INSTALL_PREFIX is
+  \c /usr/local.
   \par Note for Makefile-based projects:
   The Makefiles produced by CMake do support the common \c DESTDIR
   variable. However, specifying this variable at compile time <em>will

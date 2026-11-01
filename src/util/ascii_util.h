@@ -104,11 +104,7 @@ back_ascii_inserter( StringType *out ) {
 template<typename CharType> inline
 typename std::enable_if<ZORBA_TR1_NS::is_integral<CharType>::value,bool>::type
 is_ascii( CharType c ) {
-#ifdef WIN32
-  return __isascii( c );
-#else
   return isascii( c );
-#endif
 }
 
 /**

@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "stdafx.h"
 #include <zorba/config.h>
 
 #include "doc_uri_heuristics.h"
@@ -61,9 +60,6 @@ void normalizeInputUri(
         }
         else
         {
-  #ifdef WIN32
-          ascii::replace_all(lNormalizedPath, '\\', '/');
-  #endif
           *aResult = aSctx->resolve_relative_uri(lNormalizedPath, true);
         }
       }

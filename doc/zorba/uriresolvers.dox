@@ -105,9 +105,7 @@ So, the final relative path in our example would be
 Zorba will now attempt to find the named file relative to each
 directory in the <i>URI Path</i>. By default, the only entry on the
 URI path is the directory
-<code>/usr/share/zorba/uris/</code> (on Unix and MacOS X) or
-<code>C:\\Program Files\\Zorba
-2.1.0\\share\\zorba\\uris</code> (on Windows). So, to
+<code>/usr/share/zorba/uris/</code>. So, to
 complete this example, assuming Zorba is installed on a Unix system in
 the default location, Zorba will attempt to resolve the module
 namespace URI <code>http://www.example.com/modules/utils</code> to the
@@ -122,7 +120,7 @@ system, you may provide additional search directories either by
 passing the <code>--uri-path</code> command-line argument to Zorba, or
 by setting the <code>ZORBA_URI_PATH</code> environment variable. In
 both cases, the value is an ordered list of filesystem directories
-separated by ":" (on Unix/MacOS X) or ";" (on Windows). Zorba will
+separated by ":". Zorba will
 search each directory on the URI path in the order specified, and the
 first match found will be used. So, for example, if you invoke Zorba
 as follows (example is for a Unix system):
@@ -166,9 +164,7 @@ module files and <code>.xsd</code> schema files).
 
 The Library Path mechanism is exactly parallel to the URI Path
 mechanism.  The default, built-in entry on this path is
-<code>/usr/lib/zorba</code> (on Unix and MacOS X) and
-<code>C:\\Program Files\\Zorba 2.1.0\\lib\\zorba</code> (on
-Windows). You can add directories to this path using the
+<code>/usr/lib/zorba</code>. You can add directories to this path using the
 <code>--lib-path</code> command-line argument, or by setting the
 <code>ZORBA_LIB_PATH</code> environment variable.
 
@@ -502,9 +498,7 @@ when it is no longer needed. Second, when user code creates a
 memory ownership of the <code>std::istream</code> that is wrapped.
 However, Zorba cannot free the <code>std::istream</code> itself,
 because it was instantiated inside user code rather than inside
-Zorba's own library. On Windows, in some circumstances, if a DLL
-deletes an object that was not instantiated inside that DLL, the
-application will crash. Therefore, the <code>StreamResource</code>
+Zorba's own library. Therefore, the <code>StreamResource</code>
 factory function <code>create()</code> also takes a
 <code>StreamReleaser</code>, which is a function pointer. Zorba will
 call this function pointer, passing the <code>std::istream</code>,

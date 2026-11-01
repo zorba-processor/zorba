@@ -20,7 +20,6 @@
 // * SEE .xml FILE WITH SAME NAME           *
 // *                                        *
 // ******************************************
-#include "stdafx.h"
 
 #include "zorbatypes/rchandle.h"
 #include "zorbatypes/zstring.h"

@@ -64,7 +64,7 @@ int theFailures = 0;
 const char SECRET[] = "SECRET-VALUE-4c91";
 
 // root/
-//   data/in.xml, data/in.txt, data/m.xq, data/s.xsd, data/stop.txt
+//   data/in.xml, data/in.txt, data/m.xq, data/s.xsd, data/stop.txt, data/t.jsd
 //   data/link.xml -> ../outside/secret.xml
 //   data/ldir -> ../outside
 //   data-evil/x.xml
@@ -100,6 +100,10 @@ struct Files
           "targetNamespace=\"http://example.test/s\">"
           "<xs:element name=\"e\" type=\"xs:string\"/></xs:schema>");
     write("data/stop.txt", "foo");
+    write("data/t.jsd",
+          "{ \"$namespace\" : \"http://example.test/t\", \"$types\" : [ "
+          "{ \"$name\" : \"t\", \"$kind\" : \"atomic\", "
+          "\"$baseType\" : \"integer\" } ] }");
     write("data-evil/x.xml", std::string("<x>") + SECRET + "</x>");
     write("outside/secret.xml", std::string("<s>") + SECRET + "</s>");
     write("outside/secret.txt", SECRET);
@@ -431,8 +435,13 @@ void test_documents(Zorba* z, const Files& f)
   CHECK(denied(run(z, sec, TEXT, f.uri("data/in.txt")), "FOUT1170"));
   CHECK(denied(run(z, sec, TEXT_LINES, f.uri("data/in.txt")), "FOUT1170"));
   CHECK(allowed(run(z, sec, TEXT_AVAILABLE, f.uri("data/in.txt")), "false"));
-  CHECK(denied(run(z, sec, FETCH, f.uri("data/in.txt")),
-               "URI_UNRESOLVED_OR_NOSTREAM"));
+  Outcome const lFetch = run(z, sec, FETCH, f.uri("data/in.txt"));
+  CHECK(denied(lFetch, "URI_UNRESOLVED_OR_NOSTREAM",
+               "requires capability FileRead"));
+  // The denial is reported once, not wrapped in a second
+  // URI_UNRESOLVED_OR_NOSTREAM message.
+  CHECK(lFetch.message.find("stream is unresolved") ==
+        lFetch.message.rfind("stream is unresolved"));
   // A child context inherits the policy.
   CHECK(denied(run(z, sec->createChildContext(), DOC, f.uri("data/in.xml")),
                "FODC0002"));
@@ -572,6 +581,60 @@ void test_imports(Zorba* z, const Files& f)
 #endif
 }
 
+// JSound schema imports and $constraints run under the policy of the query
+// that calls jsd:validate()/jsd:annotate(), not under the instance policy.
+std::string jsound_import(const std::string& aLocation)
+{
+  return
+    "jsoniq version \"1.0\";\n"
+    "import module namespace jsd = \"http://jsound.io/modules/jsound\";\n"
+    "jsd:validate({ \"$namespace\" : \"http://example.test/main\",\n"
+    "  \"$imports\" : [ { \"$namespace\" : \"http://example.test/t\",\n"
+    "    \"$prefix\" : \"t\", \"$location\" : \"" + aLocation + "\" } ],\n"
+    "  \"$types\" : [ { \"$name\" : \"u\", \"$kind\" : \"atomic\",\n"
+    "    \"$baseType\" : \"t:t\" } ] }, \"u\", 2)";
+}
+
+std::string jsound_constraint(const std::string& aUri)
+{
+  return
+    "jsoniq version \"1.0\";\n"
+    "import module namespace jsd = \"http://jsound.io/modules/jsound\";\n"
+    "jsd:validate({ \"$namespace\" : \"http://example.test/main\",\n"
+    "  \"$types\" : [ { \"$name\" : \"u\", \"$kind\" : \"atomic\",\n"
+    "    \"$baseType\" : \"integer\",\n"
+    "    \"$constraints\" : [ \"fn:exists(fn:doc(\\\"" + aUri +
+    "\\\"))\" ] } ] }, \"u\", 2)";
+}
+
+void test_jsound(Zorba* z, const Files& f)
+{
+  StaticContext_t sec = context(z, SecurityPolicy::secure());
+  StaticContext_t inData = context(z, SecurityPolicy::secure()
+      .allow(Capability::FileRead).addReadPath(f.data.string()));
+  StaticContext_t all = context(z, SecurityPolicy::unrestricted());
+  std::string const lImport = jsound_import(f.uri("data/t.jsd"));
+  std::string const lConstraint = jsound_constraint(f.uri("outside/secret.xml"));
+
+  // Instance policy secure(): the query's policy decides, and a denial names
+  // the capability the $location needs.
+  CHECK(denied(run(z, sec, lImport), "SCHEMA_NOT_FOUND",
+               "requires capability FileRead"));
+  CHECK(allowed(run(z, inData, lImport), "true"));
+  CHECK(allowed(run(z, all, lConstraint), "true"));
+
+  // Instance policy unrestricted(): a secure() query cannot read files
+  // through a JSound import or constraint.
+  z->setSecurityPolicy(SecurityPolicy::unrestricted());
+  CHECK(denied(run(z, sec, lImport), "SCHEMA_NOT_FOUND",
+               "requires capability FileRead"));
+  // A constraint that raises an error makes the instance invalid.
+  CHECK(allowed(run(z, sec, lConstraint), "false"));
+  CHECK(allowed(run(z, inData, lConstraint), "false"));
+  CHECK(allowed(run(z, all, lConstraint), "true"));
+  z->setSecurityPolicy(SecurityPolicy::secure());
+}
+
 #ifndef ZORBA_NO_FULL_TEXT
 // Stop-word lists and thesauri the policy denies are not available: FTST0008
 // and FTST0018.
@@ -635,10 +698,8 @@ uri_access_security(int argc, char* argv[])
     return 1;
   }
 
-#ifndef WIN32
   // Read by the root static context when the instance is created.
   ::setenv("ZORBA_URI_PATH", lFiles->path("env").c_str(), 1);
-#endif
 
   void* lStore = StoreManager::getStore();
   Zorba* lZorba = Zorba::getInstance(lStore);
@@ -651,12 +712,11 @@ uri_access_security(int argc, char* argv[])
     test_document_cache(lZorba, *lFiles);
     test_network(lZorba);
     test_imports(lZorba, *lFiles);
+    test_jsound(lZorba, *lFiles);
 #ifndef ZORBA_NO_FULL_TEXT
     test_full_text(lZorba, *lFiles);
 #endif
-#ifndef WIN32
     test_env_uri_path(lZorba);
-#endif
   }
   catch (ZorbaException const& e)
   {

@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "stdafx.h"
 
 // This include needs to be kept in order to make sure the
 // unique_ptr<dynamic_context> manages to dealocate the

@@ -23,7 +23,6 @@
 
 
 
-#include "stdafx.h"
 #include "runtime/csv/csv.h"
 #include "functions/func_csv.h"
 

@@ -15,11 +15,7 @@
  */
 #include "http_client.h"
 
-#ifdef WIN32
-  #include <windows.h>
-#else
   #include <time.h>
-#endif
 
 #include <curl/curl.h>
 #include <map>
@@ -39,32 +35,6 @@
 namespace zorba {
 
 namespace http_client {
-#ifdef WIN32
-static void set_cacert(CURL* lCurl, std::string aPath)
-{
-  TCHAR path[MAX_BUF_SIZE];
-  int r = GetModuleFileName(NULL, path, 2048);
-  if (r == -1)
-    return;
-#ifdef UNICODE
-  char buf[MAX_BUF_SIZE];
-  memset(buf, 0, MAX_BUF_SIZE);
-  for (int i = 0; i <= r; ++i)
-  {
-    buf[i] = (char) path[i];
-  }
-  std::string lPath(buf);
-#else
-  std::string lPath(path);
-#endif
-  aPath = lPath.substr(0, lPath.rfind('\\'));
-  aPath += "\\cacert.pem";
-  if(GetFileAttributesA(aPath.c_str()) != INVALID_FILE_ATTRIBUTES)
-    curl_easy_setopt(lCurl, CURLOPT_CAINFO, aPath.c_str());
-  else
-    curl_easy_setopt(lCurl, CURLOPT_SSL_VERIFYPEER, 0L);
-}
-#endif //WIN32
 
 
 ExternalFunction*
@@ -101,10 +71,6 @@ int HttpSendFunction::doRequest(Request& aRequest, ItemSequence_t& aResult,
   // Every connection (redirects included) is checked against the policy.
   curl::restrict_to_policy(lCURL, aPolicy);
 
-#ifdef WIN32
-  std::string caCertPath;
-  set_cacert(lCURL, caCertPath);
-#endif
 
   HttpResponseHandler lRespHandler(theFactory, lHeaderList);
   bool lStatusOnly =
@@ -199,15 +165,11 @@ HttpSendFunction::evaluate(const ExternalFunction::Arguments_t& args,
       }
 
       int lMillis = lDelays[i];
-#ifdef WIN32
-      Sleep(lMillis);
-#else
       const int32_t lFactor = 1000000;
       struct timespec lTs;
       lTs.tv_sec = lMillis / 1000;
       lTs.tv_nsec = (lMillis % 1000) * lFactor;
       nanosleep(&lTs, 0);
-#endif
     }
     doRequest(lRequest, lResult, lPolicy);
     return lResult;

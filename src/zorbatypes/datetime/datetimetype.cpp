@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "stdafx.h"
 
 #include <cstdlib>
 #include <cmath>
@@ -21,12 +20,7 @@
 #include <exception>
 #include <cassert>
 
-#ifndef WIN32
 #include <sys/time.h>
-#else
-#include <sys/timeb.h>
-#include <time.h>
-#endif
 
 #include "zorbatypes/datetime.h"
 #include "zorbatypes/datetime/parse.h"
@@ -317,8 +311,6 @@ int DateTime::createGDay(int days, DateTime& dt)
 
 int DateTime::getLocalTime(DateTime& dt)
 {
-  // TODO: check code on windows
-#ifndef WIN32
   struct timeval tv;
   gettimeofday(&tv, NULL);
   struct tm curr;
@@ -326,20 +318,6 @@ int DateTime::getLocalTime(DateTime& dt)
   return createDateTime(curr.tm_year + 1900, curr.tm_mon + 1, curr.tm_mday,
                         curr.tm_hour, curr.tm_min, curr.tm_sec,
                         round((tv.tv_usec / 1000000.0) * FRAC_SECONDS_UPPER_LIMIT), dt);
-#else
-#ifndef WINCE
-  struct _timeb   tb;
-  _ftime_s(&tb);
-#else
-  struct timeb   tb;
-  ftime(&tb);
-#endif
-  struct  tm  curr;
-  _localtime64_s(&curr, &tb.time);
-  return createDateTime(curr.tm_year + 1900, curr.tm_mon + 1, curr.tm_mday,
-                        curr.tm_hour, curr.tm_min, curr.tm_sec,
-                        round((tb.millitm / 1000.0) * FRAC_SECONDS_UPPER_LIMIT), dt);
-#endif
 
 }
 

@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "stdafx.h"
 
 #include "context/root_static_context.h"
 #include "context/namespace_context.h"
@@ -31,9 +30,6 @@
 
 #include "store/api/item_factory.h"
 
-#ifdef WIN32
-#include <zorba/config.h>
-#endif //WIN32
 
 
 // DEFINE ENVIRONMENT VARIABLES
@@ -41,59 +37,6 @@ namespace zorba
 {
 
 
-#ifdef WIN32
-#define MAX_VAR_SIZE 32767
-
-static void append_to_path(
-    std::vector<zstring>& aPath,
-    zstring& zorba_root,
-    zstring& relpath)
-{
-  ascii::replace_all(relpath, '/', '\\');
-  zstring full_path(zorba_root);
-  full_path.append(relpath);
-  full_path.append("\\");
-  aPath.push_back(full_path);
-}
-
-
-static void append_env_var(
-  wchar_t const * env_var_name,
-  std::vector<zstring>& pathsVector,
-  zstring& core_path,
-  zstring& noncore_path)
-{
-  wchar_t env_var[MAX_VAR_SIZE];
-  DWORD path_size;
-  // get a relative path from the environment for LIB
-  path_size = GetEnvironmentVariableW(env_var_name, env_var, MAX_VAR_SIZE);
-  if (path_size)
-  {
-    char  dll_path[MAX_VAR_SIZE];
-    WideCharToMultiByte(CP_UTF8,
-                        0,
-                        env_var,
-                        -1,
-                        dll_path,
-                        MAX_VAR_SIZE,
-                        NULL,
-                        NULL);
-
-    char * str_env = std::strtok(dll_path, ";");
-    while (str_env !=NULL)
-    {
-      zstring zorba_env_dir(str_env);
-      if (str_env[strlen(str_env)-1] != '\\')
-      {
-        zorba_env_dir.append("\\");
-      }
-      append_to_path(pathsVector, zorba_env_dir, core_path);
-      append_to_path(pathsVector, zorba_env_dir, noncore_path);
-      str_env = std::strtok(NULL, ";");
-    }
-  }
-}
-#else
 static void append_env_var(
     const char* env_var_name,
     std::vector<zstring>& pathsVector)
@@ -116,7 +59,6 @@ static void append_env_var(
     str_env = strtok_r(NULL, ";", &save_ptr);
   }
 }
-#endif
 
 
 
@@ -201,45 +143,6 @@ void root_static_context::init()
 
   std::vector<zstring> lRootURIPath;
   std::vector<zstring> lRootLibPath;
-#ifdef WIN32
-  // compute the relative path to zorba_simplestore.dll (this dll)
-  WCHAR  wdll_path[1024];
-  DWORD dll_path_size;
-  HMODULE h_module = GetModuleHandleW (_T(ZORBA_STORE_NAME));
-  dll_path_size = GetModuleFileNameW(h_module,
-                                     wdll_path,
-                                     sizeof(wdll_path)/sizeof(wdll_path[0]));
-  if(dll_path_size)
-  {
-    wdll_path[dll_path_size] = 0;
-    char  dll_path[1024];
-    WideCharToMultiByte(CP_UTF8,
-                        0,
-                        wdll_path,
-                        -1,
-                        dll_path,
-                        sizeof(dll_path),
-                        NULL,
-                        NULL);
-
-    char *last_slash = strrchr(dll_path, '\\');
-    if(last_slash)
-    {
-      last_slash[0] = 0;
-      last_slash = strrchr (dll_path, '\\');
-      if (last_slash) 
-      {
-        last_slash[1] = 0;
-        zstring zorba_root_dir(dll_path);
-
-        append_to_path(lRootURIPath, zorba_root_dir, zstring(ZORBA_CORE_URI_DIR));
-        append_to_path(lRootURIPath, zorba_root_dir, zstring(ZORBA_NONCORE_URI_DIR));
-        append_to_path(lRootLibPath, zorba_root_dir, zstring(ZORBA_CORE_LIB_DIR));
-        append_to_path(lRootLibPath, zorba_root_dir, zstring(ZORBA_NONCORE_LIB_DIR));
-      }
-    }
-  }
-#endif
 
   const char ** lURIPathIter = get_builtin_uri_path();
   for (; *lURIPathIter != 0; ++lURIPathIter)
@@ -271,18 +174,9 @@ void root_static_context::init()
   // allows Capability::Environment.
   std::vector<zstring> lEnvURIPath;
   std::vector<zstring> lEnvLibPath;
-#ifdef WIN32
-  append_env_var (L"ZORBA_MODULE_PATH", lEnvURIPath, zstring(ZORBA_CORE_URI_DIR), zstring(ZORBA_NONCORE_URI_DIR));
-  append_env_var (L"ZORBA_MODULE_PATH", lEnvLibPath, zstring(ZORBA_CORE_LIB_DIR), zstring(ZORBA_NONCORE_LIB_DIR));
-
-  append_env_var (L"ZORBA_URI_PATH", lEnvURIPath, zstring(ZORBA_CORE_URI_DIR), zstring(ZORBA_NONCORE_URI_DIR));
-  append_env_var (L"ZORBA_LIB_PATH", lEnvLibPath, zstring(ZORBA_CORE_LIB_DIR), zstring(ZORBA_NONCORE_LIB_DIR));
-
-#else
   append_env_var ("ZORBA_URI_PATH", lEnvURIPath);
   append_env_var ("ZORBA_LIB_PATH", lEnvLibPath);
 
-#endif
   set_env_paths(lEnvURIPath, lEnvLibPath);
 } 
 

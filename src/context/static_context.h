@@ -31,11 +31,6 @@
 #include <zorba/internal/unique_ptr.h>
 #include <zorba/security.h>
 
-#ifdef WIN32
-#include "store/api/item.h"
-#include "compiler/expression/expr_base.h"
-#include "types/typemanager.h"
-#endif
 
 #include "context/static_context_consts.h"
 #include "context/decimal_format.h"

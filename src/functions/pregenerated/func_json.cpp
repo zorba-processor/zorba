@@ -23,7 +23,6 @@
 
 
 
-#include "stdafx.h"
 #include "runtime/json/json.h"
 #include "functions/func_json.h"
 

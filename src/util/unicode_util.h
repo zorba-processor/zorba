@@ -26,7 +26,7 @@
 #include <zorba/internal/ztd.h>
 
 #ifdef ZORBA_NO_ICU
-# include "zorbamisc/config/stdint.h"
+# include <stdint.h>
 # include "zorbatypes/zstring.h"
 #else
 # include <unicode/unistr.h>
@@ -229,13 +229,7 @@ bool is_iprivate( code_point c );
  * @return Returns \c true only if \a c is a whitespace character.
  */
 inline bool is_space( code_point c ) {
-#ifdef WIN32
-  // Windows' isspace() implementation crashes for non-ASCII characters.
-  char const ascii_c = static_cast<char>( c & 0x7F );
-  return ascii_c == c && isspace( ascii_c );
-#else
   return isspace( c );
-#endif /* WIN32 */
 }
 
 /**

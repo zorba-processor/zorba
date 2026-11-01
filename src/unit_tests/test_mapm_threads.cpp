@@ -24,8 +24,6 @@
 // build has ZORBA_FOR_ONE_THREAD_ONLY=ON, which compiles out the locking of
 // the rest of the engine (store reference counts, QName pool, ...).
 
-#include "stdafx.h"
-
 #include <algorithm>
 #include <atomic>
 #include <chrono>

@@ -23,7 +23,6 @@
 
 
 
-#include "stdafx.h"
 #include "runtime/errors_and_diagnostics/errors_and_diagnostics.h"
 #include "functions/func_errors_and_diagnostics.h"
 

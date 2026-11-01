@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "stdafx.h"
 
 #include "zorbautils/fatal.h"
 #include "diagnostics/assert.h"
@@ -38,9 +37,7 @@
 #include <zorba/internal/unique_ptr.h>
 
 
-#ifndef WIN32
 #include <sys/time.h>
-#endif
 
 #include <algorithm>
 

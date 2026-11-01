@@ -41,11 +41,7 @@ private:
   ~DynamicLoader();
 
 
-#ifdef WIN32
-  typedef HMODULE handle_t;
-#else
   typedef void *  handle_t;
-#endif
 
   ExternalModule* loadModule(const zstring& aFile) const;
   ExternalModule* createModule(handle_t handle, const zstring& aFile) const;

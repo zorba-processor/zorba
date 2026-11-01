@@ -22,12 +22,8 @@
 #include <cstring>
 #include <iostream>
 #include <string>
-#ifdef WIN32
-# include <windows.h>
-#else
 # include <dirent.h>
 # include <sys/types.h>                 /* for off_t */
-#endif /* WIN32 */
 
 // Zorba
 #include <zorba/config.h>
@@ -44,26 +40,16 @@ typedef os_error::exception exception;
 
 ////////// constants //////////////////////////////////////////////////////////
 
-#ifdef WIN32
-char const dir_separator = '\\';
-char const path_separator = ';';
-char const newline[] = "\r\n";
-#else
 char const dir_separator = '/';
 char const path_separator = ':';
 char const newline[] = "\n";
-#endif /* WIN32 */
 
 ////////// types //////////////////////////////////////////////////////////////
 
 /**
  * File size type.
  */
-#ifdef WIN32
-typedef __int64 size_type;
-#else
 typedef off_t size_type;
-#endif /* WIN32 */
 
 /**
  * File type.
@@ -186,15 +172,7 @@ remove( PathStringType const &path, bool ignore_not_found = false ) {
  * @return Returns \c true only if the path is absolute.
  */
 inline bool is_absolute( char const *path ) {
-#ifndef WIN32
   return path[0] == '/';
-#else
-  //
-  // No, this should NOT also check for '/'.  The path should have been
-  // normalized for Windows first, i.e., have '/' replaced by '\'.
-  //
-  return isalpha( path[0] ) && path[1] == ':' && path[2] == '\\';
-#endif /* WIN32 */
 }
 
 /**
@@ -272,10 +250,6 @@ dir_name( PathStringType const &path ) {
     return PathStringType( 1, '.' );
   if ( pos == 0 )                       // e.g., /foo
     return PathStringType( 1, dir_separator );
-#ifdef WIN32
-  if ( pos == 2 && is_absolute( path ) )
-    return path.substr( 0, 3 );
-#endif /* WIN32 */
   return path.substr( 0, pos );
 }
 
@@ -493,18 +467,7 @@ public:
 private:
   std::string dir_path_;
   entry entry_;
-#ifndef WIN32
   DIR *dir_;
-#else
-  HANDLE dir_;
-  bool dir_is_empty_;
-  WIN32_FIND_DATA ent_data_;
-  char entry_name_buf_[ MAX_PATH ];
-  bool use_first_;
-
-  void win32_opendir( char const *path );
-  void win32_closedir();
-#endif /* WIN32 */
 
   void ctor_impl();
 
@@ -615,11 +578,6 @@ append( PathStringType1 &path1, PathStringType2 const &path2 ) {
   append( path1, path2.c_str() );
 }
 
-#ifdef WIN32
-// Do not use this function directly.
-ZORBA_DLL_PUBLIC
-void win32_make_absolute( char const *path, char *abs_path );
-#endif /* WIN32 */
 
 /**
  * Makes a relative path into an absolute path.
@@ -631,15 +589,9 @@ template<class PathStringType> inline
 typename std::enable_if<ZORBA_IS_STRING(PathStringType),void>::type
 make_absolute( PathStringType *path ) {
   if ( !is_absolute( *path ) ) {
-#ifndef WIN32
     typedef typename PathStringType::size_type size_type;
     path->insert( static_cast<size_type>(0), 1, '/' );
     path->insert( 0, curdir().c_str() );
-#else
-    char temp[ MAX_PATH ];
-    win32_make_absolute( path->c_str(), temp );
-    *path = temp;
-#endif /* WIN32 */
   }
 }
 

@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-#include "stdafx.h"
 #include <zorba/config.h>
 #include <zorba/util/uuid.h>
 
@@ -25,8 +24,6 @@
 # include <CoreFoundation/CoreFoundation.h>
 #elif defined( ZORBA_HAVE_UUID_H )
 # include <uuid/uuid.h>
-#elif defined( _WIN32 )
-# include <Rpc.h>
 #else
 # error "Unsupported operating system for generating UUIDs"
 #endif
@@ -45,9 +42,7 @@ void uuid::create( uuid *result ) {
   ::memcpy( result->data, &uuid_bytes, sizeof result->data );
 #elif defined( ZORBA_HAVE_UUID_H )
   uuid_generate( result->data );
-#elif defined( _WIN32 )
-  UuidCreateSequential( (UUID*)result->data );
-#endif /* _WIN32 */
+#endif /* ZORBA_HAVE_UUID_H */
 }
 
 uuid::variant uuid::get_variant() const {

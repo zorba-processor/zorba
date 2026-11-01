@@ -17,7 +17,7 @@
 #  Zorba_INCLUDE_DIRS - include directories for Zorba
 #  Zorba_LIBRARY_DIRS - library directories for Zorba (normally not used!)
 #  Zorba_LIBRARIES    - libraries to link against QQQ
-#  Zorba_EXE          - the Zorba executable (or .bat script inside Zorba build)
+#  Zorba_EXE          - the Zorba executable
 #  Zorba_TESTDRIVER   - the Zorba testdriver executable
 #  ZORBA_STORE_NAME   - the name of the store in this installation
 #  Zorba_USE_FILE     - file which projects depending on Zorba should INCLUDE()

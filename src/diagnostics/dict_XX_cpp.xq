@@ -53,7 +53,6 @@ declare variable $input external;
 let $lang := $input/diagnostic-list/@lang
 return string-join(
   ( util:copyright(), 
-    '#include "stdafx.h"',
     '#include "zorba/config.h"',
     '#include "diagnostics/dict_impl.h"',
     '',

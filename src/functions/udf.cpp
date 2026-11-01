@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-#include "stdafx.h"
-
 #include "runtime/core/fncall_iterator.h"
 #include "runtime/core/var_iterators.h"
 

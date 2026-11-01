@@ -34,11 +34,6 @@
 #  define XERCESC_XMLSize_t XMLSize_t
 #endif
 
-//daniel: this is to make cygwin work; xerces defines WIN32 in case of cygwin, which is wrong
-#ifdef CYGWIN
-#undef WIN32
-#endif
-
 
 namespace XERCES_CPP_NAMESPACE
 {

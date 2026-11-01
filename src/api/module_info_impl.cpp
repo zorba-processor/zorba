@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "stdafx.h"
 #include "api/module_info_impl.h"
 #include <zorba/zorba_string.h>
 #include "zorbatypes/zstring.h"

@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "stdafx.h"
 
 #include <zorba/zorba_exception.h>
 
@@ -605,11 +604,7 @@ int runUriTest(int argc, char* argv[])
       "",
       "",
       "",
-#ifndef WIN32
       "/d:/a/b/c",
-#else
-      "d:/a/b/c",
-#endif      
       "",
       "",
       "/d:/a/b/c", // path notation
@@ -624,11 +619,7 @@ int runUriTest(int argc, char* argv[])
       "",
       "localhost",
       "",
-#ifndef WIN32
       "/d:/a/b/c",
-#else
-      "d:/a/b/c",
-#endif
       "",
       "",
       "localhost/d:/a/b/c", // path notation

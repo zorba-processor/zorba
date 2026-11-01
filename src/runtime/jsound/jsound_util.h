@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-#include "stdafx.h"
-
 #include <vector>
 
 #include "store/api/item.h"
@@ -40,8 +38,11 @@ public:
    *
    * @param jsd The JSound (JSON Schema Document) to load and utlimiately
    * annotate or validate against.
+   * @param sctx The static context of the caller: imports are resolved and
+   * \c $constraints are compiled under its security policy.  It must outlive
+   * the %schema.
    */
-  schema( store::Item_t const &jsd );
+  schema( store::Item_t const &jsd, static_context const *sctx );
 
   /**
    * Destroys a %schema.
@@ -137,6 +138,9 @@ private:
 
   // namespace of the loaded schema
   zstring namespace_;
+
+  // static context of the caller (see the constructor)
+  static_context const *sctx_;
 
   /**
    * Finds or creates a new type.

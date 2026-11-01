@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-#include "stdafx.h"
-
 #include <zorba/util/smart_ptr.h>
 
 namespace zorba {
