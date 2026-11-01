@@ -1,0 +1,140 @@
+# Agent benchmark (bench/agents): zorba-mcp tools (A) versus a bash sandbox
+# (B), same model, same tasks, same snapshot. See bench/agents/README.md.
+#
+#   pull_request (bench/agents/**, this file): build zorba, check that the
+#     JSONiq ground-truth queries agree with the Python reference on every
+#     task, and run the harness with its scripted fake model (--dry-run) in
+#     both configurations. Not a required check.
+#   workflow_dispatch: the real benchmark with the Anthropic API (secret
+#     ANTHROPIC_API_KEY); results are uploaded as the agent-benchmark-results
+#     artifact.
+name: Agent benchmark
+
+on:
+  pull_request:
+    paths:
+      - bench/agents/**
+      - .github/workflows/agent-benchmark.yml
+  workflow_dispatch:
+    inputs:
+      model:
+        description: Model id
+        required: false
+        default: claude-sonnet-5-5
+      runs:
+        description: Runs per task and configuration
+        required: false
+        default: "3"
+      config:
+        description: Configurations
+        type: choice
+        options: [both, A, B]
+        default: both
+      tasks:
+        description: Comma-separated task ids or prefixes (empty = all)
+        required: false
+        default: ""
+
+concurrency:
+  group: agent-benchmark-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    name: ${{ github.event_name == 'workflow_dispatch' && 'benchmark' || 'ground truth and dry run' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: ${{ github.event_name == 'workflow_dispatch' && 340 || 90 }}
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      MODEL: ${{ inputs.model || 'claude-sonnet-5-5' }}
+      RUNS: ${{ inputs.runs || '3' }}
+      CONFIG: ${{ inputs.config || 'both' }}
+      TASKS: ${{ inputs.tasks }}
+    steps:
+      - name: Require the API key
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "::error::The repository secret ANTHROPIC_API_KEY is not set; the real benchmark needs it."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v7
+
+      - name: Grading self-test and reference freshness
+        run: |
+          python3 -I -m unittest discover -s bench/agents -p 'test_*.py' -v
+          python3 -I bench/agents/reference.py --check
+
+      - name: Builder image
+        uses: ./.github/actions/builder-image
+        with:
+          context: docker/builder-latest
+          cache-scope: linux-amd64-latest
+
+      # Restore only: this workflow reuses the CI build cache without adding
+      # entries of its own.
+      - uses: actions/cache/restore@v6
+        with:
+          path: .ccache
+          key: ccache-v2-linux-amd64-latest-${{ github.sha }}
+          restore-keys: ccache-v2-linux-amd64-latest-
+
+      - name: Build zorba
+        run: |
+          mkdir -p .ccache
+          docker run --rm \
+            -e CCACHE_DIR=/src/.ccache \
+            -e CCACHE_SLOPPINESS=pch_defines,time_macros -e CCACHE_DEPEND=1 \
+            -v "$PWD":/src -w /src zorba-builder:ci sh -ec '
+              cmake --preset full-release
+              cmake --build --preset full-release
+              ccache -s'
+
+      - name: Ground truth (JSONiq queries == Python reference)
+        run: |
+          docker run --rm -v "$PWD":/src -w /src zorba-builder:ci \
+            python3 -I bench/agents/check_truth.py \
+              --zorba build/full-release/bin/zorba
+
+      - name: Build the sandbox image (configuration B)
+        run: docker build -t zorba-agent-sandbox:latest bench/agents/sandbox
+
+      - name: Install the Anthropic SDK
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          python3 -m venv .venv
+          .venv/bin/pip install --quiet -r bench/agents/requirements.txt
+
+      - name: Run the harness
+        run: |
+          # zorba-mcp runs in the builder image (its libraries are there),
+          # with the snapshot read-only and no network.
+          mcp="docker run -i --rm --network none -v $PWD:/src:ro"
+          mcp="$mcp -v $PWD/bench/agents/data/snapshot:/data:ro"
+          mcp="$mcp zorba-builder:ci /src/build/full-release/bin/zorba-mcp --root /data"
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
+            .venv/bin/python -I bench/agents/harness.py \
+              --model "$MODEL" --runs "$RUNS" --config "$CONFIG" \
+              --tasks "$TASKS" --mcp-command "$mcp" --out agent-results
+          else
+            python3 -I bench/agents/harness.py --dry-run --config both \
+              --mcp-command "$mcp" --out agent-results
+          fi
+
+      - name: Job summary
+        if: always()
+        run: |
+          if [ -f agent-results/summary.md ]; then
+            cat agent-results/summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: ${{ github.event_name == 'workflow_dispatch' && 'agent-benchmark-results' || 'agent-benchmark-dry-run' }}
+          path: agent-results/
+          if-no-files-found: ignore

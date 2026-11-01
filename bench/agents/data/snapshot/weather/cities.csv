@@ -1,0 +1,12 @@
+file,city,country,latitude,longitude
+weather/anchorage.json,Anchorage,United States,61.2181,-149.9003
+weather/ambon.json,Ambon,Indonesia,-3.6954,128.1814
+weather/bushehr.json,Bushehr,Iran,28.9234,50.8203
+weather/davao.json,Davao,Philippines,7.0731,125.6128
+weather/kupang.json,Kupang,Indonesia,-10.1772,123.607
+weather/lima.json,Lima,Peru,-12.0464,-77.0428
+weather/luganville.json,Luganville,Vanuatu,-15.5126,167.1766
+weather/manila.json,Manila,Philippines,14.5995,120.9842
+weather/port-vila.json,Port Vila,Vanuatu,-17.7333,168.3273
+weather/santiago.json,Santiago,Chile,-33.4489,-70.6693
+weather/tokyo.json,Tokyo,Japan,35.6895,139.6917

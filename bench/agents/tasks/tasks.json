@@ -1,0 +1,225 @@
+{
+  "notes": "Each task: id, category, question, answer_schema (JSON Schema of the final answer) and grading (see grading.py). Ground truth: ground_truth.json, written by reference.py and checked against the JSONiq queries in queries/.",
+  "tasks": [
+    {
+      "id": "t01_largest_quake",
+      "category": "lookup",
+      "question": "In the USGS GeoJSON feed of M2.5+ earthquakes of the past week, which event has the largest magnitude? Give its event id (the feature's id), its magnitude and its place description.",
+      "answer_schema": {
+        "type": "object",
+        "properties": {"id": {"type": "string"}, "mag": {"type": "number"}, "place": {"type": "string"}},
+        "required": ["id", "mag", "place"]
+      },
+      "grading": {"fields": {"id": {"type": "exact"}, "mag": {"type": "number", "tolerance": 0.001}, "place": {"type": "exact"}}}
+    },
+    {
+      "id": "t02_magtype_counts",
+      "category": "aggregation",
+      "question": "In the USGS GeoJSON feed of M2.5+ earthquakes of the past week, how many events are there for each magnitude type (the magType property)?",
+      "answer_schema": {
+        "type": "object",
+        "properties": {"counts": {"type": "array", "items": {"type": "object", "properties": {"magType": {"type": "string"}, "count": {"type": "integer"}}, "required": ["magType", "count"]}}},
+        "required": ["counts"]
+      },
+      "grading": {"fields": {"counts": {"type": "set", "key": "magType", "items": {"fields": {"magType": {"type": "exact"}, "count": {"type": "exact"}}}}}}
+    },
+    {
+      "id": "t03_m45_stats",
+      "category": "aggregation",
+      "question": "In the USGS GeoJSON feed of M2.5+ earthquakes of the past week, how many events have a magnitude of 4.5 or more, and what is their mean magnitude rounded to two decimals?",
+      "answer_schema": {
+        "type": "object",
+        "properties": {"count": {"type": "integer"}, "mean_mag": {"type": "number"}},
+        "required": ["count", "mean_mag"]
+      },
+      "grading": {"fields": {"count": {"type": "exact"}, "mean_mag": {"type": "number", "tolerance": 0.006}}}
+    },
+    {
+      "id": "t04_busiest_day",
+      "category": "aggregation",
+      "question": "In the USGS CSV feed of M2.5+ earthquakes of the past week, which UTC calendar day (YYYY-MM-DD, from the time column) has the most events, and how many events does it have?",
+      "answer_schema": {
+        "type": "object",
+        "properties": {"date": {"type": "string"}, "count": {"type": "integer"}},
+        "required": ["date", "count"]
+      },
+      "grading": {"fields": {"date": {"type": "exact"}, "count": {"type": "exact"}}}
+    },
+    {
+      "id": "t05_geojson_vs_csv",
+      "category": "cross-format",
+      "question": "The USGS M2.5+ past-week earthquake feed is present both as GeoJSON and as CSV, retrieved at different times. Which event ids are in the GeoJSON file but not in the CSV file, and which are in the CSV file but not in the GeoJSON file? Use empty lists if there are none.",
+      "answer_schema": {
+        "type": "object",
+        "properties": {"only_in_geojson": {"type": "array", "items": {"type": "string"}}, "only_in_csv": {"type": "array", "items": {"type": "string"}}},
+        "required": ["only_in_geojson", "only_in_csv"]
+      },
+      "grading": {"fields": {"only_in_geojson": {"type": "set"}, "only_in_csv": {"type": "set"}}}
+    },
+    {
+      "id": "t06_mag_revisions",
+      "category": "cross-format",
+      "question": "For the earthquakes present in both the USGS M2.5+ past-week GeoJSON file and the CSV file, list the events whose magnitude differs between the two files by more than 0.001 (differences in number formatting only do not count). For each, give the event id, the GeoJSON magnitude and the CSV magnitude. Use an empty list if there are none.",
+      "answer_schema": {
+        "type": "object",
+        "properties": {"events": {"type": "array", "items": {"type": "object", "properties": {"id": {"type": "string"}, "geojson_mag": {"type": "number"}, "csv_mag": {"type": "number"}}, "required": ["id", "geojson_mag", "csv_mag"]}}},
+        "required": ["events"]
+      },
+      "grading": {"fields": {"events": {"type": "set", "key": "id", "items": {"fields": {"id": {"type": "exact"}, "geojson_mag": {"type": "number", "tolerance": 0.0005}, "csv_mag": {"type": "number", "tolerance": 0.0005}}}}}}
+    },
+    {
+      "id": "t07_quakeml_coverage",
+      "category": "cross-format",
+      "question": "The QuakeML (XML) file holds the USGS M4.5+ earthquakes of the past week; its event id is the catalog:datasource attribute followed by the catalog:eventid attribute of each event (e.g. \"us\" + \"7000abcd\" = \"us7000abcd\"), the same id as in the GeoJSON feed. Which events of magnitude 4.5 or more in the M2.5+ GeoJSON file are missing from the QuakeML file, and which QuakeML events are not among the M4.5+ events of the GeoJSON file? Use empty lists if there are none.",
+      "answer_schema": {
+        "type": "object",
+        "properties": {"geojson_m45_not_in_quakeml": {"type": "array", "items": {"type": "string"}}, "quakeml_not_in_geojson_m45": {"type": "array", "items": {"type": "string"}}},
+        "required": ["geojson_m45_not_in_quakeml", "quakeml_not_in_geojson_m45"]
+      },
+      "grading": {"fields": {"geojson_m45_not_in_quakeml": {"type": "set"}, "quakeml_not_in_geojson_m45": {"type": "set"}}}
+    },
+    {
+      "id": "t08_deepest_quakeml",
+      "category": "cross-format",
+      "question": "According to the QuakeML file of M4.5+ earthquakes (use each event's preferred origin), which event is the deepest? Give its event id (catalog:datasource followed by catalog:eventid) and its depth in kilometres.",
+      "answer_schema": {
+        "type": "object",
+        "properties": {"id": {"type": "string"}, "depth_km": {"type": "number"}},
+        "required": ["id", "depth_km"]
+      },
+      "grading": {"fields": {"id": {"type": "exact"}, "depth_km": {"type": "number", "tolerance": 0.01}}}
+    },
+    {
+      "id": "t09_highest_apogee",
+      "category": "computation",
+      "question": "Among the CelesTrak space-station group objects, which one reaches the highest altitude at apogee? Compute the semi-major axis a from the mean motion n (revolutions per day) with a = (mu / n^2)^(1/3), n in radians per second and mu = 398600.4418 km^3/s^2; apogee altitude = a * (1 + eccentricity) - 6378.137 km. Give its NORAD catalog number, its object name and its apogee altitude in km.",
+      "answer_schema": {
+        "type": "object",
+        "properties": {"norad_cat_id": {"type": "integer"}, "object_name": {"type": "string"}, "apogee_km": {"type": "number"}},
+        "required": ["norad_cat_id", "object_name", "apogee_km"]
+      },
+      "grading": {"fields": {"norad_cat_id": {"type": "exact"}, "object_name": {"type": "exact"}, "apogee_km": {"type": "number", "tolerance": 1.0}}}
+    },
+    {
+      "id": "t10_low_inclination",
+      "category": "lookup",
+      "question": "In the CelesTrak OMM XML file of the space-station group, which objects have an orbital inclination below 45 degrees? Give their object names.",
+      "answer_schema": {
+        "type": "object",
+        "properties": {"object_names": {"type": "array", "items": {"type": "string"}}},
+        "required": ["object_names"]
+      },
+      "grading": {"fields": {"object_names": {"type": "set"}}}
+    },
+    {
+      "id": "t11_gdacs_counts",
+      "category": "aggregation",
+      "question": "In the GDACS disaster alert RSS feed, how many alert items are there for each event type (the gdacs:eventtype element, e.g. EQ, TC, WF), and how many items have the alert level Red?",
+      "answer_schema": {
+        "type": "object",
+        "properties": {"by_type": {"type": "array", "items": {"type": "object", "properties": {"eventtype": {"type": "string"}, "count": {"type": "integer"}}, "required": ["eventtype", "count"]}}, "red_alerts": {"type": "integer"}},
+        "required": ["by_type", "red_alerts"]
+      },
+      "grading": {"fields": {"by_type": {"type": "set", "key": "eventtype", "items": {"fields": {"eventtype": {"type": "exact"}, "count": {"type": "exact"}}}}, "red_alerts": {"type": "exact"}}}
+    },
+    {
+      "id": "t12_saffir_bounds",
+      "category": "html",
+      "question": "The snapshot contains the National Hurricane Center page describing the Saffir-Simpson hurricane wind scale. From its table, what is the lower bound of the sustained wind speed, in km/h, of each category from 1 to 5? Give the five numbers in category order.",
+      "answer_schema": {
+        "type": "object",
+        "properties": {"lower_bounds_kmh": {"type": "array", "items": {"type": "integer"}}},
+        "required": ["lower_bounds_kmh"]
+      },
+      "grading": {"fields": {"lower_bounds_kmh": {"type": "list", "items": {"type": "exact"}}}}
+    },
+    {
+      "id": "t13_cyclone_categories",
+      "category": "cross-format",
+      "question": "For each tropical cyclone (event type TC) item in the GDACS RSS feed, take its maximum wind speed in km/h from the value attribute of its gdacs:severity element, and classify it with the Saffir-Simpson table of the National Hurricane Center page in the snapshot: the category is the highest category whose km/h lower bound is less than or equal to the wind speed, or 0 if the speed is below category 1. Give the GDACS event id, the event name, the wind speed rounded to one decimal and the category.",
+      "answer_schema": {
+        "type": "object",
+        "properties": {"cyclones": {"type": "array", "items": {"type": "object", "properties": {"eventid": {"type": "string"}, "name": {"type": "string"}, "wind_kmh": {"type": "number"}, "category": {"type": "integer"}}, "required": ["eventid", "name", "wind_kmh", "category"]}}},
+        "required": ["cyclones"]
+      },
+      "grading": {"fields": {"cyclones": {"type": "set", "key": "eventid", "items": {"fields": {"eventid": {"type": "exact"}, "name": {"type": "exact"}, "wind_kmh": {"type": "number", "tolerance": 0.11}, "category": {"type": "exact"}}}}}}
+    },
+    {
+      "id": "t14_fires_near_quakes",
+      "category": "join",
+      "question": "How many NASA FIRMS active-fire detections (all fire files together) lie within 100 km of at least one earthquake of magnitude 4.5 or more from the USGS M2.5+ GeoJSON feed? Count each detection once. Also list the ids of the earthquakes that have at least one fire detection within 100 km. Use the haversine great-circle distance with an Earth radius of 6371 km.",
+      "answer_schema": {
+        "type": "object",
+        "properties": {"fire_detections": {"type": "integer"}, "quake_ids": {"type": "array", "items": {"type": "string"}}},
+        "required": ["fire_detections", "quake_ids"]
+      },
+      "grading": {"fields": {"fire_detections": {"type": "exact"}, "quake_ids": {"type": "set"}}}
+    },
+    {
+      "id": "t15_city_nearest_quake",
+      "category": "join",
+      "question": "For each city listed in the weather city index (weather/cities.csv), which earthquake of magnitude 4.5 or more from the USGS M2.5+ GeoJSON feed has the nearest epicenter, and how far is it in km? Use the city coordinates of the index and the haversine great-circle distance with an Earth radius of 6371 km. Give the city name as written in the index, the event id and the distance.",
+      "answer_schema": {
+        "type": "object",
+        "properties": {"cities": {"type": "array", "items": {"type": "object", "properties": {"city": {"type": "string"}, "quake_id": {"type": "string"}, "distance_km": {"type": "number"}}, "required": ["city", "quake_id", "distance_km"]}}},
+        "required": ["cities"]
+      },
+      "grading": {"fields": {"cities": {"type": "set", "key": "city", "items": {"fields": {"city": {"type": "exact"}, "quake_id": {"type": "exact"}, "distance_km": {"type": "number", "tolerance": 1.0}}}}}}
+    },
+    {
+      "id": "t16_malformed_weather",
+      "category": "malformed",
+      "question": "Across all city weather files (Open-Meteo JSON, one per city, listed in weather/cities.csv), which city has the highest current temperature (current.temperature_2m), and what is it in degrees Celsius? Also list the paths (relative to the snapshot directory, e.g. weather/x.json) of the weather files that cannot be parsed as JSON; use an empty list if all can be parsed.",
+      "answer_schema": {
+        "type": "object",
+        "properties": {"city": {"type": "string"}, "temperature_c": {"type": "number"}, "unreadable_files": {"type": "array", "items": {"type": "string"}}},
+        "required": ["city", "temperature_c", "unreadable_files"]
+      },
+      "grading": {"fields": {"city": {"type": "exact"}, "temperature_c": {"type": "number", "tolerance": 0.01}, "unreadable_files": {"type": "set"}}}
+    },
+    {
+      "id": "t17_gdacs_eq_match",
+      "category": "join",
+      "question": "For each earthquake (event type EQ) item of the GDACS RSS feed, find the same earthquake in the USGS M2.5+ GeoJSON feed: among the GeoJSON events of magnitude 4.5 or more whose origin time is within 120 seconds of the GDACS gdacs:fromdate, take the one with the nearest epicenter to the GDACS georss:point, if it is within 50 km (haversine, Earth radius 6371 km). Give the GDACS event id and the USGS event id, or null if there is no such event.",
+      "answer_schema": {
+        "type": "object",
+        "properties": {"matches": {"type": "array", "items": {"type": "object", "properties": {"eventid": {"type": "string"}, "usgs_id": {"type": ["string", "null"]}}, "required": ["eventid", "usgs_id"]}}},
+        "required": ["matches"]
+      },
+      "grading": {"fields": {"matches": {"type": "set", "key": "eventid", "items": {"fields": {"eventid": {"type": "exact"}, "usgs_id": {"type": "exact"}}}}}}
+    },
+    {
+      "id": "t18_hot_cities_near_alerts",
+      "category": "join",
+      "question": "Which cities of the weather city index have a forecast maximum temperature of 30 degrees Celsius or more for the first day of their weather file (daily.temperature_2m_max, first value) and at least one GDACS alert item (any event type) whose georss:point is within 500 km of the city (haversine, Earth radius 6371 km, city coordinates from the index)? For each, give the city name and the number of GDACS items within 500 km. Skip cities whose weather file cannot be parsed.",
+      "answer_schema": {
+        "type": "object",
+        "properties": {"cities": {"type": "array", "items": {"type": "object", "properties": {"city": {"type": "string"}, "alerts_within_500km": {"type": "integer"}}, "required": ["city", "alerts_within_500km"]}}},
+        "required": ["cities"]
+      },
+      "grading": {"fields": {"cities": {"type": "set", "key": "city", "items": {"fields": {"city": {"type": "exact"}, "alerts_within_500km": {"type": "exact"}}}}}}
+    },
+    {
+      "id": "t19_firms_summary",
+      "category": "aggregation",
+      "question": "For each NASA FIRMS active-fire CSV file, give its path relative to the snapshot directory, the number of detections, the number of detections with confidence 80 or more, and the total fire radiative power (frp column) rounded to one decimal.",
+      "answer_schema": {
+        "type": "object",
+        "properties": {"files": {"type": "array", "items": {"type": "object", "properties": {"file": {"type": "string"}, "detections": {"type": "integer"}, "high_confidence": {"type": "integer"}, "total_frp": {"type": "number"}}, "required": ["file", "detections", "high_confidence", "total_frp"]}}},
+        "required": ["files"]
+      },
+      "grading": {"fields": {"files": {"type": "set", "key": "file", "items": {"fields": {"file": {"type": "exact"}, "detections": {"type": "exact"}, "high_confidence": {"type": "exact"}, "total_frp": {"type": "number", "tolerance": 0.15}}}}}}
+    },
+    {
+      "id": "t20_missing_magerror",
+      "category": "lookup",
+      "question": "In the USGS CSV feed of M2.5+ earthquakes of the past week, which events have an empty magError column? Give how many there are and their event ids.",
+      "answer_schema": {
+        "type": "object",
+        "properties": {"count": {"type": "integer"}, "ids": {"type": "array", "items": {"type": "string"}}},
+        "required": ["count", "ids"]
+      },
+      "grading": {"fields": {"count": {"type": "exact"}, "ids": {"type": "set"}}}
+    }
+  ]
+}
