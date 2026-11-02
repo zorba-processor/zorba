@@ -16,8 +16,7 @@
 
 // Recursive functions under the evaluation limits: the timeout (ZXQP0068)
 // must stop them, the memory of a completed call must be released, and
-// releasing it must not change results. Also checks that the timeout bounds
-// the time of a query whose work the optimizer tries to do at compile time.
+// releasing it must not change results.
 
 #include <chrono>
 #include <cstdint>
@@ -190,8 +189,9 @@ const char UNDECLARED[] =
   "local:f(%N%)";
 
 // With a declared single result, the consumer does not ask for a second item.
+// (The sequence type of the parameter keeps the automatic cache out of it.)
 const char DECLARED[] =
-  "declare function local:f($n as xs:integer) as xs:integer\n"
+  "declare function local:f($n as xs:integer*) as xs:integer\n"
   "{ if ($n le 0) then 1 else local:f($n - 1) + local:f($n - 1) };\n"
   "local:f(%N%)";
 
@@ -219,7 +219,7 @@ const char FOR[] =
   "local:f(%N%)";
 
 const char* const SHAPES[] =
-  { UNDECLARED, DECLARED, MUTUAL, FUNCTION_ITEM, LET, FOR };
+  { UNDECLARED, DECLARED, MUTUAL, LET, FOR, FUNCTION_ITEM };
 
 std::string with_n(const char* aQuery, int n)
 {
@@ -230,7 +230,7 @@ std::string with_n(const char* aQuery, int n)
 
 // Generous: sanitizer builds on shared CI runners are slow.
 const milliseconds SLACK(15000);
-const uint64_t ADDRESS_SPACE = 3000000000ULL;
+const uint64_t ADDRESS_SPACE = 2000000000ULL;
 
 // 2^40 calls: only the timeout can end these. The call tree stays 40 deep.
 void test_timeout(Zorba* z)
@@ -291,6 +291,23 @@ void test_memory(Zorba* z)
       ++theFailures;
     }
   }
+
+#ifndef ZORBA_TEST_SANITIZER
+  // Each dynamic call also used to leave a small expression behind: 400 bytes
+  // per call, which only shows with more calls.
+  long long const before = peak_rss();
+  Outcome const o = run(z, p, with_n(FUNCTION_ITEM, 19));
+  long long const grown = peak_rss() - before;
+  std::cout << "  function items, n=19: peak RSS grew by " << (grown >> 20)
+            << " MiB; " << o << std::endl;
+  CHECK(o.ok && o.value == std::to_string(1 << 19));
+  if (grown >= allowed)
+  {
+    std::cerr << "function items: peak RSS grew by " << (grown >> 20)
+              << " MiB" << std::endl;
+    ++theFailures;
+  }
+#endif
 }
 
 struct Case
@@ -381,32 +398,6 @@ void test_results(Zorba* z)
   }
 }
 
-// The optimizer evaluates expressions without free variables at compile
-// time. That must not use up the time limit of the query, or run the query
-// for the limit once per nesting level before it even starts.
-void test_constant_folding(Zorba* z)
-{
-  seconds const timeout(3);
-  SecurityPolicy const p = SecurityPolicy::unrestricted().setTimeout(timeout);
-  const char* const COUNT = "count((1 to 100000000000)[. lt 0])";
-
-  Outcome o = run(z, p, COUNT);
-  std::cout << "  one expression: " << o << std::endl;
-  CHECK(failed_with(o, "ZXQP0068"));
-  CHECK(o.compile < timeout);
-  CHECK(within(o, 2 * timeout));
-
-  o = run(z, p, std::string("1 + ") + COUNT + " + " + COUNT);
-  std::cout << "  nested expressions: " << o << std::endl;
-  CHECK(failed_with(o, "ZXQP0068"));
-  CHECK(o.compile < timeout);
-  CHECK(within(o, 2 * timeout));
-
-  // Folding also ends with no time limit set, and the result stays right.
-  o = run(z, SecurityPolicy::unrestricted(), "count((1 to 300000)[. lt 0])");
-  CHECK(o.ok && o.value == "0");
-}
-
 void section(Zorba* z, const char* aName, void (*aTest)(Zorba*))
 {
   std::cout << aName << std::endl;
@@ -430,7 +421,6 @@ recursion_limits(int argc, char* argv[])
     section(lZorba, "test_results", test_results);
     section(lZorba, "test_memory", test_memory);
     section(lZorba, "test_timeout", test_timeout);
-    section(lZorba, "test_constant_folding", test_constant_folding);
   }
   catch (ZorbaException const& e)
   {
