@@ -81,8 +81,9 @@ the clock.
 
 `bench.yml` (XMark and JSON suites, no time limit, A and B in the same job): at
 the largest scale of each suite the wall time ratio B/A is at most 1.03, and peak
-RSS is unchanged. Three XMark queries at scale 0.1 show 1.10 (q04, q13, q20):
-0.07 s against 0.08 s, the resolution of the measurement.
+RSS is unchanged. Three XMark queries at scale 0.1 show 1.10 (q04, q13, q20:
+0.20 s against 0.22 s); the same comparison run on the commit before showed them
+at 1.00, and at scale 1 they are at most 1.02.
 
 ## Memory limit
 
