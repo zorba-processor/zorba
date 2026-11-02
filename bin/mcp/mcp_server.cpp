@@ -313,8 +313,8 @@ Server::Server( Zorba *zorba, ServerConfig config, std::ostream &log ) :
   theLog( log ),
   thePolicy( SecurityPolicy::secure() ),
   theCache( zorba, theConfig.root,
-            ( theConfig.cache_max_file_kb && theConfig.cache_max_files ) ? std::size_t( 256 ) << 20 : 0,
-            &thePolicy ) {
+            std::uintmax_t( theConfig.cache_max_file_kb ) * 1024,
+            theConfig.cache_max_files, &thePolicy ) {
   directory_config::apply_policy( thePolicy, theConfig.root );
   if ( theConfig.timeout.count() > 0 )
     thePolicy.setTimeout( theConfig.timeout );

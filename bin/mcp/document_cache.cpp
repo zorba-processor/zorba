@@ -16,13 +16,11 @@
 
 #include "document_cache.h"
 
-#include <algorithm>
-#include <cctype>
 #include <climits>
 #include <cstdlib>
+#include <cstring>
 #include <iterator>
 #include <sstream>
-#include <vector>
 
 #include <sys/stat.h>
 
@@ -138,13 +136,50 @@ public:
   }
 };
 
-///////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////
+
+bool DocumentCache::file_id( std::string const &full, FileId *id ) {
+  struct stat st;
+  if ( stat( full.c_str(), &st ) != 0 || !S_ISREG( st.st_mode ) )
+    return false;
+  id->dev = static_cast<std::uintmax_t>( st.st_dev );
+  id->ino = static_cast<std::uintmax_t>( st.st_ino );
+  id->size = static_cast<std::uintmax_t>( st.st_size );
+#ifdef __APPLE__
+  id->mtime_ns = nanoseconds( st.st_mtimespec );
+  id->ctime_ns = nanoseconds( st.st_ctimespec );
+#else
+  id->mtime_ns = nanoseconds( st.st_mtim );
+  id->ctime_ns = nanoseconds( st.st_ctim );
+#endif
+  return true;
+}
+
+// FNV-1a over the key and the metadata. A collision at worst admits a
+// document on its first hit; what is kept is still read from the file.
+std::uint64_t DocumentCache::tag_of( std::string const &key, FileId const &id ) {
+  std::uint64_t h = 14695981039346656037u;
+  auto mix = [&h]( void const *data, std::size_t size ) {
+    unsigned char const *const p = static_cast<unsigned char const*>( data );
+    for ( std::size_t i = 0; i < size; ++i )
+      h = ( h ^ p[i] ) * 1099511628211u;
+  };
+  mix( key.data(), key.size() );
+  mix( &id.dev, sizeof id.dev );
+  mix( &id.ino, sizeof id.ino );
+  mix( &id.size, sizeof id.size );
+  mix( &id.mtime_ns, sizeof id.mtime_ns );
+  mix( &id.ctime_ns, sizeof id.ctime_ns );
+  return h ? h : 1;                     // 0 marks an empty slot
+}
 
 DocumentCache::DocumentCache( Zorba *zorba, std::string const &root,
-                              std::size_t budget,
+                              std::uintmax_t max_file_bytes,
+                              std::size_t max_files,
                               SecurityPolicy const *policy ) :
   theZorba( zorba ),
-  theBudget( budget ),
+  theMaxFileBytes( max_file_bytes ),
+  theMaxFiles( max_files ),
   thePolicy( policy ),
   theModule( new Module( this ) ),
   theMapper( new Mapper() ),
@@ -153,6 +188,8 @@ DocumentCache::DocumentCache( Zorba *zorba, std::string const &root,
   theRoot = realpath( root.c_str(), buf ) ? buf : root;
   if ( theRoot.empty() || theRoot.back() != '/' )
     theRoot += '/';
+  if ( enabled() )
+    theSeen.resize( tracker_slots );
 }
 
 DocumentCache::~DocumentCache() {
@@ -168,26 +205,27 @@ void DocumentCache::attach( StaticContext_t const &sctx ) {
 }
 
 void DocumentCache::set_active( bool active ) {
-  std::lock_guard<std::mutex> lock( theMutex );
   theActive = active;
   ++theQuery;
   if ( !active )
     return;
-  // Drop the entries of deleted or modified files (a query only looks up
-  // the files it opens).
+  // Drop the entries of deleted or modified files: a query only looks up the
+  // files it opens, and they should not hold memory.
   for ( auto i = theEntries.begin(); i != theEntries.end(); ) {
     auto const next = std::next( i );
     std::string full( i->first );
     full[ full.find( '\0' ) ] = '/';
-    Signature now;
-    if ( !signature_of( full, &now ) || !( now == i->second.sig ) )
+    FileId now;
+    std::string canonical;
+    if ( !file_id( full, &now ) || !( now == i->second.id ) ||
+         !canonical_under_root( full, &canonical ) ||
+         canonical != i->second.canonical )
       erase( i );
     i = next;
   }
 }
 
 void DocumentCache::clear() {
-  std::lock_guard<std::mutex> lock( theMutex );
   theEntries.clear();
   theLru.clear();
   theStats.entries = 0;
@@ -198,76 +236,29 @@ void DocumentCache::clear() {
   }
 }
 
-DocumentCache::Stats DocumentCache::stats() const {
-  std::lock_guard<std::mutex> lock( theMutex );
-  return theStats;
-}
-
 std::string DocumentCache::stats_line() const {
   if ( !enabled() )
     return std::string();
-  Stats const s( stats() );
-  return "zorba-mcp: cache: hits=" + std::to_string( s.hits ) +
-    " misses=" + std::to_string( s.misses ) +
-    " admissions=" + std::to_string( s.admissions ) +
-    " evictions=" + std::to_string( s.evictions ) +
-    " bytes_retained=" + std::to_string( s.bytes );
+  return "zorba-mcp: cache: hits=" + std::to_string( theStats.hits ) +
+    " misses=" + std::to_string( theStats.misses ) +
+    " admissions=" + std::to_string( theStats.admissions ) +
+    " evictions=" + std::to_string( theStats.evictions ) +
+    " bytes_retained=" + std::to_string( theStats.bytes );
 }
 
-// Bytes of memory per byte of file, measured with bench/directory (peak RSS
-// of a query holding every parsed document, over the size of the files).
-std::size_t DocumentCache::estimate( std::string const &path,
-                                     std::uintmax_t size ) {
-  std::string ext;
-  std::string::size_type const dot = path.rfind( '.' );
-  if ( dot != std::string::npos && path.find( '/', dot ) == std::string::npos )
-    ext = path.substr( dot + 1 );
-  std::transform( ext.begin(), ext.end(), ext.begin(),
-                  []( unsigned char c ) { return std::tolower( c ); } );
-  // Measured: XML 19.6, JSON 22.0, CSV 31.7 (records of four short fields).
-  std::uintmax_t factor = 32;
-  if ( ext == "xml" || ext == "xhtml" )
-    factor = 20;
-  else if ( ext == "json" || ext == "jsonl" || ext == "ndjson" )
-    factor = 22;
-  else if ( ext == "csv" )
-    factor = 32;
-  // Every record also has a fixed part (the record object, its path).
-  return static_cast<std::size_t>( 1024 + size * factor );
+std::size_t DocumentCache::tracker_bytes() {
+  return tracker_slots * sizeof( std::uint64_t );
 }
 
-bool DocumentCache::key_of( std::string const &root, std::string const &path,
-                            std::string *key, Signature *sig ) const {
-  if ( root.empty() || path.empty() )
-    return false;
-  // The record carries the path relative to the root it was opened with,
-  // so the key is the root and the path as the module spells them.
-  *key = root + '\0' + path;
-  return signature_of( root + "/" + path, sig );
-}
-
-bool DocumentCache::signature_of( std::string const &full,
-                                  Signature *sig ) const {
+bool DocumentCache::canonical_under_root( std::string const &full,
+                                          std::string *canonical ) const {
   char buf[ PATH_MAX ];
   if ( !realpath( full.c_str(), buf ) )
     return false;
-  sig->canonical = buf;
   // Only files under the root: the server's policy reads nothing else.
-  if ( sig->canonical.compare( 0, theRoot.size(), theRoot ) != 0 )
+  if ( std::strncmp( buf, theRoot.data(), theRoot.size() ) != 0 )
     return false;
-  struct stat st;
-  if ( stat( buf, &st ) != 0 || !S_ISREG( st.st_mode ) )
-    return false;
-  sig->dev = static_cast<std::uintmax_t>( st.st_dev );
-  sig->ino = static_cast<std::uintmax_t>( st.st_ino );
-  sig->size = static_cast<std::uintmax_t>( st.st_size );
-#ifdef __APPLE__
-  sig->mtime_ns = nanoseconds( st.st_mtimespec );
-  sig->ctime_ns = nanoseconds( st.st_ctimespec );
-#else
-  sig->mtime_ns = nanoseconds( st.st_mtim );
-  sig->ctime_ns = nanoseconds( st.st_ctim );
-#endif
+  *canonical = buf;
   return true;
 }
 
@@ -279,43 +270,92 @@ void DocumentCache::erase( std::unordered_map<std::string,Entry>::iterator i ) {
 }
 
 Item DocumentCache::get( std::string const &root, std::string const &path ) {
-  std::string key;
-  Signature sig;
-  bool const ok = key_of( root, path, &key, &sig );
-  {
-    std::lock_guard<std::mutex> lock( theMutex );
-    if ( !theActive || key.empty() )
-      return Item();
-    auto const i = theEntries.find( key );
-    if ( !ok ) {
-      // Deleted, or not a regular file under the root.
-      if ( i != theEntries.end() )
-        erase( i );
-      return Item();
-    }
-    if ( i != theEntries.end() ) {
-      if ( i->second.sig == sig ) {
-        ++theStats.hits;
-        i->second.query = theQuery;
-        theLru.splice( theLru.begin(), theLru, i->second.lru );
-        return i->second.record;
-      }
-      erase( i );                       // the file changed
-    }
+  if ( !theActive || root.empty() || path.empty() )
+    return Item();
+  std::string const full( root + "/" + path );
+  std::string const key( root + '\0' + path );
+  FileId id;
+  if ( !file_id( full, &id ) ) {
+    // Deleted, or not a regular file.
+    auto const gone = theEntries.find( key );
+    if ( gone != theEntries.end() )
+      erase( gone );
+    return Item();
+  }
+  // Larger than the limit: nothing but the stat. If it was cached when it
+  // was smaller, the next set_active() drops it.
+  if ( id.size > theMaxFileBytes ) {
     ++theStats.misses;
+    return Item();
   }
-  Item const record( read( root, path ) );
-  // Stored under the signature seen before the read, and only if the file
-  // still has it: a file modified while it is read is parsed again next time.
-  Signature now;
-  if ( !record.isNull() && key_of( root, path, &key, &now ) && now == sig ) {
-    std::lock_guard<std::mutex> lock( theMutex );
-    store( key, path, sig, record );
+
+  auto const i = theEntries.find( key );
+  if ( i != theEntries.end() ) {
+    std::string canonical;
+    if ( id == i->second.id && canonical_under_root( full, &canonical ) &&
+         canonical == i->second.canonical ) {
+      ++theStats.hits;
+      i->second.query = theQuery;
+      theLru.splice( theLru.begin(), theLru, i->second.lru );
+      return i->second.record;
+    }
+    erase( i );                         // the file changed
   }
+
+  ++theStats.misses;
+  std::uint64_t const tag = tag_of( key, id );
+  std::uint64_t &seen = theSeen[ tag % tracker_slots ];
+  if ( seen != tag ) {
+    seen = tag;                         // the first hit: nothing else to do
+    return Item();
+  }
+  return admit( root, path, key, full, id, &seen );
+}
+
+Item DocumentCache::admit( std::string const &root, std::string const &path,
+                           std::string const &key, std::string const &full,
+                           FileId const &id, std::uint64_t *seen ) {
+  // Full of documents this query has used: reading one more would only
+  // replace them. A query thus admits at most theMaxFiles documents.
+  if ( theEntries.size() >= theMaxFiles &&
+       theEntries.at( theLru.back() ).query == theQuery )
+    return Item();
+
+  std::string canonical;
+  if ( !canonical_under_root( full, &canonical ) )
+    return Item();
+  std::size_t bytes = 0;
+  Item const record( read( root, path, &bytes ) );
+  if ( record.isNull() )
+    return Item();
+
+  // Kept only if the file still is what it was before the read (a file
+  // modified meanwhile is parsed again next time) and it holds no error,
+  // which can come from the moment rather than the file.
+  FileId now;
+  std::string canonical_now;
+  if ( !record.getObjectValue( "error" ).isNull() || !file_id( full, &now ) ||
+       !( now == id ) || !canonical_under_root( full, &canonical_now ) ||
+       canonical_now != canonical )
+    return record;
+
+  while ( theEntries.size() >= theMaxFiles ) {
+    erase( theEntries.find( theLru.back() ) );
+    ++theStats.evictions;
+  }
+  theLru.push_front( key );
+  theEntries.emplace( key,
+    Entry{ canonical, id, record, bytes, theQuery, theLru.begin() } );
+  theStats.bytes += bytes;
+  theStats.entries = theEntries.size();
+  ++theStats.admissions;
+  // After an eviction, the document needs two hits again.
+  *seen = 0;
   return record;
 }
 
-Item DocumentCache::read( std::string const &root, std::string const &path ) {
+Item DocumentCache::read( std::string const &root, std::string const &path,
+                          std::size_t *bytes ) {
   try {
     if ( !theReader ) {
       StaticContext_t sctx = theZorba->createStaticContext();
@@ -336,39 +376,19 @@ Item DocumentCache::read( std::string const &root, std::string const &path ) {
     if ( !it->next( record ) )
       record = Item();
     it->close();
+    if ( !record.isNull() )
+      *bytes = record.mem_size();
     return record;
   }
   catch ( ZorbaException const& ) {
+    // The time limit, for one: nothing is kept, and the directory module
+    // reads the file itself and reports what happens.
+    if ( theReader ) {
+      theReader->close();
+      theReader = nullptr;
+    }
     return Item();
   }
-}
-
-void DocumentCache::store( std::string const &key, std::string const &path,
-                           Signature const &sig, Item const &record ) {
-  if ( !theActive )
-    return;
-  std::size_t const bytes = estimate( path, sig.size );
-  if ( bytes > theBudget )
-    return;
-  auto const old = theEntries.find( key );
-  if ( old != theEntries.end() )
-    erase( old );
-  // Evict least recently used first, but never an entry that the current
-  // query used: a query that reads more than the budget keeps the documents
-  // it cached first instead of evicting each one before the next call.
-  while ( theStats.bytes + bytes > theBudget && !theLru.empty() ) {
-    auto const victim = theEntries.find( theLru.back() );
-    if ( victim->second.query == theQuery )
-      return;
-    erase( victim );
-    ++theStats.evictions;
-  }
-  theLru.push_front( key );
-  theEntries.emplace( key,
-    Entry{ sig, record, bytes, theQuery, theLru.begin() } );
-  theStats.bytes += bytes;
-  theStats.entries = theEntries.size();
-  ++theStats.admissions;
 }
 
 } // namespace mcp

@@ -1,9 +1,10 @@
 name: Directory scaling
 
 # How zorba --directory and zorba-mcp scale with the number and size of the
-# files under the root (bench/directory/), and how much memory the in-memory
-# store takes per parsed XML, JSON and CSV document (bench/store/). Measures
-# only; manual runs only.
+# files under the root (bench/directory/), how much memory the in-memory store
+# takes per parsed XML, JSON and CSV document (bench/store/), and what
+# zorba-mcp's document cache costs and gains (bench/directory/run_cache.sh).
+# Measures only; manual runs only.
 on:
   workflow_dispatch:
     inputs:
@@ -11,10 +12,10 @@ on:
         description: "What to measure"
         required: false
         type: choice
-        options: [directory, store, both]
+        options: [directory, store, both, cache]
         default: directory
       trees:
-        description: "Space-separated trees FILES:KB (files of ~KB KB each)"
+        description: "Space-separated trees FILES:KB (files of ~KB KB each); suite cache also FILES:KB:FORMATS and FILES:KB:@SHAPE"
         required: false
         default: "100:2 1000:2 10000:2 100:200 1000:200"
       calls:
@@ -33,6 +34,10 @@ on:
         description: "store: items per microbenchmark document"
         required: false
         default: "200000"
+      cache:
+        description: "cache: space-separated settings KB:FILES, the first one is the reference"
+        required: false
+        default: "0:0 16:10 64:10 256:10 64:1000"
 
 concurrency:
   group: directory-scaling-${{ github.ref }}
@@ -43,7 +48,7 @@ permissions:
 
 jobs:
   scaling:
-    if: inputs.suite != 'store'
+    if: inputs.suite != 'store' && inputs.suite != 'cache'
     runs-on: ubuntu-24.04
     timeout-minutes: 300
     env:
@@ -96,9 +101,65 @@ jobs:
           name: directory-scaling
           path: out/
 
+  # bench/directory/run_cache.sh: zorba-mcp with each document cache setting.
+  cache:
+    if: inputs.suite == 'cache'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 350
+    env:
+      TREES: ${{ inputs.trees }}
+      CALLS: ${{ inputs.calls }}
+      RUNS: ${{ inputs.runs }}
+      CACHE: ${{ inputs.cache }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Builder image
+        uses: ./.github/actions/builder-image
+        with:
+          context: docker/builder-latest
+          cache-scope: linux-amd64-latest
+
+      - uses: actions/cache@v6
+        with:
+          path: .ccache
+          key: ccache-v2-linux-amd64-latest-dircache-${{ github.run_id }}
+          restore-keys: ccache-v2-linux-amd64-latest-
+
+      - name: Build
+        run: |
+          mkdir -p .ccache
+          docker run --rm \
+            -e CCACHE_DIR=/src/.ccache \
+            -e CCACHE_SLOPPINESS=pch_defines,time_macros -e CCACHE_DEPEND=1 \
+            -v "$PWD":/src -w /src zorba-builder:ci sh -ec '
+              cmake --preset full-release
+              cmake --build --preset full-release
+              ccache -s
+              c++ -std=c++23 -O2 -Wall -Wextra -Werror \
+                -o build/dirbench bench/directory/dirbench.cpp'
+
+      - name: Generate trees and measure
+        run: |
+          mkdir -p out
+          docker run --rm -e CALLS -e RUNS -e TREES -e CACHE \
+            -v "$PWD":/src -w /src zorba-builder:ci sh -ec '
+              ZORBA=$(find build/full-release/bin -maxdepth 1 -name zorba -type f | head -n 1)
+              MCP=$(find build/full-release/bin -maxdepth 1 -name zorba-mcp -type f | head -n 1)
+              test -n "$ZORBA" && test -n "$MCP"
+              bench/directory/run_cache.sh "/src/$ZORBA" "/src/$MCP" /src/build/dirbench \
+                /tmp/trees /src/out "$TREES"'
+          cat out/results.md >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: directory-cache
+          path: out/
+
   # bench/store/: heap, RSS and per-kind costs of parsed documents.
   store:
-    if: inputs.suite != 'directory'
+    if: inputs.suite != 'directory' && inputs.suite != 'cache'
     runs-on: ubuntu-24.04
     timeout-minutes: 180
     env:
