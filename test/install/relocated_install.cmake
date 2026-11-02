@@ -50,6 +50,18 @@ EXECUTE_PROCESS (
   RESULT_VARIABLE _rc OUTPUT_VARIABLE _out ERROR_VARIABLE _err)
 MESSAGE (STATUS "exit ${_rc}\nstdout: ${_out}\nstderr: ${_err}")
 IF (NOT _rc EQUAL 0 OR NOT _out MATCHES "installed-copy aGk=")
+  # Diagnostics: the installed modules, and the same query with the installed
+  # module directory given explicitly.
+  FILE (GLOB_RECURSE _all "${WORK_DIR}/moved/share/*")
+  MESSAGE (STATUS "installed files under share:\n${_all}")
+  EXECUTE_PROCESS (
+    COMMAND "${CMAKE_COMMAND}" -E env
+      --unset=LD_LIBRARY_PATH --unset=DYLD_LIBRARY_PATH
+      "${WORK_DIR}/moved/bin/zorba" --omit-xml-declaration
+      --uri-path "${WORK_DIR}/moved/share/zorba/uris/core" -q
+      "import module namespace b = 'http://zorba.io/modules/base64'; b:relocated()"
+    OUTPUT_VARIABLE _o2 ERROR_VARIABLE _e2)
+  MESSAGE (STATUS "explicit uri-path: ${_o2} ${_e2}")
   MESSAGE (FATAL_ERROR "Relocated installation failed")
 ENDIF ()
 MESSAGE (STATUS "Relocated installation works")
