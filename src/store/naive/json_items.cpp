@@ -104,8 +104,49 @@ void JSONItem::free()
 *******************************************************************************/
 void JSONItem::destroy()
 {
-  GET_STORE().unregisterReferenceToUnusedNode(this);
-  delete this;
+  // Deleting an item releases its members, which may be the last reference to
+  // them. Nested calls leave the members to the outermost call, so that the
+  // stack it takes does not depend on how deep the value is.
+  static thread_local std::vector<JSONItem*>* tPending = nullptr;
+
+  if (tPending != nullptr)
+  {
+    tPending->push_back(this);
+    return;
+  }
+
+  std::vector<JSONItem*> lPending;
+  tPending = &lPending;
+  JSONItem* lItem = this;
+  for (;;)
+  {
+    GET_STORE().unregisterReferenceToUnusedNode(lItem);
+    delete lItem;
+    if (lPending.empty())
+      break;
+    lItem = lPending.back();
+    lPending.pop_back();
+  }
+  tPending = nullptr;
+}
+
+
+/*******************************************************************************
+  An item's members can be nested deeper than the limit (see
+  runtime/json/nesting.h), and the destructor of a value in a collection calls
+  this, so this does not recurse.
+********************************************************************************/
+void JSONItem::setCollectionTreeInfo(CollectionTreeInfo* collectionInfo)
+{
+  std::vector<JSONItem*> lPending(1, this);
+  while (!lPending.empty())
+  {
+    JSONItem* const lItem = lPending.back();
+    lPending.pop_back();
+    lItem->theCollectionInfo =
+      static_cast<CollectionTreeInfoWithTreeId*>(collectionInfo);
+    lItem->setCollectionInfoOfMembers(collectionInfo, lPending);
+  }
 }
 
 
@@ -277,6 +318,8 @@ SimpleJSONObject::~SimpleJSONObject()
 
 size_t SimpleJSONObject::alloc_size() const
 {
+  // Goes down into the members.
+  json_nesting::check_stack();
   return  ztd::alloc_sizeof( theKeys )
         + ztd::alloc_sizeof( thePairs );
 }
@@ -298,24 +341,34 @@ store::Item* SimpleJSONObject::copy(
  
  if (copymode.theDoCopy)
   {
+    json_nesting::check_stack();
+
     lNewObject = new SimpleJSONObject();
 
-    for (Pairs::const_iterator lIter = thePairs.begin();
-         lIter != thePairs.end();
-         ++lIter)
+    try
     {
-      store::Item_t lKey = lIter->first;
-      store::Item_t lValue = lIter->second;
-      
-      if (lValue->isStructuredItem())
+      for (Pairs::const_iterator lIter = thePairs.begin();
+           lIter != thePairs.end();
+           ++lIter)
       {
-        store::Item_t lCopiedValue = lValue->copy(NULL, copymode);
-        lNewObject->add(lKey, lCopiedValue, false);
+        store::Item_t lKey = lIter->first;
+        store::Item_t lValue = lIter->second;
+
+        if (lValue->isStructuredItem())
+        {
+          store::Item_t lCopiedValue = lValue->copy(NULL, copymode);
+          lNewObject->add(lKey, lCopiedValue, false);
+        }
+        else
+        {
+          lNewObject->add(lKey, lValue, false);
+        }
       }
-      else
-      {
-        lNewObject->add(lKey, lValue, false);
-      }
+    }
+    catch (...)
+    {
+      delete lNewObject;
+      throw;
     }
   }
 
@@ -350,6 +403,8 @@ bool SimpleJSONObject::add(
   {
     store::Item* lValue = aValue.getp();
 
+    addHeightOf(lValue);
+
     if (getCollection() != NULL && (aValue->isStructuredItem()))
     {
       assert( dynamic_cast<StructuredItem*>(lValue) );
@@ -380,12 +435,15 @@ bool SimpleJSONObject::add(
     if (lValue->isArray())
     {
       static_cast<SimpleJSONArray*>(lValue)->push_back(aValue);
+      addHeightOf(lValue);
     }
     else
     {
       SimpleJSONArray_t array = new SimpleJSONArray();
       array->push_back(lValue);
       array->push_back(aValue);
+
+      addHeightOf(array.getp());
 
       if (getCollection() != NULL)
       {
@@ -460,6 +518,9 @@ store::Item_t SimpleJSONObject::remove(const store::Item_t& aName)
     }
   }
 
+  if (isDeepest(lValue.getp()))
+    recomputeHeight();
+
   ASSERT_INVARIANT();
   return lValue;
 }
@@ -487,6 +548,8 @@ store::Item_t SimpleJSONObject::setValue(
 
   store::Item_t lOldValue = thePairs[lPosition].second;
 
+  addHeightOf(aValue.getp());
+
   if (getCollection() != NULL)
   {
     if (lOldValue->isStructuredItem())
@@ -509,6 +572,9 @@ store::Item_t SimpleJSONObject::setValue(
   lOldValue->removeReference();
   aValue->addReference();
   thePairs[lPosition].second = aValue.getp();
+
+  if (isDeepest(lOldValue.getp()))
+    recomputeHeight();
 
   ASSERT_INVARIANT();
   return lOldValue;
@@ -568,6 +634,7 @@ void SimpleJSONObject::swap(store::Item* anotherItem)
   assert(lOther);
   std::swap(theKeys, lOther->theKeys);
   std::swap(thePairs, lOther->thePairs);
+  std::swap(theHeight, lOther->theHeight);
   setCollectionTreeInfo(theCollectionInfo);
   lOther->setCollectionTreeInfo(lOther->theCollectionInfo);
 }
@@ -576,21 +643,40 @@ void SimpleJSONObject::swap(store::Item* anotherItem)
 /******************************************************************************
 
 *******************************************************************************/
-void SimpleJSONObject::setCollectionTreeInfo(CollectionTreeInfo* collectionInfo)
+void SimpleJSONObject::setCollectionInfoOfMembers(
+    CollectionTreeInfo* collectionInfo,
+    std::vector<JSONItem*>& aJSONMembers)
 {
-  theCollectionInfo = static_cast<CollectionTreeInfoWithTreeId*>(collectionInfo);
-
   for (Pairs::iterator ite = thePairs.begin();
        ite != thePairs.end();
        ++ite)
   {
     store::Item* value = ite->second;
 
-    if (value->isStructuredItem())
+    if (value->isJSONItem())
+    {
+      aJSONMembers.push_back(static_cast<JSONItem*>(value));
+    }
+    else if (value->isStructuredItem())
     {
       StructuredItem* structuredItem = static_cast<StructuredItem*>(value);
       structuredItem->setCollectionTreeInfo(collectionInfo);
     }
+  }
+}
+
+
+/******************************************************************************
+
+*******************************************************************************/
+void SimpleJSONObject::recomputeHeight()
+{
+  theHeight = 1;
+  for (Pairs::const_iterator ite = thePairs.begin();
+       ite != thePairs.end();
+       ++ite)
+  {
+    addHeightOf(ite->second);
   }
 }
 
@@ -750,6 +836,8 @@ bool SimpleJSONObject::isInSubtree(const StructuredItem* anItem) const
     return true;
   }
 
+  json_nesting::check_stack();
+
   for (Pairs::const_iterator lIter = thePairs.begin();
        lIter != thePairs.end();
        ++lIter)
@@ -880,6 +968,8 @@ SimpleJSONArray::~SimpleJSONArray()
 
 size_t SimpleJSONArray::alloc_size() const
 {
+  // Goes down into the members.
+  json_nesting::check_stack();
   return ztd::alloc_sizeof( theContent );
 }
 
@@ -894,6 +984,8 @@ size_t SimpleJSONArray::dynamic_size() const
 void SimpleJSONArray::push_back(const store::Item_t& aValue)
 {
   ASSERT_INVARIANT();
+
+  addHeightOf(aValue.getp());
 
   if (getCollection() != NULL && (aValue->isStructuredItem()))
   {
@@ -942,6 +1034,8 @@ void SimpleJSONArray::insert_before(
     const store::Item_t& member)
 {
   ASSERT_INVARIANT();
+
+  addHeightOf(member.getp());
 
   if (getCollection() != NULL &&
       (member->isStructuredItem()))
@@ -1003,6 +1097,11 @@ void SimpleJSONArray::add(
     const std::vector<store::Item_t>& aNewMembers)
 {
   ASSERT_INVARIANT();
+
+  // Before anything changes.
+  for (size_t i = 0; i < aNewMembers.size(); ++i)
+    addHeightOf(aNewMembers[i].getp());
+
   for (size_t i = 0; i < aNewMembers.size(); ++i)
   {
     store::Item* lItem = aNewMembers[i].getp();
@@ -1047,6 +1146,9 @@ store::Item_t SimpleJSONArray::remove(const xs_integer& aPos)
 
   theContent.erase(theContent.begin() + static_cast<Members::size_type>(lPosStartingZero) );
 
+  if (isDeepest(lItem.getp()))
+    recomputeHeight();
+
   ASSERT_INVARIANT();
   return lItem;
 }
@@ -1060,6 +1162,7 @@ void SimpleJSONArray::swap(store::Item* anotherItem)
   SimpleJSONArray* lOther = dynamic_cast<SimpleJSONArray*>(anotherItem);
   assert(lOther);
   std::swap(theContent, lOther->theContent);
+  std::swap(theHeight, lOther->theHeight);
   setCollectionTreeInfo(theCollectionInfo);
   lOther->setCollectionTreeInfo(lOther->theCollectionInfo);
 }
@@ -1073,6 +1176,8 @@ store::Item_t SimpleJSONArray::replace(
 {
   ASSERT_INVARIANT();
   store::Item_t lItem = getArrayValue(aPos);
+
+  addHeightOf(value.getp());
 
   if (getCollection() != NULL &&
       (lItem->isStructuredItem()))
@@ -1098,6 +1203,9 @@ store::Item_t SimpleJSONArray::replace(
   value->addReference();
   theContent[sPos] = value.getp();
 
+  if (isDeepest(lItem.getp()))
+    recomputeHeight();
+
   ASSERT_INVARIANT();
   return lItem;
 }
@@ -1106,21 +1214,40 @@ store::Item_t SimpleJSONArray::replace(
 /******************************************************************************
 
 *******************************************************************************/
-void SimpleJSONArray::setCollectionTreeInfo(CollectionTreeInfo* collectionInfo)
+void SimpleJSONArray::setCollectionInfoOfMembers(
+    CollectionTreeInfo* collectionInfo,
+    std::vector<JSONItem*>& aJSONMembers)
 {
-  theCollectionInfo = static_cast<CollectionTreeInfoWithTreeId*>(collectionInfo);
-
   for (Members::const_iterator ite = theContent.begin();
        ite != theContent.end();
        ++ite)
   {
     store::Item* value = *ite;
 
-    if (value->isStructuredItem())
+    if (value->isJSONItem())
+    {
+      aJSONMembers.push_back(static_cast<JSONItem*>(value));
+    }
+    else if (value->isStructuredItem())
     {
       StructuredItem* structuredItem = static_cast<StructuredItem*>(value);
       structuredItem->setCollectionTreeInfo(collectionInfo);
     }
+  }
+}
+
+
+/******************************************************************************
+
+*******************************************************************************/
+void SimpleJSONArray::recomputeHeight()
+{
+  theHeight = 1;
+  for (Members::const_iterator ite = theContent.begin();
+       ite != theContent.end();
+       ++ite)
+  {
+    addHeightOf(*ite);
   }
 }
 
@@ -1197,21 +1324,31 @@ store::Item* SimpleJSONArray::copy(
 
   if (copymode.theDoCopy)
   {
+    json_nesting::check_stack();
+
     lNewArray = new SimpleJSONArray();
     lNewArray->theContent.reserve(theContent.size());
 
-    for (Members::const_iterator lIter = theContent.begin();
-         lIter != theContent.end();
-         ++lIter)
+    try
     {
-      store::Item_t lValue = *lIter;
-
-      if (lValue->isStructuredItem())
+      for (Members::const_iterator lIter = theContent.begin();
+           lIter != theContent.end();
+           ++lIter)
       {
-        lValue = lValue->copy(NULL, copymode);
-      }
+        store::Item_t lValue = *lIter;
 
-      lNewArray->push_back(lValue);
+        if (lValue->isStructuredItem())
+        {
+          lValue = lValue->copy(NULL, copymode);
+        }
+
+        lNewArray->push_back(lValue);
+      }
+    }
+    catch (...)
+    {
+      delete lNewArray;
+      throw;
     }
   }
 
@@ -1306,6 +1443,8 @@ bool SimpleJSONArray::isInSubtree(const StructuredItem* anItem) const
   {
     return true;
   }
+
+  json_nesting::check_stack();
 
   for (Members::const_iterator lIter = theContent.begin();
        lIter != theContent.end();

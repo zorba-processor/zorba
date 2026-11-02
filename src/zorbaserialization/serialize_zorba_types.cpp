@@ -52,6 +52,7 @@
 #include "diagnostics/xquery_diagnostics.h"
 #include "diagnostics/assert.h"
 #include "util/string_util.h"
+#include "runtime/json/nesting.h"
 
 #include <zorba/store_consts.h>
 
@@ -1375,6 +1376,8 @@ void serialize_my_children2(Archiver& ar, store::Iterator_t iter)
 ********************************************************************************/
 void serialize_json_object(Archiver& ar, store::Item*& obj)
 {
+  json_nesting::check_stack();
+
   xs_integer lSize = xs_integer(0);
 
   if (ar.is_serializing_out())
@@ -1432,6 +1435,8 @@ void serialize_json_object(Archiver& ar, store::Item*& obj)
 ********************************************************************************/
 void serialize_json_array(Archiver& ar, store::Item*& obj)
 {
+  json_nesting::check_stack();
+
   xs_integer lSize = xs_integer(0);
   if (ar.is_serializing_out())
   {

@@ -25,6 +25,13 @@ and library paths (the built-in paths and the ones set with
 <tt>setModulePaths()</tt>). Recursion depth (1024 calls) and expression
 nesting depth (1500) are limited. There is no default timeout.
 
+Independently of the policy, a JSON value can have at most 1500 levels of
+arrays and objects. Parsing or constructing a deeper one raises
+<tt>zerr:ZXQP0071</tt>, and so does serializing one that updates made deeper,
+or walking over a value with too little stack left on the thread. In
+the directory module, the record around a file's content counts as one level,
+and a file that does not fit gets an error record like any malformed file.
+
 Zorba 4.x and earlier ran every query with all of these capabilities.
 
 \section security_allow Allowing capabilities

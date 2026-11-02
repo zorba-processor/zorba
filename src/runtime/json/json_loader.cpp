@@ -35,6 +35,7 @@
 // local
 #include "common.h"
 #include "json_loader.h"
+#include "nesting.h"
 
 using namespace std;
 
@@ -84,7 +85,8 @@ void loader::stack_element::destroy() {
 loader::loader( istream &is, bool allow_multiple, bool strip_top_level_array ) :
   parser_( is, allow_multiple ),
   strip_top_level_array_( strip_top_level_array ),
-  stripped_top_level_array_( false )
+  stripped_top_level_array_( false ),
+  depth_( 0 )
 {
 }
 
@@ -130,6 +132,17 @@ void loader::clear() {
   clear_stack();
   keys_.clear();
   stripped_top_level_array_ = false;
+  depth_ = 0;
+}
+
+void loader::check_depth( json::token const &t ) {
+  if ( depth_ >= json_nesting::MAX_DEPTH )
+    throw XQUERY_EXCEPTION(
+      zerr::ZXQP0071_JSON_NESTING_EXCEEDED,
+      ERROR_PARAMS( ZED( ZXQP0071_Limit_2 ), json_nesting::MAX_DEPTH ),
+      ERROR_LOC( t.get_loc() )
+    );
+  ++depth_;
 }
 
 void loader::make_key( zstring const &s, store::Item_t *result ) {
@@ -162,10 +175,13 @@ bool loader::next( store::Item_t *result ) {
         case '[':
           if ( strip_top_level_array_ && !stripped_top_level_array_ )
             stripped_top_level_array_ = true;
-          else
+          else {
+            check_depth( t );
             push( stack_element::array_type );
+          }
           continue;
         case '{':
+          check_depth( t );
           push( stack_element::object_type );
           continue;
         case ']':
@@ -177,6 +193,7 @@ bool loader::next( store::Item_t *result ) {
         case '}': {
           stack_element top( stack_.top() );
           stack_.pop();
+          --depth_;
           // top is off the stack, so clear_stack() will not free it: free it
           // also when createJSONObject() raises JNDY0003 for a duplicate key.
           struct destroyer {
