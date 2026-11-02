@@ -38,6 +38,8 @@ CREATE_TEST_SOURCELIST(APITests
   xml_parser_security.cpp
   uri_access_security.cpp
   evaluation_limits.cpp
+  recursion_limits.cpp
+  timeout_bounds.cpp
   expr_depth_limit.cpp
   json_depth_limit.cpp
   module_security.cpp

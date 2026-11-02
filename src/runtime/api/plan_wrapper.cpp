@@ -99,6 +99,19 @@ PlanWrapper::~PlanWrapper()
 /*******************************************************************************
 
 ********************************************************************************/
+void PlanWrapper::limitTimeout(std::chrono::milliseconds aLimit)
+{
+  ZORBA_ASSERT(!theIsOpen && !theHasParent);
+
+  if (thePlanState->theTimeout.count() == 0 ||
+      aLimit < thePlanState->theTimeout)
+    thePlanState->theTimeout = aLimit;
+}
+
+
+/*******************************************************************************
+
+********************************************************************************/
 void PlanWrapper::open()
 {
   ZORBA_ASSERT(!theIsOpen);

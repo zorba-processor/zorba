@@ -30,6 +30,7 @@
 #include <map>
 #include <sstream>
 #include <string>
+#include <vector>
 
 #include <sys/resource.h>
 #include <sys/types.h>
@@ -46,6 +47,16 @@
 using namespace zorba;
 using namespace zorba::mcp;
 
+// AddressSanitizer and ThreadSanitizer need far more address space than the
+// process uses: an address-space limit does not work with them.
+#if defined(__SANITIZE_ADDRESS__) || defined(__SANITIZE_THREAD__)
+# define ZORBA_TEST_SANITIZER 1
+#elif defined(__has_feature)
+# if __has_feature(address_sanitizer) || __has_feature(thread_sanitizer)
+#  define ZORBA_TEST_SANITIZER 1
+# endif
+#endif
+
 namespace {
 
 int failures = 0;
@@ -61,6 +72,30 @@ void check( bool ok, std::string const &what, std::string const &detail = "" ) {
     std::cout << std::endl;
   }
 }
+
+// Bounds the address space of this process while it lives.
+class AddressSpaceLimit {
+#if defined(__linux__) && !defined(ZORBA_TEST_SANITIZER)
+  struct rlimit old_;
+  bool set_ = false;
+public:
+  explicit AddressSpaceLimit( unsigned long long bytes ) {
+    if ( getrlimit( RLIMIT_AS, &old_ ) == 0 ) {
+      struct rlimit lim = old_;
+      lim.rlim_cur = bytes;
+      set_ = setrlimit( RLIMIT_AS, &lim ) == 0;
+    }
+  }
+  ~AddressSpaceLimit() {
+    if ( set_ )
+      check( setrlimit( RLIMIT_AS, &old_ ) == 0,
+             "restore the address-space limit" );
+  }
+#else
+public:
+  explicit AddressSpaceLimit( unsigned long long ) { }
+#endif
+};
 
 struct Fixture {
   Zorba *zorba;
@@ -730,13 +765,36 @@ void test_limits( Fixture const &f ) {
   check( is_tool_error( r ) &&
          contains( field( tool_error( r ), "code" ), "ZXQP0068" ),
          "evaluation over the time limit: ZXQP0068", r.dump() );
+
+  // 2^40 calls in a tree 40 deep. Bounded so that a query that retains the
+  // memory of each call fails here instead of exhausting the machine.
+  {
+    AddressSpaceLimit const limit( 3000000000ULL );
+    auto const start = std::chrono::steady_clock::now();
+    r = call_tool( server, "run_query", Json::object( { { "query",
+      "declare function local:f($n) { if ($n le 0) then 0 else "
+      "local:f($n - 1) + local:f($n - 1) }; local:f(40)" } } ) );
+    auto const elapsed = std::chrono::steady_clock::now() - start;
+    check( is_tool_error( r ) &&
+           contains( field( tool_error( r ), "code" ), "ZXQP0068" ),
+           "recursion over the time limit: ZXQP0068", r.dump() );
+    check( elapsed < std::chrono::seconds( 16 ),
+           "recursion stops about when the time limit ends" );
+  }
+
+  // The server keeps answering.
+  r = call_tool( server, "run_query",
+                 Json::object( { { "query", "1 + 1" } } ) );
+  check( !is_tool_error( r ) && result_text( r ) == "2",
+         "the server answers after a timeout", r.dump() );
 }
 
 
 // Runs the zorba-mcp executable over a pipe with the given arguments,
 // writes the input to it and returns everything it wrote to stdout.
 std::string run_binary( Fixture const &f, std::string const &queries,
-                        std::string const &input ) {
+                        std::string const &input,
+                        std::vector<std::string> const &extra_args = {} ) {
   int to_child[2], from_child[2];
   if ( pipe( to_child ) != 0 || pipe( from_child ) != 0 ) {
     check( false, "pipe" );
@@ -753,8 +811,13 @@ std::string run_binary( Fixture const &f, std::string const &queries,
          close( to_child[0] ) != 0 || close( to_child[1] ) != 0 ||
          close( from_child[0] ) != 0 || close( from_child[1] ) != 0 )
       _exit( 127 );
-    execl( f.binary.c_str(), f.binary.c_str(), "--root", f.tree.c_str(),
-           "--queries", queries.c_str(), static_cast<char*>( nullptr ) );
+    std::vector<char const*> argv = {
+      f.binary.c_str(), "--root", f.tree.c_str(), "--queries", queries.c_str()
+    };
+    for ( std::string const &arg : extra_args )
+      argv.push_back( arg.c_str() );
+    argv.push_back( nullptr );
+    execv( f.binary.c_str(), const_cast<char *const*>( argv.data() ) );
     _exit( 127 );
   }
   check( close( to_child[0] ) == 0, "close the child's input end" );
@@ -1032,6 +1095,60 @@ struct TempTree {
     out << content;
   }
 };
+
+// A query that runs out of memory under --max-memory is a tool error, and
+// the server keeps answering. The limit is the address-space limit of the
+// process, so the test needs Linux and no sanitizer.
+void test_memory_limit( Fixture const &f ) {
+#if defined(__linux__) && !defined(ZORBA_TEST_SANITIZER)
+  auto call = [&]( int id, char const *query ) {
+    return request( id, "tools/call", Json::object( {
+      { "name", "run_query" },
+      { "arguments", Json::object( { { "query", query } } ) } } ) ) + "\n";
+  };
+  char const *const hungry =
+    "declare variable $m external := 4000000000;\n"
+    "let $x := for $i in 1 to $m return string($i)\n"
+    "return count($x) + count($x)";
+
+  std::string input;
+  input += call( 1, "1 + 1" );
+  input += call( 2, hungry );
+  input += call( 3, "1 + 2" );
+  input += call( 4, hungry );
+  input += call( 5, "1 + 3" );
+  std::string const output( run_binary( f, f.queries, input, {
+    "--max-memory", "1000000000", "--timeout", "60" } ) );
+
+  std::map<std::string, Json> by_id;
+  std::istringstream lines( output );
+  std::string line;
+  while ( std::getline( lines, line ) ) {
+    Json r;
+    std::string why;
+    if ( parse_json( line, &r, &why ) && r.find( "id" ) )
+      by_id[ r.find( "id" )->text() ] = r;
+  }
+  check( by_id.size() == 5, "five responses", output );
+  if ( by_id.size() != 5 )
+    return;
+  check( !is_tool_error( by_id["1"] ) && result_text( by_id["1"] ) == "2",
+         "a query under the limit runs", by_id["1"].dump() );
+  for ( char const *const id : { "2", "4" } )
+    check( is_tool_error( by_id[id] ) &&
+           field( tool_error( by_id[id] ), "code" ) == "memory_limit" &&
+           contains( field( tool_error( by_id[id] ), "message" ),
+                     "--max-memory" ),
+           "a query over the limit is a tool error", by_id[id].dump() );
+  check( !is_tool_error( by_id["3"] ) && result_text( by_id["3"] ) == "3",
+         "the server answers after the memory limit", by_id["3"].dump() );
+  check( !is_tool_error( by_id["5"] ) && result_text( by_id["5"] ) == "4",
+         "and again after a second time", by_id["5"].dump() );
+#else
+  (void)f;
+  std::cout << "--max-memory has no effect in this build" << std::endl;
+#endif
+}
 
 // The peak resident set size of this process so far, in bytes.
 long long peak_rss() {
@@ -1495,6 +1612,7 @@ Test const tests[] = {
   { "predefined", test_predefined },
   { "limits", test_limits },
   { "binary", test_binary },
+  { "memory_limit", test_memory_limit },
   { "optional_params", test_optional_params },
   { "documents_stream", test_documents_stream },
   { "hints_jsoniq", test_hints_jsoniq },
