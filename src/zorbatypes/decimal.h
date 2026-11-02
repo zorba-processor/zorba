@@ -227,6 +227,15 @@ public:
    */
   size_t heap_bytes() const { return value_.heap_bytes(); }
 
+  /**
+   * Gets this value stored for keeping (e.g., by a store item): in a single
+   * heap block sized to fit (40 bytes up to 16 digits).
+   * The value, and so every result computed from it, is the same.
+   *
+   * @return Returns said value.
+   */
+  Decimal compacted() const { return Decimal( value_.compacted() ); }
+
   bool is_xs_int() const;
   bool is_xs_integer() const;
   bool is_xs_long() const;

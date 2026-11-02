@@ -24,6 +24,7 @@
 //   that needs more digits than fit in place.
 
 #include <iostream>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -162,15 +163,22 @@ int test_decimal_storage( int, char*[] ) {
     }
   }
 
-  // A copy that outlives its item, then is assigned values that need more
-  // digit space than the stored value has.
-  for ( char const *s : values ) {
+  // A copy that outlives its item (so it is the only reference to the
+  // stored digits, which MAPM then modifies in place), then is assigned
+  // values that need more digit space than the stored value has: from a
+  // string, a long (written without going through a string), a long long and
+  // an unsigned long long.
+  auto released = []( char const *s ) {
     Decimal d;
-    {
-      store::Item_t item( stored( Decimal( s ) ) );
-      d = item->getDecimalValue();
-    }
+    store::Item_t item( stored( Decimal( s ) ) );
+    d = item->getDecimalValue();
+    return d;
+  };
+  long const long_max = numeric_limits<long>::max();
+  long const long_min = numeric_limits<long>::min();
+  for ( char const *s : values ) {
     string const what( string( "\"" ) + s + "\" reassigned" );
+    Decimal d( released( s ) );
     d = "123456789012345678901234567890123456789.987654321";
     check( str( d ) == "123456789012345678901234567890123456789.987654321",
            what + ": " + str( d ) );
@@ -178,11 +186,19 @@ int test_decimal_storage( int, char*[] ) {
     check( str( d ) == "42", what + " 42: " + str( d ) );
     d = 18446744073709551615ULL;
     check( str( d ) == "18446744073709551615", what + " ULL: " + str( d ) );
-    Decimal e;
-    {
-      store::Item_t item( stored( Decimal( s ) ) );
-      e = item->getDecimalValue();
-    }
+    Decimal l( released( s ) );
+    l = long_max;
+    check( str( l ) == to_string( long_max ), what + " long max: " + str( l ) );
+    Decimal m( released( s ) );
+    m = long_min;
+    check( str( m ) == to_string( long_min ), what + " long min: " + str( m ) );
+    Decimal i( released( s ) );
+    i = 2147483647;
+    check( str( i ) == "2147483647", what + " int: " + str( i ) );
+    Decimal u( released( s ) );
+    u = 18446744073709551615ULL;
+    check( str( u ) == "18446744073709551615", what + " ULL: " + str( u ) );
+    Decimal e( released( s ) );
     e += Decimal( "0.5" );
     check( str( e ) == str( Decimal( s ) + Decimal( "0.5" ) ),
            what + ": += " + str( e ) );
