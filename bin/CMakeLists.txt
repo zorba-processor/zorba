@@ -108,12 +108,11 @@ ZORBA_SET_TEST_PROPERTY(bin/zorba_hint_none FAIL_REGULAR_EXPRESSION "hint:")
 ZORBA_ADD_TEST(bin/zorba_hint_serializer zorbacmd -z method=json -q "<a/>")
 ZORBA_SET_TEST_PROPERTY(bin/zorba_hint_serializer PASS_REGULAR_EXPRESSION "JNSE0014.*hint: .*serialize")
 
-<<<<<<< HEAD
 # JNSE0012: the message says how to serialize several items as JSON.
 ZORBA_ADD_TEST(bin/zorba_jnse0012 zorbacmd -z method=json -z jsoniq-multiple-items=no -q "1, 2")
 ZORBA_SET_TEST_PROPERTY(bin/zorba_jnse0012 PASS_REGULAR_EXPRESSION
   "JNSE0012\\]: cannot serialize multiple top-level items as JSON; wrap them in an array or set the serialization parameter jsoniq-multiple-items to yes")
-=======
+
 # The language of a query: its own version declaration (jsoniq version or
 # xquery version) wins; else the extension of the file (.jq is JSONiq, .xq is
 # XQuery); else --language (default xquery; -j, --jsoniq is --language jsoniq).
@@ -209,7 +208,6 @@ ZORBA_SET_TEST_PROPERTY(bin/zorba_language_help PASS_REGULAR_EXPRESSION
 # A value other than xquery and jsoniq is refused.
 ZORBA_ADD_TEST(bin/zorba_language_bad_value zorbacmd --language sql -q "1")
 ZORBA_LANGUAGE_EXPECT(bad_value "--language argument must be one of")
->>>>>>> origin/master
 
 # Security policy flags: --secure, --allow, --deny, --read-path, --write-path,
 # --network-prefix, --private-addresses. Each capability is shown denied and
