@@ -269,6 +269,25 @@ Json diagnostic_json( ZorbaException const &e, std::string const &source,
   return Json::object( { { "error", std::move( err ) } } );
 }
 
+// The names of the arguments that the tool's inputSchema does not declare
+// ("additionalProperties": false), as "a, b"; empty when there are none.
+std::string undeclared_arguments( Json const &args,
+                                  std::vector<std::string> const &declared ) {
+  std::string names;
+  for ( auto const &member : args.members() ) {
+    if ( std::find( declared.begin(), declared.end(), member.first ) ==
+         declared.end() )
+      names += ( names.empty() ? "" : ", " ) + member.first;
+  }
+  return names;
+}
+
+std::string invalid_arguments_text( std::string const &message ) {
+  return Json::object( { { "error", Json::object( {
+    { "code", "invalid-arguments" }, { "message", message }
+  } ) } } ).dump();
+}
+
 Json text_content( std::string const &text ) {
   Json content( Json::array() );
   content.push( Json::object( { { "type", "text" }, { "text", text } } ) );
@@ -536,14 +555,26 @@ Json Server::call_tool( Json const &params, bool *protocol_error,
   std::string const &tool = name->text();
   std::vector<std::pair<std::string,std::string> > const no_vars;
   QueryOutcome outcome;
+  std::string unexpected;
   if ( tool == "list_documents" ) {
-    outcome = run(
-      std::string( "import module namespace dir = \"" ) +
-        directory_config::module_ns + "\";\ndir:list($dir:root)\n",
-      std::string(), no_vars );
+    unexpected = undeclared_arguments( *args, {} );
+    if ( !unexpected.empty() ) {
+      outcome.text = invalid_arguments_text(
+        "list_documents takes no arguments; unexpected: " + unexpected );
+    } else {
+      outcome = run(
+        std::string( "import module namespace dir = \"" ) +
+          directory_config::module_ns + "\";\ndir:list($dir:root)\n",
+        std::string(), no_vars );
+    }
   } else if ( tool == "run_query" ) {
     Json const *const q = args->find( "query" );
-    if ( !q || !q->is_string() ) {
+    unexpected = undeclared_arguments( *args, { "query" } );
+    if ( !unexpected.empty() ) {
+      outcome.text = invalid_arguments_text(
+        "run_query takes only the argument \"query\"; unexpected: " +
+        unexpected );
+    } else if ( !q || !q->is_string() ) {
       outcome.text = Json::object( { { "error", Json::object( {
         { "code", "invalid-arguments" },
         { "message", "run_query requires the argument \"query\" (a string)" }
@@ -561,6 +592,10 @@ Json Server::call_tool( Json const &params, bool *protocol_error,
     }
     std::vector<std::pair<std::string,std::string> > vars;
     std::string missing;
+    std::vector<std::string> declared;
+    for ( Param const &param : p->params )
+      declared.push_back( param.name );
+    unexpected = undeclared_arguments( *args, declared );
     for ( Param const &param : p->params ) {
       Json const *const v = args->find( param.name );
       if ( !v || v->is_null() ) {
@@ -576,11 +611,12 @@ Json Server::call_tool( Json const &params, bool *protocol_error,
         missing += ( missing.empty() ? "" : ", " ) + param.name +
           " (must be a string)";
     }
-    if ( !missing.empty() ) {
-      outcome.text = Json::object( { { "error", Json::object( {
-        { "code", "invalid-arguments" },
-        { "message", tool + " requires the arguments: " + missing }
-      } ) } } ).dump();
+    if ( !unexpected.empty() ) {
+      outcome.text = invalid_arguments_text(
+        tool + " has no argument(s): " + unexpected );
+    } else if ( !missing.empty() ) {
+      outcome.text = invalid_arguments_text(
+        tool + " requires the arguments: " + missing );
     } else {
       outcome = run( p->source, p->path, vars );
     }
@@ -667,7 +703,8 @@ std::string Server::handle( std::string const &message ) {
     meta && meta->is_object() ? meta->find( meta_version ) : nullptr;
   bool const modern = version != nullptr;
 
-  if ( m == "ping" ) {
+  // ping exists in the legacy revisions only (removed in 2026-07-28).
+  if ( m == "ping" && !modern && !theLegacyVersion.empty() ) {
     result = Json::object();
   } else {
     if ( modern ) {
