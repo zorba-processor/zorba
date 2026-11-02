@@ -516,6 +516,10 @@ void test_hints_dash( Fixture const &f ) {
                 "the hint's $a2 - $a1 works" );
   check_error( server, "let $a-$b := 1 return 1", "XPST0003", "",
                "no hint where a variable is being bound" );
+  check_error( server, "let $a := 3 let $b := 1\nreturn $a-$b\n", "XPST0003",
+               "$a - $b", "$a-$b at the end of the query: hint" );
+  check_error( server, "let $x := 1 return", "XPST0003", "",
+               "no hint on another error at the end of the query" );
   check_error( server, "let $b := 1 return 1 $b", "XPST0003", "",
                "no hint on $ after something else" );
 

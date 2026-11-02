@@ -51,7 +51,7 @@ std::size_t offset_of( std::string const &query, unsigned long line,
     ++begin;
   }
   std::size_t const offset = begin + column - 1;
-  return offset < query.size() ? offset : std::string::npos;
+  return offset <= query.size() ? offset : std::string::npos;
 }
 
 // The word that ends right before the offset, skipping whitespace.
@@ -110,10 +110,26 @@ std::string syntax_error( std::string const &query, unsigned long line,
   if ( offset == std::string::npos )
     return std::string();
 
-  // After a prolog on the same line the reported column can be one too far.
-  if ( query[ offset ] != ']' && query[ offset ] != '$' && offset &&
-       ( query[ offset - 1 ] == ']' || query[ offset - 1 ] == '$' ) )
+  if ( query.find_first_not_of( " \t\r\n", offset ) == std::string::npos ) {
+    // An error at the end of the query: look at the last token. "$a-$b" at the
+    // very end is reported here, not at "$b".
+    offset = query.size();
+    while ( offset && is_space( query[ offset - 1 ] ) )
+      --offset;
+    if ( !offset )
+      return std::string();
     --offset;
+    if ( query[ offset ] != ']' ) {
+      while ( offset && is_name_char( query[ offset ] ) )
+        --offset;
+      if ( query[ offset ] != '$' )
+        return std::string();
+    }
+  } else if ( query[ offset ] != ']' && query[ offset ] != '$' && offset &&
+              ( query[ offset - 1 ] == ']' || query[ offset - 1 ] == '$' ) ) {
+    // On the first line the reported column is one too far.
+    --offset;
+  }
 
   if ( query[ offset ] == ']' ) {
     std::size_t prev = offset;
