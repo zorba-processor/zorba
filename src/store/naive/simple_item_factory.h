@@ -22,6 +22,7 @@
 
 #include "store/api/item_factory.h"
 
+#include "zorbatypes/integer.h"
 #include "zorbatypes/schema_types.h"
 
 #include "tree_id.h"
@@ -67,11 +68,14 @@ protected:
   // xs:nonNegativeInteger, ...) have their own type codes and always get a
   // new item, so a shared xs:integer is never returned for them.
   //
-  // The range holds what parsed data and queries use most: counts, indexes,
-  // small codes and quantities (JSON and CSV integers, positions, counters).
-  // The cache costs 1152 items, about 55 KB, per store.
+  // The table costs 1152 items of 48 B plus 1152 handles of 8 B, about 64 KB
+  // per store (more with ZORBA_WITH_BIG_INTEGER, where each value also holds
+  // a MAPM). The bounds are kept as xs_integer so that the range check of
+  // createInteger() builds no temporary MAPM.
   static constexpr int SMALL_INTEGER_MIN = -128;
   static constexpr int SMALL_INTEGER_MAX = 1023;
+  xs_integer const theSmallIntegerMin;
+  xs_integer const theSmallIntegerMax;
   store::Item_t theSmallIntegers[SMALL_INTEGER_MAX - SMALL_INTEGER_MIN + 1];
 
 public:
