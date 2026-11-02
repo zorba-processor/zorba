@@ -261,7 +261,11 @@ void test_protocol( Fixture const &f ) {
          r.dump() );
 
   r = roundtrip( server, request( 9, "ping" ) );
-  check( r.find( "result" ) != nullptr && !r.find( "error" ), "ping",
+  // ping was removed in 2026-07-28: an unknown method for modern requests.
+  check( error_code( r ) == -32601, "modern ping: -32601", r.dump() );
+
+  r = roundtrip( server, request( 10, "ping", Json::object(), false ) );
+  check( error_code( r ) == -32602, "ping without _meta or initialize: -32602",
          r.dump() );
 
   r = call_tool( server, "run_query", Json::object( { { "query", "1 + 1" } } ) );
@@ -596,6 +600,8 @@ void test_optional_params( Fixture const &f ) {
     { "query", "declare variable $x external := \"dflt\"; $x" },
     { "variables", obj( { { "x", "given" } } ) } } ) );
   input += call( 16, "greet", obj( { { "name", "Ana" } } ) );
+  input += call( 17, "greet", obj( { { "name", "Ana" }, { "nmae", "x" } } ) );
+  input += call( 18, "list_documents", obj( { { "path", "x" } } ) );
 
   std::string const output( run_binary( f, queries, input ) );
   std::map<std::string, Json> by_id;
@@ -607,8 +613,8 @@ void test_optional_params( Fixture const &f ) {
     if ( parse_json( line, &r, &why ) && r.find( "id" ) )
       by_id[ r.find( "id" )->text() ] = r;
   }
-  check( by_id.size() == 16, "sixteen responses", output );
-  if ( by_id.size() != 16 )
+  check( by_id.size() == 18, "eighteen responses", output );
+  if ( by_id.size() != 18 )
     return;
 
   // 1. The input schemas.
@@ -680,8 +686,22 @@ void test_optional_params( Fixture const &f ) {
   check( is_tool_error( by_id["14"] ) && !tool_error( by_id["14"] ).is_null(),
          "run_query: an external variable without a value is a tool error",
          by_id["14"].dump() );
-  check( !is_tool_error( by_id["15"] ) && result_text( by_id["15"] ) == "\"dflt\"",
-         "run_query ignores a \"variables\" argument", by_id["15"].dump() );
+
+  // An argument the tool's inputSchema does not declare is rejected, naming
+  // it, instead of being ignored.
+  struct { char const *id; char const *arg; char const *what; } const unknown[] = {
+    { "15", "variables", "run_query" },
+    { "17", "nmae", "predefined tool" },
+    { "18", "path", "list_documents" }
+  };
+  for ( auto const &u : unknown ) {
+    Json const &r = by_id[u.id];
+    check( is_tool_error( r ) &&
+           field( tool_error( r ), "code" ) == "invalid-arguments" &&
+           contains( field( tool_error( r ), "message" ), u.arg ),
+           std::string( u.what ) + ": undeclared argument \"" + u.arg +
+           "\" is a tool error", r.dump() );
+  }
 }
 
 // Runs the zorba-mcp executable over a pipe: its stdout must carry only
