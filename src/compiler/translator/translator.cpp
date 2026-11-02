@@ -11930,9 +11930,9 @@ std::string undeclared_function_hint(
         text += ", ";
       if (argVars && i < argVars->size())
         text += "$" + (*argVars)[i]->get_name()->getLocalName().str() + " as ";
-      text += sig[static_cast<int>(i)]->toSchemaString().str();
+      text += sig[static_cast<int>(i)]->toSchemaString();
     }
-    text += ") as " + sig.returnType()->toSchemaString().str();
+    text += ") as " + sig.returnType()->toSchemaString();
     signatures.push_back(text);
   }
 
