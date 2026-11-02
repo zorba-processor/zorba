@@ -8,6 +8,7 @@ permissions:
   contents: read
 jobs:
   tests:
+    if: "!contains(github.event.head_commit.message, 'jwin-bench')"
     runs-on: ubuntu-24.04
     timeout-minutes: 180
     steps:
@@ -30,25 +31,58 @@ jobs:
           docker run --rm \
             -e CCACHE_DIR=/src/.ccache \
             -e CCACHE_SLOPPINESS=pch_defines,time_macros -e CCACHE_DEPEND=1 \
-            -v "$PWD":/src -w /src zorba-builder:ci sh -ec '
+            -v "$PWD":/src -w /src zorba-builder:ci sh -c '
               cmake --preset full-release > /dev/null
               cmake --build --preset full-release > out/build.log 2>&1 || { tail -50 out/build.log; exit 1; }
-              ctest --test-dir build/full-release -j"$(nproc)" -R "jsoniq-windows|bin/mcp/windows|zorba/windowing|optim/hoist_window" \
-                > out/ctest.log 2>&1 || echo "ctest failed" >> out/ctest.log
+              ctest --test-dir build/full-release -j"$(nproc)" -R "jsoniq-windows|bin/mcp/windows|zorba/windowing|optim/hoist_window" > out/ctest.log 2>&1
+              rc=$?
               tail -n 3 out/ctest.log
-              grep -E "Failed|Not Run|\*\*\*|tests passed" out/ctest.log | head -200
-              Z=$(find build/full-release/bin -maxdepth 1 -name zorba -type f | head -n 1)
-              for f in build/full-release/test/rbkt/QueryResults/zorba/jsoniq-windows/*.xml.res; do
-                b=$(basename "$f"); b0=$(echo "$b" | sed -E "s/\.jq\.xml\.res$//; s/\.jq\.(O[02])\.xml\.res$//; s/\.(O[02])\.xml\.res$//; s/\.xml\.res$//")
-                ref=test/rbkt/ExpQueryResults/zorba/jsoniq-windows/$b0.xml.res
-                if ! cmp -s "$f" "$ref"; then echo "=== DIFF $b"; echo "--- expected"; cat "$ref" 2>/dev/null; echo "--- actual"; cat "$f"; echo; fi
-              done > out/diffs.txt
-              cat out/diffs.txt | head -400
-              ctest --test-dir build/full-release -j"$(nproc)" -R "jsoniq-windows|bin/mcp/windows" --output-on-failure > out/failures.log 2>&1 || echo "second ctest run also failed"
-              grep -E "^(Query:|testdriver: |.*[Uu]nexpected|.*error|Actual|.*Expected|.*Error:)|Test +#.*\*\*\*" out/failures.log | cut -c1-300 | head -300
-            '
+              cp build/full-release/Testing/Temporary/LastTest.log out/
+              cp -r build/full-release/test/rbkt/QueryResults/zorba/jsoniq-windows out/results
+              exit $rc'
       - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: jwin-out
+          path: out/
+  bench:
+    if: "contains(github.event.head_commit.message, 'jwin-bench')"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v7
+      - name: Builder image
+        uses: ./.github/actions/builder-image
+        with:
+          context: docker/builder-latest
+          cache-scope: linux-amd64-latest
+      - uses: actions/cache@v6
+        with:
+          path: .ccache
+          key: ccache-v2-linux-amd64-latest-jwin-${{ github.sha }}
+          restore-keys: |
+            ccache-v2-linux-amd64-latest-jwin-
+            ccache-v2-linux-amd64-latest-
+      - name: Build
+        run: |
+          mkdir -p .ccache out
+          docker run --rm \
+            -e CCACHE_DIR=/src/.ccache \
+            -e CCACHE_SLOPPINESS=pch_defines,time_macros -e CCACHE_DEPEND=1 \
+            -v "$PWD":/src -w /src zorba-builder:ci sh -ec '
+              cmake --preset full-release > /dev/null
+              cmake --build --preset full-release > out/build.log 2>&1
+              c++ -std=c++23 -O2 -Wall -Wextra -Werror -o build/dirbench bench/directory/dirbench.cpp'
+      - name: Measure
+        timeout-minutes: 320
+        run: |
+          free -m
+          docker run --rm -v "$PWD":/src -w /src zorba-builder:ci sh -ec '
+            ZORBA=$(find build/full-release/bin -maxdepth 1 -name zorba -type f | head -n 1)
+            bench/windows/run.sh "/src/$ZORBA" /src/build/dirbench /tmp/jwin /src/out'
+          cat out/results.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: jwin-bench
           path: out/
