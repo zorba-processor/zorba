@@ -168,7 +168,7 @@ Limits of these numbers:
   Concurrent use without the application's own mutex is already undefined, but
   it now fails sooner: threads taking references to the same small value crash
   the process (seen in an earlier version of the test, run 41444048529).
-- `ZORBA_WITH_BIG_INTEGER` builds were tested, not measured. A hit there
+- Big-integer builds were tested, not measured. A hit there
   converts the value through a string to find the table slot.
 
 Rulings:
