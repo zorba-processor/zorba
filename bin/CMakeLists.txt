@@ -196,6 +196,10 @@ ZORBA_LANGUAGE_EXPECT(hint_xquery "hint: [^\n]*jsoniq version")
 ZORBA_ADD_TEST(bin/zorba_language_hint_jsoniq zorbacmd --language jsoniq -q "[1, ]")
 ZORBA_SET_TEST_PROPERTY(bin/zorba_language_hint_jsoniq PASS_REGULAR_EXPRESSION "XPST0003")
 ZORBA_SET_TEST_PROPERTY(bin/zorba_language_hint_jsoniq FAIL_REGULAR_EXPRESSION "jsoniq version")
+# The help states the order and its limits.
+ZORBA_ADD_TEST(bin/zorba_language_help zorbacmd --help)
+ZORBA_SET_TEST_PROPERTY(bin/zorba_language_help PASS_REGULAR_EXPRESSION
+  "in this order: \\(1\\) a jsoniq version or xquery version declaration at the very start of the query \\(one preceded by a comment is not detected\\); \\(2\\) for a file, its extension \\(\\.jq is JSONiq, \\.xq is XQuery\\); \\(3\\) this option.*The option does not override an extension: --jsoniq -f q\\.xq is XQuery\\. --parse-only and the parse that --compile-only does first do not apply this rule")
 # A value other than xquery and jsoniq is refused.
 ZORBA_ADD_TEST(bin/zorba_language_bad_value zorbacmd --language sql -q "1")
 ZORBA_LANGUAGE_EXPECT(bad_value "--language argument must be one of")
@@ -444,6 +448,12 @@ IF (ZORBA_WITH_FILE_ACCESS)
         PASS_REGULAR_EXPRESSION "PASSED: ${_t}"
         FAIL_REGULAR_EXPRESSION "FAILED|TOP-SECRET|HIDDEN-SECRET")
     ENDFOREACH (_t)
+
+    # The help states the order, and what --queries loads.
+    ADD_TEST (NAME bin/mcp/language_help
+      COMMAND "$<TARGET_FILE:zorba_mcp${_mcp_suffix}>" --help)
+    SET_TESTS_PROPERTIES (bin/mcp/language_help PROPERTIES
+      PASS_REGULAR_EXPRESSION "A \\.jq\n *file is JSONiq unless it declares xquery version;\n *\\.xq files are not loaded.*in this order: \\(1\\) a jsoniq\n *version or xquery version declaration at the very\n *start of the query \\(one preceded by a comment is\n *not detected\\); \\(2\\) for a file, its extension \\(\\.jq\n *is JSONiq\\); \\(3\\) this option")
 
     # A --language value other than xquery and jsoniq is refused.
     ADD_TEST (NAME bin/mcp/language_invalid
