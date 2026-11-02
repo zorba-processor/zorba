@@ -264,6 +264,35 @@ IF (ZORBA_WITH_FILE_ACCESS)
     --directory "${_dirtree}" -f -q "${_dirq}/native-denied.xq")
   ZORBA_SET_TEST_PROPERTY(bin/zorba_security_dir_native_denied
     FAIL_REGULAR_EXPRESSION "native-loaded")
+  # External entities in the documents: the module resolves a relative system
+  # identifier against the URI of the file, and the policy decides whether
+  # the entity is read. --directory does not grant external-entities, so no
+  # entity is read; a policy that grants it with the root as the read path
+  # reads the entity next to the document and refuses the one outside the
+  # root, in the error record of the file.
+  SET (_direnttree "${CMAKE_SOURCE_DIR}/test/rbkt/Queries/zorba/directory/entity-tree")
+  ZORBA_SECURITY_TEST(dir_entity_directory
+    "docs/note.xml=FODC0006:[^\n]*URI access not allowed"
+    --directory "${_direnttree}" -f -q "${_dirq}/entity.xq")
+  ZORBA_SECURITY_TEST(dir_entity_outside
+    "escape.xml=FODC0006:[^\n]*URI access not allowed"
+    --secure --allow external-entities,file-read,native-modules
+    --read-path "${_direnttree}"
+    -f -q "${_dirq}/entity.xq" -e "root:=${_direnttree}")
+  ZORBA_SET_TEST_PROPERTY(bin/zorba_security_dir_entity_outside
+    FAIL_REGULAR_EXPRESSION "TOP-SECRET-ENTITY")
+  ZORBA_SET_TEST_PROPERTY(bin/zorba_security_dir_entity_directory
+    FAIL_REGULAR_EXPRESSION "TOP-SECRET-ENTITY|entity next to the document")
+  # x:parse, which takes the base URI, needs a build with XML Schema support.
+  IF (NOT ZORBA_NO_XMLSCHEMA)
+    ZORBA_SECURITY_TEST(dir_entity_inside
+      "docs/note.xml=entity next to the document"
+      --secure --allow external-entities,file-read,native-modules
+      --read-path "${_direnttree}"
+      -f -q "${_dirq}/entity.xq" -e "root:=${_direnttree}")
+    ZORBA_SET_TEST_PROPERTY(bin/zorba_security_dir_entity_inside
+      FAIL_REGULAR_EXPRESSION "TOP-SECRET-ENTITY")
+  ENDIF (NOT ZORBA_NO_XMLSCHEMA)
   ZORBA_SECURITY_TEST(dir_widen "--directory cannot be combined with"
     --directory "${_dirtree}" --allow network -q "1")
   ZORBA_SECURITY_TEST(dir_not_directory "--directory: not a directory"
