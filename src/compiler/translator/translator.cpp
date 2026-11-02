@@ -2709,6 +2709,9 @@ void* begin_visit(const VersionDecl& v)
     ERROR_PARAMS(ZED(XQST0031_BadXQueryVersion_2), versionStr));
   }
 
+  // The declaration decides the language, also when the static context the
+  // query is compiled in was set to JSONiq.
+  theSctx->set_language_kind(StaticContextConsts::language_kind_xquery);
   theSctx->set_xquery_version(version);
 
   return no_state;

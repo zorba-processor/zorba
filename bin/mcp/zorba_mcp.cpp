@@ -49,6 +49,7 @@ char const usage[] =
   "Usage: zorba-mcp --root <dir> [--queries <dir>] [--timeout <seconds>]\n"
   "                 [--max-output <bytes>] [--max-memory <bytes>]\n"
   "                 [--no-scan] [--scan-cache-mb <MiB>]\n"
+  "                 [--language xquery|jsoniq]\n"
   "\n"
   "An MCP server (stdio transport) over the Zorba JSONiq/XQuery processor.\n"
   "Queries run under the secure policy, reading only files under --root\n"
@@ -57,7 +58,9 @@ char const usage[] =
   "  --root <dir>         the directory of documents to query (required)\n"
   "  --queries <dir>      each <name>.jq file becomes a tool <name>; its\n"
   "                       leading comment is the description and its\n"
-  "                       external variables are string parameters\n"
+  "                       external variables are string parameters. A .jq\n"
+  "                       file is JSONiq unless it declares xquery version;\n"
+  "                       .xq files are not loaded\n"
   "  --timeout <seconds>  time limit of one tool call (default 30, 0: none)\n"
   "  --max-output <bytes> output size limit of one tool call (default\n"
   "                       131072); longer output is cut with a marker\n"
@@ -67,7 +70,13 @@ char const usage[] =
   "  --no-scan            no background scan of the directory: list_documents\n"
   "                       takes no arguments and lists through dir:list\n"
   "  --scan-cache-mb <MiB> memory for the scan's file index and previews\n"
-  "                       (default 64); at the limit the scan stops\n";
+  "                       (default 64); at the limit the scan stops\n"
+  "  --language <lang>    xquery (default) or jsoniq: the language of a\n"
+  "                       run_query query, in this order: (1) a jsoniq\n"
+  "                       version or xquery version declaration at the very\n"
+  "                       start of the query (one preceded by a comment is\n"
+  "                       not detected); (2) for a file, its extension (.jq\n"
+  "                       is JSONiq); (3) this option\n";
 
 bool parse_number( char const *s, unsigned long long *n ) {
   if ( !s || !*s )
@@ -128,6 +137,11 @@ int main( int argc, char const *argv[] ) {
       ++i;
     } else if ( arg == "--max-output" && parse_number( val, &n ) && n > 0 ) {
       config.max_output = static_cast<std::size_t>( n );
+      ++i;
+    } else if ( arg == "--language" && val &&
+                ( std::string( val ) == "xquery" ||
+                  std::string( val ) == "jsoniq" ) ) {
+      config.jsoniq_default = std::string( val ) == "jsoniq";
       ++i;
     } else if ( arg == "--max-memory" && parse_number( val, &n ) ) {
       config.max_memory = n;

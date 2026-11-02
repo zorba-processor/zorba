@@ -65,7 +65,7 @@ bool PutDocumentIterator::nextImpl(
   catch (ZorbaException const&)
   {
     RAISE_ERROR(err::FODC0004, loc,
-    ERROR_PARAMS(lResolvedUriString, ZED(NoResolveRelativeURI)));
+    ERROR_PARAMS(lRetrievedUriString, ZED(NoResolveRelativeURI)));
   }
 
   // check if document already exists in the store
@@ -118,7 +118,7 @@ bool RemoveDocumentIterator::nextImpl(
   catch (ZorbaException const&)
   {
     RAISE_ERROR(err::FODC0004, loc,
-    ERROR_PARAMS(lResolvedUriString, ZED(NoResolveRelativeURI)));
+    ERROR_PARAMS(lRetrievedUriString, ZED(NoResolveRelativeURI)));
   }
 
   // check if document exists in the store
@@ -169,7 +169,7 @@ bool RetrieveDocumentIterator::nextImpl(
   catch (ZorbaException const&)
   {
     RAISE_ERROR(err::FODC0004, loc,
-    ERROR_PARAMS(lResolvedUriString, ZED( NoResolveRelativeURI)));
+    ERROR_PARAMS(lRetrievedUriString, ZED(NoResolveRelativeURI)));
   }
 
   // check if document exists in the store
@@ -211,7 +211,7 @@ bool IsAvailableDocumentIterator::nextImpl(
   catch (ZorbaException const&)
   {
     RAISE_ERROR(err::FODC0004, loc,
-    ERROR_PARAMS(lResolvedUriString, ZED(NoResolveRelativeURI)));
+    ERROR_PARAMS(lRetrievedUriString, ZED(NoResolveRelativeURI)));
   }
 
   // check if document exists in the store
