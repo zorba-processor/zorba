@@ -330,15 +330,14 @@ Server::Server( Zorba *zorba, ServerConfig config, std::ostream &log ) :
 }
 
 Server::~Server() {
-  stop_scan();
+  (void)stop_scan();
   if ( theScanner )
     theLog << server_name << ": the scan cache holds "
            << theScanner->cache_summary() << std::endl;
 }
 
-void Server::stop_scan() {
-  if ( theScanner )
-    theScanner->stop();
+bool Server::stop_scan() {
+  return !theScanner || theScanner->stop();
 }
 
 std::size_t Server::scan_cache_bytes() const {

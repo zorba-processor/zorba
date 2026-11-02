@@ -348,7 +348,9 @@ IF (ZORBA_WITH_FILE_ACCESS)
     ENDFOREACH (_t)
 
     # The background scanner (see mcp/test/scan_tests.cpp).
-    FOREACH (_t scan_status scan_immediate scan_previews scan_mtime scan_refresh
+    FOREACH (_t scan_status scan_immediate scan_huge_tag scan_known_dirs
+             scan_unreadable scan_deep_tree scan_preview_bound scan_escaped_names
+             scan_refill scan_previews scan_mtime scan_refresh
              scan_symlink scan_path scan_malformed scan_deep scan_xxe scan_limit
              scan_memory scan_memory_big_preview scan_memory_walker
              scan_memory_stress scan_memory_option

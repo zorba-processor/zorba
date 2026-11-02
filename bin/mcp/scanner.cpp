@@ -987,9 +987,9 @@ std::size_t Scanner::cache_bytes() const {
   return theShared->theBytes;
 }
 
-void Scanner::stop() {
+bool Scanner::stop() {
   if ( !theWalker.joinable() && !theSampler.joinable() )
-    return;
+    return true;
   bool walker_done, sampler_done;
   {
     std::unique_lock<std::mutex> lock( theShared->theMutex );
@@ -1010,6 +1010,7 @@ void Scanner::stop() {
     theSampler.join();
   else
     theSampler.detach();
+  return walker_done && sampler_done;
 }
 
 std::string Scanner::answer( Json const &args, std::size_t max_output,

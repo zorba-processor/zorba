@@ -95,8 +95,10 @@ public:
    * Stops the threads. A thread that does not end soon, because the file
    * system does not return from a read, is left behind (detached): once it
    * returns, it ends without using libxml2 or anything but its shared state.
+   *
+   * @return whether both threads were joined.
    */
-  void stop();
+  bool stop();
 
   /**
    * Answers one list_documents call: arguments \c path, \c limit and

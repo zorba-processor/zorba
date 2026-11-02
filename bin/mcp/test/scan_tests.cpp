@@ -27,6 +27,7 @@
 #include <condition_variable>
 #include <cstdio>
 #include <cstdlib>
+#include <csignal>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -38,6 +39,8 @@
 #include <thread>
 #include <vector>
 
+#include <fcntl.h>
+#include <signal.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -50,6 +53,7 @@
 
 #include "json.h"
 #include "mcp_server.h"
+#include "scan_preview.h"
 
 using namespace zorba;
 using namespace zorba::mcp;
@@ -351,33 +355,369 @@ void test_status( Fixture const &f ) {
 // A file with no preview yet is explored at once, known to the walker or not.
 void test_immediate( Fixture const &f ) {
   {
+    // The sampler is held at this file: the request stops waiting at its bound
+    // and says the preview is pending.
     Tree t;
     t.write( "a.csv", "x,y\n1,2\n" );
     auto const gate = std::make_shared<Gate>( "sample", "*" );
-    Server server( f.zorba, gated( t.root, gate ), std::cerr );
+    ServerConfig config( gated( t.root, gate ) );
+    config.timeout = std::chrono::milliseconds( 300 );
+    Server server( f.zorba, config, std::cerr );
     check( gate->wait_reached(), "the sampler reaches the file" );
-    Listing const l( list_path( server, "a.csv" ) );
-    check( l.state() == "running", "file answer has the status", l.text );
-    check( l.preview() && contains( l.preview()->dump(), "\"columns\":[\"x\",\"y\"]" ),
-           "the sampler is stopped: the file is explored now", l.text );
+    auto const t0 = std::chrono::steady_clock::now();
+    Listing l( list_path( server, "a.csv" ) );
+    auto const ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+      std::chrono::steady_clock::now() - t0 ).count();
+    check( l.state() == "running" && !l.is_error, "file answer has the status",
+           l.text );
+    check( l.member( "preview_state" ) == "pending" && l.preview() &&
+           l.preview()->is_null(), "the preview is pending", l.text );
+    check( ms >= 250 && ms < 10000, "the request waited for its bound only",
+           std::to_string( ms ) + " ms" );
     gate->release();
     Listing const done( wait_complete( server ) );
     check( done.found() == "1" && done.sampled() == "1",
-           "exploring and sampling count the file once", done.text );
+           "requesting and sampling count the file once", done.text );
+    l = list_path( server, "a.csv" );
+    check( l.member( "preview_state" ).empty() && l.preview() &&
+           contains( l.preview()->dump(), "\"columns\":[\"x\",\"y\"]" ),
+           "afterwards it has the preview", l.text );
   }
   {
+    // The sampler is free: the request gets the preview, read on its thread and
+    // not on the request's, for a file the walker has not found.
     Tree t;
     t.write( "deep/er/b.json", "{\"k\":1}" );
     auto const gate = std::make_shared<Gate>( "walk", "" );
-    Server server( f.zorba, gated( t.root, gate ), std::cerr );
+    std::thread::id const request_thread( std::this_thread::get_id() );
+    auto const on_request_thread = std::make_shared<std::atomic<int> >( 0 );
+    auto const explored = std::make_shared<std::atomic<int> >( 0 );
+    ServerConfig config;
+    config.root = t.root;
+    config.scan_hook = [gate, request_thread, on_request_thread, explored](
+        char const *stage, std::string const &path ) {
+      if ( std::string( stage ) == "explore" ) {
+        ++*explored;
+        if ( std::this_thread::get_id() == request_thread )
+          ++*on_request_thread;
+      }
+      gate->hook( stage, path );
+    };
+    Server server( f.zorba, config, std::cerr );
     check( gate->wait_reached(), "the walker reaches the root" );
     Listing const l( list_path( server, "deep/er/b.json" ) );
     check( l.state() == "running" && l.preview() &&
            contains( l.preview()->dump(), "\"k\":[1]" ),
            "a file the walker has not found is explored too", l.text );
+    check( explored->load() == 1 && on_request_thread->load() == 0,
+           "the request thread does not parse",
+           std::to_string( explored->load() ) + " " +
+           std::to_string( on_request_thread->load() ) );
     gate->release();
     wait_complete( server );
   }
+}
+
+// One tag with very many attributes takes the parser time that grows with the
+// square of their number. It is refused before parsing, so that requests and
+// the sampler go on and the threads can be joined.
+void test_huge_tag( Fixture const &f ) {
+  Tree t;
+  auto tag = []( char const *open, char const *close, int attributes ) {
+    std::string s( open );
+    for ( int i = 0; i < attributes; ++i )
+      s += " a" + std::to_string( i ) + close;
+    return s + ">";
+  };
+  std::string const html( tag( "<p", "=1", 120000 ) );
+  std::string const xml( tag( "<p", "=\"1\"", 120000 ) + "</p>" );
+  t.write( "one.html", html );
+  t.write( "two.html", html );
+  t.write( "one.xml", xml );
+  t.write( "two.xml", xml );
+  std::string utf16( "\xFF\xFE" );
+  for ( char const c : xml ) {
+    utf16 += c;
+    utf16 += '\0';
+  }
+  t.write( "utf16.xml", utf16 );
+  t.write( "fine.csv", "x\n1\n" );
+
+  // Limits, and what is not over them.
+  t.write( "attrs300.xml", tag( "<p", "=\"1\"", 300 ) + "</p>" );
+  t.write( "attrs200.xml", tag( "<p", "=\"1\"", 200 ) + "</p>" );
+  t.write( "attrs300.html", tag( "<p", "=1", 300 ) );
+  t.write( "attrs200.html", tag( "<p", "=1", 200 ) );
+  std::string const name( 20000, 'n' );
+  t.write( "name.xml", "<" + name + "/>" );
+  t.write( "value.xml", "<p a=\"" + std::string( 200000, 'v' ) + "\"/>" );
+  t.write( "value.html", "<p a=\"" + std::string( 200000, 'v' ) + "\">x</p>" );
+  t.write( "script.html", "<script>if (a<b) {" + std::string( 100000, ' ' ) +
+                          "}</script><table><tr><th>A</th></tr></table>" );
+
+  ServerConfig config;
+  config.root = t.root;
+  config.timeout = std::chrono::seconds( 5 );
+  Server server( f.zorba, config, std::cerr );
+  for ( char const *const file : { "one.html", "one.xml", "utf16.xml",
+                                   "attrs300.xml", "attrs300.html", "name.xml" } ) {
+    auto const t0 = std::chrono::steady_clock::now();
+    Listing const l( list_path( server, file ) );
+    auto const ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+      std::chrono::steady_clock::now() - t0 ).count();
+    std::cout << file << ": " << ms << " ms" << std::endl;
+    check( ms < 8000, std::string( file ) + ": the request stays in its bound",
+           std::to_string( ms ) + " ms" );
+    check( contains( dump_of( l.preview() ), "\"error\":" ),
+           std::string( file ) + ": refused in the preview", l.text );
+  }
+  Listing l( wait_settled( server ) );
+  check( l.state() == "complete" && l.found() == "14" && l.sampled() == "14",
+         "the sampler gets through all of them", l.text );
+  for ( char const *const file : { "attrs200.xml", "attrs200.html", "value.xml",
+                                   "value.html" } ) {
+    l = list_path( server, file );
+    check( !contains( dump_of( l.preview() ), "\"error\":" ),
+           std::string( file ) + ": under the limits", l.text );
+  }
+  l = list_path( server, "script.html" );
+  check( contains( dump_of( l.preview() ), "\"headers\":[[\"A\"]]" ),
+         "a script is not taken for a tag", l.text );
+  check( server.stop_scan(), "stop joins both threads" );
+}
+
+// A sibling whose name sorts between a directory and what is under it.
+void test_known_dirs( Fixture const &f ) {
+  Tree t;
+  t.write( "sub/a.csv", "x\n1\n" );
+  stdfs::create_directories( t.root + "/sub-x" );
+  ServerConfig config;
+  config.root = t.root;
+  Server server( f.zorba, config, std::cerr );
+  wait_complete( server );
+  stdfs::remove( t.root + "/sub-x" );
+  list( server );
+  stdfs::create_directories( t.root + "/sub-x" );
+  t.write( "sub-x/f.csv", "x\n1\n" );
+  list( server );
+  wait_complete( server );
+  Listing const l( list( server ) );
+  check( l.lists( "sub-x/f.csv" ) && l.lists( "sub/a.csv" ) && l.total() == "2",
+         "a directory deleted and created again is walked", l.text );
+}
+
+// Runs as an ordinary user, also under root in a container, where permissions
+// would not stop anything. Destroy it after what it covers.
+class OrdinaryUser {
+public:
+  OrdinaryUser() : theWasRoot( geteuid() == 0 ) {
+    if ( theWasRoot )
+      check( seteuid( 65534 ) == 0, "become an ordinary user" );
+  }
+  ~OrdinaryUser() {
+    if ( theWasRoot && seteuid( 0 ) != 0 )
+      std::cout << "FAILED: back to root" << std::endl;
+  }
+private:
+  bool const theWasRoot;
+};
+
+void test_unreadable( Fixture const &f ) {
+  OrdinaryUser const user;
+  Tree t;
+  t.write( "open/a.csv", "x\n1\n" );
+  t.write( "locked/b.csv", "x\n1\n" );
+  std::string const locked( t.root + "/locked" );
+  stdfs::permissions( locked, stdfs::perms::none );
+  {
+    ServerConfig config;
+    config.root = t.root;
+    Server server( f.zorba, config, std::cerr );
+    Listing l( wait_settled( server ) );
+    l = list( server );
+    check( contains( l.text, "\"incomplete\":true" ) &&
+           l.member( "unreadable_dirs" ) == "1",
+           "an unreadable directory is stated", l.text );
+    l = list_path( server, "locked" );
+    check( l.is_error && l.error_code() == "permission-denied" && l.has_scan(),
+           "asking for it: permission-denied", l.text );
+    l = list_path( server, "locked/b.csv" );
+    check( l.is_error && l.error_code() == "permission-denied",
+           "asking for a file in it: permission-denied", l.text );
+
+    // When it can be read again, it is walked and no longer stated.
+    stdfs::permissions( locked, stdfs::perms::owner_all );
+    l = list_path( server, "locked" );
+    check( !l.is_error && l.lists( "locked/b.csv" ),
+           "readable again: it is listed", l.text );
+    l = list( server );
+    check( !contains( l.text, "\"incomplete\"" ) &&
+           !contains( l.text, "unreadable_dirs" ),
+           "readable again: nothing to state", l.text );
+
+    // A file added below after the walk is seen by the directory's mtime.
+    t.write( "open/new.csv", "n\n1\n" );
+    auto const stamp = stdfs::last_write_time( t.root + "/open" );
+    stdfs::last_write_time( t.root + "/open", stamp + std::chrono::hours( 1 ) );
+    list( server );
+    wait_settled( server );
+    l = list( server );
+    check( l.lists( "open/new.csv" ), "a new file below is found", l.text );
+
+    // And a file deleted below goes with the same check.
+    stdfs::remove( t.root + "/open/new.csv" );
+    stdfs::last_write_time( t.root + "/open", stamp + std::chrono::hours( 2 ) );
+    list( server, Json::object( { { "limit", 0 } } ) );
+    wait_settled( server );
+    l = list( server, Json::object( { { "limit", 0 } } ) );
+    check( l.total() == "3" || l.total() == "2",
+           "a deleted file below leaves the totals", l.text );
+    check( !list( server ).lists( "open/new.csv" ), "and the listing", l.text );
+  }
+}
+
+// A tree deeper than the walker goes is stated, and a path still works.
+void test_deep_tree( Fixture const &f ) {
+  Tree t;
+  std::string dir;
+  for ( int i = 0; i < 300; ++i )
+    dir += "d/";
+  t.write( dir + "leaf.csv", "x\n1\n" );
+  t.write( "top.csv", "x\n1\n" );
+  ServerConfig config;
+  config.root = t.root;
+  Server server( f.zorba, config, std::cerr );
+  wait_settled( server );
+  Listing l( list( server ) );
+  check( contains( l.text, "\"incomplete\":true" ) && l.lists( "top.csv" ),
+         "the listing says it may be incomplete", l.text );
+  l = list_path( server, dir + "leaf.csv" );
+  check( !l.is_error && contains( dump_of( l.preview() ), "\"columns\":[\"x\"]" ),
+         "a file down there still works by path", l.text );
+}
+
+void test_preview_bound( Fixture const &f ) {
+  ( void )f;
+  std::string const long_prefix( 400000, 'p' );
+  std::string const many_ns( "<" + long_prefix + ":r xmlns:" + long_prefix +
+                             "=\"u\"/>" );
+  // Control characters take six bytes each in JSON.
+  std::string const controls( 70, '\x01' );
+  std::string csv, csv_row;
+  for ( int i = 0; i < 32; ++i ) {
+    csv += std::string( i ? "," : "" ) + controls;
+    csv_row += std::string( i ? "," : "" ) + std::string( 39, '\x02' );
+  }
+  csv += "\n" + csv_row + "\n" + csv_row + "\n" + csv_row + "\n";
+  std::string json( "{" );
+  for ( int i = 0; i < 40; ++i )
+    json += std::string( i ? "," : "" ) + "\"" + controls + std::to_string( i ) +
+      "\":\"" + std::string( 39, '\x01' ) + "\"";
+  std::string json_escaped;
+  for ( char const c : json + "}" ) {
+    if ( c == '\x01' )
+      json_escaped += "\\u0001";
+    else
+      json_escaped += c;
+  }
+  std::string xml( "<r>" );
+  for ( int i = 0; i < 40; ++i )
+    xml += "<" + std::string( 70, 'e' ) + std::to_string( i ) + "/>";
+  xml += "</r>";
+
+  struct { char const *what; ScanFormat format; std::string const &data; }
+    const cases[] = {
+      { "xml with a long prefix", ScanFormat::xml, many_ns },
+      { "xml with many paths", ScanFormat::xml, xml },
+      { "csv", ScanFormat::csv, csv },
+      { "json", ScanFormat::json, json_escaped } };
+  for ( auto const &c : cases ) {
+    ScanPreview const p( make_scan_preview( c.format, c.data, false, nullptr ) );
+    check( p.json.size() < 8192, std::string( c.what ) + ": under 8 KB",
+           std::to_string( p.json.size() ) );
+    Json parsed_json;
+    std::string why;
+    check( parse_json( p.json, &parsed_json, &why ),
+           std::string( c.what ) + ": JSON", why );
+  }
+
+  // Each prefix once: strict parsers refuse repeated members.
+  ScanPreview const p( make_scan_preview( ScanFormat::xml,
+    "<a xmlns:p=\"u\" xmlns=\"d\"><b xmlns:p=\"v\" xmlns=\"e\"/></a>", false,
+    nullptr ) );
+  Json j;
+  std::string why;
+  check( parse_json( p.json, &j, &why ) && j.find( "namespaces" ) &&
+         j.find( "namespaces" )->members().size() == 2,
+         "each prefix once", p.json );
+
+  // Arrays too, for a key that is repeated.
+  ScanPreview const q( make_scan_preview( ScanFormat::json,
+    "{\"a\":[1],\"a\":[1,2]}", false, nullptr ) );
+  check( parse_json( q.json, &j, &why ) && j.find( "arrays" ) &&
+         j.find( "arrays" )->members().size() == 1, "each array once", q.json );
+}
+
+// Names that are not UTF-8 stay apart and can be asked for, where the file
+// system has them.
+void test_escaped_names( Fixture const &f ) {
+  Tree t;
+  t.write( "n\xFF.csv", "ff\n1\n" );
+  t.write( "n\xFE.csv", "fe\n1\n" );
+  t.write( "plain.csv", "p\n1\n" );
+  std::size_t files = 0;
+  for ( auto const &entry : stdfs::directory_iterator( t.root ) ) {
+    ( void )entry;
+    ++files;
+  }
+  ServerConfig config;
+  config.root = t.root;
+  Server server( f.zorba, config, std::cerr );
+  wait_complete( server );
+  Listing l( list( server ) );
+  check( l.files.size() == files, "all listed", l.text );
+  if ( files == 3 ) {
+    check( l.lists( "n\\xFF.csv" ) && l.lists( "n\\xFE.csv" ),
+           "the names stay apart", l.text );
+    l = list_path( server, "n\\xFF.csv" );
+    check( contains( dump_of( l.preview() ), "\"columns\":[\"ff\"]" ) &&
+           l.member( "path" ) == "n\\xFF.csv",
+           "the escaped name can be asked for", l.text );
+    l = list_path( server, "n\\xFE.csv" );
+    check( contains( dump_of( l.preview() ), "\"columns\":[\"fe\"]" ),
+           "the other one too", l.text );
+  }
+}
+
+// The limit is filled, and dirs is current, after files turn out to be gone.
+void test_refill( Fixture const &f ) {
+  Tree t;
+  t.write( "sub/a.csv", "x\n1\n" );
+  t.write( "sub/b.csv", "x\n1\n" );
+  t.write( "top.csv", "x\n1\n" );
+  ServerConfig config;
+  config.root = t.root;
+  Server server( f.zorba, config, std::cerr );
+  wait_complete( server );
+  stdfs::remove( t.root + "/sub/a.csv" );
+  stdfs::remove( t.root + "/sub/b.csv" );
+  Listing l( list( server, Json::object( { { "limit", 1 } } ) ) );
+  check( l.total() == "1" && l.shown() == "1" && l.lists( "top.csv" ),
+         "the limit is filled from what remains", l.text );
+
+  t.write( "two/a.csv", "x\n1\n" );
+  t.write( "two/b.csv", "x\n1\n" );
+  t.write( "two/c.csv", "x\n1\n" );
+  list_path( server, "two" );
+  wait_complete( server );
+  stdfs::remove( t.root + "/two/a.csv" );
+  l = list( server, Json::object( { { "limit", 1 } } ) );
+  check( contains( dump_of( l.head.find( "dirs" ) ),
+                   "{\"path\":\"two\",\"files\":2}" ),
+         "dirs counts what remains", l.text );
+  stdfs::remove_all( t.root + "/two" );
+  l = list( server, Json::object( { { "limit", 1 } } ) );
+  check( !contains( l.text, "two" ), "a removed directory leaves dirs", l.text );
 }
 
 void test_previews( Fixture const &f ) {
@@ -665,14 +1005,29 @@ void test_path( Fixture const &f ) {
   l = list_path( server, "." );
   check( !l.is_error && l.lists( "a/b.csv" ), "the root as .", l.text );
 
-  // A FIFO neither blocks the walker nor a request.
-  check( mkfifo( ( t.root + "/pipe.csv" ).c_str(), 0600 ) == 0, "mkfifo" );
+  // A FIFO neither blocks the walker nor a request, and is not opened: a writer
+  // waiting for a reader stays waiting.
+  std::string const fifo( t.root + "/pipe.csv" );
+  check( mkfifo( fifo.c_str(), 0600 ) == 0, "mkfifo" );
+  pid_t const writer = fork();
+  if ( writer == 0 ) {
+    int const fd = open( fifo.c_str(), O_WRONLY );
+    _exit( fd >= 0 ? 0 : 1 );
+  }
+  check( writer > 0, "start the writer" );
   list( server, Json::object( { { "refresh", true } } ) );
   l = wait_complete( server );
   check( l.found() == "1", "a FIFO is not listed", l.text );
   l = list_path( server, "pipe.csv" );
   check( l.is_error && l.error_code() == "not-found", "a FIFO is not read",
          l.text );
+  list( server );
+  std::this_thread::sleep_for( std::chrono::milliseconds( 200 ) );
+  int writer_status = 0;
+  check( waitpid( writer, &writer_status, WNOHANG ) == 0,
+         "the writer of the FIFO is still waiting" );
+  check( kill( writer, SIGKILL ) == 0 &&
+         waitpid( writer, &writer_status, 0 ) == writer, "end the writer" );
 
   // Arguments.
   Json const r1( call( server, "list_documents", Json::object( { { "limit", "x" } } ) ) );
@@ -748,8 +1103,8 @@ void test_malformed( Fixture const &f ) {
   check( l.files.size() == files, "the listing has all files", l.text );
 }
 
-// A file nested 100000 levels deep is an error in its preview, on the
-// sampler's thread and on the request's, and the server goes on.
+// A file nested 100000 levels deep is an error in its preview, sampled or
+// asked for, and the server goes on.
 void test_deep( Fixture const &f ) {
   constexpr int levels = 100000;
   auto repeat = []( std::string const &part ) {
@@ -792,10 +1147,10 @@ void test_deep( Fixture const &f ) {
            "the server goes on" );
   }
   {
-    // Explored on the request's thread, with the sampler held.
-    auto const gate = std::make_shared<Gate>( "sample", "*" );
+    // Asked for before the walker has found them.
+    auto const gate = std::make_shared<Gate>( "walk", "" );
     Server server( f.zorba, gated( t.root, gate ), std::cerr );
-    check( gate->wait_reached(), "the sampler is held" );
+    check( gate->wait_reached(), "the walker is held" );
     check_deep( server, "explored" );
     gate->release();
     wait_complete( server );
@@ -1401,6 +1756,10 @@ void test_description( Fixture const &f ) {
   std::cout << "list_documents definition: " << tool.size() << " bytes"
             << std::endl;
   check( tool.size() <= 700, "the tool definition stays short", tool );
+  check( contains( tool, "recursive" ) && contains( tool, "sorted" ) &&
+         contains( tool, "dirs" ) && contains( tool, "incomplete" ) &&
+         contains( tool, "memory_limit" ),
+         "it says what the listing is and what the terms mean", tool );
 }
 
 struct Test {
@@ -1411,6 +1770,13 @@ struct Test {
 Test const tests[] = {
   { "scan_status", test_status },
   { "scan_immediate", test_immediate },
+  { "scan_huge_tag", test_huge_tag },
+  { "scan_known_dirs", test_known_dirs },
+  { "scan_unreadable", test_unreadable },
+  { "scan_deep_tree", test_deep_tree },
+  { "scan_preview_bound", test_preview_bound },
+  { "scan_escaped_names", test_escaped_names },
+  { "scan_refill", test_refill },
   { "scan_previews", test_previews },
   { "scan_mtime", test_mtime },
   { "scan_refresh", test_refresh },

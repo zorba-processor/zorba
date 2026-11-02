@@ -88,8 +88,12 @@ public:
   /** The policy every query runs under. */
   SecurityPolicy const& policy() const { return thePolicy; }
 
-  /** Stops the background scan, if any; the destructor does it too. */
-  void stop_scan();
+  /**
+   * Stops the background scan, if any; the destructor does it too.
+   *
+   * @return whether every thread was joined.
+   */
+  bool stop_scan();
 
   /** The bytes the scan cache accounts for, or 0 without a scan. */
   std::size_t scan_cache_bytes() const;
