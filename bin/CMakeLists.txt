@@ -352,6 +352,15 @@ ZORBA_SET_TEST_PROPERTY(bin/zorba_compilechk2 PASS_REGULAR_EXPRESSION ".*XPST000
 ZORBA_ADD_TEST(bin/zorba_compilechk3 zorbacmd -q "${CMAKE_CURRENT_SOURCE_DIR}/test/mymod2.xq" -f -l -x)
 ZORBA_SET_TEST_PROPERTY(bin/zorba_compilechk3 PASS_REGULAR_EXPRESSION ".*XQST0046.*mymod2.xq.*line-begin=['\"]17['\"] column-begin=['\"]1['\"] line-end=['\"]17['\"] column-end=['\"]26['\"].*")
 
+# --profile json writes valid JSON for an iterator that was never opened (the
+# body of a cached call): no nan or inf, no counter read from uninitialized
+# memory (4294967295 is an unsigned counter that wrapped or was never set).
+ZORBA_ADD_TEST(bin/zorba_profile_json zorbacmd --profile json --no-tree-ids --no-serializer
+  -f -q "${CMAKE_SOURCE_DIR}/test/rbkt/Queries/zorba/caching/simple-01.xq")
+ZORBA_SET_TEST_PROPERTY(bin/zorba_profile_json PASS_REGULAR_EXPRESSION "\"prof-calls\"")
+ZORBA_SET_TEST_PROPERTY(bin/zorba_profile_json
+  FAIL_REGULAR_EXPRESSION ": -?(nan|inf)|4294967295")
+
 # test the --option option to set an option in the static context
 ZORBA_ADD_TEST(bin/zorba_option zorbacmd -q "${CMAKE_CURRENT_SOURCE_DIR}/test/option.xq" -f --option "{http://zorba.io/}option=value")
 ZORBA_SET_TEST_PROPERTY(bin/zorba_option PASS_REGULAR_EXPRESSION "value")
@@ -421,6 +430,19 @@ ZORBA_ADD_TEST(bin/zorba_module_path_1 zorbacmd
   --module-path "${_libdir}${PATH_SEP}${_uridir}")
 ZORBA_SET_TEST_PROPERTY(bin/zorba_module_path_1
   PASS_REGULAR_EXPRESSION "hello, v2")
+
+# A relative module path is taken against the current directory, also under
+# --secure; a path that leaves the current directory does not grant it.
+ZORBA_SECURITY_TEST(module_path_relative_secure "hello, v2"
+  --secure -f -q "${_testdir}/versioning/import1.xq" --module-path .)
+ZORBA_SET_TEST_PROPERTY(bin/zorba_security_module_path_relative_secure
+  WORKING_DIRECTORY "${_uridir}")
+ZORBA_SECURITY_DENIED(module_path_dotdot_secure XQST0059 "access denied by security policy"
+  --secure -f -q "${_testdir}/versioning/import1.xq" --module-path ../elsewhere)
+ZORBA_SET_TEST_PROPERTY(bin/zorba_security_module_path_dotdot_secure
+  WORKING_DIRECTORY "${_uridir}")
+ZORBA_SET_TEST_PROPERTY(bin/zorba_security_module_path_dotdot_secure
+  FAIL_REGULAR_EXPRESSION "hello, v2")
 
 # test compilation of the perf script
 ZORBA_ADD_TEST(bin/zorba_compilechk4 zorbacmd 
