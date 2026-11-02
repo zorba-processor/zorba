@@ -27,6 +27,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <map>
 #include <sstream>
 #include <string>
 
@@ -506,36 +507,19 @@ void test_limits( Fixture const &f ) {
 }
 
 
-// Runs the zorba-mcp executable over a pipe: its stdout must carry only
-// protocol messages, one per line, even when a query writes a trace.
-void test_binary( Fixture const &f ) {
-  std::string input;
-  input += request( 1, "server/discover" ) + "\n";
-  input += request( 2, "initialize", Json::object( {
-    { "protocolVersion", "2025-11-25" }, { "capabilities", Json::object() },
-    { "clientInfo", Json::object( { { "name", "t" }, { "version", "1" } } ) }
-  } ), false ) + "\n";
-  input += "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}\n";
-  input += request( 3, "tools/call", Json::object( {
-    { "name", "run_query" },
-    { "arguments", Json::object( { { "query", read_file( f.join_query ) } } ) }
-  } ) ) + "\r\n";
-  input += "\n";
-  input += request( 4, "tools/call", Json::object( {
-    { "name", "run_query" },
-    { "arguments", Json::object( { { "query", "trace(42, \"label\")" } } ) }
-  } ), false ) + "\n";
-  input += "this is not json\n";
-
+// Runs the zorba-mcp executable over a pipe with the given arguments,
+// writes the input to it and returns everything it wrote to stdout.
+std::string run_binary( Fixture const &f, std::string const &queries,
+                        std::string const &input ) {
   int to_child[2], from_child[2];
   if ( pipe( to_child ) != 0 || pipe( from_child ) != 0 ) {
     check( false, "pipe" );
-    return;
+    return std::string();
   }
   pid_t const pid = fork();
   if ( pid < 0 ) {
     check( false, "fork" );
-    return;
+    return std::string();
   }
   if ( pid == 0 ) {
     if ( dup2( to_child[0], STDIN_FILENO ) < 0 ||
@@ -544,7 +528,7 @@ void test_binary( Fixture const &f ) {
          close( from_child[0] ) != 0 || close( from_child[1] ) != 0 )
       _exit( 127 );
     execl( f.binary.c_str(), f.binary.c_str(), "--root", f.tree.c_str(),
-           "--queries", f.queries.c_str(), static_cast<char*>( nullptr ) );
+           "--queries", queries.c_str(), static_cast<char*>( nullptr ) );
     _exit( 127 );
   }
   check( close( to_child[0] ) == 0, "close the child's input end" );
@@ -572,6 +556,156 @@ void test_binary( Fixture const &f ) {
   check( WIFEXITED( status ) && WEXITSTATUS( status ) == 0,
          "zorba-mcp exits with 0 at end of input",
          std::to_string( status ) );
+
+  return output;
+}
+
+// External variables of a predefined query become the tool's parameters: a
+// variable with a default value is optional, one without is required. All
+// exchanges go over the zorba-mcp executable's stdio.
+void test_optional_params( Fixture const &f ) {
+  std::string const queries(
+    ( std::filesystem::path( f.queries ).parent_path() / "params_queries" )
+      .string() );
+  auto call = [&]( int id, char const *tool, Json args ) {
+    return request( id, "tools/call", Json::object( {
+      { "name", tool }, { "arguments", std::move( args ) } } ) ) + "\n";
+  };
+  auto obj = []( std::initializer_list<std::pair<std::string,Json> > l ) {
+    return Json::object( l );
+  };
+
+  std::string input;
+  input += request( 1, "tools/list" ) + "\n";
+  input += call( 2, "greet", obj( { { "name", "Ana" } } ) );
+  input += call( 3, "greet", obj( { { "name", "Ana" }, { "greeting", "hi" } } ) );
+  input += call( 4, "greet", obj( { { "greeting", "hi" } } ) );
+  input += call( 5, "greet", obj( { { "name", Json::array() } } ) );
+  input += call( 6, "greet", obj( { { "name", 5 } } ) );
+  input += call( 7, "greet", obj( { { "name", Json() } } ) );
+  input += call( 8, "scale", obj( { { "value", "21" } } ) );
+  input += call( 9, "scale", obj( { { "value", "21" }, { "factor", "3" } } ) );
+  input += call( 10, "scale", obj( { { "value", "abc" } } ) );
+  input += call( 11, "scale", obj( { { "value", "2" }, { "factor", "x" } } ) );
+  input += call( 12, "scale", obj( { { "factor", "3" } } ) );
+  input += call( 13, "run_query", obj( {
+    { "query", "declare variable $x external := \"dflt\"; $x" } } ) );
+  input += call( 14, "run_query", obj( {
+    { "query", "declare variable $x external; $x" } } ) );
+  input += call( 15, "run_query", obj( {
+    { "query", "declare variable $x external := \"dflt\"; $x" },
+    { "variables", obj( { { "x", "given" } } ) } } ) );
+  input += call( 16, "greet", obj( { { "name", "Ana" } } ) );
+
+  std::string const output( run_binary( f, queries, input ) );
+  std::map<std::string, Json> by_id;
+  std::istringstream lines( output );
+  std::string line;
+  while ( std::getline( lines, line ) ) {
+    Json r;
+    std::string why;
+    if ( parse_json( line, &r, &why ) && r.find( "id" ) )
+      by_id[ r.find( "id" )->text() ] = r;
+  }
+  check( by_id.size() == 16, "sixteen responses", output );
+  if ( by_id.size() != 16 )
+    return;
+
+  // 1. The input schemas.
+  Json const *const res1 = by_id["1"].find( "result" );
+  Json const *const tools = res1 ? res1->find( "tools" ) : nullptr;
+  std::string greet, scale;
+  if ( tools && tools->is_array() )
+    for ( Json const &t : tools->items() ) {
+      if ( field( t, "name" ) == "greet" )
+        greet = t.dump();
+      else if ( field( t, "name" ) == "scale" )
+        scale = t.dump();
+    }
+  check( contains( greet, "\"properties\":{\"name\":" ) &&
+         contains( greet, "\"greeting\":" ) &&
+         contains( greet, "\"required\":[\"name\"]" ),
+         "greet: $name required, defaulted $greeting optional", greet );
+  check( contains( scale, "\"required\":[\"value\"]" ) &&
+         contains( scale, "\"factor\":" ),
+         "scale: $value required, defaulted $factor optional", scale );
+
+  // 2. Defaults and overrides.
+  check( !is_tool_error( by_id["2"] ) &&
+         result_text( by_id["2"] ) == "hello, Ana",
+         "optional parameter omitted: the default applies", by_id["2"].dump() );
+  check( !is_tool_error( by_id["3"] ) &&
+         result_text( by_id["3"] ) == "hi, Ana",
+         "optional parameter supplied: overrides the default",
+         by_id["3"].dump() );
+  check( !is_tool_error( by_id["16"] ) &&
+         result_text( by_id["16"] ) == "hello, Ana",
+         "the override is not retained across calls", by_id["16"].dump() );
+  check( !is_tool_error( by_id["8"] ) && result_text( by_id["8"] ) == "42",
+         "typed optional parameter omitted: the default applies",
+         by_id["8"].dump() );
+  check( !is_tool_error( by_id["9"] ) && result_text( by_id["9"] ) == "63",
+         "typed optional parameter supplied as text: converted to its type",
+         by_id["9"].dump() );
+
+  // 3. A missing required parameter is a tool error naming it.
+  for ( char const *const id : { "4", "7", "12" } ) {
+    Json const &r = by_id[id];
+    check( is_tool_error( r ) &&
+           field( tool_error( r ), "code" ) == "invalid-arguments" &&
+           contains( field( tool_error( r ), "message" ),
+                     std::string( id ) == "12" ? "value" : "name" ),
+           std::string( "missing required parameter (request " ) + id +
+           "): tool error", r.dump() );
+  }
+
+  // 4. A value that does not fit the parameter is a tool error, not a crash.
+  check( is_tool_error( by_id["5"] ) &&
+         contains( field( tool_error( by_id["5"] ), "message" ), "name" ),
+         "array for a string parameter: tool error", by_id["5"].dump() );
+  check( !is_tool_error( by_id["6"] ) && result_text( by_id["6"] ) == "hello, 5",
+         "number for a string parameter: its text", by_id["6"].dump() );
+  check( is_tool_error( by_id["10"] ) && !tool_error( by_id["10"] ).is_null(),
+         "text that is not an xs:integer: tool error with a diagnostic",
+         by_id["10"].dump() );
+  check( is_tool_error( by_id["11"] ) && !tool_error( by_id["11"] ).is_null(),
+         "optional parameter of the wrong type: tool error with a diagnostic",
+         by_id["11"].dump() );
+
+  // run_query takes the query only: no variables; the query's own defaults
+  // apply and an external variable without one is an error.
+  check( !is_tool_error( by_id["13"] ) && result_text( by_id["13"] ) == "dflt",
+         "run_query: a defaulted external variable uses its default",
+         by_id["13"].dump() );
+  check( is_tool_error( by_id["14"] ) && !tool_error( by_id["14"] ).is_null(),
+         "run_query: an external variable without a value is a tool error",
+         by_id["14"].dump() );
+  check( !is_tool_error( by_id["15"] ) && result_text( by_id["15"] ) == "dflt",
+         "run_query ignores a \"variables\" argument", by_id["15"].dump() );
+}
+
+// Runs the zorba-mcp executable over a pipe: its stdout must carry only
+// protocol messages, one per line, even when a query writes a trace.
+void test_binary( Fixture const &f ) {
+  std::string input;
+  input += request( 1, "server/discover" ) + "\n";
+  input += request( 2, "initialize", Json::object( {
+    { "protocolVersion", "2025-11-25" }, { "capabilities", Json::object() },
+    { "clientInfo", Json::object( { { "name", "t" }, { "version", "1" } } ) }
+  } ), false ) + "\n";
+  input += "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}\n";
+  input += request( 3, "tools/call", Json::object( {
+    { "name", "run_query" },
+    { "arguments", Json::object( { { "query", read_file( f.join_query ) } } ) }
+  } ) ) + "\r\n";
+  input += "\n";
+  input += request( 4, "tools/call", Json::object( {
+    { "name", "run_query" },
+    { "arguments", Json::object( { { "query", "trace(42, \"label\")" } } ) }
+  } ), false ) + "\n";
+  input += "this is not json\n";
+
+  std::string const output( run_binary( f, f.queries, input ) );
 
   std::istringstream lines( output );
   std::string line;
@@ -715,6 +849,7 @@ Test const tests[] = {
   { "predefined", test_predefined },
   { "limits", test_limits },
   { "binary", test_binary },
+  { "optional_params", test_optional_params },
   { "documents_stream", test_documents_stream }
 };
 
