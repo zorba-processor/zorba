@@ -92,6 +92,14 @@ protected:
       user_function* udf,
       const QueryLoc& loc);
 
+  expr* createNormalizedProbe(
+      expr* qnameExpr,
+      expr* outerKeyExpr,
+      expr* scanExpr,
+      static_context* sctx,
+      user_function* udf,
+      const QueryLoc& loc);
+
   void expandVars(expr* idxExpr, csize outerVarId, csize innerVarId);
 };
 

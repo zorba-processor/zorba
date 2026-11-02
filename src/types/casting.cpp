@@ -1929,9 +1929,17 @@ T1_TO_T2(uint, int)
   }
   catch (const std::exception& ) 
   {
-    // An xs:unsignedLong above 2^63-1 without big integers.
+    // An xs:unsignedLong above 2^63-1 without big integers: too large for
+    // xs:integer (FOCA0003), or outside the range of a derived target (FORG0001).
     if ( throw_on_error )
-      throwFOCA0003Exception(aItem->getStringValue(), errInfo);
+    {
+      store::SchemaTypeCode const target = errInfo.theTargetType ?
+        TypeOps::get_atomic_type_code(*errInfo.theTargetType) :
+        errInfo.theTargetTypeCode;
+      if (target == store::XS_INTEGER)
+        throwFOCA0003Exception(aItem->getStringValue(), errInfo);
+      throwFORG0001Exception(aItem->getStringValue(), errInfo);
+    }
   }
   return false;
 }
