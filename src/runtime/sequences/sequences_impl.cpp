@@ -1833,7 +1833,8 @@ static void normalizeUnparsedTextUri(
   catch (ZorbaException const& e)
   {
     if (e.diagnostic() == err::FODC0005)
-      throw XQUERY_EXCEPTION(err::FOUT1170, ERROR_PARAMS(aUri), ERROR_LOC(loc));
+      throw XQUERY_EXCEPTION(err::FOUT1170, ERROR_PARAMS(aUri, ZED(BadAnyURI)),
+                             ERROR_LOC(loc));
     throw;
   }
 
@@ -1848,7 +1849,8 @@ static void normalizeUnparsedTextUri(
     lHasFragment = true;                // not a valid URI at all
   }
   if (lHasFragment)
-    throw XQUERY_EXCEPTION(err::FOUT1170, ERROR_PARAMS(aUri), ERROR_LOC(loc));
+    throw XQUERY_EXCEPTION(err::FOUT1170, ERROR_PARAMS(aUri, ZED(URIHasFragment)),
+                           ERROR_LOC(loc));
 }
 
 /**
@@ -1889,7 +1891,8 @@ static void readDocument(
   {
     if (!transcode::is_supported(aEncoding.c_str()))
     {
-      throw XQUERY_EXCEPTION(err::FOUT1190, ERROR_PARAMS(aUri), ERROR_LOC(loc));
+      throw XQUERY_EXCEPTION(err::FOUT1190, ERROR_PARAMS(aUri, aEncoding),
+                             ERROR_LOC(loc));
     }
     transcode::attach(*lStream.get(), aEncoding.c_str());
   }
@@ -2042,7 +2045,9 @@ bool FnUnparsedTextLinesIterator::nextImpl(store::Item_t& result, PlanState& pla
     {
       if (!transcode::is_supported(encodingString.c_str()))
       {
-        throw XQUERY_EXCEPTION(err::FOUT1190, ERROR_PARAMS(uriString), ERROR_LOC(loc));
+        throw XQUERY_EXCEPTION(err::FOUT1190,
+                               ERROR_PARAMS(uriString, encodingString),
+                               ERROR_LOC(loc));
       }
       transcode::attach(*state->theStream->get(), encodingString.c_str());
     }
