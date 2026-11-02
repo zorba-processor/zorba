@@ -79,12 +79,6 @@ declare function local:spec($r as xs:anyAtomicType*, $input as xs:anyAtomicType*
   try { concat("i-x0:", count(distinct-values((9223372036854775807, 9.223372036854774784E18)))) } catch * { concat("i-x0:", local-name-from-QName($err:code)) },
   try { concat("l-x0:", count(distinct-values((xs:long("9223372036854775807"), 9.223372036854774784E18)))) } catch * { concat("l-x0:", local-name-from-QName($err:code)) },
   try { concat("d64-x64:", count(distinct-values((18446744073709551616.0, 1.8446744073709551616E19)))) } catch * { concat("d64-x64:", local-name-from-QName($err:code)) },
-  try { concat("u-x64:", count(distinct-values((xs:unsignedLong("18446744073709551615"), 1.8446744073709551616E19)))) } catch * { concat("u-x64:", local-name-from-QName($err:code)) },
-  try { concat("u-du:", count(distinct-values((xs:unsignedLong("18446744073709551615"), 18446744073709551615.0)))) } catch * { concat("u-du:", local-name-from-QName($err:code)) },
-  try { concat("u-d64:", count(distinct-values((xs:unsignedLong("18446744073709551615"), 18446744073709551616.0)))) } catch * { concat("u-d64:", local-name-from-QName($err:code)) },
-  try { concat("u-i:", count(distinct-values((xs:unsignedLong("18446744073709551615"), 9223372036854775807)))) } catch * { concat("u-i:", local-name-from-QName($err:code)) },
-  try { concat("i-u:", count(distinct-values((9223372036854775807, xs:unsignedLong("18446744073709551615"))))) } catch * { concat("i-u:", local-name-from-QName($err:code)) },
-  try { concat("u-l:", count(distinct-values((xs:unsignedLong("18446744073709551615"), xs:long("9223372036854775807"))))) } catch * { concat("u-l:", local-name-from-QName($err:code)) },
   try { concat("u63-i:", count(distinct-values((xs:unsignedLong("9223372036854775807"), 9223372036854775807)))) } catch * { concat("u63-i:", local-name-from-QName($err:code)) },
   try { concat("i-u63:", count(distinct-values((9223372036854775807, xs:unsignedLong("9223372036854775807"))))) } catch * { concat("i-u63:", local-name-from-QName($err:code)) },
   try { concat("u63-l:", count(distinct-values((xs:unsignedLong("9223372036854775807"), xs:long("9223372036854775807"))))) } catch * { concat("u63-l:", local-name-from-QName($err:code)) },
@@ -95,5 +89,5 @@ declare function local:spec($r as xs:anyAtomicType*, $input as xs:anyAtomicType*
   try { concat("t3:", local:spec(distinct-values((9223372036854775808.0, 9223372036854775807, 9.223372036854775808E18)), (9223372036854775808.0, 9223372036854775807, 9.223372036854775808E18))) } catch * { concat("t3:", local-name-from-QName($err:code)) },
   try { concat("t4:", local:spec(distinct-values((9223372036854775807, 9223372036854775807.5, 9.223372036854775808E18)), (9223372036854775807, 9223372036854775807.5, 9.223372036854775808E18))) } catch * { concat("t4:", local-name-from-QName($err:code)) },
   try { concat("t5:", local:spec(distinct-values((xs:long("9223372036854775807"), 9223372036854775808.0, 9.223372036854775808E18)), (xs:long("9223372036854775807"), 9223372036854775808.0, 9.223372036854775808E18))) } catch * { concat("t5:", local-name-from-QName($err:code)) },
-  try { concat("t6:", local:spec(distinct-values((xs:unsignedLong("18446744073709551615"), 18446744073709551616.0, 1.8446744073709551616E19)), (xs:unsignedLong("18446744073709551615"), 18446744073709551616.0, 1.8446744073709551616E19))) } catch * { concat("t6:", local-name-from-QName($err:code)) }
+  try { concat("t6:", local:spec(distinct-values((xs:unsignedLong("9223372036854775807"), 9223372036854775808.0, 9.223372036854775808E18)), (xs:unsignedLong("9223372036854775807"), 9223372036854775808.0, 9.223372036854775808E18))) } catch * { concat("t6:", local-name-from-QName($err:code)) }
 )

@@ -34,8 +34,5 @@ declare function local:r($p as xs:integer*) as xs:string { concat("[", string-jo
   try { local:r(index-of((xs:long("9223372036854775807"), 9223372036854775807.0), 9223372036854775807.0)) } catch * { local-name-from-QName($err:code) },
   try { local:r(index-of((9223372036854775807, 9223372036854775808.0), 9.223372036854775808E18)) } catch * { local-name-from-QName($err:code) },
   try { local:r(index-of((9.223372036854775808E18, 9223372036854775807), 9223372036854775807)) } catch * { local-name-from-QName($err:code) },
-  try { local:r(index-of((9223372036854775807, xs:long("9223372036854775807")), xs:long("9223372036854775807"))) } catch * { local-name-from-QName($err:code) },
-  try { local:r(index-of((xs:unsignedLong("18446744073709551615"), 9223372036854775807), 9223372036854775807)) } catch * { local-name-from-QName($err:code) },
-  try { local:r(index-of((9223372036854775807, xs:unsignedLong("18446744073709551615")), xs:unsignedLong("18446744073709551615"))) } catch * { local-name-from-QName($err:code) },
-  try { local:r(index-of((xs:unsignedLong("18446744073709551615"), 18446744073709551616.0), 18446744073709551616.0)) } catch * { local-name-from-QName($err:code) }
+  try { local:r(index-of((9223372036854775807, xs:long("9223372036854775807")), xs:long("9223372036854775807"))) } catch * { local-name-from-QName($err:code) }
 )

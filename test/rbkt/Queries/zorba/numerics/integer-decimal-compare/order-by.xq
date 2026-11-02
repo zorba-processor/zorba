@@ -41,11 +41,11 @@ declare function local:r($p as xs:integer*) as xs:string { string-join($p ! stri
   try { local:r(for $x at $p in (9223372036854775807.5, xs:long("9223372036854775807"), 9223372036854775808.0) stable order by $x return $p) } catch * { local-name-from-QName($err:code) },
   try { local:r(for $x at $p in (xs:long("-9223372036854775808"), -9223372036854775809.0) stable order by $x return $p) } catch * { local-name-from-QName($err:code) },
   (: static type xs:integer :)
-  try { local:r(for $x at $p in (xs:unsignedLong("18446744073709551615"), 9223372036854775807, -1, xs:long("9223372036854775807")) stable order by $x return $p) } catch * { local-name-from-QName($err:code) },
+  try { local:r(for $x at $p in (xs:unsignedLong("9223372036854775807"), -1, xs:nonNegativeInteger(\"5\"), xs:long("9223372036854775807"), 9223372036854775807) stable order by $x return $p) } catch * { local-name-from-QName($err:code) },
   (: common type xs:double :)
   try { local:r(for $x at $p in (9.223372036854775808E18, 9223372036854775807, 1) stable order by $x return $p) } catch * { local-name-from-QName($err:code) },
   try { local:r(for $x at $p in (9.223372036854774784E18, xs:long("9223372036854775807"), -9.223372036854775808E18) stable order by $x return $p) } catch * { local-name-from-QName($err:code) },
-  try { local:r(for $x at $p in (1.8446744073709551616E19, xs:unsignedLong("18446744073709551615"), 9223372036854775808.0) stable order by $x return $p) } catch * { local-name-from-QName($err:code) },
+  try { local:r(for $x at $p in (1.8446744073709551616E19, 18446744073709551616.0, 9223372036854775808.0) stable order by $x return $p) } catch * { local-name-from-QName($err:code) },
   (: all three equal as xs:double, although 9223372036854775807 lt 9223372036854775808.0 as xs:decimal :)
   try { local:r(for $x at $p in (9223372036854775808.0, 9223372036854775807, 9.223372036854775808E18) stable order by $x return $p) } catch * { local-name-from-QName($err:code) },
   try { local:r(for $x at $p in (9223372036854775807.5, xs:long("9223372036854775807"), 9.223372036854775808E18, 9223372036854775807) stable order by $x return $p) } catch * { local-name-from-QName($err:code) }

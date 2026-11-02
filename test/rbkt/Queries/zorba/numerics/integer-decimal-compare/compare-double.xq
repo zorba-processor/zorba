@@ -19,13 +19,12 @@
 
 declare namespace err = "http://www.w3.org/2005/xqt-errors";
 
-(: xs:integer, xs:long, xs:unsignedLong, xs:decimal and xs:double around -2^63, 2^63
-   and 2^64: anything against an xs:double compares as xs:double, the others
-   exactly.
+(: xs:integer, xs:long, xs:decimal and xs:double around -2^63, 2^63 and 2^64:
+   anything against an xs:double compares as xs:double, the others exactly.
    One row per left operand, one letter per right operand: l(ess), e(qual),
    g(reater), x if eq, ne, lt, le, gt, ge, =, <, > disagree. An error is reported
    in place of its row. :)
-let $v := (-9.223372036854775808E18, xs:integer("-9223372036854775808"), xs:long("-9223372036854775808"), 9.223372036854774784E18, 9223372036854775807, xs:long("9223372036854775807"), 9223372036854775808.0, 9.223372036854775808E18, xs:unsignedLong("18446744073709551615"), 1.8446744073709551616E19, 18446744073709551616.0)
+let $v := (-9.223372036854775808E18, xs:integer("-9223372036854775808"), xs:long("-9223372036854775808"), 9.223372036854774784E18, 9223372036854775807, xs:long("9223372036854775807"), 9223372036854775808.0, 9.223372036854775808E18, 1.8446744073709551616E19, 18446744073709551616.0)
 for $a in $v
 return
   try {

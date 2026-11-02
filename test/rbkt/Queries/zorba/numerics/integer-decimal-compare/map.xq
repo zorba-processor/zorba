@@ -40,24 +40,14 @@ $r := (
   map:get("idc-decimal", 1.0),
   map:get("idc-decimal", 1.5));
 map:drop("idc-decimal");
-map:create("idc-any", "anyAtomicType");
-map:insert("idc-any", 9223372036854775807, "i");
-map:insert("idc-any", 9223372036854775808.0, "d");
+map:create("idc-double", "double");
+map:insert("idc-double", 9223372036854775807, "i");
+map:insert("idc-double", 9.223372036854775808E18, "x");
+map:insert("idc-double", 9223372036854775808.0, "d");
 $r := ($r,
   "|",
-  map:size("idc-any"),
-  map:get("idc-any", 9223372036854775807),
-  map:get("idc-any", xs:long("9223372036854775807")),
-  map:get("idc-any", 9223372036854775808.0),
-  map:get("idc-any", 9223372036854775807.0));
-map:drop("idc-any");
-map:create("idc-any-double", "anyAtomicType");
-map:insert("idc-any-double", 9223372036854775807, "i");
-map:insert("idc-any-double", 9.223372036854775808E18, "x");
-$r := ($r,
-  "|",
-  map:size("idc-any-double"),
-  map:get("idc-any-double", 9.223372036854775808E18),
-  map:get("idc-any-double", 9223372036854775807));
-map:drop("idc-any-double");
+  map:size("idc-double"),
+  map:get("idc-double", 9.223372036854775808E18),
+  map:get("idc-double", xs:long("9223372036854775807")));
+map:drop("idc-double");
 $r

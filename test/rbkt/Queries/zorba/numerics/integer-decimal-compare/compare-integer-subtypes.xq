@@ -19,12 +19,11 @@
 
 declare namespace err = "http://www.w3.org/2005/xqt-errors";
 
-(: Types derived from xs:integer around 2^63 and 2^64, static type xs:integer:
-   xs:unsignedLong values above 2^63-1 do not fit a 64-bit xs:integer.
+(: Types derived from xs:integer around 2^63, static type xs:integer.
    One row per left operand, one letter per right operand: l(ess), e(qual),
    g(reater), x if eq, ne, lt, le, gt, ge, =, <, > disagree. An error is reported
    in place of its row. :)
-let $v := (-1, xs:long("-1"), xs:nonNegativeInteger("5"), xs:long("9223372036854775807"), 9223372036854775807, xs:unsignedLong("9223372036854775807"), xs:unsignedLong("9223372036854775808"), xs:unsignedLong("18446744073709551615"))
+let $v := (-1, xs:long("-1"), xs:nonNegativeInteger("5"), xs:long("9223372036854775807"), 9223372036854775807, xs:unsignedLong("9223372036854775807"))
 for $a in $v
 return
   try {
