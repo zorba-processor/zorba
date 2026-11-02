@@ -108,6 +108,11 @@ ZORBA_SET_TEST_PROPERTY(bin/zorba_hint_none FAIL_REGULAR_EXPRESSION "hint:")
 ZORBA_ADD_TEST(bin/zorba_hint_serializer zorbacmd -z method=json -q "<a/>")
 ZORBA_SET_TEST_PROPERTY(bin/zorba_hint_serializer PASS_REGULAR_EXPRESSION "JNSE0014.*hint: .*serialize")
 
+# JNSE0012: the message says how to serialize several items as JSON.
+ZORBA_ADD_TEST(bin/zorba_jnse0012 zorbacmd -z method=json -z jsoniq-multiple-items=no -q "1, 2")
+ZORBA_SET_TEST_PROPERTY(bin/zorba_jnse0012 PASS_REGULAR_EXPRESSION
+  "JNSE0012\\]: cannot serialize multiple top-level items as JSON; wrap them in an array or set the serialization parameter jsoniq-multiple-items to yes")
+
 # Security policy flags: --secure, --allow, --deny, --read-path, --write-path,
 # --network-prefix, --private-addresses. Each capability is shown denied and
 # permitted. The queries in test/security print a marker on success. A policy
