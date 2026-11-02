@@ -134,7 +134,15 @@ class QueryResources;
                     calls themselves; every DEADLINE_CHECK_INTERVAL calls it is
                     negligible. Once the deadline has passed, it stays at 1 so
                     that every further consumeNext call raises the error again
-                    (code that swallows the error cannot keep running).
+                    (code that swallows the error cannot keep running). The
+                    count is per plan state, and a function call runs its body
+                    with a plan state of its own, which may never reach the
+                    interval: work that does not go through consumeNext often
+                    enough calls checkDeadlineNow() (see there).
+
+  theHasUDFCalls  : True if the plan run with this state contains the state of
+                    a user-defined function call (set when the call iterator
+                    opens). See UDFunctionCallIteratorState::releaseBody.
 ********************************************************************************/
 class PlanState
 {
@@ -173,6 +181,8 @@ public:
 
   bool                      theBlockOwned;
 
+  bool                      theHasUDFCalls;
+
 public:
   PlanState(
       dynamic_context* globalDctx,
@@ -185,7 +195,9 @@ public:
 
   ~PlanState();
 
-  static constexpr uint32_t DEADLINE_CHECK_INTERVAL = 1024;
+  static constexpr uint32_t DEADLINE_CHECK_INTERVAL = 64;
+
+  static constexpr uint32_t BYTES_PER_WORK_UNIT_LOG2 = 12;
 
   /**
    * Sets the call depth limit and the deadline from the security policy of
@@ -223,6 +235,42 @@ public:
    * deadline: raises ZXQP0068 if it has passed.
    */
   void checkDeadline(const QueryLoc& loc);
+
+  /**
+   * Raises ZXQP0068 if there is a deadline and it has passed, reading the
+   * clock now. For the steps of an evaluation that take long enough for the
+   * clock to be negligible (a function call, a sort, a parse), or whose own
+   * work consumeNext does not see.
+   */
+  void checkDeadlineNow(const QueryLoc& loc)
+  {
+    if (theDeadlineCountdown != 0)
+      checkDeadline(loc);
+  }
+
+  /**
+   * Counts aUnits units of work done outside consumeNext against the
+   * countdown: a unit weighs about as much as a consumeNext call, and the
+   * clock is read only when the countdown runs out.
+   */
+  void chargeWork(uint64_t aUnits, const QueryLoc& loc)
+  {
+    if (theDeadlineCountdown != 0)
+    {
+      if (aUnits >= theDeadlineCountdown)
+        checkDeadline(loc);
+      else
+        theDeadlineCountdown -= static_cast<uint32_t>(aUnits);
+    }
+  }
+
+  /**
+   * chargeWork() for an operation on a string of aBytes bytes.
+   */
+  void chargeBytes(uint64_t aBytes, const QueryLoc& loc)
+  {
+    chargeWork(aBytes >> BYTES_PER_WORK_UNIT_LOG2, loc);
+  }
 };
 
 

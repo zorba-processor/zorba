@@ -34,6 +34,8 @@ namespace flwor
   Class acting as a comparison function between two sort tuples. An instance of
   this class is passed to std::sort() method that sorts an array of sort tuples. 
 ********************************************************************************/
+class PlanState;
+
 class SortTupleCmp
 {
 private:
@@ -41,6 +43,7 @@ private:
   const std::vector<OrderSpec> * theOrderSpecs;
   const TypeManager            * theTypeManager;
   long                           theTimezone;
+  PlanState                    * thePlanState;
 
 public:
   //SortTupleCmp() : theOrderSpecs(0), theTypeManager(0), theTimezone(0) {}
@@ -49,10 +52,12 @@ public:
         const QueryLoc& loc,
         dynamic_context* dctx,
         const TypeManager* tm,
-        const std::vector<OrderSpec>* orderSpecs)
+        const std::vector<OrderSpec>* orderSpecs,
+        PlanState& planState)
     :
     theLocation(loc),
-    theOrderSpecs(orderSpecs) 
+    theOrderSpecs(orderSpecs),
+    thePlanState(&planState)
   {
     theTypeManager = tm;
     theTimezone = dctx->get_implicit_timezone();

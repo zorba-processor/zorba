@@ -21,6 +21,7 @@
 #include <exception>
 #include <filesystem>
 #include <fstream>
+#include <new>
 #include <set>
 #include <sstream>
 #include <streambuf>
@@ -54,6 +55,7 @@ namespace {
 // JSON-RPC 2.0 and MCP error codes.
 int const PARSE_ERROR = -32700;
 int const INVALID_REQUEST = -32600;
+int const INTERNAL_ERROR = -32603;
 int const METHOD_NOT_FOUND = -32601;
 int const INVALID_PARAMS = -32602;
 int const UNSUPPORTED_PROTOCOL_VERSION = -32022;
@@ -225,6 +227,16 @@ std::string tool_name( std::string const &stem ) {
   if ( name.size() > 128 )
     name.resize( 128 );
   return name;
+}
+
+std::string out_of_memory_text( unsigned long long max_memory ) {
+  return Json::object( { { "error", Json::object( {
+    { "code", "memory_limit" },
+    { "message", "the query ran out of memory (server limit --max-memory: " +
+      ( max_memory ? std::to_string( max_memory ) + " bytes" :
+                     std::string( "none" ) ) +
+      "); narrow the query, or start the server with a higher limit" }
+  } ) } } ).dump();
 }
 
 Json diagnostic_json( ZorbaException const &e, std::string const &source,
@@ -515,8 +527,17 @@ Server::run( std::string const &source, std::string const &file_name,
         "fields, a filter, or subsequence()) to see the rest]";
     }
   }
+  // The query is gone by now, and with it the memory it used.
   catch ( ZorbaException const &e ) {
-    outcome.text = diagnostic_json( e, source, file_name ).dump();
+    // Zorba reports std::bad_alloc as an internal error.
+    if ( std::strcmp( e.diagnostic().qname().localname(), "ZXQP0003" ) == 0 &&
+         std::strstr( e.what(), "bad_alloc" ) )
+      outcome.text = out_of_memory_text( theConfig.max_memory );
+    else
+      outcome.text = diagnostic_json( e, source, file_name ).dump();
+  }
+  catch ( std::bad_alloc const& ) {
+    outcome.text = out_of_memory_text( theConfig.max_memory );
   }
   catch ( std::exception const &e ) {
     outcome.text = Json::object( { { "error", Json::object( {
@@ -627,6 +648,19 @@ Json Server::call_tool( Json const &params, bool *protocol_error,
 }
 
 std::string Server::handle( std::string const &message ) {
+  Json request_id;
+  try {
+    return handle_message( message, &request_id );
+  }
+  catch ( std::exception const &e ) {
+    // Whatever it was (out of memory, most likely), the next request may work.
+    return error_response( request_id, INTERNAL_ERROR,
+      std::string( "Internal error: " ) + e.what() ).dump();
+  }
+}
+
+std::string Server::handle_message( std::string const &message,
+                                    Json *request_id ) {
   Json const null_id;
   if ( message.size() > max_message_size )
     return error_response( null_id, INVALID_REQUEST,
@@ -643,6 +677,8 @@ std::string Server::handle( std::string const &message ) {
 
   Json const *const id = msg.find( "id" );
   Json const *const method = msg.find( "method" );
+  if ( id && ( id->is_string() || id->is_integer() ) )
+    *request_id = *id;
   if ( !method ) {
     // A response from the client (we send no requests): nothing to answer.
     if ( !id || msg.find( "result" ) || msg.find( "error" ) )

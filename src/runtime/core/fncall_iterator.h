@@ -96,6 +96,14 @@ public:
   -----------------
   The size of the plan state block.
 
+  Memory of a completed call: the state of the body holds the states of the
+  calls inside the body, each with a body plan state of its own. If every
+  call kept its body open until the query ended, a recursion would keep one
+  state tree per call made, not per level of the call stack. So a call inside
+  another call closes its body when it completes (see releaseBody): what stays
+  allocated is this object and the raw state block, whose size does not grow.
+  A later run of the same call iterator opens the body again.
+
   theArgWrappers:
   ---------------
   For each argument of this function call, theArgWrappers stores a plan iterator
@@ -142,6 +150,23 @@ public:
       store::ItemHandle<FunctionItem>& theFunctionItem);
 
   void reset(PlanState& planState);
+
+  /**
+   * True if the body plan should be closed when the call completes. Not for a
+   * call from the main plan, which holds one state tree per call site, and
+   * not for a body with no function call inside: its state does not grow, and
+   * running it again after a reset is cheaper than opening it again (a
+   * function called in a loop). Profiling reports the states when the query
+   * ends. Requires the body plan to be open.
+   */
+  bool canReleaseBody(const PlanState& aCaller) const
+  {
+    return aCaller.theStackDepth > 0 &&
+           thePlanState->theHasUDFCalls &&
+           !aCaller.theProfile;
+  }
+
+  void releaseBody(const PlanState& aCaller);
 };
 
 

@@ -273,6 +273,19 @@ void UDFunctionCallIteratorState::reset(PlanState& planState)
 
 
 /*******************************************************************************
+  Called when the body has returned its last item.
+********************************************************************************/
+void UDFunctionCallIteratorState::releaseBody(const PlanState& aCaller)
+{
+  if (thePlanOpen && canReleaseBody(aCaller))
+  {
+    thePlanOpen = false;
+    thePlan->close(*thePlanState);
+  }
+}
+
+
+/*******************************************************************************
 ********************************************************************************/
 UDFunctionCallIterator::UDFunctionCallIterator(
     static_context* sctx,
@@ -451,6 +464,8 @@ void UDFunctionCallIterator::openImpl(PlanState& planState, uint32_t& offset)
 {
   UDFunctionCallIteratorState* state;
 
+  planState.theHasUDFCalls = true;
+
   if (!theIsDynamic)
   {
     NaryBaseIterator<UDFunctionCallIterator, UDFunctionCallIteratorState>::
@@ -586,6 +601,10 @@ bool UDFunctionCallIterator::nextImplCache(store::Item_t& aResult, PlanState& aP
   // the deepest call of a recursion opens its recursive call).
   aPlanState.checkCallDepth(aPlanState.theStackDepth + 1, loc);
 
+  // Each call: the body runs with its own plan state, so a recursion that
+  // does little per call would never reach the check in consumeNext.
+  aPlanState.checkDeadlineNow(loc);
+
   // Open the plan, if not done already. This cannot be done in the openImpl
   // method because in the case of recursive functions, we will get into an
   // infinite loop.
@@ -625,6 +644,8 @@ bool UDFunctionCallIterator::nextImplCache(store::Item_t& aResult, PlanState& aP
     }
 
     DEBUGGER_POP_FRAME;
+
+    lState->releaseBody(aPlanState);
   }
   else
   {
@@ -684,6 +705,8 @@ bool UDFunctionCallIterator::nextImplCache(store::Item_t& aResult, PlanState& aP
           aResult = lState->theNextResult;
         }
 
+        lState->releaseBody(aPlanState);
+
         if (!aResult.isNull())
         {
           aResult->ensureSeekable();
@@ -698,12 +721,16 @@ bool UDFunctionCallIterator::nextImplCache(store::Item_t& aResult, PlanState& aP
       else
       {
         insertCacheEntry(aPlanState, lState, lState->theCachedResult);
+
+        lState->releaseBody(aPlanState);
       }
 
       DEBUGGER_POP_FRAME;
     }
     else // cache hit
     {
+      lState->releaseBody(aPlanState);
+
       lState->theCachedResultIterator = lState->theCachedResult.begin();
       while (lState->theCachedResultIterator != lState->theCachedResult.end())
       {
@@ -728,6 +755,10 @@ bool UDFunctionCallIterator::nextImplNoCache(store::Item_t& aResult, PlanState& 
   // the deepest call of a recursion opens its recursive call).
   aPlanState.checkCallDepth(aPlanState.theStackDepth + 1, loc);
 
+  // Each call: the body runs with its own plan state, so a recursion that
+  // does little per call would never reach the check in consumeNext.
+  aPlanState.checkDeadlineNow(loc);
+
   // Open the plan, if not done already. This cannot be done in the openImpl
   // method because in the case of recursive functions, we will get into an
   // infinite loop.
@@ -742,14 +773,44 @@ bool UDFunctionCallIterator::nextImplNoCache(store::Item_t& aResult, PlanState& 
 
   DEBUGGER_PUSH_FRAME;
 
-  while (consumeNext(aResult, lState->thePlan, *lState->thePlanState))
+  if (lState->canReleaseBody(aPlanState) &&
+      theUDF->getSignature().returnType()->max_card() <= 1)
   {
-    DEBUGGER_POP_FRAME;
-    STACK_PUSH(true, lState);
-    DEBUGGER_PUSH_FRAME;
+    // A consumer that knows from the signature that there is at most one item
+    // may not ask for a next one, so this call would never see that it is
+    // complete. Reading on is safe here: with one item allowed, the body has
+    // no more work that the result could leave undone (a second item is the
+    // error that the type check of the body raises when it reads ahead).
+    if (consumeNext(aResult, lState->thePlan, *lState->thePlanState))
+    {
+      while (consumeNext(lState->theNextResult, lState->thePlan, *lState->thePlanState))
+      {
+        DEBUGGER_POP_FRAME;
+        STACK_PUSH(true, lState);
+        DEBUGGER_PUSH_FRAME;
+        aResult.transfer(lState->theNextResult);
+      }
+
+      lState->releaseBody(aPlanState);
+
+      DEBUGGER_POP_FRAME;
+      STACK_PUSH(true, lState);
+      DEBUGGER_PUSH_FRAME;
+    }
+  }
+  else
+  {
+    while (consumeNext(aResult, lState->thePlan, *lState->thePlanState))
+    {
+      DEBUGGER_POP_FRAME;
+      STACK_PUSH(true, lState);
+      DEBUGGER_PUSH_FRAME;
+    }
   }
 
   DEBUGGER_POP_FRAME;
+
+  lState->releaseBody(aPlanState);
 
   STACK_END(lState);
 }
@@ -1169,6 +1230,9 @@ bool ExtFunctionCallIterator::nextImpl(
    store::Item_t& aResult,
    PlanState& aPlanState) const
 {
+  // An external function may take any time per call.
+  aPlanState.checkDeadlineNow(loc);
+
   try
   {
     if (isCached())

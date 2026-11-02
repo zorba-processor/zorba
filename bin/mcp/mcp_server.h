@@ -46,6 +46,8 @@ struct ServerConfig {
   std::chrono::milliseconds timeout{ std::chrono::seconds( 30 ) };
   /** The maximum size of a tool's text output, in bytes. */
   std::size_t max_output = 128 * 1024;
+  /** The memory limit of the process, in bytes (0: none; see zorba_mcp.cpp). */
+  unsigned long long max_memory = 4ULL << 30;
 };
 
 /**
@@ -95,6 +97,7 @@ private:
     std::string text;
   };
 
+  std::string handle_message( std::string const &message, Json *request_id );
   void load_predefined();
   bool load_predefined( std::string const &path, std::string const &name );
 
