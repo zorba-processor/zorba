@@ -59,6 +59,20 @@ using namespace zorba::mcp;
 
 namespace {
 
+int failures = 0;
+
+void check( bool ok, std::string const &what, std::string const &detail = "" ) {
+  if ( ok ) {
+    std::cout << "ok: " << what << std::endl;
+  } else {
+    ++failures;
+    std::cout << "FAILED: " << what;
+    if ( !detail.empty() )
+      std::cout << "\n  got: " << detail;
+    std::cout << std::endl;
+  }
+}
+
 // Bounds the address space of this process while it lives.
 class AddressSpaceLimit {
 #if defined(__linux__) && !defined(ZORBA_TEST_SANITIZER)
@@ -74,27 +88,14 @@ public:
   }
   ~AddressSpaceLimit() {
     if ( set_ )
-      setrlimit( RLIMIT_AS, &old_ );
+      check( setrlimit( RLIMIT_AS, &old_ ) == 0,
+             "restore the address-space limit" );
   }
 #else
 public:
   explicit AddressSpaceLimit( unsigned long long ) { }
 #endif
 };
-
-int failures = 0;
-
-void check( bool ok, std::string const &what, std::string const &detail = "" ) {
-  if ( ok ) {
-    std::cout << "ok: " << what << std::endl;
-  } else {
-    ++failures;
-    std::cout << "FAILED: " << what;
-    if ( !detail.empty() )
-      std::cout << "\n  got: " << detail;
-    std::cout << std::endl;
-  }
-}
 
 struct Fixture {
   Zorba *zorba;
@@ -429,6 +430,228 @@ void test_syntax_error( Fixture const &f ) {
   check( loc && field( *loc, "line" ) == "2" && loc->find( "column" ) &&
          field( *loc, "text" ) == "return $x $x",
          "syntax error: line, column and the failing line", r.dump() );
+}
+
+// Runs a query that must fail with the code. A non-empty part must appear in
+// the "hint" field and not in the message; an empty part means no hint at all.
+void check_error( Server &server, std::string const &query,
+                  std::string const &code, std::string const &part,
+                  std::string const &what ) {
+  Json const r = call_tool( server, "run_query",
+                            Json::object( { { "query", query } } ) );
+  Json const e( tool_error( r ) );
+  Json const *const hint = e.find( "hint" );
+  bool ok = is_tool_error( r ) && contains( field( e, "code" ), code );
+  if ( part.empty() )
+    ok = ok && !hint;
+  else
+    ok = ok && hint && contains( hint->text(), part ) &&
+      !contains( field( e, "message" ), part );
+  check( ok, what, r.dump() );
+}
+
+// Runs a query that must succeed with this output.
+void check_result( Server &server, std::string const &query,
+                   std::string const &expected, std::string const &what ) {
+  Json const r = call_tool( server, "run_query",
+                            Json::object( { { "query", query } } ) );
+  std::string text( result_text( r ) );
+  while ( !text.empty() && text.back() == '\n' )
+    text.pop_back();
+  check( !is_tool_error( r ) && text == expected, what, r.dump() );
+}
+
+std::string const dir_import(
+  "import module namespace dir = \"http://zorba.io/modules/directory\";\n" );
+std::string const jsoniq_decl( "jsoniq version \"1.0\";\n" );
+
+// The forms the JSONiq specification defines: they resolve under a JSONiq
+// version declaration, and stay errors (with a hint) in XQuery.
+void test_hints_jsoniq( Fixture const &f ) {
+  ServerConfig config;
+  config.root = f.tree;
+  Server server( f.zorba, config, std::cerr );
+
+  // $x[]
+  check_result( server, jsoniq_decl + "let $x := [1, 2] return $x[]", "1\n2",
+                "JSONiq: $x[] unboxes an array" );
+  check_error( server, "let $x := [1, 2] return $x[]", "XPST0003",
+               "jn:members($x)", "XQuery: $x[] is an error with a hint" );
+  check_error( server, "let $x := [1, 2] return $x[ ]", "XPST0003",
+               "jn:members($x)", "XQuery: $x[ ] is an error with a hint" );
+  check_result( server, "let $x := [1, 2] return $x()", "1\n2",
+                "the hint's $x() works" );
+  check_result( server, "let $x := [1, 2] return jn:members($x)", "1\n2",
+                "the hint's jn:members($x) works" );
+  std::string const one_line(
+    "import module namespace dir = \"http://zorba.io/modules/directory\"; " );
+  check_error( server, one_line + "let $x := [1, 2] return $x[]", "XPST0003",
+               "jn:members($x)", "$x[] after a prolog on the same line" );
+  check_error( server, one_line + "(1, 2)[$$ eq 2]", "XPST0003", "\".\"",
+               "$$ after a prolog on the same line" );
+  check_error( server, one_line + "let $a := 3 let $b := 1 return $a-$b",
+               "XPST0003", "$a - $b", "$a-$b after a prolog on the same line" );
+  check_error( server, "let $x := [1] return $x[[]]", "XPST0003",
+               "jn:members($x)", "$x[[]]: hint" );
+  check_error( server, "[1, ]", "XPST0003", "",
+               "no $x[] hint on another unexpected ]" );
+  check_error( server, "let $x := [1] return $x]", "XPST0003", "",
+               "no $x[] hint on a stray ]" );
+  check_result( server, jsoniq_decl + dir_import +
+                "dir:open($dir:root, \"orders/2026/q1.xml\")(\"format\")",
+                "\"xml\"", "JSONiq: the declaration works with the module" );
+
+  // $$
+  check_result( server, jsoniq_decl + "(1, 2)[$$ eq 2]", "2",
+                "JSONiq: $$ is the context item" );
+  check_error( server, "(1, 2)[$$ eq 2]", "XPST0003", "\".\"",
+               "XQuery: $$ is an error with a hint" );
+  check_result( server, "(1, 2)[. eq 2]", "2", "the hint's . works" );
+  check_result( server, "({ \"a\" : 1 }, { \"a\" : 2 })[.(\"a\") eq 2](\"a\")",
+                "2", "the hint's .(\"key\") works" );
+
+  // Function names without a prefix.
+  struct { char const *call, *expected, *fixed; } const fns[] = {
+    { "keys({ \"a\" : 1 })", "\"a\"", "jn:keys(" },
+    { "size([1, 2])", "2", "jn:size(" },
+    { "flatten([1, [2]])", "1\n2", "jn:flatten(" },
+    { "members([1, 2])", "1\n2", "jn:members(" }
+  };
+  for ( auto const &fn : fns ) {
+    std::string const call( fn.call );
+    check_result( server, jsoniq_decl + call, fn.expected,
+                  "JSONiq: " + call + " resolves" );
+    check_error( server, call, "XPST0017", fn.fixed,
+                 "XQuery: " + call + " is an error with a hint" );
+    check_result( server, "jn:" + call, fn.expected,
+                  "the hint's jn:" + call + " works" );
+  }
+  check_result( server, jsoniq_decl + "pi() gt 3", "true",
+                "JSONiq: pi() resolves" );
+  check_error( server, "pi()", "XPST0017", "math:pi(",
+               "XQuery: pi() is an error with a hint" );
+  check_error( server, "keys(1, 2)", "XPST0017", "",
+               "no hint: jn:keys has no form with two arguments" );
+  check_error( server, "nosuchfunction(1)", "XPST0017", "",
+               "no hint on an unknown function" );
+}
+
+// "-" is a name character: never accepted, the hint gives the expression.
+void test_hints_dash( Fixture const &f ) {
+  ServerConfig config;
+  config.root = f.tree;
+  Server server( f.zorba, config, std::cerr );
+
+  check_error( server, "let $a2 := 3 let $a1 := 1 return ($a2-$a1)*2",
+               "XPST0003", "$a2 - $a1", "$a2-$a1: hint with the expression" );
+  check_error( server,
+               jsoniq_decl + "let $a2 := 3 let $a1 := 1 return $a2-$a1",
+               "XPST0003", "$a2 - $a1", "$a2-$a1 in JSONiq too" );
+  check_result( server, "let $a2 := 3 let $a1 := 1 return ($a2 - $a1)*2", "4",
+                "the hint's $a2 - $a1 works" );
+  check_error( server, "let $a-$b := 1 return 1", "XPST0003", "",
+               "no hint where a variable is being bound" );
+  check_error( server, "let $a := 3 let $b := 1\nreturn $a-$b\n", "XPST0003",
+               "$a - $b", "$a-$b at the end of the query: hint" );
+  check_error( server, "let $x := 1 return", "XPST0003", "",
+               "no hint on another error at the end of the query" );
+  check_error( server, "let $b := 1 return 1 $b", "XPST0003", "",
+               "no hint on $ after something else" );
+
+  check_error( server, "let $x := 3 return $x-1", "XPST0008", "$x - 1",
+               "$x-1: hint with the expression" );
+  check_result( server, "let $x := 3 return $x - 1", "2",
+                "the hint's $x - 1 works" );
+  check_error( server, "$no-such", "XPST0008", "",
+               "no hint when no shorter variable is in scope" );
+  check_error( server, "let $x := 3 return $y", "XPST0008", "",
+               "no hint on an undeclared name without -" );
+}
+
+void test_hints_nodes( Fixture const &f ) {
+  ServerConfig config;
+  config.root = f.tree;
+  Server server( f.zorba, config, std::cerr );
+  std::string const record( dir_import +
+    "let $d := dir:open($dir:root, \"orders/2026/q1.xml\")\n" );
+
+  // JNSE0014: the record of an XML document, and a node.
+  check_error( server, record + "return $d", "JNSE0014", "serialize(",
+               "a record holding a node: hint" );
+  check_error( server, "<a/>", "JNSE0014", "serialize(", "a node: hint" );
+  check_error( server, "abs#1", "JNSE0014", "",
+               "no node hint on a function item" );
+  Json const r = call_tool( server, "run_query",
+                            Json::object( { { "query", "<a/>" } } ) );
+  check( field( tool_error( r ), "message" ) ==
+         "can not serialize a node or function item as JSON",
+         "the message is unchanged, the hint is separate", r.dump() );
+  Json const s = call_tool( server, "run_query",
+    Json::object( { { "query", "serialize(<a>t</a>)" } } ) );
+  check( !is_tool_error( s ) && contains( result_text( s ), "<a>t<" ),
+         "the hint's serialize() works", s.dump() );
+  check_result( server, "string(<a>t</a>)", "\"t\"",
+                "the hint's string() works" );
+
+  // XPTY0019: a path over a JSON item.
+  check_error( server, record + "return $d//order", "XPTY0019",
+               "$d(\"content\")", "a path over an object: hint" );
+  check_error( server, "let $a := jn:parse-json('[1]') return $a//b",
+               "XPTY0019", "$a()", "a path over an array: hint" );
+  check_error( server, "let $n := 1 return $n//b", "XPTY0019", "",
+               "no JSON hint on a path over an atomic value" );
+  check_result( server, record + "return count($d(\"content\")//order)", "2",
+                "the hint's $d(\"content\")//order works" );
+
+  // FORG0001: a string selector on an array.
+  std::string const features(
+    "let $a := jn:parse-json('[{ \"id\" : 7 }]')\n" );
+  check_error( server, features + "return $a(\"id\")", "FORG0001",
+               "$x()(\"id\")", "a key on an array: hint" );
+  check_error( server, features + "return $a[1](\"id\")", "FORG0001",
+               "$x()(\"id\")", "a key after a predicate: hint" );
+  check_error( server, "\"abc\" cast as xs:integer", "FORG0001", "",
+               "no array hint on another failed cast" );
+  check_result( server, features + "return $a()(\"id\")", "7",
+                "the hint's $x()(\"id\") works" );
+  check_result( server, features + "return $a(1)(\"id\")", "7",
+                "the hint's $x(1)(\"id\") works" );
+}
+
+void test_hints_names( Fixture const &f ) {
+  ServerConfig config;
+  config.root = f.tree;
+  Server server( f.zorba, config, std::cerr );
+  std::string const math_ns( "http://www.w3.org/2005/xpath-functions/math" );
+
+  // zorba-mcp predeclares math:, and a query can still override it.
+  check_result( server, "math:pi() gt 3", "true", "math: is predeclared" );
+  check_result( server, "import module namespace math = \"" + math_ns + "\";\n"
+                "math:pi() gt 3", "true", "math: can still be imported" );
+  check_result( server, "declare namespace math = \"urn:other\";\n"
+                "namespace-uri(<math:a/>)", "\"urn:other\"",
+                "math: can be bound to another namespace" );
+  check_error( server, "map:merge(())", "XPST0081", "{|",
+               "map: hint with the JSON alternative" );
+  check_result( server,
+                "count(jn:keys({| for $k in (\"a\", \"b\") "
+                "return { $k : 1 } |}))", "2", "the hint's {| |} works" );
+  check_error( server, "nosuchprefix:f(1)", "XPST0081", "",
+               "no hint on an unknown prefix" );
+
+  // Other arities of a known function.
+  check_error( server, dir_import + "dir:open(\"a.xml\")", "XPST0017",
+               "dir:open($root", "dir:open with one argument: signature" );
+  check_error( server, dir_import + "dir:open(\"a.xml\")", "XPST0017",
+               "$path", "dir:open with one argument: both parameters" );
+  check_error( server, dir_import + "dir:documents(1, 2, 3)", "XPST0017",
+               "dir:documents($root", "dir:documents: signature" );
+  check_error( server, "fn:substring(1)", "XPST0017", "fn:substring(",
+               "a builtin function: signature" );
+  check_error( server, dir_import + "dir:nosuch(1)", "XPST0017", "",
+               "no hint on an unknown module function" );
+  check_error( server, "local:nosuch(1)", "XPST0017", "",
+               "no hint on an unknown local function" );
 }
 
 void test_escape( Fixture const &f ) {
@@ -1012,9 +1235,6 @@ std::string deep_object( std::size_t n ) {
   return repeated( "{\"a\":", n ) + "1" + repeated( "}", n );
 }
 
-std::string const dir_import(
-  "import module namespace dir = \"http://zorba.io/modules/directory\";\n" );
-
 // The files in the root that have an error record, with its code.
 std::string const error_records(
   dir_import +
@@ -1395,6 +1615,10 @@ Test const tests[] = {
   { "memory_limit", test_memory_limit },
   { "optional_params", test_optional_params },
   { "documents_stream", test_documents_stream },
+  { "hints_jsoniq", test_hints_jsoniq },
+  { "hints_dash", test_hints_dash },
+  { "hints_nodes", test_hints_nodes },
+  { "hints_names", test_hints_names },
   { "deep_json", test_deep_json },
   { "deep_json_binary", test_deep_json_binary },
   { "entity_expansion", test_entity_expansion },

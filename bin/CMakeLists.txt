@@ -94,6 +94,20 @@ ZORBA_SET_TEST_PROPERTY(bin/zorba_max_call_depth PASS_REGULAR_EXPRESSION ".*ZXQP
 ZORBA_ADD_TEST(bin/zorba_max_expr_depth zorbacmd --max-expr-depth 10 -q "((((((((((((1))))))))))))")
 ZORBA_SET_TEST_PROPERTY(bin/zorba_max_expr_depth PASS_REGULAR_EXPRESSION ".*ZXQP0070.*")
 
+# A diagnostic hint is printed after the message; an error without one prints
+# no "hint:" line. In XQuery mode $x[] stays XPST0003.
+ZORBA_ADD_TEST(bin/zorba_hint_syntax zorbacmd -q "let $x := [1] return $x[]")
+ZORBA_SET_TEST_PROPERTY(bin/zorba_hint_syntax PASS_REGULAR_EXPRESSION "XPST0003.*hint: .*jn:members")
+ZORBA_ADD_TEST(bin/zorba_hint_prefix zorbacmd -q "math:pi()")
+ZORBA_SET_TEST_PROPERTY(bin/zorba_hint_prefix PASS_REGULAR_EXPRESSION "XPST0081.*hint: .*import module namespace math")
+ZORBA_ADD_TEST(bin/zorba_hint_xml zorbacmd --print-errors-as-xml -q "let $x := 3 return $x-1")
+ZORBA_SET_TEST_PROPERTY(bin/zorba_hint_xml PASS_REGULAR_EXPRESSION "<hint>.*x - 1.*</hint>")
+ZORBA_ADD_TEST(bin/zorba_hint_none zorbacmd -q "nosuchfunction(1)")
+ZORBA_SET_TEST_PROPERTY(bin/zorba_hint_none PASS_REGULAR_EXPRESSION "XPST0017")
+ZORBA_SET_TEST_PROPERTY(bin/zorba_hint_none FAIL_REGULAR_EXPRESSION "hint:")
+ZORBA_ADD_TEST(bin/zorba_hint_serializer zorbacmd -z method=json -q "<a/>")
+ZORBA_SET_TEST_PROPERTY(bin/zorba_hint_serializer PASS_REGULAR_EXPRESSION "JNSE0014.*hint: .*serialize")
+
 # Security policy flags: --secure, --allow, --deny, --read-path, --write-path,
 # --network-prefix, --private-addresses. Each capability is shown denied and
 # permitted. The queries in test/security print a marker on success. A policy
@@ -328,7 +342,8 @@ IF (ZORBA_WITH_FILE_ACCESS)
     SET (_mcpq "${CMAKE_CURRENT_SOURCE_DIR}/test/mcp/queries")
     FOREACH (_t json protocol legacy tools_list list_documents join
              syntax_error escape network native_modules predefined limits binary
-             optional_params documents_stream deep_json deep_json_binary
+             optional_params documents_stream hints_jsoniq hints_dash
+             hints_nodes hints_names deep_json deep_json_binary
              entity_expansion case_paths html_edge_cases memory_limit)
       ADD_TEST (NAME bin/mcp/${_t}
         COMMAND "mcp_tests${_mcp_suffix}" ${_t} "${_dirtree}" "${_mcpq}"

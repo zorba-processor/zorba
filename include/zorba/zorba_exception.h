@@ -135,6 +135,25 @@ public:
     o.iword( get_ios_format_index() ) = static_cast<long>( f );
   }
 
+  /**
+   * Gets what to do about this error, separate from its message.
+   *
+   * @return Returns said hint or the empty string if there is none.
+   */
+  char const* hint() const throw() {
+    return hint_.c_str();
+  }
+
+  /**
+   * Sets what to do about this error.  A hint is shown after the message and
+   * changes neither the error's code nor its message.
+   *
+   * @param hint The hint; the empty string means none.
+   */
+  void set_hint( char const *hint ) {
+    hint_ = hint;
+  }
+
   // inherited
   char const* what() const throw();
 
@@ -174,6 +193,7 @@ private:
   std::string raise_file_;
   line_type raise_line_;
   std::string message_;
+  std::string hint_;
 
   static int get_ios_format_index();
 

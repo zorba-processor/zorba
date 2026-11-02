@@ -58,6 +58,7 @@
 
 #include "diagnostics/xquery_diagnostics.h"
 #include "diagnostics/util_macros.h"
+#include "diagnostics/query_hints.h"
 
 #include "system/globalenv.h"
 
@@ -2608,7 +2609,11 @@ bool static_context::lookup_ns(
     }
     else if (raiseError)
     {
-      RAISE_ERROR(err::XPST0081, loc, ERROR_PARAMS(prefix));
+      XQueryException e(XQUERY_EXCEPTION(err::XPST0081,
+                                         ERROR_PARAMS(prefix),
+                                         ERROR_LOC(loc)));
+      e.set_hint(query_hints::undeclared_prefix(prefix.str()).c_str());
+      throw e;
     }
     else
     {

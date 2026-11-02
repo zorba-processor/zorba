@@ -250,6 +250,8 @@ Json diagnostic_json( ZorbaException const &e, std::string const &source,
     { "namespace", qn.ns() ? qn.ns() : "" },
     { "message", e.what() }
   } ) );
+  if ( *e.hint() )
+    err.set( "hint", e.hint() );
   if ( XQueryException const *const xe =
          dynamic_cast<XQueryException const*>( &e ) ) {
     if ( xe->has_source() ) {
@@ -496,6 +498,9 @@ Server::run( std::string const &source, std::string const &file_name,
     sctx->setSecurityPolicy( thePolicy );
     // Relative URIs, e.g. doc("orders/q1.xml"), resolve against the root.
     sctx->setBaseURI( "file://" + percent_encode_path( theConfig.root ) + "/" );
+    // An implementation may add predeclared namespace prefixes (XQuery 3.0,
+    // 4.13); a query can still bind this one to something else.
+    sctx->addNamespace( "math", "http://www.w3.org/2005/xpath-functions/math" );
 
     XQuery_t query = theZorba->createQuery();
     if ( !file_name.empty() )

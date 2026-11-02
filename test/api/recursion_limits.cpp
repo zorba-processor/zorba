@@ -159,7 +159,7 @@ public:
   ~AddressSpaceLimit()
   {
     if (theSet)
-      setrlimit(RLIMIT_AS, &theOld);
+      CHECK(setrlimit(RLIMIT_AS, &theOld) == 0);
   }
 #else
 public:
