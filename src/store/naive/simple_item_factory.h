@@ -62,8 +62,9 @@ protected:
   // xs:integer items for the values in [SMALL_INTEGER_MIN, SMALL_INTEGER_MAX]
   // are created once, here, and createInteger() returns them, the way
   // createBoolean() returns theTrueItem or theFalseItem. Atomic items are
-  // immutable and their reference counts are guarded by the item's lock, so
-  // one item can be shared by any number of trees and threads. Only
+  // immutable, so one item can be shared by any number of trees. Like the
+  // boolean items, these items make any use of the engine from concurrent
+  // threads race on their reference counts (doc/zorba/threading.dox). Only
   // xs:integer is cached: the derived types (xs:long ... xs:byte,
   // xs:nonNegativeInteger, ...) have their own type codes and always get a
   // new item, so a shared xs:integer is never returned for them.

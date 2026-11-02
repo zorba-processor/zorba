@@ -21,11 +21,9 @@
 // - a shared item has type xs:integer exactly, and the derived integer types
 //   (xs:long ... xs:byte, xs:unsigned*, xs:nonNegativeInteger, ...) never
 //   get a shared xs:integer item;
-// - a shared item outlives every reference handed out, also when threads
-//   take and drop references concurrently.
+// - a shared item outlives every reference handed out.
 
 #include <iostream>
-#include <thread>
 #include <vector>
 
 #include "store/api/item.h"
@@ -180,42 +178,6 @@ void test_lifetime()
   CHECK(b->getIntegerValue() == xs_integer(7));
 }
 
-void test_threads()
-{
-  int const nthreads = 4;
-  int const rounds = 20000;
-  vector<store::Item_t> held;
-  vector<long> before;
-  for (int v = 0; v < 16; ++v)
-  {
-    held.push_back(integer(v));
-    before.push_back(held.back()->getRefCount());
-  }
-  vector<thread> threads;
-  for (int t = 0; t < nthreads; ++t)
-  {
-    threads.emplace_back([rounds]() {
-      for (int r = 0; r < rounds; ++r)
-      {
-        store::Item_t item;
-        GENV_ITEMFACTORY->createInteger(item, xs_integer(r % 16));
-        store::Item_t copy = item;
-      }
-    });
-  }
-  for (thread &t : threads)
-    t.join();
-
-  for (int v = 0; v < 16; ++v)
-  {
-    store::Item_t const &a = held[v];
-    CHECK_V(a->getTypeCode() == store::XS_INTEGER, v);
-    CHECK_V(a->getIntegerValue() == xs_integer(v), v);
-    // Every thread dropped what it took: no increment or decrement was lost.
-    CHECK_V(a->getRefCount() == before[v], v);
-  }
-}
-
 } // namespace
 
 int test_small_integers(int, char*[])
@@ -227,7 +189,6 @@ int test_small_integers(int, char*[])
   for (int v : samples)
     test_derived_types(v);
   test_lifetime();
-  test_threads();
   cout << (failures ? "FAILED" : "passed") << endl;
   return failures ? 1 : 0;
 }

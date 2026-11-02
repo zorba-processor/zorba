@@ -163,9 +163,11 @@ Limits of these numbers:
   is what covers `v`: with -128..127 the shares would be about 77% for JSON and
   6% for CSV. No real-world integer distribution was measured, and the benchmark
   has no negative integers, so -128..-1 is a judgment, not a result.
-- Reference counts of shared items take the item's spinlock. Threads working on
-  the same small values now contend on it where they used to have separate
-  items; throughput under concurrency was not measured.
+- The engine is single-threaded by default (`ZORBA_FOR_ONE_THREAD_ONLY=ON`, see
+  `doc/zorba/threading.dox`): reference counts are plain integers, with no lock.
+  Concurrent use without the application's own mutex is already undefined, but
+  it now fails sooner: threads taking references to the same small value crash
+  the process (seen in an earlier version of the test, run 41444048529).
 - `ZORBA_WITH_BIG_INTEGER` builds were tested, not measured. A hit there
   converts the value through a string to find the table slot.
 
