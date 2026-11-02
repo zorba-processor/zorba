@@ -18,6 +18,7 @@
 // over few iterator calls: work the optimizer tries at compile time, and
 // external functions that take long per call.
 
+#include <algorithm>
 #include <chrono>
 #include <exception>
 #include <iostream>
@@ -189,6 +190,88 @@ void test_order_by(Zorba* z)
   }
 }
 
+// The limit may run out anywhere in a query, so try many: from early on to about
+// the time the whole query takes. A limit that lands in a sort stops it with the
+// tuples half moved. What is left must still release every sort key exactly once
+// (checked by the sanitizer builds, and by the heap checks of the C library).
+void test_order_by_deadlines(Zorba* z)
+{
+  const char* const QUERIES[] = {
+    "declare variable $m external := 100000;\n"
+    "count(for $i in 1 to $m order by string($i) descending return $i)",
+    "declare variable $m external := 100000;\n"
+    "count(for $i in 1 to $m stable order by string($i) descending return $i)"
+  };
+  int const STEPS = 32;
+  seconds const budget(20);
+  steady_clock::time_point const start = steady_clock::now();
+
+  for (const char* query : QUERIES)
+  {
+    Outcome const full = run(z, SecurityPolicy::unrestricted(), query);
+    CHECK(full.ok && full.value == "100000");
+
+    int stopped = 0, completed = 0;
+    for (int step = 1; step <= STEPS; ++step)
+    {
+      if (steady_clock::now() - start > budget)
+        break;
+      milliseconds const limit(
+          std::max<long long>(1, full.elapsed.count() * step / STEPS));
+      SecurityPolicy const p =
+        SecurityPolicy::unrestricted().setTimeout(limit);
+      Outcome const o = run(z, p, query);
+      CHECK(o.ok || failed_with(o, "ZXQP0068"));
+      (o.ok ? completed : stopped)++;
+    }
+    std::cout << "  full run " << full.elapsed.count() << " ms: " << stopped
+              << " stopped, " << completed << " completed" << std::endl;
+  }
+}
+
+// An error raised by a comparison stops the sort the same way. Here the keys
+// are arranged so that the comparison that fails comes after the sort has
+// written part of its result: the NaN keys compare with both of the other
+// kinds, and the integers first meet the strings late.
+void test_error_within_sort(Zorba* z)
+{
+  std::string const flwor =
+    "for $i in 1 to $m\n"
+    "let $k := if ($i le 14) then $i\n"
+    "          else if ($i le 21) then number(concat('n', $i))\n"
+    "          else concat('s', $i)\n"
+    "stable order by $k empty least\n";
+  std::string const prolog = "declare variable $m external := 56;\n";
+  SecurityPolicy const p = SecurityPolicy::unrestricted();
+
+  Outcome o = run(z, p, prolog + flwor + "return $i");
+  std::cout << "  order by: " << o << std::endl;
+  CHECK(failed_with(o, "XPTY0004"));
+
+  o = run(z, p, prolog + flwor + "count $c return $c");
+  std::cout << "  order by and count: " << o << std::endl;
+  CHECK(failed_with(o, "XPTY0004"));
+
+  // Caught within the query: the plan is reset, and goes on running.
+  o = run(z, p, prolog +
+    "try { " + flwor + "return $i } catch * { 'caught' }");
+  std::cout << "  caught: " << o << std::endl;
+  CHECK(o.ok && o.value == "caught");
+
+  // The same keys, in an order that makes the integers meet the strings in
+  // the first comparisons. And a sort that does not fail still sorts.
+  o = run(z, p, prolog +
+    "for $i in 1 to $m\n"
+    "stable order by (if ($i mod 2 eq 0) then $i else concat('s', $i))\n"
+    "return $i");
+  CHECK(failed_with(o, "XPTY0004"));
+
+  o = run(z, p,
+    "string-join(for $i in (3, 1, 2) stable order by $i descending "
+    "return string($i), ',')");
+  CHECK(o.ok && o.value == "3,2,1");
+}
+
 // A string operation that takes long per call: the string is 50 MB, and each
 // step reads all of it.
 void test_big_strings(Zorba* z)
@@ -225,6 +308,8 @@ timeout_bounds(int argc, char* argv[])
     section(lZorba, "test_constant_folding", test_constant_folding);
     section(lZorba, "test_external_function", test_external_function);
     section(lZorba, "test_order_by", test_order_by);
+    section(lZorba, "test_order_by_deadlines", test_order_by_deadlines);
+    section(lZorba, "test_error_within_sort", test_error_within_sort);
     section(lZorba, "test_big_strings", test_big_strings);
   }
   catch (ZorbaException const& e)
