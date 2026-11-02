@@ -17,6 +17,8 @@
    xs:integer or xs:decimal against xs:double compares as xs:double, after
    rounding. :)
 
+declare namespace err = "http://www.w3.org/2005/xqt-errors";
+
 (: xs:integer and xs:decimal around -2^63, 2^63 and 2^64, static type xs:decimal.
    One row per left operand, one letter per right operand: l(ess), e(qual),
    g(reater), x if eq, ne, lt, le, gt, ge, =, <, > disagree. An error is reported

@@ -19,6 +19,8 @@ import module namespace map = "http://zorba.io/modules/unordered-maps";
    xs:integer or xs:decimal against xs:double compares as xs:double, after
    rounding. :)
 
+declare namespace err = "http://www.w3.org/2005/xqt-errors";
+
 (: unordered-maps.xq: "getting the entries is based on the "eq" comparison". :)
 variable $r := ();
 map:create("idc-decimal", "decimal");

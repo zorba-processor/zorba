@@ -17,6 +17,8 @@
    xs:integer or xs:decimal against xs:double compares as xs:double, after
    rounding. :)
 
+declare namespace err = "http://www.w3.org/2005/xqt-errors";
+
 (: Value joins, which the optimizer may evaluate with a hash index on the
    inner sequence. Returns outer-inner position pairs. :)
 string-join(

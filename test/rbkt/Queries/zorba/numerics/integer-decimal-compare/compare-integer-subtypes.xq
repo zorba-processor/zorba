@@ -17,6 +17,8 @@
    xs:integer or xs:decimal against xs:double compares as xs:double, after
    rounding. :)
 
+declare namespace err = "http://www.w3.org/2005/xqt-errors";
+
 (: Types derived from xs:integer around 2^63 and 2^64, static type xs:integer:
    xs:unsignedLong values above 2^63-1 do not fit a 64-bit xs:integer.
    One row per left operand, one letter per right operand: l(ess), e(qual),

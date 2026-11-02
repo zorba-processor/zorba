@@ -17,6 +17,8 @@
    xs:integer or xs:decimal against xs:double compares as xs:double, after
    rounding. :)
 
+declare namespace err = "http://www.w3.org/2005/xqt-errors";
+
 (: F&O 3.0 fn:distinct-values: "Values are compared using the eq operator". When
    "A eq B, B eq C, but A ne C" the number of items is implementation dependent
    "subject only to the constraints that (a) no two items in the result sequence

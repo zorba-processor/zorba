@@ -17,6 +17,8 @@
    xs:integer or xs:decimal against xs:double compares as xs:double, after
    rounding. :)
 
+declare namespace err = "http://www.w3.org/2005/xqt-errors";
+
 (: XQuery 3.0 3.10.8: "All the non-empty orderspec values must be convertible to a
    common type by subtype substitution and/or type promotion. The ordering is
    performed in the least common type that has a gt operator."

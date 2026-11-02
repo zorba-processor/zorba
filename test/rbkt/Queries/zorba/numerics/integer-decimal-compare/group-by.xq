@@ -17,6 +17,8 @@
    xs:integer or xs:decimal against xs:double compares as xs:double, after
    rounding. :)
 
+declare namespace err = "http://www.w3.org/2005/xqt-errors";
+
 (: XQuery 3.0 3.10.7: "Two tuples T1 and T2 have equivalent grouping keys if and only
    if, for each grouping variable GV, the atomized value of GV in T1 is deep-equal
    to the atomized value of GV in T2", with the same non-transitivity constraints

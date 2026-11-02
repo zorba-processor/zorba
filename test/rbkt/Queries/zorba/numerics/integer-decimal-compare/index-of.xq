@@ -17,6 +17,8 @@
    xs:integer or xs:decimal against xs:double compares as xs:double, after
    rounding. :)
 
+declare namespace err = "http://www.w3.org/2005/xqt-errors";
+
 (: F&O 3.0 fn:index-of: positions of "items that are equal to $search",
    compared with eq. Static types xs:decimal and xs:anyAtomicType. :)
 declare function local:r($p as xs:integer*) as xs:string { concat("[", string-join($p ! string(.), ","), "]") };

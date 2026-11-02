@@ -17,6 +17,8 @@
    xs:integer or xs:decimal against xs:double compares as xs:double, after
    rounding. :)
 
+declare namespace err = "http://www.w3.org/2005/xqt-errors";
+
 (: F&O 3.0 fn:deep-equal compares atomic values with eq. :)
 declare function local:b($b as xs:boolean) as xs:string { if ($b) then "t" else "f" };
 string-join((

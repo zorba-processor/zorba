@@ -17,6 +17,8 @@
    xs:integer or xs:decimal against xs:double compares as xs:double, after
    rounding. :)
 
+declare namespace err = "http://www.w3.org/2005/xqt-errors";
+
 (: xs:integer, xs:long, xs:unsignedLong, xs:decimal and xs:double around -2^63, 2^63
    and 2^64: anything against an xs:double compares as xs:double, the others
    exactly.
