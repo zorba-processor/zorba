@@ -25,9 +25,12 @@
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
+#include <cstdio>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <sstream>
@@ -271,9 +274,9 @@ Listing list_path( Server &server, std::string const &path ) {
   return list( server, Json::object( { { "path", path } } ) );
 }
 
-// Polls until the scan is complete; fails the test if it does not get there
-// (or if the answers have no scan state at all).
-Listing wait_complete( Server &server ) {
+// Polls until the scan has ended, complete or at its memory limit; fails the
+// test if it does not get there (or if the answers have no scan state at all).
+Listing wait_settled( Server &server ) {
   Json const args( Json::object( { { "limit", 0 } } ) );
   for ( int i = 0; i < 30000; ++i ) {
     Listing const l( list( server, args ) );
@@ -281,12 +284,24 @@ Listing wait_complete( Server &server ) {
       check( false, "the answer has a scan state", l.text );
       return l;
     }
-    if ( l.state() == "complete" )
+    if ( l.state() != "running" )
       return l;
     std::this_thread::sleep_for( std::chrono::milliseconds( 2 ) );
   }
-  check( false, "the scan completes" );
+  check( false, "the scan ends" );
   return Listing();
+}
+
+Listing wait_complete( Server &server ) {
+  Listing const l( wait_settled( server ) );
+  check( l.state() == "complete", "the scan completes", l.text );
+  return l;
+}
+
+// Names of the same length.
+std::string file_name( int i ) {
+  std::string n( std::to_string( 1000 + i ) );
+  return "f" + n + ".csv";
 }
 
 std::string many_json_records( std::size_t bytes ) {
@@ -734,8 +749,8 @@ void test_malformed( Fixture const &f ) {
 // A file nested 100000 levels deep is an error in its preview, on the
 // sampler's thread and on the request's, and the server goes on.
 void test_deep( Fixture const &f ) {
-  int const levels = 100000;
-  auto repeat = [levels]( std::string const &part ) {
+  constexpr int levels = 100000;
+  auto repeat = []( std::string const &part ) {
     std::string s;
     s.reserve( part.size() * static_cast<std::size_t>( levels ) );
     for ( int i = 0; i < levels; ++i )
@@ -883,28 +898,215 @@ void test_limit( Fixture const &f ) {
            l.shown() == std::to_string( l.files.size() ) && l.files.size() < 300,
            "--max-output also bounds the listing", l.text );
   }
+}
+
+// A tree of \a n files, all with a preview of the same size, so that each
+// takes the same memory.
+void write_equal_files( Tree const &t, int n ) {
+  for ( int i = 0; i < n; ++i )
+    t.write( file_name( i ), "x,y\n1,2\n" );
+}
+
+// Counts what a request had to read (stage "explore") and holds nothing.
+class ExploreCounter {
+public:
+  void hook( char const *stage, std::string const &path ) {
+    if ( std::string( stage ) != "explore" )
+      return;
+    std::lock_guard<std::mutex> lock( theMutex );
+    ++theCounts[ path ];
+  }
+  int count( std::string const &path ) {
+    std::lock_guard<std::mutex> lock( theMutex );
+    return theCounts[ path ];
+  }
+private:
+  std::mutex theMutex;
+  std::map<std::string,int> theCounts;
+};
+
+ServerConfig limited( Tree const &t, std::size_t bytes,
+                      std::shared_ptr<ExploreCounter> const &counter ) {
+  ServerConfig config;
+  config.root = t.root;
+  config.scan_limits.max_memory = bytes;
+  config.scan_hook = [counter]( char const *stage, std::string const &path ) {
+    counter->hook( stage, path );
+  };
+  return config;
+}
+
+void test_memory( Fixture const &f ) {
+  int const files = 40;
+  Tree t;
+  write_equal_files( t, files );
+
+  // What all of it takes, with no limit in the way.
+  std::size_t all = 0;
   {
     ServerConfig config;
     config.root = t.root;
-    config.scan_limits.max_files = 5;
     Server server( f.zorba, config, std::cerr );
-    Listing const l( wait_complete( server ) );
-    check( l.found() == "5" && contains( l.text, "\"capped\":true" ),
-           "the file cap is stated", l.text );
+    wait_complete( server );
+    all = server.scan_cache_bytes();
+    check( all > 0, "the cache accounts for what it holds", std::to_string( all ) );
+    std::cout << "accounted for " << files << " files: " << all << " bytes"
+              << std::endl;
   }
-  {
-    ServerConfig config;
-    config.root = t.root;
-    config.scan_limits.max_preview_memory = 1;
-    Server server( f.zorba, config, std::cerr );
-    Listing l( wait_complete( server ) );
-    check( l.found() == "300" && l.sampled() != "300" &&
-           contains( l.text, "\"capped\":true" ),
-           "the preview memory cap is stated", l.text );
-    l = list_path( server, "d0/f102.csv" );
-    check( contains( l.text, "\"columns\":[\"x\"]" ),
-           "over the memory cap a file is still explored", l.text );
+
+  // The scanner stops at the limit: the index fits, the previews do not.
+  std::size_t const limit = all * 3 / 4;
+  auto const counter = std::make_shared<ExploreCounter>();
+  Server server( f.zorba, limited( t, limit, counter ), std::cerr );
+  Listing l( wait_settled( server ) );
+  check( l.state() == "memory_limit", "the scanner stops at the limit", l.text );
+  check( l.found() == std::to_string( files ) &&
+         std::stoi( l.sampled() ) < files && std::stoi( l.sampled() ) > 1,
+         "all files found, some sampled", l.text );
+  check( server.scan_cache_bytes() <= limit, "under the limit",
+         std::to_string( server.scan_cache_bytes() ) + " of " +
+         std::to_string( limit ) );
+
+  // It never evicts to go on: nothing changes by waiting.
+  std::string const sampled( l.sampled() );
+  l = list( server );
+  check( l.sampled() == sampled, "the sampler does not go on", l.text );
+  check( !contains( l.text, "\"incomplete\"" ), "the listing is whole", l.text );
+
+  // Requests explore and evict. After this the cache holds the last ones.
+  for ( int i = 0; i < files; ++i ) {
+    Listing const one( list_path( server, file_name( i ) ) );
+    check( one.preview() && contains( one.preview()->dump(), "\"columns\":[\"x\",\"y\"]" ),
+           "a request gets its preview: " + file_name( i ), one.text );
+    check( server.scan_cache_bytes() <= limit, "under the limit after a request",
+           std::to_string( server.scan_cache_bytes() ) );
   }
+  l = list( server, Json::object( { { "limit", 0 } } ) );
+  int const held = std::stoi( l.sampled() );
+  check( held > 2 && held < files, "some previews are held", l.text );
+  check( l.state() == "memory_limit", "still at the limit", l.text );
+
+  // The coldest two now; using the coldest makes the next one the coldest.
+  std::string const coldest( file_name( files - held ) );
+  std::string const next( file_name( files - held + 1 ) );
+  int before = counter->count( coldest );
+  list_path( server, coldest );
+  check( counter->count( coldest ) == before,
+         "a held preview is not read again", coldest );
+
+  std::string const evicted( file_name( 0 ) );
+  before = counter->count( evicted );
+  list_path( server, evicted );
+  check( counter->count( evicted ) == before + 1,
+         "a preview that was evicted is read again", evicted );
+
+  before = counter->count( coldest );
+  list_path( server, coldest );
+  check( counter->count( coldest ) == before,
+         "the recently used preview stays", coldest );
+  before = counter->count( next );
+  list_path( server, next );
+  check( counter->count( next ) == before + 1,
+         "the coldest preview was evicted", next );
+  check( server.scan_cache_bytes() <= limit, "under the limit at the end",
+         std::to_string( server.scan_cache_bytes() ) );
+
+  // refresh starts over.
+  for ( int i = 5; i < files; ++i )
+    stdfs::remove( t.root + "/" + file_name( i ) );
+  list( server, Json::object( { { "refresh", true } } ) );
+  l = wait_settled( server );
+  check( l.state() == "complete" && l.found() == "5" && l.sampled() == "5",
+         "refresh resets the state", l.text );
+  check( server.scan_cache_bytes() <= limit, "under the limit after refresh",
+         std::to_string( server.scan_cache_bytes() ) );
+}
+
+// A preview that cannot fit is answered and not kept.
+void test_memory_big_preview( Fixture const &f ) {
+  Tree t;
+  std::string wide( "{" );
+  for ( int i = 0; i < 32; ++i )
+    wide += std::string( i ? "," : "" ) + "\"key" + std::to_string( 100 + i ) +
+      "\":\"" + std::string( 30, 'v' ) + "\"";
+  t.write( "wide.json", wide + "}" );
+  t.write( "a.csv", "x\n1\n" );
+  std::size_t const limit = 2048;
+  auto const counter = std::make_shared<ExploreCounter>();
+  Server server( f.zorba, limited( t, limit, counter ), std::cerr );
+  Listing l( wait_settled( server ) );
+  check( l.state() == "memory_limit" && l.found() == "2",
+         "the preview stops the scanner", l.text );
+  for ( int i = 1; i <= 2; ++i ) {
+    l = list_path( server, "wide.json" );
+    check( !l.is_error && contains( dump_of( l.preview() ), "key131" ),
+           "the preview is answered", l.text );
+    check( counter->count( "wide.json" ) == i, "it is not kept",
+           std::to_string( counter->count( "wide.json" ) ) );
+    check( server.scan_cache_bytes() <= limit, "under the limit",
+           std::to_string( server.scan_cache_bytes() ) );
+  }
+  l = list_path( server, "a.csv" );
+  check( contains( dump_of( l.preview() ), "\"columns\":[\"x\"]" ),
+         "a preview that fits is still answered", l.text );
+  check( counter->count( "a.csv" ) >= 0 && server.scan_cache_bytes() <= limit,
+         "under the limit", std::to_string( server.scan_cache_bytes() ) );
+}
+
+// The index itself does not fit: the walker stops, and requests still work.
+void test_memory_walker( Fixture const &f ) {
+  Tree t;
+  for ( int i = 0; i < 50; ++i )
+    t.write( "d" + std::to_string( i ) + "/" + file_name( i ), "x\n1\n" );
+  t.write( "d49/z.csv", "z\n1\n" );
+  std::size_t const limit = 2048;
+  auto const counter = std::make_shared<ExploreCounter>();
+  Server server( f.zorba, limited( t, limit, counter ), std::cerr );
+  Listing l( wait_settled( server ) );
+  check( l.state() == "memory_limit" && std::stoi( l.found() ) < 51,
+         "the walker stops at the limit; files_found is a lower bound", l.text );
+  check( server.scan_cache_bytes() <= limit, "under the limit",
+         std::to_string( server.scan_cache_bytes() ) );
+  l = list( server );
+  check( contains( l.text, "\"incomplete\":true" ),
+         "the listing says it may be incomplete", l.text );
+
+  l = list_path( server, "d49/z.csv" );
+  check( !l.is_error && contains( dump_of( l.preview() ), "\"columns\":[\"z\"]" ),
+         "a file below still works, by path", l.text );
+  l = list_path( server, "d49" );
+  check( !l.is_error && l.lists( "d49/z.csv" ) && l.lists( "d49/" + file_name( 49 ) ) &&
+         contains( l.text, "\"incomplete\":true" ),
+         "a directory below still works, by path", l.text );
+  l = list_path( server, "d49/nosuch.csv" );
+  check( l.is_error && l.error_code() == "not-found", "a missing file is missing",
+         l.text );
+  check( server.scan_cache_bytes() <= limit, "under the limit at the end",
+         std::to_string( server.scan_cache_bytes() ) );
+}
+
+// Eviction while the threads work, for ThreadSanitizer.
+void test_memory_stress( Fixture const &f ) {
+  int const files = 600;
+  Tree t;
+  for ( int i = 0; i < files; ++i )
+    t.write( "d" + std::to_string( i % 9 ) + "/" + file_name( i ), "x,y\n1,2\n" );
+  std::size_t const limit = 64 * 1024;
+  auto const counter = std::make_shared<ExploreCounter>();
+  Server server( f.zorba, limited( t, limit, counter ), std::cerr );
+  for ( int i = 0; i < 400; ++i ) {
+    int const n = ( i * 37 ) % files;
+    Listing const l( list_path( server, "d" + std::to_string( n % 9 ) + "/" +
+                                file_name( n ) ) );
+    check( !l.is_error, "request " + std::to_string( i ), l.text );
+    if ( i % 50 == 25 )
+      list( server, Json::object( { { "refresh", true }, { "limit", 3 } } ) );
+    if ( i % 10 == 0 )
+      list( server, Json::object( { { "limit", 3 } } ) );
+    check( server.scan_cache_bytes() <= limit, "under the limit",
+           std::to_string( server.scan_cache_bytes() ) );
+  }
+  wait_settled( server );
 }
 
 void test_no_scan( Fixture const &f ) {
@@ -1080,6 +1282,68 @@ void test_binary( Fixture const &f ) {
          "--no-scan: today's list_documents", run.out.substr( 0, 400 ) );
 }
 
+// The option, over a live session.
+void test_memory_option( Fixture const &f ) {
+  Tree t;
+  // Long names: over 1 MiB of index, whatever a preview takes.
+  for ( int i = 0; i < 3000; ++i )
+    t.write( "d" + std::to_string( i % 20 ) + "/" + std::string( 200, 'n' ) +
+             std::to_string( i ) + ".csv", "x\n1\n" );
+  t.write( "d0/here.csv", "x\n1\n" );
+
+  int to_child[2], from_child[2];
+  check( pipe( to_child ) == 0 && pipe( from_child ) == 0, "pipe" );
+  pid_t const pid = fork();
+  if ( pid == 0 ) {
+    if ( dup2( to_child[0], STDIN_FILENO ) < 0 ||
+         dup2( from_child[1], STDOUT_FILENO ) < 0 ||
+         close( to_child[0] ) != 0 || close( to_child[1] ) != 0 ||
+         close( from_child[0] ) != 0 || close( from_child[1] ) != 0 )
+      _exit( 127 );
+    execl( f.binary.c_str(), f.binary.c_str(), "--root", t.root.c_str(),
+           "--scan-cache-mb", "1", static_cast<char*>( nullptr ) );
+    _exit( 127 );
+  }
+  check( pid > 0 && close( to_child[0] ) == 0 && close( from_child[1] ) == 0,
+         "start zorba-mcp" );
+  std::FILE *const in = fdopen( to_child[1], "w" );
+  std::FILE *const out = fdopen( from_child[0], "r" );
+  char *line = nullptr;
+  std::size_t cap = 0;
+  auto exchange = [&]( std::string const &message ) {
+    std::fputs( message.c_str(), in );
+    std::fflush( in );
+    ssize_t const n = getline( &line, &cap, out );
+    return n > 0 ? std::string( line, static_cast<std::size_t>( n ) )
+                 : std::string();
+  };
+  std::string answer;
+  for ( int i = 0; i < 30000; ++i ) {
+    answer = exchange( list_call( 1, Json::object( { { "limit", 0 } } ) ) );
+    if ( !contains( answer, "running" ) )
+      break;
+    std::this_thread::sleep_for( std::chrono::milliseconds( 2 ) );
+  }
+  check( contains( answer, "memory_limit" ), "--scan-cache-mb 1: the limit is hit",
+         answer );
+  answer = exchange( list_call( 2, Json::object( { { "path", "d0/here.csv" } } ) ) );
+  check( contains( answer, "columns" ) && contains( answer, "memory_limit" ),
+         "and a file still gets its preview, with the status", answer );
+  std::fclose( in );
+  std::free( line );
+  while ( std::fgetc( out ) != EOF ) { }
+  std::fclose( out );
+  int status = -1;
+  check( waitpid( pid, &status, 0 ) == pid && WIFEXITED( status ) &&
+         WEXITSTATUS( status ) == 0, "clean exit" );
+
+  for ( char const *const bad : { "0", "abc", "99999999999" } ) {
+    Run const run( run_binary( f, { "--root", t.root, "--scan-cache-mb", bad }, "" ) );
+    check( WIFEXITED( run.status ) && WEXITSTATUS( run.status ) == 2,
+           std::string( "--scan-cache-mb " ) + bad + " is refused" );
+  }
+}
+
 // Everything at once, for ThreadSanitizer: requests, restarts and queries
 // (which also use libxml2) while the threads work.
 void test_stress( Fixture const &f ) {
@@ -1134,7 +1398,7 @@ void test_description( Fixture const &f ) {
   std::string const tool( tools->items()[0].dump() );
   std::cout << "list_documents definition: " << tool.size() << " bytes"
             << std::endl;
-  check( tool.size() <= 800, "the tool definition stays short", tool );
+  check( tool.size() <= 700, "the tool definition stays short", tool );
 }
 
 struct Test {
@@ -1154,6 +1418,11 @@ Test const tests[] = {
   { "scan_deep", test_deep },
   { "scan_xxe", test_xxe },
   { "scan_limit", test_limit },
+  { "scan_memory", test_memory },
+  { "scan_memory_big_preview", test_memory_big_preview },
+  { "scan_memory_walker", test_memory_walker },
+  { "scan_memory_stress", test_memory_stress },
+  { "scan_memory_option", test_memory_option },
   { "scan_no_scan", test_no_scan },
   { "scan_handshake", test_handshake },
   { "scan_shutdown", test_shutdown },

@@ -86,6 +86,9 @@ public:
   /** Stops the background scan, if any; the destructor does it too. */
   void stop_scan();
 
+  /** The bytes the scan cache accounts for. */
+  std::size_t scan_cache_bytes() const;
+
 private:
   struct Param {
     std::string name;

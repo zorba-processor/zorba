@@ -28,10 +28,8 @@ namespace mcp {
 struct ScanLimits {
   /** Bytes read from one file. */
   std::size_t max_file_bytes = 1024 * 1024;
-  /** Files kept in the listing. */
-  std::size_t max_files = 1000000;
-  /** Total bytes of previews kept in memory. */
-  std::size_t max_preview_memory = 64 * 1024 * 1024;
+  /** Bytes the cache of listing and previews may take. */
+  std::size_t max_memory = 64 * 1024 * 1024;
 };
 
 /**

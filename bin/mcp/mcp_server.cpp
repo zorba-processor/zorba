@@ -321,6 +321,10 @@ Server::Server( Zorba *zorba, ServerConfig config, std::ostream &log ) :
 void Server::stop_scan() {
 }
 
+std::size_t Server::scan_cache_bytes() const {
+  return 0;
+}
+
 void Server::load_predefined() {
   if ( theConfig.queries_dir.empty() )
     return;

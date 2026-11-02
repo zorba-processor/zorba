@@ -339,6 +339,8 @@ IF (ZORBA_WITH_FILE_ACCESS)
     # The background scanner (see mcp/test/scan_tests.cpp).
     FOREACH (_t scan_status scan_immediate scan_previews scan_mtime scan_refresh
              scan_symlink scan_path scan_malformed scan_deep scan_xxe scan_limit
+             scan_memory scan_memory_big_preview scan_memory_walker
+             scan_memory_stress scan_memory_option
              scan_no_scan scan_handshake scan_shutdown scan_binary scan_stress
              scan_description)
       ADD_TEST (NAME bin/mcp/${_t}
