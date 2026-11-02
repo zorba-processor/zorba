@@ -60,7 +60,7 @@ declare function local:m-field( $case as xs:string, $key as xs:string )
 };
 
 declare variable $cost-keys := ( "element", "text", "text_char", "attribute",
-  "attribute_char", "name", "object", "array", "pair", "integer", "decimal",
+  "attribute_char", "name", "object", "array", "pair", "csv_pair", "integer", "decimal",
   "double", "boolean", "null", "string", "string_char" );
 
 (: Heap bytes per item of each kind. :)
@@ -79,6 +79,11 @@ declare function local:cost( $key as xs:string ) as xs:double
   case "array" return local:m( "j_arr0" )
   case "pair" return
     ( local:m( "j_obj4" ) - local:m( "j_obj0" ) ) div 4 - local:m( "j_int" )
+  (: A CSV row (c_row4: two integers, two one-character strings) is an
+   : object whose keys come from the header line. :)
+  case "csv_pair" return
+    ( local:m( "c_row4" ) - local:m( "j_obj0" ) - 2 * local:m( "j_int" )
+      - 2 * local:m( "j_str1" ) ) div 4
   case "integer" return local:m( "j_int" )
   case "decimal" return local:m( "j_dec" )
   case "double" return local:m( "j_dbl" )
@@ -106,7 +111,8 @@ declare function local:categories( $o as item() ) as item()*
   ) else (
     [ "objects", local:n( $o, "objects" ), "object" ],
     [ "arrays", local:n( $o, "arrays" ), "array" ],
-    [ "object pairs (key, slot)", local:n( $o, "pairs" ), "pair" ],
+    [ "object pairs (key, slot)", local:n( $o, "pairs" ),
+      if ( $o( "format" ) eq "csv" ) then "csv_pair" else "pair" ],
     [ "integers", local:n( $o, "integers" ), "integer" ],
     [ "decimals", local:n( $o, "decimals" ), "decimal" ],
     [ "doubles", local:n( $o, "doubles" ), "double" ],

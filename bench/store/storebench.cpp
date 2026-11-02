@@ -223,21 +223,21 @@ std::string parse_query( std::string const &format, bool from_file ) {
   std::exit( 2 );
 }
 
-// Runs QUERY with $s bound to ARG and appends its result to OUT. The query
-// is compiled before the "before" snapshot and closed before the "after"
-// one, so only what the result holds (and store-wide caches it filled) is
-// counted.
+// Runs QUERY with $s bound to ARG and appends its result to OUT. The string
+// item for ARG exists before the "before" snapshot and is still held at the
+// "after" one; the query is compiled after the first and closed before the
+// second. So only what the result holds (and store-wide caches it filled) is
+// counted; the time covers the evaluation only.
 Measure run( Zorba *z, std::string const &query, std::string const &arg,
              std::vector<Item> &out ) {
-  XQuery_t q = z->createQuery();
-  q->compile( query );
   Item s = z->getItemFactory()->createString( arg );
-  q->getDynamicContext()->setVariable( "", "s", s );
-  s = Item();
-
   malloc_trim( 0 );
   reset_peak();
   Snap const before = snap();
+
+  XQuery_t q = z->createQuery();
+  q->compile( query );
+  q->getDynamicContext()->setVariable( "", "s", s );
   auto const t0 = std::chrono::steady_clock::now();
   {
     Iterator_t it = q->iterator();
@@ -253,6 +253,7 @@ Measure run( Zorba *z, std::string const &query, std::string const &arg,
   q = XQuery_t();
   malloc_trim( 0 );
   Snap const after = snap();
+  s = Item();
   return Measure{
     after.rss_kb - before.rss_kb, hwm - before.rss_kb,
     after.news - before.news, after.usable - before.usable,
