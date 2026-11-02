@@ -1117,8 +1117,7 @@ expr* IndexJoinRule::createNormalizedKey(
 
     let $k := outerKeyExpr
     return
-      if ($k instance of xs:float or
-          exists(probe-index-point-value(index, if (empty($k)) then "f" else "f")))
+      if ($k instance of xs:float or exists(probe-index-point-value(index, "f")))
       then scanExpr
       else probe-index-point-value(index, normalized key of $k)
 
@@ -1144,20 +1143,11 @@ expr* IndexJoinRule::createNormalizedProbe(
   flwor_expr* flwor = em->create_flwor_expr(sctx, udf, loc);
   flwor->add_clause(em->create_let_clause(sctx, loc, keyVar, outerKeyExpr));
 
-  // The key "f" depends on keyVar in form only: constant, this probe could be
-  // folded or hoisted to where the index, created ahead of the outer var, does
-  // not exist yet.
-  expr* floatKey =
-  em->create_if_expr(sctx, udf, loc,
-                     em->create_fo_expr(sctx, udf, loc, BUILTIN_FUNC(FN_EMPTY_1), keyVar),
-                     em->create_const_expr(sctx, udf, loc, "f"),
-                     em->create_const_expr(sctx, udf, loc, "f"));
-
   expr* floatProbe =
   em->create_fo_expr(sctx, udf, loc,
                      BUILTIN_FUNC(FN_ZORBA_XQDDF_PROBE_INDEX_POINT_VALUE_N),
                      qnameExpr,
-                     floatKey);
+                     em->create_const_expr(sctx, udf, loc, "f"));
 
   std::vector<expr*> args(2);
   args[0] = em->create_instanceof_expr(sctx, udf, loc, keyVar, rtm.FLOAT_TYPE_ONE);
