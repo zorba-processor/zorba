@@ -51,6 +51,13 @@ xquery version "3.0";
  : policy that the query runs under applies to every access: with a read
  : path allow-list, files outside it cannot be read even through a symbolic
  : link.
+ : <p/>
+ : A relative system identifier of an external entity in an XML file is
+ : resolved against the location of the file. Whether the entity is read is
+ : up to the security policy: it needs the external-entities capability
+ : (which <code>zorba --directory</code> does not grant) and, for a file, a
+ : read path that covers it; a refused entity yields the error record of the
+ : document.
  :
  : @author Zorba contributors
  : @project Zorba/Data Converters/Directory
@@ -333,6 +340,10 @@ declare %private %an:nondeterministic function dir:parse(
 {
   switch ( $format )
   case "xml" return
+    (: The string that file:read-text returns streams the file and carries
+     : its path, which fn:parse-xml takes as the base URI of the external
+     : entities (instead of the static base URI of this module): keep the
+     : call direct, without materializing the string first. :)
     parse-xml( file:read-text( $full ) )
   case "json" return
     let $items := jn:parse-json( file:read-text( $full ) )
