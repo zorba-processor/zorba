@@ -67,6 +67,11 @@ ZORBA_SET_TEST_PROPERTY(bin/zorba_f1 PASS_REGULAR_EXPRESSION ".*file {blub.xq} n
 ZORBA_ADD_TEST(bin/zorba1 zorbacmd --omit-xml-declaration -q "1+1")
 ZORBA_SET_TEST_PROPERTY(bin/zorba1 PASS_REGULAR_EXPRESSION "2")
 
+# -r omits the XML declaration: the output is exactly "2", no final newline.
+ZORBA_ADD_TEST(bin/zorba_r_one_plus_one zorbacmd -r -q "1 + 1")
+ZORBA_SET_TEST_PROPERTY(bin/zorba_r_one_plus_one PASS_REGULAR_EXPRESSION "^2$")
+ZORBA_SET_TEST_PROPERTY(bin/zorba_r_one_plus_one FAIL_REGULAR_EXPRESSION "<\\?xml")
+
 ZORBA_ADD_TEST(bin/zorba2 zorbacmd --serialize-html -q "1+1")
 ZORBA_SET_TEST_PROPERTY(bin/zorba2 PASS_REGULAR_EXPRESSION "2")
 

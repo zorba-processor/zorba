@@ -30,68 +30,11 @@
 
 #include "store/api/item_factory.h"
 
-#include <zorba/config.h>
-
-#include <filesystem>
-#include <string>
-
-#if defined(__unix__) || defined(__APPLE__)
-#include <dlfcn.h>
-#endif
-
 
 
 // DEFINE ENVIRONMENT VARIABLES
 namespace zorba 
 {
-
-
-/*******************************************************************************
-  The installation prefix that this library is in: <prefix>/lib/libzorba*.so.
-  The configured paths name the prefix given at configure time, which is wrong
-  after "cmake --install --prefix <other>" or after the installation is moved.
-  Empty if the location of the library is not known.
-********************************************************************************/
-static std::string library_install_prefix()
-{
-#if defined(__unix__) || defined(__APPLE__)
-  Dl_info lInfo;
-  if (dladdr(reinterpret_cast<void*>(&library_install_prefix), &lInfo) == 0 ||
-      lInfo.dli_fname == nullptr)
-    return std::string();
-  std::error_code ec;
-  std::filesystem::path const lLib =
-    std::filesystem::canonical(std::filesystem::path(lInfo.dli_fname), ec);
-  if (ec)
-    return std::string();
-  return lLib.parent_path().parent_path().string();
-#else
-  return std::string();
-#endif
-}
-
-
-/*******************************************************************************
-  Puts <prefix>/<aRelative>/ in front of aPaths if it is a directory and not
-  already in aPaths.
-********************************************************************************/
-static void prepend_installed_dir(
-    std::vector<zstring>& aPaths,
-    std::string const& aPrefix,
-    char const* aRelative)
-{
-  if (aPrefix.empty())
-    return;
-  std::string lDir = aPrefix + "/" + aRelative + "/";
-  std::error_code ec;
-  if (!std::filesystem::is_directory(std::filesystem::path(lDir), ec))
-    return;
-  zstring const lEntry(lDir);
-  for (zstring const& lPath : aPaths)
-    if (lPath == lEntry)
-      return;
-  aPaths.insert(aPaths.begin(), lEntry);
-}
 
 
 static void append_env_var(
@@ -206,12 +149,6 @@ void root_static_context::init()
   {
     lRootURIPath.push_back(*lURIPathIter);
   }
-
-  // Where this library is installed, which is not where it was configured to
-  // be if the installation was moved.
-  std::string const lPrefix = library_install_prefix();
-  prepend_installed_dir(lRootURIPath, lPrefix, ZORBA_NONCORE_URI_DIR);
-  prepend_installed_dir(lRootURIPath, lPrefix, ZORBA_CORE_URI_DIR);
   set_uri_path(lRootURIPath);
 
   const char ** lLibPathIter = get_builtin_lib_path();
@@ -219,8 +156,6 @@ void root_static_context::init()
   {
     lRootLibPath.push_back(*lLibPathIter);
   }
-  prepend_installed_dir(lRootLibPath, lPrefix, ZORBA_NONCORE_LIB_DIR);
-  prepend_installed_dir(lRootLibPath, lPrefix, ZORBA_CORE_LIB_DIR);
   set_lib_path(lRootLibPath);
 
   // by default enabled features

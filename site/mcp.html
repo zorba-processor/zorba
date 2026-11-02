@@ -54,7 +54,7 @@
 cmake --build --preset full-release
 cmake --install build/full-release
 "$HOME/zorba/bin/zorba-mcp" --root /path/to/folder</code></pre>
-<p>Install it rather than running it from the build directory: the installed tree is what puts the directory module and the file and CSV modules where the server finds them. The installed binaries find their libraries and modules relative to their own location, so the build can be installed at any prefix with <code>cmake --install build --prefix &lt;dir&gt;</code>, and the installation can be moved.</p>
+<p>Install it rather than running it from the build directory: the installed tree is what puts the directory module and the file and CSV modules where the server finds them. The installed binaries find their libraries relative to their own location, so they start from any prefix given to <code>cmake --install build --prefix &lt;dir&gt;</code> and after the installation is moved. The module and library directories are fixed at configure time, so to load the modules from the installed tree set the prefix when configuring (<code>-DCMAKE_INSTALL_PREFIX=&lt;dir&gt;</code>); with another prefix the modules are found only through the build directory.</p>
 <div class="table-wrap">
 <table>
   <thead><tr><th>Option</th><th>Effect</th></tr></thead>
