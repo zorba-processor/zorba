@@ -163,6 +163,22 @@ while (TRUE)
 atmp->m_apm_datalength = ++len;
 
 nbytes = (len + 1) >> 1;
+
+/* Zorba: a number stored compacted (m_apm_init_compact_copy) may have room
+   for fewer digits than a long has */
+if (nbytes > atmp->m_apm_malloclength)
+  {
+   void *vp;
+   if ((vp = M_apm_realloc_data(atmp, (nbytes + 32))) == NULL)
+     {
+      /* fatal, this does not return */
+      M_apm_log_error_msg(M_APM_FATAL, "\'m_apm_set_long\', Out of memory");
+     }
+
+   atmp->m_apm_malloclength = nbytes + 28;
+   atmp->m_apm_data = (UCHAR *)vp;
+  }
+
 p = buf;
 
 for (ii=0; ii < nbytes; ii++)
@@ -296,7 +312,7 @@ void m_apm_set_string(M_APM ctmp, char* s_in)
   // do we need more memory to hold this number?
   if (j > ctmp->m_apm_malloclength)
   {
-    if ((vp = MAPM_REALLOC(ctmp->m_apm_data, (j + 32))) == NULL)
+    if ((vp = M_apm_realloc_data(ctmp, (j + 32))) == NULL)
     {
       M_apm_log_error_msg(M_APM_FATAL, M_set_string_error_msg);
     }
