@@ -196,9 +196,12 @@ char const* get_help_msg() {
     ////////// j //////////////////////////////////////////////////////////////
 
     HELP_OPT( "--jsoniq, -j" )
-      "Force queries to be considered JSONiq.\n\n"
+      "The same as --language jsoniq.\n\n"
 
     ////////// l //////////////////////////////////////////////////////////////
+
+    HELP_OPT( "--language {xquery|jsoniq}" )
+      "The language of a query that has no version declaration (jsoniq version or xquery version) and is not read from a .jq or .xq file. Default: xquery.\n\n"
 
     HELP_OPT( "--lib-module, -l" )
       "Query compiler option to treat the query as a library module. If this is set --compile-only option is also set to true.\n\n"
@@ -715,6 +718,18 @@ int parse_args( int argc, char const *argv[] ) {
 
     ////////// l //////////////////////////////////////////////////////////////
 
+    else if ( IS_LONG_OPT( "--language" ) ) {
+      PARSE_ARG( "--language" );
+      string const val( ARG_VAL );
+      if ( val == "jsoniq" )
+        zc_props.jsoniq_ = true;
+      else if ( val == "xquery" )
+        zc_props.jsoniq_ = false;
+      else {
+        error = "--language argument must be one of: xquery or jsoniq.\n";
+        break;
+      }
+    }
     else if ( IS_OPT( "--lib-module", "-l" ) )
       zc_props.lib_module_ = true;
     else if ( IS_LONG_OPT( "--lib-path" ) ) {
