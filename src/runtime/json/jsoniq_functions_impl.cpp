@@ -61,6 +61,7 @@
 #include <zorba/internal/unique_ptr.h>
 
 #include "json_loader.h"
+#include "nesting.h"
 
 
 namespace zorba {
@@ -326,6 +327,8 @@ JSONDecodeFromRoundtripIterator::decodeObject(
   store::Item_t& aResult,
   JSONDecodeFromRoundtripIteratorState* aState) const
 {
+  json_nesting::check_stack();
+
   if (decodeXDM(anObj, aResult, aState))
   {
     return true;
@@ -365,6 +368,8 @@ JSONDecodeFromRoundtripIterator::decodeArray(
   store::Item_t& aResult,
   JSONDecodeFromRoundtripIteratorState* aState) const
 {
+  json_nesting::check_stack();
+
   std::vector<store::Item_t> newItems;
   bool modified = false;
 
@@ -470,6 +475,8 @@ JSONEncodeForRoundtripIterator::encodeObject(
   store::Item_t& aResult,
   JSONEncodeForRoundtripIteratorState* aState) const
 {
+  json_nesting::check_stack();
+
   std::vector<store::Item_t> newNames;
   std::vector<store::Item_t> newValues;
   bool modified = false;
@@ -504,6 +511,8 @@ JSONEncodeForRoundtripIterator::encodeArray(
   store::Item_t& aResult,
   JSONEncodeForRoundtripIteratorState* aState) const
 {
+  json_nesting::check_stack();
+
   std::vector<store::Item_t> newItems;
   bool modified = false;
 

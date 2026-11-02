@@ -180,9 +180,15 @@ AutoFSURIMapper::mapURI
   {
     zstring lCandidateURI("file://");
     // If module-path entry is relative, normalize it against the
-    // static context's base URI.
+    // static context's base URI, or against the current directory if the
+    // base URI is not an absolute path (a candidate "file://./x" would name
+    // a host, not the current directory, and the security checks would
+    // refuse it).
     if (!fs::is_absolute(*lIter)) {
-      zstring lAbsPath = fs::normalize_path(*lIter, aSctx.get_base_uri());
+      zstring lBase(aSctx.get_base_uri());
+      if (!fs::is_absolute(lBase))
+        lBase = zstring(fs::curdir());
+      zstring lAbsPath = fs::normalize_path(*lIter, lBase);
       lCandidateURI.append(lAbsPath);
     }
     else {

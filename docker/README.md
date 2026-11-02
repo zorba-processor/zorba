@@ -16,8 +16,9 @@ The `zorba` command-line tool on Ubuntu 24.04, for `linux/amd64` and
 `linux/arm64` (one multi-arch tag; Docker pulls the matching platform).
 
 ```bash
-docker run --rm ghcr.io/zorba-processor/zorba:edge -q '1 + 1'
-docker run --rm -v "$PWD":/work ghcr.io/zorba-processor/zorba:edge -f -q query.xq
+docker run --rm ghcr.io/zorba-processor/zorba:edge -r -q '1 + 1'
+echo 'for $i in 1 to 3 return $i * $i' > query.xq
+docker run --rm -v "$PWD":/work ghcr.io/zorba-processor/zorba:edge -r -f -q query.xq
 ```
 
 The image also contains the MCP server `zorba-mcp`. The entrypoint runs it when

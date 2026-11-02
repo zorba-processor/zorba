@@ -38,7 +38,7 @@
 <h2 id="what">What it is</h2>
 <p><code>zorba-mcp</code> is a <a href="https://modelcontextprotocol.io">Model Context Protocol</a> server that speaks JSON-RPC over standard input and output. The agent's client starts it, and the agent gets tools to list the files in the folder and to run JSONiq or XQuery over them. The files stay where they are: every call reads them as they are on disk, nothing is indexed or cached.</p>
 <p>The same engine and the same restrictions are available without an agent as <code>zorba --directory</code> (see <a href="#cli">below</a>). The server implements MCP 2026-07-28 (<code>server/discover</code>) and also answers clients that start with the earlier <code>initialize</code> handshake (2025-11-25, 2025-06-18, 2025-03-26).</p>
-<p>The folder is read through the <a href="zorba.html#modules">directory module</a>, <code>http://zorba.io/modules/directory</code>. A file is a record <code>{ "path", "format", "content" }</code>: <code>content</code> is a document node for XML, the parsed value for JSON (an array if a file holds several top-level values, as in JSON Lines) and an array of row objects for CSV, with the first line as column names. A file that does not parse yields <code>{ "path", "format", "error" }</code> instead, so one bad file does not stop a query over the whole folder. HTML files (<code>.html</code>, <code>.htm</code>) are parsed with <code>x:parse-html</code> and <code>content</code> is the document node; a build without XML Schema support reports them as an unsupported format.</p>
+<p>The folder is read through the <a href="zorba.html#modules">directory module</a>, <code>http://zorba.io/modules/directory</code>. A file is a record <code>{ "path", "format", "content" }</code>: <code>content</code> is a document node for XML, the parsed value for JSON (an array if a file holds several top-level values, as in JSON Lines) and an array of row objects for CSV, with the first line as column names (numbers and the words <code>true</code>, <code>false</code> and <code>null</code> are typed; the single letters <code>T</code>, <code>Y</code>, <code>F</code> and <code>N</code> stay strings, so a <code>D</code>/<code>N</code> column is not turned into booleans). A file that does not parse yields <code>{ "path", "format", "error" }</code> instead, so one bad file does not stop a query over the whole folder. HTML files (<code>.html</code>, <code>.htm</code>) are parsed with <code>x:parse-html</code> and <code>content</code> is the document node; a build without XML Schema support reports them as an unsupported format.</p>
 
 <h2 id="docker">Try it with Docker</h2>
 <p>No build is needed. The container image includes <code>zorba-mcp</code>; mount the folder you want to query at <code>/data</code>, read-only:</p>
@@ -46,15 +46,15 @@
 <p><code>-i</code> keeps standard input open, which is how the client talks to the server. The command waits silently for JSON-RPC messages, so you normally start it from an MCP client (next sections) rather than by hand. To check it by hand, send one request:</p>
 <pre class="code shell"><code>echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25"}}' \
   | docker run -i --rm -v "$PWD:/data:ro" ghcr.io/zorba-processor/zorba:edge zorba-mcp --root /data</code></pre>
-<p>The <code>edge</code> tag is the latest master build. The <code>latest</code> tag moves only on stable releases and does not include <code>zorba-mcp</code> until the first one that does; see <a href="https://github.com/zorba-processor/zorba/blob/master/docker/README.md">docker/README.md</a> for all tags. Any other arguments to the image still go to <code>zorba</code>, so <code>docker run --rm ghcr.io/zorba-processor/zorba:edge -q '1 + 1'</code> works as before.</p>
+<p>The <code>edge</code> tag is the latest master build. The <code>latest</code> tag moves only on stable releases and does not include <code>zorba-mcp</code> until the first one that does; see <a href="https://github.com/zorba-processor/zorba/blob/master/docker/README.md">docker/README.md</a> for all tags. Any other arguments to the image still go to <code>zorba</code>, so <code>docker run --rm ghcr.io/zorba-processor/zorba:edge -r -q '1 + 1'</code> works as before.</p>
 
 <h2 id="source">Build from source</h2>
 <p>On Linux or macOS with the <a href="https://github.com/zorba-processor/zorba#building">prerequisites</a> installed, the <code>full-release</code> preset builds <code>zorba-mcp</code> along with <code>zorba</code>:</p>
-<pre class="code shell"><code>cmake --preset full-release
+<pre class="code shell"><code>cmake --preset full-release -DCMAKE_INSTALL_PREFIX="$HOME/zorba"
 cmake --build --preset full-release
-cmake --install build/full-release --prefix "$HOME/zorba"
+cmake --install build/full-release
 "$HOME/zorba/bin/zorba-mcp" --root /path/to/folder</code></pre>
-<p>Install it rather than running it from the build directory: the installed tree is what puts the directory module and the file and CSV modules where the server finds them.</p>
+<p>Install it rather than running it from the build directory: the installed tree is what puts the directory module and the file and CSV modules where the server finds them. The installed binaries find their libraries relative to their own location, so they start from any prefix given to <code>cmake --install build --prefix &lt;dir&gt;</code> and after the installation is moved. The module and library directories are fixed at configure time, so to load the modules from the installed tree set the prefix when configuring (<code>-DCMAKE_INSTALL_PREFIX=&lt;dir&gt;</code>); with another prefix the modules are found only through the build directory.</p>
 <div class="table-wrap">
 <table>
   <thead><tr><th>Option</th><th>Effect</th></tr></thead>
@@ -164,7 +164,7 @@ return {
 <p>Results should be JSON objects, arrays or atomic values; convert XML nodes with <code>string()</code> or <code>data()</code> before returning them.</p>
 
 <h2 id="security">Security model</h2>
-<p>The agent writes the queries, so the server treats every query as untrusted. Queries run under Zorba's <a href="zorba.html#security">secure policy</a> with exactly two capabilities added back:</p>
+<p>The agent writes the queries, so the server treats every query as untrusted. Queries run under Zorba's <a href="zorba.html#security">secure policy</a> with exactly two capabilities added back, each restricted: <code>file-read</code>, limited to the root, and <code>native-modules</code>, limited to the file module. The effect:</p>
 <ul>
   <li><strong>Read-only.</strong> File writes are denied, and so are environment variables.</li>
   <li><strong>Confined to the root.</strong> Reads are limited to files under <code>--root</code>. Absolute paths, <code>..</code> segments and paths through symbolic links are rejected, symbolic links are not listed, and entries whose name starts with <code>.</code> are not listed.</li>
@@ -184,8 +184,9 @@ return {
 
 <h2 id="cli">From the command line: <code>--directory</code></h2>
 <p><code>zorba --directory &lt;dir&gt;</code> runs a query under the same policy as <code>zorba-mcp</code>: reads confined to <code>&lt;dir&gt;</code>, no writes, network or environment, only the file module among the native modules. <code>$dir:root</code> is bound to the folder, and the result is written as JSON, one item per line. It is the quickest way to write and test a query before giving it to an agent or saving it as a predefined query:</p>
-<pre class="code shell"><code>zorba --directory shop -f -q revenue.jq
-docker run --rm -v "$PWD:/work" ghcr.io/zorba-processor/zorba:edge --directory shop -f -q revenue.jq</code></pre>
+<p>From a checkout of the repository, this sums the orders in the XML files of the smoke-test folder per customer (the query is <a href="https://github.com/zorba-processor/zorba/blob/master/docker/runtime/smoke/examples/revenue.jq">docker/runtime/smoke/examples/revenue.jq</a>):</p>
+<pre class="code shell"><code>zorba --directory docker/runtime/smoke/data -f -q docker/runtime/smoke/examples/revenue.jq
+docker run --rm -v "$PWD:/work" ghcr.io/zorba-processor/zorba:edge --directory docker/runtime/smoke/data -f -q docker/runtime/smoke/examples/revenue.jq</code></pre>
 <p><code>--directory</code> cannot be combined with <code>--allow</code> or the other options that would widen the policy.</p>
 
 <div class="pager"><a href="zorba.html">Using Zorba</a><a href="cheatsheet.html">Next: Cheat sheet</a></div>

@@ -77,7 +77,7 @@
 </table>
 </div>
 <pre class="code shell"><code>zorba --secure --allow file-read --read-path /srv/data --timeout 10 -f -q report.xq</code></pre>
-<p>A denied file or network access raises <code>zerr:ZXQP0029</code>, and importing a module that needs a denied capability raises <code>zerr:ZXQP0067</code>; denied environment functions return the empty sequence. Modules and schemas in the URI and library paths (which include the current directory) can always be imported. The files named on the command line (queries, <code>--context-item</code>, <code>-e name=file</code>, <code>-o</code>) are opened by <code>zorba</code> itself and are not restricted.</p>
+<p>A denied file or network access raises the error of the function that made it (for example <code>err:FODC0002</code> from <code>fn:doc</code> or <code>file:FOFL9999</code> from the file module) whose message contains "access denied by security policy", and importing a module that needs a denied capability raises <code>zerr:ZXQP0067</code>; denied environment functions return the empty sequence. Modules and schemas in the URI and library paths can always be imported; with <code>--secure</code> the current directory is not one of them (add it with <code>--module-path</code> and an absolute path). The files named on the command line (queries, <code>--context-item</code>, <code>-e name=file</code>, <code>-o</code>) are opened by <code>zorba</code> itself and are not restricted.</p>
 <p class="why"><strong>Why it matters:</strong> a query from a user, a request or a file you did not write cannot read <code>/etc/passwd</code>, reach an internal service or run forever.</p>
 
 <h2 id="external">External variables</h2>
@@ -150,11 +150,14 @@
 <h2 id="embed">Embedding in C++</h2>
 <p>The C++ API is in <code>include/zorba</code>. The usual pattern: create a store and a <code>Zorba</code> instance, compile a query into an <code>XQuery</code> object, bind external variables on its dynamic context, iterate over the result, and shut down in reverse order. Compilation errors and runtime errors are thrown as <code>ZorbaException</code>. This program is compiled against the installed headers and linked with <code>libzorba_simplestore</code> as part of the site build.</p>
 <!-- example: zorba/embed -->
+<p>Save the program as <code>embed.cpp</code> and compile it against an installed Zorba (here installed with <code>cmake --install build --prefix "$HOME/zorba"</code>). A prefix that is not a system directory needs <code>LD_LIBRARY_PATH</code> so that the program finds <code>libzorba_simplestore</code>:</p>
+<pre class="code shell"><code>g++ -std=c++23 -I"$HOME/zorba/include" embed.cpp -L"$HOME/zorba/lib" -lzorba_simplestore -o embed
+LD_LIBRARY_PATH="$HOME/zorba/lib" ./embed</code></pre>
 <p>Unlike the command line, an embedded engine starts from the secure policy: queries cannot read or write files, use the network, expand external entities, load native modules or read environment variables until the application allows it, for example <code>engine-&gt;setSecurityPolicy(SecurityPolicy::secure().allow(Capability::FileRead).addReadPath("/srv/data"))</code>. <code>engine-&gt;setSecurityPolicy(SecurityPolicy::unrestricted())</code> restores the behavior of Zorba 4.x. The policy is declared in <code>include/zorba/security.h</code>.</p>
 <p class="why"><strong>Why it matters:</strong> a compiled query can be executed many times with different variables, which is how an application uses Zorba as its query engine. More examples are in <a href="https://github.com/zorba-processor/zorba/tree/master/doc/cxx/examples"><code>doc/cxx/examples</code></a>.</p>
 
 <h3 id="threading">Threading</h3>
-<p>Zorba 5.0 is not thread-safe, and there is one engine and one store per process (<code>Zorba::getInstance</code> returns a singleton). Use Zorba, and every object created from it, from one thread at a time; if several threads need it, serialize all calls with your own mutex. For parallel queries, run separate processes. Making the engine thread-safe is planned for a 5.x release.</p>
+<p>Zorba 5.0 is not thread-safe, and there is one engine and one store per process (<code>Zorba::getInstance</code> returns a singleton). Use Zorba, and every object created from it, from one thread at a time; if several threads need it, serialize all calls with your own mutex. For parallel queries, run separate processes.</p>
 
 <h2 id="limits">Limits</h2>
 <ul>

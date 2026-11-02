@@ -85,7 +85,9 @@ inline void *counted( void *p ) {
   return p;
 }
 
-inline void uncounted( void *p ) {
+// Not inlined: GCC would see the free() next to a libstdc++ operator new call
+// and report a mismatch (-Wmismatched-new-delete) depending on its inlining.
+[[gnu::noinline]] void uncounted( void *p ) {
   if ( p ) {
     g_news.fetch_sub( 1, std::memory_order_relaxed );
     g_usable.fetch_sub( static_cast<long>( malloc_usable_size( p ) ),
@@ -366,6 +368,13 @@ void walk( Item const &i, Counts &c ) {
   case store::XS_LONG:
   case store::XS_INT:
     ++c.n["integers"];
+    // xs:integer values the item factory shares (SMALL_INTEGER_MIN/MAX in
+    // src/store/naive/simple_item_factory.h).
+    if ( i.getTypeCode() == store::XS_INTEGER ) {
+      long long const v = i.getLongValue();
+      if ( v >= -128 && v <= 1023 )
+        ++c.n["small_integers"];
+    }
     break;
   case store::XS_DECIMAL:
     ++c.n["decimals"];
@@ -433,12 +442,20 @@ int file_mode( Zorba *z, std::string const &format, char const *path ) {
 
 // Microbenchmarks: documents made of N items of one kind; the per-item cost
 // of a kind is the difference between two cases divided by N (see report.xq).
+// A case listed in micro_queries evaluates that query ($s is the document)
+// instead of only parsing; its time minus the time of the parse-only case of
+// the same document is the query's.
 struct Micro {
   char const *name, *format;
   std::string head, tail;
   std::string ( *item )( long );
   std::string sep;
 };
+
+std::map<std::string, std::string> const micro_queries = {
+  { "j_dec_arith",                      // same document as j_dec
+    "sum( for $d in jn:members( jn:parse-json( $s ) )\n"
+    "     return $d * 1.5 + 0.25 )" } };
 
 std::string digits64( long i ) {
   // 64 characters that differ between items (no sharing of equal strings).
@@ -465,6 +482,8 @@ int micro_mode( Zorba *z, long n ) {
     { "j_bigint", "json", "[", "]",
       []( long i ) { return std::to_string( 1000000 + i ); }, "," },
     { "j_dec", "json", "[", "]",
+      []( long i ) { return std::to_string( i % 1000 ) + ".25"; }, "," },
+    { "j_dec_arith", "json", "[", "]",
       []( long i ) { return std::to_string( i % 1000 ) + ".25"; }, "," },
     { "j_dbl", "json", "[", "]",
       []( long i ) { return std::to_string( i % 1000 ) + ".5e3"; }, "," },
@@ -500,7 +519,11 @@ int micro_mode( Zorba *z, long n ) {
     doc += c.tail;
     long long const bytes = static_cast<long long>( doc.size() );
     std::vector<Item> items;
-    Measure const m = run( z, parse_query( c.format, false ), doc, items );
+    auto const q = micro_queries.find( c.name );
+    Measure const m = run( z, q == micro_queries.end()
+                                ? parse_query( c.format, false )
+                                : prolog + q->second,
+                           doc, items );
     std::ostringstream o;
     o << "{\"mode\":\"micro\",\"case\":\"" << c.name << "\",\"format\":\""
       << c.format << "\",\"n\":" << n << ",\"bytes\":" << bytes << ',';
