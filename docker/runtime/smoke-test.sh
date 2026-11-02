@@ -24,6 +24,7 @@ meta='{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextpr
       '{jsonrpc:"2.0",id:$id,method:"tools/call",params:{name:"run_query",arguments:{query:$q}}}'
   done
   jq -cn '{jsonrpc:"2.0",id:4,method:"tools/call",params:{name:"list_documents"}}'
+  jq -cn '{jsonrpc:"2.0",id:11,method:"tools/call",params:{name:"list_documents",arguments:{path:"customers.csv"}}}'
   jq -cn '{jsonrpc:"2.0",id:5,method:"tools/call",params:{name:"customer_name",arguments:{id:"globex"}}}'
   jq -cn '{jsonrpc:"2.0",id:6,method:"tools/call",params:{name:"run_query",arguments:{query:"doc(\"http://example.com/\")"}}}'
   # 2026-07-28: stateless, every request carries its protocol version.
@@ -32,6 +33,12 @@ meta='{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextpr
 } | docker run -i --rm -v "$here/smoke/data:/data:ro" \
       -v "$here/smoke/queries:/queries:ro" "$image" \
       zorba-mcp --root /data --queries /queries > "$out"
+
+# Without the background scan, list_documents lists the whole tree at once.
+jq -cn '{jsonrpc:"2.0",id:1,method:"initialize",params:{protocolVersion:"2025-11-25"}}
+        ,{jsonrpc:"2.0",id:12,method:"tools/call",params:{name:"list_documents"}}' \
+  | docker run -i --rm -v "$here/smoke/data:/data:ro" "$image" \
+      zorba-mcp --root /data --no-scan | jq -c 'select(.id == 12)' >> "$out"
 
 cat "$out"
 
@@ -53,7 +60,9 @@ lines='.result.isError == false and (.result.content[0].text | split("\n") | map
 check "run_query: revenue"    3 "$lines"' == [{"customer":"acme","orders":2,"total":175},{"customer":"globex","orders":1,"total":250}])'
 check "run_query: unpaid"     9 "$lines"' == [{"order":"o2","customer":"globex","total":250}])'
 check "run_query: by-country" 10 "$lines"' == [{"customer":"Acme Corp","country":"MX","total":175},{"customer":"Globex","country":"US","total":250}])'
-check "list_documents"      4 '.result.isError == false and (.result.content[0].text | split("\n") | map(select(. != "") | fromjson.path) == ["customers.csv","orders/2026/q1.xml","orders/2026/q2.xml","payments/payments.json","report.html"])'
+check "list_documents (scan)" 4 '.result.isError == false and (.result.content[0].text | split("\n")[0] | fromjson | .scan.state | IN("running","complete"))'
+check "list_documents (file)" 11 '.result.isError == false and (.result.content[0].text | fromjson | .preview.columns == ["id","name","country"])'
+check "list_documents"      12 '.result.isError == false and (.result.content[0].text | split("\n") | map(select(. != "") | fromjson.path) == ["customers.csv","orders/2026/q1.xml","orders/2026/q2.xml","payments/payments.json","report.html"])'
 check "predefined query"    5 '.result.isError == false and (.result.content[0].text | fromjson) == "Globex"'
 check "network denied"      6 '.result.isError == true and (.result.content[0].text | contains("access denied by security policy"))'
 check "server/discover"     7 '.result.resultType == "complete" and (.result.supportedVersions | index("2026-07-28") != null) and (.result.capabilities | has("tools"))'

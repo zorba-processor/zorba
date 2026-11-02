@@ -384,6 +384,7 @@ void test_tools_list( Fixture const &f ) {
 void test_list_documents( Fixture const &f ) {
   ServerConfig config;
   config.root = f.tree;
+  config.scan = false;
   Server server( f.zorba, config, std::cerr );
 
   Json const r = call_tool( server, "list_documents", Json::object() );
@@ -886,7 +887,7 @@ void test_optional_params( Fixture const &f ) {
     { "variables", obj( { { "x", "given" } } ) } } ) );
   input += call( 16, "greet", obj( { { "name", "Ana" } } ) );
   input += call( 17, "greet", obj( { { "name", "Ana" }, { "nmae", "x" } } ) );
-  input += call( 18, "list_documents", obj( { { "path", "x" } } ) );
+  input += call( 18, "list_documents", obj( { { "bogus", "x" } } ) );
 
   std::string const output( run_binary( f, queries, input ) );
   std::map<std::string, Json> by_id;
@@ -1000,7 +1001,7 @@ void test_optional_params( Fixture const &f ) {
   struct { char const *id; char const *arg; char const *what; } const unknown[] = {
     { "15", "variables", "run_query" },
     { "17", "nmae", "predefined tool" },
-    { "18", "path", "list_documents" }
+    { "18", "bogus", "list_documents" }
   };
   for ( auto const &u : unknown ) {
     Json const &r = by_id[u.id];

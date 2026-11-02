@@ -21,6 +21,7 @@
 #include <exception>
 #include <filesystem>
 #include <fstream>
+#include <memory>
 #include <new>
 #include <set>
 #include <sstream>
@@ -330,6 +331,32 @@ Server::Server( Zorba *zorba, ServerConfig config, std::ostream &log ) :
   if ( theConfig.timeout.count() > 0 )
     thePolicy.setTimeout( theConfig.timeout );
   load_predefined();
+  if ( theConfig.scan ) {
+    try {
+      theScanner = std::make_unique<Scanner>(
+        theConfig.root, theConfig.scan_limits, theConfig.scan_hook );
+    }
+    // Threads may not start under --max-memory, which is applied before this:
+    // the server then works as with --no-scan.
+    catch ( std::exception const &e ) {
+      theLog << server_name << ": no background scan: " << e.what() << std::endl;
+    }
+  }
+}
+
+Server::~Server() {
+  (void)stop_scan();
+  if ( theScanner )
+    theLog << server_name << ": the scan cache holds "
+           << theScanner->cache_summary() << std::endl;
+}
+
+bool Server::stop_scan() {
+  return !theScanner || theScanner->stop();
+}
+
+std::size_t Server::scan_cache_bytes() const {
+  return theScanner ? theScanner->cache_bytes() : 0;
 }
 
 void Server::load_predefined() {
@@ -418,20 +445,48 @@ bool Server::load_predefined( std::string const &path,
 Json Server::tools() const {
   Json list( Json::array() );
 
-  Json no_args( Json::object( {
-    { "type", "object" }, { "additionalProperties", false }
-  } ) );
-  list.push( Json::object( {
-    { "name", "list_documents" },
-    { "title", "List documents" },
-    { "description",
-      "Lists the files under the directory, recursively and sorted by path: "
-      "one JSON object per line, {path, format, size, modified}. The format "
-      "(xml, json, csv, html or null) says how run_query's dir:documents "
-      "and dir:open parse the file." },
-    { "inputSchema", no_args },
-    { "annotations", read_only_annotations() }
-  } ) );
+  if ( theScanner ) {
+    list.push( Json::object( {
+      { "name", "list_documents" },
+      { "title", "List documents" },
+      { "description",
+        "Lists files, recursive, sorted by path, with format, size, fields. "
+        "First line: scan state, totals, dirs (subdirectories, if cut or "
+        "scanning), incomplete (may miss files). memory_limit: scan stopped; "
+        "ask by path. A file as path adds a preview." },
+      { "inputSchema", Json::object( {
+          { "type", "object" },
+          { "properties", Json::object( {
+              { "path", Json::object( {
+                  { "type", "string" },
+                  { "description", "Subdirectory or file, relative." } } ) },
+              { "limit", Json::object( {
+                  { "type", "integer" },
+                  { "description", "Files to list; default 100." } } ) },
+              { "refresh", Json::object( {
+                  { "type", "boolean" },
+                  { "description", "Restart the scan." } } ) }
+            } ) },
+          { "additionalProperties", false }
+        } ) },
+      { "annotations", read_only_annotations() }
+    } ) );
+  } else {
+    Json no_args( Json::object( {
+      { "type", "object" }, { "additionalProperties", false }
+    } ) );
+    list.push( Json::object( {
+      { "name", "list_documents" },
+      { "title", "List documents" },
+      { "description",
+        "Lists the files under the directory, recursively and sorted by path: "
+        "one JSON object per line, {path, format, size, modified}. The format "
+        "(xml, json, csv, html or null) says how run_query's dir:documents "
+        "and dir:open parse the file." },
+      { "inputSchema", no_args },
+      { "annotations", read_only_annotations() }
+    } ) );
+  }
 
   Json query_props( Json::object( {
     { "query", Json::object( {
@@ -582,7 +637,17 @@ Json Server::call_tool( Json const &params, bool *protocol_error,
   std::vector<std::pair<std::string,std::string> > const no_vars;
   QueryOutcome outcome;
   std::string unexpected;
-  if ( tool == "list_documents" ) {
+  if ( tool == "list_documents" && theScanner ) {
+    bool is_error = false;
+    // A request does not wait past its time limit, nor long without one.
+    std::chrono::milliseconds const longest( std::chrono::seconds( 10 ) );
+    std::chrono::milliseconds const wait(
+      theConfig.timeout.count() > 0 ? std::min( theConfig.timeout, longest )
+                                    : longest );
+    outcome.text = theScanner->answer( *args, theConfig.max_output, wait,
+                                       &is_error );
+    outcome.ok = !is_error;
+  } else if ( tool == "list_documents" ) {
     unexpected = undeclared_arguments( *args, {} );
     if ( !unexpected.empty() ) {
       outcome.text = invalid_arguments_text(

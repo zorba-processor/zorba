@@ -48,6 +48,7 @@ namespace {
 char const usage[] =
   "Usage: zorba-mcp --root <dir> [--queries <dir>] [--timeout <seconds>]\n"
   "                 [--max-output <bytes>] [--max-memory <bytes>]\n"
+  "                 [--no-scan] [--scan-cache-mb <MiB>]\n"
   "\n"
   "An MCP server (stdio transport) over the Zorba JSONiq/XQuery processor.\n"
   "Queries run under the secure policy, reading only files under --root\n"
@@ -62,7 +63,11 @@ char const usage[] =
   "                       131072); longer output is cut with a marker\n"
   "  --max-memory <bytes> memory limit of the server (default 4294967296,\n"
   "                       0: none; Linux only): a query that needs more\n"
-  "                       fails with a tool error\n";
+  "                       fails with a tool error\n"
+  "  --no-scan            no background scan of the directory: list_documents\n"
+  "                       takes no arguments and lists through dir:list\n"
+  "  --scan-cache-mb <MiB> memory for the scan's file index and previews\n"
+  "                       (default 64); at the limit the scan stops\n";
 
 bool parse_number( char const *s, unsigned long long *n ) {
   if ( !s || !*s )
@@ -123,8 +128,15 @@ int main( int argc, char const *argv[] ) {
       ++i;
     } else if ( arg == "--max-output" && parse_number( val, &n ) && n > 0 ) {
       config.max_output = static_cast<std::size_t>( n );
+      ++i;
     } else if ( arg == "--max-memory" && parse_number( val, &n ) ) {
       config.max_memory = n;
+      ++i;
+    } else if ( arg == "--no-scan" ) {
+      config.scan = false;
+    } else if ( arg == "--scan-cache-mb" && parse_number( val, &n ) &&
+                n > 0 && n <= 1024 * 1024 ) {
+      config.scan_limits.max_memory = static_cast<std::size_t>( n ) * 1024 * 1024;
       ++i;
     } else {
       return fail( "invalid argument: " + arg );
@@ -184,6 +196,14 @@ int main( int argc, char const *argv[] ) {
         status = 1;
         break;
       }
+    }
+    // Zorba::shutdown() cleans up libxml2, which a thread left behind could be
+    // in, so in that case the process ends here.
+    if ( !server.stop_scan() ) {
+      std::cerr << "zorba-mcp: a scan thread did not stop in time" << std::endl;
+      if ( std::fclose( out ) == EOF && status == 0 )
+        status = 1;
+      std::_Exit( status );
     }
   }
   if ( std::fclose( out ) == EOF && status == 0 ) {
