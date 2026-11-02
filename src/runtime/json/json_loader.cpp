@@ -128,7 +128,20 @@ void loader::add_value( store::Item_t const &value ) {
 void loader::clear() {
   parser_.clear();
   clear_stack();
+  keys_.clear();
   stripped_top_level_array_ = false;
+}
+
+void loader::make_key( zstring const &s, store::Item_t *result ) {
+  keys_type::const_iterator const i( keys_.find( s ) );
+  if ( i != keys_.end() ) {
+    *result = i->second;
+    return;
+  }
+  zstring copy( s );
+  GENV_ITEMFACTORY->createString( *result, copy );
+  if ( keys_.size() < max_shared_keys && s.size() <= max_shared_key_length )
+    keys_.insert( keys_type::value_type( (*result)->getString(), *result ) );
 }
 
 void loader::clear_stack() {
@@ -164,6 +177,12 @@ bool loader::next( store::Item_t *result ) {
         case '}': {
           stack_element top( stack_.top() );
           stack_.pop();
+          // top is off the stack, so clear_stack() will not free it: free it
+          // also when createJSONObject() raises JNDY0003 for a duplicate key.
+          struct destroyer {
+            stack_element &e_;
+            ~destroyer() { e_.destroy(); }
+          } const destroy_top{ top };
           switch ( top.type_ ) {
             case stack_element::array_type:
               GENV_ITEMFACTORY->createJSONArray( item, *top.array_ );
@@ -176,7 +195,6 @@ bool loader::next( store::Item_t *result ) {
             default:
               assert( false );
           } // switch
-          top.destroy();
           break;
         }
         case ':':
@@ -229,7 +247,11 @@ bool loader::next( store::Item_t *result ) {
           break;
         case token::string:
           s = t.get_value();
-          GENV_ITEMFACTORY->createString( item, s );
+          if ( !stack_.empty() &&
+               stack_.top().type_ == stack_element::object_type )
+            make_key( s, &item );       // the string is an object's key
+          else
+            GENV_ITEMFACTORY->createString( item, s );
           break;
         case 'F':
         case 'T':
