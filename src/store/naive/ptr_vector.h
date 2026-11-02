@@ -44,7 +44,8 @@ namespace simplestore
   reserve and shrink_to_fit invalidate them; in addition, swap() invalidates
   the iterators of a vector that stores its contents inline.
 
-  At most 2^32 - 1 elements (the size and capacity are 32-bit).
+  The size and capacity are 32-bit: growing past them, which doubling reaches
+  at about 2^31 elements, throws std::length_error.
 ********************************************************************************/
 template <class T>
 class PtrVector
