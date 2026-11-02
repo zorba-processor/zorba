@@ -446,8 +446,9 @@ void test_documents(Zorba* z, const Files& f)
                "requires capability FileRead"));
   // The denial is reported once, not wrapped in a second
   // URI_UNRESOLVED_OR_NOSTREAM message.
-  CHECK(lFetch.message.find("stream is unresolved") ==
-        lFetch.message.rfind("stream is unresolved"));
+  CHECK(lFetch.message.find("cannot fetch resource") != std::string::npos);
+  CHECK(lFetch.message.find("cannot fetch resource") ==
+        lFetch.message.rfind("cannot fetch resource"));
   // A child context inherits the policy.
   CHECK(denied(run(z, sec->createChildContext(), DOC, f.uri("data/in.xml")),
                "FODC0002"));
