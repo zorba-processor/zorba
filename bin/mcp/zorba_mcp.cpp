@@ -48,6 +48,8 @@ namespace {
 char const usage[] =
   "Usage: zorba-mcp --root <dir> [--queries <dir>] [--timeout <seconds>]\n"
   "                 [--max-output <bytes>] [--max-memory <bytes>]\n"
+  "                 [--no-scan] [--scan-cache-mb <MiB>]\n"
+  "                 [--language xquery|jsoniq]\n"
   "\n"
   "An MCP server (stdio transport) over the Zorba JSONiq/XQuery processor.\n"
   "Queries run under the secure policy, reading only files under --root\n"
@@ -56,13 +58,25 @@ char const usage[] =
   "  --root <dir>         the directory of documents to query (required)\n"
   "  --queries <dir>      each <name>.jq file becomes a tool <name>; its\n"
   "                       leading comment is the description and its\n"
-  "                       external variables are string parameters\n"
+  "                       external variables are string parameters. A .jq\n"
+  "                       file is JSONiq unless it declares xquery version;\n"
+  "                       .xq files are not loaded\n"
   "  --timeout <seconds>  time limit of one tool call (default 30, 0: none)\n"
   "  --max-output <bytes> output size limit of one tool call (default\n"
   "                       131072); longer output is cut with a marker\n"
   "  --max-memory <bytes> memory limit of the server (default 4294967296,\n"
   "                       0: none; Linux only): a query that needs more\n"
-  "                       fails with a tool error\n";
+  "                       fails with a tool error\n"
+  "  --no-scan            no background scan of the directory: list_documents\n"
+  "                       takes no arguments and lists through dir:list\n"
+  "  --scan-cache-mb <MiB> memory for the scan's file index and previews\n"
+  "                       (default 64); at the limit the scan stops\n"
+  "  --language <lang>    xquery (default) or jsoniq: the language of a\n"
+  "                       run_query query, in this order: (1) a jsoniq\n"
+  "                       version or xquery version declaration at the very\n"
+  "                       start of the query (one preceded by a comment is\n"
+  "                       not detected); (2) for a file, its extension (.jq\n"
+  "                       is JSONiq); (3) this option\n";
 
 bool parse_number( char const *s, unsigned long long *n ) {
   if ( !s || !*s )
@@ -123,8 +137,20 @@ int main( int argc, char const *argv[] ) {
       ++i;
     } else if ( arg == "--max-output" && parse_number( val, &n ) && n > 0 ) {
       config.max_output = static_cast<std::size_t>( n );
+      ++i;
+    } else if ( arg == "--language" && val &&
+                ( std::string( val ) == "xquery" ||
+                  std::string( val ) == "jsoniq" ) ) {
+      config.jsoniq_default = std::string( val ) == "jsoniq";
+      ++i;
     } else if ( arg == "--max-memory" && parse_number( val, &n ) ) {
       config.max_memory = n;
+      ++i;
+    } else if ( arg == "--no-scan" ) {
+      config.scan = false;
+    } else if ( arg == "--scan-cache-mb" && parse_number( val, &n ) &&
+                n > 0 && n <= 1024 * 1024 ) {
+      config.scan_limits.max_memory = static_cast<std::size_t>( n ) * 1024 * 1024;
       ++i;
     } else {
       return fail( "invalid argument: " + arg );
@@ -184,6 +210,14 @@ int main( int argc, char const *argv[] ) {
         status = 1;
         break;
       }
+    }
+    // Zorba::shutdown() cleans up libxml2, which a thread left behind could be
+    // in, so in that case the process ends here.
+    if ( !server.stop_scan() ) {
+      std::cerr << "zorba-mcp: a scan thread did not stop in time" << std::endl;
+      if ( std::fclose( out ) == EOF && status == 0 )
+        status = 1;
+      std::_Exit( status );
     }
   }
   if ( std::fclose( out ) == EOF && status == 0 ) {

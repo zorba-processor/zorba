@@ -37,7 +37,7 @@
 <p class="lede">The parts of Zorba that are not the language itself: how to run queries, which libraries ship with it, the in-memory store, and the C++ API.</p>
 
 <h2 id="cli">The command line</h2>
-<p><code>zorba</code> runs one or more queries and writes the results to standard output. A query is either given inline or, with <code>-f</code>, read from a file. A <code>.jq</code> file is parsed as JSONiq; anything else as XQuery unless <code>-j</code> is given.</p>
+<p><code>zorba</code> runs one or more queries and writes the results to standard output. A query is either given inline or, with <code>-f</code>, read from a file. Which language a query is written in is decided in this order: a <code>jsoniq version "1.0";</code> or <code>xquery version "3.0";</code> declaration at the start of the query; else the extension of the file (<code>.jq</code> is JSONiq, <code>.xq</code> is XQuery); else <code>--language</code>, which is XQuery unless set. Inline queries and other extensions fall under <code>--language</code>.</p>
 <div class="table-wrap">
 <table>
   <thead><tr><th>Option</th><th>Effect</th></tr></thead>
@@ -46,7 +46,8 @@
     <tr><td><code>-f</code>, <code>--as-files</code></td><td>Treat the <code>-q</code> arguments as file names.</td></tr>
     <tr><td><code>-i</code>, <code>--indent</code></td><td>Indent the output.</td></tr>
     <tr><td><code>-r</code>, <code>--omit-xml-declaration</code></td><td>Do not print <code>&lt;?xml ...?&gt;</code>.</td></tr>
-    <tr><td><code>-j</code>, <code>--jsoniq</code></td><td>Parse the query as JSONiq whatever its extension.</td></tr>
+    <tr><td><code>--language xquery|jsoniq</code></td><td>The language of a query that has no declaration and is not read from a <code>.jq</code> or <code>.xq</code> file. Default <code>xquery</code>.</td></tr>
+    <tr><td><code>-j</code>, <code>--jsoniq</code></td><td>The same as <code>--language jsoniq</code>.</td></tr>
     <tr><td><code>-e name:=value</code></td><td>Bind an external variable to a string; <code>-e name=file</code> binds it to the parsed XML document in a file.</td></tr>
     <tr><td><code>--context-item &lt;file&gt;</code></td><td>Make the XML document in a file the context item.</td></tr>
     <tr><td><code>-z name=value</code></td><td>Set a serialization parameter, for example <code>-z method=json</code> or <code>-z method=xhtml</code>.</td></tr>

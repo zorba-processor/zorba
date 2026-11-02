@@ -385,7 +385,11 @@ static int compileAndExecute( Zorba *zorba,
   unique_ptr<fstream> planFile;
   fstream *planFilep = NULL;
 
-  if ( zc_props.jsoniq_ || fs::extension( qfilepath ) == "jq" )
+  // The language of a query without a version declaration: the extension of
+  // the file (.jq is JSONiq, .xq is XQuery), else --language. A declaration
+  // in the query wins over both.
+  string const extension( fs::extension( qfilepath ) );
+  if ( extension == "jq" || ( extension != "xq" && zc_props.jsoniq_ ) )
     sctx->setJSONiqVersion( jsoniq_version_1_0 );
 
   if ( zc_props.serialize_plan_ ) {

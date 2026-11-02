@@ -21,6 +21,7 @@
 #include <exception>
 #include <filesystem>
 #include <fstream>
+#include <memory>
 #include <new>
 #include <set>
 #include <sstream>
@@ -330,6 +331,45 @@ Server::Server( Zorba *zorba, ServerConfig config, std::ostream &log ) :
   if ( theConfig.timeout.count() > 0 )
     thePolicy.setTimeout( theConfig.timeout );
   load_predefined();
+  if ( theConfig.scan ) {
+    try {
+      theScanner = std::make_unique<Scanner>(
+        theConfig.root, theConfig.scan_limits, theConfig.scan_hook );
+    }
+    // Threads may not start under --max-memory, which is applied before this:
+    // the server then works as with --no-scan.
+    catch ( std::exception const &e ) {
+      theLog << server_name << ": no background scan: " << e.what() << std::endl;
+    }
+  }
+}
+
+Server::~Server() {
+  (void)stop_scan();
+  if ( theScanner )
+    theLog << server_name << ": the scan cache holds "
+           << theScanner->cache_summary() << std::endl;
+}
+
+bool Server::stop_scan() {
+  return !theScanner || theScanner->stop();
+}
+
+std::size_t Server::scan_cache_bytes() const {
+  return theScanner ? theScanner->cache_bytes() : 0;
+}
+
+// The static context a query is compiled in. The language of a query without
+// a version declaration is JSONiq for a .jq file, else the configured default;
+// a declaration in the query wins.
+StaticContext_t Server::new_static_context( std::string const &file_name )
+    const {
+  StaticContext_t sctx = theZorba->createStaticContext();
+  sctx->setSecurityPolicy( thePolicy );
+  std::string const ext( std::filesystem::path( file_name ).extension() );
+  if ( ext == ".jq" || ( ext != ".xq" && theConfig.jsoniq_default ) )
+    sctx->setJSONiqVersion( jsoniq_version_1_0 );
+  return sctx;
 }
 
 void Server::load_predefined() {
@@ -380,8 +420,7 @@ bool Server::load_predefined( std::string const &path,
   // Compile once to find the external variables (in no namespace) that
   // become the tool's parameters.
   try {
-    StaticContext_t sctx = theZorba->createStaticContext();
-    sctx->setSecurityPolicy( thePolicy );
+    StaticContext_t sctx = new_static_context( path );
     XQuery_t query = theZorba->createQuery();
     query->setFileName( path );
     std::istringstream qs( p.source );
@@ -418,20 +457,48 @@ bool Server::load_predefined( std::string const &path,
 Json Server::tools() const {
   Json list( Json::array() );
 
-  Json no_args( Json::object( {
-    { "type", "object" }, { "additionalProperties", false }
-  } ) );
-  list.push( Json::object( {
-    { "name", "list_documents" },
-    { "title", "List documents" },
-    { "description",
-      "Lists the files under the directory, recursively and sorted by path: "
-      "one JSON object per line, {path, format, size, modified}. The format "
-      "(xml, json, csv, html or null) says how run_query's dir:documents "
-      "and dir:open parse the file." },
-    { "inputSchema", no_args },
-    { "annotations", read_only_annotations() }
-  } ) );
+  if ( theScanner ) {
+    list.push( Json::object( {
+      { "name", "list_documents" },
+      { "title", "List documents" },
+      { "description",
+        "Lists files, recursive, sorted by path, with format, size, fields. "
+        "First line: scan state, totals, dirs (subdirectories, if cut or "
+        "scanning), incomplete (may miss files). memory_limit: scan stopped; "
+        "ask by path. A file as path adds a preview." },
+      { "inputSchema", Json::object( {
+          { "type", "object" },
+          { "properties", Json::object( {
+              { "path", Json::object( {
+                  { "type", "string" },
+                  { "description", "Subdirectory or file, relative." } } ) },
+              { "limit", Json::object( {
+                  { "type", "integer" },
+                  { "description", "Files to list; default 100." } } ) },
+              { "refresh", Json::object( {
+                  { "type", "boolean" },
+                  { "description", "Restart the scan." } } ) }
+            } ) },
+          { "additionalProperties", false }
+        } ) },
+      { "annotations", read_only_annotations() }
+    } ) );
+  } else {
+    Json no_args( Json::object( {
+      { "type", "object" }, { "additionalProperties", false }
+    } ) );
+    list.push( Json::object( {
+      { "name", "list_documents" },
+      { "title", "List documents" },
+      { "description",
+        "Lists the files under the directory, recursively and sorted by path: "
+        "one JSON object per line, {path, format, size, modified}. The format "
+        "(xml, json, csv, html or null) says how run_query's dir:documents "
+        "and dir:open parse the file." },
+      { "inputSchema", no_args },
+      { "annotations", read_only_annotations() }
+    } ) );
+  }
 
   Json query_props( Json::object( {
     { "query", Json::object( {
@@ -448,7 +515,13 @@ Json Server::tools() const {
     { "title", "Run a JSONiq/XQuery query" },
     { "description",
       "Runs a JSONiq/XQuery query over the directory and returns its result "
-      "as JSON, one item per line. Example: import module namespace dir = "
+      "as JSON, one item per line. " + std::string(
+        theConfig.jsoniq_default
+          ? "Queries are JSONiq by default; start with `xquery version "
+            "\"3.0\";` for XQuery."
+          : "Queries are XQuery by default; start with `jsoniq version "
+            "\"1.0\";` for JSONiq." ) +
+      " Example: import module namespace dir = "
       "\"http://zorba.io/modules/directory\"; for $d in "
       "dir:documents($dir:root, \"json\") return $d(\"path\"). On failure "
       "the result is an error object with the Zorba error code, message "
@@ -494,8 +567,7 @@ Server::run( std::string const &source, std::string const &file_name,
              std::vector<std::pair<std::string,std::string> > const &vars ) {
   QueryOutcome outcome;
   try {
-    StaticContext_t sctx = theZorba->createStaticContext();
-    sctx->setSecurityPolicy( thePolicy );
+    StaticContext_t sctx = new_static_context( file_name );
     // Relative URIs, e.g. doc("orders/q1.xml"), resolve against the root.
     sctx->setBaseURI( "file://" + percent_encode_path( theConfig.root ) + "/" );
     // An implementation may add predeclared namespace prefixes (XQuery 3.0,
@@ -582,7 +654,17 @@ Json Server::call_tool( Json const &params, bool *protocol_error,
   std::vector<std::pair<std::string,std::string> > const no_vars;
   QueryOutcome outcome;
   std::string unexpected;
-  if ( tool == "list_documents" ) {
+  if ( tool == "list_documents" && theScanner ) {
+    bool is_error = false;
+    // A request does not wait past its time limit, nor long without one.
+    std::chrono::milliseconds const longest( std::chrono::seconds( 10 ) );
+    std::chrono::milliseconds const wait(
+      theConfig.timeout.count() > 0 ? std::min( theConfig.timeout, longest )
+                                    : longest );
+    outcome.text = theScanner->answer( *args, theConfig.max_output, wait,
+                                       &is_error );
+    outcome.ok = !is_error;
+  } else if ( tool == "list_documents" ) {
     unexpected = undeclared_arguments( *args, {} );
     if ( !unexpected.empty() ) {
       outcome.text = invalid_arguments_text(

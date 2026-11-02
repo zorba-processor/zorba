@@ -24,6 +24,7 @@
     <li><a href="#source">Build from source</a></li>
     <li><a href="#register">Register it with a client</a></li>
     <li><a href="#tools">The tools</a></li>
+    <li><a href="#scan">The background scan</a></li>
     <li><a href="#queries">Example queries</a></li>
     <li><a href="#security">Security model</a></li>
     <li><a href="#limits">Limits and timeouts</a></li>
@@ -36,7 +37,7 @@
 <p class="lede">Point <code>zorba-mcp</code> at a folder of XML, JSON, CSV and HTML files and an AI agent can ask questions across all of them with JSONiq, without you converting or loading anything.</p>
 
 <h2 id="what">What it is</h2>
-<p><code>zorba-mcp</code> is a <a href="https://modelcontextprotocol.io">Model Context Protocol</a> server that speaks JSON-RPC over standard input and output. The agent's client starts it, and the agent gets tools to list the files in the folder and to run JSONiq or XQuery over them. The files stay where they are: every call reads them as they are on disk, nothing is indexed or cached.</p>
+<p><code>zorba-mcp</code> is a <a href="https://modelcontextprotocol.io">Model Context Protocol</a> server that speaks JSON-RPC over standard input and output. The agent's client starts it, and the agent gets tools to list the files in the folder and to run JSONiq or XQuery over them. The files stay where they are: every query reads them as they are on disk. A background scan keeps a listing and short previews in memory for <code>list_documents</code> only (see <a href="#scan">the scan</a>).</p>
 <p>The same engine and the same restrictions are available without an agent as <code>zorba --directory</code> (see <a href="#cli">below</a>). The server implements MCP 2026-07-28 (<code>server/discover</code>) and also answers clients that start with the earlier <code>initialize</code> handshake (2025-11-25, 2025-06-18, 2025-03-26).</p>
 <p>The folder is read through the <a href="zorba.html#modules">directory module</a>, <code>http://zorba.io/modules/directory</code>. A file is a record <code>{ "path", "format", "content" }</code>: <code>content</code> is a document node for XML, the parsed value for JSON (an array if a file holds several top-level values, as in JSON Lines) and an array of row objects for CSV, with the first line as column names (numbers and the words <code>true</code>, <code>false</code> and <code>null</code> are typed; the single letters <code>T</code>, <code>Y</code>, <code>F</code> and <code>N</code> stay strings, so a <code>D</code>/<code>N</code> column is not turned into booleans). A file that does not parse yields <code>{ "path", "format", "error" }</code> instead, so one bad file does not stop a query over the whole folder. HTML files (<code>.html</code>, <code>.htm</code>) are parsed with <code>x:parse-html</code> and <code>content</code> is the document node; a build without XML Schema support reports them as an unsupported format.</p>
 
@@ -60,9 +61,12 @@ cmake --install build/full-release
   <thead><tr><th>Option</th><th>Effect</th></tr></thead>
   <tbody>
     <tr><td><code>--root &lt;dir&gt;</code></td><td>The folder to query. Required.</td></tr>
-    <tr><td><code>--queries &lt;dir&gt;</code></td><td>Each <code>&lt;name&gt;.jq</code> file in this folder becomes a tool, see <a href="#tools">the tools</a>.</td></tr>
+    <tr><td><code>--queries &lt;dir&gt;</code></td><td>Each <code>&lt;name&gt;.jq</code> file in this folder becomes a tool, see <a href="#tools">the tools</a>. Only <code>.jq</code> files are loaded.</td></tr>
+    <tr><td><code>--language xquery|jsoniq</code></td><td>The language of a <code>run_query</code> query that has no <code>jsoniq version</code> or <code>xquery version</code> declaration. Default <code>xquery</code>. A predefined <code>.jq</code> file is JSONiq unless it starts with an <code>xquery version</code> declaration.</td></tr>
     <tr><td><code>--timeout &lt;seconds&gt;</code></td><td>Time limit of one tool call. Default 30; 0 means no limit.</td></tr>
     <tr><td><code>--max-output &lt;bytes&gt;</code></td><td>Output size limit of one tool call. Default 131072.</td></tr>
+    <tr><td><code>--scan-cache-mb &lt;MiB&gt;</code></td><td>Memory for the <a href="#scan">background scan</a>'s file index and previews. Default 64.</td></tr>
+    <tr><td><code>--no-scan</code></td><td>No <a href="#scan">background scan</a>: <code>list_documents</code> takes no arguments and lists every file through <code>dir:list</code>, one object per line with <code>{ "path", "format", "size", "modified" }</code>.</td></tr>
     <tr><td><code>--max-memory &lt;bytes&gt;</code></td><td>Memory limit of the server process. Default 4294967296 (4 GiB); 0 means no limit. Linux only.</td></tr>
   </tbody>
 </table>
@@ -95,7 +99,7 @@ cmake --install build/full-release
 <table>
   <thead><tr><th>Tool</th><th>What it does</th></tr></thead>
   <tbody>
-    <tr><td><code>list_documents</code></td><td>Lists the files under the folder, recursively and sorted by path, one JSON object per line: <code>{ "path", "format", "size", "modified" }</code>. The format (<code>xml</code>, <code>json</code>, <code>csv</code>, <code>html</code> or <code>null</code>) says how the directory module would parse the file.</td></tr>
+    <tr><td><code>list_documents</code></td><td>Lists the files under the folder, recursively and sorted by path, or gives the preview of one file, from <a href="#scan">the background scan</a>. Arguments, all optional: <code>path</code> (a subdirectory or a file), <code>limit</code> (files to list, default 100) and <code>refresh</code> (<code>true</code> restarts the scan). The format (<code>xml</code>, <code>json</code>, <code>csv</code>, <code>html</code> or <code>null</code>) says how the directory module would parse the file.</td></tr>
     <tr><td><code>run_query</code></td><td>Runs a JSONiq or XQuery main module, given as the argument <code>query</code>, and returns the result as JSON, one item per line. On failure the result is an error object with the Zorba error code, the message and the line and column of the failing expression, which is what lets an agent correct its query.</td></tr>
     <tr><td>Predefined queries</td><td>With <code>--queries &lt;dir&gt;</code>, each <code>&lt;name&gt;.jq</code> file becomes a tool <code>&lt;name&gt;</code>. Its leading comment is the tool's description and its external variables (<code>declare variable $id external;</code>) are its string parameters. Use them for the questions you want answered the same way every time.</td></tr>
   </tbody>
@@ -110,6 +114,33 @@ declare variable $id external;
 for $row in dir:open($dir:root, "customers.csv")("content")()
 where $row("id") eq $id
 return $row("name")</code></pre>
+
+<h2 id="scan">The background scan</h2>
+<p>When the server starts, one thread walks the folder and another reads the head of each file. The server does not wait for them, and it answers <code>list_documents</code> from what they have found so far, with the status:</p>
+<pre class="output"><code>{"scan":{"state":"running","files_found":1200,"files_sampled":300},"total":1200,"shown":100,"dirs":[{"path":"orders","files":900},{"path":"payments","files":300}]}
+{"path":"customers.csv","format":"csv","size":51,"fields":["id","name","country"]}
+{"path":"orders/2026/q1.xml","format":"xml","size":310,"fields":["/orders","/orders/order","/orders/order/@id"]}</code></pre>
+<p>The first line has the status, how many files are known under the path (<code>total</code>) and how many follow (<code>shown</code>). While <code>state</code> is <code>running</code> the listing can miss files. <code>dirs</code>, the subdirectories with the files known in each, comes while the scan runs and when <code>limit</code> or <code>--max-output</code> cut the listing. Beyond the limit, ask for a subdirectory, a higher <code>limit</code> or <code>dir:list</code> in a query. <code>fields</code> has at most 8 names, with <code>"fields_more":true</code> if there are more.</p>
+<p>With <code>"incomplete":true</code> a listing may miss files: the index did not fit in memory, a directory could not be read (<code>unreadable_dirs</code> counts those; asking for one gives <code>permission-denied</code>), or the tree goes deeper than the 256 levels the walk follows. A path below is still answered.</p>
+<p>With a file as <code>path</code>, the answer is one line with the preview. A file with no preview yet goes first in the scan's queue, and the request waits for it for at most <code>--timeout</code> or 10 seconds, whichever is less. If that is not enough, the answer has <code>"preview":null,"preview_state":"pending"</code>; ask again.</p>
+<pre class="output"><code>{"scan":{"state":"running","files_found":12,"files_sampled":3},"path":"customers.csv","format":"csv","size":51,"preview":{"columns":["id","name","country"],"kinds":["string","string","string"],"rows":[["acme","Acme Corp","MX"],["globex","Globex","US"]],"records":2}}</code></pre>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Format</th><th>Preview</th></tr></thead>
+  <tbody>
+    <tr><td>CSV</td><td><code>columns</code>, <code>kinds</code> (<code>integer</code>, <code>decimal</code>, <code>boolean</code>, <code>string</code> or <code>empty</code>, from the rows read), up to 3 <code>rows</code>, <code>records</code> (rows).</td></tr>
+    <tr><td>JSON</td><td><code>shape</code> (<code>object</code>, <code>array</code>, <code>scalar</code>, or <code>lines</code> for several top-level values), <code>keys</code> (the key paths of the first record, such as <code>rs[].id</code>, with up to 2 short samples each), <code>arrays</code> (lengths of the nested arrays of the first record), <code>records</code> (the length of a top-level array, otherwise the number of top-level values).</td></tr>
+    <tr><td>XML</td><td><code>root</code>, <code>namespaces</code>, <code>paths</code> (element and attribute paths seen), one <code>sample</code>, <code>records</code> (children of the root).</td></tr>
+    <tr><td>HTML</td><td><code>title</code>, <code>tables</code> (a count), <code>headers</code> (the <code>th</code> cells of each table).</td></tr>
+  </tbody>
+</table>
+</div>
+<p>At most 1 MiB of a file is read. Past that, nothing is counted: the preview has <code>"records":null,"truncated":true</code> (for HTML, <code>"tables":null,"truncated":true</code>) and describes the part that was read. A preview stays under 8 KB. A file that cannot be parsed has an <code>error</code> in its preview, and so has one nested too deeply (64 levels for JSON, 256 for XML, 200 for HTML), XML or HTML with one tag over 16 KB (quoted values do not count) or 256 attributes, XML declaring an encoding other than the common ones, or a file that takes over 5 seconds to parse. A preview shows file content, so treat it like the result of a query: as data, not as instructions.</p>
+<p>The scan's file index and previews stay within <code>--scan-cache-mb</code>. When the previews reach it, the scan stops reading files, so that <code>files_sampled</code> stays below <code>files_found</code>, and <code>state</code> ends as <code>memory_limit</code>. It does not evict to go on. A file asked for by <code>path</code> still gets its preview, evicting the least recently used ones; a preview that cannot fit is answered and not kept. Previews go before the index. If the index alone reaches the limit, the walk stops too: <code>files_found</code> is a lower bound, listings have <code>"incomplete":true</code>, and a file or directory asked for by <code>path</code> is still answered from the disk. <code>refresh</code> starts over. <code>--max-memory</code> counts the scan too: two thread stacks and, with glibc, address space reserved per thread. If the threads cannot start the server logs it and works as with <code>--no-scan</code>, and a failed allocation in a scan thread ends the scan as at its own limit.</p>
+<p>Queries do not use the scan. <code>run_query</code>, predefined queries and the directory module read the real files, so their results do not depend on how far it got. Only <code>list_documents</code> does, and its status says so.</p>
+<p>Each request checks what it answers about. A file whose size or modification time changed is read again. A directory is listed again, one level deep, each file shown is checked, and up to 1,024 directories below it are checked for a new modification time, which sends them to be walked again. In a larger tree those checks go round over several requests, and a change within the same tick of the file system's clock goes unseen. <code>refresh</code> empties the cache and restarts the scan. There is no file system watcher.</p>
+<p>The scan obeys the same limits as queries: it does not follow symbolic links, skips entries whose name starts with <code>.</code>, refuses any <code>path</code> with those or with <code>..</code>, opens only regular files, and parses XML without network, external entities, DTD loading or entity expansion. A file name that is not UTF-8 is shown with <code>\xNN</code> for each such byte, and that spelling works as <code>path</code>. When the input ends the server stops the threads, and if one has not stopped after a second, for instance in a read that does not return, the process ends without waiting for it.</p>
+<p>Besides <code>--scan-cache-mb</code>, the scan uses a buffer of up to 1 MiB for the file being read and the parser's working memory for it, and two thread stacks. A request also waits for no more than the time above while listing a large directory, but a file system that hangs on a directory or a status call holds the request.</p>
 
 <h2 id="queries">Example queries</h2>
 <p>A query sees the folder through <code>$dir:root</code> and these functions of the directory module: <code>dir:list($dir:root)</code>, <code>dir:open($dir:root, $path)</code> for one file and <code>dir:documents($dir:root, $formats)</code> for all files of the given formats (default: all). The examples use a folder with this layout, which the project's image tests also use:</p>
@@ -168,7 +199,7 @@ return {
 <p>The agent writes the queries, so the server treats every query as untrusted. Queries run under Zorba's <a href="zorba.html#security">secure policy</a> with exactly two capabilities added back, each restricted: <code>file-read</code>, limited to the root, and <code>native-modules</code>, limited to the file module. The effect:</p>
 <ul>
   <li><strong>Read-only.</strong> File writes are denied, and so are environment variables.</li>
-  <li><strong>Confined to the root.</strong> Reads are limited to files under <code>--root</code>. Absolute paths, <code>..</code> segments and paths through symbolic links are rejected, symbolic links are not listed, and entries whose name starts with <code>.</code> are not listed.</li>
+  <li><strong>Confined to the root.</strong> Reads are limited to files under <code>--root</code>, by queries and by <a href="#scan">the background scan</a>. Absolute paths, <code>..</code> segments and paths through symbolic links are rejected, symbolic links are not listed, and entries whose name starts with <code>.</code> are not listed.</li>
   <li><strong>No network.</strong> <code>fn:doc</code> on a URL, the HTTP client, external XML entities and importing modules or schemas over the network are all denied.</li>
   <li><strong>Native modules limited to the file module.</strong> Importing any other module implemented in C++ (for example the sleep or query-evaluation modules) raises <code>zerr:ZXQP0067</code>. The file module stays available because the directory module reads through it, and its reads are still confined to the root.</li>
 </ul>
@@ -181,7 +212,7 @@ return {
   <li>Output longer than <code>--max-output</code> bytes (default 131072) is cut and ends with a line saying that the output was truncated.</li>
   <li>A single JSON-RPC message larger than 4 MB is refused.</li>
   <li>Every call re-reads and re-parses the files it touches, so a query over a large folder costs time proportional to the files it opens. Filter by path or format with <code>dir:list</code> or the <code>$formats</code> argument before opening documents.</li>
-  <li>Zorba 5.0 is not thread-safe, so the server handles one request at a time.</li>
+  <li>Zorba 5.0 is not thread-safe, so the server handles one request at a time. The threads of the background scan do not use the engine.</li>
 </ul>
 
 <h2 id="cli">From the command line: <code>--directory</code></h2>
