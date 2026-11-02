@@ -1905,6 +1905,9 @@ bool FnTokenizeIterator::nextImpl(
 
   while ((xs_unsignedInt)state->start_pos < state->theString.length ())
   {
+    // Each token converts the whole string again in regex::next_token.
+    planState.chargeBytes(state->theString.size(), loc);
+
     try
     {
       unicode::regex re;

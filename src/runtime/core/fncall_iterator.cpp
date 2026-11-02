@@ -200,6 +200,25 @@ void UDFunctionCallIteratorState::open(
     bool isDynamic,
     store::ItemHandle<FunctionItem>& functionItem)
 {
+  thePlan = udf->getPlan(thePlanStateSize,
+                         isDynamic && functionItem->getDctx() != NULL ?
+                           functionItem->getMaxInScopeVarId() : 1).getp();
+
+  thePlanStateSize = thePlan->getStateSizeOfSubtree();
+}
+
+
+/*******************************************************************************
+  Allocates the plan state and the dynamic context of the body. Called when the
+  call runs for the first time and not when it opens: the body of every call
+  opens the calls inside it, and in a recursion half of the calls are leaves
+  that run none of them.
+********************************************************************************/
+void UDFunctionCallIteratorState::createBodyState(
+    PlanState& planState,
+    bool isDynamic,
+    store::ItemHandle<FunctionItem>& functionItem)
+{
   // Must allocate new dctx because the udf may be a recursive udf with local
   // block vars, all of which have the same dynamic-context id, but they are
   // distinct vars.
@@ -219,20 +238,12 @@ void UDFunctionCallIteratorState::open(
 
   if (isDynamic && functionItem->getDctx() != NULL)
   {
-    thePlan = udf->getPlan(thePlanStateSize, functionItem->getMaxInScopeVarId()).getp();
-
-    thePlanStateSize = thePlan->getStateSizeOfSubtree();
-
     theLocalDCtx = functionItem->getDctx();
 
     theIsLocalDCtxOwner = false;
   }
   else
   {
-    thePlan = udf->getPlan(thePlanStateSize, 1).getp();
-
-    thePlanStateSize = thePlan->getStateSizeOfSubtree();
-
     theLocalDCtx = new dynamic_context(globalDctx);
 
     theIsLocalDCtxOwner = true;
@@ -483,8 +494,7 @@ void UDFunctionCallIterator::openImpl(PlanState& planState, uint32_t& offset)
     state->init(planState);
   }
 
-  // Create the plan for the udf body (if not done already) and allocate
-  // the plan state (but not the state block) and dynamic context.
+  // Create the plan for the udf body (if not done already).
   state->open(planState, theUDF, theIsDynamic, theFunctionItem);
 
   // if the results of the function should be cached (prereq: atomic in and out)
@@ -610,6 +620,9 @@ bool UDFunctionCallIterator::nextImplCache(store::Item_t& aResult, PlanState& aP
   // infinite loop.
   if (!lState->thePlanOpen)
   {
+    if (lState->thePlanState == NULL)
+      lState->createBodyState(aPlanState, theIsDynamic, const_cast<store::ItemHandle<FunctionItem>&>(theFunctionItem));
+
     uint32_t planOffset = 0;
     lState->thePlan->open(*lState->thePlanState, planOffset);
     lState->thePlanOpen = true;
@@ -764,6 +777,9 @@ bool UDFunctionCallIterator::nextImplNoCache(store::Item_t& aResult, PlanState& 
   // infinite loop.
   if (!lState->thePlanOpen)
   {
+    if (lState->thePlanState == NULL)
+      lState->createBodyState(aPlanState, theIsDynamic, const_cast<store::ItemHandle<FunctionItem>&>(theFunctionItem));
+
     uint32_t planOffset = 0;
     lState->thePlan->open(*lState->thePlanState, planOffset);
     lState->thePlanOpen = true;

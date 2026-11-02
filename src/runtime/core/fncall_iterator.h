@@ -70,8 +70,8 @@ public:
   theLocalDCtx:
   -------------
   The dynamic context for this udf call. It is where the values of the udf's
-  local block-variables are stored.  It is created during 
-  UDFunctionCallIterator::openImpl().
+  local block-variables are stored.  It is created when the
+  call first runs (see createBodyState).
 
   thePlan:
   --------
@@ -83,10 +83,9 @@ public:
 
   thePlanState:
   -------------
-  The plan state to run thePlan with. The PlanState obj is created during 
-  UDFunctionCallIterator::openImpl(), but the actual state block is created and
-  initialized the 1st time that UDFunctionCallIterator::nextImpl() is called 
-  (at that time open() is invoked on thePlan).
+  The plan state to run thePlan with. Created, with its state block, the 1st
+  time that UDFunctionCallIterator::nextImpl() is called (see createBodyState);
+  open() is invoked on thePlan after that.
 
   thePlanOpen:
   ------------
@@ -148,6 +147,11 @@ public:
       user_function* udf,
       bool theIsDynamic,
       store::ItemHandle<FunctionItem>& theFunctionItem);
+
+  void createBodyState(
+      PlanState& planState,
+      bool isDynamic,
+      store::ItemHandle<FunctionItem>& functionItem);
 
   void reset(PlanState& planState);
 
