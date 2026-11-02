@@ -22,6 +22,7 @@ SET(DIAGNOSTICS_SRCS
    diagnostic_list.cpp
    assert.cpp
    zorba_exception.cpp
+   query_hints.cpp
    xquery_diagnostics.cpp
    xquery_exception.cpp 
    xquery_stack_trace.cpp
