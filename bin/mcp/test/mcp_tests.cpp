@@ -36,7 +36,6 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-#include <zorba/config.h>
 #include <zorba/store_manager.h>
 #include <zorba/zorba.h>
 
@@ -1212,6 +1211,13 @@ void test_html_edge_cases( Fixture const &f ) {
     "import module namespace x = \"http://zorba.io/modules/xml\";\n"
     "import module namespace file = \"http://expath.org/ns/file\";\n" );
 
+  // Builds without XML Schema support have no HTML parser.
+  bool const has_parser = !contains(
+    run_query( server,
+      dir_import + "dir:open($dir:root, \"good.html\")" ).dump(),
+    "UNSUPPORTED_FORMAT" );
+  std::cout << "HTML parser in this build: " << has_parser << std::endl;
+
   for ( auto const &file : files ) {
     std::string const name( file.name );
     auto const start = std::chrono::steady_clock::now();
@@ -1227,16 +1233,17 @@ void test_html_edge_cases( Fixture const &f ) {
     check( seconds < 120, name + ": dir:open in reasonable time",
            std::to_string( seconds ) + " s" );
 
-#ifndef ZORBA_NO_XMLSCHEMA
-    Json const p = run_query( server, parse +
-      "count(x:parse-html(file:read-text(concat($dir:root, \"/" + name +
-      "\")))//*)" );
-    std::cout << name << ": x:parse-html: " << p.dump().substr( 0, 400 )
-              << std::endl;
-    check( !p.is_null() && !contains( p.dump(), "XPST" ) &&
-           !contains( p.dump(), "XQST" ),
-           name + ": x:parse-html runs and answers", p.dump().substr( 0, 400 ) );
-#endif
+    if ( has_parser ) {
+      Json const p = run_query( server, parse +
+        "count(x:parse-html(file:read-text(concat($dir:root, \"/" + name +
+        "\")))//*)" );
+      std::cout << name << ": x:parse-html: " << p.dump().substr( 0, 400 )
+                << std::endl;
+      check( !p.is_null() && !contains( p.dump(), "XPST" ) &&
+             !contains( p.dump(), "XQST" ),
+             name + ": x:parse-html runs and answers",
+             p.dump().substr( 0, 400 ) );
+    }
 
     check_alive( server );
   }
@@ -1245,10 +1252,8 @@ void test_html_edge_cases( Fixture const &f ) {
   std::cout << "records: " << result_text( r ) << std::endl;
   check( !is_tool_error( r ) && contains( result_text( r ), "good.html=" ),
          "dir:documents over all the files", r.dump().substr( 0, 2000 ) );
-#ifndef ZORBA_NO_XMLSCHEMA
-  check( contains( result_text( r ), "good.html=ok" ),
+  check( !has_parser || contains( result_text( r ), "good.html=ok" ),
          "the good file is not affected", r.dump().substr( 0, 2000 ) );
-#endif
   check_alive( server );
 }
 
