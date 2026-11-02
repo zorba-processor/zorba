@@ -318,6 +318,9 @@ Server::Server( Zorba *zorba, ServerConfig config, std::ostream &log ) :
   load_predefined();
 }
 
+void Server::stop_scan() {
+}
+
 void Server::load_predefined() {
   if ( theConfig.queries_dir.empty() )
     return;

@@ -27,6 +27,7 @@
 #include <zorba/zorba.h>
 
 #include "json.h"
+#include "scanner.h"
 
 namespace zorba {
 namespace mcp {
@@ -46,6 +47,12 @@ struct ServerConfig {
   std::chrono::milliseconds timeout{ std::chrono::seconds( 30 ) };
   /** The maximum size of a tool's text output, in bytes. */
   std::size_t max_output = 128 * 1024;
+  /** Whether to scan the root in the background (see scanner.h). */
+  bool scan = true;
+  /** The limits of the scanner. */
+  ScanLimits scan_limits;
+  /** For tests: see ScanHook. */
+  ScanHook scan_hook;
 };
 
 /**
@@ -75,6 +82,9 @@ public:
 
   /** The policy every query runs under. */
   SecurityPolicy const& policy() const { return thePolicy; }
+
+  /** Stops the background scan, if any; the destructor does it too. */
+  void stop_scan();
 
 private:
   struct Param {

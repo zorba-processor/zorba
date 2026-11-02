@@ -317,6 +317,11 @@ IF (ZORBA_WITH_FILE_ACCESS)
     TARGET_INCLUDE_DIRECTORIES ("mcp_tests${_mcp_suffix}"
       PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/mcp")
 
+    ZORBA_GENERATE_EXE("mcp_scan_tests" "mcp/test/scan_tests.cpp;${MCP_COMMON_SRCS}"
+      "${LIBXML2_LIBRARIES}" "" "")
+    TARGET_INCLUDE_DIRECTORIES ("mcp_scan_tests${_mcp_suffix}"
+      PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/mcp")
+
     # Scripted JSON-RPC exchanges against the directory module's fixture
     # tree (see mcp/test/mcp_tests.cpp); "binary" runs zorba-mcp itself.
     SET (_mcpq "${CMAKE_CURRENT_SOURCE_DIR}/test/mcp/queries")
@@ -329,6 +334,19 @@ IF (ZORBA_WITH_FILE_ACCESS)
       SET_TESTS_PROPERTIES (bin/mcp/${_t} PROPERTIES
         PASS_REGULAR_EXPRESSION "PASSED: ${_t}"
         FAIL_REGULAR_EXPRESSION "FAILED|TOP-SECRET|HIDDEN-SECRET")
+    ENDFOREACH (_t)
+
+    # The background scanner (see mcp/test/scan_tests.cpp).
+    FOREACH (_t scan_status scan_immediate scan_previews scan_mtime scan_refresh
+             scan_symlink scan_path scan_malformed scan_xxe scan_limit
+             scan_no_scan scan_handshake scan_shutdown scan_binary scan_stress
+             scan_description)
+      ADD_TEST (NAME bin/mcp/${_t}
+        COMMAND "mcp_scan_tests${_mcp_suffix}" ${_t}
+          "$<TARGET_FILE:zorba_mcp${_mcp_suffix}>")
+      SET_TESTS_PROPERTIES (bin/mcp/${_t} PROPERTIES
+        PASS_REGULAR_EXPRESSION "PASSED: ${_t}"
+        FAIL_REGULAR_EXPRESSION "FAILED")
     ENDFOREACH (_t)
   ENDIF (UNIX)
 ENDIF (ZORBA_WITH_FILE_ACCESS)
