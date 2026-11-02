@@ -183,7 +183,10 @@ void test_sizes() {
     return;
   CHECK_SIZE( ElementNode, 88 );
   CHECK_SIZE( AttributeNode, 64 );
+#ifndef ZORBA_DEBUG_STRING
+  // ZORBA_DEBUG_STRING (on for Debug and RelWithDebInfo) enlarges zstring.
   CHECK_SIZE( TextNode, 48 );
+#endif
   CHECK_SIZE( InternalNode::NodeVector, 24 );
 }
 

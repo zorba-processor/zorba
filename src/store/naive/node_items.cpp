@@ -1602,7 +1602,10 @@ void OrdPathNode::swap(Item* anotherItem)
 ********************************************************************************/
 size_t InternalNode::alloc_size() const
 {
-  return OrdPathNode::alloc_size() + theNodes.heap_size();
+  size_t size = OrdPathNode::alloc_size();
+  for (const_iterator ite = theNodes.begin(); ite != theNodes.end(); ++ite)
+    size += ztd::mem_sizeof(*ite);
+  return size;
 }
 
 /*******************************************************************************
