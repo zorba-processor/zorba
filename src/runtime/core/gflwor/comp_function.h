@@ -20,6 +20,7 @@
 #include "context/dynamic_context.h"
 
 #include "runtime/booleans/BooleanImpl.h"
+#include "runtime/base/plan_iterator.h"
 #include "runtime/core/gflwor/common.h"
 #include "runtime/core/gflwor/orderby_iterator.h"
 
@@ -34,8 +35,6 @@ namespace flwor
   Class acting as a comparison function between two sort tuples. An instance of
   this class is passed to std::sort() method that sorts an array of sort tuples. 
 ********************************************************************************/
-class PlanState;
-
 class SortTupleCmp
 {
 private:

@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-#include "runtime/base/plan_iterator.h"
 #include "runtime/core/gflwor/comp_function.h"
 
 #include <iostream>
