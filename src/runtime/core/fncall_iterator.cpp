@@ -172,7 +172,8 @@ UDFunctionCallIteratorState::UDFunctionCallIteratorState():
   thePlan(NULL),
   thePlanState(NULL),
   thePlanOpen(false),
-  thePlanStateSize(0)
+  thePlanStateSize(0),
+  theCaller(NULL)
 {
 }
 
@@ -181,6 +182,9 @@ UDFunctionCallIteratorState::UDFunctionCallIteratorState():
 ********************************************************************************/
 UDFunctionCallIteratorState::~UDFunctionCallIteratorState()
 {
+  if (theCaller != NULL && theCaller->theCompletedCall == this)
+    theCaller->theCompletedCall = NULL;
+
   if (thePlanOpen)
     thePlan->close(*thePlanState);
 
@@ -197,6 +201,25 @@ UDFunctionCallIteratorState::~UDFunctionCallIteratorState()
 void UDFunctionCallIteratorState::open(
     PlanState& planState,
     user_function* udf,
+    bool isDynamic,
+    store::ItemHandle<FunctionItem>& functionItem)
+{
+  thePlan = udf->getPlan(thePlanStateSize,
+                         isDynamic && functionItem->getDctx() != NULL ?
+                           functionItem->getMaxInScopeVarId() : 1).getp();
+
+  thePlanStateSize = thePlan->getStateSizeOfSubtree();
+}
+
+
+/*******************************************************************************
+  Allocates the plan state and the dynamic context of the body. Called when the
+  call runs for the first time and not when it opens: the body of every call
+  opens the calls inside it, and in a recursion half of the calls are leaves
+  that run none of them.
+********************************************************************************/
+void UDFunctionCallIteratorState::createBodyState(
+    PlanState& planState,
     bool isDynamic,
     store::ItemHandle<FunctionItem>& functionItem)
 {
@@ -219,20 +242,12 @@ void UDFunctionCallIteratorState::open(
 
   if (isDynamic && functionItem->getDctx() != NULL)
   {
-    thePlan = udf->getPlan(thePlanStateSize, functionItem->getMaxInScopeVarId()).getp();
-
-    thePlanStateSize = thePlan->getStateSizeOfSubtree();
-
     theLocalDCtx = functionItem->getDctx();
 
     theIsLocalDCtxOwner = false;
   }
   else
   {
-    thePlan = udf->getPlan(thePlanStateSize, 1).getp();
-
-    thePlanStateSize = thePlan->getStateSizeOfSubtree();
-
     theLocalDCtx = new dynamic_context(globalDctx);
 
     theIsLocalDCtxOwner = true;
@@ -269,6 +284,57 @@ void UDFunctionCallIteratorState::reset(PlanState& planState)
   {
     thePlan->reset(*thePlanState);
   }
+}
+
+
+/*******************************************************************************
+  Called when the body has returned its last item. Keeps the body open until
+  the caller starts another call, because the next call of the caller may well
+  be this one again: running it after a reset is cheaper than opening it (a
+  recursion that makes its calls from a loop, or one call per level). A dynamic
+  call has its iterator closed when it completes, so it does not wait.
+********************************************************************************/
+void UDFunctionCallIteratorState::bodyCompleted(PlanState& aCaller, bool isDynamic)
+{
+  if (!thePlanOpen || !canReleaseBody(aCaller))
+    return;
+
+  if (isDynamic)
+  {
+    closeBody();
+  }
+  else
+  {
+    theCaller = &aCaller;
+    aCaller.theCompletedCall = this;
+  }
+}
+
+
+/*******************************************************************************
+  Called when a call starts: closes the body of the call of this caller that
+  completed last, unless it is the same one.
+********************************************************************************/
+void UDFunctionCallIteratorState::callStarting(PlanState& aCaller)
+{
+  UDFunctionCallIteratorState* completed = aCaller.theCompletedCall;
+
+  if (completed != NULL)
+  {
+    aCaller.theCompletedCall = NULL;
+
+    if (completed != this)
+      completed->closeBody();
+  }
+}
+
+
+/*******************************************************************************
+********************************************************************************/
+void UDFunctionCallIteratorState::closeBody()
+{
+  thePlanOpen = false;
+  thePlan->close(*thePlanState);
 }
 
 
@@ -451,6 +517,8 @@ void UDFunctionCallIterator::openImpl(PlanState& planState, uint32_t& offset)
 {
   UDFunctionCallIteratorState* state;
 
+  planState.theHasUDFCalls = true;
+
   if (!theIsDynamic)
   {
     NaryBaseIterator<UDFunctionCallIterator, UDFunctionCallIteratorState>::
@@ -468,8 +536,7 @@ void UDFunctionCallIterator::openImpl(PlanState& planState, uint32_t& offset)
     state->init(planState);
   }
 
-  // Create the plan for the udf body (if not done already) and allocate
-  // the plan state (but not the state block) and dynamic context.
+  // Create the plan for the udf body (if not done already).
   state->open(planState, theUDF, theIsDynamic, theFunctionItem);
 
   // if the results of the function should be cached (prereq: atomic in and out)
@@ -586,11 +653,20 @@ bool UDFunctionCallIterator::nextImplCache(store::Item_t& aResult, PlanState& aP
   // the deepest call of a recursion opens its recursive call).
   aPlanState.checkCallDepth(aPlanState.theStackDepth + 1, loc);
 
+  // Each call: the body runs with its own plan state, so a recursion that
+  // does little per call would never reach the check in consumeNext.
+  aPlanState.checkDeadlineNow(loc);
+
+  lState->callStarting(aPlanState);
+
   // Open the plan, if not done already. This cannot be done in the openImpl
   // method because in the case of recursive functions, we will get into an
   // infinite loop.
   if (!lState->thePlanOpen)
   {
+    if (lState->thePlanState == NULL)
+      lState->createBodyState(aPlanState, theIsDynamic, const_cast<store::ItemHandle<FunctionItem>&>(theFunctionItem));
+
     uint32_t planOffset = 0;
     lState->thePlan->open(*lState->thePlanState, planOffset);
     lState->thePlanOpen = true;
@@ -625,6 +701,8 @@ bool UDFunctionCallIterator::nextImplCache(store::Item_t& aResult, PlanState& aP
     }
 
     DEBUGGER_POP_FRAME;
+
+    lState->bodyCompleted(aPlanState, theIsDynamic);
   }
   else
   {
@@ -684,6 +762,8 @@ bool UDFunctionCallIterator::nextImplCache(store::Item_t& aResult, PlanState& aP
           aResult = lState->theNextResult;
         }
 
+        lState->bodyCompleted(aPlanState, theIsDynamic);
+
         if (!aResult.isNull())
         {
           aResult->ensureSeekable();
@@ -698,12 +778,16 @@ bool UDFunctionCallIterator::nextImplCache(store::Item_t& aResult, PlanState& aP
       else
       {
         insertCacheEntry(aPlanState, lState, lState->theCachedResult);
+
+        lState->bodyCompleted(aPlanState, theIsDynamic);
       }
 
       DEBUGGER_POP_FRAME;
     }
     else // cache hit
     {
+      lState->bodyCompleted(aPlanState, theIsDynamic);
+
       lState->theCachedResultIterator = lState->theCachedResult.begin();
       while (lState->theCachedResultIterator != lState->theCachedResult.end())
       {
@@ -728,11 +812,20 @@ bool UDFunctionCallIterator::nextImplNoCache(store::Item_t& aResult, PlanState& 
   // the deepest call of a recursion opens its recursive call).
   aPlanState.checkCallDepth(aPlanState.theStackDepth + 1, loc);
 
+  // Each call: the body runs with its own plan state, so a recursion that
+  // does little per call would never reach the check in consumeNext.
+  aPlanState.checkDeadlineNow(loc);
+
+  lState->callStarting(aPlanState);
+
   // Open the plan, if not done already. This cannot be done in the openImpl
   // method because in the case of recursive functions, we will get into an
   // infinite loop.
   if (!lState->thePlanOpen)
   {
+    if (lState->thePlanState == NULL)
+      lState->createBodyState(aPlanState, theIsDynamic, const_cast<store::ItemHandle<FunctionItem>&>(theFunctionItem));
+
     uint32_t planOffset = 0;
     lState->thePlan->open(*lState->thePlanState, planOffset);
     lState->thePlanOpen = true;
@@ -742,14 +835,44 @@ bool UDFunctionCallIterator::nextImplNoCache(store::Item_t& aResult, PlanState& 
 
   DEBUGGER_PUSH_FRAME;
 
-  while (consumeNext(aResult, lState->thePlan, *lState->thePlanState))
+  if (lState->canReleaseBody(aPlanState) &&
+      theUDF->getSignature().returnType()->max_card() <= 1)
   {
-    DEBUGGER_POP_FRAME;
-    STACK_PUSH(true, lState);
-    DEBUGGER_PUSH_FRAME;
+    // A consumer that knows from the signature that there is at most one item
+    // may not ask for a next one, so this call would never see that it is
+    // complete. Reading on is safe here: with one item allowed, the body has
+    // no more work that the result could leave undone (a second item is the
+    // error that the type check of the body raises when it reads ahead).
+    if (consumeNext(aResult, lState->thePlan, *lState->thePlanState))
+    {
+      while (consumeNext(lState->theNextResult, lState->thePlan, *lState->thePlanState))
+      {
+        DEBUGGER_POP_FRAME;
+        STACK_PUSH(true, lState);
+        DEBUGGER_PUSH_FRAME;
+        aResult.transfer(lState->theNextResult);
+      }
+
+      lState->bodyCompleted(aPlanState, theIsDynamic);
+
+      DEBUGGER_POP_FRAME;
+      STACK_PUSH(true, lState);
+      DEBUGGER_PUSH_FRAME;
+    }
+  }
+  else
+  {
+    while (consumeNext(aResult, lState->thePlan, *lState->thePlanState))
+    {
+      DEBUGGER_POP_FRAME;
+      STACK_PUSH(true, lState);
+      DEBUGGER_PUSH_FRAME;
+    }
   }
 
   DEBUGGER_POP_FRAME;
+
+  lState->bodyCompleted(aPlanState, theIsDynamic);
 
   STACK_END(lState);
 }
@@ -1169,6 +1292,9 @@ bool ExtFunctionCallIterator::nextImpl(
    store::Item_t& aResult,
    PlanState& aPlanState) const
 {
+  // An external function may take any time per call.
+  aPlanState.checkDeadlineNow(loc);
+
   try
   {
     if (isCached())

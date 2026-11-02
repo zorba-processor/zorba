@@ -19,6 +19,7 @@
 
 #include <chrono>
 #include <cstddef>
+#include <memory>
 #include <ostream>
 #include <string>
 #include <vector>
@@ -27,6 +28,7 @@
 #include <zorba/zorba.h>
 
 #include "json.h"
+#include "scanner.h"
 
 namespace zorba {
 namespace mcp {
@@ -51,12 +53,22 @@ struct ServerConfig {
   std::chrono::milliseconds timeout{ std::chrono::seconds( 30 ) };
   /** The maximum size of a tool's text output, in bytes. */
   std::size_t max_output = 128 * 1024;
+  /** Whether to scan the root in the background (see scanner.h). */
+  bool scan = true;
+  /** The limits of the scanner. */
+  ScanLimits scan_limits;
+  /** For tests: see ScanHook. */
+  ScanHook scan_hook;
+  /** The memory limit of the process, in bytes (0: none; see zorba_mcp.cpp). */
+  unsigned long long max_memory = 4ULL << 30;
 };
 
 /**
  * An MCP server over the Zorba C++ API: answers one JSON-RPC message at a
  * time. Every query runs under SecurityPolicy::secure() narrowed to reading
- * the root directory (see directory_config), with \c $dir:root bound.
+ * the root directory (see directory_config), with \c $dir:root bound. Unless
+ * configured otherwise, list_documents answers from a background scan of the
+ * root (see Scanner); queries never depend on it.
  *
  * Serves the modern revision (per-request \c _meta, \c server/discover) and,
  * once a client sends \c initialize, the legacy handshake-based revisions.
@@ -70,6 +82,8 @@ public:
    */
   Server( Zorba *zorba, ServerConfig config, std::ostream &log );
 
+  ~Server();
+
   /**
    * Handles one message (one line of the stdio transport).
    *
@@ -80,6 +94,16 @@ public:
 
   /** The policy every query runs under. */
   SecurityPolicy const& policy() const { return thePolicy; }
+
+  /**
+   * Stops the background scan, if any; the destructor does it too.
+   *
+   * @return whether every thread was joined.
+   */
+  bool stop_scan();
+
+  /** The bytes the scan cache accounts for, or 0 without a scan. */
+  std::size_t scan_cache_bytes() const;
 
 private:
   struct Param {
@@ -102,6 +126,7 @@ private:
 
   StaticContext_t new_static_context( std::string const &file_name ) const;
 
+  std::string handle_message( std::string const &message, Json *request_id );
   void load_predefined();
   bool load_predefined( std::string const &path, std::string const &name );
 
@@ -118,6 +143,7 @@ private:
   SecurityPolicy thePolicy;
   std::vector<Predefined> thePredefined;
   std::string theLegacyVersion;         // set by initialize
+  std::unique_ptr<Scanner> theScanner;  // null with --no-scan
 };
 
 } // namespace mcp

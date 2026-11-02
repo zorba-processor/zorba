@@ -158,6 +158,7 @@ bool StringToCodepointsIterator::nextImpl(
     if(!item->isStreamable())
     {
       item->getStringValue2(inputStr);
+      planState.chargeBytes(inputStr.size(), loc);
     }
     else
     {
@@ -350,6 +351,7 @@ bool ConcatStrIterator::nextImpl(
     if (consumeNext(lItem, *iter, planState))
     {
       lResStream << lItem->getStringValue();
+      planState.chargeBytes(lItem->getStringValue().size(), loc);
 
       if (consumeNext(lItem, *iter, planState))
       {
@@ -470,6 +472,7 @@ bool SubstringIterator::nextImpl(
   if (consumeNext(stringItem, theChildren[0].getp(), planState ))
   {
     stringItem->getStringValue2(strval);
+    planState.chargeBytes(strval.size(), loc);
 
     if (!strval.empty())
     {
@@ -633,6 +636,7 @@ bool SubstringIntOptIterator::nextImpl(
   if (consumeNext(stringItem, theChildren[0].getp(), planState ))
   {
     stringItem->getStringValue2(strval);
+    planState.chargeBytes(strval.size(), loc);
 
     if (!strval.empty())
     {
@@ -761,6 +765,7 @@ bool StringLengthIterator::nextImpl(
   if (consumeNext(item, theChildren [0].getp(), planState))
   {
     item->getStringValue2(strval);
+    planState.chargeBytes(strval.size(), loc);
     STACK_PUSH(GENV_ITEMFACTORY->createInteger(result, xs_integer(utf8::length(strval))), state);
   }
   else
@@ -797,6 +802,7 @@ bool NormalizeSpaceIterator::nextImpl(
   if (consumeNext(item, theChildren [0].getp(), planState))
   {
     item->getStringValue2(resStr);
+    planState.chargeBytes(resStr.size(), loc);
     ascii::normalize_space(resStr);
     STACK_PUSH(GENV_ITEMFACTORY->createString(result, resStr), state);
   }
@@ -878,6 +884,7 @@ bool NormalizeUnicodeIterator::nextImpl(
     }
 
     item0->getStringValue2(resStr);
+    planState.chargeBytes(resStr.size(), loc);
 #ifndef ZORBA_NO_ICU
     success = utf8::normalize(resStr, normType, &resStr);
     ZORBA_ASSERT(success);
@@ -1010,6 +1017,7 @@ bool UpperCaseIterator::nextImpl(
   if (consumeNext(item, theChildren [0].getp(), planState))
   {
     item->getStringValue2(strval);
+    planState.chargeBytes(strval.size(), loc);
 
     to_case_full(strval, &resStr, unicode::to_upper_full);
 
@@ -1044,6 +1052,7 @@ bool LowerCaseIterator::nextImpl(
   if (consumeNext(item, theChildren [0].getp(), planState))
   {
     item->getStringValue2(strval);
+    planState.chargeBytes(strval.size(), loc);
 
     to_lower_full_string(strval, &resStr);
 
@@ -1087,6 +1096,7 @@ bool TranslateIterator::nextImpl(
     arg_string   = arg_item  ->getStringValue().str();
     map_string   = map_item  ->getStringValue().str();
     trans_string = trans_item->getStringValue().str();
+    planState.chargeBytes(arg_string.size(), loc);
 
     typedef std::map<unicode::code_point,unicode::code_point> cp_map_type;
     cp_map_type trans_map;
@@ -1268,6 +1278,7 @@ bool ContainsIterator::nextImpl(
   if (consumeNext(item0, theChildren[0].getp(), planState ))
   {
     item0->getStringValue2(arg1);
+    planState.chargeBytes(arg1.size(), loc);
   }
 
   if (consumeNext(item1, theChildren[1].getp(), planState ))
@@ -1334,6 +1345,7 @@ bool StartsWithIterator::nextImpl(
     if (consumeNext(item0, theChildren[0].getp(), planState ))
     {
       item0->getStringValue2(arg1);
+      planState.chargeBytes(arg1.size(), loc);
     }
 
     if (consumeNext(item1, theChildren[1].getp(), planState ))
@@ -1398,6 +1410,7 @@ bool EndsWithIterator::nextImpl(
   if (consumeNext(item0, theChildren[0].getp(), planState ))
   {
     item0->getStringValue2(arg1);
+    planState.chargeBytes(arg1.size(), loc);
   }
 
   if (consumeNext(item1, theChildren[1].getp(), planState ))
@@ -1466,6 +1479,7 @@ bool SubstringBeforeIterator::nextImpl(
     if (consumeNext(item0, theChildren[0].getp(), planState ))
     {
       item0->getStringValue2(arg1);
+      planState.chargeBytes(arg1.size(), loc);
     }
 
     if (consumeNext(item1, theChildren[1].getp(), planState ))
@@ -1534,6 +1548,7 @@ bool SubstringAfterIterator::nextImpl(
     if (consumeNext(item0, theChildren[0].getp(), planState ))
     {
       item0->getStringValue2(arg1);
+      planState.chargeBytes(arg1.size(), loc);
     }
 
     if (consumeNext(item1, theChildren[1].getp(), planState ))
@@ -1604,6 +1619,7 @@ bool FnMatchesIterator::nextImpl(
 
   if (consumeNext(item, theChildren[0].getp(), planState))
     item->getStringValue2(input);
+    planState.chargeBytes(input.size(), loc);
 
   if (!consumeNext(item, theChildren[1].getp(), planState))
     ZORBA_ASSERT (false);
@@ -1667,6 +1683,7 @@ bool FnReplaceIterator::nextImpl(
 
   if (consumeNext(item, theChildren[0].getp(), planState))
     item->getStringValue2(input);
+    planState.chargeBytes(input.size(), loc);
 
   if (!consumeNext(item, theChildren[1].getp(), planState))
     ZORBA_ASSERT (false);
@@ -1851,6 +1868,7 @@ bool FnTokenizeIterator::nextImpl(
   if (consumeNext(item, theChildren[0].getp(), planState))
   {
     item->getStringValue2(state->theString);
+    planState.chargeBytes(state->theString.size(), loc);
   }
 
   if (!consumeNext(item, theChildren[1].getp(), planState))
@@ -1887,6 +1905,9 @@ bool FnTokenizeIterator::nextImpl(
 
   while ((xs_unsignedInt)state->start_pos < state->theString.length ())
   {
+    // Each token converts the whole string again in regex::next_token.
+    planState.chargeBytes(state->theString.size(), loc);
+
     try
     {
       unicode::regex re;
@@ -2185,6 +2206,7 @@ bool FnAnalyzeStringIterator::nextImpl(
     if(!item->isStreamable())
     {
       item->getStringValue2(input);
+      planState.chargeBytes(input.size(), loc);
     }
     else
     {
@@ -2587,6 +2609,7 @@ bool StringAnalyzeStringIterator::nextImpl( store::Item_t& result,
   } else {
 #endif
     item->getStringValue2( input );
+    planState.chargeBytes(input.size(), loc);
     u_input.wrap( input );
     u_size = u_input.size();
 #if STREAM_ANALYZE_STRING
@@ -2751,6 +2774,7 @@ bool StringSplitIterator::nextImpl(
   {
     state->theIStream = 0;
     item->getStringValue2(state->theInput);
+    planState.chargeBytes(state->theInput.size(), loc);
   }
 
   consumeNext(item, theChildren[1].getp(), planState);

@@ -70,8 +70,8 @@ public:
   theLocalDCtx:
   -------------
   The dynamic context for this udf call. It is where the values of the udf's
-  local block-variables are stored.  It is created during 
-  UDFunctionCallIterator::openImpl().
+  local block-variables are stored.  It is created when the
+  call first runs (see createBodyState).
 
   thePlan:
   --------
@@ -83,10 +83,9 @@ public:
 
   thePlanState:
   -------------
-  The plan state to run thePlan with. The PlanState obj is created during 
-  UDFunctionCallIterator::openImpl(), but the actual state block is created and
-  initialized the 1st time that UDFunctionCallIterator::nextImpl() is called 
-  (at that time open() is invoked on thePlan).
+  The plan state to run thePlan with. Created, with its state block, the 1st
+  time that UDFunctionCallIterator::nextImpl() is called (see createBodyState);
+  open() is invoked on thePlan after that.
 
   thePlanOpen:
   ------------
@@ -95,6 +94,21 @@ public:
   thePlanStateSize:
   -----------------
   The size of the plan state block.
+
+  Memory of a completed call: the state of the body holds the states of the
+  calls inside the body, each with a body plan state of its own. If every
+  call kept its body open until the query ended, a recursion would keep one
+  state tree per call made, not per level of the call stack. So a call inside
+  another call has its body closed once it has completed and its caller starts
+  another call (see bodyCompleted, callStarting): what stays allocated is this
+  object and the raw state block, whose size does not grow. So each caller
+  holds at most one completed body, and since a caller that is running a call
+  holds none, what is retained is at most one path through the call tree.
+  A later run of the same call iterator opens the body again.
+
+  theCaller:
+  ----------
+  The plan state whose theCompletedCall may point to this object.
 
   theArgWrappers:
   ---------------
@@ -125,6 +139,7 @@ public:
   PlanState* thePlanState;
   bool thePlanOpen;
   uint32_t thePlanStateSize;
+  PlanState* theCaller;
 
   std::vector<ItemIterator_t> theArgValues;
   std::vector<store::Iterator_t> theArgWrappers;
@@ -141,7 +156,33 @@ public:
       bool theIsDynamic,
       store::ItemHandle<FunctionItem>& theFunctionItem);
 
+  void createBodyState(
+      PlanState& planState,
+      bool isDynamic,
+      store::ItemHandle<FunctionItem>& functionItem);
+
   void reset(PlanState& planState);
+
+  /**
+   * True if the body plan should be closed when the call completes. Not for a
+   * call from the main plan, which holds one state tree per call site, and
+   * not for a body with no function call inside: its state does not grow, and
+   * running it again after a reset is cheaper than opening it again (a
+   * function called in a loop). Profiling reports the states when the query
+   * ends. Requires the body plan to be open.
+   */
+  bool canReleaseBody(const PlanState& aCaller) const
+  {
+    return aCaller.theStackDepth > 0 &&
+           thePlanState->theHasUDFCalls &&
+           !aCaller.theProfile;
+  }
+
+  void bodyCompleted(PlanState& aCaller, bool isDynamic);
+
+  void callStarting(PlanState& aCaller);
+
+  void closeBody();
 };
 
 

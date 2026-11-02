@@ -13,6 +13,15 @@
 //     written to OUT. Prints "<ms of call 1> ... <ms of call N>", then
 //     "<peak RSS KiB> <failed calls>" on a second line. A call fails when its
 //     response is not a result or has "isError":true.
+//
+//   dirbench scan OUT -- CMD ARGS...
+//     Starts the MCP server CMD, initializes a session, calls list_documents
+//     once and writes its response to OUT. If the answer has a scan state,
+//     then polls list_documents (limit 0) until it is no longer running. Prints
+//     "<handshake ms> <first list ms> <first list bytes> <ms until it ended or
+//     -> <final state or -> <VmRSS KiB after the handshake> <VmRSS KiB at the end> <peak RSS KiB>",
+//     with all times but the first list counted from the start of CMD. Linux
+//     only (VmRSS comes from /proc).
 
 #include <chrono>
 #include <cstdio>
@@ -40,7 +49,8 @@ double ms_since( clock_type::time_point t0 ) {
 
 int usage() {
   std::cerr << "usage: dirbench run OUT -- CMD...\n"
-               "       dirbench mcp CALLS QUERY OUT -- CMD...\n";
+               "       dirbench mcp CALLS QUERY OUT -- CMD...\n"
+               "       dirbench scan OUT -- CMD...\n";
   return 2;
 }
 
@@ -201,6 +211,123 @@ int mcp( int calls, char const *query_file, char const *out, char **cmd ) {
   return 0;
 }
 
+long vm_rss_kib( pid_t pid ) {
+  std::ifstream status( "/proc/" + std::to_string( pid ) + "/status" );
+  std::string word;
+  while ( status >> word )
+    if ( word == "VmRSS:" ) {
+      long kib = 0;
+      status >> kib;
+      return kib;
+    }
+  return 0;
+}
+
+int scan( char const *out, char **cmd ) {
+  int to_child[2], from_child[2];
+  if ( pipe( to_child ) < 0 || pipe( from_child ) < 0 ) {
+    std::perror( "pipe" );
+    return 1;
+  }
+  auto const t0 = clock_type::now();
+  pid_t const pid = fork();
+  if ( pid < 0 ) {
+    std::perror( "fork" );
+    return 1;
+  }
+  if ( pid == 0 ) {
+    dup2( to_child[0], STDIN_FILENO );
+    dup2( from_child[1], STDOUT_FILENO );
+    close( to_child[0] ); close( to_child[1] );
+    close( from_child[0] ); close( from_child[1] );
+    exec_or_die( cmd );
+  }
+  close( to_child[0] );
+  close( from_child[1] );
+  std::FILE *const w = fdopen( to_child[1], "w" );
+  std::FILE *const r = fdopen( from_child[0], "r" );
+  if ( !w || !r ) {
+    std::perror( "fdopen" );
+    return 1;
+  }
+  char *line = nullptr;
+  std::size_t cap = 0;
+  std::string response;
+  auto exchange = [&]( std::string const &request ) {
+    std::fputs( request.c_str(), w );
+    std::fputc( '\n', w );
+    std::fflush( w );
+    ssize_t const n = getline( &line, &cap, r );
+    if ( n <= 0 )
+      return false;
+    response.assign( line, static_cast<std::size_t>( n ) );
+    return true;
+  };
+
+  if ( !exchange( "{\"jsonrpc\":\"2.0\",\"id\":0,\"method\":\"initialize\","
+                  "\"params\":{\"protocolVersion\":\"2025-11-25\","
+                  "\"capabilities\":{},\"clientInfo\":{\"name\":\"dirbench\","
+                  "\"version\":\"1\"}}}" ) ||
+       response.find( "\"result\"" ) == std::string::npos ) {
+    std::cerr << "dirbench: initialize failed: " << response << "\n";
+    return 1;
+  }
+  double const handshake = ms_since( t0 );
+  long const rss_handshake = vm_rss_kib( pid );
+  std::fputs( "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}\n",
+              w );
+
+  std::string const list(
+    "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":"
+    "{\"name\":\"list_documents\",\"arguments\":{}}}" );
+  auto const t1 = clock_type::now();
+  if ( !exchange( list ) || response.find( "\"isError\":false" ) == std::string::npos ) {
+    std::cerr << "dirbench: list_documents failed: " << response << "\n";
+    return 1;
+  }
+  double const first_list = ms_since( t1 );
+  std::size_t const first_bytes = response.size();
+  std::ofstream( out ) << response;
+
+  char const running[] = "\\\"state\\\":\\\"running\\\"";
+  char const state[] = "\\\"state\\\":";
+  std::string done( "-" ), final_state( "-" );
+  if ( response.find( state ) != std::string::npos ) {
+    std::string const poll(
+      "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":"
+      "{\"name\":\"list_documents\",\"arguments\":{\"limit\":0}}}" );
+    while ( response.find( running ) != std::string::npos ) {
+      usleep( 2000 );
+      if ( !exchange( poll ) ) {
+        std::cerr << "dirbench: the server closed the session\n";
+        return 1;
+      }
+    }
+    done = std::to_string( ms_since( t0 ) );
+    final_state = response.find( "memory_limit" ) != std::string::npos
+      ? "memory_limit" : "complete";
+  }
+  long const rss_end = vm_rss_kib( pid );
+
+  std::fclose( w );
+  int status = 0;
+  rusage ru{};
+  if ( wait4( pid, &status, 0, &ru ) < 0 ) {
+    std::perror( "wait4" );
+    return 1;
+  }
+  std::fclose( r );
+  std::free( line );
+  if ( !WIFEXITED( status ) || WEXITSTATUS( status ) != 0 ) {
+    std::cerr << "dirbench: the server failed\n";
+    return 1;
+  }
+  std::printf( "%.1f %.1f %zu %s %s %ld %ld %ld\n", handshake, first_list,
+               first_bytes, done.c_str(), final_state.c_str(), rss_handshake,
+               rss_end, ru.ru_maxrss );
+  return 0;
+}
+
 } // namespace
 
 int main( int argc, char **argv ) {
@@ -214,5 +341,8 @@ int main( int argc, char **argv ) {
       return usage();
     return mcp( calls, argv[3], argv[4], argv + 6 );
   }
+  if ( argc >= 5 && !std::strcmp( argv[1], "scan" ) &&
+       !std::strcmp( argv[3], "--" ) )
+    return scan( argv[2], argv + 4 );
   return usage();
 }

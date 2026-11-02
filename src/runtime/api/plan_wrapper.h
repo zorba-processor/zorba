@@ -21,6 +21,7 @@
 #include "store/api/iterator.h"
 
 
+#include <chrono>
 #include <memory>
 
 #include <zorba/item.h>
@@ -106,6 +107,11 @@ public:
   void close();
 
   void checkDepth(const QueryLoc& loc);
+
+  /**
+   * Lowers the time limit that applies from open() on. Top-level plans only.
+   */
+  void limitTimeout(std::chrono::milliseconds aLimit);
 
   dynamic_context* dctx() { return theDynamicContext.get(); }
 

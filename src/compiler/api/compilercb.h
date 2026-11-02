@@ -298,6 +298,15 @@ ZORBA_DLL_PUBLIC void query_resources_fail_walk(unsigned long edge);
   Set by XQuery::setTimeout(): if theHaveTimeout, theTimeout (seconds, 0 = none)
   replaces the timeout of the security policy (see PlanState::initLimits).
 
+  theDynamicCallExpr :
+  --------------------
+  See dynamicCallExpr() in runtime/hof/function_item.cpp.
+
+  theFoldingMillis :
+  ------------------
+  The time the optimizer has spent so far evaluating constant expressions for
+  this query (see fold_rules.cpp).
+
   theTempIndexCounter :
   ---------------------
   A counter used to create unique names for temporary (query-specific) indexes
@@ -415,6 +424,10 @@ public:
   bool                      theHaveTimeout;
 
   uint32_t                  theTimeout;
+
+  uint32_t                  theFoldingMillis;
+
+  expr                    * theDynamicCallExpr;
 
   uint8_t                   theNextVisitId;
 

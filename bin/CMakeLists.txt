@@ -425,12 +425,21 @@ IF (ZORBA_WITH_FILE_ACCESS)
       SET (_mcp_suffix "_${ZORBA_STORE_NAME}")
     ENDIF (NOT ${ZORBA_STORE_NAME} STREQUAL "simplestore")
 
-    SET (MCP_COMMON_SRCS mcp/json.cpp mcp/mcp_server.cpp directory_config.cpp)
+    # The scanner's threads use libxml2 directly.
+    FIND_PACKAGE (Threads REQUIRED)
+    SET (MCP_LIBS "${LIBXML2_LIBRARIES};Threads::Threads")
+    SET (MCP_COMMON_SRCS mcp/json.cpp mcp/mcp_server.cpp mcp/scanner.cpp
+         mcp/scan_preview.cpp directory_config.cpp)
     ZORBA_GENERATE_EXE("zorba_mcp" "mcp/zorba_mcp.cpp;${MCP_COMMON_SRCS}"
-      "" "zorba-mcp" "bin")
+      "${MCP_LIBS}" "zorba-mcp" "bin")
     ZORBA_GENERATE_EXE("mcp_tests" "mcp/test/mcp_tests.cpp;${MCP_COMMON_SRCS}"
-      "" "" "")
+      "${MCP_LIBS}" "" "")
     TARGET_INCLUDE_DIRECTORIES ("mcp_tests${_mcp_suffix}"
+      PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/mcp")
+
+    ZORBA_GENERATE_EXE("mcp_scan_tests" "mcp/test/scan_tests.cpp;${MCP_COMMON_SRCS}"
+      "${MCP_LIBS}" "" "")
+    TARGET_INCLUDE_DIRECTORIES ("mcp_scan_tests${_mcp_suffix}"
       PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/mcp")
 
     # Scripted JSON-RPC exchanges against the directory module's fixture
@@ -440,7 +449,7 @@ IF (ZORBA_WITH_FILE_ACCESS)
              syntax_error escape network native_modules predefined limits binary
              optional_params documents_stream hints_jsoniq hints_dash
              hints_nodes hints_names deep_json deep_json_binary
-             entity_expansion case_paths html_edge_cases language language_binary)
+             entity_expansion case_paths html_edge_cases memory_limit language language_binary)
       ADD_TEST (NAME bin/mcp/${_t}
         COMMAND "mcp_tests${_mcp_suffix}" ${_t} "${_dirtree}" "${_mcpq}"
           "${_dirq}/join.xq" "$<TARGET_FILE:zorba_mcp${_mcp_suffix}>")
@@ -461,6 +470,24 @@ IF (ZORBA_WITH_FILE_ACCESS)
         --root "${_dirtree}" --language sql)
     SET_TESTS_PROPERTIES (bin/mcp/language_invalid PROPERTIES
       PASS_REGULAR_EXPRESSION "invalid argument: --language")
+
+    # The background scanner (see mcp/test/scan_tests.cpp).
+    FOREACH (_t scan_status scan_immediate scan_huge_tag scan_known_dirs
+             scan_unreadable scan_deep_tree scan_preview_bound scan_escaped_names
+             scan_refill scan_previews scan_mtime scan_refresh
+             scan_symlink scan_path scan_malformed scan_deep scan_xxe scan_limit
+             scan_memory scan_memory_big_preview scan_memory_walker
+             scan_memory_stress scan_memory_option scan_thread_limit
+             scan_thread_failure
+             scan_no_scan scan_handshake scan_shutdown scan_binary scan_stress
+             scan_description)
+      ADD_TEST (NAME bin/mcp/${_t}
+        COMMAND "mcp_scan_tests${_mcp_suffix}" ${_t}
+          "$<TARGET_FILE:zorba_mcp${_mcp_suffix}>")
+      SET_TESTS_PROPERTIES (bin/mcp/${_t} PROPERTIES
+        PASS_REGULAR_EXPRESSION "PASSED: ${_t}"
+        FAIL_REGULAR_EXPRESSION "FAILED")
+    ENDFOREACH (_t)
   ENDIF (UNIX)
 ENDIF (ZORBA_WITH_FILE_ACCESS)
 

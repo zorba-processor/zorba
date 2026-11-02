@@ -238,6 +238,25 @@
       }
     },
     {
+      "name": "tsan-mcp",
+      "displayName": "zorba-mcp's background scanner under ThreadSanitizer",
+      "configurePreset": "tsan",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "timeout": 1200
+      },
+      "filter": {
+        "include": {
+          "name": "bin/mcp/scan_"
+        }
+      },
+      "environment": {
+        "TSAN_OPTIONS": "halt_on_error=0:second_deadlock_stack=1:history_size=4:log_path=${sourceDir}/build/tsan/sanitizer-logs/tsan-mcp"
+      }
+    },
+    {
       "name": "tsan-bigint",
       "displayName": "Thread-safety tests under ThreadSanitizer",
       "configurePreset": "tsan-bigint",
