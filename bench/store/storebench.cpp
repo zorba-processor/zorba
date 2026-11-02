@@ -59,6 +59,7 @@
 #include <zorba/item.h>
 #include <zorba/item_factory.h>
 #include <zorba/iterator.h>
+#include <zorba/security.h>
 #include <zorba/static_context.h>
 #include <zorba/store_consts.h>
 #include <zorba/store_manager.h>
@@ -521,6 +522,10 @@ int main( int argc, char **argv ) {
   }
   void *const store = StoreManager::getStore();
   Zorba *const z = Zorba::getInstance( store );
+  // file:read-text() needs FileRead, which no default policy grants.
+  SecurityPolicy policy( SecurityPolicy::unrestricted() );
+  policy.allow( Capability::FileRead );
+  z->setSecurityPolicy( policy );
   int status;
   try {
     status = mode == "file" ? file_mode( z, argv[2], argv[3] )
