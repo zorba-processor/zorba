@@ -21,6 +21,8 @@
 #include <exception>
 #include <filesystem>
 #include <fstream>
+#include <memory>
+#include <new>
 #include <set>
 #include <sstream>
 #include <streambuf>
@@ -54,6 +56,7 @@ namespace {
 // JSON-RPC 2.0 and MCP error codes.
 int const PARSE_ERROR = -32700;
 int const INVALID_REQUEST = -32600;
+int const INTERNAL_ERROR = -32603;
 int const METHOD_NOT_FOUND = -32601;
 int const INVALID_PARAMS = -32602;
 int const UNSUPPORTED_PROTOCOL_VERSION = -32022;
@@ -227,6 +230,16 @@ std::string tool_name( std::string const &stem ) {
   return name;
 }
 
+std::string out_of_memory_text( unsigned long long max_memory ) {
+  return Json::object( { { "error", Json::object( {
+    { "code", "memory_limit" },
+    { "message", "the query ran out of memory (server limit --max-memory: " +
+      ( max_memory ? std::to_string( max_memory ) + " bytes" :
+                     std::string( "none" ) ) +
+      "); narrow the query, or start the server with a higher limit" }
+  } ) } } ).dump();
+}
+
 Json diagnostic_json( ZorbaException const &e, std::string const &source,
                       std::string const &file_name ) {
   diagnostic::QName const &qn = e.diagnostic().qname();
@@ -238,6 +251,8 @@ Json diagnostic_json( ZorbaException const &e, std::string const &source,
     { "namespace", qn.ns() ? qn.ns() : "" },
     { "message", e.what() }
   } ) );
+  if ( *e.hint() )
+    err.set( "hint", e.hint() );
   if ( XQueryException const *const xe =
          dynamic_cast<XQueryException const*>( &e ) ) {
     if ( xe->has_source() ) {
@@ -319,6 +334,32 @@ Server::Server( Zorba *zorba, ServerConfig config, std::ostream &log ) :
   if ( theConfig.timeout.count() > 0 )
     thePolicy.setTimeout( theConfig.timeout );
   load_predefined();
+  if ( theConfig.scan ) {
+    try {
+      theScanner = std::make_unique<Scanner>(
+        theConfig.root, theConfig.scan_limits, theConfig.scan_hook );
+    }
+    // Threads may not start under --max-memory, which is applied before this:
+    // the server then works as with --no-scan.
+    catch ( std::exception const &e ) {
+      theLog << server_name << ": no background scan: " << e.what() << std::endl;
+    }
+  }
+}
+
+Server::~Server() {
+  (void)stop_scan();
+  if ( theScanner )
+    theLog << server_name << ": the scan cache holds "
+           << theScanner->cache_summary() << std::endl;
+}
+
+bool Server::stop_scan() {
+  return !theScanner || theScanner->stop();
+}
+
+std::size_t Server::scan_cache_bytes() const {
+  return theScanner ? theScanner->cache_bytes() : 0;
 }
 
 void Server::load_predefined() {
@@ -407,20 +448,48 @@ bool Server::load_predefined( std::string const &path,
 Json Server::tools() const {
   Json list( Json::array() );
 
-  Json no_args( Json::object( {
-    { "type", "object" }, { "additionalProperties", false }
-  } ) );
-  list.push( Json::object( {
-    { "name", "list_documents" },
-    { "title", "List documents" },
-    { "description",
-      "Lists the files under the directory, recursively and sorted by path: "
-      "one JSON object per line, {path, format, size, modified}. The format "
-      "(xml, json, csv, html or null) says how run_query's dir:documents "
-      "and dir:open parse the file." },
-    { "inputSchema", no_args },
-    { "annotations", read_only_annotations() }
-  } ) );
+  if ( theScanner ) {
+    list.push( Json::object( {
+      { "name", "list_documents" },
+      { "title", "List documents" },
+      { "description",
+        "Lists files, recursive, sorted by path, with format, size, fields. "
+        "First line: scan state, totals, dirs (subdirectories, if cut or "
+        "scanning), incomplete (may miss files). memory_limit: scan stopped; "
+        "ask by path. A file as path adds a preview." },
+      { "inputSchema", Json::object( {
+          { "type", "object" },
+          { "properties", Json::object( {
+              { "path", Json::object( {
+                  { "type", "string" },
+                  { "description", "Subdirectory or file, relative." } } ) },
+              { "limit", Json::object( {
+                  { "type", "integer" },
+                  { "description", "Files to list; default 100." } } ) },
+              { "refresh", Json::object( {
+                  { "type", "boolean" },
+                  { "description", "Restart the scan." } } ) }
+            } ) },
+          { "additionalProperties", false }
+        } ) },
+      { "annotations", read_only_annotations() }
+    } ) );
+  } else {
+    Json no_args( Json::object( {
+      { "type", "object" }, { "additionalProperties", false }
+    } ) );
+    list.push( Json::object( {
+      { "name", "list_documents" },
+      { "title", "List documents" },
+      { "description",
+        "Lists the files under the directory, recursively and sorted by path: "
+        "one JSON object per line, {path, format, size, modified}. The format "
+        "(xml, json, csv, html or null) says how run_query's dir:documents "
+        "and dir:open parse the file." },
+      { "inputSchema", no_args },
+      { "annotations", read_only_annotations() }
+    } ) );
+  }
 
   Json query_props( Json::object( {
     { "query", Json::object( {
@@ -488,6 +557,9 @@ Server::run( std::string const &source, std::string const &file_name,
     // Relative URIs, e.g. doc("orders/q1.xml"), resolve against the root.
     sctx->setBaseURI( "file://" + percent_encode_path( theConfig.root ) + "/" );
     theCache.attach( sctx );
+    // An implementation may add predeclared namespace prefixes (XQuery 3.0,
+    // 4.13); a query can still bind this one to something else.
+    sctx->addNamespace( "math", "http://www.w3.org/2005/xpath-functions/math" );
 
     XQuery_t query = theZorba->createQuery();
     if ( !file_name.empty() )
@@ -521,8 +593,17 @@ Server::run( std::string const &source, std::string const &file_name,
         "fields, a filter, or subsequence()) to see the rest]";
     }
   }
+  // The query is gone by now, and with it the memory it used.
   catch ( ZorbaException const &e ) {
-    outcome.text = diagnostic_json( e, source, file_name ).dump();
+    // Zorba reports std::bad_alloc as an internal error.
+    if ( std::strcmp( e.diagnostic().qname().localname(), "ZXQP0003" ) == 0 &&
+         std::strstr( e.what(), "bad_alloc" ) )
+      outcome.text = out_of_memory_text( theConfig.max_memory );
+    else
+      outcome.text = diagnostic_json( e, source, file_name ).dump();
+  }
+  catch ( std::bad_alloc const& ) {
+    outcome.text = out_of_memory_text( theConfig.max_memory );
   }
   catch ( std::exception const &e ) {
     outcome.text = Json::object( { { "error", Json::object( {
@@ -562,7 +643,17 @@ Json Server::call_tool( Json const &params, bool *protocol_error,
   std::vector<std::pair<std::string,std::string> > const no_vars;
   QueryOutcome outcome;
   std::string unexpected;
-  if ( tool == "list_documents" ) {
+  if ( tool == "list_documents" && theScanner ) {
+    bool is_error = false;
+    // A request does not wait past its time limit, nor long without one.
+    std::chrono::milliseconds const longest( std::chrono::seconds( 10 ) );
+    std::chrono::milliseconds const wait(
+      theConfig.timeout.count() > 0 ? std::min( theConfig.timeout, longest )
+                                    : longest );
+    outcome.text = theScanner->answer( *args, theConfig.max_output, wait,
+                                       &is_error );
+    outcome.ok = !is_error;
+  } else if ( tool == "list_documents" ) {
     unexpected = undeclared_arguments( *args, {} );
     if ( !unexpected.empty() ) {
       outcome.text = invalid_arguments_text(
@@ -633,6 +724,19 @@ Json Server::call_tool( Json const &params, bool *protocol_error,
 }
 
 std::string Server::handle( std::string const &message ) {
+  Json request_id;
+  try {
+    return handle_message( message, &request_id );
+  }
+  catch ( std::exception const &e ) {
+    // Whatever it was (out of memory, most likely), the next request may work.
+    return error_response( request_id, INTERNAL_ERROR,
+      std::string( "Internal error: " ) + e.what() ).dump();
+  }
+}
+
+std::string Server::handle_message( std::string const &message,
+                                    Json *request_id ) {
   Json const null_id;
   if ( message.size() > max_message_size )
     return error_response( null_id, INVALID_REQUEST,
@@ -649,6 +753,8 @@ std::string Server::handle( std::string const &message ) {
 
   Json const *const id = msg.find( "id" );
   Json const *const method = msg.find( "method" );
+  if ( id && ( id->is_string() || id->is_integer() ) )
+    *request_id = *id;
   if ( !method ) {
     // A response from the client (we send no requests): nothing to answer.
     if ( !id || msg.find( "result" ) || msg.find( "error" ) )

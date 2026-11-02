@@ -80,7 +80,9 @@ PlanState::PlanState(
   theTimeout(0),
   theDeadlineCountdown(0),
   theProfile( Properties::instance().getCollectProfile() ),
-  theBlockOwned(true)
+  theBlockOwned(true),
+  theHasUDFCalls(false),
+  theCompletedCall(NULL)
 {
   assert(globalDctx != NULL && localDctx != NULL);
   theBlock = new int8_t[theBlockSize];
@@ -103,7 +105,9 @@ PlanState::PlanState(PlanState& aPlanState):
       theTimeout(aPlanState.theTimeout),
       theDeadlineCountdown(aPlanState.theDeadlineCountdown),
       theProfile(aPlanState.theProfile),
-      theBlockOwned(false)
+      theBlockOwned(false),
+      theHasUDFCalls(aPlanState.theHasUDFCalls),
+      theCompletedCall(NULL)
 {
 }
 
@@ -138,8 +142,9 @@ void PlanState::inheritLimits(const PlanState& aParent)
   theMaxStackDepth = aParent.theMaxStackDepth;
   theDeadline = aParent.theDeadline;
   theTimeout = aParent.theTimeout;
-  theDeadlineCountdown = aParent.theTimeout.count() > 0 ?
-                         DEADLINE_CHECK_INTERVAL : 0;
+  // If the deadline of the parent has passed (its countdown stays at 1), a
+  // plan started after that raises the error at once.
+  theDeadlineCountdown = aParent.theDeadlineCountdown;
 }
 
 

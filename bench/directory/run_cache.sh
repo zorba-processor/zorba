@@ -62,7 +62,7 @@ for spec in $TREES; do
       for setting in $order; do
         log=$OUT/$name-$q-$(echo "$setting" | tr : _)-$run
         if ! "$DIRBENCH" mcp "$CALLS" "$HERE/$q.xq" "$log.json" -- \
-             "$MCP" --root "$tree" --timeout 0 \
+             "$MCP" --root "$tree" --timeout 0 --no-scan \
              --cache-max-file-kb "${setting%:*}" \
              --cache-max-files "${setting#*:}" > "$log.txt" 2> "$log.log"; then
           echo "zorba-mcp $tree $q.xq $setting: the session failed:" >&2

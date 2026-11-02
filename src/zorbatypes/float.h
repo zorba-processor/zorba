@@ -47,6 +47,18 @@ class FloatImpl;
  */
 uint32_t hash_number( double d );
 
+/**
+ * Returns the hash code of an integer value held in a native type, the same
+ * as that of an equal xs:integer, xs:decimal or xs:double: its low 32 bits up
+ * to 2^53, beyond that (where promotion to xs:double rounds) hash_number() of
+ * the xs:double it is promoted to.
+ *
+ * @param n The value to hash.
+ * @return Its hash code.
+ */
+uint32_t hash_int64( int64_t n );
+uint32_t hash_uint64( uint64_t n );
+
 namespace serialization {
   template<typename FloatType>
   void operator&( Archiver&, FloatImpl<FloatType>& );

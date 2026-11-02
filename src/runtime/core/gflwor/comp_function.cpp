@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#include "types/casting.h"
+#include "types/typeops.h"
 #include "runtime/core/gflwor/comp_function.h"
 
 #include <iostream>
@@ -24,6 +26,10 @@ namespace flwor {
 
 bool SortTupleCmp::operator()(const SortTuple& t1, const SortTuple& t2) const
 {
+  // A sort makes no consumeNext calls. Raising here is like the type errors
+  // that compare() raises.
+  thePlanState->chargeWork(1, theLocation);
+
   ZORBA_ASSERT(t1.theKeyValues.size() == t2.theKeyValues.size());
   ZORBA_ASSERT(t1.theKeyValues.size() == theOrderSpecs->size());
 
@@ -112,6 +118,79 @@ long SortTupleCmp::compare(
   }
 }
   
+/*******************************************************************************
+  XQuery 3.0 3.10.8: "All the non-empty orderspec values must be convertible to
+  a common type by subtype substitution and/or type promotion. The ordering is
+  performed in the least common type that has a gt operator."
+
+  The comparison function promotes each pair of keys on its own, which is not
+  the same: as xs:double, 2^63-1, the xs:decimal 2^63 and the xs:double 2^63 are
+  all equal, while the first two compared by themselves are not, and that is
+  not even a consistent order. So promote the keys of a column that mixes
+  numeric types with no subtype relation to the common type first.
+********************************************************************************/
+void promoteNumericSortKeys(
+    std::vector<SortTuple>& sortTable,
+    const std::vector<OrderSpec>& orderSpecs,
+    const TypeManager* tm,
+    const QueryLoc& loc)
+{
+  csize numSpecs = orderSpecs.size();
+
+  for (csize i = 0; i < numSpecs; ++i)
+  {
+    // A native column has one static type: there is nothing to promote.
+    if (orderSpecs[i].theNativeCompare)
+      continue;
+
+    bool hasDouble = false;
+    bool hasFloat = false;
+    bool hasDecimal = false;
+
+    for (SortTuple& tuple : sortTable)
+    {
+      const store::Item* key = tuple.theKeyValues[i];
+      if (key == NULL || !key->isAtomic())
+        continue;
+
+      store::SchemaTypeCode type = key->getTypeCode();
+      if (TypeOps::is_subtype(type, store::XS_DOUBLE))
+        hasDouble = true;
+      else if (TypeOps::is_subtype(type, store::XS_FLOAT))
+        hasFloat = true;
+      else if (TypeOps::is_subtype(type, store::XS_DECIMAL))
+        hasDecimal = true;
+    }
+
+    store::SchemaTypeCode target;
+    if (hasDouble && (hasFloat || hasDecimal))
+      target = store::XS_DOUBLE;
+    else if (hasFloat && hasDecimal)
+      target = store::XS_FLOAT;
+    else
+      continue;
+
+    for (SortTuple& tuple : sortTable)
+    {
+      store::Item*& key = tuple.theKeyValues[i];
+      if (key == NULL || !key->isAtomic())
+        continue;
+
+      store::SchemaTypeCode type = key->getTypeCode();
+      if (!TypeOps::is_numeric(type) || TypeOps::is_subtype(type, target))
+        continue;
+
+      store::Item_t item(key);
+      store::Item_t promoted;
+      if (GenericCast::promote(promoted, item, target, NULL, tm, loc))
+      {
+        key->removeReference();
+        key = promoted.release();
+      }
+    }
+  }
+}
+
 } // namespace flwor
 } // namespace zorba
 

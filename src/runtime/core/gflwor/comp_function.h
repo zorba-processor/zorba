@@ -20,6 +20,7 @@
 #include "context/dynamic_context.h"
 
 #include "runtime/booleans/BooleanImpl.h"
+#include "runtime/base/plan_iterator.h"
 #include "runtime/core/gflwor/common.h"
 #include "runtime/core/gflwor/orderby_iterator.h"
 
@@ -29,6 +30,17 @@ namespace zorba
 
 namespace flwor
 {
+
+/**
+ * Promotes the keys of each order-by column that mixes numeric types with no
+ * subtype relation to their least common type, to be called before sorting.
+ */
+void promoteNumericSortKeys(
+    std::vector<SortTuple>& sortTable,
+    const std::vector<OrderSpec>& orderSpecs,
+    const TypeManager* tm,
+    const QueryLoc& loc);
+
 
 /***************************************************************************//**
   Class acting as a comparison function between two sort tuples. An instance of
@@ -41,6 +53,7 @@ private:
   const std::vector<OrderSpec> * theOrderSpecs;
   const TypeManager            * theTypeManager;
   long                           theTimezone;
+  PlanState                    * thePlanState;
 
 public:
   //SortTupleCmp() : theOrderSpecs(0), theTypeManager(0), theTimezone(0) {}
@@ -49,10 +62,12 @@ public:
         const QueryLoc& loc,
         dynamic_context* dctx,
         const TypeManager* tm,
-        const std::vector<OrderSpec>* orderSpecs)
+        const std::vector<OrderSpec>* orderSpecs,
+        PlanState& planState)
     :
     theLocation(loc),
-    theOrderSpecs(orderSpecs) 
+    theOrderSpecs(orderSpecs),
+    thePlanState(&planState)
   {
     theTypeManager = tm;
     theTimezone = dctx->get_implicit_timezone();

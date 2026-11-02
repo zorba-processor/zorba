@@ -28,6 +28,8 @@
 #include "compiler/expression/expr_iter.h"
 #include "compiler/expression/expr.h"
 
+#include <chrono>
+
 #include "compiler/codegen/plan_visitor.h"
 #include "compiler/api/compilercb.h"
 #include "compiler/api/compiler_api.h"
@@ -466,11 +468,38 @@ expr* FoldConst::apply(RewriterContext& rCtx, expr* node, bool& modified)
 /*******************************************************************************
 
 ********************************************************************************/
+// Total time the optimizer may spend evaluating the constant expressions of a
+// query. An expression that takes longer is left for the execution of the
+// query, which is under the time limit of the query and may never reach it.
+// Without this, the time limit of the query applied to each attempt, and each
+// enclosing expression was attempted first: a query ran for the limit once per
+// level of nesting before its execution began.
+static constexpr uint32_t MAX_FOLDING_MILLIS = 500;
+
 static bool execute(
     CompilerCB* compilercb,
     expr* node,
     store::Item_t& result)
 {
+  if (compilercb->theFoldingMillis >= MAX_FOLDING_MILLIS)
+  {
+    node->setUnfoldable(ANNOTATION_TRUE_FIXED);
+    return false;
+  }
+
+  struct FoldingTime
+  {
+    CompilerCB* theCCB;
+    std::chrono::steady_clock::time_point theStart;
+
+    ~FoldingTime()
+    {
+      theCCB->theFoldingMillis += static_cast<uint32_t>(
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+          std::chrono::steady_clock::now() - theStart).count());
+    }
+  } const foldingTime = { compilercb, std::chrono::steady_clock::now() };
+
   ulong nextVarId = 1;
   PlanIter_t plan = codegen("const-folded expr", node, compilercb, nextVarId);
 
@@ -486,10 +515,14 @@ static bool execute(
     //node->put(std::cout);
     //std::cout << std::endl;
 
-    PlanWrapperHolder pw(new PlanWrapper(plan,
-                                         &expr_ccb,
-                                         0,      // dynamic ctx
-                                         NULL)); // xquery
+    PlanWrapper* wrapper = new PlanWrapper(plan,
+                                           &expr_ccb,
+                                           0,      // dynamic ctx
+                                           NULL);  // xquery
+    wrapper->limitTimeout(std::chrono::milliseconds(
+      MAX_FOLDING_MILLIS - compilercb->theFoldingMillis));
+    PlanWrapperHolder pw(wrapper);
+
     if (pw->next(item))
     {
       if (item->isError())
@@ -510,10 +543,14 @@ static bool execute(
 
     return true;
   }
-  catch (ZorbaException const&)
+  catch (ZorbaException const& e)
   {
     node->setUnfoldable(ANNOTATION_TRUE_FIXED);
-    node->setNonDiscardable(ANNOTATION_TRUE_FIXED);
+
+    // Running out of time says nothing about the expression.
+    if (!(e.diagnostic() == zerr::ZXQP0068_QUERY_TIMEOUT))
+      node->setNonDiscardable(ANNOTATION_TRUE_FIXED);
+
     return false;
 
     // TODO:

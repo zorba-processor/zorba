@@ -19,6 +19,7 @@
 
 #include <chrono>
 #include <cstddef>
+#include <memory>
 #include <ostream>
 #include <string>
 #include <vector>
@@ -28,6 +29,7 @@
 
 #include "document_cache.h"
 #include "json.h"
+#include "scanner.h"
 
 namespace zorba {
 namespace mcp {
@@ -51,12 +53,22 @@ struct ServerConfig {
   std::size_t cache_max_file_kb = 64;
   /** How many documents the document cache keeps (0: no cache). */
   std::size_t cache_max_files = 10;
+  /** Whether to scan the root in the background (see scanner.h). */
+  bool scan = true;
+  /** The limits of the scanner. */
+  ScanLimits scan_limits;
+  /** For tests: see ScanHook. */
+  ScanHook scan_hook;
+  /** The memory limit of the process, in bytes (0: none; see zorba_mcp.cpp). */
+  unsigned long long max_memory = 4ULL << 30;
 };
 
 /**
  * An MCP server over the Zorba C++ API: answers one JSON-RPC message at a
  * time. Every query runs under SecurityPolicy::secure() narrowed to reading
- * the root directory (see directory_config), with \c $dir:root bound.
+ * the root directory (see directory_config), with \c $dir:root bound. Unless
+ * configured otherwise, list_documents answers from a background scan of the
+ * root (see Scanner); queries never depend on it.
  *
  * Serves the modern revision (per-request \c _meta, \c server/discover) and,
  * once a client sends \c initialize, the legacy handshake-based revisions.
@@ -69,6 +81,8 @@ public:
    * @param log where diagnostics go (never the protocol stream).
    */
   Server( Zorba *zorba, ServerConfig config, std::ostream &log );
+
+  ~Server();
 
   /**
    * Handles one message (one line of the stdio transport).
@@ -86,6 +100,15 @@ public:
 
   /** The counters as one line for the log; empty without a cache. */
   std::string cache_stats_line() const { return theCache.stats_line(); }
+  /**
+   * Stops the background scan, if any; the destructor does it too.
+   *
+   * @return whether every thread was joined.
+   */
+  bool stop_scan();
+
+  /** The bytes the scan cache accounts for, or 0 without a scan. */
+  std::size_t scan_cache_bytes() const;
 
 private:
   struct Param {
@@ -106,6 +129,7 @@ private:
     std::string text;
   };
 
+  std::string handle_message( std::string const &message, Json *request_id );
   void load_predefined();
   bool load_predefined( std::string const &path, std::string const &name );
 
@@ -123,6 +147,7 @@ private:
   std::vector<Predefined> thePredefined;
   DocumentCache theCache;
   std::string theLegacyVersion;         // set by initialize
+  std::unique_ptr<Scanner> theScanner;  // null with --no-scan
 };
 
 } // namespace mcp

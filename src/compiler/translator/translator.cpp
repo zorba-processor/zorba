@@ -103,6 +103,7 @@
 #include "diagnostics/xquery_diagnostics.h"
 #include "diagnostics/dict.h"
 #include "diagnostics/util_macros.h"
+#include "diagnostics/query_hints.h"
 
 #include "util/ascii_util.h"
 #include "util/stl_util.h"
@@ -1383,15 +1384,50 @@ var_expr* lookup_var(const QName* qname, const QueryLoc& loc, bool raiseError)
   {
     if (raiseError)
     {
-      zstring varName = static_context::var_name(qnameItem);
-      RAISE_ERROR(err::XPST0008, loc,
-      ERROR_PARAMS(ZED(XPST0008_VariableName_2), varName));
+      raise_undeclared_var(qnameItem.getp(), loc);
     }
 
     return NULL;
   }
 
   return var->getVar();
+}
+
+
+/*******************************************************************************
+  Raises XPST0008. When "-" in the name hides a variable that is in scope, as
+  in $x-1, the hint gives the expression with the subtraction.
+********************************************************************************/
+void raise_undeclared_var(const store::Item* qname, const QueryLoc& loc)
+{
+  zstring varName = static_context::var_name(qname);
+  XQueryException e(XQUERY_EXCEPTION(err::XPST0008,
+                                     ERROR_PARAMS(ZED(XPST0008_VariableName_2), varName),
+                                     ERROR_LOC(loc)));
+
+  std::string const local(qname->getLocalName().str());
+  std::string const prefix(qname->getPrefix().empty() ?
+                           std::string() : qname->getPrefix().str() + ':');
+
+  for (std::size_t dash = local.rfind('-');
+       dash != std::string::npos && dash > 0;
+       dash = local.rfind('-', dash - 1))
+  {
+    store::Item_t shorter;
+    GENV_ITEMFACTORY->createQName(shorter,
+                                  qname->getNamespace(),
+                                  qname->getPrefix(),
+                                  zstring(local.substr(0, dash).c_str()));
+
+    if (theSctx->lookup_var(shorter.getp()))
+    {
+      e.set_hint(query_hints::dash_in_variable(prefix + local.substr(0, dash),
+                                               local.substr(dash + 1)).c_str());
+      break;
+    }
+  }
+
+  throw e;
 }
 
 
@@ -1411,9 +1447,7 @@ var_expr* lookup_var(const store::Item* qname, const QueryLoc& loc, bool raiseEr
   {
     if (raiseError)
     {
-      zstring varName = static_context::var_name(qname);
-      RAISE_ERROR(err::XPST0008, loc,
-      ERROR_PARAMS(ZED(XPST0008_VariableName_2), varName));
+      raise_undeclared_var(qname, loc);
     }
 
     return NULL;
@@ -11052,7 +11086,13 @@ void post_predicate_visit(const PredicateList& v, const exprnode* pred, void*)
 
     // "[[ ]]": an array lookup needs a selector.
     if (selectorExpr == NULL)
-      RAISE_ERROR(err::XPST0003, loc, ERROR_PARAMS("empty array lookup"));
+    {
+      XQueryException e(XQUERY_EXCEPTION(err::XPST0003,
+                                         ERROR_PARAMS("empty array lookup"),
+                                         ERROR_LOC(loc)));
+      e.set_hint(query_hints::empty_array_lookup().c_str());
+      throw e;
+    }
 
     xqtref_t domainType = arrayExpr->get_return_type();
 
@@ -11843,6 +11883,64 @@ void end_visit(const FunctionCall& v, void* /*visit_state*/)
 
 
 /*******************************************************************************
+  The hint of a call to a function that was not found: the form it has in
+  JSONiq (keys($o) in XQuery), or its declared forms (dir:open("a.xml")).
+********************************************************************************/
+std::string undeclared_function_hint(
+    const QName* qname,
+    const store::Item* qnameItem,
+    csize numArgs)
+{
+  if (qname->get_prefix().empty() &&
+      theSctx->language_kind() == StaticContextConsts::language_kind_xquery)
+  {
+    const zstring local = qname->get_localname();
+
+    struct { const char* ns; const char* prefix; } const namespaces[] =
+    {
+      { static_context::JSONIQ_FN_NS, "jn" },
+      { static_context::XQUERY_MATH_FN_NS, "math" }
+    };
+
+    for (auto const& ns : namespaces)
+    {
+      store::Item_t name;
+      GENV_ITEMFACTORY->createQName(name, zstring(ns.ns), zstring(), local);
+
+      if (theSctx->lookup_fn(name.getp(), numArgs))
+        return query_hints::jsoniq_function(local.str(), ns.prefix);
+    }
+  }
+
+  std::string const display(qnameItem->getStringValue().str());
+  std::vector<function*> functions;
+  theSctx->find_functions(qnameItem, functions);
+  std::vector<std::string> signatures;
+
+  for (const function* f : functions)
+  {
+    const signature& sig = f->getSignature();
+    std::vector<var_expr*> const* argVars =
+      f->isUdf() ? &static_cast<const user_function*>(f)->getArgVars() : nullptr;
+
+    std::string text(display + "(");
+    for (csize i = 0; i < sig.definedParamCount(); ++i)
+    {
+      if (i)
+        text += ", ";
+      if (argVars && i < argVars->size())
+        text += "$" + (*argVars)[i]->get_name()->getLocalName().str() + " as ";
+      text += sig[static_cast<int>(i)]->toSchemaString();
+    }
+    text += ") as " + sig.returnType()->toSchemaString();
+    signatures.push_back(text);
+  }
+
+  return query_hints::other_arity(display, signatures);
+}
+
+
+/*******************************************************************************
 
 ********************************************************************************/
 expr* generate_fncall(
@@ -11896,8 +11994,11 @@ expr* generate_fncall(
       }
     }
     
-    RAISE_ERROR(err::XPST0017, loc,
-    ERROR_PARAMS(qnameItem->getStringValue(), ZED(FunctionUndeclared_3), numArgs));
+    XQueryException e(XQUERY_EXCEPTION(err::XPST0017,
+      ERROR_PARAMS(qnameItem->getStringValue(), ZED(FunctionUndeclared_3), numArgs),
+      ERROR_LOC(loc)));
+    e.set_hint(undeclared_function_hint(qname, qnameItem.getp(), numArgs).c_str());
+    throw e;
   }
 
   qnameItem = f->getName();

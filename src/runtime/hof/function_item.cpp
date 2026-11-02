@@ -1056,6 +1056,21 @@ ulong FunctionItem::getMaxInScopeVarId() const
 
 
 /*******************************************************************************
+  The expression that user_function::codegen requires and does not read. There
+  is one per CompilerCB, whose expression manager frees its expressions only
+  with the query: one per dynamic call would pile up for as long as it runs.
+********************************************************************************/
+static expr* dynamicCallExpr(CompilerCB* ccb, const QueryLoc& loc)
+{
+  if (ccb->theDynamicCallExpr == NULL)
+    ccb->theDynamicCallExpr = ccb->theEM->
+      create_function_item_expr(NULL, NULL, loc, false, false);
+
+  return ccb->theDynamicCallExpr;
+}
+
+
+/*******************************************************************************
   The getImplementation function assumes the dynChildren vector comes from a
   DynamicFnCallIterator, and as such, the first element of dynChildren is
   the function item itself, so it will be skipped.
@@ -1088,13 +1103,8 @@ PlanIter_t FunctionItem::getImplementation(
     }
   }
 
-  expr* dummy = ccb->theEM->
-  create_function_item_expr(NULL,
-                            NULL,
-                            theFunctionItemInfo->theLoc,
-                            false,
-                            false);
-  
+  expr* dummy = dynamicCallExpr(ccb, theFunctionItemInfo->theLoc);
+
   PlanIter_t udfCallIterator = theFunctionItemInfo->theFunction->
   codegen(ccb,
           theFunctionItemInfo->theClosureSctx,
@@ -1119,13 +1129,8 @@ PlanIter_t FunctionItem::getImplementation(CompilerCB* ccb)
 {
   std::vector<PlanIter_t> args;
 
-  expr* dummy = ccb->theEM->
-  create_function_item_expr(NULL,
-                            NULL,
-                            theFunctionItemInfo->theLoc,
-                            false,
-                            false);
-  
+  expr* dummy = dynamicCallExpr(ccb, theFunctionItemInfo->theLoc);
+
   PlanIter_t udfCallIterator = theFunctionItemInfo->theFunction->
   codegen(ccb,
           theFunctionItemInfo->theClosureSctx,

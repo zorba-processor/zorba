@@ -94,6 +94,20 @@ ZORBA_SET_TEST_PROPERTY(bin/zorba_max_call_depth PASS_REGULAR_EXPRESSION ".*ZXQP
 ZORBA_ADD_TEST(bin/zorba_max_expr_depth zorbacmd --max-expr-depth 10 -q "((((((((((((1))))))))))))")
 ZORBA_SET_TEST_PROPERTY(bin/zorba_max_expr_depth PASS_REGULAR_EXPRESSION ".*ZXQP0070.*")
 
+# A diagnostic hint is printed after the message; an error without one prints
+# no "hint:" line. In XQuery mode $x[] stays XPST0003.
+ZORBA_ADD_TEST(bin/zorba_hint_syntax zorbacmd -q "let $x := [1] return $x[]")
+ZORBA_SET_TEST_PROPERTY(bin/zorba_hint_syntax PASS_REGULAR_EXPRESSION "XPST0003.*hint: .*jn:members")
+ZORBA_ADD_TEST(bin/zorba_hint_prefix zorbacmd -q "math:pi()")
+ZORBA_SET_TEST_PROPERTY(bin/zorba_hint_prefix PASS_REGULAR_EXPRESSION "XPST0081.*hint: .*import module namespace math")
+ZORBA_ADD_TEST(bin/zorba_hint_xml zorbacmd --print-errors-as-xml -q "let $x := 3 return $x-1")
+ZORBA_SET_TEST_PROPERTY(bin/zorba_hint_xml PASS_REGULAR_EXPRESSION "<hint>.*x - 1.*</hint>")
+ZORBA_ADD_TEST(bin/zorba_hint_none zorbacmd -q "nosuchfunction(1)")
+ZORBA_SET_TEST_PROPERTY(bin/zorba_hint_none PASS_REGULAR_EXPRESSION "XPST0017")
+ZORBA_SET_TEST_PROPERTY(bin/zorba_hint_none FAIL_REGULAR_EXPRESSION "hint:")
+ZORBA_ADD_TEST(bin/zorba_hint_serializer zorbacmd -z method=json -q "<a/>")
+ZORBA_SET_TEST_PROPERTY(bin/zorba_hint_serializer PASS_REGULAR_EXPRESSION "JNSE0014.*hint: .*serialize")
+
 # Security policy flags: --secure, --allow, --deny, --read-path, --write-path,
 # --network-prefix, --private-addresses. Each capability is shown denied and
 # permitted. The queries in test/security print a marker on success. A policy
@@ -315,13 +329,21 @@ IF (ZORBA_WITH_FILE_ACCESS)
       SET (_mcp_suffix "_${ZORBA_STORE_NAME}")
     ENDIF (NOT ${ZORBA_STORE_NAME} STREQUAL "simplestore")
 
+    # The scanner's threads use libxml2 directly.
+    FIND_PACKAGE (Threads REQUIRED)
+    SET (MCP_LIBS "${LIBXML2_LIBRARIES};Threads::Threads")
     SET (MCP_COMMON_SRCS mcp/json.cpp mcp/mcp_server.cpp mcp/document_cache.cpp
-      directory_config.cpp)
+         mcp/scanner.cpp mcp/scan_preview.cpp directory_config.cpp)
     ZORBA_GENERATE_EXE("zorba_mcp" "mcp/zorba_mcp.cpp;${MCP_COMMON_SRCS}"
-      "" "zorba-mcp" "bin")
+      "${MCP_LIBS}" "zorba-mcp" "bin")
     ZORBA_GENERATE_EXE("mcp_tests" "mcp/test/mcp_tests.cpp;${MCP_COMMON_SRCS}"
-      "" "" "")
+      "${MCP_LIBS}" "" "")
     TARGET_INCLUDE_DIRECTORIES ("mcp_tests${_mcp_suffix}"
+      PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/mcp")
+
+    ZORBA_GENERATE_EXE("mcp_scan_tests" "mcp/test/scan_tests.cpp;${MCP_COMMON_SRCS}"
+      "${MCP_LIBS}" "" "")
+    TARGET_INCLUDE_DIRECTORIES ("mcp_scan_tests${_mcp_suffix}"
       PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/mcp")
 
     # Scripted JSON-RPC exchanges against the directory module's fixture
@@ -329,18 +351,36 @@ IF (ZORBA_WITH_FILE_ACCESS)
     SET (_mcpq "${CMAKE_CURRENT_SOURCE_DIR}/test/mcp/queries")
     FOREACH (_t json protocol legacy tools_list list_documents join
              syntax_error escape network native_modules predefined limits binary
-             optional_params documents_stream deep_json deep_json_binary
-             entity_expansion case_paths html_edge_cases
+             optional_params documents_stream hints_jsoniq hints_dash
+             hints_nodes hints_names deep_json deep_json_binary
+             entity_expansion case_paths html_edge_cases memory_limit
              cache_hit cache_invalidate cache_evict cache_off cache_policy
              cache_inject cache_size cache_default cache_abort cache_errors
-             cache_expansion
-             cache_counters)
+             cache_expansion cache_counters)
       ADD_TEST (NAME bin/mcp/${_t}
         COMMAND "mcp_tests${_mcp_suffix}" ${_t} "${_dirtree}" "${_mcpq}"
           "${_dirq}/join.xq" "$<TARGET_FILE:zorba_mcp${_mcp_suffix}>")
       SET_TESTS_PROPERTIES (bin/mcp/${_t} PROPERTIES
         PASS_REGULAR_EXPRESSION "PASSED: ${_t}"
         FAIL_REGULAR_EXPRESSION "FAILED|TOP-SECRET|HIDDEN-SECRET")
+    ENDFOREACH (_t)
+
+    # The background scanner (see mcp/test/scan_tests.cpp).
+    FOREACH (_t scan_status scan_immediate scan_huge_tag scan_known_dirs
+             scan_unreadable scan_deep_tree scan_preview_bound scan_escaped_names
+             scan_refill scan_previews scan_mtime scan_refresh
+             scan_symlink scan_path scan_malformed scan_deep scan_xxe scan_limit
+             scan_memory scan_memory_big_preview scan_memory_walker
+             scan_memory_stress scan_memory_option scan_thread_limit
+             scan_thread_failure
+             scan_no_scan scan_handshake scan_shutdown scan_binary scan_stress
+             scan_description)
+      ADD_TEST (NAME bin/mcp/${_t}
+        COMMAND "mcp_scan_tests${_mcp_suffix}" ${_t}
+          "$<TARGET_FILE:zorba_mcp${_mcp_suffix}>")
+      SET_TESTS_PROPERTIES (bin/mcp/${_t} PROPERTIES
+        PASS_REGULAR_EXPRESSION "PASSED: ${_t}"
+        FAIL_REGULAR_EXPRESSION "FAILED")
     ENDFOREACH (_t)
   ENDIF (UNIX)
 ENDIF (ZORBA_WITH_FILE_ACCESS)

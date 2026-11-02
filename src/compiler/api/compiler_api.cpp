@@ -19,6 +19,7 @@
 #include "compiler/api/compiler_api.h"
 #include "diagnostics/xquery_diagnostics.h"
 #include "diagnostics/dict.h"
+#include "diagnostics/query_hints.h"
 
 #include "system/globalenv.h"
 #include <zorba/properties.h>
@@ -252,8 +253,13 @@ parsenode_t XQueryCompiler::parse(std::istream& aXQuery, const zstring& aFileNam
   if (typeid (lNode) == typeid (ParseErrorNode))
   {
     ParseErrorNode* pen = static_cast<ParseErrorNode *>(&*node);
-    throw XQUERY_EXCEPTION_VAR(pen->err, 
-    ERROR_PARAMS(pen->msg), ERROR_LOC(pen->get_location()));
+    XQueryException e(XQUERY_EXCEPTION_VAR(pen->err,
+    ERROR_PARAMS(pen->msg), ERROR_LOC(pen->get_location())));
+    e.set_hint(query_hints::syntax_error(xquery_stream.str(),
+                                         pen->get_location().getLineBegin(),
+                                         pen->get_location().getColumnBegin(),
+                                         lXQueryMode).c_str());
+    throw e;
   }
 
   return node;

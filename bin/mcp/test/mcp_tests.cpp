@@ -50,6 +50,16 @@
 using namespace zorba;
 using namespace zorba::mcp;
 
+// AddressSanitizer and ThreadSanitizer need far more address space than the
+// process uses: an address-space limit does not work with them.
+#if defined(__SANITIZE_ADDRESS__) || defined(__SANITIZE_THREAD__)
+# define ZORBA_TEST_SANITIZER 1
+#elif defined(__has_feature)
+# if __has_feature(address_sanitizer) || __has_feature(thread_sanitizer)
+#  define ZORBA_TEST_SANITIZER 1
+# endif
+#endif
+
 namespace {
 
 int failures = 0;
@@ -65,6 +75,30 @@ void check( bool ok, std::string const &what, std::string const &detail = "" ) {
     std::cout << std::endl;
   }
 }
+
+// Bounds the address space of this process while it lives.
+class AddressSpaceLimit {
+#if defined(__linux__) && !defined(ZORBA_TEST_SANITIZER)
+  struct rlimit old_;
+  bool set_ = false;
+public:
+  explicit AddressSpaceLimit( unsigned long long bytes ) {
+    if ( getrlimit( RLIMIT_AS, &old_ ) == 0 ) {
+      struct rlimit lim = old_;
+      lim.rlim_cur = bytes;
+      set_ = setrlimit( RLIMIT_AS, &lim ) == 0;
+    }
+  }
+  ~AddressSpaceLimit() {
+    if ( set_ )
+      check( setrlimit( RLIMIT_AS, &old_ ) == 0,
+             "restore the address-space limit" );
+  }
+#else
+public:
+  explicit AddressSpaceLimit( unsigned long long ) { }
+#endif
+};
 
 struct Fixture {
   Zorba *zorba;
@@ -353,6 +387,7 @@ void test_tools_list( Fixture const &f ) {
 void test_list_documents( Fixture const &f ) {
   ServerConfig config;
   config.root = f.tree;
+  config.scan = false;
   Server server( f.zorba, config, std::cerr );
 
   Json const r = call_tool( server, "list_documents", Json::object() );
@@ -399,6 +434,228 @@ void test_syntax_error( Fixture const &f ) {
   check( loc && field( *loc, "line" ) == "2" && loc->find( "column" ) &&
          field( *loc, "text" ) == "return $x $x",
          "syntax error: line, column and the failing line", r.dump() );
+}
+
+// Runs a query that must fail with the code. A non-empty part must appear in
+// the "hint" field and not in the message; an empty part means no hint at all.
+void check_error( Server &server, std::string const &query,
+                  std::string const &code, std::string const &part,
+                  std::string const &what ) {
+  Json const r = call_tool( server, "run_query",
+                            Json::object( { { "query", query } } ) );
+  Json const e( tool_error( r ) );
+  Json const *const hint = e.find( "hint" );
+  bool ok = is_tool_error( r ) && contains( field( e, "code" ), code );
+  if ( part.empty() )
+    ok = ok && !hint;
+  else
+    ok = ok && hint && contains( hint->text(), part ) &&
+      !contains( field( e, "message" ), part );
+  check( ok, what, r.dump() );
+}
+
+// Runs a query that must succeed with this output.
+void check_result( Server &server, std::string const &query,
+                   std::string const &expected, std::string const &what ) {
+  Json const r = call_tool( server, "run_query",
+                            Json::object( { { "query", query } } ) );
+  std::string text( result_text( r ) );
+  while ( !text.empty() && text.back() == '\n' )
+    text.pop_back();
+  check( !is_tool_error( r ) && text == expected, what, r.dump() );
+}
+
+std::string const dir_import(
+  "import module namespace dir = \"http://zorba.io/modules/directory\";\n" );
+std::string const jsoniq_decl( "jsoniq version \"1.0\";\n" );
+
+// The forms the JSONiq specification defines: they resolve under a JSONiq
+// version declaration, and stay errors (with a hint) in XQuery.
+void test_hints_jsoniq( Fixture const &f ) {
+  ServerConfig config;
+  config.root = f.tree;
+  Server server( f.zorba, config, std::cerr );
+
+  // $x[]
+  check_result( server, jsoniq_decl + "let $x := [1, 2] return $x[]", "1\n2",
+                "JSONiq: $x[] unboxes an array" );
+  check_error( server, "let $x := [1, 2] return $x[]", "XPST0003",
+               "jn:members($x)", "XQuery: $x[] is an error with a hint" );
+  check_error( server, "let $x := [1, 2] return $x[ ]", "XPST0003",
+               "jn:members($x)", "XQuery: $x[ ] is an error with a hint" );
+  check_result( server, "let $x := [1, 2] return $x()", "1\n2",
+                "the hint's $x() works" );
+  check_result( server, "let $x := [1, 2] return jn:members($x)", "1\n2",
+                "the hint's jn:members($x) works" );
+  std::string const one_line(
+    "import module namespace dir = \"http://zorba.io/modules/directory\"; " );
+  check_error( server, one_line + "let $x := [1, 2] return $x[]", "XPST0003",
+               "jn:members($x)", "$x[] after a prolog on the same line" );
+  check_error( server, one_line + "(1, 2)[$$ eq 2]", "XPST0003", "\".\"",
+               "$$ after a prolog on the same line" );
+  check_error( server, one_line + "let $a := 3 let $b := 1 return $a-$b",
+               "XPST0003", "$a - $b", "$a-$b after a prolog on the same line" );
+  check_error( server, "let $x := [1] return $x[[]]", "XPST0003",
+               "jn:members($x)", "$x[[]]: hint" );
+  check_error( server, "[1, ]", "XPST0003", "",
+               "no $x[] hint on another unexpected ]" );
+  check_error( server, "let $x := [1] return $x]", "XPST0003", "",
+               "no $x[] hint on a stray ]" );
+  check_result( server, jsoniq_decl + dir_import +
+                "dir:open($dir:root, \"orders/2026/q1.xml\")(\"format\")",
+                "\"xml\"", "JSONiq: the declaration works with the module" );
+
+  // $$
+  check_result( server, jsoniq_decl + "(1, 2)[$$ eq 2]", "2",
+                "JSONiq: $$ is the context item" );
+  check_error( server, "(1, 2)[$$ eq 2]", "XPST0003", "\".\"",
+               "XQuery: $$ is an error with a hint" );
+  check_result( server, "(1, 2)[. eq 2]", "2", "the hint's . works" );
+  check_result( server, "({ \"a\" : 1 }, { \"a\" : 2 })[.(\"a\") eq 2](\"a\")",
+                "2", "the hint's .(\"key\") works" );
+
+  // Function names without a prefix.
+  struct { char const *call, *expected, *fixed; } const fns[] = {
+    { "keys({ \"a\" : 1 })", "\"a\"", "jn:keys(" },
+    { "size([1, 2])", "2", "jn:size(" },
+    { "flatten([1, [2]])", "1\n2", "jn:flatten(" },
+    { "members([1, 2])", "1\n2", "jn:members(" }
+  };
+  for ( auto const &fn : fns ) {
+    std::string const call( fn.call );
+    check_result( server, jsoniq_decl + call, fn.expected,
+                  "JSONiq: " + call + " resolves" );
+    check_error( server, call, "XPST0017", fn.fixed,
+                 "XQuery: " + call + " is an error with a hint" );
+    check_result( server, "jn:" + call, fn.expected,
+                  "the hint's jn:" + call + " works" );
+  }
+  check_result( server, jsoniq_decl + "pi() gt 3", "true",
+                "JSONiq: pi() resolves" );
+  check_error( server, "pi()", "XPST0017", "math:pi(",
+               "XQuery: pi() is an error with a hint" );
+  check_error( server, "keys(1, 2)", "XPST0017", "",
+               "no hint: jn:keys has no form with two arguments" );
+  check_error( server, "nosuchfunction(1)", "XPST0017", "",
+               "no hint on an unknown function" );
+}
+
+// "-" is a name character: never accepted, the hint gives the expression.
+void test_hints_dash( Fixture const &f ) {
+  ServerConfig config;
+  config.root = f.tree;
+  Server server( f.zorba, config, std::cerr );
+
+  check_error( server, "let $a2 := 3 let $a1 := 1 return ($a2-$a1)*2",
+               "XPST0003", "$a2 - $a1", "$a2-$a1: hint with the expression" );
+  check_error( server,
+               jsoniq_decl + "let $a2 := 3 let $a1 := 1 return $a2-$a1",
+               "XPST0003", "$a2 - $a1", "$a2-$a1 in JSONiq too" );
+  check_result( server, "let $a2 := 3 let $a1 := 1 return ($a2 - $a1)*2", "4",
+                "the hint's $a2 - $a1 works" );
+  check_error( server, "let $a-$b := 1 return 1", "XPST0003", "",
+               "no hint where a variable is being bound" );
+  check_error( server, "let $a := 3 let $b := 1\nreturn $a-$b\n", "XPST0003",
+               "$a - $b", "$a-$b at the end of the query: hint" );
+  check_error( server, "let $x := 1 return", "XPST0003", "",
+               "no hint on another error at the end of the query" );
+  check_error( server, "let $b := 1 return 1 $b", "XPST0003", "",
+               "no hint on $ after something else" );
+
+  check_error( server, "let $x := 3 return $x-1", "XPST0008", "$x - 1",
+               "$x-1: hint with the expression" );
+  check_result( server, "let $x := 3 return $x - 1", "2",
+                "the hint's $x - 1 works" );
+  check_error( server, "$no-such", "XPST0008", "",
+               "no hint when no shorter variable is in scope" );
+  check_error( server, "let $x := 3 return $y", "XPST0008", "",
+               "no hint on an undeclared name without -" );
+}
+
+void test_hints_nodes( Fixture const &f ) {
+  ServerConfig config;
+  config.root = f.tree;
+  Server server( f.zorba, config, std::cerr );
+  std::string const record( dir_import +
+    "let $d := dir:open($dir:root, \"orders/2026/q1.xml\")\n" );
+
+  // JNSE0014: the record of an XML document, and a node.
+  check_error( server, record + "return $d", "JNSE0014", "serialize(",
+               "a record holding a node: hint" );
+  check_error( server, "<a/>", "JNSE0014", "serialize(", "a node: hint" );
+  check_error( server, "abs#1", "JNSE0014", "",
+               "no node hint on a function item" );
+  Json const r = call_tool( server, "run_query",
+                            Json::object( { { "query", "<a/>" } } ) );
+  check( field( tool_error( r ), "message" ) ==
+         "can not serialize a node or function item as JSON",
+         "the message is unchanged, the hint is separate", r.dump() );
+  Json const s = call_tool( server, "run_query",
+    Json::object( { { "query", "serialize(<a>t</a>)" } } ) );
+  check( !is_tool_error( s ) && contains( result_text( s ), "<a>t<" ),
+         "the hint's serialize() works", s.dump() );
+  check_result( server, "string(<a>t</a>)", "\"t\"",
+                "the hint's string() works" );
+
+  // XPTY0019: a path over a JSON item.
+  check_error( server, record + "return $d//order", "XPTY0019",
+               "$d(\"content\")", "a path over an object: hint" );
+  check_error( server, "let $a := jn:parse-json('[1]') return $a//b",
+               "XPTY0019", "$a()", "a path over an array: hint" );
+  check_error( server, "let $n := 1 return $n//b", "XPTY0019", "",
+               "no JSON hint on a path over an atomic value" );
+  check_result( server, record + "return count($d(\"content\")//order)", "2",
+                "the hint's $d(\"content\")//order works" );
+
+  // FORG0001: a string selector on an array.
+  std::string const features(
+    "let $a := jn:parse-json('[{ \"id\" : 7 }]')\n" );
+  check_error( server, features + "return $a(\"id\")", "FORG0001",
+               "$x()(\"id\")", "a key on an array: hint" );
+  check_error( server, features + "return $a[1](\"id\")", "FORG0001",
+               "$x()(\"id\")", "a key after a predicate: hint" );
+  check_error( server, "\"abc\" cast as xs:integer", "FORG0001", "",
+               "no array hint on another failed cast" );
+  check_result( server, features + "return $a()(\"id\")", "7",
+                "the hint's $x()(\"id\") works" );
+  check_result( server, features + "return $a(1)(\"id\")", "7",
+                "the hint's $x(1)(\"id\") works" );
+}
+
+void test_hints_names( Fixture const &f ) {
+  ServerConfig config;
+  config.root = f.tree;
+  Server server( f.zorba, config, std::cerr );
+  std::string const math_ns( "http://www.w3.org/2005/xpath-functions/math" );
+
+  // zorba-mcp predeclares math:, and a query can still override it.
+  check_result( server, "math:pi() gt 3", "true", "math: is predeclared" );
+  check_result( server, "import module namespace math = \"" + math_ns + "\";\n"
+                "math:pi() gt 3", "true", "math: can still be imported" );
+  check_result( server, "declare namespace math = \"urn:other\";\n"
+                "namespace-uri(<math:a/>)", "\"urn:other\"",
+                "math: can be bound to another namespace" );
+  check_error( server, "map:merge(())", "XPST0081", "{|",
+               "map: hint with the JSON alternative" );
+  check_result( server,
+                "count(jn:keys({| for $k in (\"a\", \"b\") "
+                "return { $k : 1 } |}))", "2", "the hint's {| |} works" );
+  check_error( server, "nosuchprefix:f(1)", "XPST0081", "",
+               "no hint on an unknown prefix" );
+
+  // Other arities of a known function.
+  check_error( server, dir_import + "dir:open(\"a.xml\")", "XPST0017",
+               "dir:open($root", "dir:open with one argument: signature" );
+  check_error( server, dir_import + "dir:open(\"a.xml\")", "XPST0017",
+               "$path", "dir:open with one argument: both parameters" );
+  check_error( server, dir_import + "dir:documents(1, 2, 3)", "XPST0017",
+               "dir:documents($root", "dir:documents: signature" );
+  check_error( server, "fn:substring(1)", "XPST0017", "fn:substring(",
+               "a builtin function: signature" );
+  check_error( server, dir_import + "dir:nosuch(1)", "XPST0017", "",
+               "no hint on an unknown module function" );
+  check_error( server, "local:nosuch(1)", "XPST0017", "",
+               "no hint on an unknown local function" );
 }
 
 void test_escape( Fixture const &f ) {
@@ -512,13 +769,36 @@ void test_limits( Fixture const &f ) {
   check( is_tool_error( r ) &&
          contains( field( tool_error( r ), "code" ), "ZXQP0068" ),
          "evaluation over the time limit: ZXQP0068", r.dump() );
+
+  // 2^40 calls in a tree 40 deep. Bounded so that a query that retains the
+  // memory of each call fails here instead of exhausting the machine.
+  {
+    AddressSpaceLimit const limit( 3000000000ULL );
+    auto const start = std::chrono::steady_clock::now();
+    r = call_tool( server, "run_query", Json::object( { { "query",
+      "declare function local:f($n) { if ($n le 0) then 0 else "
+      "local:f($n - 1) + local:f($n - 1) }; local:f(40)" } } ) );
+    auto const elapsed = std::chrono::steady_clock::now() - start;
+    check( is_tool_error( r ) &&
+           contains( field( tool_error( r ), "code" ), "ZXQP0068" ),
+           "recursion over the time limit: ZXQP0068", r.dump() );
+    check( elapsed < std::chrono::seconds( 16 ),
+           "recursion stops about when the time limit ends" );
+  }
+
+  // The server keeps answering.
+  r = call_tool( server, "run_query",
+                 Json::object( { { "query", "1 + 1" } } ) );
+  check( !is_tool_error( r ) && result_text( r ) == "2",
+         "the server answers after a timeout", r.dump() );
 }
 
 
 // Runs the zorba-mcp executable over a pipe with the given arguments,
 // writes the input to it and returns everything it wrote to stdout.
 std::string run_binary( Fixture const &f, std::string const &queries,
-                        std::string const &input ) {
+                        std::string const &input,
+                        std::vector<std::string> const &extra_args = {} ) {
   int to_child[2], from_child[2];
   if ( pipe( to_child ) != 0 || pipe( from_child ) != 0 ) {
     check( false, "pipe" );
@@ -535,8 +815,13 @@ std::string run_binary( Fixture const &f, std::string const &queries,
          close( to_child[0] ) != 0 || close( to_child[1] ) != 0 ||
          close( from_child[0] ) != 0 || close( from_child[1] ) != 0 )
       _exit( 127 );
-    execl( f.binary.c_str(), f.binary.c_str(), "--root", f.tree.c_str(),
-           "--queries", queries.c_str(), static_cast<char*>( nullptr ) );
+    std::vector<char const*> argv = {
+      f.binary.c_str(), "--root", f.tree.c_str(), "--queries", queries.c_str()
+    };
+    for ( std::string const &arg : extra_args )
+      argv.push_back( arg.c_str() );
+    argv.push_back( nullptr );
+    execv( f.binary.c_str(), const_cast<char *const*>( argv.data() ) );
     _exit( 127 );
   }
   check( close( to_child[0] ) == 0, "close the child's input end" );
@@ -605,7 +890,7 @@ void test_optional_params( Fixture const &f ) {
     { "variables", obj( { { "x", "given" } } ) } } ) );
   input += call( 16, "greet", obj( { { "name", "Ana" } } ) );
   input += call( 17, "greet", obj( { { "name", "Ana" }, { "nmae", "x" } } ) );
-  input += call( 18, "list_documents", obj( { { "path", "x" } } ) );
+  input += call( 18, "list_documents", obj( { { "bogus", "x" } } ) );
 
   std::string const output( run_binary( f, queries, input ) );
   std::map<std::string, Json> by_id;
@@ -719,7 +1004,7 @@ void test_optional_params( Fixture const &f ) {
   struct { char const *id; char const *arg; char const *what; } const unknown[] = {
     { "15", "variables", "run_query" },
     { "17", "nmae", "predefined tool" },
-    { "18", "path", "list_documents" }
+    { "18", "bogus", "list_documents" }
   };
   for ( auto const &u : unknown ) {
     Json const &r = by_id[u.id];
@@ -823,6 +1108,60 @@ struct TempTree {
   }
 };
 
+// A query that runs out of memory under --max-memory is a tool error, and
+// the server keeps answering. The limit is the address-space limit of the
+// process, so the test needs Linux and no sanitizer.
+void test_memory_limit( Fixture const &f ) {
+#if defined(__linux__) && !defined(ZORBA_TEST_SANITIZER)
+  auto call = [&]( int id, char const *query ) {
+    return request( id, "tools/call", Json::object( {
+      { "name", "run_query" },
+      { "arguments", Json::object( { { "query", query } } ) } } ) ) + "\n";
+  };
+  char const *const hungry =
+    "declare variable $m external := 4000000000;\n"
+    "let $x := for $i in 1 to $m return string($i)\n"
+    "return count($x) + count($x)";
+
+  std::string input;
+  input += call( 1, "1 + 1" );
+  input += call( 2, hungry );
+  input += call( 3, "1 + 2" );
+  input += call( 4, hungry );
+  input += call( 5, "1 + 3" );
+  std::string const output( run_binary( f, f.queries, input, {
+    "--max-memory", "1000000000", "--timeout", "60" } ) );
+
+  std::map<std::string, Json> by_id;
+  std::istringstream lines( output );
+  std::string line;
+  while ( std::getline( lines, line ) ) {
+    Json r;
+    std::string why;
+    if ( parse_json( line, &r, &why ) && r.find( "id" ) )
+      by_id[ r.find( "id" )->text() ] = r;
+  }
+  check( by_id.size() == 5, "five responses", output );
+  if ( by_id.size() != 5 )
+    return;
+  check( !is_tool_error( by_id["1"] ) && result_text( by_id["1"] ) == "2",
+         "a query under the limit runs", by_id["1"].dump() );
+  for ( char const *const id : { "2", "4" } )
+    check( is_tool_error( by_id[id] ) &&
+           field( tool_error( by_id[id] ), "code" ) == "memory_limit" &&
+           contains( field( tool_error( by_id[id] ), "message" ),
+                     "--max-memory" ),
+           "a query over the limit is a tool error", by_id[id].dump() );
+  check( !is_tool_error( by_id["3"] ) && result_text( by_id["3"] ) == "3",
+         "the server answers after the memory limit", by_id["3"].dump() );
+  check( !is_tool_error( by_id["5"] ) && result_text( by_id["5"] ) == "4",
+         "and again after a second time", by_id["5"].dump() );
+#else
+  (void)f;
+  std::cout << "--max-memory has no effect in this build" << std::endl;
+#endif
+}
+
 // The peak resident set size of this process so far, in bytes.
 long long peak_rss() {
   struct rusage u;
@@ -908,9 +1247,6 @@ std::string deep_array( std::size_t n ) {
 std::string deep_object( std::size_t n ) {
   return repeated( "{\"a\":", n ) + "1" + repeated( "}", n );
 }
-
-std::string const dir_import(
-  "import module namespace dir = \"http://zorba.io/modules/directory\";\n" );
 
 // The files in the root that have an error record, with its code.
 std::string const error_records(
@@ -1915,6 +2251,16 @@ void test_cache_counters( Fixture const &f ) {
                     &out, &err );
   check( status == 2 && contains( err, "invalid argument: --cache-mb" ),
          "--cache-mb is no longer an option", err );
+
+  // What an option does, and its exceptions, is in the help.
+  status = run_mcp( f, t, { "--help" }, "", &out, &err );
+  check( status == 0, "--help exits with 0", err );
+  for ( char const *text : { "--cache-max-file-kb <KB>", "--cache-max-files <N>",
+                             "second read", "device, inode, size, mtime and ctime",
+                             "records with an", "128 times", "sequential queries",
+                             "least recently used", "does not evict",
+                             "the document cache: it holds previews" } )
+    check( contains( err, text ), std::string( "--help says: " ) + text, err );
 }
 
 struct Test {
@@ -1948,8 +2294,13 @@ Test const tests[] = {
   { "cache_errors", test_cache_errors },
   { "cache_expansion", test_cache_expansion },
   { "cache_counters", test_cache_counters },
+  { "memory_limit", test_memory_limit },
   { "optional_params", test_optional_params },
   { "documents_stream", test_documents_stream },
+  { "hints_jsoniq", test_hints_jsoniq },
+  { "hints_dash", test_hints_dash },
+  { "hints_nodes", test_hints_nodes },
+  { "hints_names", test_hints_names },
   { "deep_json", test_deep_json },
   { "deep_json_binary", test_deep_json_binary },
   { "entity_expansion", test_entity_expansion },

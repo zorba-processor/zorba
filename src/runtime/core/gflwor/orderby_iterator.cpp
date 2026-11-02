@@ -333,11 +333,17 @@ bool OrderByIterator::nextImpl(store::Item_t& result, PlanState& planState) cons
     materializeResultForSort(iterState, planState);
   }
 
+  promoteNumericSortKeys(iterState->theSortTable,
+                         theOrderSpecs,
+                         theSctx->get_typemanager(),
+                         loc);
+
   {
     SortTupleCmp cmp(loc,
                      planState.theLocalDynCtx,
                      theSctx->get_typemanager(),
-                     &theOrderSpecs);
+                     &theOrderSpecs,
+                     planState);
 
     if (theStable)
     {

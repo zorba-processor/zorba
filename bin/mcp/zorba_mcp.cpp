@@ -25,6 +25,7 @@
 #include <iostream>
 #include <string>
 
+#include <sys/resource.h>
 #include <unistd.h>
 
 #include <zorba/store_manager.h>
@@ -35,12 +36,21 @@
 
 using namespace zorba;
 
+#if defined(__SANITIZE_ADDRESS__) || defined(__SANITIZE_THREAD__)
+# define ZORBA_MCP_SANITIZER 1
+#elif defined(__has_feature)
+# if __has_feature(address_sanitizer) || __has_feature(thread_sanitizer)
+#  define ZORBA_MCP_SANITIZER 1
+# endif
+#endif
+
 namespace {
 
 char const usage[] =
   "Usage: zorba-mcp --root <dir> [--queries <dir>] [--timeout <seconds>]\n"
-  "                 [--max-output <bytes>] [--cache-max-file-kb <KB>]\n"
-  "                 [--cache-max-files <N>]\n"
+  "                 [--max-output <bytes>] [--max-memory <bytes>]\n"
+  "                 [--no-scan] [--scan-cache-mb <MiB>]\n"
+  "                 [--cache-max-file-kb <KB>] [--cache-max-files <N>]\n"
   "\n"
   "An MCP server (stdio transport) over the Zorba JSONiq/XQuery processor.\n"
   "Queries run under the secure policy, reading only files under --root\n"
@@ -53,13 +63,28 @@ char const usage[] =
   "  --timeout <seconds>  time limit of one tool call (default 30, 0: none)\n"
   "  --max-output <bytes> output size limit of one tool call (default\n"
   "                       131072); longer output is cut with a marker\n"
+  "  --max-memory <bytes> memory limit of the server (default 4294967296,\n"
+  "                       0: none; Linux only): a query that needs more\n"
+  "                       fails with a tool error\n"
+  "  --no-scan            no background scan of the directory: list_documents\n"
+  "                       takes no arguments and lists through dir:list\n"
+  "  --scan-cache-mb <MiB> memory for the scan's file index and previews\n"
+  "                       (default 64); at the limit the scan stops. This is not\n"
+  "                       the document cache: it holds previews, not documents\n"
   "  --cache-max-file-kb <KB>\n"
-  "                       the largest file whose parsed document is kept\n"
-  "                       across calls, from its second read on, while the\n"
-  "                       file is unchanged (default 64, 0: no cache)\n"
+  "                       the document cache keeps parsed documents across\n"
+  "                       calls for dir:open and dir:documents: at most this\n"
+  "                       file size (default 64, 0: no document cache). A file\n"
+  "                       enters on its second read. It is served only while\n"
+  "                       its path, device, inode, size, mtime and ctime stay\n"
+  "                       the same. Not kept: larger files, records with an\n"
+  "                       error, records over 128 times their file size.\n"
+  "                       Updating and sequential queries do not use it. One\n"
+  "                       line of counters goes to stderr at exit\n"
   "  --cache-max-files <N>\n"
-  "                       how many parsed documents are kept, least\n"
-  "                       recently used out first (default 10, 0: no cache)\n";
+  "                       how many documents it keeps, least recently used\n"
+  "                       out first (default 10, 0: no document cache); a\n"
+  "                       query does not evict a document it has used\n";
 
 bool parse_number( char const *s, unsigned long long *n ) {
   if ( !s || !*s )
@@ -67,6 +92,30 @@ bool parse_number( char const *s, unsigned long long *n ) {
   char *end = nullptr;
   *n = std::strtoull( s, &end, 10 );
   return *end == '\0' && *s != '-';
+}
+
+// A query that needs more memory than the machine has would get the server
+// killed, with no answer for the client. With an address-space limit,
+// allocation fails first: the query ends with std::bad_alloc, its memory is
+// released, and the server goes on. The limit counts address space, which is
+// somewhat more than the memory in use. Sanitizer builds cannot have this
+// limit: their runtime reserves far more address space than the process uses.
+void limit_memory( unsigned long long bytes ) {
+#if defined(__linux__) && !defined(ZORBA_MCP_SANITIZER)
+  if ( bytes == 0 )
+    return;
+  struct rlimit lim;
+  if ( getrlimit( RLIMIT_AS, &lim ) != 0 ) {
+    std::perror( "zorba-mcp: getrlimit" );
+    return;
+  }
+  lim.rlim_cur = lim.rlim_max == RLIM_INFINITY || bytes < lim.rlim_max ?
+    bytes : lim.rlim_max;
+  if ( setrlimit( RLIMIT_AS, &lim ) != 0 )
+    std::perror( "zorba-mcp: setrlimit" );
+#else
+  (void)bytes;
+#endif
 }
 
 int fail( std::string const &msg ) {
@@ -96,6 +145,15 @@ int main( int argc, char const *argv[] ) {
       ++i;
     } else if ( arg == "--max-output" && parse_number( val, &n ) && n > 0 ) {
       config.max_output = static_cast<std::size_t>( n );
+      ++i;
+    } else if ( arg == "--max-memory" && parse_number( val, &n ) ) {
+      config.max_memory = n;
+      ++i;
+    } else if ( arg == "--no-scan" ) {
+      config.scan = false;
+    } else if ( arg == "--scan-cache-mb" && parse_number( val, &n ) &&
+                n > 0 && n <= 1024 * 1024 ) {
+      config.scan_limits.max_memory = static_cast<std::size_t>( n ) * 1024 * 1024;
       ++i;
     } else if ( arg == "--cache-max-file-kb" && parse_number( val, &n ) &&
                 n <= ( SIZE_MAX >> 10 ) ) {
@@ -136,6 +194,8 @@ int main( int argc, char const *argv[] ) {
     return 1;
   }
 
+  limit_memory( config.max_memory );
+
   void *const store = StoreManager::getStore();
   Zorba *const zorba = Zorba::getInstance( store );
   int status = 0;
@@ -164,6 +224,14 @@ int main( int argc, char const *argv[] ) {
     std::string const cache_line( server.cache_stats_line() );
     if ( !cache_line.empty() )
       std::cerr << cache_line << std::endl;
+    // Zorba::shutdown() cleans up libxml2, which a thread left behind could be
+    // in, so in that case the process ends here.
+    if ( !server.stop_scan() ) {
+      std::cerr << "zorba-mcp: a scan thread did not stop in time" << std::endl;
+      if ( std::fclose( out ) == EOF && status == 0 )
+        status = 1;
+      std::_Exit( status );
+    }
   }
   if ( std::fclose( out ) == EOF && status == 0 ) {
     std::cerr << "zorba-mcp: cannot write to stdout" << std::endl;
