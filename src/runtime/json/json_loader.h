@@ -25,7 +25,9 @@
 
 // Zorba
 #include "store/api/item.h"
+#include "util/hash/hash.h"
 #include "util/json_parser.h"
+#include "util/unordered_map.h"
 #include "zorbatypes/zstring.h"
 
 namespace zorba {
@@ -110,6 +112,7 @@ private:
 
   void add_value( store::Item_t const& );
   void clear_stack();
+  void make_key( zstring const&, store::Item_t* );
 
   stack_element& push( stack_element::type t ) {
     //
@@ -123,6 +126,18 @@ private:
   parser parser_;
   bool const strip_top_level_array_;
   bool stripped_top_level_array_;
+
+  //
+  // Object keys of this parse: objects with the same key share one key item
+  // (and its string). Key items are immutable, so an update of one object
+  // (rename, delete, insert) never affects another object. The table holds a
+  // reference to each item; it is bounded so that a long stream of objects
+  // with ever-new keys does not keep them all alive.
+  //
+  static unsigned const max_shared_keys = 1024;
+  static unsigned const max_shared_key_length = 256;
+  typedef std::unordered_map<zstring,store::Item_t> keys_type;
+  keys_type keys_;
 };
 
 ///////////////////////////////////////////////////////////////////////////////

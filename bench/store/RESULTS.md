@@ -1,5 +1,88 @@
 # Store memory: results
 
+## After sharing JSON keys (candidates 1 and 3)
+
+Run 41446148403 (same job, inputs and settings as the baseline below, run
+41377872156), on the commit before the loader's leak fix, which touches only
+the path where a duplicate key raises an error. Objects of one parse share
+their key items, and objects of at most 16 pairs have no `unordered_map`.
+
+| format | file MiB | heap MiB before | heap MiB after | change | heap / file before | heap / file after | parse ms before | parse ms after | change |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| json | 1.0 | 21.0 | 9.3 | -55.9% | 20.7 | 9.1 | 66 | 58 | -11.8% |
+| json | 10.3 | 210.0 | 92.8 | -55.8% | 20.4 | 9.0 | 659 | 576 | -12.5% |
+| json | 104.4 | 2100.4 | 927.7 | -55.8% | 20.1 | 8.9 | 6605 | 5791 | -12.3% |
+| csv | 1.0 | 16.5 | 10.5 | -36.6% | 15.8 | 10.0 | 49 | 44 | -11.4% |
+| csv | 10.8 | 165.0 | 104.5 | -36.7% | 15.2 | 9.7 | 504 | 436 | -13.5% |
+| csv | 111.9 | 1655.9 | 1050.7 | -36.5% | 14.8 | 9.4 | 5061 | 4412 | -12.8% |
+| xml | 1.0 | 16.0 | 16.0 | 0.0% | 15.7 | 15.7 | 34 | 35 | +2.5% |
+| xml | 10.4 | 160.3 | 160.3 | 0.0% | 15.4 | 15.4 | 343 | 343 | -0.1% |
+| xml | 106.0 | 1603.3 | 1603.3 | 0.0% | 15.1 | 15.1 | 3420 | 3420 | 0.0% |
+
+Times are medians of 3 runs from two different CI runs. XML goes through none
+of the changed code and is the control: its time is unchanged at 10 and
+100 MiB. CSV gains from the small objects only; it already shared keys.
+
+Per kind (microbenchmarks, same derivation as the table below): `SimpleJSONObject`
+112 -> 64 B, an empty object 136 -> 88 B. In `j_obj4`, a pair with its integer
+value costs 240.4 -> 68.3 B: 48 B for the integer and 20 B of pair vector.
+Live allocations per JSON item 3.43 -> 1.33. `Item::mem_size()` now reports
+1.16x the JSON heap, up from 0.60x, because it counts a shared key item once
+per object.
+
+### Key index threshold
+
+Throwaway builds read the threshold from the environment. Objects of k keys
+(`key0`, `key1`, ...), 1.2 M pairs in all, median of 3 runs per point. "Index"
+is threshold 0, "linear" is no index at any size; both share key items. Lookup
+is the extra time of a query that looks up every key of every object with a
+fresh string (mostly query overhead). Run 41443973653.
+
+| k | parse ms index | parse ms linear | linear / index | lookup ms index | lookup ms linear | linear / index |
+|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 1250 | 1018 | 0.81 | 248 | 210 | 0.85 |
+| 2 | 994 | 879 | 0.88 | 606 | 536 | 0.88 |
+| 4 | 868 | 822 | 0.95 | 556 | 484 | 0.87 |
+| 8 | 795 | 775 | 0.97 | 542 | 543 | 1.00 |
+| 12 | 803 | 787 | 0.98 | 537 | 541 | 1.01 |
+| 16 | 767 | 766 | 1.00 | 552 | 559 | 1.01 |
+| 20 | 763 | 778 | 1.02 | 600 | 558 | 0.93 |
+| 24 | 770 | 775 | 1.01 | 599 | 611 | 1.02 |
+| 32 | 746 | 788 | 1.06 | 592 | 604 | 1.02 |
+| 48 | 756 | 841 | 1.11 | 586 | 652 | 1.11 |
+| 64 | 736 | 892 | 1.21 | 593 | 693 | 1.17 |
+
+The threshold is 16, the largest size measured where the linear search is not
+slower to build. No index saves 61-144 B per pair at every size in this sweep,
+so the limit comes from time, not memory.
+
+Objects just above the threshold pay for 16 linear inserts and then for
+building the index. Threshold 16 against an index from the first pair, median
+of 5 runs (run 41446159839):
+
+| k | parse ms index | parse ms threshold 16 | ratio | heap B / pair index | heap B / pair threshold 16 |
+|---:|---:|---:|---:|---:|---:|
+| 16 | 599 | 561 | 0.94 | 134.5 | 70.5 |
+| 17 | 606 | 631 | 1.04 | 147.3 | 153.9 |
+| 18 | 600 | 622 | 1.04 | 144.4 | 150.7 |
+| 20 | 589 | 608 | 1.03 | 139.6 | 145.2 |
+| 24 | 589 | 596 | 1.01 | 140.3 | 137.0 |
+| 32 | 572 | 583 | 1.02 | 129.2 | 126.7 |
+| 48 | 575 | 577 | 1.00 | 137.2 | 134.2 |
+
+Objects of 17-20 pairs build up to 4% slower and take up to 4.5% more heap than
+an index from the first pair. That comparison is within the new code; these
+sizes were not measured on the baseline, so their cost against it is unknown.
+
+Limits of these measurements:
+- All keys are short and of nearly equal length. Keys of equal length with a
+  long common prefix make each comparison in the linear search slower; that
+  was not measured.
+- A parse shares at most 1024 distinct keys of at most 256 bytes; other keys
+  get their own item, as before. Documents past those limits were not measured.
+
+## Baseline
+
 Run 41377872156 (job `store` of `.github/workflows/directory-scaling.yml`,
 `suite=store`, defaults: sizes 1 10 100 MiB, 3 runs per point, microbenchmark
 N = 200000), ubuntu-24.04, full-release build, glibc malloc. Inputs come
@@ -105,9 +188,9 @@ glibc chunk arithmetic and has not been measured.
 
 | # | candidate | basis | XML | JSON | CSV |
 |---|---|---|---:|---:|---:|
-| 1 | Share key items across the objects of one parse (as csv:parse does) | measured: JSON pair 182 B vs CSV pair 86 B = 96 B/pair | - | 673 MiB (32%) | already done |
+| 1 | Done, with 3: JSON -1173 MiB (-56%), CSV -605 MiB (-37%), see above. Share key items across the objects of one parse (as csv:parse does) | measured: JSON pair 182 B vs CSV pair 86 B = 96 B/pair | - | 673 MiB (32%) | already done |
 | 2 | Per-document arena (bump) allocation of nodes and items: no per-block header or rounding | measured headers only (8 B x blocks); rounding not measured | >= 194 MiB (12%) | >= 289 MiB (14%) | >= 186 MiB (11%) |
-| 3 | Small-object JSON keys without `unordered_map` (linear search over the pair vector for small objects) | estimate: map node 32 B (chunk 48) + bucket array per key | - | ~340 MiB (16%) | ~410 MiB (25%) |
+| 3 | Done, with 1. Small-object JSON keys without `unordered_map` (linear search over the pair vector for small objects) | estimate: map node 32 B (chunk 48) + bucket array per key | - | ~340 MiB (16%) | ~410 MiB (25%) |
 | 4 | Cached small integers (done, see "Shared small integers"; immediate items and doubles ruled out there) | measured on a modified store: 48.0 B per shared integer | - | 169 MiB (8.0%) | 59 MiB (3.5%) |
 | 5 | Text stored inline in TextNode (small-string), no separate rep | estimate: rep chunk >= 32 B per text node | 151 MiB (9%) | - | - |
 | 6 | Pack ElementNode (96 B) to 80 B or 64 B (32-bit counts, no `theTypeName` for untyped, smaller child vector header) | estimate: chunk 112 -> 96 / 80 | 86-172 MiB (5-11%) | - | - |
@@ -142,6 +225,10 @@ from -128 to 1023. Run 41442221289 against the baseline above, 100 MiB files:
 | json | 2100.4 | 1931.7 | 168.7 (8.0%) | 3,685,872 | 4,211,256 | 3,685,872 (87.5%) | 6.61 | 5.37 |
 | csv | 1655.9 | 1597.2 | 58.6 (3.5%) | 1,280,414 | 2,558,782 | 1,280,414 (50.0%) | 5.06 | 4.09 |
 
+- This was measured before JSON keys were shared and decimals compacted. The
+  blocks saved do not depend on either; against the heap of "After sharing JSON
+  keys" (927.7 and 1050.7 MiB) the same bytes would be 18% and 5.6%. That is
+  arithmetic, not a measurement of the combined store.
 - Live blocks saved equal the shared integers exactly, and the heap saved is
   48.0 B per shared integer in both formats: the 48 B chunk goes, the 8 B slot
   stays. The saving is below the 203 MiB + 123 MiB estimate of candidate 4
