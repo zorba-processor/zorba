@@ -3,8 +3,8 @@
 import module namespace jn = "http://jsoniq.org/functions";
 
 variable $a := jn:parse-json(
-  '[ { "id" : 1, "name" : "a" }, { "id" : 2, "name" : "b" },
-     { "id" : 3, "name" : "c" }, { "name" : "d", "id" : 4 } ]');
+  "[ { \"id\" : 1, \"name\" : \"a\" }, { \"id\" : 2, \"name\" : \"b\" },
+     { \"id\" : 3, \"name\" : \"c\" }, { \"name\" : \"d\", \"id\" : 4 } ]");
 
 rename json $a[[1]].id as "key";
 delete json $a[[2]].name;
