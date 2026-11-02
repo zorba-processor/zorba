@@ -40,6 +40,7 @@
 #include "item_vector.h"
 #include "nsbindings.h" // TODO remove by introducing explicit destructors
 #include "ordpath.h"
+#include "ptr_vector.h"
 #include "shared_types.h"
 #include "store.h"
 #include "store_defs.h"
@@ -400,18 +401,24 @@ protected:
   InternalNode    * theParent;
   uint32_t          theFlags;
 
+  // The number of attributes of an InternalNode (element or document node);
+  // 0 for other nodes. Declared here so that it occupies the padding after
+  // theFlags instead of 8 more bytes in every InternalNode.
+  uint32_t          theNumAttrs;
+
 private:
 #ifndef TEXT_ORDPATH
   static long compareInSameTree(const XmlNode* n1, const XmlNode* n2);
 #endif
 
 protected:
-  XmlNode() : theParent(NULL) { }
+  XmlNode() : theParent(NULL), theNumAttrs(0) { }
 
   XmlNode(store::StoreConsts::NodeKind k)
     :
     StructuredItem(),
-    theParent(NULL)
+    theParent(NULL),
+    theNumAttrs(0)
   {
     theFlags = (uint32_t)k;
   }
@@ -760,27 +767,26 @@ class InternalNode : public OrdPathNode
   friend class SimpleStore;
 
 public:
-  typedef std::vector<XmlNode*> NodeVector;
+  typedef PtrVector<XmlNode> NodeVector;
 
-  typedef std::vector<XmlNode*>::iterator iterator;
+  typedef NodeVector::iterator iterator;
 
-  typedef std::vector<XmlNode*>::const_iterator const_iterator;
+  typedef NodeVector::const_iterator const_iterator;
 
-  typedef std::vector<XmlNode*>::reverse_iterator reverse_iterator;
+  typedef NodeVector::reverse_iterator reverse_iterator;
 
-  typedef std::vector<XmlNode*>::const_reverse_iterator const_reverse_iterator;
+  typedef NodeVector::const_reverse_iterator const_reverse_iterator;
 
 protected:
-  std::vector<XmlNode*> theNodes;
-  csize                 theNumAttrs;
+  // The attributes (the first theNumAttrs entries) and then the children.
+  NodeVector            theNodes;
   NsBindingsContext_t   theNsContext;
 
   InternalNode() {}
 
   InternalNode(store::StoreConsts::NodeKind nodeKind)
     :
-    OrdPathNode(nodeKind),
-    theNumAttrs(0)
+    OrdPathNode(nodeKind)
   {
   }
 
@@ -791,8 +797,7 @@ protected:
       csize pos,
       store::StoreConsts::NodeKind nodeKind)
     :
-    OrdPathNode(tree, parent, append, pos, nodeKind),
-    theNumAttrs(0)
+    OrdPathNode(tree, parent, append, pos, nodeKind)
   {
   }
 

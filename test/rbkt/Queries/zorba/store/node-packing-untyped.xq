@@ -21,8 +21,13 @@ return string-join(
       string($r/@b) eq "two"),
     local:check(concat($p, "attribute type annotation"),
       $r/@a instance of attribute(a, xs:untypedAtomic)),
+    (: construction mode preserve (the default) annotates constructed
+       elements as xs:anyType :)
     local:check(concat($p, "element type annotation"),
-      $r/s instance of element(s, xs:untyped)),
+      if ($n eq 1)
+      then $r/s instance of element(s, xs:untyped)
+      else $r/s instance of element(s, xs:anyType) and
+           not($r/s instance of element(s, xs:untyped))),
     local:check(concat($p, "single child typed value"),
       data($r/s) instance of xs:untypedAtomic and data($r/s) eq "x"),
     local:check(concat($p, "attribute and child"),
