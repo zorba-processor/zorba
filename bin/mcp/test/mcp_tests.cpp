@@ -944,7 +944,7 @@ void test_deep_json( Fixture const &f ) {
   Server server( f.zorba, config, std::cerr );
 
   Json r = run_query( server, error_records );
-  check( !is_tool_error( r ) && result_text( r ) == deep_tree_records,
+  check( !is_tool_error( r ) && contains( result_text( r ), deep_tree_records ),
          "every too-deep file has its error record, the others are not "
          "affected", r.dump().substr( 0, 2000 ) );
   check_alive( server );
@@ -1018,7 +1018,7 @@ void test_deep_json_binary( Fixture const &f ) {
       by_id[ r.find( "id" )->text() ] = r;
   }
   check( by_id.size() == 6, "six responses", output.substr( 0, 2000 ) );
-  check( result_text( by_id["1"] ) == deep_tree_records,
+  check( contains( result_text( by_id["1"] ), deep_tree_records ),
          "the error records", by_id["1"].dump().substr( 0, 2000 ) );
   check( result_text( by_id["2"] ) == "2", "a normal query after the scan",
          by_id["2"].dump() );

@@ -410,7 +410,7 @@ void test_hash()
 {
   std::string const lFunction =
     "declare namespace an = \"http://zorba.io/annotations\";\n"
-    "declare %an:strictlydeterministic function local:f($x) { 1 };\n";
+    "declare %an:strictlydeterministic function local:f($x) { count($x) };\n";
   for (Shape s : SHAPES)
   {
     Outcome const o = run(std::string(IMPORT_JN) + lFunction +
@@ -691,7 +691,7 @@ void test_chain_walkers()
     not_crashed("item:size", o);
   std::string const lFunction =
     "declare namespace an = \"http://zorba.io/annotations\";\n"
-    "declare %an:strictlydeterministic function local:f($x) { 1 };\n";
+    "declare %an:strictlydeterministic function local:f($x) { count($x) };\n";
   not_crashed("hash", run(std::string(IMPORT_JN) + lFunction +
                           update_chain(CHAIN) + "local:f($root)"));
   for (char const* lFormat : { "Snelson", "JsonML-array", "JsonML-object" })
@@ -736,6 +736,7 @@ void test_chain_collection()
 struct Operation
 {
   const char* name;
+  Shape shape;
   uint64_t levelsUnderLimit;
   const char* imports;
   const char* prolog;
@@ -749,22 +750,22 @@ const char COLLECTION_IMPORTS[] =
   "\"http://zorba.io/modules/store/dynamic/collections/dml\";\n";
 
 const Operation theOperations[] = {
-  { "parse, destroy", 0, "", "", "count(jn:parse-json($v))" },
-  { "parse, serialize, destroy", 0, "", "", "jn:parse-json($v)" },
-  { "deep-equal", 0, "", "",
+  { "parse, destroy", MIXED, 0, "", "", "count(jn:parse-json($v))" },
+  { "parse, serialize, destroy", MIXED, 0, "", "", "jn:parse-json($v)" },
+  { "deep-equal", MIXED, 0, "", "",
     "deep-equal(jn:parse-json($v), jn:parse-json($w))" },
-  { "copy", 1, "", "",
+  { "copy", MIXED, 1, "", "",
     "let $x := jn:parse-json($v) return jn:size([ $x, $x ])" },
-  { "flatten", 0, "", "", "count(jn:flatten(jn:parse-json($v)))" },
-  { "encode-for-roundtrip", 0, "", "",
+  { "flatten", ARRAYS, 0, "", "", "count(jn:flatten(jn:parse-json($v)))" },
+  { "encode-for-roundtrip", MIXED, 0, "", "",
     "count(jn:encode-for-roundtrip(jn:parse-json($v)))" },
-  { "decode-from-roundtrip", 0, "", "",
+  { "decode-from-roundtrip", MIXED, 0, "", "",
     "count(jn:decode-from-roundtrip(jn:parse-json($v)))" },
-  { "hash", 0,
+  { "hash", ARRAYS, 0,
     "declare namespace an = \"http://zorba.io/annotations\";\n",
-    "declare %an:strictlydeterministic function local:f($x) { 1 };\n",
+    "declare %an:strictlydeterministic function local:f($x) { count($x) };\n",
     "local:f(jn:parse-json($v))" },
-  { "collection", 0, COLLECTION_IMPORTS, "",
+  { "collection", MIXED, 0, COLLECTION_IMPORTS, "",
     "ddl:create(xs:QName(\"m\"), jn:parse-json($v));\n"
     "dml:delete-last(xs:QName(\"m\"), 1);\n"
     "ddl:delete(xs:QName(\"m\"));\n"
@@ -773,7 +774,7 @@ const Operation theOperations[] = {
 
 std::string operation_query(const Operation& op, uint64_t n)
 {
-  std::string const lJson = json(MIXED, n - op.levelsUnderLimit);
+  std::string const lJson = json(op.shape, n - op.levelsUnderLimit);
   return std::string(IMPORT_JN) + op.imports +
     "declare variable $v external := '" + lJson + "';\n"
     "declare variable $w external := '" + lJson + "';\n" +
@@ -857,7 +858,8 @@ void test_measure()
 // what is measured here is running it.
 void test_second_thread()
 {
-  for (size_t const lSize : { size_t(512 * 1024), size_t(256 * 1024) })
+  // The smaller first: glibc reuses a cached stack that is large enough.
+  for (size_t const lSize : { size_t(256 * 1024), size_t(512 * 1024) })
     for (Operation const& op : theOperations)
     {
       Outcome o;
