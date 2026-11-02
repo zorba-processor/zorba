@@ -191,7 +191,7 @@ glibc chunk arithmetic and has not been measured.
 | 1 | Done, with 3: JSON -1173 MiB (-56%), CSV -605 MiB (-37%), see above. Share key items across the objects of one parse (as csv:parse does) | measured: JSON pair 182 B vs CSV pair 86 B = 96 B/pair | - | 673 MiB (32%) | already done |
 | 2 | Per-document arena (bump) allocation of nodes and items: no per-block header or rounding | measured headers only (8 B x blocks); rounding not measured | >= 194 MiB (12%) | >= 289 MiB (14%) | >= 186 MiB (11%) |
 | 3 | Done, with 1. Small-object JSON keys without `unordered_map` (linear search over the pair vector for small objects) | estimate: map node 32 B (chunk 48) + bucket array per key | - | ~340 MiB (16%) | ~410 MiB (25%) |
-| 4 | Immediate (tagged) or cached small integers and doubles instead of a 48 B item | measured: integer 58.5 B vs boolean 8 B (shared) = 50.5 B | - | 203 MiB (10%) + doubles 25 MiB | 123 MiB (7%) |
+| 4 | Cached small integers (done, see "Shared small integers"; immediate items and doubles ruled out there) | measured on a modified store: 48.0 B per shared integer | - | 169 MiB (8.0%) | 59 MiB (3.5%) |
 | 5 | Text stored inline in TextNode (small-string), no separate rep | estimate: rep chunk >= 32 B per text node | 151 MiB (9%) | - | - |
 | 6 | Pack ElementNode (96 B) to 80 B or 64 B (32-bit counts, no `theTypeName` for untyped, smaller child vector header) | estimate: chunk 112 -> 96 / 80 | 86-172 MiB (5-11%) | - | - |
 | 7 | Decimals without MAPM heap for values that fit (e.g. int64 mantissa + scale) | measured: 144 B per decimal outside operator new. **Done differently** (see "Compact decimals" below): 96 of the 144 B saved | - | 48 MiB (2%) measured | 117 MiB (7%) measured |
@@ -213,6 +213,62 @@ Not contributors on these inputs:
 - Whitespace-only text nodes: 705 K of the 4.94 M text nodes (97 MiB, 6%);
   dropping them changes the data model, so it is an opt-in, not an
   optimization.
+
+## Shared small integers
+
+`BasicItemFactory::createInteger` returns one shared item per xs:integer value
+from -128 to 1023. Run 41442221289 against the baseline above, 100 MiB files:
+
+| format | heap MiB before | after | saved | live blocks saved | integers | shared | parse s before | after |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| xml | 1603.3 | 1603.3 | 0 | 0 | 0 | 0 | 3.42 | 2.67 |
+| json | 2100.4 | 1931.7 | 168.7 (8.0%) | 3,685,872 | 4,211,256 | 3,685,872 (87.5%) | 6.61 | 5.37 |
+| csv | 1655.9 | 1597.2 | 58.6 (3.5%) | 1,280,414 | 2,558,782 | 1,280,414 (50.0%) | 5.06 | 4.09 |
+
+- This was measured before JSON keys were shared and decimals compacted. The
+  blocks saved do not depend on either; against the heap of "After sharing JSON
+  keys" (927.7 and 1050.7 MiB) the same bytes would be 18% and 5.6%. That is
+  arithmetic, not a measurement of the combined store.
+- Live blocks saved equal the shared integers exactly, and the heap saved is
+  48.0 B per shared integer in both formats: the 48 B chunk goes, the 8 B slot
+  stays. The saving is below the 203 MiB + 123 MiB estimate of candidate 4
+  because that estimate assumed every integer shared and 50.5 B each.
+- The heap column is measured after minus before parsing, so it does not show
+  the table itself: about 64 KB per store (1152 items of 48 B, 1152 handles of
+  8 B), by arithmetic.
+- **Time is not comparable between the two runs.** They ran on different
+  runners, and work the change cannot affect also got faster: XML -22%,
+  `x_empty` -26%, `j_arr0` -10%, `j_bool` -19%. JSON (-19%) and CSV (-19%) are
+  inside that spread, so these runs show no time regression above 5% but do not
+  measure a gain or exclude a small loss. Relative to XML, JSON is +4% and CSV
+  +4%. `j_bigint`, which pays the range check and never hits, moved with the
+  controls (-18%); `j_int`, which always hits, moved more (-33%).
+
+Limits of these numbers:
+- The hit rates come from `gen.xq`. Its small fields are `v` (0..999), `pt.x`,
+  `pt.y` and `nums`; only `id` is mostly outside the range. The upper bound 1023
+  is what covers `v`: with -128..127 the shares would be about 77% for JSON and
+  6% for CSV. No real-world integer distribution was measured, and the benchmark
+  has no negative integers, so -128..-1 is a judgment, not a result.
+- The engine is single-threaded by default (`ZORBA_FOR_ONE_THREAD_ONLY=ON`, see
+  `doc/zorba/threading.dox`): reference counts are plain integers, with no lock.
+  Concurrent use without the application's own mutex is already undefined, but
+  it now fails sooner: threads taking references to the same small value crash
+  the process (seen in an earlier version of the test, run 41444048529).
+- Big-integer builds were tested, not measured. A hit there
+  converts the value through a string to find the table slot.
+
+Rulings:
+- Immediate (tagged) items: out of scope. `store::Item_t` and every caller
+  assume a real object with a vtable and a reference count.
+- Derived integer types (xs:long ... xs:byte, xs:nonNegativeInteger, ...) are
+  not cached: the JSON and CSV parsers and xs:integer arithmetic do not produce
+  them, and each would need its own table for its own type code.
+- Doubles are not cached. The JSON file has 526,407 (CSV: none). A table of
+  integral values in the same range would hold one of the 1000 values `gen.xq`
+  produces (500.0). A cache keyed by value, needing a hash lookup per double,
+  could save at most 24 MiB (1.2% of the JSON heap), and even that depends on
+  the repetition `gen.xq` builds in with `$i mod 1000`.
 
 ## Compact decimals (candidate 7)
 

@@ -368,6 +368,13 @@ void walk( Item const &i, Counts &c ) {
   case store::XS_LONG:
   case store::XS_INT:
     ++c.n["integers"];
+    // xs:integer values the item factory shares (SMALL_INTEGER_MIN/MAX in
+    // src/store/naive/simple_item_factory.h).
+    if ( i.getTypeCode() == store::XS_INTEGER ) {
+      long long const v = i.getLongValue();
+      if ( v >= -128 && v <= 1023 )
+        ++c.n["small_integers"];
+    }
     break;
   case store::XS_DECIMAL:
     ++c.n["decimals"];
