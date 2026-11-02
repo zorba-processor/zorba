@@ -1923,11 +1923,11 @@ void test_cache_size( Fixture const &f ) {
 
 void test_cache_default( Fixture const &f ) {
   ServerConfig config;
-  check( config.cache_max_file_kb == 64 && config.cache_max_files == 10,
-         "the defaults are 64 KB and 10 files" );
+  check( config.cache_max_file_kb == 32 && config.cache_max_files == 10,
+         "the defaults are 32 KB and 10 files" );
   TempTree t;
-  t.write( "exact.json", json_of_size( 1, 64 * 1024 ) );
-  t.write( "over.json", json_of_size( 2, 64 * 1024 + 1 ) );
+  t.write( "exact.json", json_of_size( 1, 32 * 1024 ) );
+  t.write( "over.json", json_of_size( 2, 32 * 1024 + 1 ) );
   config.root = t.root;
   Server server( f.zorba, config, std::cerr );
   warm( server, "exact.json" );
@@ -1935,7 +1935,7 @@ void test_cache_default( Fixture const &f ) {
   warm( server, "over.json" );
   DocumentCache::Stats const s = server.cache_stats();
   check( s.admissions == 1 && s.entries == 1,
-         "without parameters, a file of 64 KB is admitted and a larger one "
+         "without parameters, a file of 32 KB is admitted and a larger one "
          "is not", stats_text( s ) );
 }
 
@@ -2162,6 +2162,7 @@ void test_cache_expansion( Fixture const &f ) {
   t.write( "rows.csv", rows );
   ServerConfig config;
   config.root = t.root;
+  config.cache_max_file_kb = 64;
   Server server( f.zorba, config, std::cerr );
 
   std::string const elements( dir_import +

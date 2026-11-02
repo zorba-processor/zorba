@@ -68,7 +68,7 @@ cmake --install build/full-release
     <tr><td><code>--scan-cache-mb &lt;MiB&gt;</code></td><td>Memory for the <a href="#scan">background scan</a>'s file index and previews. Default 64.</td></tr>
     <tr><td><code>--no-scan</code></td><td>No <a href="#scan">background scan</a>: <code>list_documents</code> takes no arguments and lists every file through <code>dir:list</code>, one object per line with <code>{ "path", "format", "size", "modified" }</code>.</td></tr>
     <tr><td><code>--max-memory &lt;bytes&gt;</code></td><td>Memory limit of the server process. Default 4294967296 (4 GiB); 0 means no limit. Linux only.</td></tr>
-    <tr><td><code>--cache-max-file-kb &lt;KB&gt;</code></td><td>The largest file whose parsed document is kept between calls. Default 64; 0 turns the document cache off.</td></tr>
+    <tr><td><code>--cache-max-file-kb &lt;KB&gt;</code></td><td>The largest file whose parsed document is kept between calls. Default 32; 0 turns the document cache off.</td></tr>
     <tr><td><code>--cache-max-files &lt;N&gt;</code></td><td>How many parsed documents are kept, least recently used out first. Default 10; 0 turns the document cache off.</td></tr>
   </tbody>
 </table>
