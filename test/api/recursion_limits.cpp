@@ -189,9 +189,9 @@ const char UNDECLARED[] =
   "local:f(%N%)";
 
 // With a declared single result, the consumer does not ask for a second item.
-// (The sequence type of the parameter keeps the automatic cache out of it.)
+// (An atomic parameter type would get the function an automatic cache.)
 const char DECLARED[] =
-  "declare function local:f($n as xs:integer*) as xs:integer\n"
+  "declare function local:f($n as item()) as xs:integer\n"
   "{ if ($n le 0) then 1 else local:f($n - 1) + local:f($n - 1) };\n"
   "local:f(%N%)";
 
@@ -276,22 +276,6 @@ void test_memory(Zorba* z)
   // Warm up the process: the first query loads what every query needs.
   CHECK(run(z, p, with_n(UNDECLARED, 8)).value == "256");
 
-  long long const base = peak_rss();
-  for (const char* shape : SHAPES)
-  {
-    Outcome const o = run(z, p, with_n(shape, n));
-    long long const grown = peak_rss() - base;
-    std::cout << "  n=" << n << ": peak RSS grew by " << (grown >> 20)
-              << " MiB; " << o << std::endl;
-    CHECK(o.ok && o.value == std::to_string(1 << n));
-    if (grown >= allowed)
-    {
-      std::cerr << "peak RSS grew by " << (grown >> 20) << " MiB, allowed "
-                << (allowed >> 20) << " MiB:\n" << shape << std::endl;
-      ++theFailures;
-    }
-  }
-
 #ifndef ZORBA_TEST_SANITIZER
   // Each dynamic call also used to leave a small expression behind: 400 bytes
   // per call, which only shows with more calls.
@@ -308,6 +292,23 @@ void test_memory(Zorba* z)
     ++theFailures;
   }
 #endif
+
+  long long const base = peak_rss();
+  for (const char* shape : SHAPES)
+  {
+    Outcome const o = run(z, p, with_n(shape, n));
+    long long const grown = peak_rss() - base;
+    std::cout << "  n=" << n << ": peak RSS grew by " << (grown >> 20)
+              << " MiB; " << o << std::endl;
+    CHECK(o.ok && o.value == std::to_string(1 << n));
+    if (grown >= allowed)
+    {
+      std::cerr << "peak RSS grew by " << (grown >> 20) << " MiB, allowed "
+                << (allowed >> 20) << " MiB:\n" << shape << std::endl;
+      ++theFailures;
+    }
+  }
+
 }
 
 struct Case
@@ -336,7 +337,8 @@ const Case RESULTS[] =
     "{ if ($n le 0) then 1 else local:c($n - 1) + local:c($n - 1) };\n"
     "for $i in 1 to 3 let $x := local:c($i) return ($x, $x)", "2 2 4 4 8 8" },
   // A call abandoned after the first result and then run again.
-  { "declare function local:g($n) { $n, if ($n gt 0) then local:g($n - 1) };\n"
+  { "declare function local:g($n)\n"
+    "{ $n, if ($n gt 0) then local:g($n - 1) else () };\n"
     "for $i in 1 to 3 return (head(local:g($i)), count(local:g($i)))",
     "1 2 2 3 3 4" },
   // Empty results, optional results.

@@ -148,7 +148,7 @@ void test_constant_folding(Zorba* z)
   CHECK(o.ok && o.value == "0");
 }
 
-// Sleeping is the workload here: 150 ms per call that the iterators hardly
+// Sleeping is the workload here: 500 ms per call that the iterators hardly
 // see. Checking only every so many iterator calls would run on for a long time
 // after the limit.
 void test_external_function(Zorba* z)
@@ -159,7 +159,7 @@ void test_external_function(Zorba* z)
   Outcome const o = run(z, p,
     "import module namespace sleep = 'http://zorba.io/modules/sleep';\n"
     "declare variable $m external := 100000;\n"
-    "sum(for $i in 1 to $m return (sleep:millis(150), 1))");
+    "sum(for $i in 1 to $m return (sleep:millis(500), 1))");
   std::cout << "  " << o << std::endl;
   if (o.code == "XQST0059")
   {
@@ -168,6 +168,41 @@ void test_external_function(Zorba* z)
   }
   CHECK(failed_with(o, "ZXQP0068"));
   CHECK(within(o, timeout + seconds(8)));
+}
+
+// A sort makes no iterator calls, and the limit may run out while it is under
+// way or while the tuples are read: which one depends on the machine. Either
+// way the sort does not run far past the limit, and raising from within it
+// leaves no memory behind (leak checks in the sanitizer builds).
+void test_order_by(Zorba* z)
+{
+  for (long long ms : { 300, 1000, 2000 })
+  {
+    SecurityPolicy const p =
+      SecurityPolicy::unrestricted().setTimeout(milliseconds(ms));
+    Outcome const o = run(z, p,
+      "declare variable $m external := 3000000;\n"
+      "count(for $i in 1 to $m order by string($i) descending return $i)");
+    std::cout << "  " << ms << " ms: " << o << std::endl;
+    CHECK(o.ok || failed_with(o, "ZXQP0068"));
+    CHECK(within(o, milliseconds(ms) + seconds(15)));
+  }
+}
+
+// A string operation that takes long per call: the string is 50 MB, and each
+// step reads all of it.
+void test_big_strings(Zorba* z)
+{
+  seconds const timeout(3);
+  SecurityPolicy const p = SecurityPolicy::unrestricted().setTimeout(timeout);
+  Outcome const o = run(z, p,
+    "declare variable $m external := 5000000;\n"
+    "let $s := string-join(for $i in 1 to $m return 'abcdefghij')\n"
+    "return sum(for $i in 1 to 1000000\n"
+    "           return string-length(upper-case(concat($s, $i))))");
+  std::cout << "  " << o << std::endl;
+  CHECK(failed_with(o, "ZXQP0068"));
+  CHECK(within(o, timeout + seconds(15)));
 }
 
 void section(Zorba* z, const char* aName, void (*aTest)(Zorba*))
@@ -189,6 +224,8 @@ timeout_bounds(int argc, char* argv[])
   {
     section(lZorba, "test_constant_folding", test_constant_folding);
     section(lZorba, "test_external_function", test_external_function);
+    section(lZorba, "test_order_by", test_order_by);
+    section(lZorba, "test_big_strings", test_big_strings);
   }
   catch (ZorbaException const& e)
   {
