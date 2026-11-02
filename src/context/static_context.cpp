@@ -54,6 +54,8 @@
 #include "api/auditimpl.h"
 #include "api/uri_resolver_wrappers.h"
 
+#include <atomic>
+
 #include "diagnostics/xquery_diagnostics.h"
 #include "diagnostics/util_macros.h"
 
@@ -170,12 +172,16 @@ void FunctionInfo::serialize(::zorba::serialization::Archiver& ar)
 }
 
 
+static std::atomic<ulong> theVarInfoCounter(0);
+
+
 /**************************************************************************//**
 
 *******************************************************************************/
 VarInfo::VarInfo()
   :
   theId(0),
+  theSeq(0),
   theKind(var_expr::unknown_var),
   theVarExpr(NULL)
 {
@@ -207,6 +213,7 @@ VarInfo::VarInfo(var_expr* v)
   :
   theName(v->get_name()),
   theId(v->get_unique_id()),
+  theSeq(++theVarInfoCounter),
   theKind(v->get_kind()),
   theType(v->get_type()),
   theIsExternal(v->is_external()),
@@ -225,6 +232,7 @@ void VarInfo::serialize(::zorba::serialization::Archiver& ar)
 {
   ar & theName;
   ar & theId;
+  ar & theSeq;
   ar & theKind;
   ar & theType;
   ar & theIsExternal;

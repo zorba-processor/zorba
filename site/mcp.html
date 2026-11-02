@@ -38,7 +38,7 @@
 <h2 id="what">What it is</h2>
 <p><code>zorba-mcp</code> is a <a href="https://modelcontextprotocol.io">Model Context Protocol</a> server that speaks JSON-RPC over standard input and output. The agent's client starts it, and the agent gets tools to list the files in the folder and to run JSONiq or XQuery over them. The files stay where they are: every call reads them as they are on disk, nothing is indexed or cached.</p>
 <p>The same engine and the same restrictions are available without an agent as <code>zorba --directory</code> (see <a href="#cli">below</a>). The server implements MCP 2026-07-28 (<code>server/discover</code>) and also answers clients that start with the earlier <code>initialize</code> handshake (2025-11-25, 2025-06-18, 2025-03-26).</p>
-<p>The folder is read through the <a href="zorba.html#modules">directory module</a>, <code>http://zorba.io/modules/directory</code>. A file is a record <code>{ "path", "format", "content" }</code>: <code>content</code> is a document node for XML, the parsed value for JSON (an array if a file holds several top-level values, as in JSON Lines) and an array of row objects for CSV, with the first line as column names. A file that does not parse yields <code>{ "path", "format", "error" }</code> instead, so one bad file does not stop a query over the whole folder. HTML files (<code>.html</code>, <code>.htm</code>) are parsed with <code>x:parse-html</code> and <code>content</code> is the document node; a build without XML Schema support reports them as an unsupported format.</p>
+<p>The folder is read through the <a href="zorba.html#modules">directory module</a>, <code>http://zorba.io/modules/directory</code>. A file is a record <code>{ "path", "format", "content" }</code>: <code>content</code> is a document node for XML, the parsed value for JSON (an array if a file holds several top-level values, as in JSON Lines) and an array of row objects for CSV, with the first line as column names (numbers and the words <code>true</code>, <code>false</code> and <code>null</code> are typed; the single letters <code>T</code>, <code>Y</code>, <code>F</code> and <code>N</code> stay strings, so a <code>D</code>/<code>N</code> column is not turned into booleans). A file that does not parse yields <code>{ "path", "format", "error" }</code> instead, so one bad file does not stop a query over the whole folder. HTML files (<code>.html</code>, <code>.htm</code>) are parsed with <code>x:parse-html</code> and <code>content</code> is the document node; a build without XML Schema support reports them as an unsupported format.</p>
 
 <h2 id="docker">Try it with Docker</h2>
 <p>No build is needed. The container image includes <code>zorba-mcp</code>; mount the folder you want to query at <code>/data</code>, read-only:</p>
@@ -50,11 +50,11 @@
 
 <h2 id="source">Build from source</h2>
 <p>On Linux or macOS with the <a href="https://github.com/zorba-processor/zorba#building">prerequisites</a> installed, the <code>full-release</code> preset builds <code>zorba-mcp</code> along with <code>zorba</code>:</p>
-<pre class="code shell"><code>cmake --preset full-release
+<pre class="code shell"><code>cmake --preset full-release -DCMAKE_INSTALL_PREFIX="$HOME/zorba"
 cmake --build --preset full-release
-cmake --install build/full-release --prefix "$HOME/zorba"
+cmake --install build/full-release
 "$HOME/zorba/bin/zorba-mcp" --root /path/to/folder</code></pre>
-<p>Install it rather than running it from the build directory: the installed tree is what puts the directory module and the file and CSV modules where the server finds them.</p>
+<p>Install it rather than running it from the build directory: the installed tree is what puts the directory module and the file and CSV modules where the server finds them. The installation prefix is fixed at configure time, so set it there; installing the same build elsewhere with <code>cmake --install --prefix</code> leaves binaries that do not find their libraries.</p>
 <div class="table-wrap">
 <table>
   <thead><tr><th>Option</th><th>Effect</th></tr></thead>
@@ -164,7 +164,7 @@ return {
 <p>Results should be JSON objects, arrays or atomic values; convert XML nodes with <code>string()</code> or <code>data()</code> before returning them.</p>
 
 <h2 id="security">Security model</h2>
-<p>The agent writes the queries, so the server treats every query as untrusted. Queries run under Zorba's <a href="zorba.html#security">secure policy</a> with exactly two capabilities added back:</p>
+<p>The agent writes the queries, so the server treats every query as untrusted. Queries run under Zorba's <a href="zorba.html#security">secure policy</a> with exactly two capabilities added back, each restricted: <code>file-read</code>, limited to the root, and <code>native-modules</code>, limited to the file module. The effect:</p>
 <ul>
   <li><strong>Read-only.</strong> File writes are denied, and so are environment variables.</li>
   <li><strong>Confined to the root.</strong> Reads are limited to files under <code>--root</code>. Absolute paths, <code>..</code> segments and paths through symbolic links are rejected, symbolic links are not listed, and entries whose name starts with <code>.</code> are not listed.</li>

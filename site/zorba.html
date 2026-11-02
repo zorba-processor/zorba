@@ -77,7 +77,7 @@
 </table>
 </div>
 <pre class="code shell"><code>zorba --secure --allow file-read --read-path /srv/data --timeout 10 -f -q report.xq</code></pre>
-<p>A denied file or network access raises <code>zerr:ZXQP0029</code>, and importing a module that needs a denied capability raises <code>zerr:ZXQP0067</code>; denied environment functions return the empty sequence. Modules and schemas in the URI and library paths (which include the current directory) can always be imported. The files named on the command line (queries, <code>--context-item</code>, <code>-e name=file</code>, <code>-o</code>) are opened by <code>zorba</code> itself and are not restricted.</p>
+<p>A denied file or network access raises the error of the function that made it (for example <code>err:FODC0002</code> from <code>fn:doc</code> or <code>file:FOFL9999</code> from the file module) whose message contains "access denied by security policy", and importing a module that needs a denied capability raises <code>zerr:ZXQP0067</code>; denied environment functions return the empty sequence. Modules and schemas in the URI and library paths can always be imported; with <code>--secure</code> the current directory is not one of them (add it with <code>--module-path</code> and an absolute path). The files named on the command line (queries, <code>--context-item</code>, <code>-e name=file</code>, <code>-o</code>) are opened by <code>zorba</code> itself and are not restricted.</p>
 <p class="why"><strong>Why it matters:</strong> a query from a user, a request or a file you did not write cannot read <code>/etc/passwd</code>, reach an internal service or run forever.</p>
 
 <h2 id="external">External variables</h2>
