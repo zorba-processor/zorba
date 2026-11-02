@@ -85,7 +85,9 @@ inline void *counted( void *p ) {
   return p;
 }
 
-inline void uncounted( void *p ) {
+// Not inlined: GCC would see the free() next to a libstdc++ operator new call
+// and report a mismatch (-Wmismatched-new-delete) depending on its inlining.
+[[gnu::noinline]] void uncounted( void *p ) {
   if ( p ) {
     g_news.fetch_sub( 1, std::memory_order_relaxed );
     g_usable.fetch_sub( static_cast<long>( malloc_usable_size( p ) ),
