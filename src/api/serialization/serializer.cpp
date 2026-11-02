@@ -22,6 +22,7 @@
 
 #include "diagnostics/xquery_diagnostics.h"
 #include "diagnostics/assert.h"
+#include "diagnostics/query_hints.h"
 
 #include "api/serialization/serializer.h"
 #include "api/serialization/serializable.h"
@@ -1143,9 +1144,12 @@ void serializer::json_emitter::emit_json_array(store::Item* array, int depth)
 /*******************************************************************************
 
 ********************************************************************************/
-void serializer::json_emitter::emit_jsoniq_xdm_node(store::Item*, int)
+void serializer::json_emitter::emit_jsoniq_xdm_node(store::Item* item, int)
 {
-  throw ZORBA_EXCEPTION(jerr::JNSE0014);
+  ZorbaException e(ZORBA_EXCEPTION(jerr::JNSE0014));
+  if (item->isNode())
+    e.set_hint(query_hints::node_in_json().c_str());
+  throw e;
 }
 
 
