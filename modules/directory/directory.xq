@@ -38,7 +38,11 @@ xquery version "3.0";
  : record), the parsed item for JSON
  : (an array of the items if the file holds several top-level items, as in
  : JSON Lines) and an array of row objects for CSV (the first line holds the
- : column names, see <code>csv:parse</code>). If the file cannot be read or
+ : column names, see <code>csv:parse</code>; the unquoted single letters
+ : <code>T</code>, <code>Y</code>, <code>F</code> and <code>N</code> stay strings,
+ : not booleans, so that a code column such as <code>D</code>/<code>N</code>
+ : is not corrupted; <code>true</code>, <code>false</code>, numbers and
+ : <code>null</code> are still cast). If the file cannot be read or
  : parsed, the record carries the error instead of the content, so that one
  : malformed file does not stop a query over the whole tree:
  : <pre>{ "path" : "broken/bad.json", "format" : "json",
@@ -349,7 +353,8 @@ declare %private %an:nondeterministic function dir:parse(
     let $items := jn:parse-json( file:read-text( $full ) )
     return if ( count( $items ) eq 1 ) then $items else [ $items ]
   case "csv" return
-    [ csv:parse( file:read-text( $full ) ) ]
+    [ csv:parse( file:read-text( $full ),
+                { "cast-letter-booleans" : false } ) ]
   case "html" return
     (: BEGIN-HTML-BRANCH :)
     x:parse-html( file:read-text( $full ) )

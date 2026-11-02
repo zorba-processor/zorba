@@ -68,6 +68,7 @@ CsvParseIteratorState::~CsvParseIteratorState() {}
 
 void CsvParseIteratorState::init(PlanState& planState) {
   PlanIteratorState::init(planState);
+  cast_letter_booleans_ = true;
   cast_unquoted_ = true;
   line_no_ = 1;
   missing_ = missing::null;
