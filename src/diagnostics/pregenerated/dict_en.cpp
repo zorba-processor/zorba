@@ -979,6 +979,7 @@ extern entry const dict_en[] = {
   { "~XPST0003_TryCatchExpr30", "\"try/catch\" expressions only available in XQuery 3.0 or later" },
   { "~XPST0003_TypeSwitchExpr30", "union of types in typeswitch clause is only available in XQuery 3.0 or later" },
   { "~XPST0003_WindowClause30", "\"window\" clause only available in XQuery 3.0 or later" },
+  { "~XPST0003_WindowConditions", "a window clause has a start condition followed by an end condition; only a tumbling window can omit the end condition" },
   { "~XPST0003_XQueryVersionAtLeast30_2", "\"$2\": XQuery version must be at least 3.0" },
   { "~XPST0008_SchemaAttributeName_2", "\"$2\": undefined schema-attribute name" },
   { "~XPST0008_SchemaElementName_2", "\"$2\": undefined schema-element name" },

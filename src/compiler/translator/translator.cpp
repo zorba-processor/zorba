@@ -7455,6 +7455,15 @@ void* begin_visit(const WindowClause& v)
   if (theSctx->xquery_version() < StaticContextConsts::xquery_version_3_0)
     RAISE_ERROR(err::XPST0003, loc, ERROR_PARAMS(ZED(XPST0003_WindowClause30)));
 
+  // The grammar accepts any two conditions; the specification does not.
+  rchandle<FLWORWinCond> const first = v[0];
+  rchandle<FLWORWinCond> const second = v[1];
+
+  if (!first->is_start() ||
+      (second != NULL && second->is_start()) ||
+      (second == NULL && v.get_wintype() == WindowClause::sliding_window))
+    RAISE_ERROR(err::XPST0003, loc, ERROR_PARAMS(ZED(XPST0003_WindowConditions)));
+
   return no_state;
 }
 

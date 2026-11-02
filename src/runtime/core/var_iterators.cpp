@@ -885,7 +885,11 @@ void LetVarIterator::bind(
   {
     if (theTargetPos > Integer(0))
     {
-      value->getItem((startPos + theTargetPos - Integer(1)), state->theItem);
+      xs_integer const pos = startPos + theTargetPos - Integer(1);
+      if (pos <= endPos)
+        value->getItem(pos, state->theItem);
+      else
+        state->theItem = NULL;
     }
     else
     {
@@ -997,7 +1001,9 @@ bool LetVarIterator::nextImpl(store::Item_t& result, PlanState& planState) const
       {
         startPos += state->theWindowStart;
 
-        state->theTempSeq->getItem(startPos, result);
+        // A position past the end of a window selects nothing.
+        if (state->theWindowEnd == Integer(0) || startPos <= state->theWindowEnd)
+          state->theTempSeq->getItem(startPos, result);
       }
 
       if (result)
@@ -1007,7 +1013,11 @@ bool LetVarIterator::nextImpl(store::Item_t& result, PlanState& planState) const
     {
       if (theInfLen)
       {
-        len = state->theTempSeq->getSize();
+        // The temp sequence of a tumbling window is lazy, without a size.
+        if (state->theWindowEnd > 0)
+          len = state->theWindowEnd - state->theWindowStart;
+        else
+          len = state->theTempSeq->getSize();
       }
       else
       {
