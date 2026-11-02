@@ -1,10 +1,18 @@
 name: Directory scaling
 
 # How zorba --directory and zorba-mcp scale with the number and size of the
-# files under the root (bench/directory/). Measures only; manual runs only.
+# files under the root (bench/directory/), and how much memory the in-memory
+# store takes per parsed XML, JSON and CSV document (bench/store/). Measures
+# only; manual runs only.
 on:
   workflow_dispatch:
     inputs:
+      suite:
+        description: "What to measure"
+        required: false
+        type: choice
+        options: [directory, store, both]
+        default: directory
       trees:
         description: "Space-separated trees FILES:KB (files of ~KB KB each)"
         required: false
@@ -14,9 +22,17 @@ on:
         required: false
         default: "10"
       runs:
-        description: "Runs per zorba --directory query (fresh process each)"
+        description: "Runs per zorba --directory query / store point (fresh process each)"
         required: false
         default: "3"
+      sizes:
+        description: "store: space-separated file sizes in MiB"
+        required: false
+        default: "1 10 100"
+      micro_n:
+        description: "store: items per microbenchmark document"
+        required: false
+        default: "200000"
 
 concurrency:
   group: directory-scaling-${{ github.ref }}
@@ -27,6 +43,7 @@ permissions:
 
 jobs:
   scaling:
+    if: inputs.suite != 'store'
     runs-on: ubuntu-24.04
     timeout-minutes: 300
     env:
@@ -78,3 +95,78 @@ jobs:
         with:
           name: directory-scaling
           path: out/
+
+  # bench/store/: heap, RSS and per-kind costs of parsed documents.
+  store:
+    if: inputs.suite != 'directory'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    env:
+      SIZES: ${{ inputs.sizes || '1 10 100' }}
+      RUNS: ${{ inputs.runs || '3' }}
+      MICRO_N: ${{ inputs.micro_n || '200000' }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Builder image
+        uses: ./.github/actions/builder-image
+        with:
+          context: docker/builder-latest
+          cache-scope: linux-amd64-latest
+
+      - uses: actions/cache@v6
+        with:
+          path: .ccache
+          key: ccache-v2-linux-amd64-latest-storemem-${{ github.run_id }}
+          restore-keys: ccache-v2-linux-amd64-latest-
+
+      # storebench links against libzorba through the public API only.
+      # sizes.cpp is compiled to assembly with the flags of a store source
+      # file and the sizeof() constants are read out of it.
+      - name: Build
+        run: |
+          mkdir -p .ccache
+          docker run --rm \
+            -e CCACHE_DIR=/src/.ccache \
+            -e CCACHE_SLOPPINESS=pch_defines,time_macros -e CCACHE_DEPEND=1 \
+            -v "$PWD":/src -w /src zorba-builder:ci sh -ec '
+              cmake --preset full-release
+              cmake --build --preset full-release
+              ccache -s
+              B=/src/build/full-release
+              LIB=$(dirname "$(find "$B" -name "libzorba_simplestore.so" | head -n 1)")
+              c++ -std=c++23 -O2 -Wall -Wextra -Werror \
+                -I/src/include -I"$B/include" \
+                -o build/storebench bench/store/storebench.cpp \
+                -L"$LIB" -lzorba_simplestore -Wl,-rpath,"$LIB"
+              ZORBA=$(find "$B/bin" -maxdepth 1 -name zorba -type f | head -n 1)
+              "$ZORBA" --serialize-text -f -q bench/store/sizes_cmd.xq \
+                -e db:="$B/compile_commands.json" \
+                -e src:=/src/bench/store/sizes.cpp \
+                -e out:=/src/build/store-sizes.s > build/store-sizes-cmd.sh
+              cat build/store-sizes-cmd.sh
+              ( cd "$B" && sh /src/build/store-sizes-cmd.sh )
+              awk "/^zsize_[A-Za-z0-9_]*:/ { n = substr(\$1, 7, length(\$1) - 7) }
+                   n != \"\" && \$1 == \".quad\" { print n, \$2; n = \"\" }" \
+                build/store-sizes.s > build/store-sizes.txt
+              cat build/store-sizes.txt
+              test "$(wc -l < build/store-sizes.txt)" -eq "$(grep -c "^ZSIZE(" bench/store/sizes.cpp)"'
+
+      - name: Generate inputs and measure
+        run: |
+          mkdir -p out
+          docker run --rm -e RUNS -e MICRO_N -e SIZES \
+            -v "$PWD":/src -w /src zorba-builder:ci sh -ec '
+              ZORBA=$(find build/full-release/bin -maxdepth 1 -name zorba -type f | head -n 1)
+              test -n "$ZORBA"
+              bench/store/run.sh "/src/$ZORBA" /src/build/storebench \
+                /src/build/store-sizes.txt /tmp/store /src/out "$SIZES"'
+          cat out/results.md >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: store-memory
+          path: |
+            out/
+            build/store-sizes.txt
