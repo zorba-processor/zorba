@@ -20,6 +20,7 @@
 //   values in (-1, 1) became quadratic);
 // - values equal after numeric promotion must hash equal.
 
+#include <cstdlib>
 #include <iostream>
 #include <limits>
 #include <set>
@@ -87,6 +88,44 @@ int test_numeric_hash( int, char*[] ) {
       check( i.hash() == dec.hash(), "xs:integer vs xs:decimal", *s );
     }
   }
+
+  // Around and in the range of the shared store items (-128 to 1023).
+  for ( int n = -200; n <= 1100; ++n ) {
+    xs_integer const i( n );
+    check( i.hash() == xs_decimal( i ).hash(), "xs:integer vs xs:decimal",
+           i.toString().c_str() );
+    check( i.hash() == xs_double( static_cast<double>( n ) ).hash(),
+           "xs:integer vs xs:double", i.toString().c_str() );
+    check( i.hash() == hash_int64( n ), "xs:integer vs xs:long",
+           i.toString().c_str() );
+  }
+
+  // Beyond 2^53 and around 2^63 and 2^64: integers and decimals hash like the
+  // xs:double they are promoted to. Not xs:float, whose promotion rounds further.
+  static char const *const large_integers[] = {
+    "9007199254740993", "-9007199254740993", "9223372036854774784",
+    "9223372036854775807", "-9223372036854775808", 0
+  };
+  for ( char const *const *s = large_integers; *s; ++s ) {
+    xs_integer const i( *s );
+    check( i.hash() == xs_decimal( *s ).hash(), "xs:integer vs xs:decimal", *s );
+    check( i.hash() == xs_double( *s ).hash(), "xs:integer vs xs:double", *s );
+    int64_t const n = strtoll( *s, nullptr, 10 );
+    check( hash_int64( n ) == i.hash(), "xs:long vs xs:integer", *s );
+    if ( n >= 0 )
+      check( hash_uint64( static_cast<uint64_t>( n ) ) == i.hash(),
+             "xs:unsignedLong vs xs:integer", *s );
+  }
+  static char const *const large_decimals[] = {
+    "9223372036854775807.5", "9223372036854775808", "-9223372036854775809",
+    "18446744073709551615", "18446744073709551616", 0
+  };
+  for ( char const *const *s = large_decimals; *s; ++s )
+    check( xs_decimal( *s ).hash() == xs_double( *s ).hash(),
+           "xs:decimal vs xs:double", *s );
+  check( hash_uint64( 18446744073709551615ULL ) ==
+         xs_decimal( "18446744073709551615" ).hash(),
+         "xs:unsignedLong vs xs:decimal", "2^64-1" );
 
   check( xs_double( -0.0 ).hash() == xs_double( 0.0 ).hash(), "-0 vs 0", "" );
   check( xs_float( -0.0f ).hash() == xs_integer( 0 ).hash(), "-0 vs 0", "" );

@@ -2810,16 +2810,26 @@ void IntegerItemImpl<I>::appendStringValue(zstring& buf) const {
   buf += ztd::to_string( theValue );
 }
 
+// An item of another numeric type compares by value (F&O 3.0 op:numeric-equal):
+// getIntegerValue() of an xs:decimal would truncate it, or raise an error beyond
+// the xs:integer range. theValue itself can not take other->getIntegerValue()
+// in compare(), which converts its argument to I and raises an error if the
+// value is out of that type's range (e.g. a negative value and an
+// xs:nonNegativeInteger).
 template<class I>
 long IntegerItemImpl<I>::compare( Item const *other, long,
                                   XQPCollator const* ) const {
-  return theValue.compare( other->getIntegerValue() );
+  if ( other->getTypeCode() == store::XS_DECIMAL )
+    return getDecimalValue().compare( other->getDecimalValue() );
+  return getIntegerValue().compare( other->getIntegerValue() );
 }
 
 template<class I>
 bool IntegerItemImpl<I>::equals( store::Item const *other, long,
                                  XQPCollator const* ) const {
-  return theValue == other->getIntegerValue();
+  if ( other->getTypeCode() == store::XS_DECIMAL )
+    return getDecimalValue() == other->getDecimalValue();
+  return getIntegerValue() == other->getIntegerValue();
 }
 
 template<class I>

@@ -70,7 +70,7 @@ char const meta_server_info[] = "io.modelcontextprotocol/serverInfo";
 char const server_name[] = "zorba-mcp";
 
 char const instructions[] =
-  "Queries a directory of XML, JSON and CSV documents with JSONiq/XQuery "
+  "Queries a directory of XML, JSON, CSV and HTML documents with JSONiq/XQuery "
   "(Zorba). Start with list_documents. In run_query, import the directory "
   "module (import module namespace dir = \"http://zorba.io/modules/directory\";) "
   "and use $dir:root: dir:documents($dir:root, \"xml\") or "

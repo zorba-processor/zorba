@@ -45,6 +45,17 @@ ADD_SUBDIRECTORY(update)
 ADD_SUBDIRECTORY(sax2)
 ADD_SUBDIRECTORY(scripts)
 
+# An installation that is moved after "cmake --install" still runs.
+IF (UNIX)
+ADD_TEST (NAME test/install/relocated
+  COMMAND "${CMAKE_COMMAND}"
+    -D "BUILD_DIR=${CMAKE_BINARY_DIR}"
+    -D "WORK_DIR=${CMAKE_BINARY_DIR}/relocated-install"
+    -P "${CMAKE_CURRENT_SOURCE_DIR}/install/relocated_install.cmake")
+SET_TESTS_PROPERTIES (test/install/relocated PROPERTIES
+  PASS_REGULAR_EXPRESSION "Relocated installation works" TIMEOUT 600)
+ENDIF (UNIX)
+
 ADD_SUBDIRECTORY(fots)
 
 ADD_SUBDIRECTORY(fuzz)
