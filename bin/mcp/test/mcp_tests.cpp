@@ -858,7 +858,7 @@ void test_documents_stream( Fixture const &f ) {
   ServerConfig config;
   config.root = t.root;
   config.timeout = std::chrono::milliseconds( 0 );
-  config.cache_bytes = 0;               // the module alone, no cache
+  config.cache_max_file_kb = 0;         // the module alone, no cache
   Server server( f.zorba, config, std::cerr );
   std::string const scan(
     "import module namespace dir = \"http://zorba.io/modules/directory\";\n"
