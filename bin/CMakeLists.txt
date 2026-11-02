@@ -309,16 +309,20 @@ IF (ZORBA_WITH_FILE_ACCESS)
       SET (_mcp_suffix "_${ZORBA_STORE_NAME}")
     ENDIF (NOT ${ZORBA_STORE_NAME} STREQUAL "simplestore")
 
-    SET (MCP_COMMON_SRCS mcp/json.cpp mcp/mcp_server.cpp directory_config.cpp)
+    # The scanner's threads use libxml2 directly.
+    FIND_PACKAGE (Threads REQUIRED)
+    SET (MCP_LIBS "${LIBXML2_LIBRARIES};Threads::Threads")
+    SET (MCP_COMMON_SRCS mcp/json.cpp mcp/mcp_server.cpp mcp/scanner.cpp
+         mcp/scan_preview.cpp directory_config.cpp)
     ZORBA_GENERATE_EXE("zorba_mcp" "mcp/zorba_mcp.cpp;${MCP_COMMON_SRCS}"
-      "" "zorba-mcp" "bin")
+      "${MCP_LIBS}" "zorba-mcp" "bin")
     ZORBA_GENERATE_EXE("mcp_tests" "mcp/test/mcp_tests.cpp;${MCP_COMMON_SRCS}"
-      "" "" "")
+      "${MCP_LIBS}" "" "")
     TARGET_INCLUDE_DIRECTORIES ("mcp_tests${_mcp_suffix}"
       PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/mcp")
 
     ZORBA_GENERATE_EXE("mcp_scan_tests" "mcp/test/scan_tests.cpp;${MCP_COMMON_SRCS}"
-      "${LIBXML2_LIBRARIES}" "" "")
+      "${MCP_LIBS}" "" "")
     TARGET_INCLUDE_DIRECTORIES ("mcp_scan_tests${_mcp_suffix}"
       PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/mcp")
 

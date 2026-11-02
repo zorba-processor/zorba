@@ -38,7 +38,8 @@ namespace {
 
 char const usage[] =
   "Usage: zorba-mcp --root <dir> [--queries <dir>] [--timeout <seconds>]\n"
-  "                 [--max-output <bytes>]\n"
+  "                 [--max-output <bytes>] [--no-scan]\n"
+  "                 [--scan-cache-mb <MiB>]\n"
   "\n"
   "An MCP server (stdio transport) over the Zorba JSONiq/XQuery processor.\n"
   "Queries run under the secure policy, reading only files under --root\n"
@@ -50,7 +51,11 @@ char const usage[] =
   "                       external variables are string parameters\n"
   "  --timeout <seconds>  time limit of one tool call (default 30, 0: none)\n"
   "  --max-output <bytes> output size limit of one tool call (default\n"
-  "                       131072); longer output is cut with a marker\n";
+  "                       131072); longer output is cut with a marker\n"
+  "  --no-scan            no background scan of the directory: list_documents\n"
+  "                       takes no arguments and lists through dir:list\n"
+  "  --scan-cache-mb <MiB> memory for the scan's file index and previews\n"
+  "                       (default 64); at the limit the scan stops\n";
 
 bool parse_number( char const *s, unsigned long long *n ) {
   if ( !s || !*s )
@@ -87,6 +92,12 @@ int main( int argc, char const *argv[] ) {
       ++i;
     } else if ( arg == "--max-output" && parse_number( val, &n ) && n > 0 ) {
       config.max_output = static_cast<std::size_t>( n );
+      ++i;
+    } else if ( arg == "--no-scan" ) {
+      config.scan = false;
+    } else if ( arg == "--scan-cache-mb" && parse_number( val, &n ) &&
+                n > 0 && n <= 1024 * 1024 ) {
+      config.scan_limits.max_memory = static_cast<std::size_t>( n ) * 1024 * 1024;
       ++i;
     } else {
       return fail( "invalid argument: " + arg );

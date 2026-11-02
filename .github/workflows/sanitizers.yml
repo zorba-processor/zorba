@@ -185,3 +185,79 @@ jobs:
             build/${{ matrix.preset }}/sanitizer-logs
             build/${{ matrix.preset }}/ctest.log
             build/${{ matrix.preset }}/junit.xml
+
+  # ThreadSanitizer on zorba-mcp's background scanner (bin/mcp/scan_* tests).
+  # The tests have a PASS_REGULAR_EXPRESSION, which makes ctest ignore TSan's
+  # exit code, so any report in the logs fails the job here.
+  tsan-mcp:
+    if: github.event_name != 'workflow_dispatch' || inputs.jobs != 'asan'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Build the builder image
+        uses: docker/build-push-action@v7
+        with:
+          context: docker/builder-latest
+          load: true
+          tags: zorba-builder:ci
+          cache-from: type=gha,scope=builder-linux-amd64-latest
+          cache-to: type=gha,mode=max,scope=builder-linux-amd64-latest
+
+      - uses: actions/cache@v6
+        with:
+          path: .ccache
+          key: ccache-v2-tsan-${{ github.sha }}-mcp
+          restore-keys: ccache-v2-tsan-
+
+      # TSan's shadow memory layout does not fit the runner kernel's default
+      # mmap ASLR entropy.
+      - name: Reduce ASLR entropy for TSan
+        run: sudo sysctl -w vm.mmap_rnd_bits=28
+
+      - name: Build and test under ThreadSanitizer
+        run: |
+          docker run --rm \
+            --security-opt seccomp=unconfined \
+            -e CCACHE_DIR=/src/.ccache \
+            -e CCACHE_SLOPPINESS=pch_defines,time_macros -e CCACHE_DEPEND=1 \
+            -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" \
+            -v "$PWD":/src -w /src zorba-builder:ci sh -c '
+              set -e
+              cmake --preset tsan
+              cmake --build --preset tsan
+              mkdir -p build/tsan/sanitizer-logs
+              rc=0
+              ctest --preset tsan-mcp -j2 --output-junit junit.xml \
+                > build/tsan/ctest.log 2>&1 || rc=$?
+              sed -n "/tests passed/,\$p" build/tsan/ctest.log
+              chown -R "$HOST_UID:$HOST_GID" build/tsan/sanitizer-logs \
+                build/tsan/ctest.log build/tsan/junit.xml .ccache || true
+              exit $rc'
+
+      - name: Summarize
+        if: always()
+        run: |
+          logs=build/tsan/sanitizer-logs
+          n=$(cat "$logs"/tsan-mcp.* 2>/dev/null | grep -c "^WARNING: ThreadSanitizer" || true)
+          {
+            echo "## ThreadSanitizer (zorba-mcp scanner)"
+            echo "Reports: $n"
+            echo '```'
+            cat "$logs"/tsan-mcp.* 2>/dev/null | grep "^WARNING: ThreadSanitizer\|^SUMMARY: ThreadSanitizer" \
+              | sort | uniq -c | sort -rn | head -60
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+          test "$n" -eq 0
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: tsan-logs-mcp
+          path: |
+            build/tsan/sanitizer-logs
+            build/tsan/ctest.log
+            build/tsan/junit.xml

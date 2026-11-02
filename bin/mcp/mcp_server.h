@@ -19,6 +19,7 @@
 
 #include <chrono>
 #include <cstddef>
+#include <memory>
 #include <ostream>
 #include <string>
 #include <vector>
@@ -58,7 +59,9 @@ struct ServerConfig {
 /**
  * An MCP server over the Zorba C++ API: answers one JSON-RPC message at a
  * time. Every query runs under SecurityPolicy::secure() narrowed to reading
- * the root directory (see directory_config), with \c $dir:root bound.
+ * the root directory (see directory_config), with \c $dir:root bound. Unless
+ * configured otherwise, list_documents answers from a background scan of the
+ * root (see Scanner); queries never depend on it.
  *
  * Serves the modern revision (per-request \c _meta, \c server/discover) and,
  * once a client sends \c initialize, the legacy handshake-based revisions.
@@ -71,6 +74,8 @@ public:
    * @param log where diagnostics go (never the protocol stream).
    */
   Server( Zorba *zorba, ServerConfig config, std::ostream &log );
+
+  ~Server();
 
   /**
    * Handles one message (one line of the stdio transport).
@@ -86,7 +91,7 @@ public:
   /** Stops the background scan, if any; the destructor does it too. */
   void stop_scan();
 
-  /** The bytes the scan cache accounts for. */
+  /** The bytes the scan cache accounts for, or 0 without a scan. */
   std::size_t scan_cache_bytes() const;
 
 private:
@@ -124,6 +129,7 @@ private:
   SecurityPolicy thePolicy;
   std::vector<Predefined> thePredefined;
   std::string theLegacyVersion;         // set by initialize
+  std::unique_ptr<Scanner> theScanner;  // null with --no-scan
 };
 
 } // namespace mcp

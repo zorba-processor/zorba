@@ -24,6 +24,7 @@
 #include <set>
 #include <sstream>
 #include <streambuf>
+#include <system_error>
 #include <utility>
 
 #include <zorba/diagnostic.h>
@@ -316,13 +317,32 @@ Server::Server( Zorba *zorba, ServerConfig config, std::ostream &log ) :
   if ( theConfig.timeout.count() > 0 )
     thePolicy.setTimeout( theConfig.timeout );
   load_predefined();
+  if ( theConfig.scan ) {
+    try {
+      theScanner.reset( new Scanner( theConfig.root, theConfig.scan_limits,
+                                     theConfig.scan_hook ) );
+    }
+    catch ( std::system_error const &e ) {
+      theLog << server_name << ": no background scan: " << e.what() << std::endl;
+    }
+  }
+}
+
+Server::~Server() {
+  stop_scan();
+  if ( theScanner )
+    theLog << server_name << ": the scan cache holds "
+           << theScanner->cache_bytes() << " bytes of "
+           << theConfig.scan_limits.max_memory << std::endl;
 }
 
 void Server::stop_scan() {
+  if ( theScanner )
+    theScanner->stop();
 }
 
 std::size_t Server::scan_cache_bytes() const {
-  return 0;
+  return theScanner ? theScanner->cache_bytes() : 0;
 }
 
 void Server::load_predefined() {
@@ -411,20 +431,47 @@ bool Server::load_predefined( std::string const &path,
 Json Server::tools() const {
   Json list( Json::array() );
 
-  Json no_args( Json::object( {
-    { "type", "object" }, { "additionalProperties", false }
-  } ) );
-  list.push( Json::object( {
-    { "name", "list_documents" },
-    { "title", "List documents" },
-    { "description",
-      "Lists the files under the directory, recursively and sorted by path: "
-      "one JSON object per line, {path, format, size, modified}. The format "
-      "(xml, json, csv, html or null) says how run_query's dir:documents "
-      "and dir:open parse the file." },
-    { "inputSchema", no_args },
-    { "annotations", read_only_annotations() }
-  } ) );
+  if ( theScanner ) {
+    list.push( Json::object( {
+      { "name", "list_documents" },
+      { "title", "List documents" },
+      { "description",
+        "Lists files with format, size and fields. The first line has the "
+        "scan state and totals; while running, files may be missing. A file "
+        "as path adds a preview: columns, keys or element paths, samples." },
+      { "inputSchema", Json::object( {
+          { "type", "object" },
+          { "properties", Json::object( {
+              { "path", Json::object( {
+                  { "type", "string" },
+                  { "description", "Subdirectory or file, relative." } } ) },
+              { "limit", Json::object( {
+                  { "type", "integer" },
+                  { "description", "Files to list; default 100." } } ) },
+              { "refresh", Json::object( {
+                  { "type", "boolean" },
+                  { "description", "Restart the scan." } } ) }
+            } ) },
+          { "additionalProperties", false }
+        } ) },
+      { "annotations", read_only_annotations() }
+    } ) );
+  } else {
+    Json no_args( Json::object( {
+      { "type", "object" }, { "additionalProperties", false }
+    } ) );
+    list.push( Json::object( {
+      { "name", "list_documents" },
+      { "title", "List documents" },
+      { "description",
+        "Lists the files under the directory, recursively and sorted by path: "
+        "one JSON object per line, {path, format, size, modified}. The format "
+        "(xml, json, csv, html or null) says how run_query's dir:documents "
+        "and dir:open parse the file." },
+      { "inputSchema", no_args },
+      { "annotations", read_only_annotations() }
+    } ) );
+  }
 
   Json query_props( Json::object( {
     { "query", Json::object( {
@@ -563,7 +610,11 @@ Json Server::call_tool( Json const &params, bool *protocol_error,
   std::vector<std::pair<std::string,std::string> > const no_vars;
   QueryOutcome outcome;
   std::string unexpected;
-  if ( tool == "list_documents" ) {
+  if ( tool == "list_documents" && theScanner ) {
+    bool is_error = false;
+    outcome.text = theScanner->answer( *args, theConfig.max_output, &is_error );
+    outcome.ok = !is_error;
+  } else if ( tool == "list_documents" ) {
     unexpected = undeclared_arguments( *args, {} );
     if ( !unexpected.empty() ) {
       outcome.text = invalid_arguments_text(
