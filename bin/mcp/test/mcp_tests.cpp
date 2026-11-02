@@ -448,6 +448,16 @@ void test_hints_jsoniq( Fixture const &f ) {
                 "the hint's $x() works" );
   check_result( server, "let $x := [1, 2] return jn:members($x)", "1\n2",
                 "the hint's jn:members($x) works" );
+  std::string const one_line(
+    "import module namespace dir = \"http://zorba.io/modules/directory\"; " );
+  check_error( server, one_line + "let $x := [1, 2] return $x[]", "XPST0003",
+               "jn:members($x)", "$x[] after a prolog on the same line" );
+  check_error( server, one_line + "(1, 2)[$$ eq 2]", "XPST0003", "\".\"",
+               "$$ after a prolog on the same line" );
+  check_error( server, one_line + "let $a := 3 let $b := 1 return $a-$b",
+               "XPST0003", "$a - $b", "$a-$b after a prolog on the same line" );
+  check_error( server, "let $x := [1] return $x[[]]", "XPST0003",
+               "jn:members($x)", "$x[[]]: hint" );
   check_error( server, "[1, ]", "XPST0003", "",
                "no $x[] hint on another unexpected ]" );
   check_error( server, "let $x := [1] return $x]", "XPST0003", "",

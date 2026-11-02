@@ -76,7 +76,8 @@ ZorbaException::ZorbaException( ZorbaException const &from ) :
   diagnostic_( from.diagnostic_->clone() ),
   raise_file_( from.raise_file_ ),
   raise_line_( from.raise_line_ ),
-  message_( from.message_ )
+  message_( from.message_ ),
+  hint_( from.hint_ )
 {
 }
 
@@ -96,6 +97,7 @@ ZorbaException& ZorbaException::operator=( ZorbaException const &from ) {
     raise_file_ = from.raise_file_;
     raise_line_ = from.raise_line_;
     message_    = from.message_;
+    hint_       = from.hint_;
   }
   return *this;
 }
@@ -170,6 +172,23 @@ ostream& ZorbaException::print_impl( ostream &o ) const {
   else
     o << "; raised at " << raise_file() << ':' << raise_line();
 #endif
+
+  if ( !hint_.empty() ) {
+    if ( as_xml ) {
+      o << indent << "<hint>";
+      for ( char const c : hint_ ) {
+        if ( c == '<' )
+          o << "&lt;";
+        else if ( c == '&' )
+          o << "&amp;";
+        else
+          o << c;
+      }
+      o << "</hint>" << if_nl;
+    } else {
+      o << "\nhint: " << hint_;
+    }
+  }
 
   return o;
 }

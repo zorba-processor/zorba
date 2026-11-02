@@ -16,6 +16,7 @@
 
 #include "diagnostics/xquery_diagnostics.h"
 #include "diagnostics/util_macros.h"
+#include "diagnostics/query_hints.h"
 
 #include "system/globalenv.h"
 
@@ -789,8 +790,9 @@ void TreatIterator::raiseError(const zstring& valueType) const
   }
   case TREAT_PATH_STEP:
   {
-    RAISE_ERROR_NO_PARAMS(err::XPTY0019, loc);
-    break;
+    XQueryException e(XQUERY_EXCEPTION(err::XPTY0019, ERROR_LOC(loc)));
+    e.set_hint(query_hints::path_over_item(valueType.str()).c_str());
+    throw e;
   }
   case TREAT_PATH_DOT:
   {
