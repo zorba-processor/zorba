@@ -248,7 +248,7 @@
        It is a static error if the target type of a \c cast or \c castable
        expression is \c xs:NOTATION or \c xs:anyAtomicType.
       </comment>
-      <value>"$1": invalid type for "cast" or "castable" exression</value>
+      <value>"$1": invalid target type for "cast" or "castable" expression</value>
     </diagnostic>
 
     <diagnostic code="XPST0081">
@@ -1095,7 +1095,7 @@
        It is a dynamic error if the result of the content expression of a
        computed processing instruction constructor contains the string "?>".
       </comment>
-      <value>computed processing instrucion must not contain "?&gt;"</value>
+      <value>computed processing instruction must not contain "?&gt;"</value>
     </diagnostic>
 
     <diagnostic code="XQDY0027">
@@ -1134,7 +1134,7 @@
        processing instruction constructor cannot be cast to the type
        \c xs:NCName.
       </comment>
-      <value>can not cast to xs:NCName</value>
+      <value>processing-instruction name cannot be cast to xs:NCName</value>
     </diagnostic>
 
     <diagnostic code="XQDY0044">
@@ -1149,7 +1149,7 @@
        - Its namespace prefix is other than \c xml and its namespace URI is
          <code>http://www.w3.org/XML/1998/namespace</code>.
       </comment>
-      <value>"$1": invalid attibute node-name</value>
+      <value>"$1": invalid attribute node-name</value>
     </diagnostic>
 
     <diagnostic code="XQDY0054">
@@ -1430,7 +1430,7 @@
       <comment>
        Unidentified error.
       </comment>
-      <value>unidentifier error</value>
+      <value>unidentified error</value>
     </diagnostic>
 
     <diagnostic code="FOAR0001">
@@ -1508,7 +1508,7 @@
       <comment>
        Unsupported collation.
       </comment>
-      <value>"$1": unsuported collation${: 2}</value>
+      <value>"$1": unsupported collation${: 2}</value>
     </diagnostic>
 
     <diagnostic code="FOCH0003">
@@ -1785,7 +1785,7 @@
       <comment>
        Regular expression matches zero-length string.
       </comment>
-      <value>"$1": regular expression matches zero-length string</value>
+      <value>"$1": regular expression matches the empty string</value>
     </diagnostic>
 
     <diagnostic code="FORX0004">
