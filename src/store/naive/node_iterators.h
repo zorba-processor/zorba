@@ -330,6 +330,7 @@ protected:
   store::ItemHandle<ElementNode>  theParentNode;
 
   InternalNode::iterator          theEnd;
+  InternalNode::iterator          theStart;
   InternalNode::iterator          theIte;
 
   // Copy of the attributes when the parent stores them inline; see
@@ -339,21 +340,23 @@ protected:
   void setRange()
   {
     theEnd = theParentNode->attrsEnd();
-    theIte = theParentNode->attrsBegin();
+    theStart = theParentNode->attrsBegin();
 
     if (theParentNode->nodesAreInline())
     {
-      csize const numNodes = theEnd - theIte;
-      std::copy(theIte, theEnd, theInline);
-      theIte = theInline;
+      csize const numNodes = theEnd - theStart;
+      std::copy(theStart, theEnd, theInline);
+      theStart = theInline;
       theEnd = theInline + numNodes;
     }
+
+    theIte = theStart;
   }
 
 public:
   AttributesIteratorImpl() { }
 
-  // theEnd and theIte may point into this object.
+  // theStart, theEnd and theIte may point into this object.
   AttributesIteratorImpl(const AttributesIteratorImpl&) = delete;
   AttributesIteratorImpl& operator=(const AttributesIteratorImpl&) = delete;
 
@@ -406,13 +409,13 @@ public:
 
   void open()
   {
-    theIte = theParentNode->attrsBegin();
+    theIte = theStart;
   }
 
   void reset()
   {
     if (theParentNode)
-      theIte = theParentNode->attrsBegin();
+      theIte = theStart;
   }
 
   void close()

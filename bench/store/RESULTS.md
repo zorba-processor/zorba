@@ -308,9 +308,10 @@ cannot differ between forms.
 
 ## XML node packing
 
-The tables above describe master before this change (run 41377872156). Run
-41448453817 measures the store with candidates 6 and 10 applied; same inputs
-and settings. JSON and CSV file heaps are unchanged to the digit.
+Run 41448453817 measures the store with candidates 6 and 10 applied, against
+the baseline run 41377872156, before the JSON key, small integer and decimal
+changes; same inputs and settings. JSON and CSV file heaps are unchanged to the
+digit between those two runs.
 
 | XML file MiB | heap MiB before | after | heap / file before | after | allocations / item before | after |
 |---:|---:|---:|---:|---:|---:|---:|
