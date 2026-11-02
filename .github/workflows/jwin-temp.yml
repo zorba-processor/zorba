@@ -75,9 +75,12 @@ jobs:
               c++ -std=c++23 -O2 -Wall -Wextra -Werror -o build/dirbench bench/directory/dirbench.cpp'
       - name: Measure
         timeout-minutes: 320
+        env:
+          SIZES: "1000 10000"
+          RUNS: "1"
         run: |
           free -m
-          docker run --rm -v "$PWD":/src -w /src zorba-builder:ci sh -ec '
+          docker run --rm -e SIZES -e RUNS -v "$PWD":/src -w /src zorba-builder:ci sh -ec '
             ZORBA=$(find build/full-release/bin -maxdepth 1 -name zorba -type f | head -n 1)
             bench/windows/run.sh "/src/$ZORBA" /src/build/dirbench /tmp/jwin /src/out'
           cat out/results.md >> "$GITHUB_STEP_SUMMARY"
