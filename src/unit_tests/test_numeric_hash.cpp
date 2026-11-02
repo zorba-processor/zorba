@@ -89,6 +89,17 @@ int test_numeric_hash( int, char*[] ) {
     }
   }
 
+  // Around and in the range of the shared store items (-128 to 1023).
+  for ( int n = -200; n <= 1100; ++n ) {
+    xs_integer const i( n );
+    check( i.hash() == xs_decimal( i ).hash(), "xs:integer vs xs:decimal",
+           i.toString().c_str() );
+    check( i.hash() == xs_double( static_cast<double>( n ) ).hash(),
+           "xs:integer vs xs:double", i.toString().c_str() );
+    check( i.hash() == hash_int64( n ), "xs:integer vs xs:long",
+           i.toString().c_str() );
+  }
+
   // Beyond 2^53 and around 2^63 and 2^64: integers and decimals hash like the
   // xs:double they are promoted to. Not xs:float, whose promotion rounds further.
   static char const *const large_integers[] = {
