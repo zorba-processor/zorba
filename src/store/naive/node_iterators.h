@@ -64,10 +64,18 @@ protected:
   // Copy of the children when the parent stores them inline; see setRange().
   XmlNode                        * theInline[InternalNode::NodeVector::INLINE_CAPACITY];
 
-  // A heap list keeps its address when the parent's contents are swapped with
-  // another node's (collection edit), so that this iterator goes on with the
-  // children it started on. An inline list stays in the parent's own storage,
-  // which takes the new contents, so the iterator works on a copy of it.
+  // The first child, if any; see setRange().
+  store::Item_t                    theFirstNode;
+
+  // A collection edit swaps the contents of the parent with another node's
+  // while this iterator is open (InternalNode::swap). The iterator goes on with
+  // the children it started on:
+  // - a heap list keeps its address, and an inline list stays in the parent's
+  //   own storage, which takes the new contents, so the iterator copies it;
+  // - the old children and list then belong to the tree of the other node, which
+  //   nothing else may keep alive: the reference to theFirstNode does. It is a
+  //   reference to a node, not to the tree, because the store moves the
+  //   references of nodes when it merges or splits trees.
   void setRange()
   {
     theEnd = theParentNode->childrenEnd();
@@ -80,6 +88,8 @@ protected:
       theStart = theInline;
       theEnd = theInline + numNodes;
     }
+
+    theFirstNode = (theStart != theEnd ? *theStart : NULL);
   }
 
 public:
@@ -165,7 +175,7 @@ public:
 
   void reset() { theIte = theStart; }
 
-  void close() { theIte = theEnd; theParentNode = NULL; }
+  void close() { theIte = theEnd; theParentNode = NULL; theFirstNode = NULL; }
 
   bool next(store::Item_t& result);
 };
@@ -202,6 +212,9 @@ protected:
   // ChildrenIteratorImpl::setRange().
   XmlNode                        * theInline[InternalNode::NodeVector::INLINE_CAPACITY];
 
+  // The last child, if any; see ChildrenIteratorImpl::setRange().
+  store::Item_t                    theFirstNode;
+
   void setRange()
   {
     theEnd = theParentNode->childrenREnd();
@@ -215,6 +228,8 @@ protected:
       theStart = InternalNode::reverse_iterator(theInline + numNodes);
       theEnd = InternalNode::reverse_iterator(theInline);
     }
+
+    theFirstNode = (theStart != theEnd ? *theStart : NULL);
   }
 
 public:
@@ -310,6 +325,7 @@ public:
   {
     theIte = theEnd;
     theParentNode = NULL;
+    theFirstNode = NULL;
   }
 
   bool next(store::Item_t& result);
@@ -337,6 +353,9 @@ protected:
   // ChildrenIteratorImpl::setRange().
   XmlNode                       * theInline[InternalNode::NodeVector::INLINE_CAPACITY];
 
+  // The first attribute, if any; see ChildrenIteratorImpl::setRange().
+  store::Item_t                   theFirstNode;
+
   void setRange()
   {
     theEnd = theParentNode->attrsEnd();
@@ -351,6 +370,8 @@ protected:
     }
 
     theIte = theStart;
+
+    theFirstNode = (theStart != theEnd ? *theStart : NULL);
   }
 
 public:
@@ -421,6 +442,7 @@ public:
   void close()
   {
     theParentNode = NULL;
+    theFirstNode = NULL;
   }
 
   bool next(store::Item_t& result);

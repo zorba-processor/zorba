@@ -372,8 +372,10 @@ with the same number of blocks, while the JSON file heap does not move. That
 pattern fits new items reusing fewer freed start-up chunks larger than they
 need; it was not investigated further, and no JSON saving is claimed.
 
-`Item::mem_size()` for XML is unchanged within 8 B; against the smaller heap it
-now reads 1.28x instead of 1.09x, so it remains unusable as a meter.
+`Item::mem_size()` for XML now counts a slot only when it is on the heap, by
+capacity. By arithmetic from run 41448453817 (not re-measured) it drops by 8 B
+for each of the 5.64 M inline slots and reads about 1.25x the heap instead of
+1.09x, so it remains unusable as a meter.
 
 ## Limitations
 
