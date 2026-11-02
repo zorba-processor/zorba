@@ -203,7 +203,7 @@ store::Collection_t FnCollectionIterator::getCollection(PlanState& planState) co
     if (NULL == uriItem)
     {
       RAISE_ERROR(err::FODC0002, loc,
-      ERROR_PARAMS(ZED(DefaultCollation), ZED(NotDefInDynamicCtx)));
+      ERROR_PARAMS(ZED(DefaultCollection), ZED(NotDefInDynamicCtx)));
     }
 
     resolvedURI = theSctx->resolve_relative_uri(uriItem->getStringValue());

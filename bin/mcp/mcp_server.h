@@ -45,6 +45,11 @@ struct ServerConfig {
   std::string root;
   /** A directory of predefined queries (*.jq), or empty. */
   std::string queries_dir;
+  /**
+   * The language of a query that has no version declaration and is not read
+   * from a .jq or .xq file: JSONiq if true, else XQuery.
+   */
+  bool jsoniq_default = false;
   /** The evaluation time limit of one tool call (0: none). */
   std::chrono::milliseconds timeout{ std::chrono::seconds( 30 ) };
   /** The maximum size of a tool's text output, in bytes. */
@@ -128,6 +133,8 @@ private:
     bool ok = false;
     std::string text;
   };
+
+  StaticContext_t new_static_context( std::string const &file_name ) const;
 
   std::string handle_message( std::string const &message, Json *request_id );
   void load_predefined();

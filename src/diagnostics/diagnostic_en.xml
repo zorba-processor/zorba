@@ -248,7 +248,7 @@
        It is a static error if the target type of a \c cast or \c castable
        expression is \c xs:NOTATION or \c xs:anyAtomicType.
       </comment>
-      <value>"$1": invalid type for "cast" or "castable" exression</value>
+      <value>"$1": invalid target type for "cast" or "castable" expression</value>
     </diagnostic>
 
     <diagnostic code="XPST0081">
@@ -1095,7 +1095,7 @@
        It is a dynamic error if the result of the content expression of a
        computed processing instruction constructor contains the string "?>".
       </comment>
-      <value>computed processing instrucion must not contain "?&gt;"</value>
+      <value>computed processing instruction must not contain "?&gt;"</value>
     </diagnostic>
 
     <diagnostic code="XQDY0027">
@@ -1134,7 +1134,7 @@
        processing instruction constructor cannot be cast to the type
        \c xs:NCName.
       </comment>
-      <value>can not cast to xs:NCName</value>
+      <value>processing-instruction name cannot be cast to xs:NCName</value>
     </diagnostic>
 
     <diagnostic code="XQDY0044">
@@ -1149,7 +1149,7 @@
        - Its namespace prefix is other than \c xml and its namespace URI is
          <code>http://www.w3.org/XML/1998/namespace</code>.
       </comment>
-      <value>"$1": invalid attibute node-name</value>
+      <value>"$1": invalid attribute node-name</value>
     </diagnostic>
 
     <diagnostic code="XQDY0054">
@@ -1430,7 +1430,7 @@
       <comment>
        Unidentified error.
       </comment>
-      <value>unidentifier error</value>
+      <value>unidentified error</value>
     </diagnostic>
 
     <diagnostic code="FOAR0001">
@@ -1508,7 +1508,7 @@
       <comment>
        Unsupported collation.
       </comment>
-      <value>"$1": unsuported collation${: 2}</value>
+      <value>"$1": unsupported collation${: 2}</value>
     </diagnostic>
 
     <diagnostic code="FOCH0003">
@@ -1529,14 +1529,14 @@
       <comment>
        No context document.
       </comment>
-      <value>no context document for $1() function</value>
+      <value>$1(): node is not in a tree whose root is a document node</value>
     </diagnostic>
 
     <diagnostic code="FODC0002">
       <comment>
        Error retrieving resource.
       </comment>
-      <value>"$1": error retrieving resource${: 2}</value>
+      <value>"$1": cannot retrieve resource${: 2}</value>
     </diagnostic>
 
     <diagnostic code="FODC0003">
@@ -1551,7 +1551,7 @@
       <comment>
        Invalid argument to \c fn:collection().
       </comment>
-      <value>"$1": invalid argument to fn:collection()${: 2}</value>
+      <value>"$1": invalid URI${: 2}</value>
     </diagnostic>
 
     <diagnostic code="FODC0005">
@@ -1572,7 +1572,7 @@
       <comment>
        Base URI passed to \c fn:parse() is not a valid absolute URI.
       </comment>
-      <value>"$1": base URI passed to fn:parse() is not a valid absolute URI</value>
+      <value>"$1": base-uri option must be an absolute URI</value>
     </diagnostic>
 
     <diagnostic code="FODF1280">
@@ -1785,7 +1785,7 @@
       <comment>
        Regular expression matches zero-length string.
       </comment>
-      <value>"$1": regular expression matches zero-length string</value>
+      <value>"$1": regular expression matches the empty string</value>
     </diagnostic>
 
     <diagnostic code="FORX0004">
@@ -1828,7 +1828,7 @@
       <comment>
        Identifier cannot be used to retrive a resource containing text
       </comment>
-      <value>"$1": error retrieving resource containing text${: 2}</value>
+      <value>"$1": cannot retrieve text resource${: 2}</value>
     </diagnostic>
 
     <diagnostic code="FOUT1190">
@@ -1837,7 +1837,7 @@
        using the specified encoding, the resulting characters are not
        permitted XML characters or requested encoding not supported
       </comment>
-      <value>"$1": can not decode resource retrieved</value>
+      <value>"$1": cannot decode resource${: unsupported encoding "2"}</value>
     </diagnostic>
 
     <diagnostic code="FOFL0001">
@@ -3182,11 +3182,11 @@
     </diagnostic>
 
     <diagnostic code="ZOSE0002" name="NOT_PLAIN_FILE">
-      <value>"$1": not plain file</value>
+      <value>"$1": not a regular file</value>
     </diagnostic>
 
     <diagnostic code="ZOSE0003" name="STREAM_READ_FAILURE">
-      <value>stream read failure</value>
+      <value>cannot read from stream</value>
     </diagnostic>
 
     <diagnostic code="ZOSE0004" name="IO_ERROR">
@@ -4037,7 +4037,7 @@
     
     <diagnostic code="URI_UNRESOLVED_OR_NOSTREAM">
       <comment>If the stream is unresolved or is not an stream.</comment>
-      <value>"$1": stream is unresolved or it is not a stream - "$2"</value>
+      <value>"$1": cannot fetch resource: $2</value>
     </diagnostic>
     
   </namespace>
@@ -4448,6 +4448,10 @@
 
     <entry key="NoRegisteredSerializationCallback_2">
       <value>external module "$2" not available using registered SerializationCallback</value>
+    </entry>
+
+    <entry key="URIHasFragment">
+      <value>URI must not have a fragment identifier</value>
     </entry>
 
     <entry key="NoResolveRelativeURI">

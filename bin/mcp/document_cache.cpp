@@ -46,6 +46,7 @@ char const cache_url[] = "urn:zorba-mcp:directory-cache";
 // The module text served instead of the installed (non-caching) module:
 // the same function, implemented by DocumentCache.
 char const cache_module_source[] =
+  "xquery version \"3.0\";\n"
   "module namespace dc = \"http://zorba.io/modules/directory-cache\";\n"
   "declare namespace an = \"http://zorba.io/annotations\";\n"
   "declare namespace ver = \"http://zorba.io/options/versioning\";\n"

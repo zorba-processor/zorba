@@ -22,7 +22,6 @@
 // where <test> is one of the names in the table at the end; the "binary"
 // test runs the zorba-mcp executable given as the last argument.
 
-#include <cctype>
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
@@ -1720,6 +1719,17 @@ void test_cache_hit( Fixture const &f ) {
          DocumentCache::tracker_bytes() <= 64 * 1024,
          "the hit tracker has a small fixed size",
          std::to_string( DocumentCache::tracker_bytes() ) );
+
+  // The hook module is an XQuery module whatever the language of the query.
+  ServerConfig jsoniq;
+  jsoniq.root = t.root;
+  jsoniq.jsoniq_default = true;
+  Server jq( f.zorba, jsoniq, std::cerr );
+  warm( jq, "a.json" );
+  v = open_value( jq, "a.json" );
+  s = jq.cache_stats();
+  check( v == "1" && s.admissions == 1 && s.hits == 1,
+         "the cache works with --language jsoniq", v + " / " + stats_text( s ) );
 }
 
 void test_cache_invalidate( Fixture const &f ) {
@@ -2223,11 +2233,12 @@ void test_cache_counters( Fixture const &f ) {
     "zorba-mcp: cache: hits=1 misses=2 admissions=1 evictions=0 "
     "bytes_retained=" );
   std::string::size_type const at = err.find( prefix );
-  check( status == 0 && at != std::string::npos &&
-         std::isdigit( static_cast<unsigned char>(
-           err[ at + prefix.size() ] ) ) &&
-         err[ at + prefix.size() ] != '0' &&
-         err.find( '\n', at ) == err.size() - 1,
+  std::string const bytes(
+    at == std::string::npos ? std::string() :
+    err.substr( at + prefix.size(),
+                err.find( '\n', at ) - at - prefix.size() ) );
+  check( status == 0 && !bytes.empty() && bytes[0] != '0' &&
+         bytes.find_first_not_of( "0123456789" ) == std::string::npos,
          "the counters are one line on stderr at exit", err );
   check( !contains( out, "hits" ) && !contains( out, "admissions" ) &&
          !contains( out, "bytes_retained" ),
@@ -2261,6 +2272,146 @@ void test_cache_counters( Fixture const &f ) {
                              "least recently used", "does not evict",
                              "the document cache: it holds previews" } )
     check( contains( err, text ), std::string( "--help says: " ) + text, err );
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// The language of a query: its own version declaration; else the extension of
+// the file it is read from (.jq is JSONiq); else the configured default
+// (XQuery unless --language jsoniq).
+
+// A query that runs only in JSONiq: $x[] unboxes an array.
+std::string const jsoniq_only( "let $x := [1, 2] return $x[]" );
+std::string const xquery_decl( "xquery version \"3.0\";\n" );
+
+std::string language_queries( Fixture const &f ) {
+  return ( std::filesystem::path( f.queries ).parent_path() /
+           "language_queries" ).string();
+}
+
+std::string run_query_description( Json const &list ) {
+  Json const *const res = list.find( "result" );
+  Json const *const tools = res ? res->find( "tools" ) : nullptr;
+  if ( tools && tools->is_array() )
+    for ( Json const &t : tools->items() )
+      if ( field( t, "name" ) == "run_query" )
+        return field( t, "description" );
+  return std::string();
+}
+
+// The line of the error of a failed run_query.
+std::string error_line( Server &server, std::string const &query ) {
+  Json const r = call_tool( server, "run_query",
+                            Json::object( { { "query", query } } ) );
+  Json const e( tool_error( r ) );
+  Json const *const loc = e.find( "location" );
+  return loc ? field( *loc, "line" ) : std::string();
+}
+
+void test_language( Fixture const &f ) {
+  for ( bool const jsoniq : { false, true } ) {
+    ServerConfig config;
+    config.root = f.tree;
+    config.queries_dir = language_queries( f );
+    config.jsoniq_default = jsoniq;
+    Server server( f.zorba, config, std::cerr );
+    std::string const mode( jsoniq ? "--language jsoniq: " : "default: " );
+
+    // No declaration, no file: the configured default.
+    if ( jsoniq )
+      check_result( server, jsoniq_only, "1\n2", mode + "run_query is JSONiq" );
+    else
+      check_error( server, jsoniq_only, "XPST0003", "jsoniq version",
+                   mode + "run_query is XQuery" );
+    if ( !jsoniq )
+      check_result( server, "(1, 2)[. eq 2]", "2",
+                    mode + "run_query: the XQuery context item" );
+
+    // The declaration wins, in both directions.
+    check_result( server, jsoniq_decl + jsoniq_only, "1\n2",
+                  mode + "jsoniq version wins" );
+    check_error( server, xquery_decl + jsoniq_only, "XPST0003", "jn:members",
+                 mode + "xquery version wins" );
+    check_error( server, xquery_decl + "keys({ \"a\" : 1 })", "XPST0017",
+                 "jn:keys(", mode + "xquery version: names resolve as XQuery" );
+    check_result( server, jsoniq_decl + "keys({ \"a\" : 1 })", "\"a\"",
+                  mode + "jsoniq version: names resolve as JSONiq" );
+
+    // Error lines are those of the query, whatever the language.
+    check( error_line( server, "(: one :)\n(: two :)\n1 div 0" ) == "3",
+           mode + "runtime error line" );
+    check( error_line( server, "(: one :)\n(: two :)\nlet $x := 1 return $x $x" )
+             == "3", mode + "syntax error line" );
+    check( error_line( server, jsoniq_decl + "(: one :)\n1 div 0" ) == "3",
+           mode + "runtime error line after a declaration" );
+
+    // A .jq file is JSONiq whatever the default; its declaration wins.
+    Json r = call_tool( server, "jq_plain", Json::object() );
+    check( !is_tool_error( r ) && result_text( r ) == "1\n2",
+           mode + "a .jq predefined query is JSONiq", r.dump() );
+    r = call_tool( server, "jq_jsoniq_header", Json::object() );
+    check( !is_tool_error( r ) && result_text( r ) == "1\n2",
+           mode + "a .jq predefined query with jsoniq version", r.dump() );
+    r = call_tool( server, "jq_xquery_header", Json::object() );
+    check( !is_tool_error( r ) && result_text( r ) == "2",
+           mode + "a .jq predefined query with xquery version is XQuery",
+           r.dump() );
+
+    // The description of run_query says which language applies.
+    std::string const description(
+      run_query_description( roundtrip( server, request( 1, "tools/list" ) ) ) );
+    std::string const expected( jsoniq
+      ? "Queries are JSONiq by default; start with `xquery version \"3.0\";` "
+        "for XQuery."
+      : "Queries are XQuery by default; start with `jsoniq version \"1.0\";` "
+        "for JSONiq." );
+    check( contains( description, expected ),
+           mode + "run_query describes the language", description );
+    std::cout << "run_query description (" << description.size()
+              << " bytes): " << description << std::endl;
+  }
+}
+
+// The same over the zorba-mcp executable and its --language option.
+void test_language_binary( Fixture const &f ) {
+  auto call = [&]( int id, std::string const &tool, Json args ) {
+    return request( id, "tools/call", Json::object( {
+      { "name", tool }, { "arguments", std::move( args ) } } ) ) + "\n";
+  };
+  std::string input;
+  input += call( 1, "run_query",
+                 Json::object( { { "query", jsoniq_only } } ) );
+  input += call( 2, "run_query", Json::object( {
+    { "query", xquery_decl + jsoniq_only } } ) );
+  input += call( 3, "jq_plain", Json::object() );
+  input += request( 4, "tools/list" ) + "\n";
+
+  for ( bool const jsoniq : { false, true } ) {
+    std::string const output( run_binary( f, language_queries( f ), input,
+      jsoniq ? std::vector<std::string>{ "--language", "jsoniq" }
+             : std::vector<std::string>{ "--language", "xquery" } ) );
+    std::map<std::string,Json> by_id;
+    std::istringstream lines( output );
+    std::string line;
+    while ( std::getline( lines, line ) ) {
+      Json r;
+      std::string why;
+      if ( parse_json( line, &r, &why ) && r.find( "id" ) )
+        by_id[ r.find( "id" )->text() ] = r;
+    }
+    std::string const mode( jsoniq ? "--language jsoniq: " : "--language xquery: " );
+    check( is_tool_error( by_id["1"] ) != jsoniq &&
+           ( !jsoniq || result_text( by_id["1"] ) == "1\n2" ),
+           mode + "run_query follows the option", by_id["1"].dump() );
+    check( is_tool_error( by_id["2"] ) &&
+           contains( result_text( by_id["2"] ), "XPST0003" ),
+           mode + "xquery version wins over the option", by_id["2"].dump() );
+    check( !is_tool_error( by_id["3"] ) && result_text( by_id["3"] ) == "1\n2",
+           mode + "a .jq predefined query is JSONiq", by_id["3"].dump() );
+    check( contains( run_query_description( by_id["4"] ),
+             jsoniq ? "Queries are JSONiq by default;"
+                    : "Queries are XQuery by default;" ),
+           mode + "run_query describes the language", by_id["4"].dump() );
+  }
 }
 
 struct Test {
@@ -2305,7 +2456,9 @@ Test const tests[] = {
   { "deep_json_binary", test_deep_json_binary },
   { "entity_expansion", test_entity_expansion },
   { "case_paths", test_case_paths },
-  { "html_edge_cases", test_html_edge_cases }
+  { "html_edge_cases", test_html_edge_cases },
+  { "language", test_language },
+  { "language_binary", test_language_binary }
 };
 
 } // namespace
