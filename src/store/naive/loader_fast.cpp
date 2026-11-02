@@ -87,7 +87,8 @@ XmlLoader::XmlLoader(
   theXQueryDiagnostics(xqueryDiagnostics),
   theTraceLevel(0),
   theBuildDataGuide(dataguide),
-  theParserSecurity(loadProperties.getSecurityPolicy())
+  theParserSecurity(loadProperties.getSecurityPolicy()),
+  theUnreadableEntityReported(false)
 {
 }
 
@@ -105,6 +106,19 @@ bool XmlLoader::reportDeniedResource()
     NEW_ZORBA_EXCEPTION(zerr::ZXQP0029_URI_ACCESS_DENIED,
                         ERROR_PARAMS(theParserSecurity.deniedURI())));
   return true;
+}
+
+
+void XmlLoader::reportUnreadableEntity()
+{
+  if (!theParserSecurity.unreadableEntity() || theUnreadableEntityReported)
+    return;
+  theUnreadableEntityReported = true;
+  std::string const& lURI = theParserSecurity.unreadableEntityURI();
+  std::string const lMessage("failed to load external entity \"" + lURI + '"');
+  theXQueryDiagnostics->add_error(
+    NEW_XQUERY_EXCEPTION(zerr::ZSTR0021_LOADER_PARSING_ERROR,
+                         ERROR_PARAMS(lURI, 0, 0, lMessage)));
 }
 
 
@@ -177,6 +191,28 @@ void XmlLoader::error(void* ctx, ZORBA_XML_ERROR_PTR error)
   if (error->code == XML_WAR_NS_URI)
   {
     errorLevel = XML_ERR_WARNING;
+  }
+
+  // An external general entity that the policy allowed but that could not be
+  // loaded (its file does not exist): libxml2 reports a warning when it does
+  // not validate and leaves the entity out, as XML 1.0 (4.4.3) lets a
+  // non-validating processor do. An XDM instance, though, can only be built
+  // with all external parsed entities expanded (XDM 3.0, 3.2), so it is an
+  // error, with libxml2's message.
+  if (errorLevel == XML_ERR_WARNING && error->domain == XML_FROM_IO &&
+      loader->theParserSecurity.unreadableEntity())
+  {
+    zstring lMessage(error_message_9);
+    ascii::trim_end_space(lMessage);
+
+    XQueryException *const xe =
+    NEW_XQUERY_EXCEPTION(zerr::ZSTR0021_LOADER_PARSING_ERROR,
+    ERROR_PARAMS(error->file, error->line, error->int2 /* column */,
+                 lMessage));
+    xe->set_data( error->file, error->line, error->int2 /* column */ );
+    loader->theXQueryDiagnostics->add_error( xe );
+    loader->theUnreadableEntityReported = true;
+    return;
   }
 
   switch (errorLevel)

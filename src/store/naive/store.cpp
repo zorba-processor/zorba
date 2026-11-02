@@ -997,6 +997,7 @@ store::Item_t Store::loadDocument(
   // A resource refused by the security policy is the cause of whatever the
   // parser reported after it (or of a silently incomplete document).
   loader->reportDeniedResource();
+  loader->reportUnreadableEntity();
 
   if (!lXQueryDiagnostics.errors().empty())
   {
