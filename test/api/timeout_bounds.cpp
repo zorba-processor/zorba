@@ -190,7 +190,7 @@ void test_order_by(Zorba* z)
   }
 }
 
-// The limit may run out anywhere in a query, so try many: from early on to about
+// The limit may run out anywhere in a query, so try many: from early on to past
 // the time the whole query takes. A limit that lands in a sort stops it with the
 // tuples half moved. What is left must still release every sort key exactly once
 // (checked by the sanitizer builds, and by the heap checks of the C library).
@@ -203,11 +203,11 @@ void test_order_by_deadlines(Zorba* z)
     "count(for $i in 1 to $m stable order by string($i) descending return $i)"
   };
   int const STEPS = 32;
-  seconds const budget(20);
-  steady_clock::time_point const start = steady_clock::now();
+  seconds const budget(10);
 
   for (const char* query : QUERIES)
   {
+    steady_clock::time_point const start = steady_clock::now();
     Outcome const full = run(z, SecurityPolicy::unrestricted(), query);
     CHECK(full.ok && full.value == "100000");
 
@@ -217,7 +217,7 @@ void test_order_by_deadlines(Zorba* z)
       if (steady_clock::now() - start > budget)
         break;
       milliseconds const limit(
-          std::max<long long>(1, full.elapsed.count() * step / STEPS));
+          std::max<long long>(1, full.elapsed.count() * step * 5 / (STEPS * 4)));
       SecurityPolicy const p =
         SecurityPolicy::unrestricted().setTimeout(limit);
       Outcome const o = run(z, p, query);
@@ -229,10 +229,8 @@ void test_order_by_deadlines(Zorba* z)
   }
 }
 
-// An error raised by a comparison stops the sort the same way. Here the keys
-// are arranged so that the comparison that fails comes after the sort has
-// written part of its result: the NaN keys compare with both of the other
-// kinds, and the integers first meet the strings late.
+// An error raised by a comparison stops the sort the same way, here after the
+// sort has written part of its result.
 void test_error_within_sort(Zorba* z)
 {
   std::string const flwor =
@@ -258,8 +256,8 @@ void test_error_within_sort(Zorba* z)
   std::cout << "  caught: " << o << std::endl;
   CHECK(o.ok && o.value == "caught");
 
-  // The same keys, in an order that makes the integers meet the strings in
-  // the first comparisons. And a sort that does not fail still sorts.
+  // The error comes from the first comparisons, and a sort that does not fail
+  // still sorts.
   o = run(z, p, prolog +
     "for $i in 1 to $m\n"
     "stable order by (if ($i mod 2 eq 0) then $i else concat('s', $i))\n"

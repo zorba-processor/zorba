@@ -27,7 +27,7 @@ namespace flwor {
 bool SortTupleCmp::operator()(const SortTuple& t1, const SortTuple& t2) const
 {
   // A sort makes no consumeNext calls. Raising here is like the type errors
-  // that compare() raises.
+  // that compare() raises: see SortTuple for what that leaves in the table.
   thePlanState->chargeWork(1, theLocation);
 
   ZORBA_ASSERT(t1.theKeyValues.size() == t2.theKeyValues.size());
