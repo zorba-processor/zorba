@@ -177,6 +177,12 @@ bool loader::next( store::Item_t *result ) {
         case '}': {
           stack_element top( stack_.top() );
           stack_.pop();
+          // top is off the stack, so clear_stack() will not free it: free it
+          // also when createJSONObject() raises JNDY0003 for a duplicate key.
+          struct destroyer {
+            stack_element &e_;
+            ~destroyer() { e_.destroy(); }
+          } const destroy_top{ top };
           switch ( top.type_ ) {
             case stack_element::array_type:
               GENV_ITEMFACTORY->createJSONArray( item, *top.array_ );
@@ -189,7 +195,6 @@ bool loader::next( store::Item_t *result ) {
             default:
               assert( false );
           } // switch
-          top.destroy();
           break;
         }
         case ':':
