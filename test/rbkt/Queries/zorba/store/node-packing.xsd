@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Schema for node-packing-typed.xq. -->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           targetNamespace="http://zorba.io/test/node-packing"
+           xmlns="http://zorba.io/test/node-packing"
+           elementFormDefault="qualified">
+
+  <xs:simpleType name="ints">
+    <xs:list itemType="xs:integer"/>
+  </xs:simpleType>
+
+  <xs:element name="r">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="q" type="xs:integer"/>
+        <xs:element name="d">
+          <xs:complexType>
+            <xs:simpleContent>
+              <xs:extension base="xs:decimal">
+                <xs:attribute name="u" type="xs:string"/>
+              </xs:extension>
+            </xs:simpleContent>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="l" type="ints"/>
+        <xs:element name="e">
+          <xs:complexType/>
+        </xs:element>
+      </xs:sequence>
+      <xs:attribute name="id" type="xs:integer"/>
+      <xs:attribute name="ids" type="ints"/>
+      <xs:attribute name="note" type="xs:string"/>
+    </xs:complexType>
+  </xs:element>
+
+</xs:schema>
