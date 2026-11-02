@@ -676,6 +676,7 @@ PlanIter_t op_zorba_sequence_point_access::codegen(
           (inputVar->get_kind() == var_expr::let_var ||
            inputVar->get_kind() == var_expr::win_var ||
            inputVar->get_kind() == var_expr::non_groupby_var) &&
+          pos.sign() > 0 &&
           inputVarIter->setTargetPos(pos))
       {
         return aArgs[0];
@@ -683,7 +684,7 @@ PlanIter_t op_zorba_sequence_point_access::codegen(
     }
     else if ((ctxVarIter = dynamic_cast<CtxVarIterator*>(aArgs[0].getp())) != NULL)
     {
-      if (ctxVarIter->setTargetPos(pos))
+      if (pos.sign() > 0 && ctxVarIter->setTargetPos(pos))
         return aArgs[0];
     }
   }
