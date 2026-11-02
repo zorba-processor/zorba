@@ -4,7 +4,7 @@
 # Run:
 #   docker run --rm zorba -q '1 + 1'
 #   docker run --rm -v "$PWD":/work zorba -f -q query.xq
-# MCP server over a folder of XML, JSON and CSV files (stdio):
+# MCP server over a folder of XML, JSON, CSV and HTML files (stdio):
 #   docker run -i --rm -v "$PWD":/data:ro zorba zorba-mcp --root /data
 
 FROM ubuntu:24.04 AS build
