@@ -47,6 +47,7 @@ namespace zorba {
 class CsvParseIteratorState : public PlanIteratorState
 {
 public:
+  bool cast_letter_booleans_; //
   bool cast_unquoted_; //
   csv_parser csv_; //
   zstring extra_name_; //

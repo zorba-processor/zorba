@@ -52,10 +52,21 @@ declare option ver:module-version "1.0";
  : <code>true</code> and <code>false</code> for boolean,
  : <code>T</code> and <code>Y</code> are also considered "true"
  : and <code>F</code> and <code>N</code> are also considered "false."
+ : (unless the <code>cast-letter-booleans</code> option is <code>false</code>).
  :
  : @param $csv The CSV string to parse.
  : @param $options The options to use:
  :  <dl>
+ :    <dt><code>cast-letter-booleans</code></dt>
+ :      <dd>
+ :        Whether the unquoted single letters <code>T</code>, <code>Y</code>,
+ :        <code>F</code> and <code>N</code> are cast to boolean; when
+ :        <code>false</code> they stay strings (a column of
+ :        <code>D</code>/<code>N</code> codes is not turned into booleans),
+ :        while <code>true</code> and <code>false</code> are still cast.
+ :        Only meaningful if <code>cast-unquoted-values</code> is
+ :        <code>true</code>; default: <code>true</code>.
+ :      </dd>
  :    <dt><code>cast-unquoted-values</code></dt>
  :      <dd>
  :        Whether to attempt to cast unquoted values to
@@ -169,6 +180,16 @@ declare function csv:parse( $csv as string, $options as object() )
  : <p/>
  : The default options are:
  :  <dl>
+ :    <dt><code>cast-letter-booleans</code></dt>
+ :      <dd>
+ :        Whether the unquoted single letters <code>T</code>, <code>Y</code>,
+ :        <code>F</code> and <code>N</code> are cast to boolean; when
+ :        <code>false</code> they stay strings (a column of
+ :        <code>D</code>/<code>N</code> codes is not turned into booleans),
+ :        while <code>true</code> and <code>false</code> are still cast.
+ :        Only meaningful if <code>cast-unquoted-values</code> is
+ :        <code>true</code>; default: <code>true</code>.
+ :      </dd>
  :    <dt><code>cast-unquoted-values</code></dt>
  :      <dd>
  :        Whether to attempt to cast unquoted values to
