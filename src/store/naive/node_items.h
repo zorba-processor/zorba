@@ -811,6 +811,9 @@ public:
   // To be used by the loader ONLY!
   NodeVector& nodes() { return theNodes; }
 
+  // True if the attributes and children are stored in this object.
+  bool nodesAreInline() const { return theNodes.isInline(); }
+
   csize numChildren() const { return theNodes.size() - theNumAttrs; }
 
   iterator childrenBegin() { return theNodes.begin() + theNumAttrs; }

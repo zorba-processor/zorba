@@ -16,6 +16,8 @@
 #ifndef ZORBA_SIMPLE_STORE_NODE_ITERATORS
 #define ZORBA_SIMPLE_STORE_NODE_ITERATORS
 
+#include <algorithm>
+
 #include <cassert>
 #include <set>
 #include <vector>
@@ -59,14 +61,38 @@ protected:
   InternalNode::iterator           theStart;
   InternalNode::iterator           theIte;
 
+  // Copy of the children when the parent stores them inline; see setRange().
+  XmlNode                        * theInline[InternalNode::NodeVector::INLINE_CAPACITY];
+
+  // A heap list keeps its address when the parent's contents are swapped with
+  // another node's (collection edit), so that this iterator goes on with the
+  // children it started on. An inline list stays in the parent's own storage,
+  // which takes the new contents, so the iterator works on a copy of it.
+  void setRange()
+  {
+    theEnd = theParentNode->childrenEnd();
+    theStart = theParentNode->childrenBegin();
+
+    if (theParentNode->nodesAreInline())
+    {
+      csize const numNodes = theEnd - theStart;
+      std::copy(theStart, theEnd, theInline);
+      theStart = theInline;
+      theEnd = theInline + numNodes;
+    }
+  }
+
 public:
   ChildrenIteratorImpl() { }
+
+  // theStart, theEnd and theIte may point into this object.
+  ChildrenIteratorImpl(const ChildrenIteratorImpl&) = delete;
+  ChildrenIteratorImpl& operator=(const ChildrenIteratorImpl&) = delete;
 
   void init(store::Item_t& parent, const store::Item* child = NULL)
   {
     theParentNode.transfer(parent);
-    theEnd = theParentNode->childrenEnd();
-    theStart = theParentNode->childrenBegin();
+    setRange();
 
     if (child != NULL && theStart != theEnd)
     {
@@ -93,8 +119,7 @@ public:
   void init(const store::Item* parent, const store::Item* child = NULL)
   {
     theParentNode = parent;
-    theEnd = theParentNode->childrenEnd();
-    theStart = theParentNode->childrenBegin();
+    setRange();
 
     if (child != NULL && theStart != theEnd)
     {
@@ -173,14 +198,36 @@ protected:
   InternalNode::reverse_iterator   theStart;
   InternalNode::reverse_iterator   theIte;
 
+  // Copy of the children when the parent stores them inline; see
+  // ChildrenIteratorImpl::setRange().
+  XmlNode                        * theInline[InternalNode::NodeVector::INLINE_CAPACITY];
+
+  void setRange()
+  {
+    theEnd = theParentNode->childrenREnd();
+    theStart = theParentNode->childrenRBegin();
+
+    if (theParentNode->nodesAreInline())
+    {
+      csize const numNodes = theParentNode->numChildren();
+      std::copy(theParentNode->childrenBegin(), theParentNode->childrenEnd(),
+                theInline);
+      theStart = InternalNode::reverse_iterator(theInline + numNodes);
+      theEnd = InternalNode::reverse_iterator(theInline);
+    }
+  }
+
 public:
   ChildrenReverseIteratorImpl() { }
+
+  // theStart, theEnd and theIte may point into this object.
+  ChildrenReverseIteratorImpl(const ChildrenReverseIteratorImpl&) = delete;
+  ChildrenReverseIteratorImpl& operator=(const ChildrenReverseIteratorImpl&) = delete;
 
   void init(store::Item_t& parent, const store::Item* child = NULL)
   {
     theParentNode.transfer(parent);
-    theEnd = theParentNode->childrenREnd();
-    theStart = theParentNode->childrenRBegin();
+    setRange();
 
     if (child != NULL && theStart != theEnd)
     {
@@ -207,8 +254,7 @@ public:
   void init(const store::Item* parent, const store::Item* child = NULL)
   {
     theParentNode = parent;
-    theEnd = theParentNode->childrenREnd();
-    theStart = theParentNode->childrenRBegin();
+    setRange();
 
     if (child != NULL && theStart != theEnd)
     {
@@ -286,21 +332,41 @@ protected:
   InternalNode::iterator          theEnd;
   InternalNode::iterator          theIte;
 
+  // Copy of the attributes when the parent stores them inline; see
+  // ChildrenIteratorImpl::setRange().
+  XmlNode                       * theInline[InternalNode::NodeVector::INLINE_CAPACITY];
+
+  void setRange()
+  {
+    theEnd = theParentNode->attrsEnd();
+    theIte = theParentNode->attrsBegin();
+
+    if (theParentNode->nodesAreInline())
+    {
+      csize const numNodes = theEnd - theIte;
+      std::copy(theIte, theEnd, theInline);
+      theIte = theInline;
+      theEnd = theInline + numNodes;
+    }
+  }
+
 public:
   AttributesIteratorImpl() { }
+
+  // theEnd and theIte may point into this object.
+  AttributesIteratorImpl(const AttributesIteratorImpl&) = delete;
+  AttributesIteratorImpl& operator=(const AttributesIteratorImpl&) = delete;
 
   void init(store::Item_t& parent)
   {
     theParentNode.transfer(parent);
-    theEnd = theParentNode->attrsEnd();
-    theIte = theParentNode->attrsBegin();
+    setRange();
   }
 
   void init(const store::Item* parent)
   {
     theParentNode = parent;
-    theEnd = theParentNode->attrsEnd();
-    theIte = theParentNode->attrsBegin();
+    setRange();
   }
 
   store::Item* next()

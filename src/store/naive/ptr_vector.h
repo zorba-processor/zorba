@@ -41,8 +41,10 @@ namespace simplestore
   std::vector so that the heap sizes are the same as before.
 
   Iterators are plain pointers. As with std::vector, insert, erase, resize,
-  reserve and shrink_to_fit invalidate them; in addition, swap() invalidates
-  the iterators of a vector that stores its contents inline.
+  reserve and shrink_to_fit invalidate them. Unlike std::vector, swap() does
+  not carry the iterators of an inline vector to the other vector: they stay
+  in this object and see its new contents. Code that must iterate across a
+  swap copies an inline vector first (see ChildrenIteratorImpl).
 
   The size and capacity are 32-bit: growing past them, which doubling reaches
   at about 2^31 elements, throws std::length_error.
@@ -68,8 +70,6 @@ private:
   };
   uint32_t theSize;
   uint32_t theCapacity;   // <= INLINE_CAPACITY means inline storage
-
-  bool isInline() const { return theCapacity <= INLINE_CAPACITY; }
 
   T** data() { return isInline() ? theInline : theHeap; }
 
@@ -123,6 +123,8 @@ private:
   }
 
 public:
+  bool isInline() const { return theCapacity <= INLINE_CAPACITY; }
+
   PtrVector() : theSize(0), theCapacity(INLINE_CAPACITY)
   {
     for (uint32_t i = 0; i < INLINE_CAPACITY; ++i)
