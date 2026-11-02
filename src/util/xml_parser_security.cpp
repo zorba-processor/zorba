@@ -58,7 +58,7 @@ xmlParserErrors resource_loader(
   xmlParserErrors const lResult = xmlNewInputFromUrl(aURL, aFlags, aOut);
   if (lResult != XML_ERR_OK && aType == XML_RESOURCE_GENERAL_ENTITY &&
       theCurrent != nullptr)
-    theCurrent->entityUnreadable();
+    theCurrent->entityUnreadable(aURL);
   return lResult;
 }
 
@@ -86,7 +86,7 @@ xmlParserInputPtr entity_loader(
   // it is an external general entity referenced from the content.
   if (lInput == nullptr && lSecurity != nullptr &&
       aCtxt != nullptr && aCtxt->inSubset == 0)
-    lSecurity->entityUnreadable();
+    lSecurity->entityUnreadable(aURL);
   return lInput;
 }
 
@@ -193,6 +193,16 @@ bool ParserSecurity::allowResource(const char* aURI)
     theDeniedURI = aURI ? aURI : "";
   }
   return false;
+}
+
+
+void ParserSecurity::entityUnreadable(const char* aURI)
+{
+  if (!theUnreadableEntity)
+  {
+    theUnreadableEntity = true;
+    theUnreadableURI = aURI ? aURI : "";
+  }
 }
 
 

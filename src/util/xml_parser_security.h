@@ -98,6 +98,9 @@ public:
    */
   bool unreadableEntity() const { return theUnreadableEntity; }
 
+  /** The first such entity, if unreadableEntity(). */
+  const std::string& unreadableEntityURI() const { return theUnreadableURI; }
+
   /**
    * Makes a ParserSecurity the one the entity loader consults on the current
    * thread for as long as the Scope lives. Scopes nest.
@@ -121,13 +124,14 @@ public:
   bool allowResource(const char* aURI);
 
   /** Called by the entity loader when an allowed general entity failed. */
-  void entityUnreadable() { theUnreadableEntity = true; }
+  void entityUnreadable(const char* aURI);
 
 private:
   SecurityPolicy thePolicy;
   bool           theDenied;
   std::string    theDeniedURI;
   bool           theUnreadableEntity;
+  std::string    theUnreadableURI;
 };
 
 /**

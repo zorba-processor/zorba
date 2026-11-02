@@ -87,7 +87,8 @@ XmlLoader::XmlLoader(
   theXQueryDiagnostics(xqueryDiagnostics),
   theTraceLevel(0),
   theBuildDataGuide(dataguide),
-  theParserSecurity(loadProperties.getSecurityPolicy())
+  theParserSecurity(loadProperties.getSecurityPolicy()),
+  theUnreadableEntityReported(false)
 {
 }
 
@@ -105,6 +106,19 @@ bool XmlLoader::reportDeniedResource()
     NEW_ZORBA_EXCEPTION(zerr::ZXQP0029_URI_ACCESS_DENIED,
                         ERROR_PARAMS(theParserSecurity.deniedURI())));
   return true;
+}
+
+
+void XmlLoader::reportUnreadableEntity()
+{
+  if (!theParserSecurity.unreadableEntity() || theUnreadableEntityReported)
+    return;
+  theUnreadableEntityReported = true;
+  std::string const& lURI = theParserSecurity.unreadableEntityURI();
+  std::string const lMessage("failed to load external entity \"" + lURI + '"');
+  theXQueryDiagnostics->add_error(
+    NEW_XQUERY_EXCEPTION(zerr::ZSTR0021_LOADER_PARSING_ERROR,
+                         ERROR_PARAMS(lURI, 0, 0, lMessage)));
 }
 
 
@@ -197,6 +211,7 @@ void XmlLoader::error(void* ctx, ZORBA_XML_ERROR_PTR error)
                  lMessage));
     xe->set_data( error->file, error->line, error->int2 /* column */ );
     loader->theXQueryDiagnostics->add_error( xe );
+    loader->theUnreadableEntityReported = true;
     return;
   }
 
