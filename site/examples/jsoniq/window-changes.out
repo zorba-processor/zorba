@@ -1,0 +1,13 @@
+[ {
+  "state" : "ok", 
+  "from" : 1, 
+  "samples" : 2
+}, {
+  "state" : "fail", 
+  "from" : 3, 
+  "samples" : 2
+}, {
+  "state" : "ok", 
+  "from" : 5, 
+  "samples" : 1
+} ]
