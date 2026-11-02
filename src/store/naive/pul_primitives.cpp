@@ -1907,7 +1907,7 @@ void UpdInsertIntoHashMap::apply()
 
   while (theValue->next(lValue))
   {
-    std::unique_ptr<store::IndexKey> lKey(new store::IndexKey());
+    std::unique_ptr<store::IndexKey> lKey = std::make_unique<store::IndexKey>();
     for (std::vector<store::Item_t>::const_iterator lIter = theKey.begin();
          lIter != theKey.end();
          ++lIter)
@@ -1920,7 +1920,7 @@ void UpdInsertIntoHashMap::apply()
     {
       // the index took the ownership over the key if the index
       // did _not_ already contain an entry with the same key
-      lKey.release();
+      (void)lKey.release();
     }
   }
 }

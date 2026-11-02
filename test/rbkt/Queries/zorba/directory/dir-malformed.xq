@@ -7,7 +7,7 @@ declare variable $rbktPath as xs:string external;
 declare variable $root := concat($rbktPath, "/Queries/zorba/directory/tree");
 
 string-join(
-  for $d in dir:documents($root)
+  for $d in dir:documents($root, ("xml", "json", "csv"))
   let $e := $d("error")
   return concat($d("path"), ":",
     if (exists($e))

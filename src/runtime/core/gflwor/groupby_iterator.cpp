@@ -365,7 +365,7 @@ void GroupByIterator::matVarsAndGroupBy(
 {
   store::Item_t temp;
 
-  std::unique_ptr<GroupTuple> groupTuple(new GroupTuple());
+  std::unique_ptr<GroupTuple> groupTuple = std::make_unique<GroupTuple>();
   std::vector<store::Item_t>& groupTupleItems = groupTuple->theItems;
 
   csize numVars = theGroupingSpecs.size();
@@ -424,7 +424,7 @@ void GroupByIterator::matVarsAndGroupBy(
     }
 
     groupMap->insert(groupTuple.get(), nonGroupTuple);
-    groupTuple.release();
+    (void)groupTuple.release(); // owned by groupMap now
   }
 }
 

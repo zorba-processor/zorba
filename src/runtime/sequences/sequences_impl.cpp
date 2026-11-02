@@ -302,7 +302,7 @@ bool FnDistinctValuesIterator::nextImpl(
   }
 
   // theValueCompare managed by state->theAlreadySeenMap
-  state->theAlreadySeenMap.reset(new AtomicItemHandleHashSet(valueCompare));
+  state->theAlreadySeenMap = std::make_unique<AtomicItemHandleHashSet>(valueCompare);
 
   while (consumeNext(result, theChildren[0].getp(), planState))
   {
@@ -1899,7 +1899,7 @@ static void readDocument(
     *lStream.get(),
     lStream.get_deleter()
   );
-  lStream.release();
+  (void)lStream.release(); // owned by the streamable item now
 
   if (oResult.isNull())
   {

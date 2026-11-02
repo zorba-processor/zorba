@@ -40,10 +40,8 @@ Configuring with -DZORBA_FOR_ONE_THREAD_ONLY=OFF compiles the engine locks
 in. That build is <b>unsupported</b>: it is not ThreadSanitizer-clean, and the
 rule above still applies.
 
-\section threading_future Future
+\section threading_other Anything else
 
-Making the engine thread-safe is planned for a 5.x release, before the C API
-promises multithreading. Until then, treat anything beyond the rule above as
-undefined behavior.
+Treat any use beyond the rule above as undefined behavior.
 
 */

@@ -1471,7 +1471,7 @@ void FLWORIterator::materializeGroupTuple(
 {
   ZORBA_ASSERT(theGroupByClause);
 
-  std::unique_ptr<GroupTuple> groupTuple(new GroupTuple());
+  std::unique_ptr<GroupTuple> groupTuple = std::make_unique<GroupTuple>();
   std::vector<store::Item_t>& groupTupleItems = groupTuple->theItems;
 
   std::vector<GroupingSpec> groupSpecs = theGroupByClause->theGroupingSpecs;
@@ -1524,7 +1524,7 @@ void FLWORIterator::materializeGroupTuple(
     }
 
     groupMap->insert(groupTuple.get(), nongroupVarSequences);
-    groupTuple.release();
+    (void)groupTuple.release(); // owned by groupMap now
   }
 }
 

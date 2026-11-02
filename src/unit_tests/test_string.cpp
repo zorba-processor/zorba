@@ -593,11 +593,11 @@ static void test_strip_diacritics() {
   StringType result;
 
   StringType const s1( "x " utf8_aeiou_acute " x" );
-  utf8::strip_diacritics( s1, &result );
+  ASSERT_TRUE( utf8::strip_diacritics( s1, &result ) );
   ASSERT_TRUE( result == "x aeiou x" );
 
   StringType const s2( "x " utf8_AEIOU_acute " x" );
-  utf8::strip_diacritics( s2, &result );
+  ASSERT_TRUE( utf8::strip_diacritics( s2, &result ) );
   ASSERT_TRUE( result == "x AEIOU x" );
 }
 

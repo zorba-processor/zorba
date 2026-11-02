@@ -518,7 +518,7 @@ zorba::ItemSequence_t PrepareMainModuleFunction::evaluate(
     Item lMapperFunctionItem = getItemArgument(aArgs, 2);
     if (!lMapperFunctionItem.isNull())
     {
-      lMapper.reset(new ZorbaQueryURIMapper(lMapperFunctionItem, lSctxChild));
+      lMapper = std::make_unique<ZorbaQueryURIMapper>(lMapperFunctionItem, lSctxChild);
       ltempSctx->registerURIMapper(lMapper.get());
     }
   }
@@ -528,7 +528,7 @@ zorba::ItemSequence_t PrepareMainModuleFunction::evaluate(
     Item lResolverFunctionItem = getItemArgument(aArgs, 1);
     if (!lResolverFunctionItem.isNull())
     {
-      lResolver.reset(new ZorbaQueryURLResolver(lResolverFunctionItem, lSctxChild));
+      lResolver = std::make_unique<ZorbaQueryURLResolver>(lResolverFunctionItem, lSctxChild);
       ltempSctx->registerURLResolver(lResolver.get());
     }  
   }
@@ -1042,7 +1042,7 @@ zorba::ItemSequence_t QueryPlanFunction::evaluate(
   XQuery_t lQuery = getQuery(aDctx, lQueryID);
 
   std::unique_ptr<std::stringstream> lExcPlan;
-  lExcPlan.reset(new std::stringstream());
+  lExcPlan = std::make_unique<std::stringstream>();
   if (!lQuery->saveExecutionPlan(*lExcPlan.get()))
   {
     throwError("NO_QUERY_PLAN", "FAILED getting query execution plan.");
@@ -1100,14 +1100,14 @@ zorba::ItemSequence_t LoadFromQueryPlanFunction::evaluate(
       Item lMapperFunctionItem = getItemArgument(aArgs, 2);
       if (!lMapperFunctionItem.isNull())
       {
-        lMapper.reset(new ZorbaQueryURIMapper(lMapperFunctionItem, lSctxChild));
+        lMapper = std::make_unique<ZorbaQueryURIMapper>(lMapperFunctionItem, lSctxChild);
         lPlanSer.add_URIMapper(lMapper.get());
       }
 
       Item lResolverFunctionItem = getItemArgument(aArgs, 1);
       if (!lResolverFunctionItem.isNull())
       {
-        lResolver.reset(new ZorbaQueryURLResolver(lResolverFunctionItem, lSctxChild));
+        lResolver = std::make_unique<ZorbaQueryURLResolver>(lResolverFunctionItem, lSctxChild);
         lPlanSer.add_URLResolver(lResolver.get());
       }
 

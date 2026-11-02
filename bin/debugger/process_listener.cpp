@@ -61,11 +61,9 @@ ProcessListener::run(void* params)
 
   int lChildExitStatus;
 
-  // wait for the process to exit
-  waitpid(lPid, &lChildExitStatus, 0);
-
-  // find out the process exit code if possible
-  if (WIFEXITED(lChildExitStatus)) {
+  // wait for the process to exit, then find out its exit code if possible
+  if (waitpid(lPid, &lChildExitStatus, 0) == lPid &&
+      WIFEXITED(lChildExitStatus)) {
     lExitCode = WEXITSTATUS(lChildExitStatus);
   }
 

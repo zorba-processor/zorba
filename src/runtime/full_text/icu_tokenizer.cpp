@@ -208,9 +208,11 @@ void ICU_Tokenizer::tokenize_string( char const *utf8_s, size_type utf8_len,
 
   unicode::char_type *utf16_buf;
   unicode::size_type utf16_len;
-  if ( !unicode::to_string( utf8_s, (unicode::size_type)utf8_len, &utf16_buf, &utf16_len ) ) {
-    // TODO
-  }
+  // The text to tokenize is valid UTF-8, so the conversion cannot fail.
+  bool const converted = unicode::to_string(
+    utf8_s, (unicode::size_type)utf8_len, &utf16_buf, &utf16_len
+  );
+  ZORBA_ASSERT( converted );
   unique_ptr<unicode::char_type[]> const auto_utf16_buf( utf16_buf );
 
   //
@@ -250,9 +252,11 @@ void ICU_Tokenizer::tokenize_string( char const *utf8_s, size_type utf8_len,
 
     utf8::storage_type *utf8_buf;
     utf8::size_type utf8_len;
-    if ( !utf8::to_string( word, word_len, &utf8_buf, &utf8_len ) ) {
-      // TODO
-    }
+    // The words come from valid UTF-8 text, so the conversion back cannot
+    // fail.
+    bool const converted_word =
+      utf8::to_string( word, word_len, &utf8_buf, &utf8_len );
+    ZORBA_ASSERT( converted_word );
     unique_ptr<utf8::storage_type[]> const auto_utf8_buf( utf8_buf );
 
     zstring_b utf8_word; // used only for debugging & error reporting

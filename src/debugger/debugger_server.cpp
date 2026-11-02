@@ -84,7 +84,9 @@ bool
 DebuggerServer::run()
 {
   // add the interrupt handlers to catch Ctrl-C
-    signal(SIGINT, ctrlC_Handler);
+  if (signal(SIGINT, ctrlC_Handler) == SIG_ERR) {
+    return false;
+  }
 
   theCommunicator->connect();
 

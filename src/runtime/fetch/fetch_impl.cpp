@@ -100,7 +100,7 @@ getFetchResource(
       );
     }
 
-    lRes.release();
+    (void)lRes.release(); // owned by the streamable item now
 
     return lStreamRes;
 

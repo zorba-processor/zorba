@@ -436,7 +436,7 @@ void XmlNode::detach()
           {
             if (nsContext != NULL)
             {
-              std::unique_ptr<NsBindingsContext> ctx(new NsBindingsContext());
+              std::unique_ptr<NsBindingsContext> ctx = std::make_unique<NsBindingsContext>();
               elemNode->getNamespaceBindings(ctx->getBindings());
             
               if (!ctx->empty())

@@ -81,7 +81,7 @@ public:
    * Returns 0 on success, 1 on nonspecified error and 2 on integer overflow
    *
    */
-  static int parseDuration(
+  [[nodiscard]] static int parseDuration(
         const char* str,
         ascii::size_type strlen,
         Duration& d);
@@ -89,7 +89,7 @@ public:
   /**
    * Returns 0 on success, 1 on nonspecified error and 2 on integer overflow
    */
-  static int parseYearMonthDuration(
+  [[nodiscard]] static int parseYearMonthDuration(
         const char* str,
         ascii::size_type strlen,
         Duration& d);
@@ -97,7 +97,7 @@ public:
   /**
    * Returns 0 on success, 1 on nonspecified error and 2 on integer overflow
    */
-  static int parseDayTimeDuration(
+  [[nodiscard]] static int parseDayTimeDuration(
         const char* str,
         ascii::size_type strlen,
         Duration& d,
@@ -106,7 +106,7 @@ public:
   /**
    * Returns 0 on success
    */
-  static int fromTimezone(const TimeZone& t, Duration& d);
+  [[nodiscard]] static int fromTimezone(const TimeZone& t, Duration& d);
 
 public:
   Duration();

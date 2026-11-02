@@ -94,8 +94,10 @@ public:
  *   the policy allows private addresses or the matching prefix names that
  *   address literally (or "localhost").
  * - "xqftts:" thesaurus URIs are file: URIs. "wordnet:" thesauri (and the
- *   default thesaurus, "##default") are read from the library path, like
- *   native modules, and need NativeModules.
+ *   default thesaurus, "##default") are read from the library path. The built-in
+ *   thesaurus needs no capability; any other wordnet: URI names a data file
+ *   there (it loads no native code) and needs FileRead with no read paths,
+ *   because the library path is outside every read path.
  * - Any other scheme is allowed only if neither file nor network access is
  *   restricted at all.
  */

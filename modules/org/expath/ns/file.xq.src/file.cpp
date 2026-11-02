@@ -493,7 +493,7 @@ ReadBinaryFunction::evaluate(
     Item item = module_->getItemFactory()->createStreamableBase64Binary(
       *pin, &FileModule::streamReleaser, true
     );
-    pin.release();
+    (void)pin.release(); // owned by the streamable item now
     return ItemSequence_t( new SingletonItemSequence( item ) );
   }
   catch ( std::exception const &e ) {
@@ -545,7 +545,7 @@ ReadTextFunction::evaluate(
   lResult = module_->getItemFactory()->createStreamableString(
     *pin, &FileModule::streamReleaser, path.c_str(), true
   );
-  pin.release();
+  (void)pin.release(); // owned by the streamable item now
 
   return ItemSequence_t( new SingletonItemSequence( lResult ) );
 }
@@ -635,7 +635,7 @@ void ReadTextLinesFunction::LinesItemSequence::LinesIterator::open() {
     theFunc->raiseAccessDenied( theFile, lReason );
   if ( !lStream ) {
     // As before: a file that cannot be opened yields no lines.
-    lStream.reset( new std::istringstream() );
+    lStream = std::make_unique<std::istringstream>();
     lStream->setstate( std::ios_base::failbit );
   }
   if ( transcoding ) {

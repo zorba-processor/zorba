@@ -2575,6 +2575,22 @@
         <value>not enough stack space left to compile an expression nested $2 levels deep</value>
       </entry>
     </diagnostic>
+
+    <diagnostic code="ZXQP0071" name="JSON_NESTING_EXCEEDED">
+      <comment>
+        A JSON value would be nested deeper than the fixed limit, or is too
+        deep to process with the machine stack that is left.
+      </comment>
+      <value>$1</value>
+
+      <entry key="Limit_2">
+        <value>JSON value nested more than $2 levels deep: flatten the value or split it into smaller values</value>
+      </entry>
+
+      <entry key="Stack">
+        <value>not enough stack space left for a JSON value nested this deep: flatten the value or split it into smaller values</value>
+      </entry>
+    </diagnostic>
       
     <diagnostic code="ZXQP8401" name="THESAURUS_VERSION_MISMATCH"
       if="!defined(ZORBA_NO_FULL_TEXT)">

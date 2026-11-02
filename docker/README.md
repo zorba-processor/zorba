@@ -16,9 +16,21 @@ The `zorba` command-line tool on Ubuntu 24.04, for `linux/amd64` and
 `linux/arm64` (one multi-arch tag; Docker pulls the matching platform).
 
 ```bash
-docker run --rm ghcr.io/zorba-processor/zorba:edge -q '1 + 1'
-docker run --rm -v "$PWD":/work ghcr.io/zorba-processor/zorba:edge -f -q query.xq
+docker run --rm ghcr.io/zorba-processor/zorba:edge -r -q '1 + 1'
+echo 'for $i in 1 to 3 return $i * $i' > query.xq
+docker run --rm -v "$PWD":/work ghcr.io/zorba-processor/zorba:edge -r -f -q query.xq
 ```
+
+The image also contains the MCP server `zorba-mcp`. The entrypoint runs it when
+the first argument is `zorba-mcp`; any other arguments go to `zorba`:
+
+```bash
+docker run -i --rm -v "$PWD:/data:ro" ghcr.io/zorba-processor/zorba:edge zorba-mcp --root /data
+```
+
+`images.yml` smoke-tests it (`docker/runtime/smoke-test.sh`) before it pushes.
+A run of that workflow on a branch other than `master` builds and tests the
+image and publishes nothing.
 
 | Tag | Points to | Moves? |
 |---|---|---|

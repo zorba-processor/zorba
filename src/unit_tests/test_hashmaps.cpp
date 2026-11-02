@@ -81,7 +81,7 @@ int test_hashmaps(int argc, char* argv[])
   for (int i = 0; i < num; ++i)
   {
     char tmp[20];
-    snprintf(tmp, sizeof(tmp), "%d", rand() % num);
+    (void)snprintf(tmp, sizeof(tmp), "%d", rand() % num); // an int fits in tmp
     str_buf[i] = tmp;
 
     //std::cout << str_buf[i] << std::endl;

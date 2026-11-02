@@ -33,8 +33,8 @@ XqdbClient::XqdbClient(unsigned int aPort)
 {
   theEventHandler->init();
 
-  theCommandLineHandler.reset(new CommandLineHandler(
-      aPort, *theIdQueue, *theQuitQueue, theEventHandler.get(), theCommandPrompt.get()));
+  theCommandLineHandler = std::make_unique<CommandLineHandler>(
+      aPort, *theIdQueue, *theQuitQueue, theEventHandler.get(), theCommandPrompt.get());
 }
 
 XqdbClient::~XqdbClient()

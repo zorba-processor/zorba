@@ -8,6 +8,7 @@
 <link rel="icon" href="assets/zorba-mark.svg" type="image/svg+xml">
 <link rel="icon" href="assets/favicon-32.png" type="image/png" sizes="32x32">
 <link rel="apple-touch-icon" href="assets/favicon-180.png">
+<link rel="alternate" type="text/markdown" href="index.md">
 <link rel="stylesheet" href="assets/site.css">
 </head>
 <body>
@@ -78,10 +79,12 @@
 
 <h2 id="start">Quick start</h2>
 <p>The fastest way to try Zorba is the container image published by the project. Run a query given on the command line:</p>
-<pre class="code shell"><code>docker run --rm ghcr.io/zorba-processor/zorba -q '1 + 1'</code></pre>
+<pre class="code shell"><code>docker run --rm ghcr.io/zorba-processor/zorba:edge -r -q '1 + 1'</code></pre>
+<p>This prints <code>2</code> with no final newline. <code>-r</code> omits the XML declaration, which is otherwise written before the result.</p>
 <p>Or mount the current directory and run a query file. The extension decides the language: <code>.xq</code> is XQuery, <code>.jq</code> is JSONiq.</p>
-<pre class="code shell"><code>docker run --rm -v "$PWD":/work ghcr.io/zorba-processor/zorba -i -f -q query.xq</code></pre>
-<p><code>-f</code> says the argument of <code>-q</code> is a file, <code>-i</code> indents the output. The examples on this site run with <code>zorba -i -r -f -q file</code>; <code>-r</code> omits the XML declaration. More flags are described in <a href="zorba.html#cli">Using Zorba</a>.</p>
+<pre class="code shell"><code>echo 'for $i in 1 to 3 return &lt;n&gt;{$i * $i}&lt;/n&gt;' &gt; query.xq
+docker run --rm -v "$PWD":/work ghcr.io/zorba-processor/zorba:edge -i -r -f -q query.xq</code></pre>
+<p><code>-f</code> says the argument of <code>-q</code> is a file, <code>-i</code> indents the output. The examples on this site run with <code>zorba -i -r -f -q file</code>; their files are in <a href="https://github.com/zorba-processor/zorba/tree/master/site/examples">site/examples</a>. More flags are described in <a href="zorba.html#cli">Using Zorba</a>.</p>
 
 <h2 id="source">Build from source</h2>
 <p>Zorba builds with CMake on Linux and macOS and needs a C++23 compiler, ICU, libxml2, libcurl and, for XML Schema support, Xerces-C. The repository's <a href="https://github.com/zorba-processor/zorba#readme">README</a> lists the packages for Debian, Ubuntu and Homebrew and the CMake presets to use.</p>
@@ -92,6 +95,7 @@
   <a href="xquery.html"><strong>XQuery</strong><span>Paths, FLWOR, constructors, functions, types, errors, updates, full text.</span></a>
   <a href="jsoniq.html"><strong>JSONiq</strong><span>Objects, arrays, navigation, null, updates, mixing JSON with XML.</span></a>
   <a href="zorba.html"><strong>Using Zorba</strong><span>The CLI, built-in modules, collections and indexes, scripting, C++ embedding.</span></a>
+  <a href="mcp.html"><strong>AI agents (MCP)</strong><span>Query a folder of XML, JSON, CSV and HTML files from an AI agent with zorba-mcp.</span></a>
   <a href="cheatsheet.html"><strong>Cheat sheet</strong><span>The syntax on one page.</span></a>
 </div>
 <p>Each example names the file it comes from. The examples and their data live in <a href="https://github.com/zorba-processor/zorba/tree/master/site/examples"><code>site/examples</code></a> in the repository; the examples share two data files, <a href="examples/data/books.xml"><code>books.xml</code></a> and <a href="examples/data/orders.json"><code>orders.json</code></a>.</p>

@@ -1,0 +1,2 @@
+# The snapshot is kept byte for byte (SOURCES.md lists SHA-256 sums).
+data/snapshot/** -text -diff

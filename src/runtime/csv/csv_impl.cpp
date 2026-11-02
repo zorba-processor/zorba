@@ -228,6 +228,27 @@ static void emit_csv_value(const store::Item_t& item,
 
 ///////////////////////////////////////////////////////////////////////////////
 
+void CsvParseIteratorState::reset( PlanState &state ) {
+  PlanIteratorState::reset( state );
+  //
+  // Every member that set_options() or a previous parse may have changed has
+  // to be restored: when the iterator is reset to parse another input (e.g.,
+  // in each iteration of a FLWOR expression), the field names of the previous
+  // input's header must not be reused, nor options that this call does not
+  // give.
+  //
+  cast_letter_booleans_ = true;
+  cast_unquoted_ = true;
+  csv_ = csv_parser();
+  extra_name_.clear();
+  keys_.clear();
+  line_no_ = 1;
+  missing_ = missing::null;
+  skip_called_ = false;
+  string_ = zstring();
+  value_ = zstring();
+}
+
 void CsvParseIterator::set_input( store::Item_t const &item,
                                   CsvParseIteratorState *state ) const {
   if ( item->isStreamable() )
@@ -246,6 +267,7 @@ void CsvParseIterator::set_options( store::Item_t const &item,
   char opt_char;
   zstring value;
 
+  get_bool_opt( item, "cast-letter-booleans", &state->cast_letter_booleans_, loc );
   get_bool_opt( item, "cast-unquoted-values", &state->cast_unquoted_, loc );
   get_string_opt( item, "extra-name", &state->extra_name_, loc );
   set_keys( item, &state->keys_, loc );
@@ -435,15 +457,22 @@ bool CsvParseIterator::nextImpl( store::Item_t &result,
             break;
         }
     } else if ( state->cast_unquoted_ && !quoted && !state->keys_.empty() ) {
-      if ( *value == "T" || *value == "Y" )
+      if ( state->cast_letter_booleans_ && ( *value == "T" || *value == "Y" ) )
         GENV_ITEMFACTORY->createBoolean( item, true );
-      else if ( *value == "F" || *value == "N" )
+      else if ( state->cast_letter_booleans_ && ( *value == "F" || *value == "N" ) )
         GENV_ITEMFACTORY->createBoolean( item, false );
       else {
         json::token t;
         switch ( parse_json( *value, state->parse_json_state_, &t ) ) {
           case json::boolean:
-            GENV_ITEMFACTORY->createBoolean( item, (*value)[0] == 't' );
+            //
+            // Read the character through c_str(): the non-const operator[]
+            // would make value_'s representation unsharable, and the next
+            // values (possibly the field names of the next input) would then
+            // be created from an unsharable representation, which costs a
+            // copy per value instead of a shared reference.
+            //
+            GENV_ITEMFACTORY->createBoolean( item, value->c_str()[0] == 't' );
             break;
           case json::null:
             GENV_ITEMFACTORY->createJSONNull( item );

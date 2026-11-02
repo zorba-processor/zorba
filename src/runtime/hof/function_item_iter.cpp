@@ -75,7 +75,7 @@ bool FunctionItemIterator::nextImpl(store::Item_t& result, PlanState& planState)
   if (numOuterVars > 0)
   {
     std::unique_ptr<dynamic_context> evalDctx;
-    evalDctx.reset(new dynamic_context(planState.theGlobalDynCtx));
+    evalDctx = std::make_unique<dynamic_context>(planState.theGlobalDynCtx);
 
     for (csize i = 0; i < numOuterVars; ++i)
     {
@@ -95,7 +95,7 @@ bool FunctionItemIterator::nextImpl(store::Item_t& result, PlanState& planState)
     }
 
     result = new FunctionItem(theFunctionItemInfo, evalDctx.get(), planState);
-    evalDctx.release();
+    (void)evalDctx.release(); // owned by the function item now
   }
   else
   {

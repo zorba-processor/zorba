@@ -17,7 +17,7 @@ xquery version "3.0";
  :)
 
 (:~
- : Read-only access to a directory tree of XML, JSON and CSV documents.
+ : Read-only access to a directory tree of XML, JSON, CSV and HTML documents.
  : <p/>
  : The documents stay ordinary files. Every call walks the tree again and
  : parses only the documents it returns, so the result always reflects the
@@ -34,10 +34,18 @@ xquery version "3.0";
  : <p/>
  : A document is returned as a record:
  : <pre>{ "path" : "orders/2026/q1.xml", "format" : "xml", "content" : ... }</pre>
- : where the content is a document node for XML, the parsed item for JSON
+ : where the content is a document node for XML and for HTML (parsed leniently
+ : as by <code>x:parse-html</code>, so that markup that is not well-formed
+ : still yields a document; HTML needs a build with XML Schema support, in
+ : other builds an HTML file yields the <code>UNSUPPORTED_FORMAT</code> error
+ : record), the parsed item for JSON
  : (an array of the items if the file holds several top-level items, as in
  : JSON Lines) and an array of row objects for CSV (the first line holds the
- : column names, see <code>csv:parse</code>). If the file cannot be read or
+ : column names, see <code>csv:parse</code>; the unquoted single letters
+ : <code>T</code>, <code>Y</code>, <code>F</code> and <code>N</code> stay strings,
+ : not booleans, so that a code column such as <code>D</code>/<code>N</code>
+ : is not corrupted; <code>true</code>, <code>false</code>, numbers and
+ : <code>null</code> are still cast). If the file cannot be read or
  : parsed, the record carries the error instead of the content, so that one
  : malformed file does not stop a query over the whole tree:
  : <pre>{ "path" : "broken/bad.json", "format" : "json",
@@ -50,6 +58,13 @@ xquery version "3.0";
  : policy that the query runs under applies to every access: with a read
  : path allow-list, files outside it cannot be read even through a symbolic
  : link.
+ : <p/>
+ : A relative system identifier of an external entity in an XML file is
+ : resolved against the location of the file. Whether the entity is read is
+ : up to the security policy: it needs the external-entities capability
+ : (which <code>zorba --directory</code> does not grant) and, for a file, a
+ : read path that covers it; a refused entity yields the error record of the
+ : document.
  :
  : @author Zorba contributors
  : @project Zorba/Data Converters/Directory
@@ -60,6 +75,9 @@ import module namespace file = "http://expath.org/ns/file";
 import module namespace jn = "http://jsoniq.org/functions";
 import module namespace csv = "http://zorba.io/modules/json-csv";
 import module namespace dc = "http://zorba.io/modules/directory-cache";
+(: BEGIN-HTML-IMPORT :)
+import module namespace x = "http://zorba.io/modules/xml";
+(: END-HTML-IMPORT :)
 
 declare namespace an = "http://zorba.io/annotations";
 declare namespace err = "http://www.w3.org/2005/xqt-errors";
@@ -171,6 +189,7 @@ declare %an:nondeterministic function dir:documents(
 (:~
  : Returns the format of a path, by extension (case-insensitive):
  : <code>xml</code> for .xml and .xhtml, <code>json</code> for .json,
+ : .geojson,
  : .jsonl and .ndjson, <code>csv</code> for .csv, <code>html</code> for
  : .html and .htm.
  :
@@ -187,7 +206,7 @@ declare function dir:format( $path as xs:string ) as xs:string?
   return
     switch ( $ext )
     case "xml" case "xhtml" return "xml"
-    case "json" case "jsonl" case "ndjson" return "json"
+    case "json" case "jsonl" case "ndjson" case "geojson" return "json"
     case "csv" return "csv"
     case "html" case "htm" return "html"
     default return ()
@@ -340,18 +359,21 @@ declare %private %an:nondeterministic function dir:parse(
 {
   switch ( $format )
   case "xml" return
+    (: The string that file:read-text returns streams the file and carries
+     : its path, which fn:parse-xml takes as the base URI of the external
+     : entities (instead of the static base URI of this module): keep the
+     : call direct, without materializing the string first. :)
     parse-xml( file:read-text( $full ) )
   case "json" return
     let $items := jn:parse-json( file:read-text( $full ) )
     return if ( count( $items ) eq 1 ) then $items else [ $items ]
   case "csv" return
-    [ csv:parse( file:read-text( $full ) ) ]
+    [ csv:parse( file:read-text( $full ),
+                { "cast-letter-booleans" : false } ) ]
   case "html" return
-    (: HOOK(parse-html): parse with parse-html() once it is available, e.g.
-     : parse-html( file:read-text( $full ) ). Until then HTML files are
-     : listed and reported as unsupported. :)
-    error( xs:QName( "dir:UNSUPPORTED_FORMAT" ),
-      "HTML documents are not parsed yet (parse-html() is not available)" )
+    (: BEGIN-HTML-BRANCH :)
+    x:parse-html( file:read-text( $full ) )
+    (: END-HTML-BRANCH :)
   default return
     error( xs:QName( "dir:UNSUPPORTED_FORMAT" ),
       "no parser for this file extension" )

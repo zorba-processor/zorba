@@ -53,6 +53,8 @@
 #include "zorbatypes/numconversions.h"
 #include "zorbautils/store_util.h"
 
+#include "runtime/json/nesting.h"
+
 #include "jsound_util.h"
 
 // Change to "1" to include $raise-file and $raise-line in annotated results.
@@ -1979,9 +1981,9 @@ void type::load_constraints( store::Item_t const &constraints_item,
     ASSERT_TYPE( item, "constraint", XS_STRING );
     zstring constraint_str( item->getStringValue() );
     try {
-      unique_ptr<constraint> c( new constraint( constraint_str, *s.sctx_ ) );
+      unique_ptr<constraint> c = std::make_unique<constraint>( constraint_str, *s.sctx_ );
       constraints_.push_back( c.get() );
-      c.release();
+      (void)c.release(); // owned by constraints_ now
     }
     catch ( ZorbaException const &e ) {
       ascii::replace_all( constraint_str, '\n', ' ' );
@@ -2130,6 +2132,7 @@ void type::to_json( store::Item_t *result ) const {
 
 bool type::validate( store::Item_t const &validate_item, bool do_cast,
                      store::Item_t *result ) const {
+  json_nesting::check_stack();
   DECL_FACET_type( type, this, enumeration );
   VALIDATE_FACET( enumeration,
     enumeration_type->is_enum_valid( validate_item ) );
@@ -2296,6 +2299,7 @@ schema::~schema() {
 }
 
 type const* schema::find_or_create_type( store::Item_t const &type_item ) {
+  json_nesting::check_stack();
   if ( IS_ATOMIC_TYPE( type_item, XS_STRING ) ) {
     zstring fq_name_str( type_item->getStringValue() );
     return fq_find_type( &fq_name_str );
@@ -2521,10 +2525,10 @@ type* schema::new_type( store::Item_t const &kind_item ) {
   zstring const kind_str( kind_item->getStringValue() );
   unique_ptr<type> t;
   switch ( find_kind( kind_str ) ) {
-    case k_atomic: t.reset( new atomic_type ); break;
-    case k_array : t.reset( new array_type  ); break;
-    case k_object: t.reset( new object_type ); break;
-    case k_union : t.reset( new union_type  ); break;
+    case k_atomic: t = std::make_unique<atomic_type>(); break;
+    case k_array : t = std::make_unique<array_type>(); break;
+    case k_object: t = std::make_unique<object_type>(); break;
+    case k_union : t = std::make_unique<union_type>(); break;
     default:
       throw XQUERY_EXCEPTION(
         jse::ILLEGAL_FACET_VALUE,

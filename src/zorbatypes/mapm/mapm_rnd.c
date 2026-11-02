@@ -297,8 +297,9 @@ M_APM		 atmp;
 atmp = M_get_stack_var();
 M_get_microsec(&sec3,&usec3);
 
-sprintf(buf1,"%ld",usec3);
-sprintf(buf2,"%lu",sec3);
+/* Both buffers hold any long. */
+(void)sprintf(buf1,"%ld",usec3);
+(void)sprintf(buf2,"%lu",sec3);
 M_reverse_string(buf2);
 strcat(buf1,buf2);
 

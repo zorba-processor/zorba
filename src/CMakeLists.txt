@@ -196,7 +196,7 @@ SET_TARGET_PROPERTIES(zorba_${ZORBA_STORE_NAME} PROPERTIES VERSION ${ZORBA_MAJOR
 SET_TARGET_PROPERTIES(zorba_${ZORBA_STORE_NAME} PROPERTIES CLEAN_DIRECT_OUTPUT 0)
 # INSTALL_NAME_DIR is a MacOS X-specific property that causes the
 # "install_name" property of binaries to be corrected at "make install" time.
-SET_TARGET_PROPERTIES(zorba_${ZORBA_STORE_NAME} PROPERTIES INSTALL_NAME_DIR "${CMAKE_INSTALL_PREFIX}/lib")
+SET_TARGET_PROPERTIES(zorba_${ZORBA_STORE_NAME} PROPERTIES INSTALL_NAME_DIR "@rpath")
 
 #
 # Specify where the zorba libs are to be installed

@@ -1,0 +1,109 @@
+name: clang-tidy
+
+# Runs clang-tidy with the repository's .clang-tidy over the C and C++ sources
+# of src/, modules/ and bin/, using the compile_commands.json of a Clang build
+# of the full-release preset in the Arch latest-toolchain builder (the image
+# of the linux-amd64-clang CI job). Any finding fails the job
+# (WarningsAsErrors). Not a required check.
+#
+# Generated sources are not analyzed: the Bison/Flex output in
+# src/compiler/parser, */pregenerated/* and anything under build/. Headers
+# are filtered by ExcludeHeaderFilterRegex in .clang-tidy.
+on:
+  pull_request:
+    # Only what clang-tidy reads: C/C++ sources and headers of the analyzed
+    # tree (and include/, which they include), its configuration and this
+    # workflow.
+    paths:
+      - 'src/**/*.c'
+      - 'src/**/*.cpp'
+      - 'src/**/*.h'
+      - 'src/**/*.hpp'
+      - 'src/**/*.tcc'
+      - 'include/**/*.h'
+      - 'include/**/*.hpp'
+      - 'include/**/*.tcc'
+      - 'modules/**/*.c'
+      - 'modules/**/*.cpp'
+      - 'modules/**/*.h'
+      - 'modules/**/*.hpp'
+      - 'bin/**/*.c'
+      - 'bin/**/*.cpp'
+      - 'bin/**/*.h'
+      - 'bin/**/*.hpp'
+      - '.clang-tidy'
+      - '.github/workflows/clang-tidy.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: clang-tidy-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  clang-tidy:
+    name: clang-tidy (unchecked return values)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Builder image
+        uses: ./.github/actions/builder-image
+        with:
+          context: docker/builder-latest
+          cache-scope: linux-amd64-latest
+
+      - uses: actions/cache@v6
+        with:
+          path: .ccache
+          key: ccache-v2-clang-tidy-${{ github.sha }}
+          restore-keys: ccache-v2-clang-tidy-
+
+      # The build produces the headers that CMake configures or generates.
+      # ZORBA_USE_PCH=OFF: compile_commands.json must not reference a
+      # precompiled header that clang-tidy would have to load.
+      # ZORBA_WITH_DEBUGGER=ON: src/debugger and bin/debugger are analyzed too.
+      - name: Configure and build (Clang)
+        run: |
+          docker run --rm \
+            -e CC=clang -e CXX=clang++ \
+            -e CCACHE_DIR=/src/.ccache \
+            -e CCACHE_SLOPPINESS=pch_defines,time_macros -e CCACHE_DEPEND=1 \
+            -v "$PWD":/src -w /src zorba-builder:ci sh -ec '
+              cmake --preset full-release -DZORBA_USE_PCH=OFF -DZORBA_WITH_DEBUGGER=ON
+              cmake --build --preset full-release -- -k 0
+              ccache -s'
+
+      # -source-filter keeps the analyzed translation units: src/, modules/
+      # and bin/ minus the generated ones. The summary prints the number of
+      # findings by check and by top-level directory, then every finding.
+      - name: Run clang-tidy
+        run: |
+          docker run --rm -v "$PWD":/src -w /src zorba-builder:ci sh -ec '
+            clang-tidy --version
+            mkdir -p build/tidy
+            rc=0
+            run-clang-tidy -p build/full-release -j"$(nproc)" -quiet \
+              -source-filter "^/src/(src|modules|bin)/(?!(.*/)?pregenerated/)(?!(.*/)?compiler/parser/(xquery|jsoniq)_(parser|scanner)[.]cpp$)" \
+              > build/tidy/clang-tidy.log 2>&1 || rc=$?
+            sed -nE "/: (warning|error): .*\[[a-z0-9.,-]+\]$/p" build/tidy/clang-tidy.log \
+              | sort -u > build/tidy/findings.txt
+            sed -n "/^Running clang-tidy/p" build/tidy/clang-tidy.log
+            echo "findings: $(wc -l < build/tidy/findings.txt)"
+            sed -E "s/.*\[([a-z0-9.-]+).*\]$/\1/" build/tidy/findings.txt | sort | uniq -c
+            sed -E "s#^/src/([a-z]+)/.*#\1#" build/tidy/findings.txt | sort | uniq -c
+            cat build/tidy/findings.txt
+            sed -nE "/clang-diagnostic-error|Error while processing/p" build/tidy/clang-tidy.log | head -50
+            exit $rc'
+
+      - name: Upload the clang-tidy log
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: clang-tidy-log
+          path: |
+            build/tidy/clang-tidy.log
+            build/tidy/findings.txt

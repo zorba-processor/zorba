@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<orders quarter="2026-Q1">
+  <order id="o1" customer="acme"><total>100</total></order>
+  <order id="o2" customer="globex"><total>250</total></order>
+</orders>

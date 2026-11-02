@@ -189,11 +189,11 @@ void cacheable_function::computeCacheSettings(XQueryDiagnostics* aDiag)
     useDefaultCachingSettings();
 
   theAreCacheSettingsComputed = true;
-  theCache.reset(new FunctionCache(
+  theCache = std::make_unique<FunctionCache>(
       theModuleSctx,
       theExcludeFromCacheKey,
       theCompareWithDeepEqual,
-      theCacheAcrossSnapshots));
+      theCacheAcrossSnapshots);
 }
 
 

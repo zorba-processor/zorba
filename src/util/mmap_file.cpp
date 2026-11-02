@@ -34,8 +34,11 @@ namespace zorba {
 void mmap_file::close() {
   if ( addr_ && ::munmap( static_cast<char*>( addr_ ), size_ ) == -1 )
     throw ZORBA_IO_EXCEPTION( "munmap()", path_ );
+  // The data goes through the mapping, already unmapped, not through the
+  // descriptor, so a failing close() cannot lose any; close() also runs in
+  // the destructor, which must not throw.
   if ( fd_ != -1 )
-    ::close( fd_ );
+    (void)::close( fd_ );
   init();
 }
 

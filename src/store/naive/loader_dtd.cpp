@@ -272,8 +272,11 @@ void FragmentXmlLoader::startParser()
 {
   FragmentIStream &fs = *theFragmentStream;
 
+  // Relative external entities resolve against this URI.
+  char const *const input_uri =
+    parserInputUri(*fs.theStream, zstring(), theBaseUri);
   fs.ctxt = xmlCreatePushParserCtxt(&theSaxHandler, NULL, NULL, 0,
-                                    get_uri( *fs.theStream ));
+                                    *input_uri ? input_uri : NULL);
   if (fs.ctxt == NULL)
   {
     theXQueryDiagnostics->add_error(NEW_ZORBA_EXCEPTION(zerr::ZSTR0021_LOADER_PARSING_ERROR, ERROR_PARAMS( ZED( XMLParserInitFailed ) )));
@@ -920,11 +923,8 @@ store::Item_t DtdXmlLoader::loadXml(
 
   theBaseUri = baseUri;
 
-  char const *doc_uri;
-  if ( char const *const stream_uri = get_uri( stream ) )
-    doc_uri = stream_uri;
-  else
-    doc_uri = docUri.c_str();
+  // Relative external entities resolve against this URI.
+  char const *const doc_uri = parserInputUri(stream, docUri, baseUri);
 
   if (docUri.empty())
   {

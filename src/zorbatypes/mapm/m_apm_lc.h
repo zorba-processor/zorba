@@ -293,6 +293,9 @@ extern   void   memory_free(void *);
 #endif
 
 #define	M_APM_IDENT 0x6BCC9AE5
+/* Zorba: m_apm_data points right after the struct, in the same allocation
+   (m_apm_init, m_apm_init_compact_copy); M_APM_IDENT: separate allocation */
+#define	M_APM_IDENT_INLINE 0x6BCC9AE6
 
 #define	M_APM_RETURN 0
 #define	M_APM_FATAL 1
@@ -353,6 +356,7 @@ extern	void	M_5x_do_it(M_APM, int, M_APM);
 extern	void	M_4x_do_it(M_APM, int, M_APM);
 
 extern	M_APM	M_get_stack_var(void);
+extern	void	*M_apm_realloc_data(M_APM, int);
 extern	void	M_restore_stack(int);
 extern	int 	M_get_sizeof_int(void);
 

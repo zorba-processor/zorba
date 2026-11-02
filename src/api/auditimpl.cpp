@@ -195,7 +195,7 @@ void ConfigurationImpl::enableAudit(size_t i) {
 void ConfigurationImpl::enableAudit(const String& aPropertyName) {
   DynPropsMap::const_iterator it = m_dyn_props.find(aPropertyName);
   if (it == m_dyn_props.end()) {
-    std::unique_ptr<PropertyImpl> lImpl(new PropertyImpl(aPropertyName));
+    std::unique_ptr<PropertyImpl> lImpl = std::make_unique<PropertyImpl>(aPropertyName);
     m_dyn_props[aPropertyName] = lImpl.release();
   }
 }

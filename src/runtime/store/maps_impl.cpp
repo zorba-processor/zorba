@@ -635,7 +635,7 @@ MapInsertIterator::nextImpl(
         ERROR_PARAMS(lName->getLocalName(), lType));
       }
 
-      std::unique_ptr<store::IndexKey> k(new store::IndexKey());
+      std::unique_ptr<store::IndexKey> k = std::make_unique<store::IndexKey>();
       for (size_t i = 0; i < lKeyAttrs.size(); ++i)
       {
         k->push_back(lKeyAttrs[i]);
@@ -646,7 +646,7 @@ MapInsertIterator::nextImpl(
       {
         // the index took the ownership over the key if the index
         // did _not_ already contain an entry with the same key
-        k.release();
+        (void)k.release();
       }
     }
   }

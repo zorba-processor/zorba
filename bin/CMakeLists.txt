@@ -67,6 +67,12 @@ ZORBA_SET_TEST_PROPERTY(bin/zorba_f1 PASS_REGULAR_EXPRESSION ".*file {blub.xq} n
 ZORBA_ADD_TEST(bin/zorba1 zorbacmd --omit-xml-declaration -q "1+1")
 ZORBA_SET_TEST_PROPERTY(bin/zorba1 PASS_REGULAR_EXPRESSION "2")
 
+# -r omits the XML declaration. The exact output, "2" with no final newline,
+# is checked by test/install/relocated, which compares it with STREQUAL.
+ZORBA_ADD_TEST(bin/zorba_r_one_plus_one zorbacmd -r -q "1 + 1")
+ZORBA_SET_TEST_PROPERTY(bin/zorba_r_one_plus_one PASS_REGULAR_EXPRESSION "^2")
+ZORBA_SET_TEST_PROPERTY(bin/zorba_r_one_plus_one FAIL_REGULAR_EXPRESSION "<\\?xml")
+
 ZORBA_ADD_TEST(bin/zorba2 zorbacmd --serialize-html -q "1+1")
 ZORBA_SET_TEST_PROPERTY(bin/zorba2 PASS_REGULAR_EXPRESSION "2")
 
@@ -226,6 +232,15 @@ IF (ZORBA_WITH_FILE_ACCESS)
   ZORBA_SECURITY_TEST(dir_join
     "{ \"order\" : \"o1\", \"file\" : \"orders/2026/q1.xml\", \"total\" : 100, \"status\" : \"paid\" }\n{ \"order\" : \"o2\""
     --directory "${_dirtree}" -f -q "${_dirq}/join.xq")
+  IF (ZORBA_NO_XMLSCHEMA)
+    ZORBA_SECURITY_TEST(dir_html_unsupported
+      "html-html-false-UNSUPPORTED_FORMAT"
+      --directory "${_dirtree}" -f -q "${_dirq}/html-unsupported.xq")
+  ELSE (ZORBA_NO_XMLSCHEMA)
+    ZORBA_SECURITY_TEST(dir_html
+      "html-html-true-HTML report"
+      --directory "${_dirtree}" -f -q "${_dirq}/html.xq")
+  ENDIF (ZORBA_NO_XMLSCHEMA)
   ZORBA_SECURITY_DENIED(dir_doc_escape FODC0002 "access denied by security policy"
     --directory "${_dirtree}" -f -q "${_dirq}/doc-escape.xq")
   ZORBA_SECURITY_DENIED(dir_symlink_escape FOFL9999 "access denied by security policy"
@@ -245,10 +260,42 @@ IF (ZORBA_WITH_FILE_ACCESS)
   # is on the policy's list.
   ZORBA_SECURITY_TEST(dir_native_allowed "\"native-1\""
     --directory "${_dirtree}" -f -q "${_dirq}/native-allowed.xq")
+  # A wordnet: thesaurus other than the built-in one reads a data file in the
+  # library path, outside the directory.
+  IF (NOT ZORBA_NO_FULL_TEXT)
+    ZORBA_SECURITY_DENIED(dir_wordnet_denied FTST0018 "access denied by security policy"
+      --directory "${_dirtree}" -f -q "${_dirq}/wordnet-denied.xq")
+  ENDIF (NOT ZORBA_NO_FULL_TEXT)
   ZORBA_SECURITY_DENIED(dir_native_denied ZXQP0067 "http://zorba.io/modules/sleep"
     --directory "${_dirtree}" -f -q "${_dirq}/native-denied.xq")
   ZORBA_SET_TEST_PROPERTY(bin/zorba_security_dir_native_denied
     FAIL_REGULAR_EXPRESSION "native-loaded")
+  # External entities in the documents: the module resolves a relative system
+  # identifier against the URI of the file, and the policy decides whether
+  # the entity is read. --directory does not grant external-entities, so no
+  # entity is read; a policy that grants it with the root as the read path
+  # reads the entity next to the document and refuses the one outside the
+  # root, in the error record of the file.
+  SET (_direnttree "${CMAKE_SOURCE_DIR}/test/rbkt/Queries/zorba/directory/entity-tree")
+  ZORBA_SECURITY_TEST(dir_entity_directory
+    "docs/note.xml=FODC0006:[^\n]*URI access not allowed"
+    --directory "${_direnttree}" -f -q "${_dirq}/entity.xq")
+  ZORBA_SECURITY_TEST(dir_entity_outside
+    "escape.xml=FODC0006:[^\n]*URI access not allowed"
+    --secure --allow external-entities,file-read,native-modules
+    --read-path "${_direnttree}"
+    -f -q "${_dirq}/entity.xq" -e "root:=${_direnttree}")
+  ZORBA_SET_TEST_PROPERTY(bin/zorba_security_dir_entity_outside
+    FAIL_REGULAR_EXPRESSION "TOP-SECRET-ENTITY")
+  ZORBA_SET_TEST_PROPERTY(bin/zorba_security_dir_entity_directory
+    FAIL_REGULAR_EXPRESSION "TOP-SECRET-ENTITY|entity next to the document")
+  ZORBA_SECURITY_TEST(dir_entity_inside
+    "docs/note.xml=entity next to the document"
+    --secure --allow external-entities,file-read,native-modules
+    --read-path "${_direnttree}"
+    -f -q "${_dirq}/entity.xq" -e "root:=${_direnttree}")
+  ZORBA_SET_TEST_PROPERTY(bin/zorba_security_dir_entity_inside
+    FAIL_REGULAR_EXPRESSION "TOP-SECRET-ENTITY")
   ZORBA_SECURITY_TEST(dir_widen "--directory cannot be combined with"
     --directory "${_dirtree}" --allow network -q "1")
   ZORBA_SECURITY_TEST(dir_not_directory "--directory: not a directory"
@@ -282,9 +329,10 @@ IF (ZORBA_WITH_FILE_ACCESS)
     SET (_mcpq "${CMAKE_CURRENT_SOURCE_DIR}/test/mcp/queries")
     FOREACH (_t json protocol legacy tools_list list_documents join
              syntax_error escape network native_modules predefined limits binary
+             optional_params documents_stream deep_json deep_json_binary
+             entity_expansion case_paths html_edge_cases
              cache_hit cache_invalidate cache_evict cache_off cache_policy
-             cache_inject
-             documents_stream)
+             cache_inject)
       ADD_TEST (NAME bin/mcp/${_t}
         COMMAND "mcp_tests${_mcp_suffix}" ${_t} "${_dirtree}" "${_mcpq}"
           "${_dirq}/join.xq" "$<TARGET_FILE:zorba_mcp${_mcp_suffix}>")
@@ -313,6 +361,15 @@ ZORBA_SET_TEST_PROPERTY(bin/zorba_compilechk2 PASS_REGULAR_EXPRESSION ".*XPST000
 # test for bug #2934414
 ZORBA_ADD_TEST(bin/zorba_compilechk3 zorbacmd -q "${CMAKE_CURRENT_SOURCE_DIR}/test/mymod2.xq" -f -l -x)
 ZORBA_SET_TEST_PROPERTY(bin/zorba_compilechk3 PASS_REGULAR_EXPRESSION ".*XQST0046.*mymod2.xq.*line-begin=['\"]17['\"] column-begin=['\"]1['\"] line-end=['\"]17['\"] column-end=['\"]26['\"].*")
+
+# --profile json writes valid JSON for an iterator that was never opened (the
+# body of a cached call): no nan or inf, no counter read from uninitialized
+# memory (4294967295 is an unsigned counter that wrapped or was never set).
+ZORBA_ADD_TEST(bin/zorba_profile_json zorbacmd --profile json --no-tree-ids --no-serializer
+  -f -q "${CMAKE_SOURCE_DIR}/test/rbkt/Queries/zorba/caching/simple-01.xq")
+ZORBA_SET_TEST_PROPERTY(bin/zorba_profile_json PASS_REGULAR_EXPRESSION "\"prof-calls\"")
+ZORBA_SET_TEST_PROPERTY(bin/zorba_profile_json
+  FAIL_REGULAR_EXPRESSION ": -?(nan|inf)|4294967295")
 
 # test the --option option to set an option in the static context
 ZORBA_ADD_TEST(bin/zorba_option zorbacmd -q "${CMAKE_CURRENT_SOURCE_DIR}/test/option.xq" -f --option "{http://zorba.io/}option=value")
@@ -383,6 +440,19 @@ ZORBA_ADD_TEST(bin/zorba_module_path_1 zorbacmd
   --module-path "${_libdir}${PATH_SEP}${_uridir}")
 ZORBA_SET_TEST_PROPERTY(bin/zorba_module_path_1
   PASS_REGULAR_EXPRESSION "hello, v2")
+
+# A relative module path is taken against the current directory, also under
+# --secure; a path that leaves the current directory does not grant it.
+ZORBA_SECURITY_TEST(module_path_relative_secure "hello, v2"
+  --secure -f -q "${_testdir}/versioning/import1.xq" --module-path .)
+ZORBA_SET_TEST_PROPERTY(bin/zorba_security_module_path_relative_secure
+  WORKING_DIRECTORY "${_uridir}")
+ZORBA_SECURITY_DENIED(module_path_dotdot_secure XQST0059 "access denied by security policy"
+  --secure -f -q "${_testdir}/versioning/import1.xq" --module-path ../elsewhere)
+ZORBA_SET_TEST_PROPERTY(bin/zorba_security_module_path_dotdot_secure
+  WORKING_DIRECTORY "${_uridir}")
+ZORBA_SET_TEST_PROPERTY(bin/zorba_security_module_path_dotdot_secure
+  FAIL_REGULAR_EXPRESSION "hello, v2")
 
 # test compilation of the perf script
 ZORBA_ADD_TEST(bin/zorba_compilechk4 zorbacmd 

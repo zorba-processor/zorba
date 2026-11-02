@@ -103,7 +103,7 @@ public:
    *  Returns 0 on success
    *  Returns 2 if both the Date and the Time have a timezone, and they differ (FORG0008)
    */
-  static int createDateTime(
+  [[nodiscard]] static int createDateTime(
         const DateTime* date,
         const DateTime* time,
         DateTime& result);
@@ -113,7 +113,7 @@ public:
    *  years. No TimeZone.
    *  Returns 0 on success
    */
-  static int createDateTime(
+  [[nodiscard]] static int createDateTime(
         int years,
         int months,
         int days,
@@ -128,7 +128,7 @@ public:
    *  years. TimeZone may be NULL
    *  Returns 0 on success
    */
-  static int createDateTime(
+  [[nodiscard]] static int createDateTime(
         int years,
         int months,
         int days,
@@ -143,7 +143,7 @@ public:
    *  years. TimeZone may be NULL
    *  Returns 0 on success
    */
-  static int createDateTime(
+  [[nodiscard]] static int createDateTime(
         int years,
         int months,
         int days,
@@ -159,7 +159,7 @@ public:
    *  TimeZone may be NULL
    *  Returns 0 on success
    */
-  static int createDate(
+  [[nodiscard]] static int createDate(
         int years,
         int months,
         int days,
@@ -171,7 +171,7 @@ public:
    *  is a reference
    *  Returns 0 on success
    */
-  static int createTime(
+  [[nodiscard]] static int createTime(
         int hours,
         int minutes,
         double seconds,
@@ -182,77 +182,77 @@ public:
    *  The function will use the absolute value of the months parameter.
    *  Returns 0 on success
    */
-  static int createGYearMonth(int years, int months, DateTime& dt);
+  [[nodiscard]] static int createGYearMonth(int years, int months, DateTime& dt);
   
   /**
    *  Returns 0 on success
    */
-  static int createGYear(int years, DateTime& dt);
+  [[nodiscard]] static int createGYear(int years, DateTime& dt);
 
   /**
    *  The function will use the absolute values of all int parameters.
    *  Returns 0 on success
    */
-  static int createGMonth(int months, DateTime& dt);
+  [[nodiscard]] static int createGMonth(int months, DateTime& dt);
 
   /**
    *  The function will use the absolute values of all int parameters.
    *  Returns 0 on success
    */
-  static int createGMonthDay(int months, int days, DateTime& dt);
+  [[nodiscard]] static int createGMonthDay(int months, int days, DateTime& dt);
   
   /**
    *  The function will use the absolute values of all int parameters.
    *  Returns 0 on success
    */
-  static int createGDay(int days, DateTime& dt);
+  [[nodiscard]] static int createGDay(int days, DateTime& dt);
 
   static int getLocalTime(DateTime& dt);
 
   /**
    *  Returns 0 on success
    */
-  static int parseDateTime(const char* str, ascii::size_type strlen, DateTime& dt);
+  [[nodiscard]] static int parseDateTime(const char* str, ascii::size_type strlen, DateTime& dt);
       
   /**
    *  Returns 0 on success
    */
-  static int parseDate(const char* str, ascii::size_type strlen, DateTime& dt);
+  [[nodiscard]] static int parseDate(const char* str, ascii::size_type strlen, DateTime& dt);
       
   /**
    *  Returns 0 on success
    */
-  static int parseTime(const char* str, ascii::size_type strlen, DateTime& dt);
+  [[nodiscard]] static int parseTime(const char* str, ascii::size_type strlen, DateTime& dt);
       
   /**
    *  Returns 0 on success
    */
-  static int parseGYearMonth(const char* str, ascii::size_type strlen, DateTime& dt);
+  [[nodiscard]] static int parseGYearMonth(const char* str, ascii::size_type strlen, DateTime& dt);
 
   /**
    *  Returns 0 on success
    */
-  static int parseGYear(const char* str, ascii::size_type strlen, DateTime& dt);
+  [[nodiscard]] static int parseGYear(const char* str, ascii::size_type strlen, DateTime& dt);
 
   /**
    *  Returns 0 on success
    */
-  static int parseGMonth(const char* str, ascii::size_type strlen, DateTime& dt);
+  [[nodiscard]] static int parseGMonth(const char* str, ascii::size_type strlen, DateTime& dt);
 
   /**
    *  Returns 0 on success
    */
-  static int parseGMonthDay(const char* str, ascii::size_type strlen, DateTime& dt);
+  [[nodiscard]] static int parseGMonthDay(const char* str, ascii::size_type strlen, DateTime& dt);
 
   /**
    *  Returns 0 on success
    */
-  static int parseGDay(const char* str, ascii::size_type strlen, DateTime& dt);
+  [[nodiscard]] static int parseGDay(const char* str, ascii::size_type strlen, DateTime& dt);
 
   static int getDayOfYear(int year, int month, int day);
 
 protected:
-  static int parse_date(
+  [[nodiscard]] static int parse_date(
         const char* str,
         ascii::size_type strlen,
         ascii::size_type& position,
@@ -260,7 +260,7 @@ protected:
         long& month,
         long& day);
 
-  static int parse_time(
+  [[nodiscard]] static int parse_time(
         const char* str,
         ascii::size_type strlen,
         ascii::size_type& position,

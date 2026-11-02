@@ -118,8 +118,8 @@ CDynamicContext::get_context_item(
     // Wrap in a CSequence to produce an XQC_Sequence. We pass
     // "true" to make CSequence assume memory-management
     // responsibility for the SingleItemSequence.
-    std::unique_ptr<CSequence> lSeq(new CSequence(lItemSeq.get(), true, NULL));
-    lItemSeq.release();
+    std::unique_ptr<CSequence> lSeq = std::make_unique<CSequence>(lItemSeq.get(), true, nullptr);
+    (void)lItemSeq.release(); // owned by lSeq now
     (*value) = lSeq.release()->getXQC();
     return XQC_NO_ERROR;
   }
@@ -188,10 +188,9 @@ CDynamicContext::get_variable(
       // Wrap in a CSequence to produce an XQC_Sequence. We pass
       // "true" to make CSequence assume memory-management
       // responsibility for the SingleItemSequence.
-      std::unique_ptr<CSequence> lSeq
-        (new CSequence(lItemSeq.get(), true, NULL));
+      std::unique_ptr<CSequence> lSeq = std::make_unique<CSequence>(lItemSeq.get(), true, nullptr);
       
-      lItemSeq.release();
+      (void)lItemSeq.release(); // owned by lSeq now
       (*seq) = lSeq.release()->getXQC();
       return XQC_NO_ERROR;
     }

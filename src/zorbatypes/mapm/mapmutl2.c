@@ -199,7 +199,7 @@ void m_apm_copy(M_APM dest, M_APM src)
 
   if (j > dest->m_apm_malloclength)
   {
-    if ((vp = MAPM_REALLOC(dest->m_apm_data, (j + 32))) == NULL)
+    if ((vp = M_apm_realloc_data(dest, (j + 32))) == NULL)
     {
        M_apm_log_error_msg(M_APM_FATAL, "\'m_apm_copy\', Out of memory");
     }
@@ -310,7 +310,7 @@ void M_long_2_ascii(char* output, long input)
   // problems at 'LONG_MIN', etc
   if ((m > t) || (m < -t))
   {
-    sprintf(p, "%ld", m);
+    (void)sprintf(p, "%ld", m);   /* room reserved by the caller */
   }
   else
   {

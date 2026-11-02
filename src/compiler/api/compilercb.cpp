@@ -213,6 +213,8 @@ std::atomic<long> QueryResources::theNumAlive(0);
 
 std::atomic<unsigned long> QueryResources::theNumWalks(0);
 
+std::atomic<unsigned long> QueryResources::theFailWalkAtEdge(0);
+
 
 long query_resources_alive()
 {
@@ -223,6 +225,12 @@ long query_resources_alive()
 unsigned long query_resources_walks()
 {
   return QueryResources::theNumWalks.load();
+}
+
+
+void query_resources_fail_walk(unsigned long edge)
+{
+  QueryResources::theFailWalkAtEdge.store(edge);
 }
 
 

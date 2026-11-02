@@ -382,7 +382,7 @@ void operator&(Archiver& ar, float& obj)
     if (isdigit(float_str.c_str()[0]))
     {
       char strtemp[100];
-      snprintf(strtemp, sizeof(strtemp), "%.7e", (double)obj);
+      (void)snprintf(strtemp, sizeof(strtemp), "%.7e", (double)obj); // fits in strtemp
       float_str = strtemp;
     }
 
@@ -413,7 +413,7 @@ void operator&(Archiver& ar, double& obj)
     if (isdigit(double_str.c_str()[0]))
     {
       char strtemp[100];
-      snprintf(strtemp, sizeof(strtemp), "%.16e", obj);
+      (void)snprintf(strtemp, sizeof(strtemp), "%.16e", obj); // fits in strtemp
       double_str = strtemp;
     }
 

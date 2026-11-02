@@ -396,10 +396,8 @@ static int compileAndExecute( Zorba *zorba,
 
     string planFilePath = qfilepath;
     planFilePath += ".plan";
-    planFile.reset(
-      new fstream(
-        planFilePath.c_str(), ios::in | ios::out | ios::trunc | ios::binary
-      )
+    planFile = std::make_unique<fstream>(
+      planFilePath.c_str(), ios::in | ios::out | ios::trunc | ios::binary
     );
     planFilep = planFile.get();
     assert(planFilep->good());
@@ -800,9 +798,9 @@ int main( int argc, char const *argv[] ) {
 
     if ( as_file ) {
       fs::make_absolute( &path );
-      qstream.reset( new ifstream( path.c_str() ) );
+      qstream = std::make_unique<ifstream>( path.c_str() );
     } else {
-      qstream.reset( new istringstream( uri ) );
+      qstream = std::make_unique<istringstream>( uri );
     }
 
     if ( as_file && (!qstream->good() || qstream->eof()) ) {

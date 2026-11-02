@@ -61,6 +61,7 @@
 #include <zorba/internal/unique_ptr.h>
 
 #include "json_loader.h"
+#include "nesting.h"
 
 
 namespace zorba {
@@ -326,6 +327,8 @@ JSONDecodeFromRoundtripIterator::decodeObject(
   store::Item_t& aResult,
   JSONDecodeFromRoundtripIteratorState* aState) const
 {
+  json_nesting::check_stack();
+
   if (decodeXDM(anObj, aResult, aState))
   {
     return true;
@@ -365,6 +368,8 @@ JSONDecodeFromRoundtripIterator::decodeArray(
   store::Item_t& aResult,
   JSONDecodeFromRoundtripIteratorState* aState) const
 {
+  json_nesting::check_stack();
+
   std::vector<store::Item_t> newItems;
   bool modified = false;
 
@@ -470,6 +475,8 @@ JSONEncodeForRoundtripIterator::encodeObject(
   store::Item_t& aResult,
   JSONEncodeForRoundtripIteratorState* aState) const
 {
+  json_nesting::check_stack();
+
   std::vector<store::Item_t> newNames;
   std::vector<store::Item_t> newValues;
   bool modified = false;
@@ -504,6 +511,8 @@ JSONEncodeForRoundtripIterator::encodeArray(
   store::Item_t& aResult,
   JSONEncodeForRoundtripIteratorState* aState) const
 {
+  json_nesting::check_stack();
+
   std::vector<store::Item_t> newItems;
   bool modified = false;
 
@@ -649,7 +658,7 @@ JSONEncodeForRoundtripIterator::encodeNode(
     }
 
     // and now serialize
-    std::unique_ptr<std::stringstream> lResultStream(new std::stringstream());
+    std::unique_ptr<std::stringstream> lResultStream = std::make_unique<std::stringstream>();
     lItemIt->open();
     lSerializer.serialize(lItemIt, *lResultStream.get());
     lItemIt->close();
@@ -658,7 +667,7 @@ JSONEncodeForRoundtripIterator::encodeNode(
     GENV_ITEMFACTORY->createStreamableString(
         values.at(1), *lResultStream.get(),
         FnSerializeIterator::streamReleaser, true);
-    lResultStream.release();
+    (void)lResultStream.release(); // owned by the streamable item now
   }
 
   GENV_ITEMFACTORY->createJSONObject(aResult, names, values);
@@ -906,7 +915,7 @@ bool JSONParseIterator::nextImpl(
 void MultiObjectKeysIteratorState::init(PlanState& planState)
 {
   PlanIteratorState::init(planState);
-  theUniqueKeys.reset(new HashSet<zstring, HashMapZStringCmp>(64, false));
+  theUniqueKeys = std::make_unique<HashSet<zstring, HashMapZStringCmp>>(64, false);
 }
 
 

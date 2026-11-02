@@ -73,6 +73,9 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - JSound schema imports and `$constraints` (`jsd:validate`, `jsd:annotate`) now run under the security policy of the calling query instead of the instance policy, so a query restricted with `StaticContext::setSecurityPolicy()` can no longer read files or reach the network through them. ([#106](https://github.com/zorba-processor/zorba/pull/106))
 - `zorba --directory <dir>` runs the query under the secure policy with only `file-read` (restricted to `<dir>`) and `native-modules` allowed; options that would widen it (`--allow`, `--read-path`, `--write-path`, `--network-prefix`, `--private-addresses allow`) are rejected. The directory module rejects paths with `..` segments, absolute paths and paths through symbolic links (`dir:INVALID_PATH`), and its listing does not follow symbolic links. ([#111](https://github.com/zorba-processor/zorba/pull/111))
 - `zorba-mcp` runs every query under the same policy as `zorba --directory`: the secure policy with only `file-read` (restricted to the root) and `native-modules` allowed. ([#112](https://github.com/zorba-processor/zorba/pull/112))
+- `SecurityPolicy::addNativeModule()` restricts `Capability::NativeModules` to the listed module namespace URIs; importing any other native module raises `zerr:ZXQP0067` naming the module. With no entries, `NativeModules` applies to every native module as before. The list is part of the serialized execution plan, so plans saved by earlier versions no longer load (plan archive version 28). ([#115](https://github.com/zorba-processor/zorba/pull/115))
+- `zorba --directory` and `zorba-mcp` allow only the native file module (`http://expath.org/ns/file`), which the directory module uses; a query under them can no longer load other native modules in the library path, such as zorba-query or sleep. ([#115](https://github.com/zorba-processor/zorba/pull/115))
+- A `wordnet:` thesaurus URI other than the built-in default reads a data file from the library path and loads no native code. It now needs `Capability::FileRead` with no read-path list instead of `Capability::NativeModules`, so under `zorba --directory` and `zorba-mcp` it is denied with `err:FTST0018`. The built-in thesaurus stays allowed without a capability. ([#120](https://github.com/zorba-processor/zorba/pull/120))
 
 ### Added
 
@@ -116,6 +119,9 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - `zorba --directory <dir>`: runs the query with the directory module's `$dir:root` bound to `<dir>` and writes the result as JSON, one item per line. ([#111](https://github.com/zorba-processor/zorba/pull/111))
 - `zorba-mcp --root <dir> [--queries <dir>] [--timeout <seconds>] [--max-output <bytes>]`: an MCP server (JSON-RPC 2.0 over stdio) that lets an AI agent query a directory of XML, JSON and CSV documents. It implements MCP 2026-07-28 (per-request `_meta`, `server/discover`) and, after an `initialize` request, the handshake revisions 2025-11-25, 2025-06-18 and 2025-03-26. Tools: `list_documents`, `run_query` (a JSONiq/XQuery query with the directory module's `$dir:root` bound; the result is JSON, one item per line) and one tool per `<name>.jq` file in `--queries` (its leading comment is the description, its external variables are string parameters). A failed query returns the Zorba error code, message and the line and column of the failing expression. Output longer than `--max-output` (default 128 KiB) is cut with a marker; each call is limited to `--timeout` seconds (default 30). ([#112](https://github.com/zorba-processor/zorba/pull/112))
 - Add an opt-in to run the W3C QT3 suite under the secure policy (`test/fots/qt3_run.py --policy secure`, QT3 workflow input `policy`): the driver and the test-case queries get only file-read under the suite, driver, manifest and expected-failures directories plus native modules; the default run is unchanged. ([#113](https://github.com/zorba-processor/zorba/pull/113))
+- Agent benchmark (`bench/agents/`): the same model answers 20 situational-awareness tasks over a frozen, multi-format snapshot of public geospatial feeds (USGS earthquakes as GeoJSON, CSV and QuakeML; CelesTrak OMM XML and CSV; GDACS RSS; Open-Meteo JSON; NASA FIRMS CSV; an NHC HTML table; one deliberately truncated JSON file) with either the `zorba-mcp` tools or a sandboxed bash tool, measuring correctness, tool calls, tokens, cost, wall time and repeatability. The ground truth is computed twice, by a Python reference and by JSONiq queries run with `zorba --directory`, and the `Agent benchmark` workflow checks that both agree and runs the harness with a scripted model on pull requests; the real benchmark runs from `workflow_dispatch`. ([#117](https://github.com/zorba-processor/zorba/pull/117))
+- The `ghcr.io/zorba-processor/zorba` image runs `zorba-mcp`: `docker run -i --rm -v "$PWD:/data:ro" ghcr.io/zorba-processor/zorba zorba-mcp --root /data` serves a folder of XML, JSON and CSV files to an MCP client. Any other arguments still go to `zorba`. The image workflow smoke-tests the server (`initialize`, `server/discover`, `tools/list`, `tools/call`) before it pushes. ([#123](https://github.com/zorba-processor/zorba/pull/123))
+- The documentation site has a page on querying a folder from an AI agent (`zorba --directory` and `zorba-mcp`). ([#123](https://github.com/zorba-processor/zorba/pull/123))
 
 ### Changed
 
@@ -146,6 +152,18 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - CI: the embedded, embedded-noicu, bigint and full-nopch profile jobs now run on a pull request only when files in their area change (path filters in `.github/ci-filters.yml`); the required jobs still run for any code change and master pushes run everything. `scripts/check-profile-filters.sh` fails if a file containing a profile's guard macro is not covered by that profile's filter. ([#96](https://github.com/zorba-processor/zorba/pull/96))
 - CI: the Linux jobs pull the builder image published to GHCR (tag `df-<hash of the Dockerfile>`, built by `images.yml` on master) instead of building it, and build it locally only when the Dockerfile changed. ([#96](https://github.com/zorba-processor/zorba/pull/96))
 - The JSON serialization method writes the `item-separator` serialization parameter, when set, between top-level items (it was ignored). ([#111](https://github.com/zorba-processor/zorba/pull/111))
+- Unchecked results of pthread, POSIX I/O and C library calls in `src/`,
+  `modules/` and `bin/` are now checked: a failing pthread call aborts with
+  a fatal error (as the checked mutex and condition calls already did), and
+  a failing `close()` after `fs::create()` raises an I/O error instead of
+  being ignored. A clang-tidy job (`cert-err33-c`,
+  `bugprone-unused-return-value`) keeps new unchecked calls out. ([#116](https://github.com/zorba-processor/zorba/pull/116))
+- The directory module (`dir:open`, `dir:documents`, `zorba --directory`,
+  `zorba-mcp`) parses `.html` and `.htm` files with `x:parse-html` and returns
+  the document node as `content`; a file that cannot be parsed yields the
+  per-file error record. Builds without XML Schema support report HTML files
+  as an unsupported format. ([#122](https://github.com/zorba-processor/zorba/pull/122))
+- The directory module reads `.geojson` files as JSON. ([#122](https://github.com/zorba-processor/zorba/pull/122))
 
 ### Fixed
 
@@ -245,6 +263,45 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - The built-in thesaurus (`using thesaurus default`, WordNet data in the library path) no longer requires `Capability::NativeModules`; other `wordnet:` URIs still do, and a thesaurus at a file path still needs `FileRead`. ([#106](https://github.com/zorba-processor/zorba/pull/106))
 - A JSound schema import denied by the security policy names the capability its `$location` needs, not the one for the namespace URI tried after it. ([#106](https://github.com/zorba-processor/zorba/pull/106))
 - Fetch module errors (`zuri:URI_UNRESOLVED_OR_NOSTREAM`) are no longer wrapped in a second copy of the same error message. ([#106](https://github.com/zorba-processor/zorba/pull/106))
+- Fix the pthread mutex of `RCLock` (used where spin locks are unavailable,
+  such as macOS) silently falling back to a default mutex: the type passed
+  to `pthread_mutexattr_settype()` included `PTHREAD_PROCESS_PRIVATE`, which
+  made the call fail. ([#116](https://github.com/zorba-processor/zorba/pull/116))
+- Fix undefined behavior in full-text tokenization when converting the text
+  between UTF-8 and UTF-16 fails; it now raises an internal error. ([#116](https://github.com/zorba-processor/zorba/pull/116))
+- Fix the debugger's response queue destroying its mutex while still locked. ([#116](https://github.com/zorba-processor/zorba/pull/116))
+- The public `hexbinary_stream.h`, `base64_stream.h` and
+  `transcode_stream.h` headers include the standard headers they use, so
+  they compile on their own with Clang. ([#116](https://github.com/zorba-processor/zorba/pull/116))
+- Free the state of a closed query when a cycle through it passes through
+  the applied argument of a partially applied function item (e.g. a prolog
+  variable holding `$call(function($y) { $y + 1 }, ?)`); before, the cycle
+  collector did not follow those arguments and the state leaked. ([#118](https://github.com/zorba-processor/zorba/pull/118))
+- Keep the cycle collector usable when a walk of a closed query's graph
+  fails (e.g. out of memory): the graph is kept and the next collection
+  walks it again; before, the exception escaped from reference releases. ([#118](https://github.com/zorba-processor/zorba/pull/118))
+- Fix `fn:parse-xml`, `fn:parse-xml-fragment` and the xml module's
+  parse-external-parsed-entity option resolving a relative system identifier
+  of an external entity against the process's working directory instead of
+  the static base URI (or the `base-uri` option): an entity that the security
+  policy allows is now expanded instead of silently dropped, and a refused one
+  raises `zerr:ZXQP0029` naming the resolved URI (W3C QT3 test case
+  `fn-parse-xml/parse-xml-010`). ([#124](https://github.com/zorba-processor/zorba/pull/124))
+- Fix `csv:parse` reusing the field names and options of a previous input when
+  the same call parses several inputs (in a FLWOR expression or a function
+  called more than once): a second input with a different header raised
+  `csv:EXTRA_VALUE` or returned its header line as a record with the first
+  input's field names, and `dir:documents` gave every CSV file after the first
+  the first file's field names. ([#125](https://github.com/zorba-processor/zorba/pull/125))
+- Fix `csv:parse` returning values after an unquoted `true` or `false` whose
+  use as object keys read freed memory, which could drop object fields or
+  crash. ([#125](https://github.com/zorba-processor/zorba/pull/125))
+- Fix JSON objects keeping a pointer into a temporary copy of each key: when a
+  key string was not shared with its copy (as with the values `csv:parse`
+  returned after an unquoted `true` or `false`), the object read freed memory
+  on every later lookup, which could drop or garble object fields or crash.
+  Objects now own their key strings. ([#127](https://github.com/zorba-processor/zorba/pull/127))
+- `dir:documents` no longer keeps every parsed document in memory until the query ends: it sorted the records with an `order by` over the loaded documents, which holds the result of every tuple until the last one is loaded. It now sorts the paths first and parses each document when the caller asks for it, so a query that consumes the documents one at a time holds one of them (peak RSS of a scan of 1000 files of 200 KB: 4610 MiB before, 55 MiB after). ([#128](https://github.com/zorba-processor/zorba/pull/128))
 
 ### Removed
 

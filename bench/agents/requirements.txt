@@ -1,0 +1,3 @@
+# Only for real benchmark runs (harness.py without --dry-run); the dry run,
+# reference.py and check_truth.py use the standard library only.
+anthropic==2.3.0

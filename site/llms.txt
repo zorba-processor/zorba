@@ -1,0 +1,17 @@
+# Zorba
+
+> Zorba is an embeddable C++ processor for XQuery 3.0 (with the Update Facility, Full Text and scripting extensions) and JSONiq 1.0. It runs queries over XML and JSON from the `zorba` command line, from C++, or from an AI agent through zorba-mcp, which queries a folder of XML, JSON, CSV and HTML files read-only. It does not implement XQuery 3.1 maps, arrays, `=>` or `?`; JSON is handled through JSONiq. Every example in these pages is run against the current Zorba build before the site is published. Each page below is also available as HTML at the same address with `.html` instead of `.md`.
+
+## Documentation
+
+- [Overview](https://zorba-processor.github.io/zorba/index.md): What Zorba is, good and poor fits, quick start with the container image, building from source.
+- [The big picture](https://zorba-processor.github.io/zorba/map.md): The data model behind XQuery and JSONiq, how the specifications relate, and which ones Zorba implements.
+- [XQuery](https://zorba-processor.github.io/zorba/xquery.md): Paths, FLWOR, constructors, functions, types, errors, updates and full-text search, with verified examples.
+- [JSONiq](https://zorba-processor.github.io/zorba/jsoniq.md): Objects, arrays, navigation, null handling, updates, mixing JSON with XML, and how JSONiq compares with XQuery 3.1.
+- [Using Zorba](https://zorba-processor.github.io/zorba/zorba.md): The command line, built-in modules, collections, indexes, integrity constraints, scripting, and embedding in C++.
+- [AI agents (MCP)](https://zorba-processor.github.io/zorba/mcp.md): Query a folder of XML, JSON, CSV and HTML files from an AI agent with zorba-mcp: running it, registering it with an MCP client, and what it exposes.
+- [Cheat sheet](https://zorba-processor.github.io/zorba/cheatsheet.md): The XQuery, JSONiq and Zorba syntax on one page, each entry linked to a verified example.
+
+## Optional
+
+- [Source repository](https://github.com/zorba-processor/zorba): Source code, build instructions and the example files used by these pages (`site/examples`).

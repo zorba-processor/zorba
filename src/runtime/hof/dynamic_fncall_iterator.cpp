@@ -218,10 +218,8 @@ bool SingleDynamicFnCallIterator::nextImpl(
             argValues.push_back(tempItem);
 
           store::TempSeq_t argSeq = GENV_STORE.createTempSeq(argValues);
-          store::Iterator_t argSeqIter = argSeq->getIterator();
-          PlanIter_t value = new PlanStateIteratorWrapper(argSeqIter);
-                    
-          fnItem->setArgumentValue(pos, value);
+
+          fnItem->setArgumentValue(pos, argSeq);
         }
         else
         {
@@ -549,7 +547,7 @@ bool MultiDynamicFnCallIterator::nextImpl(
       if (targetItem->isObject())
       {
         if (!state->theKeysSet.get())
-          state->theKeysSet.reset(new HashSet<zstring, HashMapZStringCmp>(64, false));
+          state->theKeysSet = std::make_unique<HashSet<zstring, HashMapZStringCmp>>(64, false);
 
         state->theIterator = targetItem->getObjectKeys();
 

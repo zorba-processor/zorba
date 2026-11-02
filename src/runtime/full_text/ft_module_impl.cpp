@@ -477,7 +477,11 @@ bool StripDiacriticsIterator::nextImpl( store::Item_t &result,
 
   consumeNext( item, theChildren[0], plan_state );
   item->getStringValue2( phrase );
-  utf8::strip_diacritics( phrase, &stripped_phrase );
+  {
+    // String values are valid UTF-8, so the strip cannot fail.
+    bool const stripped = utf8::strip_diacritics( phrase, &stripped_phrase );
+    ZORBA_ASSERT( stripped );
+  }
   GENV_ITEMFACTORY->createString( result, stripped_phrase );
   STACK_PUSH( true, state );
 
@@ -675,7 +679,7 @@ bool TokenizeNodesIterator::nextImpl( store::Item_t &result,
   state->callback_.set_tokens( state->tokens_ );
   state->langs_.push( lang );
   state->tokenizers_.push( tokenizer.get() );
-  tokenizer.release();
+  (void)tokenizer.release(); // owned by state->tokenizers_ now
 
   while ( true ) {
     if ( state->tokens_.empty() ) {
@@ -710,7 +714,7 @@ bool TokenizeNodesIterator::nextImpl( store::Item_t &result,
             state->langs_.push( lang );
             tokenizer = get_tokenizer( lang, &state->t_state_, loc );
             state->tokenizers_.push( tokenizer.get() );
-            tokenizer.release();
+            (void)tokenizer.release(); // owned by state->tokenizers_ now
             add_sentinel = true;
           }
           [[fallthrough]];

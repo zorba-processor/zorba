@@ -107,6 +107,9 @@ protected:
   // on it, so that external entities are checked against the policy.
   xml::ParserSecurity              theParserSecurity;
 
+  // Set when error() has reported an unreadable external entity.
+  bool                             theUnreadableEntityReported;
+
 
 protected:
   void applyLoadOptions(const store::LoadProperties& props, xmlParserCtxtPtr ctxt);
@@ -134,6 +137,25 @@ public:
    * returns true.
    */
   bool reportDeniedResource();
+
+  /**
+   * If an external general entity that the policy allowed could not be
+   * loaded and error() did not report it already (libxml2 before 2.14 loads
+   * entity content in a context of its own, whose warning does not reach
+   * error()), adds zerr:ZSTR0021 for it.
+   */
+  void reportUnreadableEntity();
+
+  /**
+   * The URI libxml2 resolves relative system identifiers (external entities,
+   * the external DTD subset, XInclude targets) against: the URI the stream
+   * was opened from, else the document URI, else the base URI (for
+   * fn:parse-xml, the static base URI). Empty if none of them is known.
+   */
+  static char const* parserInputUri(
+      std::istream& aStream,
+      const zstring& aDocUri,
+      const zstring& aBaseUri);
 };
 
 

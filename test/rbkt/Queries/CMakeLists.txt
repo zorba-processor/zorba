@@ -191,6 +191,15 @@ FOREACH(TESTFILE ${TESTFILES})
     IF (TESTNAME MATCHES "^test/rbkt/zorba/versioning/(schema1|link1)$")
       SET (SKIP_TEST 1)
     ENDIF ()
+    # The directory module parses HTML with the xml module, which needs a schema.
+    IF (TESTNAME MATCHES "^test/rbkt/zorba/directory/dir-html-(open|documents|error)$")
+      SET (SKIP_TEST 1)
+    ENDIF ()
+  ELSE (ZORBA_NO_XMLSCHEMA)
+    # Covers the build without XML Schema support only.
+    IF (TESTNAME STREQUAL "test/rbkt/zorba/directory/dir-html-unsupported")
+      SET (SKIP_TEST 1)
+    ENDIF ()
   ENDIF (ZORBA_NO_XMLSCHEMA)
   IF (ZORBA_NO_ICU)
     # Without ICU there is no transcoding to or from legacy character sets, and

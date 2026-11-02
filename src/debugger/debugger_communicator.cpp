@@ -81,7 +81,7 @@ DebuggerCommunicator::connect()
 	for (int i = 0; i < TIMEOUT && !theSocket; i++) {
 		try {
 			// Connect to the client on the given host and port
-      std::unique_ptr<TCPSocket> lSocket(new TCPSocket(theHost, thePort));
+      std::unique_ptr<TCPSocket> lSocket = std::make_unique<TCPSocket>(theHost, thePort);
       theSocket = lSocket.release();
       theSocketInStream = new SocketStreambuf(*theSocket);
       theSocketOutStream = new SocketStreambuf(*theSocket);
@@ -175,6 +175,9 @@ DebuggerCommunicator::ResponseQueue::run()
     // release the lock before trying to send one more sessage
     theLock.unlock();
   }
+  // Locked at the start for the condition variable: a mutex must not be
+  // destroyed while locked.
+  theMutex.unlock();
 }
 
 void

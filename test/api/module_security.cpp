@@ -608,8 +608,10 @@ void test_http_uri_resolution(Zorba* z)
 ////////////////////////////////////////////////////////////////////////////////
 
 // The built-in thesaurus (WordNet data in the library path, "##default" or
-// its URL) is engine data: it needs no capability. Other wordnet: URIs need
-// NativeModules, and a thesaurus the query names by file path needs FileRead.
+// its URL) is engine data: it needs no capability. Other wordnet: URIs name a
+// data file ("wordnet-en.zth") in the library path, not a native library: they
+// need FileRead with no read-path list (the library path is not on a list),
+// and a thesaurus the query names by file path needs FileRead.
 void test_wordnet(Zorba* z, const Files& f)
 {
   CHECK(SecurityPolicy::secure().checkURI("##default",
@@ -618,8 +620,16 @@ void test_wordnet(Zorba* z, const Files& f)
                                           EntityData::THESAURUS));
   CHECK(!SecurityPolicy::secure().checkURI("wordnet://other.example/",
                                            EntityData::THESAURUS));
-  CHECK(SecurityPolicy::secure().allow(Capability::NativeModules)
+  CHECK(!SecurityPolicy::secure().allow(Capability::NativeModules)
         .checkURI("wordnet://other.example/", EntityData::THESAURUS));
+  CHECK(SecurityPolicy::secure().allow(Capability::FileRead)
+        .checkURI("wordnet://other.example/", EntityData::THESAURUS));
+  CHECK(!SecurityPolicy::secure().allow(Capability::FileRead)
+        .addReadPath(f.path("data"))
+        .checkURI("wordnet://other.example/", EntityData::THESAURUS));
+  CHECK(SecurityPolicy::secure().allow(Capability::FileRead)
+        .addReadPath(f.path("data"))
+        .checkURI("##default", EntityData::THESAURUS));
 
 #ifndef ZORBA_NO_FULL_TEXT
   const char QUERY[] =
@@ -638,7 +648,18 @@ void test_wordnet(Zorba* z, const Files& f)
   CHECK(denied(run(z, context(z, SecurityPolicy::secure()),
       "<msg>affluent man</msg> contains text \"wealthy\" using thesaurus at "
       "\"wordnet://other.example/\""),
-               "FTST0018", "requires capability NativeModules"));
+               "FTST0018", "requires capability FileRead"));
+  CHECK(denied(run(z, context(z, SecurityPolicy::secure()
+                                  .allow(Capability::NativeModules)),
+      "<msg>affluent man</msg> contains text \"wealthy\" using thesaurus at "
+      "\"wordnet://other.example/\""),
+               "FTST0018", "requires capability FileRead"));
+  CHECK(denied(run(z, context(z, SecurityPolicy::secure()
+                                  .allow(Capability::FileRead)
+                                  .addReadPath(f.path("data"))),
+      "<msg>affluent man</msg> contains text \"wealthy\" using thesaurus at "
+      "\"wordnet://other.example/\""),
+               "FTST0018", "access denied by security policy"));
 #else
   (void)z;
   (void)f;

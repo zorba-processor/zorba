@@ -48,7 +48,7 @@ namespace zorba
           1 - nonspecified error
           2 - integer overflow
 ********************************************************************************/
-int parse_long(
+[[nodiscard]] int parse_long(
     const char* str,
     size_t len,
     size_t& position,
@@ -66,7 +66,7 @@ int parse_long(
   @param result
   @return Returns 0 on success and a positive value on an error
 ********************************************************************************/
-int parse_frac(
+[[nodiscard]] int parse_frac(
     const char* str,
     size_t len,
     size_t& position,
