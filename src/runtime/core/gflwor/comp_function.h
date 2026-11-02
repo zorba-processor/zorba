@@ -30,6 +30,17 @@ namespace zorba
 namespace flwor
 {
 
+/**
+ * Promotes the keys of each order-by column that mixes numeric types with no
+ * subtype relation to their least common type, to be called before sorting.
+ */
+void promoteNumericSortKeys(
+    std::vector<SortTuple>& sortTable,
+    const std::vector<OrderSpec>& orderSpecs,
+    const TypeManager* tm,
+    const QueryLoc& loc);
+
+
 /***************************************************************************//**
   Class acting as a comparison function between two sort tuples. An instance of
   this class is passed to std::sort() method that sorts an array of sort tuples. 

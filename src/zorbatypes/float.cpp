@@ -489,6 +489,19 @@ uint32_t hash_number( double d ) {
   return hashfun::h32( &bits, sizeof bits, FNV_32_INIT );
 }
 
+uint32_t hash_int64( int64_t n ) {
+  int64_t const exact_limit = INT64_C( 1 ) << 53;
+  if ( n >= -exact_limit && n <= exact_limit )
+    return static_cast<uint32_t>( n );
+  return hash_number( static_cast<double>( n ) );
+}
+
+uint32_t hash_uint64( uint64_t n ) {
+  if ( n <= UINT64_C( 1 ) << 53 )
+    return static_cast<uint32_t>( n );
+  return hash_number( static_cast<double>( n ) );
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 
 template class FloatImpl<double>;
