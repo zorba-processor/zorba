@@ -67,6 +67,16 @@ std::int64_t mtime_of( struct stat const &st ) {
   return static_cast<std::int64_t>( t.tv_sec ) * 1000000000 + t.tv_nsec;
 }
 
+// Descriptors here are opened read-only: a failed close loses nothing, and
+// there is nothing to do about it.
+bool close_fd( int fd ) {
+  return close( fd ) == 0;
+}
+
+bool close_dir( DIR *dir ) {
+  return closedir( dir ) == 0;
+}
+
 // Opens rel under root_fd one component at a time, following no link: the
 // intermediate components as directories, the last with last_flags. O_NONBLOCK
 // because opening a FIFO would otherwise wait for a writer. Returns -1 (and
@@ -85,7 +95,7 @@ int open_under( int root_fd, std::string const &rel, int last_flags ) {
     int const fd = openat( cur, name.c_str(), flags );
     int const saved = errno;
     if ( cur != root_fd )
-      close( cur );
+      close_fd( cur );
     if ( fd < 0 || last ) {
       errno = saved;
       return fd;
@@ -114,7 +124,7 @@ bool list_directory( int root_fd, std::string const &rel,
     return false;
   DIR *const dir = fdopendir( fd );
   if ( !dir ) {
-    close( fd );
+    close_fd( fd );
     return false;
   }
   std::vector<DirEntry> batch;
@@ -134,7 +144,7 @@ bool list_directory( int root_fd, std::string const &rel,
                                mtime_of( st ) } );
     if ( batch.size() >= merge_batch ) {
       if ( !fn( batch ) ) {
-        closedir( dir );
+        close_dir( dir );
         return true;
       }
       batch.clear();
@@ -142,7 +152,7 @@ bool list_directory( int root_fd, std::string const &rel,
   }
   if ( !batch.empty() )
     fn( batch );
-  closedir( dir );
+  close_dir( dir );
   return true;
 }
 
@@ -257,7 +267,7 @@ struct Scanner::Shared {
 
   ~Shared() {
     if ( theRootFd >= 0 )
-      close( theRootFd );
+      close_fd( theRootFd );
   }
 
   ScanLimits const theLimits;
@@ -535,7 +545,7 @@ struct Scanner::Shared {
     bool const ok = read_capped( fd, theLimits.max_file_bytes, size, stop,
                                  &data, &truncated );
     int const saved = errno;
-    close( fd );
+    close_fd( fd );
     ScanPreview preview;
     if ( !ok ) {
       preview.json = "{\"error\":";
@@ -610,7 +620,7 @@ struct Scanner::Shared {
                               static_cast<std::uint64_t>( st.st_size ),
                               &theStopping );
       else if ( fd >= 0 )
-        close( fd );
+        close_fd( fd );
 
       lock.lock();
       theSamplerBusy = false;
@@ -677,7 +687,7 @@ struct Scanner::Shared {
     }
     ScanPreview fresh;
     if ( known ) {
-      close( fd );
+      close_fd( fd );
     } else {
       hook( "explore", rel );
       fresh = preview_of( fd, format, size, nullptr );
@@ -838,7 +848,7 @@ struct Scanner::Shared {
                                ? std::string() : f.rel.substr( 0, slash ) );
         if ( parent_fd < 0 || dir != parent ) {
           if ( parent_fd >= 0 )
-            close( parent_fd );
+            close_fd( parent_fd );
           parent_fd = open_under( theRootFd, dir, O_DIRECTORY );
           parent = dir;
         }
@@ -858,7 +868,7 @@ struct Scanner::Shared {
         }
       }
       if ( parent_fd >= 0 )
-        close( parent_fd );
+        close_fd( parent_fd );
       std::lock_guard<std::mutex> lock( theMutex );
       for ( Shown const &f : shown ) {
         if ( !f.gone )
@@ -1058,12 +1068,12 @@ std::string Scanner::answer( Json const &args, std::size_t max_output,
     if ( S_ISREG( st.st_mode ) )
       return s.file_answer( fd, st, rel, max_output );
     if ( S_ISDIR( st.st_mode ) ) {
-      close( fd );
+      close_fd( fd );
       return s.directory_answer( rel, limit, max_output, is_error );
     }
   }
   if ( fd >= 0 )
-    close( fd );
+    close_fd( fd );
   {
     std::lock_guard<std::mutex> lock( s.theMutex );
     s.erase_tree( rel );

@@ -21,6 +21,7 @@
 #include <exception>
 #include <filesystem>
 #include <fstream>
+#include <memory>
 #include <set>
 #include <sstream>
 #include <streambuf>
@@ -319,8 +320,8 @@ Server::Server( Zorba *zorba, ServerConfig config, std::ostream &log ) :
   load_predefined();
   if ( theConfig.scan ) {
     try {
-      theScanner.reset( new Scanner( theConfig.root, theConfig.scan_limits,
-                                     theConfig.scan_hook ) );
+      theScanner = std::make_unique<Scanner>(
+        theConfig.root, theConfig.scan_limits, theConfig.scan_hook );
     }
     catch ( std::system_error const &e ) {
       theLog << server_name << ": no background scan: " << e.what() << std::endl;

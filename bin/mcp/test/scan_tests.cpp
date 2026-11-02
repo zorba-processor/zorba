@@ -1313,8 +1313,8 @@ void test_memory_option( Fixture const &f ) {
   char *line = nullptr;
   std::size_t cap = 0;
   auto exchange = [&]( std::string const &message ) {
-    std::fputs( message.c_str(), in );
-    std::fflush( in );
+    if ( std::fputs( message.c_str(), in ) == EOF || std::fflush( in ) == EOF )
+      return std::string();
     ssize_t const n = getline( &line, &cap, out );
     return n > 0 ? std::string( line, static_cast<std::size_t>( n ) )
                  : std::string();
@@ -1331,10 +1331,10 @@ void test_memory_option( Fixture const &f ) {
   answer = exchange( list_call( 2, Json::object( { { "path", "d0/here.csv" } } ) ) );
   check( contains( answer, "columns" ) && contains( answer, "memory_limit" ),
          "and a file still gets its preview, with the status", answer );
-  std::fclose( in );
+  check( std::fclose( in ) == 0, "close the input" );
   std::free( line );
   while ( std::fgetc( out ) != EOF ) { }
-  std::fclose( out );
+  check( std::fclose( out ) == 0, "close the output" );
   int status = -1;
   check( waitpid( pid, &status, 0 ) == pid && WIFEXITED( status ) &&
          WEXITSTATUS( status ) == 0, "clean exit" );
