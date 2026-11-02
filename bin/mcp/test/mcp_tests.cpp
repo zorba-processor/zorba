@@ -632,14 +632,14 @@ void test_optional_params( Fixture const &f ) {
 
   // 2. Defaults and overrides.
   check( !is_tool_error( by_id["2"] ) &&
-         result_text( by_id["2"] ) == "hello, Ana",
+         result_text( by_id["2"] ) == "\"hello, Ana\"",
          "optional parameter omitted: the default applies", by_id["2"].dump() );
   check( !is_tool_error( by_id["3"] ) &&
-         result_text( by_id["3"] ) == "hi, Ana",
+         result_text( by_id["3"] ) == "\"hi, Ana\"",
          "optional parameter supplied: overrides the default",
          by_id["3"].dump() );
   check( !is_tool_error( by_id["16"] ) &&
-         result_text( by_id["16"] ) == "hello, Ana",
+         result_text( by_id["16"] ) == "\"hello, Ana\"",
          "the override is not retained across calls", by_id["16"].dump() );
   check( !is_tool_error( by_id["8"] ) && result_text( by_id["8"] ) == "42",
          "typed optional parameter omitted: the default applies",
@@ -663,7 +663,7 @@ void test_optional_params( Fixture const &f ) {
   check( is_tool_error( by_id["5"] ) &&
          contains( field( tool_error( by_id["5"] ), "message" ), "name" ),
          "array for a string parameter: tool error", by_id["5"].dump() );
-  check( !is_tool_error( by_id["6"] ) && result_text( by_id["6"] ) == "hello, 5",
+  check( !is_tool_error( by_id["6"] ) && result_text( by_id["6"] ) == "\"hello, 5\"",
          "number for a string parameter: its text", by_id["6"].dump() );
   check( is_tool_error( by_id["10"] ) && !tool_error( by_id["10"] ).is_null(),
          "text that is not an xs:integer: tool error with a diagnostic",
@@ -674,13 +674,13 @@ void test_optional_params( Fixture const &f ) {
 
   // run_query takes the query only: no variables; the query's own defaults
   // apply and an external variable without one is an error.
-  check( !is_tool_error( by_id["13"] ) && result_text( by_id["13"] ) == "dflt",
+  check( !is_tool_error( by_id["13"] ) && result_text( by_id["13"] ) == "\"dflt\"",
          "run_query: a defaulted external variable uses its default",
          by_id["13"].dump() );
   check( is_tool_error( by_id["14"] ) && !tool_error( by_id["14"] ).is_null(),
          "run_query: an external variable without a value is a tool error",
          by_id["14"].dump() );
-  check( !is_tool_error( by_id["15"] ) && result_text( by_id["15"] ) == "dflt",
+  check( !is_tool_error( by_id["15"] ) && result_text( by_id["15"] ) == "\"dflt\"",
          "run_query ignores a \"variables\" argument", by_id["15"].dump() );
 }
 
