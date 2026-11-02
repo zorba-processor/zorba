@@ -222,9 +222,10 @@ protected:
 public:
   // Objects of at most this many pairs have no Keys index: a key is found by
   // a linear search over thePairs. The index is built when an object grows
-  // past it and dropped when it shrinks back to it. Chosen from the
-  // measurement in bench/store/RESULTS.md.
-  static constexpr size_type KEY_INDEX_THRESHOLD = 12;
+  // past it and dropped when it shrinks back to it. 16 is the largest object
+  // size measured where the linear search is not slower to build than the
+  // index (bench/store/RESULTS.md).
+  static constexpr size_type KEY_INDEX_THRESHOLD = 16;
 
 protected:
 
