@@ -731,6 +731,60 @@ void test_malformed( Fixture const &f ) {
   check( l.files.size() == files, "the listing has all files", l.text );
 }
 
+// A file nested 100000 levels deep is an error in its preview, on the
+// sampler's thread and on the request's, and the server goes on.
+void test_deep( Fixture const &f ) {
+  int const levels = 100000;
+  auto repeat = [levels]( std::string const &part ) {
+    std::string s;
+    s.reserve( part.size() * static_cast<std::size_t>( levels ) );
+    for ( int i = 0; i < levels; ++i )
+      s += part;
+    return s;
+  };
+  Tree t;
+  t.write( "array.json", repeat( "[" ) + repeat( "]" ) );
+  t.write( "object.json", repeat( "{\"a\":" ) + "1" + repeat( "}" ) );
+  t.write( "closed.xml", repeat( "<a>" ) + repeat( "</a>" ) );
+  t.write( "open.xml", repeat( "<a>" ) );
+  t.write( "closed.html", repeat( "<i>" ) + repeat( "</i>" ) );
+  t.write( "open.html", repeat( "<div>" ) );
+  t.write( "fine.csv", "x\n1\n" );
+  std::vector<char const*> const deep{ "array.json", "object.json", "closed.xml",
+                                       "open.xml", "closed.html", "open.html" };
+
+  auto check_deep = [&deep]( Server &server, std::string const &how ) {
+    for ( char const *const name : deep ) {
+      Listing const l( list_path( server, name ) );
+      check( !l.is_error && contains( dump_of( l.preview() ), "\"error\":" ),
+             how + ": " + name + " reports the depth in its preview", l.text );
+      check( l.text.size() < 4096, how + ": " + name + ": a short answer",
+             l.text.substr( 0, 400 ) );
+    }
+  };
+  {
+    // Sampled in the background.
+    ServerConfig config;
+    config.root = t.root;
+    Server server( f.zorba, config, std::cerr );
+    Listing const l( wait_complete( server ) );
+    check( l.found() == "7" && l.sampled() == "7",
+           "the sampler gets through the deep files", l.text );
+    check_deep( server, "sampled" );
+    check( contains( list_path( server, "fine.csv" ).text, "\"columns\":[\"x\"]" ),
+           "the server goes on" );
+  }
+  {
+    // Explored on the request's thread, with the sampler held.
+    auto const gate = std::make_shared<Gate>( "sample", "*" );
+    Server server( f.zorba, gated( t.root, gate ), std::cerr );
+    check( gate->wait_reached(), "the sampler is held" );
+    check_deep( server, "explored" );
+    gate->release();
+    wait_complete( server );
+  }
+}
+
 std::atomic<int> entity_loads( 0 );
 
 xmlParserInputPtr counting_loader( char const*, char const*, xmlParserCtxtPtr ) {
@@ -1097,6 +1151,7 @@ Test const tests[] = {
   { "scan_symlink", test_symlink },
   { "scan_path", test_path },
   { "scan_malformed", test_malformed },
+  { "scan_deep", test_deep },
   { "scan_xxe", test_xxe },
   { "scan_limit", test_limit },
   { "scan_no_scan", test_no_scan },
