@@ -33,7 +33,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  IMAGE: ghcr.io/${{ github.repository_owner }}/zorba:latest
+  IMAGE: ghcr.io/${{ github.repository_owner }}/zorba:edge
 
 jobs:
   examples:

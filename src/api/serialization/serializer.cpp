@@ -50,6 +50,7 @@
 #include "store/api/item.h"
 #include "store/api/item_factory.h"
 #include "store/api/copymode.h"
+#include "runtime/json/nesting.h"
 
 namespace zorba {
 
@@ -979,15 +980,21 @@ void serializer::json_emitter::emit_json_item(store::Item* item, int depth)
 {
   // This is called for any item within a JSON array or object, or for a
   // top-level item. JSON rules for simple types apply here.
-  if (item->isObject())
+  if (item->isJSONItem())
   {
-    emit_json_object(item, depth);
+    // A value deepened through updates to its members gets here too: see
+    // runtime/json/nesting.h. An exception ends this emitter's use.
+    if (theNestingDepth >= json_nesting::MAX_DEPTH)
+      json_nesting::raise_limit();
+    json_nesting::check_stack();
+    ++theNestingDepth;
 
-    thePreviousItemKind = PREVIOUS_ITEM_WAS_NODE;
-  }
-  else if (item->isArray())
-  {
-    emit_json_array(item, depth);
+    if (item->isObject())
+      emit_json_object(item, depth);
+    else
+      emit_json_array(item, depth);
+
+    --theNestingDepth;
 
     thePreviousItemKind = PREVIOUS_ITEM_WAS_NODE;
   }

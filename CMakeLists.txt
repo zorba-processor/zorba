@@ -94,8 +94,6 @@ IF (CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
        "Set the defalt installation directory to \"dist\" in the binary directory." FORCE)
 ENDIF (CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
 
-# Enable RPaths in installed binaries
-SET(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
 SET(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 
 # turn on the folder grouping used by IDEs (VS or XCode)
@@ -379,6 +377,16 @@ MESSAGE(STATUS "Zorba version number: ${ZORBA_VERSION}")
 
 SET(ZORBA_LIB_DIRNAME "lib" CACHE STRING
   "directory name for libs (may want to set to 'lib64' on 64-bit Linux platforms)")
+
+# Enable RPaths in installed binaries. They are relative to the binary, so an
+# installation keeps working when it is installed with another --prefix than
+# the one given at configure time, or moved afterwards: executables are in
+# <prefix>/bin and libraries in <prefix>/lib.
+IF (APPLE)
+  SET(CMAKE_INSTALL_RPATH "@loader_path/../lib${LIB_SUFFIX};@loader_path")
+ELSE (APPLE)
+  SET(CMAKE_INSTALL_RPATH "$ORIGIN/../lib${LIB_SUFFIX};$ORIGIN")
+ENDIF (APPLE)
 
 # Directories for modules and schemas. "Core" are those which are
 # shipped with Zorba and must be present for correct Zorba

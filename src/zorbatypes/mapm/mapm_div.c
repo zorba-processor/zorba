@@ -190,7 +190,7 @@ k = (iterations + 1) >> 1;     /* required size of result, in bytes */
 
 if (k > r->m_apm_malloclength)
   {
-   if ((vp = MAPM_REALLOC(r->m_apm_data, (k + 32))) == NULL)
+   if ((vp = M_apm_realloc_data(r, (k + 32))) == NULL)
      {
       /* fatal, this does not return */
 

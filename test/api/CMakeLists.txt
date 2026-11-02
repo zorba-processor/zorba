@@ -41,6 +41,7 @@ CREATE_TEST_SOURCELIST(APITests
   recursion_limits.cpp
   timeout_bounds.cpp
   expr_depth_limit.cpp
+  json_depth_limit.cpp
   module_security.cpp
   invoke_module_globals.cpp
   function_item_lifetime.cpp
@@ -55,6 +56,18 @@ SET (TestsToRun ${APITests})
 LIST (FILTER TestsToRun EXCLUDE REGEX "(^|/)APITests\\.cpp$")
 
 MESSAGE(STATUS "Adding API tests for CTest")
+
+# json_depth_limit runs case by case, so that each case reports its own result
+LIST (FILTER TestsToRun EXCLUDE REGEX "(^|/)json_depth_limit\\.cpp$")
+FOREACH (_c parse_arrays parse_objects parse_mixed parse_truncated
+         ctor_arrays ctor_objects ctor_mixed ctor_function ctor_union
+         serialize deep_equal flatten copy atomize hash item_size collection
+         json_xml roundtrip jsound api update
+         chain_serialize chain_copy chain_deep_equal chain_destroy
+         chain_walkers chain_collection measure second_thread)
+  ZORBA_ADD_TEST("test/api/json_depth_limit/${_c}" APITests json_depth_limit
+    ${_c})
+ENDFOREACH (_c)
 
 # add all the ADD_TEST for each testing
 FOREACH (test ${TestsToRun})

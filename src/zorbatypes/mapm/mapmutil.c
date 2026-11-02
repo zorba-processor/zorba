@@ -134,7 +134,21 @@ static  char* M_init_error_msg = "\'m_apm_init\', Out of memory";
 
 
 /******************************************************************************
+  Zorba: the digit array of a number made by m_apm_init_compact_copy() with
+  DATALENGTH digits: the bytes they take rounded up to 8, at least 8.
+*******************************************************************************/
+static int M_compact_capacity(int datalength)
+{
+  int capacity = (((datalength + 1) >> 1) + 7) & ~7;
+  return((capacity < 8) ? 8 : capacity);
+}
+
+
+/******************************************************************************
   Create a new M_APM_struct and initialize it to the number 0.
+
+  Zorba: the struct and its initial 84-byte digit array are one allocation
+  (the digits follow the struct; see M_APM_IDENT_INLINE), not two.
 *******************************************************************************/
 M_APM	m_apm_init()
 {
@@ -147,27 +161,106 @@ M_APM	m_apm_init()
     M_init_trig_globals();
   }
 
-  if ((atmp = (M_APM)MAPM_MALLOC(sizeof(M_APM_struct))) == NULL)
+  if ((atmp = (M_APM)MAPM_MALLOC(sizeof(M_APM_struct) + 84)) == NULL)
   {
     /* fatal, this does not return */
     M_apm_log_error_msg(M_APM_FATAL, M_init_error_msg);
   }
 
-  atmp->m_apm_id           = M_APM_IDENT;
+  atmp->m_apm_id           = M_APM_IDENT_INLINE;
   atmp->m_apm_malloclength = 80;
   atmp->m_apm_datalength   = 1;
   atmp->m_apm_refcount     = 1;           /* not for us, for MAPM C++ class */
   atmp->m_apm_exponent     = 0;
   atmp->m_apm_sign         = 0;
+  atmp->m_apm_data         = (UCHAR *)(atmp + 1);
 
-  if ((atmp->m_apm_data = (UCHAR *)MAPM_MALLOC(84)) == NULL)
+  atmp->m_apm_data[0] = 0;
+  return(atmp);
+}
+
+
+/******************************************************************************
+  Zorba: create a new M_APM_struct with the value of SRC, stored in a single
+  allocation: the digits follow the struct, in an array sized to fit (at
+  least 8 bytes; with a 32-byte struct, 16 digits fit in a 40-byte block).
+  m_apm_init() gives every number room for 160 digits, and arithmetic grows
+  that room to what intermediate results need; this is for values that are
+  kept for long (xs:decimal items in the store). If such a number is later
+  assigned a value with more digits than fit, M_apm_realloc_data() moves the
+  digits to a separate allocation.
+*******************************************************************************/
+M_APM	m_apm_init_compact_copy(M_APM src)
+{
+  M_APM	atmp;
+  int	nbytes, capacity;
+
+  nbytes   = (src->m_apm_datalength + 1) >> 1;
+  capacity = M_compact_capacity(src->m_apm_datalength);
+
+  if ((atmp = (M_APM)MAPM_MALLOC(sizeof(M_APM_struct) + capacity)) == NULL)
   {
     /* fatal, this does not return */
     M_apm_log_error_msg(M_APM_FATAL, M_init_error_msg);
   }
-  
-  atmp->m_apm_data[0] = 0;
+
+  atmp->m_apm_id           = M_APM_IDENT_INLINE;
+  atmp->m_apm_malloclength = capacity - 4;  /* same convention as m_apm_init */
+  atmp->m_apm_datalength   = src->m_apm_datalength;
+  atmp->m_apm_refcount     = 1;
+  atmp->m_apm_exponent     = src->m_apm_exponent;
+  atmp->m_apm_sign         = src->m_apm_sign;
+  atmp->m_apm_data         = (UCHAR *)(atmp + 1);
+
+  memcpy(atmp->m_apm_data, src->m_apm_data, nbytes);
+  memset(atmp->m_apm_data + nbytes, 0, capacity - nbytes);
   return(atmp);
+}
+
+
+/******************************************************************************
+  Zorba: nonzero if ATMP is stored as m_apm_init_compact_copy() stores it.
+*******************************************************************************/
+int	m_apm_is_compact(M_APM atmp)
+{
+  return(atmp->m_apm_id == M_APM_IDENT_INLINE &&
+         atmp->m_apm_malloclength + 4 ==
+           M_compact_capacity(atmp->m_apm_datalength));
+}
+
+
+/******************************************************************************
+  Zorba: bytes that ATMP takes from malloc (struct and digits; allocator
+  headers and rounding not included).
+*******************************************************************************/
+int	m_apm_heap_bytes(M_APM atmp)
+{
+  return((int)sizeof(M_APM_struct) + atmp->m_apm_malloclength + 4);
+}
+
+
+/******************************************************************************
+  Zorba: the realloc() of ATMP's digit array to SIZE bytes, for every place
+  that grows it. Digits stored in the struct's allocation (M_APM_IDENT_INLINE)
+  are copied to a new separate allocation (the space they leave stays unused
+  until the struct is freed). Returns NULL if out of memory; the caller sets
+  m_apm_data and m_apm_malloclength.
+*******************************************************************************/
+void	*M_apm_realloc_data(M_APM atmp, int size)
+{
+  void	*vp;
+  int	capacity;
+
+  if (atmp->m_apm_id != M_APM_IDENT_INLINE)
+    return(MAPM_REALLOC(atmp->m_apm_data, size));
+
+  capacity = atmp->m_apm_malloclength + 4;
+  if ((vp = MAPM_MALLOC(size)) != NULL)
+  {
+    memcpy(vp, atmp->m_apm_data, (capacity < size) ? capacity : size);
+    atmp->m_apm_id = M_APM_IDENT;
+  }
+  return(vp);
 }
 
 
@@ -178,8 +271,13 @@ void	m_apm_free(M_APM atmp)
 {
   if (atmp->m_apm_id == M_APM_IDENT)
   {
-    atmp->m_apm_id = 0x0FFFFFF0L;
+    atmp->m_apm_id = 0x0FFFFFF0;
     MAPM_FREE(atmp->m_apm_data);
+    MAPM_FREE(atmp);
+  }
+  else if (atmp->m_apm_id == M_APM_IDENT_INLINE)
+  {
+    atmp->m_apm_id = 0x0FFFFFF0;
     MAPM_FREE(atmp);
   }
   else
@@ -492,7 +590,7 @@ ct = count;
 ii = (ctmp->m_apm_datalength + ct + 1) >> 1;
 if (ii > ctmp->m_apm_malloclength)
   {
-   if ((vp = MAPM_REALLOC(ctmp->m_apm_data, (ii + 32))) == NULL)
+   if ((vp = M_apm_realloc_data(ctmp, (ii + 32))) == NULL)
      {
       /* fatal, this does not return */
 
@@ -607,7 +705,7 @@ void M_apm_pad(M_APM ctmp, int new_length)
 
   if (numb > ctmp->m_apm_malloclength)
   {
-    if ((vp = MAPM_REALLOC(ctmp->m_apm_data, (numb + 32))) == NULL)
+    if ((vp = M_apm_realloc_data(ctmp, (numb + 32))) == NULL)
     {
       M_apm_log_error_msg(M_APM_FATAL, "\'M_apm_pad\', Out of memory");
     }

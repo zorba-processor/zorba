@@ -1452,10 +1452,12 @@ protected:
   xs_decimal theValue;
 
 protected:
+  // The value is kept compacted: one heap block instead of two (see
+  // Decimal::compacted()).
   DecimalItem(store::SchemaTypeCode t, const xs_decimal& v)
     :
     AtomicItem(t),
-    theValue(v)
+    theValue(v.compacted())
   {
   }
 
@@ -1584,7 +1586,7 @@ public:
 
   uint32_t hash(long timezone = 0, const XQPCollator* aCollation = 0) const
   {
-    return static_cast<uint32_t>(theValue);
+    return hash_int64(theValue);
   }
 
   bool equals(
@@ -1924,7 +1926,7 @@ protected:
 
   uint32_t hash(long timezone = 0, const XQPCollator* aCollation = 0) const
   {
-    return static_cast<uint32_t>(theValue);
+    return hash_uint64(theValue);
   }
 
   bool equals(

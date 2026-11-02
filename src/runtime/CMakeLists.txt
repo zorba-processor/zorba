@@ -152,6 +152,7 @@ LIST(APPEND RUNTIME_SRCS
   scripting/scripting.cpp
   json/json_constructors.cpp
   json/json_loader.cpp
+  json/nesting.cpp
 )
 
 ADD_SRC_SUBFOLDER(RUNTIME_SRCS csv CSV_SRCS)

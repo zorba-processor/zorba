@@ -290,10 +290,13 @@ public:
  * initialization is done only when profiling is enabled.
  */
 struct mbr_fn {
-  unsigned call_count_;
-  unsigned next_count_;
-  double cpu_time_;
-  double wall_time_;
+  // Zero from construction: a state whose init() is never called (an
+  // iterator that is not opened, e.g. the body of a cached function call) is
+  // still printed in a profile.
+  unsigned call_count_ = 0;
+  unsigned next_count_ = 0;
+  double cpu_time_ = 0;
+  double wall_time_ = 0;
 
   void init() {
     call_count_ = 0;

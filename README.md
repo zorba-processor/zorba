@@ -24,9 +24,16 @@ one thread at a time (see [doc/zorba/threading.dox](doc/zorba/threading.dox)).
 ## Docker
 
 ```bash
-docker run --rm ghcr.io/zorba-processor/zorba:edge -q '1 + 1'
-docker run --rm -v "$PWD":/work ghcr.io/zorba-processor/zorba:edge -f -q query.xq
+docker run --rm ghcr.io/zorba-processor/zorba:edge -r -q '1 + 1'
+echo 'for $i in 1 to 3 return $i * $i' > query.xq
+docker run --rm -v "$PWD":/work ghcr.io/zorba-processor/zorba:edge -r -f -q query.xq
 ```
+
+The first command prints `2` with no final newline. Without `-r` the output
+starts with the XML declaration (`<?xml version="1.0" encoding="UTF-8"?>`).
+`-f` says the argument of `-q` is a file. The repository has more query files
+in [site/examples](site/examples) and
+[docker/runtime/smoke](docker/runtime/smoke).
 
 `edge` is the latest master build and releases are tagged by version (for
 example `5.0.0-alpha.1`). Until the first stable 5.x release, `latest` is an
@@ -60,6 +67,7 @@ supported.
 Debian / Ubuntu:
 
 ```bash
+sudo apt-get update
 sudo apt-get install build-essential cmake ninja-build pkg-config \
   libicu-dev libxml2-dev libxslt1-dev libcurl4-openssl-dev zlib1g-dev \
   libxerces-c-dev uuid-dev
@@ -105,6 +113,13 @@ latest toolchain and libraries) provide ready-made build environments.
 ```bash
 ctest --preset full-release-offline -j8   # everything except network tests
 ```
+
+Against the distribution's stock Xerces-C, the tests
+`zorba/schemas/choice-empty-sequence` and `zorba/schemas/union-whitespace`
+fail (see `doc/KNOWN_ISSUES.txt`). Six datetime and `format-date` tests need
+the `de_DE.UTF-8` and `fr_FR.UTF-8` locales; on Debian / Ubuntu, install the
+`locales` package and run `sudo localedef -i de_DE -f UTF-8 de_DE.UTF-8` and
+`sudo localedef -i fr_FR -f UTF-8 fr_FR.UTF-8`.
 
 The http-client tests need the HTTP test server in `test/http-test-data`
 (see its README). With Docker:

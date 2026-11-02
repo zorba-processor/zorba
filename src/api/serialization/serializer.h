@@ -396,6 +396,9 @@ protected:
 
     virtual void emit_json_string(zstring const &string);
 
+    // The arrays and objects being emitted.
+    uint32_t theNestingDepth = 0;
+
     store::Item_t theJSONiqValueName;
     store::Item_t theTypeName;
     store::Item_t theValueName;

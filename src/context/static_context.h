@@ -160,6 +160,10 @@ protected:
 
   ulong            theId;
 
+  // Creation sequence number: orders variables by declaration, independent
+  // of the (pointer-hashed) order of the variable maps.
+  ulong            theSeq;
+
   int              theKind;
 
   xqtref_t         theType;
@@ -189,6 +193,8 @@ public:
   const store::Item_t& getName() const { return theName; }
 
   ulong getId() const { return theId; }
+
+  ulong getSeq() const { return theSeq; }
 
   void setId(ulong id) { theId = id; }
 

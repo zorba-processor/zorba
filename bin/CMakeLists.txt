@@ -67,6 +67,12 @@ ZORBA_SET_TEST_PROPERTY(bin/zorba_f1 PASS_REGULAR_EXPRESSION ".*file {blub.xq} n
 ZORBA_ADD_TEST(bin/zorba1 zorbacmd --omit-xml-declaration -q "1+1")
 ZORBA_SET_TEST_PROPERTY(bin/zorba1 PASS_REGULAR_EXPRESSION "2")
 
+# -r omits the XML declaration. The exact output, "2" with no final newline,
+# is checked by test/install/relocated, which compares it with STREQUAL.
+ZORBA_ADD_TEST(bin/zorba_r_one_plus_one zorbacmd -r -q "1 + 1")
+ZORBA_SET_TEST_PROPERTY(bin/zorba_r_one_plus_one PASS_REGULAR_EXPRESSION "^2")
+ZORBA_SET_TEST_PROPERTY(bin/zorba_r_one_plus_one FAIL_REGULAR_EXPRESSION "<\\?xml")
+
 ZORBA_ADD_TEST(bin/zorba2 zorbacmd --serialize-html -q "1+1")
 ZORBA_SET_TEST_PROPERTY(bin/zorba2 PASS_REGULAR_EXPRESSION "2")
 
@@ -322,7 +328,8 @@ IF (ZORBA_WITH_FILE_ACCESS)
     SET (_mcpq "${CMAKE_CURRENT_SOURCE_DIR}/test/mcp/queries")
     FOREACH (_t json protocol legacy tools_list list_documents join
              syntax_error escape network native_modules predefined limits binary
-             optional_params documents_stream memory_limit)
+             optional_params documents_stream deep_json deep_json_binary
+             entity_expansion case_paths html_edge_cases memory_limit)
       ADD_TEST (NAME bin/mcp/${_t}
         COMMAND "mcp_tests${_mcp_suffix}" ${_t} "${_dirtree}" "${_mcpq}"
           "${_dirq}/join.xq" "$<TARGET_FILE:zorba_mcp${_mcp_suffix}>")
@@ -351,6 +358,15 @@ ZORBA_SET_TEST_PROPERTY(bin/zorba_compilechk2 PASS_REGULAR_EXPRESSION ".*XPST000
 # test for bug #2934414
 ZORBA_ADD_TEST(bin/zorba_compilechk3 zorbacmd -q "${CMAKE_CURRENT_SOURCE_DIR}/test/mymod2.xq" -f -l -x)
 ZORBA_SET_TEST_PROPERTY(bin/zorba_compilechk3 PASS_REGULAR_EXPRESSION ".*XQST0046.*mymod2.xq.*line-begin=['\"]17['\"] column-begin=['\"]1['\"] line-end=['\"]17['\"] column-end=['\"]26['\"].*")
+
+# --profile json writes valid JSON for an iterator that was never opened (the
+# body of a cached call): no nan or inf, no counter read from uninitialized
+# memory (4294967295 is an unsigned counter that wrapped or was never set).
+ZORBA_ADD_TEST(bin/zorba_profile_json zorbacmd --profile json --no-tree-ids --no-serializer
+  -f -q "${CMAKE_SOURCE_DIR}/test/rbkt/Queries/zorba/caching/simple-01.xq")
+ZORBA_SET_TEST_PROPERTY(bin/zorba_profile_json PASS_REGULAR_EXPRESSION "\"prof-calls\"")
+ZORBA_SET_TEST_PROPERTY(bin/zorba_profile_json
+  FAIL_REGULAR_EXPRESSION ": -?(nan|inf)|4294967295")
 
 # test the --option option to set an option in the static context
 ZORBA_ADD_TEST(bin/zorba_option zorbacmd -q "${CMAKE_CURRENT_SOURCE_DIR}/test/option.xq" -f --option "{http://zorba.io/}option=value")
@@ -421,6 +437,19 @@ ZORBA_ADD_TEST(bin/zorba_module_path_1 zorbacmd
   --module-path "${_libdir}${PATH_SEP}${_uridir}")
 ZORBA_SET_TEST_PROPERTY(bin/zorba_module_path_1
   PASS_REGULAR_EXPRESSION "hello, v2")
+
+# A relative module path is taken against the current directory, also under
+# --secure; a path that leaves the current directory does not grant it.
+ZORBA_SECURITY_TEST(module_path_relative_secure "hello, v2"
+  --secure -f -q "${_testdir}/versioning/import1.xq" --module-path .)
+ZORBA_SET_TEST_PROPERTY(bin/zorba_security_module_path_relative_secure
+  WORKING_DIRECTORY "${_uridir}")
+ZORBA_SECURITY_DENIED(module_path_dotdot_secure XQST0059 "access denied by security policy"
+  --secure -f -q "${_testdir}/versioning/import1.xq" --module-path ../elsewhere)
+ZORBA_SET_TEST_PROPERTY(bin/zorba_security_module_path_dotdot_secure
+  WORKING_DIRECTORY "${_uridir}")
+ZORBA_SET_TEST_PROPERTY(bin/zorba_security_module_path_dotdot_secure
+  FAIL_REGULAR_EXPRESSION "hello, v2")
 
 # test compilation of the perf script
 ZORBA_ADD_TEST(bin/zorba_compilechk4 zorbacmd 

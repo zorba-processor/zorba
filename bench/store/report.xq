@@ -60,8 +60,9 @@ declare function local:m-field( $case as xs:string, $key as xs:string )
 };
 
 declare variable $cost-keys := ( "element", "text", "text_char", "attribute",
-  "attribute_char", "name", "object", "array", "pair", "csv_pair", "integer", "decimal",
-  "double", "boolean", "null", "string", "string_char" );
+  "attribute_char", "name", "object", "array", "pair", "csv_pair", "integer",
+  "small_integer", "decimal", "double", "boolean", "null", "string",
+  "string_char" );
 
 (: Heap bytes per item of each kind. :)
 declare function local:cost( $key as xs:string ) as xs:double
@@ -84,7 +85,10 @@ declare function local:cost( $key as xs:string ) as xs:double
   case "csv_pair" return
     ( local:m( "c_row4" ) - local:m( "j_obj0" ) - 2 * local:m( "j_int" )
       - 2 * local:m( "j_str1" ) ) div 4
-  case "integer" return local:m( "j_int" )
+  (: j_int holds values 0..999, which the item factory shares; j_bigint
+   : holds values from 1000000, which get an item each. :)
+  case "integer" return local:m( "j_bigint" )
+  case "small_integer" return local:m( "j_int" )
   case "decimal" return local:m( "j_dec" )
   case "double" return local:m( "j_dbl" )
   case "boolean" return local:m( "j_bool" )
@@ -113,7 +117,10 @@ declare function local:categories( $o as item() ) as item()*
     [ "arrays", local:n( $o, "arrays" ), "array" ],
     [ "object pairs (key, slot)", local:n( $o, "pairs" ),
       if ( $o( "format" ) eq "csv" ) then "csv_pair" else "pair" ],
-    [ "integers", local:n( $o, "integers" ), "integer" ],
+    [ "integers in -128..1023 (shared)", local:n( $o, "small_integers" ),
+      "small_integer" ],
+    [ "other integers",
+      local:n( $o, "integers" ) - local:n( $o, "small_integers" ), "integer" ],
     [ "decimals", local:n( $o, "decimals" ), "decimal" ],
     [ "doubles", local:n( $o, "doubles" ), "double" ],
     [ "booleans", local:n( $o, "booleans" ), "boolean" ],
