@@ -111,7 +111,7 @@ glibc chunk arithmetic and has not been measured.
 | 4 | Immediate (tagged) or cached small integers and doubles instead of a 48 B item | measured: integer 58.5 B vs boolean 8 B (shared) = 50.5 B | - | 203 MiB (10%) + doubles 25 MiB | 123 MiB (7%) |
 | 5 | Text stored inline in TextNode (small-string), no separate rep | estimate: rep chunk >= 32 B per text node | 151 MiB (9%) | - | - |
 | 6 | Pack ElementNode (96 B) to 80 B or 64 B (32-bit counts, no `theTypeName` for untyped, smaller child vector header) | estimate: chunk 112 -> 96 / 80 | 86-172 MiB (5-11%) | - | - |
-| 7 | Decimals without MAPM heap for values that fit (e.g. int64 mantissa + scale) | measured: 144 B per decimal outside operator new | - | 72 MiB (3%) | 176 MiB (11%) |
+| 7 | Decimals without MAPM heap for values that fit (e.g. int64 mantissa + scale) | measured: 144 B per decimal outside operator new. **Done differently** (see "Compact decimals" below): 96 of the 144 B saved | - | 48 MiB (2%) measured | 117 MiB (7%) measured |
 | 8 | Short strings inline in StringItem (no rep) | estimate: rep chunk >= 32 B per string | - | 80 MiB (4%) | 117 MiB (7%) |
 | 9 | Attribute value as a plain string instead of an UntypedAtomicItem | estimate: 48 B chunk per attribute | 65 MiB (4%) | - | - |
 | 10 | Child vector inline for elements with one child | estimate: vector chunk >= 32 B per element with children | not measured (needs a count of single-child elements) | - | - |
@@ -130,6 +130,42 @@ Not contributors on these inputs:
 - Whitespace-only text nodes: 705 K of the 4.94 M text nodes (97 MiB, 6%);
   dropping them changes the data model, so it is an opt-in, not an
   optimization.
+
+## Compact decimals (candidate 7)
+
+The tables above describe master before this change. A decimal's MAPM number
+was two blocks: `M_APM_struct` (40 B, chunk 48) and a digit array (84 B, chunk
+96). Now `M_APM_struct` is 32 B, a new number is one block (struct + 84 B,
+chunk 128), and `DecimalItem` keeps a copy in one block sized to fit (struct +
+digits rounded up to 8 bytes: 40 B, chunk 48, up to 16 significant digits).
+
+Measured with `suite=store`: run 41444652502 (change) against run 41444656225
+(master plus the `j_dec_arith` case), 3 runs per point, medians:
+
+| | before | after | change |
+|---|---:|---:|---:|
+| CSV heap, 100 MiB file | 1655.9 MiB | 1538.7 MiB | -117.2 MiB (-7.1%) |
+| JSON heap, 100 MiB file | 2100.4 MiB | 2052.3 MiB | -48.1 MiB (-2.3%) |
+| XML heap, 100 MiB file | 1603.3 MiB | 1603.3 MiB | 0 |
+| decimal, heap per item (`j_dec`) | 202.5 B | 106.5 B | -96 B |
+| CSV parse, 100 MiB file | 4.98 s | 5.00 s | +0.4% |
+| JSON parse, 100 MiB file | 6.58 s | 6.61 s | +0.4% |
+| `j_dec` parse, 200000 decimals | 94 ms | 83 ms | -12% |
+| `j_dec_arith`, same document, whole query | 235 ms | 230 ms | -2% |
+| `j_dec_arith` minus `j_dec` (arithmetic only) | 141 ms | 147 ms | +4% |
+
+XML, which has no decimal items, moved 2.1% between the two runs (3.54 s and
+3.47 s), so differences of that size are runner noise. `j_dec_arith` is
+`sum( for $d in jn:members( jn:parse-json( $s ) ) return $d * 1.5 + 0.25 )`:
+every intermediate result is a decimal item, so it pays for one compaction per
+item, and a new number saves one allocation.
+
+An int64 mantissa plus scale inside the item, as first proposed, would save
+the other 48 B per decimal (59 MiB on CSV, 24 MiB on JSON; arithmetic, not
+measured), but every `getDecimalValue()`, now a reference count increment,
+would have to build a MAPM number, and values that do not fit would need a
+second representation. The compact block keeps one representation, so results
+cannot differ between forms.
 
 ## Limitations
 
