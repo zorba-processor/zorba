@@ -31,6 +31,7 @@ SET(UNIT_TEST_SRCS
   test_numeric_hash.cpp
   test_ordpath.cpp
   test_parameters.cpp
+  test_profile_data.cpp
   test_security_policy.cpp
   test_small_integers.cpp
   test_string.cpp
