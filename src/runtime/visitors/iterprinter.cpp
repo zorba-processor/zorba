@@ -16,6 +16,7 @@
 
 // standard
 #include <cassert>
+#include <cmath>
 #include <iostream>
 
 // Zorba
@@ -488,6 +489,9 @@ void JSONIterPrinter::addIntAttribute( char const *name, xs_integer value ) {
 }
 
 void JSONIterPrinter::addDecAttribute( char const *name, double value ) {
+  // JSON has no nan or infinity.
+  if ( !std::isfinite( value ) )
+    value = 0;
   os_ << ",\n" << indent << "\"" << zorba::json::serialize(name) << "\": "
       << value;
 }

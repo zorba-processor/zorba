@@ -24,9 +24,16 @@ one thread at a time (see [doc/zorba/threading.dox](doc/zorba/threading.dox)).
 ## Docker
 
 ```bash
-docker run --rm ghcr.io/zorba-processor/zorba:edge -q '1 + 1'
-docker run --rm -v "$PWD":/work ghcr.io/zorba-processor/zorba:edge -f -q query.xq
+docker run --rm ghcr.io/zorba-processor/zorba:edge -r -q '1 + 1'
+echo 'for $i in 1 to 3 return $i * $i' > query.xq
+docker run --rm -v "$PWD":/work ghcr.io/zorba-processor/zorba:edge -r -f -q query.xq
 ```
+
+The first command prints `2` with no final newline. Without `-r` the output
+starts with the XML declaration (`<?xml version="1.0" encoding="UTF-8"?>`).
+`-f` says the argument of `-q` is a file. The repository has more query files
+in [site/examples](site/examples) and
+[docker/runtime/smoke](docker/runtime/smoke).
 
 `edge` is the latest master build and releases are tagged by version (for
 example `5.0.0-alpha.1`). Until the first stable 5.x release, `latest` is an

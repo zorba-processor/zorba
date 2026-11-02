@@ -16,7 +16,7 @@ find . -type f -name '*.cpp' | sort | while read -r f; do
   mkdir -p "$out/$(dirname "$f")"
   if g++ -std=c++23 -I/opt/zorba/include "$src/$f" -L/opt/zorba/lib \
        -lzorba_simplestore -o /tmp/example 2> "$out/$base.err"; then
-    /tmp/example > "$out/$base.out" 2>> "$out/$base.err"
+    LD_LIBRARY_PATH=/opt/zorba/lib /tmp/example > "$out/$base.out" 2>> "$out/$base.err"
     echo $? > "$out/$base.rc"
   else
     : > "$out/$base.out"

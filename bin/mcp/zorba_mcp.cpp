@@ -15,7 +15,7 @@
  */
 
 // zorba-mcp: an MCP server (stdio transport) that lets an AI agent query a
-// directory of XML, JSON and CSV documents with JSONiq/XQuery.
+// directory of XML, JSON, CSV and HTML documents with JSONiq/XQuery.
 
 #include <csignal>
 #include <cstdio>
