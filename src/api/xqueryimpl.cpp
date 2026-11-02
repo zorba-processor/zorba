@@ -798,6 +798,12 @@ void XQueryImpl::getExternalVariables(Iterator_t& aVarsIter) const
     {
       ite->second.getp()->getVariables(vars, false, false, true);
     }
+
+    // The variable maps are hashed by item pointer; report the variables in
+    // declaration order so the result is the same on every run.
+    std::stable_sort(vars.begin(), vars.end(),
+                     [](VarInfo const* a, VarInfo const* b)
+                     { return a->getSeq() < b->getSeq(); });
     
     std::vector<VarInfo*>::const_iterator varIte = vars.begin();
     std::vector<VarInfo*>::const_iterator varEnd = vars.end();

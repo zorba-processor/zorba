@@ -40,6 +40,7 @@ namespace UnitTests {
   int test_icu_streambuf( int, char*[] );
 #endif /* ZORBA_NO_ICU */
 
+  int test_decimal_storage( int, char*[] );
   int test_json_object( int, char*[] );
   int test_json_parser( int, char*[] );
   int test_mem_sizeof( int, char*[] );
@@ -51,7 +52,9 @@ namespace UnitTests {
   int test_numeric_hash( int, char*[] );
   int test_ordpath( int, char*[] );
   int test_parameters( int, char*[] );
+  int test_profile_data( int, char*[] );
   int test_security_policy( int, char*[] );
+  int test_small_integers( int, char*[] );
   int test_string( int, char*[] );
   int test_time( int, char*[] );
   int test_time_parse( int, char*[] );

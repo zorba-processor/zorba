@@ -41,6 +41,7 @@ void initializeTestList()
   libunittests["ato"] = test_ato_;
   libunittests["base64"] = test_base64;
   libunittests["base64_streambuf"] = test_base64_streambuf;
+  libunittests["decimal_storage"] = test_decimal_storage;
   libunittests["fs_util"] = test_fs_util;
   libunittests["hashmaps"] = test_hashmaps;
   libunittests["hexbinary"] = test_hexbinary;
@@ -62,7 +63,9 @@ void initializeTestList()
   libunittests["json_object"] = test_json_object;
   libunittests["json_parser"] = test_json_parser;
   libunittests["parameters"] = test_parameters;
+  libunittests["profile_data"] = test_profile_data;
   libunittests["security_policy"] = test_security_policy;
+  libunittests["small_integers"] = test_small_integers;
   libunittests["string"] = test_string;
   libunittests["time"] = test_time;
   libunittests["time_parse"] = test_time_parse;

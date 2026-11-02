@@ -259,6 +259,14 @@ declare variable $zerr:ZXQP0070 as xs:QName := fn:QName($zerr:NS, "zerr:ZXQP0070
 
 (:~
  :
+ : A JSON value would be nested deeper than the fixed limit, or is too
+ : deep to process with the machine stack that is left.
+ : 
+:)
+declare variable $zerr:ZXQP0071 as xs:QName := fn:QName($zerr:NS, "zerr:ZXQP0071");
+
+(:~
+ :
  : The version of the thesaurus is not the expected version.
  : 
 :)

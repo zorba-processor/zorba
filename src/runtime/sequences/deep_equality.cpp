@@ -39,6 +39,8 @@
 
 #include <compiler/api/compilercb.h>
 
+#include "runtime/json/nesting.h"
+
 #include <runtime/sequences/sequences.h>
 #include <runtime/core/arithmetic_impl.h>
 #include <runtime/util/iterator_impl.h>
@@ -362,6 +364,8 @@ bool deepEqualObjects(
   assert(item1->isObject());
   assert(item2->isObject());
 
+  json_nesting::check_stack();
+
   if (item1->getNumObjectPairs() != item2->getNumObjectPairs())
     return false;
 
@@ -398,6 +402,8 @@ bool deepEqualArrays(
 {
   assert(item1->isArray());
   assert(item2->isArray());
+
+  json_nesting::check_stack();
 
   if (item1->getArraySize() != item2->getArraySize())
     return false;
@@ -718,6 +724,8 @@ uint32_t deHashArray(
 {
   uint32_t lHash = FNV_32_INIT;
   uint32_t lInnerHash;
+
+  json_nesting::check_stack();
 
   store::Iterator_t lValues = item->getArrayValues();
   store::Item_t lValue;

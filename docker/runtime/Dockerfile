@@ -2,8 +2,9 @@
 # Build (from the repo root):
 #   docker build -t zorba -f docker/runtime/Dockerfile .
 # Run:
-#   docker run --rm zorba -q '1 + 1'
-#   docker run --rm -v "$PWD":/work zorba -f -q query.xq
+#   docker run --rm zorba -r -q '1 + 1'
+#   echo 'for $i in 1 to 3 return $i * $i' > query.xq
+#   docker run --rm -v "$PWD":/work zorba -r -f -q query.xq
 # MCP server over a folder of XML, JSON, CSV and HTML files (stdio):
 #   docker run -i --rm -v "$PWD":/data:ro zorba zorba-mcp --root /data
 

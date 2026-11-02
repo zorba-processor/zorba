@@ -977,6 +977,11 @@ bool FLWORIterator::nextImpl(store::Item_t& result, PlanState& planState) const
               }
 
               {
+                promoteNumericSortKeys(state->theSortTable,
+                                       theMaterializeClause->theOrderSpecs,
+                                       theSctx->get_typemanager(),
+                                       theMaterializeClause->theLocation);
+
                 SortTupleCmp cmp(theMaterializeClause->theLocation,
                                  planState.theLocalDynCtx,
                                  theSctx->get_typemanager(),
@@ -1053,6 +1058,11 @@ bool FLWORIterator::nextImpl(store::Item_t& result, PlanState& planState) const
             }
 
             {
+              promoteNumericSortKeys(state->theSortTable,
+                                     theOrderByClause->theOrderSpecs,
+                                     theSctx->get_typemanager(),
+                                     theOrderByClause->theLocation);
+
               SortTupleCmp cmp(theOrderByClause->theLocation,
                                planState.theLocalDynCtx,
                                theSctx->get_typemanager(),

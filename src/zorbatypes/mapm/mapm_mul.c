@@ -119,7 +119,7 @@ ii = (numdigits + 1) >> 1;     /* required size of result, in bytes */
 
 if (ii > r->m_apm_malloclength)
   {
-   if ((vp = MAPM_REALLOC(r->m_apm_data, (ii + 32))) == NULL)
+   if ((vp = M_apm_realloc_data(r, (ii + 32))) == NULL)
      {
       /* fatal, this does not return */
 

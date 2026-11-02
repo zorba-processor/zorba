@@ -620,10 +620,12 @@ void test_optional_params( Fixture const &f ) {
   // 1. The input schemas.
   Json const *const res1 = by_id["1"].find( "result" );
   Json const *const tools = res1 ? res1->find( "tools" ) : nullptr;
-  std::string greet, scale;
+  std::string greet, scale, ordered;
   if ( tools && tools->is_array() )
     for ( Json const &t : tools->items() ) {
-      if ( field( t, "name" ) == "greet" )
+      if ( field( t, "name" ) == "ordered" )
+        ordered = t.dump();
+      else if ( field( t, "name" ) == "greet" )
         greet = t.dump();
       else if ( field( t, "name" ) == "scale" )
         scale = t.dump();
@@ -635,6 +637,27 @@ void test_optional_params( Fixture const &f ) {
   check( contains( scale, "\"required\":[\"value\"]" ) &&
          contains( scale, "\"factor\":" ),
          "scale: $value required, defaulted $factor optional", scale );
+
+  // The properties are listed in declaration order, so the tool list is the
+  // same on every run.
+  {
+    size_t pos = 0;
+    bool in_order = !ordered.empty();
+    for ( char const *n : { "zeta", "alpha", "mid", "beta", "omega", "kappa",
+                            "delta", "sigma" } ) {
+      size_t const at = ordered.find( std::string( "\"" ) + n + "\":{", pos );
+      if ( at == std::string::npos ) {
+        in_order = false;
+        break;
+      }
+      pos = at;
+    }
+    check( in_order, "properties follow declaration order", ordered );
+    check( contains( ordered,
+             "\"required\":[\"zeta\",\"mid\",\"omega\",\"delta\"]" ),
+           "required lists the required parameters in declaration order",
+           ordered );
+  }
 
   // 2. Defaults and overrides.
   check( !is_tool_error( by_id["2"] ) &&
@@ -850,6 +873,390 @@ void test_documents_stream( Fixture const &f ) {
          " MiB scanning 40" );
 }
 
+///////////////////////////////////////////////////////////////////////////////
+// Files that take a parser to its limits: each gets a result or an error of
+// its own, and the server keeps answering.
+
+// The limit on the nesting depth of JSON values, zerr:ZXQP0071.
+std::size_t const json_limit = 1500;
+
+std::string repeated( std::string const &s, std::size_t n ) {
+  std::string r;
+  r.reserve( s.size() * n );
+  for ( std::size_t i = 0; i < n; ++i )
+    r += s;
+  return r;
+}
+
+std::string deep_array( std::size_t n ) {
+  return repeated( "[", n ) + "1" + repeated( "]", n );
+}
+
+std::string deep_object( std::size_t n ) {
+  return repeated( "{\"a\":", n ) + "1" + repeated( "}", n );
+}
+
+std::string const dir_import(
+  "import module namespace dir = \"http://zorba.io/modules/directory\";\n" );
+
+// The files in the root that have an error record, with its code.
+std::string const error_records(
+  dir_import +
+  "string-join(for $d in dir:documents($dir:root)\n"
+  "            order by $d(\"path\")\n"
+  "            return concat($d(\"path\"), \"=\", \n"
+  "              if (exists($d(\"error\"))) then $d(\"error\")(\"code\")\n"
+  "              else \"ok\"), \" \")" );
+
+Json run_query( Server &server, std::string const &query ) {
+  return call_tool( server, "run_query",
+                    Json::object( { { "query", query } } ) );
+}
+
+void check_alive( Server &server ) {
+  Json const r = run_query( server, "1 + 1" );
+  check( !is_tool_error( r ) && result_text( r ) == "2",
+         "the server still answers a normal query", r.dump() );
+}
+
+void write_deep_tree( TempTree const &t ) {
+  t.write( "good.json", "{ \"a\" : [ 1, 2 ] }" );
+  t.write( "bad.json", "{ \"a\" : " );
+  // The record around a file's content is one more level.
+  t.write( "under.json", deep_array( json_limit - 1 ) );
+  t.write( "at-limit.json", deep_array( json_limit ) );
+  t.write( "over.json", deep_array( json_limit + 1 ) );
+  t.write( "deep-array.json", deep_array( 200000 ) );
+  t.write( "deep-object.json", deep_object( 200000 ) );
+}
+
+std::string const deep_tree_records(
+  "at-limit.json=ZXQP0071 bad.json=JNDY0021 deep-array.json=ZXQP0071 "
+  "deep-object.json=ZXQP0071 good.json=ok over.json=ZXQP0071 under.json=ok" );
+
+void test_deep_json( Fixture const &f ) {
+  TempTree t;
+  write_deep_tree( t );
+  ServerConfig config;
+  config.root = t.root;
+  config.timeout = std::chrono::milliseconds( 0 );
+  Server server( f.zorba, config, std::cerr );
+
+  Json r = run_query( server, error_records );
+  check( !is_tool_error( r ) && contains( result_text( r ), deep_tree_records ),
+         "every too-deep file has its error record, the others are not "
+         "affected", r.dump().substr( 0, 2000 ) );
+  check_alive( server );
+
+  // The file that just fits is served, and serializes.
+  r = run_query( server,
+    dir_import + "dir:open($dir:root, \"under.json\")" );
+  check( !is_tool_error( r ) && contains( result_text( r ), "content" ) &&
+         !contains( result_text( r ), "ZXQP0071" ),
+         "the file that fits is served", r.dump().substr( 0, 2000 ) );
+  check_alive( server );
+
+  r = run_query( server,
+    dir_import + "dir:open($dir:root, \"deep-array.json\")" );
+  check( !is_tool_error( r ) && contains( result_text( r ), "ZXQP0071" ) &&
+         contains( result_text( r ), std::to_string( json_limit ) ),
+         "dir:open of a too-deep file: the error record says the limit",
+         r.dump().substr( 0, 2000 ) );
+  check_alive( server );
+
+  // Serializing everything dir:documents returns.
+  r = run_query( server, dir_import + "dir:documents($dir:root)" );
+  check( !is_tool_error( r ) && contains( result_text( r ), "good.json" ),
+         "dir:documents serializes with too-deep files in the tree",
+         r.dump().substr( 0, 2000 ) );
+  check_alive( server );
+
+  // A query that builds such a value.
+  r = run_query( server,
+    "import module namespace jn = \"http://jsoniq.org/functions\";\n"
+    "jn:parse-json(concat(string-join(for $i in 1 to 200000 return \"[\"),\n"
+    "                     string-join(for $i in 1 to 200000 return \"]\")))" );
+  check( is_tool_error( r ) &&
+         contains( field( tool_error( r ), "code" ), "ZXQP0071" ),
+         "a query that parses a too-deep value: tool error",
+         r.dump().substr( 0, 2000 ) );
+  check_alive( server );
+}
+
+// The same with the executable: it must survive and answer later calls.
+void test_deep_json_binary( Fixture const &f ) {
+  TempTree t;
+  write_deep_tree( t );
+  Fixture g( f );
+  g.tree = t.root;
+  auto call = [&]( int id, std::string const &query ) {
+    return request( id, "tools/call", Json::object( {
+      { "name", "run_query" },
+      { "arguments", Json::object( { { "query", query } } ) }
+    } ) ) + "\n";
+  };
+  std::string input;
+  input += call( 1, error_records );
+  input += call( 2, "1 + 1" );
+  input += call( 3, dir_import + "dir:documents($dir:root)" );
+  input += call( 4, "2 + 2" );
+  input += call( 5,
+    "import module namespace jn = \"http://jsoniq.org/functions\";\n"
+    "jn:parse-json(concat(string-join(for $i in 1 to 200000 return \"[\"),\n"
+    "                     string-join(for $i in 1 to 200000 return \"]\")))" );
+  input += call( 6, "3 + 3" );
+
+  std::string const output( run_binary( g, f.queries, input ) );
+  std::map<std::string, Json> by_id;
+  std::istringstream lines( output );
+  std::string line;
+  while ( std::getline( lines, line ) ) {
+    Json r;
+    std::string why;
+    if ( parse_json( line, &r, &why ) && r.find( "id" ) )
+      by_id[ r.find( "id" )->text() ] = r;
+  }
+  check( by_id.size() == 6, "six responses", output.substr( 0, 2000 ) );
+  check( contains( result_text( by_id["1"] ), deep_tree_records ),
+         "the error records", by_id["1"].dump().substr( 0, 2000 ) );
+  check( result_text( by_id["2"] ) == "2", "a normal query after the scan",
+         by_id["2"].dump() );
+  check( !is_tool_error( by_id["3"] ), "dir:documents serializes",
+         by_id["3"].dump().substr( 0, 2000 ) );
+  check( result_text( by_id["4"] ) == "4", "a normal query after serializing",
+         by_id["4"].dump() );
+  check( is_tool_error( by_id["5"] ) &&
+         contains( field( tool_error( by_id["5"] ), "code" ), "ZXQP0071" ),
+         "a query that parses a too-deep value: tool error",
+         by_id["5"].dump().substr( 0, 2000 ) );
+  check( result_text( by_id["6"] ) == "6", "a normal query after the error",
+         by_id["6"].dump() );
+}
+
+// Internal entities that expand to far more than the document: libxml2 as
+// built in this environment refuses them, quickly, and the file gets its
+// error record. Runs under the production libxml2 of every CI job.
+void test_entity_expansion( Fixture const &f ) {
+  TempTree t;
+  std::string laughs( "<?xml version=\"1.0\"?>\n<!DOCTYPE lolz [\n"
+                      "<!ENTITY lol0 \"lol\">\n" );
+  for ( int i = 1; i < 10; ++i ) {
+    laughs += "<!ENTITY lol" + std::to_string( i ) + " \"";
+    for ( int j = 0; j < 10; ++j )
+      laughs += "&lol" + std::to_string( i - 1 ) + ";";
+    laughs += "\">\n";
+  }
+  laughs += "]>\n<lolz>&lol9;</lolz>";
+  t.write( "laughs.xml", laughs );
+
+  // One long entity referenced many times: no nesting, the same growth.
+  std::string quadratic( "<?xml version=\"1.0\"?>\n<!DOCTYPE r [\n"
+                         "<!ENTITY a \"" + std::string( 100000, 'a' ) +
+                         "\">\n]>\n<r>" );
+  quadratic += repeated( "&a;", 100000 );
+  quadratic += "</r>";
+  t.write( "quadratic.xml", quadratic );
+
+  t.write( "good.xml", "<r>fine</r>" );
+  ServerConfig config;
+  config.root = t.root;
+  config.timeout = std::chrono::milliseconds( 0 );
+  Server server( f.zorba, config, std::cerr );
+
+  auto const start = std::chrono::steady_clock::now();
+  long long const rss = peak_rss();
+  Json const r = run_query( server, error_records );
+  auto const seconds = std::chrono::duration_cast<std::chrono::seconds>(
+    std::chrono::steady_clock::now() - start ).count();
+  long long const growth = peak_rss() - rss;
+  std::cout << "entity expansion: " << result_text( r ) << " in " << seconds
+            << " s, peak RSS grew by " << ( growth >> 20 ) << " MiB"
+            << std::endl;
+  check( !is_tool_error( r ) && contains( result_text( r ), "good.xml=ok" ) &&
+         !contains( result_text( r ), "laughs.xml=ok" ) &&
+         !contains( result_text( r ), "quadratic.xml=ok" ),
+         "the expansions get an error record, the other file does not",
+         r.dump().substr( 0, 2000 ) );
+  check( seconds < 30, "refused quickly", std::to_string( seconds ) + " s" );
+  check( growth < 1024LL * 1024 * 1024, "refused before using much memory",
+         std::to_string( growth >> 20 ) + " MiB" );
+  check_alive( server );
+}
+
+// Paths that differ from the root in case only, for the case-insensitive file
+// systems (macOS by default; elsewhere these spell other, absent paths). A
+// different spelling of the root leads to no file outside of it, and a sibling
+// whose name starts with the root's stays denied under every spelling.
+void test_case_paths( Fixture const &f ) {
+  TempTree t;
+  std::filesystem::create_directories( t.root + "/Sub" );
+  t.write( "Sub/File.json", "{ \"inside\" : \"INSIDE-VALUE\" }" );
+  std::string const sibling( t.base + "/root-sibling" );
+  std::filesystem::create_directories( sibling );
+  {
+    std::ofstream out( ( sibling + "/secret.json" ).c_str() );
+    out << "{ \"secret\" : \"TOP-SECRET\" }";
+  }
+  bool const insensitive =
+    std::filesystem::exists( t.base + "/ROOT/Sub/File.json" );
+  std::cout << "file system is case-" << ( insensitive ? "in" : "" )
+            << "sensitive" << std::endl;
+
+  std::string const read(
+    "import module namespace file = \"http://expath.org/ns/file\";\n"
+    "file:read-text(\"" );
+  std::string const denied[] = {
+    t.base + "/root-sibling/secret.json",
+    t.base + "/ROOT-SIBLING/secret.json",
+    t.base + "/Root-Sibling/secret.json",
+    t.root + "/../root-sibling/secret.json",
+    t.base + "/ROOT/../root-sibling/secret.json",
+    t.base + "/ROOT/../ROOT-SIBLING/secret.json"
+  };
+
+  auto check_server = [&]( std::string const &root, char const *what ) {
+    ServerConfig config;
+    config.root = root;
+    std::string why;
+    check( directory_config::normalize( &config.root, &why ) || !insensitive,
+           std::string( what ) + ": the root is usable", why );
+    if ( !why.empty() )
+      return;
+    Server server( f.zorba, config, std::cerr );
+    std::cout << what << ": root " << config.root << std::endl;
+
+    for ( std::string const &path : denied ) {
+      Json r = run_query( server, read + path + "\")" );
+      check( is_tool_error( r ) && !contains( r.dump(), "TOP-SECRET" ),
+             std::string( what ) + ": sibling stays denied: " + path,
+             r.dump() );
+      r = run_query( server, "doc(\"file://" + path + "\")" );
+      check( is_tool_error( r ) && !contains( r.dump(), "TOP-SECRET" ),
+             std::string( what ) + ": fn:doc of the sibling: " + path,
+             r.dump() );
+    }
+
+    // dir:open with a relative path: nothing leaves the root.
+    char const *const relative[] = {
+      "../root-sibling/secret.json", "../ROOT-SIBLING/secret.json",
+      "SUB/../../root-sibling/secret.json", "Sub/../../ROOT-SIBLING/secret.json"
+    };
+    for ( char const *const path : relative ) {
+      Json const r = run_query( server,
+        dir_import + "dir:open($dir:root, \"" + path + "\")" );
+      check( is_tool_error( r ) && !contains( r.dump(), "TOP-SECRET" ),
+             std::string( what ) + ": dir:open outside the root: " + path,
+             r.dump() );
+    }
+
+    // A different-case spelling inside the root reads that file or is refused;
+    // on a case-sensitive file system there is no such file.
+    char const *const inside[] = { "Sub/File.json", "SUB/FILE.JSON", "sub/file.json" };
+    for ( char const *const path : inside ) {
+      Json const r = run_query( server,
+        dir_import + "dir:open($dir:root, \"" + path + "\")" );
+      std::cout << what << ": dir:open " << path << ": "
+                << r.dump().substr( 0, 400 ) << std::endl;
+      check( !contains( r.dump(), "TOP-SECRET" ),
+             std::string( what ) + ": inside the root: " + path, r.dump() );
+    }
+    Json const r = run_query( server, read + t.base + "/ROOT/Sub/File.json\")" );
+    std::cout << what << ": read through the upper-case root: "
+              << r.dump().substr( 0, 400 ) << std::endl;
+    check( !contains( r.dump(), "TOP-SECRET" ),
+           std::string( what ) + ": read through the upper-case root", r.dump() );
+
+    check_alive( server );
+  };
+  check_server( t.root, "root as created" );
+  if ( insensitive )
+    check_server( t.base + "/ROOT", "root spelled in upper case" );
+}
+
+// HTML files a parser has to survive: every one gives a result or an error
+// record, through dir:open, dir:documents and x:parse-html.
+void test_html_edge_cases( Fixture const &f ) {
+  TempTree t;
+  char const nul[] = "<html>\0<body>a\0b<div \0x=\"\0\">c</div></body></html>";
+  struct { char const *name; std::string content; } const files[] = {
+    { "deep.html", repeated( "<div>", 200000 ) },
+    { "deep-closed.html", repeated( "<div>", 200000 ) +
+                          repeated( "</div>", 200000 ) },
+    { "attributes.html", "<html><body><a href=\"" +
+                         std::string( 12 * 1024 * 1024, 'x' ) +
+                         "\">x</a></body></html>" },
+    { "many-attributes.html", "<html><body><a " +
+                              [] {
+                                std::string r;
+                                for ( int i = 0; i < 20000; ++i )
+                                  r += "a" + std::to_string( i ) + "=\"1\" ";
+                                return r;
+                              }() + ">x</a></body></html>" },
+    { "truncated.html", "<html><body><div class=\"unterminated" },
+    { "truncated-tag.html", "<html><body><" },
+    { "nul.html", std::string( nul, sizeof nul - 1 ) },
+    { "only-nul.html", std::string( 1024, '\0' ) },
+    { "empty.html", "" },
+    { "good.html", "<html><body><p>fine</p></body></html>" }
+  };
+  for ( auto const &file : files )
+    t.write( file.name, file.content );
+
+  ServerConfig config;
+  config.root = t.root;
+  config.timeout = std::chrono::milliseconds( 0 );
+  Server server( f.zorba, config, std::cerr );
+
+  std::string const parse( dir_import +
+    "import module namespace x = \"http://zorba.io/modules/xml\";\n"
+    "import module namespace file = \"http://expath.org/ns/file\";\n" );
+
+  // Builds without XML Schema support have no HTML parser.
+  bool const has_parser = !contains(
+    run_query( server,
+      dir_import + "dir:open($dir:root, \"good.html\")" ).dump(),
+    "UNSUPPORTED_FORMAT" );
+  std::cout << "HTML parser in this build: " << has_parser << std::endl;
+
+  for ( auto const &file : files ) {
+    std::string const name( file.name );
+    auto const start = std::chrono::steady_clock::now();
+    Json const r = run_query( server, dir_import +
+      "let $d := dir:open($dir:root, \"" + name + "\")\n"
+      "return if (exists($d(\"error\"))) then $d(\"error\")(\"code\")\n"
+      "       else concat(\"ok \", count($d(\"content\")//*))" );
+    auto const seconds = std::chrono::duration_cast<std::chrono::seconds>(
+      std::chrono::steady_clock::now() - start ).count();
+    std::cout << name << ": dir:open: " << r.dump().substr( 0, 400 ) << " in "
+              << seconds << " s" << std::endl;
+    check( !r.is_null(), name + ": dir:open answers" );
+    check( seconds < 120, name + ": dir:open in reasonable time",
+           std::to_string( seconds ) + " s" );
+
+    if ( has_parser ) {
+      Json const p = run_query( server, parse +
+        "count(x:parse-html(file:read-text(concat($dir:root, \"/" + name +
+        "\")))//*)" );
+      std::cout << name << ": x:parse-html: " << p.dump().substr( 0, 400 )
+                << std::endl;
+      check( !p.is_null() && !contains( p.dump(), "XPST" ) &&
+             !contains( p.dump(), "XQST" ),
+             name + ": x:parse-html runs and answers",
+             p.dump().substr( 0, 400 ) );
+    }
+
+    check_alive( server );
+  }
+
+  Json const r = run_query( server, error_records );
+  std::cout << "records: " << result_text( r ) << std::endl;
+  check( !is_tool_error( r ) && contains( result_text( r ), "good.html=" ),
+         "dir:documents over all the files", r.dump().substr( 0, 2000 ) );
+  check( !has_parser || contains( result_text( r ), "good.html=ok" ),
+         "the good file is not affected", r.dump().substr( 0, 2000 ) );
+  check_alive( server );
+}
+
 struct Test {
   char const *name;
   void (*fn)( Fixture const& );
@@ -870,7 +1277,12 @@ Test const tests[] = {
   { "limits", test_limits },
   { "binary", test_binary },
   { "optional_params", test_optional_params },
-  { "documents_stream", test_documents_stream }
+  { "documents_stream", test_documents_stream },
+  { "deep_json", test_deep_json },
+  { "deep_json_binary", test_deep_json_binary },
+  { "entity_expansion", test_entity_expansion },
+  { "case_paths", test_case_paths },
+  { "html_edge_cases", test_html_edge_cases }
 };
 
 } // namespace
