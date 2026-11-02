@@ -15,6 +15,7 @@
  */
 
 #include "diagnostics/util_macros.h"
+#include "diagnostics/query_hints.h"
 
 #include "runtime/hof/dynamic_fncall_iterator.h"
 #include "runtime/hof/function_item.h"
@@ -327,11 +328,21 @@ bool SingleDynamicFnCallIterator::nextImpl(
           }
           else
           {
-            GenericCast::castToBuiltinAtomic(selectorItem3,
-                                             selectorItem2,
-                                             store::XS_INTEGER,
-                                             NULL,
-                                             loc);
+            try
+            {
+              GenericCast::castToBuiltinAtomic(selectorItem3,
+                                               selectorItem2,
+                                               store::XS_INTEGER,
+                                               NULL,
+                                               loc);
+            }
+            catch (XQueryException& e)
+            {
+              if (e.diagnostic() == err::FORG0001)
+                e.set_hint(query_hints::key_on_array(
+                  selectorItem2->getStringValue().str()).c_str());
+              throw;
+            }
 
             result = targetItem->getArrayValue(selectorItem3->getIntegerValue());
           }
