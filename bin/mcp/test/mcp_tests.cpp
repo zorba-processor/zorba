@@ -1118,9 +1118,6 @@ std::string deep_object( std::size_t n ) {
   return repeated( "{\"a\":", n ) + "1" + repeated( "}", n );
 }
 
-std::string const dir_import(
-  "import module namespace dir = \"http://zorba.io/modules/directory\";\n" );
-
 // The files in the root that have an error record, with its code.
 std::string const error_records(
   dir_import +
