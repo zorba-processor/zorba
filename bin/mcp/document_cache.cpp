@@ -16,6 +16,7 @@
 
 #include "document_cache.h"
 
+#include <algorithm>
 #include <climits>
 #include <cstdlib>
 #include <cstring>
@@ -305,6 +306,8 @@ Item DocumentCache::get( std::string const &root, std::string const &path ) {
   ++theStats.misses;
   std::uint64_t const tag = tag_of( key, id );
   std::uint64_t &seen = theSeen[ tag % tracker_slots ];
+  if ( seen == refused_tag( tag ) )
+    return Item();                      // not worth another try
   if ( seen != tag ) {
     seen = tag;                         // the first hit: nothing else to do
     return Item();
@@ -324,17 +327,24 @@ Item DocumentCache::admit( std::string const &root, std::string const &path,
   std::string canonical;
   if ( !canonical_under_root( full, &canonical ) )
     return Item();
+  // A read that yields nothing to keep is not tried again until the file
+  // changes: a tree of such files must not pay for a second query per read.
+  ++theStats.refused;
+  *seen = refused_tag( *seen );
   std::size_t bytes = 0;
   Item const record( read( root, path, &bytes ) );
   if ( record.isNull() )
     return Item();
 
-  // Kept only if the file still is what it was before the read (a file
-  // modified meanwhile is parsed again next time) and it holds no error,
-  // which can come from the moment rather than the file.
+  // Kept only if it holds no error (which can come from the moment rather
+  // than the file), is not a small file that expands far beyond what files of
+  // its size take, and the file still is what it was before the read (a file
+  // modified meanwhile is parsed again next time).
   FileId now;
   std::string canonical_now;
-  if ( !record.getObjectValue( "error" ).isNull() || !file_id( full, &now ) ||
+  if ( !record.getObjectValue( "error" ).isNull() ||
+       bytes > max_expansion * std::max<std::uintmax_t>( id.size, 1024 ) ||
+       !file_id( full, &now ) ||
        !( now == id ) || !canonical_under_root( full, &canonical_now ) ||
        canonical_now != canonical )
     return record;
@@ -348,6 +358,7 @@ Item DocumentCache::admit( std::string const &root, std::string const &path,
     Entry{ canonical, id, record, bytes, theQuery, theLru.begin() } );
   theStats.bytes += bytes;
   theStats.entries = theEntries.size();
+  --theStats.refused;
   ++theStats.admissions;
   // After an eviction, the document needs two hits again.
   *seen = 0;

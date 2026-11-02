@@ -1743,8 +1743,8 @@ void test_cache_abort( Fixture const &f ) {
   later.timeout = std::chrono::milliseconds( 200 );
   Server loop( f.zorba, later, std::cerr );
   Json const r = run_query( loop, dir_import +
-    "count(for $i in 1 to 9223372036854775807 "
-    "return dir:open($dir:root, \"a.json\"))" );
+    "sum(for $i in 1 to 9223372036854775807 "
+    "return dir:open($dir:root, \"a.json\")(\"content\")(\"v\"))" );
   check( is_tool_error( r ) &&
          contains( field( tool_error( r ), "code" ), "ZXQP0068" ),
          "a query over the time limit: ZXQP0068", r.dump().substr( 0, 500 ) );
@@ -1781,6 +1781,8 @@ void test_cache_errors( Fixture const &f ) {
   DocumentCache::Stats s = server.cache_stats();
   check( s.admissions == 0 && s.entries == 0,
          "an error record is not cached", stats_text( s ) );
+  check( s.refused == 2, "and is read to be admitted only once per file",
+         std::to_string( s.refused ) );
 
   std::string first;
   for ( int i = 0; i < 3; ++i ) {
@@ -1799,6 +1801,43 @@ void test_cache_errors( Fixture const &f ) {
   check( contains( v, deep_tree_records ), "dir:documents over the same files",
          v.substr( 0, 2000 ) );
   check_alive( server );
+}
+
+// A small file can expand far beyond what files of its size take: internal
+// entities. Such a record is not kept; a plain file of the same limit is.
+void test_cache_expansion( Fixture const &f ) {
+  TempTree t;
+  std::string entity( "<!DOCTYPE a [<!ENTITY e \"" );
+  entity += repeated( "<b/>", 1000 ) + "\">]><a>" + repeated( "&e;", 100 ) +
+    "</a>";
+  t.write( "entity.xml", entity );
+  std::string rows( "a\n" );
+  rows += repeated( "1\n", 32 * 1024 - 1 );
+  t.write( "rows.csv", rows );
+  ServerConfig config;
+  config.root = t.root;
+  Server server( f.zorba, config, std::cerr );
+
+  std::string const elements( dir_import +
+    "count(dir:open($dir:root, \"entity.xml\")(\"content\")/a/b)" );
+  for ( int i = 0; i < 3; ++i ) {
+    std::string const v = query_text( server, elements );
+    check( v == "100000", "the document is served each time", v );
+  }
+  DocumentCache::Stats s = server.cache_stats();
+  check( s.admissions == 0 && s.entries == 0 && s.bytes == 0 && s.refused == 1,
+         "a record that expands far beyond its file is not kept",
+         stats_text( s ) );
+
+  std::string const count_rows( dir_import +
+    "count(dir:open($dir:root, \"rows.csv\")(\"content\")())" );
+  for ( int i = 0; i < 3; ++i ) {
+    std::string const v = query_text( server, count_rows );
+    check( v == std::to_string( 32 * 1024 - 1 ), "the rows are served", v );
+  }
+  s = server.cache_stats();
+  check( s.admissions == 1 && s.hits == 1 && s.entries == 1,
+         "a CSV file of one short column is kept", stats_text( s ) );
 }
 
 // Runs zorba-mcp with \a args, sends it \a input, closes its input and
@@ -1907,6 +1946,7 @@ Test const tests[] = {
   { "cache_default", test_cache_default },
   { "cache_abort", test_cache_abort },
   { "cache_errors", test_cache_errors },
+  { "cache_expansion", test_cache_expansion },
   { "cache_counters", test_cache_counters },
   { "optional_params", test_optional_params },
   { "documents_stream", test_documents_stream },

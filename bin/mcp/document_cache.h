@@ -51,8 +51,10 @@ namespace mcp {
  * a cache. The second read admits it: the cache runs dir:open in a query of
  * its own, compiled under the server's security policy with the installed
  * (non-caching) hook, and keeps the record that query returns. Records enter
- * only that way: a user query cannot hand the cache a record. A record with
- * an error is not kept, and neither is one whose file changed during the read.
+ * only that way: a user query cannot hand the cache a record. A record is not
+ * kept if it holds an error, if it takes more than \c max_expansion times the
+ * size of its file, or if the file changed during the read; the file is then
+ * not tried again until it changes.
  *
  * Eviction: at most \c max_files records stay, least recently used out first.
  * A record that the current query used is not evicted, and a document is then
@@ -69,6 +71,7 @@ public:
     std::size_t hits = 0;
     std::size_t misses = 0;
     std::size_t admissions = 0;
+    std::size_t refused = 0;    // read to be admitted, but not kept
     std::size_t evictions = 0;
     std::size_t entries = 0;
     std::size_t bytes = 0;      // the memory of the records (Item::mem_size)
@@ -145,6 +148,14 @@ private:
 
   // The hit tracker: one tag per slot, like a direct-mapped CPU cache. 32 KiB.
   static constexpr std::size_t tracker_slots = 4096;
+
+  // The memory of a record over the size of its file (at least 1 KiB), above
+  // which it is not kept. Measured worst cases at 64 KB, Item::mem_size over
+  // file size: XML 49, JSON 24, CSV 118, HTML 64; an XML file of 4 KB whose
+  // internal entities libxml2 accepts: 9600.
+  static constexpr std::uintmax_t max_expansion = 128;
+
+  static std::uint64_t refused_tag( std::uint64_t tag ) { return tag ^ 1; }
 
   static bool file_id( std::string const &full, FileId *id );
   static std::uint64_t tag_of( std::string const &key, FileId const &id );
