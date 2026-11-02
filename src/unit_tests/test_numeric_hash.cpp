@@ -20,6 +20,7 @@
 //   values in (-1, 1) became quadratic);
 // - values equal after numeric promotion must hash equal.
 
+#include <cstdlib>
 #include <iostream>
 #include <limits>
 #include <set>
@@ -98,6 +99,11 @@ int test_numeric_hash( int, char*[] ) {
     xs_integer const i( *s );
     check( i.hash() == xs_decimal( *s ).hash(), "xs:integer vs xs:decimal", *s );
     check( i.hash() == xs_double( *s ).hash(), "xs:integer vs xs:double", *s );
+    int64_t const n = strtoll( *s, nullptr, 10 );
+    check( hash_int64( n ) == i.hash(), "xs:long vs xs:integer", *s );
+    if ( n >= 0 )
+      check( hash_uint64( static_cast<uint64_t>( n ) ) == i.hash(),
+             "xs:unsignedLong vs xs:integer", *s );
   }
   static char const *const large_decimals[] = {
     "9223372036854775807.5", "9223372036854775808", "-9223372036854775809",
@@ -106,6 +112,9 @@ int test_numeric_hash( int, char*[] ) {
   for ( char const *const *s = large_decimals; *s; ++s )
     check( xs_decimal( *s ).hash() == xs_double( *s ).hash(),
            "xs:decimal vs xs:double", *s );
+  check( hash_uint64( 18446744073709551615ULL ) ==
+         xs_decimal( "18446744073709551615" ).hash(),
+         "xs:unsignedLong vs xs:decimal", "2^64-1" );
 
   check( xs_double( -0.0 ).hash() == xs_double( 0.0 ).hash(), "-0 vs 0", "" );
   check( xs_float( -0.0f ).hash() == xs_integer( 0 ).hash(), "-0 vs 0", "" );

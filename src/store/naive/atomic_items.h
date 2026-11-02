@@ -1584,7 +1584,7 @@ public:
 
   uint32_t hash(long timezone = 0, const XQPCollator* aCollation = 0) const
   {
-    return static_cast<uint32_t>(theValue);
+    return hash_int64(theValue);
   }
 
   bool equals(
@@ -1924,7 +1924,7 @@ protected:
 
   uint32_t hash(long timezone = 0, const XQPCollator* aCollation = 0) const
   {
-    return static_cast<uint32_t>(theValue);
+    return hash_uint64(theValue);
   }
 
   bool equals(

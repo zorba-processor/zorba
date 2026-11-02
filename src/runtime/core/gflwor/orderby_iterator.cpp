@@ -33,6 +33,9 @@
 #include "runtime/core/gflwor/common.h"
 #include "runtime/core/gflwor/comp_function.h"
 
+#include "types/casting.h"
+#include "types/typeops.h"
+
 #include <vector>
 #include <algorithm>
 
@@ -333,6 +336,8 @@ bool OrderByIterator::nextImpl(store::Item_t& result, PlanState& planState) cons
     materializeResultForSort(iterState, planState);
   }
 
+  promoteNumericKeys(iterState);
+
   {
     SortTupleCmp cmp(loc,
                      planState.theLocalDynCtx,
@@ -376,6 +381,79 @@ bool OrderByIterator::nextImpl(store::Item_t& result, PlanState& planState) cons
   bindings. Then, it inserts the pair (T, I(R)) into theOrderMap (where I is
   an iterator over the temp seq storing R).
 ********************************************************************************/
+/*******************************************************************************
+  XQuery 3.0 3.10.8: "All the non-empty orderspec values must be convertible to
+  a common type by subtype substitution and/or type promotion. The ordering is
+  performed in the least common type that has a gt operator."
+
+  The comparison function promotes each pair of keys on its own, which is not
+  the same: as xs:double, 2^63-1, the xs:decimal 2^63 and the xs:double 2^63 are
+  all equal, while the first two compared by themselves are not, and that is
+  not even a consistent order. So promote the keys of a column that mixes
+  numeric types with no subtype relation to the common type first.
+********************************************************************************/
+void OrderByIterator::promoteNumericKeys(OrderByState* iterState) const
+{
+  OrderByState::SortTable& sortTable = iterState->theSortTable;
+  const TypeManager* tm = theSctx->get_typemanager();
+
+  csize numSpecs = theOrderSpecs.size();
+
+  for (csize i = 0; i < numSpecs; ++i)
+  {
+    // A native column has one static type: there is nothing to promote.
+    if (theOrderSpecs[i].theNativeCompare)
+      continue;
+
+    bool hasDouble = false;
+    bool hasFloat = false;
+    bool hasDecimal = false;
+
+    for (SortTuple& tuple : sortTable)
+    {
+      const store::Item* key = tuple.theKeyValues[i];
+      if (key == NULL || !key->isAtomic())
+        continue;
+
+      store::SchemaTypeCode type = key->getTypeCode();
+      if (TypeOps::is_subtype(type, store::XS_DOUBLE))
+        hasDouble = true;
+      else if (TypeOps::is_subtype(type, store::XS_FLOAT))
+        hasFloat = true;
+      else if (TypeOps::is_subtype(type, store::XS_DECIMAL))
+        hasDecimal = true;
+    }
+
+    store::SchemaTypeCode target;
+    if (hasDouble && (hasFloat || hasDecimal))
+      target = store::XS_DOUBLE;
+    else if (hasFloat && hasDecimal)
+      target = store::XS_FLOAT;
+    else
+      continue;
+
+    for (SortTuple& tuple : sortTable)
+    {
+      store::Item*& key = tuple.theKeyValues[i];
+      if (key == NULL || !key->isAtomic())
+        continue;
+
+      store::SchemaTypeCode type = key->getTypeCode();
+      if (!TypeOps::is_numeric(type) || TypeOps::is_subtype(type, target))
+        continue;
+
+      store::Item_t item(key);
+      store::Item_t promoted;
+      if (GenericCast::promote(promoted, item, target, NULL, tm, loc))
+      {
+        key->removeReference();
+        key = promoted.release();
+      }
+    }
+  }
+}
+
+
 void OrderByIterator::materializeResultForSort( 
     OrderByState* iterState,
     PlanState& planState) const 

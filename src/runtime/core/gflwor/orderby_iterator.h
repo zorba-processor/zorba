@@ -228,6 +228,8 @@ private:
         OrderByState* iterState,
         PlanState& planState) const;
 
+  void promoteNumericKeys(OrderByState* iterState) const;
+
   void bindOrderBy(
         OrderByState* iterState,
         PlanState& planState) const;
