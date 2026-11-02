@@ -31,6 +31,7 @@ SET(UNIT_TEST_SRCS
   test_ordpath.cpp
   test_parameters.cpp
   test_security_policy.cpp
+  test_small_integers.cpp
   test_string.cpp
   test_time.cpp
   test_time_parse.cpp

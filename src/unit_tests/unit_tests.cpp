@@ -61,6 +61,7 @@ void initializeTestList()
   libunittests["json_parser"] = test_json_parser;
   libunittests["parameters"] = test_parameters;
   libunittests["security_policy"] = test_security_policy;
+  libunittests["small_integers"] = test_small_integers;
   libunittests["string"] = test_string;
   libunittests["time"] = test_time;
   libunittests["time_parse"] = test_time_parse;
