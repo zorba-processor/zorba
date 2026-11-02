@@ -23,6 +23,7 @@
 #include <cctype>
 #include <chrono>
 #include <cstring>
+#include <exception>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -1264,15 +1265,30 @@ struct HtmlCollector {
   std::vector<std::size_t> open_tables;  // index into headers + 1; 0: not kept
   std::size_t depth = 0;
   bool too_deep = false;
+  bool failed = false;                  // an allocation failed
 };
 
 bool html_name_is( xmlChar const *name, char const *what ) {
   return xmlStrcasecmp( name, reinterpret_cast<xmlChar const*>( what ) ) == 0;
 }
 
+// No exception may leave a callback: libxml2 is C code. An allocation that fails
+// stops the parser.
+void html_start_element( HtmlCollector &c, xmlChar const *name );
+
 void html_start( void *user, xmlChar const *name, xmlChar const** ) {
   HtmlCollector &c = *static_cast<HtmlCollector*>( user );
-  if ( c.too_deep )
+  try {
+    html_start_element( c, name );
+  }
+  catch ( std::exception const& ) {
+    c.failed = true;
+    xmlStopParser( c.ctxt );
+  }
+}
+
+void html_start_element( HtmlCollector &c, xmlChar const *name ) {
+  if ( c.too_deep || c.failed )
     return;
   if ( ++c.depth > max_html_depth ) {
     c.too_deep = true;
@@ -1326,9 +1342,15 @@ void html_characters( void *user, xmlChar const *text, int length ) {
     target = &c.headers[ c.open_tables.back() - 1 ].back();
   if ( !target || target->size() >= keep || length <= 0 )
     return;
-  target->append( reinterpret_cast<char const*>( text ),
-                  std::min( static_cast<std::size_t>( length ),
-                            keep - target->size() ) );
+  try {
+    target->append( reinterpret_cast<char const*>( text ),
+                    std::min( static_cast<std::size_t>( length ),
+                              keep - target->size() ) );
+  }
+  catch ( std::exception const& ) {
+    c.failed = true;
+    xmlStopParser( c.ctxt );
+  }
 }
 
 std::string trimmed_short( std::string const &text ) {
@@ -1383,7 +1405,8 @@ ScanPreview html_preview( std::string const &data, bool truncated,
   std::size_t const chunk = 64 * 1024;
   bool too_slow = false;
   bool stopped = false;
-  for ( std::size_t at = 0; at < data.size() && !collected.too_deep; at += chunk ) {
+  for ( std::size_t at = 0;
+        at < data.size() && !collected.too_deep && !collected.failed; at += chunk ) {
     if ( stop && stop->load( std::memory_order_relaxed ) ) {
       stopped = true;
       break;
@@ -1398,7 +1421,7 @@ ScanPreview html_preview( std::string const &data, bool truncated,
       static_cast<int>( std::min( chunk, data.size() - at ) ), 0 );
     ( void )parsed;
   }
-  if ( !stopped && !too_slow && !collected.too_deep ) {
+  if ( !stopped && !too_slow && !collected.too_deep && !collected.failed ) {
     int const parsed = htmlParseChunk( ctxt, nullptr, 0, 1 );
     ( void )parsed;
   }
@@ -1426,6 +1449,8 @@ ScanPreview html_preview( std::string const &data, bool truncated,
   if ( collected.too_deep )
     member( out, "error", json_quoted( "nesting deeper than " +
                                   std::to_string( max_html_depth ) ) );
+  else if ( collected.failed )
+    member( out, "error", json_quoted( "out of memory" ) );
   else if ( too_slow )
     member( out, "error", json_quoted( "parsing stopped after " +
                                   std::to_string( max_parse_time.count() ) + " s" ) );

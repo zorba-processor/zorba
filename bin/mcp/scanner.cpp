@@ -25,6 +25,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <deque>
+#include <exception>
 #include <list>
 #include <map>
 #include <mutex>
@@ -553,8 +554,8 @@ struct Scanner::Shared {
       std::size_t const cost = entry_cost( rel );
       if ( !room_in_index( cost ) )
         return false;
-      theBytes += cost;
       it = theEntries.emplace( rel, Entry() ).first;
+      theBytes += cost;
       it->second.format = scan_format( rel );
       it->second.size = size;
       it->second.mtime = mtime;
@@ -600,11 +601,11 @@ struct Scanner::Shared {
     std::size_t const cost = dir_cost( rel );
     if ( !room_in_index( cost ) )
       return;
-    theBytes += cost;
     KnownDir known;
     known.mtime = mtime;
     known.seen = theStamp;
     theKnownDirs.emplace( rel, known );
+    theBytes += cost;
     theDirs.push_back( rel );
   }
 
@@ -827,7 +828,50 @@ struct Scanner::Shared {
     return json + "}";
   }
 
+  // An allocation can fail in these threads (under --max-memory, while a query
+  // holds most of it). The scan then ends where it is, as at its own limit,
+  // and the server goes on.
   void walker() {
+    for ( ;; ) {
+      try {
+        walk();
+        break;
+      }
+      catch ( std::exception const& ) {
+        std::lock_guard<std::mutex> lock( theMutex );
+        theWalkerBusy = false;
+        stop_sampling();
+        theIndexFull = true;
+        theDirs.clear();
+        theCv.notify_all();
+      }
+    }
+    std::lock_guard<std::mutex> lock( theMutex );
+    theWalkerDone = true;
+    theCv.notify_all();
+  }
+
+  void sampler() {
+    for ( ;; ) {
+      try {
+        sample();
+        break;
+      }
+      catch ( std::exception const& ) {
+        std::lock_guard<std::mutex> lock( theMutex );
+        theSamplerBusy = false;
+        stop_sampling();
+        // A request being read stays pending; asking again sends a new one.
+        theCurrentRequest.reset();
+        theCv.notify_all();
+      }
+    }
+    std::lock_guard<std::mutex> lock( theMutex );
+    theSamplerDone = true;
+    theCv.notify_all();
+  }
+
+  void walk() {
     std::unique_lock<std::mutex> lock( theMutex );
     while ( !theStopping ) {
       if ( theDirs.empty() ) {
@@ -847,11 +891,9 @@ struct Scanner::Shared {
       theWalkerBusy = false;
       theCv.notify_all();
     }
-    theWalkerDone = true;
-    theCv.notify_all();
   }
 
-  void sampler() {
+  void sample() {
     std::unique_lock<std::mutex> lock( theMutex );
     while ( !theStopping ) {
       std::shared_ptr<Request> request;
@@ -917,8 +959,6 @@ struct Scanner::Shared {
       }
       theCv.notify_all();
     }
-    theSamplerDone = true;
-    theCv.notify_all();
   }
 
   // Answers, on the thread that calls Scanner::answer().

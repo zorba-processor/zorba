@@ -67,5 +67,10 @@ Rules this code depends on:
   before giving up its index. LRU rather than frequency counts: it is simple, and
   there is no data favoring anything else.
 
+- `--max-memory` (`RLIMIT_AS`) is applied before the threads start. If they
+  cannot start, `Server` works as with `--no-scan`. In the threads a failed
+  allocation ends the scan as at `memory_limit`; it must not leave a libxml2
+  callback, which is C code.
+
 Tests hold the threads at known points with `ServerConfig::scan_hook`. Tests
 under ThreadSanitizer: the `tsan-mcp` job of `sanitizers.yml`.

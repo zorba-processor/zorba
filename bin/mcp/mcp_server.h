@@ -54,6 +54,8 @@ struct ServerConfig {
   ScanLimits scan_limits;
   /** For tests: see ScanHook. */
   ScanHook scan_hook;
+  /** The memory limit of the process, in bytes (0: none; see zorba_mcp.cpp). */
+  unsigned long long max_memory = 4ULL << 30;
 };
 
 /**
@@ -117,6 +119,7 @@ private:
     std::string text;
   };
 
+  std::string handle_message( std::string const &message, Json *request_id );
   void load_predefined();
   bool load_predefined( std::string const &path, std::string const &name );
 

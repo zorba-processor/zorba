@@ -353,7 +353,7 @@ IF (ZORBA_WITH_FILE_ACCESS)
              syntax_error escape network native_modules predefined limits binary
              optional_params documents_stream hints_jsoniq hints_dash
              hints_nodes hints_names deep_json deep_json_binary
-             entity_expansion case_paths html_edge_cases)
+             entity_expansion case_paths html_edge_cases memory_limit)
       ADD_TEST (NAME bin/mcp/${_t}
         COMMAND "mcp_tests${_mcp_suffix}" ${_t} "${_dirtree}" "${_mcpq}"
           "${_dirq}/join.xq" "$<TARGET_FILE:zorba_mcp${_mcp_suffix}>")
@@ -368,7 +368,8 @@ IF (ZORBA_WITH_FILE_ACCESS)
              scan_refill scan_previews scan_mtime scan_refresh
              scan_symlink scan_path scan_malformed scan_deep scan_xxe scan_limit
              scan_memory scan_memory_big_preview scan_memory_walker
-             scan_memory_stress scan_memory_option
+             scan_memory_stress scan_memory_option scan_thread_limit
+             scan_thread_failure
              scan_no_scan scan_handshake scan_shutdown scan_binary scan_stress
              scan_description)
       ADD_TEST (NAME bin/mcp/${_t}

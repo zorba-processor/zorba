@@ -985,7 +985,8 @@ bool FLWORIterator::nextImpl(store::Item_t& result, PlanState& planState) const
                 SortTupleCmp cmp(theMaterializeClause->theLocation,
                                  planState.theLocalDynCtx,
                                  theSctx->get_typemanager(),
-                                 &theMaterializeClause->theOrderSpecs);
+                                 &theMaterializeClause->theOrderSpecs,
+                                 planState);
 
                 if (theMaterializeClause->theStable)
                 {
@@ -1066,7 +1067,8 @@ bool FLWORIterator::nextImpl(store::Item_t& result, PlanState& planState) const
               SortTupleCmp cmp(theOrderByClause->theLocation,
                                planState.theLocalDynCtx,
                                theSctx->get_typemanager(),
-                               &theOrderByClause->theOrderSpecs);
+                               &theOrderByClause->theOrderSpecs,
+                               planState);
 
               if (theOrderByClause->theStable)
               {

@@ -34,6 +34,7 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <new>
 #include <sstream>
 #include <string>
 #include <thread>
@@ -41,6 +42,7 @@
 
 #include <fcntl.h>
 #include <signal.h>
+#include <sys/resource.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -54,6 +56,14 @@
 #include "json.h"
 #include "mcp_server.h"
 #include "scan_preview.h"
+
+#if defined(__SANITIZE_ADDRESS__) || defined(__SANITIZE_THREAD__)
+# define ZORBA_TEST_SANITIZER 1
+#elif defined(__has_feature)
+# if __has_feature(address_sanitizer) || __has_feature(thread_sanitizer)
+#  define ZORBA_TEST_SANITIZER 1
+# endif
+#endif
 
 using namespace zorba;
 using namespace zorba::mcp;
@@ -1477,6 +1487,80 @@ void test_memory_stress( Fixture const &f ) {
   wait_settled( server );
 }
 
+// Under --max-memory threads may not start: the server works as with --no-scan.
+// In a child process, whose address space is limited to just over what it uses,
+// which leaves no room for a thread's stack. The limit is Linux only, and
+// sanitizer runtimes cannot run under one.
+void test_thread_limit( Fixture const &f ) {
+#if defined(__linux__) && !defined(ZORBA_TEST_SANITIZER)
+  Tree t;
+  t.write( "a.csv", "x\n1\n" );
+  pid_t const pid = fork();
+  if ( pid == 0 ) {
+    std::ifstream statm( "/proc/self/statm" );
+    unsigned long pages = 0;
+    statm >> pages;
+    struct rlimit lim;
+    if ( pages == 0 || getrlimit( RLIMIT_AS, &lim ) != 0 )
+      _exit( 3 );
+    lim.rlim_cur = pages * static_cast<unsigned long>( sysconf( _SC_PAGESIZE ) ) +
+      1024 * 1024;
+    if ( setrlimit( RLIMIT_AS, &lim ) != 0 )
+      _exit( 3 );
+    int code = 1;
+    try {
+      ServerConfig config;
+      config.root = t.root;
+      Server server( f.zorba, config, std::cerr );
+      std::string const tools( server.handle( request( 1, "tools/list" ) ) );
+      code = contains( tools, "\"list_documents\"" ) &&
+             !contains( tools, "\"refresh\"" ) ? 0 : 2;
+    }
+    catch ( ... ) {
+      code = 4;
+    }
+    _exit( code );
+  }
+  check( pid > 0, "start the child" );
+  int status = -1;
+  check( waitpid( pid, &status, 0 ) == pid, "wait for the child" );
+  check( WIFEXITED( status ) && WEXITSTATUS( status ) == 0,
+         "no thread can start: the server works without the scan",
+         std::to_string( status ) );
+#else
+  ( void )f;
+#endif
+}
+
+// An allocation that fails in a scan thread ends the scan, not the server.
+void test_thread_failure( Fixture const &f ) {
+  Tree t;
+  t.write( "a.csv", "x\n1\n" );
+  t.write( "sub/b.csv", "y\n1\n" );
+  auto const walk_failed = std::make_shared<std::atomic<bool> >( false );
+  auto const sample_failed = std::make_shared<std::atomic<bool> >( false );
+  ServerConfig config;
+  config.root = t.root;
+  config.scan_hook = [walk_failed, sample_failed](
+      char const *stage, std::string const &path ) {
+    std::string const s( stage );
+    if ( ( s == "walk" && path == "sub" && !walk_failed->exchange( true ) ) ||
+         ( s == "sample" && !sample_failed->exchange( true ) ) )
+      throw std::bad_alloc();
+  };
+  Server server( f.zorba, config, std::cerr );
+  Listing l( wait_settled( server ) );
+  check( walk_failed->load() && l.state() == "memory_limit",
+         "the scan ends at its limit", l.text );
+  l = list( server );
+  check( contains( l.text, "\"incomplete\":true" ),
+         "the listing says it may be incomplete", l.text );
+  l = list_path( server, "sub/b.csv" );
+  check( contains( dump_of( l.preview() ), "\"columns\":[\"y\"]" ),
+         "a request still gets its preview", l.text );
+  check( server.stop_scan(), "stop joins both threads" );
+}
+
 void test_no_scan( Fixture const &f ) {
   Tree t;
   t.write( "a.csv", "x\n1\n" );
@@ -1644,6 +1728,13 @@ void test_binary( Fixture const &f ) {
   }
   check( n == 2, "one protocol message per line on stdout", run.out );
 
+  run = run_binary( f, { "--root", t.root, "--max-output", "100000",
+                         "--max-memory", "0", "--scan-cache-mb", "8" },
+                    list_call( 1, Json::object( { { "limit", 1 } } ) ) );
+  check( WIFEXITED( run.status ) && WEXITSTATUS( run.status ) == 0 &&
+         contains( run.out, "files_found" ),
+         "options with values are read as such", run.out );
+
   run = run_binary( f, { "--root", t.root, "--no-scan" }, list_call( 1 ) );
   check( WIFEXITED( run.status ) && WEXITSTATUS( run.status ) == 0 &&
          contains( run.out, "modified" ) && !contains( run.out, "files_found" ),
@@ -1802,6 +1893,8 @@ Test const tests[] = {
   { "scan_memory_walker", test_memory_walker },
   { "scan_memory_stress", test_memory_stress },
   { "scan_memory_option", test_memory_option },
+  { "scan_thread_limit", test_thread_limit },
+  { "scan_thread_failure", test_thread_failure },
   { "scan_no_scan", test_no_scan },
   { "scan_handshake", test_handshake },
   { "scan_shutdown", test_shutdown },
