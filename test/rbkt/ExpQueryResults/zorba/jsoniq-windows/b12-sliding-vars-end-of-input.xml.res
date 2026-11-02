@@ -1,0 +1,1 @@
+[ { "w" : [ 1, 2 ], "s" : 1, "sp" : 1, "sprev" : null, "snext" : 2, "e" : 2, "ep" : 2, "eprev" : 1, "enext" : 3 }, { "w" : [ 2, 3 ], "s" : 2, "sp" : 2, "sprev" : 1, "snext" : 3, "e" : 3, "ep" : 3, "eprev" : 2, "enext" : null }, { "w" : [ 3 ], "s" : 3, "sp" : 3, "sprev" : 2, "snext" : null, "e" : 3, "ep" : 3, "eprev" : 2, "enext" : null } ]

@@ -1015,6 +1015,60 @@ void test_optional_params( Fixture const &f ) {
 
 // Runs the zorba-mcp executable over a pipe: its stdout must carry only
 // protocol messages, one per line, even when a query writes a trace.
+// Window clauses through run_query under the default policy. The queries
+// declare the language themselves.
+void test_windows( Fixture const &f ) {
+  ServerConfig config;
+  config.root = f.tree;
+  Server server( f.zorba, config, std::cerr );
+
+  check_result( server, jsoniq_decl +
+    "let $a := [ {\"v\":10}, {}, {\"v\":30}, {\"v\":null} ]\n"
+    "return [ for sliding window $w in $a[] start at $s when true "
+    "only end at $e when $e - $s eq 1 return sum($w.v[$$ instance of decimal]) ]",
+    "[ 10, 30, 30 ]", "sliding window over irregular objects" );
+  check_result( server, jsoniq_decl + dir_import +
+    "[ for tumbling window $w in dir:open($dir:root, \"payments/payments.json\").content[] "
+    "start $s previous $p when empty($p) or $s.status ne $p.status "
+    "return { \"status\": $s.status, \"total\": sum($w.amount) } ]",
+    "[ { \"status\" : \"paid\", \"total\" : 175 } ]",
+    "tumbling window over a document of the root" );
+  check_error( server, jsoniq_decl +
+    "[ for sliding window $w in (1, 2) start when true return 1 ]",
+    "XPST0003", "", "a sliding window needs an end condition" );
+
+  std::string input;
+  input += request( 1, "initialize", Json::object( {
+    { "protocolVersion", "2025-11-25" }, { "capabilities", Json::object() },
+    { "clientInfo", Json::object( { { "name", "t" }, { "version", "1" } } ) }
+  } ), false ) + "\n";
+  input += "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}\n";
+  input += request( 2, "tools/call", Json::object( {
+    { "name", "run_query" },
+    { "arguments", Json::object( { { "query", jsoniq_decl +
+      "[ for tumbling window $w in (1, 2, 3) start at $s when true "
+      "end at $e when $e - $s eq 1 return [ $w ] ]" } } ) }
+  } ), false ) + "\n";
+  std::string const output( run_binary( f, f.queries, input ) );
+  std::istringstream lines( output );
+  std::string line;
+  bool found = false;
+  while ( std::getline( lines, line ) ) {
+    Json r;
+    std::string why;
+    if ( !parse_json( line, &r, &why ) )
+      continue;
+    Json const *const id = r.find( "id" );
+    if ( id && !id->is_null() && id->text() == "2" ) {
+      found = true;
+      check( !is_tool_error( r ) &&
+             contains( result_text( r ), "[ [ 1, 2 ], [ 3 ] ]" ),
+             "window clause through the zorba-mcp binary", line );
+    }
+  }
+  check( found, "zorba-mcp answered the window query", output );
+}
+
 void test_binary( Fixture const &f ) {
   std::string input;
   input += request( 1, "server/discover" ) + "\n";
@@ -1613,6 +1667,7 @@ Test const tests[] = {
   { "predefined", test_predefined },
   { "limits", test_limits },
   { "binary", test_binary },
+  { "windows", test_windows },
   { "memory_limit", test_memory_limit },
   { "optional_params", test_optional_params },
   { "documents_stream", test_documents_stream },
