@@ -570,8 +570,7 @@ void test_unreadable( Fixture const &f ) {
     list( server, Json::object( { { "limit", 0 } } ) );
     wait_settled( server );
     l = list( server, Json::object( { { "limit", 0 } } ) );
-    check( l.total() == "3" || l.total() == "2",
-           "a deleted file below leaves the totals", l.text );
+    check( l.total() == "2", "a deleted file below leaves the totals", l.text );
     check( !list( server ).lists( "open/new.csv" ), "and the listing", l.text );
   }
 }
@@ -625,9 +624,17 @@ void test_preview_bound( Fixture const &f ) {
     xml += "<" + std::string( 70, 'e' ) + std::to_string( i ) + "/>";
   xml += "</r>";
 
+  // Under the limit of a tag: the prefixes themselves have to be cut.
+  std::string const prefix( 3000, 'q' );
+  std::string prefixes( "<r" );
+  for ( int i = 0; i < 4; ++i )
+    prefixes += " xmlns:" + prefix + std::to_string( i ) + "=\"u\"";
+  prefixes += "/>";
+
   struct { char const *what; ScanFormat format; std::string const &data; }
     const cases[] = {
       { "xml with a long prefix", ScanFormat::xml, many_ns },
+      { "xml with long prefixes", ScanFormat::xml, prefixes },
       { "xml with many paths", ScanFormat::xml, xml },
       { "csv", ScanFormat::csv, csv },
       { "json", ScanFormat::json, json_escaped } };
@@ -711,6 +718,10 @@ void test_refill( Fixture const &f ) {
   list_path( server, "two" );
   wait_complete( server );
   stdfs::remove( t.root + "/two/a.csv" );
+  stdfs::last_write_time( t.root + "/two",
+    stdfs::last_write_time( t.root + "/two" ) + std::chrono::hours( 1 ) );
+  list( server, Json::object( { { "limit", 0 } } ) );
+  wait_complete( server );
   l = list( server, Json::object( { { "limit", 1 } } ) );
   check( contains( dump_of( l.head.find( "dirs" ) ),
                    "{\"path\":\"two\",\"files\":2}" ),
@@ -1537,7 +1548,7 @@ void test_shutdown( Fixture const &f ) {
     Server server( f.zorba, gated( t.root, gate ), std::cerr );
     check( gate->wait_reached(), "the sampler is held at a file" );
     auto const t0 = std::chrono::steady_clock::now();
-    server.stop_scan();
+    check( !server.stop_scan(), "the held thread is left behind" );
     auto const ms = std::chrono::duration_cast<std::chrono::milliseconds>(
       std::chrono::steady_clock::now() - t0 ).count();
     check( ms < 10000, "stop does not wait for a held file",

@@ -29,19 +29,34 @@ Rules this code depends on:
   cleans up libxml2, so `Server` stops the scanner first. Zorba changes the
   process-wide external entity loader; the scanner never reaches it, because
   it parses without loading anything.
-- Files are opened from a descriptor of the root, one path component at a
+- The request thread never parses. A file with no preview goes to the sampler
+  ahead of its queue, and the request waits up to a bound from `--timeout`, then
+  answers `"preview_state":"pending"`.
+- Directories are opened from a descriptor of the root, one path component at a
   time with `O_NOFOLLOW`, because a check of a path followed by an open could
-  be raced. `O_NONBLOCK` keeps a FIFO from blocking the open, and only regular
-  files are read.
+  be raced. A file is opened only after `fstatat` says it is regular, and
+  `st_dev`/`st_ino` are compared after the open, so a FIFO or device is never
+  opened.
+- Markup goes through `markup_refusal()` before libxml2: time in start tag
+  parsing grows with the square of one tag's attributes and cannot be
+  interrupted, so a tag over 16 KB (without quoted values) or 256 attributes is
+  refused. A push parser would not help: it only regains control between
+  chunks. HTML is parsed with SAX in 64 KB chunks and builds no tree; there is
+  no HTML reader in libxml2. Parsing stops after 5 s.
 - Parsers get at most `ScanLimits::max_file_bytes` and report what they cannot
   parse in the preview's `error`. Nesting is bounded: 64 levels for JSON,
   256 for XML, 200 for the walk of the HTML tree, which takes no stack; deeper
   is an `error`.
 - XML parser options must not gain `NOENT`, `DTDLOAD`, `DTDATTR`, `DTDVALID`,
   `XINCLUDE` or `HUGE`.
-- `Scanner::stop()` waits one second. A thread still in a `read()` is detached;
-  it holds the shared state, and after the read it sees the stop flag and ends
-  without touching libxml2.
+- `Scanner::stop()` waits one second and says whether it joined the threads. If
+  not, `main` ends the process with `_Exit`: `Zorba::shutdown()` calls
+  `xmlCleanupParser`, which must not run with a thread in libxml2.
+- Listings go through directories in batches of 256 and hold no whole directory.
+  A listing that saw a whole directory removes what it did not see, by stamps.
+- What is not bounded by `--scan-cache-mb`: the buffer of the file being read (1
+  MiB), libxml2's working memory for it, two thread stacks, and up to `limit`
+  entries in an answer.
 
 - Memory: everything the scanner holds is charged against
   `ScanLimits::max_memory` (`--scan-cache-mb`), on the high side, under the one

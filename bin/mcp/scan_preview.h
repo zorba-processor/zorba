@@ -53,9 +53,20 @@ struct ScanPreview {
  * @param truncated whether the file goes on after \a data.
  * @param stop if it becomes true, the result may be incomplete and is to be
  * thrown away.
+ * @return the preview: under 8 KB, with an \c error if parsing took over 5 s, or
+ * if markup has one tag over 16 KB (without quoted values) or 256 attributes.
  */
 ScanPreview make_scan_preview( ScanFormat format, std::string const &data,
                                bool truncated, std::atomic<bool> const *stop );
+
+/**
+ * A path as text: bytes that are not UTF-8 become \\xNN (two upper-case hex
+ * digits), so that different names stay different.
+ */
+std::string scan_path_text( std::string const &path );
+
+/** The bytes of a path from its text (see scan_path_text). */
+std::string scan_path_from_text( std::string const &text );
 
 /** \a s with every invalid UTF-8 sequence replaced by U+FFFD. */
 std::string scan_valid_utf8( std::string const &s );

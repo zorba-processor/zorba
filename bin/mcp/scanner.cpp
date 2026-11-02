@@ -57,6 +57,15 @@ std::chrono::seconds const stop_wait( 1 );
 // How many entries of a directory are merged at a time.
 std::size_t const merge_batch = 256;
 std::size_t const read_chunk = 64 * 1024;
+// Known directories whose mtime one directory request checks.
+std::size_t const max_dir_checks = 1024;
+// Files whose preview requests are waiting for, at most.
+std::size_t const max_requests = 64;
+// How deep the walker goes: opening a directory takes one openat per level, so
+// a walk takes time in the square of the depth. A path below still works.
+std::size_t const max_walk_depth = 256;
+
+typedef std::chrono::steady_clock scan_clock;
 
 std::int64_t mtime_of( struct stat const &st ) {
 #ifdef __APPLE__
@@ -77,11 +86,14 @@ bool close_dir( DIR *dir ) {
   return closedir( dir ) == 0;
 }
 
-// Opens rel under root_fd one component at a time, following no link: the
-// intermediate components as directories, the last with last_flags. O_NONBLOCK
-// because opening a FIFO would otherwise wait for a writer. Returns -1 (and
-// errno) on failure.
-int open_under( int root_fd, std::string const &rel, int last_flags ) {
+bool is_denied( int error ) {
+  return error == EACCES || error == EPERM;
+}
+
+// Opens the directory rel under root_fd one component at a time, following no
+// link. Returns -1 (and errno) on failure.
+int open_directory( int root_fd, std::string const &rel ) {
+  int const flags = O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC;
   if ( rel.empty() )
     return openat( root_fd, ".", O_RDONLY | O_DIRECTORY | O_CLOEXEC );
   int cur = root_fd;
@@ -90,8 +102,6 @@ int open_under( int root_fd, std::string const &rel, int last_flags ) {
     std::size_t const slash = rel.find( '/', start );
     bool const last = slash == std::string::npos;
     std::string const name( rel, start, last ? slash : slash - start );
-    int const flags = O_RDONLY | O_NOFOLLOW | O_CLOEXEC |
-      ( last ? last_flags | O_NONBLOCK : O_DIRECTORY );
     int const fd = openat( cur, name.c_str(), flags );
     int const saved = errno;
     if ( cur != root_fd )
@@ -105,6 +115,61 @@ int open_under( int root_fd, std::string const &rel, int last_flags ) {
   }
 }
 
+char const* base_name( std::string const &rel ) {
+  std::size_t const slash = rel.rfind( '/' );
+  return rel.c_str() + ( slash == std::string::npos ? 0 : slash + 1 );
+}
+
+std::string parent_of( std::string const &rel ) {
+  std::size_t const slash = rel.rfind( '/' );
+  return slash == std::string::npos ? std::string() : rel.substr( 0, slash );
+}
+
+// The status of rel, not following a link; 0 or an errno. Nothing is opened
+// but the directories on the way, so a FIFO or a device sees nothing of it.
+int stat_under( int root_fd, std::string const &rel, struct stat *st ) {
+  int const parent = open_directory( root_fd, parent_of( rel ) );
+  if ( parent < 0 )
+    return errno;
+  int const failed = fstatat( parent, base_name( rel ), st, AT_SYMLINK_NOFOLLOW );
+  int const error = failed ? errno : 0;
+  close_fd( parent );
+  return error;
+}
+
+// Opens a regular file: only after seeing that it is one, and only if what got
+// opened is what was seen. Returns -1 (and errno) otherwise.
+int open_regular( int root_fd, std::string const &rel, struct stat *st ) {
+  int const parent = open_directory( root_fd, parent_of( rel ) );
+  if ( parent < 0 )
+    return -1;
+  struct stat before;
+  int fd = -1;
+  int error = 0;
+  if ( fstatat( parent, base_name( rel ), &before, AT_SYMLINK_NOFOLLOW ) != 0 ) {
+    error = errno;
+  } else if ( !S_ISREG( before.st_mode ) ) {
+    error = ENOENT;
+  } else {
+    fd = openat( parent, base_name( rel ),
+                 O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_NOCTTY | O_CLOEXEC );
+    if ( fd < 0 ) {
+      error = errno;
+    } else if ( fstat( fd, st ) != 0 ) {
+      error = errno;
+      close_fd( fd );
+      fd = -1;
+    } else if ( st->st_dev != before.st_dev || st->st_ino != before.st_ino ) {
+      error = ENOENT;
+      close_fd( fd );
+      fd = -1;
+    }
+  }
+  close_fd( parent );
+  errno = error;
+  return fd;
+}
+
 struct DirEntry {
   std::string name;
   bool is_dir;
@@ -113,29 +178,45 @@ struct DirEntry {
 };
 
 // Lists the regular files and directories directly in rel, in batches to
-// fn(batch), which returns whether to go on. Links and dot entries are left
-// out; fstatat does not follow links. Returns whether the directory could be
-// opened.
+// fn(batch), which returns whether to go on; nothing holds the whole directory.
+// Links and dot entries are left out; fstatat does not follow links. Returns 0,
+// or an errno if rel could not be listed in full, and *whole says whether all of
+// it went through fn.
 template <typename Fn>
-bool list_directory( int root_fd, std::string const &rel,
-                     std::atomic<bool> const &stopping, Fn fn ) {
-  int const fd = open_under( root_fd, rel, O_DIRECTORY );
+int list_directory( int root_fd, std::string const &rel,
+                    std::atomic<bool> const &stopping, Fn fn, bool *whole ) {
+  *whole = false;
+  int const fd = open_directory( root_fd, rel );
   if ( fd < 0 )
-    return false;
+    return errno;
   DIR *const dir = fdopendir( fd );
   if ( !dir ) {
+    int const error = errno;
     close_fd( fd );
-    return false;
+    return error;
   }
   std::vector<DirEntry> batch;
-  while ( struct dirent const *const de = readdir( dir ) ) {
-    if ( stopping.load( std::memory_order_relaxed ) )
+  int error = 0;
+  bool done = true;
+  for ( ;; ) {
+    errno = 0;
+    struct dirent const *const de = readdir( dir );
+    if ( !de ) {
+      error = errno;
       break;
+    }
+    if ( stopping.load( std::memory_order_relaxed ) ) {
+      done = false;
+      break;
+    }
     if ( de->d_name[0] == '.' )
       continue;
     struct stat st;
-    if ( fstatat( fd, de->d_name, &st, AT_SYMLINK_NOFOLLOW ) != 0 )
+    if ( fstatat( fd, de->d_name, &st, AT_SYMLINK_NOFOLLOW ) != 0 ) {
+      if ( is_denied( errno ) )
+        error = errno;                  // names can be read, but not what they are
       continue;
+    }
     bool const is_dir = S_ISDIR( st.st_mode );
     if ( !is_dir && !S_ISREG( st.st_mode ) )
       continue;
@@ -144,16 +225,17 @@ bool list_directory( int root_fd, std::string const &rel,
                                mtime_of( st ) } );
     if ( batch.size() >= merge_batch ) {
       if ( !fn( batch ) ) {
-        close_dir( dir );
-        return true;
+        done = false;
+        break;
       }
       batch.clear();
     }
   }
-  if ( !batch.empty() )
-    fn( batch );
+  if ( done && !batch.empty() && !fn( batch ) )
+    done = false;
   close_dir( dir );
-  return true;
+  *whole = done && error == 0;
+  return error;
 }
 
 // Reads up to cap bytes; *truncated says whether the file goes on.
@@ -228,7 +310,7 @@ std::string error_line( std::string const &status, char const *code,
 void append_file_members( std::string &out, std::string const &rel,
                           ScanFormat format, std::uint64_t size ) {
   out += "\"path\":";
-  append_json_string( out, scan_valid_utf8( rel ) );
+  append_json_string( out, scan_path_text( rel ) );
   out += ",\"format\":";
   if ( format == ScanFormat::none )
     out += "null";
@@ -249,6 +331,7 @@ struct Scanner::Shared {
     ScanFormat format = ScanFormat::none;
     std::uint64_t size = 0;
     std::int64_t mtime = 0;
+    std::uint64_t seen = 0;             // the stamp of the last listing with it
     bool queued = false;                // given to the sampler
     bool sampled = false;               // has its preview, or has none to have
     bool has_preview = false;
@@ -256,6 +339,19 @@ struct Scanner::Shared {
     std::string fields;
     std::size_t preview_cost = 0;       // what preview and fields are charged
     std::list<Entries::iterator>::iterator lru;  // if has_preview
+  };
+
+  struct KnownDir {
+    std::int64_t mtime = 0;
+    std::uint64_t seen = 0;
+  };
+
+  // A file a request wants the preview of, read by the sampler.
+  struct Request {
+    explicit Request( std::string const &path ) : rel( path ) { }
+    std::string const rel;
+    bool done = false;
+    std::string preview;
   };
 
   Shared( std::string const &root, ScanLimits const &limits, ScanHook hook ) :
@@ -279,14 +375,19 @@ struct Scanner::Shared {
   std::mutex theMutex;
   std::condition_variable theCv;
   std::uint32_t theGen = 1;             // refresh adds one
+  std::uint64_t theStamp = 0;           // each listing adds one
   std::deque<std::string> theDirs;      // directories to walk
   std::deque<std::string> theFiles;     // files to sample
+  std::deque<std::shared_ptr<Request> > theRequests;  // before theFiles
+  std::shared_ptr<Request> theCurrentRequest;         // being read
   bool theWalkerBusy = false;
   bool theSamplerBusy = false;
   bool theWalkerDone = false;
   bool theSamplerDone = false;
   Entries theEntries;                   // sorted by path, as listings are
-  std::set<std::string> theKnownDirs;   // walked or queued
+  std::map<std::string,KnownDir> theKnownDirs;  // walked or queued
+  std::set<std::string> theUnreadable;  // directories that could not be listed
+  std::string theDirCursor;             // where the mtime checks go on from
   std::list<Entries::iterator> theLru;  // entries with previews; front: recent
   std::size_t theSampled = 0;           // entries with sampled set
   std::size_t theBytes = 0;             // charged, all in
@@ -294,6 +395,7 @@ struct Scanner::Shared {
   bool theLimitHit = false;             // the state is memory_limit when idle
   bool theSamplingStopped = false;
   bool theIndexFull = false;            // the listing may miss files
+  bool theTooDeep = false;              // the walk left out what is too deep
 
   void hook( char const *stage, std::string const &path ) const {
     if ( theHook )
@@ -315,7 +417,8 @@ struct Scanner::Shared {
   }
 
   static std::size_t dir_cost( std::string const &rel ) {
-    return 32 + heap_block_overhead + 2 * string_cost( rel.size() );
+    return sizeof( KnownDir ) + 32 + heap_block_overhead +
+      2 * string_cost( rel.size() );
   }
 
   static std::size_t preview_cost( ScanPreview const &preview ) {
@@ -325,11 +428,15 @@ struct Scanner::Shared {
       heap_block_overhead;
   }
 
+  static bool has_prefix( std::string const &s, std::string const &prefix ) {
+    return s.compare( 0, prefix.size(), prefix ) == 0;
+  }
+
   // Guarded by theMutex, from here on.
 
   bool idle() const {
     return theDirs.empty() && !theWalkerBusy && theFiles.empty() &&
-      !theSamplerBusy;
+      theRequests.empty() && !theSamplerBusy;
   }
 
   std::string status() const {
@@ -390,9 +497,19 @@ struct Scanner::Shared {
     theEntries.erase( it );
   }
 
-  void erase_dir( std::set<std::string>::iterator it ) {
-    theBytes -= dir_cost( *it );
-    theKnownDirs.erase( it );
+  void forget_unreadable( std::string const &rel ) {
+    std::set<std::string>::iterator const it = theUnreadable.find( rel );
+    if ( it != theUnreadable.end() ) {
+      theBytes -= dir_cost( *it );
+      theUnreadable.erase( it );
+    }
+  }
+
+  void note_unreadable( std::string const &rel ) {
+    if ( !theUnreadable.count( rel ) && room_in_index( dir_cost( rel ) ) ) {
+      theBytes += dir_cost( rel );
+      theUnreadable.insert( rel );
+    }
   }
 
   void erase_tree( std::string const &rel ) {
@@ -401,16 +518,24 @@ struct Scanner::Shared {
       erase( it );
     std::string const prefix( rel + "/" );
     it = theEntries.lower_bound( prefix );
-    while ( it != theEntries.end() &&
-            it->first.compare( 0, prefix.size(), prefix ) == 0 )
+    while ( it != theEntries.end() && has_prefix( it->first, prefix ) )
       erase( it++ );
     auto d = theKnownDirs.lower_bound( prefix );
-    while ( d != theKnownDirs.end() &&
-            d->compare( 0, prefix.size(), prefix ) == 0 )
-      erase_dir( d++ );
+    while ( d != theKnownDirs.end() && has_prefix( d->first, prefix ) ) {
+      theBytes -= dir_cost( d->first );
+      d = theKnownDirs.erase( d );
+    }
     d = theKnownDirs.find( rel );
-    if ( d != theKnownDirs.end() )
-      erase_dir( d );
+    if ( d != theKnownDirs.end() ) {
+      theBytes -= dir_cost( d->first );
+      theKnownDirs.erase( d );
+    }
+    forget_unreadable( rel );
+    auto u = theUnreadable.lower_bound( prefix );
+    while ( u != theUnreadable.end() && has_prefix( *u, prefix ) ) {
+      theBytes -= dir_cost( *u );
+      u = theUnreadable.erase( u );
+    }
   }
 
   void queue_sample( std::string const &rel, Entry &e ) {
@@ -435,6 +560,7 @@ struct Scanner::Shared {
       it->second.mtime = mtime;
     }
     Entry &e = it->second;
+    e.seen = theStamp;
     if ( e.size != size || e.mtime != mtime ) {
       forget_preview( e );
       e.queued = false;
@@ -452,15 +578,33 @@ struct Scanner::Shared {
     return true;
   }
 
-  // Queues a subdirectory unless it has been.
-  void merge_dir( std::string const &rel ) {
-    if ( theIndexFull || theKnownDirs.count( rel ) )
+  // Records a subdirectory: queued if new or changed.
+  void merge_dir( std::string const &rel, std::int64_t mtime ) {
+    auto const it = theKnownDirs.find( rel );
+    if ( it != theKnownDirs.end() ) {
+      it->second.seen = theStamp;
+      if ( it->second.mtime != mtime ) {
+        it->second.mtime = mtime;
+        if ( !theIndexFull )
+          theDirs.push_back( rel );
+      }
       return;
+    }
+    if ( theIndexFull )
+      return;
+    if ( static_cast<std::size_t>( std::count( rel.begin(), rel.end(), '/' ) ) >=
+         max_walk_depth ) {
+      theTooDeep = true;
+      return;
+    }
     std::size_t const cost = dir_cost( rel );
     if ( !room_in_index( cost ) )
       return;
     theBytes += cost;
-    theKnownDirs.insert( rel );
+    KnownDir known;
+    known.mtime = mtime;
+    known.seen = theStamp;
+    theKnownDirs.emplace( rel, known );
     theDirs.push_back( rel );
   }
 
@@ -468,14 +612,136 @@ struct Scanner::Shared {
     return dir.empty() ? name : dir + "/" + name;
   }
 
-  void merge_batch_of( std::string const &dir,
-                       std::vector<DirEntry> const &batch ) {
-    for ( DirEntry const &de : batch ) {
-      std::string const rel( child( dir, de.name ) );
-      if ( de.is_dir )
-        merge_dir( rel );
-      else
-        merge_file( rel, de.size, de.mtime );
+  // What a listing that went through a whole directory did not see is gone.
+  void remove_unseen( std::string const &dir, std::uint64_t start ) {
+    std::string const prefix( dir.empty() ? dir : dir + "/" );
+    Entries::iterator it = theEntries.lower_bound( prefix );
+    while ( it != theEntries.end() && has_prefix( it->first, prefix ) ) {
+      std::size_t const slash = it->first.find( '/', prefix.size() );
+      if ( slash == std::string::npos ) {
+        if ( it->second.seen < start )
+          erase( it++ );
+        else
+          ++it;
+      } else {
+        // '0' follows '/': past everything under this subdirectory.
+        it = theEntries.lower_bound( it->first.substr( 0, slash ) + "0" );
+      }
+    }
+    std::vector<std::string> gone;
+    for ( auto d = theKnownDirs.lower_bound( prefix );
+          d != theKnownDirs.end() && has_prefix( d->first, prefix ); ++d )
+      if ( d->second.seen < start &&
+           d->first.find( '/', prefix.size() ) == std::string::npos )
+        gone.push_back( d->first );
+    for ( std::string const &rel : gone )
+      erase_tree( rel );
+  }
+
+  // Files that have no room in the index, for an answer about their directory.
+  struct Unindexed {
+    std::size_t keep = 0;
+    std::size_t total = 0;
+    std::vector<DirEntry> files;
+
+    void add( DirEntry const &de ) {
+      ++total;
+      if ( keep == 0 )
+        return;
+      files.push_back( de );
+      if ( files.size() >= 2 * keep + merge_batch )
+        trim();
+    }
+
+    void trim() {
+      std::sort( files.begin(), files.end(),
+                 []( DirEntry const &a, DirEntry const &b ) {
+                   return a.name < b.name;
+                 } );
+      if ( files.size() > keep )
+        files.resize( keep );
+    }
+  };
+
+  // Lists one directory into what is known, in batches. A walk ends at a full
+  // index; a request goes on, for its unindexed files. Returns 0 or an errno.
+  int list_level( std::string const &dir, std::uint32_t gen,
+                  std::atomic<bool> const &stop,
+                  scan_clock::time_point const *deadline, Unindexed *unindexed ) {
+    std::uint64_t start;
+    {
+      std::lock_guard<std::mutex> lock( theMutex );
+      start = ++theStamp;
+    }
+    bool whole = false;
+    int const error = list_directory( theRootFd, dir, stop,
+      [&]( std::vector<DirEntry> const &batch ) {
+        std::lock_guard<std::mutex> guard( theMutex );
+        if ( gen != theGen || theStopping || ( !unindexed && theIndexFull ) )
+          return false;                 // restarted, or nothing more fits
+        for ( DirEntry const &de : batch ) {
+          std::string const rel( child( dir, de.name ) );
+          if ( de.is_dir )
+            merge_dir( rel, de.mtime );
+          else if ( !merge_file( rel, de.size, de.mtime ) && unindexed )
+            unindexed->add( de );
+        }
+        theCv.notify_all();
+        return !deadline || scan_clock::now() <= *deadline;
+      }, &whole );
+
+    std::lock_guard<std::mutex> lock( theMutex );
+    if ( gen != theGen )
+      return error;
+    if ( is_denied( error ) ) {
+      note_unreadable( dir );
+    } else if ( whole ) {
+      forget_unreadable( dir );
+      remove_unseen( dir, start );
+    }
+    return error;
+  }
+
+  // Finds changes further down than a request lists: a directory whose mtime
+  // changed is walked again. At most max_dir_checks per request, going round.
+  void check_known_dirs( std::string const &prefix ) {
+    std::vector<std::pair<std::string,std::int64_t> > known;
+    {
+      std::lock_guard<std::mutex> lock( theMutex );
+      auto d = theKnownDirs.lower_bound( std::max( theDirCursor, prefix ) );
+      for ( ; d != theKnownDirs.end() && has_prefix( d->first, prefix ) &&
+              known.size() < max_dir_checks; ++d )
+        known.emplace_back( d->first, d->second.mtime );
+      theDirCursor = known.size() == max_dir_checks ? known.back().first
+                                                    : std::string();
+    }
+    std::vector<std::pair<std::string,std::int64_t> > changed;
+    std::vector<std::string> gone;
+    for ( auto const &k : known ) {
+      struct stat st;
+      // A link on the way is harmless: only the time is used, and the walker
+      // opens the directory without following any.
+      if ( fstatat( theRootFd, k.first.c_str(), &st, AT_SYMLINK_NOFOLLOW ) != 0 ) {
+        if ( errno == ENOENT || errno == ENOTDIR )
+          gone.push_back( k.first );
+      } else if ( !S_ISDIR( st.st_mode ) ) {
+        gone.push_back( k.first );
+      } else if ( mtime_of( st ) != k.second ) {
+        changed.emplace_back( k.first, mtime_of( st ) );
+      }
+    }
+    if ( changed.empty() && gone.empty() )
+      return;
+    std::lock_guard<std::mutex> lock( theMutex );
+    for ( std::string const &rel : gone )
+      erase_tree( rel );
+    for ( auto const &c : changed ) {
+      auto const it = theKnownDirs.find( c.first );
+      if ( it != theKnownDirs.end() ) {
+        it->second.mtime = c.second;
+        if ( !theIndexFull )
+          theDirs.push_back( c.first );
+      }
     }
     theCv.notify_all();
   }
@@ -538,25 +804,27 @@ struct Scanner::Shared {
   // Unguarded: reading and parsing.
 
   // Reads and parses the open file; takes over fd.
-  ScanPreview preview_of( int fd, ScanFormat format, std::uint64_t size,
-                          std::atomic<bool> const *stop ) const {
+  ScanPreview preview_of( int fd, ScanFormat format, std::uint64_t size ) const {
     std::string data;
     bool truncated = false;
-    bool const ok = read_capped( fd, theLimits.max_file_bytes, size, stop,
+    bool const ok = read_capped( fd, theLimits.max_file_bytes, size, &theStopping,
                                  &data, &truncated );
     int const saved = errno;
     close_fd( fd );
     ScanPreview preview;
     if ( !ok ) {
-      preview.json = "{\"error\":";
-      append_json_string( preview.json, std::string( "cannot read the file: " ) +
-                          std::strerror( saved ) );
-      preview.json += '}';
+      preview.json = error_preview_text( "cannot read the file", saved );
       return preview;
     }
-    if ( stop && stop->load( std::memory_order_relaxed ) )
+    if ( theStopping )
       return preview;                   // not to be used; libxml2 not touched
-    return make_scan_preview( format, data, truncated, stop );
+    return make_scan_preview( format, data, truncated, &theStopping );
+  }
+
+  static std::string error_preview_text( char const *what, int error ) {
+    std::string json( "{\"error\":" );
+    append_json_string( json, std::string( what ) + ": " + std::strerror( error ) );
+    return json + "}";
   }
 
   void walker() {
@@ -573,14 +841,7 @@ struct Scanner::Shared {
       lock.unlock();
 
       hook( "walk", dir );
-      list_directory( theRootFd, dir, theStopping,
-        [&]( std::vector<DirEntry> const &batch ) {
-          std::lock_guard<std::mutex> guard( theMutex );
-          if ( gen != theGen || theStopping || theIndexFull )
-            return false;               // restarted, or nothing more fits
-          merge_batch_of( dir, batch );
-          return true;
-        } );
+      list_level( dir, gen, theStopping, nullptr, nullptr );
 
       lock.lock();
       theWalkerBusy = false;
@@ -593,56 +854,64 @@ struct Scanner::Shared {
   void sampler() {
     std::unique_lock<std::mutex> lock( theMutex );
     while ( !theStopping ) {
-      if ( theFiles.empty() ) {
-        theCv.wait( lock, [this] { return theStopping || !theFiles.empty(); } );
+      std::shared_ptr<Request> request;
+      std::string rel;
+      if ( !theRequests.empty() ) {
+        request = theRequests.front();
+        theRequests.pop_front();
+        theCurrentRequest = request;
+        rel = request->rel;
+      } else if ( !theFiles.empty() ) {
+        rel = theFiles.front();
+        theFiles.pop_front();
+        Entries::iterator const it = theEntries.find( rel );
+        if ( it == theEntries.end() || it->second.sampled )
+          continue;                     // deleted or asked for meanwhile
+      } else {
+        theCv.wait( lock, [this] {
+          return theStopping || !theRequests.empty() || !theFiles.empty();
+        } );
         continue;
       }
-      std::string const rel( theFiles.front() );
-      theFiles.pop_front();
-      Entries::iterator const it = theEntries.find( rel );
-      if ( it == theEntries.end() || it->second.sampled )
-        continue;                       // deleted or explored meanwhile
-      ScanFormat const format = it->second.format;
       std::uint32_t const gen = theGen;
       theSamplerBusy = true;
       lock.unlock();
 
-      hook( "sample", rel );
-      int const fd = theStopping ? -1 : open_under( theRootFd, rel, 0 );
-      int const open_errno = errno;
+      hook( request ? "explore" : "sample", rel );
       struct stat st;
-      bool regular = false;
-      if ( fd >= 0 )
-        regular = fstat( fd, &st ) == 0 && S_ISREG( st.st_mode );
+      std::memset( &st, 0, sizeof st );
+      int const fd = theStopping ? -1 : open_regular( theRootFd, rel, &st );
+      int const open_errno = errno;
       ScanPreview preview;
-      if ( regular )
-        preview = preview_of( fd, format,
-                              static_cast<std::uint64_t>( st.st_size ),
-                              &theStopping );
-      else if ( fd >= 0 )
-        close_fd( fd );
+      if ( fd >= 0 )
+        preview = preview_of( fd, scan_format( rel ),
+                              static_cast<std::uint64_t>( st.st_size ) );
 
       lock.lock();
       theSamplerBusy = false;
       if ( !theStopping ) {
-        Entries::iterator const e = theEntries.find( rel );
-        if ( regular ) {
+        bool const gone = open_errno == ENOENT || open_errno == ELOOP ||
+          open_errno == ENOTDIR;
+        if ( fd < 0 )
+          preview.json = error_preview_text( "cannot open the file", open_errno );
+        if ( request ) {
+          if ( fd >= 0 && gen == theGen &&
+               merge_file( rel, static_cast<std::uint64_t>( st.st_size ),
+                           mtime_of( st ) ) )
+            store_requested( rel, preview );
+          request->preview = preview.json;
+          request->done = true;
+          theCurrentRequest.reset();
+        } else if ( fd >= 0 ) {
           store_sampled( rel, gen, static_cast<std::uint64_t>( st.st_size ),
                          mtime_of( st ), preview );
-        } else if ( e != theEntries.end() && gen == theGen ) {
-          if ( fd < 0 && open_errno != ENOENT && open_errno != ELOOP &&
-               open_errno != ENOTDIR ) {
-            // Still there, but not readable.
-            ScanPreview unreadable;
-            unreadable.json = "{\"error\":";
-            append_json_string( unreadable.json,
-              std::string( "cannot open the file: " ) +
-              std::strerror( open_errno ) );
-            unreadable.json += '}';
-            store_sampled( rel, gen, e->second.size, e->second.mtime,
-                           unreadable );
-          } else {
-            erase( e );                 // gone, or no longer a regular file
+        } else if ( gen == theGen ) {
+          Entries::iterator const e = theEntries.find( rel );
+          if ( e != theEntries.end() ) {
+            if ( gone )
+              erase( e );               // or no longer a regular file
+            else
+              store_sampled( rel, gen, e->second.size, e->second.mtime, preview );
           }
         }
       }
@@ -660,46 +929,61 @@ struct Scanner::Shared {
     theEntries.clear();
     theLru.clear();
     theKnownDirs.clear();
+    theUnreadable.clear();
     theDirs.clear();
     theFiles.clear();
+    theRequests.clear();
+    theDirCursor.clear();
     theDirs.push_back( std::string() );
     theSampled = theBytes = thePreviewBytes = 0;
-    theLimitHit = theSamplingStopped = theIndexFull = false;
+    theLimitHit = theSamplingStopped = theIndexFull = theTooDeep = false;
     theCv.notify_all();
   }
 
-  std::string file_answer( int fd, struct stat const &st,
-                           std::string const &rel, std::size_t max_output ) {
+  // The request for this file that is on its way, or a new one if there is room.
+  std::shared_ptr<Request> request_for( std::string const &rel ) {
+    if ( theCurrentRequest && theCurrentRequest->rel == rel )
+      return theCurrentRequest;
+    for ( std::shared_ptr<Request> const &r : theRequests )
+      if ( r->rel == rel )
+        return r;
+    if ( theRequests.size() >= max_requests )
+      return std::shared_ptr<Request>();
+    theRequests.push_back( std::make_shared<Request>( rel ) );
+    theCv.notify_all();
+    return theRequests.back();
+  }
+
+  // The request thread does not parse: the sampler does, with this file first,
+  // and the request waits for that up to its bound.
+  std::string file_answer( struct stat const &st, std::string const &rel,
+                           std::size_t max_output,
+                           std::chrono::milliseconds wait ) {
     ScanFormat const format = scan_format( rel );
     std::uint64_t const size = static_cast<std::uint64_t>( st.st_size );
-    std::int64_t const mtime = mtime_of( st );
     std::string preview( "null" );
-    bool known = format == ScanFormat::none;
-    if ( !known ) {
-      std::lock_guard<std::mutex> lock( theMutex );
-      Entries::iterator const it = theEntries.find( rel );
-      if ( it != theEntries.end() && it->second.has_preview &&
-           it->second.size == size && it->second.mtime == mtime ) {
-        preview = it->second.preview;
-        theLru.splice( theLru.begin(), theLru, it->second.lru );
-        known = true;
-      }
-    }
-    ScanPreview fresh;
-    if ( known ) {
-      close_fd( fd );
-    } else {
-      hook( "explore", rel );
-      fresh = preview_of( fd, format, size, nullptr );
-      preview = fresh.json;
-    }
+    bool pending = false;
     std::string scan_status;
     {
-      std::lock_guard<std::mutex> lock( theMutex );
-      merge_file( rel, size, mtime );
-      if ( !known )
-        store_requested( rel, fresh );
+      std::unique_lock<std::mutex> lock( theMutex );
+      merge_file( rel, size, mtime_of( st ) );
       theCv.notify_all();
+      if ( format != ScanFormat::none ) {
+        Entries::iterator const it = theEntries.find( rel );
+        if ( it != theEntries.end() && it->second.has_preview ) {
+          preview = it->second.preview;
+          theLru.splice( theLru.begin(), theLru, it->second.lru );
+        } else {
+          std::shared_ptr<Request> const request( request_for( rel ) );
+          bool const done = request && theCv.wait_for( lock, wait, [&] {
+            return request->done || theStopping;
+          } ) && request->done;
+          if ( done )
+            preview = request->preview;
+          else
+            pending = true;
+        }
+      }
       scan_status = status();
     }
 
@@ -708,72 +992,46 @@ struct Scanner::Shared {
     std::size_t const closing = std::strlen( ",\"preview\":}" );
     if ( out.size() + closing + preview.size() > max_output )
       preview = "{\"error\":\"the preview is longer than the output limit\"}";
-    out += ",\"preview\":" + preview + "}";
+    out += ",\"preview\":" + preview;
+    if ( pending )
+      out += ",\"preview_state\":\"pending\"";
+    out += "}";
     return out;
   }
 
-  // Makes what is known about rel what is in it now, one level deep.
-  bool relist( std::string const &rel, std::vector<DirEntry> *found ) {
+  std::string directory_answer( std::string const &rel, std::size_t limit,
+                                std::size_t max_output,
+                                std::chrono::milliseconds wait, bool *is_error ) {
+    // More than this cannot fit: do not read them.
+    limit = std::min( limit, max_output / 32 + 1 );
+    scan_clock::time_point const deadline = scan_clock::now() + wait;
     static std::atomic<bool> const never( false );
-    bool const opened = list_directory( theRootFd, rel, never,
-      [found]( std::vector<DirEntry> const &batch ) {
-        found->insert( found->end(), batch.begin(), batch.end() );
-        return true;
-      } );
-    if ( !opened )
-      return false;
-    std::unordered_set<std::string> files, dirs;
-    for ( DirEntry const &de : *found )
-      ( de.is_dir ? dirs : files ).insert( de.name );
-    std::string const prefix( rel.empty() ? rel : rel + "/" );
 
-    std::lock_guard<std::mutex> lock( theMutex );
-    merge_batch_of( rel, *found );
-    Entries::iterator it = theEntries.lower_bound( prefix );
-    while ( it != theEntries.end() &&
-            it->first.compare( 0, prefix.size(), prefix ) == 0 ) {
-      std::size_t const slash = it->first.find( '/', prefix.size() );
-      if ( slash == std::string::npos ) {
-        if ( files.count( it->first.substr( prefix.size() ) ) )
-          ++it;
-        else
-          erase( it++ );
-      } else {
-        std::string const name(
-          it->first.substr( prefix.size(), slash - prefix.size() ) );
-        if ( !dirs.count( name ) )
-          erase_tree( prefix + name );
-        // '0' follows '/': past everything under this subdirectory.
-        it = theEntries.lower_bound( prefix + name + "0" );
+    Unindexed unindexed;
+    unindexed.keep = limit;
+    std::uint32_t gen;
+    {
+      std::lock_guard<std::mutex> lock( theMutex );
+      gen = theGen;
+    }
+    int const error = list_level( rel, gen, never, &deadline, &unindexed );
+    if ( error && !is_denied( error ) && error != EINTR ) {
+      std::lock_guard<std::mutex> lock( theMutex );
+      if ( error == ENOENT || error == ENOTDIR || error == ELOOP ) {
+        *is_error = true;
+        erase_tree( rel );
+        return error_line( status(), "not-found",
+                           "no such file or directory under the root" );
       }
     }
-    auto d = theKnownDirs.lower_bound( prefix );
-    while ( d != theKnownDirs.end() &&
-            d->compare( 0, prefix.size(), prefix ) == 0 ) {
-      std::size_t const slash = d->find( '/', prefix.size() );
-      std::string const name(
-        d->substr( prefix.size(), slash == std::string::npos
-                                  ? slash : slash - prefix.size() ) );
-      if ( dirs.count( name ) )
-        d = theKnownDirs.lower_bound( prefix + name + "0" );
-      else
-        erase_dir( d++ );
-    }
-    return true;
-  }
-
-  std::string directory_answer( std::string const &rel, std::size_t limit,
-                                std::size_t max_output, bool *is_error ) {
-    std::vector<DirEntry> found;
-    if ( !relist( rel, &found ) ) {
+    if ( is_denied( error ) ) {
       *is_error = true;
       std::lock_guard<std::mutex> lock( theMutex );
-      erase_tree( rel );
-      return error_line( status(), "not-found",
-                         "no such file or directory under the root" );
+      return error_line( status(), "permission-denied",
+                         "the directory cannot be read" );
     }
-    // More than this cannot fit: do not stat them.
-    limit = std::min( limit, max_output / 32 + 1 );
+    std::string const prefix( rel.empty() ? rel : rel + "/" );
+    check_known_dirs( prefix );
 
     struct Shown {
       std::string rel;
@@ -781,133 +1039,151 @@ struct Scanner::Shared {
       std::uint64_t size;
       std::int64_t mtime;
       std::string fields;
-      bool gone;
     };
     std::vector<Shown> shown;
-    std::size_t total = 0;
-    std::map<std::string,std::size_t> dirs;  // files known per subdirectory
-    std::string const prefix( rel.empty() ? rel : rel + "/" );
-    {
-      std::lock_guard<std::mutex> lock( theMutex );
-      std::string last_dir;
-      std::size_t *last_count = nullptr;
-      for ( Entries::const_iterator it = theEntries.lower_bound( prefix );
-            it != theEntries.end() &&
-            it->first.compare( 0, prefix.size(), prefix ) == 0; ++it ) {
-        ++total;
-        if ( limit == 0 )
-          continue;
-        if ( shown.size() < limit ) {
-          Entry const &e = it->second;
-          shown.push_back( Shown{ it->first, e.format, e.size, e.mtime,
-                                  e.fields, false } );
-        }
-        std::size_t const slash = it->first.find( '/', prefix.size() );
-        if ( slash == std::string::npos )
-          continue;
-        if ( slash - prefix.size() != last_dir.size() ||
-             it->first.compare( prefix.size(), last_dir.size(), last_dir ) != 0 ) {
-          last_dir = it->first.substr( prefix.size(), slash - prefix.size() );
-          last_count = &dirs[ prefix + last_dir ];
-        }
-        ++*last_count;
-      }
-      // The ones the walker has not reached, or that have no files.
-      if ( limit > 0 )
-        for ( DirEntry const &de : found )
-          if ( de.is_dir )
-            dirs[ prefix + de.name ];
-      // With a full index, the files of this directory that have no room in it
-      // are still answered, from the listing just made.
-      if ( theIndexFull ) {
-        for ( DirEntry const &de : found ) {
-          if ( de.is_dir )
-            continue;
-          std::string const path( child( rel, de.name ) );
-          if ( theEntries.count( path ) )
-            continue;
-          ++total;
-          shown.push_back( Shown{ path, scan_format( path ), de.size, de.mtime,
-                                  std::string(), false } );
-        }
-        std::sort( shown.begin(), shown.end(),
-                   []( Shown const &a, Shown const &b ) { return a.rel < b.rel; } );
-        if ( limit < shown.size() )
-          shown.resize( limit );
-      }
-    }
 
-    // Every file shown is as it is now. Paths are sorted: most share a parent.
+    // Every file shown is as it is now. Those that are gone make room for the
+    // next ones. Paths are sorted: most share a parent.
     {
+      std::string after;
+      bool started = false;
       std::string parent;
       int parent_fd = -1;
-      std::vector<Shown const*> changed;
-      for ( Shown &f : shown ) {
-        std::size_t const slash = f.rel.rfind( '/' );
-        std::string const dir( slash == std::string::npos
-                               ? std::string() : f.rel.substr( 0, slash ) );
-        if ( parent_fd < 0 || dir != parent ) {
-          if ( parent_fd >= 0 )
-            close_fd( parent_fd );
-          parent_fd = open_under( theRootFd, dir, O_DIRECTORY );
-          parent = dir;
+      while ( shown.size() < limit ) {
+        std::vector<Shown> batch;
+        {
+          std::lock_guard<std::mutex> lock( theMutex );
+          Entries::const_iterator it = started ? theEntries.upper_bound( after )
+                                               : theEntries.lower_bound( prefix );
+          for ( ; it != theEntries.end() && has_prefix( it->first, prefix ) &&
+                  batch.size() < limit - shown.size(); ++it ) {
+            Entry const &e = it->second;
+            batch.push_back( Shown{ it->first, e.format, e.size, e.mtime, e.fields } );
+          }
         }
-        struct stat st;
-        char const *const name =
-          f.rel.c_str() + ( slash == std::string::npos ? 0 : slash + 1 );
-        if ( parent_fd < 0 ||
-             fstatat( parent_fd, name, &st, AT_SYMLINK_NOFOLLOW ) != 0 ||
-             !S_ISREG( st.st_mode ) ) {
-          f.gone = true;
-        } else if ( static_cast<std::uint64_t>( st.st_size ) != f.size ||
-                    mtime_of( st ) != f.mtime ) {
-          changed.push_back( &f );
-          f.size = static_cast<std::uint64_t>( st.st_size );
-          f.mtime = mtime_of( st );
-          f.fields.clear();
+        if ( batch.empty() )
+          break;
+        started = true;
+        after = batch.back().rel;
+
+        std::vector<std::string> gone;
+        std::vector<Shown> changed;
+        for ( Shown &f : batch ) {
+          std::string const dir( parent_of( f.rel ) );
+          if ( parent_fd < 0 || dir != parent ) {
+            if ( parent_fd >= 0 )
+              close_fd( parent_fd );
+            parent_fd = open_directory( theRootFd, dir );
+            parent = dir;
+          }
+          struct stat st;
+          if ( parent_fd < 0 ||
+               fstatat( parent_fd, base_name( f.rel ), &st,
+                        AT_SYMLINK_NOFOLLOW ) != 0 ||
+               !S_ISREG( st.st_mode ) ) {
+            gone.push_back( f.rel );
+            continue;
+          }
+          if ( static_cast<std::uint64_t>( st.st_size ) != f.size ||
+               mtime_of( st ) != f.mtime ) {
+            f.size = static_cast<std::uint64_t>( st.st_size );
+            f.mtime = mtime_of( st );
+            f.fields.clear();
+            changed.push_back( f );
+          }
+          shown.push_back( f );
         }
+        {
+          std::lock_guard<std::mutex> lock( theMutex );
+          for ( std::string const &path : gone ) {
+            Entries::iterator const it = theEntries.find( path );
+            if ( it != theEntries.end() )
+              erase( it );
+          }
+          for ( Shown const &f : changed )
+            merge_file( f.rel, f.size, f.mtime );
+          if ( !changed.empty() )
+            theCv.notify_all();
+        }
+        if ( scan_clock::now() > deadline )
+          break;
       }
       if ( parent_fd >= 0 )
         close_fd( parent_fd );
-      std::lock_guard<std::mutex> lock( theMutex );
-      for ( Shown const &f : shown ) {
-        if ( !f.gone )
-          continue;
-        Entries::iterator const it = theEntries.find( f.rel );
-        if ( it != theEntries.end() )
-          erase( it );
-        --total;
-      }
-      for ( Shown const *const f : changed )
-        merge_file( f->rel, f->size, f->mtime );
-      if ( !changed.empty() )
-        theCv.notify_all();
     }
 
+    // With a full index, the files of this directory that have no room in it
+    // are still answered, from the listing just made.
+    unindexed.trim();
+    for ( DirEntry const &de : unindexed.files ) {
+      std::string const path( child( rel, de.name ) );
+      shown.push_back( Shown{ path, scan_format( path ), de.size, de.mtime,
+                              std::string() } );
+    }
+    std::sort( shown.begin(), shown.end(),
+               []( Shown const &a, Shown const &b ) { return a.rel < b.rel; } );
+    if ( shown.size() > limit )
+      shown.resize( limit );
+
+    // What the answer states comes after all of that, so it is current.
+    std::size_t total = unindexed.total;
+    std::size_t dirs_total = 0;
+    std::map<std::string,std::size_t> dirs;  // files known per subdirectory
     std::string scan_status;
-    bool incomplete, idle;
+    bool incomplete, is_idle;
+    std::size_t unreadable;
     {
       std::lock_guard<std::mutex> lock( theMutex );
+      if ( limit > 0 ) {
+        for ( auto d = theKnownDirs.lower_bound( prefix );
+              d != theKnownDirs.end() && has_prefix( d->first, prefix ); ++d ) {
+          if ( d->first.find( '/', prefix.size() ) != std::string::npos )
+            continue;
+          ++dirs_total;
+          if ( dirs.size() < max_dirs_shown )
+            dirs[ d->first ] = 0;
+        }
+      }
+      std::string last_dir;
+      std::size_t *last_count = nullptr;
+      for ( Entries::const_iterator it = theEntries.lower_bound( prefix );
+            it != theEntries.end() && has_prefix( it->first, prefix ); ++it ) {
+        ++total;
+        if ( limit == 0 )
+          continue;
+        std::size_t const slash = it->first.find( '/', prefix.size() );
+        if ( slash == std::string::npos )
+          continue;
+        if ( slash + 1 != last_dir.size() ||
+             it->first.compare( 0, slash + 1, last_dir ) != 0 ) {
+          last_dir = it->first.substr( 0, slash + 1 );
+          auto const found = dirs.find( it->first.substr( 0, slash ) );
+          last_count = found == dirs.end() ? nullptr : &found->second;
+        }
+        if ( last_count )
+          ++*last_count;
+      }
       scan_status = status();
-      incomplete = theIndexFull;
-      idle = this->idle();
+      unreadable = theUnreadable.size();
+      incomplete = theIndexFull || theTooDeep || unreadable > 0;
+      is_idle = idle();
     }
+
     std::string dirs_members;
     if ( !dirs.empty() ) {
       dirs_members = ",\"dirs\":[";
-      std::size_t count = 0;
+      bool first = true;
       for ( auto const &d : dirs ) {
-        if ( count == max_dirs_shown )
-          break;
-        if ( count++ )
+        if ( !first )
           dirs_members += ',';
+        first = false;
         dirs_members += "{\"path\":";
-        append_json_string( dirs_members, scan_valid_utf8( d.first ) );
+        append_json_string( dirs_members, scan_path_text( d.first ) );
         dirs_members += ",\"files\":" + std::to_string( d.second ) + "}";
       }
       dirs_members += ']';
-      if ( dirs.size() > count )
-        dirs_members += ",\"dirs_total\":" + std::to_string( dirs.size() );
+      if ( dirs_total > dirs.size() )
+        dirs_members += ",\"dirs_total\":" + std::to_string( dirs_total );
       if ( dirs_members.size() > max_output / 2 )
         dirs_members.clear();
     }
@@ -915,13 +1191,12 @@ struct Scanner::Shared {
     // The first line: its size with the largest counts it can have.
     std::size_t room = max_output;
     std::size_t const first_line = scan_status.size() + dirs_members.size() +
-      std::strlen( "{,\"total\":,\"shown\":,\"incomplete\":true}" ) + 2 * 20;
+      std::strlen( "{,\"total\":,\"shown\":,\"incomplete\":true,\"unreadable_dirs\":}" ) +
+      3 * 20;
     room = room > first_line ? room - first_line : 0;
     std::string lines;
     std::size_t shown_count = 0;
     for ( Shown const &f : shown ) {
-      if ( f.gone )
-        continue;
       std::string line( "\n{" );
       append_file_members( line, f.rel, f.format, f.size );
       if ( !f.fields.empty() )
@@ -937,8 +1212,10 @@ struct Scanner::Shared {
                      std::to_string( shown_count ) );
     if ( incomplete )
       out += ",\"incomplete\":true";
+    if ( unreadable > 0 )
+      out += ",\"unreadable_dirs\":" + std::to_string( unreadable );
     // The files shown say what is under a directory, unless some are missing.
-    if ( limit > 0 && ( shown_count < total || !idle || incomplete ) )
+    if ( limit > 0 && ( shown_count < total || !is_idle || incomplete ) )
       out += dirs_members;
     out += '}';
     return out + lines;
@@ -1014,7 +1291,7 @@ bool Scanner::stop() {
 }
 
 std::string Scanner::answer( Json const &args, std::size_t max_output,
-                             bool *is_error ) {
+                             std::chrono::milliseconds wait, bool *is_error ) {
   Shared &s = *theShared;
   auto status = [&s]() {
     std::lock_guard<std::mutex> lock( s.theMutex );
@@ -1059,22 +1336,27 @@ std::string Scanner::answer( Json const &args, std::size_t max_output,
     s.refresh();
 
   if ( rel.empty() )
-    return s.directory_answer( rel, limit, max_output, is_error );
+    return s.directory_answer( rel, limit, max_output, wait, is_error );
 
-  // What is there now decides. A link gets the answer of a missing file: it
-  // says nothing about its target.
-  int const fd = open_under( s.theRootFd, rel, 0 );
+  // What is there now decides, and only a stat looks at it. A link gets the
+  // answer of a missing file: it says nothing about its target.
   struct stat st;
-  if ( fd >= 0 && fstat( fd, &st ) == 0 ) {
-    if ( S_ISREG( st.st_mode ) )
-      return s.file_answer( fd, st, rel, max_output );
-    if ( S_ISDIR( st.st_mode ) ) {
-      close_fd( fd );
-      return s.directory_answer( rel, limit, max_output, is_error );
+  std::memset( &st, 0, sizeof st );
+  int error = stat_under( s.theRootFd, rel, &st );
+  if ( error == ENOENT && rel.find( "\\x" ) != std::string::npos ) {
+    // A name that is not UTF-8, as answers write it.
+    std::string const bytes( scan_path_from_text( rel ) );
+    if ( stat_under( s.theRootFd, bytes, &st ) == 0 ) {
+      rel = bytes;
+      error = 0;
     }
   }
-  if ( fd >= 0 )
-    close_fd( fd );
+  if ( error == 0 && S_ISREG( st.st_mode ) )
+    return s.file_answer( st, rel, max_output, wait );
+  if ( error == 0 && S_ISDIR( st.st_mode ) )
+    return s.directory_answer( rel, limit, max_output, wait, is_error );
+  if ( is_denied( error ) )
+    return fail( "permission-denied", "the path cannot be read" );
   {
     std::lock_guard<std::mutex> lock( s.theMutex );
     s.erase_tree( rel );

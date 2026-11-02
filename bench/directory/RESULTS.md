@@ -48,5 +48,8 @@ Growth is the medians of the table; the last column is rounded to 0.1 MiB.
   10,000 files the RSS growth at the limit would be about 48 MiB; that is
   extrapolated, not measured.
 
+These numbers predate the later change to bounded listing and SAX parsing of
+HTML, and were not measured again.
+
 Limits: one small-file tree shape on one runner; no cold cache, no slow file
 system, no files over the 1 MiB cap.

@@ -17,6 +17,7 @@
 #ifndef ZORBA_MCP_SCANNER_H
 #define ZORBA_MCP_SCANNER_H
 
+#include <chrono>
 #include <cstddef>
 #include <functional>
 #include <memory>
@@ -94,7 +95,9 @@ public:
   /**
    * Stops the threads. A thread that does not end soon, because the file
    * system does not return from a read, is left behind (detached): once it
-   * returns, it ends without using libxml2 or anything but its shared state.
+   * returns, it ends without using anything but its shared state. If a thread
+   * was left behind, do not call Zorba::shutdown(), which cleans up libxml2:
+   * the thread could be in it. End the process instead.
    *
    * @return whether both threads were joined.
    */
@@ -109,10 +112,14 @@ public:
    * @param args the arguments of the call.
    * @param max_output the maximum size of the answer, in bytes (the first
    * line can go over it, if smaller than that).
+   * @param wait how long to wait for the sampler to read a file asked for, and
+   * for a large directory to be listed; then the answer has what is known, and
+   * \\c "preview_state":"pending" if the preview is not there yet.
    * @param is_error set to whether the answer is an error.
    * @return the answer.
    */
-  std::string answer( Json const &args, std::size_t max_output, bool *is_error );
+  std::string answer( Json const &args, std::size_t max_output,
+                      std::chrono::milliseconds wait, bool *is_error );
 
   /** The bytes the cache accounts for (see ScanLimits::max_memory). */
   std::size_t cache_bytes() const;

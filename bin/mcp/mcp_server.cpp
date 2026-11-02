@@ -435,9 +435,10 @@ Json Server::tools() const {
       { "name", "list_documents" },
       { "title", "List documents" },
       { "description",
-        "Lists files with format, size and fields. The first line has the "
-        "scan state and totals; while running, files may be missing. A file "
-        "as path adds a preview: columns, keys or element paths, samples." },
+        "Lists files, recursive, sorted by path, with format, size, fields. "
+        "First line: scan state, totals, dirs (subdirectories, if cut or "
+        "scanning), incomplete (may miss files). memory_limit: scan stopped; "
+        "ask by path. A file as path adds a preview." },
       { "inputSchema", Json::object( {
           { "type", "object" },
           { "properties", Json::object( {
@@ -611,7 +612,13 @@ Json Server::call_tool( Json const &params, bool *protocol_error,
   std::string unexpected;
   if ( tool == "list_documents" && theScanner ) {
     bool is_error = false;
-    outcome.text = theScanner->answer( *args, theConfig.max_output, &is_error );
+    // A request does not wait past its time limit, nor long without one.
+    std::chrono::milliseconds const longest( std::chrono::seconds( 10 ) );
+    std::chrono::milliseconds const wait(
+      theConfig.timeout.count() > 0 ? std::min( theConfig.timeout, longest )
+                                    : longest );
+    outcome.text = theScanner->answer( *args, theConfig.max_output, wait,
+                                       &is_error );
     outcome.ok = !is_error;
   } else if ( tool == "list_documents" ) {
     unexpected = undeclared_arguments( *args, {} );

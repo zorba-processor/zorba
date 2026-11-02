@@ -3,7 +3,8 @@
 - `zorba-mcp` scans the directory in the background: `list_documents` answers
   at once with what is known and a status, takes `path`, `limit` and `refresh`,
   and gives a short preview of a file (CSV columns, JSON key paths, XML element
-  paths, HTML tables) with samples, read from at most 1 MiB of the file.
+  paths, HTML tables) with samples, read from at most 1 MiB of the file. A
+  request waits a bounded time for a preview and otherwise says it is pending.
 - Add the `--no-scan` option to `zorba-mcp` to keep the previous behavior, and
   `--scan-cache-mb` to limit the memory of the scan's file index and previews,
   with least-recently-used replacement of previews on request.

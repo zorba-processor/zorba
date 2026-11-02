@@ -156,6 +156,14 @@ int main( int argc, char const *argv[] ) {
         break;
       }
     }
+    // Zorba::shutdown() cleans up libxml2, which a thread left behind could be
+    // in, so in that case the process ends here.
+    if ( !server.stop_scan() ) {
+      std::cerr << "zorba-mcp: a scan thread did not stop in time" << std::endl;
+      if ( std::fclose( out ) == EOF && status == 0 )
+        status = 1;
+      std::_Exit( status );
+    }
   }
   if ( std::fclose( out ) == EOF && status == 0 ) {
     std::cerr << "zorba-mcp: cannot write to stdout" << std::endl;

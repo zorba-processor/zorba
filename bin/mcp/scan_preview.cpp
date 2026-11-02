@@ -21,6 +21,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <chrono>
 #include <cstring>
 #include <unordered_map>
 #include <unordered_set>
@@ -57,6 +58,12 @@ std::size_t const max_error_bytes = 160;
 std::size_t const max_depth = 64;         // JSON nesting
 std::size_t const max_xml_depth = 256;    // XML nesting
 std::size_t const max_html_depth = 200;   // HTML nesting
+std::size_t const max_preview_bytes = 8 * 1024;  // a preview, whole
+std::size_t const preview_budget = 6 * 1024;     // what the lists of one take
+std::size_t const max_field_bytes = 1024;        // the fields of a listing
+std::size_t const max_tag_bytes = 16 * 1024;     // a tag, without quoted values
+std::size_t const max_tag_attributes = 256;
+std::chrono::seconds const max_parse_time( 5 );
 
 char const ellipsis[] = "\xE2\x80\xA6";
 char const replacement[] = "\xEF\xBF\xBD";
@@ -158,13 +165,17 @@ std::string fields_members( std::vector<std::string> const &names, bool more ) {
   if ( names.empty() )
     return std::string();
   std::string out( "\"fields\":[" );
-  for ( std::size_t i = 0; i < names.size() && i < max_fields; ++i ) {
-    if ( i )
+  std::size_t shown = 0;
+  for ( ; shown < names.size() && shown < max_fields; ++shown ) {
+    std::string const name( quoted( names[ shown ] ) );
+    if ( out.size() + name.size() > max_field_bytes )
+      break;
+    if ( shown )
       out += ',';
-    append_json_string( out, names[i] );
+    out += name;
   }
   out += ']';
-  if ( more || names.size() > max_fields )
+  if ( more || names.size() > shown )
     out += ",\"fields_more\":true";
   return out;
 }
@@ -270,6 +281,7 @@ ScanPreview csv_preview( std::string const &data, bool truncated ) {
   std::size_t const cell_cap = 64;
   std::vector<std::string> columns;
   std::size_t column_count = 0;
+  std::size_t column_bytes = 0;
   bool have_header = false;
   std::vector<CsvColumn> kinds;
   std::vector<std::string> rows;
@@ -283,8 +295,13 @@ ScanPreview csv_preview( std::string const &data, bool truncated ) {
 
   auto end_cell = [&]() {
     if ( !have_header ) {
-      if ( columns.size() < max_columns )
-        columns.push_back( short_text( cell, max_name_bytes ) );
+      std::string const column( short_text( cell, max_name_bytes ) );
+      std::size_t const size = quoted( column ).size();
+      if ( columns.size() < max_columns &&
+           column_bytes + size <= preview_budget / 2 ) {
+        columns.push_back( column );
+        column_bytes += size;
+      }
     } else if ( fields < kinds.size() ) {
       kinds[ fields ].add( cell, cell_quoted, cell_cut );
       if ( records < max_rows )
@@ -530,16 +547,22 @@ private:
     } else {
       if ( theNotFirst > 0 )
         return;
-      if ( theKeys.size() >= max_paths || path.size() > max_name_bytes ) {
+      std::size_t const size = quoted( path ).size();
+      if ( theKeys.size() >= max_paths || path.size() > max_name_bytes ||
+           theBytes + size > preview_budget ) {
         theMoreKeys = true;
         return;
       }
+      theBytes += size;
       index = theKeys.size();
       theKeyIndex.emplace( path, index );
       theKeys.push_back( Key{ path, {} } );
     }
-    if ( sample && theKeys[ index ].samples.size() < max_samples )
+    if ( sample && theKeys[ index ].samples.size() < max_samples &&
+         theBytes + sample->size() <= preview_budget ) {
+      theBytes += sample->size();
       theKeys[ index ].samples.push_back( *sample );
+    }
   }
 
   bool value( std::string &path, std::size_t depth ) {
@@ -804,7 +827,12 @@ private:
     if ( depth == 0 ) {
       theTopLength = length;
     } else if ( theNotFirst == 0 && theArrays.size() < max_arrays &&
-                path.size() <= max_name_bytes ) {
+                path.size() <= max_name_bytes &&
+                std::none_of( theArrays.begin(), theArrays.end(),
+                  [&path]( std::pair<std::string,std::size_t> const &a ) {
+                    return a.first == path;
+                  } ) ) {
+      theBytes += quoted( path ).size();
       theArrays.emplace_back( path, length );
     }
     return true;
@@ -821,8 +849,203 @@ private:
   std::vector<Key> theKeys;
   std::unordered_map<std::string,std::size_t> theKeyIndex;
   bool theMoreKeys = false;
+  std::size_t theBytes = 0;
   std::vector<std::pair<std::string,std::size_t> > theArrays;
 };
+
+///////////////////////////////////////////////////////////////////////////////
+// Markup, before it is parsed
+
+char const* find_text( char const *p, char const *end, char const *text ) {
+  char const *const found = std::search( p, end, text, text + std::strlen( text ) );
+  return found == end ? end : found + std::strlen( text );
+}
+
+bool starts_with( char const *p, char const *end, char const *text ) {
+  std::size_t const n = std::strlen( text );
+  return static_cast<std::size_t>( end - p ) >= n && std::memcmp( p, text, n ) == 0;
+}
+
+bool is_markup_space( char c ) {
+  return c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\f';
+}
+
+// Past a DOCTYPE, whose internal subset can hold '>'.
+char const* past_doctype( char const *p, char const *end ) {
+  int depth = 0;
+  for ( ; p < end; ++p ) {
+    if ( *p == '[' )
+      ++depth;
+    else if ( *p == ']' )
+      --depth;
+    else if ( *p == '>' && depth <= 0 )
+      return p + 1;
+  }
+  return end;
+}
+
+// Why the parser should not get this markup, or the empty string. Time in
+// libxml2's start tag parsing grows with the square of the attributes of one
+// tag (libxml2 2.9.14: 167 s in HTML and 5 s in XML for 120000 attributes), and
+// neither parser can be interrupted inside a tag, so such a tag is refused here,
+// in a time linear in the bytes. Quoted values do not count: those parse in
+// linear time, and data URIs make them long.
+std::string markup_refusal( std::string const &data, bool html ) {
+  std::string stripped;
+  char const *p = data.data();
+  char const *end = p + data.size();
+  // UTF-16 and UTF-32: the ASCII of the markup without its NUL bytes.
+  if ( !html && has_nul( data ) ) {
+    stripped.reserve( data.size() );
+    for ( char const c : data )
+      if ( c != '\0' )
+        stripped += c;
+    p = stripped.data();
+    end = p + stripped.size();
+  }
+
+  while ( p < end ) {
+    p = std::find( p, end, '<' );
+    if ( p == end )
+      break;
+    ++p;
+    if ( p == end )
+      break;
+    if ( *p == '!' || *p == '?' ) {
+      if ( starts_with( p, end, "!--" ) )
+        p = find_text( p, end, "-->" );
+      else if ( html )
+        p = find_text( p, end, ">" );   // anything else ends at the first '>'
+      else if ( *p == '?' )
+        p = find_text( p, end, "?>" );
+      else if ( starts_with( p, end, "![CDATA[" ) )
+        p = find_text( p, end, "]]>" );
+      else
+        p = past_doctype( p, end );
+      continue;
+    }
+    if ( *p == '/' )
+      ++p;
+    if ( p == end )
+      break;
+    unsigned char const lead = static_cast<unsigned char>( *p );
+    if ( !std::isalpha( lead ) && lead != '_' && lead != ':' && lead < 0x80 )
+      continue;                         // not a tag, as in "a < b"
+
+    // The name.
+    char const *const name_start = p;
+    while ( p < end && !is_markup_space( *p ) && *p != '>' && *p != '/' )
+      ++p;
+    std::size_t bytes = static_cast<std::size_t>( p - name_start );
+    std::size_t attributes = 0;
+    std::string name;
+    if ( html && bytes <= 6 ) {
+      for ( char const *q = name_start; q < p; ++q )
+        name += static_cast<char>( std::tolower( static_cast<unsigned char>( *q ) ) );
+    }
+    bool const closing = name_start[-1] == '/';
+
+    // The attributes.
+    while ( p < end && *p != '>' ) {
+      if ( bytes > max_tag_bytes )
+        return "a tag longer than " + std::to_string( max_tag_bytes ) + " bytes";
+      if ( is_markup_space( *p ) || *p == '/' ) {
+        ++p;
+        ++bytes;
+        continue;
+      }
+      if ( ++attributes > max_tag_attributes )
+        return "a tag with more than " + std::to_string( max_tag_attributes ) +
+          " attributes";
+      char const *const attribute = p;
+      // A first '=' is part of the name, as in HTML.
+      ++p;
+      while ( p < end && !is_markup_space( *p ) && *p != '=' && *p != '>' &&
+              *p != '/' )
+        ++p;
+      bytes += static_cast<std::size_t>( p - attribute );
+      while ( p < end && is_markup_space( *p ) ) {
+        ++p;
+        ++bytes;
+      }
+      if ( p == end || *p != '=' )
+        continue;
+      ++p;
+      while ( p < end && is_markup_space( *p ) ) {
+        ++p;
+        ++bytes;
+      }
+      if ( p < end && ( *p == '"' || *p == '\'' ) ) {
+        char const *const quote_end = std::find( p + 1, end, *p );
+        p = quote_end == end ? end : quote_end + 1;
+      } else {
+        char const *const value = p;
+        while ( p < end && !is_markup_space( *p ) && *p != '>' )
+          ++p;
+        bytes += static_cast<std::size_t>( p - value );
+      }
+    }
+    if ( bytes > max_tag_bytes )
+      return "a tag longer than " + std::to_string( max_tag_bytes ) + " bytes";
+    if ( p < end )
+      ++p;                              // the '>'
+
+    // In HTML, what a script or a style holds is not markup.
+    if ( !closing && ( name == "script" || name == "style" ) ) {
+      std::string const close_tag( "</" + name );
+      while ( p < end ) {
+        p = std::find( p, end, '<' );
+        if ( static_cast<std::size_t>( end - p ) < close_tag.size() ) {
+          p = end;
+          break;
+        }
+        bool same = true;
+        for ( std::size_t i = 0; i < close_tag.size() && same; ++i )
+          same = std::tolower( static_cast<unsigned char>( p[i] ) ) ==
+            static_cast<unsigned char>( close_tag[i] );
+        if ( same )
+          break;
+        ++p;
+      }
+    }
+  }
+  return std::string();
+}
+
+// Declared encodings other than these are refused: with one like UTF-7 the
+// markup that the parser sees is not the markup that was checked.
+std::string encoding_refusal( std::string const &data ) {
+  if ( starts_with( data.data(), data.data() + data.size(), "\x4C\x6F\xA7\x94" ) )
+    return "an EBCDIC encoding";
+  std::string head;
+  for ( std::size_t i = 0; i < data.size() && head.size() < 256; ++i )
+    if ( data[i] != '\0' )
+      head += data[i];
+  std::size_t const declaration = head.find( "<?xml" );
+  if ( declaration == std::string::npos )
+    return std::string();
+  std::size_t const declaration_end = head.find( "?>", declaration );
+  std::size_t const at = head.find( "encoding", declaration );
+  if ( at == std::string::npos ||
+       ( declaration_end != std::string::npos && at > declaration_end ) )
+    return std::string();
+  std::size_t const quote_start = head.find_first_of( "\"'", at );
+  if ( quote_start == std::string::npos )
+    return std::string();
+  std::size_t const quote_end = head.find( head[ quote_start ], quote_start + 1 );
+  if ( quote_end == std::string::npos )
+    return std::string();
+  std::string name( head, quote_start + 1, quote_end - quote_start - 1 );
+  for ( char &c : name )
+    c = static_cast<char>( std::tolower( static_cast<unsigned char>( c ) ) );
+  for ( char const *const known :
+        { "utf-8", "utf8", "us-ascii", "ascii", "iso-8859-", "iso8859-", "latin",
+          "windows-125", "cp125", "utf-16", "ucs-2", "ucs2", "shift_jis",
+          "euc-", "gb", "big5" } )
+    if ( name.compare( 0, std::strlen( known ), known ) == 0 )
+      return std::string();
+  return "the encoding " + name;
+}
 
 ///////////////////////////////////////////////////////////////////////////////
 // XML
@@ -849,10 +1072,18 @@ bool only_space( char const *s ) {
 }
 
 ScanPreview xml_preview( std::string const &data, bool truncated,
-                         std::atomic<bool> const *stop ) {
+                         std::atomic<bool> const *stop,
+                         std::chrono::steady_clock::time_point deadline ) {
   ScanPreview result;
   if ( data.empty() ) {
     result.json = error_preview( "an empty file" );
+    return result;
+  }
+  std::string refusal( encoding_refusal( data ) );
+  if ( refusal.empty() )
+    refusal = markup_refusal( data, false );
+  if ( !refusal.empty() ) {
+    result.json = error_preview( "not parsed: " + refusal );
     return result;
   }
   xmlTextReaderPtr const reader =
@@ -872,15 +1103,21 @@ ScanPreview xml_preview( std::string const &data, bool truncated,
   std::string sample_path, sample_value;
   std::size_t records = 0;
   bool too_deep = false;
+  bool too_slow = false;
+  std::size_t list_bytes = 0;
+  unsigned long nodes = 0;
   int ret;
 
   auto add_path = [&]( std::string const &path ) {
     if ( seen.count( path ) )
       return;
-    if ( paths.size() >= max_paths || path.size() > max_name_bytes ) {
+    std::size_t const size = quoted( path ).size();
+    if ( paths.size() >= max_paths || path.size() > max_name_bytes ||
+         list_bytes + size > preview_budget ) {
       more_paths = true;
       return;
     }
+    list_bytes += size;
     seen.insert( path );
     paths.push_back( path );
   };
@@ -888,6 +1125,10 @@ ScanPreview xml_preview( std::string const &data, bool truncated,
   while ( ( ret = xmlTextReaderRead( reader ) ) == 1 ) {
     if ( stop && stop->load( std::memory_order_relaxed ) )
       break;
+    if ( ++nodes % 256 == 0 && std::chrono::steady_clock::now() > deadline ) {
+      too_slow = true;
+      break;
+    }
     int const type = xmlTextReaderNodeType( reader );
     if ( type == XML_READER_TYPE_ELEMENT ) {
       int const d = xmlTextReaderDepth( reader );
@@ -912,12 +1153,25 @@ ScanPreview xml_preview( std::string const &data, bool truncated,
         while ( xmlTextReaderMoveToNextAttribute( reader ) == 1 ) {
           char const *const value = xml_text( xmlTextReaderConstValue( reader ) );
           if ( xmlTextReaderIsNamespaceDecl( reader ) == 1 ) {
-            if ( namespaces.size() < max_namespaces ) {
-              char const *const prefix =
-                xml_text( xmlTextReaderConstPrefix( reader ) );
-              namespaces.emplace_back(
-                *prefix ? xml_text( xmlTextReaderConstLocalName( reader ) ) : "",
-                short_text( value, std::strlen( value ), max_name_bytes ) );
+            char const *const prefix =
+              xml_text( xmlTextReaderConstPrefix( reader ) );
+            char const *const local =
+              xml_text( xmlTextReaderConstLocalName( reader ) );
+            std::string const declared(
+              *prefix ? short_text( local, std::strlen( local ), max_name_bytes )
+                      : std::string() );
+            std::string const uri(
+              short_text( value, std::strlen( value ), max_name_bytes ) );
+            std::size_t const size = quoted( declared ).size() + quoted( uri ).size();
+            // Only the first declaration of each prefix: JSON has no repeats.
+            if ( namespaces.size() < max_namespaces &&
+                 list_bytes + size <= preview_budget &&
+                 std::none_of( namespaces.begin(), namespaces.end(),
+                   [&declared]( std::pair<std::string,std::string> const &n ) {
+                     return n.first == declared;
+                   } ) ) {
+              list_bytes += size;
+              namespaces.emplace_back( declared, uri );
             }
           } else {
             char const *const attr = xml_text( xmlTextReaderConstName( reader ) );
@@ -943,6 +1197,9 @@ ScanPreview xml_preview( std::string const &data, bool truncated,
   std::string error;
   if ( too_deep ) {
     error = "nesting deeper than " + std::to_string( max_xml_depth );
+  } else if ( too_slow ) {
+    error = "parsing stopped after " +
+      std::to_string( max_parse_time.count() ) + " s";
   } else if ( ret < 0 ) {
     // A file cut by the cap ends in the middle of something: only an error
     // before the end of what was read says the file is malformed.
@@ -992,27 +1249,99 @@ ScanPreview xml_preview( std::string const &data, bool truncated,
 ///////////////////////////////////////////////////////////////////////////////
 // HTML
 
-#ifdef LIBXML_HTML_ENABLED
+#if defined( LIBXML_HTML_ENABLED ) && defined( LIBXML_PUSH_ENABLED )
 
-bool is_element( xmlNode const *node, char const *name ) {
-  return node->type == XML_ELEMENT_NODE &&
-    xmlStrcasecmp( node->name, reinterpret_cast<xmlChar const*>( name ) ) == 0;
+// What the SAX callbacks collect. No tree is built: memory does not grow with
+// the markup, and nesting takes no stack here.
+struct HtmlCollector {
+  xmlParserCtxtPtr ctxt = nullptr;
+  std::string title;
+  bool have_title = false;
+  bool in_title = false;
+  bool in_header = false;
+  std::size_t tables = 0;
+  std::vector<std::vector<std::string> > headers;
+  std::vector<std::size_t> open_tables;  // index into headers + 1; 0: not kept
+  std::size_t depth = 0;
+  bool too_deep = false;
+};
+
+bool html_name_is( xmlChar const *name, char const *what ) {
+  return xmlStrcasecmp( name, reinterpret_cast<xmlChar const*>( what ) ) == 0;
 }
 
-std::string node_text( xmlNode const *node ) {
-  xmlChar *const text = xmlNodeGetContent( node );
-  std::string out( xml_text( text ) );
-  if ( text )
-    xmlFree( text );
-  std::size_t const first = out.find_first_not_of( " \t\r\n" );
+void html_start( void *user, xmlChar const *name, xmlChar const** ) {
+  HtmlCollector &c = *static_cast<HtmlCollector*>( user );
+  if ( c.too_deep )
+    return;
+  if ( ++c.depth > max_html_depth ) {
+    c.too_deep = true;
+    xmlStopParser( c.ctxt );
+    return;
+  }
+  if ( html_name_is( name, "title" ) ) {
+    if ( !c.have_title ) {
+      c.have_title = true;
+      c.in_title = true;
+    }
+  } else if ( html_name_is( name, "table" ) ) {
+    ++c.tables;
+    if ( c.headers.size() < max_tables ) {
+      c.headers.emplace_back();
+      c.open_tables.push_back( c.headers.size() );
+    } else {
+      c.open_tables.push_back( 0 );
+    }
+  } else if ( html_name_is( name, "th" ) && !c.open_tables.empty() &&
+              c.open_tables.back() != 0 ) {
+    std::vector<std::string> &cells = c.headers[ c.open_tables.back() - 1 ];
+    if ( cells.size() < max_header_cells ) {
+      cells.emplace_back();
+      c.in_header = true;
+    }
+  }
+}
+
+void html_end( void *user, xmlChar const *name ) {
+  HtmlCollector &c = *static_cast<HtmlCollector*>( user );
+  if ( c.depth > 0 )
+    --c.depth;
+  if ( html_name_is( name, "title" ) ) {
+    c.in_title = false;
+  } else if ( html_name_is( name, "th" ) ) {
+    c.in_header = false;
+  } else if ( html_name_is( name, "table" ) && !c.open_tables.empty() ) {
+    c.open_tables.pop_back();
+    c.in_header = false;
+  }
+}
+
+void html_characters( void *user, xmlChar const *text, int length ) {
+  HtmlCollector &c = *static_cast<HtmlCollector*>( user );
+  std::size_t const keep = 4 * max_value_bytes;
+  std::string *target = nullptr;
+  if ( c.in_title )
+    target = &c.title;
+  else if ( c.in_header && !c.open_tables.empty() && c.open_tables.back() != 0 )
+    target = &c.headers[ c.open_tables.back() - 1 ].back();
+  if ( !target || target->size() >= keep || length <= 0 )
+    return;
+  target->append( reinterpret_cast<char const*>( text ),
+                  std::min( static_cast<std::size_t>( length ),
+                            keep - target->size() ) );
+}
+
+std::string trimmed_short( std::string const &text ) {
+  std::size_t const first = text.find_first_not_of( " \t\r\n" );
   if ( first == std::string::npos )
     return std::string();
-  std::size_t const last = out.find_last_not_of( " \t\r\n" );
-  return short_text( out.data() + first, last - first + 1, max_value_bytes );
+  std::size_t const last = text.find_last_not_of( " \t\r\n" );
+  return short_text( text.data() + first, last - first + 1, max_value_bytes );
 }
 
 ScanPreview html_preview( std::string const &data, bool truncated,
-                          std::atomic<bool> const *stop ) {
+                          std::atomic<bool> const *stop,
+                          std::chrono::steady_clock::time_point deadline ) {
   ScanPreview result;
   if ( data.empty() ) {
     result.json = error_preview( "an empty file" );
@@ -1022,96 +1351,84 @@ ScanPreview html_preview( std::string const &data, bool truncated,
     result.json = error_preview( "binary data: a NUL byte" );
     return result;
   }
-  htmlParserCtxtPtr const ctxt = htmlNewParserCtxt();
+  std::string const refusal( markup_refusal( data, true ) );
+  if ( !refusal.empty() ) {
+    result.json = error_preview( "not parsed: " + refusal );
+    return result;
+  }
+
+  HtmlCollector collected;
+  htmlSAXHandler sax;
+  std::memset( &sax, 0, sizeof sax );
+  sax.startElement = html_start;
+  sax.endElement = html_end;
+  sax.characters = html_characters;
+  htmlParserCtxtPtr const ctxt = htmlCreatePushParserCtxt(
+    &sax, &collected, nullptr, 0, nullptr, XML_CHAR_ENCODING_NONE );
   if ( !ctxt ) {
     result.json = error_preview( "the parser cannot start" );
     return result;
   }
-  htmlDocPtr const doc = htmlCtxtReadMemory(
-    ctxt, data.data(), static_cast<int>( data.size() ), nullptr, nullptr,
-    HTML_PARSE_NONET | HTML_PARSE_NOERROR | HTML_PARSE_NOWARNING |
-    HTML_PARSE_RECOVER );
-  if ( !doc ) {
+  collected.ctxt = ctxt;
+  // IGNORE_ENC: a declared encoding could make the parser see other markup than
+  // was checked above.
+  if ( htmlCtxtUseOptions( ctxt, HTML_PARSE_NONET | HTML_PARSE_NOERROR |
+                                 HTML_PARSE_NOWARNING | HTML_PARSE_RECOVER |
+                                 HTML_PARSE_IGNORE_ENC ) < 0 ) {
     htmlFreeParserCtxt( ctxt );
-    result.json = error_preview( "not parsable as HTML" );
+    result.json = error_preview( "the parser cannot start" );
     return result;
   }
 
-  std::string title;
-  bool have_title = false;
-  std::size_t tables = 0;
-  std::vector<std::vector<std::string> > headers;
-  std::vector<std::size_t> open_tables;  // 0: over max_tables
-  std::size_t depth = 0;
-  bool too_deep = false;
-
-  // No recursion: a tree of any depth takes no stack.
-  xmlNode const *node = xmlDocGetRootElement( doc );
-  xmlNode const *const top = node;
-  while ( node ) {
-    if ( stop && stop->load( std::memory_order_relaxed ) )
+  std::size_t const chunk = 64 * 1024;
+  bool too_slow = false;
+  bool stopped = false;
+  for ( std::size_t at = 0; at < data.size() && !collected.too_deep; at += chunk ) {
+    if ( stop && stop->load( std::memory_order_relaxed ) ) {
+      stopped = true;
       break;
-    if ( is_element( node, "title" ) && !have_title ) {
-      title = node_text( node );
-      have_title = true;
-    } else if ( is_element( node, "table" ) ) {
-      ++tables;
-      if ( headers.size() < max_tables ) {
-        headers.emplace_back();
-        open_tables.push_back( headers.size() );
-      } else {
-        open_tables.push_back( 0 );
-      }
-    } else if ( is_element( node, "th" ) && !open_tables.empty() &&
-                open_tables.back() != 0 ) {
-      std::vector<std::string> &cells = headers[ open_tables.back() - 1 ];
-      if ( cells.size() < max_header_cells )
-        cells.push_back( node_text( node ) );
     }
-    if ( node->children && node->type == XML_ELEMENT_NODE &&
-         !is_element( node, "th" ) && !is_element( node, "title" ) ) {
-      if ( depth < max_html_depth ) {
-        ++depth;
-        node = node->children;
-        continue;
-      }
-      too_deep = true;
+    if ( std::chrono::steady_clock::now() > deadline ) {
+      too_slow = true;
+      break;
     }
-    // Leave the node, and the ancestors it was the last child of.
-    for ( ;; ) {
-      if ( is_element( node, "table" ) )
-        open_tables.pop_back();
-      if ( node == top ) {
-        node = nullptr;
-        break;
-      }
-      if ( node->next ) {
-        node = node->next;
-        break;
-      }
-      node = node->parent;
-      --depth;
-    }
+    // What the parser reports is not an error here: it recovers.
+    int const parsed = htmlParseChunk(
+      ctxt, data.data() + at,
+      static_cast<int>( std::min( chunk, data.size() - at ) ), 0 );
+    ( void )parsed;
   }
-  xmlFreeDoc( doc );
+  if ( !stopped && !too_slow && !collected.too_deep ) {
+    int const parsed = htmlParseChunk( ctxt, nullptr, 0, 1 );
+    ( void )parsed;
+  }
   htmlFreeParserCtxt( ctxt );
 
   std::string out( "{" );
-  if ( have_title )
-    member( out, "title", quoted( title ) );
-  member( out, "tables", truncated ? "null" : std::to_string( tables ) );
+  if ( collected.have_title )
+    member( out, "title", quoted( trimmed_short( collected.title ) ) );
+  member( out, "tables", truncated ? "null" : std::to_string( collected.tables ) );
   std::string h( "[" );
-  for ( std::size_t i = 0; i < headers.size(); ++i ) {
+  for ( std::size_t i = 0; i < collected.headers.size(); ++i ) {
+    std::vector<std::string> cells;
+    for ( std::string const &cell : collected.headers[i] )
+      cells.push_back( trimmed_short( cell ) );
+    std::string const table( string_array( cells ) );
+    if ( h.size() + table.size() > preview_budget )
+      break;
     if ( i )
       h += ',';
-    h += string_array( headers[i] );
+    h += table;
   }
   member( out, "headers", h + "]" );
   if ( truncated )
     member( out, "truncated", "true" );
-  if ( too_deep )
+  if ( collected.too_deep )
     member( out, "error", quoted( "nesting deeper than " +
                                   std::to_string( max_html_depth ) ) );
+  else if ( too_slow )
+    member( out, "error", quoted( "parsing stopped after " +
+                                  std::to_string( max_parse_time.count() ) + " s" ) );
   out += '}';
   result.json = std::move( out );
   return result;
@@ -1119,8 +1436,8 @@ ScanPreview html_preview( std::string const &data, bool truncated,
 
 #else
 
-ScanPreview html_preview( std::string const&, bool,
-                          std::atomic<bool> const* ) {
+ScanPreview html_preview( std::string const&, bool, std::atomic<bool> const*,
+                          std::chrono::steady_clock::time_point ) {
   ScanPreview result;
   result.json = error_preview( "libxml2 was built without HTML support" );
   return result;
@@ -1166,21 +1483,75 @@ char const* scan_format_name( ScanFormat format ) {
 
 ScanPreview make_scan_preview( ScanFormat format, std::string const &data,
                                bool truncated, std::atomic<bool> const *stop ) {
+  auto const deadline = std::chrono::steady_clock::now() + max_parse_time;
+  ScanPreview result;
   switch ( format ) {
-    case ScanFormat::xml:  return xml_preview( data, truncated, stop );
-    case ScanFormat::html: return html_preview( data, truncated, stop );
-    case ScanFormat::csv:  return csv_preview( data, truncated );
-    case ScanFormat::json: {
-      if ( has_nul( data ) ) {
-        ScanPreview result;
+    case ScanFormat::xml:
+      result = xml_preview( data, truncated, stop, deadline );
+      break;
+    case ScanFormat::html:
+      result = html_preview( data, truncated, stop, deadline );
+      break;
+    case ScanFormat::csv:
+      result = csv_preview( data, truncated );
+      break;
+    case ScanFormat::json:
+      if ( has_nul( data ) )
         result.json = error_preview( "binary data: a NUL byte" );
-        return result;
-      }
-      return JsonReader( data, truncated ).run();
-    }
-    case ScanFormat::none: break;
+      else
+        result = JsonReader( data, truncated ).run();
+      break;
+    case ScanFormat::none:
+      return result;
   }
-  return ScanPreview();
+  // The lists have budgets; this is for the members that do not.
+  if ( result.json.size() >= max_preview_bytes ) {
+    result.json = error_preview( "the preview is over " +
+      std::to_string( max_preview_bytes ) + " bytes" );
+    result.fields.clear();
+  }
+  return result;
+}
+
+std::string scan_path_text( std::string const &path ) {
+  static char const hex[] = "0123456789ABCDEF";
+  std::string out;
+  char const *p = path.data();
+  char const *const end = p + path.size();
+  while ( p < end ) {
+    std::size_t const len = utf8_length( p, end );
+    if ( len ) {
+      out.append( p, len );
+      p += len;
+    } else {
+      unsigned char const b = static_cast<unsigned char>( *p++ );
+      out += "\\x";
+      out += hex[ b >> 4 ];
+      out += hex[ b & 0x0F ];
+    }
+  }
+  return out;
+}
+
+std::string scan_path_from_text( std::string const &text ) {
+  auto digit = []( char c ) {
+    if ( c >= '0' && c <= '9' )
+      return c - '0';
+    if ( c >= 'A' && c <= 'F' )
+      return c - 'A' + 10;
+    return -1;
+  };
+  std::string out;
+  for ( std::size_t i = 0; i < text.size(); ++i ) {
+    if ( text[i] == '\\' && i + 3 < text.size() && text[ i + 1 ] == 'x' &&
+         digit( text[ i + 2 ] ) >= 0 && digit( text[ i + 3 ] ) >= 0 ) {
+      out += static_cast<char>( digit( text[ i + 2 ] ) * 16 + digit( text[ i + 3 ] ) );
+      i += 3;
+    } else {
+      out += text[i];
+    }
+  }
+  return out;
 }
 
 std::string scan_valid_utf8( std::string const &s ) {
