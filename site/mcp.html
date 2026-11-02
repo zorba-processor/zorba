@@ -60,7 +60,8 @@ cmake --install build/full-release
   <thead><tr><th>Option</th><th>Effect</th></tr></thead>
   <tbody>
     <tr><td><code>--root &lt;dir&gt;</code></td><td>The folder to query. Required.</td></tr>
-    <tr><td><code>--queries &lt;dir&gt;</code></td><td>Each <code>&lt;name&gt;.jq</code> file in this folder becomes a tool, see <a href="#tools">the tools</a>.</td></tr>
+    <tr><td><code>--queries &lt;dir&gt;</code></td><td>Each <code>&lt;name&gt;.jq</code> file in this folder becomes a tool, see <a href="#tools">the tools</a>. Only <code>.jq</code> files are loaded.</td></tr>
+    <tr><td><code>--language xquery|jsoniq</code></td><td>The language of a <code>run_query</code> query that has no <code>jsoniq version</code> or <code>xquery version</code> declaration. Default <code>xquery</code>. A predefined <code>.jq</code> file is JSONiq unless it starts with an <code>xquery version</code> declaration.</td></tr>
     <tr><td><code>--timeout &lt;seconds&gt;</code></td><td>Time limit of one tool call. Default 30; 0 means no limit.</td></tr>
     <tr><td><code>--max-output &lt;bytes&gt;</code></td><td>Output size limit of one tool call. Default 131072.</td></tr>
   </tbody>

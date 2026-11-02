@@ -100,6 +100,8 @@ private:
     std::string text;
   };
 
+  StaticContext_t new_static_context( std::string const &file_name ) const;
+
   void load_predefined();
   bool load_predefined( std::string const &path, std::string const &name );
 

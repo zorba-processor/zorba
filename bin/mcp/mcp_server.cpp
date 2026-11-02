@@ -320,6 +320,19 @@ Server::Server( Zorba *zorba, ServerConfig config, std::ostream &log ) :
   load_predefined();
 }
 
+// The static context a query is compiled in. The language of a query without
+// a version declaration is JSONiq for a .jq file, else the configured default;
+// a declaration in the query wins.
+StaticContext_t Server::new_static_context( std::string const &file_name )
+    const {
+  StaticContext_t sctx = theZorba->createStaticContext();
+  sctx->setSecurityPolicy( thePolicy );
+  std::string const ext( std::filesystem::path( file_name ).extension() );
+  if ( ext == ".jq" || ( ext != ".xq" && theConfig.jsoniq_default ) )
+    sctx->setJSONiqVersion( jsoniq_version_1_0 );
+  return sctx;
+}
+
 void Server::load_predefined() {
   if ( theConfig.queries_dir.empty() )
     return;
@@ -368,8 +381,7 @@ bool Server::load_predefined( std::string const &path,
   // Compile once to find the external variables (in no namespace) that
   // become the tool's parameters.
   try {
-    StaticContext_t sctx = theZorba->createStaticContext();
-    sctx->setSecurityPolicy( thePolicy );
+    StaticContext_t sctx = new_static_context( path );
     XQuery_t query = theZorba->createQuery();
     query->setFileName( path );
     std::istringstream qs( p.source );
@@ -436,7 +448,13 @@ Json Server::tools() const {
     { "title", "Run a JSONiq/XQuery query" },
     { "description",
       "Runs a JSONiq/XQuery query over the directory and returns its result "
-      "as JSON, one item per line. Example: import module namespace dir = "
+      "as JSON, one item per line. " + std::string(
+        theConfig.jsoniq_default
+          ? "Queries are JSONiq by default; start with `xquery version "
+            "\"3.0\";` for XQuery."
+          : "Queries are XQuery by default; start with `jsoniq version "
+            "\"1.0\";` for JSONiq." ) +
+      " Example: import module namespace dir = "
       "\"http://zorba.io/modules/directory\"; for $d in "
       "dir:documents($dir:root, \"json\") return $d(\"path\"). On failure "
       "the result is an error object with the Zorba error code, message "
@@ -482,8 +500,7 @@ Server::run( std::string const &source, std::string const &file_name,
              std::vector<std::pair<std::string,std::string> > const &vars ) {
   QueryOutcome outcome;
   try {
-    StaticContext_t sctx = theZorba->createStaticContext();
-    sctx->setSecurityPolicy( thePolicy );
+    StaticContext_t sctx = new_static_context( file_name );
     // Relative URIs, e.g. doc("orders/q1.xml"), resolve against the root.
     sctx->setBaseURI( "file://" + percent_encode_path( theConfig.root ) + "/" );
     // An implementation may add predeclared namespace prefixes (XQuery 3.0,
