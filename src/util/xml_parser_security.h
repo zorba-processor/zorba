@@ -91,6 +91,17 @@ public:
   const std::string& deniedURI() const { return theDeniedURI; }
 
   /**
+   * True if an external general entity that the policy allowed could not be
+   * loaded (e.g. its file does not exist) during a parse. libxml2 reports
+   * that as a warning when it does not validate and leaves the entity out;
+   * the loaders report it as an error instead (see XmlLoader::error()).
+   */
+  bool unreadableEntity() const { return theUnreadableEntity; }
+
+  /** The first such entity, if unreadableEntity(). */
+  const std::string& unreadableEntityURI() const { return theUnreadableURI; }
+
+  /**
    * Makes a ParserSecurity the one the entity loader consults on the current
    * thread for as long as the Scope lives. Scopes nest.
    */
@@ -112,10 +123,15 @@ public:
    */
   bool allowResource(const char* aURI);
 
+  /** Called by the entity loader when an allowed general entity failed. */
+  void entityUnreadable(const char* aURI);
+
 private:
   SecurityPolicy thePolicy;
   bool           theDenied;
   std::string    theDeniedURI;
+  bool           theUnreadableEntity;
+  std::string    theUnreadableURI;
 };
 
 /**

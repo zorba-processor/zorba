@@ -1,0 +1,2 @@
+<!DOCTYPE a [<!ENTITY foo SYSTEM "missing.entity">]>
+<a>&foo;</a>
