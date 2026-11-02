@@ -475,7 +475,7 @@
        It is a static error to import two schema components that both define the
        same name in the same symbol space and in the same scope.
       </comment>
-      <value>"$1": name previosly imported</value>
+      <value>"$1": name already imported</value>
     </diagnostic>
 
     <diagnostic code="XQST0036">
@@ -680,7 +680,7 @@
       </entry>
 
       <entry key="XercesMessage">
-        <value>$2,$3: error in schema${ with System ID "4"}${ with Public ID "5"}${: 6}</value>
+        <value>error in schema at line $2, column $3${ of "4"}${ (public ID "5")}${: 6}</value>
       </entry>
     </diagnostic>
 
@@ -1105,7 +1105,7 @@
        expected validity property: \c valid if validation mode is \c strict, or
        either \c valid or \c notKnown if validation mode is \c lax.
       </comment>
-      <value>"$1": unexpected validity property${: 2}</value>
+      <value>$1${: 2}</value>
 
       <entry key="SerializationElementName_2">
         <value>"$2": invalid serialization parameters; element name must be "serialization-parameters"</value>
@@ -1124,7 +1124,7 @@
       </entry>
 
       <entry key="NoTypeInCtx_2">
-        <value>"$2": type no defined in current context</value>
+        <value>"$2": type not defined in the current context</value>
       </entry>
     </diagnostic>
 
@@ -1216,7 +1216,7 @@
        does not have a top-level element declaration in the in-scope element
        declarations, if validation mode is \c strict.
       </comment>
-      <value>validated element does not have a top-level element declaration in the in-scope element declarations${: 1}</value>
+      <value>no top-level element declaration in scope for validated element${: 1}</value>
     </diagnostic>
 
     <diagnostic code="XQDY0091">
