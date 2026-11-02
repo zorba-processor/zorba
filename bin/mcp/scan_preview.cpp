@@ -126,7 +126,7 @@ std::string short_text( std::string const &s, std::size_t max ) {
   return short_text( s.data(), s.size(), max );
 }
 
-std::string quoted( std::string const &s ) {
+std::string json_quoted( std::string const &s ) {
   std::string out;
   append_json_string( out, s );
   return out;
@@ -150,13 +150,13 @@ void finish( std::string &out, bool truncated, bool failed,
     member( out, "records", failed ? "null" : std::to_string( records ) );
   }
   if ( failed )
-    member( out, "error", quoted( short_text( error, max_error_bytes ) ) );
+    member( out, "error", json_quoted( short_text( error, max_error_bytes ) ) );
   out += '}';
 }
 
 std::string error_preview( std::string const &error ) {
   std::string out( "{" );
-  member( out, "error", quoted( short_text( error, max_error_bytes ) ) );
+  member( out, "error", json_quoted( short_text( error, max_error_bytes ) ) );
   out += '}';
   return out;
 }
@@ -167,7 +167,7 @@ std::string fields_members( std::vector<std::string> const &names, bool more ) {
   std::string out( "\"fields\":[" );
   std::size_t shown = 0;
   for ( ; shown < names.size() && shown < max_fields; ++shown ) {
-    std::string const name( quoted( names[ shown ] ) );
+    std::string const name( json_quoted( names[ shown ] ) );
     if ( out.size() + name.size() > max_field_bytes )
       break;
     if ( shown )
@@ -296,7 +296,7 @@ ScanPreview csv_preview( std::string const &data, bool truncated ) {
   auto end_cell = [&]() {
     if ( !have_header ) {
       std::string const column( short_text( cell, max_name_bytes ) );
-      std::size_t const size = quoted( column ).size();
+      std::size_t const size = json_quoted( column ).size();
       if ( columns.size() < max_columns &&
            column_bytes + size <= preview_budget / 2 ) {
         columns.push_back( column );
@@ -472,7 +472,7 @@ public:
       shape = "object";
     else
       shape = first ? "scalar" : "empty";
-    member( out, "shape", quoted( shape ) );
+    member( out, "shape", json_quoted( shape ) );
 
     std::string keys( "{" );
     std::vector<std::string> names;
@@ -547,7 +547,7 @@ private:
     } else {
       if ( theNotFirst > 0 )
         return;
-      std::size_t const size = quoted( path ).size();
+      std::size_t const size = json_quoted( path ).size();
       if ( theKeys.size() >= max_paths || path.size() > max_name_bytes ||
            theBytes + size > preview_budget ) {
         theMoreKeys = true;
@@ -578,7 +578,7 @@ private:
         std::string text;
         if ( !string( &text ) )
           return false;
-        std::string const sample( quoted( short_text( text, max_value_bytes ) ) );
+        std::string const sample( json_quoted( short_text( text, max_value_bytes ) ) );
         add_key( path, &sample );
         return true;
       }
@@ -640,7 +640,7 @@ private:
     std::size_t const len = static_cast<std::size_t>( theP - start );
     std::string const sample( len <= max_value_bytes
       ? std::string( start, len )
-      : quoted( short_text( start, len, max_value_bytes ) ) );
+      : json_quoted( short_text( start, len, max_value_bytes ) ) );
     add_key( path, &sample );
     return true;
   }
@@ -832,7 +832,7 @@ private:
                   [&path]( std::pair<std::string,std::size_t> const &a ) {
                     return a.first == path;
                   } ) ) {
-      theBytes += quoted( path ).size();
+      theBytes += json_quoted( path ).size();
       theArrays.emplace_back( path, length );
     }
     return true;
@@ -1111,7 +1111,7 @@ ScanPreview xml_preview( std::string const &data, bool truncated,
   auto add_path = [&]( std::string const &path ) {
     if ( seen.count( path ) )
       return;
-    std::size_t const size = quoted( path ).size();
+    std::size_t const size = json_quoted( path ).size();
     if ( paths.size() >= max_paths || path.size() > max_name_bytes ||
          list_bytes + size > preview_budget ) {
       more_paths = true;
@@ -1162,7 +1162,7 @@ ScanPreview xml_preview( std::string const &data, bool truncated,
                       : std::string() );
             std::string const uri(
               short_text( value, std::strlen( value ), max_name_bytes ) );
-            std::size_t const size = quoted( declared ).size() + quoted( uri ).size();
+            std::size_t const size = json_quoted( declared ).size() + json_quoted( uri ).size();
             // Only the first declaration of each prefix: JSON has no repeats.
             if ( namespaces.size() < max_namespaces &&
                  list_bytes + size <= preview_budget &&
@@ -1221,7 +1221,7 @@ ScanPreview xml_preview( std::string const &data, bool truncated,
   xmlFreeTextReader( reader );
 
   std::string out( "{" );
-  member( out, "root", root.empty() ? "null" : quoted( root ) );
+  member( out, "root", root.empty() ? "null" : json_quoted( root ) );
   std::string ns( "{" );
   for ( auto const &n : namespaces ) {
     if ( ns.size() > 1 )
@@ -1236,8 +1236,8 @@ ScanPreview xml_preview( std::string const &data, bool truncated,
     member( out, "paths_more", "true" );
   if ( !sample_path.empty() ) {
     std::string s( "{" );
-    member( s, "path", quoted( sample_path ) );
-    member( s, "value", quoted( sample_value ) );
+    member( s, "path", json_quoted( sample_path ) );
+    member( s, "value", json_quoted( sample_value ) );
     member( out, "sample", s + "}" );
   }
   finish( out, truncated, !error.empty(), records, error );
@@ -1406,7 +1406,7 @@ ScanPreview html_preview( std::string const &data, bool truncated,
 
   std::string out( "{" );
   if ( collected.have_title )
-    member( out, "title", quoted( trimmed_short( collected.title ) ) );
+    member( out, "title", json_quoted( trimmed_short( collected.title ) ) );
   member( out, "tables", truncated ? "null" : std::to_string( collected.tables ) );
   std::string h( "[" );
   for ( std::size_t i = 0; i < collected.headers.size(); ++i ) {
@@ -1424,10 +1424,10 @@ ScanPreview html_preview( std::string const &data, bool truncated,
   if ( truncated )
     member( out, "truncated", "true" );
   if ( collected.too_deep )
-    member( out, "error", quoted( "nesting deeper than " +
+    member( out, "error", json_quoted( "nesting deeper than " +
                                   std::to_string( max_html_depth ) ) );
   else if ( too_slow )
-    member( out, "error", quoted( "parsing stopped after " +
+    member( out, "error", json_quoted( "parsing stopped after " +
                                   std::to_string( max_parse_time.count() ) + " s" ) );
   out += '}';
   result.json = std::move( out );
