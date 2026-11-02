@@ -60,6 +60,7 @@ supported.
 Debian / Ubuntu:
 
 ```bash
+sudo apt-get update
 sudo apt-get install build-essential cmake ninja-build pkg-config \
   libicu-dev libxml2-dev libxslt1-dev libcurl4-openssl-dev zlib1g-dev \
   libxerces-c-dev uuid-dev
@@ -105,6 +106,13 @@ latest toolchain and libraries) provide ready-made build environments.
 ```bash
 ctest --preset full-release-offline -j8   # everything except network tests
 ```
+
+Against the distribution's stock Xerces-C, the tests
+`zorba/schemas/choice-empty-sequence` and `zorba/schemas/union-whitespace`
+fail (see `doc/KNOWN_ISSUES.txt`). Six datetime and `format-date` tests need
+the `de_DE.UTF-8` and `fr_FR.UTF-8` locales; on Debian / Ubuntu, install the
+`locales` package and run `sudo localedef -i de_DE -f UTF-8 de_DE.UTF-8` and
+`sudo localedef -i fr_FR -f UTF-8 fr_FR.UTF-8`.
 
 The http-client tests need the HTTP test server in `test/http-test-data`
 (see its README). With Docker:
