@@ -1,5 +1,6 @@
 #!/bin/sh
-# Store memory benchmark (see .github/workflows/store-memory.yml).
+# Store memory benchmark (job "store" of
+# .github/workflows/directory-scaling.yml, input suite=store).
 # Usage: run.sh ZORBA STOREBENCH SIZES WORKDIR OUTDIR "MB MB ..."
 #
 # For XML, JSON and CSV and each size in MiB, generates one file (gen.xq)

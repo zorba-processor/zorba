@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 
-// Store memory benchmark (bench/store/, .github/workflows/store-memory.yml).
+// Store memory benchmark (bench/store/run.sh; job "store" of
+// .github/workflows/directory-scaling.yml).
 // Linux/glibc only. Uses the public API only; links against libzorba.
 //
 //   storebench file FORMAT PATH   parse PATH as dir:documents does
