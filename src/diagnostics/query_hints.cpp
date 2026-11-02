@@ -15,6 +15,7 @@
  */
 #include "query_hints.h"
 
+#include <algorithm>
 #include <cstring>
 
 namespace zorba {
@@ -50,8 +51,8 @@ std::size_t offset_of( std::string const &query, unsigned long line,
       return std::string::npos;
     ++begin;
   }
-  std::size_t const offset = begin + column - 1;
-  return offset <= query.size() ? offset : std::string::npos;
+  // The end of the query can be reported past its last character.
+  return std::min( begin + column - 1, query.size() );
 }
 
 // The word that ends right before the offset, skipping whitespace.
