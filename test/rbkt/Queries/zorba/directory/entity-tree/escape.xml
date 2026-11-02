@@ -1,0 +1,2 @@
+<!DOCTYPE leak [<!ENTITY secret SYSTEM "../outside/secret.ent">]>
+<leak>&secret;</leak>
