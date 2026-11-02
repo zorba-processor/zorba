@@ -309,11 +309,11 @@
       </entry>
 
       <entry key="NoVarTypeInMainModule_23">
-        <value>"$2": type of variable "$3" is not among the in-scope types of the main module</value>
+        <value>"$2": type of variable "$3" is not in scope in the main module; import the schema that defines it</value>
       </entry>
 
       <entry key="NoVarTypeInModule_234">
-        <value>"$2": type of variable "$3" is not among the in-scope types of module "$4"</value>
+        <value>"$2": type of variable "$3" is not in scope in module "$4"; import the schema that defines it</value>
       </entry>
 
       <entry key="ValueNoCastTo_23">
@@ -507,27 +507,27 @@
       <value>$1</value>
 
       <entry key="NoVarTypeInMainModule_23">
-        <value>"$2": type of variable "$3" is not among the in-scope types of the main module</value>
+        <value>"$2": type of variable "$3" is not in scope in the main module; import the schema that defines it</value>
       </entry>
 
       <entry key="NoVarTypeInModule_234">
-        <value>"$2": type of variable "$3" is not among the in-scope types of module "$4"</value>
+        <value>"$2": type of variable "$3" is not in scope in module "$4"; import the schema that defines it</value>
       </entry>
 
       <entry key="NoRetTypeInMainModule_23">
-        <value>"$2": return type of function "$3" is not among the in-scope types of the main module</value>
+        <value>"$2": return type of function "$3" is not in scope in the main module; import the schema that defines it</value>
       </entry>
 
       <entry key="NoRetTypeInModule_234">
-        <value>"$2": return type of function "$3" is not among the in-scope types of module "$4"</value>
+        <value>"$2": return type of function "$3" is not in scope in module "$4"; import the schema that defines it</value>
       </entry>
 
       <entry key="NoParamTypeInMainModule_23">
-        <value>"$2": parameter type of function "$3" is not among the in-scope types of the main module</value>
+        <value>"$2": parameter type of function "$3" is not in scope in the main module; import the schema that defines it</value>
       </entry>
 
       <entry key="NoParamTypeInModule_234">
-        <value>"$2": parameter type of function "$3" is not among the in-scope types of module "$4"</value>
+        <value>"$2": parameter type of function "$3" is not in scope in module "$4"; import the schema that defines it</value>
       </entry>
 
     </diagnostic>
@@ -569,7 +569,7 @@
       <value>$1</value>
 
       <entry key="FUNCTION_23">
-        <value>"$2": function name in reserved namespace "$3"</value>
+        <value>"$2": function name in reserved namespace "$3"; use another prefix (local: in a main module)</value>
       </entry>
 
       <entry key="ANNOTATION_23">
@@ -597,7 +597,7 @@
        It is a static error if multiple module imports in the same Prolog
        specify the same target namespace.
       </comment>
-      <value>"$1": duplicate target namespace</value>
+      <value>"$1": module namespace imported more than once</value>
     </diagnostic>
 
     <diagnostic code="XQST0048">
@@ -605,7 +605,7 @@
        It is a static error if a function or variable declared in a library
        module is not in the target namespace of the library module.
       </comment>
-      <value>"$1": QName not in library namespace</value>
+      <value>"$1": not in the target namespace of the library module; use the prefix of its module declaration</value>
     </diagnostic>
 
     <diagnostic code="XQST0049">
@@ -664,19 +664,19 @@
       <value>$1</value>
 
       <entry key="UnknownSchema_23o">
-        <value>no schema found for target namespace "$2"${ : 3}</value>
+        <value>no schema found for target namespace "$2"${: 3}</value>
       </entry>
 
       <entry key="UnknownModule_234o">
-        <value>module "$2" not found at location "$3"${ : 4}</value>
+        <value>module "$2" not found at "$3"${: 4}</value>
       </entry>
 
       <entry key="BadModule_23">
-        <value>module "$2" at location "$3" is not library module</value>
+        <value>module "$2" at "$3" is not a library module: it must start with a module namespace declaration</value>
       </entry>
 
       <entry key="WrongModule_234">
-        <value>attempt to import module "$2" at location "$3" actually imports module "$4"</value>
+        <value>module at "$3" has target namespace "$4", not "$2"</value>
       </entry>
 
       <entry key="XercesMessage">
@@ -749,15 +749,15 @@
       <value>$1</value>
 
       <entry key="ReservedPrefixInDecl_2">
-        <value>"$2": reserved prefix can not appear in namespace declaration</value>
+        <value>"$2": reserved prefix cannot be declared</value>
       </entry>
 
       <entry key="ReservedPrefixInModule_2">
-        <value>"$2": reserved prefix can not appear in module declaration</value>
+        <value>"$2": reserved prefix cannot be used in a module declaration</value>
       </entry>
 
       <entry key="ReservedPrefixInImport_2">
-        <value>"$2": reserved prefix can not appear in schema or module import</value>
+        <value>"$2": reserved prefix cannot be used in a schema or module import</value>
       </entry>
 
       <entry key="xmlnsInAttrDecl">
@@ -2374,7 +2374,7 @@
     </diagnostic>
 
     <diagnostic code="ZXQP0008" name="FUNCTION_IMPL_NOT_FOUND">
-      <value>"$1": function implementation not found</value>
+      <value>"$1": no implementation registered for external function</value>
     </diagnostic>
 
     <diagnostic code="ZXQP0009" name="FUNCTION_LOCALNAME_MISMATCH">

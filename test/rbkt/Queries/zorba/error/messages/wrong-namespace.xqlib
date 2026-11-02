@@ -1,0 +1,6 @@
+(: Declares a function outside its target namespace. :)
+module namespace w = "urn:zorba-test:wrong";
+
+declare namespace o = "urn:zorba-test:o";
+
+declare function o:f() { 1 };
