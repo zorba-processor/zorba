@@ -161,7 +161,7 @@ every intermediate result is a decimal item, so it pays for one compaction per
 item, and a new number saves one allocation.
 
 An int64 mantissa plus scale inside the item, as first proposed, would save
-the other 48 B per decimal (61 MiB on CSV, 25 MiB on JSON; arithmetic, not
+the other 48 B per decimal (59 MiB on CSV, 24 MiB on JSON; arithmetic, not
 measured), but every `getDecimalValue()`, now a reference count increment,
 would have to build a MAPM number, and values that do not fit would need a
 second representation. The compact block keeps one representation, so results
