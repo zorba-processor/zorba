@@ -50,11 +50,11 @@
 
 <h2 id="source">Build from source</h2>
 <p>On Linux or macOS with the <a href="https://github.com/zorba-processor/zorba#building">prerequisites</a> installed, the <code>full-release</code> preset builds <code>zorba-mcp</code> along with <code>zorba</code>:</p>
-<pre class="code shell"><code>cmake --preset full-release
+<pre class="code shell"><code>cmake --preset full-release -DCMAKE_INSTALL_PREFIX="$HOME/zorba"
 cmake --build --preset full-release
-cmake --install build/full-release --prefix "$HOME/zorba"
+cmake --install build/full-release
 "$HOME/zorba/bin/zorba-mcp" --root /path/to/folder</code></pre>
-<p>Install it rather than running it from the build directory: the installed tree is what puts the directory module and the file and CSV modules where the server finds them.</p>
+<p>Install it rather than running it from the build directory: the installed tree is what puts the directory module and the file and CSV modules where the server finds them. The installation prefix is fixed at configure time, so set it there; installing the same build elsewhere with <code>cmake --install --prefix</code> leaves binaries that do not find their libraries.</p>
 <div class="table-wrap">
 <table>
   <thead><tr><th>Option</th><th>Effect</th></tr></thead>
@@ -164,7 +164,7 @@ return {
 <p>Results should be JSON objects, arrays or atomic values; convert XML nodes with <code>string()</code> or <code>data()</code> before returning them.</p>
 
 <h2 id="security">Security model</h2>
-<p>The agent writes the queries, so the server treats every query as untrusted. Queries run under Zorba's <a href="zorba.html#security">secure policy</a> with exactly two capabilities added back:</p>
+<p>The agent writes the queries, so the server treats every query as untrusted. Queries run under Zorba's <a href="zorba.html#security">secure policy</a> with exactly two capabilities added back, each restricted: <code>file-read</code>, limited to the root, and <code>native-modules</code>, limited to the file module. The effect:</p>
 <ul>
   <li><strong>Read-only.</strong> File writes are denied, and so are environment variables.</li>
   <li><strong>Confined to the root.</strong> Reads are limited to files under <code>--root</code>. Absolute paths, <code>..</code> segments and paths through symbolic links are rejected, symbolic links are not listed, and entries whose name starts with <code>.</code> are not listed.</li>
