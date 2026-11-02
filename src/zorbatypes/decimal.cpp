@@ -368,7 +368,7 @@ uint32_t Decimal::hash( value_type const &value ) {
   // Integers beyond 2^53 are not exactly representable as xs:double, to which
   // they are promoted when compared with one: all integers that round to the
   // same xs:double must hash equal, so hash those on the xs:double.
-  static value_type const exact_limit( "9007199254740992" );   // 2^53
+  static value_type const exact_limit( "16777216" );   // 2^24
 
   if ( value.is_integer() && value <= exact_limit && value >= -exact_limit ) {
     char buf[64];
@@ -377,7 +377,7 @@ uint32_t Decimal::hash( value_type const &value ) {
   }
 
   // In all other cases, hash it as the xs:double it is promoted to.
-  return hash_number( FloatImpl<double>( Decimal( value ) ).getNumber() );
+  return hash_number( FloatImpl<float>( Decimal( value ) ).getNumber() );
 }
 
 zstring Decimal::toString( value_type const &value, bool minusZero,

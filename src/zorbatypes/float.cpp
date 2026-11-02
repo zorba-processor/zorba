@@ -469,7 +469,12 @@ uint32_t hash_number( double d ) {
   // to the same hash code: hash tables keyed on fractional numbers (e.g. the
   // cache of a recursive function) degrade to linear lists.
   uint32_t h;
-  if ( hash_as_integer( d, &h ) )
+  if ( d == std::trunc( d ) && std::fabs( d ) > 16777216.0 &&
+       std::fabs( d ) <= std::numeric_limits<float>::max() ) {
+    float const r = static_cast<float>( d );
+    if ( hash_as_integer( r, &h ) )
+      return h;
+  } else if ( hash_as_integer( d, &h ) )
     return h;
   if ( d != d )
     return 0x7FC00000u;                 // all NaNs alike
@@ -490,16 +495,16 @@ uint32_t hash_number( double d ) {
 }
 
 uint32_t hash_int64( int64_t n ) {
-  int64_t const exact_limit = INT64_C( 1 ) << 53;
+  int64_t const exact_limit = INT64_C( 1 ) << 24;
   if ( n >= -exact_limit && n <= exact_limit )
     return static_cast<uint32_t>( n );
-  return hash_number( static_cast<double>( n ) );
+  return hash_number( static_cast<float>( n ) );
 }
 
 uint32_t hash_uint64( uint64_t n ) {
-  if ( n <= UINT64_C( 1 ) << 53 )
+  if ( n <= UINT64_C( 1 ) << 24 )
     return static_cast<uint32_t>( n );
-  return hash_number( static_cast<double>( n ) );
+  return hash_number( static_cast<float>( n ) );
 }
 
 ///////////////////////////////////////////////////////////////////////////////
