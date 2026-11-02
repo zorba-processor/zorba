@@ -1153,6 +1153,11 @@ expr* IndexJoinRule::createNormalizedProbe(
   args[0] = em->create_instanceof_expr(sctx, udf, loc, keyVar, rtm.FLOAT_TYPE_ONE);
   args[1] = em->create_fo_expr(sctx, udf, loc, BUILTIN_FUNC(FN_EXISTS_1), floatProbe);
 
+  // It references no variable, but the index does not exist before its create
+  // expr, which stands ahead of the outer var: it must stay where it is.
+  floatProbe->setUnhoistable(ANNOTATION_TRUE);
+  args[1]->setUnhoistable(ANNOTATION_TRUE);
+
   expr* keyProbe =
   em->create_fo_expr(sctx, udf, loc,
                      BUILTIN_FUNC(FN_ZORBA_XQDDF_PROBE_INDEX_POINT_VALUE_N),
