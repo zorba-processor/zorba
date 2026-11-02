@@ -99,9 +99,16 @@ public:
   calls inside the body, each with a body plan state of its own. If every
   call kept its body open until the query ended, a recursion would keep one
   state tree per call made, not per level of the call stack. So a call inside
-  another call closes its body when it completes (see releaseBody): what stays
-  allocated is this object and the raw state block, whose size does not grow.
+  another call has its body closed once it has completed and its caller starts
+  another call (see bodyCompleted, callStarting): what stays allocated is this
+  object and the raw state block, whose size does not grow. So each caller
+  holds at most one completed body, and since a caller that is running a call
+  holds none, what is retained is at most one path through the call tree.
   A later run of the same call iterator opens the body again.
+
+  theCaller:
+  ----------
+  The plan state whose theCompletedCall may point to this object.
 
   theArgWrappers:
   ---------------
@@ -132,6 +139,7 @@ public:
   PlanState* thePlanState;
   bool thePlanOpen;
   uint32_t thePlanStateSize;
+  PlanState* theCaller;
 
   std::vector<ItemIterator_t> theArgValues;
   std::vector<store::Iterator_t> theArgWrappers;
@@ -170,7 +178,11 @@ public:
            !aCaller.theProfile;
   }
 
-  void releaseBody(const PlanState& aCaller);
+  void bodyCompleted(PlanState& aCaller, bool isDynamic);
+
+  void callStarting(PlanState& aCaller);
+
+  void closeBody();
 };
 
 

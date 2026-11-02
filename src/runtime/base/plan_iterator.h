@@ -142,7 +142,10 @@ class QueryResources;
 
   theHasUDFCalls  : True if the plan run with this state contains the state of
                     a user-defined function call (set when the call iterator
-                    opens). See UDFunctionCallIteratorState::releaseBody.
+                    opens). See UDFunctionCallIteratorState::canReleaseBody.
+
+  theCompletedCall: The call in this plan that completed last and has its body
+                    still open (see UDFunctionCallIteratorState::bodyCompleted).
 ********************************************************************************/
 class PlanState
 {
@@ -182,6 +185,8 @@ public:
   bool                      theBlockOwned;
 
   bool                      theHasUDFCalls;
+
+  class UDFunctionCallIteratorState * theCompletedCall;
 
 public:
   PlanState(

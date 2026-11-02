@@ -81,7 +81,8 @@ PlanState::PlanState(
   theDeadlineCountdown(0),
   theProfile( Properties::instance().getCollectProfile() ),
   theBlockOwned(true),
-  theHasUDFCalls(false)
+  theHasUDFCalls(false),
+  theCompletedCall(NULL)
 {
   assert(globalDctx != NULL && localDctx != NULL);
   theBlock = new int8_t[theBlockSize];
@@ -105,7 +106,8 @@ PlanState::PlanState(PlanState& aPlanState):
       theDeadlineCountdown(aPlanState.theDeadlineCountdown),
       theProfile(aPlanState.theProfile),
       theBlockOwned(false),
-      theHasUDFCalls(aPlanState.theHasUDFCalls)
+      theHasUDFCalls(aPlanState.theHasUDFCalls),
+      theCompletedCall(NULL)
 {
 }
 
