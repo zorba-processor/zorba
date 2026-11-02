@@ -856,7 +856,7 @@ void test_documents_stream( Fixture const &f ) {
 // its own, and the server keeps answering.
 
 // The limit on the nesting depth of JSON values, zerr:ZXQP0071.
-std::size_t const json_limit = 5000;
+std::size_t const json_limit = 1500;
 
 std::string repeated( std::string const &s, std::size_t n ) {
   std::string r;
@@ -1153,7 +1153,7 @@ void test_case_paths( Fixture const &f ) {
 
 // HTML files a parser has to survive: every one gives a result or an error
 // record, through dir:open, dir:documents and x:parse-html.
-void test_hostile_html( Fixture const &f ) {
+void test_html_edge_cases( Fixture const &f ) {
   TempTree t;
   char const nul[] = "<html>\0<body>a\0b<div \0x=\"\0\">c</div></body></html>";
   struct { char const *name; std::string content; } const files[] = {
@@ -1185,7 +1185,7 @@ void test_hostile_html( Fixture const &f ) {
   config.timeout = std::chrono::milliseconds( 0 );
   Server server( f.zorba, config, std::cerr );
 
-  std::string const parse(
+  std::string const parse( dir_import +
     "import module namespace x = \"http://zorba.io/modules/xml\";\n"
     "import module namespace file = \"http://expath.org/ns/file\";\n" );
 
@@ -1210,7 +1210,9 @@ void test_hostile_html( Fixture const &f ) {
       "\")))//*)" );
     std::cout << name << ": x:parse-html: " << p.dump().substr( 0, 400 )
               << std::endl;
-    check( !p.is_null(), name + ": x:parse-html answers" );
+    check( !p.is_null() && !contains( p.dump(), "XPST" ) &&
+           !contains( p.dump(), "XQST" ),
+           name + ": x:parse-html runs and answers", p.dump().substr( 0, 400 ) );
 #endif
 
     check_alive( server );
@@ -1252,7 +1254,7 @@ Test const tests[] = {
   { "deep_json_binary", test_deep_json_binary },
   { "entity_expansion", test_entity_expansion },
   { "case_paths", test_case_paths },
-  { "hostile_html", test_hostile_html }
+  { "html_edge_cases", test_html_edge_cases }
 };
 
 } // namespace

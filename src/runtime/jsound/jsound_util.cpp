@@ -53,6 +53,8 @@
 #include "zorbatypes/numconversions.h"
 #include "zorbautils/store_util.h"
 
+#include "runtime/json/nesting.h"
+
 #include "jsound_util.h"
 
 // Change to "1" to include $raise-file and $raise-line in annotated results.
@@ -2130,6 +2132,7 @@ void type::to_json( store::Item_t *result ) const {
 
 bool type::validate( store::Item_t const &validate_item, bool do_cast,
                      store::Item_t *result ) const {
+  json_nesting::check_stack();
   DECL_FACET_type( type, this, enumeration );
   VALIDATE_FACET( enumeration,
     enumeration_type->is_enum_valid( validate_item ) );
@@ -2296,6 +2299,7 @@ schema::~schema() {
 }
 
 type const* schema::find_or_create_type( store::Item_t const &type_item ) {
+  json_nesting::check_stack();
   if ( IS_ATOMIC_TYPE( type_item, XS_STRING ) ) {
     zstring fq_name_str( type_item->getStringValue() );
     return fq_find_type( &fq_name_str );

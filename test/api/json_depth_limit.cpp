@@ -49,7 +49,7 @@ using namespace zorba;
 namespace {
 
 // The limit, stated independently of the implementation.
-const uint64_t LIMIT = 5000;
+const uint64_t LIMIT = 1500;
 
 // Far beyond the limit.
 const uint64_t DEEP = 200000;
@@ -499,6 +499,26 @@ void test_json_xml()
       CHECK(refused(run(std::string(IMPORT_JN) + lImport +
                         "count(" + lCall + value(s, DEEP) + lOptions + ")")));
     }
+
+  // Well-formed JsonML goes all the way down.
+  auto lConvert = [&](const std::string& aJson, const char* aFormat) {
+    return run(std::string(IMPORT_JN) + lImport +
+               "count(jx:json-to-xml(jn:parse-json('" + aJson + "'), "
+               "{ \"json-format\" : \"" + aFormat + "\" }))");
+  };
+  auto lJsonMLArray = [](uint64_t n) {
+    return repeat("[\"a\",", n) + "\"t\"" + repeat("]", n);
+  };
+  auto lJsonMLObject = [](uint64_t n) {
+    return repeat("{\"tagName\":\"a\",\"childNodes\":[", n) + "\"t\"" +
+      repeat("]}", n);
+  };
+  report("JsonML-array at the limit",
+         lConvert(lJsonMLArray(LIMIT), "JsonML-array"));
+  report("JsonML-object at the limit",
+         lConvert(lJsonMLObject(LIMIT / 2), "JsonML-object"));
+  CHECK(refused(lConvert(lJsonMLArray(DEEP), "JsonML-array")));
+  CHECK(refused(lConvert(lJsonMLObject(DEEP), "JsonML-object")));
 }
 
 void test_roundtrip()
@@ -562,11 +582,11 @@ void test_update()
   // Into the root of a value: exactly at the limit, then one more.
   CHECK(worked(run(with_jn(
     "variable $a := [ 1 ];\n"
-    "replace value of json $a[[1]] with " + value(ARRAYS, LIMIT - 1) + ";\n"
+    "replace value of json $a(1) with " + value(ARRAYS, LIMIT - 1) + ";\n"
     "$a"))));
   CHECK(refused(run(with_jn(
     "variable $a := [ 1 ];\n"
-    "replace value of json $a[[1]] with " + value(ARRAYS, LIMIT) + ";\n"
+    "replace value of json $a(1) with " + value(ARRAYS, LIMIT) + ";\n"
     "$a"))));
   CHECK(worked(run(with_jn(
     "variable $a := [ ];\n"
@@ -577,11 +597,11 @@ void test_update()
     "insert json " + value(ARRAYS, LIMIT) + " into $a at position 1;\n"
     "$a"))));
   CHECK(worked(run(with_jn(
-    "variable $o := { };\n"
+    "variable $o := {||};\n"
     "insert json { \"a\" : " + value(ARRAYS, LIMIT - 1) + " } into $o;\n"
     "$o"))));
   CHECK(refused(run(with_jn(
-    "variable $o := { };\n"
+    "variable $o := {||};\n"
     "insert json { \"a\" : " + value(ARRAYS, LIMIT) + " } into $o;\n"
     "$o"))));
   CHECK(worked(run(with_jn(
@@ -596,7 +616,7 @@ void test_update()
   // A deep member that was removed no longer counts.
   CHECK(worked(run(with_jn(
     "variable $a := [ " + value(ARRAYS, LIMIT - 1) + " ];\n"
-    "delete json $a[[1]];\n"
+    "delete json $a(1);\n"
     "[ [ $a ] ]"))));
 }
 
@@ -740,8 +760,8 @@ const Operation theOperations[] = {
     "count(jn:encode-for-roundtrip(jn:parse-json($v)))" },
   { "decode-from-roundtrip", 0, "", "",
     "count(jn:decode-from-roundtrip(jn:parse-json($v)))" },
-  { "hash", 0, "",
-    "declare namespace an = \"http://zorba.io/annotations\";\n"
+  { "hash", 0,
+    "declare namespace an = \"http://zorba.io/annotations\";\n",
     "declare %an:strictlydeterministic function local:f($x) { 1 };\n",
     "local:f(jn:parse-json($v))" },
   { "collection", 0, COLLECTION_IMPORTS, "",

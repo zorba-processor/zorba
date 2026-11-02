@@ -108,6 +108,7 @@ private:
   typedef std::stack<stack_element> stack_type;
   stack_type stack_;
 
+  void check_depth( json::token const& );
   void add_value( store::Item_t const& );
   void clear_stack();
 
@@ -123,6 +124,7 @@ private:
   parser parser_;
   bool const strip_top_level_array_;
   bool stripped_top_level_array_;
+  uint32_t depth_;                      // arrays and objects on stack_
 };
 
 ///////////////////////////////////////////////////////////////////////////////

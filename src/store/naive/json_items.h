@@ -34,6 +34,8 @@
 #include "simple_collection.h"
 #include "structured_item.h"
 
+#include "runtime/json/nesting.h"
+
 namespace zorba
 {
 
@@ -109,10 +111,43 @@ protected:
 
   CollectionTreeInfoWithTreeId * theCollectionInfo;
 
+  // The levels of arrays and objects in this value, as seen when its own
+  // members last changed: 1 if none is a JSON item. An update of a member does
+  // not reach this item (see runtime/json/nesting.h).
+  uint32_t                       theHeight;
+
+  // Raises the limit error if aMember would make this value too deep, and
+  // takes it into account otherwise. To be called before aMember is added.
+  void addHeightOf(const store::Item* aMember)
+  {
+    if (aMember->isJSONItem())
+    {
+      uint32_t const lHeight = static_cast<const JSONItem*>(aMember)->theHeight;
+      if (lHeight >= json_nesting::MAX_DEPTH)
+        json_nesting::raise_limit();
+      if (lHeight >= theHeight)
+        theHeight = lHeight + 1;
+    }
+  }
+
+  // Whether removing aMember can make this value less deep.
+  bool isDeepest(const store::Item* aMember) const
+  {
+    return aMember->isJSONItem() &&
+           static_cast<const JSONItem*>(aMember)->theHeight + 1 == theHeight;
+  }
+
+  // Adds the JSON items among the members to aJSONMembers and propagates
+  // the collection info to the other structured ones.
+  virtual void setCollectionInfoOfMembers(
+      CollectionTreeInfo* collectionInfo,
+      std::vector<JSONItem*>& aJSONMembers) = 0;
+
 public:
   SYNC_CODE(RCLock* getRCLock() const { return &theRCLock; })
 
-  JSONItem(store::Item::ItemKind k) : StructuredItem(k), theCollectionInfo(NULL) {}
+  JSONItem(store::Item::ItemKind k)
+    : StructuredItem(k), theCollectionInfo(NULL), theHeight(1) {}
 
   virtual ~JSONItem();
   
@@ -131,7 +166,7 @@ public:
   
   CollectionTreeInfo* getCollectionTreeInfo() const { return theCollectionInfo; }
 
-  void setCollectionTreeInfo(CollectionTreeInfo* collectionInfo) = 0;
+  void setCollectionTreeInfo(CollectionTreeInfo* collectionInfo);
   
   long getCollectionTreeRefCount() const;
 
@@ -290,12 +325,19 @@ public:
 
   // StructuredItem API
 
-  void setCollectionTreeInfo(CollectionTreeInfo* collectionInfo);
-
   bool isInSubtree(const StructuredItem* aJSONItem) const;
 
   virtual void swap(store::Item* anotherItem);
 
+protected:
+  void setCollectionInfoOfMembers(
+      CollectionTreeInfo* collectionInfo,
+      std::vector<JSONItem*>& aJSONMembers);
+
+private:
+  void recomputeHeight();
+
+public:
   // Invariant handling
 #ifndef NDEBUG
   void assertInvariant() const;
@@ -453,13 +495,17 @@ public:
 
   // StructuredItem API
   
-  void setCollectionTreeInfo(CollectionTreeInfo* collectionInfo);
-
   virtual void swap(Item* anotherItem);
 
   bool isInSubtree(const StructuredItem* aJSONItem) const;
 
 protected:
+  void setCollectionInfoOfMembers(
+      CollectionTreeInfo* collectionInfo,
+      std::vector<JSONItem*>& aJSONMembers);
+
+  void recomputeHeight();
+
   void add(uint64_t pos, const std::vector<store::Item_t>& aNewMembers);
 
   static uint64_t cast(const xs_integer& i);
