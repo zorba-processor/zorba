@@ -281,23 +281,23 @@
       <value>$1</value>
 
       <entry key="NoReturnTypePromote_234">
-        <value>$2 can not be promoted to return type $3 of function $4()</value>
+        <value>$2 cannot be promoted to return type $3 of function $4()</value>
       </entry>
 
       <entry key="NoParamTypePromote_234">
-        <value>$2 can not be promoted to parameter type $3 of function $4()</value>
+        <value>$2 cannot be promoted to parameter type $3 of function $4()</value>
       </entry>
 
       <entry key="NoTypePromote_23">
-        <value>$2 can not be promoted to type $3</value>
+        <value>$2 cannot be promoted to type $3</value>
       </entry>
 
       <entry key="NoMultiSeqTypePromotion_2">
-        <value>sequence of more than one item can not be promoted to type $2</value>
+        <value>sequence of more than one item cannot be promoted to type $2</value>
       </entry>
 
       <entry key="NoTreatAs_23">
-        <value>$2 can not be treated as type $3</value>
+        <value>$2 cannot be treated as type $3</value>
       </entry>
 
       <entry key="JSONIQ_SELECTOR">
@@ -305,7 +305,7 @@
       </entry>
 
       <entry key="MultiValuedGroupingKey">
-        <value>atomization of grouping variable produces more than one item</value>
+        <value>grouping key must be at most one atomic value, but atomization produced more than one item</value>
       </entry>
 
       <entry key="NoVarTypeInMainModule_23">
@@ -317,7 +317,7 @@
       </entry>
 
       <entry key="ValueNoCastTo_23">
-        <value>$2: value can not be cast to type $3</value>
+        <value>$2: value cannot be cast to type $3</value>
       </entry>
 
       <entry key="PiTarget_2">
@@ -330,7 +330,7 @@
        It is a type error if the result of the last step in a path expression
        contains both nodes and non-nodes.
       </comment>
-      <value>path expression last step must not have nodes and atomic values</value>
+      <value>last step of a path expression returned both nodes and atomic values</value>
     </diagnostic>
 
     <diagnostic code="XPTY0019">
@@ -346,7 +346,7 @@
       <comment>
        It is a type error if, in an axis step, the context item is not a node.
       </comment>
-      <value>context item in axis step is not a node</value>
+      <value>context item of an axis step is not a node</value>
     </diagnostic>
 
     <diagnostic code="XPTY0117">
@@ -362,7 +362,7 @@
       </entry>
 
       <entry key="NotationParam_23">
-        <value>$2 can not be promoted to parameter type xs:NOTATION of function $3()</value>
+        <value>$2 cannot be promoted to parameter type xs:NOTATION of function $3()</value>
       </entry>
 
     </diagnostic>
@@ -1078,7 +1078,7 @@
        document-node().
       </comment>
 
-      <value>"$1" cannot be treated as type $2</value>
+      <value>$1 cannot be treated as type $2</value>
     </diagnostic>
 
     <diagnostic code="XQDY0025">
@@ -1485,7 +1485,7 @@
       <comment>
        NaN supplied as float/double value.
       </comment>
-      <value>NaN supplied as float/double value</value>
+      <value>duration cannot be multiplied or divided by NaN</value>
     </diagnostic>
 
     <diagnostic code="FOCA0006">
@@ -1727,14 +1727,14 @@
        \c fn:zero-or-one() called with a sequence containing more than one
        item.
       </comment>
-      <value>fn:zero-or-one() called with a sequnce containing more than one item</value>
+      <value>fn:zero-or-one(): argument has more than one item</value>
     </diagnostic>
 
     <diagnostic code="FORG0004">
       <comment>
        \c fn:one-or-more() called with a sequence containing no items.
       </comment>
-      <value>fn:one-or-more() called with a sequence containing no items</value>
+      <value>fn:one-or-more(): argument is empty</value>
     </diagnostic>
 
     <diagnostic code="FORG0005">
@@ -1742,7 +1742,7 @@
        \c fn:exactly-one() called with a sequence containing zero or more
        than one item.
       </comment>
-      <value>fn:exactly-one() called with a sequence containing zero or more than one item</value>
+      <value>fn:exactly-one(): argument does not have exactly one item</value>
     </diagnostic>
 
     <diagnostic code="FORG0006">
@@ -1756,7 +1756,7 @@
       <comment>
        The two arguments to fn:dateTime() have inconsistent timezones.
       </comment>
-      <value>"$1" and "$2": two arguments to fn:dateTime() have inconsistent timezones</value>
+      <value>"$1" and "$2": date and time have different timezones</value>
     </diagnostic>
 
     <diagnostic code="FORG0009">
