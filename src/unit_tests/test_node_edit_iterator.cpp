@@ -18,13 +18,21 @@
 // collection module's edit function replaces that node: edit swaps the contents
 // of the node with the new content (UpdEditInCollection, InternalNode::swap).
 // The iterator goes on with the nodes it started on, while an iterator opened
-// after the edit sees the new content. The first node returned stays referenced,
-// which keeps the replaced nodes alive. The cases cross the sizes at which
-// element nodes change how they store their nodes, in both directions.
+// after the edit sees the new content. Every case runs twice: with the first
+// node returned still referenced by the caller and with no reference at all,
+// where only the iterator can keep the replaced nodes alive. The cases cross
+// the sizes at which element nodes change how they store their nodes, in both
+// directions.
+//
+// The test also prints, without checking them, the time of one iterator
+// start and close and of one reference to a node, taken in the same process.
 
+#include <algorithm>
+#include <chrono>
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <vector>
 
 #include <zorba/iterator.h>
 #include <zorba/store_manager.h>
@@ -117,7 +125,7 @@ struct Case {
   char const *fresh;    // what a new iterator returns after the edit
 };
 
-void test_case( Case const &c, int n ) {
+void test_case( Case const &c, int n, bool hold_first ) {
   ostringstream names;
   names << "local:c" << n;
   string const qname( "xs:QName(\"" + names.str() + "\")" );
@@ -125,7 +133,8 @@ void test_case( Case const &c, int n ) {
   ostringstream label;
   label << ( c.kind == CHILDREN ? "children" :
              c.kind == REVERSE ? "reverse" : "attributes" )
-        << ' ' << c.before << " -> " << c.content;
+        << ' ' << c.before << " -> " << c.content
+        << ( hold_first ? "" : " (no reference)" );
   string const name( label.str() );
 
   try {
@@ -144,6 +153,8 @@ void test_case( Case const &c, int n ) {
       }
       expect( name, "first node", first->getNodeName()->getLocalName().c_str(),
               c.first );
+      if ( !hold_first )
+        first = NULL;
 
       run( "dml:edit(dml:collection(" + qname + "), " + c.content + ");\n()" );
 
@@ -197,6 +208,40 @@ Case const cases[] = {
   { CHILDREN,   "<r><a/><b/><c/></r>",    "<n><x/><y/><z/><w/></n>", "a", "b c", "a b c", "x y z w" },
 };
 
+// Median of 5, in ns per call of f.
+template<class F>
+double time_ns( int calls, F const &f ) {
+  vector<double> runs;
+  for ( int r = 0; r < 5; ++r ) {
+    chrono::steady_clock::time_point const t0 = chrono::steady_clock::now();
+    for ( int i = 0; i < calls; ++i )
+      f();
+    chrono::duration<double,nano> const d = chrono::steady_clock::now() - t0;
+    runs.push_back( d.count() / calls );
+  }
+  sort( runs.begin(), runs.end() );
+  return runs[2];
+}
+
+void print_costs() {
+  store::Item_t node( Unmarshaller::getInternalItem(
+    run( "dml:collection(xs:QName(\"local:cost\"))" ) ) );
+  int const calls = 1000000;
+  store::Item const *const raw = node.getp();
+  double const reference = time_ns( calls, [raw]() {
+    store::Item_t held( const_cast<store::Item*>( raw ) );
+  } );
+  store::ChildrenIterator *const r =
+    GENV_ITERATOR_FACTORY->createChildrenIterator();
+  store::Iterator_t keep( r );
+  double const iterator = time_ns( calls, [raw, r]() {
+    r->init( raw );
+    r->close();
+  } );
+  cout << "cost: node reference " << reference << " ns, iterator init+close "
+       << iterator << " ns" << endl;
+}
+
 } // namespace
 
 namespace UnitTests {
@@ -204,8 +249,13 @@ namespace UnitTests {
 int test_node_edit_iterator( int, char*[] ) {
   failures = 0;
   int n = 0;
+  run( "ddl:create(xs:QName(\"local:cost\"));\n"
+       "dml:insert-last(xs:QName(\"local:cost\"), <r><a/></r>);\n()" );
+  print_costs();
   for ( Case const &c : cases )
-    test_case( c, ++n );
+    test_case( c, ++n, true );
+  for ( Case const &c : cases )
+    test_case( c, ++n, false );
   cout << ( failures ? "FAILED" : "passed" ) << endl;
   return failures ? 1 : 0;
 }

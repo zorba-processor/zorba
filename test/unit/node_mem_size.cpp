@@ -15,7 +15,10 @@
  */
 
 // Item::mem_size() of an XML node includes its subtree, whether the element
-// keeps its children inline (up to two) or on the heap.
+// keeps its children inline (up to two) or on the heap, and counts the heap
+// array by its capacity: a slot is not counted when it is inline. The parser
+// sizes the array exactly, so the third child adds an array of 3 slots and the
+// fourth one more slot.
 
 #include <iostream>
 #include <sstream>
@@ -47,19 +50,32 @@ int node_mem_size( int, char*[] ) {
   void *store = StoreManager::getStore();
   Zorba *z = Zorba::getInstance( store );
   int failures = 0;
-  size_t previous = docSize( z, 0 );
-  std::cout << "children 0: " << previous << std::endl;
+  size_t sizes[5];
+  for ( int n = 0; n <= 4; ++n ) {
+    sizes[n] = docSize( z, n );
+    std::cout << "children " << n << ": " << sizes[n] << std::endl;
+  }
+  size_t const child = sizes[1] - sizes[0];
+  size_t const slot = sizeof( void* );
   // One element is at least its vptr, parent and name pointers.
-  size_t const min_per_child = 3 * sizeof( void* );
-  for ( int n : { 1, 2, 3, 4, 1000 } ) {
-    size_t const size = docSize( z, n );
-    std::cout << "children " << n << ": " << size << std::endl;
-    if ( size < previous + min_per_child ) {
-      std::cerr << "FAILED: " << n << " children: mem_size " << size
-                << " after " << previous << std::endl;
+  if ( sizes[1] < sizes[0] || child < 3 * slot ) {
+    std::cerr << "FAILED: first child adds " << child << std::endl;
+    ++failures;
+  }
+  size_t const want[] = { child, child + 3 * slot, child + slot };
+  for ( int n = 1; n <= 3; ++n ) {
+    size_t const step = sizes[n + 1] - sizes[n];
+    if ( step != want[n - 1] ) {
+      std::cerr << "FAILED: child " << n + 1 << " adds " << step << ", want "
+                << want[n - 1] << std::endl;
       ++failures;
     }
-    previous = size;
+  }
+  size_t const many = docSize( z, 1000 );
+  std::cout << "children 1000: " << many << std::endl;
+  if ( many < sizes[4] + 996 * child ) {
+    std::cerr << "FAILED: 1000 children: " << many << std::endl;
+    ++failures;
   }
   z->shutdown();
   StoreManager::shutdownStore( store );
