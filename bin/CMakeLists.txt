@@ -283,16 +283,13 @@ IF (ZORBA_WITH_FILE_ACCESS)
     FAIL_REGULAR_EXPRESSION "TOP-SECRET-ENTITY")
   ZORBA_SET_TEST_PROPERTY(bin/zorba_security_dir_entity_directory
     FAIL_REGULAR_EXPRESSION "TOP-SECRET-ENTITY|entity next to the document")
-  # x:parse, which takes the base URI, needs a build with XML Schema support.
-  IF (NOT ZORBA_NO_XMLSCHEMA)
-    ZORBA_SECURITY_TEST(dir_entity_inside
-      "docs/note.xml=entity next to the document"
-      --secure --allow external-entities,file-read,native-modules
-      --read-path "${_direnttree}"
-      -f -q "${_dirq}/entity.xq" -e "root:=${_direnttree}")
-    ZORBA_SET_TEST_PROPERTY(bin/zorba_security_dir_entity_inside
-      FAIL_REGULAR_EXPRESSION "TOP-SECRET-ENTITY")
-  ENDIF (NOT ZORBA_NO_XMLSCHEMA)
+  ZORBA_SECURITY_TEST(dir_entity_inside
+    "docs/note.xml=entity next to the document"
+    --secure --allow external-entities,file-read,native-modules
+    --read-path "${_direnttree}"
+    -f -q "${_dirq}/entity.xq" -e "root:=${_direnttree}")
+  ZORBA_SET_TEST_PROPERTY(bin/zorba_security_dir_entity_inside
+    FAIL_REGULAR_EXPRESSION "TOP-SECRET-ENTITY")
   ZORBA_SECURITY_TEST(dir_widen "--directory cannot be combined with"
     --directory "${_dirtree}" --allow network -q "1")
   ZORBA_SECURITY_TEST(dir_not_directory "--directory: not a directory"

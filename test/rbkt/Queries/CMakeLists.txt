@@ -195,10 +195,6 @@ FOREACH(TESTFILE ${TESTFILES})
     IF (TESTNAME MATCHES "^test/rbkt/zorba/directory/dir-html-(open|documents|error)$")
       SET (SKIP_TEST 1)
     ENDIF ()
-    # Resolving external entities against the file's URI uses x:parse too.
-    IF (TESTNAME STREQUAL "test/rbkt/zorba/directory/dir-entity-base")
-      SET (SKIP_TEST 1)
-    ENDIF ()
   ELSE (ZORBA_NO_XMLSCHEMA)
     # Covers the build without XML Schema support only.
     IF (TESTNAME STREQUAL "test/rbkt/zorba/directory/dir-html-unsupported")
