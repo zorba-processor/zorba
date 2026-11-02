@@ -39,6 +39,9 @@ jobs:
               tail -n 3 out/ctest.log
               cp build/full-release/Testing/Temporary/LastTest.log out/
               cp -r build/full-release/test/rbkt/QueryResults/zorba/jsoniq-windows out/results
+              Z=$(find build/full-release/bin -maxdepth 1 -name zorba -type f | head -n 1)
+              "$Z" --help > out/help.txt 2>&1
+              "$Z" --print-iterator-tree -f -q bench/windows/never_closes.jq -e source:=gen:100 > out/plan.txt 2>&1
               exit $rc'
       - uses: actions/upload-artifact@v7
         if: always()
