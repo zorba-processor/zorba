@@ -16,6 +16,7 @@ SET(ZORBAUTILS_SRCS
     fatal.cpp
     hashset_structured_itemh.cpp
     hashset_atomic_itemh.cpp
+    numeric_key_hash.cpp
     mutex.cpp
     condition.cpp
     latch.cpp

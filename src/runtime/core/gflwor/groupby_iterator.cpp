@@ -109,6 +109,7 @@ void GroupByState::reset(PlanState& aPlanState)
   }
 
   theGroupMap->clear();
+  theGroupMap->compareFunction().resetNumericKeys();
 }
   
 
@@ -391,6 +392,8 @@ void GroupByIterator::matVarsAndGroupBy(
   numVars = theNonGroupingSpecs.size();
 
   std::vector<store::TempSeq_t>* nonGroupTuple = NULL;
+
+  groupMap->compareFunction().prepare(*groupMap, groupTuple.get());
 
   if (groupMap->get(groupTuple.get(), nonGroupTuple))
   {

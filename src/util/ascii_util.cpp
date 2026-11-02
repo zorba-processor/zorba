@@ -46,7 +46,7 @@ char* itoa( long long n, char *buf ) {
   do { 
     n_prev = n;
     n /= 10; 
-    *s++ = "9876543210123456789" [ 9 + n_prev - n * 10 ];
+    *s++ = "9876543210123456789" [ 9 + (n_prev - n * 10) ];
   } while ( n );
 
   if ( n_prev < 0 ) *s++ = '-';

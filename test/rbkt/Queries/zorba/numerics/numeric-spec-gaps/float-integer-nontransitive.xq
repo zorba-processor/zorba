@@ -19,9 +19,11 @@ declare function local:spec($r as xs:anyAtomicType*, $input as xs:anyAtomicType*
 };
 declare function local:check($a as xs:anyAtomicType, $b as xs:anyAtomicType, $c as xs:anyAtomicType) as xs:string
 {
-  string-join(
-    for $p in ([$a,$b,$c], [$a,$c,$b], [$b,$a,$c], [$b,$c,$a], [$c,$a,$b], [$c,$b,$a])
-    let $input := $p[]
+  let $all := ($a, $b, $c)
+  let $orders := (1,2,3, 1,3,2, 2,1,3, 2,3,1, 3,1,2, 3,2,1)
+  return string-join(
+    for $o in 0 to 5
+    let $input := for $i in 1 to 3 return $all[$orders[$o * 3 + $i]]
     return concat(
       if (local:spec(distinct-values($input), $input)) then "d" else "D",
       if (local:spec(for $x in $input group by $k := $x return $k, $input)) then "g" else "G"),

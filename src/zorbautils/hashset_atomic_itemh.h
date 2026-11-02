@@ -19,6 +19,7 @@
 #include <cassert>
 
 #include "zorbautils/hashset.h"
+#include "zorbautils/numeric_key_hash.h"
 
 #include "runtime/booleans/BooleanImpl.h"
 
@@ -51,6 +52,7 @@ public:
   TypeManager    * theTypeManager;
   long             theTimezone;
   XQPCollator    * theCollator;
+  NumericKeyHash   theNumericKeys;
 };
 
 
@@ -100,7 +102,9 @@ public:
     uint32_t hash(store::Item* t) const
     {
       assert (t != NULL);
-      return t->hash(theCompareParam->theTimezone,  theCompareParam->theCollator);
+      return theCompareParam->theNumericKeys.hash(t,
+                                                  theCompareParam->theTimezone,
+                                                  theCompareParam->theCollator);
     }
   };
 
@@ -118,13 +122,16 @@ public:
 
   bool exists(const store::Item_t& key) 
   {
-    return theSet.exists(key.getp()); 
+    theCompareParam->theNumericKeys.prepare(theSet, key.getp());
+    return theSet.exists(key.getp());
   }
 
   bool insert(store::Item_t& key) 
   {
     assert(key->isAtomic());
     store::Item* tmp = key.getp();
+
+    theCompareParam->theNumericKeys.prepare(theSet, tmp);
 
     bool inserted = theSet.insert(tmp);
 

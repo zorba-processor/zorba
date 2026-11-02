@@ -217,6 +217,8 @@ processTypes(
         lType = GENV_TYPESYSTEM.XS_HEXBINARY_QNAME;
       else if (t == "null")
         lType = GENV_TYPESYSTEM.JS_NULL_QNAME;
+      else if (t == "anyatomictype")
+        lType = GENV_TYPESYSTEM.XS_ANY_ATOMIC_QNAME;
       else
         RAISE_ERROR(zerr::ZXQD0005_INVALID_KEY_FOR_MAP, loc,
             ERROR_PARAMS(t,

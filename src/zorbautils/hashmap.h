@@ -576,6 +576,27 @@ bool get_sync() const
 }
 
 /*******************************************************************************
+  Places every entry again after the hash function of the compare function has
+  changed. The entries, their number and the size of the table stay the same;
+  iterators into the map are invalidated.
+********************************************************************************/
+void rehash()
+{
+  SYNC_CODE(AutoMutex lock(theMutexp);)
+  resizeHashTab(theNumBuckets);
+}
+
+
+/*******************************************************************************
+
+********************************************************************************/
+const C& compareFunction() const
+{
+  return theCompareFunction;
+}
+
+
+/*******************************************************************************
 
 ********************************************************************************/
 void clear()

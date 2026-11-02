@@ -16,6 +16,9 @@
 #ifndef ZORBA_SIMPLE_STORE_INDEX_HASH_VALUE
 #define ZORBA_SIMPLE_STORE_INDEX_HASH_VALUE
 
+#include <memory>
+
+#include "zorbautils/numeric_key_hash.h"
 #include "simple_index.h"
 #include "zorbatypes/integer.h"
 #include <map>
@@ -35,6 +38,7 @@ private:
   csize                       theNumColumns;
   long                        theTimezone;
   std::vector<XQPCollator*>   theCollators;
+  std::shared_ptr<NumericKeyHash> theNumericKeys;       // copies share it
 
 public:
   ValueIndexCompareFunction(
@@ -45,6 +49,32 @@ public:
   ~ValueIndexCompareFunction();
 
   const XQPCollator* getCollator(csize i) const { return theCollators[i]; }
+
+  /**
+   * For an index with a column of xs:anyAtomicType, where keys of different
+   * numeric types meet: see NumericKeyHash. The other columns hold one type, so
+   * they need none of it and their indexes can be probed concurrently.
+   */
+  void useNumericKeyHash() { theNumericKeys = std::make_shared<NumericKeyHash>(); }
+
+  void resetNumericKeys() const { if (theNumericKeys) theNumericKeys->reset(); }
+
+  /**
+   * To call on the compare function of the map before looking up or inserting
+   * the key.
+   */
+  template<class MapType>
+  void prepare(MapType& map, const store::IndexKey* key) const
+  {
+    if (theNumericKeys)
+    {
+      for (csize i = 0; i < theNumColumns; ++i)
+      {
+        if ((*key)[i] != NULL)
+          theNumericKeys->prepare(map, (*key)[i].getp());
+      }
+    }
+  }
 
   uint32_t hash(const store::IndexKey* key) const;
 

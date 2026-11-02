@@ -16,10 +16,13 @@
 #ifndef ZORBA_RUNTIME_GFLWOR_COMMON
 #define ZORBA_RUNTIME_GFLWOR_COMMON
 
+#include <memory>
+
 #include "zorba/api_shared_types.h"
 
 #include "zorbautils/checked_vector.h"
 #include "zorbautils/hashmap.h"
+#include "zorbautils/numeric_key_hash.h"
 
 #include "system/globalenv.h"
 
@@ -221,6 +224,7 @@ private:
   std::vector<GroupingSpec> * theGroupingSpecs;
   const TypeManager         * theTypeManager;
   long                        theTimezone;
+  std::shared_ptr<NumericKeyHash> theNumericKeys;       // copies share it
 
 public:
   //GroupTupleCmp() : theGroupingSpecs(0), theTypeManager(0), theTimezone(0) {}
@@ -234,6 +238,22 @@ public:
   uint32_t hash(GroupTuple* t) const;
 
   bool equal(const GroupTuple* t1, const GroupTuple* t2) const;
+
+  /**
+   * To call on the compare function of the map before looking up or inserting
+   * the tuple t.
+   */
+  template<class MapType>
+  void prepare(MapType& map, const GroupTuple* t) const
+  {
+    for (const store::Item_t& key : t->theItems)
+    {
+      if (key)
+        theNumericKeys->prepare(map, key.getp());
+    }
+  }
+
+  void resetNumericKeys() const { theNumericKeys->reset(); }
 };
 
 

@@ -55,7 +55,8 @@ void AtomicItemHandleHashSet::clear()
     n->removeReference();
   }
 
-  theSet.clear(); 
+  theSet.clear();
+  theCompareParam->theNumericKeys.reset();
 }
 
 }
