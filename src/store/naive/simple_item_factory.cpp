@@ -39,6 +39,7 @@
 
 #include "util/ascii_util.h"
 #include "util/stream_util.h"
+#include "zorbatypes/numconversions.h"
 
 #include <zorba/internal/unique_ptr.h>
 
@@ -53,6 +54,9 @@ BasicItemFactory::BasicItemFactory(UriPool* uriPool, QNamePool* qnPool)
   theFalseItem(new BooleanItem(store::XS_BOOLEAN, false)),
   theNullItem(new json::JSONNull())
 {
+  for (int i = SMALL_INTEGER_MIN; i <= SMALL_INTEGER_MAX; ++i)
+    theSmallIntegers[i - SMALL_INTEGER_MIN] =
+        new IntegerItem(store::XS_INTEGER, xs_integer(i));
 }
 
 
@@ -339,6 +343,11 @@ bool BasicItemFactory::createDecimal(store::Item_t& result, const xs_decimal& va
 
 bool BasicItemFactory::createInteger(store::Item_t& result, const xs_integer& value)
 {
+  if (value >= SMALL_INTEGER_MIN && value <= SMALL_INTEGER_MAX)
+  {
+    result = theSmallIntegers[to_xs_int(value) - SMALL_INTEGER_MIN];
+    return true;
+  }
   result = new IntegerItem(store::XS_INTEGER, value);
   return true;
 }

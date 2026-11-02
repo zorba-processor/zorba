@@ -58,6 +58,22 @@ protected:
   store::Item_t theFalseItem;
   store::Item_t theNullItem;
 
+  // xs:integer items for the values in [SMALL_INTEGER_MIN, SMALL_INTEGER_MAX]
+  // are created once, here, and createInteger() returns them, the way
+  // createBoolean() returns theTrueItem or theFalseItem. Atomic items are
+  // immutable and their reference counts are guarded by the item's lock, so
+  // one item can be shared by any number of trees and threads. Only
+  // xs:integer is cached: the derived types (xs:long ... xs:byte,
+  // xs:nonNegativeInteger, ...) have their own type codes and always get a
+  // new item, so a shared xs:integer is never returned for them.
+  //
+  // The range holds what parsed data and queries use most: counts, indexes,
+  // small codes and quantities (JSON and CSV integers, positions, counters).
+  // The cache costs 1152 items, about 55 KB, per store.
+  static constexpr int SMALL_INTEGER_MIN = -128;
+  static constexpr int SMALL_INTEGER_MAX = 1023;
+  store::Item_t theSmallIntegers[SMALL_INTEGER_MAX - SMALL_INTEGER_MIN + 1];
+
 public:
   BasicItemFactory(UriPool* uriPool, QNamePool* qnPool);
 
