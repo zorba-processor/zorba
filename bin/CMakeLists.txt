@@ -181,15 +181,15 @@ ZORBA_ADD_TEST(bin/zorba_language_header_xquery_names zorbacmd --language jsoniq
 ZORBA_LANGUAGE_EXPECT(header_xquery_names "XPST0017")
 # The error lines are those of the file, whatever the language.
 ZORBA_ADD_TEST(bin/zorba_language_lines_jq zorbacmd -f -q "${_langdir}/lines.jq")
-ZORBA_LANGUAGE_EXPECT(lines_jq "lines\\.jq>:3,[0-9]+:")
+ZORBA_LANGUAGE_EXPECT(lines_jq "lines[.]jq>:3,[0-9]+:")
 ZORBA_ADD_TEST(bin/zorba_language_lines_xq zorbacmd -f -q "${_langdir}/lines.xq")
-ZORBA_LANGUAGE_EXPECT(lines_xq "lines\\.xq>:3,[0-9]+:")
+ZORBA_LANGUAGE_EXPECT(lines_xq "lines[.]xq>:3,[0-9]+:")
 ZORBA_ADD_TEST(bin/zorba_language_lines_syntax_jq zorbacmd -f -q "${_langdir}/lines_syntax.jq")
-ZORBA_LANGUAGE_EXPECT(lines_syntax_jq "lines_syntax\\.jq>:3,[0-9]+:")
+ZORBA_LANGUAGE_EXPECT(lines_syntax_jq "lines_syntax[.]jq>:3,[0-9]+:")
 ZORBA_ADD_TEST(bin/zorba_language_lines_syntax_xq zorbacmd -f -q "${_langdir}/lines_syntax.xq")
-ZORBA_LANGUAGE_EXPECT(lines_syntax_xq "lines_syntax\\.xq>:3,[0-9]+:")
+ZORBA_LANGUAGE_EXPECT(lines_syntax_xq "lines_syntax[.]xq>:3,[0-9]+:")
 ZORBA_ADD_TEST(bin/zorba_language_lines_syntax_option zorbacmd --language jsoniq -f -q "${_langdir}/lines_syntax.xq")
-ZORBA_LANGUAGE_EXPECT(lines_syntax_option "lines_syntax\\.xq>:3,[0-9]+:")
+ZORBA_LANGUAGE_EXPECT(lines_syntax_option "lines_syntax[.]xq>:3,[0-9]+:")
 # The hints say what to write; none recommends what already applies.
 ZORBA_ADD_TEST(bin/zorba_language_hint_xquery zorbacmd -q "let $x := [1] return $x[]")
 ZORBA_LANGUAGE_EXPECT(hint_xquery "hint: [^\n]*jsoniq version")
@@ -199,7 +199,7 @@ ZORBA_SET_TEST_PROPERTY(bin/zorba_language_hint_jsoniq FAIL_REGULAR_EXPRESSION "
 # The help states the order and its limits.
 ZORBA_ADD_TEST(bin/zorba_language_help zorbacmd --help)
 ZORBA_SET_TEST_PROPERTY(bin/zorba_language_help PASS_REGULAR_EXPRESSION
-  "in this order: \\(1\\) a jsoniq version or xquery version declaration at the very start of the query \\(one preceded by a comment is not detected\\); \\(2\\) for a file, its extension \\(\\.jq is JSONiq, \\.xq is XQuery\\); \\(3\\) this option.*The option does not override an extension: --jsoniq -f q\\.xq is XQuery\\. --parse-only and the parse that --compile-only does first do not apply this rule")
+  "in this order: [(]1[)] a jsoniq version or xquery version declaration at the very start of the query [(]one preceded by a comment is not detected[)]; [(]2[)] for a file, its extension [(][.]jq is JSONiq, [.]xq is XQuery[)]; [(]3[)] this option.*The option does not override an extension: --jsoniq -f q[.]xq is XQuery[.] --parse-only and the parse that --compile-only does first do not apply this rule")
 # A value other than xquery and jsoniq is refused.
 ZORBA_ADD_TEST(bin/zorba_language_bad_value zorbacmd --language sql -q "1")
 ZORBA_LANGUAGE_EXPECT(bad_value "--language argument must be one of")
@@ -462,7 +462,7 @@ IF (ZORBA_WITH_FILE_ACCESS)
     ADD_TEST (NAME bin/mcp/language_help
       COMMAND "$<TARGET_FILE:zorba_mcp${_mcp_suffix}>" --help)
     SET_TESTS_PROPERTIES (bin/mcp/language_help PROPERTIES
-      PASS_REGULAR_EXPRESSION "A \\.jq\n *file is JSONiq unless it declares xquery version;\n *\\.xq files are not loaded.*in this order: \\(1\\) a jsoniq\n *version or xquery version declaration at the very\n *start of the query \\(one preceded by a comment is\n *not detected\\); \\(2\\) for a file, its extension \\(\\.jq\n *is JSONiq\\); \\(3\\) this option")
+      PASS_REGULAR_EXPRESSION "A [.]jq\n *file is JSONiq unless it declares xquery version;\n *[.]xq files are not loaded.*in this order: [(]1[)] a jsoniq\n *version or xquery version declaration at the very\n *start of the query [(]one preceded by a comment is\n *not detected[)]; [(]2[)] for a file, its extension [(][.]jq\n *is JSONiq[)]; [(]3[)] this option")
 
     # A --language value other than xquery and jsoniq is refused.
     ADD_TEST (NAME bin/mcp/language_invalid
