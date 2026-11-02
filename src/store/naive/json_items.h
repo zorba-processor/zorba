@@ -17,6 +17,7 @@
 #ifndef ZORBA_STORE_JSON_ITEMS_H
 #define ZORBA_STORE_JSON_ITEMS_H
 
+#include <memory>
 #include <vector>
 
 #include <zorba/config.h>
@@ -212,10 +213,20 @@ protected:
   typedef std::vector<std::pair<store::Item*, store::Item*> > Pairs;
   typedef Pairs::size_type size_type;
 
-  // The map owns its keys: a zstring copy shares the key item's
-  // representation when that one is sharable and is a deep clone otherwise,
-  // so a key never refers to memory the object does not hold.
+  // Index from key string to position in thePairs. The map owns its keys: a
+  // zstring copy shares the key item's representation when that one is
+  // sharable and is a deep clone otherwise, so a key never refers to memory
+  // the object does not hold.
   typedef std::unordered_map<zstring, size_type> Keys;
+
+public:
+  // Objects of at most this many pairs have no Keys index: a key is found by
+  // a linear search over thePairs. The index is built when an object grows
+  // past it and dropped when it shrinks back to it. Chosen from the
+  // measurement in bench/store/RESULTS.md.
+  static constexpr size_type KEY_INDEX_THRESHOLD = 12;
+
+protected:
 
   class KeyIterator : public store::Iterator
   {
@@ -238,8 +249,11 @@ protected:
   };
 
 private:
-  Keys   theKeys;
-  Pairs  thePairs;
+  Pairs                 thePairs;
+  std::unique_ptr<Keys> theKeys;  // null while thePairs is small
+
+  size_type findKey(store::Item const *aName, zstring const &aNameStr) const;
+  void      buildKeyIndex();
 
 public:
   SimpleJSONObject() : JSONObject() {}
