@@ -21,6 +21,7 @@
 #include <chrono>
 #include <cstdint>
 #include <exception>
+#include <fstream>
 #include <iostream>
 #include <string>
 
@@ -182,6 +183,46 @@ long long peak_rss()
 #endif
 }
 
+// The peak of one run, for builds where earlier runs leave memory behind
+// (the sanitizer allocator holds freed blocks in quarantine, and the peak of
+// the process only ever rises). The kernel resets its peak counter when "5"
+// is written to clear_refs; the growth is then the peak above the resident
+// size at the start of the run. Returns false where this is not available.
+struct RunPeak
+{
+  long long theStart = 0;
+  bool theOk = false;
+
+  static long long status_kb(const char* aKey)
+  {
+    std::ifstream f("/proc/self/status");
+    std::string line;
+    std::string const key(aKey);
+    while (std::getline(f, line))
+      if (line.compare(0, key.size(), key) == 0)
+        return std::stoll(line.substr(key.size()));
+    return -1;
+  }
+
+  RunPeak()
+  {
+#ifdef __linux__
+    std::ofstream f("/proc/self/clear_refs");
+    if (f && (f << "5" << std::flush))
+    {
+      theStart = status_kb("VmRSS:") * 1024;
+      theOk = theStart > 0 && status_kb("VmHWM:") * 1024 <= theStart + (8 << 20);
+    }
+#endif
+  }
+
+  // Growth of the peak; -1 where it cannot be measured per run.
+  long long growth() const
+  {
+    return theOk ? status_kb("VmHWM:") * 1024 - theStart : -1;
+  }
+};
+
 // %N% is replaced by the argument of the outermost call.
 const char UNDECLARED[] =
   "declare function local:f($n)\n"
@@ -296,8 +337,26 @@ void test_memory(Zorba* z)
   long long const base = peak_rss();
   for (const char* shape : SHAPES)
   {
+#ifdef ZORBA_TEST_SANITIZER
+    // Smaller runs of the same shape, to show how the peak scales with the
+    // number of calls: retained memory would grow with it.
+    for (int const m : { n - 2, n - 1 })
+    {
+      RunPeak const rp;
+      Outcome const o = run(z, p, with_n(shape, m));
+      std::cout << "  n=" << m << ": peak RSS grew by " << (rp.growth() >> 20)
+                << " MiB; " << o << std::endl;
+      CHECK(o.ok && o.value == std::to_string(1 << m));
+    }
+    RunPeak const rp;
+#endif
     Outcome const o = run(z, p, with_n(shape, n));
+#ifdef ZORBA_TEST_SANITIZER
+    long long const own = rp.growth();
+    long long const grown = own >= 0 ? own : peak_rss() - base;
+#else
     long long const grown = peak_rss() - base;
+#endif
     std::cout << "  n=" << n << ": peak RSS grew by " << (grown >> 20)
               << " MiB; " << o << std::endl;
     CHECK(o.ok && o.value == std::to_string(1 << n));
