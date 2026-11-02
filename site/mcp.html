@@ -63,6 +63,7 @@ cmake --install build/full-release
     <tr><td><code>--queries &lt;dir&gt;</code></td><td>Each <code>&lt;name&gt;.jq</code> file in this folder becomes a tool, see <a href="#tools">the tools</a>.</td></tr>
     <tr><td><code>--timeout &lt;seconds&gt;</code></td><td>Time limit of one tool call. Default 30; 0 means no limit.</td></tr>
     <tr><td><code>--max-output &lt;bytes&gt;</code></td><td>Output size limit of one tool call. Default 131072.</td></tr>
+    <tr><td><code>--max-memory &lt;bytes&gt;</code></td><td>Memory limit of the server process. Default 4294967296 (4 GiB); 0 means no limit. Linux only.</td></tr>
   </tbody>
 </table>
 </div>
@@ -175,7 +176,8 @@ return {
 
 <h2 id="limits">Limits and timeouts</h2>
 <ul>
-  <li>A tool call stops after <code>--timeout</code> seconds (default 30) with the Zorba error <code>zerr:ZXQP0068</code>; <code>--timeout 0</code> removes the limit.</li>
+  <li>A query stops at <code>--timeout</code> seconds (default 30) with the Zorba error <code>zerr:ZXQP0068</code>; <code>--timeout 0</code> removes the limit. The answer can come later than that by the time the current step takes and the time to free the memory of the query: in our measurements, milliseconds for a query that holds little memory, up to 2 seconds for one that holds 3 GB or runs a single string operation over 100 MB. The limit starts when the query starts running: compiling it comes first, and evaluating its constant expressions during compilation takes at most 500 ms.</li>
+  <li>A query that needs more than <code>--max-memory</code> bytes (default 4 GiB, counted as address space; Linux only) ends with a tool error with code <code>memory_limit</code>, and the server keeps answering. On other systems, or with <code>--max-memory 0</code>, such a query can get the server killed by the system.</li>
   <li>Output longer than <code>--max-output</code> bytes (default 131072) is cut and ends with a line saying that the output was truncated.</li>
   <li>A single JSON-RPC message larger than 4 MB is refused.</li>
   <li>Every call re-reads and re-parses the files it touches, so a query over a large folder costs time proportional to the files it opens. Filter by path or format with <code>dir:list</code> or the <code>$formats</code> argument before opening documents.</li>

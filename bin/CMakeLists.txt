@@ -344,7 +344,7 @@ IF (ZORBA_WITH_FILE_ACCESS)
              syntax_error escape network native_modules predefined limits binary
              optional_params documents_stream hints_jsoniq hints_dash
              hints_nodes hints_names deep_json deep_json_binary
-             entity_expansion case_paths html_edge_cases)
+             entity_expansion case_paths html_edge_cases memory_limit)
       ADD_TEST (NAME bin/mcp/${_t}
         COMMAND "mcp_tests${_mcp_suffix}" ${_t} "${_dirtree}" "${_mcpq}"
           "${_dirq}/join.xq" "$<TARGET_FILE:zorba_mcp${_mcp_suffix}>")
