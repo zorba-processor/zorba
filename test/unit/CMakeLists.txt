@@ -84,6 +84,7 @@ SET(UNIT_TESTS_SRCS
   cxx_api_changes.cpp
   external_function.cpp
   no_folding.cpp
+  node_mem_size.cpp
   ordpath_big.cpp
   uri_file_decoding_test.cpp
   ext_in_opt.cpp
