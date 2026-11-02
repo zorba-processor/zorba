@@ -107,6 +107,26 @@ IndexJoinRule::~IndexJoinRule()
 
 
 /*******************************************************************************
+  Whether an expr is or contains a probe of a value index: see
+  createNormalizedProbe(), whose shape later rewrites may simplify.
+********************************************************************************/
+static bool containsValueProbe(expr* e)
+{
+  if (e->get_function_kind() == FunctionConsts::FN_ZORBA_XQDDF_PROBE_INDEX_POINT_VALUE_N)
+    return true;
+
+  ExprIterator iter(e);
+  while (!iter.done())
+  {
+    if (containsValueProbe(**iter))
+      return true;
+    iter.next();
+  }
+  return false;
+}
+
+
+/*******************************************************************************
   This rule analyzes the where clauses of flwor exprs to deterimne whether any
   predicate in a clause is a join predicate and whether the associated join
   can be converted into a hashjoin using an index that is built on-the-fly.
@@ -460,8 +480,7 @@ bool IndexJoinRule::isIndexJoinPredicate(PredicateInfo& predInfo)
 
   // The inner var is already bound to an index probe (the predicate may have
   // been kept in the WHERE clause after a rewrite with normalized keys).
-  if (innerVarClause->get_expr()->get_function_kind() ==
-      FunctionConsts::FN_ZORBA_XQDDF_PROBE_INDEX_POINT_VALUE_N)
+  if (containsValueProbe(innerVarClause->get_expr()))
     return false;
 
   // The inner var must not be an outer FOR var
