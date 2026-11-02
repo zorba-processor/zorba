@@ -53,8 +53,8 @@ fresh string (mostly query overhead). Run 41443973653.
 | 64 | 736 | 892 | 1.21 | 593 | 693 | 1.17 |
 
 The threshold is 16, the largest size measured where the linear search is not
-slower to build. The search saves 64-72 B per pair at every size in this
-sweep, so the limit comes from time, not memory.
+slower to build. No index saves 61-144 B per pair at every size in this sweep,
+so the limit comes from time, not memory.
 
 Objects just above the threshold pay for 16 linear inserts and then for
 building the index. Threshold 16 against an index from the first pair, median
@@ -70,10 +70,9 @@ of 5 runs (run 41446159839):
 | 32 | 572 | 583 | 1.02 | 129.2 | 126.7 |
 | 48 | 575 | 577 | 1.00 | 137.2 | 134.2 |
 
-These objects build up to 4% slower and take up to 4.5% more heap than an index
-from the first pair, because the index is built with twice the buckets. That
-comparison is within the new code; these sizes were not measured on the
-baseline, so their cost against it is unknown.
+Objects of 17-20 pairs build up to 4% slower and take up to 4.5% more heap than
+an index from the first pair. That comparison is within the new code; these
+sizes were not measured on the baseline, so their cost against it is unknown.
 
 Limits of these measurements:
 - All keys are short and of nearly equal length. Keys of equal length with a
