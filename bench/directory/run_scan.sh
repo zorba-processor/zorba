@@ -55,6 +55,7 @@ for spec in $TREES; do
       if [ "$4" != - ]; then co="$co $4"; fi
       c=$(sed -n 's/.*the scan cache holds \([0-9]*\) bytes.*/\1/p' "$OUT/$name-$mode.log")
       if [ -n "$c" ]; then ca="$ca $c"; fi
+      sed -n 's/.*the scan cache holds/  cache:/p' "$OUT/$name-$mode.log" >> "$RAW"
     done
     cache=$(echo $ca | median)
     per=-

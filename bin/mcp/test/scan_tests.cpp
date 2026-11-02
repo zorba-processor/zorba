@@ -330,6 +330,8 @@ void test_status( Fixture const &f ) {
          "it has what is known so far", l.text );
   check( l.total() == "1" && l.found() == "1",
          "the total is what is known so far", l.text );
+  check( contains( dump_of( l.head.find( "dirs" ) ), "\"path\":\"sub\"" ),
+         "while running, the subdirectories are named", l.text );
 
   gate->release();
   l = wait_complete( server );

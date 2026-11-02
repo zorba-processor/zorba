@@ -332,8 +332,7 @@ Server::~Server() {
   stop_scan();
   if ( theScanner )
     theLog << server_name << ": the scan cache holds "
-           << theScanner->cache_bytes() << " bytes of "
-           << theConfig.scan_limits.max_memory << std::endl;
+           << theScanner->cache_summary() << std::endl;
 }
 
 void Server::stop_scan() {

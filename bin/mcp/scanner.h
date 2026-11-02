@@ -115,6 +115,9 @@ public:
   /** The bytes the cache accounts for (see ScanLimits::max_memory). */
   std::size_t cache_bytes() const;
 
+  /** One line on the cache, for the log. */
+  std::string cache_summary() const;
+
 private:
   struct Shared;
 

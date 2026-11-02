@@ -317,11 +317,14 @@ struct Scanner::Shared {
 
   // Guarded by theMutex, from here on.
 
-  std::string status() const {
-    bool const idle = theDirs.empty() && !theWalkerBusy && theFiles.empty() &&
+  bool idle() const {
+    return theDirs.empty() && !theWalkerBusy && theFiles.empty() &&
       !theSamplerBusy;
+  }
+
+  std::string status() const {
     std::string s( "\"scan\":{\"state\":\"" );
-    s += !idle ? "running" : theLimitHit ? "memory_limit" : "complete";
+    s += !idle() ? "running" : theLimitHit ? "memory_limit" : "complete";
     s += "\",\"files_found\":" + std::to_string( theEntries.size() ) +
       ",\"files_sampled\":" + std::to_string( theSampled ) + "}";
     return s;
@@ -771,12 +774,13 @@ struct Scanner::Shared {
       bool gone;
     };
     std::vector<Shown> shown;
-    std::size_t total = 0, dirs_total = 0;
-    std::vector<std::pair<std::string,std::size_t> > dirs;
+    std::size_t total = 0;
+    std::map<std::string,std::size_t> dirs;  // files known per subdirectory
     std::string const prefix( rel.empty() ? rel : rel + "/" );
     {
       std::lock_guard<std::mutex> lock( theMutex );
       std::string last_dir;
+      std::size_t *last_count = nullptr;
       for ( Entries::const_iterator it = theEntries.lower_bound( prefix );
             it != theEntries.end() &&
             it->first.compare( 0, prefix.size(), prefix ) == 0; ++it ) {
@@ -794,13 +798,15 @@ struct Scanner::Shared {
         if ( slash - prefix.size() != last_dir.size() ||
              it->first.compare( prefix.size(), last_dir.size(), last_dir ) != 0 ) {
           last_dir = it->first.substr( prefix.size(), slash - prefix.size() );
-          ++dirs_total;
-          if ( dirs.size() < max_dirs_shown )
-            dirs.emplace_back( prefix + last_dir, 0 );
+          last_count = &dirs[ prefix + last_dir ];
         }
-        if ( dirs_total <= max_dirs_shown )
-          ++dirs.back().second;
+        ++*last_count;
       }
+      // The ones the walker has not reached, or that have no files.
+      if ( limit > 0 )
+        for ( DirEntry const &de : found )
+          if ( de.is_dir )
+            dirs[ prefix + de.name ];
       // With a full index, the files of this directory that have no room in it
       // are still answered, from the listing just made.
       if ( theIndexFull ) {
@@ -869,25 +875,29 @@ struct Scanner::Shared {
     }
 
     std::string scan_status;
-    bool incomplete;
+    bool incomplete, idle;
     {
       std::lock_guard<std::mutex> lock( theMutex );
       scan_status = status();
       incomplete = theIndexFull;
+      idle = this->idle();
     }
     std::string dirs_members;
     if ( !dirs.empty() ) {
       dirs_members = ",\"dirs\":[";
-      for ( std::size_t i = 0; i < dirs.size(); ++i ) {
-        if ( i )
+      std::size_t count = 0;
+      for ( auto const &d : dirs ) {
+        if ( count == max_dirs_shown )
+          break;
+        if ( count++ )
           dirs_members += ',';
         dirs_members += "{\"path\":";
-        append_json_string( dirs_members, scan_valid_utf8( dirs[i].first ) );
-        dirs_members += ",\"files\":" + std::to_string( dirs[i].second ) + "}";
+        append_json_string( dirs_members, scan_valid_utf8( d.first ) );
+        dirs_members += ",\"files\":" + std::to_string( d.second ) + "}";
       }
       dirs_members += ']';
-      if ( dirs_total > dirs.size() )
-        dirs_members += ",\"dirs_total\":" + std::to_string( dirs_total );
+      if ( dirs.size() > count )
+        dirs_members += ",\"dirs_total\":" + std::to_string( dirs.size() );
       if ( dirs_members.size() > max_output / 2 )
         dirs_members.clear();
     }
@@ -917,7 +927,8 @@ struct Scanner::Shared {
                      std::to_string( shown_count ) );
     if ( incomplete )
       out += ",\"incomplete\":true";
-    if ( limit > 0 && shown_count < total )
+    // The files shown say what is under a directory, unless some are missing.
+    if ( limit > 0 && ( shown_count < total || !idle || incomplete ) )
       out += dirs_members;
     out += '}';
     return out + lines;
@@ -951,6 +962,14 @@ Scanner::Scanner( std::string const &root, ScanLimits const &limits,
 
 Scanner::~Scanner() {
   stop();
+}
+
+std::string Scanner::cache_summary() const {
+  std::lock_guard<std::mutex> lock( theShared->theMutex );
+  return std::to_string( theShared->theBytes ) + " bytes of " +
+    std::to_string( theShared->theLimits.max_memory ) + ", " +
+    std::to_string( theShared->theEntries.size() ) + " files, " +
+    std::to_string( theShared->theLru.size() ) + " previews";
 }
 
 std::size_t Scanner::cache_bytes() const {
