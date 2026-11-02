@@ -1452,10 +1452,12 @@ protected:
   xs_decimal theValue;
 
 protected:
+  // The value is kept compacted: one heap block instead of two (see
+  // Decimal::compacted()).
   DecimalItem(store::SchemaTypeCode t, const xs_decimal& v)
     :
     AtomicItem(t),
-    theValue(v)
+    theValue(v.compacted())
   {
   }
 

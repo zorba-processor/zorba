@@ -357,7 +357,7 @@ M_apm_pad(M_bin, k);          /* bytes is an exact power of 2       */
 
 if (k > rr->m_apm_malloclength)
   {
-   if ((vp = MAPM_REALLOC(rr->m_apm_data, (k + 32))) == NULL)
+   if ((vp = M_apm_realloc_data(rr, (k + 32))) == NULL)
      {
       /* fatal, this does not return */
 

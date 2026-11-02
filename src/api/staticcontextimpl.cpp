@@ -17,6 +17,8 @@
 #include "common/common.h"
 #include "api/staticcontextimpl.h"
 
+#include <algorithm>
+
 #include <zorba/error.h>
 #include <zorba/external_module.h>
 #include <zorba/diagnostic_handler.h>
@@ -1816,6 +1818,12 @@ StaticContextImpl::getExternalVariables(Iterator_t& aVarsIter) const
   ZORBA_TRY
   std::vector<VarInfo*> vars;
   theCtx->getVariables(vars, true, false, true);
+
+  // The variable maps are hashed by item pointer; report the variables in
+  // declaration order so the result is the same on every run.
+  std::stable_sort(vars.begin(), vars.end(),
+                   [](VarInfo const* a, VarInfo const* b)
+                   { return a->getSeq() < b->getSeq(); });
 
   std::vector<VarInfo*>::const_iterator ite = vars.begin();
   std::vector<VarInfo*>::const_iterator end = vars.end();

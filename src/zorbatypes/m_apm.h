@@ -25,6 +25,7 @@
 
 #ifdef __cplusplus
 #include <atomic>
+#include <cstddef>
 #endif
 
 /*
@@ -55,7 +56,7 @@ typedef unsigned char UCHAR;
 typedef struct  
 {
   UCHAR * m_apm_data;
-  long    m_apm_id;
+  int     m_apm_id;             /* M_APM_IDENT or M_APM_IDENT_INLINE */
   int     m_apm_refcount;       /* <- used only by C++ MAPM class */
   int     m_apm_malloclength;
   int     m_apm_datalength;
@@ -105,6 +106,9 @@ extern  M_APM_TLS M_APM MM_LOG_3_BASE_E;
  */
 
 extern  M_APM m_apm_init(void);
+extern  M_APM m_apm_init_compact_copy(M_APM);
+extern  int   m_apm_heap_bytes(M_APM);
+extern  int   m_apm_is_compact(M_APM);
 extern void  m_apm_free(M_APM);
 extern  void  m_apm_free_all_mem(void);
 extern  void  m_apm_trim_mem_usage(void);
@@ -240,7 +244,11 @@ int MM_cpp_min_precision;
 
 
   m_apm_id           : A sanity mark to check whether the struct has been
-                       corrupted.
+                       corrupted. Its value also tells where m_apm_data is:
+                       M_APM_IDENT_INLINE for digits stored in the struct's
+                       own allocation, right after it (m_apm_init and
+                       m_apm_init_compact_copy), M_APM_IDENT for a separate
+                       allocation (once the digits outgrow that space).
   m_apm_refcount     : Ref counter for memory management. Initialized to 1.
   m_apm_data         : uchar array that stores the encoded significant digits
                        of the number.
@@ -255,7 +263,7 @@ int MM_cpp_min_precision;
   typedef struct  
   {
     UCHAR * m_apm_data;
-    long    m_apm_id;
+    int     m_apm_id;
     int     m_apm_refcount;
     int     m_apm_malloclength;
     int     m_apm_datalength;
@@ -443,7 +451,7 @@ protected:
 
 public:
   /**
-   * Create an mapm number and set it to 0. This takes 2 memory allocations!
+   * Create an mapm number and set it to 0. This takes 1 memory allocation.
    */
   MAPM(void) 
   {
@@ -472,8 +480,8 @@ public:
   }
 
   /**
-   * Create an mapm number from a string. This takes at least 2 memory
-   * allocations!
+   * Create an mapm number from a string. This takes at least 1 memory
+   * allocation.
    */
   MAPM(const char* s) 
   { 
@@ -716,6 +724,33 @@ public:
   int is_zero(void) const { return (m_apm_sign(cval()) == 0); }
 
   int is_one(void) const { return (m_apm_compare(cval(), MAPM(1).cval()) == 0); }
+
+  /**
+   * Bytes that this number's M_APM_struct and digit array take from malloc
+   * (allocator headers and rounding not included).
+   */
+  size_t heap_bytes(void) const
+  {
+    return static_cast<size_t>(m_apm_heap_bytes(cval()));
+  }
+
+  /**
+   * Returns this number stored for keeping: one allocation that holds the
+   * M_APM_struct and, right after it, the digits, sized to fit (instead of
+   * the room for 160 digits a new number starts with, or the larger room
+   * that arithmetic may have grown). Returns this number itself (shared) if
+   * it is stored that way already. The value, and so every result computed
+   * from it, is the same.
+   */
+  MAPM compacted(void) const
+  {
+    if (m_apm_is_compact(cval()))
+      return *this;
+    threadInit();
+    MAPM r(m_apm_init_compact_copy(cval()));   // refcount 2
+    unref(r.myVal);                             // owned by r alone
+    return r;
+  }
 
   /* Functions: */
   MAPM abs(void) const

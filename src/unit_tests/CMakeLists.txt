@@ -18,6 +18,7 @@ SET(UNIT_TEST_SRCS
   test_ato_.cpp
   test_base64.cpp
   test_base64_streambuf.cpp
+  test_decimal_storage.cpp
   test_fs_util.cpp
   test_hashmaps.cpp
   test_hexbinary.cpp
@@ -31,6 +32,7 @@ SET(UNIT_TEST_SRCS
   test_ordpath.cpp
   test_parameters.cpp
   test_security_policy.cpp
+  test_small_integers.cpp
   test_string.cpp
   test_time.cpp
   test_time_parse.cpp
