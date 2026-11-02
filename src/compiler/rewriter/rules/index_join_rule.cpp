@@ -1120,6 +1120,10 @@ expr* IndexJoinRule::createNormalizedProbe(
   var_expr* keyVar = theRCtx->createTempVar(sctx, loc, var_expr::let_var);
   keyVar->set_type(outerKeyExpr->get_return_type());
 
+  // First: the type of keyVar, asked for below, comes from its clause.
+  flwor_expr* flwor = em->create_flwor_expr(sctx, udf, loc);
+  flwor->add_clause(em->create_let_clause(sctx, loc, keyVar, outerKeyExpr));
+
   expr* floatProbe =
   em->create_fo_expr(sctx, udf, loc,
                      BUILTIN_FUNC(FN_ZORBA_XQDDF_PROBE_INDEX_POINT_VALUE_N),
@@ -1136,8 +1140,6 @@ expr* IndexJoinRule::createNormalizedProbe(
                      qnameExpr,
                      createNormalizedKey(keyVar, sctx, udf, loc));
 
-  flwor_expr* flwor = em->create_flwor_expr(sctx, udf, loc);
-  flwor->add_clause(em->create_let_clause(sctx, loc, keyVar, outerKeyExpr));
   flwor->set_return_expr(
     em->create_if_expr(sctx, udf, loc,
                        em->create_fo_expr(sctx, udf, loc, BUILTIN_FUNC(OP_OR_N), args),
