@@ -47,8 +47,10 @@ struct ServerConfig {
   std::chrono::milliseconds timeout{ std::chrono::seconds( 30 ) };
   /** The maximum size of a tool's text output, in bytes. */
   std::size_t max_output = 128 * 1024;
-  /** The byte budget of the document cache (0: no cache). */
-  std::size_t cache_bytes = 0;
+  /** The largest file the document cache admits, in KiB (0: no cache). */
+  std::size_t cache_max_file_kb = 64;
+  /** How many documents the document cache keeps (0: no cache). */
+  std::size_t cache_max_files = 10;
 };
 
 /**
@@ -81,6 +83,9 @@ public:
 
   /** The counters of the document cache. */
   DocumentCache::Stats cache_stats() const { return theCache.stats(); }
+
+  /** The counters as one line for the log; empty without a cache. */
+  std::string cache_stats_line() const { return theCache.stats_line(); }
 
 private:
   struct Param {

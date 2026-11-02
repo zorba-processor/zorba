@@ -45,7 +45,7 @@ namespace mcp {
  * context resolve it to an external function backed by this cache. On a
  * miss, the cache builds the record by running dir:open in a query of its
  * own, compiled under the server's security policy with the installed
- * (non-caching) hook, and stores what that query returns. Records only
+ * (non-caching) hook, and admissions what that query returns. Records only
  * enter the cache that way: a user query cannot hand the cache a record.
  *
  * A record is keyed by the root and the path it was opened with, and is
@@ -65,7 +65,7 @@ public:
   struct Stats {
     std::size_t hits = 0;
     std::size_t misses = 0;
-    std::size_t stores = 0;
+    std::size_t admissions = 0;
     std::size_t evictions = 0;
     std::size_t entries = 0;
     std::size_t bytes = 0;      // sum of the estimates of the entries
@@ -108,6 +108,12 @@ public:
   void clear();
 
   Stats stats() const;
+
+  /** The counters as one line for the log; empty if the cache is disabled. */
+  std::string stats_line() const;
+
+  /** The memory of the hit tracker. */
+  static std::size_t tracker_bytes() { return 0; }
 
   /** The estimated in-memory size of a parsed file of \a size bytes. */
   static std::size_t estimate( std::string const &path, std::uintmax_t size );

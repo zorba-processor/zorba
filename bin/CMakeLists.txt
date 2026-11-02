@@ -332,7 +332,8 @@ IF (ZORBA_WITH_FILE_ACCESS)
              optional_params documents_stream deep_json deep_json_binary
              entity_expansion case_paths html_edge_cases
              cache_hit cache_invalidate cache_evict cache_off cache_policy
-             cache_inject)
+             cache_inject cache_size cache_default cache_abort cache_errors
+             cache_counters)
       ADD_TEST (NAME bin/mcp/${_t}
         COMMAND "mcp_tests${_mcp_suffix}" ${_t} "${_dirtree}" "${_mcpq}"
           "${_dirq}/join.xq" "$<TARGET_FILE:zorba_mcp${_mcp_suffix}>")

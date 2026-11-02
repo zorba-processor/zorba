@@ -39,7 +39,8 @@ namespace {
 
 char const usage[] =
   "Usage: zorba-mcp --root <dir> [--queries <dir>] [--timeout <seconds>]\n"
-  "                 [--max-output <bytes>] [--cache-mb <MiB>]\n"
+  "                 [--max-output <bytes>] [--cache-max-file-kb <KB>]\n"
+  "                 [--cache-max-files <N>]\n"
   "\n"
   "An MCP server (stdio transport) over the Zorba JSONiq/XQuery processor.\n"
   "Queries run under the secure policy, reading only files under --root\n"
@@ -52,10 +53,13 @@ char const usage[] =
   "  --timeout <seconds>  time limit of one tool call (default 30, 0: none)\n"
   "  --max-output <bytes> output size limit of one tool call (default\n"
   "                       131072); longer output is cut with a marker\n"
-  "  --cache-mb <MiB>     memory budget of the parsed documents kept across\n"
-  "                       calls (default 0: no cache); a document is\n"
-  "                       served from the cache only while its file is\n"
-  "                       unchanged\n";
+  "  --cache-max-file-kb <KB>\n"
+  "                       the largest file whose parsed document is kept\n"
+  "                       across calls, from its second read on, while the\n"
+  "                       file is unchanged (default 64, 0: no cache)\n"
+  "  --cache-max-files <N>\n"
+  "                       how many parsed documents are kept, least\n"
+  "                       recently used out first (default 10, 0: no cache)\n";
 
 bool parse_number( char const *s, unsigned long long *n ) {
   if ( !s || !*s )
@@ -93,9 +97,12 @@ int main( int argc, char const *argv[] ) {
     } else if ( arg == "--max-output" && parse_number( val, &n ) && n > 0 ) {
       config.max_output = static_cast<std::size_t>( n );
       ++i;
-    } else if ( arg == "--cache-mb" && parse_number( val, &n ) &&
-                n <= ( SIZE_MAX >> 20 ) ) {
-      config.cache_bytes = static_cast<std::size_t>( n ) << 20;
+    } else if ( arg == "--cache-max-file-kb" && parse_number( val, &n ) &&
+                n <= ( SIZE_MAX >> 10 ) ) {
+      config.cache_max_file_kb = static_cast<std::size_t>( n );
+      ++i;
+    } else if ( arg == "--cache-max-files" && parse_number( val, &n ) ) {
+      config.cache_max_files = static_cast<std::size_t>( n );
       ++i;
     } else {
       return fail( "invalid argument: " + arg );
@@ -154,6 +161,9 @@ int main( int argc, char const *argv[] ) {
         break;
       }
     }
+    std::string const cache_line( server.cache_stats_line() );
+    if ( !cache_line.empty() )
+      std::cerr << cache_line << std::endl;
   }
   if ( std::fclose( out ) == EOF && status == 0 ) {
     std::cerr << "zorba-mcp: cannot write to stdout" << std::endl;

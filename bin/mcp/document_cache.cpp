@@ -203,6 +203,17 @@ DocumentCache::Stats DocumentCache::stats() const {
   return theStats;
 }
 
+std::string DocumentCache::stats_line() const {
+  if ( !enabled() )
+    return std::string();
+  Stats const s( stats() );
+  return "zorba-mcp: cache: hits=" + std::to_string( s.hits ) +
+    " misses=" + std::to_string( s.misses ) +
+    " admissions=" + std::to_string( s.admissions ) +
+    " evictions=" + std::to_string( s.evictions ) +
+    " bytes_retained=" + std::to_string( s.bytes );
+}
+
 // Bytes of memory per byte of file, measured with bench/directory (peak RSS
 // of a query holding every parsed document, over the size of the files).
 std::size_t DocumentCache::estimate( std::string const &path,
@@ -357,7 +368,7 @@ void DocumentCache::store( std::string const &key, std::string const &path,
     Entry{ sig, record, bytes, theQuery, theLru.begin() } );
   theStats.bytes += bytes;
   theStats.entries = theEntries.size();
-  ++theStats.stores;
+  ++theStats.admissions;
 }
 
 } // namespace mcp
