@@ -55,7 +55,11 @@ xmlParserErrors resource_loader(
     if (lSecurity == nullptr || !lSecurity->allowResource(aURL))
       return XML_IO_EACCES;
   }
-  return xmlNewInputFromUrl(aURL, aFlags, aOut);
+  xmlParserErrors const lResult = xmlNewInputFromUrl(aURL, aFlags, aOut);
+  if (lResult != XML_ERR_OK && aType == XML_RESOURCE_GENERAL_ENTITY &&
+      theCurrent != nullptr)
+    theCurrent->entityUnreadable();
+  return lResult;
 }
 
 #else /* LIBXML_VERSION < 21400 */
@@ -71,15 +75,19 @@ xmlParserInputPtr entity_loader(
     const char* aID,
     xmlParserCtxtPtr aCtxt)
 {
-  if (ParserSecurity* const lSecurity = theCurrent)
-  {
-    if (!lSecurity->allowResource(aURL))
-      return nullptr;
-  }
+  ParserSecurity* const lSecurity = theCurrent;
+  if (lSecurity != nullptr && !lSecurity->allowResource(aURL))
+    return nullptr;
   xmlExternalEntityLoader const lNext = theNextLoader.load();
-  if (lNext == nullptr)
-    return xmlNoNetExternalEntityLoader(aURL, aID, aCtxt);
-  return lNext(aURL, aID, aCtxt);
+  xmlParserInputPtr const lInput =
+    lNext == nullptr ? xmlNoNetExternalEntityLoader(aURL, aID, aCtxt)
+                     : lNext(aURL, aID, aCtxt);
+  // This loader is not told what it loads: outside the DTD (inSubset is 0),
+  // it is an external general entity referenced from the content.
+  if (lInput == nullptr && lSecurity != nullptr &&
+      aCtxt != nullptr && aCtxt->inSubset == 0)
+    lSecurity->entityUnreadable();
+  return lInput;
 }
 
 void install_entity_loader()
@@ -110,7 +118,8 @@ bool allows_external_resource(const SecurityPolicy& aPolicy, const char* aURI)
 ParserSecurity::ParserSecurity(const SecurityPolicy& aPolicy)
   :
   thePolicy(aPolicy),
-  theDenied(false)
+  theDenied(false),
+  theUnreadableEntity(false)
 {
 }
 
@@ -119,7 +128,8 @@ ParserSecurity::ParserSecurity(const SecurityPolicy* aPolicy)
   :
   thePolicy(aPolicy ? *aPolicy
                     : GENV_ROOT_STATIC_CONTEXT.get_security_policy()),
-  theDenied(false)
+  theDenied(false),
+  theUnreadableEntity(false)
 {
 }
 
