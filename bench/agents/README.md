@@ -211,7 +211,10 @@ ANTHROPIC_API_KEY=... python3 bench/agents/harness.py --backend api \
 Options: `--backend api|claude-code`, `--model`, `--runs`, `--config
 A|B|both`, `--tasks`, `--effort`, `--max-turns`, `--max-tokens`,
 `--tool-timeout`, `--max-output`, `--mcp-command` (how to start zorba-mcp;
-`{snapshot}` is replaced), `--sandbox-image`, `--queries-dir` (predefined
+`{snapshot}` is replaced), `--language xquery|jsoniq` (default `xquery`;
+passed to zorba-mcp as `--language`, it is the language of a query without a
+version declaration and applies to configuration A only; `summary.json`,
+the `summary.md` title and every line of `runs.jsonl` record it), `--sandbox-image`, `--queries-dir` (predefined
 query tools for A), `--out`; for `claude-code` also `--claude-command` (claude
 on the host, A), `--claude-image` (B), `--egress-allow`, `--run-timeout` and
 `--check-cli`.

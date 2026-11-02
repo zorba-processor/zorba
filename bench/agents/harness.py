@@ -229,7 +229,8 @@ def mcp_command(args):
            for part in shlex.split(args.mcp_command)]
     if args.queries_dir:
         cmd += ["--queries", args.queries_dir]
-    return cmd + ["--timeout", str(args.tool_timeout),
+    return cmd + ["--language", args.language,
+                  "--timeout", str(args.tool_timeout),
                   "--max-output", str(args.max_output)]
 
 
@@ -862,7 +863,7 @@ def mean_or_none(xs):
     return sum(xs) / len(xs) if xs else None
 
 
-def summarize(records, model, dry_run, backend):
+def summarize(records, model, dry_run, backend, language="xquery"):
     groups = collections.defaultdict(list)
     for r in records:
         groups[(r["task"], r["config"])].append(r)
@@ -919,15 +920,15 @@ def summarize(records, model, dry_run, backend):
             "mean_repeatability": sum(r["repeatability"] for r in cr) / len(cr),
             "fully_repeatable_tasks": sum(r["repeatability"] == 1 for r in cr),
         })
-    return {"model": model, "backend": backend, "dry_run": dry_run,
-            "per_task": rows, "aggregate": agg}
+    return {"model": model, "backend": backend, "language": language,
+            "dry_run": dry_run, "per_task": rows, "aggregate": agg}
 
 
 def markdown(summary):
     def f(x, nd=2):
         return "-" if x is None else f"{x:.{nd}f}"
     out = [f"# Agent benchmark: {summary['model']} "
-           f"(backend {summary['backend']})"
+           f"(backend {summary['backend']}, language {summary['language']})"
            + (" (dry run, scripted fake model)" if summary["dry_run"] else ""),
            "",
            "A = zorba-mcp tools only; B = bash sandbox only. Tokens include "
@@ -986,6 +987,11 @@ def main():
     ap.add_argument("--mcp-command", default="zorba-mcp --root {snapshot}",
                     help="command that starts zorba-mcp ({snapshot} is "
                     "replaced); --timeout and --max-output are appended")
+    ap.add_argument("--language", choices=["xquery", "jsoniq"],
+                    default="xquery",
+                    help="language of a query without a version declaration, "
+                    "passed to zorba-mcp as --language (configuration A); "
+                    "recorded in the results")
     ap.add_argument("--queries-dir", default="",
                     help="predefined query tools for A; must not contain "
                     "queries that answer a task")
@@ -1082,7 +1088,8 @@ def main():
     if status:
         return status
 
-    summary = summarize(records, args.model, args.dry_run, args.backend)
+    summary = summarize(records, args.model, args.dry_run, args.backend,
+                      args.language)
     with open(os.path.join(args.out, "summary.json"), "w") as f:
         json.dump(summary, f, indent=1)
     md = markdown(summary)
@@ -1118,7 +1125,7 @@ def run_all(args, tasks, configs, truth, records, lock, runs_path, mcp_log,
                                      task["grading"])
                        if res["answer"] is not None else "no answer")
                 rec = {"task": task["id"], "config": cfg, "run": run,
-                       "backend": args.backend,
+                       "backend": args.backend, "language": args.language,
                        "model": "fake" if args.dry_run else args.model,
                        "time": now_iso(), "correct": why is None,
                        "grading": why, **res,
