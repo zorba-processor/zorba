@@ -95,7 +95,7 @@ char const* get_help_msg() {
       "Allow the given capabilities to queries (see --secure for the names). Applied in command-line order with --deny, after the starting policy: \"--secure --allow file-read\" and \"--deny all --allow file-read\" are equivalent. Repeatable.\n\n"
 
     HELP_OPT( "--as-files, -f" )
-      "Treat all -q arguments as file paths instead of URIs or inline queries. This option is deprecated and will be defaulted to true in the future, so any entry in the command line is going to be treated as files.\n\n"
+      "Treat all -q arguments as file paths instead of URIs or inline queries. This option is deprecated and will be defaulted to true in the future, so any entry in the command line is going to be treated as files. The language of a file query: see --language.\n\n"
 
     ////////// b //////////////////////////////////////////////////////////////
 
@@ -196,9 +196,12 @@ char const* get_help_msg() {
     ////////// j //////////////////////////////////////////////////////////////
 
     HELP_OPT( "--jsoniq, -j" )
-      "Force queries to be considered JSONiq.\n\n"
+      "The same as --language jsoniq. It does not override a declaration or a .jq or .xq extension (see --language).\n\n"
 
     ////////// l //////////////////////////////////////////////////////////////
+
+    HELP_OPT( "--language {xquery|jsoniq}" )
+      "Language of a query, in this order: (1) a jsoniq version or xquery version declaration at the very start of the query (one preceded by a comment is not detected); (2) for a file, its extension (.jq is JSONiq, .xq is XQuery); (3) this option. Default: xquery. The option does not override an extension: --jsoniq -f q.xq is XQuery. --parse-only and the parse that --compile-only does first do not apply this rule (a .jq file with JSONiq-only syntax fails there).\n\n"
 
     HELP_OPT( "--lib-module, -l" )
       "Query compiler option to treat the query as a library module. If this is set --compile-only option is also set to true.\n\n"
@@ -715,6 +718,18 @@ int parse_args( int argc, char const *argv[] ) {
 
     ////////// l //////////////////////////////////////////////////////////////
 
+    else if ( IS_LONG_OPT( "--language" ) ) {
+      PARSE_ARG( "--language" );
+      string const val( ARG_VAL );
+      if ( val == "jsoniq" )
+        zc_props.jsoniq_ = true;
+      else if ( val == "xquery" )
+        zc_props.jsoniq_ = false;
+      else {
+        error = "--language argument must be one of: xquery or jsoniq.\n";
+        break;
+      }
+    }
     else if ( IS_OPT( "--lib-module", "-l" ) )
       zc_props.lib_module_ = true;
     else if ( IS_LONG_OPT( "--lib-path" ) ) {

@@ -360,6 +360,7 @@
 #define ZED_NoMultiKeyNodeValues_2 "~NoMultiKeyNodeValues_2"
 #define ZED_NoParseFnArity "~NoParseFnArity"
 #define ZED_NoRegisteredSerializationCallback_2 "~NoRegisteredSerializationCallback_2"
+#define ZED_URIHasFragment "~URIHasFragment"
 #define ZED_NoResolveRelativeURI "~NoResolveRelativeURI"
 #define ZED_NoSeqAsArithOp "~NoSeqAsArithOp"
 #define ZED_NoSeqAsCollationParam "~NoSeqAsCollationParam"
