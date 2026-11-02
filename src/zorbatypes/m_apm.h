@@ -25,6 +25,7 @@
 
 #ifdef __cplusplus
 #include <atomic>
+#include <cstddef>
 #endif
 
 /*
@@ -716,6 +717,15 @@ public:
   int is_zero(void) const { return (m_apm_sign(cval()) == 0); }
 
   int is_one(void) const { return (m_apm_compare(cval(), MAPM(1).cval()) == 0); }
+
+  /**
+   * Bytes that this number's M_APM_struct and digit array take from malloc
+   * (allocator headers and rounding not included).
+   */
+  size_t heap_bytes(void) const
+  {
+    return sizeof(M_APM_struct) + cval()->m_apm_malloclength + 4;
+  }
 
   /* Functions: */
   MAPM abs(void) const

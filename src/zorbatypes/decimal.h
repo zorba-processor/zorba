@@ -221,6 +221,12 @@ public:
 
   size_t alloc_size() const;
 
+  /**
+   * Gets the number of bytes the value takes from malloc (allocator headers
+   * and rounding not included).
+   */
+  size_t heap_bytes() const { return value_.heap_bytes(); }
+
   bool is_xs_int() const;
   bool is_xs_integer() const;
   bool is_xs_long() const;
