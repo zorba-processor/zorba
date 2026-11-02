@@ -620,10 +620,12 @@ void test_optional_params( Fixture const &f ) {
   // 1. The input schemas.
   Json const *const res1 = by_id["1"].find( "result" );
   Json const *const tools = res1 ? res1->find( "tools" ) : nullptr;
-  std::string greet, scale;
+  std::string greet, scale, ordered;
   if ( tools && tools->is_array() )
     for ( Json const &t : tools->items() ) {
-      if ( field( t, "name" ) == "greet" )
+      if ( field( t, "name" ) == "ordered" )
+        ordered = t.dump();
+      else if ( field( t, "name" ) == "greet" )
         greet = t.dump();
       else if ( field( t, "name" ) == "scale" )
         scale = t.dump();
@@ -635,6 +637,27 @@ void test_optional_params( Fixture const &f ) {
   check( contains( scale, "\"required\":[\"value\"]" ) &&
          contains( scale, "\"factor\":" ),
          "scale: $value required, defaulted $factor optional", scale );
+
+  // The properties are listed in declaration order, so the tool list is the
+  // same on every run.
+  {
+    size_t pos = 0;
+    bool in_order = !ordered.empty();
+    for ( char const *n : { "zeta", "alpha", "mid", "beta", "omega", "kappa",
+                            "delta", "sigma" } ) {
+      size_t const at = ordered.find( std::string( "\"" ) + n + "\":{", pos );
+      if ( at == std::string::npos ) {
+        in_order = false;
+        break;
+      }
+      pos = at;
+    }
+    check( in_order, "properties follow declaration order", ordered );
+    check( contains( ordered,
+             "\"required\":[\"zeta\",\"mid\",\"omega\",\"delta\"]" ),
+           "required lists the required parameters in declaration order",
+           ordered );
+  }
 
   // 2. Defaults and overrides.
   check( !is_tool_error( by_id["2"] ) &&
