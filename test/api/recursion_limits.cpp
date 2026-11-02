@@ -306,7 +306,9 @@ void test_memory(Zorba* z)
 {
 #ifdef ZORBA_TEST_SANITIZER
   int const n = 15;
-  long long const allowed = 640LL << 20;
+  // Measured per run: at most 148 MiB. Without the release of completed
+  // calls, 32768 calls at about 11 KB each would add 360 MiB or more.
+  long long const allowed = 320LL << 20;
 #else
   int const n = 17;
   long long const allowed = 128LL << 20;
