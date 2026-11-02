@@ -6,7 +6,9 @@
  : writes N files of at most K KB each under DIR, all of the shape S:
  :   xml-empty     one element per 4 bytes
  :   xml-attrs     one element with an attribute per 9 bytes
- :   xml-entity    one internal entity that expands to much more than the file
+ :   xml-entity-R  an internal entity of 1000 elements, referenced R times
+ :                 (the file is about 4 KB; libxml2 refuses too large an
+ :                 expansion, and the document then has an error record)
  :   json-arrays   one empty array per 3 bytes
  :   json-objects  one object of one member per 8 bytes
  :   csv-rows      one row of one column per 2 bytes
@@ -33,10 +35,6 @@ declare function local:content( $bytes as xs:integer ) as xs:string
     concat( "<a>", local:times( "<b/>", ( $bytes - 7 ) idiv 4 ), "</a>" )
   case "xml-attrs" return
     concat( "<a>", local:times( "<b c=''/>", ( $bytes - 7 ) idiv 9 ), "</a>" )
-  case "xml-entity" return
-    (: 4 KB of elements, referenced as often as the file has room for. :)
-    concat( '<!DOCTYPE a [<!ENTITY e "', local:times( "<b/>", 1000 ), '">]><a>',
-            local:times( "&amp;e;", ( $bytes - 4040 ) idiv 3 ), "</a>" )
   case "json-arrays" return
     concat( "[", local:times( "[],", ( $bytes - 4 ) idiv 3 ), "[]]" )
   case "json-objects" return
@@ -48,6 +46,11 @@ declare function local:content( $bytes as xs:integer ) as xs:string
   case "html-p" return
     concat( "<html><body>", local:times( "<p>", ( $bytes - 12 ) idiv 3 ) )
   default return
+    if ( starts-with( $shape, "xml-entity-" ) ) then
+      concat( '<!DOCTYPE a [<!ENTITY e "', local:times( "<b/>", 1000 ), '">]><a>',
+              local:times( "&amp;e;", xs:integer( substring-after( $shape, "xml-entity-" ) ) ),
+              "</a>" )
+    else
     error( xs:QName( "local:SHAPE" ), concat( "unknown shape: ", $shape ) )
 };
 
