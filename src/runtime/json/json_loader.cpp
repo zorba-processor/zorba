@@ -251,9 +251,12 @@ bool loader::next( store::Item_t *result ) {
           }
           catch ( std::range_error const& ) {
             //
-            // The number does not fit the type (e.g. xs:double overflows).
-            // Raise what an out-of-range numeric literal in a query raises
-            // instead of letting std::range_error escape as an internal error.
+            // An xs:double never gets here: XSD 1.1 floatingPointRound maps a
+            // value out of its range to INF, -INF or zero, so 1e999 is INF, as
+            // in xs:double("1e999").  This is for a number that xs:decimal
+            // rejects: raise what an out-of-range numeric literal in a query
+            // raises instead of letting std::range_error escape as an internal
+            // error.
             //
             throw XQUERY_EXCEPTION(
               err::FOAR0002,
