@@ -67,7 +67,7 @@ namespace simplestore {
 
 #define ZORBA_LOADER_CHECK_ERROR(loader) \
   do { \
-    if (!loader.theXQueryDiagnostics->errors().empty()) \
+    if (loader.theOutOfMemory || !loader.theXQueryDiagnostics->errors().empty()) \
       return; \
   } while (0);
 
@@ -95,6 +95,30 @@ XmlLoader::XmlLoader(
 
 XmlLoader::~XmlLoader() 
 {
+}
+
+
+void XmlLoader::setOutOfMemory() noexcept
+{
+  theOutOfMemory = true;
+  if (ctxt != NULL)
+    xmlStopParser(ctxt);
+}
+
+
+void XmlLoader::noteOutOfMemory() noexcept
+{
+  try
+  {
+    throw;
+  }
+  catch (std::bad_alloc const&)
+  {
+    setOutOfMemory();
+  }
+  catch (...)
+  {
+  }
 }
 
 
@@ -142,6 +166,12 @@ void XmlLoader::error(void* ctx, ZORBA_XML_ERROR_PTR error)
 {
   if ( error->level == XML_ERR_NONE )
     return;
+
+  if ( error->code == XML_ERR_NO_MEMORY )
+  {
+    static_cast<XmlLoader*>( ctx )->setOutOfMemory();
+    return;
+  }
 
   ascii::itoa_buf_type itoa_buf;
 
@@ -406,6 +436,7 @@ std::streamsize FastXmlLoader::readPacket(std::istream& stream, char* buf, long 
   }
   catch (...)
   {
+    noteOutOfMemory();
     theXQueryDiagnostics->add_error(
       NEW_ZORBA_EXCEPTION( zerr::ZSTR0020_LOADER_IO_ERROR )
     );
@@ -479,6 +510,8 @@ store::Item_t FastXmlLoader::loadXml(
 
     if (ctxt == NULL)
     {
+      // Only a failed allocation makes this fail.
+      setOutOfMemory();
       theXQueryDiagnostics->
       add_error(NEW_ZORBA_EXCEPTION(zerr::ZSTR0021_LOADER_PARSING_ERROR,
                                     ERROR_PARAMS(ZED(XMLParserInitFailed))));
@@ -527,6 +560,7 @@ store::Item_t FastXmlLoader::loadXml(
   }
   catch (...)
   {
+    noteOutOfMemory();
     theXQueryDiagnostics->add_error(
       NEW_ZORBA_EXCEPTION(zerr::ZXQP0003_INTERNAL_ERROR));
     abortload();
@@ -607,6 +641,10 @@ void FastXmlLoader::startDocument(void * ctx)
   catch (ZorbaException const& e)
   {
     loader.theXQueryDiagnostics->add_error( e );
+  }
+  catch (std::bad_alloc const&)
+  {
+    loader.setOutOfMemory();
   }
   catch (...)
   {
@@ -692,6 +730,10 @@ void FastXmlLoader::endDocument(void * ctx)
   catch (ZorbaException const& e)
   {
     loader.theXQueryDiagnostics->add_error( e );
+  }
+  catch (std::bad_alloc const&)
+  {
+    loader.setOutOfMemory();
   }
   catch (...)
   {
@@ -942,6 +984,10 @@ void FastXmlLoader::startElement(
   {
     loader.theXQueryDiagnostics->add_error( e );
   }
+  catch (std::bad_alloc const&)
+  {
+    loader.setOutOfMemory();
+  }
   catch (...)
   {
     loader.theXQueryDiagnostics->
@@ -1070,6 +1116,10 @@ void  FastXmlLoader::endElement(
   {
     loader.theXQueryDiagnostics->add_error( e );
   }
+  catch (std::bad_alloc const&)
+  {
+    loader.setOutOfMemory();
+  }
   catch (...)
   {
     loader.theXQueryDiagnostics->add_error(
@@ -1120,6 +1170,10 @@ void FastXmlLoader::characters(void * ctx, const xmlChar * ch, int len)
   catch (ZorbaException const& e)
   {
     loader.theXQueryDiagnostics->add_error( e );
+  }
+  catch (std::bad_alloc const&)
+  {
+    loader.setOutOfMemory();
   }
   catch (...)
   {
@@ -1174,6 +1228,10 @@ void FastXmlLoader::cdataBlock(void * ctx, const xmlChar * ch, int len)
   {
     loader.theXQueryDiagnostics->add_error( e );
   }
+  catch (std::bad_alloc const&)
+  {
+    loader.setOutOfMemory();
+  }
   catch (...)
   {
     loader.theXQueryDiagnostics->add_error(
@@ -1224,6 +1282,10 @@ void FastXmlLoader::processingInstruction(
   {
     loader.theXQueryDiagnostics->add_error( e );
   }
+  catch (std::bad_alloc const&)
+  {
+    loader.setOutOfMemory();
+  }
   catch (...)
   {
     loader.theXQueryDiagnostics->add_error(
@@ -1268,6 +1330,10 @@ void FastXmlLoader::comment(void * ctx, const xmlChar * ch)
   catch (ZorbaException const& e)
   {
     loader.theXQueryDiagnostics->add_error( e );
+  }
+  catch (std::bad_alloc const&)
+  {
+    loader.setOutOfMemory();
   }
   catch (...)
   {

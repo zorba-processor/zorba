@@ -72,5 +72,15 @@ Rules this code depends on:
   allocation ends the scan as at `memory_limit`; it must not leave a libxml2
   callback, which is C code.
 
+- On the main thread a failed allocation ends the query: std::bad_alloc reaches
+  `Server::run()`, and is the tool error `memory_limit`. What makes this hold:
+  destructors and what they call do not allocate (`JSONItem::destroy()`), or may
+  throw and do not while unwinding (`string_appender`); MAPM throws instead of
+  calling `exit()`; a failure in a libxml2 callback is kept by the loader and
+  thrown after the parse; a catch clause of a query does not catch it. The main
+  stack takes its size before the limit is set, since at the limit it could not
+  grow. Whatever still leaves a `noexcept` function ends the process with status 3
+  and a message (`on_terminate()`, `--help`).
+
 Tests hold the threads at known points with `ServerConfig::scan_hook`. Tests
 under ThreadSanitizer: the `tsan-mcp` job of `sanitizers.yml`.

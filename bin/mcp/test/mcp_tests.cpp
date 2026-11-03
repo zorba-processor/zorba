@@ -1336,7 +1336,10 @@ char const *const exhaustion_queries[] = {
   "dir:open($dir:root, (\"data.xml\", \"x\")[$i gt 0][1]).content",
   "concat(string-join(for $j in 1 to 100000 return \"0123456789\"), $i)",
   "(parse-json(file:read-text($dir:root || \"/numbers.json\" || "
-    "substring(\"\", $i)))[] ! ($$ * 3.5))"
+    "substring(\"\", $i)))[] ! ($$ * 3.5))",
+  // A catch clause does not make the query go on.
+  "try { parse-json(file:read-text($dir:root || \"/data.json\" || "
+    "substring(\"\", $i))) } catch * { () }"
 };
 
 // A query that runs out of memory gets the tool error memory_limit and the same
@@ -1482,6 +1485,9 @@ void test_exhaust_strings( Fixture const &f ) {
 }
 void test_exhaust_numbers( Fixture const &f ) {
   memory_exhaustion( f, exhaustion_queries[6] );
+}
+void test_exhaust_try( Fixture const &f ) {
+  memory_exhaustion( f, exhaustion_queries[7] );
 }
 
 // The same contract where an address-space limit cannot be used (sanitizer
@@ -4490,6 +4496,7 @@ Test const tests[] = {
   { "exhaust_xml", test_exhaust_xml },
   { "exhaust_strings", test_exhaust_strings },
   { "exhaust_numbers", test_exhaust_numbers },
+  { "exhaust_try", test_exhaust_try },
   { "exhaust_injected", test_exhaust_injected },
   { "optional_params", test_optional_params },
   { "documents_stream", test_documents_stream },

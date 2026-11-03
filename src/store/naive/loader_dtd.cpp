@@ -279,6 +279,8 @@ void FragmentXmlLoader::startParser()
                                     *input_uri ? input_uri : NULL);
   if (fs.ctxt == NULL)
   {
+    // Only a failed allocation makes this fail.
+    setOutOfMemory();
     theXQueryDiagnostics->add_error(NEW_ZORBA_EXCEPTION(zerr::ZSTR0021_LOADER_PARSING_ERROR, ERROR_PARAMS( ZED( XMLParserInitFailed ) )));
     throw 0; // the argument to throw is not used by the catch clause
   }
@@ -560,6 +562,7 @@ store::Item_t FragmentXmlLoader::loadXml(
   }
   catch (...)
   {
+    noteOutOfMemory();
     fs.current_loader = NULL;
     fs.parser_done = true;
     fs.events.clear();
@@ -899,6 +902,7 @@ std::streamsize DtdXmlLoader::readPacket(std::istream& stream, char* buf, std::s
   }
   catch (...)
   {
+    noteOutOfMemory();
     theXQueryDiagnostics->add_error(
       NEW_ZORBA_EXCEPTION( zerr::ZSTR0020_LOADER_IO_ERROR )
     );
@@ -980,6 +984,8 @@ store::Item_t DtdXmlLoader::loadXml(
 
     if (ctxt == NULL)
     {
+      // Only a failed allocation makes this fail.
+      setOutOfMemory();
       theXQueryDiagnostics->add_error(
         NEW_ZORBA_EXCEPTION(
           zerr::ZSTR0021_LOADER_PARSING_ERROR,
@@ -1030,6 +1036,7 @@ store::Item_t DtdXmlLoader::loadXml(
   }
   catch (...)
   {
+    noteOutOfMemory();
     theXQueryDiagnostics->add_error(
       NEW_ZORBA_EXCEPTION(zerr::ZXQP0003_INTERNAL_ERROR));
     abortload();
@@ -1252,6 +1259,10 @@ void DtdXmlLoader::startDocument(void * ctx)
   {
     loader.theXQueryDiagnostics->add_error( e );
   }
+  catch (std::bad_alloc const&)
+  {
+    loader.setOutOfMemory();
+  }
   catch (...)
   {
     loader.theXQueryDiagnostics->add_error(
@@ -1333,6 +1344,10 @@ void DtdXmlLoader::endDocument(void * ctx)
   catch (ZorbaException const& e)
   {
     loader.theXQueryDiagnostics->add_error( e );
+  }
+  catch (std::bad_alloc const&)
+  {
+    loader.setOutOfMemory();
   }
   catch (...)
   {
@@ -1641,6 +1656,10 @@ void DtdXmlLoader::startElement(
   {
     loader.theXQueryDiagnostics->add_error( e );
   }
+  catch (std::bad_alloc const&)
+  {
+    loader.setOutOfMemory();
+  }
   catch (...)
   {
     loader.theXQueryDiagnostics->
@@ -1773,6 +1792,10 @@ void  DtdXmlLoader::endElement(
   {
     loader.theXQueryDiagnostics->add_error( e );
   }
+  catch (std::bad_alloc const&)
+  {
+    loader.setOutOfMemory();
+  }
   catch (...)
   {
     loader.theXQueryDiagnostics->add_error(
@@ -1823,6 +1846,10 @@ void DtdXmlLoader::characters(void * ctx, const xmlChar * ch, int len)
   catch (ZorbaException const& e)
   {
     loader.theXQueryDiagnostics->add_error( e );
+  }
+  catch (std::bad_alloc const&)
+  {
+    loader.setOutOfMemory();
   }
   catch (...)
   {
@@ -1877,6 +1904,10 @@ void DtdXmlLoader::cdataBlock(void * ctx, const xmlChar * ch, int len)
   {
     loader.theXQueryDiagnostics->add_error( e );
   }
+  catch (std::bad_alloc const&)
+  {
+    loader.setOutOfMemory();
+  }
   catch (...)
   {
     loader.theXQueryDiagnostics->add_error(
@@ -1927,6 +1958,10 @@ void DtdXmlLoader::processingInstruction(
   {
     loader.theXQueryDiagnostics->add_error( e );
   }
+  catch (std::bad_alloc const&)
+  {
+    loader.setOutOfMemory();
+  }
   catch (...)
   {
     loader.theXQueryDiagnostics->add_error(
@@ -1969,6 +2004,10 @@ void DtdXmlLoader::comment(void * ctx, const xmlChar * ch)
   catch (ZorbaException const& e)
   {
     loader.theXQueryDiagnostics->add_error( e );
+  }
+  catch (std::bad_alloc const&)
+  {
+    loader.setOutOfMemory();
   }
   catch (...)
   {

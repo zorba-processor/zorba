@@ -15,6 +15,7 @@
  */
 
 #include <iostream>
+#include <new>
 #include <climits>
 
 #include <libxml/parser.h>
@@ -993,6 +994,9 @@ store::Item_t Store::loadDocument(
   std::unique_ptr<XmlLoader> loader(getXmlLoader(&lXQueryDiagnostics, loadProperties));
 
   root = loader->loadXml(baseUri, docUri, stream);
+
+  if (loader->outOfMemory())
+    throw std::bad_alloc();
 
   // A resource refused by the security policy is the cause of whatever the
   // parser reported after it (or of a silently incomplete document).

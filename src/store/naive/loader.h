@@ -16,6 +16,7 @@
 #ifndef ZORBA_SIMPLE_STORE_LOADER
 #define ZORBA_SIMPLE_STORE_LOADER
 
+#include <new>
 #include <stack>
 #include <libxml/parser.h>
 #include <libxml/xmlstring.h>
@@ -110,12 +111,27 @@ protected:
   // Set when error() has reported an unreadable external entity.
   bool                             theUnreadableEntityReported;
 
+  // Set when an allocation failed during the parse, in this library or in
+  // libxml2. Memory running out says nothing about the document, so it is not
+  // an error of the load: Store::loadDocument() throws std::bad_alloc, which no
+  // catch clause of a query can catch. It cannot be thrown where it happens, in
+  // a callback of libxml2, which is C code.
+  bool                             theOutOfMemory = false;
+
+  // For a handler of any exception: sets theOutOfMemory if it is std::bad_alloc.
+  void noteOutOfMemory() noexcept;
+
 
 protected:
   void applyLoadOptions(const store::LoadProperties& props, xmlParserCtxtPtr ctxt);
 
 
 public:
+  bool outOfMemory() const { return theOutOfMemory; }
+
+  // Also stops the parser.
+  void setOutOfMemory() noexcept;
+
   XmlLoader(
       store::ItemFactory* factory,
       XQueryDiagnostics* xqueryDiagnostics,
