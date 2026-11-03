@@ -34,11 +34,14 @@ namespace query_hints {
  * @param query The text of the module being parsed.
  * @param line The 1-based line of the error.
  * @param column The 1-based column (in bytes) of the error.
+ * @param line_end The 1-based line of the end of the error.
+ * @param column_end The 1-based column (in bytes) of the end of the error.
  * @param xquery_grammar Whether the module is parsed as XQuery, not JSONiq.
  * @param message The message of the parser.
  */
 std::string syntax_error( std::string const &query, unsigned long line,
-                          unsigned long column, bool xquery_grammar,
+                          unsigned long column, unsigned long line_end,
+                          unsigned long column_end, bool xquery_grammar,
                           std::string const &message );
 
 /**

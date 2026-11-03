@@ -259,6 +259,8 @@ parsenode_t XQueryCompiler::parse(std::istream& aXQuery, const zstring& aFileNam
     e.set_hint(query_hints::syntax_error(xquery_stream.str(),
                                          pen->get_location().getLineBegin(),
                                          pen->get_location().getColumnBegin(),
+                                         pen->get_location().getLineEnd(),
+                                         pen->get_location().getColumnEnd(),
                                          lXQueryMode,
                                          pen->msg.str()).c_str());
     throw e;

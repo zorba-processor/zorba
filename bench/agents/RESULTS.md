@@ -350,3 +350,7 @@ changes can affect a JSONiq session, and were not measured:
 - A selector computed at run time gets a placeholder in the hint of a key on an
   array. Run 41704494854 has no `err:FORG0001`.
 - `$a--` gets `$a - -...`.
+- A hint that says to start the query with a version declaration says it must be
+  the very first characters, before any comment, and the hint on `.` is worded
+  around that. The 11 `.` failures above got the old wording.
+- A selector with `"`, `\` or a control character gets the placeholder too.

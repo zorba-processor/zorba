@@ -113,9 +113,23 @@ bool starts_with( std::string const &s, char const *prefix ) {
   return s.compare( 0, std::strlen( prefix ), prefix ) == 0;
 }
 
+// Whether a version declaration that starts with this word is at this offset.
+bool declaration_at( std::string const &query, std::size_t pos,
+                     std::string const &word ) {
+  if ( query.compare( pos, word.size(), word ) != 0 )
+    return false;
+  pos += word.size();
+  if ( pos == query.size() || !is_space( query[ pos ] ) )
+    return false;
+  while ( pos < query.size() && is_space( query[ pos ] ) )
+    ++pos;
+  return query.compare( pos, 7, "version" ) == 0 ||
+    query.compare( pos, 8, "encoding" ) == 0;
+}
+
 // Whether the first thing in the query, after whitespace and comments, is a
 // version declaration that starts with this word.
-bool declares( std::string const &query, char const *word ) {
+bool declares( std::string const &query, std::string const &word ) {
   std::size_t pos = 0;
   while ( pos < query.size() ) {
     if ( is_space( query[ pos ] ) ) {
@@ -137,23 +151,52 @@ bool declares( std::string const &query, char const *word ) {
       break;
     }
   }
-  std::size_t const size = std::strlen( word );
-  if ( query.compare( pos, size, word ) != 0 )
-    return false;
-  pos += size;
-  if ( pos == query.size() || !is_space( query[ pos ] ) )
-    return false;
-  while ( pos < query.size() && is_space( query[ pos ] ) )
-    ++pos;
-  return query.compare( pos, 7, "version" ) == 0 ||
-    query.compare( pos, 8, "encoding" ) == 0;
+  return declaration_at( query, pos, word );
 }
 
-// How to make the query JSONiq. A second declaration would be another error.
+// How to give the query the other language. The grammar is chosen from the first
+// bytes of the query and accepts only its own declaration, so the new declaration
+// has to be the very first characters; and a second one would be another error.
+std::string change_language( std::string const &query,
+                             std::string const &from,
+                             std::string const &declaration ) {
+  if ( declaration_at( query, 0, from ) )
+    return "replace the " + from + " version declaration with " + declaration;
+  if ( declares( query, from ) )
+    return "put " + declaration + " in place of the " + from + " version "
+      "declaration, as the very first characters of the query, before any "
+      "comment.";
+  return "start the query with " + declaration + " as its very first "
+    "characters, before any comment.";
+}
+
 std::string use_jsoniq( std::string const &query ) {
-  return declares( query, "xquery" )
-    ? "replace the xquery version declaration with jsoniq version \"1.0\";"
-    : "start the query with jsoniq version \"1.0\";";
+  return change_language( query, "xquery", "jsoniq version \"1.0\";" );
+}
+
+// The offset right after the comments and whitespace that end before this one,
+// going back: the end of what precedes them, or 0.
+std::size_t before_comments( std::string const &query, std::size_t end ) {
+  for ( ;; ) {
+    while ( end && is_space( query[ end - 1 ] ) )
+      --end;
+    if ( end < 2 || query.compare( end - 2, 2, ":)" ) != 0 )
+      return end;
+    int depth = 1;
+    for ( end -= 2; end >= 2 && depth; ) {
+      if ( query.compare( end - 2, 2, ":)" ) == 0 ) {
+        ++depth;
+        end -= 2;
+      } else if ( query.compare( end - 2, 2, "(:" ) == 0 ) {
+        --depth;
+        end -= 2;
+      } else {
+        --end;
+      }
+    }
+    if ( depth )
+      return end;                         // not a comment after all
+  }
 }
 
 // Whether the "." at this location comes right after an expression or a type,
@@ -168,14 +211,11 @@ bool dot_after_expression( std::string const &query, std::size_t offset ) {
       return false;
     --dot;
   }
-  while ( dot && is_space( query[ dot - 1 ] ) )
-    --dot;
+  dot = before_comments( query, dot );
   if ( !dot )
     return false;
   char const c = query[ dot - 1 ];
-  if ( c == ')' )                         // the end of a comment says nothing
-    return dot < 2 || query[ dot - 2 ] != ':';
-  if ( c == ']' || c == '}' || c == '"' || c == '\'' )
+  if ( c == ')' || c == ']' || c == '}' || c == '"' || c == '\'' )
     return true;
   if ( !is_name_char( c ) || c == '-' )
     return false;
@@ -208,21 +248,24 @@ bool is_invalid_escape( std::string const &query, std::size_t backslash ) {
 
 // The JSONiq scanner ends an unterminated string right before a "\" that does
 // not start an escape, or at the end of the query. The message of the parser
-// has the text it read. The location is not the start of that text when the
-// literal spans lines, so the query is searched for the text.
-std::string invalid_escape( std::string const &query,
+// has the text it read, and the end of the location is the end of that text,
+// where the "\" is if there is one. (The start of the location is not the start
+// of the text when the literal spans lines.)
+std::string invalid_escape( std::string const &query, std::size_t end,
                             std::string const &message,
                             std::size_t prefix_size ) {
   std::string const text( message.substr( prefix_size,
                                           message.size() - prefix_size - 1 ) );
-  if ( text.empty() || text[0] != '"' )
+  if ( text.empty() || text[0] != '"' || end == std::string::npos )
     return std::string();                 // single quotes are the problem
-  std::string const stop( text + '\\' );
-  std::size_t at = query.find( stop );
-  while ( at != std::string::npos &&
-          !is_invalid_escape( query, at + text.size() ) )
-    at = query.find( stop, at + 1 );
-  if ( at == std::string::npos )
+  // On the first line the reported column is one too far.
+  bool found = false;
+  for ( std::size_t const at : { end, end ? end - 1 : end } )
+    found = found || ( at < query.size() && at >= text.size() &&
+                       query[ at ] == '\\' &&
+                       query.compare( at - text.size(), text.size(), text ) == 0 &&
+                       is_invalid_escape( query, at ) );
+  if ( !found )
     return std::string();                 // it ran to the end of the query
   return "In a JSONiq string \"\\\" starts an escape (\\\" \\' \\\\ \\/ \\b "
     "\\f \\n \\r \\t \\uXXXX), and this string has one that is not valid. For "
@@ -232,7 +275,8 @@ std::string invalid_escape( std::string const &query,
 } // namespace
 
 std::string syntax_error( std::string const &query, unsigned long line,
-                          unsigned long column, bool xquery_grammar,
+                          unsigned long column, unsigned long line_end,
+                          unsigned long column_end, bool xquery_grammar,
                           std::string const &message ) {
   std::size_t offset = offset_of( query, line, column );
 
@@ -242,17 +286,15 @@ std::string syntax_error( std::string const &query, unsigned long line,
        starts_with( message, "syntax error, unexpected \".\"" ) ) {
     if ( dot_after_expression( query, offset ) )
       return std::string();
-    return std::string( "In JSONiq the context item is $$, not \".\". Write $$, "
-      "or " ) + ( declares( query, "jsoniq" )
-        ? "replace the jsoniq version declaration with"
-        : "start the query with" ) +
-      " xquery version \"3.0\"; to parse it as XQuery, where \".\" is the "
-      "context item.";
+    return std::string( "In JSONiq the context item is $$, not \".\". Write $$. "
+      "To parse it as XQuery, where \".\" is the context item, " ) +
+      change_language( query, "jsoniq", "xquery version \"3.0\";" );
   }
 
   char const unterminated[] = "syntax error, unterminated string literal \"";
   if ( !xquery_grammar && starts_with( message, unterminated ) )
-    return invalid_escape( query, message, sizeof unterminated - 1 );
+    return invalid_escape( query, offset_of( query, line_end, column_end ),
+                           message, sizeof unterminated - 1 );
 
   if ( offset == std::string::npos )
     return std::string();
@@ -309,10 +351,12 @@ std::string jsoniq_function( std::string const &local,
       "XQuery, where a function without a prefix is in fn:. Write " + call +
       " with import module namespace math = "
       "\"http://www.w3.org/2005/xpath-functions/math\"; in the prolog, or "
-      "start the query with jsoniq version \"1.0\";";
+      "start the query with jsoniq version \"1.0\"; as its very first "
+      "characters, before any comment.";
   return "\"" + local + "\" is a JSONiq function and this query is XQuery, "
     "where a function without a prefix is in fn:. Write " + call + ", or "
-    "start the query with jsoniq version \"1.0\";";
+    "start the query with jsoniq version \"1.0\"; as its very first characters, "
+    "before any comment.";
 }
 
 std::string empty_array_lookup() {
@@ -355,8 +399,23 @@ std::string undeclared_prefix( std::string const &prefix ) {
   return std::string();
 }
 
+namespace {
+
+// A selector that reads the same between double quotes once decoded.
+bool reads_as_literal( std::string const &key ) {
+  for ( char const c : key ) {
+    unsigned char const u = static_cast<unsigned char>( c );
+    if ( c == '"' || c == '\\' || u < 0x20 || u == 0x7F )
+      return false;
+  }
+  return true;
+}
+
+} // namespace
+
 std::string key_on_array( std::string const &key, bool jsoniq ) {
-  std::string const lookup( "(\"" + key + "\")" );
+  std::string const lookup(
+    "(\"" + ( reads_as_literal( key ) ? key : std::string( "key" ) ) + "\")" );
   return "This item is an array, and " + lookup + " selects a member by "
     "integer position. To read this key from its members write $x()" + lookup +
     ( jsoniq ? " or $x[]" + lookup : std::string() ) +

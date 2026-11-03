@@ -16,7 +16,8 @@
   points to it, unless that namespace declares the function with another arity;
   `$a- $b` and undeclared names that end in `-` explain that `-` belongs to names.
   The hint for a string selector on an array also offers `$x[]` in JSONiq, and
-  does not repeat a selector computed at run time.
+  does not repeat a selector computed at run time, or one with `"`, `\` or a
+  control character.
 
 ### Fixed
 
