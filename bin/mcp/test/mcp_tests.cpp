@@ -1494,7 +1494,7 @@ void test_exhaust_try( Fixture const &f ) {
 // builds): in one process, operator new fails above a budget. Allocations with
 // malloc, which the C libraries and MAPM use, do not fail here; the tests above
 // cover them, in the builds that can have the limit.
-void test_exhaust_injected( Fixture const &f ) {
+void exhaust_injected( Fixture const &f, char const *const inner ) {
 #if defined(__linux__)
   TempTree t;
   write_exhaustion_data( t );
@@ -1520,36 +1520,41 @@ void test_exhaust_injected( Fixture const &f ) {
   check( result_text( call( 1, after ) ) == "42", "a query before the budget" );
 
   int id = 2;
-  for ( char const *const inner : exhaustion_queries ) {
-    std::string const hungry( prolog +
-      "let $all := for $i in 1 to 1000000000 return " + inner + "\n"
-      "return count($all) + count($all)" );
-    std::size_t first_live = 0;
-    for ( int run = 0; run < 3; ++run ) {
-      new_budget = new_live.load() + 64 * 1024 * 1024;
-      Json const r( call( id++, hungry ) );
-      check( is_tool_error( r ) &&
-             field( tool_error( r ), "code" ) == "memory_limit",
-             std::string( "memory_limit: " ) + inner, r.dump() );
-      Json const next( call( id++, after ) );
-      check( !is_tool_error( next ) && result_text( next ) == "42",
-             std::string( "the next call is answered: " ) + inner, next.dump() );
-      // Under the same budget, so its memory came back; and none stays behind
-      // from one failure to the next.
-      std::size_t const live = new_live.load();
-      new_budget = 0;
-      if ( run == 1 )
-        first_live = live;
-      if ( run == 2 )
-        check( live < first_live + 1024 * 1024,
-               std::string( "the memory comes back: " ) + inner,
-               std::to_string( first_live ) + " then " + std::to_string( live ) );
-    }
+  std::string const hungry( prolog +
+    "let $all := for $i in 1 to 1000000000 return " + inner + "\n"
+    "return count($all) + count($all)" );
+  std::size_t first_live = 0;
+  for ( int run = 0; run < 3; ++run ) {
+    new_budget = new_live.load() + 32 * 1024 * 1024;
+    Json const r( call( id++, hungry ) );
+    check( is_tool_error( r ) &&
+           field( tool_error( r ), "code" ) == "memory_limit",
+           "the query is the tool error memory_limit", r.dump() );
+    Json const next( call( id++, after ) );
+    check( !is_tool_error( next ) && result_text( next ) == "42",
+           "the next call is answered", next.dump() );
+    // Under the same budget, so its memory came back; and none stays behind
+    // from one failure to the next.
+    std::size_t const live = new_live.load();
+    new_budget = 0;
+    if ( run == 1 )
+      first_live = live;
+    if ( run == 2 )
+      check( live < first_live + 1024 * 1024, "the memory comes back",
+             std::to_string( first_live ) + " then " + std::to_string( live ) );
   }
 #else
   (void)f;
+  (void)inner;
   std::cout << "no operator new budget in this build" << std::endl;
 #endif
+}
+
+// One test per data shape, each with the time limit of a test: sanitizer builds
+// are slow here.
+template<std::size_t N>
+void test_exhaust_injected( Fixture const &f ) {
+  exhaust_injected( f, exhaustion_queries[N] );
 }
 
 // The peak resident set size of this process so far, in bytes.
@@ -4497,7 +4502,14 @@ Test const tests[] = {
   { "exhaust_strings", test_exhaust_strings },
   { "exhaust_numbers", test_exhaust_numbers },
   { "exhaust_try", test_exhaust_try },
-  { "exhaust_injected", test_exhaust_injected },
+  { "exhaust_injected_generated", test_exhaust_injected<0> },
+  { "exhaust_injected_json", test_exhaust_injected<1> },
+  { "exhaust_injected_json_array", test_exhaust_injected<2> },
+  { "exhaust_injected_csv", test_exhaust_injected<3> },
+  { "exhaust_injected_xml", test_exhaust_injected<4> },
+  { "exhaust_injected_strings", test_exhaust_injected<5> },
+  { "exhaust_injected_numbers", test_exhaust_injected<6> },
+  { "exhaust_injected_try", test_exhaust_injected<7> },
   { "optional_params", test_optional_params },
   { "documents_stream", test_documents_stream },
   { "hints_jsoniq", test_hints_jsoniq },

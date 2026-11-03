@@ -456,7 +456,10 @@ IF (ZORBA_WITH_FILE_ACCESS)
              hints_nodes hints_names deep_json deep_json_binary
              entity_expansion case_paths html_edge_cases memory_limit
              exhaust_at_start exhaust_generated exhaust_json exhaust_json_array exhaust_csv
-             exhaust_xml exhaust_strings exhaust_numbers exhaust_try exhaust_injected
+             exhaust_xml exhaust_strings exhaust_numbers exhaust_try
+             exhaust_injected_generated exhaust_injected_json
+             exhaust_injected_json_array exhaust_injected_csv exhaust_injected_xml
+             exhaust_injected_strings exhaust_injected_numbers exhaust_injected_try
              language
              language_binary no_write read_functions native_import reflection_random
              cache_hit cache_invalidate cache_evict cache_off cache_policy
@@ -486,10 +489,12 @@ IF (ZORBA_WITH_FILE_ACCESS)
     # The queries of these tests take most of the address-space limit: one at a
     # time, and with time for the session after each of them.
     FOREACH (_t exhaust_generated exhaust_json exhaust_json_array exhaust_csv
-                exhaust_xml exhaust_strings exhaust_numbers exhaust_try
-                exhaust_injected)
+                exhaust_xml exhaust_strings exhaust_numbers exhaust_try)
       SET_TESTS_PROPERTIES (bin/mcp/${_t} PROPERTIES
         RESOURCE_LOCK mcp_memory_exhaustion TIMEOUT 400)
+    ENDFOREACH (_t)
+    FOREACH (_t generated json json_array csv xml strings numbers try)
+      SET_TESTS_PROPERTIES (bin/mcp/exhaust_injected_${_t} PROPERTIES TIMEOUT 400)
     ENDFOREACH (_t)
 
     # The help states what happens when memory runs out.
