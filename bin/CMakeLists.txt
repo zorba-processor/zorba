@@ -486,7 +486,7 @@ IF (ZORBA_WITH_FILE_ACCESS)
              scan_memory_stress scan_memory_option scan_thread_limit
              scan_thread_failure
              scan_no_scan scan_handshake scan_shutdown scan_binary scan_stress
-             scan_description)
+             scan_description scan_compact_listing scan_corpus_listing)
       ADD_TEST (NAME bin/mcp/${_t}
         COMMAND "mcp_scan_tests${_mcp_suffix}" ${_t}
           "$<TARGET_FILE:zorba_mcp${_mcp_suffix}>")
