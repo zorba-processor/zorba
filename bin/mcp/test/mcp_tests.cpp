@@ -22,6 +22,7 @@
 // where <test> is one of the names in the table at the end; the "binary"
 // test runs the zorba-mcp executable given as the last argument.
 
+#include <algorithm>
 #include <chrono>
 #include <cstdlib>
 #include <filesystem>
