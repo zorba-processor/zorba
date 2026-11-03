@@ -29,8 +29,9 @@ Inputs:
 - **A sliding window holds the whole input.** A moving average over 10 points takes
   1157 MiB at 10^6 records from `lines` and 705 MiB from `whole`, against 36 MiB
   without the window.
-- **A JSON array parsed whole holds the input before any window sees it:** 721 MiB at
-  10^6 records, with or without a window clause. JSON Lines through `whole` costs 35 MiB.
+- **A JSON array parsed whole held the input before any window saw it:** 721 MiB at
+  10^6 records, with or without a window clause, against 35 MiB for JSON Lines through
+  `whole`. `parse-json(...)[]` now takes 36 MiB; see "One large JSON array".
 - **Sliding windows that stay open cost quadratic time.** Doubling the records takes
   4 times as long, because each record evaluates the end condition of every open window.
 
@@ -113,6 +114,44 @@ in a temp sequence (`theDomainSeq`).
 - Aggregates read `$w` from the temp sequence, per window: a moving average costs
   records times window size.
 
+## One large JSON array
+
+`run_array.sh`, run 41620856411: both builds in one job on an `ubuntu-24.04` runner, the
+lowest time of 3 runs and the largest peak RSS. Before is `7c8d649f9`, after is
+`7afbd0320`. 10^6 records, a 78 MB array file. `filter` is `filter.jq`, `aggregate` is
+`baseline`, `tumbling` is `sessions`.
+
+| query | input | before ms | before MiB | after ms | after MiB |
+|---|---|---:|---:|---:|---:|
+| filter | `parse-json(file:read-text(F))[]` | 3446 | 722 | 4973 | 36 |
+| aggregate | `parse-json(file:read-text(F))[]` | 3533 | 722 | 5009 | 36 |
+| tumbling | `parse-json(file:read-text(F))[]` | 4194 | 722 | 6061 | 36 |
+| filter | the same over an ordinary string | 3578 | 937 | 4786 | 365 |
+| aggregate | the same over an ordinary string | 3647 | 937 | 5032 | 365 |
+| tumbling | the same over an ordinary string | 4298 | 938 | 5970 | 365 |
+| filter | `dir:open(D, F).content[]` | 4309 | 985 | 4307 | 985 |
+| aggregate | `dir:open(D, F).content[]` | 4437 | 985 | 4398 | 985 |
+| tumbling | `dir:open(D, F).content[]` | 5151 | 986 | 5155 | 985 |
+| first member | `parse-json(file:read-text(F))[][1].id` | 3031 | 720 | 2241 | 36 |
+| two parses of one text in a variable | `count(parse-json($t)[])` twice | 5698 | 720 | 9043 | 236 |
+
+Each top-level value is parsed twice, so that any error in it comes before its first
+member, as with the built array: the time grows by about 45%. `dir:open` builds the
+record as before.
+
+Where the memory goes, as peak RSS:
+
+| query | ms | peak RSS MiB |
+|---|---:|---:|
+| `1` (the process) | 19 | 35 |
+| `string-length(file:read-text(F))` (the text in memory) | 380 | 165 |
+| `size(parse-json(file:read-text(F)))` | 3079 | 720 |
+| `size(parse-json(file:read-text(N)))`, N holding 10^6 nulls | 148 | 52 |
+
+Of the 685 MiB above the process, the array takes about 17 MiB and the members about 668
+MiB, 700 bytes per record. `parse-json(file:read-text(F))` reads the text from the file,
+so it holds none of it.
+
 ## Optimization candidates
 
 None of these is implemented.
@@ -123,4 +162,3 @@ None of these is implemented.
 | Stop testing an open window once its condition cannot change (for example `$e - $s eq k` past k) | Avoids the quadratic cost only for conditions the compiler can prove monotonic; the general case stays. |
 | Incremental `count`, `sum` and `avg` on sliding windows | `moving_minutes` from records times window size to records. Only for these aggregates over `$w` or a navigation on it. |
 | `std::deque` instead of `std::vector` in the lazy temp sequence and for `theOpenWindows` | Purging and closing the first window are linear in what remains. No slowdown appears at k = 100000, so the expected effect is small. |
-| Streaming `[]` on a top-level array in a file | `array` input at the 36 MiB of `whole`; `jsoniq-strip-top-level-array` is the existing path to measure first. |
