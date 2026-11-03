@@ -614,7 +614,7 @@ bool EliminateUnusedLetVars::safe_to_fold_var(csize varPos, int& numRefs)
     unsafe = true;
 
   // A call in this flwor can change what the domain expr reads.
-  if (theFlwor->is_sequential() || expr_tools::calls_unproven_function(theFlwor))
+  if (expr_tools::calls_unproven_function(theFlwor))
     unsafe = true;
 
   bool safe = safe_to_fold_var_rec(theFlwor, varPos+1, var, unsafe, isSafeVar, numRefs);
@@ -694,9 +694,11 @@ bool EliminateUnusedLetVars::safe_to_fold_var_rec(
         {
           return false;
         }
-        else if (kind == flwor_clause::for_clause &&
-                 (*domExpr)->get_return_type()->max_card() >= 2)   
+        else if ((*domExpr)->is_sequential() ||
+                 (kind == flwor_clause::for_clause &&
+                  (*domExpr)->get_return_type()->max_card() >= 2))
         {
+          // A later clause runs after the side effects of a sequential one.
           unsafe = unsafe1 = true;
         }
 

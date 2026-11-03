@@ -1006,6 +1006,10 @@ public:
 private:
   bool varCanChange(const var_expr* var) const;
 
+  const expr* boundExpr(const var_expr* var) const;
+
+  bool isNeverFunctionItem(const expr* e) const;
+
   bool targetIsProven(const expr* target);
 
   bool builtinHasImpurity(const function* f) const;
@@ -1038,66 +1042,128 @@ bool ImpurityWalk::varCanChange(const var_expr* var) const
 }
 
 
+// What the value of the variable comes from, if a query cannot change it.
+const expr* ImpurityWalk::boundExpr(const var_expr* var) const
+{
+  if (varCanChange(var))
+    return NULL;
+
+  switch (var->get_kind())
+  {
+  case var_expr::for_var:
+  case var_expr::let_var:
+    return var->get_domain_expr();
+
+  case var_expr::prolog_var:
+  case var_expr::local_var:
+  {
+    if (var->is_external() || var->num_set_exprs() == 0)
+      return NULL;
+
+    const var_set_expr* decl = var->get_set_expr(0);
+
+    return decl->get_expr_kind() == var_decl_expr_kind ? decl->get_expr() : NULL;
+  }
+  default:
+    return NULL;
+  }
+}
+
+
+// $x(1) with an $x that is not a function item is a lookup in a JSON item, which
+// has no effect. Collections hold nodes and JSON items only, and a member of a
+// JSON item is never a function item.
+bool ImpurityWalk::isNeverFunctionItem(const expr* e) const
+{
+  while (e != NULL)
+  {
+    xqtref_t const type = const_cast<expr*>(e)->get_return_type();
+
+    if (TypeOps::is_subtype(theTM, *type, *GENV_TYPESYSTEM.STRUCTURED_ITEM_TYPE_STAR) ||
+        TypeOps::is_subtype(theTM, *type, *GENV_TYPESYSTEM.ANY_ATOMIC_TYPE_STAR))
+      return true;
+
+    switch (e->get_expr_kind())
+    {
+    case wrapper_expr_kind:
+      e = static_cast<const wrapper_expr*>(e)->get_input();
+      break;
+
+    case function_trace_expr_kind:
+      e = static_cast<const function_trace_expr*>(e)->get_input();
+      break;
+
+    case treat_expr_kind:
+    case promote_expr_kind:
+      e = static_cast<const cast_base_expr*>(e)->get_input();
+      break;
+
+    case flwor_expr_kind:
+      e = static_cast<const flwor_expr*>(e)->get_return_expr();
+      break;
+
+    case var_expr_kind:
+      e = boundExpr(static_cast<const var_expr*>(e));
+      break;
+
+    case dynamic_function_invocation_expr_kind:
+      e = static_cast<const dynamic_function_invocation_expr*>(e)->get_input();
+      break;
+
+    case fo_expr_kind:
+      switch (static_cast<const fo_expr*>(e)->get_func()->getKind())
+      {
+      case FunctionConsts::ZORBA_STORE_STATIC_COLLECTIONS_DML_COLLECTION_1:
+      case FunctionConsts::ZORBA_STORE_STATIC_COLLECTIONS_DML_COLLECTION_2:
+      case FunctionConsts::ZORBA_STORE_STATIC_COLLECTIONS_DML_COLLECTION_3:
+      case FunctionConsts::ZORBA_STORE_DYNAMIC_COLLECTIONS_DML_COLLECTION_1:
+      case FunctionConsts::ZORBA_STORE_DYNAMIC_COLLECTIONS_DML_COLLECTION_2:
+      case FunctionConsts::ZORBA_STORE_DYNAMIC_COLLECTIONS_DML_COLLECTION_3:
+        return true;
+      default:
+        return false;
+      }
+
+    default:
+      return false;
+    }
+  }
+
+  return false;
+}
+
+
 bool ImpurityWalk::targetIsProven(const expr* target)
 {
-  while (true)
+  if (isNeverFunctionItem(target))
+    return true;
+
+  while (target != NULL)
   {
     switch (target->get_expr_kind())
     {
     case wrapper_expr_kind:
       target = static_cast<const wrapper_expr*>(target)->get_input();
-      continue;
+      break;
 
     case function_trace_expr_kind:
       target = static_cast<const function_trace_expr*>(target)->get_input();
-      continue;
+      break;
 
     case treat_expr_kind:
     case promote_expr_kind:
       target = static_cast<const cast_base_expr*>(target)->get_input();
-      continue;
+      break;
 
     case flwor_expr_kind:
       // The function item is what the return clause gives. The clauses are looked
       // at as children of the call.
       target = static_cast<const flwor_expr*>(target)->get_return_expr();
-      continue;
+      break;
 
     case var_expr_kind:
-    {
-      const var_expr* var = static_cast<const var_expr*>(target);
-
-      if (varCanChange(var))
-        return false;
-
-      switch (var->get_kind())
-      {
-      case var_expr::for_var:
-      case var_expr::let_var:
-        target = var->get_domain_expr();
-        break;
-
-      case var_expr::prolog_var:
-      case var_expr::local_var:
-      {
-        if (var->is_external() || var->num_set_exprs() == 0)
-          return false;
-
-        const var_set_expr* decl = var->get_set_expr(0);
-
-        target = (decl->get_expr_kind() == var_decl_expr_kind ?
-                  decl->get_expr() : NULL);
-        break;
-      }
-      default:
-        return false;
-      }
-
-      if (target == NULL)
-        return false;
-
-      continue;
-    }
+      target = boundExpr(static_cast<const var_expr*>(target));
+      break;
 
     case function_item_expr_kind:
     {
@@ -1114,7 +1180,7 @@ bool ImpurityWalk::targetIsProven(const expr* target)
           return false;
 
         target = values[0];
-        continue;
+        break;
       }
 
       const function* f = fi->get_function();
@@ -1126,6 +1192,8 @@ bool ImpurityWalk::targetIsProven(const expr* target)
       return false;
     }
   }
+
+  return false;
 }
 
 
