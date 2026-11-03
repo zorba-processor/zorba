@@ -143,7 +143,7 @@ lowest time of 3 runs and the largest peak RSS. Before is `7c8d649f9`, after is
 With the option, a query that reads all the members takes 34% to 43% more time than the
 same build without it, for the second parse of each top-level value; one that stops at
 the first member takes 37% less. Without the option the plan is the one before; the time
-differences above are of both signs, between -6% and +8%.
+differences above are of both signs, between -6% and +9%.
 
 The first parse checks the JSON without building items. In the same job, with a first
 parse that built the items and dropped them:

@@ -174,6 +174,33 @@ static bool is_read_text_utf8(const expr* e)
 }
 
 
+// What the translator wraps around a literal in an object constructor, until the
+// optimizer removes it. Nothing here can raise on a literal; a cast or a treat
+// that a query writes around a value can, so it does not count as a literal.
+static const expr* skip_object_value_wrappers(const expr* e)
+{
+  while (e->get_expr_kind() == fo_expr_kind &&
+         static_cast<const fo_expr*>(e)->get_func()->getKind() ==
+           FunctionConsts::OP_ZORBA_JSON_BOX_1)
+    e = static_cast<const fo_expr*>(e)->get_arg(0);
+  return e;
+}
+
+
+static const expr* skip_object_name_wrappers(const expr* e)
+{
+  if (e->get_expr_kind() == cast_expr_kind)
+    e = static_cast<const cast_base_expr*>(e)->get_input();
+
+  if (e->get_expr_kind() == fo_expr_kind &&
+      static_cast<const fo_expr*>(e)->get_func()->getKind() ==
+        FunctionConsts::FN_DATA_1)
+    e = static_cast<const fo_expr*>(e)->get_arg(0);
+
+  return e;
+}
+
+
 namespace {
 
 /**
@@ -250,8 +277,8 @@ public:
 
     for (csize i = 0; i < object->num_pairs(); ++i)
     {
-      const expr* name = skip_type_wrappers(object->get_name_expr(i));
-      const expr* value = skip_type_wrappers(object->get_value_expr(i));
+      const expr* name = skip_object_name_wrappers(object->get_name_expr(i));
+      const expr* value = skip_object_value_wrappers(object->get_value_expr(i));
 
       if (name->get_expr_kind() != const_expr_kind)
         return false;
