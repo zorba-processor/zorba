@@ -1,0 +1,11 @@
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           targetNamespace="urn:zorba-test:schema" xmlns="urn:zorba-test:schema"
+           elementFormDefault="qualified">
+  <xs:element name="a">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="b" type="xs:integer"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>
