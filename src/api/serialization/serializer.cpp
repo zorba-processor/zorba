@@ -330,15 +330,17 @@ void serializer::emitter::emit_declaration()
 {
   if ( ser->byte_order_mark == PARAMETER_VALUE_YES )
   {
+    static char const utf16le_bom[] = { '\xFF', '\xFE' };
+    static char const utf16be_bom[] = { '\xFE', '\xFF' };
     std::streambuf *const orig_buf = transcode::orig_streambuf( tr );
-    if ( ser->encoding == "UTF-8" )
+    zstring encoding( ser->encoding );
+    ascii::to_upper( encoding );
+    if ( encoding == "UTF-8" )
       orig_buf->sputn( utf8::BOM, sizeof utf8::BOM );
-    else if ( ser->encoding == "UTF-16" )
-      orig_buf->sputn( (char const*)&unicode::BOM, sizeof unicode::BOM );
-    else if ( ser->encoding == "UTF-16LE" )
-      orig_buf->sputn( (char const*)&unicode::BOM_LE, sizeof unicode::BOM_LE );
-    else if ( ser->encoding == "UTF-16BE" )
-      orig_buf->sputn( (char const*)&unicode::BOM_BE, sizeof unicode::BOM_BE );
+    else if ( encoding == "UTF-16LE" )
+      orig_buf->sputn( utf16le_bom, sizeof utf16le_bom );
+    else if ( encoding == "UTF-16BE" )
+      orig_buf->sputn( utf16be_bom, sizeof utf16be_bom );
   }
 }
 
@@ -1017,9 +1019,7 @@ void serializer::json_emitter::emit_json_item(store::Item* item, int depth)
       }
       else if (item->isPosOrNegInf())
       {
-        // QQQ with Cloudscript, this is supposed to be INF or -INF - how can
-        // I tell which I have?
-        emit_json_string("INF");
+        emit_json_string(item->getStringValue());
         break;
       }
       // else fall through
@@ -2013,6 +2013,7 @@ serializer::text_emitter::text_emitter(
 ********************************************************************************/
 void serializer::text_emitter::emit_declaration()
 {
+  emitter::emit_declaration();
 }
 
 
@@ -2033,9 +2034,7 @@ void serializer::text_emitter::emit_streamable_item(store::Item* item)
   {
     // prepare the stream
     is.exceptions( std::ios::badbit | std::ios::failbit );
-    pos = is.tellg();
-    if (pos)
-      is.seekg(0, std::ios::beg);
+    pos = is.tellg();                   // getStream() left it past any mark
     is.exceptions(is.exceptions() & ~std::ios::failbit);
   }
 
