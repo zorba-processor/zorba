@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <algorithm>
 #include <iostream>
 #include <sstream>
 #include <list>
@@ -39,6 +40,7 @@
 #include "compiler/expression/expr.h"
 #include "compiler/expression/expr_visitor.h"
 #include "compiler/expression/flwor_expr.h"
+#include "compiler/expression/expr_iter.h"
 #include "compiler/expression/fo_expr.h"
 #include "compiler/expression/script_exprs.h"
 #include "compiler/expression/json_exprs.h"
@@ -1482,6 +1484,111 @@ bool nativeColumnSort(expr* colExpr)
 }
 
 
+/*******************************************************************************
+  Whether the value of "e" could change between two evaluations with the same
+  values of its variables, or whether e reads one of the given variables. The
+  kinds of exprs are listed, not excluded: a call to a user or external function,
+  a dynamic call or an eval has a body that is not visible here, and a constructor
+  makes a node or object whose identity is new at each evaluation.
+********************************************************************************/
+static bool reads_vars_or_may_vary(
+    const expr* e,
+    const std::vector<const var_expr*>& vars)
+{
+  switch (e->get_expr_kind())
+  {
+  case var_expr_kind:
+    if (std::find(vars.begin(), vars.end(), static_cast<const var_expr*>(e)) !=
+        vars.end())
+      return true;
+    break;
+
+  case fo_expr_kind:
+  {
+    const function* f = static_cast<const fo_expr*>(e)->get_func();
+    if (!f->isBuiltin() || !f->isDeterministic() || f->isSequential() ||
+        f->isUpdating() || f->getKind() == FunctionConsts::FN_TRACE_2)
+      return true;
+    break;
+  }
+
+  case const_expr_kind:
+  case relpath_expr_kind:
+  case axis_step_expr_kind:
+  case match_expr_kind:
+  case flwor_expr_kind:
+  case if_expr_kind:
+  case castable_expr_kind:
+  case cast_expr_kind:
+  case instanceof_expr_kind:
+  case treat_expr_kind:
+  case promote_expr_kind:
+  case name_cast_expr_kind:
+  case order_expr_kind:
+  case wrapper_expr_kind:
+    break;
+
+  default:
+    return true;
+  }
+
+  ExprConstIterator iter(e);
+  while (!iter.done())
+  {
+    const expr* child = iter.get_expr();
+    if (child != NULL && reads_vars_or_may_vary(child, vars))
+      return true;
+
+    iter.next();
+  }
+
+  return false;
+}
+
+
+/*******************************************************************************
+  The domain of a sliding window clause stays eager if the FLWOR or a condition has
+  side effects: reading the domain must not interleave with them.
+********************************************************************************/
+static bool window_has_side_effects(const flwor_expr& flworExpr, const window_clause* wc)
+{
+  return (flworExpr.is_sequential() ||
+          (wc->get_win_start() != NULL && wc->get_win_start()->get_expr()->is_sequential()) ||
+          (wc->get_win_stop() != NULL && wc->get_win_stop()->get_expr()->is_sequential()));
+}
+
+
+/*******************************************************************************
+  An end condition whose value depends only on the current item has the same
+  value for every candidate window of a sliding window clause, if it reads none
+  of the start vars and evaluating it again cannot give another value: between
+  the evaluations for one item nothing else runs, so even a variable that a
+  sequential return clause assigns has one value during them. An error raised
+  by the condition is raised by the first of those evaluations in any case, and
+  there is no evaluation if no window is open in any case.
+********************************************************************************/
+static bool same_end_cond_for_all_windows(const window_clause* wc)
+{
+  const flwor_wincond* stop = wc->get_win_stop();
+  const flwor_wincond* start = wc->get_win_start();
+
+  if (stop == NULL || start == NULL)
+    return false;
+
+  std::vector<const var_expr*> vars;
+
+  for (const flwor_wincond::vars* v : { &start->get_in_vars(), &start->get_out_vars() })
+  {
+    vars.push_back(v->posvar);
+    vars.push_back(v->curr);
+    vars.push_back(v->prev);
+    vars.push_back(v->next);
+  }
+
+  return !reads_vars_or_may_vary(stop->get_expr(), vars);
+}
+
+
 PlanIter_t gflwor_codegen(flwor_expr& flworExpr, int currentClause)
 {
 #define PREV_ITER gflwor_codegen(flworExpr, currentClause - 1)
@@ -1686,7 +1793,8 @@ PlanIter_t gflwor_codegen(flwor_expr& flworExpr, int currentClause)
                               varRefs,
                               *start_clause,
                               *end_clause,
-                              wc->lazyEval());
+                              wc->lazyEval() || !window_has_side_effects(flworExpr, wc),
+                              same_end_cond_for_all_windows(wc));
 
     return winIter;
   }
