@@ -290,6 +290,10 @@ FnSerializeIterator::nextImpl(store::Item_t& aResult, PlanState& aPlanState) con
       setSerializationParams(lSerializer, lParams, theSctx, loc);
     }
 
+    // F&O: "The final stage of serialization, that is, encoding, is skipped."
+    // The byte order mark belongs to that stage.
+    lSerializer.setParameter("byte-order-mark", "no");
+
     {
       // and now serialize
       std::unique_ptr<std::stringstream> lResultStream = std::make_unique<std::stringstream>();

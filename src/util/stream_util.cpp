@@ -106,14 +106,66 @@ ostream& roman( ostream &o, unsigned n ) {
   return o;
 }
 
-bool skip_utf8_bom( istream &is ) {
-  char buf[ sizeof utf8::BOM ];
-  if ( is.read( buf, sizeof buf ) ) {
-    if ( ::memcmp( buf, utf8::BOM, sizeof utf8::BOM ) == 0 )
+static int utf8_bom_skipped_index() {
+  static int const index = ios_base::xalloc();
+  return index;
+}
+
+static bool skip_bom_bytes( istream &is ) {
+  typedef streambuf::traits_type traits;
+  streambuf *const buf = is.rdbuf();
+  //
+  // Through the streambuf: a streambuf's exception must get through, and the
+  // state of the stream must not change.  The stream may be unable to seek, so
+  // look only at bytes that are in the get area, where they can be put back.
+  //
+  if ( buf->sgetc() != traits::to_int_type( utf8::BOM[0] ) ||
+       buf->in_avail() < static_cast<streamsize>( sizeof utf8::BOM ) )
+    return false;
+  buf->sbumpc();
+  if ( buf->sgetc() == traits::to_int_type( utf8::BOM[1] ) ) {
+    buf->sbumpc();
+    if ( buf->sgetc() == traits::to_int_type( utf8::BOM[2] ) ) {
+      buf->sbumpc();
       return true;
-    is.seekg( 0 );
+    }
+    buf->sungetc();
   }
+  buf->sungetc();
   return false;
+}
+
+bool skip_utf8_bom( istream &is, bool remember ) {
+  bool const skipped = skip_bom_bytes( is );
+  if ( skipped && remember )
+    is.iword( utf8_bom_skipped_index() ) = 1;
+  return skipped;
+}
+
+void skip_utf8_bom_again( istream &is ) {
+  long &skipped = is.iword( utf8_bom_skipped_index() );
+  if ( skipped && !skip_bom_bytes( is ) )
+    skipped = 0;                        // the file changed: nothing to skip
+}
+
+bool get_text_line( istream &is, string *line ) {
+  typedef streambuf::traits_type traits;
+  streambuf *const buf = is.rdbuf();
+  line->clear();
+  traits::int_type c = buf->sbumpc();
+  if ( traits::eq_int_type( c, traits::eof() ) )
+    return false;
+  for ( ; !traits::eq_int_type( c, traits::eof() ); c = buf->sbumpc() ) {
+    if ( c == '\n' )
+      break;
+    if ( c == '\r' ) {
+      if ( buf->sgetc() == '\n' )
+        buf->sbumpc();
+      break;
+    }
+    *line += traits::to_char_type( c );
+  }
+  return true;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

@@ -298,9 +298,7 @@ namespace zorba { namespace http_client {
       {
         // prepare the stream
         is.exceptions( std::ios::badbit | std::ios::failbit );
-        pos = is.tellg();
-        if (pos)
-          is.seekg(0, std::ios::beg);
+        pos = is.tellg();               // getStream() left it past any mark
         is.exceptions(is.exceptions() & ~std::ios::failbit);
       }
 

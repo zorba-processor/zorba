@@ -22,6 +22,7 @@
 #include <store/api/item.h>
 #include <store/api/store.h>
 #include <zorba/store_consts.h>
+#include <zorba/util/stream_util.h>
 
 #include "context/static_context.h"
 #include "diagnostics/xquery_diagnostics.h"
@@ -88,6 +89,9 @@ loader::loader( istream &is, bool allow_multiple, bool strip_top_level_array ) :
   stripped_top_level_array_( false ),
   depth_( 0 )
 {
+  // F&O 3.1 fn:parse-json: "If the input starts with a byte order mark, this
+  // function ignores it."  Not in json::lexer, which also checks single values.
+  skip_utf8_bom( is, false );
 }
 
 loader::~loader() {
@@ -252,9 +256,12 @@ bool loader::next( store::Item_t *result ) {
           }
           catch ( std::range_error const& ) {
             //
-            // The number does not fit the type (e.g. xs:double overflows).
-            // Raise what an out-of-range numeric literal in a query raises
-            // instead of letting std::range_error escape as an internal error.
+            // A number the lexer accepted does not get here: an xs:integer out
+            // of range became an xs:decimal above, an xs:decimal has no range,
+            // and XSD 1.1 floatingPointRound maps an xs:double out of range to
+            // INF, -INF or zero (1e999 is INF, as in xs:double("1e999")).  If
+            // one ever does, raise FOAR0002 rather than let std::range_error
+            // escape as an internal error.
             //
             throw XQUERY_EXCEPTION(
               err::FOAR0002,
