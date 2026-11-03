@@ -176,7 +176,7 @@ bool loader::next( store::Item_t *result ) {
     while ( parser_.next( &t ) ) {
       switch( t.get_type() ) {
         case '[':
-          if ( unbox_top_level_arrays_ && stack_.empty() ) {
+          if ( unbox_top_level_arrays_ && stack_.empty() && !in_top_level_array_ ) {
             check_depth( t );
             in_top_level_array_ = true;
             continue;
