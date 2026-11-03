@@ -193,11 +193,11 @@ glibc chunk arithmetic and has not been measured.
 | 3 | Done, with 1. Small-object JSON keys without `unordered_map` (linear search over the pair vector for small objects) | estimate: map node 32 B (chunk 48) + bucket array per key | - | ~340 MiB (16%) | ~410 MiB (25%) |
 | 4 | Cached small integers (done, see "Shared small integers"; immediate items and doubles ruled out there) | measured on a modified store: 48.0 B per shared integer | - | 169 MiB (8.0%) | 59 MiB (3.5%) |
 | 5 | Text stored inline in TextNode (small-string), no separate rep | estimate: rep chunk >= 32 B per text node | 151 MiB (9%) | - | - |
-| 6 | Pack ElementNode (96 B) to 80 B or 64 B (32-bit counts, no `theTypeName` for untyped, smaller child vector header) | estimate: chunk 112 -> 96 / 80 | 86-172 MiB (5-11%) | - | - |
+| 6 | Pack ElementNode (96 B) to 88 B | done, see "XML node packing"; measured: chunk 112 -> 96 | 86 MiB (5%) | - | - |
 | 7 | Decimals without MAPM heap for values that fit (e.g. int64 mantissa + scale) | measured: 144 B per decimal outside operator new. **Done differently** (see "Compact decimals" below): 96 of the 144 B saved | - | 48 MiB (2%) measured | 117 MiB (7%) measured |
 | 8 | Short strings inline in StringItem (no rep) | estimate: rep chunk >= 32 B per string | - | 80 MiB (4%) | 117 MiB (7%) |
-| 9 | Attribute value as a plain string instead of an UntypedAtomicItem | estimate: 48 B chunk per attribute | 65 MiB (4%) | - | - |
-| 10 | Child vector inline for elements with one child | estimate: vector chunk >= 32 B per element with children | not measured (needs a count of single-child elements) | - | - |
+| 9 | Attribute value as a plain string instead of an UntypedAtomicItem | not done, see "XML node packing"; estimate: 48 B chunk per attribute | 65 MiB (4%) | - | - |
+| 10 | Child vector inline for elements with up to two attributes and children | done, see "XML node packing"; measured: vector chunk 32 B gone for 7 of 8 elements | 151 MiB (9%) | - | - |
 
 The savings overlap (2 shrinks what 4-9 save; 1 and 3 both act on pairs) and
 do not add up.
@@ -306,6 +306,77 @@ would have to build a MAPM number, and values that do not fit would need a
 second representation. The compact block keeps one representation, so results
 cannot differ between forms.
 
+## XML node packing
+
+Run 41448453817 measures the store with candidates 6 and 10 applied, against
+the baseline run 41377872156, before the JSON key, small integer and decimal
+changes; same inputs and settings. JSON and CSV file heaps are unchanged to the
+digit between those two runs.
+
+| XML file MiB | heap MiB before | after | heap / file before | after | allocations / item before | after |
+|---:|---:|---:|---:|---:|---:|---:|
+| 1.0 | 16.0 | 13.7 | 15.7 | 13.4 | 2.12 | 1.71 |
+| 10.4 | 160.3 | 136.7 | 15.4 | 13.1 | 2.12 | 1.71 |
+| 106.0 | 1603.3 | 1366.6 | 15.1 | 12.9 | 2.12 | 1.71 |
+
+The 100 MiB heap drops by 236.7 MiB (14.8%), which is exactly the arithmetic:
+705,211 records x (8 elements x 16 B + 7 vector chunks x 32 B) = 86.1 + 150.6
+MiB. RSS and peak follow the heap (12.9x and 13.0x).
+
+| kind | heap B before | after | allocations before | after |
+|---|---:|---:|---:|---:|
+| element | 120 | 104 | 1 | 1 |
+| text node | 144 | 112 | 3 | 2 |
+| attribute | 208 | 176 | 4 | 3 |
+
+What changed: `theNumAttrs` is a `uint32_t` in the padding after
+`XmlNode::theFlags`, and `InternalNode::theNodes` is a `PtrVector`
+(`src/store/naive/ptr_vector.h`), 24 B holding up to two pointers inline.
+`sizeof(ElementNode)` goes from 96 to 88, chunk 112 to 96; TextNode and
+AttributeNode keep their sizes.
+
+Parse time, 100 MiB XML, medians of 3. Runners differ a lot between runs (the
+same master code took 3.42 s and 2.05 s), so only runs whose unchanged JSON and
+CSV times agree are compared:
+
+| run | code | xml s | json s | csv s |
+|---|---|---:|---:|---:|
+| 41377872156 | before | 3.42 | 6.61 | 5.06 |
+| 41448453817 | after | 3.10 | 6.66 | 5.07 |
+
+XML parsing is 9% faster with JSON and CSV within 1%; the microbenchmarks in
+those two runs agree (`x_text1` 104 to 90 ms, `x_attr1` 129 to 118 ms, `x_empty`
+53 to 54 ms). A second pair on other runners, 41443565715 (master, xml 2.05 s,
+json 5.24 s) and 41442025801 (this change, xml 2.23 s, json 6.22 s), is not
+comparable directly; its xml/json ratio falls by 8%.
+
+Rulings:
+
+- **6, further packing: not done.** The next chunk (80 B) needs
+  `sizeof(ElementNode)` <= 72, and only the 8 B list pointer can still go. That
+  means keeping size and capacity in a heap block, so the 75% of elements that
+  have one child would allocate again: +32 B against -16 B. `theTypeName` was
+  never stored per element in this build (`EMBEDED_TYPE` is off; types live in
+  `XmlTree::theTypesMap`), so that part of the candidate saves nothing.
+- **10, done with two slots, not one.** In these files 6 of 8 elements have one
+  child and 1 of 8 has two; an element of 88 B has the room in its 96 B chunk.
+  Elements with one attribute and one text also fit.
+- **9: not done.** It would save an estimated 65 MiB (4.8% of the new heap).
+  `getTypedValue()` hands out the stored item today; with a plain string it
+  has to allocate one per atomization of an untyped attribute, and about 30
+  sites (typed and list values, ID/IDREF checks, update undo) would have to
+  branch on the representation. The atomization cost was not measured.
+
+`j_int`, `j_dbl`, `j_str1` and `j_dec` report 2.5 B per item less in these runs
+with the same number of blocks, while the JSON file heap does not move. That
+pattern fits new items reusing fewer freed start-up chunks larger than they
+need; it was not investigated further, and no JSON saving is claimed.
+
+`Item::mem_size()` for XML now counts a slot only when it is on the heap, by
+capacity. By arithmetic from run 41448453817 (not re-measured) it drops by 8 B
+for each of the 5.64 M inline slots and reads about 1.25x the heap instead of
+1.09x, so it remains unusable as a meter.
+
 ## Limitations
 
 - glibc malloc only; other allocators round differently.
@@ -313,5 +384,7 @@ cannot differ between forms.
   nesting will weigh content and OrdPaths differently.
 - The per-kind costs are measured in isolation; the model's residual
   (-3% to -7%) is where they interact (e.g. vector growth slack).
+- Per-kind costs, breakdowns and the ranking above predate "XML node packing";
+  only rows 6, 9 and 10 were updated.
 - Estimates marked "estimate" are arithmetic on sizeof and chunk sizes, not
   measurements of a modified store.

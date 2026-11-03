@@ -119,9 +119,33 @@ public:
   ulong                       theDataPos;
 
 public:
-  SortTuple() { }
+  SortTuple() : theDataPos(0) { }
 
-  ~SortTuple() { }
+  // Each key reference has one owner. A comparison may raise an error (a type
+  // error, the time limit), which stops a sort with tuples still on their way
+  // to their place. With moves, every key is then in exactly one tuple, in the
+  // table or in one that the sort is destroying. Copies would leave some keys
+  // in two tuples of the table and others in none.
+  SortTuple(const SortTuple&) = delete;
+  SortTuple& operator=(const SortTuple&) = delete;
+
+  SortTuple(SortTuple&& other) noexcept : theDataPos(other.theDataPos)
+  {
+    theKeyValues.swap(other.theKeyValues);
+  }
+
+  SortTuple& operator=(SortTuple&& other) noexcept
+  {
+    if (this != &other)
+    {
+      clear();
+      theKeyValues.swap(other.theKeyValues);
+      theDataPos = other.theDataPos;
+    }
+    return *this;
+  }
+
+  ~SortTuple() { clear(); }
 
   void clear()
   {

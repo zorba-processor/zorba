@@ -1,0 +1,2 @@
+(: A main module, imported as a library module by modules.xq. :)
+1

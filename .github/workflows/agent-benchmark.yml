@@ -43,6 +43,11 @@ on:
         description: Comma-separated task ids or prefixes (empty = all)
         required: false
         default: ""
+      language:
+        description: "Language of a query without a version declaration, passed to zorba-mcp as --language (configuration A)"
+        type: choice
+        options: [xquery, jsoniq]
+        default: xquery
 
 concurrency:
   group: agent-benchmark-${{ github.ref }}-${{ github.event_name }}
@@ -65,6 +70,7 @@ jobs:
       RUNS: ${{ inputs.runs || '3' }}
       CONFIG: ${{ inputs.config || 'both' }}
       TASKS: ${{ inputs.tasks }}
+      QUERY_LANGUAGE: ${{ inputs.language || 'xquery' }}
     steps:
       - name: Require the credentials of the chosen backend
         if: github.event_name == 'workflow_dispatch'
@@ -165,7 +171,8 @@ jobs:
             if [ "$BACKEND" = api ]; then python=.venv/bin/python; fi
             "$python" -I bench/agents/harness.py --backend "$BACKEND" \
               --model "$MODEL" --runs "$RUNS" --config "$CONFIG" \
-              --tasks "$TASKS" --mcp-command "$mcp" --out agent-results
+              --tasks "$TASKS" --language "$QUERY_LANGUAGE" \
+              --mcp-command "$mcp" --out agent-results
           else
             for backend in api claude-code; do
               python3 -I bench/agents/harness.py --backend "$backend" \

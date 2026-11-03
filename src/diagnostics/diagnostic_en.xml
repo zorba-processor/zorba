@@ -252,7 +252,7 @@
        It is a static error if the target type of a \c cast or \c castable
        expression is \c xs:NOTATION or \c xs:anyAtomicType.
       </comment>
-      <value>"$1": invalid type for "cast" or "castable" exression</value>
+      <value>"$1": invalid target type for "cast" or "castable" expression</value>
     </diagnostic>
 
     <diagnostic code="XPST0081">
@@ -285,23 +285,23 @@
       <value>$1</value>
 
       <entry key="NoReturnTypePromote_234">
-        <value>$2 can not be promoted to return type $3 of function $4()</value>
+        <value>$2 cannot be promoted to return type $3 of function $4()</value>
       </entry>
 
       <entry key="NoParamTypePromote_234">
-        <value>$2 can not be promoted to parameter type $3 of function $4()</value>
+        <value>$2 cannot be promoted to parameter type $3 of function $4()</value>
       </entry>
 
       <entry key="NoTypePromote_23">
-        <value>$2 can not be promoted to type $3</value>
+        <value>$2 cannot be promoted to type $3</value>
       </entry>
 
       <entry key="NoMultiSeqTypePromotion_2">
-        <value>sequence of more than one item can not be promoted to type $2</value>
+        <value>sequence of more than one item cannot be promoted to type $2</value>
       </entry>
 
       <entry key="NoTreatAs_23">
-        <value>$2 can not be treated as type $3</value>
+        <value>$2 cannot be treated as type $3</value>
       </entry>
 
       <entry key="JSONIQ_SELECTOR">
@@ -309,19 +309,19 @@
       </entry>
 
       <entry key="MultiValuedGroupingKey">
-        <value>atomization of grouping variable produces more than one item</value>
+        <value>grouping key must be at most one atomic value, but atomization produced more than one item</value>
       </entry>
 
       <entry key="NoVarTypeInMainModule_23">
-        <value>"$2": type of variable "$3" is not among the in-scope types of the main module</value>
+        <value>"$2": type of variable "$3" is not in scope in the main module; import the schema that defines it</value>
       </entry>
 
       <entry key="NoVarTypeInModule_234">
-        <value>"$2": type of variable "$3" is not among the in-scope types of module "$4"</value>
+        <value>"$2": type of variable "$3" is not in scope in module "$4"; import the schema that defines it</value>
       </entry>
 
       <entry key="ValueNoCastTo_23">
-        <value>$2: value can not be cast to type $3</value>
+        <value>$2: value cannot be cast to type $3</value>
       </entry>
 
       <entry key="PiTarget_2">
@@ -334,7 +334,7 @@
        It is a type error if the result of the last step in a path expression
        contains both nodes and non-nodes.
       </comment>
-      <value>path expression last step must not have nodes and atomic values</value>
+      <value>last step of a path expression returned both nodes and atomic values</value>
     </diagnostic>
 
     <diagnostic code="XPTY0019">
@@ -350,7 +350,7 @@
       <comment>
        It is a type error if, in an axis step, the context item is not a node.
       </comment>
-      <value>context item in axis step is not a node</value>
+      <value>context item of an axis step is not a node</value>
     </diagnostic>
 
     <diagnostic code="XPTY0117">
@@ -366,7 +366,7 @@
       </entry>
 
       <entry key="NotationParam_23">
-        <value>$2 can not be promoted to parameter type xs:NOTATION of function $3()</value>
+        <value>$2 cannot be promoted to parameter type xs:NOTATION of function $3()</value>
       </entry>
 
     </diagnostic>
@@ -479,7 +479,7 @@
        It is a static error to import two schema components that both define the
        same name in the same symbol space and in the same scope.
       </comment>
-      <value>"$1": name previosly imported</value>
+      <value>"$1": name already imported</value>
     </diagnostic>
 
     <diagnostic code="XQST0036">
@@ -511,27 +511,27 @@
       <value>$1</value>
 
       <entry key="NoVarTypeInMainModule_23">
-        <value>"$2": type of variable "$3" is not among the in-scope types of the main module</value>
+        <value>"$2": type of variable "$3" is not in scope in the main module; import the schema that defines it</value>
       </entry>
 
       <entry key="NoVarTypeInModule_234">
-        <value>"$2": type of variable "$3" is not among the in-scope types of module "$4"</value>
+        <value>"$2": type of variable "$3" is not in scope in module "$4"; import the schema that defines it</value>
       </entry>
 
       <entry key="NoRetTypeInMainModule_23">
-        <value>"$2": return type of function "$3" is not among the in-scope types of the main module</value>
+        <value>"$2": return type of function "$3" is not in scope in the main module; import the schema that defines it</value>
       </entry>
 
       <entry key="NoRetTypeInModule_234">
-        <value>"$2": return type of function "$3" is not among the in-scope types of module "$4"</value>
+        <value>"$2": return type of function "$3" is not in scope in module "$4"; import the schema that defines it</value>
       </entry>
 
       <entry key="NoParamTypeInMainModule_23">
-        <value>"$2": parameter type of function "$3" is not among the in-scope types of the main module</value>
+        <value>"$2": parameter type of function "$3" is not in scope in the main module; import the schema that defines it</value>
       </entry>
 
       <entry key="NoParamTypeInModule_234">
-        <value>"$2": parameter type of function "$3" is not among the in-scope types of module "$4"</value>
+        <value>"$2": parameter type of function "$3" is not in scope in module "$4"; import the schema that defines it</value>
       </entry>
 
     </diagnostic>
@@ -573,7 +573,7 @@
       <value>$1</value>
 
       <entry key="FUNCTION_23">
-        <value>"$2": function name in reserved namespace "$3"</value>
+        <value>"$2": function name in reserved namespace "$3"; use another prefix (local: in a main module)</value>
       </entry>
 
       <entry key="ANNOTATION_23">
@@ -601,7 +601,7 @@
        It is a static error if multiple module imports in the same Prolog
        specify the same target namespace.
       </comment>
-      <value>"$1": duplicate target namespace</value>
+      <value>"$1": module namespace imported more than once</value>
     </diagnostic>
 
     <diagnostic code="XQST0048">
@@ -609,7 +609,7 @@
        It is a static error if a function or variable declared in a library
        module is not in the target namespace of the library module.
       </comment>
-      <value>"$1": QName not in library namespace</value>
+      <value>"$1": not in the target namespace of the library module; use the prefix of its module declaration</value>
     </diagnostic>
 
     <diagnostic code="XQST0049">
@@ -668,23 +668,23 @@
       <value>$1</value>
 
       <entry key="UnknownSchema_23o">
-        <value>no schema found for target namespace "$2"${ : 3}</value>
+        <value>no schema found for target namespace "$2"${: 3}</value>
       </entry>
 
       <entry key="UnknownModule_234o">
-        <value>module "$2" not found at location "$3"${ : 4}</value>
+        <value>module "$2" not found at "$3"${: 4}</value>
       </entry>
 
       <entry key="BadModule_23">
-        <value>module "$2" at location "$3" is not library module</value>
+        <value>module "$2" at "$3" is not a library module: it must start with a module namespace declaration</value>
       </entry>
 
       <entry key="WrongModule_234">
-        <value>attempt to import module "$2" at location "$3" actually imports module "$4"</value>
+        <value>module at "$3" has target namespace "$4", not "$2"</value>
       </entry>
 
       <entry key="XercesMessage">
-        <value>$2,$3: error in schema${ with System ID "4"}${ with Public ID "5"}${: 6}</value>
+        <value>error in schema at line $2, column $3${ of "4"}${ (public ID "5")}${: 6}</value>
       </entry>
     </diagnostic>
 
@@ -753,15 +753,15 @@
       <value>$1</value>
 
       <entry key="ReservedPrefixInDecl_2">
-        <value>"$2": reserved prefix can not appear in namespace declaration</value>
+        <value>"$2": reserved prefix cannot be declared</value>
       </entry>
 
       <entry key="ReservedPrefixInModule_2">
-        <value>"$2": reserved prefix can not appear in module declaration</value>
+        <value>"$2": reserved prefix cannot be used in a module declaration</value>
       </entry>
 
       <entry key="ReservedPrefixInImport_2">
-        <value>"$2": reserved prefix can not appear in schema or module import</value>
+        <value>"$2": reserved prefix cannot be used in a schema or module import</value>
       </entry>
 
       <entry key="xmlnsInAttrDecl">
@@ -1082,7 +1082,7 @@
        document-node().
       </comment>
 
-      <value>"$1" cannot be treated as type $2</value>
+      <value>$1 cannot be treated as type $2</value>
     </diagnostic>
 
     <diagnostic code="XQDY0025">
@@ -1099,7 +1099,7 @@
        It is a dynamic error if the result of the content expression of a
        computed processing instruction constructor contains the string "?>".
       </comment>
-      <value>computed processing instrucion must not contain "?&gt;"</value>
+      <value>computed processing instruction must not contain "?&gt;"</value>
     </diagnostic>
 
     <diagnostic code="XQDY0027">
@@ -1109,7 +1109,7 @@
        expected validity property: \c valid if validation mode is \c strict, or
        either \c valid or \c notKnown if validation mode is \c lax.
       </comment>
-      <value>"$1": unexpected validity property${: 2}</value>
+      <value>$1${: 2}</value>
 
       <entry key="SerializationElementName_2">
         <value>"$2": invalid serialization parameters; element name must be "serialization-parameters"</value>
@@ -1128,7 +1128,7 @@
       </entry>
 
       <entry key="NoTypeInCtx_2">
-        <value>"$2": type no defined in current context</value>
+        <value>"$2": type not defined in the current context</value>
       </entry>
     </diagnostic>
 
@@ -1138,7 +1138,7 @@
        processing instruction constructor cannot be cast to the type
        \c xs:NCName.
       </comment>
-      <value>can not cast to xs:NCName</value>
+      <value>processing-instruction name cannot be cast to xs:NCName</value>
     </diagnostic>
 
     <diagnostic code="XQDY0044">
@@ -1153,7 +1153,7 @@
        - Its namespace prefix is other than \c xml and its namespace URI is
          <code>http://www.w3.org/XML/1998/namespace</code>.
       </comment>
-      <value>"$1": invalid attibute node-name</value>
+      <value>"$1": invalid attribute node-name</value>
     </diagnostic>
 
     <diagnostic code="XQDY0054">
@@ -1220,7 +1220,7 @@
        does not have a top-level element declaration in the in-scope element
        declarations, if validation mode is \c strict.
       </comment>
-      <value>validated element does not have a top-level element declaration in the in-scope element declarations${: 1}</value>
+      <value>no top-level element declaration in scope for validated element${: 1}</value>
     </diagnostic>
 
     <diagnostic code="XQDY0091">
@@ -1434,7 +1434,7 @@
       <comment>
        Unidentified error.
       </comment>
-      <value>unidentifier error</value>
+      <value>unidentified error</value>
     </diagnostic>
 
     <diagnostic code="FOAR0001">
@@ -1489,7 +1489,7 @@
       <comment>
        NaN supplied as float/double value.
       </comment>
-      <value>NaN supplied as float/double value</value>
+      <value>duration cannot be multiplied or divided by NaN</value>
     </diagnostic>
 
     <diagnostic code="FOCA0006">
@@ -1512,7 +1512,7 @@
       <comment>
        Unsupported collation.
       </comment>
-      <value>"$1": unsuported collation${: 2}</value>
+      <value>"$1": unsupported collation${: 2}</value>
     </diagnostic>
 
     <diagnostic code="FOCH0003">
@@ -1533,14 +1533,14 @@
       <comment>
        No context document.
       </comment>
-      <value>no context document for $1() function</value>
+      <value>$1(): node is not in a tree whose root is a document node</value>
     </diagnostic>
 
     <diagnostic code="FODC0002">
       <comment>
        Error retrieving resource.
       </comment>
-      <value>"$1": error retrieving resource${: 2}</value>
+      <value>"$1": cannot retrieve resource${: 2}</value>
     </diagnostic>
 
     <diagnostic code="FODC0003">
@@ -1555,7 +1555,7 @@
       <comment>
        Invalid argument to \c fn:collection().
       </comment>
-      <value>"$1": invalid argument to fn:collection()${: 2}</value>
+      <value>"$1": invalid URI${: 2}</value>
     </diagnostic>
 
     <diagnostic code="FODC0005">
@@ -1576,7 +1576,7 @@
       <comment>
        Base URI passed to \c fn:parse() is not a valid absolute URI.
       </comment>
-      <value>"$1": base URI passed to fn:parse() is not a valid absolute URI</value>
+      <value>"$1": base-uri option must be an absolute URI</value>
     </diagnostic>
 
     <diagnostic code="FODF1280">
@@ -1731,14 +1731,14 @@
        \c fn:zero-or-one() called with a sequence containing more than one
        item.
       </comment>
-      <value>fn:zero-or-one() called with a sequnce containing more than one item</value>
+      <value>fn:zero-or-one(): argument has more than one item</value>
     </diagnostic>
 
     <diagnostic code="FORG0004">
       <comment>
        \c fn:one-or-more() called with a sequence containing no items.
       </comment>
-      <value>fn:one-or-more() called with a sequence containing no items</value>
+      <value>fn:one-or-more(): argument is empty</value>
     </diagnostic>
 
     <diagnostic code="FORG0005">
@@ -1746,7 +1746,7 @@
        \c fn:exactly-one() called with a sequence containing zero or more
        than one item.
       </comment>
-      <value>fn:exactly-one() called with a sequence containing zero or more than one item</value>
+      <value>fn:exactly-one(): argument does not have exactly one item</value>
     </diagnostic>
 
     <diagnostic code="FORG0006">
@@ -1760,7 +1760,7 @@
       <comment>
        The two arguments to fn:dateTime() have inconsistent timezones.
       </comment>
-      <value>"$1" and "$2": two arguments to fn:dateTime() have inconsistent timezones</value>
+      <value>"$1" and "$2": date and time have different timezones</value>
     </diagnostic>
 
     <diagnostic code="FORG0009">
@@ -1789,7 +1789,7 @@
       <comment>
        Regular expression matches zero-length string.
       </comment>
-      <value>"$1": regular expression matches zero-length string</value>
+      <value>"$1": regular expression matches the empty string</value>
     </diagnostic>
 
     <diagnostic code="FORX0004">
@@ -1832,7 +1832,7 @@
       <comment>
        Identifier cannot be used to retrive a resource containing text
       </comment>
-      <value>"$1": error retrieving resource containing text${: 2}</value>
+      <value>"$1": cannot retrieve text resource${: 2}</value>
     </diagnostic>
 
     <diagnostic code="FOUT1190">
@@ -1841,7 +1841,7 @@
        using the specified encoding, the resulting characters are not
        permitted XML characters or requested encoding not supported
       </comment>
-      <value>"$1": can not decode resource retrieved</value>
+      <value>"$1": cannot decode resource${: unsupported encoding "2"}</value>
     </diagnostic>
 
     <diagnostic code="FOFL0001">
@@ -2378,7 +2378,7 @@
     </diagnostic>
 
     <diagnostic code="ZXQP0008" name="FUNCTION_IMPL_NOT_FOUND">
-      <value>"$1": function implementation not found</value>
+      <value>"$1": no implementation registered for external function</value>
     </diagnostic>
 
     <diagnostic code="ZXQP0009" name="FUNCTION_LOCALNAME_MISMATCH">
@@ -3186,11 +3186,11 @@
     </diagnostic>
 
     <diagnostic code="ZOSE0002" name="NOT_PLAIN_FILE">
-      <value>"$1": not plain file</value>
+      <value>"$1": not a regular file</value>
     </diagnostic>
 
     <diagnostic code="ZOSE0003" name="STREAM_READ_FAILURE">
-      <value>stream read failure</value>
+      <value>cannot read from stream</value>
     </diagnostic>
 
     <diagnostic code="ZOSE0004" name="IO_ERROR">
@@ -3361,7 +3361,7 @@
     </diagnostic>
 
     <diagnostic code="ZJPE0004" name="ILLEGAL_LITERAL">
-      <value>illegal JSON literal</value>
+      <value>illegal JSON literal: expected true, false or null</value>
     </diagnostic>
 
     <diagnostic code="ZJPE0005" name="ILLEGAL_NUMBER">
@@ -3472,12 +3472,12 @@
 
     <diagnostic code="JNDY0003">
       <comment>It is a dynamic error if two pairs in an object constructor or in a simple object union have the same name.</comment>
-      <value>"$1": pair with the same name already exists in object</value>
+      <value>"$1": duplicate key in object</value>
     </diagnostic>
 
     <diagnostic code="JNTY0004">
       <comment>It is a type error to call fn:data on a sequence containing an array or an object.</comment>
-      <value>can not atomize an $1 item: an $1 has probably been passed where an atomic value is expected (e.g., as a key, or to a function expecting an atomic item)</value>
+      <value>cannot atomize an $1: an atomic value is expected here</value>
     </diagnostic>
 
     <diagnostic code="JNUP0005">
@@ -3548,7 +3548,7 @@
 
     <diagnostic code="JNTY0011">
       <comment>It is a type error if the content sequence in a node constructor or in an XQUF insert or replace update expression contains an object or an array.</comment>
-      <value>JSON item cannot appear in content sequence of node constructor or updating expression</value>
+      <value>object or array cannot appear in the content of a node constructor or updating expression</value>
     </diagnostic>
 
     <diagnostic code="JNSE0012">
@@ -3557,7 +3557,7 @@
       jsoniq-serialization-multiple-items is set to no.
       </comment>
 
-      <value>can not serialize multiple top-level items as JSON</value>
+      <value>cannot serialize multiple top-level items as JSON; wrap them in an array or set the serialization parameter jsoniq-multiple-items to yes</value>
     </diagnostic>
 
     <diagnostic code="JNSE0013">
@@ -3566,7 +3566,7 @@
       the jsoniq-serialization-extensions serialization parameter
       set to false.</comment>
 
-      <value>can not serialize value as JSON: $1</value>
+      <value>cannot serialize value as JSON: $1</value>
     </diagnostic>
 
     <diagnostic code="JNSE0014">
@@ -3598,13 +3598,13 @@
 
     <diagnostic code="JNUP0017">
       <comment> It is a dynamic error if the value in a replace expression is not exactly a single item.</comment>
-      <value>can not replace with less or more than an item</value>
+      <value>replacement value must be exactly one item</value>
     </diagnostic>
 
     <diagnostic code="JNTY0018">
       <comment>It is a dynamic error if there is not exactly one supplied parameter for an object or array selector.</comment>
 
-      <value>object or array selection needs zero or one parameter</value>
+      <value>object or array lookup takes zero or one argument</value>
     </diagnostic>
 
     <diagnostic code="JNUP0019">
@@ -3621,12 +3621,12 @@
 
     <diagnostic code="JNTY0024">
       <comment>objects or arrays don't have a string value</comment>
-      <value>$1 items do not have string value</value>
+      <value>an $1 has no string value</value>
     </diagnostic>
 
     <diagnostic code="JNTY0020">
       <comment>parser error for invalid option type</comment>
-      <value>$1: invalid option type for option $2 (expected $3)</value>
+      <value>"$2" option: $1 given, $3 expected</value>
     </diagnostic>
 
     <diagnostic code="JNTY0021">
@@ -3647,7 +3647,7 @@
         <value>'\\$2': illegal JSON character escape</value>
       </entry>
       <entry key="IllegalLiteral">
-        <value>illegal JSON literal</value>
+        <value>illegal JSON literal: expected true, false or null</value>
       </entry>
       <entry key="IllegalNumber">
         <value>illegal JSON number</value>
@@ -4041,7 +4041,7 @@
     
     <diagnostic code="URI_UNRESOLVED_OR_NOSTREAM">
       <comment>If the stream is unresolved or is not an stream.</comment>
-      <value>"$1": stream is unresolved or it is not a stream - "$2"</value>
+      <value>"$1": cannot fetch resource: $2</value>
     </diagnostic>
     
   </namespace>
@@ -4452,6 +4452,10 @@
 
     <entry key="NoRegisteredSerializationCallback_2">
       <value>external module "$2" not available using registered SerializationCallback</value>
+    </entry>
+
+    <entry key="URIHasFragment">
+      <value>URI must not have a fragment identifier</value>
     </entry>
 
     <entry key="NoResolveRelativeURI">

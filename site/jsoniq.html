@@ -45,7 +45,7 @@
 <h2 id="two">Two syntaxes</h2>
 <p>Zorba implements JSONiq 1.0 in two forms, and they share one data model and one function library:</p>
 <ul>
-  <li><strong>The JSONiq syntax</strong>, used for files ending in <code>.jq</code> or with the <code>--jsoniq</code> flag. It adds <code>$o.key</code> lookups, <code>$a[[i]]</code> and <code>$a[]</code> for arrays, the literals <code>true</code>, <code>false</code> and <code>null</code>, and uses <code>$$</code> for the context item because <code>.</code> is taken.</li>
+  <li><strong>The JSONiq syntax</strong>, used for files ending in <code>.jq</code>, for queries that start with <code>jsoniq version "1.0";</code>, and for other queries when <code>zorba</code> runs with <code>--language jsoniq</code> (<code>--jsoniq</code>). A declaration decides over the extension, and the extension over the option. It adds <code>$o.key</code> lookups, <code>$a[[i]]</code> and <code>$a[]</code> for arrays, the literals <code>true</code>, <code>false</code> and <code>null</code>, and uses <code>$$</code> for the context item because <code>.</code> is taken.</li>
   <li><strong>The JSONiq extension to XQuery</strong>, used in <code>.xq</code> files. JSON constructors work as in JSONiq, but navigation is done by calling objects and arrays like functions: <code>$o("key")</code>, <code>$a(1)</code>, <code>$a()</code>. See <a href="#xqsyntax">JSON in XQuery syntax</a>.</li>
 </ul>
 <p>Everything on the <a href="xquery.html">XQuery page</a> applies to both, apart from those syntax differences. Most examples here use the JSONiq syntax.</p>
