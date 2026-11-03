@@ -1734,6 +1734,169 @@ void test_language_binary( Fixture const &f ) {
   }
 }
 
+// The README states what a query cannot do under zorba-mcp. These tests hold
+// each statement: no write, no read outside the root through any function,
+// no network, and no native module other than the file module.
+std::string const file_import(
+  "import module namespace file = \"http://expath.org/ns/file\";\n" );
+
+// Names of the entries of a directory, sorted, with their contents.
+std::string snapshot( std::string const &dir ) {
+  std::vector<std::string> entries;
+  for ( auto const &e : std::filesystem::recursive_directory_iterator( dir ) ) {
+    std::string s( e.path().string() );
+    if ( e.is_regular_file() && !e.is_symlink() )
+      s += "=" + read_file( e.path().string() );
+    entries.push_back( s );
+  }
+  std::sort( entries.begin(), entries.end() );
+  std::string out;
+  for ( std::string const &s : entries )
+    out += s + "\n";
+  return out;
+}
+
+void test_no_write( Fixture const &f ) {
+  TempTree t;
+  t.write( "keep.txt", "KEEP" );
+  {
+    std::ofstream out( ( t.base + "/outside/other.txt" ).c_str() );
+    out << "OTHER";
+  }
+  ServerConfig config;
+  config.root = t.root;
+  Server server( f.zorba, config, std::cerr );
+  std::string const before( snapshot( t.base ) );
+  std::string const r( t.root ), o( t.base + "/outside" );
+
+  std::string const queries[] = {
+    file_import + "file:write-text(\"" + r + "/new.txt\", \"x\")",
+    file_import + "file:write-text(\"" + o + "/new.txt\", \"x\")",
+    file_import + "file:write-text(\"" + r + "/keep.txt\", \"CHANGED\")",
+    file_import + "file:write-text-lines(\"" + r + "/new.txt\", (\"a\", \"b\"))",
+    file_import + "file:write-binary(\"" + r + "/new.bin\", xs:base64Binary(\"AAAA\"))",
+    file_import + "file:append-text(\"" + r + "/keep.txt\", \"x\")",
+    file_import + "file:append-text-lines(\"" + r + "/keep.txt\", \"x\")",
+    file_import + "file:append-binary(\"" + r + "/keep.txt\", xs:base64Binary(\"AAAA\"))",
+    file_import + "file:delete(\"" + r + "/keep.txt\")",
+    file_import + "file:delete(\"" + o + "/other.txt\")",
+    file_import + "file:create-directory(\"" + r + "/newdir\")",
+    file_import + "file:copy(\"" + r + "/keep.txt\", \"" + r + "/copy.txt\")",
+    file_import + "file:copy(\"" + r + "/keep.txt\", \"" + o + "/copy.txt\")",
+    file_import + "file:move(\"" + r + "/keep.txt\", \"" + r + "/moved.txt\")",
+    file_import + "file:move(\"" + r + "/keep.txt\", \"" + o + "/moved.txt\")",
+    "put(<a/>, \"file://" + r + "/put.xml\")",
+    "put(<a/>, \"file://" + o + "/put.xml\")",
+    "put(<a/>, \"put.xml\")"
+  };
+  for ( std::string const &q : queries ) {
+    Json const res = run_query( server, q );
+    check( is_tool_error( res ), "write is refused: " + q, res.dump() );
+    check( snapshot( t.base ) == before, "nothing changed on disk: " + q );
+  }
+  check_alive( server );
+}
+
+void test_read_functions( Fixture const &f ) {
+  TempTree t;
+  t.write( "inside.txt", "INSIDE-VALUE" );
+  {
+    std::ofstream out( ( t.base + "/outside/secret.txt" ).c_str() );
+    out << "TOP-SECRET";
+  }
+  std::filesystem::create_symlink( t.base + "/outside/secret.txt",
+                                   t.root + "/link.txt" );
+  ServerConfig config;
+  config.root = t.root;
+  Server server( f.zorba, config, std::cerr );
+  std::string const r( t.root ), o( t.base + "/outside" );
+
+  // Controls: the same functions read a file under the root.
+  std::string const allowed[] = {
+    "unparsed-text(\"file://" + r + "/inside.txt\")",
+    "unparsed-text(\"inside.txt\")",
+    file_import + "file:read-text(\"" + r + "/inside.txt\")"
+  };
+  for ( std::string const &q : allowed ) {
+    Json const res = run_query( server, q );
+    check( !is_tool_error( res ) && contains( result_text( res ), "INSIDE-VALUE" ),
+           "reads under the root: " + q, res.dump() );
+  }
+
+  std::string const denied[] = {
+    "unparsed-text(\"file://" + o + "/secret.txt\")",
+    "unparsed-text(\"../outside/secret.txt\")",
+    "unparsed-text-lines(\"file://" + o + "/secret.txt\")",
+    "unparsed-text(\"file://" + r + "/link.txt\")",
+    "doc(\"file://" + o + "/secret.txt\")",
+    "doc(\"file://" + r + "/link.txt\")",
+    "doc(\"../outside/secret.txt\")",
+    file_import + "file:read-text(\"" + o + "/secret.txt\")",
+    file_import + "file:read-text(\"" + r + "/link.txt\")",
+    file_import + "file:read-text(\"../outside/secret.txt\")",
+    file_import + "file:read-text-lines(\"" + o + "/secret.txt\")",
+    file_import + "file:read-binary(\"" + o + "/secret.txt\")",
+    file_import + "file:list(\"" + o + "\")",
+    file_import + "file:size(\"" + o + "/secret.txt\")",
+    file_import + "file:copy(\"" + o + "/secret.txt\", \"" + r + "/c.txt\")"
+  };
+  for ( std::string const &q : denied ) {
+    Json const res = run_query( server, q );
+    check( is_tool_error( res ) && !contains( res.dump(), "TOP-SECRET" ),
+           "read outside the root is refused: " + q, res.dump() );
+  }
+  check( !std::filesystem::exists( t.root + "/c.txt" ), "no copy was made" );
+
+  // unparsed-text-available answers false, and leaks nothing.
+  Json const res = run_query( server,
+    "unparsed-text-available(\"file://" + o + "/secret.txt\")" );
+  check( !contains( res.dump(), "TOP-SECRET" ) &&
+         ( is_tool_error( res ) || result_text( res ) == "false" ),
+         "unparsed-text-available outside the root", res.dump() );
+
+  // No network from the functions that read a URI.
+  for ( char const *const q : {
+          "unparsed-text(\"http://127.0.0.1:9/a.txt\")",
+          "unparsed-text(\"https://127.0.0.1:9/a.txt\")",
+          "unparsed-text-lines(\"http://127.0.0.1:9/a.txt\")",
+          "doc(\"https://127.0.0.1:9/a.xml\")",
+          "doc(\"ftp://127.0.0.1:9/a.xml\")" } ) {
+    Json const n = run_query( server, q );
+    check( is_tool_error( n ) &&
+           contains( n.dump(), "access denied by security policy" ),
+           std::string( "network read is refused: " ) + q, n.dump() );
+  }
+  check_alive( server );
+}
+
+// The native modules other than the file module do not load: the HTTP and
+// FTP clients, curl, fetch and the others cannot be reached.
+void test_native_import( Fixture const &f ) {
+  ServerConfig config;
+  config.root = f.tree;
+  Server server( f.zorba, config, std::cerr );
+  for ( char const *const ns : {
+          "http://zorba.io/modules/http-client",
+          "http://www.zorba-xquery.com/modules/http-client",
+          "http://zorba.io/modules/http-client-wrapper",
+          "http://zorba.io/modules/ftp-client",
+          "http://zorba.io/modules/util-curl",
+          "http://zorba.io/modules/fetch",
+          "http://zorba.io/modules/random",
+          "http://zorba.io/modules/reflection",
+          "http://zorba.io/modules/sleep" } ) {
+    Json const r = run_query( server, std::string( "import module namespace m = \"" ) +
+                                      ns + "\";\n\"loaded\"" );
+    check( is_tool_error( r ) && !contains( result_text( r ), "loaded" ),
+           std::string( "module import is refused: " ) + ns, r.dump() );
+    check( is_tool_error( r ) &&
+           ( contains( field( tool_error( r ), "code" ), "ZXQP0067" ) ||
+             contains( r.dump(), "access denied by security policy" ) ),
+           std::string( "refused by the policy: " ) + ns, r.dump() );
+  }
+  check_alive( server );
+}
+
 struct Test {
   char const *name;
   void (*fn)( Fixture const& );
@@ -1766,7 +1929,10 @@ Test const tests[] = {
   { "case_paths", test_case_paths },
   { "html_edge_cases", test_html_edge_cases },
   { "language", test_language },
-  { "language_binary", test_language_binary }
+  { "language_binary", test_language_binary },
+  { "no_write", test_no_write },
+  { "read_functions", test_read_functions },
+  { "native_import", test_native_import }
 };
 
 } // namespace
