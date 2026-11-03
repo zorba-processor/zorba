@@ -1,4 +1,4 @@
-(: The same with fn:subsequence. :)
+(: The same with fn:subsequence (see s15). :)
 declare namespace an = "http://zorba.io/annotations";
 declare %an:assignable variable $g := 0;
 declare %an:sequential function local:bump() { $g := $g + 1; $g };

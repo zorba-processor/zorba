@@ -1,4 +1,4 @@
-(: A predicate over a loop with the call runs all of it, as with a direct call. :)
+(: Per tuple and lazy at all levels (a direct call differs, see s12). :)
 declare namespace an = "http://zorba.io/annotations";
 declare %an:assignable variable $g := 0;
 declare %an:sequential function local:bump() { $g := $g + 1; $g };
