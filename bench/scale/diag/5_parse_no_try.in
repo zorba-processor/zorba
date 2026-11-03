@@ -1,0 +1,2 @@
+(let $items := parse-json(file:read-text($dir:root || "/data.jsonl"))
+ return if (count($items) eq 1) then $items else [ $items ])[]
