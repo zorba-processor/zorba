@@ -8,7 +8,7 @@ declare variable $h as function(item()*, item()) as item()* := local:draw#2;
 let $p :=
   for sliding window $w in 1 to 64
     start at $s when true
-    only end $x at $e when fold-left(1, 0, $h) mod 2 eq 0
+    only end $x at $e when fold-left($x, 0, $h) mod 2 eq 0
   return $s * 1000 + $e
 return some $a in $p, $b in $p satisfies
   ($a idiv 1000 lt $b idiv 1000 and $b idiv 1000 le $a mod 1000 and $a mod 1000 ne $b mod 1000)

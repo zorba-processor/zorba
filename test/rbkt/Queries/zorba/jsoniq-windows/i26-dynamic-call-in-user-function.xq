@@ -1,11 +1,12 @@
-(: The same, with the call inside a function that is not declared sequential. :)
+(: The same, with the call inside a function that is not declared sequential.
+   The call depends on the tuple, so that the optimizer keeps it in the loop. :)
 declare namespace an = "http://zorba.io/annotations";
 declare %an:assignable variable $g := 0;
-declare %an:sequential function local:bump() { $g := $g + 1; $g };
+declare %an:sequential function local:bump($x) { $g := $g + 1; $g };
 declare %an:nondeterministic function local:g() { $g };
-declare variable $f := local:bump#0;
-declare function local:call($h) { $h() };
+declare variable $f := local:bump#1;
+declare function local:call($h, $y) { $h($y) };
 for sliding window $w in (for $i in 1 to 3 return $i * 10 + local:g())
   start when true
   only end when true
-return (local:call($f), $w)
+return (local:call($f, $w), $w)
