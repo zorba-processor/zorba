@@ -1023,22 +1023,27 @@ static expr* partial_eval_return_clause(
   {
     if (flworExpr->num_clauses() == 1)
     {
-      modified = true;
-
       flwor_clause* c = flworExpr->get_clause(0);
 
       if (c->get_kind() == flwor_clause::for_clause)
       {
-        return static_cast<for_clause*>(c)->get_expr();
+        // An outer for gives a tuple for an empty domain: the domain has not
+        // the same cardinality as the FLWOR.
+        if (!static_cast<for_clause*>(c)->is_allowing_empty())
+        {
+          modified = true;
+          return static_cast<for_clause*>(c)->get_expr();
+        }
       }
-      else
+      else if (c->get_kind() == flwor_clause::let_clause)
       {
-        assert(c->get_kind() == flwor_clause::let_clause);
-
+        modified = true;
         return rCtx.theEM->create_const_expr(sctx, udf, loc, 1);
       }
+      // A window clause gives one tuple per window: keep it.
     }
-    else if (flworExpr->is_single_for(pos))
+    else if (flworExpr->is_single_for(pos) &&
+             !static_cast<for_clause*>(flworExpr->get_clause(pos))->is_allowing_empty())
     {
       flwor_clause* c = flworExpr->get_clause(pos);
       return static_cast<for_clause*>(c)->get_expr();

@@ -1066,12 +1066,12 @@ bool WindowIterator::nextImpl(store::Item_t& aResult, PlanState& planState) cons
 
         bindVariable(planState,
                      state->theDomainSeq,
-                     state->theOpenWindows[0].theStartPos,
+                     state->theCurWindow->theStartPos,
                      state->theCurWindow->theEndPos);
 
         theStartClause.bindExtern(planState,
                                   state->theDomainSeq,
-                                  state->theOpenWindows[0].theStartPos);
+                                  state->theCurWindow->theStartPos);
 
         theEndClause.bindExtern(planState,
                                 state->theDomainSeq,

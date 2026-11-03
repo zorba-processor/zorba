@@ -1,0 +1,5 @@
+{"id":1,"state":"ok","v":1}
+{"id":2,"state":"ok"}
+{"id":3,"state":"fail","v":3,"extra":{"why":"disk"}}
+{"id":4,"state":"fail","v":null}
+{"id":5,"state":"ok","v":5}

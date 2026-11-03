@@ -164,8 +164,13 @@ main(int argc, char** argv)
     // parallel. ".xq" keeps the historical names.
     std::string lQuerySuffix =
     std::string(argv[i]).substr( std::string(argv[i]).rfind('.') );
+    // Runs of one query at different optimization levels must not share them
+    // either.
+    char const* const lOptLevelEnv = getenv( "ZORBA_OPTLEVEL" );
     std::string lOutputBase = lQueryWithoutSuffix
       + ( lQuerySuffix == ".xq" ? std::string() : lQuerySuffix );
+    if ( lOptLevelEnv )
+      lOutputBase += std::string( "." ) + lOptLevelEnv;
     std::unique_ptr<zorba::TestSchemaURIMapper>        smapper;
     std::unique_ptr<zorba::TestModuleURIMapper>        mmapper;
     std::unique_ptr<zorba::TestCollectionURIMapper>    cmapper;
