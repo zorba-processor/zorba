@@ -27,6 +27,7 @@
     <li><a href="#load">Loading JSON</a></li>
     <li><a href="#flwor">FLWOR over JSON</a></li>
     <li><a href="#group">Grouping</a></li>
+    <li><a href="#windows">Windows over JSON</a></li>
     <li><a href="#null">Null and absent keys</a></li>
     <li><a href="#types">Types</a></li>
     <li><a href="#merge">Merging objects</a></li>
@@ -83,6 +84,13 @@
 <h2 id="group">Grouping</h2>
 <!-- example: jsoniq/group -->
 <p class="why"><strong>Why it matters:</strong> after <code>group by</code>, <code>$o</code> holds all orders of the customer, so <code>$o.items[].sku</code> collects across them.</p>
+
+<h2 id="windows">Windows over JSON</h2>
+<p>A window clause binds a run of consecutive items to one variable, and works on objects as on any item. A sliding window starts one window at each item that meets the start condition. A tumbling window starts the next window only after the previous one ended. <code>previous</code> and <code>next</code> are empty at the ends of the input, and a condition on a missing key is false.</p>
+<!-- example: jsoniq/window-moving-average -->
+<!-- example: jsoniq/window-sessions -->
+<!-- example: jsoniq/window-changes -->
+<p class="why"><strong>Why it matters:</strong> moving averages, sessions and change detection on irregular records take one clause, with no reshaping first.</p>
 
 <h2 id="null">Null and absent keys</h2>
 <p>A key can be present with the value <code>null</code>, or absent. A lookup of an absent key returns the empty sequence, so comparisons on it return the empty sequence too. When an object value expression returns the empty sequence, the constructor stores <code>null</code>; that is why the second order shows <code>null</code> in the first comparison.</p>

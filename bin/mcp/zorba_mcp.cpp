@@ -18,6 +18,7 @@
 // directory of XML, JSON, CSV and HTML documents with JSONiq/XQuery.
 
 #include <csignal>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -49,6 +50,7 @@ char const usage[] =
   "Usage: zorba-mcp --root <dir> [--queries <dir>] [--timeout <seconds>]\n"
   "                 [--max-output <bytes>] [--max-memory <bytes>]\n"
   "                 [--no-scan] [--scan-cache-mb <MiB>]\n"
+  "                 [--cache-max-file-kb <KB>] [--cache-max-files <N>]\n"
   "                 [--language xquery|jsoniq]\n"
   "\n"
   "An MCP server (stdio transport) over the Zorba JSONiq/XQuery processor.\n"
@@ -70,7 +72,22 @@ char const usage[] =
   "  --no-scan            no background scan of the directory: list_documents\n"
   "                       takes no arguments and lists through dir:list\n"
   "  --scan-cache-mb <MiB> memory for the scan's file index and previews\n"
-  "                       (default 64); at the limit the scan stops\n"
+  "                       (default 64); at the limit the scan stops. This is not\n"
+  "                       the document cache: it holds previews, not documents\n"
+  "  --cache-max-file-kb <KB>\n"
+  "                       the document cache keeps parsed documents across\n"
+  "                       calls for dir:open and dir:documents: at most this\n"
+  "                       file size (default 16, 0: no document cache). A file\n"
+  "                       enters on its second read. It is served only while\n"
+  "                       its path, device, inode, size, mtime and ctime stay\n"
+  "                       the same. Not kept: larger files, records with an\n"
+  "                       error, records over 128 times their file size.\n"
+  "                       Updating and sequential queries do not use it. One\n"
+  "                       line of counters goes to stderr at exit\n"
+  "  --cache-max-files <N>\n"
+  "                       how many documents it keeps, least recently used\n"
+  "                       out first (default 10, 0: no document cache); a\n"
+  "                       query does not evict a document it has used\n"
   "  --language <lang>    xquery (default) or jsoniq: the language of a\n"
   "                       run_query query, in this order: (1) a jsoniq\n"
   "                       version or xquery version declaration at the very\n"
@@ -152,6 +169,13 @@ int main( int argc, char const *argv[] ) {
                 n > 0 && n <= 1024 * 1024 ) {
       config.scan_limits.max_memory = static_cast<std::size_t>( n ) * 1024 * 1024;
       ++i;
+    } else if ( arg == "--cache-max-file-kb" && parse_number( val, &n ) &&
+                n <= ( SIZE_MAX >> 10 ) ) {
+      config.cache_max_file_kb = static_cast<std::size_t>( n );
+      ++i;
+    } else if ( arg == "--cache-max-files" && parse_number( val, &n ) ) {
+      config.cache_max_files = static_cast<std::size_t>( n );
+      ++i;
     } else {
       return fail( "invalid argument: " + arg );
     }
@@ -211,6 +235,9 @@ int main( int argc, char const *argv[] ) {
         break;
       }
     }
+    std::string const cache_line( server.cache_stats_line() );
+    if ( !cache_line.empty() )
+      std::cerr << cache_line << std::endl;
     // Zorba::shutdown() cleans up libxml2, which a thread left behind could be
     // in, so in that case the process ends here.
     if ( !server.stop_scan() ) {
