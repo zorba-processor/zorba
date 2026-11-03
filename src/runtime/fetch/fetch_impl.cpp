@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <zorba/util/stream_util.h>
 #include <zorba/util/transcode_stream.h>
 #include <zorba/internal/unique_ptr.h>
 #include <zorba/diagnostic_list.h>
@@ -160,6 +161,9 @@ FetchContentIterator::nextImpl(
     }
     transcode::attach(*lRes->getStream(), lEncodingStr.c_str());
   }
+
+  if (lRes->isStreamSeekable())
+    skip_utf8_bom(*lRes->getStream());
 
   // return the resource in a streamable string. This transfers memory
   // ownership of the istream (via its StreamReleaser) to the StreamableString
