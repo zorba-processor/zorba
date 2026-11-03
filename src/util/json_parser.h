@@ -512,7 +512,6 @@ private:
   void set_loc_range( location* );
 
   std::istream *in_;
-  bool at_start_;
   std::string file_;
   line_type line_, prev_line_;
   column_type col_, prev_col_;

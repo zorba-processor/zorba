@@ -212,7 +212,7 @@ inline void lexer::set_loc_range( location *loc ) {
   );
 }
 
-lexer::lexer( istream &in ) : in_( &in ), at_start_( true ) {
+lexer::lexer( istream &in ) : in_( &in ) {
   line_ = prev_line_ = 1;
   col_ = prev_col_ = 1;
 }
@@ -238,20 +238,6 @@ bool lexer::next( token *t, bool throw_exceptions ) {
     char c;
     if ( !get_char( &c ) )
       return false;
-    if ( at_start_ ) {
-      at_start_ = false;
-      //
-      // F&O 3.1 fn:parse-json: "If the input starts with a byte order mark,
-      // this function ignores it."  JSON has no other token that starts with
-      // this byte, so what is not a mark is an illegal character below.
-      //
-      char c2, c3;
-      if ( c == '\xEF' && get_char( &c2 ) && c2 == '\xBB' &&
-           get_char( &c3 ) && c3 == '\xBF' ) {
-        col_ -= 3;
-        continue;
-      }
-    }
     switch ( c ) {
       case ' ':
       case '\n':
