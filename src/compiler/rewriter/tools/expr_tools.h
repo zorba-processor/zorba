@@ -90,6 +90,10 @@ bool call_results_can_differ(const expr* root);
 // The same for the call itself, without looking at its arguments.
 bool is_call_with_varying_result(const expr* call);
 
+// Whether "root" reads a state that a call can change, in a query with such calls.
+// Lazy evaluation interleaves it with those calls, even if they are outside of "root".
+bool depends_on_call_effects(const expr* root);
+
 
 /*******************************************************************************
 

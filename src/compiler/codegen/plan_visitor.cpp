@@ -413,6 +413,21 @@ ftnode_visitor* get_ftnode_visitor()
 #endif /* ZORBA_NO_FULL_TEXT */
 
 
+// XQSX 6.7: "The associated expression is evaluated first to produce the binding
+// sequence, then the next clause is evaluated once for each item in the binding
+// sequence." This applies to a domain with a call that can have a side effect. Any
+// other domain stays lazy.
+PlanIter_t binding_sequence_iter(const for_clause* fc, PlanIter_t domainIter)
+{
+  expr* domExpr = fc->get_expr();
+
+  if (expr_tools::calls_unproven_function(domExpr))
+    return new MaterializeIterator(domExpr->get_sctx(), domExpr->get_loc(), domainIter);
+
+  return domainIter;
+}
+
+
 PlanIter_t pop_itstack()
 {
   return plan_visitor_ns::pop_stack(itstack);
@@ -1664,7 +1679,7 @@ PlanIter_t gflwor_codegen(flwor_expr& flworExpr, int currentClause)
 
     var_expr* var = fc->get_var();
 
-    PlanIter_t domainIter = pop_itstack();
+    PlanIter_t domainIter = binding_sequence_iter(fc, pop_itstack());
 
     std::vector<PlanIter_t>& varRefs = clauseVarMap->theVarRebinds[0]->theOutputVarRefs;
     std::vector<PlanIter_t>* posVarRefs = &no_var_iters;
@@ -2090,7 +2105,7 @@ void flwor_codegen(const flwor_expr& flworExpr)
 
       var_expr* var = fc->get_var();
 
-      PlanIter_t domainIter = pop_itstack();
+      PlanIter_t domainIter = binding_sequence_iter(fc, pop_itstack());
 
       std::vector<PlanIter_t>& varRefs =
       clauseVarMap->theVarRebinds[0]->theOutputVarRefs;

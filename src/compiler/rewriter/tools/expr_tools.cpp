@@ -1510,12 +1510,30 @@ bool is_call_with_varying_result(const expr* call)
 }
 
 
+bool depends_on_call_effects(const expr* root)
+{
+  if (call_effects(root) != CompilerCB::CALLS_HAVE_EFFECTS)
+    return false;
+
+  ImpurityWalk w(root);
+
+  bool const answer = w.walk(root, true);
+
+  if (!answer)
+    w.remember();
+
+  return answer;
+}
+
+
 /*******************************************************************************
   The closed world of a query: the walk covers the query body, what its prolog
   variables are initialized with, and every function that it names in a call or a
   function item. A dynamic function call can only reach what this walk reaches,
   unless something here brings in code that it cannot see. Anything that can do so,
-  or that can have a side effect itself, ends the walk with CALLS_HAVE_EFFECTS.
+  or that can have a side effect itself, means CALLS_HAVE_EFFECTS. A query with no
+  dynamic call has no call to classify: its direct sequential calls have their own
+  rules, and CALLS_ARE_PURE leaves them alone at no cost.
 ********************************************************************************/
 class ClosedWorldWalk
 {
@@ -1550,11 +1568,14 @@ private:
 
 void ClosedWorldWalk::walkFunction(const function* f)
 {
-  if (f == NULL || f->isSequential() || f->isUpdating())
+  if (f == NULL)
   {
     theHasEffects = true;
     return;
   }
+
+  if (f->isSequential() || f->isUpdating())
+    theHasEffects = true;
 
   if (!f->isDeterministic())
     theResultsCanDiffer = true;
@@ -1580,10 +1601,7 @@ void ClosedWorldWalk::walkBuiltin(const fo_expr* fo)
   const function* f = fo->get_func();
 
   if (f->isExternal())
-  {
     theHasEffects = true;
-    return;
-  }
 
   switch (f->getKind())
   {
@@ -1598,7 +1616,7 @@ void ClosedWorldWalk::walkBuiltin(const fo_expr* fo)
   case FunctionConsts::FN_ZORBA_EVAL_U_1:
   case FunctionConsts::FN_ZORBA_EVAL_S_1:
     theHasEffects = true;
-    return;
+    break;
   case FunctionConsts::FN_TRACE_2:
     theResultsCanDiffer = true;
     break;
@@ -1636,7 +1654,7 @@ void ClosedWorldWalk::walkVar(const var_expr* var)
       theHasEffects = true;
   }
 
-  for (csize i = 0; i < var->num_set_exprs() && !theHasEffects; ++i)
+  for (csize i = 0; i < var->num_set_exprs(); ++i)
   {
     const var_set_expr* setExpr = var->get_set_expr(i);
 
@@ -1653,7 +1671,7 @@ void ClosedWorldWalk::walk(const expr* e)
   // The kinds of expr and the functions below are all that gives an expr a sequential
   // or updating scripting kind. The kind of the expr itself cannot be used: a block
   // with the declaration of a prolog variable has one.
-  if (theHasEffects)
+  if (theHasEffects && theHasCalls)
     return;
 
   switch (e->get_expr_kind())
@@ -1694,7 +1712,7 @@ void ClosedWorldWalk::walk(const expr* e)
   case rename_expr_kind:
   case replace_expr_kind:
     theHasEffects = true;
-    return;
+    break;
 
   case doc_expr_kind:
   case elem_expr_kind:
@@ -1715,7 +1733,7 @@ void ClosedWorldWalk::walk(const expr* e)
   }
 
   ExprConstIterator iter(e);
-  while (!iter.done() && !theHasEffects)
+  while (!iter.done() && !(theHasEffects && theHasCalls))
   {
     const expr* child = iter.get_expr();
 
@@ -1742,9 +1760,11 @@ void classify_calls(expr* root)
 
   w.walk(root);
 
-  if (w.theHasEffects)
+  if (!w.theHasCalls)
+    ccb->theCallEffects = CompilerCB::CALLS_ARE_PURE;
+  else if (w.theHasEffects)
     ccb->theCallEffects = CompilerCB::CALLS_HAVE_EFFECTS;
-  else if (w.theHasCalls && w.theResultsCanDiffer)
+  else if (w.theResultsCanDiffer)
     ccb->theCallEffects = CompilerCB::CALLS_RESULTS_CAN_DIFFER;
   else
     ccb->theCallEffects = CompilerCB::CALLS_ARE_PURE;

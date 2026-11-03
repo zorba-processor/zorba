@@ -48,13 +48,6 @@ public:
 protected:
   bool hoistChildren(RewriterContext&, expr*, struct PathHolder*);
 
-  bool hoistInsideChildren(RewriterContext&, expr*);
-
-  bool callsUnproven(const expr* e) const
-  {
-    return theHasUnprovenCalls && expr_tools::calls_unproven_function(e);
-  }
-
   expr* hoistExpr(RewriterContext&, expr*, struct PathHolder*);
 
   bool contains_var(var_expr* v, const DynamicBitset& varset);
