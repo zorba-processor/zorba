@@ -3092,33 +3092,39 @@ void test_cache_change_during_read( Fixture const &f ) {
 
   std::string const rows( query_text( server, q ) );
   check( rows != "0" && !contains( rows, "error" ), "the rows of the file", rows );
-  // How long the query takes to reach the file depends on the build.
-  for ( int const delay : { 30, 60, 120, 240, 480 } ) {
-    if ( server.cache_stats().refused )
-      break;
-    std::thread toucher( [&path, delay]() {
+  auto touch = [&path]() {
+    struct timespec const times[2] = { { 0, UTIME_NOW }, { 0, UTIME_NOW } };
+    utimensat( AT_FDCWD, path.c_str(), times, 0 );
+  };
+  // How long a query takes to reach the file depends on the build: a change
+  // too early is a first read of new metadata, and one too late finds a record
+  // kept. Each try starts from new metadata seen once.
+  bool during = false;
+  for ( int delay = 30; !during && delay < 4000; delay *= 2 ) {
+    touch();
+    changed_files();
+    check( query_text( server, q ) == rows, "the first read of the try" );
+    std::thread toucher( [&touch, delay]() {
       std::this_thread::sleep_for( std::chrono::milliseconds( delay ) );
-      struct timespec const times[2] = { { 0, UTIME_NOW }, { 0, UTIME_NOW } };
-      utimensat( AT_FDCWD, path.c_str(), times, 0 );
+      touch();
     } );
     std::string const v( query_text( server, q ) );
     toucher.join();
     changed_files();
     check( v == rows, "the read while the file changes", v );
-    if ( !server.cache_stats().refused )
-      query_text( server, q );          // the first read of the new metadata
+    during = server.cache_stats().refused > 0;
   }
   DocumentCache::Stats s = server.cache_stats();
-  check( s.refused == 1 && s.admissions == 0 && s.entries == 0 && s.bytes == 0,
+  check( during && s.refused == 1 && s.entries == 0 && s.bytes == 0,
          "read to be admitted, and not kept", stats_text( s ) + ", refused " +
          std::to_string( s.refused ) );
 
   // Once it holds still, it is an ordinary file again.
-  std::this_thread::sleep_for( std::chrono::milliseconds( 20 ) );
+  std::size_t const admissions = s.admissions, hits = s.hits;
   for ( int i = 0; i < 3; ++i )
     check( query_text( server, q ) == rows, "the value afterwards" );
   s = server.cache_stats();
-  check( s.admissions == 1 && s.hits == 1 && s.entries == 1,
+  check( s.admissions == admissions + 1 && s.hits == hits + 1 && s.entries == 1,
          "it enters once it holds still", stats_text( s ) );
 }
 
