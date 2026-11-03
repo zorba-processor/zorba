@@ -51,10 +51,10 @@ lookup ends at the first comparison.
 A hash join on operands of static type xs:anyAtomicType makes a second index probe
 for each outer tuple, to see whether the inner side holds an xs:float; with one, or
 with an xs:float outer key, that probe scans the inner side. j4_join against master:
-6.65 s against 6.48 s and 6.58 s against 6.66 s at 100mb, in two runs. The two
-measures bracket 1.0, and the other queries range 0.94 to 1.06 in the same runs, so
-this is within runner noise. XMark is unchanged (ratios 1.00 to 1.01 in the largest
-queries).
+6.65 s against 6.48 s and 6.58 s against 6.66 s at 100mb, in two runs. One
+run each, so this does not separate a cost of a few percent from runner noise. The
+highest XMark ratios are 1.10 (q04 in the first run, q03 and q13 in the second), each
+in one run only.
 
 ## Not measured
 
