@@ -1,4 +1,4 @@
-(: A read in an earlier let is not moved out of the loop. :)
+(: A let reads the variable for all the tuples before the next let makes the calls, as with a direct call. :)
 declare namespace an = "http://zorba.io/annotations";
 declare %an:assignable variable $g := 0;
 declare %an:sequential function local:bump() { $g := $g + 1; $g };
