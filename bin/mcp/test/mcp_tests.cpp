@@ -1931,7 +1931,7 @@ void test_reflection_random( Fixture const &f ) {
   check( !is_tool_error( res ) && result_text( res ) == "2",
          "reflection:eval runs a query", res.dump() );
   res = run_query( server, imp + "refl:invoke(xs:QName(\"fn:concat\"), \"a\", \"b\")" );
-  check( !is_tool_error( res ) && result_text( res ) == "ab",
+  check( !is_tool_error( res ) && result_text( res ) == "\"ab\"",
          "reflection:invoke calls a function", res.dump() );
   res = run_query( server, imp + "refl:eval(\"declare variable $x := 1; $x\")" );
   check( !is_tool_error( res ), "reflection:eval with a prolog", res.dump() );
