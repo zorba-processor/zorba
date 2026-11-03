@@ -6,6 +6,10 @@
   all its numeric keys on their `xs:float` rounding from then on, so large
   integers share buckets only there; a container without `xs:float` keys costs
   the same as before.
+- A join on operands of static type `xs:anyAtomicType` no longer loses pairs with an
+  `xs:float` on one side. When an `xs:float` takes part it runs as a nested loop.
+- `map:create` accepts the key type `"anyAtomicType"`; such a map no longer raises
+  `ZSTR0040` when keys of different types meet.
 - Comparing numeric items of different types directly (index and map keys, some
   `group by` keys) goes by value: `5` no longer equals `5.5e0`, and both
   directions agree.
