@@ -2249,10 +2249,10 @@ void collect_flwor_vars (
       vars.insert(lookup_var(wc.get_var()->get_var_name(), loc, true));
       for (int j = 1; j >= 0; j--)
       {
-        const FLWORWinCond* cond = &*wc[j];
+        const FLWORWinCond* cond = wc[j].getp();
         if (cond != NULL)
         {
-          const WindowVars* wv = &*cond->get_winvars();
+          const WindowVars* wv = cond->get_winvars().getp();
           if (wv != NULL)
           {
             if (wv->get_next())

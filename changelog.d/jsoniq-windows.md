@@ -5,6 +5,8 @@
 
 ### Fixed
 
+- Compile a `group by` after a window clause without an end condition or whose
+  conditions bind no variables, in builds where it failed.
 - Bind a sliding window to its own start item when an earlier window with
   `only end` never closed. It was bound to the start item of that earlier window.
 - Return nothing for a position past the end of a window variable, as in
