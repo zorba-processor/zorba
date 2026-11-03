@@ -4,7 +4,8 @@ name: Directory scaling
 # files under the root (bench/directory/), and how much memory the in-memory
 # store takes per parsed XML, JSON and CSV document (bench/store/), and what
 # zorba-mcp's background scan (bench/directory/run_scan.sh) and document cache
-# (bench/directory/run_cache.sh) cost. Measures only; manual runs only.
+# (bench/directory/run_cache.sh) cost, and how much semi-structured data goes
+# through zorba-mcp (bench/scale/). Measures only; manual runs only.
 on:
   workflow_dispatch:
     inputs:
@@ -12,7 +13,7 @@ on:
         description: "What to measure"
         required: false
         type: choice
-        options: [directory, store, both, scan, cache]
+        options: [directory, store, both, scan, cache, scale]
         default: directory
       trees:
         description: "Space-separated trees FILES:KB (files of ~KB KB each); suite cache also FILES:KB:FORMATS and FILES:KB:@SHAPE"
@@ -38,6 +39,34 @@ on:
         description: "cache: space-separated settings KB:FILES, the first one is the reference"
         required: false
         default: "0:0 16:10 64:10 256:10 64:1000"
+      engine_ref:
+        description: "scale: the branch or commit of the engine to build (default: this branch)"
+        required: false
+        default: ""
+      scale_sizes:
+        description: "scale: JSON array of sizes in 10^6 bytes of JSON Lines, one job each"
+        required: false
+        default: "[100,1000,10000]"
+      scale_inputs:
+        description: "scale: space-separated FORM-PATH to run, e.g. jsonl-lines dir-documents (empty: all)"
+        required: false
+        default: ""
+      scale_ops:
+        description: "scale: space-separated operations of bench/scale/ops (empty: all)"
+        required: false
+        default: ""
+      scale_diag:
+        description: "scale: also run bench/scale/diag (1 or 0)"
+        required: false
+        default: "1"
+      scale_ext_timeout:
+        description: "scale: --timeout of the second pass over the failed cells (0: no second pass)"
+        required: false
+        default: "1200"
+      scale_ext_inputs:
+        description: "scale: FORM-PATH of the second pass (empty: all)"
+        required: false
+        default: ""
       soak:
         description: "cache: long sessions, space-separated FORMATS:SCENARIO:FILES:KB:MAXKB:MAXFILES (bench/directory/dirbench.cpp, soak)"
         required: false
@@ -52,7 +81,7 @@ on:
         default: ""
 
 concurrency:
-  group: directory-scaling-${{ github.ref }}
+  group: directory-scaling-${{ github.ref }}-${{ inputs.engine_ref }}
   cancel-in-progress: false
 
 permissions:
@@ -60,7 +89,7 @@ permissions:
 
 jobs:
   scaling:
-    if: inputs.suite != 'store' && inputs.suite != 'scan' && inputs.suite != 'cache'
+    if: inputs.suite != 'store' && inputs.suite != 'scan' && inputs.suite != 'cache' && inputs.suite != 'scale'
     runs-on: ubuntu-24.04
     timeout-minutes: 300
     env:
@@ -228,7 +257,7 @@ jobs:
 
   # bench/store/: heap, RSS and per-kind costs of parsed documents.
   store:
-    if: inputs.suite != 'directory' && inputs.suite != 'scan' && inputs.suite != 'cache'
+    if: inputs.suite != 'directory' && inputs.suite != 'scan' && inputs.suite != 'cache' && inputs.suite != 'scale'
     runs-on: ubuntu-24.04
     timeout-minutes: 180
     env:
@@ -300,3 +329,130 @@ jobs:
           path: |
             out/
             build/store-sizes.txt
+
+  # bench/scale/: synthetic logs through zorba-mcp's run_query. The bench scripts
+  # come from the dispatched branch, the engine from engine_ref.
+  scale-build:
+    if: inputs.suite == 'scale'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.engine_ref || github.sha }}
+
+      - uses: actions/checkout@v7
+        with:
+          path: _bench
+
+      - name: Builder image
+        uses: ./.github/actions/builder-image
+        with:
+          context: docker/builder-latest
+          cache-scope: linux-amd64-latest
+
+      - uses: actions/cache@v6
+        with:
+          path: .ccache
+          key: ccache-v2-linux-amd64-latest-scale-${{ github.run_id }}
+          restore-keys: ccache-v2-linux-amd64-latest-
+
+      - name: Build
+        run: |
+          mkdir -p .ccache
+          git log -1 --format='engine commit %H %s'
+          docker run --rm \
+            -e CCACHE_DIR=/src/.ccache \
+            -e CCACHE_SLOPPINESS=pch_defines,time_macros -e CCACHE_DEPEND=1 \
+            -v "$PWD":/src -w /src zorba-builder:ci sh -ec '
+              cmake --preset full-release
+              cmake --build --preset full-release
+              ccache -s
+              c++ -std=c++23 -O2 -Wall -Wextra -Werror \
+                -o build/dirbench _bench/bench/directory/dirbench.cpp
+              c++ -std=c++23 -O2 -Wall -Wextra -Werror \
+                -o build/scalegen _bench/bench/scale/gen.cpp'
+          tar czf scale-build.tgz --exclude='*.o' --exclude='CMakeFiles' build
+          ls -l scale-build.tgz
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: scale-build
+          path: scale-build.tgz
+          retention-days: 3
+
+  scale:
+    needs: scale-build
+    if: inputs.suite == 'scale'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 355
+    strategy:
+      fail-fast: false
+      matrix:
+        size: ${{ fromJSON(inputs.scale_sizes) }}
+    env:
+      SIZE_MB: ${{ matrix.size }}
+      INPUTS: ${{ inputs.scale_inputs }}
+      OPS_INPUT: ${{ inputs.scale_ops }}
+      DIAG: ${{ inputs.scale_diag }}
+      EXT_TIMEOUT: ${{ inputs.scale_ext_timeout }}
+      EXT_INPUTS: ${{ inputs.scale_ext_inputs }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.engine_ref || github.sha }}
+
+      - uses: actions/checkout@v7
+        with:
+          path: _bench
+
+      - name: Builder image
+        uses: ./.github/actions/builder-image
+        with:
+          context: docker/builder-latest
+          cache-scope: linux-amd64-latest
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: scale-build
+
+      - name: Runner
+        run: |
+          tar xzf scale-build.tgz
+          rm scale-build.tgz
+          mkdir -p out
+          # The file system with the most room holds the data.
+          DATA=$(df --output=avail,target / /mnt | tail -n +2 | sort -n | tail -n 1 | awk '{ print $2 }')
+          sudo mkdir -p "$DATA/scale"
+          sudo chmod 777 "$DATA/scale"
+          echo "DATA=$DATA/scale" >> "$GITHUB_ENV"
+          {
+            echo "engine commit: $(git log -1 --format=%H)"
+            echo "data directory: $DATA/scale"
+            uname -a
+            lscpu | grep -E '^(Model name|CPU\(s\)|Thread|Core)'
+            free -b
+            df -B1 / /mnt
+            docker run --rm zorba-builder:ci sh -c \
+              'echo "container cgroup memory.max: $(cat /sys/fs/cgroup/memory.max)"; ulimit -a'
+          } | tee out/runner.txt
+
+      - name: Measure
+        run: |
+          RUNS=1
+          if [ "$SIZE_MB" -le 100 ]; then RUNS=3; fi
+          docker run --rm -e SIZE_MB -e INPUTS -e DIAG -e EXT_TIMEOUT -e EXT_INPUTS \
+            -e RUNS="$RUNS" -e OPS="$OPS_INPUT" -v "$DATA":/work -v "$PWD":/src -w /src \
+            zorba-builder:ci sh -ec '
+              [ -n "$OPS" ] || unset OPS
+              MCP=$(find build/full-release/bin -maxdepth 1 -name zorba-mcp -type f | head -n 1)
+              test -n "$MCP"
+              _bench/bench/scale/run.sh "/src/$MCP" /src/build/dirbench /src/build/scalegen \
+                /work /src/out'
+          cat out/results.md >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: scale-${{ matrix.size }}
+          path: out/
