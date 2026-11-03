@@ -46,7 +46,7 @@ bool one_in( unsigned n ) { return next_random() % n == 0; }
 
 struct Record {
   std::uint64_t seq;
-  char ts[32];
+  char ts[80];
   unsigned run, node;
   char const *event;
   enum { V_NONE, V_NULL, V_TEXT, V_NUMBER } v_kind;
@@ -237,7 +237,7 @@ int main( int argc, char **argv ) {
     if ( dir && seq % per_file == 0 ) {
       if ( f )
         close_or_die( f );
-      char name[32];
+      char name[48];
       std::snprintf( name, sizeof name, "/part-%06" PRIu64 ".jsonl",
                      seq / per_file );
       f = open_or_die( out + name );
