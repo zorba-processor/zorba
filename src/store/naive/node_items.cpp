@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#include <cstring>
+#include <sstream>
 #include <stack>
 
 #include <zorba/config.h>
@@ -1996,7 +1998,16 @@ XmlNode* DocumentNode::copyInternal(
   {
     tree = NodeFactory::instance().createXmlTree();
 
-    copyNode = NodeFactory::instance().createDocumentNode(tree, theBaseUri, theDocUri);
+    // A generated document URI names one tree: the copy gets its own.
+    zstring docUri(theDocUri);
+    if (std::strncmp(docUri.c_str(), "zorba://internalDocumentURI-", 28) == 0)
+    {
+      std::ostringstream uristream;
+      uristream << "zorba://internalDocumentURI-" << tree->getTreeId();
+      docUri = uristream.str();
+    }
+
+    copyNode = NodeFactory::instance().createDocumentNode(tree, theBaseUri, docUri);
 
     const_iterator ite = childrenBegin();
     const_iterator end = childrenEnd();

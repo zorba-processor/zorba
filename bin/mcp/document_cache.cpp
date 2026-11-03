@@ -20,6 +20,7 @@
 #include <climits>
 #include <cstdlib>
 #include <cstring>
+#include <ctime>
 #include <iterator>
 #include <sstream>
 
@@ -63,6 +64,11 @@ char const reader_source[] =
   "declare variable $root as xs:string external;\n"
   "declare variable $path as xs:string external;\n"
   "dir:open( $root, $path )\n";
+
+// A copy of a record, for the query that reads it.
+char const copier_source[] =
+  "declare variable $record external;\n"
+  "copy $copy := $record modify () return $copy\n";
 
 void release_stream( std::istream *s ) {
   delete s;
@@ -178,8 +184,11 @@ std::uint64_t DocumentCache::tag_of( std::string const &key, FileId const &id ) 
 DocumentCache::DocumentCache( Zorba *zorba, std::string const &root,
                               std::uintmax_t max_file_bytes,
                               std::size_t max_files,
-                              SecurityPolicy const *policy ) :
+                              SecurityPolicy const *policy,
+                              std::string const &base_uri ) :
   theZorba( zorba ),
+  theGivenRoot( root ),
+  theBaseUri( base_uri ),
   theMaxFileBytes( max_file_bytes ),
   theMaxFiles( max_files ),
   thePolicy( policy ),
@@ -236,6 +245,10 @@ void DocumentCache::clear() {
     theReader->close();
     theReader = nullptr;
   }
+  if ( theCopier ) {
+    theCopier->close();
+    theCopier = nullptr;
+  }
 }
 
 std::string DocumentCache::stats_line() const {
@@ -264,6 +277,33 @@ bool DocumentCache::canonical_under_root( std::string const &full,
   return true;
 }
 
+// The root of a key: another spelling of a root is the same root.
+bool DocumentCache::root_key( std::string const &root,
+                              std::string *key ) const {
+  if ( root == theGivenRoot ) {
+    key->assign( theRoot, 0, theRoot.size() - 1 );
+    return true;
+  }
+  char buf[ PATH_MAX ];
+  if ( !realpath( root.c_str(), buf ) )
+    return false;
+  *key = buf;
+  return true;
+}
+
+std::uint64_t* DocumentCache::tracker_slot( std::uint64_t tag ) {
+  std::uint64_t *const set =
+    &theSeen[ ( tag % ( tracker_slots / tracker_ways ) ) * tracker_ways ];
+  std::uint64_t *empty = nullptr;
+  for ( std::size_t way = 0; way < tracker_ways; ++way ) {
+    if ( set[way] == tag || set[way] == refused_tag( tag ) )
+      return &set[way];
+    if ( !set[way] && !empty )
+      empty = &set[way];
+  }
+  return empty ? empty : &set[ ( tag >> 32 ) % tracker_ways ];
+}
+
 void DocumentCache::erase( std::unordered_map<std::string,Entry>::iterator i ) {
   theStats.bytes -= i->second.bytes;
   theLru.erase( i->second.lru );
@@ -275,15 +315,10 @@ Item DocumentCache::get( std::string const &root, std::string const &path ) {
   if ( !theActive || root.empty() || path.empty() )
     return Item();
   std::string const full( root + "/" + path );
-  std::string const key( root + '\0' + path );
   FileId id;
-  if ( !file_id( full, &id ) ) {
-    // Deleted, or not a regular file.
-    auto const gone = theEntries.find( key );
-    if ( gone != theEntries.end() )
-      erase( gone );
+  // Deleted, or not a regular file: the next set_active() drops its record.
+  if ( !file_id( full, &id ) )
     return Item();
-  }
   // Larger than the limit: nothing but the stat. If it was cached when it
   // was smaller, the next set_active() drops it.
   if ( id.size > theMaxFileBytes ) {
@@ -291,6 +326,11 @@ Item DocumentCache::get( std::string const &root, std::string const &path ) {
     return Item();
   }
 
+  std::string key;
+  if ( !root_key( root, &key ) )
+    return Item();
+  key += '\0';
+  key += path;
   auto const i = theEntries.find( key );
   if ( i != theEntries.end() ) {
     std::string canonical;
@@ -299,14 +339,14 @@ Item DocumentCache::get( std::string const &root, std::string const &path ) {
       ++theStats.hits;
       i->second.query = theQuery;
       theLru.splice( theLru.begin(), theLru, i->second.lru );
-      return i->second.record;
+      return copy_of( i->second.record );
     }
     erase( i );                         // the file changed
   }
 
   ++theStats.misses;
   std::uint64_t const tag = tag_of( key, id );
-  std::uint64_t &seen = theSeen[ tag % tracker_slots ];
+  std::uint64_t &seen = *tracker_slot( tag );
   if ( seen == refused_tag( tag ) )
     return Item();                      // not worth another try
   if ( seen != tag ) {
@@ -323,6 +363,13 @@ Item DocumentCache::admit( std::string const &root, std::string const &path,
   // replace them. A query thus admits at most theMaxFiles documents.
   if ( theEntries.size() >= theMaxFiles &&
        theEntries.at( theLru.back() ).query == theQuery )
+    return Item();
+
+  // Changed a moment ago: a write now could leave the same timestamps. The
+  // next read tries again.
+  struct timespec now_time;
+  if ( clock_gettime( CLOCK_REALTIME, &now_time ) != 0 ||
+       nanoseconds( now_time ) - id.ctime_ns < min_change_age )
     return Item();
 
   std::string canonical;
@@ -363,7 +410,41 @@ Item DocumentCache::admit( std::string const &root, std::string const &path,
   ++theStats.admissions;
   // After an eviction, the document needs two hits again.
   *seen = 0;
-  return record;
+  return copy_of( record );
+}
+
+// Null if there is no copy (the time limit, for one): the directory module
+// then reads the file itself and reports what happens.
+Item DocumentCache::copy_of( Item const &record ) {
+  try {
+    if ( !theCopier ) {
+      StaticContext_t sctx = theZorba->createStaticContext();
+      XQuery_t copier = theZorba->createQuery();
+      std::istringstream qs( copier_source );
+      Zorba_CompilerHints_t hints;
+      copier->compile( qs, sctx, hints );
+      theCopier = copier;
+    }
+    DynamicContext *const dctx = theCopier->getDynamicContext();
+    dctx->setVariable( "", "record", record );
+    Item copy;
+    Iterator_t it( theCopier->iterator() );
+    it->open();
+    if ( !it->next( copy ) )
+      copy = Item();
+    it->close();
+    // The variable must not hold a record that is evicted.
+    dctx->setVariable( "", "record",
+                       theZorba->getItemFactory()->createString( "" ) );
+    return copy;
+  }
+  catch ( ZorbaException const& ) {
+    if ( theCopier ) {
+      theCopier->close();
+      theCopier = nullptr;
+    }
+    return Item();
+  }
 }
 
 Item DocumentCache::read( std::string const &root, std::string const &path,
@@ -372,6 +453,7 @@ Item DocumentCache::read( std::string const &root, std::string const &path,
     if ( !theReader ) {
       StaticContext_t sctx = theZorba->createStaticContext();
       sctx->setSecurityPolicy( *thePolicy );
+      sctx->setBaseURI( theBaseUri );
       XQuery_t reader = theZorba->createQuery();
       std::istringstream qs( reader_source );
       Zorba_CompilerHints_t hints;
