@@ -375,6 +375,10 @@ public:
 
 protected:
   csize theDepth;
+#if LIBXML_VERSION < 21400
+  bool theRootClosed;
+  bool theDocumentEnded;
+#endif
 
 public:
   HtmlXmlLoader(
@@ -399,6 +403,10 @@ protected:
   static void htmlCharacters(void * ctx, const xmlChar * ch, int len);
 
   static void htmlError(void * ctx, ZORBA_XML_ERROR_PTR error);
+
+#if LIBXML_VERSION < 21400
+  static void htmlEndDocument(void * ctx);
+#endif
 };
 
 

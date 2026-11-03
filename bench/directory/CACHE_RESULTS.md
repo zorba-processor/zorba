@@ -95,4 +95,110 @@ The 16 KB columns are run 41567671862; the 64 KB columns are run 41494352367, be
 
 A small file can expand far beyond that without the limit: an XML file of 4.8 KB with one internal entity of 1000 elements referenced 240 times, which libxml2 accepts. Ten of them, without the limit: 457,780,370 bytes retained and peak RSS 340 MiB against 119 without a cache (run 41496831344). With the limit they are not kept: 0 bytes retained, peak RSS 109 / 108 MiB (run 41567671862). 1000 references are refused by libxml2 and yield an error record.
 
-The hit tracker is 4096 slots of 8 bytes, 32 KiB, allocated once.
+The hit tracker is 4096 tags of 8 bytes, 32 KiB, allocated once.
+
+## Long sessions
+
+Run 41622009308 (commit a9e65c56c), `dirbench soak` through `run_cache.sh`: one session per row and number of calls, `--no-scan`, `--timeout 0`, 0 failed calls in all of them. Peak RSS is `VmHWM`. Admissions and evictions are those of the longest session.
+
+- `hits`: a scan of all the files.
+- `turnover`: one file per query, each read twice, more files than slots: every second call admits and evicts.
+- `rewrite`, `touch`, `delete`: a scan, and before it one file is rewritten with another size, gets a new modification time, or is deleted and written again.
+- `refused`: a scan of files that do not parse.
+
+| scenario | format | files x KB | KB:files | calls | peak RSS MiB | bytes retained | admissions | evictions |
+|---|---|---|---|---|---|---|---:|---:|
+| hits | xml | 10x2 | 16:10 | 100 / 1000 / 10000 | 37.9 / 38.0 / 37.9 | 600190 / 600200 / 600210 | 10 | 0 |
+| hits | json | 10x2 | 16:10 | 100 / 1000 / 10000 | 37.9 / 37.4 / 37.4 | 346020 / 346020 / 346020 | 10 | 0 |
+| hits | csv | 10x2 | 16:10 | 100 / 1000 / 10000 | 38.0 / 37.8 / 38.0 | 1137420 / 1137420 / 1137420 | 10 | 0 |
+| hits | html | 10x2 | 16:10 | 100 / 1000 / 10000 | 38.0 / 37.9 / 38.0 | 440850 / 440860 / 440870 | 10 | 0 |
+| turnover | xml | 15x2 | 16:10 | 100 / 1000 / 10000 | 37.9 / 37.7 / 37.9 | 591390 / 591410 / 591430 | 5000 | 4990 |
+| turnover | json | 15x2 | 16:10 | 100 / 1000 / 10000 | 37.1 / 37.3 / 37.4 | 339725 / 339725 / 339725 | 5000 | 4990 |
+| turnover | csv | 15x2 | 16:10 | 100 / 1000 / 10000 | 37.8 / 37.8 / 37.8 | 1075260 / 1075260 / 1075260 | 5000 | 4990 |
+| turnover | html | 15x2 | 16:10 | 100 / 1000 / 10000 | 38.2 / 38.0 / 38.0 | 433900 / 433920 / 433940 | 5000 | 4990 |
+| rewrite | xml | 10x2 | 16:10 | 100 / 1000 / 10000 | 38.2 / 38.3 / 37.9 | 421944 / 421962 / 421980 | 10007 | 0 |
+| rewrite | json | 10x2 | 16:10 | 100 / 1000 / 10000 | 37.1 / 37.9 / 37.6 | 243930 / 243930 / 209328 | 10006 | 0 |
+| rewrite | csv | 10x2 | 16:10 | 100 / 1000 / 10000 | 37.8 / 38.0 / 38.1 | 796350 / 796350 / 796350 | 10007 | 0 |
+| rewrite | html | 10x2 | 16:10 | 100 / 1000 / 10000 | 37.9 / 37.8 / 38.4 | 267680 / 311788 / 267712 | 10006 | 0 |
+| touch | xml | 10x2 | 16:10 | 100 / 1000 / 10000 | 38.0 / 38.2 / 38.1 | 480176 / 540216 / 540234 | 10007 | 0 |
+| touch | json | 10x2 | 16:10 | 100 / 1000 / 10000 | 37.8 / 37.4 / 37.6 | 276816 / 276816 / 276816 | 10006 | 0 |
+| touch | csv | 10x2 | 16:10 | 100 / 1000 / 10000 | 38.0 / 38.3 / 38.0 | 1023678 / 1023678 / 1023678 | 10007 | 0 |
+| touch | html | 10x2 | 16:10 | 100 / 1000 / 10000 | 38.2 / 38.2 / 38.4 | 396792 / 396810 / 396828 | 10007 | 0 |
+| delete | xml | 10x2 | 16:10 | 100 / 1000 / 10000 | 38.0 / 38.4 / 37.8 | 540207 / 480200 / 480216 | 10006 | 0 |
+| delete | json | 10x2 | 16:10 | 100 / 1000 / 10000 | 37.3 / 37.8 / 37.4 | 311418 / 311418 / 276816 | 10006 | 0 |
+| delete | csv | 10x2 | 16:10 | 100 / 1000 / 10000 | 38.0 / 38.0 / 38.0 | 1023678 / 1023678 / 1023678 | 10007 | 0 |
+| delete | html | 10x2 | 16:10 | 100 / 1000 / 10000 | 38.1 / 38.1 / 38.0 | 396801 / 396819 / 352744 | 10006 | 0 |
+| refused | xml | 10x2 | 16:10 | 100 / 1000 / 10000 | 38.9 / 39.0 / 38.6 | 0 / 0 / 0 | 0 | 0 |
+| refused | json | 10x2 | 16:10 | 100 / 1000 / 10000 | 38.7 / 38.7 / 38.6 | 0 / 0 / 0 | 0 | 0 |
+| hits | xml | 10x2 | 0:0 | 100 / 1000 / 10000 | 36.6 / 36.8 / 36.7 | - / - / - | - | - |
+| hits | json | 10x2 | 0:0 | 100 / 1000 / 10000 | 36.7 / 36.3 / 36.5 | - / - / - | - | - |
+| hits | csv | 10x2 | 0:0 | 100 / 1000 / 10000 | 36.8 / 36.5 / 36.6 | - / - / - | - | - |
+| hits | html | 10x2 | 0:0 | 100 / 1000 / 10000 | 36.9 / 37.0 / 36.6 | - / - / - | - | - |
+| turnover | xml | 15x2 | 0:0 | 100 / 1000 / 10000 | 36.6 / 36.4 / 36.4 | - / - / - | - | - |
+| turnover | json | 15x2 | 0:0 | 100 / 1000 / 10000 | 36.0 / 36.2 / 36.2 | - / - / - | - | - |
+| turnover | csv | 15x2 | 0:0 | 100 / 1000 / 10000 | 36.3 / 36.0 / 36.0 | - / - / - | - | - |
+| turnover | html | 15x2 | 0:0 | 100 / 1000 / 10000 | 36.6 / 36.7 / 36.5 | - / - / - | - | - |
+| turnover | xml | 6x3072 | 8192:2 | 100 / 1000 | 292.0 / 292.8 | 182191858 / 182191862 | 500 | 498 |
+| turnover | json | 6x3072 | 8192:2 | 100 / 1000 | 152.7 / 152.6 | 103460820 / 103460820 | 500 | 498 |
+| turnover | csv | 6x3072 | 8192:2 | 100 / 1000 | 424.9 / 424.9 | 349175964 / 349175964 | 500 | 498 |
+| turnover | html | 6x3072 | 8192:2 | 100 / 1000 | 226.5 / 232.0 | 131598442 / 131598446 | 500 | 498 |
+| turnover | xml | 6x3072 | 0:0 | 100 / 1000 | 147.4 / 147.4 | - / - | - | - |
+| turnover | json | 6x3072 | 0:0 | 100 / 1000 | 85.5 / 85.7 | - / - | - | - |
+| turnover | csv | 6x3072 | 0:0 | 100 / 1000 | 205.8 / 205.8 | - / - | - | - |
+| turnover | html | 6x3072 | 0:0 | 100 / 1000 | 119.5 / 119.1 | - / - | - | - |
+
+Peak RSS does not grow with the calls on files of 2 KB: the largest difference between 100 and 10000 calls is 0.5 MiB, in either direction, with or without the cache. On files of 3 MiB, measured to 1000 calls only, the largest difference between 100 and 1000 calls is 5.5 MiB, HTML (226.5 to 232.0); the others are within 0.8 MiB. In `turnover` at 10000 calls, 5000 records were admitted and 4990 released with RSS where it was at 100 calls.
+
+`bytes_retained` stays flat. Two things move it, neither growing with use:
+
+- An XML or HTML record holds a generated document URI with the number of its tree, so a record built later takes a byte or two more (`hits`, XML: 600190, 600200, 600210, ten records).
+- In `rewrite`, `touch` and `delete`, the file changed before the last scan may not be held when the session ends, and the rewritten files alternate between two sizes. The value depends on where the session stops, not on how long it ran.
+
+Six files of about 3 MiB with two slots hold two records, as the table shows; the RSS over no cache is what they account for.
+
+Run 41652889390 (commit 58e5763db, with the tracker's random replacement and the fix of the copy's document URI) repeated `hits`, `turnover`, `delete` and `refused` on 2 KB files and `turnover` on 3 MiB files with the cache. Admissions, evictions and `bytes_retained` of `hits` and `turnover` are the same as in the table; peak RSS at 2 KB stays between 37.1 and 39.3 MiB, within 0.8 MiB between 100 and 10000 calls. On 3 MiB files, HTML goes from 226.2 to 229.0 MiB between 100 and 1000 calls and the others stay within 0.2 MiB. Sessions on 3 MiB files were not run to 10000 calls.
+
+ASan with leak detection covers the same paths in `bin/mcp/cache_turnover`, `cache_invalidate_loop`, `cache_refused_loop` and `cache_session_binary`, for all formats.
+
+## One large file, kept
+
+Same run. One file of 30 MiB, `--cache-max-file-kb` 61440, five calls of `large.xq` (node or row count, sum, first record). The last response has the same bytes as without a cache in all formats; run 41652889390 gives the same, with 940 MiB for XML and the other figures unchanged.
+
+| format | peak RSS MiB | hits | misses | admissions | bytes retained |
+|---|---:|---:|---:|---:|---:|
+| XML | 939 | 3 | 2 | 1 | 669,761,129 |
+| JSON | 364 | 3 | 2 | 1 | 327,044,980 |
+| CSV | 593 | 3 | 2 | 1 | 564,043,296 |
+| HTML | 1173 | 3 | 2 | 1 | 796,544,440 |
+
+## What a hit costs now
+
+A hit returns a copy of the record, so that a query sees what it would see reading the file. Later calls on ten files read repeatedly, against no cache, 5 runs per setting, same run:
+
+| tree | scan | aggregate |
+|---|---:|---:|
+| 10x2KB-xml | -15.0% | -12.9% |
+| 10x16KB-xml | -33.2% | -30.4% |
+| 10x16KB-json | -40.7% | -37.7% |
+| 10x16KB-csv | -41.5% | -37.6% |
+
+Run 41652889390 (commit 58e5763db), same setting: 10x16KB-xml -31.9%, -29.0%; 10x16KB-json -45.8%, -42.4%; 10x16KB-csv -47.1%, -41.7%. The sections above this one were measured before the copy. Nothing else in the matrix was measured again.
+
+## The hit tracker and collisions
+
+Before run 41622009308 the tracker had one tag per slot. Two files in a slot replace each other at each read and never enter. With tags that behave as uniform, a file is alone in its slot with probability (1 - 1/4096)^(n-1): 783.5 of 1000 expected, against 754 to 804 measured (runs 41547644611, 41567671862). For ten files, one pair collides in 1.09% of trees; tree 10x64KB-csv-fields in run 41497878541 admitted 8 of 10 in all its sessions, while the same shape admitted 10 in run 41494352367. At 100 files 70% of trees lose at least one pair.
+
+It is now 4096 tags in sets of 8, the same 32 KiB, and a tag finding its set full replaces one chosen at random. Tags of files read once stay until replaced. A choice fixed by the tag, tried first, had two files of a full set replace each other forever.
+
+A simulation with random tags, 50 scans, 200 trees (60 for the largest), files that never entered, on average and in how many trees:
+
+| files read once, then files scanned | choice fixed by the tag | chosen at random |
+|---|---:|---:|
+| 0, 1000 | 0, 0% | 0, 0% |
+| 0, 4096 | 75.7, 98% | 0, 0% |
+| 0, 10000 | 7160, 100% | 3030, 100% |
+| 3000, 100 | 3.0, 78.5% | 0, 0% |
+| 10000, 300 | 15.6, 99.5% | 0, 0% |
+| 20000, 1000 | 28.8, 100% | 0, 0% |
+
+At random, in 10000 then 300, 24 files on average are still out after the second scan and none after the fourth. With far more files than tags, as in 0 then 10000, many stay out. On Actions, `bin/mcp/cache_slack_many` and `cache_full_tracker` cover 100 and 300 files. The "778-804 of 1000" above predates this.

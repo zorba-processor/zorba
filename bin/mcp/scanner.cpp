@@ -74,7 +74,10 @@ std::int64_t mtime_of( struct stat const &st ) {
 #else
   struct timespec const &t = st.st_mtim;
 #endif
-  return static_cast<std::int64_t>( t.tv_sec ) * 1000000000 + t.tv_nsec;
+  // Only compared with another such value: it may wrap for times past 2262.
+  return static_cast<std::int64_t>(
+    static_cast<std::uint64_t>( t.tv_sec ) * 1000000000u +
+    static_cast<std::uint64_t>( t.tv_nsec ) );
 }
 
 // Descriptors here are opened read-only: a failed close loses nothing, and
