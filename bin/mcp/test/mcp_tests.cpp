@@ -729,22 +729,89 @@ void test_hints_context_item( Fixture const &f ) {
   check( dot_message == "invalid expression: syntax error, unexpected \".\"",
          "the message is unchanged", dot_message );
 
-  // With a JSONiq declaration, a second declaration would be another error:
-  // the hint says to replace it.
+  // A declaration counts only as the very first characters of the query: the
+  // grammar is chosen from them, and each grammar accepts only its own
+  // declaration. What each hint says to write is run as written.
+  std::string const first_characters(
+    "as the very first characters of the query, before any comment" );
+  std::string const start_xquery( "start the query with xquery version "
+    "\"3.0\"; as its very first characters, before any comment" );
+  std::string const start_jsoniq( "start the query with jsoniq version "
+    "\"1.0\"; as its very first characters, before any comment" );
+
+  // JSONiq session, declaration at byte 0: replace it.
   check_error( xq, jsoniq_decl + "(1, 2)[. eq 2]", "XPST0003",
-               "replace the jsoniq version declaration",
-               ". under a declaration: replace it" );
-  check_error( jq, "(: c :) jsoniq version \"1.0\";\n(1, 2)[. eq 2]", "XPST0003",
-               "replace the jsoniq version declaration",
-               ". under a declaration after a comment: replace it" );
+               "replace the jsoniq version declaration with xquery version",
+               ". under a declaration at byte 0, XQuery session: replace it" );
+  check_error( jq, jsoniq_decl + "(1, 2)[. eq 2]", "XPST0003",
+               "replace the jsoniq version declaration with xquery version",
+               ". under a declaration at byte 0: replace it" );
+  check_result( jq, "xquery version \"3.0\";\n(1, 2)[. eq 2]", "2",
+                "JSONiq session: the replacement at byte 0 runs" );
+
+  // JSONiq session, declaration after a comment or a newline: in its place, and
+  // first. Only replacing it where it stands is XPST0003 again.
+  for ( std::string const &before : { std::string( "(: c :) " ),
+                                      std::string( "\n" ) } ) {
+    std::string const q( before + jsoniq_decl + "(1, 2)[. eq 2]" );
+    check_error( jq, q, "XPST0003", first_characters,
+                 ". under a declaration not at byte 0: first characters" );
+    check( !contains( hint_of( jq, q ), "replace the" ),
+           ". under a declaration not at byte 0: not replace it there" );
+    check_error( jq, before + "xquery version \"3.0\";\n(1, 2)[. eq 2]",
+                 "XPST0003", "", "the replacement where it stands is an error" );
+    check_result( jq, "xquery version \"3.0\";\n" + before + "(1, 2)[. eq 2]",
+                  "2", "the declaration as the first characters runs" );
+  }
+
+  // JSONiq session, no declaration.
   check( !contains( hint_of( jq, "(1, 2)[. eq 2]" ), "replace" ),
          "no declaration: nothing to replace" );
+  check_error( jq, "(1, 2)[. eq 2]", "XPST0003", start_xquery,
+               "no declaration: the first characters" );
+  check_error( jq, "(: c :) (1, 2)[. eq 2]", "XPST0003", start_xquery,
+               "no declaration after a comment: the first characters" );
+  check_error( jq, "\n(1, 2)[. eq 2]", "XPST0003", start_xquery,
+               "no declaration after a newline: the first characters" );
+  check_result( jq, "xquery version \"3.0\"; (: c :) (1, 2)[. eq 2]", "2",
+                "before the comment, as the hint says, it runs" );
+
+  // XQuery session, declaration at byte 0: replace it.
   check_error( xq, "xquery version \"3.0\";\n(1, 2)[$$ ge 2]", "XPST0003",
-               "replace the xquery version declaration",
-               "$$ under an xquery declaration: replace it" );
+               "replace the xquery version declaration with jsoniq version",
+               "$$ under an xquery declaration at byte 0: replace it" );
   check_error( xq, "xquery version \"3.0\";\nlet $x := [1] return $x[]",
-               "XPST0003", "replace the xquery version declaration",
-               "$x[] under an xquery declaration: replace it" );
+               "XPST0003",
+               "replace the xquery version declaration with jsoniq version",
+               "$x[] under an xquery declaration at byte 0: replace it" );
+  check_result( xq, "jsoniq version \"1.0\";\n(1, 2)[$$ ge 2]", "2",
+                "XQuery session: the replacement at byte 0 runs" );
+
+  // XQuery session, declaration after a comment or a newline.
+  for ( std::string const &before : { std::string( "(: c :) " ),
+                                      std::string( "\n" ) } ) {
+    std::string const q( before + "xquery version \"3.0\";\n(1, 2)[$$ ge 2]" );
+    check_error( xq, q, "XPST0003", first_characters,
+                 "$$ under a declaration not at byte 0: first characters" );
+    check( !contains( hint_of( xq, q ), "replace the" ),
+           "$$ under a declaration not at byte 0: not replace it there" );
+    check_error( xq, before + jsoniq_decl + "(1, 2)[$$ ge 2]", "XPST0003", "",
+                 "the replacement where it stands is an error" );
+    check_result( xq, jsoniq_decl + before + "(1, 2)[$$ ge 2]", "2",
+                  "the declaration as the first characters runs" );
+  }
+
+  // XQuery session, no declaration: three hints with the same advice.
+  check_error( xq, "(1, 2)[$$ ge 2]", "XPST0003", start_jsoniq,
+               "$$, no declaration: the first characters" );
+  check_error( xq, "(: c :) (1, 2)[$$ ge 2]", "XPST0003", start_jsoniq,
+               "$$ after a comment: the first characters" );
+  check_error( xq, "let $x := [1] return $x[]", "XPST0003", start_jsoniq,
+               "$x[], no declaration: the first characters" );
+  check_error( xq, "keys(1)", "XPST0017", start_jsoniq,
+               "keys, no declaration: the first characters" );
+  check_result( xq, "jsoniq version \"1.0\"; (: c :) (1, 2)[$$ ge 2]", "2",
+                "before the comment, as the hint says, it runs" );
 
   // Only where an expression can start: after one, "." is not a context item
   // the author meant.
@@ -754,6 +821,15 @@ void test_hints_context_item( Fixture const &f ) {
                "no hint on . after a cast" );
   check_error( jq, "1 instance of array() . a", "XPST0003", "",
                "no hint on . after )" );
+  // A comment in between changes nothing, either way.
+  check_error( jq, "1 instance of xs:integer (: c :) . a", "XPST0003", "",
+               "no hint on . after a type and a comment" );
+  check_error( jq, "1 instance of xs:integer (: a (: b :) :)\n(: c :) . a",
+               "XPST0003", "", "no hint on . after a type and nested comments" );
+  check_error( jq, "(1, 2)[(: c :) . eq 2]", "XPST0003", "$$",
+               "hint on . after [ and a comment" );
+  check_error( jq, "(: c :) . eq 1", "XPST0003", "$$",
+               "hint on . after only a comment" );
   for ( char const *const q : { "(1, 2)[$$ eq 1 and . eq 1]", "let $x := .",
                                 "1 + .", "if (1) then . else 2",
                                 "for $x in 1 return ." } )
@@ -807,6 +883,17 @@ void test_hints_array_key( Fixture const &f ) {
     std::cout << "message with a selector from a document: "
               << message_of( *s, from_document ) << std::endl;
   }
+
+  // A literal selector that would not read as a literal once decoded: the hint
+  // would give code that is not the query's, and that may not run.
+  check_error( jq, csv + "return $c(\"a\\\"b\")", "FORG0001", "$x()(\"key\")",
+               "a selector with a quote: the hint has a placeholder" );
+  check_error( jq, csv + "return $c(\"a\\\\b\")", "FORG0001", "$x()(\"key\")",
+               "a selector with a backslash: the hint has a placeholder" );
+  check_error( jq, csv + "return $c(\"a\\nb\")", "FORG0001", "$x()(\"key\")",
+               "a selector with a newline: the hint has a placeholder" );
+  check_error( xq, csv + "return $c(\"a\"\"b\")", "FORG0001", "$x()(\"key\")",
+               "XQuery, a selector with a quote: the hint has a placeholder" );
 
   // A comment hides a declaration from the choice of grammar. The XQuery grammar
   // has no jsoniq version, so the query does not parse and no $x[] is offered.
@@ -994,6 +1081,13 @@ void test_hints_string_escape( Fixture const &f ) {
                "a valid escape, then an unterminated string: no hint" );
   check_error( jq, "\"a\\\"b\" \"a", "XPST0003", "",
                "the same text before a valid escape: no hint" );
+  // The cause is the missing quote; what a comment holds is not the literal.
+  check_error( jq, "(: \"a\\s :) \"a", "XPST0003", "",
+               "the same text and a \\ in a comment: no hint" );
+  check_error( jq, "(: \"a\\s :)\n\"a", "XPST0003", "",
+               "the same text and a \\ in a comment, another line: no hint" );
+  check_error( jq, "(: \"a\\s :) \"a\\qb\"", "XPST0003", "\\\\",
+               "a \\ in a comment and an invalid escape: hint" );
   std::cout << "a literal over two lines: "
             << call_tool( jq, "run_query", Json::object( {
                  { "query", "\"abc\ndef\\qghi\"" } } ) ).dump() << std::endl;
@@ -1898,6 +1992,16 @@ void test_hints_document_value( Fixture const &f ) {
   std::cout << "the message, " << message.size() << " bytes: "
             << message.substr( 0, 120 ) << std::endl;
 
+  // The message of any failed cast carries the value whole, selector or not.
+  check( contains( message, text ), "$arr($v): the message has the value",
+         message.substr( 0, 120 ) );
+  std::string const cast_message( message_of( jq, dir_import +
+    "let $r := dir:open($dir:root, \"k.json\")(\"content\")\n"
+    "return xs:integer($r(\"k\"))" ) );
+  check( contains( cast_message, text ),
+         "xs:integer($v): the message has the value",
+         cast_message.substr( 0, 120 ) );
+
   // A selector written in the query is the author's own: the hint repeats it.
   check_error( jq, dir_import +
                "let $c := dir:open($dir:root, \"a.json\")(\"content\")\n"
@@ -1936,12 +2040,13 @@ void test_xml_namespace_message( Fixture const &f ) {
 
   std::string const element( message_of( server, "parse-xml(\"<a:b/>\")" ) );
   std::cout << "undefined prefix of an element: " << element << std::endl;
-  check( contains( element, "\"a\": namespace prefix for \"b\"" ) &&
+  check( contains( element, "\"a\": namespace prefix for \"b\" not defined" ) &&
          !contains( element, "$" ), "the prefix of an element", element );
   std::string const attribute(
     message_of( server, "parse-xml(\"<e c:d='1'/>\")" ) );
   std::cout << "undefined prefix of an attribute: " << attribute << std::endl;
-  check( contains( attribute, "\"c\": namespace prefix for \"d\"" ) &&
+  check( contains( attribute,
+                   "\"c\": namespace prefix for \"d\" on \"e\" not defined" ) &&
          !contains( attribute, "$" ), "the prefix of an attribute", attribute );
 }
 
