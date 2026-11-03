@@ -458,7 +458,13 @@ IF (ZORBA_WITH_FILE_ACCESS)
              language_binary no_write read_functions native_import reflection_random
              cache_hit cache_invalidate cache_evict cache_off cache_policy
              cache_inject cache_size cache_default cache_abort cache_errors
-             cache_expansion cache_counters)
+             cache_expansion cache_counters cache_slack_size cache_slack_slots
+             cache_slack_many cache_same_file cache_root_spelling
+             cache_replace cache_turnover cache_invalidate_loop
+             cache_refused_loop cache_session_binary cache_same_output
+             cache_change_detect cache_change_during_read cache_change_at_once
+             cache_error_identical cache_xdm cache_xdm_properties
+             cache_no_effects cache_updates_bypass cache_timeout_state)
       ADD_TEST (NAME bin/mcp/${_t}
         COMMAND "mcp_tests${_mcp_suffix}" ${_t} "${_dirtree}" "${_mcpq}"
           "${_dirq}/join.xq" "$<TARGET_FILE:zorba_mcp${_mcp_suffix}>")
