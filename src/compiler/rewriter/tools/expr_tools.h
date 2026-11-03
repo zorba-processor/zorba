@@ -52,6 +52,16 @@ int count_variable_uses(expr* root, var_expr* v, int limit, std::vector<expr**>*
 
 int estimate_expression_size(expr* root, int limit);
 
+// Whether a call to this function can run code it receives as an argument or
+// finds by name: a function type among its parameters, or fn:invoke and the like.
+bool function_runs_opaque_code(const function* f);
+
+// Whether a side effect can run during the evaluation of "root": a sequential
+// expr or function, or a call whose target is not visible to the compiler. The
+// scripting kind of an expr does not say this: a dynamic function call has the kind
+// of a simple expr whatever it calls. User functions are followed into their bodies.
+bool may_run_side_effects(const expr* root);
+
 
 /*******************************************************************************
 

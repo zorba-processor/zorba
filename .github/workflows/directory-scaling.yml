@@ -67,6 +67,18 @@ on:
         description: "scale: FORM-PATH of the second pass (empty: all)"
         required: false
         default: ""
+      soak:
+        description: "cache: long sessions, space-separated FORMATS:SCENARIO:FILES:KB:MAXKB:MAXFILES (bench/directory/dirbench.cpp, soak)"
+        required: false
+        default: ""
+      soak_calls:
+        description: "cache: run_query calls of each long session, space-separated"
+        required: false
+        default: "100 1000 10000"
+      large:
+        description: "cache: one large file kept by the cache, space-separated FORMAT:MIB"
+        required: false
+        default: ""
 
 concurrency:
   group: directory-scaling-${{ github.ref }}-${{ inputs.engine_ref }}
@@ -194,6 +206,9 @@ jobs:
       CALLS: ${{ inputs.calls }}
       RUNS: ${{ inputs.runs }}
       CACHE: ${{ inputs.cache }}
+      SOAK: ${{ inputs.soak }}
+      SOAK_CALLS: ${{ inputs.soak_calls }}
+      LARGE: ${{ inputs.large }}
     steps:
       - uses: actions/checkout@v7
 
@@ -225,7 +240,7 @@ jobs:
       - name: Generate trees and measure
         run: |
           mkdir -p out
-          docker run --rm -e CALLS -e RUNS -e TREES -e CACHE \
+          docker run --rm -e CALLS -e RUNS -e TREES -e CACHE -e SOAK -e SOAK_CALLS -e LARGE \
             -v "$PWD":/src -w /src zorba-builder:ci sh -ec '
               ZORBA=$(find build/full-release/bin -maxdepth 1 -name zorba -type f | head -n 1)
               MCP=$(find build/full-release/bin -maxdepth 1 -name zorba-mcp -type f | head -n 1)

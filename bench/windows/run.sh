@@ -6,7 +6,7 @@
 # Each cell runs in a fresh process: RUNS times below 10^6 records, once at
 # 10^6. It reports the median wall time, the largest peak RSS and the result of
 # the query. Environment: SIZES (default "10000 100000 1000000"), RUNS (3),
-# LIMIT (seconds per run, 3600).
+# LIMIT (seconds per run, 3600), NEVER, NEVER_LINEAR, NEVER_LINEAR_QUERIES.
 set -eu
 ZORBA=$1 DIRBENCH=$2 WORK=$3 OUT=$4
 SIZES=${SIZES:-10000 100000 1000000}
@@ -74,7 +74,16 @@ for n in $SIZES; do
   done
 done
 
-# Candidate windows that stay open: the cost per record grows with the record.
-for n in 1000 2000 4000 8000 16000; do
-  cell never_closes gen "gen:$n" "$n"
+# Windows that stay open, by form. NEVER: sizes with quadratic growth expected in
+# some form; NEVER_LINEAR: larger sizes, for the forms that stay linear.
+NEVER=${NEVER:-1000 2000 4000 8000 16000}
+for n in $NEVER; do
+  for q in never_closes never_closes_read never_closes_start open_at_end open_at_end_read first_stays_open tumbling_never; do
+    cell "$q" gen "gen:$n" "$n"
+  done
+done
+for n in ${NEVER_LINEAR:-}; do
+  for q in ${NEVER_LINEAR_QUERIES:-never_closes never_closes_read open_at_end tumbling_never}; do
+    cell "$q" gen "gen:$n" "$n"
+  done
 done

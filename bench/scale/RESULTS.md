@@ -5,8 +5,11 @@ Arch builder image), 2026-11-03. Every cell goes through `run_query` of `zorba-m
 
 | engine | commit | run | jobs: size, CPU |
 |---|---|---|---|
-| master | `7c8d649f97` | 41659837513 | 100 MB: EPYC 7763; 1 GB: EPYC 9V45; 10 GB: EPYC 7763 |
-| `window-performance` (PR #169, in progress) | `eabbb66ea3` | 41659857371 | 100 MB: EPYC 7763; 1 GB: EPYC 9V74; 10 GB: EPYC 9V45 |
+| master before PR #169 | `7c8d649f97` | 41659837513 | 100 MB: EPYC 7763; 1 GB: EPYC 9V45; 10 GB: EPYC 7763 |
+| `window-performance`, the head of PR #169 | `eabbb66ea3` | 41659857371 | 100 MB: EPYC 7763; 1 GB: EPYC 9V74; 10 GB: EPYC 9V45 |
+
+PR #169 was merged into master as `e1138396f4` after these runs started. In this file,
+"master" is `7c8d649f97`, without it; `window-performance` is what it merged.
 
 Each job has its own runner, so times of different jobs come from different CPUs.
 Every runner: 4 vCPU, 16760344576 bytes of RAM (15.6 GiB), 3221221376 bytes of swap,

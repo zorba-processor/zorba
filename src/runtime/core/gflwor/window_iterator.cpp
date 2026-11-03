@@ -270,6 +270,20 @@ void WindowVars::bindExtern(
 }
 
 
+bool WindowVars::hasInnerItemRefs() const
+{
+  return !theCurVars.empty() || !thePrevVars.empty() || !theNextVars.empty();
+}
+
+
+bool WindowVars::hasOuterItemRefs() const
+{
+  return (!theCurOuterVars.empty() ||
+          !thePrevOuterVars.empty() ||
+          !theNextOuterVars.empty());
+}
+
+
 /////////////////////////////////////////////////////////////////////////////////
 //                                                                             //
 //  StartClause                                                                //
@@ -565,7 +579,7 @@ WindowDef::WindowDef(ulong aStartPos) : theStartPos(aStartPos), theEndPos(0)
 //                                                                             //
 /////////////////////////////////////////////////////////////////////////////////
 
-WindowState::WindowState() : theDomainSeq (NULL) , theCurInputPos(1)
+WindowState::WindowState() : theDomainSeq (NULL) , theCurInputPos(1), thePurgedUpTo(0)
 {
 }
 
@@ -579,6 +593,7 @@ void WindowState::init(PlanState& aState)
 {
   PlanIteratorState::init(aState);
   theCurInputPos = 1;
+  thePurgedUpTo = 0;
   theDomainSeq = NULL;
 }
 
@@ -587,8 +602,10 @@ void WindowState::reset(PlanState& planState)
 {
   PlanIteratorState::reset(planState);
   theCurInputPos = 1;
+  thePurgedUpTo = 0;
   theDomainSeq = NULL;
   theOpenWindows.clear();
+  theUnclosedWindows.clear();
 }
 
 
@@ -598,9 +615,6 @@ void WindowState::reset(PlanState& planState)
 //  WindowIterator                                                             //
 //                                                                             //
 /////////////////////////////////////////////////////////////////////////////////
-
-const ulong WindowIterator::MAX_HISTORY = 2147483647; //TODO should be set platform dependent, but somebody hat comment out everything in platform.h!
-
 
 /***************************************************************************//**
 
@@ -617,7 +631,7 @@ WindowIterator::WindowIterator(
     StartClause& startClause,
     EndClause& endClause,
     bool lazyEval,
-    ulong maxNeededHistory)
+    bool endCondSameForAllWindows)
   :
   PlanIterator(sctx, loc),
   theWindowType(windowType),
@@ -628,12 +642,16 @@ WindowIterator::WindowIterator(
   theStartClause(startClause),
   theEndClause(endClause),
   theLazyEval(lazyEval),
-  theMaxNeededHistory(maxNeededHistory)
+  theEndCondSameForAllWindows(endCondSameForAllWindows)
 {
   castIterVector<LetVarIterator>(theVarRefs, varRefs);
 
-  if (theWindowType == TUMBLING)
-    theMaxNeededHistory = 1;
+  // The inner vars of the end condition read the current item and its
+  // neighbors, which doGarbageCollection keeps for every window.
+  theWindowsHoldItems = (!theVarRefs.empty() ||
+                         theStartClause.theWindowVars.hasInnerItemRefs() ||
+                         theStartClause.theWindowVars.hasOuterItemRefs() ||
+                         theEndClause.theWindowVars.hasOuterItemRefs());
 }
 
 
@@ -660,8 +678,8 @@ void WindowIterator::serialize(::zorba::serialization::Archiver& ar)
   ar & theStartClause;
   ar & theEndClause;
   ar & theLazyEval;
-
-  ar & theMaxNeededHistory;
+  ar & theEndCondSameForAllWindows;
+  ar & theWindowsHoldItems;
 }
 
 
@@ -803,27 +821,87 @@ void WindowIterator::bindVariable(
 
 
 /***************************************************************************//**
-  The theMaxNeededHistory has to be determined by the compiler e.g. for
-  $seq[$startPos - 4] cases
+  Test the end condition of the candidate windows on the current item. Before
+  evaluating the end condition expr, we must rebind the internal vars of the
+  start condition, because those variables may be referenced in the end cond
+  expr. If the condition has one value for all windows, it needs neither that
+  nor more than one evaluation.
+********************************************************************************/
+void WindowIterator::checkEndCondition(
+    WindowState* state,
+    PlanState& planState) const
+{
+  std::vector<WindowDef*>& unclosed = state->theUnclosedWindows;
+
+  if (unclosed.empty())
+    return;
+
+  ulong const pos = state->theCurInputPos;
+
+  if (theEndCondSameForAllWindows)
+  {
+    if (theEndClause.evaluate(planState, state->theDomainSeq, pos))
+    {
+      for (WindowDef* window : unclosed)
+        window->theEndPos = pos;
+
+      unclosed.clear();
+    }
+
+    return;
+  }
+
+  csize numUnclosed = 0;
+
+  for (WindowDef* window : unclosed)
+  {
+    theStartClause.bindIntern(planState,
+                              state->theDomainSeq,
+                              window->theStartPos);
+
+    if (theEndClause.evaluate(planState, state->theDomainSeq, pos))
+      window->theEndPos = pos;
+    else
+      unclosed[numUnclosed++] = window;
+  }
+
+  unclosed.resize(numUnclosed);
+}
+
+
+/***************************************************************************//**
+  Release the items of the domain sequence that no reader can ask for anymore.
+  This runs only after the tuple of the last returned window has been consumed:
+  the consumer pulled the next tuple, so nothing reads the previous binding of
+  the window var. A clause that keeps the window var past its tuple (order by,
+  group by, a function item) has copied its items by then, and holds them with
+  its own references.
+
+  What remains readable by position, with p the current position:
+
+  - p, as the "previous" item of the next position (p + 1 is not purged, nor
+    anything after it);
+  - if windows hold items: from the item before the start of the first open
+    window on. That window, and the ones after it, bind the "previous" of their
+    start, their start, the items between start and end, and the neighbors of
+    their end. The first open window has the smallest start.
 ********************************************************************************/
 void WindowIterator::doGarbageCollection(WindowState* state) const
 {
-  if (theMaxNeededHistory != MAX_HISTORY)
-  {
-    if (state->theOpenWindows.empty())
-    {
-      if (state->theCurInputPos > theMaxNeededHistory)
-        state->theDomainSeq->
-        purgeUpTo(xs_integer(state->theCurInputPos - theMaxNeededHistory));
-    }
-    else
-    {
-      int64_t purgeTo =
-      state->theOpenWindows.front().theStartPos - theMaxNeededHistory;
+  ulong firstKept = state->theCurInputPos;
 
-      if (purgeTo > 0)
-        state->theDomainSeq->purgeUpTo(xs_integer(purgeTo));
-    }
+  if (theWindowsHoldItems && !state->theOpenWindows.empty())
+  {
+    ulong const startPos = state->theOpenWindows.front().theStartPos;
+    firstKept = startPos > 1 ? startPos - 1 : 1;
+  }
+
+  ulong const purgeTo = firstKept - 1;
+
+  if (purgeTo > state->thePurgedUpTo)
+  {
+    state->theDomainSeq->purgeUpTo(xs_integer(purgeTo));
+    state->thePurgedUpTo = purgeTo;
   }
 }
 
@@ -860,88 +938,60 @@ bool WindowIterator::nextImpl(store::Item_t& aResult, PlanState& planState) cons
                                     state->theCurInputPos))
         {
           state->theOpenWindows.push_back(WindowDef(state->theCurInputPos));
+          state->theUnclosedWindows.push_back(&state->theOpenWindows.back());
         }
 
         // For each candidate window, check if the current domain item satisfies
-        // the end condition. Notice that before evaluating the end condition
-        // expr, we must rebind the internal vars of the start condition, because
-        // those varaibles may be refrenced in the end cond expr.
-        state->theCurWindow = state->theOpenWindows.begin();
-
-        while ( state->theCurWindow != state->theOpenWindows.end() )
-        {
-          if (state->theCurWindow->theEndPos == 0)
-          {
-            theStartClause.bindIntern(planState,
-                                      state->theDomainSeq,
-                                      state->theCurWindow->theStartPos);
-
-            ulong lCurPos = state->theCurInputPos;
-            if ( theEndClause.evaluate(planState,
-                                       state->theDomainSeq,
-                                       lCurPos))
-            {
-              state->theCurWindow->theEndPos = lCurPos;
-            }
-          }
-
-          ++state->theCurWindow;
-        }
+        // the end condition.
+        checkEndCondition(state, planState);
 
         // Try to return closed windows to the consumer iterator. Notice that
         // windows must be sorted according to the position of their starting
         // items in the domain sequence. So, we can return a closed window only
         // if it appears as the first window in state->theOpenWindows.
-        state->theCurWindow = state->theOpenWindows.begin();
-
-        while (!state->theOpenWindows.empty())
+        while (!state->theOpenWindows.empty() &&
+               state->theOpenWindows.front().theEndPos != 0)
         {
-          if (state->theCurWindow->theEndPos != 0)
-          {
-            // The current window is closed and its starting item is before the
-            // stating items of all other windows (open or closed) in the domain
-            // sequence. So, (a) bind the window var and the external vars of 
-            // the start and end conditions, (b) remove the window from the set
-            // of candidate windows, (c) purge from the domain temp seq any item
-            // that we know for sure they will not be needed in subsequent 
-            // evaluations of the start and/or end conditions, and (d) return to
-            // the caller a new tuple that consists of the current input tuple
-            // augmented with one column per variable that was bound in this step.
-            theStartClause.bindExtern(planState,
-                                      state->theDomainSeq,
-                                      state->theCurWindow->theStartPos);
-
-            theEndClause.bindExtern(planState,
+          // The current window is closed and its starting item is before the
+          // stating items of all other windows (open or closed) in the domain
+          // sequence. So, (a) bind the window var and the external vars of 
+          // the start and end conditions, (b) remove the window from the set
+          // of candidate windows, (c) return to the caller a new tuple that
+          // consists of the current input tuple augmented with one column per
+          // variable that was bound in this step, and (d) purge from the domain
+          // temp seq the items that only this window needed.
+          theStartClause.bindExtern(planState,
                                     state->theDomainSeq,
-                                    state->theCurWindow->theEndPos);
+                                    state->theOpenWindows.front().theStartPos);
 
-            bindVariable(planState,
-                         state->theDomainSeq,
-                         state->theCurWindow->theStartPos,
-                         state->theCurWindow->theEndPos);
+          theEndClause.bindExtern(planState,
+                                  state->theDomainSeq,
+                                  state->theOpenWindows.front().theEndPos);
 
-            state->theCurWindow = state->theOpenWindows.erase(state->theCurWindow);
+          bindVariable(planState,
+                       state->theDomainSeq,
+                       state->theOpenWindows.front().theStartPos,
+                       state->theOpenWindows.front().theEndPos);
 
-            //doGarbageCollection(state);
+          state->theOpenWindows.pop_front();
 
-            if (theTreatIter)
+          if (theTreatIter)
+          {
+            store::Item_t tmp;
+            while (consumeNext(tmp, theTreatIter, planState))
             {
-              store::Item_t tmp;
-              while (consumeNext(tmp, theTreatIter, planState))
-              {
-                ;
-              }
-
-              theTreatIter->reset(planState);
+              ;
             }
 
-            STACK_PUSH(true, state);
+            theTreatIter->reset(planState);
           }
-          else
-          {
-            break;
-          }
+
+          STACK_PUSH(true, state);
+
+          doGarbageCollection(state);
         }
+
+        doGarbageCollection(state);
 
         ++state->theCurInputPos;
       }
@@ -995,9 +1045,9 @@ bool WindowIterator::nextImpl(store::Item_t& aResult, PlanState& planState) cons
             }
 
             STACK_PUSH(true, state);
-
-            doGarbageCollection(state);
           }
+
+          doGarbageCollection(state);
 
           ++state->theCurInputPos;
         }
@@ -1040,44 +1090,42 @@ bool WindowIterator::nextImpl(store::Item_t& aResult, PlanState& planState) cons
               }
 
               STACK_PUSH(true, state);
-
-              --state->theCurInputPos;
-              doGarbageCollection(state);
-              ++state->theCurInputPos;
             }
 
             state->theOpenWindows.push_back(state->theCurInputPos);
           }
+
+          doGarbageCollection(state);
 
           ++state->theCurInputPos;
         }
       }
     }
 
-    // Check if we have open and/or closed windows
-    state->theCurWindow = state->theOpenWindows.begin();
-
-    while (state->theCurWindow != state->theOpenWindows.end())
+    // The domain sequence has ended. Return the windows that remain, in order.
+    // Unclosed windows get the last item as their end, or are dropped if the end
+    // condition says "only end".
+    while (!state->theOpenWindows.empty())
     {
-      if (!theEndClause.theOnlyEnd || state->theCurWindow->theEndPos != 0)
+      if (!theEndClause.theOnlyEnd || state->theOpenWindows.front().theEndPos != 0)
       {
-        if (state->theCurWindow->theEndPos == 0)
-          state->theCurWindow->theEndPos = state->theCurInputPos - 1;
+        if (state->theOpenWindows.front().theEndPos == 0)
+          state->theOpenWindows.front().theEndPos = state->theCurInputPos - 1;
 
         bindVariable(planState,
                      state->theDomainSeq,
-                     state->theCurWindow->theStartPos,
-                     state->theCurWindow->theEndPos);
+                     state->theOpenWindows.front().theStartPos,
+                     state->theOpenWindows.front().theEndPos);
 
         theStartClause.bindExtern(planState,
                                   state->theDomainSeq,
-                                  state->theCurWindow->theStartPos);
+                                  state->theOpenWindows.front().theStartPos);
 
         theEndClause.bindExtern(planState,
                                 state->theDomainSeq,
-                                state->theCurWindow->theEndPos);
+                                state->theOpenWindows.front().theEndPos);
 
-        state->theCurWindow = state->theOpenWindows.erase(state->theCurWindow);
+        state->theOpenWindows.pop_front();
 
         if (theTreatIter)
         {
@@ -1091,10 +1139,12 @@ bool WindowIterator::nextImpl(store::Item_t& aResult, PlanState& planState) cons
         }
 
         STACK_PUSH(true, state);
+
+        doGarbageCollection(state);
       }
       else
       {
-        ++state->theCurWindow;
+        state->theOpenWindows.pop_front();
       }
     }
 
