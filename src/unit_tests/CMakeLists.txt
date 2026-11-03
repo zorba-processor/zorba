@@ -28,6 +28,8 @@ SET(UNIT_TEST_SRCS
   test_mapm_threads.cpp
   test_mem_sizeof.cpp
   test_mmap_file.cpp
+  test_node_edit_iterator.cpp
+  test_node_packing.cpp
   test_numeric_hash.cpp
   test_ordpath.cpp
   test_parameters.cpp

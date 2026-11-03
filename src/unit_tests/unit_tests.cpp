@@ -55,6 +55,8 @@ void initializeTestList()
   libunittests["mem_sizeof"] = test_mem_sizeof;
   libunittests["memory_manager"] = test_memory_manager;
   libunittests["mmap_file"] = test_mmap_file;
+  libunittests["node_edit_iterator"] = test_node_edit_iterator;
+  libunittests["node_packing"] = test_node_packing;
   libunittests["numeric_hash"] = test_numeric_hash;
   libunittests["ordpath"] = test_ordpath;
 

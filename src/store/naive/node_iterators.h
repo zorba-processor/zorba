@@ -16,6 +16,8 @@
 #ifndef ZORBA_SIMPLE_STORE_NODE_ITERATORS
 #define ZORBA_SIMPLE_STORE_NODE_ITERATORS
 
+#include <algorithm>
+
 #include <cassert>
 #include <set>
 #include <vector>
@@ -59,14 +61,48 @@ protected:
   InternalNode::iterator           theStart;
   InternalNode::iterator           theIte;
 
+  // Copy of the children when the parent stores them inline; see setRange().
+  XmlNode                        * theInline[InternalNode::NodeVector::INLINE_CAPACITY];
+
+  // The first child, if any; see setRange().
+  store::Item_t                    theFirstNode;
+
+  // A collection edit swaps the contents of the parent with another node's
+  // while this iterator is open (InternalNode::swap). The iterator goes on with
+  // the children it started on:
+  // - a heap list keeps its address, and an inline list stays in the parent's
+  //   own storage, which takes the new contents, so the iterator copies it;
+  // - the old children and list then belong to the tree of the other node, which
+  //   nothing else may keep alive: the reference to theFirstNode does. It is a
+  //   reference to a node, not to the tree, because the store moves the
+  //   references of nodes when it merges or splits trees.
+  void setRange()
+  {
+    theEnd = theParentNode->childrenEnd();
+    theStart = theParentNode->childrenBegin();
+
+    if (theParentNode->nodesAreInline())
+    {
+      csize const numNodes = theEnd - theStart;
+      std::copy(theStart, theEnd, theInline);
+      theStart = theInline;
+      theEnd = theInline + numNodes;
+    }
+
+    theFirstNode = (theStart != theEnd ? *theStart : NULL);
+  }
+
 public:
   ChildrenIteratorImpl() { }
+
+  // theStart, theEnd and theIte may point into this object.
+  ChildrenIteratorImpl(const ChildrenIteratorImpl&) = delete;
+  ChildrenIteratorImpl& operator=(const ChildrenIteratorImpl&) = delete;
 
   void init(store::Item_t& parent, const store::Item* child = NULL)
   {
     theParentNode.transfer(parent);
-    theEnd = theParentNode->childrenEnd();
-    theStart = theParentNode->childrenBegin();
+    setRange();
 
     if (child != NULL && theStart != theEnd)
     {
@@ -93,8 +129,7 @@ public:
   void init(const store::Item* parent, const store::Item* child = NULL)
   {
     theParentNode = parent;
-    theEnd = theParentNode->childrenEnd();
-    theStart = theParentNode->childrenBegin();
+    setRange();
 
     if (child != NULL && theStart != theEnd)
     {
@@ -140,7 +175,7 @@ public:
 
   void reset() { theIte = theStart; }
 
-  void close() { theIte = theEnd; theParentNode = NULL; }
+  void close() { theIte = theEnd; theParentNode = NULL; theFirstNode = NULL; }
 
   bool next(store::Item_t& result);
 };
@@ -173,14 +208,41 @@ protected:
   InternalNode::reverse_iterator   theStart;
   InternalNode::reverse_iterator   theIte;
 
+  // Copy of the children when the parent stores them inline; see
+  // ChildrenIteratorImpl::setRange().
+  XmlNode                        * theInline[InternalNode::NodeVector::INLINE_CAPACITY];
+
+  // The last child, if any; see ChildrenIteratorImpl::setRange().
+  store::Item_t                    theFirstNode;
+
+  void setRange()
+  {
+    theEnd = theParentNode->childrenREnd();
+    theStart = theParentNode->childrenRBegin();
+
+    if (theParentNode->nodesAreInline())
+    {
+      csize const numNodes = theParentNode->numChildren();
+      std::copy(theParentNode->childrenBegin(), theParentNode->childrenEnd(),
+                theInline);
+      theStart = InternalNode::reverse_iterator(theInline + numNodes);
+      theEnd = InternalNode::reverse_iterator(theInline);
+    }
+
+    theFirstNode = (theStart != theEnd ? *theStart : NULL);
+  }
+
 public:
   ChildrenReverseIteratorImpl() { }
+
+  // theStart, theEnd and theIte may point into this object.
+  ChildrenReverseIteratorImpl(const ChildrenReverseIteratorImpl&) = delete;
+  ChildrenReverseIteratorImpl& operator=(const ChildrenReverseIteratorImpl&) = delete;
 
   void init(store::Item_t& parent, const store::Item* child = NULL)
   {
     theParentNode.transfer(parent);
-    theEnd = theParentNode->childrenREnd();
-    theStart = theParentNode->childrenRBegin();
+    setRange();
 
     if (child != NULL && theStart != theEnd)
     {
@@ -207,8 +269,7 @@ public:
   void init(const store::Item* parent, const store::Item* child = NULL)
   {
     theParentNode = parent;
-    theEnd = theParentNode->childrenREnd();
-    theStart = theParentNode->childrenRBegin();
+    setRange();
 
     if (child != NULL && theStart != theEnd)
     {
@@ -264,6 +325,7 @@ public:
   {
     theIte = theEnd;
     theParentNode = NULL;
+    theFirstNode = NULL;
   }
 
   bool next(store::Item_t& result);
@@ -284,23 +346,51 @@ protected:
   store::ItemHandle<ElementNode>  theParentNode;
 
   InternalNode::iterator          theEnd;
+  InternalNode::iterator          theStart;
   InternalNode::iterator          theIte;
+
+  // Copy of the attributes when the parent stores them inline; see
+  // ChildrenIteratorImpl::setRange().
+  XmlNode                       * theInline[InternalNode::NodeVector::INLINE_CAPACITY];
+
+  // The first attribute, if any; see ChildrenIteratorImpl::setRange().
+  store::Item_t                   theFirstNode;
+
+  void setRange()
+  {
+    theEnd = theParentNode->attrsEnd();
+    theStart = theParentNode->attrsBegin();
+
+    if (theParentNode->nodesAreInline())
+    {
+      csize const numNodes = theEnd - theStart;
+      std::copy(theStart, theEnd, theInline);
+      theStart = theInline;
+      theEnd = theInline + numNodes;
+    }
+
+    theIte = theStart;
+
+    theFirstNode = (theStart != theEnd ? *theStart : NULL);
+  }
 
 public:
   AttributesIteratorImpl() { }
 
+  // theStart, theEnd and theIte may point into this object.
+  AttributesIteratorImpl(const AttributesIteratorImpl&) = delete;
+  AttributesIteratorImpl& operator=(const AttributesIteratorImpl&) = delete;
+
   void init(store::Item_t& parent)
   {
     theParentNode.transfer(parent);
-    theEnd = theParentNode->attrsEnd();
-    theIte = theParentNode->attrsBegin();
+    setRange();
   }
 
   void init(const store::Item* parent)
   {
     theParentNode = parent;
-    theEnd = theParentNode->attrsEnd();
-    theIte = theParentNode->attrsBegin();
+    setRange();
   }
 
   store::Item* next()
@@ -340,18 +430,19 @@ public:
 
   void open()
   {
-    theIte = theParentNode->attrsBegin();
+    theIte = theStart;
   }
 
   void reset()
   {
     if (theParentNode)
-      theIte = theParentNode->attrsBegin();
+      theIte = theStart;
   }
 
   void close()
   {
     theParentNode = NULL;
+    theFirstNode = NULL;
   }
 
   bool next(store::Item_t& result);

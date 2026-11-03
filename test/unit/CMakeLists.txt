@@ -84,6 +84,7 @@ SET(UNIT_TESTS_SRCS
   cxx_api_changes.cpp
   external_function.cpp
   no_folding.cpp
+  node_mem_size.cpp
   ordpath_big.cpp
   uri_file_decoding_test.cpp
   ext_in_opt.cpp
@@ -163,6 +164,8 @@ IF(ZORBA_WITH_UNIT_TESTS)
   ZORBA_ADD_TEST("test/libunit/mapm_threads" LibUnitTest mapm_threads)
   ZORBA_ADD_TEST("test/libunit/memory_manager" LibUnitTest memory_manager)
   ZORBA_ADD_TEST("test/libunit/mmap_file" LibUnitTest mmap_file)
+  ZORBA_ADD_TEST("test/libunit/node_edit_iterator" LibUnitTest node_edit_iterator)
+  ZORBA_ADD_TEST("test/libunit/node_packing" LibUnitTest node_packing)
   ZORBA_ADD_TEST("test/libunit/numeric_hash" LibUnitTest numeric_hash)
   ZORBA_ADD_TEST("test/libunit/ordpath" LibUnitTest ordpath)
   IF (NOT ZORBA_NO_FULL_TEXT)
