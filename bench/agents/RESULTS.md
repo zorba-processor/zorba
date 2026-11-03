@@ -166,3 +166,86 @@ and B is a hypothesis; these runs have no variant with a shorter listing.
 
 Limits: one rerun per language, 3 runs per task, one model; B differs between
 two runs by up to 4.2% in tokens with no configuration change.
+
+## 2026-11-03, commits 7c8d649f9 and 27e952e2f (`list_documents` shorter)
+
+Backend `claude-code`, model `claude-sonnet-5-5`, `--language jsoniq`, 20 tasks,
+3 runs per task and configuration: 60 sessions per cell. 7c8d649f9 is master,
+run 41646733315. 27e952e2f adds the shorter `list_documents` listing to that
+master, run 41646738034. Per-task tables and the per-run records are in
+[`baselines/2026-11-03-7c8d649f9-jsoniq/`](baselines/2026-11-03-7c8d649f9-jsoniq/)
+and
+[`baselines/2026-11-03-27e952e2f-jsoniq/`](baselines/2026-11-03-27e952e2f-jsoniq/).
+Tokens are means per session; reported USD is the sum over the 60 sessions of
+the cost that Claude Code reports.
+
+| Config | Measure | 7c8d649f9 | 27e952e2f |
+|---|---|---:|---:|
+| A | accuracy | 1.00 | 1.00 |
+| A | tool calls | 3.7 | 3.9 |
+| A | tokens, mean | 23983 | 25108 |
+| A | tokens, median | 19762 | 17988 |
+| A | wall s | 19.4 | 18.5 |
+| A | reported USD | 2.1899 | 2.1799 |
+| A | failed `run_query` | 61 of 161 | 67 of 171 |
+| B | accuracy | 1.00 | 0.98 |
+| B | tokens, mean | 15436 | 13499 |
+| B | tokens, median | 11346 | 10812 |
+| B | wall s | 13.8 | 12.7 |
+| B | reported USD | 0.9715 | 0.9885 |
+
+The listing went from 4671 to 3986 characters (57 calls per run) and with
+`path=weather` from 2629 to 2574 (3 calls per run).
+
+**These two runs do not show a saving from the shorter listing.** Comparing the
+mean per task of 27e952e2f with that of 7c8d649f9:
+
+| Config | Tasks lower | Tasks higher | Median difference | Mean difference |
+|---|---:|---:|---:|---:|
+| A | 15 | 5 | -2344 | +1125 |
+| B | 11 | 7 | -7 | -1936 |
+
+B has no listing and no code change between the two runs, and its mean moved
+12.5%. That is larger than the 4.2% stated for the earlier reruns, and larger
+than the difference in A. The one wrong answer is `t13_cyclone_categories`,
+run 2, in B.
+
+### Query errors, both runs together
+
+128 of 332 `run_query` calls failed, in 74 of the 120 A sessions (62%), by
+cause:
+
+| Cause | Failed |
+|---|---:|
+| `.` as the context item (JSONiq uses `$$`) | 39 |
+| String lookup on an array (FORG0001) | 25 |
+| `math:` prefix not declared | 11 |
+| Returning a node (JNSE0014) | 10 |
+| `$a-$b` without spaces | 10 |
+| Other syntax | 8 |
+| Singleton expected | 8 |
+| `number` or `xs:null` as a type | 4 |
+| Names that do not exist | 4 |
+| `\s` in a string, backslash not escaped | 4 |
+| `[n]` on an array | 3 |
+| Single quotes | 2 |
+
+16 repeat a cause already seen in the session and 37 come right after another
+failure.
+
+| Failed queries in the session | Sessions | Median tokens |
+|---:|---:|---:|
+| 0 | 46 | 11447 |
+| 1 | 45 | 18299 |
+| 2 | 15 | 32834 |
+| 3 | 8 | 38432 |
+| 4 or more | 6 | 71340 |
+
+Harder tasks fail more, so this table overstates the cost of an error. Within
+one task, sessions with an error use a median of 1.46 times the tokens of
+sessions without one (14 tasks have both kinds). Over the 15 tasks with a
+session without errors, those sessions use a median of 1.19 times the tokens
+of B; over all sessions of both runs A uses 1.70 times the tokens of B.
+
+Limits: 3 runs per task, one model, 1.8 MB of data. The cache counters of these
+runs cannot be used: `zorba-mcp.log` keeps one process, with no queries.
