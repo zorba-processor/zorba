@@ -275,6 +275,15 @@ ZORBA_DLL_PUBLIC void query_resources_fail_walk(unsigned long edge);
   theDebuggerCommons :
   --------------------
 
+  theMayRunSideEffects :
+  ----------------------
+  False once the compiler has checked that no side effect can run during the
+  evaluation of the query (expr_tools::may_run_side_effects). Until then it is true.
+
+  theOuterMayRunSideEffects :
+  ---------------------------
+  The same, for the query that runs this one through eval.
+
   theHasEval :
   ------------
   True if there is an eval expr within the compilation unit covered by this CCB.
@@ -420,6 +429,10 @@ public:
   bool                      theIsUpdating;
 
   bool                      theIsSequential;
+
+  bool                      theOuterMayRunSideEffects;
+
+  bool                      theMayRunSideEffects;
 
   bool                      theHaveTimeout;
 

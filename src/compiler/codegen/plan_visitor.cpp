@@ -41,6 +41,7 @@
 #include "compiler/expression/expr_visitor.h"
 #include "compiler/expression/flwor_expr.h"
 #include "compiler/expression/expr_iter.h"
+#include "compiler/rewriter/tools/expr_tools.h"
 #include "compiler/expression/fo_expr.h"
 #include "compiler/expression/script_exprs.h"
 #include "compiler/expression/json_exprs.h"
@@ -1485,11 +1486,52 @@ bool nativeColumnSort(expr* colExpr)
 
 
 /*******************************************************************************
+  Whether a call to a built-in function gives the same value when evaluated again
+  with the same arguments, and no new node or object among it. Atomic values have
+  no identity, and the listed functions return items they received.
+********************************************************************************/
+static bool is_repeatable_builtin(const function* f, const QueryLoc& loc)
+{
+  if (!f->isBuiltin() ||
+      !f->isDeterministic() ||
+      f->isSequential() ||
+      f->isUpdating() ||
+      expr_tools::function_runs_opaque_code(f))
+    return false;
+
+  switch (f->getKind())
+  {
+  case FunctionConsts::OP_ZORBA_MULTI_OBJECT_LOOKUP_2:
+  case FunctionConsts::OP_ZORBA_SINGLE_OBJECT_LOOKUP_2:
+  case FunctionConsts::OP_ZORBA_MULTI_ARRAY_LOOKUP_2:
+  case FunctionConsts::OP_ZORBA_SINGLE_ARRAY_LOOKUP_2:
+  case FunctionConsts::OP_ZORBA_MEMBERS_1:
+  case FunctionConsts::OP_CONCATENATE_N:
+  case FunctionConsts::FN_HEAD_1:
+  case FunctionConsts::FN_TAIL_1:
+  case FunctionConsts::FN_EXACTLY_ONE_1:
+  case FunctionConsts::FN_ZERO_OR_ONE_1:
+  case FunctionConsts::FN_ONE_OR_MORE_1:
+    return true;
+  default:
+    break;
+  }
+
+  return TypeOps::is_subtype(&GENV_TYPESYSTEM,
+                             *f->getSignature().returnType(),
+                             *GENV_TYPESYSTEM.ANY_ATOMIC_TYPE_STAR,
+                             loc);
+}
+
+
+/*******************************************************************************
   Whether the value of "e" could change between two evaluations with the same
-  values of its variables, or whether e reads one of the given variables. The
-  kinds of exprs are listed, not excluded: a call to a user or external function,
-  a dynamic call or an eval has a body that is not visible here, and a constructor
-  makes a node or object whose identity is new at each evaluation.
+  values of its variables, or whether e reads one of the given variables. What
+  repeats is listed, anything else does not: a call to a user or external function,
+  a dynamic call or an eval has a body that is not visible here, a built-in may run
+  a function it receives or return a new node, and a constructor makes a node or
+  object whose identity is new at each evaluation. fn:trace returns item()*, so it
+  is not listed either, and it writes once per window.
 ********************************************************************************/
 static bool reads_vars_or_may_vary(
     const expr* e,
@@ -1504,13 +1546,9 @@ static bool reads_vars_or_may_vary(
     break;
 
   case fo_expr_kind:
-  {
-    const function* f = static_cast<const fo_expr*>(e)->get_func();
-    if (!f->isBuiltin() || !f->isDeterministic() || f->isSequential() ||
-        f->isUpdating() || f->getKind() == FunctionConsts::FN_TRACE_2)
+    if (!is_repeatable_builtin(static_cast<const fo_expr*>(e)->get_func(), e->get_loc()))
       return true;
     break;
-  }
 
   case const_expr_kind:
   case relpath_expr_kind:
@@ -1547,23 +1585,10 @@ static bool reads_vars_or_may_vary(
 
 
 /*******************************************************************************
-  The domain of a sliding window clause stays eager if the FLWOR or a condition has
-  side effects: reading the domain must not interleave with them.
-********************************************************************************/
-static bool window_has_side_effects(const flwor_expr& flworExpr, const window_clause* wc)
-{
-  return (flworExpr.is_sequential() ||
-          (wc->get_win_start() != NULL && wc->get_win_start()->get_expr()->is_sequential()) ||
-          (wc->get_win_stop() != NULL && wc->get_win_stop()->get_expr()->is_sequential()));
-}
-
-
-/*******************************************************************************
   An end condition whose value depends only on the current item has the same
   value for every candidate window of a sliding window clause, if it reads none
   of the start vars and evaluating it again cannot give another value: between
-  the evaluations for one item nothing else runs, so even a variable that a
-  sequential return clause assigns has one value during them. An error raised
+  the evaluations for one item nothing else runs. An error raised
   by the condition is raised by the first of those evaluations in any case, and
   there is no evaluation if no window is open in any case.
 ********************************************************************************/
@@ -1793,7 +1818,9 @@ PlanIter_t gflwor_codegen(flwor_expr& flworExpr, int currentClause)
                               varRefs,
                               *start_clause,
                               *end_clause,
-                              wc->lazyEval() || !window_has_side_effects(flworExpr, wc),
+                              // A sliding window reads its domain as it goes only in a query where
+                              // no side effect can interleave with that reading.
+                              wc->lazyEval() || !theCCB->theMayRunSideEffects,
                               same_end_cond_for_all_windows(wc));
 
     return winIter;
