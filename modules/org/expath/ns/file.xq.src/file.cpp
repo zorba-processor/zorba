@@ -541,7 +541,8 @@ ReadTextFunction::evaluate(
       throw raiseFileError("FOFL0006", e.what(), lEncoding.c_str() );
     }
   }
-  skip_utf8_bom( *pin );
+  if ( !transcoding )
+    skip_utf8_bom( *pin );              // ICU handles the signature of UTF-16
   lResult = module_->getItemFactory()->createStreamableString(
     *pin, &FileModule::streamReleaser, path.c_str(), true
   );
@@ -646,7 +647,7 @@ void ReadTextLinesFunction::LinesItemSequence::LinesIterator::open() {
       theFunc->raiseFileError( "FOFL0006", e.what(), theEncoding.c_str() );
     }
   }
-  if ( lStream->good() )
+  else if ( lStream->good() )
     skip_utf8_bom( *lStream );
   theStream = lStream.release();
 }
@@ -657,10 +658,9 @@ ReadTextLinesFunction::LinesItemSequence::LinesIterator::next(Item& aRes) {
     return false;
 
   std::string s;
-  getline( *theStream, s );
-  if ( theStream->bad() )
+  if ( !get_text_line( *theStream, &s ) )
     return false;
-  
+
   aRes = theFunc->module_->getItemFactory()->createString( s );
   return true;
 }

@@ -161,8 +161,7 @@ FetchContentIterator::nextImpl(
     }
     transcode::attach(*lRes->getStream(), lEncodingStr.c_str());
   }
-
-  if (lRes->isStreamSeekable())
+  else
     skip_utf8_bom(*lRes->getStream());
 
   // return the resource in a streamable string. This transfers memory

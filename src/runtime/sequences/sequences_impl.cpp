@@ -1897,7 +1897,7 @@ static void readDocument(
     }
     transcode::attach(*lStream.get(), aEncoding.c_str());
   }
-  if (lStreamResource->isStreamSeekable())
+  else
     skip_utf8_bom(*lStream);
   //creates stream item
   GENV_ITEMFACTORY->createStreamableString(
@@ -2004,6 +2004,7 @@ bool FnUnparsedTextLinesIterator::nextImpl(store::Item_t& result, PlanState& pla
   store::Item_t encodingItem;
   store::Item_t streamItem;
   zstring streamLine;
+  std::string lLine;
   zstring uriString;
   zstring encodingString("UTF-8");
   zstring lNormUri;
@@ -2054,12 +2055,12 @@ bool FnUnparsedTextLinesIterator::nextImpl(store::Item_t& result, PlanState& pla
       }
       transcode::attach(*state->theStream->get(), encodingString.c_str());
     }
-    if (state->theStreamResource->isStreamSeekable())
+    else
       skip_utf8_bom(**state->theStream);
 
-    while (state->theStream->get()->good())
+    while (get_text_line(**state->theStream, &lLine))
     {
-      getline(*state->theStream->get(), streamLine);
+      streamLine.assign(lLine.data(), lLine.size());
       STACK_PUSH(GENV_ITEMFACTORY->createString(result, streamLine), state);
     }
   }

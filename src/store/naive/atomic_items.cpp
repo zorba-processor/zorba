@@ -2233,10 +2233,12 @@ std::istream& StreamableStringItem::getStream()
     // by Zorba is lost possibly in an internal try/catch of the seekg
     std::streambuf * pbuf;
     pbuf = theIstream->rdbuf();
-    pbuf->pubseekoff(0, std::ios::beg);
+    std::streampos const lPos = pbuf->pubseekoff(0, std::ios::beg);
     theIstream->clear();
-    // A byte order mark is not part of the string.
-    skip_utf8_bom_again(*theIstream);
+    // A byte order mark is not part of the string. Without a seek the stream
+    // is still past the mark, and what follows it is text.
+    if (lPos != std::streampos(std::streamoff(-1)))
+      skip_utf8_bom_again(*theIstream);
   }
   theIsConsumed = true;
   return *theIstream;

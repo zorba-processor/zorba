@@ -19,6 +19,7 @@
 #define ZORBA_API_STREAM_UTIL_H
 
 #include <iostream>
+#include <string>
 
 #include <zorba/config.h>
 
@@ -27,23 +28,38 @@ namespace zorba {
 ///////////////////////////////////////////////////////////////////////////////
 
 /**
- * Skips the UTF-8 byte order mark (BOM), if any, at the start of a seekable
- * istream.  The stream remembers that it had one: see skip_utf8_bom_again().
+ * Skips the UTF-8 byte order mark (BOM), if any, at the current position.  This
+ * also works on a stream that cannot seek, except that a BOM split across two
+ * buffers of the stream stays in it.
  *
  * @param is The istream to read.
+ * @param remember If \c true, the stream remembers that it had a BOM: see
+ * skip_utf8_bom_again().
  * @return Returns \c true only if a BOM was present and skipped.
  */
 ZORBA_DLL_PUBLIC
-bool skip_utf8_bom( std::istream &is );
+bool skip_utf8_bom( std::istream &is, bool remember = true );
 
 /**
- * Skips the BOM that skip_utf8_bom() found, for code that has just sought to
- * the start of the same istream.
+ * Skips the BOM that skip_utf8_bom() remembered, if it is still there, for code
+ * that has just sought to the start of the same istream.
  *
  * @param is The istream, positioned at its start.
  */
 ZORBA_DLL_PUBLIC
 void skip_utf8_bom_again( std::istream &is );
+
+/**
+ * Gets the next line of a text, as F&O defines lines for fn:unparsed-text-lines:
+ * they end with x0A, x0D x0A or x0D, and what follows the last end of line is a
+ * line only if it is not empty.
+ *
+ * @param is The istream to read.
+ * @param line The string to put the line into, without its end.
+ * @return Returns \c true only if there was a line.
+ */
+ZORBA_DLL_PUBLIC
+bool get_text_line( std::istream &is, std::string *line );
 
 /**
  * Reads from the given istream until \a n non-whitespace characters are read
