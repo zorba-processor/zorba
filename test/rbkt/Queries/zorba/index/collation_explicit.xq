@@ -22,6 +22,5 @@ index_ddl:delete(xs:QName("c:hash"));
 index_ddl:delete(xs:QName("c:tree"));
 index_ddl:delete(xs:QName("c:general-hash"));
 index_ddl:delete(xs:QName("c:general-tree"));
-ddl:delete(xs:QName("c:coll"));
 
 $result
