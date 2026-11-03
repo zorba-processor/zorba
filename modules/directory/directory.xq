@@ -369,7 +369,7 @@ declare %private %an:nondeterministic function dir:parse(
     return if ( count( $items ) eq 1 ) then $items else [ $items ]
   case "csv" return
     [ csv:parse( file:read-text( $full ),
-                { "cast-letter-booleans" : false } ) ]
+                { "cast-letter-booleans" : false() } ) ]
   case "html" return
     (: BEGIN-HTML-BRANCH :)
     x:parse-html( file:read-text( $full ) )

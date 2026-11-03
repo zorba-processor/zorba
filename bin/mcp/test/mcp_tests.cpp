@@ -2296,6 +2296,8 @@ void test_cache_counters( Fixture const &f ) {
   check( status == 0 && !bytes.empty() && bytes[0] != '0' &&
          bytes.find_first_not_of( "0123456789" ) == std::string::npos,
          "the counters are one line on stderr at exit", err );
+  check( !contains( err, "ZWST0008" ),
+         "the directory module compiles without a deprecation warning", err );
   check( !contains( out, "hits" ) && !contains( out, "admissions" ) &&
          !contains( out, "bytes_retained" ),
          "the tool responses do not carry the counters", out );
