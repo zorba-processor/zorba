@@ -6,9 +6,9 @@
   raised `JNDY0021`, `csv:parse` and `dir:open` had it in the first key, and the
   string value started with U+FEFF. `file:read-text`, `file:read-text-lines`,
   `fn:unparsed-text`, `fn:unparsed-text-lines` and `fetch:content` now skip the
-  mark, also on a stream that cannot seek such as HTTP, unless the mark is split
-  across two buffers of that stream. Only when the resource is decoded as UTF-8:
-  in `UTF-16LE` and `UTF-16BE` a leading U+FEFF is text. `base64:decode` keeps it.
+  mark. Only when the resource is decoded as UTF-8:
+  in `UTF-16LE` and `UTF-16BE` a leading U+FEFF is text. `base64:decode` keeps it. Over HTTP these functions decode the resource as
+  ISO-8859-1 (existing behavior), so a mark there arrives as three characters.
 - `jn:parse-json` ignores a byte order mark at the start of its input, as
   `fn:parse-json` does in F&O 3.1.
 - `byte-order-mark="yes"`: write the two octets of the mark in the right order for

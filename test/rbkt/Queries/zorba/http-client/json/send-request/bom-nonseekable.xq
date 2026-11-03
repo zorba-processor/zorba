@@ -1,8 +1,8 @@
+import module namespace http = "http://zorba.io/modules/http-client";
 import module namespace fetch = "http://zorba.io/modules/fetch";
 
-(: Over HTTP the stream cannot seek: the mark goes when the resource is read. :)
+(: The string of an HTTP response is a stream that cannot seek. :)
 variable $u := "http://$HTTP_TEST_SERVER/http-test-data/";
-string-to-codepoints(fetch:content(concat($u, "bom.txt")))[1],
-string-to-codepoints(unparsed-text(concat($u, "bom.txt")))[1],
-count(unparsed-text-lines(concat($u, "bom.txt"))),
-jn:members(jn:parse-json(fetch:content(concat($u, "bom-json.txt"))))
+jn:members(jn:parse-json(http:get(concat($u, "bom-json.txt"))("body")("content"))),
+substring(fetch:content(concat($u, "http1.xml")), 1, 1),
+substring(unparsed-text(concat($u, "http1.xml")), 1, 1)
