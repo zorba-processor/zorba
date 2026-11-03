@@ -156,11 +156,13 @@ Peak RSS does not grow with the calls on files of 2 KB: the largest difference b
 
 Six files of about 3 MiB with two slots hold two records, as the table shows; the RSS over no cache is what they account for.
 
+Run 41652889390 (commit 58e5763db, with the tracker's random replacement and the fix of the copy's document URI) repeated `hits`, `turnover`, `delete` and `refused` on 2 KB files and `turnover` on 3 MiB files with the cache. Admissions, evictions and `bytes_retained` of `hits` and `turnover` are the same as in the table; peak RSS at 2 KB stays between 37.1 and 39.3 MiB, within 0.8 MiB between 100 and 10000 calls. On 3 MiB files, HTML goes from 226.2 to 229.0 MiB between 100 and 1000 calls and the others stay within 0.2 MiB. Sessions on 3 MiB files were not run to 10000 calls.
+
 ASan with leak detection covers the same paths in `bin/mcp/cache_turnover`, `cache_invalidate_loop`, `cache_refused_loop` and `cache_session_binary`, for all formats.
 
 ## One large file, kept
 
-Same run. One file of 30 MiB, `--cache-max-file-kb` 61440, five calls of `large.xq` (node or row count, sum, first record). The last response has the same bytes as without a cache in all formats.
+Same run. One file of 30 MiB, `--cache-max-file-kb` 61440, five calls of `large.xq` (node or row count, sum, first record). The last response has the same bytes as without a cache in all formats; run 41652889390 gives the same, with 940 MiB for XML and the other figures unchanged.
 
 | format | peak RSS MiB | hits | misses | admissions | bytes retained |
 |---|---:|---:|---:|---:|---:|
@@ -180,7 +182,7 @@ A hit returns a copy of the record, so that a query sees what it would see readi
 | 10x16KB-json | -40.7% | -37.7% |
 | 10x16KB-csv | -41.5% | -37.6% |
 
-The sections above this one were measured before the copy. Nothing else in the matrix was measured again.
+Run 41652889390 (commit 58e5763db), same setting: 10x16KB-xml -31.9%, -29.0%; 10x16KB-json -45.8%, -42.4%; 10x16KB-csv -47.1%, -41.7%. The sections above this one were measured before the copy. Nothing else in the matrix was measured again.
 
 ## The hit tracker and collisions
 
