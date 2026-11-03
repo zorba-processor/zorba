@@ -1951,7 +1951,7 @@ void test_compact_listing( Fixture const &f ) {
 }
 
 // The listing of the benchmark corpus (bench/agents/data/snapshot): its size is
-// printed, before and after this change, in the test's output.
+// printed and checked.
 void test_corpus_listing( Fixture const &f ) {
   stdfs::path const corpus( stdfs::path( __FILE__ ).parent_path()
     .parent_path().parent_path().parent_path() / "bench" / "agents" / "data" /
@@ -1974,6 +1974,12 @@ void test_corpus_listing( Fixture const &f ) {
   check( all.total() == "21" && all.shown() == "21",
          "the corpus has 21 files", all.text );
   check( weather.total() == "12", "weather has 12 files", weather.text );
+  // The sizes of this listing of the frozen corpus: 4671 and 2629 characters
+  // before (the benchmark's baseline logs have the same two numbers).
+  check( all.text.size() == 3986, "the corpus listing is 3986 characters",
+         std::to_string( all.text.size() ) );
+  check( weather.text.size() == 2574, "the weather listing is 2574 characters",
+         std::to_string( weather.text.size() ) );
   check( !contains( all.text, "features[]" ) && !contains( all.text, "/channel/" ) &&
          !contains( all.text, "metadata." ),
          "the corpus listing has no nested names", all.text );
