@@ -3357,7 +3357,7 @@
     </diagnostic>
 
     <diagnostic code="ZJPE0004" name="ILLEGAL_LITERAL">
-      <value>illegal JSON literal</value>
+      <value>illegal JSON literal: expected true, false or null</value>
     </diagnostic>
 
     <diagnostic code="ZJPE0005" name="ILLEGAL_NUMBER">
@@ -3468,12 +3468,12 @@
 
     <diagnostic code="JNDY0003">
       <comment>It is a dynamic error if two pairs in an object constructor or in a simple object union have the same name.</comment>
-      <value>"$1": pair with the same name already exists in object</value>
+      <value>"$1": duplicate key in object</value>
     </diagnostic>
 
     <diagnostic code="JNTY0004">
       <comment>It is a type error to call fn:data on a sequence containing an array or an object.</comment>
-      <value>can not atomize an $1 item: an $1 has probably been passed where an atomic value is expected (e.g., as a key, or to a function expecting an atomic item)</value>
+      <value>cannot atomize an $1: an atomic value is expected here</value>
     </diagnostic>
 
     <diagnostic code="JNUP0005">
@@ -3544,7 +3544,7 @@
 
     <diagnostic code="JNTY0011">
       <comment>It is a type error if the content sequence in a node constructor or in an XQUF insert or replace update expression contains an object or an array.</comment>
-      <value>JSON item cannot appear in content sequence of node constructor or updating expression</value>
+      <value>object or array cannot appear in the content of a node constructor or updating expression</value>
     </diagnostic>
 
     <diagnostic code="JNSE0012">
@@ -3553,7 +3553,7 @@
       jsoniq-serialization-multiple-items is set to no.
       </comment>
 
-      <value>can not serialize multiple top-level items as JSON</value>
+      <value>cannot serialize multiple top-level items as JSON; wrap them in an array or set the serialization parameter jsoniq-multiple-items to yes</value>
     </diagnostic>
 
     <diagnostic code="JNSE0013">
@@ -3562,7 +3562,7 @@
       the jsoniq-serialization-extensions serialization parameter
       set to false.</comment>
 
-      <value>can not serialize value as JSON: $1</value>
+      <value>cannot serialize value as JSON: $1</value>
     </diagnostic>
 
     <diagnostic code="JNSE0014">
@@ -3594,13 +3594,13 @@
 
     <diagnostic code="JNUP0017">
       <comment> It is a dynamic error if the value in a replace expression is not exactly a single item.</comment>
-      <value>can not replace with less or more than an item</value>
+      <value>replacement value must be exactly one item</value>
     </diagnostic>
 
     <diagnostic code="JNTY0018">
       <comment>It is a dynamic error if there is not exactly one supplied parameter for an object or array selector.</comment>
 
-      <value>object or array selection needs zero or one parameter</value>
+      <value>object or array lookup takes zero or one argument</value>
     </diagnostic>
 
     <diagnostic code="JNUP0019">
@@ -3617,12 +3617,12 @@
 
     <diagnostic code="JNTY0024">
       <comment>objects or arrays don't have a string value</comment>
-      <value>$1 items do not have string value</value>
+      <value>an $1 has no string value</value>
     </diagnostic>
 
     <diagnostic code="JNTY0020">
       <comment>parser error for invalid option type</comment>
-      <value>$1: invalid option type for option $2 (expected $3)</value>
+      <value>"$2" option: $1 given, $3 expected</value>
     </diagnostic>
 
     <diagnostic code="JNTY0021">
@@ -3643,7 +3643,7 @@
         <value>'\\$2': illegal JSON character escape</value>
       </entry>
       <entry key="IllegalLiteral">
-        <value>illegal JSON literal</value>
+        <value>illegal JSON literal: expected true, false or null</value>
       </entry>
       <entry key="IllegalNumber">
         <value>illegal JSON number</value>
