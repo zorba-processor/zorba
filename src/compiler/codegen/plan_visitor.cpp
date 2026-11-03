@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <algorithm>
 #include <iostream>
 #include <sstream>
 #include <list>
@@ -39,6 +40,8 @@
 #include "compiler/expression/expr.h"
 #include "compiler/expression/expr_visitor.h"
 #include "compiler/expression/flwor_expr.h"
+#include "compiler/expression/expr_iter.h"
+#include "compiler/rewriter/tools/expr_tools.h"
 #include "compiler/expression/fo_expr.h"
 #include "compiler/expression/script_exprs.h"
 #include "compiler/expression/json_exprs.h"
@@ -1482,6 +1485,135 @@ bool nativeColumnSort(expr* colExpr)
 }
 
 
+/*******************************************************************************
+  Whether a call to a built-in function gives the same value when evaluated again
+  with the same arguments, and no new node or object among it. Atomic values have
+  no identity, and the listed functions return items they received.
+********************************************************************************/
+static bool is_repeatable_builtin(const function* f, const QueryLoc& loc)
+{
+  if (!f->isBuiltin() ||
+      !f->isDeterministic() ||
+      f->isSequential() ||
+      f->isUpdating() ||
+      expr_tools::function_runs_opaque_code(f))
+    return false;
+
+  switch (f->getKind())
+  {
+  case FunctionConsts::OP_ZORBA_MULTI_OBJECT_LOOKUP_2:
+  case FunctionConsts::OP_ZORBA_SINGLE_OBJECT_LOOKUP_2:
+  case FunctionConsts::OP_ZORBA_MULTI_ARRAY_LOOKUP_2:
+  case FunctionConsts::OP_ZORBA_SINGLE_ARRAY_LOOKUP_2:
+  case FunctionConsts::OP_ZORBA_MEMBERS_1:
+  case FunctionConsts::OP_CONCATENATE_N:
+  case FunctionConsts::FN_HEAD_1:
+  case FunctionConsts::FN_TAIL_1:
+  case FunctionConsts::FN_EXACTLY_ONE_1:
+  case FunctionConsts::FN_ZERO_OR_ONE_1:
+  case FunctionConsts::FN_ONE_OR_MORE_1:
+    return true;
+  default:
+    break;
+  }
+
+  return TypeOps::is_subtype(&GENV_TYPESYSTEM,
+                             *f->getSignature().returnType(),
+                             *GENV_TYPESYSTEM.ANY_ATOMIC_TYPE_STAR,
+                             loc);
+}
+
+
+/*******************************************************************************
+  Whether the value of "e" could change between two evaluations with the same
+  values of its variables, or whether e reads one of the given variables. What
+  repeats is listed, anything else does not: a call to a user or external function,
+  a dynamic call or an eval has a body that is not visible here, a built-in may run
+  a function it receives or return a new node, and a constructor makes a node or
+  object whose identity is new at each evaluation. fn:trace returns item()*, so it
+  is not listed either, and it writes once per window.
+********************************************************************************/
+static bool reads_vars_or_may_vary(
+    const expr* e,
+    const std::vector<const var_expr*>& vars)
+{
+  switch (e->get_expr_kind())
+  {
+  case var_expr_kind:
+    if (std::find(vars.begin(), vars.end(), static_cast<const var_expr*>(e)) !=
+        vars.end())
+      return true;
+    break;
+
+  case fo_expr_kind:
+    if (!is_repeatable_builtin(static_cast<const fo_expr*>(e)->get_func(), e->get_loc()))
+      return true;
+    break;
+
+  case const_expr_kind:
+  case relpath_expr_kind:
+  case axis_step_expr_kind:
+  case match_expr_kind:
+  case flwor_expr_kind:
+  case if_expr_kind:
+  case castable_expr_kind:
+  case cast_expr_kind:
+  case instanceof_expr_kind:
+  case treat_expr_kind:
+  case promote_expr_kind:
+  case name_cast_expr_kind:
+  case order_expr_kind:
+  case wrapper_expr_kind:
+    break;
+
+  default:
+    return true;
+  }
+
+  ExprConstIterator iter(e);
+  while (!iter.done())
+  {
+    const expr* child = iter.get_expr();
+    if (child != NULL && reads_vars_or_may_vary(child, vars))
+      return true;
+
+    iter.next();
+  }
+
+  return false;
+}
+
+
+/*******************************************************************************
+  An end condition whose value depends only on the current item has the same
+  value for every candidate window of a sliding window clause, if it reads none
+  of the start vars and evaluating it again cannot give another value: between
+  the evaluations for one item nothing else runs. An error raised
+  by the condition is raised by the first of those evaluations in any case, and
+  there is no evaluation if no window is open in any case.
+********************************************************************************/
+static bool same_end_cond_for_all_windows(const window_clause* wc)
+{
+  const flwor_wincond* stop = wc->get_win_stop();
+  const flwor_wincond* start = wc->get_win_start();
+
+  if (stop == NULL || start == NULL)
+    return false;
+
+  std::vector<const var_expr*> vars;
+
+  for (const flwor_wincond::vars* v : { &start->get_in_vars(), &start->get_out_vars() })
+  {
+    vars.push_back(v->posvar);
+    vars.push_back(v->curr);
+    vars.push_back(v->prev);
+    vars.push_back(v->next);
+  }
+
+  return !reads_vars_or_may_vary(stop->get_expr(), vars);
+}
+
+
 PlanIter_t gflwor_codegen(flwor_expr& flworExpr, int currentClause)
 {
 #define PREV_ITER gflwor_codegen(flworExpr, currentClause - 1)
@@ -1686,7 +1818,10 @@ PlanIter_t gflwor_codegen(flwor_expr& flworExpr, int currentClause)
                               varRefs,
                               *start_clause,
                               *end_clause,
-                              wc->lazyEval());
+                              // A sliding window reads its domain as it goes only in a query where
+                              // no side effect can interleave with that reading.
+                              wc->lazyEval() || !theCCB->theMayRunSideEffects,
+                              same_end_cond_for_all_windows(wc));
 
     return winIter;
   }
