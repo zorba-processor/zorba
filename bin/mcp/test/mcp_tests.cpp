@@ -2403,12 +2403,6 @@ std::vector<std::string> cache_formats( Fixture const &f ) {
   Server server( f.zorba, config, std::cerr );
   if ( query_text( server, value_query( "probe.html" ) ) == "1" )
     formats.push_back( "html" );
-  // The first XML record of a process can account for 29 bytes that later ones
-  // do not (seen in builds without HTML, where no document is read here). The
-  // tests compare records with each other, so one is built first.
-  t.write( "probe.xml", sized_text( "xml", 1, 100 ) );
-  for ( int read = 0; read < 3; ++read )
-    query_text( server, value_query( "probe.xml" ) );
   return formats;
 }
 
@@ -2434,10 +2428,11 @@ ServerConfig cache_config( std::string const &root, std::size_t kb,
 
 // The memory of \a entries records of the same size. An XML or HTML record holds
 // a generated document URI, with the number of its tree: a few bytes depend on
-// how many documents the process has read. The others take the same to the byte.
+// how many documents the process has read: 4 digits at most between the numbers
+// of these tests. The others take the same to the byte.
 bool same_bytes( std::string const &format, std::size_t got,
                  std::size_t expected, std::size_t entries ) {
-  std::size_t const slack = format == "xml" || format == "html" ? 6 * entries : 0;
+  std::size_t const slack = format == "xml" || format == "html" ? 4 * entries : 0;
   return got + slack >= expected && got <= expected + slack;
 }
 
@@ -3001,7 +2996,7 @@ void overwrite( std::string const &path, std::string const &text ) {
   if ( fd >= 0 ) {
     check( pwrite( fd, text.data(), text.size(), 0 ) ==
            static_cast<ssize_t>( text.size() ), "write" );
-    close( fd );
+    check( close( fd ) == 0, "close after writing" );
   }
 }
 
@@ -3147,6 +3142,7 @@ void test_cache_change_at_once( Fixture const &f ) {
     int const value = round % 8 + 1;
     std::atomic<bool> stop( false );
     std::atomic<int> last( 0 );
+    std::atomic<bool> closed( true );
     std::thread writer( [&]() {
       int const fd = open( path.c_str(), O_WRONLY );
       for ( int i = 0; fd >= 0 && !stop.load(); ++i ) {
@@ -3155,8 +3151,8 @@ void test_cache_change_at_once( Fixture const &f ) {
         if ( pwrite( fd, text.data(), text.size(), 0 ) > 0 )
           last = v;
       }
-      if ( fd >= 0 )
-        close( fd );
+      if ( fd >= 0 && close( fd ) != 0 )
+        closed = false;
     } );
     // Reads against writes of the same size, as close together as they come.
     for ( int i = 0; i < 2; ++i )
@@ -3165,6 +3161,7 @@ void test_cache_change_at_once( Fixture const &f ) {
       std::this_thread::yield();
     stop = true;
     writer.join();
+    check( closed.load(), "the writer closed the file" );
     std::string const expected( std::to_string( last.load() ) );
     std::string const got( open_value( server, "a.json" ) );
     if ( got != expected ) {
@@ -3212,7 +3209,89 @@ void test_cache_change_at_once( Fixture const &f ) {
     check( contains( read, std::to_string( attempt % 8 + 1 ) ),
            "the read of a new file", read );
   }
-  check( true, "reads quick enough to tell: " + std::to_string( told ) );
+
+  // A record held, then a write of the same size at once: the record is replaced
+  // on the next read, every time. The file has been at rest for longer than a
+  // tick of the file clock, so the write gets a new change time.
+  TempTree held;
+  std::string const held_path( held.root + "/a.json" );
+  held.write( "a.json", json_of_size( 1, 40 ) );
+  Server refreshed( f.zorba, cache_config( held.root, 16, 10 ), std::cerr );
+  for ( int round = 0; round < 20; ++round ) {
+    int const old_value = round % 8 + 1;
+    int const new_value = ( round + 1 ) % 8 + 1;
+    DocumentCache::Stats const before = refreshed.cache_stats();
+    changed_files();
+    for ( int read = 0; read < 3; ++read ) {
+      std::string const v( open_value( refreshed, "a.json" ) );
+      check( v == std::to_string( old_value ), "the value of a file at rest", v );
+    }
+    DocumentCache::Stats const kept = refreshed.cache_stats();
+    check( kept.admissions == before.admissions + 1 &&
+           kept.hits > before.hits && kept.entries == 1,
+           "a file at rest is kept and served from the cache",
+           stats_text( kept ) );
+    overwrite( held_path, json_of_size( new_value, 40 ) );
+    std::string const v( open_value( refreshed, "a.json" ) );
+    check( v == std::to_string( new_value ),
+           "the record gives way to a write right after a hit", v );
+    check( refreshed.cache_stats().hits == kept.hits,
+           "that read is not a hit", stats_text( refreshed.cache_stats() ) );
+  }
+}
+
+// A table of first reads full of files read once must not keep out those read
+// repeatedly.
+void test_cache_full_tracker( Fixture const &f ) {
+  TempTree t;
+  std::filesystem::create_directories( t.root + "/once" );
+  std::filesystem::create_directories( t.root + "/often" );
+  int const once = 10000;
+  int const often = 300;
+  for ( int i = 0; i < once; ++i )
+    t.write( "once/" + std::to_string( i ) + ".json", "{ \"v\" : 1 }" );
+  for ( int i = 0; i < often; ++i )
+    t.write( "often/" + numbered( "json", i ), sized_text( "json", i, 100 ) );
+  Server server( f.zorba, cache_config( t.root, 16, 400 ), std::cerr );
+  std::string const first( query_text( server, dir_import +
+    "count(dir:documents(concat($dir:root, \"/once\")))" ) );
+  check( first == std::to_string( once ), "the files read once", first );
+  std::string const scan( dir_import +
+    "count(dir:documents(concat($dir:root, \"/often\")))" );
+  for ( int call = 0; call < 10; ++call ) {
+    std::string const v( query_text( server, scan ) );
+    check( v == std::to_string( often ), "the files read often", v );
+  }
+  DocumentCache::Stats const s = server.cache_stats();
+  check( s.entries == static_cast<std::size_t>( often ) && s.evictions == 0 &&
+         s.admissions == static_cast<std::size_t>( often ),
+         "the files read often have entered", stats_text( s ) );
+}
+
+// File times past what nanoseconds in 64 bits can count (the year 2262).
+void test_cache_far_times( Fixture const &f ) {
+  TempTree t;
+  t.write( "a.json", json_of_size( 1, 40 ) );
+  std::string const path( t.root + "/a.json" );
+  auto set_mtime = [&path]( std::time_t seconds ) {
+    struct timespec const times[2] = { { 0, UTIME_OMIT }, { seconds, 0 } };
+    check( utimensat( AT_FDCWD, path.c_str(), times, 0 ) == 0, "set the time" );
+    changed_files();
+  };
+  set_mtime( 10000000000 );             // the year 2286
+  Server server( f.zorba, cache_config( t.root, 16, 10 ), std::cerr );
+  for ( int read = 0; read < 3; ++read )
+    check( open_value( server, "a.json" ) == "1", "the value of the file" );
+  DocumentCache::Stats s = server.cache_stats();
+  check( s.admissions == 1 && s.hits == 1 && s.entries == 1,
+         "a modification time in the future does not keep a file out",
+         stats_text( s ) );
+  set_mtime( 20000000000 );             // the year 2603
+  overwrite( path, json_of_size( 2, 40 ) );
+  changed_files();
+  check( open_value( server, "a.json" ) == "2", "the file is read again" );
+  s = server.cache_stats();
+  check( s.hits == 1, "that read is not a hit", stats_text( s ) );
 }
 
 // Errors are the same on the first read and on later ones.
@@ -4000,6 +4079,8 @@ Test const tests[] = {
   { "cache_change_detect", test_cache_change_detect },
   { "cache_change_during_read", test_cache_change_during_read },
   { "cache_change_at_once", test_cache_change_at_once },
+  { "cache_full_tracker", test_cache_full_tracker },
+  { "cache_far_times", test_cache_far_times },
   { "cache_error_identical", test_cache_error_identical },
   { "cache_xdm", test_cache_xdm },
   { "cache_xdm_properties", test_cache_xdm_properties },
