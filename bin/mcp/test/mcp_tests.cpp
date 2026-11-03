@@ -40,6 +40,8 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include <libxml/xmlversion.h>
+
 #include <zorba/store_manager.h>
 #include <zorba/zorba.h>
 
@@ -1578,6 +1580,87 @@ void test_case_paths( Fixture const &f ) {
 
 // HTML files a parser has to survive: every one gives a result or an error
 // record, through dir:open, dir:documents and x:parse-html.
+// What comes at the end of an HTML file. Before 2.14, libxml2 hands its text
+// over every 1000 characters, and a piece of blanks with more to come is not
+// blanks to it: after the end of the root it opens a second html element and
+// reports the end of the document with that element open, and a piece that ends
+// the input can leave the end of the document unreported.
+void check_html_end_of_input( Fixture const &f ) {
+  std::string const page( "<html><body><p>7</p></body></html>" );
+  std::string const opened( "<html><body><p>7</p>" );
+  std::string const text( "<html><body><p>" );
+  std::string const blanks( 2000, ' ' );
+  std::string const line_ends( [] {
+    std::string r;
+    for ( int i = 0; i < 1000; ++i )
+      r += "\r\n";
+    return r;
+  }() );
+  std::string const x1000( 1000, 'x' ), x2000( 2000, 'x' );
+  std::string const fine( "no error|1|1|7" );
+#if LIBXML_VERSION >= 21400
+  // Text after the end of the root is a second root.
+  std::string const after_text( "no error|1|2|7tail" );
+  std::string const after_element( "no error|1|2|7d" );
+  // Blanks are text of the html element.
+  std::string const blanks_in_html( "no error|1|1|7" );
+#else
+  // Text after the end of the root is not reported.
+  std::string const after_text( fine );
+  std::string const after_element( fine );
+  // A long run of blanks in the html element is a p element of blanks.
+  std::string const blanks_in_html( "no error|2|1|7" );
+#endif
+  struct { char const *name; std::string content; std::string expected; }
+  const cases[] = {
+    { "blanks-999.html", page + blanks.substr( 0, 999 ), fine },
+    { "blanks-1000.html", page + blanks.substr( 0, 1000 ), fine },
+    { "blanks-1001.html", page + blanks.substr( 0, 1001 ), fine },
+    { "blanks-2000.html", page + blanks, fine },
+    { "line-ends-2000.html", page + line_ends, fine },
+    { "comment-blanks-1000.html",
+      page + "<!-- c -->" + blanks.substr( 0, 1000 ), fine },
+    { "open-blanks-1000.html", opened + blanks.substr( 0, 1000 ), fine },
+    { "open-blanks-2000.html", opened + blanks, fine },
+    { "open-text-1000.html", text + x1000, "no error|1|1|" + x1000 },
+    { "open-text-2000.html", text + x2000, "no error|1|1|" + x2000 },
+    { "text-after.html", page + "tail", after_text },
+    { "blanks-text-after.html", page + blanks.substr( 0, 1001 ) + "tail",
+      after_text },
+    { "element-after.html", page + "<div>d</div>", after_element },
+    { "blanks-element-after.html",
+      page + blanks.substr( 0, 1001 ) + "<div>d</div>", after_element },
+    { "blanks-in-html.html",
+      "<html><body><p>7</p></body>" + blanks + "</html>", blanks_in_html }
+  };
+  TempTree t;
+  for ( auto const &c : cases )
+    t.write( c.name, c.content );
+  ServerConfig config;
+  config.root = t.root;
+  Server server( f.zorba, config, std::cerr );
+  for ( auto const &c : cases ) {
+    Json const r = run_query( server, dir_import +
+      "let $d := dir:open($dir:root, \"" + c.name + "\")\n"
+      "let $c := $d(\"content\")\n"
+      "return string-join((\n"
+      "  if (exists($d(\"error\"))) then $d(\"error\")(\"message\")\n"
+      "  else \"no error\",\n"
+      "  string(count($c//*:p)), string(count($c/*)),\n"
+      "  normalize-space(string($c))), \"|\")" );
+    check( !is_tool_error( r ) && result_text( r ) == "\"" + c.expected + "\"",
+           std::string( c.name ) + ": content and no error record",
+           r.dump().substr( 0, 400 ) );
+    Json const p = run_query( server, dir_import +
+      "import module namespace x = \"http://zorba.io/modules/xml\";\n"
+      "import module namespace file = \"http://expath.org/ns/file\";\n"
+      "count(x:parse-html(file:read-text(concat($dir:root, \"/" +
+      std::string( c.name ) + "\")))//*:p)" );
+    check( !is_tool_error( p ), std::string( c.name ) + ": x:parse-html",
+           p.dump().substr( 0, 400 ) );
+  }
+}
+
 void test_html_edge_cases( Fixture const &f ) {
   TempTree t;
   char const nul[] = "<html>\0<body>a\0b<div \0x=\"\0\">c</div></body></html>";
@@ -1658,6 +1741,9 @@ void test_html_edge_cases( Fixture const &f ) {
   check( !has_parser || contains( result_text( r ), "good.html=ok" ),
          "the good file is not affected", r.dump().substr( 0, 2000 ) );
   check_alive( server );
+
+  if ( has_parser )
+    check_html_end_of_input( f );
 }
 
 
