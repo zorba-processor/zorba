@@ -1906,6 +1906,114 @@ void test_native_import( Fixture const &f ) {
   check_alive( server );
 }
 
+// reflection:eval and reflection:invoke (all variants) run under the same
+// policy as the query that calls them: nothing outside the root is read,
+// nothing is written, no network. random only computes numbers.
+void test_reflection_random( Fixture const &f ) {
+  TempTree t;
+  t.write( "keep.txt", "KEEP" );
+  {
+    std::ofstream out( ( t.base + "/outside/secret.txt" ).c_str() );
+    out << "TOP-SECRET";
+  }
+  ServerConfig config;
+  config.root = t.root;
+  Server server( f.zorba, config, std::cerr );
+  std::string const r( t.root ), o( t.base + "/outside" );
+  std::string const before( snapshot( t.base ) );
+  std::string const imp(
+    "import module namespace refl = \"http://zorba.io/modules/reflection\";\n"
+    "import module namespace rnd = \"http://zorba.io/modules/random\";\n" +
+    file_import );
+
+  // Controls: both modules work.
+  Json res = run_query( server, imp + "refl:eval(\"1 + 1\")" );
+  check( !is_tool_error( res ) && result_text( res ) == "2",
+         "reflection:eval runs a query", res.dump() );
+  res = run_query( server, imp + "refl:invoke(xs:QName(\"fn:concat\"), \"a\", \"b\")" );
+  check( !is_tool_error( res ) && result_text( res ) == "ab",
+         "reflection:invoke calls a function", res.dump() );
+  res = run_query( server, imp + "refl:eval(\"declare variable $x := 1; $x\")" );
+  check( !is_tool_error( res ), "reflection:eval with a prolog", res.dump() );
+
+  // The eval query text, as an XQuery string literal body.
+  std::string const fi(
+    "import module namespace file = 'http://expath.org/ns/file'; " );
+  std::string const inner[] = {
+    "unparsed-text('file://" + o + "/secret.txt')",
+    "doc('file://" + o + "/secret.txt')",
+    fi + "file:read-text('" + o + "/secret.txt')",
+    fi + "file:write-text('" + r + "/new.txt', 'x')",
+    fi + "file:write-text('" + o + "/new.txt', 'x')",
+    fi + "file:delete('" + r + "/keep.txt')",
+    "unparsed-text('http://127.0.0.1:9/a.txt')",
+    "doc('http://127.0.0.1:9/a.xml')",
+    "import module namespace h = 'http://zorba.io/modules/http-client'; 1",
+    "import module namespace s = 'http://zorba.io/modules/sleep'; 1",
+    "put(<a/>, 'file://" + r + "/put.xml')"
+  };
+  for ( char const *const fn : { "eval", "eval-n", "eval-s" } ) {
+    for ( std::string const &q : inner ) {
+      std::string quoted;
+      for ( char c : q )
+        quoted += ( c == '"' ) ? std::string( "\"\"" ) : std::string( 1, c );
+      res = run_query( server, imp + "refl:" + fn + "(\"" + quoted + "\")" );
+      std::string const what( std::string( "reflection:" ) + fn + ": " + q );
+      if ( q.compare( 0, 3, "put" ) != 0 )
+        check( is_tool_error( res ) && !contains( res.dump(), "TOP-SECRET" ),
+               "refused: " + what, res.dump() );
+      check( snapshot( t.base ) == before, "disk unchanged: " + what );
+    }
+  }
+  // The updating variant: refused, or an update that changes nothing.
+  for ( std::string const &q : inner ) {
+    std::string quoted;
+    for ( char c : q )
+      quoted += ( c == '"' ) ? std::string( "\"\"" ) : std::string( 1, c );
+    res = run_query( server, imp + "refl:eval-u(\"" + quoted + "\")" );
+    check( !contains( res.dump(), "TOP-SECRET" ),
+           "eval-u leaks nothing: " + q, res.dump() );
+    check( snapshot( t.base ) == before, "disk unchanged: eval-u " + q );
+  }
+
+  // invoke, invoke-n, invoke-s, invoke-u of the functions that reach the OS.
+  std::string const calls[] = {
+    "xs:QName(\"fn:unparsed-text\"), \"file://" + o + "/secret.txt\"",
+    "xs:QName(\"fn:doc\"), \"file://" + o + "/secret.txt\"",
+    "xs:QName(\"file:read-text\"), \"" + o + "/secret.txt\"",
+    "xs:QName(\"file:write-text\"), \"" + r + "/new.txt\", \"x\"",
+    "xs:QName(\"file:write-text\"), \"" + o + "/new.txt\", \"x\"",
+    "xs:QName(\"file:delete\"), \"" + r + "/keep.txt\"",
+    "xs:QName(\"fn:unparsed-text\"), \"http://127.0.0.1:9/a.txt\"",
+    "xs:QName(\"fn:doc\"), \"http://127.0.0.1:9/a.xml\""
+  };
+  for ( char const *const fn : { "invoke", "invoke-n", "invoke-s" } ) {
+    for ( std::string const &c : calls ) {
+      res = run_query( server, imp + "refl:" + fn + "(" + c + ")" );
+      std::string const what( std::string( "reflection:" ) + fn + ": " + c );
+      check( is_tool_error( res ) && !contains( res.dump(), "TOP-SECRET" ),
+             "refused: " + what, res.dump() );
+      check( snapshot( t.base ) == before, "disk unchanged: " + what );
+    }
+  }
+  for ( std::string const &c : calls ) {
+    res = run_query( server, imp + "refl:invoke-u(" + c + ")" );
+    check( !contains( res.dump(), "TOP-SECRET" ),
+           "invoke-u leaks nothing: " + c, res.dump() );
+    check( snapshot( t.base ) == before, "disk unchanged: invoke-u " + c );
+  }
+
+  // random: every function runs and no file appears or changes.
+  res = run_query( server, imp +
+    "(rnd:random(), rnd:random(3), rnd:seeded-random(1, 2), "
+    "rnd:random-between(1, 10), rnd:random-between(1, 10, 3), "
+    "rnd:seeded-random-between(1, 1, 10, 2), "
+    "rnd:uuid())" );
+  check( !is_tool_error( res ), "random functions run", res.dump() );
+  check( snapshot( t.base ) == before, "disk unchanged: random" );
+  check_alive( server );
+}
+
 struct Test {
   char const *name;
   void (*fn)( Fixture const& );
@@ -1941,7 +2049,8 @@ Test const tests[] = {
   { "language_binary", test_language_binary },
   { "no_write", test_no_write },
   { "read_functions", test_read_functions },
-  { "native_import", test_native_import }
+  { "native_import", test_native_import },
+  { "reflection_random", test_reflection_random }
 };
 
 } // namespace
