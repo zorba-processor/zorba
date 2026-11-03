@@ -6,17 +6,22 @@
   raised `JNDY0021`, `csv:parse` and `dir:open` had it in the first key, and the
   string value started with U+FEFF. `file:read-text`, `file:read-text-lines`,
   `fn:unparsed-text`, `fn:unparsed-text-lines` and `fetch:content` now skip the
-  mark, only when the resource is decoded as UTF-8: in `UTF-16LE` and `UTF-16BE` a leading U+FEFF is text. `base64:decode` keeps it.
-  Over HTTP these functions decode the resource as
-  ISO-8859-1 (existing behavior), so a mark there arrives as three characters.
+  mark, only when the resource is decoded as UTF-8: in `UTF-16LE` and `UTF-16BE`
+  a leading U+FEFF is text. `base64:decode` keeps it. Over HTTP, `fetch:content`
+  and `fn:unparsed-text` decode the resource as ISO-8859-1, so a mark there
+  arrives as three characters.
 - `jn:parse-json` ignores a byte order mark at the start of its input, as
   `fn:parse-json` does in F&O 3.1.
-- `byte-order-mark="yes"`: write the two octets of the mark in the right order for
-  `UTF-16LE` and `UTF-16BE` (it wrote four, swapped), no NUL after the UTF-8 mark,
-  no second mark for `UTF-16`, for `encoding` in any case, and with the `text`
-  method too. `fn:serialize` skips encoding, so its string has no mark.
+- `byte-order-mark="yes"` with the `xml`, `xhtml` and `text` methods and the
+  encodings `UTF-8`, `UTF-16`, `UTF-16LE` and `UTF-16BE`, in any case: write the
+  two octets of the mark in the right order for `UTF-16LE` and `UTF-16BE` (it
+  wrote four, swapped), no NUL after the UTF-8 mark, no second mark for `UTF-16`,
+  and with the `text` method too. `fn:serialize` no longer writes the mark itself;
+  an explicit `encoding` parameter still applies to its string.
 - `fn:unparsed-text-lines` and `file:read-text-lines`: lines also end with x0D, and
   a last empty line does not count, as F&O defines it. An empty file has no lines.
+- `fn:unparsed-text-lines` and `file:read-text-lines` raise `FOUT1190` and
+  `FOFL9999` on octets that cannot be decoded, instead of ending the lines there.
 - The `text` output method and an HTTP request body no longer go back to position 0
   of a streamed string, which brought the mark back.
 - JSON serialization of `-INF` no longer loses the sign.
