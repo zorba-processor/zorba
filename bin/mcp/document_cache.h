@@ -54,7 +54,14 @@ namespace mcp {
  * only that way: a user query cannot hand the cache a record. A record is not
  * kept if it holds an error, if it takes more than \c max_expansion times the
  * size of its file, or if the file changed during the read; the file is then
- * not tried again until it changes.
+ * not tried again until it changes. A file changed less than
+ * \c min_change_age ago is left for a later read: a further write could carry
+ * the same timestamps, and the record would then never be seen to be old.
+ *
+ * What a query gets is its own copy of the record, so that it sees what it
+ * would see reading the file: new nodes on each read, in document order among
+ * the other documents by the moment of the read. Nothing a query does reaches
+ * the record kept here.
  *
  * Eviction: at most \c max_files records stay, least recently used out first.
  * A record that the current query used is not evicted, and a document is then
@@ -84,10 +91,12 @@ public:
    * @param max_files the number of records kept; 0 disables the cache.
    * @param policy the policy the records are read under (read when the
    * first record is built, so it may be set up after construction).
+   * @param base_uri the base URI of the records, the one of the server's
+   * queries.
    */
   DocumentCache( Zorba *zorba, std::string const &root,
                  std::uintmax_t max_file_bytes, std::size_t max_files,
-                 SecurityPolicy const *policy );
+                 SecurityPolicy const *policy, std::string const &base_uri );
   ~DocumentCache();
 
   DocumentCache( DocumentCache const& ) = delete;
@@ -124,16 +133,16 @@ public:
   static std::size_t tracker_bytes();
 
   /**
-   * The record of \a path under \a root (dc:get): the cached record if its
-   * file is unchanged, the record dir:open builds if this read admits the
-   * document, else null (the directory module then reads the file itself).
+   * The record of \a path under \a root (dc:get): a copy of the cached record
+   * if its file is unchanged, the record dir:open builds if this read admits
+   * the document, else null (the directory module then reads the file itself).
    */
   Item get( std::string const &root, std::string const &path );
 
 private:
   struct FileId {
     std::uintmax_t dev = 0, ino = 0, size = 0;
-    std::int64_t mtime_ns = 0, ctime_ns = 0;
+    std::int64_t mtime_sec = 0, mtime_nsec = 0, ctime_sec = 0, ctime_nsec = 0;
     bool operator==( FileId const& ) const = default;
   };
 
@@ -146,8 +155,20 @@ private:
     std::list<std::string>::iterator lru;
   };
 
-  // The hit tracker: one tag per slot, like a direct-mapped CPU cache. 32 KiB.
+  // The hit tracker: 4096 tags in sets of 8, like a set-associative CPU cache,
+  // 32 KiB. A tag takes a free slot of its set; if there is none, it replaces
+  // one chosen at random. Tags of files read once stay until replaced. A choice
+  // that depended on the tag would have two files of a set replace each other
+  // at each read, and never enter, once the set is full.
   static constexpr std::size_t tracker_slots = 4096;
+  static constexpr std::size_t tracker_ways = 8;
+
+  // How long ago a file must have changed for its record to be kept, in
+  // nanoseconds. File times come from a clock that ticks every 1 to 10 ms.
+  // The change time is used because no program can set it. It is compared with
+  // this machine's clock: a file server whose clock is ahead keeps a file out
+  // until this clock passes that time.
+  static constexpr std::int64_t min_change_age = 20000000;
 
   // The memory of a record over the size of its file (at least 1 KiB), above
   // which it is not kept. Measured worst cases at 64 KB, Item::mem_size over
@@ -158,26 +179,34 @@ private:
   static std::uint64_t refused_tag( std::uint64_t tag ) { return tag ^ 1; }
 
   static bool file_id( std::string const &full, FileId *id );
+  static bool changed_just_now( FileId const &id );
   static std::uint64_t tag_of( std::string const &key, FileId const &id );
+  std::uint64_t* tracker_slot( std::uint64_t tag );
+  bool root_key( std::string const &root, std::string *key ) const;
   bool canonical_under_root( std::string const &full,
                              std::string *canonical ) const;
   void erase( std::unordered_map<std::string,Entry>::iterator i );
   Item read( std::string const &root, std::string const &path,
              std::size_t *bytes );
+  Item copy_of( Item const &record );
   Item admit( std::string const &root, std::string const &path,
               std::string const &key, std::string const &full,
               FileId const &id, std::uint64_t *seen );
 
   Zorba *const theZorba;
+  std::string const theGivenRoot;
   std::string theRoot;                  // canonical, with a trailing '/'
+  std::string const theBaseUri;
   std::uintmax_t const theMaxFileBytes;
   std::size_t const theMaxFiles;
   SecurityPolicy const *const thePolicy;
   XQuery_t theReader;                   // dir:open($root, $path)
+  XQuery_t theCopier;                   // a copy of $record
   bool theActive = true;
   std::uint64_t theQuery = 0;           // incremented by set_active()
 
   std::vector<std::uint64_t> theSeen;   // the hit tracker
+  std::uint64_t theVictim = 0x9E3779B97F4A7C15u;  // xorshift64 state
   std::unordered_map<std::string,Entry> theEntries;
   std::list<std::string> theLru;        // most recently used first
   Stats theStats;

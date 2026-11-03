@@ -13,9 +13,18 @@
 # calls. Reports the medians over the runs of call 1 and of the median of the
 # later calls, the highest peak RSS, and the counters of the last run.
 # Writes OUTDIR/results.md and OUTDIR/raw.txt; fails if any query fails.
+#
+# With SOAK set, also runs long sessions and appends them to results.md (see
+# "dirbench soak"). SOAK is a list of
+# FORMATS:SCENARIO:FILES:KB:MAXKB:MAXFILES[:CALLS], with FORMATS separated by
+# commas or "all", and CALLS by commas (default SOAK_CALLS, by spaces). It reports
+# RSS and the counters on exit for each number of calls. LARGE, a list of
+# FORMAT:MIB, checks one file of that size kept by the cache: the last response
+# of a session with the cache has the same bytes as without it.
 set -eu
 ZORBA=$1 MCP=$2 DIRBENCH=$3 WORK=$4 OUT=$5 TREES=$6
 RUNS=${RUNS:-3}
+SOAK_CALLS=${SOAK_CALLS:-100 1000 10000}
 CALLS=${CALLS:-6}
 CACHE=${CACHE:-0:0 16:10 64:10 256:10 64:1000}
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -105,4 +114,98 @@ done
   echo
   cat "$MD"
 } > "$OUT/results.md"
+
+# Long sessions: what stays in memory as the calls go on.
+SOAK_MD=$OUT/soak.md
+if [ -n "${SOAK:-}" ]; then
+  {
+    echo
+    echo "## Long sessions"
+    echo
+    echo "--no-scan --timeout 0. RSS in MiB. KB:files 0:0 is no cache; hits to bytes retained are the counters on exit."
+    echo
+    echo "| format | scenario | files x KB | KB:files | calls | RSS at the end | peak RSS | hits | misses | admissions | evictions | bytes retained | failed |"
+    echo "|---|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|"
+  } > "$SOAK_MD"
+  for spec in $SOAK; do
+    IFS=: read -r formats scenario files kb max_kb max_files only_calls <<EOF_SPEC
+$spec
+EOF_SPEC
+    [ "$formats" = all ] && formats="xml json csv html"
+    for format in $(echo "$formats" | tr , ' '); do
+      for calls in $(echo "${only_calls:-$SOAK_CALLS}" | tr , ' '); do
+        dir=$WORK/soak-$format-$scenario-$max_kb-$max_files-$calls
+        rm -rf "$dir"
+        mkdir -p "$dir"
+        log=$OUT/soak-$format-$scenario-$max_kb-$max_files-$calls
+        if ! (cd "$dir" && "$DIRBENCH" soak "$format" "$scenario" "$files" "$kb" \
+              "$calls" "$log.json" -- "$MCP" --root "$dir" --timeout 0 --no-scan \
+              --cache-max-file-kb "$max_kb" --cache-max-files "$max_files") \
+             > "$log.txt" 2> "$log.log"; then
+          echo "soak $format $scenario $max_kb:$max_files $calls: the session failed:" >&2
+          tail -n 5 "$log.txt" "$log.log" >&2
+          exit 1
+        fi
+        set -- $(tail -n 1 "$log.txt")
+        echo "soak $format $scenario $files $kb $max_kb:$max_files $(tr '\n' ';' < "$log.txt") $(grep 'zorba-mcp: cache:' "$log.log" | cut -d' ' -f3- || true)" >> "$RAW"
+        echo "| $format | $scenario | ${files}x$kb | $max_kb:$max_files | $1 | $(awk -v k="$2" 'BEGIN { printf "%.1f", k / 1024 }') | $(awk -v k="$3" 'BEGIN { printf "%.1f", k / 1024 }') | $(counter hits "$log.log") | $(counter misses "$log.log") | $(counter admissions "$log.log") | $(counter evictions "$log.log") | $(counter bytes_retained "$log.log") | $4 |" >> "$SOAK_MD"
+        rm -rf "$dir"
+      done
+    done
+  done
+  cat "$SOAK_MD" >> "$OUT/results.md"
+fi
+
+# One large file: the cache gives the bytes that the file gives.
+if [ -n "${LARGE:-}" ]; then
+  {
+    echo
+    echo "## One large file, kept"
+    echo
+    echo "Five calls of a query over the whole content."
+    echo
+    echo "| format | MiB | KB:files | peak RSS MiB | hits | misses | admissions | bytes retained | same bytes as no cache |"
+    echo "|---|---:|---|---:|---:|---:|---:|---:|---|"
+  } >> "$OUT/results.md"
+  for spec in $LARGE; do
+    format=${spec%:*} mib=${spec#*:}
+    dir=$WORK/large-$format
+    rm -rf "$dir"
+    mkdir -p "$dir"
+    if [ "$format" = html ]; then
+      awk -v n="$((mib * 45000))" 'BEGIN { print "<html><body>"
+        for ( i = 0; i < n; ++i ) print "<p class=\"c1\">" i " text</p>"
+        print "</body></html>" }' > "$dir/f.html"
+    else
+      "$ZORBA" -f -q "$HERE/gen_tree.xq" -e "out:=$dir" -e "files:=1" \
+        -e "kb:=$((mib * 1024))" -e "formats:=$format" > /dev/null
+    fi
+    q=$HERE/large.xq
+    max_kb=$((mib * 2048))
+    base=$OUT/large-$format-off
+    "$DIRBENCH" mcp 5 "$q" "$base.json" -- "$MCP" --root "$dir" --timeout 0 \
+      --no-scan --cache-max-file-kb 0 > "$base.txt" 2> "$base.log"
+    log=$OUT/large-$format-on
+    "$DIRBENCH" mcp 5 "$q" "$log.json" -- "$MCP" --root "$dir" --timeout 0 \
+      --no-scan --cache-max-file-kb "$max_kb" --cache-max-files 10 \
+      > "$log.txt" 2> "$log.log"
+    for f in "$base" "$log"; do
+      set -- $(sed -n 2p "$f.txt")
+      if [ "$2" -ne 0 ]; then
+        echo "large $format: $2 failed calls" >&2
+        cat "$f.json" "$f.log" >&2
+        exit 1
+      fi
+    done
+    same=no
+    cmp -s "$base.json" "$log.json" && same=yes
+    set -- $(sed -n 2p "$log.txt")
+    echo "| $format | $mib | $max_kb:10 | $(awk -v k="$1" 'BEGIN { printf "%.0f", k / 1024 }') | $(counter hits "$log.log") | $(counter misses "$log.log") | $(counter admissions "$log.log") | $(counter bytes_retained "$log.log") | $same |" >> "$OUT/results.md"
+    rm -rf "$dir"
+    if [ "$same" != yes ]; then
+      echo "large $format: another result with the cache" >&2
+      exit 1
+    fi
+  done
+fi
 cat "$OUT/results.md"

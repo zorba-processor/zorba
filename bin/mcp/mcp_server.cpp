@@ -174,6 +174,11 @@ std::string percent_encode_path( std::string const &path ) {
   return out;
 }
 
+// The base URI of the queries, and of what the directory module parses for them.
+std::string base_uri_of( std::string const &root ) {
+  return "file://" + percent_encode_path( root ) + "/";
+}
+
 // Line n (1-based) of a text, or the empty string.
 std::string source_line( std::string const &source, unsigned long n ) {
   std::istringstream in( source );
@@ -329,7 +334,7 @@ Server::Server( Zorba *zorba, ServerConfig config, std::ostream &log ) :
   thePolicy( SecurityPolicy::secure() ),
   theCache( zorba, theConfig.root,
             std::uintmax_t( theConfig.cache_max_file_kb ) * 1024,
-            theConfig.cache_max_files, &thePolicy ) {
+            theConfig.cache_max_files, &thePolicy, base_uri_of( theConfig.root ) ) {
   directory_config::apply_policy( thePolicy, theConfig.root );
   if ( theConfig.timeout.count() > 0 )
     thePolicy.setTimeout( theConfig.timeout );
@@ -572,7 +577,7 @@ Server::run( std::string const &source, std::string const &file_name,
   try {
     StaticContext_t sctx = new_static_context( file_name );
     // Relative URIs, e.g. doc("orders/q1.xml"), resolve against the root.
-    sctx->setBaseURI( "file://" + percent_encode_path( theConfig.root ) + "/" );
+    sctx->setBaseURI( base_uri_of( theConfig.root ) );
     theCache.attach( sctx );
     // An implementation may add predeclared namespace prefixes (XQuery 3.0,
     // 4.13); a query can still bind this one to something else.
