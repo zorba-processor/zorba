@@ -462,10 +462,11 @@ Json Server::tools() const {
       { "name", "list_documents" },
       { "title", "List documents" },
       { "description",
-        "Lists files, recursive, sorted by path, with format, size, fields. "
+        "Lists files, recursive, sorted by path, with format, size, top-level "
+        "fields. "
         "First line: scan state, totals, dirs (subdirectories, if cut or "
         "scanning), incomplete (may miss files). memory_limit: scan stopped; "
-        "ask by path. A file as path adds a preview." },
+        "ask by path. A file as path gives its preview: nested fields, samples." },
       { "inputSchema", Json::object( {
           { "type", "object" },
           { "properties", Json::object( {

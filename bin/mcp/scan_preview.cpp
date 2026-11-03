@@ -476,7 +476,6 @@ public:
     member( out, "shape", json_quoted( shape ) );
 
     std::string keys( "{" );
-    std::vector<std::string> names;
     for ( Key const &k : theKeys ) {
       if ( keys.size() > 1 )
         keys += ',';
@@ -488,7 +487,6 @@ public:
         keys += k.samples[i];
       }
       keys += ']';
-      names.push_back( k.path );
     }
     member( out, "keys", keys + "}" );
     if ( theMoreKeys )
@@ -510,7 +508,7 @@ public:
 
     ScanPreview result;
     result.json = std::move( out );
-    result.fields = fields_members( names, theMoreKeys );
+    result.fields = fields_members( theTop, theMoreTop );
     return result;
   }
 
@@ -519,6 +517,20 @@ private:
     std::string path;
     std::vector<std::string> samples;
   };
+
+  // The names a listing shows: the members of the first top-level object, or of
+  // the first object in a top-level array. Nothing nested.
+  void add_top( std::string const &name, std::size_t depth ) {
+    if ( theNotFirst > 0 || depth > ( theTopArray ? 1 : 0 ) )
+      return;
+    if ( std::find( theTop.begin(), theTop.end(), name ) != theTop.end() )
+      return;
+    if ( theTop.size() >= max_fields || name.size() > max_name_bytes ) {
+      theMoreTop = true;
+      return;
+    }
+    theTop.push_back( name );
+  }
 
   bool cut() {
     if ( theTruncated ) {
@@ -765,6 +777,7 @@ private:
       if ( base )
         path += '.';
       path += short_text( key, max_value_bytes );
+      add_top( short_text( key, max_value_bytes ), depth );
       bool const ok = value( path, depth + 1 );
       path.resize( base );
       if ( !ok )
@@ -826,6 +839,7 @@ private:
       path.resize( base );
     }
     if ( depth == 0 ) {
+      theTopArray = true;
       theTopLength = length;
     } else if ( theNotFirst == 0 && theArrays.size() < max_arrays &&
                 path.size() <= max_name_bytes &&
@@ -850,6 +864,9 @@ private:
   std::vector<Key> theKeys;
   std::unordered_map<std::string,std::size_t> theKeyIndex;
   bool theMoreKeys = false;
+  std::vector<std::string> theTop;      // for the listing
+  bool theMoreTop = false;
+  bool theTopArray = false;             // the first top-level value is an array
   std::size_t theBytes = 0;
   std::vector<std::pair<std::string,std::size_t> > theArrays;
 };
@@ -1243,7 +1260,12 @@ ScanPreview xml_preview( std::string const &data, bool truncated,
   }
   finish( out, truncated, !error.empty(), records, error );
   result.json = std::move( out );
-  result.fields = fields_members( paths, more_paths );
+  // A listing names the root and what it holds directly, not what is below.
+  std::vector<std::string> top;
+  for ( std::string const &path : paths )
+    if ( std::count( path.begin(), path.end(), '/' ) <= 2 )
+      top.push_back( path );
+  result.fields = fields_members( top, more_paths );
   return result;
 }
 
