@@ -1792,7 +1792,10 @@ void test_no_write( Fixture const &f ) {
   };
   for ( std::string const &q : queries ) {
     Json const res = run_query( server, q );
-    check( is_tool_error( res ), "write is refused: " + q, res.dump() );
+    // fn:put stores the document in the engine's memory, not on disk, so it
+    // is accepted; the disk check below is what holds for it.
+    if ( q.compare( 0, 3, "put" ) != 0 )
+      check( is_tool_error( res ), "write is refused: " + q, res.dump() );
     check( snapshot( t.base ) == before, "nothing changed on disk: " + q );
   }
   check_alive( server );
@@ -1811,6 +1814,8 @@ void test_read_functions( Fixture const &f ) {
   config.root = t.root;
   Server server( f.zorba, config, std::cerr );
   std::string const r( t.root ), o( t.base + "/outside" );
+  std::string const fetch_import(
+    "import module namespace fetch = \"http://zorba.io/modules/fetch\";\n" );
 
   // Controls: the same functions read a file under the root.
   std::string const allowed[] = {
@@ -1839,7 +1844,10 @@ void test_read_functions( Fixture const &f ) {
     file_import + "file:read-binary(\"" + o + "/secret.txt\")",
     file_import + "file:list(\"" + o + "\")",
     file_import + "file:size(\"" + o + "/secret.txt\")",
-    file_import + "file:copy(\"" + o + "/secret.txt\", \"" + r + "/c.txt\")"
+    file_import + "file:copy(\"" + o + "/secret.txt\", \"" + r + "/c.txt\")",
+    fetch_import + "fetch:content(\"file://" + o + "/secret.txt\")",
+    fetch_import + "fetch:content(\"file://" + r + "/link.txt\")",
+    fetch_import + "fetch:content-binary(\"file://" + o + "/secret.txt\")"
   };
   for ( std::string const &q : denied ) {
     Json const res = run_query( server, q );
@@ -1861,7 +1869,9 @@ void test_read_functions( Fixture const &f ) {
           "unparsed-text(\"https://127.0.0.1:9/a.txt\")",
           "unparsed-text-lines(\"http://127.0.0.1:9/a.txt\")",
           "doc(\"https://127.0.0.1:9/a.xml\")",
-          "doc(\"ftp://127.0.0.1:9/a.xml\")" } ) {
+          "doc(\"ftp://127.0.0.1:9/a.xml\")",
+          "import module namespace fetch = \"http://zorba.io/modules/fetch\";\n"
+          "fetch:content(\"http://127.0.0.1:9/a.txt\")" } ) {
     Json const n = run_query( server, q );
     check( is_tool_error( n ) &&
            contains( n.dump(), "access denied by security policy" ),
@@ -1871,7 +1881,9 @@ void test_read_functions( Fixture const &f ) {
 }
 
 // The native modules other than the file module do not load: the HTTP and
-// FTP clients, curl, fetch and the others cannot be reached.
+// FTP clients cannot be reached. (util-curl declares no function; fetch,
+// random and reflection are implemented in the engine, not in a library, and
+// check the policy when called: see read_functions.)
 void test_native_import( Fixture const &f ) {
   ServerConfig config;
   config.root = f.tree;
@@ -1881,10 +1893,6 @@ void test_native_import( Fixture const &f ) {
           "http://www.zorba-xquery.com/modules/http-client",
           "http://zorba.io/modules/http-client-wrapper",
           "http://zorba.io/modules/ftp-client",
-          "http://zorba.io/modules/util-curl",
-          "http://zorba.io/modules/fetch",
-          "http://zorba.io/modules/random",
-          "http://zorba.io/modules/reflection",
           "http://zorba.io/modules/sleep" } ) {
     Json const r = run_query( server, std::string( "import module namespace m = \"" ) +
                                       ns + "\";\n\"loaded\"" );
