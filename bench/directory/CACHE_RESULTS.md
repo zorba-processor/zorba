@@ -184,6 +184,19 @@ The sections above this one were measured before the copy. Nothing else in the m
 
 ## The hit tracker and collisions
 
-Before run 41622009308 the tracker had one tag per slot. Two files in a slot replace each other at each read and never enter. With tags that behave as uniform, a file is alone in its slot with probability (1 - 1/4096)^(n-1): 783.5 of 1000 expected, against 754 to 804 measured (runs 41547644611, 41567671862). For ten files, one pair collides in 1.09% of trees; tree 10x64KB-csv-fields in run 41497878541 admitted 8 of 10 in all its sessions, while the same shape admitted 10 in run 41494352367. At 100 files 70% of trees lose at least one pair. A simulation of the hash over the paths and metadata of generated trees gives the same figures as the formula.
+Before run 41622009308 the tracker had one tag per slot. Two files in a slot replace each other at each read and never enter. With tags that behave as uniform, a file is alone in its slot with probability (1 - 1/4096)^(n-1): 783.5 of 1000 expected, against 754 to 804 measured (runs 41547644611, 41567671862). For ten files, one pair collides in 1.09% of trees; tree 10x64KB-csv-fields in run 41497878541 admitted 8 of 10 in all its sessions, while the same shape admitted 10 in run 41494352367. At 100 files 70% of trees lose at least one pair.
 
-It is now 4096 tags in sets of 8, the same 32 KiB. In the same simulation, of repeated scans: 100 and 1000 files all enter in all trees, 4096 files 4085 on average, 10000 files 5310 (with one tag per slot: 1509 and 866). The "778-804 of 1000" above predates this.
+It is now 4096 tags in sets of 8, the same 32 KiB, and a tag finding its set full replaces one chosen at random. Tags of files read once stay until replaced. A choice fixed by the tag, tried first, had two files of a full set replace each other forever.
+
+A simulation with random tags, 50 scans, 200 trees (60 for the largest), files that never entered, on average and in how many trees:
+
+| files read once, then files scanned | choice fixed by the tag | chosen at random |
+|---|---:|---:|
+| 0, 1000 | 0, 0% | 0, 0% |
+| 0, 4096 | 75.7, 98% | 0, 0% |
+| 0, 10000 | 7160, 100% | 3030, 100% |
+| 3000, 100 | 3.0, 78.5% | 0, 0% |
+| 10000, 300 | 15.6, 99.5% | 0, 0% |
+| 20000, 1000 | 28.8, 100% | 0, 0% |
+
+At random, in 10000 then 300, 24 files on average are still out after the second scan and none after the fourth. With far more files than tags, as in 0 then 10000, many stay out. On Actions, `bin/mcp/cache_slack_many` and `cache_full_tracker` cover 100 and 300 files. The "778-804 of 1000" above predates this.

@@ -2349,7 +2349,7 @@ void test_cache_counters( Fixture const &f ) {
   for ( char const *text : { "--cache-max-file-kb <KB>", "--cache-max-files <N>",
                              "second read", "device, inode, size, mtime and ctime",
                              "records with an", "128 times", "sequential queries",
-                             "changed in the last 20 ms", "its own copy",
+                             "changed in the last 20 ms", "its own copy", "with its clock ahead",
                              "least recently used", "does not evict",
                              "the document cache: it holds previews" } )
     check( contains( err, text ), std::string( "--help says: " ) + text, err );

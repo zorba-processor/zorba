@@ -142,7 +142,7 @@ public:
 private:
   struct FileId {
     std::uintmax_t dev = 0, ino = 0, size = 0;
-    std::int64_t mtime_ns = 0, ctime_ns = 0;
+    std::int64_t mtime_sec = 0, mtime_nsec = 0, ctime_sec = 0, ctime_nsec = 0;
     bool operator==( FileId const& ) const = default;
   };
 
@@ -157,14 +157,17 @@ private:
 
   // The hit tracker: 4096 tags in sets of 8, like a set-associative CPU cache,
   // 32 KiB. A tag takes a free slot of its set; if there is none, it replaces
-  // the tag in the slot its hash selects. With one tag per slot, two files of
-  // the same slot would replace each other at each read and never enter.
+  // one chosen at random. Tags of files read once stay until replaced. A choice
+  // that depended on the tag would have two files of a set replace each other
+  // at each read, and never enter, once the set is full.
   static constexpr std::size_t tracker_slots = 4096;
   static constexpr std::size_t tracker_ways = 8;
 
   // How long ago a file must have changed for its record to be kept, in
   // nanoseconds. File times come from a clock that ticks every 1 to 10 ms.
-  // The change time is used because no program can set it.
+  // The change time is used because no program can set it. It is compared with
+  // this machine's clock: a file server whose clock is ahead keeps a file out
+  // until this clock passes that time.
   static constexpr std::int64_t min_change_age = 20000000;
 
   // The memory of a record over the size of its file (at least 1 KiB), above
@@ -176,6 +179,7 @@ private:
   static std::uint64_t refused_tag( std::uint64_t tag ) { return tag ^ 1; }
 
   static bool file_id( std::string const &full, FileId *id );
+  static bool changed_just_now( FileId const &id );
   static std::uint64_t tag_of( std::string const &key, FileId const &id );
   std::uint64_t* tracker_slot( std::uint64_t tag );
   bool root_key( std::string const &root, std::string *key ) const;
@@ -202,6 +206,7 @@ private:
   std::uint64_t theQuery = 0;           // incremented by set_active()
 
   std::vector<std::uint64_t> theSeen;   // the hit tracker
+  std::uint64_t theVictim = 0x9E3779B97F4A7C15u;  // xorshift64 state
   std::unordered_map<std::string,Entry> theEntries;
   std::list<std::string> theLru;        // most recently used first
   Stats theStats;

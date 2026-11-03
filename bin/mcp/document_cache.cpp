@@ -84,10 +84,6 @@ std::string string_arg( ExternalFunction::Arguments_t const &args,
   return item.isNull() ? std::string() : item.getStringValue().str();
 }
 
-std::int64_t nanoseconds( struct timespec const &t ) {
-  return static_cast<std::int64_t>( t.tv_sec ) * 1000000000 + t.tv_nsec;
-}
-
 } // namespace
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -154,13 +150,31 @@ bool DocumentCache::file_id( std::string const &full, FileId *id ) {
   id->ino = static_cast<std::uintmax_t>( st.st_ino );
   id->size = static_cast<std::uintmax_t>( st.st_size );
 #ifdef __APPLE__
-  id->mtime_ns = nanoseconds( st.st_mtimespec );
-  id->ctime_ns = nanoseconds( st.st_ctimespec );
+  struct timespec const &modified = st.st_mtimespec, &changed = st.st_ctimespec;
 #else
-  id->mtime_ns = nanoseconds( st.st_mtim );
-  id->ctime_ns = nanoseconds( st.st_ctim );
+  struct timespec const &modified = st.st_mtim, &changed = st.st_ctim;
 #endif
+  id->mtime_sec = modified.tv_sec;
+  id->mtime_nsec = modified.tv_nsec;
+  id->ctime_sec = changed.tv_sec;
+  id->ctime_nsec = changed.tv_nsec;
   return true;
+}
+
+// Whether the change time is less than min_change_age ago, or ahead of this
+// machine's clock. No arithmetic on whole times: they can be far off.
+bool DocumentCache::changed_just_now( FileId const &id ) {
+  struct timespec now;
+  if ( clock_gettime( CLOCK_REALTIME, &now ) != 0 )
+    return true;
+  std::int64_t const now_sec = now.tv_sec;
+  if ( id.ctime_sec > now_sec )
+    return true;
+  if ( id.ctime_sec < now_sec - 1 )
+    return false;
+  std::int64_t const age = ( now_sec - id.ctime_sec ) * 1000000000 +
+    ( now.tv_nsec - id.ctime_nsec );
+  return age < min_change_age;
 }
 
 // FNV-1a over the key and the metadata. A collision at worst admits a
@@ -176,8 +190,10 @@ std::uint64_t DocumentCache::tag_of( std::string const &key, FileId const &id ) 
   mix( &id.dev, sizeof id.dev );
   mix( &id.ino, sizeof id.ino );
   mix( &id.size, sizeof id.size );
-  mix( &id.mtime_ns, sizeof id.mtime_ns );
-  mix( &id.ctime_ns, sizeof id.ctime_ns );
+  mix( &id.mtime_sec, sizeof id.mtime_sec );
+  mix( &id.mtime_nsec, sizeof id.mtime_nsec );
+  mix( &id.ctime_sec, sizeof id.ctime_sec );
+  mix( &id.ctime_nsec, sizeof id.ctime_nsec );
   return h ? h : 1;                     // 0 marks an empty slot
 }
 
@@ -301,7 +317,12 @@ std::uint64_t* DocumentCache::tracker_slot( std::uint64_t tag ) {
     if ( !set[way] && !empty )
       empty = &set[way];
   }
-  return empty ? empty : &set[ ( tag >> 32 ) % tracker_ways ];
+  if ( empty )
+    return empty;
+  theVictim ^= theVictim << 13;
+  theVictim ^= theVictim >> 7;
+  theVictim ^= theVictim << 17;
+  return &set[ theVictim >> 61 ];       // the high bits: tracker_ways is 8
 }
 
 void DocumentCache::erase( std::unordered_map<std::string,Entry>::iterator i ) {
@@ -367,9 +388,7 @@ Item DocumentCache::admit( std::string const &root, std::string const &path,
 
   // Changed a moment ago: a write now could leave the same timestamps. The
   // next read tries again.
-  struct timespec now_time;
-  if ( clock_gettime( CLOCK_REALTIME, &now_time ) != 0 ||
-       nanoseconds( now_time ) - id.ctime_ns < min_change_age )
+  if ( changed_just_now( id ) )
     return Item();
 
   std::string canonical;
@@ -413,8 +432,9 @@ Item DocumentCache::admit( std::string const &root, std::string const &path,
   return copy_of( record );
 }
 
-// Null if there is no copy (the time limit, for one): the directory module
-// then reads the file itself and reports what happens.
+// Null if the engine reports an error, as when it runs out of memory; the query
+// has no policy, so no time limit stops it. The directory module then reads the
+// file itself and reports what happens.
 Item DocumentCache::copy_of( Item const &record ) {
   try {
     if ( !theCopier ) {

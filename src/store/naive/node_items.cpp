@@ -1999,12 +1999,16 @@ XmlNode* DocumentNode::copyInternal(
     tree = NodeFactory::instance().createXmlTree();
 
     // A generated document URI names one tree: the copy gets its own.
-    zstring docUri(theDocUri);
-    if (std::strncmp(docUri.c_str(), "zorba://internalDocumentURI-", 28) == 0)
+    zstring docUri;
+    if (std::strncmp(theDocUri.c_str(), "zorba://internalDocumentURI-", 28) == 0)
     {
       std::ostringstream uristream;
       uristream << "zorba://internalDocumentURI-" << tree->getTreeId();
       docUri = uristream.str();
+    }
+    else
+    {
+      docUri = theDocUri;
     }
 
     copyNode = NodeFactory::instance().createDocumentNode(tree, theBaseUri, docUri);
