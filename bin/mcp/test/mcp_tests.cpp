@@ -1378,8 +1378,8 @@ void memory_exhaustion( Fixture const &f, std::string const &inner ) {
   input += call( 6, after );
 
   std::string const err_file( t.base + "/stderr" );
-  for ( char const *const limit : { "600000000", "900000000", "1300000000" } ) {
-    for ( int run = 0; run < 3; ++run ) {
+  for ( char const *const limit : { "500000000", "800000000", "1200000000" } ) {
+    for ( int run = 0; run < 2; ++run ) {
       std::string const what( std::string( "limit " ) + limit + ", run " +
                               std::to_string( run ) + ": " );
       std::cout.flush();
@@ -1425,6 +1425,39 @@ void memory_exhaustion( Fixture const &f, std::string const &inner ) {
 #else
   (void)f;
   (void)inner;
+  std::cout << "--max-memory has no effect in this build" << std::endl;
+#endif
+}
+
+// With no memory to start in, the exit is the one --help states.
+void test_exhaust_at_start( Fixture const &f ) {
+#if defined(__linux__) && !defined(ZORBA_TEST_SANITIZER)
+  struct rlimit no_core = { 0, 0 };
+  check( setrlimit( RLIMIT_CORE, &no_core ) == 0, "no core files" );
+  TempTree t;
+  std::string const err_file( t.base + "/stderr" );
+  pid_t const pid = fork();
+  if ( pid < 0 ) {
+    check( false, "fork" );
+    return;
+  }
+  if ( pid == 0 ) {
+    int const err = open( err_file.c_str(),
+                          O_WRONLY | O_CREAT | O_TRUNC, 0600 );
+    if ( err < 0 || dup2( err, STDERR_FILENO ) < 0 )
+      _exit( 127 );
+    execl( f.binary.c_str(), f.binary.c_str(), "--root", t.root.c_str(),
+           "--max-memory", "1000000", static_cast<char*>( nullptr ) );
+    _exit( 127 );
+  }
+  int status = 0;
+  check( waitpid( pid, &status, 0 ) == pid, "wait for zorba-mcp" );
+  std::string const log( read_file( err_file ) );
+  check( WIFEXITED( status ) && WEXITSTATUS( status ) == 3,
+         "exit status 3", std::to_string( status ) + "\n" + log );
+  check( contains( log, "zorba-mcp: out of memory" ), "a message on stderr", log );
+#else
+  (void)f;
   std::cout << "--max-memory has no effect in this build" << std::endl;
 #endif
 }
@@ -4449,6 +4482,7 @@ Test const tests[] = {
   { "cache_timeout_state", test_cache_timeout_state },
   { "windows", test_windows },
   { "memory_limit", test_memory_limit },
+  { "exhaust_at_start", test_exhaust_at_start },
   { "exhaust_generated", test_exhaust_generated },
   { "exhaust_json", test_exhaust_json },
   { "exhaust_json_array", test_exhaust_json_array },

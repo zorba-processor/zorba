@@ -455,7 +455,7 @@ IF (ZORBA_WITH_FILE_ACCESS)
              optional_params documents_stream hints_jsoniq hints_dash
              hints_nodes hints_names deep_json deep_json_binary
              entity_expansion case_paths html_edge_cases memory_limit
-             exhaust_generated exhaust_json exhaust_json_array exhaust_csv
+             exhaust_at_start exhaust_generated exhaust_json exhaust_json_array exhaust_csv
              exhaust_xml exhaust_strings exhaust_numbers exhaust_injected language
              language_binary no_write read_functions native_import reflection_random
              cache_hit cache_invalidate cache_evict cache_off cache_policy
@@ -481,6 +481,20 @@ IF (ZORBA_WITH_FILE_ACCESS)
       COMMAND "$<TARGET_FILE:zorba_mcp${_mcp_suffix}>" --help)
     SET_TESTS_PROPERTIES (bin/mcp/language_help PROPERTIES
       PASS_REGULAR_EXPRESSION "A [.]jq\n *file is JSONiq unless it declares xquery version;\n *[.]xq files are not loaded.*in this order: [(]1[)] a jsoniq\n *version or xquery version declaration at the very\n *start of the query [(]one preceded by a comment is\n *not detected[)]; [(]2[)] for a file, its extension [(][.]jq\n *is JSONiq[)]; [(]3[)] this option")
+
+    # The queries of these tests take most of the address-space limit: one at a
+    # time, and with time for the session after each of them.
+    FOREACH (_t exhaust_generated exhaust_json exhaust_json_array exhaust_csv
+                exhaust_xml exhaust_strings exhaust_numbers exhaust_injected)
+      SET_TESTS_PROPERTIES (bin/mcp/${_t} PROPERTIES
+        RESOURCE_LOCK mcp_memory_exhaustion TIMEOUT 400)
+    ENDFOREACH (_t)
+
+    # The help states what happens when memory runs out.
+    ADD_TEST (NAME bin/mcp/max_memory_help
+      COMMAND "$<TARGET_FILE:zorba_mcp${_mcp_suffix}>" --help)
+    SET_TESTS_PROPERTIES (bin/mcp/max_memory_help PROPERTIES
+      PASS_REGULAR_EXPRESSION "fails with the tool error memory_limit, and the\n *server answers the next call[.] If memory runs out\n *where that cannot be done, for example while the\n *server starts, it exits with status 3 and a message\n *on stderr, with no response to the call")
 
     # A --language value other than xquery and jsoniq is refused.
     ADD_TEST (NAME bin/mcp/language_invalid
