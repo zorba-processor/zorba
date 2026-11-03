@@ -24,6 +24,7 @@ namespace query_hints {
 namespace {
 
 char const use_jsoniq[] = "start the query with jsoniq version \"1.0\";";
+char const math_ns[] = "http://www.w3.org/2005/xpath-functions/math";
 
 bool is_name_char( char c ) {
   return ( c >= 'a' && c <= 'z' ) || ( c >= 'A' && c <= 'Z' ) ||
@@ -68,17 +69,21 @@ std::string word_before( std::string const &query, std::size_t end ) {
 // "$a2-$a1": the scanner reads the name "a2-", and the error is at "$a1".
 std::string dash_before_variable( std::string const &query,
                                   std::size_t offset ) {
-  if ( offset < 2 || query[ offset - 1 ] != '-' )
+  std::size_t dash = offset;              // "$a2- $a1" is the same mistake
+  while ( dash && is_space( query[ dash - 1 ] ) )
+    --dash;
+  if ( dash < 2 || query[ dash - 1 ] != '-' )
     return std::string();
+  --dash;
 
-  std::size_t begin = offset - 1;
+  std::size_t begin = dash;
   while ( begin && ( is_name_char( query[ begin - 1 ] ) ||
                      query[ begin - 1 ] == ':' ) )
     --begin;
-  if ( begin == offset - 1 || is_digit( query[ begin ] ) ||
+  if ( begin == dash || is_digit( query[ begin ] ) ||
        query[ begin ] == '.' || query[ begin ] == '-' )
     return std::string();                 // no name: "1-$a", "(-$a"
-  std::string left( query.substr( begin, offset - 1 - begin ) );
+  std::string left( query.substr( begin, dash - begin ) );
 
   bool const is_variable = begin && query[ begin - 1 ] == '$';
   if ( is_variable ) {
@@ -103,13 +108,51 @@ std::string dash_before_variable( std::string const &query,
     "Write " + left + " - " + query.substr( offset, end - offset ) + ".";
 }
 
+bool starts_with( std::string const &s, char const *prefix ) {
+  return s.compare( 0, std::strlen( prefix ), prefix ) == 0;
+}
+
+// The JSONiq scanner ends an unterminated string right before a "\" that does
+// not start an escape, or at the end of the query. The message of the parser
+// has the text it read, and the location is the start of that text.
+std::string invalid_escape( std::string const &query, std::size_t offset,
+                            std::string const &message,
+                            std::size_t prefix_size ) {
+  std::string const text( message.substr( prefix_size,
+                                          message.size() - prefix_size - 1 ) );
+  if ( text.empty() || text[0] != '"' )
+    return std::string();                 // single quotes are the problem
+  // On the first line the reported column is one too far.
+  for ( std::size_t const at : { offset, offset ? offset - 1 : offset } ) {
+    std::size_t const end = at + text.size();
+    if ( end < query.size() && query.compare( at, text.size(), text ) == 0 &&
+         query[ end ] == '\\' )
+      return "In a JSONiq string \"\\\" starts an escape (\\\" \\\\ \\/ \\b \\f "
+        "\\n \\r \\t \\uXXXX), and this string has one that is not valid. For a "
+        "backslash write \\\\.";
+  }
+  return std::string();
+}
+
 } // namespace
 
 std::string syntax_error( std::string const &query, unsigned long line,
-                          unsigned long column, bool xquery_grammar ) {
+                          unsigned long column, bool xquery_grammar,
+                          std::string const &message ) {
+  // The token is known from the message, whatever precedes it.
+  if ( !xquery_grammar &&
+       starts_with( message, "syntax error, unexpected \".\"" ) )
+    return "In JSONiq the context item is $$, not \".\". Write $$, or start the "
+      "query with xquery version \"3.0\"; to parse it as XQuery, where \".\" is "
+      "the context item.";
+
   std::size_t offset = offset_of( query, line, column );
   if ( offset == std::string::npos )
     return std::string();
+
+  char const unterminated[] = "syntax error, unterminated string literal \"";
+  if ( !xquery_grammar && starts_with( message, unterminated ) )
+    return invalid_escape( query, offset, message, sizeof unterminated - 1 );
 
   if ( query.find_first_not_of( " \t\r\n", offset ) == std::string::npos ) {
     // An error at the end of the query: look at the last token. "$a-$b" at the
@@ -206,12 +249,44 @@ std::string undeclared_prefix( std::string const &prefix ) {
   return std::string();
 }
 
-std::string key_on_array( std::string const &key ) {
+std::string key_on_array( std::string const &key, bool jsoniq ) {
   std::string const lookup( "(\"" + key + "\")" );
   return "This item is an array, and " + lookup + " selects a member by "
     "integer position. To read this key from its members write $x()" + lookup +
+    ( jsoniq ? " or $x[]" + lookup : std::string() ) +
     ", or $x(1)" + lookup + " for the first member; a predicate such as [1] "
     "filters the sequence and does not open the array.";
+}
+
+bool is_math_uri( std::string const &uri ) {
+  char const end[] = "/math";
+  std::size_t const size = sizeof end - 1;
+  return uri.size() >= size &&
+    uri.compare( uri.size() - size, size, end ) == 0;
+}
+
+std::string unknown_module( std::string const &uri, bool fetch_denied ) {
+  std::string hint;
+  if ( fetch_denied )
+    hint = "Zorba could not load this module from any location it may read, "
+      "and the security policy denies fetching it from this URI, which may "
+      "hold no module at all. Check the URI.";
+  if ( is_math_uri( uri ) ) {
+    if ( !hint.empty() )
+      hint += ' ';
+    hint += std::string( "The functions pi, sin, cos and the like are in " ) +
+      math_ns + ".";
+  }
+  return hint;
+}
+
+std::string math_function( std::string const &local, bool prefix_bound ) {
+  std::string hint( "\"" + local + "\" is in " + math_ns + ", not in this "
+    "namespace. Write math:" + local + "(...)" );
+  if ( !prefix_bound )
+    hint += std::string( " with import module namespace math = \"" ) + math_ns +
+      "\"; in the prolog";
+  return hint + ".";
 }
 
 std::string path_over_item( std::string const &value_type ) {

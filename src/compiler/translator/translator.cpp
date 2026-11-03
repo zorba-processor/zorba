@@ -1427,6 +1427,11 @@ void raise_undeclared_var(const store::Item* qname, const QueryLoc& loc)
     }
   }
 
+  // No variable can be meant by a name that ends in "-", in scope or not.
+  if (!*e.hint() && local.size() > 1 && local.back() == '-')
+    e.set_hint(query_hints::dash_in_variable(
+      prefix + local.substr(0, local.size() - 1), std::string()).c_str());
+
   throw e;
 }
 
@@ -3729,8 +3734,15 @@ void end_visit(const ModuleImport& v, void* /*visit_state*/)
       }
       else
       {
-        RAISE_ERROR(err::XQST0059, loc,
-        ERROR_PARAMS(ZED(XQST0059_UnknownModule_234o), targetNS, compURI, errorMsg));
+        XQueryException e(XQUERY_EXCEPTION(err::XQST0059,
+          ERROR_PARAMS(ZED(XQST0059_UnknownModule_234o), targetNS, compURI, errorMsg),
+          ERROR_LOC(loc)));
+        // check_network() denies a remote URI with this capability, and only
+        // a remote URI: the fetch is what the policy denied, not the module.
+        e.set_hint(query_hints::unknown_module(
+          targetNS.str(),
+          errorMsg.find("capability RemoteImport") != zstring::npos).c_str());
+        throw e;
       }
 
       // Get the parent of the query root sctx. This is the user-specified sctx
@@ -11921,6 +11933,28 @@ std::string undeclared_function_hint(
 
       if (theSctx->lookup_fn(name.getp(), numArgs))
         return query_hints::jsoniq_function(local.str(), ns.prefix);
+    }
+  }
+
+  // A math module that is not the W3C one, and that lacks the function.
+  const zstring fnNs = qnameItem->getNamespace();
+  if (fnNs != static_context::XQUERY_MATH_FN_NS &&
+      query_hints::is_math_uri(fnNs.str()))
+  {
+    store::Item_t name;
+    GENV_ITEMFACTORY->createQName(name,
+                                  zstring(static_context::XQUERY_MATH_FN_NS),
+                                  zstring(),
+                                  qnameItem->getLocalName());
+
+    if (theSctx->lookup_fn(name.getp(), numArgs))
+    {
+      zstring bound;
+      bool const prefixBound =
+        theSctx->lookup_ns(bound, zstring("math"), QueryLoc::null, false) &&
+        bound == static_context::XQUERY_MATH_FN_NS;
+      return query_hints::math_function(qnameItem->getLocalName().str(),
+                                        prefixBound);
     }
   }
 

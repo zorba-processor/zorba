@@ -244,8 +244,11 @@ void parameters::substitute( value_type *s ) const {
               value_type const param( lookup_param( i ) );
               replace = !param.empty() || replace;
               replacement += param;
-            } else
+            } else {
+              // For a later pass: not a ${...} of this pass any more.
               dollar_pos = value_type::npos;
+              inside_braces = false;
+            }
             break;
           case '}':
             inside_braces = false;

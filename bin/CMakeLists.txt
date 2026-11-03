@@ -465,7 +465,7 @@ IF (ZORBA_WITH_FILE_ACCESS)
              optional_params documents_stream hints_jsoniq hints_dash
              hints_dash_forms hints_context_item hints_array_key
              hints_unknown_module hints_math_function hints_string_escape
-             query_notes
+             query_primer
              hints_nodes hints_names deep_json deep_json_binary
              entity_expansion case_paths html_edge_cases memory_limit language
              language_binary no_write read_functions native_import reflection_random

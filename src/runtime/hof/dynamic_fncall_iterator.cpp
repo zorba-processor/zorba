@@ -340,7 +340,9 @@ bool SingleDynamicFnCallIterator::nextImpl(
             {
               if (e.diagnostic() == err::FORG0001)
                 e.set_hint(query_hints::key_on_array(
-                  selectorItem2->getStringValue().str()).c_str());
+                  selectorItem2->getStringValue().str(),
+                  theSctx->language_kind() ==
+                    StaticContextConsts::language_kind_jsoniq).c_str());
               throw;
             }
 

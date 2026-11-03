@@ -30,6 +30,7 @@
 #include <fstream>
 #include <iostream>
 #include <map>
+#include <set>
 #include <sstream>
 #include <string>
 #include <thread>
@@ -46,6 +47,7 @@
 #include "directory_config.h"
 #include "json.h"
 #include "mcp_server.h"
+#include "query_primer.h"
 
 using namespace zorba;
 using namespace zorba::mcp;
@@ -869,14 +871,74 @@ void test_hints_dash_forms( Fixture const &f ) {
                 "names keep their - : no syntax is added" );
 }
 
-// What the tools say about the language, and that it is true.
-void test_query_notes( Fixture const &f ) {
+// Every example of the primer runs as written, with this result. An example is
+// what the primer writes between backticks, so a new one without a result here
+// fails, and so does a result here whose example the primer dropped.
+void test_query_primer( Fixture const &f ) {
   ServerConfig config;
   config.root = f.tree;
   config.jsoniq_default = true;
-  Server server( f.zorba, config, std::cerr );
+  Server jq( f.zorba, config, std::cerr );
+  ServerConfig xq_config;
+  xq_config.root = f.tree;
+  Server xq( f.zorba, xq_config, std::cerr );
 
-  Json const init = roundtrip( server, request( 1, "initialize", Json::object( {
+  std::map<std::string,std::string> const examples {
+    { "(1, 2, 3)[$$ ge 2]", "2\n3" },
+    { "let $c := [{\"a\": 1}, {\"a\": 2}] "
+      "return ($c[](\"a\"), $c()(\"a\"), $c(2)(\"a\"))", "1\n2\n1\n2\n2" },
+    { "let $a := 3 let $b := 1 return $a - $b", "2" },
+    { "matches(\"a1\", \"\\\\d\")", "true" },
+    { "math:pi() gt 3", "true" },
+    { "(1, 2.5, \"a\")[$$ instance of xs:decimal or "
+      "$$ instance of xs:double]", "1\n2.5" },
+    { "for sliding window $w in (1, 2, 3, 4) start at $s when true "
+      "only end at $e when $e - $s eq 1 return sum($w)", "3\n5\n7" }
+  };
+
+  std::string const primer( query_primer );
+  std::set<std::string> seen;
+  for ( std::size_t begin = primer.find( '`' ); begin != std::string::npos;
+        begin = primer.find( '`', begin + 1 ) ) {
+    std::size_t const end = primer.find( '`', begin + 1 );
+    check( end != std::string::npos, "the backticks of the primer are paired",
+           primer );
+    if ( end == std::string::npos )
+      break;
+    std::string const example( primer.substr( begin + 1, end - begin - 1 ) );
+    begin = end;
+    seen.insert( example );
+    auto const it = examples.find( example );
+    check( it != examples.end(), "the primer's example has a result here",
+           example );
+    if ( it == examples.end() )
+      continue;
+    check_result( jq, example, it->second, "JSONiq by default: " + example );
+    check_result( xq, jsoniq_decl + example, it->second,
+                  "with the declaration: " + example );
+  }
+  check( seen.size() == examples.size(),
+         "every result here has its example in the primer", primer );
+  check( contains( primer, "for sliding window" ),
+         "the primer has a window example", primer );
+
+  // Where the primer goes, and what it costs.
+  std::cout << "query primer: " << primer.size() << " bytes" << std::endl;
+  check( primer.size() <= 800, "the primer stays short", primer );
+
+  Json const list = roundtrip( jq, request( 2, "tools/list" ) );
+  Json const *const list_res = list.find( "result" );
+  Json const *const tools = list_res ? list_res->find( "tools" ) : nullptr;
+  check( tools && tools->items().size() >= 2, "tools", list.dump() );
+  if ( !tools || tools->items().size() < 2 )
+    return;
+  std::string const description( field( tools->items()[1], "description" ) );
+  std::cout << "run_query description: " << description.size() << " bytes"
+            << std::endl;
+  check( contains( description, primer ), "run_query has the primer",
+         description );
+
+  Json const init = roundtrip( jq, request( 1, "initialize", Json::object( {
     { "protocolVersion", "2025-11-25" },
     { "capabilities", Json::object() },
     { "clientInfo", Json::object( { { "name", "t" }, { "version", "1" } } ) }
@@ -884,36 +946,21 @@ void test_query_notes( Fixture const &f ) {
   Json const *const res = init.find( "result" );
   std::string const instructions( res ? field( *res, "instructions" ) : "" );
   std::cout << "instructions: " << instructions.size() << " bytes" << std::endl;
-  check( contains( instructions, "$$" ), "instructions: context item",
-         instructions );
-  check( contains( instructions, "content" ) &&
-         contains( instructions, "$c()" ) && contains( instructions, "$c[]" ),
-         "instructions: an array is opened with () or []", instructions );
+  check( contains( instructions, "primer" ) &&
+         !contains( instructions, primer ),
+         "the instructions point to the primer, once is enough", instructions );
 
-  Json const list = roundtrip( server, request( 2, "tools/list" ) );
-  Json const *const list_res = list.find( "result" );
-  Json const *const tools = list_res ? list_res->find( "tools" ) : nullptr;
-  check( tools && tools->items().size() >= 2, "tools", list.dump() );
-  if ( !tools || tools->items().size() < 2 )
-    return;
-  Json const &run_query = tools->items()[1];
-  std::string const description( field( run_query, "description" ) );
-  std::cout << "run_query description: " << description.size() << " bytes"
-            << std::endl;
-  for ( char const *const part : { "$$", "$c()", "$c[]", "math:", "$a - $b",
-                                   "\\\\" } )
-    check( contains( description, part ),
-           std::string( "run_query says " ) + part, description );
-
-  // Each statement holds.
+  // The statements of the primer that are not examples.
   std::string const csv( dir_import +
     "dir:open($dir:root, \"customers.csv\")(\"content\")" );
-  check_result( server, csv + "[][1](\"id\")", "\"acme\"", "$c[] on a CSV" );
-  check_result( server, csv + "()[1](\"id\")", "\"acme\"", "$c() on a CSV" );
-  check_result( server, "math:cos(0) eq 1", "true",
-                "math: without an import" );
-  check_result( server, "let $a := 3 let $b := 1 return $a - $b", "2",
-                "$a - $b" );
+  check_result( jq, csv + "[][1](\"id\")", "\"acme\"", "[] on a CSV" );
+  check_result( jq, csv + "()[1](\"id\")", "\"acme\"", "() on a CSV" );
+  check_error( jq, csv + "(\"id\")", "FORG0001", "$x[]",
+               "not a key on a CSV" );
+  check_error( jq, "(1, 2)[. eq 2]", "XPST0003", "$$", "not . in JSONiq" );
+  check_error( jq, "1 instance of number", "XPST0051", "",
+               "there is no type number" );
+  check_error( jq, "'a'", "XPST0003", "", "not single quotes" );
 }
 
 void test_escape( Fixture const &f ) {
@@ -3052,7 +3099,7 @@ Test const tests[] = {
   { "hints_unknown_module", test_hints_unknown_module },
   { "hints_math_function", test_hints_math_function },
   { "hints_string_escape", test_hints_string_escape },
-  { "query_notes", test_query_notes },
+  { "query_primer", test_query_primer },
   { "hints_nodes", test_hints_nodes },
   { "hints_names", test_hints_names },
   { "deep_json", test_deep_json },

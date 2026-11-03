@@ -15,6 +15,7 @@
  */
 
 #include "mcp_server.h"
+#include "query_primer.h"
 
 #include <algorithm>
 #include <cstring>
@@ -77,7 +78,8 @@ char const instructions[] =
   "and use $dir:root: dir:documents($dir:root, \"xml\") or "
   "dir:documents($dir:root, (\"json\", \"csv\")) return records "
   "{path, format, content} (or {path, format, error}); "
-  "dir:open($dir:root, $path) returns one. Results are JSON, one item per "
+  "dir:open($dir:root, $path) returns one. Read the JSONiq primer in the "
+  "run_query description before writing a query. Results are JSON, one item per "
   "line; return JSON objects, arrays or atomic values, not XML nodes "
   "(convert with string() or data()). Only files under the directory can "
   "be read; network access, writes and environment variables are denied. "
@@ -526,7 +528,8 @@ Json Server::tools() const {
             "\"1.0\";` for JSONiq." ) +
       " Example: import module namespace dir = "
       "\"http://zorba.io/modules/directory\"; for $d in "
-      "dir:documents($dir:root, \"json\") return $d(\"path\"). On failure "
+      "dir:documents($dir:root, \"json\") return $d(\"path\"). " +
+      query_primer + " On failure "
       "the result is an error object with the Zorba error code, message "
       "and the line/column of the failing expression." },
     { "inputSchema", Json::object( {
