@@ -37,6 +37,10 @@ protected:
 
   expr_tools::ExprVarsMap theExprVarsMap;
 
+  // Whether the root expr has an unproven call (expr_tools::calls_unproven_function).
+  // The walk is needed only then.
+  bool                    theHasUnprovenCalls;
+
 public:
   HoistRule() : RewriteRule(RewriteRule::HoistExprsOutOfLoops, "Hoist") {}
 
@@ -44,6 +48,13 @@ public:
 
 protected:
   bool hoistChildren(RewriterContext&, expr*, struct PathHolder*);
+
+  bool hoistInsideChildren(RewriterContext&, expr*);
+
+  bool callsUnproven(const expr* e) const
+  {
+    return theHasUnprovenCalls && expr_tools::calls_unproven_function(e);
+  }
 
   expr* hoistExpr(RewriterContext&, expr*, struct PathHolder*);
 

@@ -265,6 +265,10 @@ FOREACH(TESTFILE ${TESTFILES})
           ENVIRONMENT "ZORBA_OPTLEVEL=${_optlevel}")
       ENDFOREACH ()
     ENDIF ()
+    # Without hoisting these take hours.
+    IF (TESTNAME MATCHES "^test/rbkt/zorba/optim/hoist_proven_")
+      SET_TESTS_PROPERTIES ("${TESTNAME}" PROPERTIES TIMEOUT 120)
+    ENDIF ()
     # Boundary-value tests: a regression (e.g. a range that never stops at
     # the largest xs:integer) loops forever, so fail fast.
     IF (TESTNAME MATCHES "^test/rbkt/zorba/numerics/integer-")

@@ -380,6 +380,11 @@ expr* IndexJoinRule::apply(RewriterContext& rCtx, expr* node, bool& modified)
 ********************************************************************************/
 bool IndexJoinRule::isIndexJoinPredicate(PredicateInfo& predInfo)
 {
+  // The join would move the evaluation of the predicate and of the domain of the
+  // inner var, and a call in the outermost expr can change what they read.
+  if (expr_tools::calls_unproven_function(theVarDefExprs[0]))
+    return false;
+
   const fo_expr* foExpr = NULL;
   const function* fn;
   const expr* predExpr = predInfo.thePredicate;

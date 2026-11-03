@@ -62,6 +62,29 @@ bool function_runs_opaque_code(const function* f);
 // of a simple expr whatever it calls. User functions are followed into their bodies.
 bool may_run_side_effects(const expr* root);
 
+// Whether "root" can call a function that the compiler cannot prove to be
+// deterministic and free of side effects. Only a function item whose origin is
+// visible (a function item expression, reached through let and for variables and
+// prolog variables that cannot be assigned) can be proven. A call that cannot, and
+// anything that contains one or calls a user function containing one, is not moved,
+// merged, duplicated or eliminated, and nothing moves across it: the function can
+// change the state that other expressions read. The scripting kind of the expr
+// does not say this, because a dynamic function call is a simple expr whatever it
+// calls, and it must remain one for simple functions to be able to make such calls.
+bool calls_unproven_function(const expr* root);
+
+// The same for the call itself, without looking at its arguments.
+bool is_unproven_call(const expr* call);
+
+// Whether "root" can read or change a state that a function can change, or return
+// new nodes: its value can depend on when it is evaluated and how many times.
+bool depends_on_evaluation_order(const expr* root);
+
+// Whether a clause of this flwor, or its return clause, makes an unproven call that
+// another clause could observe: the call and everything else can run in clause order
+// or interleaved, and only the first is what a sequential function gets.
+bool evaluates_in_clause_order(const flwor_expr* flwor);
+
 
 /*******************************************************************************
 

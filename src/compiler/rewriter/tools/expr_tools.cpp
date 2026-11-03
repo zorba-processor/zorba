@@ -27,6 +27,8 @@
 
 #include "functions/func_errors_and_diagnostics.h"
 #include "functions/udf.h"
+#include "runtime/hof/function_item.h"
+#include "system/globalenv.h"
 #include "types/typeimpl.h"
 
 #include "types/typeops.h"
@@ -954,6 +956,476 @@ bool may_run_side_effects(const expr* root)
   std::set<const function*> visitedUdfs;
 
   return may_run_side_effects_rec(root, visitedUdfs);
+}
+
+
+/*******************************************************************************
+  The walk behind calls_unproven_function() (theStrict false) and
+  depends_on_evaluation_order() (theStrict true). A function reached in strict mode
+  is proven only if its body is free of any impurity; in the other mode, only if
+  its body makes no unproven call.
+
+  Any finding makes the whole walk answer true. So a walk that answers false has
+  cleared every function it visited, cycles included, and the compiler cb remembers
+  them. A rewrite only removes calls from a body or replaces them by what was already
+  reachable from it, so a remembered answer stays correct or conservative.
+********************************************************************************/
+class ImpurityWalk
+{
+  CompilerCB                    * theCCB;
+  TypeManager                   * theTM;
+  std::set<const function*>       theVisited[2];
+
+public:
+  explicit ImpurityWalk(const expr* e)
+    :
+    theCCB(const_cast<expr*>(e)->get_ccb()),
+    theTM(e->get_type_manager())
+  {
+  }
+
+  bool walk(const expr* e, bool strict);
+
+  bool isUnprovenCall(const expr* call);
+
+  bool functionHasImpurity(const function* f, bool strict);
+
+  // The answer for "f" alone, remembered whatever it is.
+  bool functionAnswer(const function* f, bool strict);
+
+  void remember()
+  {
+    for (int i = 0; i < 2; ++i)
+    {
+      std::set<const function*>::const_iterator ite = theVisited[i].begin();
+      for (; ite != theVisited[i].end(); ++ite)
+        theCCB->theFunctionPurity[i][*ite] = false;
+    }
+  }
+
+private:
+  bool varCanChange(const var_expr* var) const;
+
+  bool targetIsProven(const expr* target);
+
+  bool builtinHasImpurity(const function* f) const;
+};
+
+
+static bool takes_function_item(const function* f, csize i)
+{
+  const signature& sig = f->getSignature();
+
+  if (i >= sig.paramCount())
+    return false;
+
+  XQType::TypeKind const kind = sig[static_cast<int>(i)]->type_kind();
+
+  return kind == XQType::FUNCTION_TYPE_KIND || kind == XQType::ANY_FUNCTION_TYPE_KIND;
+}
+
+
+// A prolog variable is assignable by default. It can only change if there is an
+// assignment to it, or if a query that eval compiles at run time can add one.
+bool ImpurityWalk::varCanChange(const var_expr* var) const
+{
+  if (!var->is_mutable())
+    return false;
+
+  return theCCB->theHasEval || var->num_set_exprs() != 1;
+}
+
+
+bool ImpurityWalk::targetIsProven(const expr* target)
+{
+  while (true)
+  {
+    switch (target->get_expr_kind())
+    {
+    case wrapper_expr_kind:
+      target = static_cast<const wrapper_expr*>(target)->get_input();
+      continue;
+
+    case function_trace_expr_kind:
+      target = static_cast<const function_trace_expr*>(target)->get_input();
+      continue;
+
+    case treat_expr_kind:
+    case promote_expr_kind:
+      target = static_cast<const cast_base_expr*>(target)->get_input();
+      continue;
+
+    case flwor_expr_kind:
+      // The function item is what the return clause gives. The clauses are looked
+      // at as children of the call.
+      target = static_cast<const flwor_expr*>(target)->get_return_expr();
+      continue;
+
+    case var_expr_kind:
+    {
+      const var_expr* var = static_cast<const var_expr*>(target);
+
+      if (varCanChange(var))
+        return false;
+
+      switch (var->get_kind())
+      {
+      case var_expr::for_var:
+      case var_expr::let_var:
+        target = var->get_domain_expr();
+        break;
+
+      case var_expr::prolog_var:
+      case var_expr::local_var:
+      {
+        if (var->is_external() || var->num_set_exprs() == 0)
+          return false;
+
+        const var_set_expr* decl = var->get_set_expr(0);
+
+        target = (decl->get_expr_kind() == var_decl_expr_kind ?
+                  decl->get_expr() : NULL);
+        break;
+      }
+      default:
+        return false;
+      }
+
+      if (target == NULL)
+        return false;
+
+      continue;
+    }
+
+    case function_item_expr_kind:
+    {
+      const function_item_expr* fi = static_cast<const function_item_expr*>(target);
+
+      // The body of a coercion calls the function item it wraps, which is the
+      // value of its only closure variable.
+      if (fi->is_coercion())
+      {
+        const std::vector<expr*>& values =
+        const_cast<function_item_expr*>(fi)->get_fi_info()->theInScopeVarValues;
+
+        if (values.size() != 1)
+          return false;
+
+        target = values[0];
+        continue;
+      }
+
+      const function* f = fi->get_function();
+
+      return f != NULL && !functionHasImpurity(f, true);
+    }
+
+    default:
+      return false;
+    }
+  }
+}
+
+
+bool ImpurityWalk::isUnprovenCall(const expr* call)
+{
+  if (call->get_expr_kind() == dynamic_function_invocation_expr_kind)
+  {
+    return !targetIsProven(
+        static_cast<const dynamic_function_invocation_expr*>(call)->get_input());
+  }
+
+  if (call->get_expr_kind() != fo_expr_kind)
+    return false;
+
+  const fo_expr* fo = static_cast<const fo_expr*>(call);
+  const function* f = fo->get_func();
+
+  if (f->isUdf())
+    return functionHasImpurity(f, false);
+
+  switch (f->getKind())
+  {
+  case FunctionConsts::FN_FUNCTION_NAME_1:
+  case FunctionConsts::FN_FUNCTION_ARITY_1:
+    return false;
+  default:
+    break;
+  }
+
+  if (!function_runs_opaque_code(f))
+    return false;
+
+  bool checked = false;
+
+  for (csize i = 0; i < fo->num_args(); ++i)
+  {
+    if (takes_function_item(f, i))
+    {
+      checked = true;
+
+      if (!targetIsProven(fo->get_arg(i)))
+        return true;
+    }
+  }
+
+  // fn:invoke and the like find the function by name.
+  return !checked;
+}
+
+
+bool ImpurityWalk::builtinHasImpurity(const function* f) const
+{
+  if (!f->isDeterministic() || f->isSequential() || f->isUpdating() ||
+      f->accessesDynCtx())
+    return true;
+
+  switch (f->getKind())
+  {
+  case FunctionConsts::FN_TRACE_2:
+  case FunctionConsts::FN_ERROR_0:
+  case FunctionConsts::FN_ERROR_1:
+  case FunctionConsts::FN_ERROR_2:
+  case FunctionConsts::FN_ERROR_3:
+  case FunctionConsts::FN_COLLECTION_0:
+  case FunctionConsts::FN_COLLECTION_1:
+  case FunctionConsts::FN_URI_COLLECTION_0:
+  case FunctionConsts::FN_URI_COLLECTION_1:
+  case FunctionConsts::FN_DOC_1:
+  case FunctionConsts::FN_DOC_AVAILABLE_1:
+    return true;
+  case FunctionConsts::OP_CONCATENATE_N:
+    return false;
+  default:
+    break;
+  }
+
+  // The stores of collections, documents, indexes and maps change while a query runs.
+  if (f->getName()->getNamespace().find("/modules/store/") != zstring::npos)
+    return true;
+
+  // A built-in function may return a new node or JSON item, unless it returns atomics.
+  return !TypeOps::is_subtype(theTM,
+                              *f->getSignature().returnType(),
+                              *GENV_TYPESYSTEM.ANY_ATOMIC_TYPE_STAR);
+}
+
+
+bool ImpurityWalk::functionHasImpurity(const function* f, bool strict)
+{
+  if (strict &&
+      (!f->isDeterministic() || f->isSequential() || f->isUpdating()))
+    return true;
+
+  if (!f->isUdf())
+    return strict && builtinHasImpurity(f);
+
+  const CompilerCB::FunctionPurityMap& cache = theCCB->theFunctionPurity[strict ? 1 : 0];
+  CompilerCB::FunctionPurityMap::const_iterator cached = cache.find(f);
+
+  if (cached != cache.end())
+    return cached->second;
+
+  if (!theVisited[strict ? 1 : 0].insert(f).second)
+    return false;
+
+  const expr* body = static_cast<const user_function*>(f)->getBody();
+
+  return body == NULL || walk(body, strict);
+}
+
+
+bool ImpurityWalk::functionAnswer(const function* f, bool strict)
+{
+  bool const answer = functionHasImpurity(f, strict);
+
+  if (!answer)
+    remember();
+
+  theCCB->theFunctionPurity[strict ? 1 : 0][f] = answer;
+
+  return answer;
+}
+
+
+bool ImpurityWalk::walk(const expr* e, bool strict)
+{
+  switch (e->get_expr_kind())
+  {
+  case dynamic_function_invocation_expr_kind:
+  {
+    if (isUnprovenCall(e))
+      return true;
+
+    break;
+  }
+  case fo_expr_kind:
+  {
+    if (isUnprovenCall(e))
+      return true;
+
+    if (strict &&
+        functionHasImpurity(static_cast<const fo_expr*>(e)->get_func(), true))
+      return true;
+
+    break;
+  }
+  case var_expr_kind:
+  {
+    if (strict && varCanChange(static_cast<const var_expr*>(e)))
+      return true;
+
+    break;
+  }
+  case doc_expr_kind:
+  case elem_expr_kind:
+  case attr_expr_kind:
+  case namespace_expr_kind:
+  case text_expr_kind:
+  case pi_expr_kind:
+  case json_direct_object_expr_kind:
+  case json_object_expr_kind:
+  case json_array_expr_kind:
+  case transform_expr_kind:
+  case delete_expr_kind:
+  case insert_expr_kind:
+  case rename_expr_kind:
+  case replace_expr_kind:
+  case var_set_expr_kind:
+  case apply_expr_kind:
+  case exit_expr_kind:
+  case exit_catcher_expr_kind:
+  case flowctl_expr_kind:
+  case while_expr_kind:
+  case eval_expr_kind:
+  {
+    if (strict)
+      return true;
+
+    break;
+  }
+  default:
+    break;
+  }
+
+  ExprConstIterator iter(e);
+  while (!iter.done())
+  {
+    const expr* child = iter.get_expr();
+
+    if (child != NULL && walk(child, strict))
+      return true;
+
+    iter.next();
+  }
+
+  return false;
+}
+
+
+bool calls_unproven_function(const expr* root)
+{
+  ImpurityWalk w(root);
+
+  bool const answer = w.walk(root, false);
+
+  if (!answer)
+    w.remember();
+
+  return answer;
+}
+
+
+bool is_unproven_call(const expr* call)
+{
+  ImpurityWalk w(call);
+
+  if (call->get_expr_kind() == fo_expr_kind)
+  {
+    const function* f = static_cast<const fo_expr*>(call)->get_func();
+
+    if (f->isUdf())
+      return w.functionAnswer(f, false);
+  }
+
+  bool const answer = w.isUnprovenCall(call);
+
+  if (!answer)
+    w.remember();
+
+  return answer;
+}
+
+
+bool depends_on_evaluation_order(const expr* root)
+{
+  ImpurityWalk w(root);
+
+  bool const answer = w.walk(root, true);
+
+  if (!answer)
+    w.remember();
+
+  return answer;
+}
+
+
+bool evaluates_in_clause_order(const flwor_expr* flwor)
+{
+  // The exprs that a sequential flwor can run in a clause of their own.
+  std::vector<const expr*> parts;
+  std::vector<const expr*> others;
+
+  csize const numClauses = flwor->num_clauses();
+
+  for (csize i = 0; i < numClauses; ++i)
+  {
+    const flwor_clause* c = flwor->get_clause(i);
+
+    switch (c->get_kind())
+    {
+    case flwor_clause::for_clause:
+    case flwor_clause::let_clause:
+    case flwor_clause::window_clause:
+      parts.push_back(static_cast<const forletwin_clause*>(c)->get_expr());
+      break;
+    case flwor_clause::where_clause:
+      others.push_back(static_cast<const where_clause*>(c)->get_expr());
+      break;
+    default:
+      break;
+    }
+  }
+
+  parts.push_back(flwor->get_return_expr());
+
+  csize firstCall = parts.size();
+
+  for (csize i = 0; i < parts.size(); ++i)
+  {
+    if (calls_unproven_function(parts[i]))
+    {
+      firstCall = i;
+      break;
+    }
+  }
+
+  if (firstCall == parts.size())
+    return false;
+
+  for (csize i = 0; i < parts.size(); ++i)
+  {
+    if (i != firstCall && depends_on_evaluation_order(parts[i]))
+      return true;
+  }
+
+  for (csize i = 0; i < others.size(); ++i)
+  {
+    if (depends_on_evaluation_order(others[i]))
+      return true;
+  }
+
+  return false;
 }
 
 

@@ -105,7 +105,8 @@ expr* IndexMatchingRule::apply(RewriterContext& rCtx, expr* node, bool& modified
 
     theQueryExpr = static_cast<flwor_expr*>(node);
 
-    bool matched = matchIndex();
+    // An index probe would move the evaluation of the flwor, and of its predicates.
+    bool matched = !expr_tools::calls_unproven_function(theQueryExpr) && matchIndex();
 
     if (matched)
     {

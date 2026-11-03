@@ -474,6 +474,28 @@ RULE_REWRITE_PRE(EliminateUnusedLetVars)
     }
     else if (clause->get_kind() == flwor_clause::orderby_clause)
     {
+      // There is at most one tuple to sort, so the keys are not needed, but a call
+      // in a key must still run.
+      orderby_clause* oc = static_cast<orderby_clause*>(clause);
+      csize numLets = 0;
+
+      for (csize i = 0; i < oc->num_columns(); ++i)
+      {
+        expr* key = oc->get_column_expr(i);
+
+        if (expr_tools::calls_unproven_function(key))
+        {
+          var_expr* keyVar = rCtx.createTempVar(sctx, key->get_loc(), var_expr::let_var);
+
+          let_clause* keyClause = rCtx.theEM->
+          create_let_clause(sctx, key->get_loc(), keyVar, key);
+
+          keyVar->set_flwor_clause(keyClause);
+
+          theFlwor->add_clause(++numLets, keyClause);
+        }
+      }
+
       theFlwor->remove_clause(0);
       continue;
     }
@@ -555,7 +577,8 @@ bool EliminateUnusedLetVars::safe_to_fold_var(csize varPos, int& numRefs)
   expr* varDomExpr = varClause->get_expr();
   var_expr* var = varClause->get_var();
 
-  if (varDomExpr->is_sequential())
+  if (varDomExpr->is_sequential() ||
+      expr_tools::calls_unproven_function(varDomExpr))
     return false;
 
   bool isSafeVar = 
@@ -588,6 +611,10 @@ bool EliminateUnusedLetVars::safe_to_fold_var(csize varPos, int& numRefs)
   bool unsafe = false;
 
   if (theFlwor->dereferencesNodes() && varDomExpr->constructsNodes())
+    unsafe = true;
+
+  // A call in this flwor can change what the domain expr reads.
+  if (theFlwor->is_sequential() || expr_tools::calls_unproven_function(theFlwor))
     unsafe = true;
 
   bool safe = safe_to_fold_var_rec(theFlwor, varPos+1, var, unsafe, isSafeVar, numRefs);
@@ -1149,7 +1176,8 @@ RULE_REWRITE_PRE(RefactorPredFLWOR)
   // TODO: we should be able to apply the rule if all the sequential clauses
   // are before the clause that defines the pos var.
   // TODO: consider more than one positional preds in CNF
-  if (! flwor->has_sequential_clauses())
+  if (! flwor->has_sequential_clauses() &&
+      ! expr_tools::calls_unproven_function(flwor))
   {
     csize numClauses = flwor->num_clauses();
 
@@ -1221,7 +1249,8 @@ RULE_REWRITE_PRE(RefactorPredFLWOR)
   // "if E then flwor else ()", where flwor is the original flwor expr without the
   // where clause.
 
-  if (!flwor->has_sequential_clauses())
+  if (!flwor->has_sequential_clauses() &&
+      !expr_tools::calls_unproven_function(flwor))
   {
     expr* whereExpr = NULL;
     csize numClauses = flwor->num_clauses();
@@ -1627,6 +1656,10 @@ expr* MergeFLWOR::apply(RewriterContext& rCtx, expr* node, bool& modified)
   if (node->get_expr_kind() == flwor_expr_kind)
   {
     flwor_expr* flwor = static_cast<flwor_expr *>(node);
+
+    // The clauses of a flwor with such a call are the order of its evaluation.
+    if (expr_tools::calls_unproven_function(flwor))
+      return NULL;
 
     // Try to merge an inner flwor that appears in the return clause of the
     // outer flwor.

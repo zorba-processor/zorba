@@ -241,7 +241,7 @@ expr* MarkExprs::apply(RewriterContext& rCtx, expr* node, bool& modified)
   }
   }
 
-  if (node->is_sequential())
+  if (node->is_sequential() || expr_tools::is_unproven_call(node))
   {
     curNonDiscardable = ANNOTATION_TRUE_FIXED;
     curUnfoldable = ANNOTATION_TRUE_FIXED;
@@ -1080,6 +1080,39 @@ static expr* partial_eval_return_clause(
 
 ********************************************************************************/
 
+/*******************************************************************************
+  f(E1, ..., En) --> let $a1 := E1 ... let $an := En return f($a1, ..., $an)
+********************************************************************************/
+static expr* bind_args_in_lets(RewriterContext& rCtx, fo_expr* fo)
+{
+  static_context* sctx = fo->get_sctx();
+  user_function* udf = fo->get_udf();
+  const QueryLoc& loc = fo->get_loc();
+
+  flwor_expr* flwor = rCtx.theEM->create_flwor_expr(sctx, udf, loc);
+
+  for (csize i = 0; i < fo->num_args(); ++i)
+  {
+    expr* arg = fo->get_arg(i);
+    const QueryLoc& argLoc = arg->get_loc();
+
+    var_expr* var = rCtx.createTempVar(sctx, argLoc, var_expr::let_var);
+
+    let_clause* clause = rCtx.theEM->create_let_clause(sctx, argLoc, var, arg);
+
+    var->set_flwor_clause(clause);
+
+    flwor->add_clause(clause);
+
+    fo->set_arg(i, rCtx.theEM->create_wrapper_expr(sctx, udf, argLoc, var));
+  }
+
+  flwor->set_return_expr(fo);
+
+  return flwor;
+}
+
+
 RULE_REWRITE_PRE(InlineFunctions)
 {
   return NULL;
@@ -1097,6 +1130,16 @@ RULE_REWRITE_POST(InlineFunctions)
 
       const user_function* udf = static_cast<const user_function*>(fo->get_func());
       expr* body = udf->getBody();
+
+      // A let in the body can be folded into the place that uses the parameter, and
+      // an argument is only evaluated when it is read. An argument that can change
+      // the state must run before the body, as at O0 where that let stays.
+      for (csize i = 0; i < fo->num_args(); ++i)
+      {
+        if (fo->get_arg(i)->is_sequential() ||
+            expr_tools::calls_unproven_function(fo->get_arg(i)))
+          return bind_args_in_lets(rCtx, const_cast<fo_expr*>(fo));
+      }
 
       if (//!udf->isSequential() &&
           (
@@ -1116,9 +1159,6 @@ RULE_REWRITE_POST(InlineFunctions)
         {
           var_expr* p = udfArgs[i];
           subst[p] = fo->get_arg(i);
-
-          if (fo->get_arg(i)->is_sequential())
-            return NULL;
         }
 
         body = body->clone(fo->get_udf(), subst);

@@ -284,6 +284,12 @@ ZORBA_DLL_PUBLIC void query_resources_fail_walk(unsigned long edge);
   ---------------------------
   The same, for the query that runs this one through eval.
 
+  theFunctionPurity :
+  -------------------
+  What expr_tools::calls_unproven_function() [0] and
+  expr_tools::depends_on_evaluation_order() [1] found for each function so far.
+  Compile time only: not serialized.
+
   theHasEval :
   ------------
   True if there is an eval expr within the compilation unit covered by this CCB.
@@ -403,6 +409,8 @@ public:
 
   typedef std::map<csize, static_context_t> SctxMap;
 
+  typedef std::map<const function*, bool> FunctionPurityMap;
+
   typedef std::multimap<const expr*, pragma*>  PragmaMap;
 
   typedef PragmaMap::const_iterator PragmaMapIter;
@@ -433,6 +441,8 @@ public:
   bool                      theOuterMayRunSideEffects;
 
   bool                      theMayRunSideEffects;
+
+  FunctionPurityMap         theFunctionPurity[2];
 
   bool                      theHaveTimeout;
 

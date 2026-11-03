@@ -58,8 +58,9 @@ struct PathHolder
   struct PathHolder  * prev;
   expr               * theExpr;
   long                 clauseCount;
+  bool                 isBarrier;
 
-  PathHolder() : prev(NULL), theExpr(NULL), clauseCount(0)
+  PathHolder() : prev(NULL), theExpr(NULL), clauseCount(0), isBarrier(false)
   {
   }
 };
@@ -120,6 +121,8 @@ expr* HoistRule::apply(
   DynamicBitset freeset(numVars+1);
   expr_tools::build_expr_to_vars_map(node, theVarIdMap, freeset, theExprVarsMap);
 
+  theHasUnprovenCalls = expr_tools::calls_unproven_function(node);
+
   PathHolder root;
   modified = hoistChildren(rCtx, node, &root);
 
@@ -149,6 +152,10 @@ bool HoistRule::hoistChildren(RewriterContext& rCtx, expr* e, PathHolder* path)
     PathHolder step;
     step.prev = path;
     step.theExpr = e;
+
+    // An unproven call in any clause runs in every iteration, and can change what
+    // an expr reads: nothing leaves this flwor.
+    step.isBarrier = callsUnproven(flwor);
 
     csize numClauses = flwor->num_clauses();
     csize i = 0;
@@ -440,35 +447,17 @@ bool HoistRule::hoistChildren(RewriterContext& rCtx, expr* e, PathHolder* path)
 
   else if (e->get_expr_kind() == block_expr_kind || e->is_sequential())
   {
-    ExprIterator iter(e);
-
-    while (!iter.done())
-    {
-      // TODO: if no updating child exprs have been encountered so far, subexprs
-      // of the current child expr may be hoisted outside the sequential expr as
-      // long as they don't reference any local vars.
-      expr* ce = **iter;
-
-      PathHolder root;
-      bool nestedModified = hoistChildren(rCtx, ce, &root);
-
-      if (nestedModified && root.theExpr != NULL)
-      {
-        assert(root.theExpr->get_expr_kind() == flwor_expr_kind);
-
-        static_cast<flwor_expr*>(root.theExpr)->set_return_expr(ce);
-        (**iter) = root.theExpr;
-      }
-
-      status = nestedModified || status;
-
-      iter.next();
-    }
+    status = hoistInsideChildren(rCtx, e);
   }
 
   else if (e->is_updating() || e->get_expr_kind() == transform_expr_kind)
   {
     // do nothing
+  }
+
+  else if (callsUnproven(e))
+  {
+    status = hoistInsideChildren(rCtx, e);
   }
 
   else if (e->get_expr_kind() == trycatch_expr_kind)
@@ -535,6 +524,43 @@ bool HoistRule::hoistChildren(RewriterContext& rCtx, expr* e, PathHolder* path)
 
 
 /*******************************************************************************
+  Hoist within each child of "e", but not out of it: the evaluation of the children
+  is ordered, because of what the others can change.
+********************************************************************************/
+bool HoistRule::hoistInsideChildren(RewriterContext& rCtx, expr* e)
+{
+  bool status = false;
+
+  ExprIterator iter(e);
+
+  while (!iter.done())
+  {
+    // TODO: if no updating child exprs have been encountered so far, subexprs
+    // of the current child expr may be hoisted outside the sequential expr as
+    // long as they don't reference any local vars.
+    expr* ce = **iter;
+
+    PathHolder root;
+    bool nestedModified = hoistChildren(rCtx, ce, &root);
+
+    if (nestedModified && root.theExpr != NULL)
+    {
+      assert(root.theExpr->get_expr_kind() == flwor_expr_kind);
+
+      static_cast<flwor_expr*>(root.theExpr)->set_return_expr(ce);
+      (**iter) = root.theExpr;
+    }
+
+    status = nestedModified || status;
+
+    iter.next();
+  }
+
+  return status;
+}
+
+
+/*******************************************************************************
   Try to hoist the given expr e out of some for loop that is located in some
   flwor expr inside the stack of flwor exprs that is accessible via the "holder"
   param.
@@ -544,7 +570,7 @@ expr* HoistRule::hoistExpr(
     expr* e,
     struct PathHolder* path)
 {
-  if (non_hoistable(e) || e->constructsNodes())
+  if (non_hoistable(e) || e->constructsNodes() || callsUnproven(e))
   {
     return NULL;
   }
@@ -598,6 +624,22 @@ expr* HoistRule::hoistExpr(
       assert(step->theExpr->get_expr_kind() == flwor_expr_kind);
 
       flwor_expr* flwor = static_cast<flwor_expr*>(step->theExpr);
+
+      if (step->isBarrier)
+      {
+        if (!inloop)
+          return NULL;
+
+        // Stay at the start of the flwor inside this one, which has no such call.
+        ZORBA_ASSERT(nextstep);
+
+        if (nextstep->theExpr->get_expr_kind() != flwor_expr_kind)
+          return NULL;
+
+        step = nextstep;
+        clauseNo = -1;
+        break;
+      }
 
       bool foundReferencedFLWORVar = false;
       bool foundSequentialClause = false;
