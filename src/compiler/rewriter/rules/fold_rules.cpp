@@ -247,6 +247,10 @@ expr* MarkExprs::apply(RewriterContext& rCtx, expr* node, bool& modified)
     curUnfoldable = ANNOTATION_TRUE_FIXED;
   }
 
+  // Its result may be a new node.
+  if (expr_tools::is_call_with_varying_result(node))
+    curConstructsNodes = ANNOTATION_TRUE;
+
   if (saveNonDiscardable != curNonDiscardable &&
       saveNonDiscardable != ANNOTATION_TRUE_FIXED)
   {
@@ -950,6 +954,10 @@ static expr* partial_eval_eq(RewriterContext& rCtx, fo_expr& fo)
   {
     xs_integer ival = val->getIntegerValue();
 
+    // Every call in the argument must run.
+    if (expr_tools::calls_unproven_function(count_expr))
+      return NULL;
+
     if (ival < 0)
     {
       if (!count_expr->isNonDiscardable())
@@ -1016,6 +1024,10 @@ static expr* partial_eval_return_clause(
   csize pos;
 
   assert(udf == rCtx.theUDF);
+
+  // The clauses must run, whatever the cardinality of the result.
+  if (expr_tools::calls_unproven_function(flworExpr))
+    return flworExpr;
 
   if (returnExpr->get_expr_kind() == const_expr_kind ||
       (!returnExpr->isNonDiscardable() &&

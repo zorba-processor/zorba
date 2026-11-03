@@ -287,7 +287,9 @@ RULE_REWRITE_PRE(EliminateUnusedLetVars)
         pvar = NULL;
       }
 
-      if (domExpr->is_sequential() || domCount > 1)
+      if (domExpr->is_sequential() ||
+          domCount > 1 ||
+          expr_tools::calls_unproven_function(domExpr))
         continue;
 
       // FOR clause with 0 cardinality
@@ -437,6 +439,18 @@ RULE_REWRITE_PRE(EliminateUnusedLetVars)
       if (whereCond == NULL)
       {
         whereCond = whereExpr;
+      }
+      else if (expr_tools::calls_unproven_function(whereCond) ||
+               expr_tools::calls_unproven_function(whereExpr))
+      {
+        // In the order of the clauses, which an "and" keeps.
+        whereCond = rCtx.theEM->
+        create_fo_expr(sctx,
+                       udf,
+                       whereCond->get_loc(),
+                       BUILTIN_FUNC(OP_AND_N),
+                       whereCond,
+                       whereExpr);
       }
       else if (whereCond->get_function_kind() == FunctionConsts::OP_AND_N)
       {
@@ -1113,6 +1127,7 @@ RULE_REWRITE_PRE(RefactorPredFLWOR)
 
     if (!condExpr->is_sequential() &&
         !thenExpr->is_sequential() &&
+        !expr_tools::calls_unproven_function(flwor) &&
         (elseExpr->is_simple() || elseExpr->is_vacuous()) &&
         !elseExpr->isNonDiscardable() &&
         elseExpr->get_return_type()->is_empty())

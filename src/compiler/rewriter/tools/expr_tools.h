@@ -62,28 +62,37 @@ bool function_runs_opaque_code(const function* f);
 // of a simple expr whatever it calls. User functions are followed into their bodies.
 bool may_run_side_effects(const expr* root);
 
-// Whether "root" can call a function that the compiler cannot prove to be
-// deterministic and free of side effects. Only a function item whose origin is
-// visible (a function item expression, reached through let and for variables and
-// prolog variables that cannot be assigned) can be proven. A call that cannot, and
-// anything that contains one or calls a user function containing one, is not moved,
-// merged, duplicated or eliminated, and nothing moves across it: the function can
-// change the state that other expressions read. The scripting kind of the expr
-// does not say this, because a dynamic function call is a simple expr whatever it
-// calls, and it must remain one for simple functions to be able to make such calls.
+// What a dynamic function call can do in this query, by what is reachable from the
+// query body (CompilerCB::CallEffects). It sets CompilerCB::theCallEffects, so that it
+// is one walk over the query. To be called before the optimizer runs.
+void classify_calls(expr* root);
+
+// Whether "root" can call a function that can have a side effect, as far as the
+// compiler can tell. Only a query in which something with a side effect is reachable
+// has such calls, and only a function item whose origin is not visible can be one
+// (a function item expression, reached through let and for variables and prolog
+// variables that cannot be assigned, is visible). Such a call, and anything that
+// contains it or calls a user function containing it, is not moved, merged, duplicated
+// or eliminated, and nothing moves across it. The scripting kind of the expr does not
+// say this, because a dynamic function call is a simple expr whatever it calls, and it
+// must remain one for simple functions to be able to make such calls.
 bool calls_unproven_function(const expr* root);
 
 // The same for the call itself, without looking at its arguments.
 bool is_unproven_call(const expr* call);
 
-// Whether "root" can read or change a state that a function can change, or return
-// new nodes: its value can depend on when it is evaluated and how many times.
-bool depends_on_evaluation_order(const expr* root);
+// Whether a call in "root" can give a different result each time, or new nodes, so
+// that one evaluation cannot serve for several. This holds in a query with no side
+// effect too, if a nondeterministic function or a constructor is reachable. Such a
+// call is not hoisted, but it can be dropped or moved within its iteration.
+bool call_results_can_differ(const expr* root);
 
-// Whether a clause of this flwor, or its return clause, makes an unproven call that
-// another clause could observe: the call and everything else can run in clause order
-// or interleaved, and only the first is what a sequential function gets.
-bool evaluates_in_clause_order(const flwor_expr* flwor);
+// The same for the call itself, without looking at its arguments.
+bool is_call_with_varying_result(const expr* call);
+
+// Whether "root" reads a state that a call can change, in a query with such calls.
+// Lazy evaluation interleaves it with those calls, even if they are outside of "root".
+bool depends_on_call_effects(const expr* root);
 
 
 /*******************************************************************************

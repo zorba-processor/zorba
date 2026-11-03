@@ -413,6 +413,21 @@ ftnode_visitor* get_ftnode_visitor()
 #endif /* ZORBA_NO_FULL_TEXT */
 
 
+// XQSX 6.7: "The associated expression is evaluated first to produce the binding
+// sequence, then the next clause is evaluated once for each item in the binding
+// sequence." This applies to a domain with a call that can have a side effect. Any
+// other domain stays lazy.
+PlanIter_t binding_sequence_iter(const for_clause* fc, PlanIter_t domainIter)
+{
+  expr* domExpr = fc->get_expr();
+
+  if (expr_tools::calls_unproven_function(domExpr))
+    return new MaterializeIterator(domExpr->get_sctx(), domExpr->get_loc(), domainIter);
+
+  return domainIter;
+}
+
+
 PlanIter_t pop_itstack()
 {
   return plan_visitor_ns::pop_stack(itstack);
@@ -943,29 +958,8 @@ bool begin_visit(flwor_expr& v)
   bool isGeneral = v.compute_is_general();
 
   v.set_general(isGeneral);
-
-  // A call that the compiler cannot prove to be free of side effects can be a
-  // sequential function. A flwor where that can be seen gets the same evaluation as
-  // a sequential one: each clause completes before the next. The tuples of a general
-  // flwor are materialized where the plan below says so. A flwor where it cannot be
-  // seen keeps its lazy evaluation.
-  bool const unprovenCalls = (!v.is_sequential() &&
-                              theCCB->theMayRunSideEffects &&
-                              expr_tools::evaluates_in_clause_order(&v));
-
-  if (unprovenCalls)
-  {
-    isGeneral = true;
-    v.set_general(true);
-  }
-
-  auto const runsInOrder = [unprovenCalls](const expr* e)
-  {
-    return e->is_sequential() ||
-           (unprovenCalls && expr_tools::calls_unproven_function(e));
-  };
-
-  if (v.is_sequential() || unprovenCalls)
+    
+  if (v.is_sequential())
   {
     pragma* pr = 0;
     theCCB->lookup_pragma(&v, "no-materialization", pr);
@@ -1060,7 +1054,7 @@ bool begin_visit(flwor_expr& v)
               ++numForClauses;
           }
 
-          if (!pr && runsInOrder(domExpr) &&
+          if (!pr && domExpr->is_sequential() &&
               (k == flwor_clause::for_clause ||
                k == flwor_clause::window_clause ||
                numForClauses > 0))
@@ -1107,7 +1101,7 @@ bool begin_visit(flwor_expr& v)
 
       const flwor_clause* lastClause = v.get_clause(v.num_clauses()-1);
 
-      if (runsInOrder(v.get_return_expr()) &&
+      if (v.get_return_expr()->is_sequential() &&
           lastClause->get_kind() != flwor_clause::orderby_clause &&
           lastClause->get_kind() != flwor_clause::groupby_clause)
       {
@@ -1685,7 +1679,7 @@ PlanIter_t gflwor_codegen(flwor_expr& flworExpr, int currentClause)
 
     var_expr* var = fc->get_var();
 
-    PlanIter_t domainIter = pop_itstack();
+    PlanIter_t domainIter = binding_sequence_iter(fc, pop_itstack());
 
     std::vector<PlanIter_t>& varRefs = clauseVarMap->theVarRebinds[0]->theOutputVarRefs;
     std::vector<PlanIter_t>* posVarRefs = &no_var_iters;
@@ -2111,7 +2105,7 @@ void flwor_codegen(const flwor_expr& flworExpr)
 
       var_expr* var = fc->get_var();
 
-      PlanIter_t domainIter = pop_itstack();
+      PlanIter_t domainIter = binding_sequence_iter(fc, pop_itstack());
 
       std::vector<PlanIter_t>& varRefs =
       clauseVarMap->theVarRebinds[0]->theOutputVarRefs;

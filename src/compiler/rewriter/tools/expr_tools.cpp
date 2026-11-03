@@ -902,9 +902,19 @@ static bool may_run_side_effects_rec(
     const expr* e,
     std::set<const function*>& visitedUdfs)
 {
+  CompilerCB* ccb = const_cast<expr*>(e)->get_ccb();
+
+  // Nothing with a side effect is reachable (classify_calls): a call has none.
+  bool const callsHaveEffects = ccb->theCallEffects == CompilerCB::CALLS_HAVE_EFFECTS;
+
   switch (e->get_expr_kind())
   {
   case dynamic_function_invocation_expr_kind:
+    if (callsHaveEffects)
+      return true;
+
+    break;
+
   case eval_expr_kind:
   case var_set_expr_kind:
   case apply_expr_kind:
@@ -918,7 +928,7 @@ static bool may_run_side_effects_rec(
   {
     const function* f = static_cast<const fo_expr*>(e)->get_func();
 
-    if (f->isSequential() || function_runs_opaque_code(f))
+    if (f->isSequential() || (callsHaveEffects && function_runs_opaque_code(f)))
       return true;
 
     if (f->isUdf() && visitedUdfs.insert(f).second)
@@ -959,11 +969,56 @@ bool may_run_side_effects(const expr* root)
 }
 
 
+// Whether what this built-in function returns is atomic or comes from its input, so
+// that it returns nothing new. Otherwise it may return a new node or JSON item.
+static bool builtin_returns_existing_items(const function* f, TypeManager* tm)
+{
+  switch (f->getKind())
+  {
+  case FunctionConsts::OP_CONCATENATE_N:
+  case FunctionConsts::OP_HOIST_1:
+  case FunctionConsts::OP_UNHOIST_1:
+  case FunctionConsts::FN_HEAD_1:
+  case FunctionConsts::FN_TAIL_1:
+  case FunctionConsts::FN_REVERSE_1:
+  case FunctionConsts::FN_REMOVE_2:
+  case FunctionConsts::FN_INSERT_BEFORE_3:
+  case FunctionConsts::FN_SUBSEQUENCE_2:
+  case FunctionConsts::FN_SUBSEQUENCE_3:
+  case FunctionConsts::OP_ZORBA_SUBSEQUENCE_INT_3:
+  case FunctionConsts::OP_ZORBA_SEQUENCE_POINT_ACCESS_2:
+  case FunctionConsts::FN_EXACTLY_ONE_1:
+  case FunctionConsts::OP_EXACTLY_ONE_NORAISE_1:
+  case FunctionConsts::FN_ONE_OR_MORE_1:
+  case FunctionConsts::FN_ZERO_OR_ONE_1:
+  case FunctionConsts::FN_UNORDERED_1:
+  case FunctionConsts::FN_ROOT_1:
+  case FunctionConsts::OP_SORT_NODES_ASC_1:
+  case FunctionConsts::OP_SORT_NODES_ASC_OR_ATOMICS_1:
+  case FunctionConsts::OP_SORT_NODES_DESC_1:
+  case FunctionConsts::OP_SORT_NODES_DESC_OR_ATOMICS_1:
+  case FunctionConsts::OP_SORT_DISTINCT_NODES_ASC_1:
+  case FunctionConsts::OP_SORT_DISTINCT_NODES_ASC_OR_ATOMICS_1:
+  case FunctionConsts::OP_SORT_DISTINCT_NODES_DESC_1:
+  case FunctionConsts::OP_SORT_DISTINCT_NODES_DESC_OR_ATOMICS_1:
+  case FunctionConsts::OP_ZORBA_MULTI_OBJECT_LOOKUP_2:
+  case FunctionConsts::OP_ZORBA_MULTI_ARRAY_LOOKUP_2:
+  case FunctionConsts::FN_JSONIQ_MEMBERS_1:
+    return true;
+  default:
+    break;
+  }
+
+  return TypeOps::is_subtype(tm,
+                             *f->getSignature().returnType(),
+                             *GENV_TYPESYSTEM.ANY_ATOMIC_TYPE_STAR);
+}
+
+
 /*******************************************************************************
-  The walk behind calls_unproven_function() (theStrict false) and
-  depends_on_evaluation_order() (theStrict true). A function reached in strict mode
-  is proven only if its body is free of any impurity; in the other mode, only if
-  its body makes no unproven call.
+  The walk behind calls_unproven_function() and the like. It looks for a call whose
+  target is not proven. In strict mode, used for the body of a target, it looks for
+  any impurity as well: a target is proven only if its body has none.
 
   Any finding makes the whole walk answer true. So a walk that answers false has
   cleared every function it visited, cycles included, and the compiler cb remembers
@@ -1264,8 +1319,6 @@ bool ImpurityWalk::builtinHasImpurity(const function* f) const
   case FunctionConsts::FN_DOC_1:
   case FunctionConsts::FN_DOC_AVAILABLE_1:
     return true;
-  case FunctionConsts::OP_CONCATENATE_N:
-    return false;
   default:
     break;
   }
@@ -1274,10 +1327,7 @@ bool ImpurityWalk::builtinHasImpurity(const function* f) const
   if (f->getName()->getNamespace().find("/modules/store/") != zstring::npos)
     return true;
 
-  // A built-in function may return a new node or JSON item, unless it returns atomics.
-  return !TypeOps::is_subtype(theTM,
-                              *f->getSignature().returnType(),
-                              *GENV_TYPESYSTEM.ANY_ATOMIC_TYPE_STAR);
+  return !builtin_returns_existing_items(f, theTM);
 }
 
 
@@ -1356,6 +1406,7 @@ bool ImpurityWalk::walk(const expr* e, bool strict)
   case json_direct_object_expr_kind:
   case json_object_expr_kind:
   case json_array_expr_kind:
+  case validate_expr_kind:
   case transform_expr_kind:
   case delete_expr_kind:
   case insert_expr_kind:
@@ -1393,7 +1444,13 @@ bool ImpurityWalk::walk(const expr* e, bool strict)
 }
 
 
-bool calls_unproven_function(const expr* root)
+static CompilerCB::CallEffects call_effects(const expr* e)
+{
+  return const_cast<expr*>(e)->get_ccb()->theCallEffects;
+}
+
+
+static bool has_unproven_call(const expr* root)
 {
   ImpurityWalk w(root);
 
@@ -1406,7 +1463,7 @@ bool calls_unproven_function(const expr* root)
 }
 
 
-bool is_unproven_call(const expr* call)
+static bool is_unproven_call_itself(const expr* call)
 {
   ImpurityWalk w(call);
 
@@ -1427,8 +1484,37 @@ bool is_unproven_call(const expr* call)
 }
 
 
-bool depends_on_evaluation_order(const expr* root)
+bool calls_unproven_function(const expr* root)
 {
+  return call_effects(root) == CompilerCB::CALLS_HAVE_EFFECTS && has_unproven_call(root);
+}
+
+
+bool is_unproven_call(const expr* call)
+{
+  return call_effects(call) == CompilerCB::CALLS_HAVE_EFFECTS &&
+         is_unproven_call_itself(call);
+}
+
+
+bool call_results_can_differ(const expr* root)
+{
+  return call_effects(root) != CompilerCB::CALLS_ARE_PURE && has_unproven_call(root);
+}
+
+
+bool is_call_with_varying_result(const expr* call)
+{
+  return call_effects(call) != CompilerCB::CALLS_ARE_PURE &&
+         is_unproven_call_itself(call);
+}
+
+
+bool depends_on_call_effects(const expr* root)
+{
+  if (call_effects(root) != CompilerCB::CALLS_HAVE_EFFECTS)
+    return false;
+
   ImpurityWalk w(root);
 
   bool const answer = w.walk(root, true);
@@ -1440,62 +1526,248 @@ bool depends_on_evaluation_order(const expr* root)
 }
 
 
-bool evaluates_in_clause_order(const flwor_expr* flwor)
+/*******************************************************************************
+  The closed world of a query: the walk covers the query body, what its prolog
+  variables are initialized with, and every function that it names in a call or a
+  function item. A dynamic function call can only reach what this walk reaches,
+  unless something here brings in code that it cannot see. Anything that can do so,
+  or that can have a side effect itself, means CALLS_HAVE_EFFECTS. A query with no
+  dynamic call has no call to classify: its direct sequential calls have their own
+  rules, and CALLS_ARE_PURE leaves them alone at no cost.
+********************************************************************************/
+class ClosedWorldWalk
 {
-  // The exprs that a sequential flwor can run in a clause of their own.
-  std::vector<const expr*> parts;
-  std::vector<const expr*> others;
+  TypeManager                   * theTM;
+  std::set<const function*>       theFunctions;
+  std::set<const var_expr*>       theVars;
 
-  csize const numClauses = flwor->num_clauses();
+public:
+  bool theHasCalls;
+  bool theResultsCanDiffer;
+  bool theHasEffects;
 
-  for (csize i = 0; i < numClauses; ++i)
+  explicit ClosedWorldWalk(TypeManager* tm)
+    :
+    theTM(tm),
+    theHasCalls(false),
+    theResultsCanDiffer(false),
+    theHasEffects(false)
   {
-    const flwor_clause* c = flwor->get_clause(i);
-
-    switch (c->get_kind())
-    {
-    case flwor_clause::for_clause:
-    case flwor_clause::let_clause:
-    case flwor_clause::window_clause:
-      parts.push_back(static_cast<const forletwin_clause*>(c)->get_expr());
-      break;
-    case flwor_clause::where_clause:
-      others.push_back(static_cast<const where_clause*>(c)->get_expr());
-      break;
-    default:
-      break;
-    }
   }
 
-  parts.push_back(flwor->get_return_expr());
+  void walk(const expr* e);
 
-  csize firstCall = parts.size();
+private:
+  void walkFunction(const function* f);
 
-  for (csize i = 0; i < parts.size(); ++i)
+  void walkBuiltin(const fo_expr* fo);
+
+  void walkVar(const var_expr* var);
+};
+
+
+void ClosedWorldWalk::walkFunction(const function* f)
+{
+  if (f == NULL)
   {
-    if (calls_unproven_function(parts[i]))
-    {
-      firstCall = i;
-      break;
-    }
+    theHasEffects = true;
+    return;
   }
 
-  if (firstCall == parts.size())
-    return false;
+  if (f->isSequential() || f->isUpdating())
+    theHasEffects = true;
 
-  for (csize i = 0; i < parts.size(); ++i)
+  if (!f->isDeterministic())
+    theResultsCanDiffer = true;
+
+  if (!f->isUdf())
+    return;
+
+  if (!theFunctions.insert(f).second)
+    return;
+
+  const expr* body = static_cast<const user_function*>(f)->getBody();
+
+  // An external function, or one loaded from a plan: nothing says what it runs.
+  if (body == NULL)
+    theHasEffects = true;
+  else
+    walk(body);
+}
+
+
+void ClosedWorldWalk::walkBuiltin(const fo_expr* fo)
+{
+  const function* f = fo->get_func();
+
+  if (f->isExternal())
+    theHasEffects = true;
+
+  switch (f->getKind())
   {
-    if (i != firstCall && depends_on_evaluation_order(parts[i]))
-      return true;
+  case FunctionConsts::FN_FUNCTION_LOOKUP_2:
+  case FunctionConsts::OP_ZORBA_FUNCTION_LOOKUP_5:
+  case FunctionConsts::FN_ZORBA_INVOKE_N:
+  case FunctionConsts::FN_ZORBA_INVOKE_N_N:
+  case FunctionConsts::FN_ZORBA_INVOKE_U_N:
+  case FunctionConsts::FN_ZORBA_INVOKE_S_N:
+  case FunctionConsts::FN_ZORBA_EVAL_1:
+  case FunctionConsts::FN_ZORBA_EVAL_N_1:
+  case FunctionConsts::FN_ZORBA_EVAL_U_1:
+  case FunctionConsts::FN_ZORBA_EVAL_S_1:
+    theHasEffects = true;
+    break;
+  case FunctionConsts::FN_TRACE_2:
+    theResultsCanDiffer = true;
+    break;
+  default:
+    break;
   }
 
-  for (csize i = 0; i < others.size(); ++i)
+  walkFunction(f);
+
+  if (function_runs_opaque_code(f))
+    theHasCalls = true;
+
+  if (!builtin_returns_existing_items(f, theTM))
+    theResultsCanDiffer = true;
+}
+
+
+void ClosedWorldWalk::walkVar(const var_expr* var)
+{
+  if (var->get_kind() != var_expr::prolog_var &&
+      var->get_kind() != var_expr::local_var)
+    return;
+
+  if (!theVars.insert(var).second)
+    return;
+
+  // The value comes from outside of the query. Only a type can say that it is not a
+  // function item that reaches code the walk does not see.
+  if (var->is_external())
   {
-    if (depends_on_evaluation_order(others[i]))
-      return true;
+    xqtref_t type = const_cast<var_expr*>(var)->get_return_type();
+
+    if (!TypeOps::is_subtype(theTM, *type, *GENV_TYPESYSTEM.STRUCTURED_ITEM_TYPE_STAR) &&
+        !TypeOps::is_subtype(theTM, *type, *GENV_TYPESYSTEM.ANY_ATOMIC_TYPE_STAR))
+      theHasEffects = true;
   }
 
-  return false;
+  for (csize i = 0; i < var->num_set_exprs(); ++i)
+  {
+    const var_set_expr* setExpr = var->get_set_expr(i);
+
+    if (setExpr->get_expr_kind() != var_decl_expr_kind)
+      theHasEffects = true;
+    else if (setExpr->get_expr() != NULL)
+      walk(setExpr->get_expr());
+  }
+}
+
+
+void ClosedWorldWalk::walk(const expr* e)
+{
+  // The kinds of expr and the functions below are all that gives an expr a sequential
+  // or updating scripting kind. The kind of the expr itself cannot be used: a block
+  // with the declaration of a prolog variable has one.
+  if (theHasEffects && theHasCalls)
+    return;
+
+  switch (e->get_expr_kind())
+  {
+  case dynamic_function_invocation_expr_kind:
+    theHasCalls = true;
+    break;
+
+  case fo_expr_kind:
+  {
+    const fo_expr* fo = static_cast<const fo_expr*>(e);
+
+    if (fo->get_func()->isUdf())
+      walkFunction(fo->get_func());
+    else
+      walkBuiltin(fo);
+
+    break;
+  }
+  case function_item_expr_kind:
+    walkFunction(static_cast<const function_item_expr*>(e)->get_function());
+    break;
+
+  case var_expr_kind:
+    walkVar(static_cast<const var_expr*>(e));
+    break;
+
+  case var_set_expr_kind:
+  case apply_expr_kind:
+  case exit_expr_kind:
+  case exit_catcher_expr_kind:
+  case flowctl_expr_kind:
+  case while_expr_kind:
+  case eval_expr_kind:
+  case debugger_expr_kind:
+  case delete_expr_kind:
+  case insert_expr_kind:
+  case rename_expr_kind:
+  case replace_expr_kind:
+    theHasEffects = true;
+    break;
+
+  case doc_expr_kind:
+  case elem_expr_kind:
+  case attr_expr_kind:
+  case namespace_expr_kind:
+  case text_expr_kind:
+  case pi_expr_kind:
+  case json_direct_object_expr_kind:
+  case json_object_expr_kind:
+  case json_array_expr_kind:
+  case validate_expr_kind:
+  case transform_expr_kind:
+    theResultsCanDiffer = true;
+    break;
+
+  default:
+    break;
+  }
+
+  ExprConstIterator iter(e);
+  while (!iter.done() && !(theHasEffects && theHasCalls))
+  {
+    const expr* child = iter.get_expr();
+
+    if (child != NULL)
+      walk(child);
+
+    iter.next();
+  }
+}
+
+
+void classify_calls(expr* root)
+{
+  CompilerCB* ccb = root->get_ccb();
+
+  // What an eval query can see comes from the query that runs it.
+  if (ccb->theIsEval)
+  {
+    ccb->theCallEffects = CompilerCB::CALLS_HAVE_EFFECTS;
+    return;
+  }
+
+  ClosedWorldWalk w(root->get_type_manager());
+
+  w.walk(root);
+
+  if (!w.theHasCalls)
+    ccb->theCallEffects = CompilerCB::CALLS_ARE_PURE;
+  else if (w.theHasEffects)
+    ccb->theCallEffects = CompilerCB::CALLS_HAVE_EFFECTS;
+  else if (w.theResultsCanDiffer)
+    ccb->theCallEffects = CompilerCB::CALLS_RESULTS_CAN_DIFFER;
+  else
+    ccb->theCallEffects = CompilerCB::CALLS_ARE_PURE;
 }
 
 

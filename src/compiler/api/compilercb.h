@@ -286,8 +286,14 @@ ZORBA_DLL_PUBLIC void query_resources_fail_walk(unsigned long edge);
 
   theFunctionPurity :
   -------------------
-  What expr_tools::calls_unproven_function() [0] and
-  expr_tools::depends_on_evaluation_order() [1] found for each function so far.
+  What the walk of expr_tools::calls_unproven_function() found for each function so
+  far: [0] whether it makes an unproven call, [1] whether it has any impurity.
+  Compile time only: not serialized.
+
+  theCallEffects :
+  ----------------
+  What a dynamic function call can do in this query, set by
+  expr_tools::classify_calls(). Until then, and in an eval query, it can have effects.
   Compile time only: not serialized.
 
   theHasEval :
@@ -411,6 +417,16 @@ public:
 
   typedef std::map<const function*, bool> FunctionPurityMap;
 
+  enum CallEffects
+  {
+    // Something with a side effect, or code the compiler cannot see, is reachable.
+    CALLS_HAVE_EFFECTS,
+    // No side effect, but a nondeterministic function or a constructor is reachable.
+    CALLS_RESULTS_CAN_DIFFER,
+    // Neither, or no dynamic call: a call is an ordinary pure expression.
+    CALLS_ARE_PURE
+  };
+
   typedef std::multimap<const expr*, pragma*>  PragmaMap;
 
   typedef PragmaMap::const_iterator PragmaMapIter;
@@ -443,6 +459,8 @@ public:
   bool                      theMayRunSideEffects;
 
   FunctionPurityMap         theFunctionPurity[2];
+
+  CallEffects               theCallEffects = CALLS_HAVE_EFFECTS;
 
   bool                      theHaveTimeout;
 

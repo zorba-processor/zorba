@@ -1,4 +1,4 @@
-(: fn validate gives a new node per call. :)
+(: A validate expression gives a new node per call. :)
 declare namespace an = "http://zorba.io/annotations";
 declare %an:assignable variable $g := 0;
 declare %an:sequential function local:bump() { $g := $g + 1; $g };
