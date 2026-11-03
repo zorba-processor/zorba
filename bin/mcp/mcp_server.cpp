@@ -465,19 +465,19 @@ Json Server::tools() const {
       { "name", "list_documents" },
       { "title", "List documents" },
       { "description",
-        "Lists files, recursive, sorted by path, with format, size, fields. "
-        "First line: scan state, totals, dirs (subdirectories, if cut or "
+        "Lists files, recursive, sorted by path: format, size, top-level "
+        "fields. Line 1: scan state, totals, dirs (subdirectories, if cut or "
         "scanning), incomplete (may miss files). memory_limit: scan stopped; "
-        "ask by path. A file as path adds a preview." },
+        "ask by path. A file as path adds a preview (nested fields)." },
       { "inputSchema", Json::object( {
           { "type", "object" },
           { "properties", Json::object( {
               { "path", Json::object( {
                   { "type", "string" },
-                  { "description", "Subdirectory or file, relative." } } ) },
+                  { "description", "Subdirectory or file." } } ) },
               { "limit", Json::object( {
                   { "type", "integer" },
-                  { "description", "Files to list; default 100." } } ) },
+                  { "description", "Max files; default 100." } } ) },
               { "refresh", Json::object( {
                   { "type", "boolean" },
                   { "description", "Restart the scan." } } ) }

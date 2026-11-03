@@ -1864,6 +1864,127 @@ void test_description( Fixture const &f ) {
          "it says what the listing is and what the terms mean", tool );
 }
 
+// Without path the listing names each file's top-level fields and nothing
+// nested; with a file as path, the whole preview is there.
+void test_compact_listing( Fixture const &f ) {
+  Tree t;
+  t.write( "a.json",
+    "{\"id\":1,\"meta\":{\"nestedkey\":\"nestedsample\",\"list\":[1,2]},"
+    "\"items\":[{\"inner\":\"innersample\"}]}" );
+  t.write( "b.json", "[{\"id\":1,\"owner\":{\"deepkey\":\"deepsample\"}},{\"id\":2}]" );
+  t.write( "c.xml", "<r a=\"1\"><c><d>xmlsample</d></c><e/></r>" );
+  t.write( "d.csv", "id,name\n1,csvsample\n" );
+  t.write( "wide.json",
+    "{\"k1\":1,\"k2\":2,\"k3\":3,\"k4\":4,\"k5\":5,\"k6\":6,\"k7\":7,\"k8\":8,"
+    "\"k9\":9}" );
+  t.write( "sub/e.json", "{\"top\":{\"below\":\"subsample\"}}" );
+  ServerConfig config;
+  config.root = t.root;
+  Server server( f.zorba, config, std::cerr );
+  wait_complete( server );
+
+  auto fields_of = [&]( Listing const &l, std::string const &path ) {
+    for ( Json const &file : l.files )
+      if ( file.find( "path" )->text() == path ) {
+        Json const *const m = file.find( "fields" );
+        return m ? m->dump() : std::string( "none" );
+      }
+    return std::string( "not listed" );
+  };
+
+  Listing const l( list( server ) );
+  check( l.total() == "6" && l.shown() == "6" && l.state() == "complete",
+         "compact: counts and status as before", l.text );
+  check( fields_of( l, "a.json" ) == "[\"id\",\"meta\",\"items\"]",
+         "compact: a json object lists its top-level keys", l.text );
+  check( fields_of( l, "b.json" ) == "[\"id\",\"owner\"]",
+         "compact: a json array lists the keys of its records", l.text );
+  check( fields_of( l, "c.xml" ) == "[\"/r\",\"/r/@a\",\"/r/c\",\"/r/e\"]",
+         "compact: xml lists the root and its children", l.text );
+  check( fields_of( l, "d.csv" ) == "[\"id\",\"name\"]",
+         "compact: csv lists its columns", l.text );
+  check( contains( l.text, "\"fields\":[\"k1\",\"k2\",\"k3\",\"k4\",\"k5\","
+                           "\"k6\",\"k7\",\"k8\"],\"fields_more\":true" ),
+         "compact: at most 8 fields, then fields_more", l.text );
+  check( fields_of( l, "sub/e.json" ) == "[\"top\"]",
+         "compact: a file in a subdirectory lists its top-level keys", l.text );
+  for ( char const *const nested :
+        { "nestedkey", "nestedsample", "meta.", "items[]", "innersample",
+          "deepkey", "deepsample", "owner.", "/r/c/d", "xmlsample",
+          "csvsample", "below", "subsample", "preview", "records", "kinds",
+          "rows", "namespaces", "arrays" } )
+    check( !contains( l.text, nested ),
+           std::string( "compact: the listing has no " ) + nested, l.text );
+
+  // A directory as path is a listing too.
+  Listing const sub( list_path( server, "sub" ) );
+  check( fields_of( sub, "sub/e.json" ) == "[\"top\"]" &&
+         !contains( sub.text, "below" ) && !contains( sub.text, "preview" ),
+         "compact: a directory as path is compact", sub.text );
+
+  // A file as path: the preview, with the nested detail.
+  Listing const a( list_path( server, "a.json" ) );
+  std::string const p( dump_of( a.preview() ) );
+  check( contains( p, "\"meta.nestedkey\":[\"nestedsample\"]" ) &&
+         contains( p, "\"items[].inner\":[\"innersample\"]" ) &&
+         contains( p, "\"shape\":\"object\"" ) && contains( p, "\"arrays\"" ),
+         "path: a json file has its full preview", a.text );
+  Listing const c( list_path( server, "c.xml" ) );
+  check( contains( c.text, "\"/r/c/d\"" ) && contains( c.text, "xmlsample" ) &&
+         contains( c.text, "\"paths\"" ),
+         "path: an xml file has its full preview", c.text );
+  Listing const d( list_path( server, "d.csv" ) );
+  check( contains( d.text, "csvsample" ) && contains( d.text, "\"kinds\"" ),
+         "path: a csv file has its full preview", d.text );
+
+  // limit and refresh work as before.
+  Listing const one( list( server, Json::object( { { "limit", 1 } } ) ) );
+  check( one.shown() == "1" && one.total() == "6" && one.files.size() == 1,
+         "limit: still cuts the listing", one.text );
+  Listing const again( list( server, Json::object( { { "refresh", true } } ) ) );
+  check( again.has_scan() && !again.is_error, "refresh: still answers",
+         again.text );
+  wait_complete( server );
+  Listing const after( list( server ) );
+  check( fields_of( after, "a.json" ) == "[\"id\",\"meta\",\"items\"]",
+         "refresh: the listing is compact again", after.text );
+}
+
+// The listing of the benchmark corpus (bench/agents/data/snapshot): its size is
+// printed and checked.
+void test_corpus_listing( Fixture const &f ) {
+  stdfs::path const corpus( stdfs::path( __FILE__ ).parent_path()
+    .parent_path().parent_path().parent_path() / "bench" / "agents" / "data" /
+    "snapshot" );
+  check( stdfs::is_directory( corpus ), "the benchmark corpus is there",
+         corpus.string() );
+  if ( !stdfs::is_directory( corpus ) )
+    return;
+  ServerConfig config;
+  config.root = stdfs::canonical( corpus ).string();
+  Server server( f.zorba, config, std::cerr );
+  wait_complete( server );
+
+  Listing const all( list( server ) );
+  std::cout << "corpus listing without path: " << all.text.size()
+            << " characters, " << all.files.size() << " files" << std::endl;
+  Listing const weather( list_path( server, "weather" ) );
+  std::cout << "corpus listing of weather: " << weather.text.size()
+            << " characters, " << weather.files.size() << " files" << std::endl;
+  check( all.total() == "21" && all.shown() == "21",
+         "the corpus has 21 files", all.text );
+  check( weather.total() == "12", "weather has 12 files", weather.text );
+  // The sizes of this listing of the frozen corpus: 4671 and 2629 characters
+  // before (the benchmark's baseline logs have the same two numbers).
+  check( all.text.size() == 3986, "the corpus listing is 3986 characters",
+         std::to_string( all.text.size() ) );
+  check( weather.text.size() == 2574, "the weather listing is 2574 characters",
+         std::to_string( weather.text.size() ) );
+  check( !contains( all.text, "features[]" ) && !contains( all.text, "/channel/" ) &&
+         !contains( all.text, "metadata." ),
+         "the corpus listing has no nested names", all.text );
+}
+
 struct Test {
   char const *name;
   void (*fn)( Fixture const& );
@@ -1900,7 +2021,9 @@ Test const tests[] = {
   { "scan_shutdown", test_shutdown },
   { "scan_binary", test_binary },
   { "scan_stress", test_stress },
-  { "scan_description", test_description }
+  { "scan_description", test_description },
+  { "scan_compact_listing", test_compact_listing },
+  { "scan_corpus_listing", test_corpus_listing }
 };
 
 } // namespace
