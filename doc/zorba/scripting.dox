@@ -317,6 +317,8 @@ While it contains statements, the outer construct is still an expression (it ret
 
 In short, an expression is sequential if it contains statements that have side effects (updating some XML, assigning a variable in scope outside of the expression) or that affect the control flow (break, continue, exit returning) - or if it calls a sequential function.
 
+A call through a function item, such as <tt>$f()</tt> or <tt>fn:for-each($s, $f)</tt>, is sequential if the function it reaches is. The compiler accepts such a call in any function, because it cannot always know the function. Unless it can see the function and prove it deterministic and free of side effects, it treats the call as one that may have side effects: at every optimization level the call runs where and as many times as it is written, and nothing is moved across it. If another clause of a FLWOR expression can observe the call, each clause runs for all the tuples before the next, as with a direct call of a sequential function.
+
 \subsection scripting_do_do Do-do-do-do-deliver
 
 This pattern of having, in a block, several statements followed by a single expression is the most general way of using statements together with expressions. The main program is built that way: it can be a single expression, it can be several statements followed by a single expression, or it can be just several statements (in which case it is as if the final expression were empty).
