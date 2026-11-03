@@ -24,6 +24,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cstdio>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -31,6 +32,7 @@
 #include <map>
 #include <sstream>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include <sys/resource.h>
@@ -1150,6 +1152,14 @@ struct TempTree {
     std::ofstream out( ( root + "/" + rel ).c_str(), std::ios::binary );
     out << content;
   }
+
+  // Moves the modification time of a file by \a seconds.
+  void touch( std::string const &rel, int seconds ) const {
+    namespace stdfs = std::filesystem;
+    stdfs::path const p( root + "/" + rel );
+    stdfs::last_write_time( p, stdfs::last_write_time( p ) +
+                               std::chrono::seconds( seconds ) );
+  }
 };
 
 // A query that runs out of memory under --max-memory is a tool error, and
@@ -1241,6 +1251,7 @@ void test_documents_stream( Fixture const &f ) {
   ServerConfig config;
   config.root = t.root;
   config.timeout = std::chrono::milliseconds( 0 );
+  config.cache_max_file_kb = 0;         // the module alone, no cache
   Server server( f.zorba, config, std::cerr );
   std::string const scan(
     "import module namespace dir = \"http://zorba.io/modules/directory\";\n"
@@ -1647,6 +1658,678 @@ void test_html_edge_cases( Fixture const &f ) {
   check( !has_parser || contains( result_text( r ), "good.html=ok" ),
          "the good file is not affected", r.dump().substr( 0, 2000 ) );
   check_alive( server );
+}
+
+
+std::string query_text( Server &server, std::string const &query ) {
+  Json const r = call_tool( server, "run_query",
+                            Json::object( { { "query", query } } ) );
+  if ( is_tool_error( r ) )
+    return "error: " + r.dump();
+  return result_text( r );
+}
+
+std::string open_value( Server &server, std::string const &file ) {
+  return query_text( server, dir_import + "dir:open($dir:root, \"" + file +
+                             "\")(\"content\")(\"v\")" );
+}
+
+// Two reads: the first one caches nothing, the second one admits.
+void warm( Server &server, std::string const &file ) {
+  open_value( server, file );
+  open_value( server, file );
+}
+
+std::string stats_text( DocumentCache::Stats const &s ) {
+  return "hits " + std::to_string( s.hits ) + ", misses " +
+    std::to_string( s.misses ) + ", admissions " +
+    std::to_string( s.admissions ) + ", evictions " +
+    std::to_string( s.evictions ) + ", entries " +
+    std::to_string( s.entries ) + ", bytes " + std::to_string( s.bytes );
+}
+
+// A JSON file of exactly \a size bytes whose member v is \a v.
+std::string json_of_size( int v, std::size_t size ) {
+  std::string text( "{ \"v\" : " + std::to_string( v ) + " }" );
+  text.append( size - text.size(), ' ' );
+  return text;
+}
+
+void test_cache_hit( Fixture const &f ) {
+  TempTree t;
+  t.write( "a.json", "{ \"v\" : 1 }" );
+  t.write( "b.xml", "<r><v>2</v></r>" );
+  ServerConfig config;
+  config.root = t.root;
+  Server server( f.zorba, config, std::cerr );
+
+  std::string v = open_value( server, "a.json" );
+  DocumentCache::Stats s = server.cache_stats();
+  check( v == "1" && s.misses == 1 && s.admissions == 0 && s.hits == 0 &&
+         s.entries == 0 && s.bytes == 0,
+         "the first dir:open caches nothing", v + " / " + stats_text( s ) );
+
+  v = open_value( server, "a.json" );
+  s = server.cache_stats();
+  check( v == "1" && s.misses == 2 && s.admissions == 1 && s.hits == 0 &&
+         s.entries == 1 && s.bytes > 0,
+         "the second dir:open admits the document",
+         v + " / " + stats_text( s ) );
+
+  v = open_value( server, "a.json" );
+  s = server.cache_stats();
+  check( v == "1" && s.hits == 1 && s.misses == 2 && s.admissions == 1,
+         "the third dir:open is served from the cache",
+         v + " / " + stats_text( s ) );
+
+  std::string const docs( dir_import +
+    "string-join(for $d in dir:documents($dir:root) "
+    "return $d(\"path\"), \",\")" );
+  v = query_text( server, docs );
+  s = server.cache_stats();
+  check( v == "\"a.json,b.xml\"" && s.hits == 2 && s.misses == 3 &&
+         s.entries == 1,
+         "dir:documents uses the cache; the other document's first hit "
+         "caches nothing", v + " / " + stats_text( s ) );
+
+  v = query_text( server, docs );
+  s = server.cache_stats();
+  check( v == "\"a.json,b.xml\"" && s.hits == 3 && s.misses == 4 &&
+         s.admissions == 2 && s.entries == 2,
+         "a repeated dir:documents admits the other document",
+         v + " / " + stats_text( s ) );
+
+  v = query_text( server, docs );
+  s = server.cache_stats();
+  check( v == "\"a.json,b.xml\"" && s.hits == 5 && s.misses == 4,
+         "dir:documents is then served from the cache",
+         v + " / " + stats_text( s ) );
+
+  // Opened under another root, the record carries another relative path.
+  std::filesystem::create_directories( t.root + "/sub" );
+  t.write( "sub/c.json", "{ \"v\" : 3 }" );
+  std::string const both( dir_import +
+    "dir:open($dir:root, \"sub/c.json\")(\"path\"), "
+    "dir:open(concat($dir:root, \"/sub\"), \"c.json\")(\"path\")" );
+  for ( int i = 0; i < 3; ++i ) {
+    v = query_text( server, both );
+    check( v == "\"sub/c.json\"\n\"c.json\"",
+           "a record keeps the path relative to the root it was opened with",
+           v );
+  }
+
+  // A query that can apply updates does not use the cache.
+  DocumentCache::Stats const before = server.cache_stats();
+  v = query_text( server, dir_import +
+    "declare namespace an = \"http://zorba.io/annotations\";\n"
+    "declare %an:sequential function local:f() "
+    "{ dir:open($dir:root, \"a.json\")(\"content\")(\"v\") };\n"
+    "local:f()" );
+  s = server.cache_stats();
+  check( v == "1" && s.hits == before.hits && s.misses == before.misses,
+         "a sequential query bypasses the cache",
+         v + " / " + stats_text( s ) );
+
+  check( DocumentCache::tracker_bytes() > 0 &&
+         DocumentCache::tracker_bytes() <= 64 * 1024,
+         "the hit tracker has a small fixed size",
+         std::to_string( DocumentCache::tracker_bytes() ) );
+
+  // The hook module is an XQuery module whatever the language of the query.
+  ServerConfig jsoniq;
+  jsoniq.root = t.root;
+  jsoniq.jsoniq_default = true;
+  Server jq( f.zorba, jsoniq, std::cerr );
+  warm( jq, "a.json" );
+  v = open_value( jq, "a.json" );
+  s = jq.cache_stats();
+  check( v == "1" && s.admissions == 1 && s.hits == 1,
+         "the cache works with --language jsoniq", v + " / " + stats_text( s ) );
+}
+
+void test_cache_invalidate( Fixture const &f ) {
+  TempTree t;
+  t.write( "a.json", "{ \"v\" : 1 }" );
+  t.write( "b.json", "{ \"v\" : 5 }" );
+  ServerConfig config;
+  config.root = t.root;
+  Server server( f.zorba, config, std::cerr );
+
+  std::string v = open_value( server, "a.json" );
+  check( v == "1", "initial content", v );
+  open_value( server, "a.json" );
+  warm( server, "b.json" );
+  check( server.cache_stats().entries == 2, "both documents are admitted",
+         stats_text( server.cache_stats() ) );
+
+  t.write( "a.json", "{ \"v\" : 22 }" );
+  v = open_value( server, "a.json" );
+  check( v == "22" && server.cache_stats().entries == 1,
+         "a file of another size is parsed again and counts as a first hit",
+         v + " / " + stats_text( server.cache_stats() ) );
+  v = open_value( server, "a.json" );
+  check( v == "22" && server.cache_stats().entries == 2,
+         "its second hit admits it again",
+         v + " / " + stats_text( server.cache_stats() ) );
+
+  t.write( "a.json", "{ \"v\" : 33 }" );
+  t.touch( "a.json", 10 );
+  v = open_value( server, "a.json" );
+  check( v == "33", "a file of the same size, modified, is parsed again", v );
+
+  open_value( server, "a.json" );
+  v = open_value( server, "a.json" );
+  DocumentCache::Stats s = server.cache_stats();
+  check( v == "33" && s.hits == 1 && s.entries == 2,
+         "the new content is cached", v + " / " + stats_text( s ) );
+
+  // Only the change time differs.
+  std::this_thread::sleep_for( std::chrono::milliseconds( 50 ) );
+  std::filesystem::permissions( t.root + "/a.json",
+    std::filesystem::perms::group_read, std::filesystem::perm_options::add );
+  std::filesystem::permissions( t.root + "/a.json",
+    std::filesystem::perms::group_read, std::filesystem::perm_options::remove );
+  v = open_value( server, "a.json" );
+  s = server.cache_stats();
+  check( v == "33" && s.hits == 1 && s.entries == 1,
+         "a change of the change time alone drops the entry",
+         v + " / " + stats_text( s ) );
+  open_value( server, "a.json" );
+
+  // Another file of the same size and modification time.
+  auto const mtime =
+    std::filesystem::last_write_time( t.root + "/a.json" );
+  t.write( "a.new", "{ \"v\" : 44 }" );
+  std::filesystem::last_write_time( t.root + "/a.new", mtime );
+  std::filesystem::rename( t.root + "/a.new", t.root + "/a.json" );
+  v = open_value( server, "a.json" );
+  s = server.cache_stats();
+  check( v == "44" && s.hits == 1,
+         "another inode with the same size and mtime is parsed again",
+         v + " / " + stats_text( s ) );
+
+  std::filesystem::remove( t.root + "/a.json" );
+  v = open_value( server, "a.json" );
+  s = server.cache_stats();
+  check( contains( v, "NOT_FOUND" ) && s.entries == 1,
+         "a deleted file is not served and its entry is dropped",
+         v + " / " + stats_text( s ) );
+
+  v = query_text( server, dir_import +
+    "count(dir:documents($dir:root))" );
+  check( v == "1", "dir:documents no longer returns the deleted file", v );
+}
+
+void test_cache_evict( Fixture const &f ) {
+  TempTree t;
+  auto name = []( int i ) {
+    return std::string( i < 10 ? "f0" : "f" ) + std::to_string( i ) + ".json";
+  };
+  for ( int i = 1; i <= 11; ++i )
+    t.write( name( i ), "{ \"v\" : " + std::to_string( i ) + " }" );
+  ServerConfig config;
+  config.root = t.root;
+  Server server( f.zorba, config, std::cerr );
+
+  for ( int i = 1; i <= 10; ++i )
+    warm( server, name( i ) );
+  DocumentCache::Stats s = server.cache_stats();
+  check( s.admissions == 10 && s.evictions == 0 && s.entries == 10,
+         "ten documents stay cached", stats_text( s ) );
+  std::size_t const ten_bytes = s.bytes;
+
+  std::string v = open_value( server, name( 1 ) );
+  s = server.cache_stats();
+  check( v == "1" && s.hits == 1, "a cached document is served",
+         v + " / " + stats_text( s ) );
+
+  warm( server, name( 11 ) );
+  s = server.cache_stats();
+  check( s.admissions == 11 && s.evictions == 1 && s.entries == 10 &&
+         s.bytes <= ten_bytes + 64,
+         "the 11th admitted document evicts one", stats_text( s ) );
+
+  v = open_value( server, name( 1 ) );
+  s = server.cache_stats();
+  check( v == "1" && s.hits == 2, "a recently hit document survives",
+         v + " / " + stats_text( s ) );
+
+  v = open_value( server, name( 2 ) );
+  s = server.cache_stats();
+  check( v == "2" && s.hits == 2 && s.entries == 10,
+         "the coldest document was the one evicted, and is parsed again",
+         v + " / " + stats_text( s ) );
+
+  // Evicted documents need two hits again.
+  s = server.cache_stats();
+  check( s.admissions == 11, "an evicted document's next hit does not admit",
+         stats_text( s ) );
+
+  ServerConfig two;
+  two.root = t.root;
+  two.cache_max_files = 2;
+  Server small( f.zorba, two, std::cerr );
+  warm( small, name( 1 ) );
+  warm( small, name( 2 ) );
+  warm( small, name( 3 ) );
+  s = small.cache_stats();
+  check( s.admissions == 3 && s.evictions == 1 && s.entries == 2,
+         "--cache-max-files sets the number of documents", stats_text( s ) );
+
+  // A query over more documents than the cache holds does not replace what
+  // it has just used, so a repeated scan costs at most N admissions.
+  TempTree many;
+  for ( int i = 10; i < 40; ++i )
+    many.write( "g" + std::to_string( i ) + ".json",
+                "{ \"v\" : " + std::to_string( i ) + " }" );
+  ServerConfig scan;
+  scan.root = many.root;
+  Server scanner( f.zorba, scan, std::cerr );
+  std::string const count( dir_import +
+    "count(dir:documents($dir:root)[exists(.(\"content\"))])" );
+  v = query_text( scanner, count );
+  s = scanner.cache_stats();
+  check( v == "30" && s.admissions == 0 && s.misses == 30,
+         "a first scan caches nothing", v + " / " + stats_text( s ) );
+  v = query_text( scanner, count );
+  s = scanner.cache_stats();
+  check( v == "30" && s.admissions == 10 && s.evictions == 0 &&
+         s.entries == 10,
+         "a second scan admits as many documents as the cache holds",
+         v + " / " + stats_text( s ) );
+  v = query_text( scanner, count );
+  s = scanner.cache_stats();
+  check( v == "30" && s.admissions == 10 && s.evictions == 0 && s.hits == 10,
+         "a third scan hits them and admits nothing more",
+         v + " / " + stats_text( s ) );
+}
+
+void test_cache_size( Fixture const &f ) {
+  TempTree t;
+  t.write( "exact.json", json_of_size( 1, 1024 ) );
+  t.write( "over.json", json_of_size( 2, 1025 ) );
+  ServerConfig config;
+  config.root = t.root;
+  config.cache_max_file_kb = 1;
+  Server server( f.zorba, config, std::cerr );
+
+  std::string v;
+  for ( int i = 0; i < 3; ++i )
+    v = open_value( server, "exact.json" );
+  DocumentCache::Stats s = server.cache_stats();
+  check( v == "1" && s.admissions == 1 && s.hits == 1 && s.entries == 1,
+         "a file of exactly the limit is admitted",
+         v + " / " + stats_text( s ) );
+
+  for ( int i = 0; i < 3; ++i )
+    v = open_value( server, "over.json" );
+  s = server.cache_stats();
+  check( v == "2" && s.admissions == 1 && s.hits == 1 && s.entries == 1,
+         "a file one byte over the limit never enters",
+         v + " / " + stats_text( s ) );
+
+  t.write( "exact.json", json_of_size( 3, 1025 ) );
+  v = open_value( server, "exact.json" );
+  s = server.cache_stats();
+  check( v == "3" && s.entries == 0 && s.bytes == 0,
+         "a cached file that grows over the limit is dropped",
+         v + " / " + stats_text( s ) );
+}
+
+void test_cache_default( Fixture const &f ) {
+  ServerConfig config;
+  check( config.cache_max_file_kb == 16 && config.cache_max_files == 10,
+         "the defaults are 16 KB and 10 files" );
+  TempTree t;
+  t.write( "exact.json", json_of_size( 1, 16 * 1024 ) );
+  t.write( "over.json", json_of_size( 2, 16 * 1024 + 1 ) );
+  config.root = t.root;
+  Server server( f.zorba, config, std::cerr );
+  warm( server, "exact.json" );
+  warm( server, "over.json" );
+  warm( server, "over.json" );
+  DocumentCache::Stats const s = server.cache_stats();
+  check( s.admissions == 1 && s.entries == 1,
+         "without parameters, a file of 16 KB is admitted and a larger one "
+         "is not", stats_text( s ) );
+}
+
+void test_cache_off( Fixture const &f ) {
+  for ( bool files : { false, true } ) {
+    TempTree t;
+    t.write( "a.json", "{ \"v\" : 1 }" );
+    ServerConfig config;
+    config.root = t.root;
+    ( files ? config.cache_max_files : config.cache_max_file_kb ) = 0;
+    Server server( f.zorba, config, std::cerr );
+
+    std::string const v1 = open_value( server, "a.json" );
+    std::string const v2 = open_value( server, "a.json" );
+    std::string const v3 = open_value( server, "a.json" );
+    t.write( "a.json", "{ \"v\" : 2 }" );
+    std::string const v4 = open_value( server, "a.json" );
+    DocumentCache::Stats const s = server.cache_stats();
+    check( v1 == "1" && v2 == "1" && v3 == "1" && v4 == "2" && s.hits == 0 &&
+           s.misses == 0 && s.admissions == 0 && s.entries == 0,
+           std::string( "with a limit of 0 " ) +
+           ( files ? "files" : "KB" ) + " nothing is cached",
+           v1 + v2 + v3 + v4 + " / " + stats_text( s ) );
+    check( server.cache_stats_line().empty(),
+           "without a cache there is no counters line",
+           server.cache_stats_line() );
+  }
+}
+
+void test_cache_policy( Fixture const &f ) {
+  TempTree t;
+  t.write( "a.json", "{ \"v\" : 1 }" );
+  t.write( "../outside/secret.json", "{ \"v\" : \"TOP-" "SECRET\" }" );
+  ServerConfig config;
+  config.root = t.root;
+  Server server( f.zorba, config, std::cerr );
+
+  SecurityPolicy expected( SecurityPolicy::secure() );
+  directory_config::apply_policy( expected, t.root );
+  expected.setTimeout( config.timeout );
+  check( server.policy() == expected,
+         "the policy is the directory policy, cache or not" );
+
+  // Warm the cache, then try to reach the file outside the root.
+  warm( server, "a.json" );
+  std::string v = open_value( server, "../outside/secret.json" );
+  check( contains( v, "INVALID_PATH" ) && !contains( v, "SECRET" ),
+         "dir:open outside the root: INVALID_PATH", v );
+
+  std::string const dc(
+    "import module namespace dc = "
+    "\"http://zorba.io/modules/directory-cache\";\n" );
+  // More than once: a second hit is what would admit a document.
+  for ( int i = 0; i < 3; ++i ) {
+    v = query_text( server, dir_import + dc +
+      "count(dc:get($dir:root, \"../outside/secret.json\")), "
+      "count(dc:get(\"" + t.base + "/outside\", \"secret.json\"))" );
+    check( v == "0\n0",
+           "the cache serves nothing outside the root", v );
+    check( !contains( v, "SECRET" ), "no content outside the root", v );
+  }
+
+  v = query_text( server,
+    "import module namespace file = \"http://expath.org/ns/file\";\n"
+    "file:read-text(\"" + t.base + "/outside/secret.json\")" );
+  check( contains( v, "error" ) && !contains( v, "SECRET" ),
+         "file:read-text outside the root: still denied", v );
+
+  DocumentCache::Stats const s = server.cache_stats();
+  check( s.entries == 1, "only the document under the root is cached",
+         stats_text( s ) );
+}
+
+// A user query that imports the hook module cannot change what dir:open
+// returns to later queries: the hook has no function that takes a record.
+void test_cache_inject( Fixture const &f ) {
+  TempTree t;
+  t.write( "a.json", "{ \"v\" : 1 }" );
+  t.write( "b.json", "{ \"v\" : 2 }" );
+  ServerConfig config;
+  config.root = t.root;
+  Server server( f.zorba, config, std::cerr );
+
+  std::string const dc(
+    "import module namespace dc = "
+    "\"http://zorba.io/modules/directory-cache\";\n" );
+  std::string const forged(
+    "{ \"path\" : \"a.json\", \"format\" : \"json\", "
+    "\"content\" : { \"v\" : \"FORGED\" } }" );
+
+  warm( server, "a.json" );
+  std::string v = open_value( server, "a.json" );
+  check( v == "1", "a.json is cached", v );
+
+  v = query_text( server, dir_import + dc +
+    "dc:put($dir:root, \"a.json\", " + forged + ")" );
+  check( contains( v, "error" ) && contains( v, "XPST0017" ),
+         "the hook module has no dc:put", v );
+
+  v = query_text( server,
+    "declare namespace dc = \"http://zorba.io/modules/directory-cache\";\n"
+    "declare function dc:put($root as xs:string, $path as xs:string, "
+    "$record as object()) as object() external;\n"
+    "dc:put(\"" + t.root + "\", \"b.json\", " + forged + ")" );
+  check( contains( v, "error" ) && !contains( v, "FORGED" ),
+         "an external dc:put declared by the query has no implementation", v );
+
+  warm( server, "b.json" );
+  v = query_text( server, dir_import + dc +
+    "dc:get($dir:root, \"a.json\")(\"content\")(\"v\"), "
+    "dc:get($dir:root, \"b.json\")(\"content\")(\"v\")" );
+  check( v == "1\n2", "dc:get returns what dir:open builds", v );
+
+  v = open_value( server, "a.json" ) + "," + open_value( server, "b.json" );
+  DocumentCache::Stats const s = server.cache_stats();
+  check( v == "1,2" && s.entries == 2 && s.admissions == 2,
+         "dir:open still returns the files' content", v + " / " +
+         stats_text( s ) );
+}
+
+// A query stopped by the time limit leaves whole records or none.
+void test_cache_abort( Fixture const &f ) {
+  TempTree t;
+  t.write( "a.json", "{ \"v\" : 1 }" );
+  std::string big( "id,cat,v,n\n" );
+  while ( big.size() < 10u << 20 )
+    big += "1000001,c1,919,name-1000001\n";
+  t.write( "big.csv", big );
+
+  // Stopped while it reads the document, on every hit.
+  ServerConfig config;
+  config.root = t.root;
+  config.cache_max_file_kb = 64 * 1024;
+  config.timeout = std::chrono::milliseconds( 20 );
+  Server server( f.zorba, config, std::cerr );
+  std::string const open_big( dir_import +
+    "count(dir:open($dir:root, \"big.csv\")(\"content\"))" );
+  for ( int i = 0; i < 3; ++i ) {
+    Json const r = run_query( server, open_big );
+    check( is_tool_error( r ) &&
+           contains( field( tool_error( r ), "code" ), "ZXQP0068" ),
+           "a read over the time limit: ZXQP0068", r.dump().substr( 0, 500 ) );
+  }
+  DocumentCache::Stats s = server.cache_stats();
+  check( s.admissions == 0 && s.entries == 0 && s.bytes == 0,
+         "a read stopped by the time limit leaves no record", stats_text( s ) );
+
+  // Stopped after it used the cache.
+  ServerConfig later;
+  later.root = t.root;
+  later.timeout = std::chrono::milliseconds( 200 );
+  Server loop( f.zorba, later, std::cerr );
+  Json const r = run_query( loop, dir_import +
+    "sum(for $i in 1 to 9223372036854775807 "
+    "return dir:open($dir:root, \"a.json\")(\"content\")(\"v\"))" );
+  check( is_tool_error( r ) &&
+         contains( field( tool_error( r ), "code" ), "ZXQP0068" ),
+         "a query over the time limit: ZXQP0068", r.dump().substr( 0, 500 ) );
+  std::string const v = open_value( loop, "a.json" );
+  s = loop.cache_stats();
+  check( v == "1" && s.admissions == 1 && s.entries == 1,
+         "the record kept is whole", v + " / " + stats_text( s ) );
+}
+
+// A file that yields an error record, here the JSON nesting limit, is read
+// again each time; a deep file that fits is cached like any other.
+void test_cache_errors( Fixture const &f ) {
+  TempTree t;
+  write_deep_tree( t );
+  ServerConfig config;
+  config.root = t.root;
+  config.timeout = std::chrono::milliseconds( 0 );
+  Server server( f.zorba, config, std::cerr );
+
+  std::string const open_over( dir_import +
+    "dir:open($dir:root, \"over.json\")(\"error\")(\"code\")" );
+  std::string const open_bad( dir_import +
+    "dir:open($dir:root, \"bad.json\")(\"error\")(\"code\")" );
+  std::string const open_under( dir_import +
+    "dir:open($dir:root, \"under.json\")" );
+  for ( int i = 0; i < 3; ++i ) {
+    std::string v = query_text( server, open_over );
+    check( contains( v, "ZXQP0071" ),
+           "a file over the nesting limit keeps its error record", v );
+    v = query_text( server, open_bad );
+    check( contains( v, "JNDY0021" ),
+           "a malformed file keeps its error record", v );
+  }
+  DocumentCache::Stats s = server.cache_stats();
+  check( s.admissions == 0 && s.entries == 0,
+         "an error record is not cached", stats_text( s ) );
+  check( s.refused == 2, "and is read to be admitted only once per file",
+         std::to_string( s.refused ) );
+
+  std::string first;
+  for ( int i = 0; i < 3; ++i ) {
+    std::string const v = query_text( server, open_under );
+    check( contains( v, "content" ) && !contains( v, "ZXQP0071" ) &&
+           ( i == 0 || v == first ),
+           "the file that fits is the same from the cache",
+           v.substr( 0, 500 ) );
+    first = v;
+  }
+  s = server.cache_stats();
+  check( s.admissions == 1 && s.hits == 1, "the file that fits is cached",
+         stats_text( s ) );
+
+  std::string const v = query_text( server, error_records );
+  check( contains( v, deep_tree_records ), "dir:documents over the same files",
+         v.substr( 0, 2000 ) );
+  check_alive( server );
+}
+
+// A small file can expand far beyond what files of its size take: internal
+// entities. Such a record is not kept; a plain file of the same limit is.
+void test_cache_expansion( Fixture const &f ) {
+  TempTree t;
+  std::string entity( "<!DOCTYPE a [<!ENTITY e \"" );
+  entity += repeated( "<b/>", 1000 ) + "\">]><a>" + repeated( "&e;", 100 ) +
+    "</a>";
+  t.write( "entity.xml", entity );
+  std::string rows( "a\n" );
+  rows += repeated( "1\n", 32 * 1024 - 1 );
+  t.write( "rows.csv", rows );
+  ServerConfig config;
+  config.root = t.root;
+  config.cache_max_file_kb = 64;
+  Server server( f.zorba, config, std::cerr );
+
+  std::string const elements( dir_import +
+    "count(dir:open($dir:root, \"entity.xml\")(\"content\")/a/b)" );
+  for ( int i = 0; i < 3; ++i ) {
+    std::string const v = query_text( server, elements );
+    check( v == "100000", "the document is served each time", v );
+  }
+  DocumentCache::Stats s = server.cache_stats();
+  check( s.admissions == 0 && s.entries == 0 && s.bytes == 0 && s.refused == 1,
+         "a record that expands far beyond its file is not kept",
+         stats_text( s ) );
+
+  std::string const count_rows( dir_import +
+    "count(dir:open($dir:root, \"rows.csv\")(\"content\")())" );
+  for ( int i = 0; i < 3; ++i ) {
+    std::string const v = query_text( server, count_rows );
+    check( v == std::to_string( 32 * 1024 - 1 ), "the rows are served", v );
+  }
+  s = server.cache_stats();
+  check( s.admissions == 1 && s.hits == 1 && s.entries == 1,
+         "a CSV file of one short column is kept", stats_text( s ) );
+}
+
+// Runs zorba-mcp with \a args, sends it \a input, closes its input and
+// returns its exit status (-1 if it did not exit) with its stdout and stderr.
+int run_mcp( Fixture const &f, TempTree const &t,
+             std::vector<std::string> const &args, std::string const &input,
+             std::string *out, std::string *err ) {
+  std::string const in_file( t.base + "/mcp.in" );
+  std::string const out_file( t.base + "/mcp.out" );
+  std::string const err_file( t.base + "/mcp.err" );
+  std::ofstream( in_file.c_str(), std::ios::binary ) << input;
+  pid_t const pid = fork();
+  if ( pid == 0 ) {
+    if ( !std::freopen( in_file.c_str(), "r", stdin ) ||
+         !std::freopen( out_file.c_str(), "w", stdout ) ||
+         !std::freopen( err_file.c_str(), "w", stderr ) )
+      _exit( 127 );
+    std::vector<char*> argv;
+    argv.push_back( const_cast<char*>( f.binary.c_str() ) );
+    for ( std::string const &arg : args )
+      argv.push_back( const_cast<char*>( arg.c_str() ) );
+    argv.push_back( nullptr );
+    execv( f.binary.c_str(), argv.data() );
+    _exit( 127 );
+  }
+  int status = 0;
+  if ( pid < 0 || waitpid( pid, &status, 0 ) != pid )
+    return -1;
+  *out = read_file( out_file );
+  *err = read_file( err_file );
+  return WIFEXITED( status ) ? WEXITSTATUS( status ) : -1;
+}
+
+void test_cache_counters( Fixture const &f ) {
+  TempTree t;
+  t.write( "a.json", "{ \"v\" : 1 }" );
+  std::string const call( request( 1, "tools/call", Json::object( {
+    { "name", "run_query" },
+    { "arguments", Json::object( { { "query", dir_import +
+      "dir:open($dir:root, \"a.json\")(\"content\")(\"v\")" } } ) }
+  } ) ) + "\n" );
+  std::string const three( call + call + call );
+  std::string out, err;
+
+  int status = run_mcp( f, t, { "--root", t.root }, three, &out, &err );
+  std::string const prefix(
+    "zorba-mcp: cache: hits=1 misses=2 admissions=1 evictions=0 "
+    "bytes_retained=" );
+  std::string::size_type const at = err.find( prefix );
+  std::string const bytes(
+    at == std::string::npos ? std::string() :
+    err.substr( at + prefix.size(),
+                err.find( '\n', at ) - at - prefix.size() ) );
+  check( status == 0 && !bytes.empty() && bytes[0] != '0' &&
+         bytes.find_first_not_of( "0123456789" ) == std::string::npos,
+         "the counters are one line on stderr at exit", err );
+  check( !contains( err, "ZWST0008" ),
+         "the directory module compiles without a deprecation warning", err );
+  check( !contains( out, "hits" ) && !contains( out, "admissions" ) &&
+         !contains( out, "bytes_retained" ),
+         "the tool responses do not carry the counters", out );
+
+  status = run_mcp( f, t, { "--root", t.root, "--cache-max-file-kb", "0" },
+                    three, &out, &err );
+  check( status == 0 && !contains( err, "cache:" ),
+         "--cache-max-file-kb 0: off, no counters line", err );
+  status = run_mcp( f, t, { "--root", t.root, "--cache-max-files", "0" },
+                    three, &out, &err );
+  check( status == 0 && !contains( err, "cache:" ),
+         "--cache-max-files 0: off, no counters line", err );
+
+  status = run_mcp( f, t, { "--root", t.root, "--cache-max-file-kb", "1",
+                            "--cache-max-files", "1" }, three, &out, &err );
+  check( status == 0 && contains( err, prefix ),
+         "both parameters together", err );
+
+  status = run_mcp( f, t, { "--root", t.root, "--cache-mb", "64" }, "",
+                    &out, &err );
+  check( status == 2 && contains( err, "invalid argument: --cache-mb" ),
+         "--cache-mb is no longer an option", err );
+
+  // What an option does, and its exceptions, is in the help.
+  status = run_mcp( f, t, { "--help" }, "", &out, &err );
+  check( status == 0, "--help exits with 0", err );
+  for ( char const *text : { "--cache-max-file-kb <KB>", "--cache-max-files <N>",
+                             "second read", "device, inode, size, mtime and ctime",
+                             "records with an", "128 times", "sequential queries",
+                             "least recently used", "does not evict",
+                             "the document cache: it holds previews" } )
+    check( contains( err, text ), std::string( "--help says: " ) + text, err );
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -2087,6 +2770,18 @@ Test const tests[] = {
   { "predefined", test_predefined },
   { "limits", test_limits },
   { "binary", test_binary },
+  { "cache_hit", test_cache_hit },
+  { "cache_invalidate", test_cache_invalidate },
+  { "cache_evict", test_cache_evict },
+  { "cache_off", test_cache_off },
+  { "cache_policy", test_cache_policy },
+  { "cache_inject", test_cache_inject },
+  { "cache_size", test_cache_size },
+  { "cache_default", test_cache_default },
+  { "cache_abort", test_cache_abort },
+  { "cache_errors", test_cache_errors },
+  { "cache_expansion", test_cache_expansion },
+  { "cache_counters", test_cache_counters },
   { "windows", test_windows },
   { "memory_limit", test_memory_limit },
   { "optional_params", test_optional_params },
