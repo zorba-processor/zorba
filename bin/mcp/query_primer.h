@@ -21,9 +21,10 @@ namespace mcp {
 
 /**
  * The JSONiq primer of the run_query description, read by the agent on every
- * session. It is built from the errors agents make most often, plus the
- * window clause. Every example goes between backticks, and only examples do:
- * the query_primer test runs what is between backticks and asserts its result.
+ * session whose default language is JSONiq; an XQuery session does not have it.
+ * It is built from the errors agents make most often, plus the window clause.
+ * Every example goes between backticks, and only examples do: the query_primer
+ * test runs what is between backticks and asserts its result.
  */
 char const query_primer[] =
   "JSONiq primer; each example runs as written. The context item is $$, not "
