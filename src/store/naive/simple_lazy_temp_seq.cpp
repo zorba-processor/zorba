@@ -54,8 +54,8 @@ SimpleLazyTempSeq::~SimpleLazyTempSeq()
 ********************************************************************************/
 void SimpleLazyTempSeq::clear()
 {
-  std::vector<store::Item*>::iterator ite = theItems.begin();
-  std::vector<store::Item*>::iterator end = theItems.end();
+  std::deque<store::Item*>::iterator ite = theItems.begin();
+  std::deque<store::Item*>::iterator end = theItems.end();
   for (; ite != end; ++ite)
   {
     (*ite)->removeReference();
@@ -179,10 +179,10 @@ void SimpleLazyTempSeq::purgeUpTo(xs_integer position)
   }
 
   ZORBA_ASSERT(pos >= thePurgedUpTo);
-  ZORBA_ASSERT(static_cast<std::vector<store::Item*>::size_type>(pos - thePurgedUpTo) <= theItems.size());
+  ZORBA_ASSERT(static_cast<std::deque<store::Item*>::size_type>(pos - thePurgedUpTo) <= theItems.size());
 
-  std::vector<store::Item*>::iterator ite = theItems.begin();
-  std::vector<store::Item*>::iterator end = theItems.begin() + static_cast<std::vector<store::Item*>::size_type>(pos - thePurgedUpTo);
+  std::deque<store::Item*>::iterator ite = theItems.begin();
+  std::deque<store::Item*>::iterator end = theItems.begin() + static_cast<std::deque<store::Item*>::size_type>(pos - thePurgedUpTo);
   for (; ite != end; ++ite)
   {
     (*ite)->removeReference();
@@ -212,7 +212,7 @@ void SimpleLazyTempSeq::getItem(xs_integer position, store::Item_t& result)
 
   ZORBA_ASSERT(pos > thePurgedUpTo);
 
-  std::vector<store::Item*>::size_type numItemsToBuffer = static_cast<std::vector<store::Item*>::size_type>(pos - thePurgedUpTo);
+  std::deque<store::Item*>::size_type numItemsToBuffer = static_cast<std::deque<store::Item*>::size_type>(pos - thePurgedUpTo);
 
   while (!theMatFinished && theItems.size() <  numItemsToBuffer) 
   {
@@ -221,7 +221,7 @@ void SimpleLazyTempSeq::getItem(xs_integer position, store::Item_t& result)
 
   if (theItems.size() >= numItemsToBuffer)
   {
-    std::vector<store::Item*>::size_type sPos = static_cast<std::vector<store::Item*>::size_type>(pos - thePurgedUpTo - 1);
+    std::deque<store::Item*>::size_type sPos = static_cast<std::deque<store::Item*>::size_type>(pos - thePurgedUpTo - 1);
     result = theItems[sPos];
   }
   else 
@@ -266,7 +266,7 @@ inline bool SimpleLazyTempSeq::containsItem(xs_integer position)
 
   ZORBA_ASSERT(pos > thePurgedUpTo);
 
-  std::vector<store::Item*>::size_type numItemsToBuffer = static_cast<std::vector<store::Item*>::size_type>(pos - thePurgedUpTo);
+  std::deque<store::Item*>::size_type numItemsToBuffer = static_cast<std::deque<store::Item*>::size_type>(pos - thePurgedUpTo);
 
   while (!theMatFinished && theItems.size() <  numItemsToBuffer) 
   {

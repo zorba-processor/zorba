@@ -23,9 +23,11 @@
 // test runs the zorba-mcp executable given as the last argument.
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
+#include <ctime>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -36,10 +38,15 @@
 #include <thread>
 #include <vector>
 
+#include <fcntl.h>
 #include <sys/resource.h>
+#include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/utsname.h>
 #include <sys/wait.h>
 #include <unistd.h>
+
+#include <libxml/xmlversion.h>
 
 #include <zorba/store_manager.h>
 #include <zorba/zorba.h>
@@ -152,8 +159,22 @@ Json roundtrip( Server &server, std::string const &message ) {
   return r;
 }
 
+// The document cache leaves alone a file changed in the last 20 ms. The tests
+// about what it keeps read after that; those about the moment after a change
+// write without going through this.
+std::chrono::steady_clock::time_point last_change;
+
+void changed_files() {
+  last_change = std::chrono::steady_clock::now();
+}
+
+void wait_after_change() {
+  std::this_thread::sleep_until( last_change + std::chrono::milliseconds( 30 ) );
+}
+
 Json call_tool( Server &server, std::string const &tool, Json args,
                 int id = 100 ) {
+  wait_after_change();
   return roundtrip( server, request( id, "tools/call", Json::object( {
     { "name", tool }, { "arguments", args } } ) ) );
 }
@@ -1456,6 +1477,7 @@ struct TempTree {
   void write( std::string const &rel, std::string const &content ) const {
     std::ofstream out( ( root + "/" + rel ).c_str(), std::ios::binary );
     out << content;
+    changed_files();
   }
 
   // Moves the modification time of a file by \a seconds.
@@ -1464,6 +1486,7 @@ struct TempTree {
     stdfs::path const p( root + "/" + rel );
     stdfs::last_write_time( p, stdfs::last_write_time( p ) +
                                std::chrono::seconds( seconds ) );
+    changed_files();
   }
 };
 
@@ -1883,6 +1906,87 @@ void test_case_paths( Fixture const &f ) {
 
 // HTML files a parser has to survive: every one gives a result or an error
 // record, through dir:open, dir:documents and x:parse-html.
+// What comes at the end of an HTML file. Before 2.14, libxml2 hands its text
+// over every 1000 characters, and a piece of blanks with more to come is not
+// blanks to it: after the end of the root it opens a second html element and
+// reports the end of the document with that element open, and a piece that ends
+// the input can leave the end of the document unreported.
+void check_html_end_of_input( Fixture const &f ) {
+  std::string const page( "<html><body><p>7</p></body></html>" );
+  std::string const opened( "<html><body><p>7</p>" );
+  std::string const text( "<html><body><p>" );
+  std::string const blanks( 2000, ' ' );
+  std::string const line_ends( [] {
+    std::string r;
+    for ( int i = 0; i < 1000; ++i )
+      r += "\r\n";
+    return r;
+  }() );
+  std::string const x1000( 1000, 'x' ), x2000( 2000, 'x' );
+  std::string const fine( "no error|1|1|7" );
+#if LIBXML_VERSION >= 21400
+  // Text after the end of the root is a second root.
+  std::string const after_text( "no error|1|2|7tail" );
+  std::string const after_element( "no error|1|2|7d" );
+  // Blanks are text of the html element.
+  std::string const blanks_in_html( "no error|1|1|7" );
+#else
+  // Text after the end of the root is not reported.
+  std::string const after_text( fine );
+  std::string const after_element( fine );
+  // A long run of blanks in the html element is a p element of blanks.
+  std::string const blanks_in_html( "no error|2|1|7" );
+#endif
+  struct { char const *name; std::string content; std::string expected; }
+  const cases[] = {
+    { "blanks-999.html", page + blanks.substr( 0, 999 ), fine },
+    { "blanks-1000.html", page + blanks.substr( 0, 1000 ), fine },
+    { "blanks-1001.html", page + blanks.substr( 0, 1001 ), fine },
+    { "blanks-2000.html", page + blanks, fine },
+    { "line-ends-2000.html", page + line_ends, fine },
+    { "comment-blanks-1000.html",
+      page + "<!-- c -->" + blanks.substr( 0, 1000 ), fine },
+    { "open-blanks-1000.html", opened + blanks.substr( 0, 1000 ), fine },
+    { "open-blanks-2000.html", opened + blanks, fine },
+    { "open-text-1000.html", text + x1000, "no error|1|1|" + x1000 },
+    { "open-text-2000.html", text + x2000, "no error|1|1|" + x2000 },
+    { "text-after.html", page + "tail", after_text },
+    { "blanks-text-after.html", page + blanks.substr( 0, 1001 ) + "tail",
+      after_text },
+    { "element-after.html", page + "<div>d</div>", after_element },
+    { "blanks-element-after.html",
+      page + blanks.substr( 0, 1001 ) + "<div>d</div>", after_element },
+    { "blanks-in-html.html",
+      "<html><body><p>7</p></body>" + blanks + "</html>", blanks_in_html }
+  };
+  TempTree t;
+  for ( auto const &c : cases )
+    t.write( c.name, c.content );
+  ServerConfig config;
+  config.root = t.root;
+  Server server( f.zorba, config, std::cerr );
+  for ( auto const &c : cases ) {
+    Json const r = run_query( server, dir_import +
+      "let $d := dir:open($dir:root, \"" + c.name + "\")\n"
+      "let $c := $d(\"content\")\n"
+      "return string-join((\n"
+      "  if (exists($d(\"error\"))) then $d(\"error\")(\"message\")\n"
+      "  else \"no error\",\n"
+      "  string(count($c//*:p)), string(count($c/*)),\n"
+      "  normalize-space(string($c))), \"|\")" );
+    check( !is_tool_error( r ) && result_text( r ) == "\"" + c.expected + "\"",
+           std::string( c.name ) + ": content and no error record",
+           r.dump().substr( 0, 400 ) );
+    Json const p = run_query( server, dir_import +
+      "import module namespace x = \"http://zorba.io/modules/xml\";\n"
+      "import module namespace file = \"http://expath.org/ns/file\";\n"
+      "count(x:parse-html(file:read-text(concat($dir:root, \"/" +
+      std::string( c.name ) + "\")))//*:p)" );
+    check( !is_tool_error( p ), std::string( c.name ) + ": x:parse-html",
+           p.dump().substr( 0, 400 ) );
+  }
+}
+
 void test_html_edge_cases( Fixture const &f ) {
   TempTree t;
   char const nul[] = "<html>\0<body>a\0b<div \0x=\"\0\">c</div></body></html>";
@@ -1963,6 +2067,9 @@ void test_html_edge_cases( Fixture const &f ) {
   check( !has_parser || contains( result_text( r ), "good.html=ok" ),
          "the good file is not affected", r.dump().substr( 0, 2000 ) );
   check_alive( server );
+
+  if ( has_parser )
+    check_html_end_of_input( f );
 }
 
 
@@ -2552,6 +2659,7 @@ void test_cache_expansion( Fixture const &f ) {
 int run_mcp( Fixture const &f, TempTree const &t,
              std::vector<std::string> const &args, std::string const &input,
              std::string *out, std::string *err ) {
+  wait_after_change();
   std::string const in_file( t.base + "/mcp.in" );
   std::string const out_file( t.base + "/mcp.out" );
   std::string const err_file( t.base + "/mcp.err" );
@@ -2632,9 +2740,1270 @@ void test_cache_counters( Fixture const &f ) {
   for ( char const *text : { "--cache-max-file-kb <KB>", "--cache-max-files <N>",
                              "second read", "device, inode, size, mtime and ctime",
                              "records with an", "128 times", "sequential queries",
+                             "changed in the last 20 ms", "its own copy", "with its clock ahead",
                              "least recently used", "does not evict",
                              "the document cache: it holds previews" } )
     check( contains( err, text ), std::string( "--help says: " ) + text, err );
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// The document cache with room to spare, and whether what it serves is right.
+// The tests above sit at its limits. Counters are compared with exact values,
+// and results with a server that has no cache.
+
+std::string const jn_import(
+  "import module namespace jn = \"http://jsoniq.org/functions\";\n" );
+
+// A file of \a format, of exactly \a size bytes, that holds the value \a v.
+std::string sized_text( std::string const &format, int v, std::size_t size ) {
+  std::string const value( std::to_string( v ) );
+  std::string text;
+  if ( format == "xml" )
+    text = "<r><v>" + value + "</v></r>";
+  else if ( format == "html" )
+    // The padding in a comment: no text after the end of the document.
+    return "<html><body><p>" + value + "</p><!-- " +
+      std::string( size - 42 - value.size(), 'x' ) + " --></body></html>";
+  else if ( format == "csv" )
+    text = "v,pad\n" + value + ",";
+  else
+    text = "{ \"v\" : " + value + " }";
+  text.append( size - text.size(), format == "csv" ? 'x' : ' ' );
+  return text;
+}
+
+// The value that sized_text() put in \a file, whatever its format.
+std::string value_query( std::string const &file ) {
+  return dir_import + jn_import +
+    "let $d := dir:open($dir:root, \"" + file + "\")\n"
+    "let $c := $d(\"content\")\n"
+    "return switch ($d(\"format\"))\n"
+    "  case \"xml\" return xs:integer($c/r/v)\n"
+    "  case \"html\" return xs:integer($c//*:p)\n"
+    "  case \"csv\" return xs:integer(jn:members($c)(\"v\"))\n"
+    "  default return xs:integer($c(\"v\"))";
+}
+
+// The formats of this build: only a build with XML Schema support parses HTML.
+std::vector<std::string> cache_formats( Fixture const &f ) {
+  std::vector<std::string> formats{ "xml", "json", "csv" };
+  TempTree t;
+  t.write( "probe.html", sized_text( "html", 1, 100 ) );
+  ServerConfig config;
+  config.root = t.root;
+  Server server( f.zorba, config, std::cerr );
+  if ( query_text( server, value_query( "probe.html" ) ) == "1" )
+    formats.push_back( "html" );
+  return formats;
+}
+
+std::string const count_documents( dir_import +
+  "count(dir:documents($dir:root)[exists(.(\"content\"))])" );
+
+// A file name of the same length for every i < 1000, so that records of files
+// of the same size take the same memory.
+std::string numbered( std::string const &format, int i ) {
+  std::string n( std::to_string( i ) );
+  n.insert( 0, 3 - n.size(), '0' );
+  return "f" + n + "." + format;
+}
+
+ServerConfig cache_config( std::string const &root, std::size_t kb,
+                           std::size_t files ) {
+  ServerConfig config;
+  config.root = root;
+  config.cache_max_file_kb = kb;
+  config.cache_max_files = files;
+  return config;
+}
+
+// The memory of \a entries records of the same size. An XML or HTML record holds
+// a generated document URI, with the number of its tree: a few bytes depend on
+// how many documents the process has read: 4 digits at most between the numbers
+// of these tests. The others take the same to the byte.
+bool same_bytes( std::string const &format, std::size_t got,
+                 std::size_t expected, std::size_t entries ) {
+  std::size_t const slack = format == "xml" || format == "html" ? 4 * entries : 0;
+  return got + slack >= expected && got <= expected + slack;
+}
+
+// The same query on a server with the cache and on one without, \a calls times:
+// the responses are the same bytes, on the first call and on later ones.
+void same_output( Server &on, Server &off, std::string const &query,
+                  std::string const &what, int calls = 5 ) {
+  for ( int i = 1; i <= calls; ++i ) {
+    std::string const with( query_text( on, query ) );
+    std::string const without( query_text( off, query ) );
+    check( with == without, what + ", call " + std::to_string( i ),
+           "with the cache: " + with + "\n  without: " + without );
+  }
+}
+
+//////// With room to spare ///////////////////////////////////////////////////
+
+// A tenth and half of the limit, one byte under, at it and one byte over.
+void test_cache_slack_size( Fixture const &f ) {
+  std::size_t const limit = 16 * 1024;
+  std::size_t const sizes[] = { limit / 10, limit / 2, limit - 1, limit,
+                                limit + 1 };
+  for ( std::string const &format : cache_formats( f ) ) {
+    TempTree t;
+    int i = 0;
+    for ( std::size_t const size : sizes ) {
+      t.write( numbered( format, i ), sized_text( format, i + 10, size ) );
+      ++i;
+    }
+    Server server( f.zorba, cache_config( t.root, 16, 100 ), std::cerr );
+    std::size_t expected = 0;
+    i = 0;
+    for ( std::size_t const size : sizes ) {
+      std::string const q( value_query( numbered( format, i ) ) );
+      std::string const what(
+        format + " of " + std::to_string( size ) + " bytes" );
+      DocumentCache::Stats const before = server.cache_stats();
+      for ( int call = 0; call < 3; ++call ) {
+        std::string const v( query_text( server, q ) );
+        check( v == std::to_string( i + 10 ), what + ": its value", v );
+      }
+      DocumentCache::Stats const s = server.cache_stats();
+      bool const fits = size <= limit;
+      expected += fits ? 1 : 0;
+      check( s.admissions - before.admissions == ( fits ? 1u : 0u ) &&
+             s.hits - before.hits == ( fits ? 1u : 0u ) &&
+             s.misses - before.misses == ( fits ? 2u : 3u ) &&
+             s.evictions == 0 && s.entries == expected &&
+             ( !fits || s.bytes > before.bytes ),
+             what + ( fits ? ": kept" : ": not kept" ), stats_text( s ) );
+      ++i;
+    }
+  }
+}
+
+// Ten files with one slot less, as many, one more, twice and ten times as many.
+void test_cache_slack_slots( Fixture const &f ) {
+  TempTree t;
+  for ( int i = 0; i < 10; ++i )
+    t.write( numbered( "json", i ), sized_text( "json", i, 200 ) );
+
+  std::size_t ten_bytes = 0;
+  for ( std::size_t const slots : { 10u, 11u, 20u, 100u, 9u } ) {
+    std::string const what( std::to_string( slots ) + " slots: " );
+    std::size_t const held = std::min<std::size_t>( slots, 10 );
+    Server server( f.zorba, cache_config( t.root, 16, slots ), std::cerr );
+    for ( int call = 1; call <= 5; ++call ) {
+      std::string const v( query_text( server, count_documents ) );
+      check( v == "10", what + "the scan sees every file", v );
+    }
+    DocumentCache::Stats s = server.cache_stats();
+    // Scans 1 and 2 miss 10 each. The second keeps what fits, and scans 3, 4
+    // and 5 hit it and miss the rest.
+    check( s.admissions == held && s.evictions == 0 && s.entries == held &&
+           s.hits == 3 * held && s.misses == 20 + 3 * ( 10 - held ),
+           what + "a repeated scan keeps what fits and evicts nothing",
+           stats_text( s ) );
+    if ( slots == 10 )
+      ten_bytes = s.bytes;
+    check( s.bytes * 10 == ten_bytes * held,
+           what + "the memory is that of the records held",
+           std::to_string( s.bytes ) + " against " +
+           std::to_string( ten_bytes ) + " for ten" );
+
+    // One query per read: each document enters, the coldest leaves if full.
+    Server opener( f.zorba, cache_config( t.root, 16, slots ), std::cerr );
+    for ( int i = 0; i < 10; ++i )
+      for ( int read = 0; read < 2; ++read )
+        query_text( opener, value_query( numbered( "json", i ) ) );
+    s = opener.cache_stats();
+    check( s.admissions == 10 && s.evictions == 10 - held &&
+           s.entries == held && s.hits == 0,
+           what + "one document per query", stats_text( s ) );
+  }
+}
+
+// Many files with room for all: each of them enters, and is then hit.
+void test_cache_slack_many( Fixture const &f ) {
+  for ( auto const &setting : { std::pair<int,std::size_t>( 100, 150 ),
+                                std::pair<int,std::size_t>( 300, 400 ) } ) {
+    int const files = setting.first;
+    std::size_t const n = static_cast<std::size_t>( files );
+    std::string const what( std::to_string( files ) + " files, " +
+                            std::to_string( setting.second ) + " slots: " );
+    TempTree t;
+    for ( int i = 0; i < files; ++i )
+      t.write( numbered( "json", i ), sized_text( "json", i, 100 ) );
+    Server server( f.zorba, cache_config( t.root, 16, setting.second ),
+                   std::cerr );
+    for ( int call = 1; call <= 3; ++call ) {
+      std::string const v( query_text( server, count_documents ) );
+      check( v == std::to_string( files ), what + "the scan sees every file",
+             v );
+    }
+    DocumentCache::Stats const s = server.cache_stats();
+    check( s.admissions == n && s.hits == n && s.misses == 2 * n &&
+           s.evictions == 0 && s.entries == n,
+           what + "every document enters on its second read", stats_text( s ) );
+  }
+}
+
+//////// One file, one record /////////////////////////////////////////////////
+
+// A file reached by different spellings of its path, by dir:documents and
+// dir:open, repeatedly and more than once in a query.
+void test_cache_same_file( Fixture const &f ) {
+  for ( std::string const &format : cache_formats( f ) ) {
+    TempTree t;
+    std::string const name( "a." + format );
+    t.write( name, sized_text( format, 7, 400 ) );
+    std::filesystem::create_directories( t.root + "/sub" );
+    std::filesystem::create_symlink( t.root + "/" + name,
+                                     t.root + "/sub/link." + format );
+
+    // What one record of this file takes.
+    Server reference( f.zorba, cache_config( t.root, 16, 10 ), std::cerr );
+    query_text( reference, value_query( name ) );
+    query_text( reference, value_query( name ) );
+    std::size_t const one = reference.cache_stats().bytes;
+    check( one > 0 && reference.cache_stats().entries == 1,
+           format + ": one record", stats_text( reference.cache_stats() ) );
+
+    Server server( f.zorba, cache_config( t.root, 16, 10 ), std::cerr );
+    query_text( server, value_query( name ) );
+    query_text( server, value_query( name ) );
+    std::size_t hits = 0;
+    auto expect_one = [&]( std::string const &what ) {
+      DocumentCache::Stats const s = server.cache_stats();
+      check( s.admissions == 1 && s.entries == 1 &&
+             same_bytes( format, s.bytes, one, 1 ) &&
+             s.evictions == 0 && s.hits > hits,
+             format + ", " + what + ": a hit on the one record",
+             stats_text( s ) + ", one document " + std::to_string( one ) );
+      hits = s.hits;
+    };
+
+    for ( std::string const &spelling :
+          { "./" + name, ".//" + name, "./././" + name } ) {
+      std::string const v( query_text( server, value_query( spelling ) ) );
+      check( v == "7", format + ", " + spelling + ": its value", v );
+      expect_one( spelling );
+    }
+
+    std::string v( query_text( server, dir_import +
+      "string-join(for $d in dir:documents($dir:root) "
+      "return string($d(\"path\")), \",\")" ) );
+    check( v == "\"" + name + "\"", format + ": dir:documents", v );
+    expect_one( "dir:documents" );
+
+    v = query_text( server, dir_import +
+      "count((dir:open($dir:root, \"" + name + "\"), "
+      "dir:open($dir:root, \"./" + name + "\"), "
+      "dir:documents($dir:root), dir:documents($dir:root)))" );
+    check( v == "4", format + ": four reads in one query", v );
+    expect_one( "four reads in one query" );
+
+    for ( int i = 0; i < 20; ++i )
+      query_text( server, value_query( name ) );
+    expect_one( "twenty more calls" );
+
+    // A trailing separator on the root is the same root.
+    for ( std::string const suffix : { "/", "//" } ) {
+      v = query_text( server, dir_import +
+        "dir:open(concat($dir:root, \"" + suffix + "\"), \"" + name +
+        "\")(\"path\")" );
+      check( v == "\"" + name + "\"", format + ": root with " + suffix, v );
+      expect_one( "the root with " + suffix );
+    }
+
+    // What the directory module refuses stays out of the cache.
+    for ( std::string const &refused :
+          { "sub/../" + name, "sub/link." + format, "/" + name } ) {
+      v = query_text( server, value_query( refused ) );
+      check( contains( v, "INVALID_PATH" ), format + ": " + refused + " refused",
+             v );
+    }
+    DocumentCache::Stats const s = server.cache_stats();
+    check( s.admissions == 1 && s.entries == 1 &&
+           same_bytes( format, s.bytes, one, 1 ),
+           format + ": refused paths add no record", stats_text( s ) );
+  }
+}
+
+// Another spelling of the root reads the same file. The record of each spelling
+// carries what the spelling gives it.
+void test_cache_root_spelling( Fixture const &f ) {
+  TempTree t;
+  t.write( "a.xml", sized_text( "xml", 7, 400 ) );
+  std::filesystem::create_directories( t.root + "/sub" );
+  t.write( "sub/b.xml", sized_text( "xml", 8, 400 ) );
+  std::filesystem::create_directory_symlink( t.root, t.base + "/alias" );
+
+  Server on( f.zorba, cache_config( t.root, 16, 10 ), std::cerr );
+  Server off( f.zorba, cache_config( t.root, 0, 0 ), std::cerr );
+  for ( std::string const &root :
+        { std::string( "$dir:root" ), std::string( "concat($dir:root, \"/.\")" ),
+          std::string( "concat($dir:root, \"/sub/..\")" ),
+          "\"" + t.base + "/alias\"" } ) {
+    std::string const content( "dir:open(" + root + ", \"a.xml\")(\"content\")" );
+    same_output( on, off, dir_import +
+      "let $c := " + content + " return "
+      "(string($c/r/v), base-uri($c), base-uri($c/r/v))",
+      "the root " + root );
+  }
+  // Under a root that is lower in the tree, a file has another path.
+  same_output( on, off, dir_import +
+    "dir:open(concat($dir:root, \"/sub\"), \"b.xml\")(\"path\"),"
+    "dir:open($dir:root, \"sub/b.xml\")(\"path\"),"
+    "base-uri(dir:open(concat($dir:root, \"/sub\"), \"b.xml\")(\"content\")),"
+    "base-uri(dir:open($dir:root, \"sub/b.xml\")(\"content\"))",
+    "two paths of a file" );
+  DocumentCache::Stats const s = on.cache_stats();
+  check( s.entries == 3 && s.evictions == 0,
+         "one record for each file and relative path", stats_text( s ) );
+}
+
+// A changed file replaces its record, and the old bytes go.
+void test_cache_replace( Fixture const &f ) {
+  for ( std::string const &format : cache_formats( f ) ) {
+    TempTree t;
+    std::string const name( "a." + format );
+    std::string const other( "b." + format );
+    t.write( other, sized_text( format, 1, 300 ) );
+    auto bytes_of = [&]( std::string const &text ) {
+      TempTree alone;
+      alone.write( name, text );
+      Server s( f.zorba, cache_config( alone.root, 16, 10 ), std::cerr );
+      query_text( s, value_query( name ) );
+      query_text( s, value_query( name ) );
+      return s.cache_stats().bytes;
+    };
+    // Not by padding alone: content that takes nodes, members or rows.
+    auto text_of = [&]( int v, int rows ) {
+      std::string text;
+      if ( format == "xml" ) {
+        text = "<r><v>" + std::to_string( v ) + "</v>";
+        for ( int i = 0; i < rows; ++i )
+          text += "<e>x</e>";
+        text += "</r>";
+      } else if ( format == "html" ) {
+        text = "<html><body><p>" + std::to_string( v ) + "</p>";
+        for ( int i = 0; i < rows; ++i )
+          text += "<div>x</div>";
+        text += "</body></html>";
+      } else if ( format == "csv" ) {
+        text = "v,e\n";
+        // value_query takes the column v of the only row of the other sizes.
+        text += std::to_string( v ) + "," + std::string( rows * 8, 'x' ) + "\n";
+      } else {
+        text = "{ \"v\" : " + std::to_string( v ) + ", \"e\" : [";
+        for ( int i = 0; i < rows; ++i )
+          text += ( i ? ",\"x\"" : "\"x\"" );
+        text += "] }";
+      }
+      return text;
+    };
+
+    Server server( f.zorba, cache_config( t.root, 16, 10 ), std::cerr );
+    std::size_t admissions = 0;
+    int v = 0;
+    for ( int const rows : { 5, 400, 50, 800, 2 } ) {
+      ++v;
+      std::string const text( text_of( v, rows ) );
+      std::size_t const expected = bytes_of( text );
+      t.write( name, text );
+      std::this_thread::sleep_for( std::chrono::milliseconds( 20 ) );
+      for ( int read = 0; read < 3; ++read ) {
+        std::string const got( query_text( server, value_query( name ) ) );
+        check( got == std::to_string( v ),
+               format + ": the new content is served", got );
+      }
+      ++admissions;
+      DocumentCache::Stats const s = server.cache_stats();
+      check( s.admissions == admissions && s.entries == 1 &&
+             same_bytes( format, s.bytes, expected, 1 ) && s.evictions == 0,
+             format + ": of " + std::to_string( rows ) +
+             " rows, one record, of its own size",
+             stats_text( s ) + ", expected bytes " +
+             std::to_string( expected ) );
+    }
+
+    // The old bytes go at the next query, whichever file it reads.
+    t.write( name, text_of( 99, 900 ) );
+    query_text( server, value_query( other ) );
+    DocumentCache::Stats const s = server.cache_stats();
+    check( s.entries == 0 && s.bytes == 0,
+           format + ": a query that does not read it drops the old record",
+           stats_text( s ) );
+  }
+}
+
+//////// Long sessions leave nothing behind ///////////////////////////////////
+
+// More files than slots, again and again: as many records and bytes as slots.
+void test_cache_turnover( Fixture const &f ) {
+  for ( std::string const &format : cache_formats( f ) ) {
+    TempTree t;
+    int const files = 6;
+    std::size_t const slots = 3;
+    for ( int i = 0; i < files; ++i )
+      t.write( numbered( format, i ), sized_text( format, i, 500 ) );
+    Server server( f.zorba, cache_config( t.root, 16, slots ), std::cerr );
+    std::size_t bytes = 0;
+    for ( int round = 1; round <= 6; ++round ) {
+      for ( int i = 0; i < files; ++i )
+        for ( int read = 0; read < 2; ++read ) {
+          std::string const v(
+            query_text( server, value_query( numbered( format, i ) ) ) );
+          check( v == std::to_string( i ), format + ": the value during turnover",
+                 v );
+        }
+      DocumentCache::Stats const s = server.cache_stats();
+      if ( round == 1 )
+        bytes = s.bytes;
+      std::size_t const admitted =
+        static_cast<std::size_t>( round ) * static_cast<std::size_t>( files );
+      check( s.entries == slots && same_bytes( format, s.bytes, bytes, slots ) &&
+             bytes > 0 && s.admissions == admitted && s.evictions == admitted - slots,
+             format + ": round " + std::to_string( round ) +
+             ", flat at as many records as slots",
+             stats_text( s ) + ", first round bytes " + std::to_string( bytes ) );
+    }
+  }
+}
+
+// Each kind of change, again and again, with reads in between.
+void test_cache_invalidate_loop( Fixture const &f ) {
+  namespace stdfs = std::filesystem;
+  for ( std::string const &format : cache_formats( f ) ) {
+    TempTree t;
+    int const files = 3;
+    for ( int i = 0; i < files; ++i )
+      t.write( numbered( format, i ), sized_text( format, i, 500 ) );
+    Server server( f.zorba, cache_config( t.root, 16, 10 ), std::cerr );
+    auto read_all = [&]( int offset ) {
+      for ( int read = 0; read < 3; ++read )
+        for ( int i = 0; i < files; ++i ) {
+          std::string const v(
+            query_text( server, value_query( numbered( format, i ) ) ) );
+          check( v == std::to_string( i + offset ),
+                 format + ": the file as it is now", v );
+        }
+    };
+    read_all( 0 );
+    DocumentCache::Stats s = server.cache_stats();
+    std::size_t const bytes = s.bytes;
+    check( s.entries == 3 && bytes > 0, format + ": three records",
+           stats_text( s ) );
+
+    int offset = 0;
+    for ( int round = 1; round <= 4; ++round ) {
+      std::string const what( format + ", round " + std::to_string( round ) );
+      // Rewritten.
+      offset = round;
+      for ( int i = 0; i < files; ++i )
+        t.write( numbered( format, i ),
+                 sized_text( format, i + offset, 500 ) );
+      std::this_thread::sleep_for( std::chrono::milliseconds( 20 ) );
+      read_all( offset );
+      s = server.cache_stats();
+      check( s.entries == 3 && same_bytes( format, s.bytes, bytes, 3 ),
+             what + ": rewritten, as many bytes", stats_text( s ) );
+      // Touched.
+      for ( int i = 0; i < files; ++i )
+        t.touch( numbered( format, i ), round );
+      read_all( offset );
+      s = server.cache_stats();
+      check( s.entries == 3 && same_bytes( format, s.bytes, bytes, 3 ),
+             what + ": touched, as many bytes", stats_text( s ) );
+      // Deleted: the records go, with the next query of any kind.
+      for ( int i = 0; i < files; ++i )
+        stdfs::remove( t.root + "/" + numbered( format, i ) );
+      check( query_text( server, count_documents ) == "0",
+             what + ": no files left" );
+      s = server.cache_stats();
+      check( s.entries == 0 && s.bytes == 0,
+             what + ": deleted, no record and no bytes", stats_text( s ) );
+      for ( int i = 0; i < files; ++i )
+        t.write( numbered( format, i ),
+                 sized_text( format, i + offset, 500 ) );
+      read_all( offset );
+      s = server.cache_stats();
+      check( s.entries == 3 && same_bytes( format, s.bytes, bytes, 3 ) &&
+             s.evictions == 0,
+             what + ": created again, as many bytes", stats_text( s ) );
+    }
+  }
+}
+
+// What is read but not kept holds nothing, and is not read twice per call.
+void test_cache_refused_loop( Fixture const &f ) {
+  TempTree t;
+  t.write( "bad.json", "{ \"v\" : " );
+  t.write( "bad.xml", "<r><v>" );
+  std::string entity(
+    "<!DOCTYPE r [<!ENTITY e \"" + repeated( "<a/>", 1000 ) + "\">]><r>" );
+  entity += repeated( "&e;", 240 ) + "</r>";
+  t.write( "expands.xml", entity );
+  Server server( f.zorba, cache_config( t.root, 16, 10 ), std::cerr );
+  std::string const q( dir_import +
+    "count(dir:documents($dir:root)[exists(.(\"error\"))])" );
+  std::string const first( query_text( server, q ) );
+  for ( int call = 2; call <= 12; ++call ) {
+    std::string const v( query_text( server, q ) );
+    check( v == first, "the same records on each call", v );
+    DocumentCache::Stats const s = server.cache_stats();
+    check( s.entries == 0 && s.bytes == 0 && s.admissions == 0 &&
+           s.evictions == 0 && s.refused == 3,
+           "three files read to be admitted once each; none kept",
+           stats_text( s ) + ", refused " + std::to_string( s.refused ) );
+  }
+}
+
+// The real server: the counters on exit do not grow with the calls.
+void test_cache_session_binary( Fixture const &f ) {
+  for ( std::string const &format : cache_formats( f ) ) {
+    TempTree t;
+    int const files = 5;
+    for ( int i = 0; i < files; ++i )
+      t.write( numbered( format, i ), sized_text( format, i, 800 ) );
+    auto session = [&]( int calls ) {
+      std::string input;
+      for ( int i = 0; i < calls; ++i ) {
+        // Each file is read twice in a row, and there are fewer slots.
+        std::string const q(
+          value_query( numbered( format, ( i / 2 ) % files ) ) );
+        input += request( i + 1, "tools/call", Json::object( {
+          { "name", "run_query" },
+          { "arguments", Json::object( { { "query", q } } ) }
+        } ) ) + "\n";
+      }
+      std::string out, err;
+      int const status = run_mcp( f, t, { "--root", t.root, "--no-scan",
+                                          "--cache-max-files", "2" },
+                                  input, &out, &err );
+      check( status == 0 && !contains( out, "\"isError\":true" ),
+             format + ": a session of " + std::to_string( calls ) + " calls",
+             err );
+      std::string::size_type const at = err.find( "zorba-mcp: cache: " );
+      std::string line( at == std::string::npos ? "" : err.substr( at ) );
+      return line.substr( 0, line.find( '\n' ) );
+    };
+    auto counter = []( std::string const &line, std::string const &name ) {
+      std::string::size_type const at = line.find( name + "=" );
+      return at == std::string::npos ? std::string()
+        : line.substr( at + name.size() + 1,
+                       line.find_first_of( " \n", at ) - at - name.size() - 1 );
+    };
+    std::string const a( session( 20 ) ), b( session( 60 ) );
+    check( counter( a, "admissions" ) == "10" &&
+           counter( a, "evictions" ) == "8" &&
+           counter( a, "hits" ) == "0",
+           format + ": 20 calls: 10 admitted, 8 evicted", a );
+    check( counter( b, "admissions" ) == "30" &&
+           counter( b, "evictions" ) == "28" &&
+           !counter( a, "bytes_retained" ).empty() &&
+           same_bytes( format, std::stoul( counter( a, "bytes_retained" ) ),
+                       std::stoul( counter( b, "bytes_retained" ) ), 2 ),
+           format + ": 60 calls: as many bytes retained as after 20",
+           a + " / " + b );
+  }
+}
+
+//////// What it serves is what the files say ////////////////////////////////
+
+// All formats and the directory query fixtures.
+void test_cache_same_output( Fixture const &f ) {
+  namespace stdfs = std::filesystem;
+  Server on( f.zorba, cache_config( f.tree, 1024, 1000 ), std::cerr );
+  Server off( f.zorba, cache_config( f.tree, 0, 0 ), std::cerr );
+
+  std::string const dump( dir_import +
+    "for $d in dir:documents($dir:root) return (\n"
+    "  $d(\"path\"), $d(\"format\"), $d(\"error\"),\n"
+    "  let $c := $d(\"content\") return\n"
+    "    if ($c instance of node()) then serialize($c) else $c)" );
+  same_output( on, off, dump, "every record, whole" );
+  same_output( on, off, dir_import + "dir:list($dir:root)", "dir:list" );
+
+  stdfs::path const rbkt(
+    stdfs::path( f.tree ).parent_path().parent_path().parent_path()
+      .parent_path() );
+  auto fixtures = [&]( stdfs::path const &dir, std::string const &prefix ) {
+    std::vector<stdfs::path> files;
+    for ( stdfs::directory_entry const &e : stdfs::directory_iterator( dir ) ) {
+      std::string const ext( e.path().extension().string() );
+      if ( ( ext == ".xq" || ext == ".jq" ) &&
+           e.path().filename().string().rfind( prefix, 0 ) == 0 )
+        files.push_back( e.path() );
+    }
+    std::sort( files.begin(), files.end() );
+    int used = 0;
+    for ( stdfs::path const &file : files ) {
+      std::string query( read_file( file.string() ) );
+      if ( !contains( query, "directory\"" ) )
+        continue;
+      // The test driver binds this variable.
+      std::string const bound( " := \"" + rbkt.string() + "\";" );
+      for ( std::string const &decl :
+            { std::string( "$rbktPath as xs:string external;" ),
+              std::string( "$rbktPath as string external;" ) } ) {
+        std::string::size_type const at = query.find( decl );
+        if ( at != std::string::npos )
+          query.replace( at, decl.size(), "$rbktPath" + bound );
+      }
+      same_output( on, off, query, file.filename().string(), 4 );
+      ++used;
+    }
+    check( used > 0, "fixtures in " + dir.string() );
+  };
+  fixtures( rbkt / "Queries/zorba/directory", "dir-" );
+  fixtures( rbkt / "Queries/zorba/jsoniq-windows", "a1" );
+  fixtures( stdfs::path( f.join_query ).parent_path(), "" );
+
+  // Each format, generated, in one tree, read over and over.
+  TempTree t;
+  for ( std::string const &format : cache_formats( f ) )
+    for ( int i = 0; i < 3; ++i )
+      t.write( numbered( format, i ), sized_text( format, i, 300 + i * 100 ) );
+  t.write( "several.jsonl", "{ \"a\" : 1 }\n{ \"a\" : 2 }\n" );
+  t.write( "letters.csv", "c,n\nT,1\nN,2\nY,\n" );
+  t.write( "ns.xml", "<?xml version=\"1.0\"?>\n<!-- c --><?pi d?>"
+                     "<p:r xmlns:p=\"urn:p\" a=\"1\"><![CDATA[x<y]]></p:r>" );
+  t.write( "empty.json", "" );
+  t.write( "other.txt", "not parsed" );
+  Server on2( f.zorba, cache_config( t.root, 16, 100 ), std::cerr );
+  Server off2( f.zorba, cache_config( t.root, 0, 0 ), std::cerr );
+  same_output( on2, off2, dump, "generated files, whole" );
+  same_output( on2, off2, dir_import +
+    "for $d in dir:documents($dir:root, (\"json\", \"csv\")) "
+    "return { \"p\" : $d(\"path\"), \"c\" : $d(\"content\") }",
+    "records in a constructor" );
+  check( on2.cache_stats().hits > 0, "the files were served from the cache",
+         stats_text( on2.cache_stats() ) );
+}
+
+// Writes over a file without changing its size or its inode.
+void overwrite( std::string const &path, std::string const &text ) {
+  int const fd = open( path.c_str(), O_WRONLY );
+  check( fd >= 0, "open for writing" );
+  if ( fd >= 0 ) {
+    check( pwrite( fd, text.data(), text.size(), 0 ) ==
+           static_cast<ssize_t>( text.size() ), "write" );
+    check( close( fd ) == 0, "close after writing" );
+  }
+}
+
+// Changes that keep the size and the modification time.
+void test_cache_change_detect( Fixture const &f ) {
+  namespace stdfs = std::filesystem;
+  for ( std::string const &format : cache_formats( f ) ) {
+    TempTree t;
+    std::string const name( "a." + format );
+    std::string const path( t.root + "/" + name );
+    t.write( name, sized_text( format, 1, 200 ) );
+    Server server( f.zorba, cache_config( t.root, 16, 10 ), std::cerr );
+    auto cached = [&]() {
+      query_text( server, value_query( name ) );
+      std::size_t const hits = server.cache_stats().hits;
+      for ( int i = 0; i < 2; ++i )
+        query_text( server, value_query( name ) );
+      check( server.cache_stats().hits > hits, format + ": a record is held",
+             stats_text( server.cache_stats() ) );
+    };
+    auto expect = [&]( int v, std::string const &what ) {
+      for ( int read = 0; read < 3; ++read ) {
+        std::string const got( query_text( server, value_query( name ) ) );
+        check( got == std::to_string( v ), format + ": " + what, got );
+      }
+    };
+    auto const settle = []() {
+      std::this_thread::sleep_for( std::chrono::milliseconds( 50 ) );
+    };
+
+    // In place, the same size and inode; only the change time tells.
+    cached();
+    auto mtime = stdfs::last_write_time( path );
+    settle();
+    overwrite( path, sized_text( format, 2, 200 ) );
+    stdfs::last_write_time( path, mtime );
+    changed_files();
+    expect( 2, "written in place, size and mtime kept" );
+
+    // Atomic rename over the file, the same size and modification time.
+    cached();
+    mtime = stdfs::last_write_time( path );
+    settle();
+    t.write( "swap.tmp", sized_text( format, 3, 200 ) );
+    stdfs::last_write_time( t.root + "/swap.tmp", mtime );
+    stdfs::rename( t.root + "/swap.tmp", path );
+    changed_files();
+    expect( 3, "swapped by rename, size and mtime kept" );
+
+    // Deleted and created again, the same size and modification time.
+    cached();
+    mtime = stdfs::last_write_time( path );
+    settle();
+    stdfs::remove( path );
+    t.write( name, sized_text( format, 4, 200 ) );
+    stdfs::last_write_time( path, mtime );
+    changed_files();
+    expect( 4, "deleted and created again, size and mtime kept" );
+
+    // Another file under the name, and then the first one back.
+    cached();
+    settle();
+    t.write( "other.tmp", sized_text( format, 5, 200 ) );
+    stdfs::rename( path, t.root + "/keep.tmp" );
+    stdfs::rename( t.root + "/other.tmp", path );
+    changed_files();
+    expect( 5, "another file under the name" );
+    stdfs::rename( path, t.root + "/other.tmp" );
+    stdfs::rename( t.root + "/keep.tmp", path );
+    changed_files();
+    expect( 4, "the first file back under the name" );
+  }
+}
+
+// A file that changes while it is read to be admitted is not kept: its first
+// read has seen the same metadata, and the change comes during the second.
+void test_cache_change_during_read( Fixture const &f ) {
+  TempTree t;
+  std::string big( "v,pad\n" );
+  std::string const row( "1,xxxxxxxxxxxxxxxxxxxxxxxx\n" );
+  while ( big.size() < 4u << 20 )
+    big += row;
+  t.write( "big.csv", big );
+  std::string const path( t.root + "/big.csv" );
+  Server server( f.zorba, cache_config( t.root, 64 * 1024, 10 ), std::cerr );
+  std::string const q( dir_import + jn_import +
+    "count(jn:members(dir:open($dir:root, \"big.csv\")(\"content\")))" );
+
+  std::string const rows( query_text( server, q ) );
+  check( rows != "0" && !contains( rows, "error" ), "the rows of the file", rows );
+  auto touch = [&path]() {
+    struct timespec const times[2] = { { 0, UTIME_NOW }, { 0, UTIME_NOW } };
+    utimensat( AT_FDCWD, path.c_str(), times, 0 );
+  };
+  // How long a query takes to reach the file depends on the build: a change
+  // too early is a first read of new metadata, and one too late finds a record
+  // kept. Each try starts from new metadata seen once.
+  bool during = false;
+  for ( int delay = 30; !during && delay < 4000; delay *= 2 ) {
+    touch();
+    changed_files();
+    check( query_text( server, q ) == rows, "the first read of the try" );
+    std::thread toucher( [&touch, delay]() {
+      std::this_thread::sleep_for( std::chrono::milliseconds( delay ) );
+      touch();
+    } );
+    std::string const v( query_text( server, q ) );
+    toucher.join();
+    changed_files();
+    check( v == rows, "the read while the file changes", v );
+    during = server.cache_stats().refused > 0;
+  }
+  DocumentCache::Stats s = server.cache_stats();
+  check( during && s.refused == 1 && s.entries == 0 && s.bytes == 0,
+         "read to be admitted, and not kept", stats_text( s ) + ", refused " +
+         std::to_string( s.refused ) );
+
+  // Once it holds still, it is an ordinary file again.
+  std::size_t const admissions = s.admissions, hits = s.hits;
+  for ( int i = 0; i < 3; ++i )
+    check( query_text( server, q ) == rows, "the value afterwards" );
+  s = server.cache_stats();
+  check( s.admissions == admissions + 1 && s.hits == hits + 1 && s.entries == 1,
+         "it enters once it holds still", stats_text( s ) );
+}
+
+// The last write wins, however close it is to the read that was kept.
+void test_cache_change_at_once( Fixture const &f ) {
+  struct utsname u;
+  if ( uname( &u ) == 0 )
+    check( true, std::string( "on " ) + u.sysname + " " + u.release );
+  TempTree t;
+  std::string const path( t.root + "/a.json" );
+  t.write( "a.json", json_of_size( 1, 40 ) );
+  Server server( f.zorba, cache_config( t.root, 16, 10 ), std::cerr );
+  std::string const twice( dir_import +
+    "for $i in 1 to 2 "
+    "return dir:open($dir:root, \"a.json\")(\"content\")(\"v\")" );
+  int const rounds = 200;
+  int stale = 0;
+  std::string detail;
+  for ( int round = 0; round < rounds; ++round ) {
+    int const value = round % 8 + 1;
+    std::atomic<bool> stop( false );
+    std::atomic<int> last( 0 );
+    std::atomic<bool> closed( true );
+    std::thread writer( [&]() {
+      int const fd = open( path.c_str(), O_WRONLY );
+      for ( int i = 0; fd >= 0 && !stop.load(); ++i ) {
+        int const v = ( i % 2 ? value : 9 );
+        std::string const text( json_of_size( v, 40 ) );
+        if ( pwrite( fd, text.data(), text.size(), 0 ) > 0 )
+          last = v;
+      }
+      if ( fd >= 0 && close( fd ) != 0 )
+        closed = false;
+    } );
+    // Reads against writes of the same size, as close together as they come.
+    for ( int i = 0; i < 2; ++i )
+      query_text( server, twice );
+    while ( !last.load() )
+      std::this_thread::yield();
+    stop = true;
+    writer.join();
+    check( closed.load(), "the writer closed the file" );
+    std::string const expected( std::to_string( last.load() ) );
+    std::string const got( open_value( server, "a.json" ) );
+    if ( got != expected ) {
+      ++stale;
+      detail = "last written " + expected + ", served " + got;
+    }
+  }
+  DocumentCache::Stats const s = server.cache_stats();
+  check( stale == 0, "the last write is served after every round: " +
+         std::to_string( stale ) + " of " + std::to_string( rounds ) +
+         " not, with " + stats_text( s ), detail );
+
+  // A file read at once is left for later, if the read is quick enough to tell.
+  TempTree quick;
+  Server fresh( f.zorba, cache_config( quick.root, 16, 10 ), std::cerr );
+  int told = 0;
+  for ( int attempt = 0; attempt < 30; ++attempt ) {
+    wait_after_change();
+    std::size_t const before = fresh.cache_stats().admissions;
+    { std::ofstream( ( quick.root + "/a.json" ).c_str(), std::ios::binary )
+        << json_of_size( attempt % 8 + 1, 40 ); }
+    std::string const read( result_text( roundtrip( fresh, request( 100, "tools/call", Json::object( {
+      { "name", "run_query" },
+      { "arguments", Json::object( { { "query", twice } } ) } } ) ) ) ) );
+    // The age the cache goes by, from the file's own change time. If it is still
+    // under the limit now, it was at both reads.
+    struct stat st;
+    struct timespec now;
+    bool const known =
+      stat( ( quick.root + "/a.json" ).c_str(), &st ) == 0 &&
+      clock_gettime( CLOCK_REALTIME, &now ) == 0;
+#ifdef __APPLE__
+    struct timespec const &ctime_of = st.st_ctimespec;
+#else
+    struct timespec const &ctime_of = st.st_ctim;
+#endif
+    if ( known &&
+         ( now.tv_sec - ctime_of.tv_sec ) * 1000000000LL +
+         ( now.tv_nsec - ctime_of.tv_nsec ) < 20000000LL ) {
+      ++told;
+      check( fresh.cache_stats().admissions == before,
+             "a file written less than 20 ms ago is not kept",
+             stats_text( fresh.cache_stats() ) );
+    }
+    check( contains( read, std::to_string( attempt % 8 + 1 ) ),
+           "the read of a new file", read );
+  }
+
+  // A record held, then a write of the same size at once: the record is replaced
+  // on the next read, every time. The file has been at rest for longer than a
+  // tick of the file clock, so the write gets a new change time.
+  TempTree held;
+  std::string const held_path( held.root + "/a.json" );
+  held.write( "a.json", json_of_size( 1, 40 ) );
+  Server refreshed( f.zorba, cache_config( held.root, 16, 10 ), std::cerr );
+  for ( int round = 0; round < 20; ++round ) {
+    int const old_value = round % 8 + 1;
+    int const new_value = ( round + 1 ) % 8 + 1;
+    DocumentCache::Stats const before = refreshed.cache_stats();
+    changed_files();
+    for ( int read = 0; read < 3; ++read ) {
+      std::string const v( open_value( refreshed, "a.json" ) );
+      check( v == std::to_string( old_value ), "the value of a file at rest", v );
+    }
+    DocumentCache::Stats const kept = refreshed.cache_stats();
+    check( kept.admissions == before.admissions + 1 &&
+           kept.hits > before.hits && kept.entries == 1,
+           "a file at rest is kept and served from the cache",
+           stats_text( kept ) );
+    overwrite( held_path, json_of_size( new_value, 40 ) );
+    std::string const v( open_value( refreshed, "a.json" ) );
+    check( v == std::to_string( new_value ),
+           "the record gives way to a write right after a hit", v );
+    check( refreshed.cache_stats().hits == kept.hits,
+           "that read is not a hit", stats_text( refreshed.cache_stats() ) );
+  }
+}
+
+// A table of first reads full of files read once must not keep out those read
+// repeatedly.
+void test_cache_full_tracker( Fixture const &f ) {
+  TempTree t;
+  std::filesystem::create_directories( t.root + "/once" );
+  std::filesystem::create_directories( t.root + "/often" );
+  int const once = 10000;
+  int const often = 300;
+  for ( int i = 0; i < once; ++i )
+    t.write( "once/" + std::to_string( i ) + ".json", "{ \"v\" : 1 }" );
+  for ( int i = 0; i < often; ++i )
+    t.write( "often/" + numbered( "json", i ), sized_text( "json", i, 100 ) );
+  Server server( f.zorba, cache_config( t.root, 16, 400 ), std::cerr );
+  std::string const first( query_text( server, dir_import +
+    "count(dir:documents(concat($dir:root, \"/once\")))" ) );
+  check( first == std::to_string( once ), "the files read once", first );
+  std::string const scan( dir_import +
+    "count(dir:documents(concat($dir:root, \"/often\")))" );
+  for ( int call = 0; call < 10; ++call ) {
+    std::string const v( query_text( server, scan ) );
+    check( v == std::to_string( often ), "the files read often", v );
+  }
+  DocumentCache::Stats const s = server.cache_stats();
+  check( s.entries == static_cast<std::size_t>( often ) && s.evictions == 0 &&
+         s.admissions == static_cast<std::size_t>( often ),
+         "the files read often have entered", stats_text( s ) );
+}
+
+// File times past what nanoseconds in 64 bits can count (the year 2262).
+void test_cache_far_times( Fixture const &f ) {
+  TempTree t;
+  t.write( "a.json", json_of_size( 1, 40 ) );
+  std::string const path( t.root + "/a.json" );
+  auto set_mtime = [&path]( std::time_t seconds ) {
+    struct timespec const times[2] = { { 0, UTIME_OMIT }, { seconds, 0 } };
+    check( utimensat( AT_FDCWD, path.c_str(), times, 0 ) == 0, "set the time" );
+    changed_files();
+  };
+  set_mtime( 10000000000 );             // the year 2286
+  Server server( f.zorba, cache_config( t.root, 16, 10 ), std::cerr );
+  for ( int read = 0; read < 3; ++read )
+    check( open_value( server, "a.json" ) == "1", "the value of the file" );
+  DocumentCache::Stats s = server.cache_stats();
+  check( s.admissions == 1 && s.hits == 1 && s.entries == 1,
+         "a modification time in the future does not keep a file out",
+         stats_text( s ) );
+  set_mtime( 20000000000 );             // the year 2603
+  overwrite( path, json_of_size( 2, 40 ) );
+  changed_files();
+  check( open_value( server, "a.json" ) == "2", "the file is read again" );
+  s = server.cache_stats();
+  check( s.hits == 1, "that read is not a hit", stats_text( s ) );
+}
+
+// Errors are the same on the first read and on later ones.
+void test_cache_error_identical( Fixture const &f ) {
+  TempTree t;
+  t.write( "bad.json", "{ \"v\" : " );
+  t.write( "bad.xml", "<r><v>" );
+  t.write( "bad.csv", "a,b\n\"unterminated" );
+  t.write( "bad.html", "<html><body><" );
+  t.write( "empty.xml", "" );
+  t.write( "notes.txt", "text" );
+  t.write( "good.json", "{ \"v\" : 1 }" );
+  std::filesystem::create_directories( t.root + "/dir.json" );
+  Server on( f.zorba, cache_config( t.root, 16, 10 ), std::cerr );
+  Server off( f.zorba, cache_config( t.root, 0, 0 ), std::cerr );
+  for ( std::string const name :
+        { "bad.json", "bad.xml", "bad.csv", "bad.html", "empty.xml",
+          "notes.txt", "missing.json", "dir.json", "../good.json" } ) {
+    same_output( on, off, dir_import +
+      "let $d := dir:open($dir:root, \"" + name + "\") "
+      "return ($d(\"path\"), $d(\"format\"), $d(\"error\"))",
+      "the error of " + name );
+    same_output( on, off, dir_import +
+      "dir:open($dir:root, \"" + name + "\")(\"content\")(\"v\")",
+      "reading on after the error of " + name );
+  }
+  same_output( on, off, dir_import +
+    "for $d in dir:documents($dir:root) return ($d(\"path\"), $d(\"error\"))",
+    "the errors of a scan" );
+  // A CSV or HTML file is parsed leniently, and may hold no error.
+  std::string const fine( query_text( off, dir_import +
+    "count(dir:documents($dir:root)[empty(.(\"error\"))])" ) );
+  DocumentCache::Stats const s = on.cache_stats();
+  check( std::to_string( s.entries ) == fine,
+         "only the files without an error are kept",
+         stats_text( s ) + ", without an error: " + fine );
+  check( fine != "0" && !contains( fine, "error" ), "some file has no error",
+         fine );
+}
+
+// Node identity, roots, identifiers and the order of documents.
+void test_cache_xdm( Fixture const &f ) {
+  TempTree t;
+  for ( std::string const name : { "a", "b", "m", "z" } )
+    t.write( name + ".xml",
+             "<r><v id=\"" + name + "\">" + name + "</v></r>" );
+  Server on( f.zorba, cache_config( t.root, 16, 100 ), std::cerr );
+  Server off( f.zorba, cache_config( t.root, 0, 0 ), std::cerr );
+  auto content = []( std::string const &name ) {
+    return "dir:open($dir:root, \"" + name + ".xml\")(\"content\")";
+  };
+
+  // Two files are kept first, in an order other than that of the paths.
+  for ( std::string const name : { "z", "m" } )
+    for ( int read = 0; read < 3; ++read ) {
+      query_text( on, dir_import + content( name ) + "/r/v/string()" );
+      query_text( off, dir_import + content( name ) + "/r/v/string()" );
+    }
+
+  std::string const a( content( "a" ) ), z( content( "z" ) );
+  struct { char const *what; std::string query; } const queries[] = {
+    { "a scan's path expression, documents in order of their reads",
+      "string-join((for $d in dir:documents($dir:root) "
+      "return $d(\"content\"))/r/v/string(), \",\")" },
+    { "the same, with //",
+      "string-join((for $d in dir:documents($dir:root) "
+      "return $d(\"content\"))//v, \",\")" },
+    { "a union of documents read one by one",
+      "let $z := " + z + " let $a := " + a + " "
+      "return string-join(($a | $z)/r/v, \",\")" },
+    { "documents in the order they are read, in a path expression",
+      "string-join((" + a + ", " + z + ", " + content( "m" ) + ")/r/v, \",\")" },
+    { "documents read the other way",
+      "string-join((" + z + ", " + a + ", " + content( "m" ) + ")/r/v, \",\")" },
+    { "<< between documents",
+      "let $a := " + a + " let $z := " + z + " return ($a << $z, $z << $a)" },
+    { "is, between two reads of a file",
+      "let $x := " + z + " let $y := " + z + " return $x is $y" },
+    { "is, a node and itself",
+      "let $x := " + z + " return $x is $x" },
+    { "fn:root",
+      "let $d := " + z + " return root($d/r/v) is $d" },
+    { "generate-id, one read",
+      "let $d := " + z + " return generate-id($d) eq generate-id($d)" },
+    { "generate-id, two reads",
+      "generate-id(" + z + ") eq generate-id(" + z + ")" },
+    { "generate-id, two files",
+      "generate-id(" + z + ") eq generate-id(" + a + ")" },
+    { "the same node twice, deduplicated",
+      "let $d := " + z + " return count(($d/r, $d/r)/v)" },
+    { "two reads, deduplicated",
+      "count((" + z + ", " + z + ")/r)" },
+    { "the parent of a record's root element",
+      "let $d := " + z + " return $d/r/.. is $d" }
+  };
+  for ( auto const &q : queries )
+    same_output( on, off, dir_import + q.query, q.what );
+
+  // The nodes of one call are not those of the next, with or without a cache.
+  auto ids_differ = [&]( Server &server ) {
+    std::vector<std::string> ids;
+    for ( int i = 0; i < 3; ++i )
+      ids.push_back( query_text( server, dir_import +
+                                 "generate-id(" + z + ")" ) );
+    return ids[0] != ids[1] && ids[1] != ids[2] && ids[0] != ids[2];
+  };
+  bool const without = ids_differ( off );
+  bool const with = ids_differ( on );
+  check( with == without, "generate-id across calls",
+         std::string( "calls differ with the cache: " ) +
+         ( with ? "yes" : "no" ) + ", without: " + ( without ? "yes" : "no" ) );
+  check( on.cache_stats().hits > 0, "the documents were served from the cache",
+         stats_text( on.cache_stats() ) );
+}
+
+// What a document carries besides its nodes' names and text.
+void test_cache_xdm_properties( Fixture const &f ) {
+  TempTree t;
+  t.write( "a.xml",
+    "<?xml version=\"1.0\"?>\n"
+    "<!DOCTYPE r [<!ATTLIST e k ID #IMPLIED>\n"
+    "             <!ATTLIST e ref IDREF #IMPLIED>\n"
+    "             <!ENTITY g \"text\">]>\n"
+    "<!-- before --><?pi data?>\n"
+    "<r xmlns=\"urn:d\" xmlns:p=\"urn:p\" xml:lang=\"es\" xml:base=\"sub/\">\n"
+    "  <e k=\"one\" ref=\"two\" p:a=\"1\">&g;</e>\n"
+    "  <e k=\"two\"><![CDATA[a<b]]><!-- in --></e>\n"
+    "  <p:n xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" "
+    "xsi:nil=\"true\"/>\n"
+    "</r>\n<?pi after?>" );
+  t.write( "page.html",
+           "<html><head><title>T</title></head><body lang=\"es\">"
+           "<p id=\"x\">a<br>b</p></body></html>" );
+  Server on( f.zorba, cache_config( t.root, 16, 10 ), std::cerr );
+  Server off( f.zorba, cache_config( t.root, 0, 0 ), std::cerr );
+  std::string const decl(
+    dir_import + "declare namespace d = \"urn:d\";\n"
+    "declare namespace p = \"urn:p\";\n"
+    "declare variable $c := dir:open($dir:root, \"a.xml\")(\"content\");\n" );
+  struct { char const *what; char const *query; } const queries[] = {
+    { "serialize", "serialize($c)" },
+    { "base-uri", "base-uri($c), base-uri($c/d:r), base-uri($c/d:r/d:e[1])" },
+    { "document-uri", "replace(document-uri($c), \"[0-9]+$\", \"N\")" },
+    { "document-uri of two reads",
+      "document-uri($c) eq document-uri(dir:open($dir:root, \"a.xml\")"
+      "(\"content\"))" },
+    { "fn:parse-xml in the query", "base-uri(parse-xml(\"<a/>\"))" },
+    { "kinds", "for $n in $c/node() return string(node-name($n)), "
+               "count($c/descendant-or-self::node())" },
+    { "fn:id", "count(id(\"one\", $c)), string(id(\"two\", $c)/@k)" },
+    { "fn:idref", "count(idref(\"two\", $c)), string(idref(\"two\", $c)/../@k)" },
+    { "namespaces", "for $p in in-scope-prefixes($c/d:r/d:e[1]) "
+                    "order by $p "
+                    "return ($p, namespace-uri-for-prefix($p, $c/d:r/d:e[1]))" },
+    { "lang", "lang(\"es\", $c/d:r/d:e[1])" },
+    { "nilled", "nilled($c/d:r/p:n)" },
+    { "typed values", "for $v in data($c/d:r/d:e/@k) "
+                      "return $v instance of xs:untypedAtomic, "
+                      "$c/d:r/d:e[1] instance of element(*, xs:untyped), "
+                      "data($c/d:r/d:e[1])" },
+    { "fn:path", "path($c/d:r/d:e[2]/@k)" },
+    { "html", "let $h := dir:open($dir:root, \"page.html\")(\"content\") "
+              "return (serialize($h), base-uri($h), "
+              "replace(document-uri($h), \"[0-9]+$\", \"N\"), "
+              "string(id(\"x\", $h)))" }
+  };
+  for ( auto const &q : queries )
+    same_output( on, off, decl + q.query, q.what );
+  check( on.cache_stats().hits > 0, "the documents were served from the cache",
+         stats_text( on.cache_stats() ) );
+}
+
+// What one query does with a record, the next one does not see.
+void test_cache_no_effects( Fixture const &f ) {
+  TempTree t;
+  t.write( "a.xml", "<r><v>1</v><w>2</w></r>" );
+  t.write( "a.json", "{ \"v\" : 1, \"o\" : { \"p\" : [1, 2] } }" );
+  t.write( "a.csv", "v,w\n1,2\n" );
+  Server on( f.zorba, cache_config( t.root, 16, 10 ), std::cerr );
+  Server off( f.zorba, cache_config( t.root, 0, 0 ), std::cerr );
+  std::string const x( "dir:open($dir:root, \"a.xml\")(\"content\")" );
+  std::string const j( "dir:open($dir:root, \"a.json\")(\"content\")" );
+  std::string const c( "dir:open($dir:root, \"a.csv\")(\"content\")" );
+  std::string const check_all( dir_import +
+    "serialize(" + x + "), " + j + ", " + c + ", "
+    "serialize(" + x + "/r/..), count(" + x + "/r/v/..)" );
+
+  std::string const queries[] = {
+    // A node of a record inside a new tree.
+    "<w>{ " + x + "/r }</w>",
+    "let $n := " + x + "/r/v return (<w>{ $n }</w>/v/.. , $n/..)",
+    "let $n := " + x + "/r/v let $w := <w>{ $n }</w> "
+      "return ($n/.. is $w, root($n) is $w, $w/v is $n)",
+    "document { " + x + "/r }",
+    "<w>{ " + x + "/r/v/text(), " + x + "/r/w/text() }</w>",
+    // A copy changed by a transform.
+    "copy $d := " + x + " modify (delete node $d/r/v, "
+      "insert node <n/> into $d/r, rename node $d/r as \"s\") return $d",
+    "copy $d := " + x + "/r/v modify replace value of node $d with \"9\" "
+      "return $d",
+    "copy $d := " + j + " modify insert json { \"n\" : 1 } into $d return $d",
+    "copy $d := " + j + " modify delete json $d(\"v\") return $d",
+    "copy $d := " + j + " modify replace value of json $d(\"o\")(\"p\")(1) "
+      "with 9 return $d",
+    "copy $d := " + c + " modify append json 9 into $d return $d",
+    // A JSON item of a record inside a new one.
+    "{ \"a\" : " + j + ", \"b\" : [ " + j + "(\"o\") ], \"c\" : " + c + " }",
+    "let $o := " + j + "(\"o\") return ({ \"a\" : $o }, [ $o ], $o)",
+    "{ \"n\" : " + x + "/r }",
+    "[ " + x + " ]",
+    "{| " + j + ", { \"z\" : 1 } |}",
+    "dir:open($dir:root, \"a.json\")",
+    "dir:open($dir:root, \"a.xml\")"
+  };
+  for ( std::string const &q : queries ) {
+    same_output( on, off, dir_import + q, q, 3 );
+    same_output( on, off, check_all, "after: " + q, 1 );
+  }
+  check( on.cache_stats().hits > 0, "the documents were served from the cache",
+         stats_text( on.cache_stats() ) );
+}
+
+// Queries that can apply updates read their own copy.
+void test_cache_updates_bypass( Fixture const &f ) {
+  TempTree t;
+  t.write( "a.xml", "<r><v>1</v></r>" );
+  t.write( "a.json", "{ \"v\" : 1, \"a\" : [1] }" );
+  Server on( f.zorba, cache_config( t.root, 16, 10 ), std::cerr );
+  Server off( f.zorba, cache_config( t.root, 0, 0 ), std::cerr );
+  std::string const x( "dir:open($dir:root, \"a.xml\")(\"content\")" );
+  std::string const j( "dir:open($dir:root, \"a.json\")(\"content\")" );
+  std::string const look( dir_import + "serialize(" + x + "), " + j );
+  for ( int i = 0; i < 3; ++i )
+    same_output( on, off, look, "before", 1 );
+  DocumentCache::Stats const held = on.cache_stats();
+  check( held.entries == 2 && held.hits > 0, "both documents are held",
+         stats_text( held ) );
+
+  std::string const refl(
+    "import module namespace refl = \"http://zorba.io/modules/reflection\";\n" );
+  std::string const seq(
+    "declare namespace an = \"http://zorba.io/annotations\";\n" );
+  // Text for a string literal: a query that reads the file itself.
+  std::string const inner(
+    "import module namespace dir = \"\"http://zorba.io/modules/directory\"\"; " );
+  auto inner_open = [&]( std::string const &name ) {
+    return "dir:open(\"\"" + t.root + "\"\", \"\"" + name +
+      "\"\")(\"\"content\"\")";
+  };
+  std::string const inner_delete(
+    inner + "delete json " + inner_open( "a.json" ) + "(\"\"v\"\")" );
+  struct { char const *what; std::string query; } const queries[] = {
+    { "updating, XML", dir_import + "delete node " + x + "/r/v" },
+    { "updating, JSON", dir_import + "delete json " + j + "(\"v\")" },
+    { "updating, JSON array",
+      dir_import + "append json 2 into " + j + "(\"a\")" },
+    { "updating function", dir_import +
+      "declare updating function local:u($n as node()) { delete node $n };\n"
+      "local:u(" + x + "/r/v)" },
+    { "sequential", dir_import + seq +
+      "declare %an:sequential function local:s() {\n"
+      "  variable $n := " + x + "/r/v;\n"
+      "  delete node $n;\n  string(" + x + ") };\n"
+      "local:s()" },
+    { "sequential, a script", dir_import +
+      "variable $n := " + x + "/r/v;\n"
+      "delete node $n;\ncount(" + x + "/r/v);" },
+    { "reflection:eval-u, XML", refl +
+      "refl:eval-u(\"" + inner + "delete node " + inner_open( "a.xml" ) +
+      "/r/v\")" },
+    { "reflection:eval-u, JSON", refl +
+      "refl:eval-u(\"" + inner_delete + "\")" },
+    { "reflection:eval-s", refl +
+      "refl:eval-s(\"" + inner_delete + "; 1\")" },
+    { "a function item of reflection:eval-u", refl +
+      "function-lookup(xs:QName(\"refl:eval-u\"), 1)(\"" + inner_delete +
+      "\")" },
+    { "a function item of reflection:eval-s", refl +
+      "function-lookup(xs:QName(\"refl:eval-s\"), 1)(\"" + inner_delete +
+      "; 1\")" },
+    { "reflection:eval", refl +
+      "refl:eval(\"" + inner + inner_open( "a.json" ) + "(\"\"v\"\")\")" },
+  };
+  for ( auto const &q : queries ) {
+    same_output( on, off, q.query, q.what, 2 );
+    std::string const after( query_text( on, look ) );
+    check( after == query_text( off, look ),
+           std::string( "the files as they are after: " ) + q.what, after );
+  }
+}
+
+// A query stopped by the time limit, in the middle of a scan.
+void test_cache_timeout_state( Fixture const &f ) {
+  TempTree t;
+  for ( int i = 0; i < 12; ++i )
+    t.write( numbered( "json", i ), sized_text( "json", i, 300 ) );
+  ServerConfig config = cache_config( t.root, 16, 5 );
+  config.timeout = std::chrono::milliseconds( 1500 );
+  Server on( f.zorba, config, std::cerr );
+  Server off( f.zorba, cache_config( t.root, 0, 0 ), std::cerr );
+  std::string const stopped( dir_import + jn_import +
+    "sum(for $i in 1 to 9223372036854775807 "
+    "return count(dir:documents($dir:root)))" );
+  std::string const all( dir_import +
+    "string-join(for $d in dir:documents($dir:root) "
+    "return string($d(\"content\")(\"v\")), \",\")" );
+  std::size_t one = 0;
+  for ( int round = 0; round < 2; ++round ) {
+    Json const r = run_query( on, stopped );
+    check( is_tool_error( r ) &&
+           contains( field( tool_error( r ), "code" ), "ZXQP0068" ),
+           "stopped by the time limit", r.dump().substr( 0, 400 ) );
+    DocumentCache::Stats const s = on.cache_stats();
+    if ( !one && s.entries )
+      one = s.bytes / s.entries;
+    check( s.entries <= 5 && s.bytes == s.entries * one,
+           "whole records, no more than the slots", stats_text( s ) );
+    same_output( on, off, all, "the next call", 3 );
+    check( on.cache_stats().entries == 5, "the records of the next calls",
+           stats_text( on.cache_stats() ) );
+  }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -3087,6 +4456,28 @@ Test const tests[] = {
   { "cache_errors", test_cache_errors },
   { "cache_expansion", test_cache_expansion },
   { "cache_counters", test_cache_counters },
+  { "cache_slack_size", test_cache_slack_size },
+  { "cache_slack_slots", test_cache_slack_slots },
+  { "cache_slack_many", test_cache_slack_many },
+  { "cache_same_file", test_cache_same_file },
+  { "cache_root_spelling", test_cache_root_spelling },
+  { "cache_replace", test_cache_replace },
+  { "cache_turnover", test_cache_turnover },
+  { "cache_invalidate_loop", test_cache_invalidate_loop },
+  { "cache_refused_loop", test_cache_refused_loop },
+  { "cache_session_binary", test_cache_session_binary },
+  { "cache_same_output", test_cache_same_output },
+  { "cache_change_detect", test_cache_change_detect },
+  { "cache_change_during_read", test_cache_change_during_read },
+  { "cache_change_at_once", test_cache_change_at_once },
+  { "cache_full_tracker", test_cache_full_tracker },
+  { "cache_far_times", test_cache_far_times },
+  { "cache_error_identical", test_cache_error_identical },
+  { "cache_xdm", test_cache_xdm },
+  { "cache_xdm_properties", test_cache_xdm_properties },
+  { "cache_no_effects", test_cache_no_effects },
+  { "cache_updates_bypass", test_cache_updates_bypass },
+  { "cache_timeout_state", test_cache_timeout_state },
   { "windows", test_windows },
   { "memory_limit", test_memory_limit },
   { "optional_params", test_optional_params },

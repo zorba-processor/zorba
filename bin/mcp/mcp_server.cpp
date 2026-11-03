@@ -176,6 +176,11 @@ std::string percent_encode_path( std::string const &path ) {
   return out;
 }
 
+// The base URI of the queries, and of what the directory module parses for them.
+std::string base_uri_of( std::string const &root ) {
+  return "file://" + percent_encode_path( root ) + "/";
+}
+
 // Line n (1-based) of a text, or the empty string.
 std::string source_line( std::string const &source, unsigned long n ) {
   std::istringstream in( source );
@@ -331,7 +336,7 @@ Server::Server( Zorba *zorba, ServerConfig config, std::ostream &log ) :
   thePolicy( SecurityPolicy::secure() ),
   theCache( zorba, theConfig.root,
             std::uintmax_t( theConfig.cache_max_file_kb ) * 1024,
-            theConfig.cache_max_files, &thePolicy ) {
+            theConfig.cache_max_files, &thePolicy, base_uri_of( theConfig.root ) ) {
   directory_config::apply_policy( thePolicy, theConfig.root );
   if ( theConfig.timeout.count() > 0 )
     thePolicy.setTimeout( theConfig.timeout );
@@ -467,19 +472,19 @@ Json Server::tools() const {
       { "name", "list_documents" },
       { "title", "List documents" },
       { "description",
-        "Lists files, recursive, sorted by path, with format, size, fields. "
-        "First line: scan state, totals, dirs (subdirectories, if cut or "
+        "Lists files, recursive, sorted by path: format, size, top-level "
+        "fields. Line 1: scan state, totals, dirs (subdirectories, if cut or "
         "scanning), incomplete (may miss files). memory_limit: scan stopped; "
-        "ask by path. A file as path adds a preview." },
+        "ask by path. A file as path adds a preview (nested fields)." },
       { "inputSchema", Json::object( {
           { "type", "object" },
           { "properties", Json::object( {
               { "path", Json::object( {
                   { "type", "string" },
-                  { "description", "Subdirectory or file, relative." } } ) },
+                  { "description", "Subdirectory or file." } } ) },
               { "limit", Json::object( {
                   { "type", "integer" },
-                  { "description", "Files to list; default 100." } } ) },
+                  { "description", "Max files; default 100." } } ) },
               { "refresh", Json::object( {
                   { "type", "boolean" },
                   { "description", "Restart the scan." } } ) }
@@ -575,7 +580,7 @@ Server::run( std::string const &source, std::string const &file_name,
   try {
     StaticContext_t sctx = new_static_context( file_name );
     // Relative URIs, e.g. doc("orders/q1.xml"), resolve against the root.
-    sctx->setBaseURI( "file://" + percent_encode_path( theConfig.root ) + "/" );
+    sctx->setBaseURI( base_uri_of( theConfig.root ) );
     theCache.attach( sctx );
     // An implementation may add predeclared namespace prefixes (XQuery 3.0,
     // 4.13); a query can still bind this one to something else.

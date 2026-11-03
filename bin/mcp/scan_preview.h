@@ -37,7 +37,10 @@ struct ScanPreview {
   std::string json;
   /**
    * The members \c "fields":[...] (and \c "fields_more":true) to put in a
-   * listing, as JSON text; empty if the format has none.
+   * listing, as JSON text; empty if the format has none. Top-level names only:
+   * CSV columns, the keys of a JSON object (or of the objects of a top-level
+   * array), the root of an XML file and what it holds directly. The nested
+   * detail is in the preview.
    */
   std::string fields;
 };

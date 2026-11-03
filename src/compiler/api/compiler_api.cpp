@@ -51,6 +51,7 @@
 #include "compiler/rewriter/tools/udf_graph.h"
 
 #include "compiler/codegen/plan_visitor.h"
+#include "compiler/rewriter/tools/expr_tools.h"
 #ifdef ZORBA_XQUERYX
 #include "compiler/xqueryx/xqueryx_to_xquery.h"
 #endif
@@ -347,6 +348,10 @@ PlanIter_t XQueryCompiler::compile(
   rootExpr = translate(ast, auditRecord);
 
   rootExpr = optimize(rootExpr, auditRecord);
+
+  theCompilerCB->theMayRunSideEffects =
+    theCompilerCB->theOuterMayRunSideEffects ||
+    expr_tools::may_run_side_effects(rootExpr);
 
   return codegen(rootExpr, nextDynamicVarId, auditRecord);
 }

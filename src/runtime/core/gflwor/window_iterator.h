@@ -16,6 +16,9 @@
 #ifndef ZORBA_RUNTIME_GFLWOR_WINDOW
 #define ZORBA_RUNTIME_GFLWOR_WINDOW
 
+#include <deque>
+#include <vector>
+
 #include "zorbautils/checked_vector.h"
 #include "common/shared_types.h"
 #include "runtime/base/plan_iterator.h"
@@ -104,6 +107,13 @@ public:
       PlanState& planState,
       const store::TempSeq_t& inSeq,
       ulong pos) const;
+
+  // Whether a reference to an item of the domain sequence exists among the
+  // variables inside the window clause.
+  bool hasInnerItemRefs() const;
+
+  // The same for the variables visible after the window clause.
+  bool hasOuterItemRefs() const;
 };
 
 
@@ -242,7 +252,7 @@ protected:
   A simple class to store info about a "candidate" window. A candidate window
   is one for which a quailifying starting item has been found within the domain
   sequence, but no quailifying end item has been found yet. Instances of this class
-  are stored inside the WindowState::theOpenWindows vector until an item is found
+  are stored inside the WindowState::theOpenWindows deque until an item is found
   that satisfies the end condition.
 
   theStartPos : The position within the domain sequence of the item that marks
@@ -250,7 +260,8 @@ protected:
   theEndPos   : The position within the domain sequence of the item that marks
                 the end of the window. Once this is set, the window is not a
                 candidate anymore (it becomes a real window), and the WindowDef
-                obj is removed from the WindowState::theOpenWindows vector.
+                obj is removed from the WindowState::theOpenWindows deque when
+                all the windows that start before it have been returned.
 ********************************************************************************/
 class WindowDef
 {
@@ -270,10 +281,17 @@ public:
                    materialized into (lazily, if the WindowIterator was created
                    with the lazy flag on).
   theCurInputPos : 
-  theOpenWindows : A vector storing "candidate" windows, i.e., windows for which
-                   a quailifying starting item has been found within the domain
-                   sequence, but no quailifying end item has been found yet.
-  theCurWindow   : Iterator over theOpenWindows vector
+  theOpenWindows : The windows that have not been returned to the consumer yet,
+                   in the order of their starting items: "candidate" windows,
+                   for which a quailifying starting item has been found within
+                   the domain sequence but no quailifying end item yet, and
+                   windows that have an end but start after a candidate window.
+  theUnclosedWindows : The candidate windows among theOpenWindows, so that testing
+                   the end condition does not walk the closed ones. A deque keeps
+                   references to its elements when elements are added at the back
+                   or removed at the front, and only closed windows are removed
+                   while the domain sequence is being scanned.
+  thePurgedUpTo  : The number of leading items purged from theDomainSeq.
 ********************************************************************************/
 class WindowState : public PlanIteratorState
 {
@@ -282,8 +300,9 @@ class WindowState : public PlanIteratorState
 protected:
   store::TempSeq_t                 theDomainSeq;
   ulong                            theCurInputPos;
-  std::vector<WindowDef>           theOpenWindows;
-  std::vector<WindowDef>::iterator theCurWindow;
+  std::deque<WindowDef>            theOpenWindows;
+  std::vector<WindowDef*>          theUnclosedWindows;
+  ulong                            thePurgedUpTo;
 
 public:
   WindowState();
@@ -310,13 +329,18 @@ public:
   theEndClause        : Object representing the end cond of this window clause
   theLazyEval         : Whether to use an eager or a lazy temp sequence to
                         buffer the domain sequence.
-  theMaxNeededHistory : This is relevant only if a lazy temp sequence is used.
+  theEndCondSameForAllWindows :
+                        The end condition has the same value at a given item for
+                        every candidate window: see same_end_cond_for_all_windows
+                        in plan_visitor.cpp. It is evaluated once per item.
+  theWindowsHoldItems : Whether an open window needs the items from its start on.
+                        False when nothing refers to the window var, the start
+                        vars or the end vars visible after the clause: then only
+                        positions remain of a window, not items.
 ********************************************************************************/
 class WindowIterator : public PlanIterator
 {
 public:
-  static const ulong MAX_HISTORY;
-
   enum WindowType
   {
     TUMBLING,
@@ -337,7 +361,8 @@ private:
   EndClause                  theEndClause;
 
   bool                       theLazyEval;
-  ulong                      theMaxNeededHistory;
+  bool                       theEndCondSameForAllWindows;
+  bool                       theWindowsHoldItems;
 
 public:
   SERIALIZABLE_CLASS(WindowIterator);
@@ -364,7 +389,7 @@ public:
         StartClause& startClause,
         EndClause& endClause,
         bool lazyEval,
-        ulong maxNeededHistory = MAX_HISTORY);
+        bool endCondSameForAllWindows);
 
   ~WindowIterator();
 
@@ -388,7 +413,9 @@ private:
         ulong aStartPos,
         ulong aEndPos) const;
 
-  void doGarbageCollection(WindowState* lState) const;
+  void checkEndCondition(WindowState* state, PlanState& planState) const;
+
+  void doGarbageCollection(WindowState* state) const;
 };
 
 
