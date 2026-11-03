@@ -7,3 +7,6 @@
   MAPM's decimal numbers (which ended the process with status 100, also in `zorba`).
   If memory runs out where nothing can recover, for example while the server starts,
   `zorba-mcp` exits with status 3 and a message on stderr.
+- Running out of memory while parsing XML, or in `file:` functions and external
+  functions, is no longer an error that a catch clause can catch, such as the one
+  in `dir:open`: it ends the query, as a timeout does.
