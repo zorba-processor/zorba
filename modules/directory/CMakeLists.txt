@@ -33,6 +33,8 @@ IF (ZORBA_WITH_FILE_ACCESS)
   ENDIF (ZORBA_NO_XMLSCHEMA)
   DECLARE_ZORBA_MODULE (FILE "${_dir_xq}" VERSION 1.0
     URI "http://zorba.io/modules/directory")
+  DECLARE_ZORBA_MODULE (FILE directory-cache.xq VERSION 1.0
+    URI "http://zorba.io/modules/directory-cache")
 ENDIF (ZORBA_WITH_FILE_ACCESS)
 
 # vim:set et sw=2 ts=2:

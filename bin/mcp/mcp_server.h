@@ -27,6 +27,7 @@
 #include <zorba/security.h>
 #include <zorba/zorba.h>
 
+#include "document_cache.h"
 #include "json.h"
 #include "scanner.h"
 
@@ -53,6 +54,10 @@ struct ServerConfig {
   std::chrono::milliseconds timeout{ std::chrono::seconds( 30 ) };
   /** The maximum size of a tool's text output, in bytes. */
   std::size_t max_output = 128 * 1024;
+  /** The largest file the document cache admits, in KiB (0: no cache). */
+  std::size_t cache_max_file_kb = 16;
+  /** How many documents the document cache keeps (0: no cache). */
+  std::size_t cache_max_files = 10;
   /** Whether to scan the root in the background (see scanner.h). */
   bool scan = true;
   /** The limits of the scanner. */
@@ -95,6 +100,11 @@ public:
   /** The policy every query runs under. */
   SecurityPolicy const& policy() const { return thePolicy; }
 
+  /** The counters of the document cache. */
+  DocumentCache::Stats cache_stats() const { return theCache.stats(); }
+
+  /** The counters as one line for the log; empty without a cache. */
+  std::string cache_stats_line() const { return theCache.stats_line(); }
   /**
    * Stops the background scan, if any; the destructor does it too.
    *
@@ -142,6 +152,7 @@ private:
   std::ostream &theLog;
   SecurityPolicy thePolicy;
   std::vector<Predefined> thePredefined;
+  DocumentCache theCache;
   std::string theLegacyVersion;         // set by initialize
   std::unique_ptr<Scanner> theScanner;  // null with --no-scan
 };
