@@ -98,7 +98,9 @@ char const usage[] =
   "                       version or xquery version declaration at the very\n"
   "                       start of the query (one preceded by a comment is\n"
   "                       not detected); (2) for a file, its extension (.jq\n"
-  "                       is JSONiq); (3) this option\n";
+  "                       is JSONiq); (3) this option. jsoniq also\n"
+  "                       puts a JSONiq primer in the run_query description,\n"
+  "                       and a pointer to it in the server instructions\n";
 
 bool parse_number( char const *s, unsigned long long *n ) {
   if ( !s || !*s )

@@ -67,7 +67,8 @@ std::string other_arity( std::string const &name,
  * The hint of a variable that is undeclared because "-" is part of its name.
  *
  * @param left The name of the variable in scope, without "$".
- * @param right What follows the "-" in the name; may be empty.
+ * @param right What follows the "-" in the name. Empty or only "-" means the
+ * operand is not known: the hint gives the form to continue from.
  */
 std::string dash_in_variable( std::string const &left,
                               std::string const &right );
@@ -78,7 +79,8 @@ std::string undeclared_prefix( std::string const &prefix );
 /**
  * The hint of a selector that is not an integer, on an array.
  *
- * @param key The selector.
+ * @param key The selector if the query has it literally, else a placeholder:
+ * a value computed at run time may hold the text of a document.
  * @param jsoniq Whether the query is JSONiq, which has $x[].
  */
 std::string key_on_array( std::string const &key, bool jsoniq );
@@ -91,7 +93,12 @@ std::string key_on_array( std::string const &key, bool jsoniq );
  */
 std::string unknown_module( std::string const &uri, bool fetch_denied );
 
-/** Whether a namespace looks like a math module: its URI ends in "/math". */
+/**
+ * Whether a namespace is a math module, or a misspelling of one seen in practice:
+ * the W3C namespace or the Zorba module, under http or https, with or without
+ * "www.", and the old Zorba namespace. Any other URI that ends in "/math" says
+ * nothing about these functions.
+ */
 bool is_math_uri( std::string const &uri );
 
 /**
@@ -100,8 +107,11 @@ bool is_math_uri( std::string const &uri );
  *
  * @param local The local name of the function.
  * @param prefix_bound Whether the prefix "math" is bound to that namespace.
+ * @param prefix_taken Whether the prefix "math" is bound to another namespace,
+ * so that importing that namespace under this prefix would be another error.
  */
-std::string math_function( std::string const &local, bool prefix_bound );
+std::string math_function( std::string const &local, bool prefix_bound,
+                           bool prefix_taken );
 
 /**
  * The hint of a path whose left side is not a node.

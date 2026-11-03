@@ -71,19 +71,25 @@ char const meta_server_info[] = "io.modelcontextprotocol/serverInfo";
 
 char const server_name[] = "zorba-mcp";
 
-char const instructions[] =
+// The JSONiq primer is only for a session whose queries are JSONiq by default.
+// Its examples mean something else in XQuery, or nothing.
+std::string instructions( bool jsoniq_default ) {
+  return std::string(
   "Queries a directory of XML, JSON, CSV and HTML documents with JSONiq/XQuery "
   "(Zorba). Start with list_documents. In run_query, import the directory "
   "module (import module namespace dir = \"http://zorba.io/modules/directory\";) "
   "and use $dir:root: dir:documents($dir:root, \"xml\") or "
   "dir:documents($dir:root, (\"json\", \"csv\")) return records "
   "{path, format, content} (or {path, format, error}); "
-  "dir:open($dir:root, $path) returns one. Read the JSONiq primer in the "
-  "run_query description before writing a query. Results are JSON, one item per "
+  "dir:open($dir:root, $path) returns one. " ) +
+  ( jsoniq_default ? "Read the JSONiq primer in the run_query description "
+                     "before writing a query. " : "" ) +
+  "Results are JSON, one item per "
   "line; return JSON objects, arrays or atomic values, not XML nodes "
   "(convert with string() or data()). Only files under the directory can "
   "be read; network access, writes and environment variables are denied. "
   "Predefined query tools, when present, answer common questions directly.";
+}
 
 Json server_info() {
   return Json::object( {
@@ -534,7 +540,9 @@ Json Server::tools() const {
       " Example: import module namespace dir = "
       "\"http://zorba.io/modules/directory\"; for $d in "
       "dir:documents($dir:root, \"json\") return $d(\"path\"). " +
-      query_primer + " On failure "
+      ( theConfig.jsoniq_default ? std::string( query_primer ) + " "
+                                 : std::string() ) +
+      "On failure "
       "the result is an error object with the Zorba error code, message "
       "and the line/column of the failing expression." },
     { "inputSchema", Json::object( {
@@ -828,7 +836,7 @@ std::string Server::handle_message( std::string const &message,
       { "protocolVersion", negotiated },
       { "capabilities", Json::object( { { "tools", Json::object() } } ) },
       { "serverInfo", server_info() },
-      { "instructions", instructions }
+      { "instructions", instructions( theConfig.jsoniq_default ) }
     } );
     return Json::object( {
       { "jsonrpc", "2.0" }, { "id", *id }, { "result", result }
@@ -873,7 +881,7 @@ std::string Server::handle_message( std::string const &message,
       result = Json::object( {
         { "supportedVersions", all_versions() },
         { "capabilities", Json::object( { { "tools", Json::object() } } ) },
-        { "instructions", instructions }
+        { "instructions", instructions( theConfig.jsoniq_default ) }
       } );
     } else if ( m == "tools/list" ) {
       result = Json::object( { { "tools", tools() } } );

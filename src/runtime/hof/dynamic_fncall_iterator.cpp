@@ -20,6 +20,7 @@
 #include "runtime/hof/dynamic_fncall_iterator.h"
 #include "runtime/hof/function_item.h"
 #include "runtime/core/fncall_iterator.h"
+#include "runtime/core/item_iterator.h"
 #include "runtime/api/plan_wrapper.h"
 #include "runtime/api/plan_iterator_wrapper.h"
 #include "runtime/visitors/planiter_visitor.h"
@@ -338,9 +339,13 @@ bool SingleDynamicFnCallIterator::nextImpl(
             }
             catch (XQueryException& e)
             {
+              // A selector written in the query is the author's own. Any
+              // other may hold the text of a document, and the hint reads as
+              // advice of the server: it gets a placeholder.
               if (e.diagnostic() == err::FORG0001)
                 e.set_hint(query_hints::key_on_array(
-                  selectorItem2->getStringValue().str(),
+                  dynamic_cast<SingletonIterator*>(theChildren[1].getp()) ?
+                    selectorItem2->getStringValue().str() : std::string("key"),
                   theSctx->language_kind() ==
                     StaticContextConsts::language_kind_jsoniq).c_str());
               throw;

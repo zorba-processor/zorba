@@ -110,7 +110,8 @@ ZORBA_ADD_TEST(bin/zorba_hint_string_escape zorbacmd -f -q "${_hintdir}/hint_str
 ZORBA_SET_TEST_PROPERTY(bin/zorba_hint_string_escape PASS_REGULAR_EXPRESSION "XPST0003.*hint: .*starts an escape")
 ZORBA_ADD_TEST(bin/zorba_hint_math_function zorbacmd -f -q "${_hintdir}/hint_math_function.xq")
 ZORBA_SET_TEST_PROPERTY(bin/zorba_hint_math_function PASS_REGULAR_EXPRESSION "XPST0017.*hint: .*import module namespace math")
-ZORBA_ADD_TEST(bin/zorba_hint_unknown_module zorbacmd -f -q "${_hintdir}/hint_unknown_module.xq")
+# --disable-http-resolution denies the fetch, so this test needs no network.
+ZORBA_ADD_TEST(bin/zorba_hint_unknown_module zorbacmd --disable-http-resolution -f -q "${_hintdir}/hint_unknown_module.xq")
 ZORBA_SET_TEST_PROPERTY(bin/zorba_hint_unknown_module PASS_REGULAR_EXPRESSION "XQST0059.*hint: .*may hold no module")
 # A failed fetch (of the loopback, which refuses it) whose URI names the capability
 # is not a denied fetch.
