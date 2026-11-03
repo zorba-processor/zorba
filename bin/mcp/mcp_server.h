@@ -55,7 +55,7 @@ struct ServerConfig {
   /** The maximum size of a tool's text output, in bytes. */
   std::size_t max_output = 128 * 1024;
   /** The largest file the document cache admits, in KiB (0: no cache). */
-  std::size_t cache_max_file_kb = 32;
+  std::size_t cache_max_file_kb = 16;
   /** How many documents the document cache keeps (0: no cache). */
   std::size_t cache_max_files = 10;
   /** Whether to scan the root in the background (see scanner.h). */

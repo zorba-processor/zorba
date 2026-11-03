@@ -77,7 +77,7 @@ char const usage[] =
   "  --cache-max-file-kb <KB>\n"
   "                       the document cache keeps parsed documents across\n"
   "                       calls for dir:open and dir:documents: at most this\n"
-  "                       file size (default 32, 0: no document cache). A file\n"
+  "                       file size (default 16, 0: no document cache). A file\n"
   "                       enters on its second read. It is served only while\n"
   "                       its path, device, inode, size, mtime and ctime stay\n"
   "                       the same. Not kept: larger files, records with an\n"
