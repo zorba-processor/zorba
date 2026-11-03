@@ -27,6 +27,7 @@
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
+#include <ctime>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -2402,6 +2403,12 @@ std::vector<std::string> cache_formats( Fixture const &f ) {
   Server server( f.zorba, config, std::cerr );
   if ( query_text( server, value_query( "probe.html" ) ) == "1" )
     formats.push_back( "html" );
+  // The first XML record of a process can account for 29 bytes that later ones
+  // do not (seen in builds without HTML, where no document is read here). The
+  // tests compare records with each other, so one is built first.
+  t.write( "probe.xml", sized_text( "xml", 1, 100 ) );
+  for ( int read = 0; read < 3; ++read )
+    query_text( server, value_query( "probe.xml" ) );
   return formats;
 }
 
@@ -2612,7 +2619,7 @@ void test_cache_same_file( Fixture const &f ) {
     expect_one( "twenty more calls" );
 
     // A trailing separator on the root is the same root.
-    for ( std::string const &suffix : { "/", "//" } ) {
+    for ( std::string const suffix : { "/", "//" } ) {
       v = query_text( server, dir_import +
         "dir:open(concat($dir:root, \"" + suffix + "\"), \"" + name +
         "\")(\"path\")" );
@@ -3173,12 +3180,24 @@ void test_cache_change_at_once( Fixture const &f ) {
     std::size_t const before = fresh.cache_stats().admissions;
     { std::ofstream( ( quick.root + "/a.json" ).c_str(), std::ios::binary )
         << json_of_size( attempt % 8 + 1, 40 ); }
-    auto const written = std::chrono::steady_clock::now();
     std::string const read( result_text( roundtrip( fresh, request( 100, "tools/call", Json::object( {
       { "name", "run_query" },
       { "arguments", Json::object( { { "query", twice } } ) } } ) ) ) ) );
-    if ( std::chrono::steady_clock::now() - written <
-         std::chrono::milliseconds( 20 ) ) {
+    // The age the cache goes by, from the file's own change time. If it is still
+    // under the limit now, it was at both reads.
+    struct stat st;
+    struct timespec now;
+    bool const known =
+      stat( ( quick.root + "/a.json" ).c_str(), &st ) == 0 &&
+      clock_gettime( CLOCK_REALTIME, &now ) == 0;
+#ifdef __APPLE__
+    struct timespec const &ctime_of = st.st_ctimespec;
+#else
+    struct timespec const &ctime_of = st.st_ctim;
+#endif
+    if ( known &&
+         ( now.tv_sec - ctime_of.tv_sec ) * 1000000000LL +
+         ( now.tv_nsec - ctime_of.tv_nsec ) < 20000000LL ) {
       ++told;
       check( fresh.cache_stats().admissions == before,
              "a file written less than 20 ms ago is not kept",
@@ -3203,7 +3222,7 @@ void test_cache_error_identical( Fixture const &f ) {
   std::filesystem::create_directories( t.root + "/dir.json" );
   Server on( f.zorba, cache_config( t.root, 16, 10 ), std::cerr );
   Server off( f.zorba, cache_config( t.root, 0, 0 ), std::cerr );
-  for ( std::string const &name :
+  for ( std::string const name :
         { "bad.json", "bad.xml", "bad.csv", "bad.html", "empty.xml",
           "notes.txt", "missing.json", "dir.json", "../good.json" } ) {
     same_output( on, off, dir_import +
@@ -3231,7 +3250,7 @@ void test_cache_error_identical( Fixture const &f ) {
 // Node identity, roots, identifiers and the order of documents.
 void test_cache_xdm( Fixture const &f ) {
   TempTree t;
-  for ( std::string const &name : { "a", "b", "m", "z" } )
+  for ( std::string const name : { "a", "b", "m", "z" } )
     t.write( name + ".xml",
              "<r><v id=\"" + name + "\">" + name + "</v></r>" );
   Server on( f.zorba, cache_config( t.root, 16, 100 ), std::cerr );
@@ -3241,7 +3260,7 @@ void test_cache_xdm( Fixture const &f ) {
   };
 
   // Two files are kept first, in an order other than that of the paths.
-  for ( std::string const &name : { "z", "m" } )
+  for ( std::string const name : { "z", "m" } )
     for ( int read = 0; read < 3; ++read ) {
       query_text( on, dir_import + content( name ) + "/r/v/string()" );
       query_text( off, dir_import + content( name ) + "/r/v/string()" );
