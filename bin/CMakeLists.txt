@@ -111,7 +111,12 @@ ZORBA_SET_TEST_PROPERTY(bin/zorba_hint_string_escape PASS_REGULAR_EXPRESSION "XP
 ZORBA_ADD_TEST(bin/zorba_hint_math_function zorbacmd -f -q "${_hintdir}/hint_math_function.xq")
 ZORBA_SET_TEST_PROPERTY(bin/zorba_hint_math_function PASS_REGULAR_EXPRESSION "XPST0017.*hint: .*import module namespace math")
 ZORBA_ADD_TEST(bin/zorba_hint_unknown_module zorbacmd -f -q "${_hintdir}/hint_unknown_module.xq")
-ZORBA_SET_TEST_PROPERTY(bin/zorba_hint_unknown_module PASS_REGULAR_EXPRESSION "XQST0059.*hint: .*xpath-functions/math")
+ZORBA_SET_TEST_PROPERTY(bin/zorba_hint_unknown_module PASS_REGULAR_EXPRESSION "XQST0059.*hint: .*may hold no module")
+# A failed fetch (of the loopback, which refuses it) whose URI names the capability
+# is not a denied fetch.
+ZORBA_ADD_TEST(bin/zorba_no_hint_capability_uri zorbacmd -f -q "${_hintdir}/capability_uri.xq")
+ZORBA_SET_TEST_PROPERTY(bin/zorba_no_hint_capability_uri PASS_REGULAR_EXPRESSION "XQST0059")
+ZORBA_SET_TEST_PROPERTY(bin/zorba_no_hint_capability_uri FAIL_REGULAR_EXPRESSION "hint:")
 ZORBA_ADD_TEST(bin/zorba_hint_none zorbacmd -q "nosuchfunction(1)")
 ZORBA_SET_TEST_PROPERTY(bin/zorba_hint_none PASS_REGULAR_EXPRESSION "XPST0017")
 ZORBA_SET_TEST_PROPERTY(bin/zorba_hint_none FAIL_REGULAR_EXPRESSION "hint:")
@@ -465,7 +470,8 @@ IF (ZORBA_WITH_FILE_ACCESS)
              optional_params documents_stream hints_jsoniq hints_dash
              hints_dash_forms hints_context_item hints_array_key
              hints_unknown_module hints_math_function hints_string_escape
-             query_primer
+             query_primer hints_document_value primer_json_content
+             xml_namespace_message
              hints_nodes hints_names deep_json deep_json_binary
              entity_expansion case_paths html_edge_cases memory_limit language
              language_binary no_write read_functions native_import reflection_random
@@ -491,7 +497,7 @@ IF (ZORBA_WITH_FILE_ACCESS)
     ADD_TEST (NAME bin/mcp/language_help
       COMMAND "$<TARGET_FILE:zorba_mcp${_mcp_suffix}>" --help)
     SET_TESTS_PROPERTIES (bin/mcp/language_help PROPERTIES
-      PASS_REGULAR_EXPRESSION "A [.]jq\n *file is JSONiq unless it declares xquery version;\n *[.]xq files are not loaded.*in this order: [(]1[)] a jsoniq\n *version or xquery version declaration at the very\n *start of the query [(]one preceded by a comment is\n *not detected[)]; [(]2[)] for a file, its extension [(][.]jq\n *is JSONiq[)]; [(]3[)] this option")
+      PASS_REGULAR_EXPRESSION "A [.]jq\n *file is JSONiq unless it declares xquery version;\n *[.]xq files are not loaded.*in this order: [(]1[)] a jsoniq\n *version or xquery version declaration at the very\n *start of the query [(]one preceded by a comment is\n *not detected[)]; [(]2[)] for a file, its extension [(][.]jq\n *is JSONiq[)]; [(]3[)] this option[.] jsoniq also\n *puts a JSONiq primer in the run_query description,\n *and a pointer to it in the server instructions")
 
     # A --language value other than xquery and jsoniq is refused.
     ADD_TEST (NAME bin/mcp/language_invalid

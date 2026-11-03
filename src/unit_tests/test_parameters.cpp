@@ -121,6 +121,12 @@ static void test_braces() {
     ASSERT_NO_EXCEPTION( p.substitute( &s ) );
     ASSERT_TRUE( s == "xbyaz" );
   }
+  { // the template of libxml_514: $6 after a ${ 8}
+    string s( "\"$5\": element has${ 8} attribute(s): \"$6\"" );
+    parameters const p( MAKE_PARAMS( "", "", "", "", "e", "ids", "", "3" ) );
+    ASSERT_NO_EXCEPTION( p.substitute( &s ) );
+    ASSERT_TRUE( s == "\"e\": element has 3 attribute(s): \"ids\"" );
+  }
   { // a ${1} after a ${2}
     string s( "${2,}${1}" );
     parameters const p( MAKE_PARAMS( "a", "b" ) );
