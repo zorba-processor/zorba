@@ -658,6 +658,264 @@ void test_hints_names( Fixture const &f ) {
                "no hint on an unknown local function" );
 }
 
+// The hint of a failed query, or "" if it succeeded or has none.
+std::string hint_of( Server &server, std::string const &query ) {
+  Json const r = call_tool( server, "run_query",
+                            Json::object( { { "query", query } } ) );
+  return field( tool_error( r ), "hint" );
+}
+
+// "." is not the context item in JSONiq: never accepted, the hint says so.
+void test_hints_context_item( Fixture const &f ) {
+  ServerConfig config;
+  config.root = f.tree;
+  config.jsoniq_default = true;
+  Server jq( f.zorba, config, std::cerr );
+  ServerConfig xq_config;
+  xq_config.root = f.tree;
+  Server xq( f.zorba, xq_config, std::cerr );
+
+  // The shapes of the agent benchmark.
+  std::string const predicate(
+    "let $m := (1, 2.5)\n"
+    "let $s := $m[. instance of xs:decimal or . instance of xs:double]\n"
+    "return count($s)" );
+  check_error( jq, predicate, "XPST0003", "$$", ". in a predicate: hint" );
+  check_error( jq, predicate, "XPST0003", "xquery version \"3.0\";",
+               ". in a predicate: the XQuery alternative" );
+  check_error( jq, "[distinct-values((\"a\", \"b\")[not(.=\"a\")])]",
+               "XPST0003", "$$", ". in a function call: hint" );
+  check_error( jq, "(1, 2)[. eq 2]", "XPST0003", "$$",
+               ". on the first line: hint" );
+  check_error( xq, jsoniq_decl + "(1, 2)[. eq 2]", "XPST0003", "$$",
+               ". under a JSONiq version declaration: hint" );
+  check( contains( field( tool_error( call_tool( jq, "run_query",
+           Json::object( { { "query", "(1, 2)[. eq 2]" } } ) ) ), "message" ),
+           "unexpected \".\"" ),
+         "the message is unchanged", "" );
+
+  // What the hint says works.
+  check_result( jq, "(1, 2)[$$ eq 2]", "2", "the hint's $$ works" );
+  check_result( jq, "xquery version \"3.0\";\n(1, 2)[. eq 2]", "2",
+                "the hint's xquery version \"3.0\"; works" );
+
+  // No syntax is added, and only this token gets the hint.
+  check_result( jq, "({ \"a\" : 1 }).a", "1", "a lookup is not this error" );
+  check_error( jq, "[1, ]", "XPST0003", "", "no hint on another token" );
+  check_error( xq, "let . := 1 return 1", "XPST0003", "",
+               "no hint in XQuery, where . is the context item" );
+  check_error( jq, "let $s := \"unexpected \\\".\\\"\" return", "XPST0003", "",
+               "no hint from the text of a string" );
+}
+
+// A key on an array: the hint gives only what the language of the query has.
+void test_hints_array_key( Fixture const &f ) {
+  ServerConfig config;
+  config.root = f.tree;
+  config.jsoniq_default = true;
+  Server jq( f.zorba, config, std::cerr );
+  ServerConfig xq_config;
+  xq_config.root = f.tree;
+  Server xq( f.zorba, xq_config, std::cerr );
+
+  // The content of a CSV file is an array: the shape of the agent benchmark.
+  std::string const csv( dir_import +
+    "let $c := dir:open($dir:root, \"customers.csv\")(\"content\")\n" );
+  check_error( jq, csv + "return $c(\"name\")", "FORG0001", "$x[](\"name\")",
+               "a key on CSV content, JSONiq: [] in the hint" );
+  check_error( jq, csv + "return $c(\"name\")", "FORG0001", "$x()(\"name\")",
+               "a key on CSV content, JSONiq: () in the hint" );
+  check_error( xq, csv + "return $c(\"name\")", "FORG0001", "$x()(\"name\")",
+               "a key on CSV content, XQuery: () in the hint" );
+  check( !contains( hint_of( xq, csv + "return $c(\"name\")" ), "$x[]" ),
+         "XQuery: no [] in the hint, the grammar rejects it", "" );
+  check_error( jq, "let $s := \"abc\" return xs:integer($s)", "FORG0001", "",
+               "no hint on another failed cast" );
+
+  // What the hint says works.
+  check_result( jq, csv + "return count($c[](\"name\"))", "2",
+                "the hint's [] works" );
+  check_result( xq, csv + "return count($c()(\"name\"))", "2",
+                "the hint's () works" );
+}
+
+// A module that is not available: the hint says what is known.
+void test_hints_unknown_module( Fixture const &f ) {
+  ServerConfig config;
+  config.root = f.tree;
+  Server server( f.zorba, config, std::cerr );
+  std::string const math_ns( "http://www.w3.org/2005/xpath-functions/math" );
+  auto const import = []( std::string const &uri ) {
+    return "import module namespace m = \"" + uri + "\";\nm:pi()";
+  };
+
+  // The namespaces of the agent benchmark.
+  for ( char const *const uri : { "http://www.zorba.io/modules/math",
+                                  "http://www.zorba-xquery.com/modules/math" } ) {
+    check_error( server, import( uri ), "XQST0059", math_ns,
+                 std::string( uri ) + ": where the math functions are" );
+    check_error( server, import( uri ), "XQST0059", "Check the URI",
+                 std::string( uri ) + ": what to do" );
+  }
+
+  // A remote URI: the policy denied the fetch, and the module may not exist.
+  std::string const remote( import( "http://127.0.0.1:9/remote-module" ) );
+  check_error( server, remote, "XQST0059", "may hold no module",
+               "a remote module: the fetch is what was denied" );
+  check( !contains( hint_of( server, remote ), math_ns ),
+         "a remote module: no math hint", "" );
+
+  // No network fetch was denied: nothing to explain.
+  check_error( server, import( "urn:no:such:module" ), "XQST0059", "",
+               "no hint on a module that needs no fetch" );
+  check_error( server, import( "file:///no/such/module.xq" ), "XQST0059", "",
+               "no hint on a denied file" );
+}
+
+// A function of the W3C math namespace, called in another math namespace.
+void test_hints_math_function( Fixture const &f ) {
+  ServerConfig config;
+  config.root = f.tree;
+  Server server( f.zorba, config, std::cerr );
+  ServerConfig jq_config;
+  jq_config.root = f.tree;
+  jq_config.jsoniq_default = true;
+  Server jq( f.zorba, jq_config, std::cerr );
+  std::string const zorba_math(
+    "import module namespace m = \"http://zorba.io/modules/math\";\n" );
+
+  // The shapes of the agent benchmark.
+  check_error( server, zorba_math + "declare function local:d($a) { "
+               "let $p := m:pi() div 180 return $a * $p };\nlocal:d(1)",
+               "XPST0017", "math:pi(", "m:pi: hint" );
+  check_error( server, zorba_math + "m:sin(1)", "XPST0017", "math:sin(",
+               "m:sin: hint" );
+  check_error( jq, zorba_math + "m:sin(1)", "XPST0017", "math:sin(",
+               "m:sin in JSONiq: hint" );
+
+  // What the hint says works: zorba-mcp predeclares math:.
+  check_result( server, "math:pi() gt 3", "true", "the hint's math:pi works" );
+  check_result( jq, "math:pi() gt 3", "true", "math: is predeclared in JSONiq" );
+  check_result( server, "math:sin(0) eq 0", "true",
+                "the hint's math:sin works" );
+
+  // Only a function that exists there, with these arguments.
+  check_error( server, zorba_math + "m:nosuch(1)", "XPST0017", "",
+               "no hint on a name math: does not have" );
+  check_error( server, zorba_math + "m:sin()", "XPST0017", "",
+               "no hint on an arity math: does not have" );
+  check_error( server, "declare namespace x = \"urn:other\";\nx:pi()",
+               "XPST0017", "", "no hint in a namespace that is not math" );
+  check_error( server, "local:pi()", "XPST0017", "",
+               "no hint on a local function named pi" );
+  check_error( server, "math:nosuch(1)", "XPST0017", "",
+               "no hint in the math namespace itself" );
+}
+
+// "\" escapes in a JSONiq string; in XQuery it is an ordinary character.
+void test_hints_string_escape( Fixture const &f ) {
+  ServerConfig config;
+  config.root = f.tree;
+  config.jsoniq_default = true;
+  Server jq( f.zorba, config, std::cerr );
+  ServerConfig xq_config;
+  xq_config.root = f.tree;
+  Server xq( f.zorba, xq_config, std::cerr );
+
+  // The shape of the agent benchmark.
+  check_error( jq, "let $p := \"a b\"\n"
+               "let $t := tokenize(normalize-space(string($p)),\"\\s+\")\n"
+               "return $t", "XPST0003", "\\\\", "\\s in a regex: hint" );
+  check_error( jq, "\"\\d\"", "XPST0003", "\\\\", "on the first line: hint" );
+  check_error( jq, "\"abc\\qdef\"", "XPST0003", "\\\\", "after text: hint" );
+  check_error( jq, "\"\\u12\"", "XPST0003", "\\\\", "a short \\u: hint" );
+  check_error( jq, "\"abc\\", "XPST0003", "\\\\", "\\ at the end: hint" );
+
+  // What the hint says works.
+  check_result( jq, "tokenize(\"a b\", \"\\\\s+\")", "\"a\"\n\"b\"",
+                "the hint's \\\\ works" );
+
+  // Other unterminated strings are not about an escape.
+  check_error( jq, "\"abc", "XPST0003", "", "no hint without a backslash" );
+  check_error( jq, "\"a\\\"", "XPST0003", "",
+               "no hint when the escape is valid" );
+  check_error( jq, "'abc'", "XPST0003", "", "no hint on single quotes" );
+  check_error( jq, "'a\\sb'", "XPST0003", "",
+               "no hint on \\ in single quotes" );
+  check_error( xq, "\"abc", "XPST0003", "", "no hint in XQuery" );
+  check_result( xq, "tokenize(\"a b\", \"\\s+\")", "\"a\"\n\"b\"",
+                "XQuery: \\ is an ordinary character" );
+}
+
+// "-" is a name character: more forms of the same mistake.
+void test_hints_dash_forms( Fixture const &f ) {
+  ServerConfig config;
+  config.root = f.tree;
+  Server server( f.zorba, config, std::cerr );
+
+  check_error( server, "let $a := 3 let $b := 1 return $a- $b", "XPST0003",
+               "$a - $b", "$a- $b: hint" );
+  check_error( server, "let $a := 3 let $b := 1\nreturn $a-\n  $b", "XPST0003",
+               "$a - $b", "$a- and $b on another line: hint" );
+  check_error( server, "$no-(1)", "XPST0008", "\"$no-\"",
+               "a name ending in - that is unknown: hint" );
+  check_error( server, "$no--(1)", "XPST0008", "\"$no--\"",
+               "a name ending in -- that is unknown: hint" );
+  check_error( server, "$-(1)", "XPST0003", "",
+               "no hint when no name precedes the -" );
+  check_error( server, "$no-such", "XPST0008", "",
+               "no hint on a name with - inside and no shorter variable" );
+  check_result( server, "let $a-b := 1 return $a-b", "1",
+                "names keep their - : no syntax is added" );
+}
+
+// What the tools say about the language, and that it is true.
+void test_query_notes( Fixture const &f ) {
+  ServerConfig config;
+  config.root = f.tree;
+  config.jsoniq_default = true;
+  Server server( f.zorba, config, std::cerr );
+
+  Json const init = roundtrip( server, request( 1, "initialize", Json::object( {
+    { "protocolVersion", "2025-11-25" },
+    { "capabilities", Json::object() },
+    { "clientInfo", Json::object( { { "name", "t" }, { "version", "1" } } ) }
+  } ), false ) );
+  Json const *const res = init.find( "result" );
+  std::string const instructions( res ? field( *res, "instructions" ) : "" );
+  std::cout << "instructions: " << instructions.size() << " bytes" << std::endl;
+  check( contains( instructions, "$$" ), "instructions: context item",
+         instructions );
+  check( contains( instructions, "content" ) &&
+         contains( instructions, "$c()" ) && contains( instructions, "$c[]" ),
+         "instructions: an array is opened with () or []", instructions );
+
+  Json const list = roundtrip( server, request( 2, "tools/list" ) );
+  Json const *const list_res = list.find( "result" );
+  Json const *const tools = list_res ? list_res->find( "tools" ) : nullptr;
+  check( tools && tools->items().size() >= 2, "tools", list.dump() );
+  if ( !tools || tools->items().size() < 2 )
+    return;
+  Json const &run_query = tools->items()[1];
+  std::string const description( field( run_query, "description" ) );
+  std::cout << "run_query description: " << description.size() << " bytes"
+            << std::endl;
+  for ( char const *const part : { "$$", "$c()", "$c[]", "math:", "$a - $b",
+                                   "\\\\" } )
+    check( contains( description, part ),
+           std::string( "run_query says " ) + part, description );
+
+  // Each statement holds.
+  std::string const csv( dir_import +
+    "dir:open($dir:root, \"customers.csv\")(\"content\")" );
+  check_result( server, csv + "[][1](\"id\")", "\"acme\"", "$c[] on a CSV" );
+  check_result( server, csv + "()[1](\"id\")", "\"acme\"", "$c() on a CSV" );
+  check_result( server, "math:cos(0) eq 1", "true",
+                "math: without an import" );
+  check_result( server, "let $a := 3 let $b := 1 return $a - $b", "2",
+                "$a - $b" );
+}
+
 void test_escape( Fixture const &f ) {
   ServerConfig config;
   config.root = f.tree;
@@ -2788,6 +3046,13 @@ Test const tests[] = {
   { "documents_stream", test_documents_stream },
   { "hints_jsoniq", test_hints_jsoniq },
   { "hints_dash", test_hints_dash },
+  { "hints_dash_forms", test_hints_dash_forms },
+  { "hints_context_item", test_hints_context_item },
+  { "hints_array_key", test_hints_array_key },
+  { "hints_unknown_module", test_hints_unknown_module },
+  { "hints_math_function", test_hints_math_function },
+  { "hints_string_escape", test_hints_string_escape },
+  { "query_notes", test_query_notes },
   { "hints_nodes", test_hints_nodes },
   { "hints_names", test_hints_names },
   { "deep_json", test_deep_json },

@@ -102,6 +102,16 @@ ZORBA_ADD_TEST(bin/zorba_hint_prefix zorbacmd -q "math:pi()")
 ZORBA_SET_TEST_PROPERTY(bin/zorba_hint_prefix PASS_REGULAR_EXPRESSION "XPST0081.*hint: .*import module namespace math")
 ZORBA_ADD_TEST(bin/zorba_hint_xml zorbacmd --print-errors-as-xml -q "let $x := 3 return $x-1")
 ZORBA_SET_TEST_PROPERTY(bin/zorba_hint_xml PASS_REGULAR_EXPRESSION "<hint>.*x - 1.*</hint>")
+# The hints come from the engine, so zorba prints them too.
+SET (_hintdir "${CMAKE_CURRENT_SOURCE_DIR}/test/language")
+ZORBA_ADD_TEST(bin/zorba_hint_context_item zorbacmd -f -q "${_hintdir}/hint_context_item.jq")
+ZORBA_SET_TEST_PROPERTY(bin/zorba_hint_context_item PASS_REGULAR_EXPRESSION "XPST0003.*hint: .*context item")
+ZORBA_ADD_TEST(bin/zorba_hint_string_escape zorbacmd -f -q "${_hintdir}/hint_string_escape.jq")
+ZORBA_SET_TEST_PROPERTY(bin/zorba_hint_string_escape PASS_REGULAR_EXPRESSION "XPST0003.*hint: .*starts an escape")
+ZORBA_ADD_TEST(bin/zorba_hint_math_function zorbacmd -f -q "${_hintdir}/hint_math_function.xq")
+ZORBA_SET_TEST_PROPERTY(bin/zorba_hint_math_function PASS_REGULAR_EXPRESSION "XPST0017.*hint: .*import module namespace math")
+ZORBA_ADD_TEST(bin/zorba_hint_unknown_module zorbacmd -f -q "${_hintdir}/hint_unknown_module.xq")
+ZORBA_SET_TEST_PROPERTY(bin/zorba_hint_unknown_module PASS_REGULAR_EXPRESSION "XQST0059.*hint: .*xpath-functions/math")
 ZORBA_ADD_TEST(bin/zorba_hint_none zorbacmd -q "nosuchfunction(1)")
 ZORBA_SET_TEST_PROPERTY(bin/zorba_hint_none PASS_REGULAR_EXPRESSION "XPST0017")
 ZORBA_SET_TEST_PROPERTY(bin/zorba_hint_none FAIL_REGULAR_EXPRESSION "hint:")
@@ -453,6 +463,9 @@ IF (ZORBA_WITH_FILE_ACCESS)
     FOREACH (_t json protocol legacy tools_list list_documents join
              syntax_error escape network native_modules predefined limits binary windows
              optional_params documents_stream hints_jsoniq hints_dash
+             hints_dash_forms hints_context_item hints_array_key
+             hints_unknown_module hints_math_function hints_string_escape
+             query_notes
              hints_nodes hints_names deep_json deep_json_binary
              entity_expansion case_paths html_edge_cases memory_limit language
              language_binary no_write read_functions native_import reflection_random
