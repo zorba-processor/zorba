@@ -173,7 +173,8 @@ bool loader::next( store::Item_t *result ) {
     while ( parser_.next( &t ) ) {
       switch( t.get_type() ) {
         case '[':
-          if ( strip_top_level_array_ && !stripped_top_level_array_ )
+          if ( strip_top_level_array_ && !stripped_top_level_array_ &&
+               stack_.empty() )
             stripped_top_level_array_ = true;
           else {
             check_depth( t );
