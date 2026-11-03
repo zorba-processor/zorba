@@ -32,12 +32,16 @@
 #include <fstream>
 #include <iostream>
 #include <map>
+#include <new>
 #include <sstream>
 #include <string>
 #include <thread>
 #include <vector>
 
 #include <fcntl.h>
+#if defined(__linux__)
+# include <malloc.h>
+#endif
 #include <sys/resource.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -65,6 +69,59 @@ using namespace zorba::mcp;
 # if __has_feature(address_sanitizer) || __has_feature(thread_sanitizer)
 #  define ZORBA_TEST_SANITIZER 1
 # endif
+#endif
+
+#if defined(__linux__)
+// For test_exhaust_injected: operator new fails above a budget of live bytes,
+// as it would at a memory limit, also in builds that cannot have one.
+namespace {
+std::atomic<std::size_t> new_live{ 0 };
+std::atomic<std::size_t> new_budget{ 0 };  // 0: none
+
+void* budget_alloc( std::size_t n ) noexcept {
+  std::size_t const budget = new_budget.load( std::memory_order_relaxed );
+  if ( budget && new_live.load( std::memory_order_relaxed ) + n > budget )
+    return nullptr;
+  void *const p = std::malloc( n ? n : 1 );
+  if ( p )
+    new_live.fetch_add( malloc_usable_size( p ), std::memory_order_relaxed );
+  return p;
+}
+
+void budget_free( void *p ) noexcept {
+  if ( p ) {
+    new_live.fetch_sub( malloc_usable_size( p ), std::memory_order_relaxed );
+    std::free( p );
+  }
+}
+} // namespace
+
+void* operator new( std::size_t n ) {
+  if ( void *const p = budget_alloc( n ) )
+    return p;
+  throw std::bad_alloc();
+}
+void* operator new[]( std::size_t n ) {
+  if ( void *const p = budget_alloc( n ) )
+    return p;
+  throw std::bad_alloc();
+}
+void* operator new( std::size_t n, std::nothrow_t const& ) noexcept {
+  return budget_alloc( n );
+}
+void* operator new[]( std::size_t n, std::nothrow_t const& ) noexcept {
+  return budget_alloc( n );
+}
+void operator delete( void *p ) noexcept { budget_free( p ); }
+void operator delete[]( void *p ) noexcept { budget_free( p ); }
+void operator delete( void *p, std::size_t ) noexcept { budget_free( p ); }
+void operator delete[]( void *p, std::size_t ) noexcept { budget_free( p ); }
+void operator delete( void *p, std::nothrow_t const& ) noexcept {
+  budget_free( p );
+}
+void operator delete[]( void *p, std::nothrow_t const& ) noexcept {
+  budget_free( p );
+}
 #endif
 
 namespace {
@@ -1236,6 +1293,223 @@ void test_memory_limit( Fixture const &f ) {
 #else
   (void)f;
   std::cout << "--max-memory has no effect in this build" << std::endl;
+#endif
+}
+
+#if defined(__linux__)
+// The data of the memory exhaustion tests: the same irregular records as JSON
+// Lines, as a JSON array and as CSV; XML; numbers with many digits. About
+// 2 MB each, so that the queries below read them many times over.
+void write_exhaustion_data( TempTree const &t ) {
+  std::string jsonl, array( "[\n" ), csv( "seq,run,v,note\n" );
+  std::string xml( "<log>\n" ), numbers( "[\n" );
+  int const records = 20000;
+  for ( int i = 0; i < records; ++i ) {
+    std::string const n( std::to_string( i ) );
+    std::string const v( std::to_string( i % 97 ) + ".25" );
+    std::string const rec( "{\"seq\":" + n + ",\"run\":\"r" +
+      std::to_string( i % 7 ) + "\",\"v\":" + v +
+      ",\"metrics\":{\"temp\":57.3,\"tags\":[\"a\",\"b\"]}}" );
+    jsonl += rec + "\n";
+    array += rec + ( i + 1 < records ? ",\n" : "\n" );
+    csv += n + ",r" + std::to_string( i % 7 ) + "," + v + ",some note\n";
+    xml += "<r seq=\"" + n + "\"><v>" + v + "</v><note>some note</note></r>\n";
+    numbers += "12345678901234567890123456789012345678." + n +
+      ( i + 1 < records ? ",\n" : "\n" );
+  }
+  t.write( "data.jsonl", jsonl );
+  t.write( "data.json", array + "]\n" );
+  t.write( "data.csv", csv );
+  t.write( "data.xml", xml + "</log>\n" );
+  t.write( "numbers.json", numbers + "]\n" );
+  t.write( "small.json", "{\"answer\":42}\n" );
+}
+#endif
+
+// Expressions that use $i and make new items; the queries below keep them all.
+char const *const exhaustion_queries[] = {
+  "string($i)",
+  "dir:open($dir:root, (\"data.jsonl\", \"x\")[$i gt 0][1]).content[]",
+  "[ parse-json(file:read-text($dir:root || \"/data.json\" || "
+    "substring(\"\", $i))) ][]",
+  "dir:open($dir:root, (\"data.csv\", \"x\")[$i gt 0][1]).content[]",
+  "dir:open($dir:root, (\"data.xml\", \"x\")[$i gt 0][1]).content",
+  "concat(string-join(for $j in 1 to 100000 return \"0123456789\"), $i)",
+  "(parse-json(file:read-text($dir:root || \"/numbers.json\" || "
+    "substring(\"\", $i)))[] ! ($$ * 3.5))"
+};
+
+// A query that runs out of memory gets the tool error memory_limit and the same
+// server answers the next calls, whichever allocation fails: where that happens
+// is not deterministic, so each query runs several times at several limits, in
+// a session that goes on after it. \a inner is an expression that uses $i and
+// makes new items; the query keeps them all.
+void memory_exhaustion( Fixture const &f, std::string const &inner ) {
+#if defined(__linux__) && !defined(ZORBA_TEST_SANITIZER)
+  TempTree t;
+  write_exhaustion_data( t );
+  Fixture g( f );
+  g.tree = t.root;
+  // A failed run should not leave a core file of the size of the limit.
+  struct rlimit no_core = { 0, 0 };
+  check( setrlimit( RLIMIT_CORE, &no_core ) == 0, "no core files" );
+
+  std::string const prolog(
+    "jsoniq version \"1.0\";\n"
+    "import module namespace dir = \"http://zorba.io/modules/directory\";\n"
+    "import module namespace file = \"http://expath.org/ns/file\";\n"
+    "import module namespace csv = \"http://zorba.io/modules/json-csv\";\n" );
+  std::string const hungry( prolog +
+    "let $all := for $i in 1 to 1000000000 return " + inner + "\n"
+    "return count($all) + count($all)" );
+  std::string const after( prolog +
+    "dir:open($dir:root, \"small.json\").content.answer" );
+  auto call = [&]( int id, std::string const &query ) {
+    return request( id, "tools/call", Json::object( {
+      { "name", "run_query" },
+      { "arguments", Json::object( { { "query", query } } ) } } ) ) + "\n";
+  };
+  std::string input;
+  input += call( 1, hungry );
+  input += call( 2, "1 + 1" );
+  input += call( 3, after );
+  input += call( 4, hungry );
+  input += call( 5, after );
+  input += call( 6, after );
+
+  std::string const err_file( t.base + "/stderr" );
+  for ( char const *const limit : { "600000000", "900000000", "1300000000" } ) {
+    for ( int run = 0; run < 3; ++run ) {
+      std::string const what( std::string( "limit " ) + limit + ", run " +
+                              std::to_string( run ) + ": " );
+      std::cout.flush();
+      int const saved_err = dup( STDERR_FILENO );
+      int const err = open( err_file.c_str(),
+                            O_WRONLY | O_CREAT | O_TRUNC, 0600 );
+      check( saved_err >= 0 && err >= 0 && dup2( err, STDERR_FILENO ) >= 0,
+             "capture stderr" );
+      std::string const output( run_binary( g, g.queries, input, {
+        "--max-memory", limit, "--timeout", "300" } ) );
+      check( dup2( saved_err, STDERR_FILENO ) >= 0 && close( err ) == 0 &&
+             close( saved_err ) == 0, "restore stderr" );
+
+      std::string const log( read_file( err_file ) );
+      std::map<std::string, Json> by_id;
+      std::istringstream lines( output );
+      std::string line;
+      while ( std::getline( lines, line ) ) {
+        Json r;
+        std::string why;
+        if ( parse_json( line, &r, &why ) && r.find( "id" ) )
+          by_id[ r.find( "id" )->text() ] = r;
+      }
+      check( by_id.size() == 6, what + "six responses", output + "\n" + log );
+      for ( char const *const id : { "1", "4" } )
+        check( by_id.count( id ) && is_tool_error( by_id[id] ) &&
+               field( tool_error( by_id[id] ), "code" ) == "memory_limit",
+               what + "the query is the tool error memory_limit",
+               by_id.count( id ) ? by_id[id].dump() : log );
+      check( by_id.count( "2" ) && !is_tool_error( by_id["2"] ) &&
+             result_text( by_id["2"] ) == "2",
+             what + "the server answers the next call", log );
+      for ( char const *const id : { "3", "5", "6" } )
+        check( by_id.count( id ) && !is_tool_error( by_id[id] ) &&
+               result_text( by_id[id] ) == "42",
+               what + "it reads a document afterwards",
+               by_id.count( id ) ? by_id[id].dump() : log );
+      check( !contains( log, "ZSTR0065" ) && !contains( log, "MAPM Error" ) &&
+             !contains( log, "terminate called" ),
+             what + "nothing is left behind at exit", log );
+    }
+  }
+#else
+  (void)f;
+  (void)inner;
+  std::cout << "--max-memory has no effect in this build" << std::endl;
+#endif
+}
+
+void test_exhaust_generated( Fixture const &f ) {
+  memory_exhaustion( f, exhaustion_queries[0] );
+}
+void test_exhaust_json( Fixture const &f ) {
+  memory_exhaustion( f, exhaustion_queries[1] );
+}
+void test_exhaust_json_array( Fixture const &f ) {
+  memory_exhaustion( f, exhaustion_queries[2] );
+}
+void test_exhaust_csv( Fixture const &f ) {
+  memory_exhaustion( f, exhaustion_queries[3] );
+}
+void test_exhaust_xml( Fixture const &f ) {
+  memory_exhaustion( f, exhaustion_queries[4] );
+}
+void test_exhaust_strings( Fixture const &f ) {
+  memory_exhaustion( f, exhaustion_queries[5] );
+}
+void test_exhaust_numbers( Fixture const &f ) {
+  memory_exhaustion( f, exhaustion_queries[6] );
+}
+
+// The same contract where an address-space limit cannot be used (sanitizer
+// builds): in one process, operator new fails above a budget. Allocations with
+// malloc, which the C libraries and MAPM use, do not fail here; the tests above
+// cover them, in the builds that can have the limit.
+void test_exhaust_injected( Fixture const &f ) {
+#if defined(__linux__)
+  TempTree t;
+  write_exhaustion_data( t );
+  ServerConfig config;
+  config.root = t.root;
+  config.jsoniq_default = true;
+  // Only the budget ends these queries, however slow the build.
+  config.timeout = std::chrono::milliseconds( 0 );
+  std::ostringstream log;
+  Server server( f.zorba, config, log );
+  auto call = [&]( int id, std::string const &query ) {
+    return roundtrip( server, request( id, "tools/call", Json::object( {
+      { "name", "run_query" },
+      { "arguments", Json::object( { { "query", query } } ) } } ) ) );
+  };
+  std::string const prolog(
+    "jsoniq version \"1.0\";\n"
+    "import module namespace dir = \"http://zorba.io/modules/directory\";\n"
+    "import module namespace file = \"http://expath.org/ns/file\";\n"
+    "import module namespace csv = \"http://zorba.io/modules/json-csv\";\n" );
+  std::string const after( prolog +
+    "dir:open($dir:root, \"small.json\").content.answer" );
+  check( result_text( call( 1, after ) ) == "42", "a query before the budget" );
+
+  int id = 2;
+  for ( char const *const inner : exhaustion_queries ) {
+    std::string const hungry( prolog +
+      "let $all := for $i in 1 to 1000000000 return " + inner + "\n"
+      "return count($all) + count($all)" );
+    std::size_t first_live = 0;
+    for ( int run = 0; run < 3; ++run ) {
+      new_budget = new_live.load() + 64 * 1024 * 1024;
+      Json const r( call( id++, hungry ) );
+      check( is_tool_error( r ) &&
+             field( tool_error( r ), "code" ) == "memory_limit",
+             std::string( "memory_limit: " ) + inner, r.dump() );
+      Json const next( call( id++, after ) );
+      check( !is_tool_error( next ) && result_text( next ) == "42",
+             std::string( "the next call is answered: " ) + inner, next.dump() );
+      // Under the same budget, so its memory came back; and none stays behind
+      // from one failure to the next.
+      std::size_t const live = new_live.load();
+      new_budget = 0;
+      if ( run == 1 )
+        first_live = live;
+      if ( run == 2 )
+        check( live < first_live + 1024 * 1024,
+               std::string( "the memory comes back: " ) + inner,
+               std::to_string( first_live ) + " then " + std::to_string( live ) );
+    }
+  }
+#else
+  (void)f;
+  std::cout << "no operator new budget in this build" << std::endl;
 #endif
 }
 
@@ -4175,6 +4449,14 @@ Test const tests[] = {
   { "cache_timeout_state", test_cache_timeout_state },
   { "windows", test_windows },
   { "memory_limit", test_memory_limit },
+  { "exhaust_generated", test_exhaust_generated },
+  { "exhaust_json", test_exhaust_json },
+  { "exhaust_json_array", test_exhaust_json_array },
+  { "exhaust_csv", test_exhaust_csv },
+  { "exhaust_xml", test_exhaust_xml },
+  { "exhaust_strings", test_exhaust_strings },
+  { "exhaust_numbers", test_exhaust_numbers },
+  { "exhaust_injected", test_exhaust_injected },
   { "optional_params", test_optional_params },
   { "documents_stream", test_documents_stream },
   { "hints_jsoniq", test_hints_jsoniq },

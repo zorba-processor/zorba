@@ -239,7 +239,7 @@
     },
     {
       "name": "tsan-mcp",
-      "displayName": "zorba-mcp's background scanner under ThreadSanitizer",
+      "displayName": "zorba-mcp's background scanner and memory exhaustion under ThreadSanitizer",
       "configurePreset": "tsan",
       "output": {
         "outputOnFailure": true
@@ -249,7 +249,7 @@
       },
       "filter": {
         "include": {
-          "name": "bin/mcp/scan_"
+          "name": "bin/mcp/(scan_|exhaust_injected)"
         }
       },
       "environment": {

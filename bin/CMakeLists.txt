@@ -454,7 +454,9 @@ IF (ZORBA_WITH_FILE_ACCESS)
              syntax_error escape network native_modules predefined limits binary windows
              optional_params documents_stream hints_jsoniq hints_dash
              hints_nodes hints_names deep_json deep_json_binary
-             entity_expansion case_paths html_edge_cases memory_limit language
+             entity_expansion case_paths html_edge_cases memory_limit
+             exhaust_generated exhaust_json exhaust_json_array exhaust_csv
+             exhaust_xml exhaust_strings exhaust_numbers exhaust_injected language
              language_binary no_write read_functions native_import reflection_random
              cache_hit cache_invalidate cache_evict cache_off cache_policy
              cache_inject cache_size cache_default cache_abort cache_errors
