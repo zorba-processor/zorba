@@ -31,7 +31,8 @@ Inputs:
   without the window.
 - **A JSON array parsed whole held the input before any window saw it:** 721 MiB at
   10^6 records, with or without a window clause, against 35 MiB for JSON Lines through
-  `whole`. `parse-json(...)[]` now takes 36 MiB; see "One large JSON array".
+  `whole`. `parse-json(...)[]` takes 36 MiB with the option `zorba-streaming-members`;
+  see "One large JSON array".
 - **Sliding windows that stay open cost quadratic time.** Doubling the records takes
   4 times as long, because each record evaluates the end condition of every open window.
 
@@ -116,39 +117,54 @@ in a temp sequence (`theDomainSeq`).
 
 ## One large JSON array
 
-`run_array.sh`, run 41620856411: both builds in one job on an `ubuntu-24.04` runner, the
+`run_array.sh`, run 41645367526: three runs in one job on an `ubuntu-24.04` runner, the
 lowest time of 3 runs and the largest peak RSS. Before is `7c8d649f9`, after is
-`7afbd0320`. 10^6 records, a 78 MB array file. `filter` is `filter.jq`, `aggregate` is
-`baseline`, `tumbling` is `sessions`.
+`9fb980aba`. 10^6 records, a 78 MB array file. `filter` is `filter.jq`, `aggregate` is
+`baseline`, `tumbling` is `sessions`. The option is
+`{ "zorba-streaming-members" : true }`.
 
 | query | input | before ms | before MiB | after ms | after MiB |
 |---|---|---:|---:|---:|---:|
-| filter | `parse-json(file:read-text(F))[]` | 3446 | 722 | 4973 | 36 |
-| aggregate | `parse-json(file:read-text(F))[]` | 3533 | 722 | 5009 | 36 |
-| tumbling | `parse-json(file:read-text(F))[]` | 4194 | 722 | 6061 | 36 |
-| filter | the same over an ordinary string | 3578 | 937 | 4786 | 365 |
-| aggregate | the same over an ordinary string | 3647 | 937 | 5032 | 365 |
-| tumbling | the same over an ordinary string | 4298 | 938 | 5970 | 365 |
-| filter | `dir:open(D, F).content[]` | 4309 | 985 | 4307 | 985 |
-| aggregate | `dir:open(D, F).content[]` | 4437 | 985 | 4398 | 985 |
-| tumbling | `dir:open(D, F).content[]` | 5151 | 986 | 5155 | 985 |
-| first member | `parse-json(file:read-text(F))[][1].id` | 3031 | 720 | 2241 | 36 |
-| two parses of one text in a variable | `count(parse-json($t)[])` twice | 5698 | 720 | 9043 | 236 |
+| filter | `parse-json(file:read-text(F))[]` | 4346 | 722 | 4596 | 722 |
+| aggregate | same | 4807 | 722 | 4524 | 722 |
+| tumbling | same | 5454 | 722 | 5541 | 722 |
+| filter | same, with the option | - | - | 6177 | 36 |
+| aggregate | same, with the option | - | - | 6449 | 36 |
+| tumbling | same, with the option | - | - | 7909 | 36 |
+| filter | an ordinary string, with the option | - | - | 6046 | 365 |
+| aggregate | an ordinary string, with the option | - | - | 6344 | 365 |
+| tumbling | an ordinary string, with the option | - | - | 7674 | 365 |
+| filter | `dir:open(D, F).content[]` | 5190 | 985 | 5409 | 985 |
+| aggregate | same | 5426 | 985 | 5511 | 985 |
+| tumbling | same | 6337 | 986 | 6875 | 986 |
+| first member | `parse-json(file:read-text(F))[][1].id` | 3928 | 720 | 3954 | 720 |
+| first member | same, with the option | - | - | 2477 | 36 |
 
-Each top-level value is parsed twice, so that any error in it comes before its first
-member, as with the built array: the time grows by about 45%. `dir:open` builds the
-record as before.
+With the option, a query that reads all the members takes 34% to 43% more time than the
+same build without it, for the second parse of each top-level value; one that stops at
+the first member takes 37% less. Without the option the plan is the one before; the time
+differences above are of both signs, between -6% and +8%.
 
-Where the memory goes, as peak RSS:
+The first parse checks the JSON without building items. In the same job, with a first
+parse that built the items and dropped them:
+
+| query | with the option, building items: ms | not building them: ms |
+|---|---:|---:|
+| filter | 6819 | 6177 |
+| aggregate | 7111 | 6449 |
+| tumbling | 8385 | 7909 |
+| first member | 3148 | 2477 |
+
+Where the memory goes, as peak RSS without the option:
 
 | query | ms | peak RSS MiB |
 |---|---:|---:|
-| `1` (the process) | 19 | 35 |
-| `string-length(file:read-text(F))` (the text in memory) | 380 | 165 |
-| `size(parse-json(file:read-text(F)))` | 3079 | 720 |
-| `size(parse-json(file:read-text(N)))`, N holding 10^6 nulls | 148 | 52 |
+| `1` (the process) | 22 | 35 |
+| `string-length(file:read-text(F))` (the text in memory) | 439 | 165 |
+| `size(parse-json(file:read-text(F)))` | 3930 | 720 |
+| `size(parse-json(file:read-text(N)))`, N holding 10^6 nulls | 173 | 53 |
 
-Of the 685 MiB above the process, the array takes about 17 MiB and the members about 668
+Of the 685 MiB above the process, the array takes about 18 MiB and the members about 667
 MiB, 700 bytes per record. `parse-json(file:read-text(F))` reads the text from the file,
 so it holds none of it.
 
