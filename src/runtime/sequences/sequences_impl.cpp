@@ -33,6 +33,7 @@
 // For timing
 #include <zorba/util/time.h>
 
+#include <zorba/util/stream_util.h>
 #include <zorba/util/transcode_stream.h>
 
 #include <util/fs_util.h>
@@ -1896,6 +1897,8 @@ static void readDocument(
     }
     transcode::attach(*lStream.get(), aEncoding.c_str());
   }
+  if (lStreamResource->isStreamSeekable())
+    skip_utf8_bom(*lStream);
   //creates stream item
   GENV_ITEMFACTORY->createStreamableString(
     oResult,
@@ -2051,6 +2054,8 @@ bool FnUnparsedTextLinesIterator::nextImpl(store::Item_t& result, PlanState& pla
       }
       transcode::attach(*state->theStream->get(), encodingString.c_str());
     }
+    if (state->theStreamResource->isStreamSeekable())
+      skip_utf8_bom(**state->theStream);
 
     while (state->theStream->get()->good())
     {

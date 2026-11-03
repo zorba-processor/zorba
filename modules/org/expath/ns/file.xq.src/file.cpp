@@ -646,6 +646,8 @@ void ReadTextLinesFunction::LinesItemSequence::LinesIterator::open() {
       theFunc->raiseFileError( "FOFL0006", e.what(), theEncoding.c_str() );
     }
   }
+  if ( lStream->good() )
+    skip_utf8_bom( *lStream );
   theStream = lStream.release();
 }
 

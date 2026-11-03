@@ -20,6 +20,7 @@
 
 #include <zorba/internal/unique_ptr.h>
 #include <zorba/util/base64_util.h>
+#include <zorba/util/stream_util.h>
 
 #include "diagnostics/assert.h"
 #include "diagnostics/xquery_diagnostics.h"
@@ -2234,6 +2235,8 @@ std::istream& StreamableStringItem::getStream()
     pbuf = theIstream->rdbuf();
     pbuf->pubseekoff(0, std::ios::beg);
     theIstream->clear();
+    // A byte order mark is not part of the string.
+    skip_utf8_bom_again(*theIstream);
   }
   theIsConsumed = true;
   return *theIstream;

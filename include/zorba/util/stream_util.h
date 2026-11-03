@@ -27,13 +27,23 @@ namespace zorba {
 ///////////////////////////////////////////////////////////////////////////////
 
 /**
- * Skips the UTF-8 byte order mark (BOM), if any.
+ * Skips the UTF-8 byte order mark (BOM), if any, at the start of a seekable
+ * istream.  The stream remembers that it had one: see skip_utf8_bom_again().
  *
  * @param is The istream to read.
  * @return Returns \c true only if a BOM was present and skipped.
  */
 ZORBA_DLL_PUBLIC
 bool skip_utf8_bom( std::istream &is );
+
+/**
+ * Skips the BOM that skip_utf8_bom() found, for code that has just sought to
+ * the start of the same istream.
+ *
+ * @param is The istream, positioned at its start.
+ */
+ZORBA_DLL_PUBLIC
+void skip_utf8_bom_again( std::istream &is );
 
 /**
  * Reads from the given istream until \a n non-whitespace characters are read

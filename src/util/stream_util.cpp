@@ -106,14 +106,29 @@ ostream& roman( ostream &o, unsigned n ) {
   return o;
 }
 
+static int utf8_bom_skipped_index() {
+  static int const index = ios_base::xalloc();
+  return index;
+}
+
 bool skip_utf8_bom( istream &is ) {
   char buf[ sizeof utf8::BOM ];
-  if ( is.read( buf, sizeof buf ) ) {
-    if ( ::memcmp( buf, utf8::BOM, sizeof utf8::BOM ) == 0 )
-      return true;
-    is.seekg( 0 );
+  if ( is.read( buf, sizeof buf ) &&
+       ::memcmp( buf, utf8::BOM, sizeof utf8::BOM ) == 0 ) {
+    is.iword( utf8_bom_skipped_index() ) = 1;
+    return true;
   }
+  is.clear();                           // a file shorter than a BOM fails read()
+  is.seekg( 0 );
   return false;
+}
+
+void skip_utf8_bom_again( istream &is ) {
+  if ( is.iword( utf8_bom_skipped_index() ) ) {
+    // Not istream::read(): it would hide an exception of the streambuf.
+    char buf[ sizeof utf8::BOM ];
+    is.rdbuf()->sgetn( buf, sizeof buf );
+  }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
