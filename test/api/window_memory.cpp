@@ -120,6 +120,14 @@ const Case BOUNDED[] =
     "      only end at $e when $e - $s eq 9\n"
     "    return count($w))",
     "199910" },
+  { "sliding over 10 items, a dynamic call in a query with no side effect",
+    "declare function local:inc($x) { $x + 1 };\n"
+    "declare variable $fs := (local:inc#1, local:inc#1);\n"
+    "sum(for sliding window $w in local:d()\n"
+    "      start at $s when true\n"
+    "      only end at $e when $e - $s eq 9\n"
+    "    return $fs[1](count($w)))",
+    "219901" },
   { "sliding over 10 items, end on the current item",
     "sum(for sliding window $w in local:d()\n"
     "      start at $s when $s mod 10 eq 1\n"
