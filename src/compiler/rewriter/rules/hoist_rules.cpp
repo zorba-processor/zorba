@@ -121,7 +121,7 @@ expr* HoistRule::apply(
   DynamicBitset freeset(numVars+1);
   expr_tools::build_expr_to_vars_map(node, theVarIdMap, freeset, theExprVarsMap);
 
-  theHasUnprovenCalls = expr_tools::calls_unproven_function(node);
+  theHasUnprovenCalls = expr_tools::call_results_can_differ(node);
 
   PathHolder root;
   modified = hoistChildren(rCtx, node, &root);
@@ -570,7 +570,9 @@ expr* HoistRule::hoistExpr(
     expr* e,
     struct PathHolder* path)
 {
-  if (non_hoistable(e) || e->constructsNodes() || callsUnproven(e))
+  if (non_hoistable(e) ||
+      e->constructsNodes() ||
+      (theHasUnprovenCalls && expr_tools::call_results_can_differ(e)))
   {
     return NULL;
   }

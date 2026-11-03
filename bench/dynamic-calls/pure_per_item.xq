@@ -1,4 +1,4 @@
-(: A call that depends on the loop variable: it stays in the loop before and now. :)
+(: A call that depends on the loop variable, in a query with no side effect. :)
 declare function local:work($x) { $x + 1 };
 declare variable $fs := (local:work#1, local:work#1);
 declare variable $f := $fs[1];

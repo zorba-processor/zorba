@@ -1,4 +1,4 @@
-(: The same in a loop: the let runs for all the tuples before the return clause, as with a direct call. :)
+(: The same in a loop: the call runs per tuple. :)
 declare namespace an = "http://zorba.io/annotations";
 declare %an:assignable variable $g := 0;
 declare %an:sequential function local:bump() { $g := $g + 1; $g };

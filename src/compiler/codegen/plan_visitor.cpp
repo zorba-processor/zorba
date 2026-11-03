@@ -943,29 +943,8 @@ bool begin_visit(flwor_expr& v)
   bool isGeneral = v.compute_is_general();
 
   v.set_general(isGeneral);
-
-  // A call that the compiler cannot prove to be free of side effects can be a
-  // sequential function. A flwor where that can be seen gets the same evaluation as
-  // a sequential one: each clause completes before the next. The tuples of a general
-  // flwor are materialized where the plan below says so. A flwor where it cannot be
-  // seen keeps its lazy evaluation.
-  bool const unprovenCalls = (!v.is_sequential() &&
-                              theCCB->theMayRunSideEffects &&
-                              expr_tools::evaluates_in_clause_order(&v));
-
-  if (unprovenCalls)
-  {
-    isGeneral = true;
-    v.set_general(true);
-  }
-
-  auto const runsInOrder = [unprovenCalls](const expr* e)
-  {
-    return e->is_sequential() ||
-           (unprovenCalls && expr_tools::calls_unproven_function(e));
-  };
-
-  if (v.is_sequential() || unprovenCalls)
+    
+  if (v.is_sequential())
   {
     pragma* pr = 0;
     theCCB->lookup_pragma(&v, "no-materialization", pr);
@@ -1060,7 +1039,7 @@ bool begin_visit(flwor_expr& v)
               ++numForClauses;
           }
 
-          if (!pr && runsInOrder(domExpr) &&
+          if (!pr && domExpr->is_sequential() &&
               (k == flwor_clause::for_clause ||
                k == flwor_clause::window_clause ||
                numForClauses > 0))
@@ -1107,7 +1086,7 @@ bool begin_visit(flwor_expr& v)
 
       const flwor_clause* lastClause = v.get_clause(v.num_clauses()-1);
 
-      if (runsInOrder(v.get_return_expr()) &&
+      if (v.get_return_expr()->is_sequential() &&
           lastClause->get_kind() != flwor_clause::orderby_clause &&
           lastClause->get_kind() != flwor_clause::groupby_clause)
       {

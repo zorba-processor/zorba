@@ -37,8 +37,7 @@ protected:
 
   expr_tools::ExprVarsMap theExprVarsMap;
 
-  // Whether the root expr has an unproven call (expr_tools::calls_unproven_function).
-  // The walk is needed only then.
+  // Whether the root expr can have an unproven call. The walks are needed only then.
   bool                    theHasUnprovenCalls;
 
 public:

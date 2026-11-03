@@ -9,8 +9,7 @@ declare %an:sequential function local:bump() { $g := $g + 1; string($g) };
 declare variable $f := local:bump#0;
 ddl:create(xs:QName("e:foo"));
 iddl:create(xs:QName("e:by-id"));
-dml:insert(xs:QName("e:foo"), ({ "id" : "1" }, { "id" : "2" }, { "id" : "3" }));
+dml:insert(xs:QName("e:foo"), (<a id="1"/>, <a id="2"/>, <a id="3"/>));
 for $i in dml:collection(xs:QName("e:foo"))
-where $i("id") eq $f()
-order by $i("id")
-return $i("id")
+where xs:string($i/@id) eq xs:string($f())
+return xs:string($i/@id)

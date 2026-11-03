@@ -1,0 +1,36 @@
+name: hst temporary
+# Temporary, for the throwaway branch of the dynamic call work. Never on master or on the PR branch.
+on:
+  push:
+    branches: [hst-try]
+permissions:
+  contents: read
+jobs:
+  tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Builder image
+        uses: ./.github/actions/builder-image
+        with:
+          context: docker/builder-latest
+          cache-scope: linux-amd64-latest
+      - uses: actions/cache@v6
+        with:
+          path: .ccache
+          key: ccache-v2-linux-amd64-latest-hst-${{ github.sha }}
+          restore-keys: |
+            ccache-v2-linux-amd64-latest-hst-
+            ccache-v2-linux-amd64-latest-
+      - name: Build and run
+        run: |
+          mkdir -p .ccache out
+          docker run --rm -e CCACHE_DIR=/src/.ccache -e CCACHE_SLOPPINESS=pch_defines,time_macros -e CCACHE_DEPEND=1 -v "$PWD":/src -w /src zorba-builder:ci sh .github/hst-run.sh
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: hst-out
+          path: out/

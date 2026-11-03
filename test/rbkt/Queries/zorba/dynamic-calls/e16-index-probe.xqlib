@@ -1,7 +1,7 @@
 module namespace e = "http://zorba.io/tests/dynamic-calls-index";
 import module namespace dml = "http://zorba.io/modules/store/static/collections/dml";
 declare namespace an = "http://zorba.io/annotations";
-declare %an:mutable %an:unordered %an:mutable-nodes collection e:foo;
-declare %an:manual %an:value-range index e:by-id
+declare %an:ordered collection e:foo as element(a);
+declare %an:automatic %an:value-equality index e:by-id
 on nodes dml:collection(xs:QName("e:foo"))
-by .("id") as Q{http://www.w3.org/2001/XMLSchema}string;
+by xs:string(@id) as xs:string;

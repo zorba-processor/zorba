@@ -1,4 +1,4 @@
-(: As with a direct call, the tuples of a loop are computed before its return clause runs. :)
+(: Per tuple and interleaved: the domain is read as the loop goes (a direct call differs, see s05). :)
 declare namespace an = "http://zorba.io/annotations";
 declare %an:assignable variable $g := 0;
 declare %an:sequential function local:bump() { $g := $g + 1; $g };

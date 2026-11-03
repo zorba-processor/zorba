@@ -1,4 +1,4 @@
-(: A call in the condition stays in the return clause, after the let has run for all the tuples. :)
+(: A call in the condition stays in the return clause, and each tuple reads the state of its iteration. :)
 declare namespace an = "http://zorba.io/annotations";
 declare %an:assignable variable $g := 0;
 declare %an:sequential function local:bump() { $g := $g + 1; $g };

@@ -128,6 +128,18 @@ const Case BOUNDED[] =
     "      only end at $e when $e - $s eq 9\n"
     "    return $fs[1](count($w)))",
     "219901" },
+  // Dynamic calls in a query with no side effect stay lazy: a materialized loop
+  // holds 5 * 10^6 tuples, or 5 * 10^6 nodes.
+  { "first of a loop with a dynamic call",
+    "declare function local:id($x) { $x };\n"
+    "declare variable $fs := (local:id#1, local:id#1);\n"
+    "(for $i in 1 to 5000000 return $fs[1]($i))[1]",
+    "1" },
+  { "loop over constructed nodes with a dynamic call",
+    "declare function local:id($x) { $x };\n"
+    "declare variable $fs := (local:id#1, local:id#1);\n"
+    "count(for $i in 1 to 5000000 let $n := <n/> return $fs[1]($n))",
+    "5000000" },
   { "sliding over 10 items, end on the current item",
     "sum(for sliding window $w in local:d()\n"
     "      start at $s when $s mod 10 eq 1\n"

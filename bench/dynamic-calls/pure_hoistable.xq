@@ -1,4 +1,4 @@
-(: A pure function the compiler cannot see, with a constant argument: hoisted before, called per iteration now. :)
+(: A query with no side effect and a target the compiler cannot follow, with a constant argument: an ordinary pure expression, hoisted. :)
 declare function local:work($n) { sum(for $j in 1 to $n return $j * 2) };
 declare variable $fs := (local:work#1, local:work#1);
 declare variable $f := $fs[1];

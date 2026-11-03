@@ -12833,8 +12833,21 @@ void end_visit(const DynamicFunctionInvocation& v, void* /*visit_state*/)
 
     push_nodestack(accessorExpr);
   }
-  else if (numArgs > 0)
+  else if (numArgs > 0 &&
+           !(theSctx->language_kind() == StaticContextConsts::language_kind_xquery &&
+             srcType->max_card() <= 1))
   {
+    // XQuery 3.0, 3.2.2: the function must be one item, and an empty sequence is a
+    // type error. For at most one item, the iterator raises it (the branch below). A
+    // lookup over a sequence of JSON items takes each item, so the for stays, but not
+    // over an empty sequence. In JSONiq, a lookup over an empty sequence is empty.
+    if (theSctx->language_kind() == StaticContextConsts::language_kind_xquery &&
+        srcType->get_quantifier() != SequenceType::QUANT_PLUS)
+      sourceExpr = wrap_in_type_match(sourceExpr,
+                                      theRTM.ITEM_TYPE_PLUS,
+                                      loc,
+                                      TREAT_TYPE_MATCH);
+
     flwor_expr* flworExpr = wrap_expr_in_flwor(sourceExpr, false);
 
     for_clause* fc = static_cast<for_clause*>(flworExpr->get_clause(0));
