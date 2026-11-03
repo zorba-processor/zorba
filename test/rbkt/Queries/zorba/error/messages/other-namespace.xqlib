@@ -1,0 +1,4 @@
+(: Has another target namespace than the one modules.xq imports. :)
+module namespace o = "urn:zorba-test:other";
+
+declare function o:f() { 1 };

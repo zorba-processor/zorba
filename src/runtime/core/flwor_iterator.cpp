@@ -848,6 +848,7 @@ void FlworState::clearGroupMap()
   }
   
   theGroupMap->clear();
+  theGroupMap->compareFunction().resetNumericKeys();
 }
 
 
@@ -1506,6 +1507,8 @@ void FLWORIterator::materializeGroupTuple(
   std::vector<NonGroupingSpec> nongroupingSpecs = theGroupByClause->theNonGroupingSpecs;
   std::vector<store::TempSeq_t>* nongroupVarSequences = 0;
   csize numNonGroupingSpecs = nongroupingSpecs.size();
+
+  groupMap->compareFunction().prepare(*groupMap, groupTuple.get());
 
   if (groupMap->get(groupTuple.get(), nongroupVarSequences))
   {

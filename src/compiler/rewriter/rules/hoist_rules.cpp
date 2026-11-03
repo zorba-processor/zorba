@@ -916,6 +916,15 @@ static bool non_hoistable(expr* e)
     if (fkind == FunctionConsts::OP_CONCATENATE_N && fo->num_args() == 0)
       return true;
 
+    // A probe with a constant key references no variable, but it must stay
+    // below the creation of a temporary index (see
+    // IndexJoinRule::createNormalizedProbe()).
+    if (fkind == FunctionConsts::FN_ZORBA_XQDDF_PROBE_INDEX_POINT_VALUE_N ||
+        (fkind == FunctionConsts::FN_EXISTS_1 &&
+         fo->get_arg(0)->get_function_kind() ==
+         FunctionConsts::FN_ZORBA_XQDDF_PROBE_INDEX_POINT_VALUE_N))
+      return true;
+
     if (fkind == FunctionConsts::ZORBA_STORE_STATIC_COLLECTIONS_DML_COLLECTION_1 ||
         fkind == FunctionConsts::ZORBA_STORE_STATIC_COLLECTIONS_DML_COLLECTION_2 ||
         fkind == FunctionConsts::ZORBA_STORE_STATIC_COLLECTIONS_DML_COLLECTION_3 ||

@@ -47,7 +47,10 @@ namespace UnitTests {
   int test_mapm_threads( int, char*[] );
   int test_memory_manager( int, char*[] );
   int test_mmap_file( int, char*[] );
+  int test_node_edit_iterator( int, char*[] );
+  int test_node_packing( int, char*[] );
   int test_numeric_hash( int, char*[] );
+  int test_numeric_items( int, char*[] );
   int test_ordpath( int, char*[] );
   int test_parameters( int, char*[] );
   int test_profile_data( int, char*[] );

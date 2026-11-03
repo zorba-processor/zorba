@@ -107,6 +107,26 @@ IndexJoinRule::~IndexJoinRule()
 
 
 /*******************************************************************************
+  Whether an expr is or contains a probe of a value index: see
+  createNormalizedProbe(), whose shape later rewrites may simplify.
+********************************************************************************/
+static bool containsValueProbe(expr* e)
+{
+  if (e->get_function_kind() == FunctionConsts::FN_ZORBA_XQDDF_PROBE_INDEX_POINT_VALUE_N)
+    return true;
+
+  ExprIterator iter(e);
+  while (!iter.done())
+  {
+    if (containsValueProbe(**iter))
+      return true;
+    iter.next();
+  }
+  return false;
+}
+
+
+/*******************************************************************************
   This rule analyzes the where clauses of flwor exprs to deterimne whether any
   predicate in a clause is a join predicate and whether the associated join
   can be converted into a hashjoin using an index that is built on-the-fly.
@@ -460,8 +480,7 @@ bool IndexJoinRule::isIndexJoinPredicate(PredicateInfo& predInfo)
 
   // The inner var is already bound to an index probe (the predicate may have
   // been kept in the WHERE clause after a rewrite with normalized keys).
-  if (innerVarClause->get_expr()->get_function_kind() ==
-      FunctionConsts::FN_ZORBA_XQDDF_PROBE_INDEX_POINT_VALUE_N)
+  if (containsValueProbe(innerVarClause->get_expr()))
     return false;
 
   // The inner var must not be an outer FOR var
@@ -567,6 +586,14 @@ bool IndexJoinRule::isIndexJoinPredicate(PredicateInfo& predInfo)
   }
   else
   {
+    // A general index holds numbers as xs:double, but an xs:integer or xs:decimal
+    // compared with an xs:float is cast to xs:float (XPath 3.0 B.1), which an
+    // index lookup can not express.
+    bool const innerFloat = TypeOps::is_subtype(tm, *primeInnerType, *rtm.FLOAT_TYPE_ONE, innerLoc);
+    bool const outerFloat = TypeOps::is_subtype(tm, *primeOuterType, *rtm.FLOAT_TYPE_ONE, outerLoc);
+    if (innerFloat != outerFloat)
+      return false;
+
     // TODO: allow domain exprs that return atomic items?
     if (! TypeOps::is_subtype(tm,
                               *innerDomainExpr->get_return_type(),
@@ -998,21 +1025,29 @@ bool IndexJoinRule::findIndexPos(PredicateInfo& predInfo, csize boundVarId)
     let $k := keyExpr
     return
       if (empty($k)) then ()
-      else if ($k instance of xs:decimal or $k instance of xs:double or
-               $k instance of xs:float)
+      else if ($k instance of xs:float) then "f"
+      else if ($k instance of xs:decimal or $k instance of xs:double)
       then concat("n", string(abs(xs:double($k))))
       else if ($k instance of xs:string or $k instance of xs:untypedAtomic or
                $k instance of xs:anyURI)
       then concat("s", string($k))
       else "o"
 
-  If "$a eq $b" can be true, then the keys of $a and $b are equal: numbers are
-  compared via promotion, so equal numbers have equal xs:double values;
-  xs:untypedAtomic and xs:anyURI are compared as xs:string (the index uses the
-  default collation, like "eq"). Items of other types share the key "o". The
-  converse does not hold, so the join predicate must still be applied to the
-  probe results. Pairs for which "eq" would raise a type error get different
-  keys and are never compared (permitted by "Errors and Optimization").
+  If "$a eq $b" can be true and neither is an xs:float, then the keys of $a and
+  $b are equal: other numbers are compared via promotion to xs:double, so equal
+  numbers have equal xs:double values; xs:untypedAtomic and xs:anyURI are
+  compared as xs:string (the index uses the default collation, like "eq"). Items
+  of other types share the key "o". The converse does not hold, so the join
+  predicate must still be applied to the probe results. Pairs for which "eq"
+  would raise a type error get different keys and are never compared (permitted
+  by "Errors and Optimization").
+
+  An xs:integer or xs:decimal compared with an xs:float is cast to xs:float
+  (XPath 3.0 B.1): 16777217 eq xs:float(16777216). One key can not cover both a
+  number's xs:double and its xs:float rounding, and keying all numbers on their
+  xs:float rounding would put up to 2^(e-23) integers around 2^e on one key. So
+  inner xs:float items share the key "f", and createNormalizedProbe() scans the
+  domain when an xs:float takes part.
 ********************************************************************************/
 expr* IndexJoinRule::createNormalizedKey(
     expr* keyExpr,
@@ -1026,10 +1061,11 @@ expr* IndexJoinRule::createNormalizedKey(
   var_expr* keyVar = theRCtx->createTempVar(sctx, loc, var_expr::let_var);
   keyVar->set_type(keyExpr->get_return_type());
 
-  std::vector<expr*> numArgs(3);
+  expr* isFloat = em->create_instanceof_expr(sctx, udf, loc, keyVar, rtm.FLOAT_TYPE_ONE);
+
+  std::vector<expr*> numArgs(2);
   numArgs[0] = em->create_instanceof_expr(sctx, udf, loc, keyVar, rtm.DECIMAL_TYPE_ONE);
   numArgs[1] = em->create_instanceof_expr(sctx, udf, loc, keyVar, rtm.DOUBLE_TYPE_ONE);
-  numArgs[2] = em->create_instanceof_expr(sctx, udf, loc, keyVar, rtm.FLOAT_TYPE_ONE);
   expr* isNumeric = em->create_fo_expr(sctx, udf, loc, BUILTIN_FUNC(OP_OR_N), numArgs);
 
   std::vector<expr*> strArgs(3);
@@ -1058,17 +1094,76 @@ expr* IndexJoinRule::createNormalizedKey(
     em->create_fo_expr(sctx, udf, loc, BUILTIN_FUNC(FN_EMPTY_1), keyVar),
     em->create_seq(sctx, udf, loc),
     em->create_if_expr(sctx, udf, loc,
-      isNumeric,
-      numKey,
+      isFloat,
+      em->create_const_expr(sctx, udf, loc, "f"),
       em->create_if_expr(sctx, udf, loc,
-        isString,
-        strKey,
-        em->create_const_expr(sctx, udf, loc, "o"))));
+        isNumeric,
+        numKey,
+        em->create_if_expr(sctx, udf, loc,
+          isString,
+          strKey,
+          em->create_const_expr(sctx, udf, loc, "o")))));
 
   flwor_expr* flwor = em->create_flwor_expr(sctx, udf, loc);
   flwor->add_clause(em->create_let_clause(sctx, loc, keyVar, keyExpr));
   flwor->set_return_expr(body);
 
+  return flwor;
+}
+
+
+/*******************************************************************************
+  The expr that replaces the domain of the inner var, for normalized keys:
+
+    let $k := outerKeyExpr
+    return
+      if ($k instance of xs:float or exists(probe-index-point-value(index, "f")))
+      then scanExpr
+      else probe-index-point-value(index, normalized key of $k)
+
+  Without any xs:float, this costs a second probe for each outer tuple. With one,
+  the join runs as a nested loop, which the predicate kept in the WHERE clause
+  filters, in the order of the domain.
+********************************************************************************/
+expr* IndexJoinRule::createNormalizedProbe(
+    expr* qnameExpr,
+    expr* outerKeyExpr,
+    expr* scanExpr,
+    static_context* sctx,
+    user_function* udf,
+    const QueryLoc& loc)
+{
+  ExprManager* em = theRootExpr->get_ccb()->getExprManager();
+  RootTypeManager& rtm = GENV_TYPESYSTEM;
+
+  var_expr* keyVar = theRCtx->createTempVar(sctx, loc, var_expr::let_var);
+  keyVar->set_type(outerKeyExpr->get_return_type());
+
+  // First: the type of keyVar, asked for below, comes from its clause.
+  flwor_expr* flwor = em->create_flwor_expr(sctx, udf, loc);
+  flwor->add_clause(em->create_let_clause(sctx, loc, keyVar, outerKeyExpr));
+
+  expr* floatProbe =
+  em->create_fo_expr(sctx, udf, loc,
+                     BUILTIN_FUNC(FN_ZORBA_XQDDF_PROBE_INDEX_POINT_VALUE_N),
+                     qnameExpr,
+                     em->create_const_expr(sctx, udf, loc, "f"));
+
+  std::vector<expr*> args(2);
+  args[0] = em->create_instanceof_expr(sctx, udf, loc, keyVar, rtm.FLOAT_TYPE_ONE);
+  args[1] = em->create_fo_expr(sctx, udf, loc, BUILTIN_FUNC(FN_EXISTS_1), floatProbe);
+
+  expr* keyProbe =
+  em->create_fo_expr(sctx, udf, loc,
+                     BUILTIN_FUNC(FN_ZORBA_XQDDF_PROBE_INDEX_POINT_VALUE_N),
+                     qnameExpr,
+                     createNormalizedKey(keyVar, sctx, udf, loc));
+
+  flwor->set_return_expr(
+    em->create_if_expr(sctx, udf, loc,
+                       em->create_fo_expr(sctx, udf, loc, BUILTIN_FUNC(OP_OR_N), args),
+                       scanExpr,
+                       keyProbe));
   return flwor;
 }
 
@@ -1092,6 +1187,8 @@ void IndexJoinRule::rewriteJoin(PredicateInfo& predInfo)
   // 
   expr* indexDomainExpr = innerClause->get_expr();
   expandVars(indexDomainExpr, predInfo.theOuterVarId, predInfo.theInnerVarId);
+
+  expr* scanExpr = predInfo.theNormalizeKeys ? indexDomainExpr->clone(udf) : NULL;
 
   //
   // Create the index declaration
@@ -1132,8 +1229,7 @@ void IndexJoinRule::rewriteJoin(PredicateInfo& predInfo)
                                          sctx, udf, loc);
     columnTypes[0] = GENV_TYPESYSTEM.STRING_TYPE_QUESTION;
 
-    probeKeyExpr = createNormalizedKey(predInfo.theOuterOp->clone(udf),
-                                       sctx, udf, loc);
+    probeKeyExpr = predInfo.theOuterOp->clone(udf);
   }
   else
   {
@@ -1222,7 +1318,7 @@ void IndexJoinRule::rewriteJoin(PredicateInfo& predInfo)
   //
   // Replace the expr defining the inner var with an index probe.
   //
-  fo_expr* probeExpr = NULL;
+  expr* probeExpr = NULL;
 
   if (predInfo.theIsGeneral)
   {
@@ -1241,6 +1337,10 @@ void IndexJoinRule::rewriteJoin(PredicateInfo& predInfo)
                    BUILTIN_FUNC(OP_SORT_DISTINCT_NODES_ASC_1),
                    probeExpr);
   }
+  else if (predInfo.theNormalizeKeys)
+  {
+    probeExpr = createNormalizedProbe(qnameExpr, probeKeyExpr, scanExpr, sctx, udf, loc);
+  }
   else
   {
     probeExpr = em->
@@ -1252,17 +1352,19 @@ void IndexJoinRule::rewriteJoin(PredicateInfo& predInfo)
                    probeKeyExpr);
   }
 
-  if (probeKeyExpr != predInfo.theOuterOp)
+  if (predInfo.theNormalizeKeys)
   {
     DynamicBitset keyVars;
-    expr_tools::build_expr_to_vars_map(probeKeyExpr,
+    expr_tools::build_expr_to_vars_map(probeExpr,
                                        *theVarIdMap,
                                        keyVars,
                                        *theExprVarsMap);
   }
-
-  DynamicBitset probeVars = (*theExprVarsMap)[predInfo.theOuterOp];
-  (*theExprVarsMap)[probeExpr] = probeVars;
+  else
+  {
+    DynamicBitset probeVars = (*theExprVarsMap)[predInfo.theOuterOp];
+    (*theExprVarsMap)[probeExpr] = probeVars;
+  }
 
   innerClause->set_expr(probeExpr);
 

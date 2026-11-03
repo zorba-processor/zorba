@@ -174,7 +174,8 @@ GroupTupleCmp::GroupTupleCmp(
   :
   theLocation(loc),
   theGroupingSpecs(groupingSpecs),
-  theTypeManager(tm)
+  theTypeManager(tm),
+  theNumericKeys(std::make_shared<NumericKeyHash>())
 {
   theTimezone = dctx->get_implicit_timezone();
 }
@@ -192,7 +193,7 @@ uint32_t GroupTupleCmp::hash(GroupTuple* t) const
   {
     if (*ite)
     {
-      hash += (*ite)->hash(theTimezone, (*ite2).theCollator);
+      hash += theNumericKeys->hash((*ite).getp(), theTimezone, (*ite2).theCollator);
     }
   }
 

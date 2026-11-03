@@ -91,8 +91,11 @@ uint32_t ValueIndexCompareFunction::hash(const store::IndexKey* key) const
     if ((*key)[i] == NULL)
       continue;
 
-    hval = hashfun::h32<uint32_t>((*key)[i]->hash(theTimezone, theCollators[i]),
-                                  hval);
+    uint32_t const h = theNumericKeys ?
+      theNumericKeys->hash((*key)[i].getp(), theTimezone, theCollators[i]) :
+      (*key)[i]->hash(theTimezone, theCollators[i]);
+
+    hval = hashfun::h32<uint32_t>(h, hval);
   }
 
   return hval;
@@ -117,8 +120,20 @@ bool ValueIndexCompareFunction::equal(
     if (i1 == NULL || i2 == NULL)
       return false;
 
-    if (! (*key1)[i]->equals((*key2)[i].getp(), theTimezone, theCollators[i]))
-      return false;
+    try
+    {
+      if (! i1->equals(i2.getp(), theTimezone, theCollators[i]))
+        return false;
+    }
+    catch (ZorbaException const& e)
+    {
+      // Keys of xs:anyAtomicType that meet in a hash bucket: unordered-maps.xq,
+      // "getting the entries is based on the "eq" comparison", and values of
+      // types eq is not defined for are not equal.
+      if (e.diagnostic() == zerr::ZSTR0040_TYPE_ERROR)
+        return false;
+      throw;
+    }
   }
 
   return true;
@@ -194,6 +209,14 @@ ValueIndex::ValueIndex(
   IndexImpl(qname, spec),
   theCompFunction(getNumColumns(), spec.theTimezone, spec.theCollations)
 {
+  for (const store::Item_t& type : spec.theKeyTypes)
+  {
+    if (type.getp() == GET_STORE().theSchemaTypeNames[store::XS_ANY_ATOMIC].getp())
+    {
+      theCompFunction.useNumericKeyHash();
+      break;
+    }
+  }
 }
 
 
@@ -335,6 +358,7 @@ void ValueHashIndex::clear()
   }
 
   theMap.clear();
+  theMap.compareFunction().resetNumericKeys();
 }
 
 
@@ -368,6 +392,8 @@ bool ValueHashIndex::insert(store::IndexKey*& key, store::Item_t& value)
     RAISE_ERROR_NO_LOC(zerr::ZSTR0003_INDEX_PARTIAL_KEY_INSERT,
     ERROR_PARAMS(key->toString(), theQname->getStringValue()));
   }
+
+  theMap.compareFunction().prepare(theMap, key);
 
   IndexMap::iterator pos = theMap.find(key);
 
@@ -420,6 +446,8 @@ bool ValueHashIndex::remove(
     RAISE_ERROR_NO_LOC(zerr::ZSTR0004_INDEX_PARTIAL_KEY_REMOVE,
     ERROR_PARAMS(key->toString(), theQname->getStringValue()));
   }
+
+  theMap.compareFunction().prepare(theMap, key);
 
   IndexMap::iterator pos = theMap.find(key);
 
@@ -480,6 +508,8 @@ void ProbeValueHashIndexIterator::init(const store::IndexCondition_t& cond,
   store::IndexKey* key = &(theCondition->theKey);
 
   assert(key->size() == theIndex->getNumColumns());
+
+  theIndex->theMap.compareFunction().prepare(theIndex->theMap, key);
 
   theIndex->theMap.get(key, theResultSet);
 

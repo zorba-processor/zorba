@@ -90,6 +90,27 @@ class ClaudeArgsTest(unittest.TestCase):
                          {"StructuredOutput", "Bash"})
 
 
+class LanguageTest(unittest.TestCase):
+    def cmd(self, **kw):
+        return harness.mcp_command(args(
+            mcp_command="zorba-mcp --root {snapshot}", snapshot="/d",
+            queries_dir="", **kw))
+
+    def test_passed_to_zorba_mcp(self):
+        for lang in ("xquery", "jsoniq"):
+            c = self.cmd(language=lang)
+            self.assertEqual(opt(c, "--language"), lang)
+
+    def test_recorded_in_the_summary(self):
+        s = harness.summarize([], "m", False, "api", "jsoniq")
+        self.assertEqual(s["language"], "jsoniq")
+        self.assertIn("language jsoniq", harness.markdown(s))
+
+    def test_summary_default_is_xquery(self):
+        self.assertEqual(harness.summarize([], "m", False, "api")["language"],
+                         "xquery")
+
+
 class ParseStreamTest(unittest.TestCase):
     def test_events(self):
         lines = [

@@ -84,6 +84,7 @@ SET(UNIT_TESTS_SRCS
   cxx_api_changes.cpp
   external_function.cpp
   no_folding.cpp
+  node_mem_size.cpp
   ordpath_big.cpp
   uri_file_decoding_test.cpp
   ext_in_opt.cpp
@@ -157,12 +158,15 @@ IF(ZORBA_WITH_UNIT_TESTS)
   ZORBA_ADD_TEST("test/libunit/parameters" LibUnitTest parameters)
   ZORBA_ADD_TEST("test/libunit/profile_data" LibUnitTest profile_data)
   ZORBA_ADD_TEST("test/libunit/security_policy" LibUnitTest security_policy)
+  ZORBA_ADD_TEST("test/libunit/numeric_items" LibUnitTest numeric_items)
   ZORBA_ADD_TEST("test/libunit/small_integers" LibUnitTest small_integers)
   ZORBA_ADD_TEST("test/libunit/time_parse" LibUnitTest time_parse)
   ZORBA_ADD_TEST("test/libunit/decimal_storage" LibUnitTest decimal_storage)
   ZORBA_ADD_TEST("test/libunit/mapm_threads" LibUnitTest mapm_threads)
   ZORBA_ADD_TEST("test/libunit/memory_manager" LibUnitTest memory_manager)
   ZORBA_ADD_TEST("test/libunit/mmap_file" LibUnitTest mmap_file)
+  ZORBA_ADD_TEST("test/libunit/node_edit_iterator" LibUnitTest node_edit_iterator)
+  ZORBA_ADD_TEST("test/libunit/node_packing" LibUnitTest node_packing)
   ZORBA_ADD_TEST("test/libunit/numeric_hash" LibUnitTest numeric_hash)
   ZORBA_ADD_TEST("test/libunit/ordpath" LibUnitTest ordpath)
   IF (NOT ZORBA_NO_FULL_TEXT)

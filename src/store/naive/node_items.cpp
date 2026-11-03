@@ -464,7 +464,8 @@ XmlNode::XmlNode(
     store::StoreConsts::NodeKind nodeKind)
   :
   theParent(parent),
-  theFlags(0)
+  theFlags(0),
+  theNumAttrs(0)
 {
   assert(tree || parent);
   assert(parent == NULL || parent->getTree() != NULL);
@@ -1601,7 +1602,10 @@ void OrdPathNode::swap(Item* anotherItem)
 ********************************************************************************/
 size_t InternalNode::alloc_size() const
 {
-  return OrdPathNode::alloc_size() + ztd::alloc_sizeof( theNodes );
+  size_t size = OrdPathNode::alloc_size() + theNodes.heap_size();
+  for (const_iterator ite = theNodes.begin(); ite != theNodes.end(); ++ite)
+    size += ztd::mem_sizeof(**ite);
+  return size;
 }
 
 /*******************************************************************************
@@ -1878,12 +1882,7 @@ csize InternalNode::removeAttr(XmlNode* attr)
 ********************************************************************************/
 void InternalNode::finalizeNode()
 {
-  if (theNodes.capacity() > theNodes.size())
-  {
-    std::vector<XmlNode*> tmp(theNodes.size());
-    tmp = theNodes;
-    theNodes.swap(tmp);
-  }
+  theNodes.shrink_to_fit();
 }
 
 
@@ -1908,7 +1907,7 @@ void InternalNode::swap(Item* anotherItem)
 {
   OrdPathNode::swap(anotherItem);
   InternalNode* lOtherItem = dynamic_cast<InternalNode*>(anotherItem);
-  std::swap(theNodes, lOtherItem->theNodes);
+  theNodes.swap(lOtherItem->theNodes);
   for (iterator lIterator = theNodes.begin();
        lIterator != theNodes.end();
        ++lIterator)
@@ -2202,7 +2201,7 @@ ElementNode::ElementNode(
 
   if (numAttributes > 0)
   {
-    theNumAttrs = numAttributes;
+    theNumAttrs = static_cast<uint32_t>(numAttributes);
     theNodes.resize(numAttributes);
   }
 
