@@ -1029,7 +1029,9 @@ static bool takes_function_item(const function* f, csize i)
 // assignment to it, or if a query that eval compiles at run time can add one.
 bool ImpurityWalk::varCanChange(const var_expr* var) const
 {
-  if (!var->is_mutable())
+  if ((var->get_kind() != var_expr::prolog_var &&
+       var->get_kind() != var_expr::local_var) ||
+      !var->is_mutable())
     return false;
 
   return theCCB->theHasEval || var->num_set_exprs() != 1;
