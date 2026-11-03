@@ -47,9 +47,14 @@ void	M_apm_log_error_msg(int fatal, char *message)
 {
   if (fatal)
   {
-    /* Nothing else can report a failing write to stderr. */
-    (void)fprintf(stderr, "MAPM Error: %s\n", message);
-    exit(100);
+    /*
+     * Zorba: every fatal error is that memory ran out. It leaves all the MAPM
+     * functions of this thread, as std::bad_alloc: nothing in them catches it
+     * or cleans up (at most a few small buffers stay allocated), so no state
+     * that they keep may be left unusable (see M_reset_stack).
+     */
+    M_reset_stack();
+    M_apm_out_of_memory();
   }
   else
   {

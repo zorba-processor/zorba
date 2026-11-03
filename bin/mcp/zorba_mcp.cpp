@@ -22,7 +22,9 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <exception>
 #include <iostream>
+#include <new>
 #include <string>
 
 #include <sys/resource.h>
@@ -68,7 +70,11 @@ char const usage[] =
   "                       131072); longer output is cut with a marker\n"
   "  --max-memory <bytes> memory limit of the server (default 4294967296,\n"
   "                       0: none; Linux only): a query that needs more\n"
-  "                       fails with a tool error\n"
+  "                       fails with the tool error memory_limit, and the\n"
+  "                       server answers the next call. If memory runs out\n"
+  "                       where that cannot be done, for example while the\n"
+  "                       server starts, it exits with status 3 and a message\n"
+  "                       on stderr, with no response to the call\n"
   "  --no-scan            no background scan of the directory: list_documents\n"
   "                       takes no arguments and lists through dir:list\n"
   "  --scan-cache-mb <MiB> memory for the scan's file index and previews\n"
@@ -108,6 +114,58 @@ bool parse_number( char const *s, unsigned long long *n ) {
   return *end == '\0' && *s != '-';
 }
 
+// The exit status when memory ran out where nothing can recover from it.
+int const out_of_memory_status = 3;
+
+std::terminate_handler default_terminate = nullptr;
+
+// std::bad_alloc that nothing can catch ends the process here, without a core
+// file of the size of the limit: see --help. Any other exception keeps the
+// default behavior, which shows a defect.
+[[noreturn]] void on_terminate() {
+  bool out_of_memory = false;
+  try {
+    if ( std::exception_ptr const e = std::current_exception() )
+      std::rethrow_exception( e );
+  }
+  catch ( std::bad_alloc const& ) {
+    out_of_memory = true;
+  }
+  catch ( ... ) {
+  }
+  if ( !out_of_memory )
+    default_terminate();
+  static char const msg[] =
+    "zorba-mcp: out of memory where it cannot be recovered from; exiting\n";
+  // Nothing else can report a failing write to stderr.
+  [[maybe_unused]] ssize_t const n = write( STDERR_FILENO, msg, sizeof msg - 1 );
+  std::_Exit( out_of_memory_status );
+}
+
+#if defined(__linux__) && !defined(ZORBA_MCP_SANITIZER)
+// The stack grows on demand, within the address-space limit: at the limit a
+// call deeper than any before would get SIGSEGV instead of an allocation that
+// fails. So the stack takes its size now, with one page of it in memory. The
+// arguments and environment, at most a quarter of its size, are also on it. A
+// stack with no size limit reserves what the usual limit would.
+__attribute__((noinline)) void reserve_stack() {
+  struct rlimit lim;
+  if ( getrlimit( RLIMIT_STACK, &lim ) != 0 ) {
+    std::perror( "zorba-mcp: getrlimit" );
+    return;
+  }
+  std::uintptr_t const usual = 8 * 1024 * 1024;
+  std::uintptr_t const size = lim.rlim_cur == RLIM_INFINITY ?
+    usual : static_cast<std::uintptr_t>( lim.rlim_cur );
+  std::uintptr_t const margin = size / 4 + 64 * 1024;
+  if ( size <= margin )
+    return;
+  char here;
+  *reinterpret_cast<char volatile*>(
+    reinterpret_cast<std::uintptr_t>( &here ) - ( size - margin ) ) = 0;
+}
+#endif
+
 // A query that needs more memory than the machine has would get the server
 // killed, with no answer for the client. With an address-space limit,
 // allocation fails first: the query ends with std::bad_alloc, its memory is
@@ -118,6 +176,7 @@ void limit_memory( unsigned long long bytes ) {
 #if defined(__linux__) && !defined(ZORBA_MCP_SANITIZER)
   if ( bytes == 0 )
     return;
+  reserve_stack();
   struct rlimit lim;
   if ( getrlimit( RLIMIT_AS, &lim ) != 0 ) {
     std::perror( "zorba-mcp: getrlimit" );
@@ -213,6 +272,7 @@ int main( int argc, char const *argv[] ) {
     return 1;
   }
 
+  default_terminate = std::set_terminate( on_terminate );
   limit_memory( config.max_memory );
 
   void *const store = StoreManager::getStore();
@@ -230,7 +290,17 @@ int main( int argc, char const *argv[] ) {
         line.pop_back();
       if ( line.find_first_not_of( " \t" ) == std::string::npos )
         continue;
-      std::string const response( server.handle( line ) );
+      std::string response;
+      try {
+        response = server.handle( line );
+      }
+      catch ( std::bad_alloc const& ) {
+        // Not even the error response of handle() could be made. The memory is
+        // back by now if it was the call that held it.
+        response =
+          "{\"jsonrpc\":\"2.0\",\"id\":null,\"error\":{\"code\":-32603,"
+          "\"message\":\"Internal error: out of memory\"}}";
+      }
       if ( response.empty() )
         continue;
       if ( std::fputs( response.c_str(), out ) == EOF ||

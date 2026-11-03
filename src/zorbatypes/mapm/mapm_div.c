@@ -128,13 +128,13 @@ void	*vp;
 
 if (M_div_firsttime)
   {
-   M_div_firsttime = FALSE;
-
    M_div_worka = m_apm_init();
    M_div_workb = m_apm_init();
    M_div_tmp7  = m_apm_init();
    M_div_tmp8  = m_apm_init();
    M_div_tmp9  = m_apm_init();
+
+   M_div_firsttime = FALSE;
   }
 
 sign = a->m_apm_sign * b->m_apm_sign;

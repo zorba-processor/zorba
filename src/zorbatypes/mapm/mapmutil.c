@@ -336,6 +336,12 @@ void	M_init_util_data()
   
   if (M_mul_div == NULL || M_mul_rem == NULL)
   {
+    /* The test above must not find the first one without the second. */
+    MAPM_FREE(M_mul_div);
+    MAPM_FREE(M_mul_rem);
+    M_mul_div = NULL;
+    M_mul_rem = NULL;
+
     /* fatal, this does not return */
     
     M_apm_log_error_msg(M_APM_FATAL, "\'M_init_util_data\', Out of memory");
@@ -428,10 +434,10 @@ void	m_apm_round(M_APM btmp, int places, M_APM atmp)
 
   if (M_util_firsttime)
   {
-    M_util_firsttime = FALSE;
-
     M_work_0_5 = m_apm_init();
     m_apm_set_string(M_work_0_5, "5");
+
+    M_util_firsttime = FALSE;
   }
 
   ii = places + 1;

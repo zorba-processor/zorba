@@ -52,6 +52,13 @@ SET(MAPM_SRCS
     mapmutl1.c
     mapmutl2.c)
   
+# An allocation that fails throws std::bad_alloc through these functions (see
+# M_apm_log_error_msg).
+FOREACH(MAPM_SRC ${MAPM_SRCS})
+  SET_SOURCE_FILES_PROPERTIES(${CMAKE_SOURCE_DIR}/src/zorbatypes/mapm/${MAPM_SRC}
+    PROPERTIES COMPILE_OPTIONS "-fexceptions")
+ENDFOREACH(MAPM_SRC)
+
 # disable warning "assuming signed overflow does not occur when assuming that (X + c) < X is always false."
 # no signed overflow may occur in these parts of mapm
 IF (CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_GNUCXX)
