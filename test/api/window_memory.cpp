@@ -130,9 +130,9 @@ const Case BOUNDED[] =
     "      only end $e at $q previous $ep next $en when $q - $p eq 2\n"
     "    return count($w) + count($sp) + count($sn) + count($ep) + count($en))",
     "139984" },
-  { "sliding, read after the input was read twice",
+  { "sliding, once per outer tuple, with a domain that depends on the tuple",
     "sum(for $k in 1 to 2\n"
-    "    for sliding window $w in local:d()\n"
+    "    for sliding window $w in (for $i in 1 to 20000 return concat($pad, $i + $k))\n"
     "      start at $s when true\n"
     "      only end at $e when $e - $s eq 1\n"
     "    return count($w))",
