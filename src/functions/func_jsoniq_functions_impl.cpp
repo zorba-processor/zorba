@@ -134,9 +134,16 @@ xqtref_t fn_jsoniq_trim::getReturnType(const fo_expr* caller) const
 ********************************************************************************/
 static bool is_read_text_utf8(const expr* e)
 {
-  while (e->get_expr_kind() == promote_expr_kind ||
-         e->get_expr_kind() == treat_expr_kind)
-    e = static_cast<const cast_base_expr*>(e)->get_input();
+  while (true)
+  {
+    if (e->get_expr_kind() == promote_expr_kind ||
+        e->get_expr_kind() == treat_expr_kind)
+      e = static_cast<const cast_base_expr*>(e)->get_input();
+    else if (e->get_expr_kind() == function_trace_expr_kind)
+      e = static_cast<const function_trace_expr*>(e)->get_input();
+    else
+      break;
+  }
 
   if (e->get_expr_kind() != fo_expr_kind)
     return false;
