@@ -658,8 +658,15 @@ ReadTextLinesFunction::LinesItemSequence::LinesIterator::next(Item& aRes) {
     return false;
 
   std::string s;
-  if ( !get_text_line( *theStream, &s ) )
-    return false;
+  try {
+    if ( !get_text_line( *theStream, &s ) )
+      return false;
+  }
+  catch ( ZorbaException const &e ) {
+    // file:read-text-lines declares FOFL9999 for any other error, such as
+    // octets that cannot be decoded.
+    theFunc->raiseFileError( "FOFL9999", e.what(), theFile );
+  }
 
   aRes = theFunc->module_->getItemFactory()->createString( s );
   return true;

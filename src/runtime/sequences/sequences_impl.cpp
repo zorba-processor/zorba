@@ -2058,8 +2058,24 @@ bool FnUnparsedTextLinesIterator::nextImpl(store::Item_t& result, PlanState& pla
     else
       skip_utf8_bom(**state->theStream);
 
-    while (get_text_line(**state->theStream, &lLine))
+    while (true)
     {
+      bool lGotLine;
+      try
+      {
+        lGotLine = get_text_line(**state->theStream, &lLine);
+      }
+      catch (ZorbaException const& e)
+      {
+        if (!(e.diagnostic() == zerr::ZOSE0006_TRANSCODING_ERROR))
+          throw;
+        // F&O: octets that cannot be decoded using the encoding.
+        throw XQUERY_EXCEPTION(err::FOUT1190,
+                               ERROR_PARAMS(uriString, encodingString),
+                               ERROR_LOC(loc));
+      }
+      if (!lGotLine)
+        break;
       streamLine.assign(lLine.data(), lLine.size());
       STACK_PUSH(GENV_ITEMFACTORY->createString(result, streamLine), state);
     }
