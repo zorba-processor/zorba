@@ -48,6 +48,18 @@ read-only and confined to the folder:
 docker run -i --rm -v "$PWD:/data:ro" ghcr.io/zorba-processor/zorba:edge zorba-mcp --root /data
 ```
 
+### What a query can do
+
+Under `zorba-mcp`, queries run with a restrictive policy:
+
+- They read only files under `--root`; they cannot write or reach the network.
+- Each call has a time limit (`--timeout`) and an output limit (`--max-output`).
+  On Linux, the server's address space is limited too (`--max-memory`).
+
+These limits are not a substitute for isolation. Zorba is a C++ engine and has
+had memory errors, so run it in a container, as above, when queries or files
+are not trusted. To report a security problem, see [SECURITY.md](SECURITY.md).
+
 See [Querying a folder from an AI agent (MCP)](https://zorba-processor.github.io/zorba/mcp.html)
 for registering it with Claude Code or another MCP client.
 
