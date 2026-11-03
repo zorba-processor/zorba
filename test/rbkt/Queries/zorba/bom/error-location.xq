@@ -1,4 +1,5 @@
 import module namespace file = "http://expath.org/ns/file";
+declare namespace err = "http://www.w3.org/2005/xqt-errors";
 declare variable $rbktPath as xs:string external;
 declare variable $d := concat($rbktPath, "/Queries/zorba/bom/data/");
 (: The mark does not count for the column of an error. :)

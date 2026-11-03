@@ -5,4 +5,4 @@ variable $u := "http://$HTTP_TEST_SERVER/http-test-data/";
 string-to-codepoints(fetch:content(concat($u, "bom.txt")))[1],
 string-to-codepoints(unparsed-text(concat($u, "bom.txt")))[1],
 count(unparsed-text-lines(concat($u, "bom.txt"))),
-jn:members(jn:parse-json(fetch:content(concat($u, "bom.json"))))
+jn:members(jn:parse-json(fetch:content(concat($u, "bom-json.txt"))))

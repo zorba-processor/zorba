@@ -33,6 +33,7 @@ static bool check( Zorba *z, char const *method, char const *encoding,
                    std::string const &expected ) {
   Zorba_SerializerOptions_t opts;
   opts.set( "method", method );
+  opts.set( "omit-xml-declaration", "yes" );
   opts.set( "encoding", encoding );
   opts.set( "byte-order-mark", "yes" );
   XQuery_t const q = z->compileQuery( "'a'" );
@@ -57,9 +58,12 @@ int serializer_bom( int, char*[] ) {
     std::string const utf8( "\xEF\xBB\xBF" "a" );
     ok &= check( z, "text", "UTF-8", utf8 );
     ok &= check( z, "text", "utf-8", utf8 );
+    ok &= check( z, "xml", "UTF-8", utf8 );
 #ifndef ZORBA_NO_ICU
     ok &= check( z, "text", "UTF-16LE", std::string( "\xFF\xFE" "a\0", 4 ) );
     ok &= check( z, "text", "UTF-16BE", std::string( "\xFE\xFF\0a", 4 ) );
+    ok &= check( z, "xml", "UTF-16LE", std::string( "\xFF\xFE" "a\0", 4 ) );
+    ok &= check( z, "xml", "UTF-16BE", std::string( "\xFE\xFF\0a", 4 ) );
     // One signature, in the order of the code unit that follows.
     Zorba_SerializerOptions_t opts;
     opts.set( "method", "text" );
