@@ -326,7 +326,10 @@ Server::Server( Zorba *zorba, ServerConfig config, std::ostream &log ) :
   theZorba( zorba ),
   theConfig( std::move( config ) ),
   theLog( log ),
-  thePolicy( SecurityPolicy::secure() ) {
+  thePolicy( SecurityPolicy::secure() ),
+  theCache( zorba, theConfig.root,
+            std::uintmax_t( theConfig.cache_max_file_kb ) * 1024,
+            theConfig.cache_max_files, &thePolicy ) {
   directory_config::apply_policy( thePolicy, theConfig.root );
   if ( theConfig.timeout.count() > 0 )
     thePolicy.setTimeout( theConfig.timeout );
@@ -570,6 +573,7 @@ Server::run( std::string const &source, std::string const &file_name,
     StaticContext_t sctx = new_static_context( file_name );
     // Relative URIs, e.g. doc("orders/q1.xml"), resolve against the root.
     sctx->setBaseURI( "file://" + percent_encode_path( theConfig.root ) + "/" );
+    theCache.attach( sctx );
     // An implementation may add predeclared namespace prefixes (XQuery 3.0,
     // 4.13); a query can still bind this one to something else.
     sctx->addNamespace( "math", "http://www.w3.org/2005/xpath-functions/math" );
@@ -580,6 +584,8 @@ Server::run( std::string const &source, std::string const &file_name,
     std::istringstream qs( source );
     Zorba_CompilerHints_t hints;
     query->compile( qs, sctx, hints );
+    // A query that can apply updates could modify cached documents.
+    theCache.set_active( !query->isUpdating() && !query->isSequential() );
 
     DynamicContext *const dctx = query->getDynamicContext();
     directory_config::bind_root( theZorba, dctx, theConfig.root );
