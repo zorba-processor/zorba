@@ -6,8 +6,8 @@
   raised `JNDY0021`, `csv:parse` and `dir:open` had it in the first key, and the
   string value started with U+FEFF. `file:read-text`, `file:read-text-lines`,
   `fn:unparsed-text`, `fn:unparsed-text-lines` and `fetch:content` now skip the
-  mark. Only when the resource is decoded as UTF-8:
-  in `UTF-16LE` and `UTF-16BE` a leading U+FEFF is text. `base64:decode` keeps it. Over HTTP these functions decode the resource as
+  mark, only when the resource is decoded as UTF-8: in `UTF-16LE` and `UTF-16BE` a leading U+FEFF is text. `base64:decode` keeps it.
+  Over HTTP these functions decode the resource as
   ISO-8859-1 (existing behavior), so a mark there arrives as three characters.
 - `jn:parse-json` ignores a byte order mark at the start of its input, as
   `fn:parse-json` does in F&O 3.1.
@@ -17,5 +17,6 @@
   method too. `fn:serialize` skips encoding, so its string has no mark.
 - `fn:unparsed-text-lines` and `file:read-text-lines`: lines also end with x0D, and
   a last empty line does not count, as F&O defines it. An empty file has no lines.
-- The `text` output method of a streamed string no longer goes back to position 0.
+- The `text` output method and an HTTP request body no longer go back to position 0
+  of a streamed string, which brought the mark back.
 - JSON serialization of `-INF` no longer loses the sign.

@@ -3,8 +3,8 @@ import module namespace file = "http://expath.org/ns/file";
 
 declare variable $rbktPath as xs:string external;
 
-(: What the server received. In UTF-8: without a charset a text body goes in
- : ISO-8859-1, where ICU drops U+FEFF. The answer comes back read as ISO-8859-1. :)
+(: What the server received, in UTF-8: without a charset a text body goes in
+ : ISO-8859-1, where ICU drops U+FEFF, and this test could not fail. :)
 variable $req :=
 {
   "method": "POST",
