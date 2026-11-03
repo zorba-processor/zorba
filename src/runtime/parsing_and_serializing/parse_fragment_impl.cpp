@@ -569,6 +569,10 @@ bool FnZorbaParseHtmlIterator::nextImpl(
     }
     catch (const ZorbaException& e)
     {
+      // A failed internal check says nothing about the content.
+      if (e.diagnostic() == zerr::ZXQP0002_ASSERT_FAILED)
+        throw;
+
       XQueryException xe(XQUERY_EXCEPTION(err::FODC0006,
       ERROR_PARAMS("x:parse-html()", e.what()), ERROR_LOC(loc)));
 
