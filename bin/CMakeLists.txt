@@ -99,6 +99,8 @@ ZORBA_SET_TEST_PROPERTY(bin/zorba_plan_parse_members FAIL_REGULAR_EXPRESSION "Mu
 ZORBA_ADD_TEST(bin/zorba_plan_parse_array_var zorbacmd --print-iterator-tree -f -q "${CMAKE_CURRENT_SOURCE_DIR}/test/plan_parse_array_var.jq")
 ZORBA_SET_TEST_PROPERTY(bin/zorba_plan_parse_array_var PASS_REGULAR_EXPRESSION "MultiArrayMembersIterator")
 ZORBA_SET_TEST_PROPERTY(bin/zorba_plan_parse_array_var FAIL_REGULAR_EXPRESSION "JSONParseMembersIterator")
+ZORBA_ADD_TEST(bin/zorba_timeout_parse_members zorbacmd --timeout 1 -f -q "${CMAKE_CURRENT_SOURCE_DIR}/test/timeout_parse_members.jq")
+ZORBA_SET_TEST_PROPERTY(bin/zorba_timeout_parse_members PASS_REGULAR_EXPRESSION ".*ZXQP0068.*")
 # --max-expr-depth sets the policy's expression nesting limit.
 ZORBA_ADD_TEST(bin/zorba_max_expr_depth zorbacmd --max-expr-depth 10 -q "((((((((((((1))))))))))))")
 ZORBA_SET_TEST_PROPERTY(bin/zorba_max_expr_depth PASS_REGULAR_EXPRESSION ".*ZXQP0070.*")
