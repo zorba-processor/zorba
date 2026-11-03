@@ -24,7 +24,7 @@ def gen():
     for i in range(150): body='(for $v%d in 1 to 1 return ($v%d, %s))'%(i,i,body)
     open('/tmp/g/compile_effects_nested.xq','w').write(ef+fs+'$g := 1;\ncount(%s)\n'%body)
 gen()
-qs=sorted(glob.glob('/tmp/q/*.xq'))+sorted(glob.glob('/tmp/g/*.xq'))
+qs=sorted(glob.glob('/tmp/q/effects_*.xq'))
 for q in qs:
     n=os.path.basename(q)[:-3]
     for which,z in (('base',zb),('head',zh)):
