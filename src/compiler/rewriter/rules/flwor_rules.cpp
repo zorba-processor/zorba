@@ -23,6 +23,7 @@
 #include "compiler/rewriter/tools/expr_tools.h"
 
 #include "compiler/expression/flwor_expr.h"
+#include "compiler/expression/function_item_expr.h"
 #include "compiler/expression/script_exprs.h"
 #include "compiler/expression/expr_iter.h"
 #include "compiler/expression/expr.h"
@@ -613,8 +614,15 @@ bool EliminateUnusedLetVars::safe_to_fold_var(csize varPos, int& numRefs)
   if (theFlwor->dereferencesNodes() && varDomExpr->constructsNodes())
     unsafe = true;
 
-  // A call in this flwor can change what the domain expr reads.
-  if (expr_tools::calls_unproven_function(theFlwor))
+  // A call in this flwor can change what the domain expr reads, unless the domain
+  // expr is what is evaluated right before it: "for $f in E return $f(...)", which is
+  // how the translator writes a dynamic function call with arguments. E is the function
+  // of the call, and without the for an empty E is the type error that it must be.
+  if (expr_tools::calls_unproven_function(theFlwor) &&
+      !(theFlwor->num_clauses() == 1 &&
+        theFlwor->get_return_expr()->get_expr_kind() == dynamic_function_invocation_expr_kind &&
+        static_cast<dynamic_function_invocation_expr*>(theFlwor->get_return_expr())->
+        get_input()->skip_wrappers() == var))
     unsafe = true;
 
   bool safe = safe_to_fold_var_rec(theFlwor, varPos+1, var, unsafe, isSafeVar, numRefs);
