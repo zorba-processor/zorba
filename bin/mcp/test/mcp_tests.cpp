@@ -22,6 +22,7 @@
 // where <test> is one of the names in the table at the end; the "binary"
 // test runs the zorba-mcp executable given as the last argument.
 
+#include <algorithm>
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
@@ -1017,6 +1018,60 @@ void test_optional_params( Fixture const &f ) {
 
 // Runs the zorba-mcp executable over a pipe: its stdout must carry only
 // protocol messages, one per line, even when a query writes a trace.
+// Window clauses through run_query under the default policy. The queries
+// declare the language themselves.
+void test_windows( Fixture const &f ) {
+  ServerConfig config;
+  config.root = f.tree;
+  Server server( f.zorba, config, std::cerr );
+
+  check_result( server, jsoniq_decl +
+    "let $a := [ {\"v\":10}, {}, {\"v\":30}, {\"v\":null} ]\n"
+    "return [ for sliding window $w in $a[] start at $s when true "
+    "only end at $e when $e - $s eq 1 return sum($w.v[$$ instance of decimal]) ]",
+    "[ 10, 30, 30 ]", "sliding window over irregular objects" );
+  check_result( server, jsoniq_decl + dir_import +
+    "[ for tumbling window $w in dir:open($dir:root, \"payments/payments.json\").content[] "
+    "start $s previous $p when empty($p) or $s.status ne $p.status "
+    "return { \"status\": $s.status, \"total\": sum($w.amount) } ]",
+    "[ { \"status\" : \"paid\", \"total\" : 175 } ]",
+    "tumbling window over a document of the root" );
+  check_error( server, jsoniq_decl +
+    "[ for sliding window $w in (1, 2) start when true return 1 ]",
+    "XPST0003", "", "a sliding window needs an end condition" );
+
+  std::string input;
+  input += request( 1, "initialize", Json::object( {
+    { "protocolVersion", "2025-11-25" }, { "capabilities", Json::object() },
+    { "clientInfo", Json::object( { { "name", "t" }, { "version", "1" } } ) }
+  } ), false ) + "\n";
+  input += "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}\n";
+  input += request( 2, "tools/call", Json::object( {
+    { "name", "run_query" },
+    { "arguments", Json::object( { { "query", jsoniq_decl +
+      "[ for tumbling window $w in (1, 2, 3) start at $s when true "
+      "end at $e when $e - $s eq 1 return [ $w ] ]" } } ) }
+  } ), false ) + "\n";
+  std::string const output( run_binary( f, f.queries, input ) );
+  std::istringstream lines( output );
+  std::string line;
+  bool found = false;
+  while ( std::getline( lines, line ) ) {
+    Json r;
+    std::string why;
+    if ( !parse_json( line, &r, &why ) )
+      continue;
+    Json const *const id = r.find( "id" );
+    if ( id && !id->is_null() && id->text() == "2" ) {
+      found = true;
+      check( !is_tool_error( r ) &&
+             contains( result_text( r ), "[ [ 1, 2 ], [ 3 ] ]" ),
+             "window clause through the zorba-mcp binary", line );
+    }
+  }
+  check( found, "zorba-mcp answered the window query", output );
+}
+
 void test_binary( Fixture const &f ) {
   std::string input;
   input += request( 1, "server/discover" ) + "\n";
@@ -2415,6 +2470,285 @@ void test_language_binary( Fixture const &f ) {
   }
 }
 
+// The README states what a query cannot do under zorba-mcp. These tests hold
+// each statement: no write, no read outside the root through any function,
+// no network, and no native module other than the file module.
+std::string const file_import(
+  "import module namespace file = \"http://expath.org/ns/file\";\n" );
+
+// Names of the entries of a directory, sorted, with their contents.
+std::string snapshot( std::string const &dir ) {
+  std::vector<std::string> entries;
+  for ( auto const &e : std::filesystem::recursive_directory_iterator( dir ) ) {
+    std::string s( e.path().string() );
+    if ( e.is_regular_file() && !e.is_symlink() )
+      s += "=" + read_file( e.path().string() );
+    entries.push_back( s );
+  }
+  std::sort( entries.begin(), entries.end() );
+  std::string out;
+  for ( std::string const &s : entries )
+    out += s + "\n";
+  return out;
+}
+
+void test_no_write( Fixture const &f ) {
+  TempTree t;
+  t.write( "keep.txt", "KEEP" );
+  {
+    std::ofstream out( ( t.base + "/outside/other.txt" ).c_str() );
+    out << "OTHER";
+  }
+  ServerConfig config;
+  config.root = t.root;
+  Server server( f.zorba, config, std::cerr );
+  std::string const before( snapshot( t.base ) );
+  std::string const r( t.root ), o( t.base + "/outside" );
+
+  std::string const queries[] = {
+    file_import + "file:write-text(\"" + r + "/new.txt\", \"x\")",
+    file_import + "file:write-text(\"" + o + "/new.txt\", \"x\")",
+    file_import + "file:write-text(\"" + r + "/keep.txt\", \"CHANGED\")",
+    file_import + "file:write-text-lines(\"" + r + "/new.txt\", (\"a\", \"b\"))",
+    file_import + "file:write-binary(\"" + r + "/new.bin\", xs:base64Binary(\"AAAA\"))",
+    file_import + "file:append-text(\"" + r + "/keep.txt\", \"x\")",
+    file_import + "file:append-text-lines(\"" + r + "/keep.txt\", \"x\")",
+    file_import + "file:append-binary(\"" + r + "/keep.txt\", xs:base64Binary(\"AAAA\"))",
+    file_import + "file:delete(\"" + r + "/keep.txt\")",
+    file_import + "file:delete(\"" + o + "/other.txt\")",
+    file_import + "file:create-directory(\"" + r + "/newdir\")",
+    file_import + "file:copy(\"" + r + "/keep.txt\", \"" + r + "/copy.txt\")",
+    file_import + "file:copy(\"" + r + "/keep.txt\", \"" + o + "/copy.txt\")",
+    file_import + "file:move(\"" + r + "/keep.txt\", \"" + r + "/moved.txt\")",
+    file_import + "file:move(\"" + r + "/keep.txt\", \"" + o + "/moved.txt\")",
+    "put(<a/>, \"file://" + r + "/put.xml\")",
+    "put(<a/>, \"file://" + o + "/put.xml\")",
+    "put(<a/>, \"put.xml\")"
+  };
+  for ( std::string const &q : queries ) {
+    Json const res = run_query( server, q );
+    // fn:put stores the document in the engine's memory, not on disk, so it
+    // is accepted; the disk check below is what holds for it.
+    if ( q.compare( 0, 3, "put" ) != 0 )
+      check( is_tool_error( res ), "write is refused: " + q, res.dump() );
+    check( snapshot( t.base ) == before, "nothing changed on disk: " + q );
+  }
+  check_alive( server );
+}
+
+void test_read_functions( Fixture const &f ) {
+  TempTree t;
+  t.write( "inside.txt", "INSIDE-VALUE" );
+  {
+    std::ofstream out( ( t.base + "/outside/secret.txt" ).c_str() );
+    out << "TOP-SECRET";
+  }
+  std::filesystem::create_symlink( t.base + "/outside/secret.txt",
+                                   t.root + "/link.txt" );
+  ServerConfig config;
+  config.root = t.root;
+  Server server( f.zorba, config, std::cerr );
+  std::string const r( t.root ), o( t.base + "/outside" );
+  std::string const fetch_import(
+    "import module namespace fetch = \"http://zorba.io/modules/fetch\";\n" );
+
+  // Controls: the same functions read a file under the root.
+  std::string const allowed[] = {
+    "unparsed-text(\"file://" + r + "/inside.txt\")",
+    "unparsed-text(\"inside.txt\")",
+    file_import + "file:read-text(\"" + r + "/inside.txt\")"
+  };
+  for ( std::string const &q : allowed ) {
+    Json const res = run_query( server, q );
+    check( !is_tool_error( res ) && contains( result_text( res ), "INSIDE-VALUE" ),
+           "reads under the root: " + q, res.dump() );
+  }
+
+  std::string const denied[] = {
+    "unparsed-text(\"file://" + o + "/secret.txt\")",
+    "unparsed-text(\"../outside/secret.txt\")",
+    "unparsed-text-lines(\"file://" + o + "/secret.txt\")",
+    "unparsed-text(\"file://" + r + "/link.txt\")",
+    "doc(\"file://" + o + "/secret.txt\")",
+    "doc(\"file://" + r + "/link.txt\")",
+    "doc(\"../outside/secret.txt\")",
+    file_import + "file:read-text(\"" + o + "/secret.txt\")",
+    file_import + "file:read-text(\"" + r + "/link.txt\")",
+    file_import + "file:read-text(\"../outside/secret.txt\")",
+    file_import + "file:read-text-lines(\"" + o + "/secret.txt\")",
+    file_import + "file:read-binary(\"" + o + "/secret.txt\")",
+    file_import + "file:list(\"" + o + "\")",
+    file_import + "file:size(\"" + o + "/secret.txt\")",
+    file_import + "file:copy(\"" + o + "/secret.txt\", \"" + r + "/c.txt\")",
+    fetch_import + "fetch:content(\"file://" + o + "/secret.txt\")",
+    fetch_import + "fetch:content(\"file://" + r + "/link.txt\")",
+    fetch_import + "fetch:content-binary(\"file://" + o + "/secret.txt\")"
+  };
+  for ( std::string const &q : denied ) {
+    Json const res = run_query( server, q );
+    check( is_tool_error( res ) && !contains( res.dump(), "TOP-SECRET" ),
+           "read outside the root is refused: " + q, res.dump() );
+  }
+  check( !std::filesystem::exists( t.root + "/c.txt" ), "no copy was made" );
+
+  // unparsed-text-available answers false, and leaks nothing.
+  Json const res = run_query( server,
+    "unparsed-text-available(\"file://" + o + "/secret.txt\")" );
+  check( !contains( res.dump(), "TOP-SECRET" ) &&
+         ( is_tool_error( res ) || result_text( res ) == "false" ),
+         "unparsed-text-available outside the root", res.dump() );
+
+  // No network from the functions that read a URI.
+  for ( char const *const q : {
+          "unparsed-text(\"http://127.0.0.1:9/a.txt\")",
+          "unparsed-text(\"https://127.0.0.1:9/a.txt\")",
+          "unparsed-text-lines(\"http://127.0.0.1:9/a.txt\")",
+          "doc(\"https://127.0.0.1:9/a.xml\")",
+          "doc(\"ftp://127.0.0.1:9/a.xml\")",
+          "import module namespace fetch = \"http://zorba.io/modules/fetch\";\n"
+          "fetch:content(\"http://127.0.0.1:9/a.txt\")" } ) {
+    Json const n = run_query( server, q );
+    check( is_tool_error( n ) &&
+           contains( n.dump(), "access denied by security policy" ),
+           std::string( "network read is refused: " ) + q, n.dump() );
+  }
+  check_alive( server );
+}
+
+// The native modules other than the file module do not load: the HTTP and
+// FTP clients cannot be reached. (util-curl declares no function; fetch,
+// random and reflection are implemented in the engine, not in a library, and
+// check the policy when called: see read_functions.)
+void test_native_import( Fixture const &f ) {
+  ServerConfig config;
+  config.root = f.tree;
+  Server server( f.zorba, config, std::cerr );
+  for ( char const *const ns : {
+          "http://zorba.io/modules/http-client",
+          "http://www.zorba-xquery.com/modules/http-client",
+          "http://zorba.io/modules/http-client-wrapper",
+          "http://zorba.io/modules/ftp-client",
+          "http://zorba.io/modules/sleep" } ) {
+    Json const r = run_query( server, std::string( "import module namespace m = \"" ) +
+                                      ns + "\";\n\"loaded\"" );
+    check( is_tool_error( r ) && !contains( result_text( r ), "loaded" ),
+           std::string( "module import is refused: " ) + ns, r.dump() );
+    check( is_tool_error( r ) &&
+           ( contains( field( tool_error( r ), "code" ), "ZXQP0067" ) ||
+             contains( r.dump(), "access denied by security policy" ) ),
+           std::string( "refused by the policy: " ) + ns, r.dump() );
+  }
+  check_alive( server );
+}
+
+// reflection:eval and reflection:invoke (all variants) run under the same
+// policy as the query that calls them: nothing outside the root is read,
+// nothing is written, no network. random only computes numbers.
+void test_reflection_random( Fixture const &f ) {
+  TempTree t;
+  t.write( "keep.txt", "KEEP" );
+  {
+    std::ofstream out( ( t.base + "/outside/secret.txt" ).c_str() );
+    out << "TOP-SECRET";
+  }
+  ServerConfig config;
+  config.root = t.root;
+  Server server( f.zorba, config, std::cerr );
+  std::string const r( t.root ), o( t.base + "/outside" );
+  std::string const before( snapshot( t.base ) );
+  std::string const imp(
+    "import module namespace refl = \"http://zorba.io/modules/reflection\";\n"
+    "import module namespace rnd = \"http://zorba.io/modules/random\";\n" +
+    file_import );
+
+  // Controls: both modules work.
+  Json res = run_query( server, imp + "refl:eval(\"1 + 1\")" );
+  check( !is_tool_error( res ) && result_text( res ) == "2",
+         "reflection:eval runs a query", res.dump() );
+  res = run_query( server, imp + "refl:invoke(xs:QName(\"fn:concat\"), \"a\", \"b\")" );
+  check( !is_tool_error( res ) && result_text( res ) == "\"ab\"",
+         "reflection:invoke calls a function", res.dump() );
+  res = run_query( server, imp + "refl:eval(\"declare variable $x := 1; $x\")" );
+  check( !is_tool_error( res ), "reflection:eval with a prolog", res.dump() );
+
+  // The eval query text, as an XQuery string literal body.
+  std::string const fi(
+    "import module namespace file = 'http://expath.org/ns/file'; " );
+  std::string const inner[] = {
+    "unparsed-text('file://" + o + "/secret.txt')",
+    "doc('file://" + o + "/secret.txt')",
+    fi + "file:read-text('" + o + "/secret.txt')",
+    fi + "file:write-text('" + r + "/new.txt', 'x')",
+    fi + "file:write-text('" + o + "/new.txt', 'x')",
+    fi + "file:delete('" + r + "/keep.txt')",
+    "unparsed-text('http://127.0.0.1:9/a.txt')",
+    "doc('http://127.0.0.1:9/a.xml')",
+    "import module namespace h = 'http://zorba.io/modules/http-client'; 1",
+    "import module namespace s = 'http://zorba.io/modules/sleep'; 1",
+    "put(<a/>, 'file://" + r + "/put.xml')"
+  };
+  for ( char const *const fn : { "eval", "eval-n", "eval-s" } ) {
+    for ( std::string const &q : inner ) {
+      std::string quoted;
+      for ( char c : q )
+        quoted += ( c == '"' ) ? std::string( "\"\"" ) : std::string( 1, c );
+      res = run_query( server, imp + "refl:" + fn + "(\"" + quoted + "\")" );
+      std::string const what( std::string( "reflection:" ) + fn + ": " + q );
+      if ( q.compare( 0, 3, "put" ) != 0 )
+        check( is_tool_error( res ) && !contains( res.dump(), "TOP-SECRET" ),
+               "refused: " + what, res.dump() );
+      check( snapshot( t.base ) == before, "disk unchanged: " + what );
+    }
+  }
+  // The updating variant: refused, or an update that changes nothing.
+  for ( std::string const &q : inner ) {
+    std::string quoted;
+    for ( char c : q )
+      quoted += ( c == '"' ) ? std::string( "\"\"" ) : std::string( 1, c );
+    res = run_query( server, imp + "refl:eval-u(\"" + quoted + "\")" );
+    check( !contains( res.dump(), "TOP-SECRET" ),
+           "eval-u leaks nothing: " + q, res.dump() );
+    check( snapshot( t.base ) == before, "disk unchanged: eval-u " + q );
+  }
+
+  // invoke, invoke-n, invoke-s, invoke-u of the functions that reach the OS.
+  std::string const calls[] = {
+    "xs:QName(\"fn:unparsed-text\"), \"file://" + o + "/secret.txt\"",
+    "xs:QName(\"fn:doc\"), \"file://" + o + "/secret.txt\"",
+    "xs:QName(\"file:read-text\"), \"" + o + "/secret.txt\"",
+    "xs:QName(\"file:write-text\"), \"" + r + "/new.txt\", \"x\"",
+    "xs:QName(\"file:write-text\"), \"" + o + "/new.txt\", \"x\"",
+    "xs:QName(\"file:delete\"), \"" + r + "/keep.txt\"",
+    "xs:QName(\"fn:unparsed-text\"), \"http://127.0.0.1:9/a.txt\"",
+    "xs:QName(\"fn:doc\"), \"http://127.0.0.1:9/a.xml\""
+  };
+  for ( char const *const fn : { "invoke", "invoke-n", "invoke-s" } ) {
+    for ( std::string const &c : calls ) {
+      res = run_query( server, imp + "refl:" + fn + "(" + c + ")" );
+      std::string const what( std::string( "reflection:" ) + fn + ": " + c );
+      check( is_tool_error( res ) && !contains( res.dump(), "TOP-SECRET" ),
+             "refused: " + what, res.dump() );
+      check( snapshot( t.base ) == before, "disk unchanged: " + what );
+    }
+  }
+  for ( std::string const &c : calls ) {
+    res = run_query( server, imp + "refl:invoke-u(" + c + ")" );
+    check( !contains( res.dump(), "TOP-SECRET" ),
+           "invoke-u leaks nothing: " + c, res.dump() );
+    check( snapshot( t.base ) == before, "disk unchanged: invoke-u " + c );
+  }
+
+  // random: every function runs and no file appears or changes.
+  res = run_query( server, imp +
+    "(rnd:random(), rnd:random(3), rnd:seeded-random(1, 2), "
+    "rnd:random-between(1, 10), rnd:random-between(1, 10, 3), "
+    "rnd:seeded-random-between(1, 1, 10, 2), "
+    "rnd:uuid())" );
+  check( !is_tool_error( res ), "random functions run", res.dump() );
+  check( snapshot( t.base ) == before, "disk unchanged: random" );
+  check_alive( server );
+}
+
 struct Test {
   char const *name;
   void (*fn)( Fixture const& );
@@ -2446,6 +2780,7 @@ Test const tests[] = {
   { "cache_errors", test_cache_errors },
   { "cache_expansion", test_cache_expansion },
   { "cache_counters", test_cache_counters },
+  { "windows", test_windows },
   { "memory_limit", test_memory_limit },
   { "optional_params", test_optional_params },
   { "documents_stream", test_documents_stream },
@@ -2459,7 +2794,11 @@ Test const tests[] = {
   { "case_paths", test_case_paths },
   { "html_edge_cases", test_html_edge_cases },
   { "language", test_language },
-  { "language_binary", test_language_binary }
+  { "language_binary", test_language_binary },
+  { "no_write", test_no_write },
+  { "read_functions", test_read_functions },
+  { "native_import", test_native_import },
+  { "reflection_random", test_reflection_random }
 };
 
 } // namespace

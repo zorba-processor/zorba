@@ -27,6 +27,7 @@
 #define ZED_XPST0003_XQueryVersionAtLeast30_2 "~XPST0003_XQueryVersionAtLeast30_2"
 #define ZED_XPST0003_OuterForClause30 "~XPST0003_OuterForClause30"
 #define ZED_XPST0003_WindowClause30 "~XPST0003_WindowClause30"
+#define ZED_XPST0003_WindowConditions "~XPST0003_WindowConditions"
 #define ZED_XPST0003_CountClause30 "~XPST0003_CountClause30"
 #define ZED_XPST0003_SwitchExpr30 "~XPST0003_SwitchExpr30"
 #define ZED_XPST0003_TypeSwitchExpr30 "~XPST0003_TypeSwitchExpr30"

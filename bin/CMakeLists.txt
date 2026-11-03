@@ -451,11 +451,11 @@ IF (ZORBA_WITH_FILE_ACCESS)
     # tree (see mcp/test/mcp_tests.cpp); "binary" runs zorba-mcp itself.
     SET (_mcpq "${CMAKE_CURRENT_SOURCE_DIR}/test/mcp/queries")
     FOREACH (_t json protocol legacy tools_list list_documents join
-             syntax_error escape network native_modules predefined limits binary
+             syntax_error escape network native_modules predefined limits binary windows
              optional_params documents_stream hints_jsoniq hints_dash
              hints_nodes hints_names deep_json deep_json_binary
              entity_expansion case_paths html_edge_cases memory_limit language
-             language_binary
+             language_binary no_write read_functions native_import reflection_random
              cache_hit cache_invalidate cache_evict cache_off cache_policy
              cache_inject cache_size cache_default cache_abort cache_errors
              cache_expansion cache_counters)

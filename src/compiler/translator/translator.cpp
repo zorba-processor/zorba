@@ -2249,10 +2249,10 @@ void collect_flwor_vars (
       vars.insert(lookup_var(wc.get_var()->get_var_name(), loc, true));
       for (int j = 1; j >= 0; j--)
       {
-        const FLWORWinCond* cond = &*wc[j];
+        const FLWORWinCond* cond = wc[j].getp();
         if (cond != NULL)
         {
-          const WindowVars* wv = &*cond->get_winvars();
+          const WindowVars* wv = cond->get_winvars().getp();
           if (wv != NULL)
           {
             if (wv->get_next())
@@ -7457,6 +7457,15 @@ void* begin_visit(const WindowClause& v)
 
   if (theSctx->xquery_version() < StaticContextConsts::xquery_version_3_0)
     RAISE_ERROR(err::XPST0003, loc, ERROR_PARAMS(ZED(XPST0003_WindowClause30)));
+
+  // The grammar accepts any two conditions; the specification does not.
+  rchandle<FLWORWinCond> const first = v[0];
+  rchandle<FLWORWinCond> const second = v[1];
+
+  if (!first->is_start() ||
+      (second != NULL && second->is_start()) ||
+      (second == NULL && v.get_wintype() == WindowClause::sliding_window))
+    RAISE_ERROR(err::XPST0003, loc, ERROR_PARAMS(ZED(XPST0003_WindowConditions)));
 
   return no_state;
 }

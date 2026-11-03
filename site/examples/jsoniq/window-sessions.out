@@ -1,0 +1,9 @@
+[ {
+  "start" : "2026-03-01T09:00:00Z", 
+  "events" : 2, 
+  "pages" : [ "home", "search" ]
+}, {
+  "start" : "2026-03-01T09:30:00Z", 
+  "events" : 2, 
+  "pages" : [ "home" ]
+} ]
