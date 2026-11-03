@@ -1,4 +1,4 @@
-(: Clauses that read no state and one call. :)
+(: A call per tuple over a nested domain that reads no state. :)
 declare namespace an = "http://zorba.io/annotations";
 declare %an:assignable variable $g := 0;
 declare %an:sequential function local:bump() { $g := $g + 1; $g };

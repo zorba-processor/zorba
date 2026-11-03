@@ -265,6 +265,17 @@ FOREACH(TESTFILE ${TESTFILES})
           ENVIRONMENT "ZORBA_OPTLEVEL=${_optlevel}")
       ENDFOREACH ()
     ENDIF ()
+    # A query with no side effect gets the same rewrites at O1 and O2.
+    IF (TESTNAME MATCHES "^test/rbkt/zorba/optim/dyncall_")
+      ZORBA_ADD_TEST("${TESTNAME}-O2" testdriver ${TESTFILE})
+      SET_TESTS_PROPERTIES ("${TESTNAME}-O2" PROPERTIES
+        ENVIRONMENT "ZORBA_OPTLEVEL=O2" TIMEOUT 120)
+      SET_TESTS_PROPERTIES ("${TESTNAME}" PROPERTIES TIMEOUT 120)
+    ENDIF ()
+    # Materializing the tuples of these takes minutes.
+    IF (TESTNAME MATCHES "^test/rbkt/zorba/dynamic-calls/l[0-9]")
+      SET_TESTS_PROPERTIES ("${TESTNAME}" "${TESTNAME}-O0" "${TESTNAME}-O2" PROPERTIES TIMEOUT 120)
+    ENDIF ()
     # Without hoisting these take hours.
     IF (TESTNAME MATCHES "^test/rbkt/zorba/optim/hoist_proven_")
       SET_TESTS_PROPERTIES ("${TESTNAME}" PROPERTIES TIMEOUT 120)
