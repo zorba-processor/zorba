@@ -30,6 +30,7 @@
 #include "zorbatypes/URI.h"
 
 #include "zorbautils/hashfun.h"
+#include "zorbautils/numeric_key_hash.h"
 
 #include "store/api/item.h"
 #include "store/api/store.h"
@@ -62,6 +63,41 @@ using namespace zorba::locale;
 
 namespace zorba {
 namespace simplestore {
+
+
+/*******************************************************************************
+  Numeric items of different kinds (see atomic_items.h).
+********************************************************************************/
+bool isFloatingItem(const store::Item* item)
+{
+  store::SchemaTypeCode const code = item->getTypeCode();
+  return code == store::XS_DOUBLE || code == store::XS_FLOAT;
+}
+
+
+bool isExactNumericItem(const store::Item* item)
+{
+  return is_exact_numeric(item->getTypeCode());
+}
+
+
+bool floatingEquals(const store::Item* exact, const store::Item* floating)
+{
+  if (floating->getTypeCode() == store::XS_DOUBLE)
+    return xs_double(exact->getDecimalValue()) == floating->getDoubleValue();
+  return xs_float(exact->getDecimalValue()) == floating->getFloatValue();
+}
+
+
+long floatingCompare(const store::Item* exact, const store::Item* floating)
+{
+  if (floating->isNaN())
+    throw ZORBA_EXCEPTION(zerr::ZSTR0041_NAN_COMPARISON);
+  if (floating->getTypeCode() == store::XS_DOUBLE)
+    return xs_double(exact->getDecimalValue()).compare(floating->getDoubleValue());
+  return xs_float(exact->getDecimalValue()).compare(floating->getFloatValue());
+}
+
 
 
 /*******************************************************************************
@@ -2717,6 +2753,8 @@ size_t DecimalItem::dynamic_size() const
 long DecimalItem::compare( const Item* other, long,
                            const XQPCollator* ) const
 {
+  if ( isFloatingItem( other ) )
+    return floatingCompare( this, other );
   return theValue.compare(other->getDecimalValue());
 }
 
@@ -2724,6 +2762,8 @@ long DecimalItem::compare( const Item* other, long,
 bool DecimalItem::equals( const store::Item* other, long,
                           const XQPCollator* ) const
 {
+  if ( isFloatingItem( other ) )
+    return floatingEquals( this, other );
   return theValue == other->getDecimalValue();
 }
 
@@ -2810,16 +2850,21 @@ void IntegerItemImpl<I>::appendStringValue(zstring& buf) const {
   buf += ztd::to_string( theValue );
 }
 
-// An item of another numeric type compares by value (F&O 3.0 op:numeric-equal):
-// getIntegerValue() of an xs:decimal would truncate it, or raise an error beyond
-// the xs:integer range. theValue itself can not take other->getIntegerValue()
-// in compare(), which converts its argument to I and raises an error if the
-// value is out of that type's range (e.g. a negative value and an
-// xs:nonNegativeInteger).
+// An item of another numeric type compares by value (F&O 3.0 op:numeric-equal,
+// "Returns true if and only if the value of $arg1 is equal to the value of
+// $arg2"), never through getIntegerValue(), which truncates an xs:decimal,
+// xs:double or xs:float, and raises an error beyond the xs:integer range (an
+// xs:unsignedLong above 2^63-1 without big integers). theValue itself can not
+// take other->getIntegerValue() in compare(), which converts its argument to I
+// and raises an error if the value is out of that type's range (e.g. a negative
+// value and an xs:nonNegativeInteger).
 template<class I>
 long IntegerItemImpl<I>::compare( Item const *other, long,
                                   XQPCollator const* ) const {
-  if ( other->getTypeCode() == store::XS_DECIMAL )
+  if ( isFloatingItem( other ) )
+    return floatingCompare( this, other );
+  store::SchemaTypeCode const code = other->getTypeCode();
+  if ( code == store::XS_DECIMAL || code == store::XS_UNSIGNED_LONG )
     return getDecimalValue().compare( other->getDecimalValue() );
   return getIntegerValue().compare( other->getIntegerValue() );
 }
@@ -2827,7 +2872,10 @@ long IntegerItemImpl<I>::compare( Item const *other, long,
 template<class I>
 bool IntegerItemImpl<I>::equals( store::Item const *other, long,
                                  XQPCollator const* ) const {
-  if ( other->getTypeCode() == store::XS_DECIMAL )
+  if ( isFloatingItem( other ) )
+    return floatingEquals( this, other );
+  store::SchemaTypeCode const code = other->getTypeCode();
+  if ( code == store::XS_DECIMAL || code == store::XS_UNSIGNED_LONG )
     return getDecimalValue() == other->getDecimalValue();
   return getIntegerValue() == other->getIntegerValue();
 }

@@ -15,6 +15,8 @@
  */
 
 #include <vector>
+#include <cmath>
+
 #include <zorba/internal/unique_ptr.h>
 
 #include "zorbatypes/chartype.h"
@@ -44,6 +46,8 @@
 #include "types/typemanagerimpl.h"
 #include "types/schema/schema.h"
 #include "types/casting.h"
+
+#include "zorbautils/numeric_key_hash.h"
 
 #include "context/static_context.h"
 
@@ -1810,21 +1814,23 @@ T1_TO_T2(uint, str)
 
 T1_TO_T2(uint, flt)
 {
-  aFactory->createFloat(result, xs_float(aItem->getUnsignedIntegerValue()));
+  // getDecimalValue(): an xs:unsignedLong above 2^63-1 fits no
+  // xs:nonNegativeInteger without big integers.
+  aFactory->createFloat(result, xs_float(aItem->getDecimalValue()));
   return true;
 }
 
 
 T1_TO_T2(uint, dbl)
 {
-  aFactory->createDouble(result, xs_double(aItem->getUnsignedIntegerValue()));
+  aFactory->createDouble(result, xs_double(aItem->getDecimalValue()));
   return true;
 }
 
 
 T1_TO_T2(uint, dec)
 {
-  aFactory->createDecimal(result, xs_decimal(aItem->getUnsignedIntegerValue()));
+  aFactory->createDecimal(result, aItem->getDecimalValue());
   return true;
 }
 
@@ -1923,8 +1929,17 @@ T1_TO_T2(uint, int)
   }
   catch (const std::exception& ) 
   {
+    // An xs:unsignedLong above 2^63-1 without big integers: too large for
+    // xs:integer (FOCA0003), or outside the range of a derived target (FORG0001).
     if ( throw_on_error )
-      throwFOCA0002Exception(aItem->getStringValue(), errInfo);
+    {
+      store::SchemaTypeCode const target = errInfo.theTargetType ?
+        TypeOps::get_atomic_type_code(*errInfo.theTargetType) :
+        errInfo.theTargetTypeCode;
+      if (target == store::XS_INTEGER)
+        throwFOCA0003Exception(aItem->getStringValue(), errInfo);
+      throwFORG0001Exception(aItem->getStringValue(), errInfo);
+    }
   }
   return false;
 }
@@ -2740,6 +2755,96 @@ bool GenericCast::castStringToAtomic(
 
 
 /*******************************************************************************
+  XSD 1.1 Part 2 3.4.21: the range of xs:unsignedLong reaches 18446744073709551615.
+  Casting through xs:integer or xs:nonNegativeInteger, as the other types derived
+  from xs:integer do, would limit it to the xs:integer range when that is a 64-bit
+  long long. So a string or number goes to its own range here, in all profiles.
+  F&O 3.0 19.1.2 and 19.2: a fraction is truncated; NaN and INF raise FOCA0002; a
+  value outside the range of the derived type raises FORG0001.
+
+  @return 1 if done, 0 if failed, -1 if the source type is not handled here.
+********************************************************************************/
+static int cast_to_unsigned_long(
+    store::Item_t& result,
+    const store::Item* item,
+    const zstring* lexical,
+    store::ItemFactory* factory,
+    const ErrorInfo& errInfo,
+    bool throw_on_error)
+{
+  static xs_decimal const max_value("18446744073709551615");
+  static xs_decimal const neg_one("-1");
+  static double const limit = 18446744073709551616.0;   // 2^64
+
+  xs_unsignedLong n = 0;
+  bool in_range = false;
+  zstring strval;
+
+  if (lexical != nullptr)
+  {
+    strval = *lexical;
+    if (is_xs_integer_lexical(strval))
+    {
+      zstring trimmed(strval);
+      ascii::trim_space(trimmed);
+      xs_decimal const d(trimmed.c_str());
+      in_range = d.sign() >= 0 && d <= max_value;
+      if (in_range)
+        n = ztd::aton<xs_unsignedLong>(d.toString().c_str());
+    }
+  }
+  else
+  {
+    store::SchemaTypeCode const code = item->getTypeCode();
+    strval = item->getStringValue();
+
+    if (code == store::XS_FLOAT || code == store::XS_DOUBLE)
+    {
+      double const d = code == store::XS_FLOAT ?
+        static_cast<double>(item->getFloatValue().getNumber()) :
+        item->getDoubleValue().getNumber();
+
+      if (!std::isfinite(d))
+      {
+        if (throw_on_error)
+          throwFOCA0002Exception(strval, errInfo);
+        return 0;
+      }
+
+      double const t = std::trunc(d);
+      in_range = t > -1.0 && t < limit;
+      if (in_range)
+        n = static_cast<xs_unsignedLong>(t == 0 ? 0.0 : t);   // also -0.0
+    }
+    else if (is_exact_numeric(code))
+    {
+      xs_decimal const d(item->getDecimalValue());
+      in_range = d > neg_one;
+      if (in_range && d.sign() > 0)
+      {
+        xs_decimal const t(d.floor());
+        in_range = t <= max_value;
+        if (in_range)
+          n = ztd::aton<xs_unsignedLong>(t.toString().c_str());
+      }
+    }
+    else
+      return -1;
+  }
+
+  if (!in_range)
+  {
+    if (throw_on_error)
+      throwFORG0001Exception(strval, errInfo);
+    return 0;
+  }
+
+  factory->createUnsignedLong(result, n);
+  return 1;
+}
+
+
+/*******************************************************************************
   Executes the string casting of the passed string to an item of the passed
   target type.
 ********************************************************************************/
@@ -2774,6 +2879,9 @@ bool GenericCast::castStringToBuiltinAtomic(
   store::Item_t item;
   store::SchemaTypeCode sourceTypeCode = store::XS_STRING;
   store::SchemaTypeCode targetTypeCode = TypeOps::get_atomic_type_code(*targetType);
+
+  if (targetTypeCode == store::XS_UNSIGNED_LONG)
+    return cast_to_unsigned_long(result, NULL, &str, factory, errInfo, throw_on_error) == 1;
 
   if (theMapping[sourceTypeCode] == theMapping[targetTypeCode])
   {
@@ -2935,6 +3043,20 @@ bool GenericCast::castToBuiltinAtomic(
       throwXPTY0004Exception(errInfo);
 
     return false;
+  }
+
+  if (targetTypeCode == store::XS_UNSIGNED_LONG)
+  {
+    bool const lexical =
+      theMapping[sourceTypeCode] == theMapping[store::XS_STRING] ||
+      sourceTypeCode == store::XS_UNTYPED_ATOMIC;
+    if (lexical)
+      item->getStringValue2(stringValue);
+    int const done = cast_to_unsigned_long(result, item.getp(),
+                                           lexical ? &stringValue : NULL,
+                                           factory, errInfo, throw_on_error);
+    if (done >= 0)
+      return done == 1;
   }
 
   CastFunc castFunc = theCastMatrix[theMapping[sourceTypeCode]]

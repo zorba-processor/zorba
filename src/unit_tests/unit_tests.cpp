@@ -65,6 +65,7 @@ void initializeTestList()
   libunittests["parameters"] = test_parameters;
   libunittests["profile_data"] = test_profile_data;
   libunittests["security_policy"] = test_security_policy;
+  libunittests["numeric_items"] = test_numeric_items;
   libunittests["small_integers"] = test_small_integers;
   libunittests["string"] = test_string;
   libunittests["time"] = test_time;

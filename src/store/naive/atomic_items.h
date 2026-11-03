@@ -55,6 +55,21 @@ namespace zorba
 namespace simplestore
 {
 
+/**
+ * Whether an item is an xs:double or xs:float, an xs:decimal or derived from
+ * xs:decimal: numeric items of two different kinds compare by value, the exact
+ * one promoted (F&O 3.0 4.2, XPath 3.0 B.1), never through a truncating accessor.
+ */
+bool isFloatingItem(const store::Item* item);
+bool isExactNumericItem(const store::Item* item);
+
+/**
+ * Compares an item of xs:decimal or a derived type with an xs:double or xs:float
+ * item by value.
+ */
+bool floatingEquals(const store::Item* exact, const store::Item* floating);
+long floatingCompare(const store::Item* exact, const store::Item* floating);
+
 
 enum AnyUriTypeCode
 {
@@ -1328,6 +1343,9 @@ public:
         long timezone = 0,
         const XQPCollator* aCollation = 0) const
   {
+    if (isExactNumericItem(other))
+      return floatingEquals(other, this);
+
     return theValue == other->getDoubleValue();
   }
 
@@ -1336,6 +1354,9 @@ public:
         long timezone = 0,
         const XQPCollator* aCollation = 0) const
   {
+    if (isExactNumericItem(other))
+      return -floatingCompare(other, this);
+
     if (theValue.isNaN() || other->getDoubleValue().isNaN())
       throw ZORBA_EXCEPTION(zerr::ZSTR0041_NAN_COMPARISON);
 
@@ -1392,6 +1413,9 @@ public:
         long timezone = 0,
         const XQPCollator* aCollation = 0) const
   {
+    if (isExactNumericItem(other))
+      return floatingEquals(other, this);
+
     return getDoubleValue() == other->getDoubleValue();
   }
 
@@ -1400,7 +1424,10 @@ public:
         long timezone = 0,
         const XQPCollator* aCollation = 0) const
   {
-    if (theValue.isNaN() || other->getFloatValue().isNaN())
+    if (isExactNumericItem(other))
+      return -floatingCompare(other, this);
+
+    if (theValue.isNaN() || other->getDoubleValue().isNaN())
       throw ZORBA_EXCEPTION( zerr::ZSTR0041_NAN_COMPARISON );
 
     return getDoubleValue().compare(other->getDoubleValue());
@@ -1594,6 +1621,9 @@ public:
         long timezone = 0,
         const XQPCollator* collation = 0 ) const
   {
+    if (isFloatingItem(other))
+      return floatingEquals(this, other);
+
     try
     {
       return theValue == other->getLongValue();
@@ -1609,6 +1639,9 @@ public:
         long timezone = 0,
         const XQPCollator* aCollation = 0) const
   {
+    if (isFloatingItem(other))
+      return floatingCompare(this, other);
+
     try
     {
       return (theValue < other->getLongValue() ?
@@ -1679,6 +1712,9 @@ public:
         long timezone = 0,
         const XQPCollator* collation = 0 ) const
   {
+    if (isFloatingItem(other))
+      return floatingEquals(this, other);
+
     try
     {
       return theValue == other->getLongValue();
@@ -1694,6 +1730,9 @@ public:
         long timezone = 0,
         const XQPCollator* aCollation = 0) const
   {
+    if (isFloatingItem(other))
+      return floatingCompare(this, other);
+
     try
     {
       return (theValue < other->getLongValue() ?
@@ -1762,6 +1801,9 @@ public:
         long timezone = 0,
         const XQPCollator* collation = 0 ) const
   {
+    if (isFloatingItem(other))
+      return floatingEquals(this, other);
+
     try
     {
       return theValue == other->getLongValue();
@@ -1777,6 +1819,9 @@ public:
         long timezone = 0,
         const XQPCollator* collation = 0) const
   {
+    if (isFloatingItem(other))
+      return floatingCompare(this, other);
+
     try
     {
       return (theValue < other->getLongValue() ?
@@ -1849,6 +1894,9 @@ public:
         long timezone = 0,
         const XQPCollator* collation = 0 ) const
   {
+    if (isFloatingItem(other))
+      return floatingEquals(this, other);
+
     try
     {
       return theValue == other->getLongValue();
@@ -1864,6 +1912,9 @@ public:
         long timezone = 0,
         const XQPCollator* collation = 0) const
   {
+    if (isFloatingItem(other))
+      return floatingCompare(this, other);
+
     try
     {
       return (theValue < other->getLongValue() ?
@@ -1934,6 +1985,9 @@ protected:
         long timezone = 0,
         const XQPCollator* collation = 0 ) const
   {
+    if (isFloatingItem(other))
+      return floatingEquals(this, other);
+
     try
     {
       return theValue == other->getUnsignedLongValue();
@@ -1949,6 +2003,9 @@ protected:
         long timezone = 0,
         const XQPCollator* collation = 0) const
   {
+    if (isFloatingItem(other))
+      return floatingCompare(this, other);
+
     try
     {
       return (theValue < other->getUnsignedLongValue() ?
@@ -2021,6 +2078,9 @@ public:
         long timezone = 0,
         const XQPCollator* collation = 0 ) const
   {
+    if (isFloatingItem(other))
+      return floatingEquals(this, other);
+
     try
     {
       return theValue == other->getUnsignedLongValue();
@@ -2043,6 +2103,9 @@ public:
         long timezone = 0,
         const XQPCollator* collation = 0) const
   {
+    if (isFloatingItem(other))
+      return floatingCompare(this, other);
+
     try
     {
       return (theValue < other->getUnsignedLongValue() ?
@@ -2117,6 +2180,9 @@ public:
         long timezone = 0,
         const XQPCollator* aCollation = 0 ) const
   {
+    if (isFloatingItem(other))
+      return floatingEquals(this, other);
+
     try
     {
       return theValue == other->getUnsignedLongValue();
@@ -2139,6 +2205,9 @@ public:
         long timezone = 0,
         const XQPCollator* collation = 0) const
   {
+    if (isFloatingItem(other))
+      return floatingCompare(this, other);
+
     try
     {
       return (theValue < other->getUnsignedLongValue() ?
@@ -2218,6 +2287,9 @@ public:
         long timezone = 0,
         const XQPCollator* aCollation = 0 ) const
   {
+    if (isFloatingItem(other))
+      return floatingEquals(this, other);
+
     try
     {
       return theValue == other->getUnsignedLongValue();
@@ -2240,6 +2312,9 @@ public:
         long timezone = 0,
         const XQPCollator* aCollation = 0) const
   {
+    if (isFloatingItem(other))
+      return floatingCompare(this, other);
+
     try
     {
       return (theValue < other->getUnsignedLongValue() ?

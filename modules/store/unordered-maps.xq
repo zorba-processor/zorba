@@ -65,7 +65,8 @@ declare variable $map:PERSISTENT as string := "persistent";
  : Note that the function is sequential and immediately creates the map.
  : <p/>
  : Each key-type should be specified as string (e.g. "integer",
- : "string", "boolean", "double", or "datetime").
+ : "string", "boolean", "double", or "datetime"). With "anyAtomicType", a key
+ : attribute may hold values of any atomic type; they are compared by value.
  : <p/>
  : For example,
  : <pre>map:create("my-map", "string")</pre> or
