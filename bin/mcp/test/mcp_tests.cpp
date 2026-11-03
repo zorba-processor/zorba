@@ -2615,8 +2615,9 @@ void test_cache_root_spelling( Fixture const &f ) {
   Server on( f.zorba, cache_config( t.root, 16, 10 ), std::cerr );
   Server off( f.zorba, cache_config( t.root, 0, 0 ), std::cerr );
   for ( std::string const &root :
-        { "$dir:root", "concat($dir:root, \"/.\")",
-          "concat($dir:root, \"/sub/..\")", "\"" + t.base + "/alias\"" } ) {
+        { std::string( "$dir:root" ), std::string( "concat($dir:root, \"/.\")" ),
+          std::string( "concat($dir:root, \"/sub/..\")" ),
+          "\"" + t.base + "/alias\"" } ) {
     std::string const content( "dir:open(" + root + ", \"a.xml\")(\"content\")" );
     same_output( on, off, dir_import +
       "let $c := " + content + " return "
