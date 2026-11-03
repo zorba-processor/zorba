@@ -175,6 +175,7 @@ void JSONParseMembersIterator::serialize(::zorba::serialization::Archiver& ar)
 
     ar & theRelativeLocation;
     ar & theStreamIsPrivate;
+    ar & theAllowMultiple;
 }
 
 

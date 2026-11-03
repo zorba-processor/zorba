@@ -91,15 +91,24 @@ ZORBA_SET_TEST_PROPERTY(bin/zorba_timeout PASS_REGULAR_EXPRESSION ".*ZXQP0068.*"
 ZORBA_ADD_TEST(bin/zorba_max_call_depth zorbacmd --max-udf-call-depth 10 -q "let $f := function($f, $n) { if ($n le 0) then 0 else $f($f, $n - 1) } return $f($f, 20)")
 ZORBA_SET_TEST_PROPERTY(bin/zorba_max_call_depth PASS_REGULAR_EXPRESSION ".*ZXQP0069.*")
 
-# Unboxing a parse directly reads the members one at a time; an array that a
-# variable keeps goes through the store as a whole.
-ZORBA_ADD_TEST(bin/zorba_plan_parse_members zorbacmd --print-iterator-tree -f -q "${CMAKE_CURRENT_SOURCE_DIR}/test/plan_parse_members.jq")
-ZORBA_SET_TEST_PROPERTY(bin/zorba_plan_parse_members PASS_REGULAR_EXPRESSION "JSONParseMembersIterator")
-ZORBA_SET_TEST_PROPERTY(bin/zorba_plan_parse_members FAIL_REGULAR_EXPRESSION "MultiArrayMembersIterator")
-ZORBA_ADD_TEST(bin/zorba_plan_parse_array_var zorbacmd --print-iterator-tree -f -q "${CMAKE_CURRENT_SOURCE_DIR}/test/plan_parse_array_var.jq")
-ZORBA_SET_TEST_PROPERTY(bin/zorba_plan_parse_array_var PASS_REGULAR_EXPRESSION "MultiArrayMembersIterator")
-ZORBA_SET_TEST_PROPERTY(bin/zorba_plan_parse_array_var FAIL_REGULAR_EXPRESSION "JSONParseMembersIterator")
-ZORBA_ADD_TEST(bin/zorba_timeout_parse_members zorbacmd --timeout 1 -f -q "${CMAKE_CURRENT_SOURCE_DIR}/test/timeout_parse_members.jq")
+# The option zorba-streaming-members, written as a literal in a parse that is
+# unboxed directly, reads the members one at a time; anything else goes through
+# the store as a whole.
+SET (_plandir "${CMAKE_CURRENT_SOURCE_DIR}/test")
+ZORBA_ADD_TEST(bin/zorba_plan_parse_default zorbacmd --print-iterator-tree -f -q "${_plandir}/plan_parse_members.jq")
+ZORBA_SET_TEST_PROPERTY(bin/zorba_plan_parse_default PASS_REGULAR_EXPRESSION "MultiArrayMembersIterator")
+ZORBA_SET_TEST_PROPERTY(bin/zorba_plan_parse_default FAIL_REGULAR_EXPRESSION "JSONParseMembersIterator")
+FOREACH (_opt 0 1 2)
+  ZORBA_ADD_TEST(bin/zorba_plan_parse_streaming_O${_opt} zorbacmd --optimization-level ${_opt} --print-iterator-tree -f -q "${_plandir}/plan_parse_streaming.jq")
+  ZORBA_SET_TEST_PROPERTY(bin/zorba_plan_parse_streaming_O${_opt} PASS_REGULAR_EXPRESSION "JSONParseMembersIterator")
+  ZORBA_SET_TEST_PROPERTY(bin/zorba_plan_parse_streaming_O${_opt} FAIL_REGULAR_EXPRESSION "MultiArrayMembersIterator")
+ENDFOREACH ()
+FOREACH (_q plan_parse_streaming_off plan_parse_streaming_dynamic plan_parse_streaming_strip plan_parse_array_var)
+  ZORBA_ADD_TEST(bin/zorba_${_q} zorbacmd --print-iterator-tree -f -q "${_plandir}/${_q}.jq")
+  ZORBA_SET_TEST_PROPERTY(bin/zorba_${_q} PASS_REGULAR_EXPRESSION "MultiArrayMembersIterator")
+  ZORBA_SET_TEST_PROPERTY(bin/zorba_${_q} FAIL_REGULAR_EXPRESSION "JSONParseMembersIterator")
+ENDFOREACH ()
+ZORBA_ADD_TEST(bin/zorba_timeout_parse_members zorbacmd --timeout 1 -f -q "${_plandir}/timeout_parse_members.jq")
 ZORBA_SET_TEST_PROPERTY(bin/zorba_timeout_parse_members PASS_REGULAR_EXPRESSION ".*ZXQP0068.*")
 # --max-expr-depth sets the policy's expression nesting limit.
 ZORBA_ADD_TEST(bin/zorba_max_expr_depth zorbacmd --max-expr-depth 10 -q "((((((((((((1))))))))))))")

@@ -200,9 +200,9 @@
 
 <!--
 /*******************************************************************************
-  fn-jsoniq:members(fn-jsoniq:parse-json($source)): the members of the top-level
-  arrays one at a time. No function of its own: fn_jsoniq_members::codegen
-  creates it.
+  fn-jsoniq:members(fn-jsoniq:parse-json($source, $options)) with the option
+  zorba-streaming-members: the members of the top-level arrays one at a time. No
+  function of its own: fn_jsoniq_members::codegen creates it.
 ********************************************************************************/
 -->
 <zorba:iterator name="JSONParseMembersIterator" arity="nary" generateCodegen="false">
@@ -213,15 +213,18 @@
     <zorba:member type="std::istream*" name="theOwnedStream" brief=""/>
     <zorba:member type="json::loader*" name="theScanner" brief="checks a top-level value"/>
     <zorba:member type="json::loader*" name="theLoader" brief="returns its members"/>
+    <zorba:member type="bool" name="theGotOne"/>
   </zorba:state>
 
   <zorba:constructor>
     <zorba:parameter type="QueryLoc" name="aRelativeLocation" />
     <zorba:parameter type="bool" name="aStreamIsPrivate" />
+    <zorba:parameter type="bool" name="aAllowMultiple" />
   </zorba:constructor>
 
   <zorba:member type="QueryLoc" name="theRelativeLocation" />
   <zorba:member type="bool" name="theStreamIsPrivate" brief="the stream of the input has no other reader"/>
+  <zorba:member type="bool" name="theAllowMultiple" brief=""/>
 
 </zorba:iterator>
 

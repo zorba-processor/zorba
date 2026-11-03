@@ -210,6 +210,7 @@ public:
   std::istream* theOwnedStream; //
   json::loader* theScanner; //checks a top-level value
   json::loader* theLoader; //returns its members
+  bool theGotOne; //
 
   JSONParseMembersIteratorState();
 
@@ -224,6 +225,7 @@ class JSONParseMembersIterator : public NaryBaseIterator<JSONParseMembersIterato
 protected:
   QueryLoc theRelativeLocation; //
   bool theStreamIsPrivate; //the stream of the input has no other reader
+  bool theAllowMultiple; //
 public:
   SERIALIZABLE_CLASS(JSONParseMembersIterator);
 
@@ -237,11 +239,13 @@ public:
     const QueryLoc& loc,
     std::vector<PlanIter_t>& children,
     QueryLoc aRelativeLocation,
-    bool aStreamIsPrivate)
+    bool aStreamIsPrivate,
+    bool aAllowMultiple)
     : 
     NaryBaseIterator<JSONParseMembersIterator, JSONParseMembersIteratorState>(sctx, loc, children),
     theRelativeLocation(aRelativeLocation),
-    theStreamIsPrivate(aStreamIsPrivate)
+    theStreamIsPrivate(aStreamIsPrivate),
+    theAllowMultiple(aAllowMultiple)
   {}
 
   virtual ~JSONParseMembersIterator();

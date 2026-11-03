@@ -38,7 +38,7 @@ measure() {
   echo "| query | input | ms | peak RSS MiB | result |"
   echo "|---|---|---:|---:|---|"
   for q in filter baseline sessions; do
-    for input in "array:$WORK/tree/x.json" "string:$WORK/tree/x.json" "dir:$WORK/tree:x.json" "whole:$WORK/x.jsonl"; do
+    for input in "array:$WORK/tree/x.json" "members:$WORK/tree/x.json" "string:$WORK/tree/x.json" "members-string:$WORK/tree/x.json" "dir:$WORK/tree:x.json" "whole:$WORK/x.jsonl"; do
       echo "| $q | ${input%%:*} | $(measure -f -q "$HERE/$q.jq" -e "source:=$input") |"
     done
   done
@@ -51,5 +51,6 @@ measure() {
   echo "| array of nulls: size(parse-json(file:read-text)) | $(measure -q "jsoniq version \"1.0\"; import module namespace file = \"http://expath.org/ns/file\"; size(parse-json(file:read-text(\"$WORK/nulls.json\")))") |"
   echo "| text in a variable: let \$t ... parse-json(\$t)[] twice | $(measure -q "jsoniq version \"1.0\"; import module namespace file = \"http://expath.org/ns/file\"; let \$t := file:read-text(\"$WORK/tree/x.json\") return count(parse-json(\$t)[]) + count(parse-json(\$t)[])") |"
   echo "| first member: parse-json(file:read-text)[][1].id | $(measure -q "jsoniq version \"1.0\"; import module namespace file = \"http://expath.org/ns/file\"; parse-json(file:read-text(\"$WORK/tree/x.json\"))[][1].id") |"
+  echo "| first member, with the option | $(measure -q "jsoniq version \"1.0\"; import module namespace file = \"http://expath.org/ns/file\"; parse-json(file:read-text(\"$WORK/tree/x.json\"), { \"zorba-streaming-members\" : true })[][1].id") |"
 } > "$MD"
 cat "$MD"

@@ -82,6 +82,24 @@ public:
   }
 
   /**
+   * With unbox_top_level_arrays(), makes next() check the JSON without building
+   * Items: it raises what building them raises, in the same order, and returns
+   * a null Item for each member and for the end of each top-level value.
+   * in_top_level_array() and last_value_was_array() tell them apart.
+   */
+  void check_only() {
+    check_only_ = true;
+  }
+
+  /**
+   * Gets whether the top-level value that check_only() parsing has just ended
+   * was an array.
+   */
+  bool last_value_was_array() const {
+    return last_value_was_array_;
+  }
+
+  /**
    * Gets whether the Item that next() returned is a member of a top-level array
    * (see unbox_top_level_arrays()).
    */
@@ -131,6 +149,7 @@ private:
 
   void check_depth( json::token const& );
   void add_value( store::Item_t const& );
+  void check_duplicate_keys( std::vector<store::Item_t> const& ) const;
   void clear_stack();
   void make_key( zstring const&, store::Item_t* );
 
@@ -148,6 +167,8 @@ private:
   bool stripped_top_level_array_;
   bool unbox_top_level_arrays_;
   bool in_top_level_array_;
+  bool check_only_;
+  bool last_value_was_array_;
   uint32_t depth_;                      // arrays and objects on stack_
 
   //

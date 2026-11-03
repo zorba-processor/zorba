@@ -859,6 +859,11 @@ bool JSONParseIterator::nextImpl(
       processBooleanOption(
         lOptions, "jsoniq-strip-top-level-array", &lStripTopLevelArray
       );
+      // It takes effect in fn_jsoniq_members::codegen, or not at all.
+      bool lStreamingMembers = false;
+      processBooleanOption(
+        lOptions, "zorba-streaming-members", &lStreamingMembers
+      );
     }
 
     if (lInput->isStreamable())
@@ -912,18 +917,19 @@ bool JSONParseIterator::nextImpl(
 
 
 /*******************************************************************************
-  fn-jsoniq:members(fn-jsoniq:parse-json($source as xs:string?))
+  fn-jsoniq:members(fn-jsoniq:parse-json($source as xs:string?, $options)) with
+  the option zorba-streaming-members
 
   Returns the members of the top-level arrays without building the arrays.
 
   Unboxing a built array parses it whole before its first member, so a query
   that stops early still gets any error in the rest of the array, and before any
   other error that a member would cause. To keep that, each top-level value is
-  parsed twice: theScanner parses it and drops the items, which raises the same
-  errors in the same order, and then theLoader goes back and returns the members.
-  A value after the array is not read until the query asks for more than the
-  array holds, as with the built array. Peak memory is the largest member, plus
-  the text unless it stays in a file.
+  parsed twice: theScanner checks it without building items, which raises the
+  same errors in the same order, and then theLoader goes back and returns the
+  members. A value after the array is not read until the query asks for more than
+  the array holds, as with the built array. Peak memory is the largest member,
+  plus the text unless it stays in a file.
 
   theStream is read twice, so it must not move in between: when the file stream
   has another possible reader (a variable holding the text; a query that writes
@@ -940,6 +946,7 @@ static void releaseParseMembers(JSONParseMembersIteratorState* state)
   state->theOwnedStream = nullptr;
   state->theStream = nullptr;
   state->theInput = nullptr;
+  state->theGotOne = false;
 }
 
 
@@ -950,6 +957,7 @@ void JSONParseMembersIteratorState::init(PlanState& aState)
   theOwnedStream = nullptr;
   theScanner = nullptr;
   theLoader = nullptr;
+  theGotOne = false;
 }
 
 
@@ -967,14 +975,15 @@ JSONParseMembersIteratorState::~JSONParseMembersIteratorState()
 
 
 /**
- * Parses the top-level values up to the end of the next array, dropping the
- * items, and goes back to the start of that array.
+ * Checks the top-level values up to the end of the next array, and goes back to
+ * the start of that array.
  *
  * @return false if there is no other array.
  */
 static bool scanToNextTopLevelArray(
     JSONParseMembersIteratorState* state,
     PlanState& planState,
+    bool allowMultiple,
     const QueryLoc& loc)
 {
   store::Item_t item;
@@ -988,18 +997,29 @@ static bool scanToNextTopLevelArray(
       if (!state->theScanner->next(&item))
         return false;
 
-      if (item.isNull())
-      {
-        state->theStream->clear();
-        state->theStream->seekg(valueStart);
-        return true;
-      }
-
       if (!state->theScanner->in_top_level_array())
-        break; // a top-level object: nothing to return, go on to the next value
+        break;
 
       planState.chargeWork(1, loc);
     }
+
+    if (!allowMultiple && state->theGotOne)
+    {
+      throw XQUERY_EXCEPTION(
+        jerr::JNDY0021,
+        ERROR_PARAMS( ZED( JNDY0021_UnexpectedExtraContent ) ),
+        ERROR_LOC( loc )
+      );
+    }
+    state->theGotOne = true;
+
+    if (state->theScanner->last_value_was_array())
+    {
+      state->theStream->clear();
+      state->theStream->seekg(valueStart);
+      return true;
+    }
+    // A top-level object has no members: go on to the next value.
   }
 }
 
@@ -1045,6 +1065,7 @@ static void openParseMembers(
   state->theScanner = new json::loader(*state->theStream, true);
   state->theLoader = new json::loader(*state->theStream, true);
   state->theScanner->unbox_top_level_arrays();
+  state->theScanner->check_only();
   state->theLoader->unbox_top_level_arrays();
 
   // The locations as in JSONParseIterator: of the string literal in the query,
@@ -1079,7 +1100,7 @@ bool JSONParseMembersIterator::nextImpl(
   {
     openParseMembers(state, lInput, theStreamIsPrivate, theRelativeLocation);
 
-    while (scanToNextTopLevelArray(state, planState, loc))
+    while (scanToNextTopLevelArray(state, planState, theAllowMultiple, loc))
     {
       while (state->theLoader->next(&result) && !result.isNull())
       {

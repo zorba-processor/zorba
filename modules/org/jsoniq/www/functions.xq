@@ -169,13 +169,15 @@ declare function jn:parse-json($j as string?) as json-item* external;
  : <ul>
  :   <li>jsoniq-multiple-top-level-items: allow parsing of sequences of JSON Objects and Arrays (boolean; default: true)</li>
  :   <li>jsoniq-strip-top-level-array: if the top-level JSON item is an array, strip it and return its elements as multiple top-level items (boolean; default: false)</li>
+ :   <li>zorba-streaming-members: when the result is unboxed directly, as in <code>parse-json($j, $o)[]</code>, return the members of each top-level array one at a time instead of building the array (boolean; default: false). Each top-level value is parsed twice: the first time to check it, so that the errors and their order are the ones without the option, and the second time to return its members. The first parse does not hold the members, and <code>file:read-text</code> called directly as the first argument, in a query with no sequential expression, stays in the file: it is read twice, and if the file changes in place during the query the members returned, or an error raised, follow the new content. Otherwise the text is held in memory. It takes effect only when the options are an object written in the call whose values are all literals, and it has no effect with jsoniq-strip-top-level-array set to true or on a result that is not unboxed directly.</li>
  : </ul>
  :
  : @error jerr:JNDY0021 if the given string is not valid JSON or
  :   if jsoniq-multiple-top-level-items is false and there is additional
  :   content after the first JSON Object or Array.
  : @error jerr:JNTY0020 if the value for the option
- :   jsoniq-multiple-top-level-items is not of type boolean.
+ :   jsoniq-multiple-top-level-items, jsoniq-strip-top-level-array or
+ :   zorba-streaming-members is not of type boolean.
  :
  : @return a sequence of JSON Object or Array item.
  :)

@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#include <set>
+
 #include "functions/func_jsoniq_functions.h"
 #include "functions/func_jsoniq_functions_impl.h"
 
@@ -26,6 +28,7 @@
 #include "compiler/api/compilercb.h"
 #include "compiler/expression/expr.h"
 #include "compiler/expression/fo_expr.h"
+#include "compiler/expression/json_exprs.h"
 
 #include "types/typeops.h"
 
@@ -132,7 +135,7 @@ xqtref_t fn_jsoniq_trim::getReturnType(const fo_expr* caller) const
 /*******************************************************************************
 
 ********************************************************************************/
-static bool is_read_text_utf8(const expr* e)
+static const expr* skip_type_wrappers(const expr* e)
 {
   while (true)
   {
@@ -142,8 +145,14 @@ static bool is_read_text_utf8(const expr* e)
     else if (e->get_expr_kind() == function_trace_expr_kind)
       e = static_cast<const function_trace_expr*>(e)->get_input();
     else
-      break;
+      return e;
   }
+}
+
+
+static bool is_read_text_utf8(const expr* e)
+{
+  e = skip_type_wrappers(e);
 
   if (e->get_expr_kind() != fo_expr_kind)
     return false;
@@ -165,6 +174,124 @@ static bool is_read_text_utf8(const expr* e)
 }
 
 
+namespace {
+
+/**
+ * The parse-json options of an object written as a literal.
+ */
+class LiteralParseOptions
+{
+  std::set<zstring> theSeen;
+  bool theStreaming = false;
+  bool theStrip = false;
+  bool theAllowMultiple = true;
+
+  enum Value { NOT_BOOLEAN, IS_FALSE, IS_TRUE };
+
+  // false if the object's value is not known here, or evaluating it raises.
+  bool add(const zstring& name, Value value)
+  {
+    if (!theSeen.insert(name).second)
+      return false;
+
+    bool* option = nullptr;
+    if (name == "zorba-streaming-members")
+      option = &theStreaming;
+    else if (name == "jsoniq-strip-top-level-array")
+      option = &theStrip;
+    else if (name == "jsoniq-multiple-top-level-items")
+      option = &theAllowMultiple;
+    else
+      return true;
+
+    if (value == NOT_BOOLEAN)
+      return false;
+
+    *option = (value == IS_TRUE);
+    return true;
+  }
+
+  static Value value_of(const store::Item* item)
+  {
+    if (!item->isAtomic() || item->getTypeCode() != store::XS_BOOLEAN)
+      return NOT_BOOLEAN;
+    return item->getBooleanValue() ? IS_TRUE : IS_FALSE;
+  }
+
+public:
+  bool read(const expr* options)
+  {
+    options = skip_type_wrappers(options);
+
+    if (options->get_expr_kind() == const_expr_kind)
+    {
+      store::Item_t object = static_cast<const const_expr*>(options)->get_val();
+      if (!object->isObject())
+        return false;
+
+      store::Item_t key;
+      store::Iterator_t keys = object->getObjectKeys();
+      keys->open();
+      while (keys->next(key))
+      {
+        store::Item_t value = object->getObjectValue(key);
+        if (!add(key->getStringValue(), value_of(value.getp())))
+          return false;
+      }
+      keys->close();
+      return true;
+    }
+
+    if (options->get_expr_kind() != json_direct_object_expr_kind)
+      return false;
+
+    const json_direct_object_expr* object =
+      static_cast<const json_direct_object_expr*>(options);
+
+    for (csize i = 0; i < object->num_pairs(); ++i)
+    {
+      const expr* name = skip_type_wrappers(object->get_name_expr(i));
+      const expr* value = skip_type_wrappers(object->get_value_expr(i));
+
+      if (name->get_expr_kind() != const_expr_kind)
+        return false;
+
+      Value v;
+      if (value->get_expr_kind() == const_expr_kind)
+      {
+        v = value_of(static_cast<const const_expr*>(value)->get_val());
+      }
+      else if (value->get_expr_kind() == fo_expr_kind &&
+               static_cast<const fo_expr*>(value)->get_func()->getKind() ==
+                 FunctionConsts::FN_TRUE_0)
+      {
+        v = IS_TRUE;
+      }
+      else if (value->get_expr_kind() == fo_expr_kind &&
+               static_cast<const fo_expr*>(value)->get_func()->getKind() ==
+                 FunctionConsts::FN_FALSE_0)
+      {
+        v = IS_FALSE;
+      }
+      else
+      {
+        return false;
+      }
+
+      if (!add(static_cast<const const_expr*>(name)->get_val()->getStringValue(), v))
+        return false;
+    }
+    return true;
+  }
+
+  bool streaming() const { return theStreaming && !theStrip; }
+
+  bool allowMultiple() const { return theAllowMultiple; }
+};
+
+} // namespace
+
+
 PlanIter_t fn_jsoniq_members::codegen(
   CompilerCB* ccb,
   static_context* sctx,
@@ -172,34 +299,39 @@ PlanIter_t fn_jsoniq_members::codegen(
   std::vector<PlanIter_t>& argv,
   expr& arg) const
 {
-  // Unboxing a parse directly: no one else can see the top-level arrays, so
-  // they need not be built. See JSONParseMembersIterator.
+  // Unboxing a parse directly, with the option zorba-streaming-members written
+  // as a literal: no one else can see the top-level arrays, so they need not be
+  // built. See JSONParseMembersIterator.
   const expr* input = static_cast<const fo_expr&>(arg).get_arg(0);
 
   if (input->get_expr_kind() == fo_expr_kind &&
       static_cast<const fo_expr*>(input)->get_func()->getKind() ==
-        FunctionConsts::FN_JSONIQ_PARSE_JSON_1)
+        FunctionConsts::FN_JSONIQ_PARSE_JSON_2)
   {
-    if (JSONParseIterator* parse = dynamic_cast<JSONParseIterator*>(argv[0].getp()))
+    const fo_expr* parseCall = static_cast<const fo_expr*>(input);
+    JSONParseIterator* parse = dynamic_cast<JSONParseIterator*>(argv[0].getp());
+    LiteralParseOptions options;
+
+    if (parse && options.read(parseCall->get_arg(1)) && options.streaming())
     {
-      std::vector<PlanIter_t>& children = parse->getChildren();
+      std::vector<PlanIter_t> source(1, parse->getChildren()[0]);
 
       QueryLoc relativeLoc = QueryLoc::null;
-      if (SingletonIterator* source =
-            dynamic_cast<SingletonIterator*>(children[0].getp()))
+      if (SingletonIterator* literal =
+            dynamic_cast<SingletonIterator*>(source[0].getp()))
       {
-        if (source->getValue()->isAtomic())
-          relativeLoc = source->getLocation();
+        if (literal->getValue()->isAtomic())
+          relativeLoc = literal->getLocation();
       }
 
       // Every call of file:read-text makes its own stream. In a sequential
       // query an expression can write to the file between two reads of it.
       bool const streamIsPrivate =
-        !ccb->isSequential() &&
-        is_read_text_utf8(static_cast<const fo_expr*>(input)->get_arg(0));
+        !ccb->isSequential() && is_read_text_utf8(parseCall->get_arg(0));
 
       return new JSONParseMembersIterator(
-        sctx, loc, children, relativeLoc, streamIsPrivate);
+        sctx, parse->getLocation(), source, relativeLoc, streamIsPrivate,
+        options.allowMultiple());
     }
   }
 
