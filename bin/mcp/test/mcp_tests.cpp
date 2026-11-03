@@ -990,6 +990,10 @@ void test_hints_string_escape( Fixture const &f ) {
                "a literal over two lines without a backslash: no hint" );
   check_error( jq, "\"a\\qb\" \"a", "XPST0003", "\\\\",
                "the first string of two has the escape: hint" );
+  check_error( jq, "\"\\\\\" \"", "XPST0003", "",
+               "a valid escape, then an unterminated string: no hint" );
+  check_error( jq, "\"a\\\"b\" \"a", "XPST0003", "",
+               "the same text before a valid escape: no hint" );
   std::cout << "a literal over two lines: "
             << call_tool( jq, "run_query", Json::object( {
                  { "query", "\"abc\ndef\\qghi\"" } } ) ).dump() << std::endl;
@@ -1030,10 +1034,10 @@ void test_hints_dash_forms( Fixture const &f ) {
                "a name ending in -- that is unknown: hint" );
   check_error( server, "$no--(1)", "XPST0008", "$no - -",
                "a name ending in --: the form that parses" );
-  check_error( server, "let $no := 3 return $no--(1)", "XPST0008", "$no - -",
+  check_error( server, "let $x := 3 return $x--(1)", "XPST0008", "$x - -",
                "a name ending in -- with the variable in scope" );
-  check_result( server, "let $no := 3 return $no - -(1)", "4",
-                "the hint's $no - - works" );
+  check_result( server, "let $x := 3 return $x - -(1)", "4",
+                "the hint's $x - - works" );
   check_error( server, "$-(1)", "XPST0003", "",
                "no hint when no name precedes the -" );
   check_error( server, "$no-such", "XPST0008", "",
@@ -1884,7 +1888,7 @@ void test_hints_document_value( Fixture const &f ) {
 
   std::string const query( dir_import +
     "let $r := dir:open($dir:root, \"k.json\")(\"content\")\n"
-    "let $c := [ { \"a\" : 1 } ]\n"
+    "let $c := dir:open($dir:root, \"a.json\")(\"content\")\n"
     "return $c($r(\"k\"))" );
   std::string const hint( hint_of( jq, query ) );
   check( !hint.empty() && !contains( hint, "IGNORE" ) && !contains( hint, "xxx" ),

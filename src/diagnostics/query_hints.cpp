@@ -16,6 +16,7 @@
 #include "query_hints.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cstring>
 
 namespace zorba {
@@ -188,6 +189,23 @@ bool dot_after_expression( std::string const &query, std::size_t offset ) {
   return true;
 }
 
+// Whether the "\" at this offset does not start an escape of the JSONiq scanner.
+bool is_invalid_escape( std::string const &query, std::size_t backslash ) {
+  std::size_t const next = backslash + 1;
+  if ( next == query.size() )
+    return true;
+  if ( std::strchr( "\"'\\/bfnrt", query[ next ] ) && query[ next ] )
+    return false;
+  if ( query[ next ] != 'u' )
+    return true;
+  if ( query.size() - next < 5 )
+    return true;
+  for ( std::size_t i = next + 1; i <= next + 4; ++i )
+    if ( !std::isxdigit( static_cast<unsigned char>( query[ i ] ) ) )
+      return true;
+  return false;
+}
+
 // The JSONiq scanner ends an unterminated string right before a "\" that does
 // not start an escape, or at the end of the query. The message of the parser
 // has the text it read. The location is not the start of that text when the
@@ -199,11 +217,13 @@ std::string invalid_escape( std::string const &query,
                                           message.size() - prefix_size - 1 ) );
   if ( text.empty() || text[0] != '"' )
     return std::string();                 // single quotes are the problem
-  if ( query.size() >= text.size() &&
-       query.compare( query.size() - text.size(), text.size(), text ) == 0 )
+  std::string const stop( text + '\\' );
+  std::size_t at = query.find( stop );
+  while ( at != std::string::npos &&
+          !is_invalid_escape( query, at + text.size() ) )
+    at = query.find( stop, at + 1 );
+  if ( at == std::string::npos )
     return std::string();                 // it ran to the end of the query
-  if ( query.find( text + '\\' ) == std::string::npos )
-    return std::string();
   return "In a JSONiq string \"\\\" starts an escape (\\\" \\' \\\\ \\/ \\b "
     "\\f \\n \\r \\t \\uXXXX), and this string has one that is not valid. For "
     "a backslash write \\\\.";
