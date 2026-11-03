@@ -799,6 +799,8 @@ private:
 
   bool array( std::string &path, std::size_t depth ) {
     ++theP;
+    if ( depth == 0 && theNotFirst == 0 )
+      theTopArray = true;
     skip_space();
     if ( theP == theEnd )
       return cut();
@@ -839,7 +841,6 @@ private:
       path.resize( base );
     }
     if ( depth == 0 ) {
-      theTopArray = true;
       theTopLength = length;
     } else if ( theNotFirst == 0 && theArrays.size() < max_arrays &&
                 path.size() <= max_name_bytes &&
