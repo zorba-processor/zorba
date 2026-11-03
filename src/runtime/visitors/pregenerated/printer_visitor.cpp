@@ -1705,6 +1705,20 @@ void PrinterVisitor::endVisit( const JSONParseIterator& ) {
 // </JSONParseIterator>
 
 
+// <JSONParseMembersIterator>
+void PrinterVisitor::beginVisit( const JSONParseMembersIterator& a) {
+  thePrinter.startBeginVisit("JSONParseMembersIterator", ++theId);
+  printCommons( &a, theId );
+  thePrinter.endBeginVisit( theId );
+}
+
+void PrinterVisitor::endVisit( const JSONParseMembersIterator& ) {
+  thePrinter.startEndVisit();
+  thePrinter.endEndVisit();
+}
+// </JSONParseMembersIterator>
+
+
 // <MultiObjectKeysIterator>
 void PrinterVisitor::beginVisit( const MultiObjectKeysIterator& a) {
   thePrinter.startBeginVisit("MultiObjectKeysIterator", ++theId);

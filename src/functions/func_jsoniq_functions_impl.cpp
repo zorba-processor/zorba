@@ -23,6 +23,8 @@
 
 #include "compiler/parser/query_loc.h"
 #include "compiler/expression/expr_consts.h"
+#include "compiler/api/compilercb.h"
+#include "compiler/expression/expr.h"
 #include "compiler/expression/fo_expr.h"
 
 #include "types/typeops.h"
@@ -130,13 +132,70 @@ xqtref_t fn_jsoniq_trim::getReturnType(const fo_expr* caller) const
 /*******************************************************************************
 
 ********************************************************************************/
+static bool is_read_text_utf8(const expr* e)
+{
+  while (e->get_expr_kind() == promote_expr_kind ||
+         e->get_expr_kind() == treat_expr_kind)
+    e = static_cast<const cast_base_expr*>(e)->get_input();
+
+  if (e->get_expr_kind() != fo_expr_kind)
+    return false;
+
+  const fo_expr* call = static_cast<const fo_expr*>(e);
+  const store::Item* name = call->get_func()->getName();
+
+  if (name->getNamespace() != "http://expath.org/ns/file" ||
+      name->getLocalName() != "read-text")
+    return false;
+
+  if (call->num_args() == 1)
+    return true;
+
+  const expr* encoding = call->get_arg(1);
+  return encoding->get_expr_kind() == const_expr_kind &&
+         static_cast<const const_expr*>(encoding)->get_val()->getStringValue() ==
+           "UTF-8";
+}
+
+
 PlanIter_t fn_jsoniq_members::codegen(
-  CompilerCB*,
+  CompilerCB* ccb,
   static_context* sctx,
   const QueryLoc& loc,
   std::vector<PlanIter_t>& argv,
   expr& arg) const
 {
+  // Unboxing a parse directly: no one else can see the top-level arrays, so
+  // they need not be built. See JSONParseMembersIterator.
+  const expr* input = static_cast<const fo_expr&>(arg).get_arg(0);
+
+  if (input->get_expr_kind() == fo_expr_kind &&
+      static_cast<const fo_expr*>(input)->get_func()->getKind() ==
+        FunctionConsts::FN_JSONIQ_PARSE_JSON_1)
+  {
+    if (JSONParseIterator* parse = dynamic_cast<JSONParseIterator*>(argv[0].getp()))
+    {
+      std::vector<PlanIter_t>& children = parse->getChildren();
+
+      QueryLoc relativeLoc = QueryLoc::null;
+      if (SingletonIterator* source =
+            dynamic_cast<SingletonIterator*>(children[0].getp()))
+      {
+        if (source->getValue()->isAtomic())
+          relativeLoc = source->getLocation();
+      }
+
+      // Every call of file:read-text makes its own stream. In a sequential
+      // query an expression can write to the file between two reads of it.
+      bool const streamIsPrivate =
+        !ccb->isSequential() &&
+        is_read_text_utf8(static_cast<const fo_expr*>(input)->get_arg(0));
+
+      return new JSONParseMembersIterator(
+        sctx, loc, children, relativeLoc, streamIsPrivate);
+    }
+  }
+
   if (arg.get_return_type()->max_card() <= 1)
     return new SingleArrayMembersIterator(sctx, loc, argv[0]);
 

@@ -71,6 +71,25 @@ public:
   bool next( store::Item_t *result );
 
   /**
+   * Makes next() return the members of each top-level array, one at a time and
+   * without building the array, and then a null Item for the end of that array.
+   * A top-level array counts for the nesting limit as it does when it is built.
+   * Top-level objects are returned as usual: in_top_level_array() tells them
+   * from members.
+   */
+  void unbox_top_level_arrays() {
+    unbox_top_level_arrays_ = true;
+  }
+
+  /**
+   * Gets whether the Item that next() returned is a member of a top-level array
+   * (see unbox_top_level_arrays()).
+   */
+  bool in_top_level_array() const {
+    return in_top_level_array_;
+  }
+
+  /**
    * Sets the file location.
    *
    * @param file The source file name.
@@ -127,6 +146,8 @@ private:
   parser parser_;
   bool const strip_top_level_array_;
   bool stripped_top_level_array_;
+  bool unbox_top_level_arrays_;
+  bool in_top_level_array_;
   uint32_t depth_;                      // arrays and objects on stack_
 
   //

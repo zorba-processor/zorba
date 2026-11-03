@@ -86,6 +86,8 @@ loader::loader( istream &is, bool allow_multiple, bool strip_top_level_array ) :
   parser_( is, allow_multiple ),
   strip_top_level_array_( strip_top_level_array ),
   stripped_top_level_array_( false ),
+  unbox_top_level_arrays_( false ),
+  in_top_level_array_( false ),
   depth_( 0 )
 {
 }
@@ -132,6 +134,7 @@ void loader::clear() {
   clear_stack();
   keys_.clear();
   stripped_top_level_array_ = false;
+  in_top_level_array_ = false;
   depth_ = 0;
 }
 
@@ -173,6 +176,11 @@ bool loader::next( store::Item_t *result ) {
     while ( parser_.next( &t ) ) {
       switch( t.get_type() ) {
         case '[':
+          if ( unbox_top_level_arrays_ && stack_.empty() ) {
+            check_depth( t );
+            in_top_level_array_ = true;
+            continue;
+          }
           if ( strip_top_level_array_ && !stripped_top_level_array_ )
             stripped_top_level_array_ = true;
           else {
@@ -185,6 +193,12 @@ bool loader::next( store::Item_t *result ) {
           push( stack_element::object_type );
           continue;
         case ']':
+          if ( unbox_top_level_arrays_ && stack_.empty() ) {
+            --depth_;
+            in_top_level_array_ = false;
+            *result = nullptr;
+            return true;
+          }
           if ( stack_.empty() && strip_top_level_array_ ) {
             stripped_top_level_array_ = false;
             continue;

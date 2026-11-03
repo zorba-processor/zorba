@@ -200,6 +200,34 @@
 
 <!--
 /*******************************************************************************
+  fn-jsoniq:members(fn-jsoniq:parse-json($source)): the members of the top-level
+  arrays one at a time. No function of its own: fn_jsoniq_members::codegen
+  creates it.
+********************************************************************************/
+-->
+<zorba:iterator name="JSONParseMembersIterator" arity="nary" generateCodegen="false">
+
+  <zorba:state generateInit="false" generateReset="false" generateDestructor="false">
+    <zorba:member type="store::Item_t" name="theInput" brief="holds the stream"/>
+    <zorba:member type="std::istream*" name="theStream" brief=""/>
+    <zorba:member type="std::istream*" name="theOwnedStream" brief=""/>
+    <zorba:member type="json::loader*" name="theScanner" brief="checks a top-level value"/>
+    <zorba:member type="json::loader*" name="theLoader" brief="returns its members"/>
+  </zorba:state>
+
+  <zorba:constructor>
+    <zorba:parameter type="QueryLoc" name="aRelativeLocation" />
+    <zorba:parameter type="bool" name="aStreamIsPrivate" />
+  </zorba:constructor>
+
+  <zorba:member type="QueryLoc" name="theRelativeLocation" />
+  <zorba:member type="bool" name="theStreamIsPrivate" brief="the stream of the input has no other reader"/>
+
+</zorba:iterator>
+
+
+<!--
+/*******************************************************************************
 ********************************************************************************/
 -->
 <zorba:iterator name="MultiObjectKeysIterator" arity="unary">

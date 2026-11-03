@@ -5,6 +5,7 @@ jsoniq version "1.0";
  : One second separates consecutive records, ten minutes every 100 records. :)
 module namespace b = "http://zorba.io/bench/windows";
 
+import module namespace dir = "http://zorba.io/modules/directory";
 import module namespace file = "http://expath.org/ns/file";
 declare namespace an = "http://zorba.io/annotations";
 
@@ -27,7 +28,9 @@ declare function b:line($i as integer) as string
 (: gen:N     records made while the query runs; nothing else holds them.
  : lines:F   a JSON Lines file, parsed line by line (file:read-text-lines).
  : whole:F   a JSON Lines file, read into one string, then parse-json.
- : array:F   one JSON array in a file, parse-json, then []. :)
+ : array:F   one JSON array in a file, parse-json, then [].
+ : string:F  the same, with the text made into an ordinary string first.
+ : dir:D:F   one JSON array in file F under directory D, dir:open, then []. :)
 declare %an:nondeterministic function b:source($source as string) as item*
 {
   let $kind := substring-before($source, ":")
@@ -38,6 +41,8 @@ declare %an:nondeterministic function b:source($source as string) as item*
     case "lines" return file:read-text-lines($arg) ! parse-json($$)
     case "whole" return parse-json(file:read-text($arg))
     case "array" return parse-json(file:read-text($arg))[]
+    case "string" return parse-json(concat(file:read-text($arg), ""))[]
+    case "dir" return dir:open(substring-before($arg, ":"), substring-after($arg, ":")).content[]
     default return error()
 };
 
