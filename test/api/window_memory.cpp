@@ -19,9 +19,11 @@
 // queries with few open windows must stay far below that. The last query does
 // need its input, and shows that the measure sees it.
 
+#include <algorithm>
 #include <chrono>
 #include <exception>
 #include <iostream>
+#include <sstream>
 #include <string>
 
 #if defined(__unix__) || defined(__APPLE__)
@@ -241,6 +243,32 @@ void check_cost(Zorba* z)
   }
 }
 
+// fn:trace in an end condition is an observable call for each window: the
+// condition is not shared between the 20 windows, so the 20th item is traced 20 times.
+void check_trace(Zorba* z)
+{
+  std::ostringstream trace;
+  StaticContext_t sctx = z->createStaticContext();
+  sctx->setTraceStream(trace);
+  XQuery_t q = z->compileQuery(
+    "count(for sliding window $w in 1 to 20\n"
+    "        start when true\n"
+    "        only end $e when trace($e, 't') lt 0\n"
+    "      return 1)", sctx);
+  Iterator_t it = q->iterator();
+  it->open();
+  Item item;
+  while (it->next(item))
+    ;
+  it->close();
+
+  std::string const text = trace.str();
+  std::size_t const lines = std::count(text.begin(), text.end(), '\n');
+  std::cout << "trace in the end condition: " << lines << " lines" << std::endl;
+  if (lines != 210)
+    fail("trace in the end condition: expected 210 lines, got " + std::to_string(lines) + "\n" + text);
+}
+
 } // anonymous namespace
 
 
@@ -252,6 +280,7 @@ window_memory(int argc, char* argv[])
 
   try
   {
+    check_trace(lZorba);
     check_cost(lZorba);
     check_memory(lZorba);
   }
