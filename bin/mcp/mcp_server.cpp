@@ -28,7 +28,7 @@
 #include <streambuf>
 #include <utility>
 
-#include <libxml/dict.h>
+#include <libxml/parser.h>
 
 #include <zorba/user_exception.h>
 #include <zorba/diagnostic.h>

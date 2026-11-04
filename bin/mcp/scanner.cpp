@@ -40,7 +40,6 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include <libxml/dict.h>
 #include <libxml/parser.h>
 
 #include "scan_preview.h"

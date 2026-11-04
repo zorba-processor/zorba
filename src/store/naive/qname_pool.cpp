@@ -505,9 +505,6 @@ retry:
     normVictim->removeReference();
   }
 }
-
-
-/*******************************************************************************
   Return a qname slot for a new qname to be stored in. If the cache free list
   is not empty, we use the 1st slot from tha list; the qname currently in that
 /*******************************************************************************
@@ -530,6 +527,9 @@ void QNamePool::undoCacheInsert(QNameItem* qn, QNameItem** normVictim)
 }
 
 
+/*******************************************************************************
+  Return a qname slot for a new qname to be stored in. If the cache free list
+  is not empty, we use the 1st slot from tha list; the qname currently in that
   slot (if any) is removed from the pool. If the cache free list is empty a new
   QNameItem is allocated from the heap.
 ********************************************************************************/
