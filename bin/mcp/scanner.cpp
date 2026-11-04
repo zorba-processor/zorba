@@ -857,7 +857,7 @@ struct Scanner::Shared {
   void sampler() {
     // See Server::Server. The scan of a root starts with the server, before any
     // query can have taken the memory.
-    xmlFreeDict( xmlDictCreate() );
+    xmlDictFree( xmlDictCreate() );
     for ( ;; ) {
       try {
         sample();

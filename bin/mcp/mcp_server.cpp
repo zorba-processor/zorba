@@ -340,7 +340,7 @@ Server::Server( Zorba *zorba, ServerConfig config, std::ostream &log ) :
             theConfig.cache_max_files, &thePolicy, base_uri_of( theConfig.root ) ) {
   // libxml2 ends the process if it cannot allocate its state for a thread, the
   // first time the thread uses it: this thread does so now, before any query.
-  xmlFreeDict( xmlDictCreate() );
+  xmlDictFree( xmlDictCreate() );
   directory_config::apply_policy( thePolicy, theConfig.root );
   if ( theConfig.timeout.count() > 0 )
     thePolicy.setTimeout( theConfig.timeout );
