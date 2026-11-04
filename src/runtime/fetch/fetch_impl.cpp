@@ -88,7 +88,7 @@ getFetchResource(
       if ( !lErrorMessage.empty() )
         throw XQUERY_EXCEPTION(
           zuri::URI_UNRESOLVED_OR_NOSTREAM,
-          ERROR_PARAMS( aUri->getStringValue(), lErrorMessage ),
+          ERROR_PARAMS( aUri->getStringValue(), ERROR_TEXT( lErrorMessage ) ),
           ERROR_LOC( aLoc )
         );
       throw XQUERY_EXCEPTION(
@@ -113,7 +113,7 @@ getFetchResource(
       throw;
     throw XQUERY_EXCEPTION(
       zuri::URI_UNRESOLVED_OR_NOSTREAM,
-      ERROR_PARAMS( aUri->getStringValue(), e.what() ),
+      ERROR_PARAMS( aUri->getStringValue(), ERROR_TEXT( e.what() ) ),
       ERROR_LOC( aLoc )
     );
   }

@@ -127,7 +127,7 @@ char* XQueryXConvertor::XQueryX2XQuery( const char *xqueryx, const SecurityPolic
     throw ZORBA_EXCEPTION(zerr::ZXQP0029_URI_ACCESS_DENIED,
                           ERROR_PARAMS(security.deniedURI()));
   if(!doc)
-    throw ZORBA_EXCEPTION(zerr::ZXQP0031_MALFORMED_XQUERYX_INPUT, ERROR_PARAMS(errstr));
+    throw ZORBA_EXCEPTION(zerr::ZXQP0031_MALFORMED_XQUERYX_INPUT, ERROR_PARAMS(ERROR_TEXT( errstr )));
 
   // The stylesheet is built in and needs no I/O: forbid all of it.
   xsltSecurityPrefsPtr prefs = xsltNewSecurityPrefs();
@@ -138,7 +138,7 @@ char* XQueryXConvertor::XQueryX2XQuery( const char *xqueryx, const SecurityPolic
     if (tctxt) xsltFreeTransformContext(tctxt);
     if (prefs) xsltFreeSecurityPrefs(prefs);
     xmlFreeDoc(doc);
-    throw ZORBA_EXCEPTION( zerr::ZXQP0032_ERROR_TRANSFORMING_XQUERYX_TO_XQUERY, ERROR_PARAMS(errstr) );
+    throw ZORBA_EXCEPTION( zerr::ZXQP0032_ERROR_TRANSFORMING_XQUERYX_TO_XQUERY, ERROR_PARAMS(ERROR_TEXT( errstr )) );
   }
   xsltSetSecurityPrefs(prefs, XSLT_SECPREF_READ_FILE, xsltSecurityForbid);
   xsltSetSecurityPrefs(prefs, XSLT_SECPREF_WRITE_FILE, xsltSecurityForbid);
@@ -155,7 +155,7 @@ char* XQueryXConvertor::XQueryX2XQuery( const char *xqueryx, const SecurityPolic
   if(!res)
   {
     xmlFreeDoc(doc);
-    throw ZORBA_EXCEPTION( zerr::ZXQP0032_ERROR_TRANSFORMING_XQUERYX_TO_XQUERY, ERROR_PARAMS(errstr) );
+    throw ZORBA_EXCEPTION( zerr::ZXQP0032_ERROR_TRANSFORMING_XQUERYX_TO_XQUERY, ERROR_PARAMS(ERROR_TEXT( errstr )) );
   }
 /*  if ((ctxt->state == XSLT_STATE_ERROR) || (ctxt->state == XSLT_STATE_STOPPED))
   {

@@ -372,7 +372,7 @@ bool IsThesaurusLangSupportedIterator::nextImpl( store::Item_t &result,
     );
     if ( !rsrc.get() )
       throw XQUERY_EXCEPTION(
-        err::FTST0018, ERROR_PARAMS( uri, error_msg ), ERROR_LOC( loc )
+        err::FTST0018, ERROR_PARAMS( uri, ERROR_TEXT( error_msg ) ), ERROR_LOC( loc )
       );
 #if 0
     if ( !error_msg.empty() )
@@ -549,7 +549,7 @@ bool ThesaurusLookupIterator::nextImpl( store::Item_t &result,
   );
   if ( !rsrc.get() )
     throw XQUERY_EXCEPTION(
-      err::FTST0018, ERROR_PARAMS( uri, error_msg ), ERROR_LOC( loc )
+      err::FTST0018, ERROR_PARAMS( uri, ERROR_TEXT( error_msg ) ), ERROR_LOC( loc )
     );
 
   provider = dynamic_cast<internal::ThesaurusProvider const*>( rsrc.get() );

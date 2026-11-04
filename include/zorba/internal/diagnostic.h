@@ -18,6 +18,7 @@
 #define ZORBA_INTERNAL_DIAGNOSTIC_H
 
 // standard
+#include <cstddef>
 #include <string>
 #include <vector>
 
@@ -277,6 +278,19 @@ public:
   typedef params_type::size_type size_type;
 
   /**
+   * The text of an error, as opposed to the data that it quotes: the message
+   * of a parser, of another diagnostic or of a library, or the name of a type.
+   * See the bounds in add_param().
+   */
+  class text {
+  public:
+    template<typename T>
+    explicit text( T const &t ) : value( ztd::to_string( t ) ) { }
+
+    value_type value;
+  };
+
+  /**
    * A empty instance for convenience.
    */
   static parameters const empty;
@@ -295,7 +309,31 @@ public:
    */
   template<typename T>
   parameters& operator,( T const &t ) {
-    add_param( ztd::to_string( t ) );
+    add_param( ztd::to_string( t ), false );
+    return *this;
+  }
+
+  /**
+   * Adds a string literal, as the text of an error, as the next parameter.
+   *
+   * @tparam N The size of the literal.
+   * @param s The literal.
+   * @return Returns \c *this.
+   */
+  template<std::size_t N>
+  parameters& operator,( char const (&s)[N] ) {
+    add_param( ztd::to_string( s ), true );
+    return *this;
+  }
+
+  /**
+   * Adds the text of an error as the next parameter.
+   *
+   * @param t The text.
+   * @return Returns \c *this.
+   */
+  parameters& operator,( text const &t ) {
+    add_param( t.value, true );
     return *this;
   }
 
@@ -366,7 +404,7 @@ public:
 private:
   params_type params_;
 
-  void add_param( value_type const& );
+  void add_param( value_type const&, bool is_text );
   value_type lookup_param( size_type i ) const;
   bool then_else( bool, value_type const&, value_type::size_type*,
                   value_type* ) const;

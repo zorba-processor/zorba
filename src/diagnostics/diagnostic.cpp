@@ -158,12 +158,99 @@ parameters const parameters::empty;
   case '1': case '2': case '3': case '4': case '5': \
   case '6': case '7': case '8': case '9'
 
+namespace {
+
+//
+// The bounds of a parameter.  Data, that is, a parameter of any other kind than
+// the two below, is quoted whole up to data_bound bytes.  Past it, it becomes
+// its head, an ellipsis, its tail and its size: at most data_ends + 3 +
+// data_ends + 30 bytes.
+//
+// A parameter that reads as the name of a resource, and the text of an error
+// (see parameters::text and string literals), stay whole up to long_bound, the
+// size of a path on Linux.  Past it, a name is taken for data, and text keeps
+// long_ends bytes at each end.
+//
+parameters::size_type const data_bound = 100;
+parameters::size_type const data_ends = 40;
+parameters::size_type const long_bound = 4096;
+parameters::size_type const long_ends = 2000;
+
+inline bool is_utf8_continuation( char c ) {
+  return (static_cast<unsigned char>( c ) & 0xC0) == 0x80;
+}
+
+/**
+ * Replaces the middle of a string with an ellipsis and appends its size.  The
+ * cuts fall between UTF-8 characters.
+ *
+ * @param s The string.  It must be longer than twice \a ends.
+ * @param ends The number of bytes to keep at each end, at most.
+ */
+void shorten( parameters::value_type *s, parameters::size_type ends ) {
+  parameters::size_type const size = s->size();
+  parameters::size_type head = ends, tail = size - ends;
+  // A character has 3 continuation bytes at most: past that, it's not UTF-8.
+  for ( int i = 0; i < 3 && is_utf8_continuation( (*s)[ head ] ); ++i )
+    --head;
+  for ( int i = 0; i < 3 && is_utf8_continuation( (*s)[ tail ] ); ++i )
+    ++tail;
+  s->replace( head, tail - head, "\xE2\x80\xA6" );
+  *s += " (" + std::to_string( size ) + " bytes)";
+}
+
+/**
+ * Checks whether a string reads as a URI, a path or a QName: "{uri}local", or a
+ * scheme or a prefix before ':', or a '/' or a '\'.  A path that starts with
+ * '/' may have spaces.
+ */
+bool reads_as_name( parameters::value_type const &s ) {
+  bool has_space = false;
+  for ( char const c : s ) {
+    unsigned char const u = static_cast<unsigned char>( c );
+    if ( u < 0x20 || u == 0x7F || c == '"' || c == '<' || c == '>' )
+      return false;
+    has_space = has_space || c == ' ';
+  }
+  if ( s[0] == '/' )
+    return true;
+  if ( has_space )
+    return false;
+  if ( s[0] == '{' || s.find_first_of( "/\\" ) != parameters::value_type::npos )
+    return true;
+  if ( !ascii::is_alpha( s[0] ) )
+    return false;
+  for ( char const c : s ) {
+    if ( c == ':' )
+      return true;
+    if ( !ascii::is_alnum( c ) && c != '+' && c != '-' && c != '.' && c != '_' )
+      return false;
+  }
+  return false;
+}
+
+} // anonymous namespace
+
 parameters::parameters() {
 }
 
-void parameters::add_param( value_type const &s ) {
+void parameters::add_param( value_type const &s, bool is_text ) {
   params_.push_back( s );
   value_type &p = params_.back();
+  //
+  // Bound the value first, so that the cuts can't fall inside an escape below.
+  // A dictionary key is expanded later, by lookup_param(), so it reaches here
+  // as a key: it's not data.
+  //
+  if ( p.size() > data_bound &&
+       !(p[0] == ZED_PREFIX[0] && zorba::diagnostic::dict::find( p.c_str() )) ) {
+    if ( is_text ) {
+      if ( p.size() > long_bound )
+        shorten( &p, long_ends );
+    } else if ( p.size() > long_bound || !reads_as_name( p ) ) {
+      shorten( &p, data_ends );
+    }
+  }
   //
   // A parameter's value is inserted literally: substitute() makes one pass
   // per parameter over the whole string, so a value inserted by an earlier

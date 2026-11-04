@@ -696,7 +696,7 @@ bool DynamicContextImpl::setContextSize(const Item& inValue)
       xqtref_t type = GENV_TYPESYSTEM.create_value_type(value);
 
       throw ZORBA_EXCEPTION(zerr::ZAPI0024_NON_INTEGER_CONTEXT_SIZE_VALUE,
-      ERROR_PARAMS(type->toSchemaString()));
+      ERROR_PARAMS(ERROR_TEXT( type->toSchemaString() )));
     }
   }
   catch (ZorbaException const& e)
@@ -741,7 +741,7 @@ bool DynamicContextImpl::setContextPosition(const Item& inValue)
       xqtref_t type = GENV_TYPESYSTEM.create_value_type(value);
 
       throw ZORBA_EXCEPTION(zerr::ZAPI0026_NON_INTEGER_CONTEXT_POSITION_VALUE,
-      ERROR_PARAMS(type->toSchemaString()));
+      ERROR_PARAMS(ERROR_TEXT( type->toSchemaString() )));
     }
   }
   catch (ZorbaException const& e)
@@ -840,9 +840,9 @@ bool DynamicContextImpl::setCurrentDateTime(const Item& aDateTimeItem)
       TypeManager* tm = theStaticContext->get_typemanager();
       xqtref_t type = tm->create_value_type(lItem);
       RAISE_ERROR_NO_LOC(zerr::ZAPI0014_INVALID_ARGUMENT,
-      ERROR_PARAMS(type->toSchemaString(),
+      ERROR_PARAMS(ERROR_TEXT( type->toSchemaString() ),
                    ZED(TypeIsNotSubtype),
-                   GENV_TYPESYSTEM.DATETIME_TYPE_ONE->toSchemaString()));
+                   ERROR_TEXT( GENV_TYPESYSTEM.DATETIME_TYPE_ONE->toSchemaString() )));
     }
 
     theCtx->set_current_date_time(lItem);

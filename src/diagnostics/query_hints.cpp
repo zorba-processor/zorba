@@ -401,8 +401,11 @@ std::string undeclared_prefix( std::string const &prefix ) {
 
 namespace {
 
-// A selector that reads the same between double quotes once decoded.
+// A selector short enough to repeat in a hint that reads the same between
+// double quotes once decoded.
 bool reads_as_literal( std::string const &key ) {
+  if ( key.size() > 100 )
+    return false;
   for ( char const c : key ) {
     unsigned char const u = static_cast<unsigned char>( c );
     if ( c == '"' || c == '\\' || u < 0x20 || u == 0x7F )

@@ -443,6 +443,30 @@ static void test_bound_literals() {
   ASSERT_TRUE( s == literal );
 }
 
+// The text of an error stays whole up to the long bound.
+static void test_bound_text() {
+  string const at( 4096, 't' ), past( 4097, 't' );
+  {
+    string s( "$1" );
+    parameters const p( MAKE_PARAMS( parameters::text( at ) ) );
+    p.substitute( &s );
+    ASSERT_TRUE( s == at );
+  }
+  {
+    string s( "$1" );
+    parameters const p( MAKE_PARAMS( parameters::text( past ) ) );
+    p.substitute( &s );
+    ASSERT_TRUE( s == short_form( past, 2000, 2000 ) );
+  }
+  { // with what escapes mean, and from a character string
+    string s( "$1" );
+    char const *const message = "a message: $2 \\ ${";
+    parameters const p( MAKE_PARAMS( parameters::text( message ) ) );
+    p.substitute( &s );
+    ASSERT_TRUE( s == message );
+  }
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 
 namespace zorba {
@@ -461,6 +485,7 @@ int test_parameters( int, char*[] ) {
   test_bound_keys();
   test_bound_names();
   test_bound_literals();
+  test_bound_text();
 
   cout << failures << " test(s) failed\n";
   return failures ? 1 : 0;

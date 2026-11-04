@@ -93,7 +93,7 @@ ResolveUriIterator::nextImpl(store::Item_t& result, PlanState& planState) const
       catch (ZorbaException const& e) 
       {
         throw XQUERY_EXCEPTION(
-          err::FORG0002, ERROR_PARAMS( strBase, e.what() ), ERROR_LOC( loc )
+          err::FORG0002, ERROR_PARAMS( strBase, ERROR_TEXT( e.what() ) ), ERROR_LOC( loc )
         );
       }
 
@@ -105,7 +105,7 @@ ResolveUriIterator::nextImpl(store::Item_t& result, PlanState& planState) const
       catch (ZorbaException const& e) 
       {
         throw XQUERY_EXCEPTION(
-          err::FORG0002, ERROR_PARAMS( strRelative, e.what() ), ERROR_LOC( loc )
+          err::FORG0002, ERROR_PARAMS( strRelative, ERROR_TEXT( e.what() ) ), ERROR_LOC( loc )
         );
       }
     }

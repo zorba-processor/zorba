@@ -40,7 +40,7 @@ void checkNodeType(
   if (!TypeOps::is_subtype(tm, node, *(collectionDecl->getNodeType()), loc))
   {
     RAISE_ERROR(zerr::ZDTY0001_COLLECTION_INVALID_NODE_TYPE, loc,
-    ERROR_PARAMS(tm->create_value_type(node)->toSchemaString(),
+    ERROR_PARAMS(ERROR_TEXT( tm->create_value_type(node)->toSchemaString() ),
                  collectionDecl->getName()->getStringValue()));
   }
 }

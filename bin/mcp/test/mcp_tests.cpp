@@ -3384,13 +3384,14 @@ void test_error_query_line( Fixture const &f ) {
   check( is_tool_error( r ) && loc, "a long line: the location",
          r.dump().substr( 0, 300 ) );
   std::string const text( field( *loc, "text" ) );
-  std::cout << "the failing line: " << text << std::endl;
+  std::string const shown( text.substr( 0, 800 ) );
+  std::cout << "the failing line: " << shown << std::endl;
   check( text.size() < 1000, "a long line: a short text",
          std::to_string( text.size() ) );
-  check( contains( text, "div 0" ), "a long line: the place of the error", text );
+  check( contains( text, "div 0" ), "a long line: the place of the error", shown );
   check( contains( text, "[zorba-mcp: line of " +
                    std::to_string( query.size() ) + " bytes]" ),
-         "a long line: the marker states the total", text );
+         "a long line: the marker states the total", shown );
 
   // A short line stays as it is.
   Json const short_r = call_tool( server, "run_query",
@@ -3401,22 +3402,32 @@ void test_error_query_line( Fixture const &f ) {
          "a short line is whole", short_r.dump() );
 
   // A literal selector: a long one gets the placeholder in the hint.
+  TempTree t;
+  t.write( "a.json", "[ { \"a\" : 1 } ]" );
+  ServerConfig tree_config;
+  tree_config.root = t.root;
+  tree_config.jsoniq_default = true;
+  Server tree_server( f.zorba, tree_config, std::cerr );
   std::string const selector( 5000, 's' );
-  std::string const hint( hint_of( server, "let $c := [ 1 ] return $c(\"" + selector + "\")" ) );
+  std::string const hint( hint_of( tree_server, dir_import +
+    "let $c := dir:open($dir:root, \"a.json\")(\"content\")\n"
+    "return $c(\"" + selector + "\")" ) );
   check( !contains( hint, selector.substr( 0, 200 ) ) &&
-         contains( hint, "$x()(\"key\")" ), "a long selector in the hint", hint );
+         contains( hint, "$x()(\"key\")" ), "a long selector in the hint",
+         hint.substr( 0, 300 ) );
 
-  // Any other hint: it repeats the name of a prefix here.
+  // Any other hint: this one repeats the names of two variables.
   ServerConfig xq_config;
   xq_config.root = f.tree;
   Server xq( f.zorba, xq_config, std::cerr );
-  std::string const prefix_hint(
-    hint_of( xq, std::string( 8000, 'q' ) + ":f()" ) );
-  std::cout << "the hint: " << prefix_hint.size() << " bytes" << std::endl;
-  check( prefix_hint.size() <= 4096, "a long hint is bounded",
-         std::to_string( prefix_hint.size() ) );
-  check( contains( prefix_hint, "[zorba-mcp: hint cut, " ),
-         "a long hint has the marker", prefix_hint.substr( 0, 300 ) );
+  std::string const name( 8000, 'q' );
+  std::string const long_hint( hint_of( xq, "let $" + name +
+    " := 3 let $b := 1 return $" + name + "-$b" ) );
+  std::cout << "the hint: " << long_hint.size() << " bytes" << std::endl;
+  check( long_hint.size() <= 4096, "a long hint is bounded",
+         std::to_string( long_hint.size() ) );
+  check( contains( long_hint, "[zorba-mcp: hint cut, " ),
+         "a long hint has the marker", long_hint.substr( 0, 300 ) );
 }
 
 void test_error_help( Fixture const &f ) {

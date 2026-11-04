@@ -53,7 +53,8 @@ docker run -i --rm -v "$PWD:/data:ro" ghcr.io/zorba-processor/zorba:edge zorba-m
 Under `zorba-mcp`, queries run with a restrictive policy:
 
 - They read only files under `--root`; they cannot write or reach the network.
-- Each call has a time limit (`--timeout`) and an output limit (`--max-output`).
+- Each call has a time limit (`--timeout`) and a limit on its output and on the
+  message of an error (`--max-output`).
   On Linux, the server's address space is limited too (`--max-memory`).
 
 These limits are not a substitute for isolation. Zorba is a C++ engine and has
