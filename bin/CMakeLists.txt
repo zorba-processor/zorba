@@ -114,8 +114,8 @@ ZORBA_SET_TEST_PROPERTY(bin/zorba_hint_math_function PASS_REGULAR_EXPRESSION "XP
 ZORBA_ADD_TEST(bin/zorba_hint_unknown_module zorbacmd --disable-http-resolution -f -q "${_hintdir}/hint_unknown_module.xq")
 ZORBA_SET_TEST_PROPERTY(bin/zorba_hint_unknown_module PASS_REGULAR_EXPRESSION "XQST0059.*hint: .*may hold no module")
 # The message of a failed cast shortens the value and keeps its own text. A
-# regression would write megabytes on one line, which ctest copies to the CI log
-# and which stalled the runners for hours: lines are cut before ctest reads them.
+# regression would write megabytes on one line, which ctest copies to the CI log:
+# the lines are cut before ctest reads them.
 IF (UNIX)
   SET (_ten "abcdefghijabcdefghijabcdefghijabcdefghij")
   SET (_short "FORG0001.*\"${_ten}…${_ten} \\(3000000 bytes\\)\": value of type xs:string is not castable to type xs:integer")

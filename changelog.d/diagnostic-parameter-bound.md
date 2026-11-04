@@ -11,5 +11,6 @@
 - `zorba-mcp`: `--max-output` also limits the `message` of an error: a longer
   one loses its middle and keeps its end, with a marker that states its total
   size. A hint is at most 4 KB, and `location.text` shows about 512 bytes around
-  the column of the error when the line is longer than that. A selector over 100
+  the column of the error when the line is longer than that, or the two ends of
+  a line over 65535 bytes, where a column cannot be trusted. A selector over 100
   bytes is not repeated in the hint for a string selector on an array.

@@ -3393,6 +3393,21 @@ void test_error_query_line( Fixture const &f ) {
                    std::to_string( query.size() ) + " bytes]" ),
          "a long line: the marker states the total", shown );
 
+  // A column fits: the bytes around it, without the start of the line.
+  std::string const near_pad( 20000, 'p' );
+  std::string const near_query(
+    "let $pad := \"" + near_pad + "\" return string-length($pad) div 0" );
+  Json const near_r = call_tool( server, "run_query",
+    Json::object( { { "query", near_query } } ) );
+  Json const near_e( tool_error( near_r ) );
+  Json const *const near_loc = near_e.find( "location" );
+  check( is_tool_error( near_r ) && near_loc, "a line of 20 KB: the location",
+         near_r.dump().substr( 0, 300 ) );
+  std::string const near_text( field( *near_loc, "text" ) );
+  check( near_text.size() < 1000 && contains( near_text, "div 0" ) &&
+         !contains( near_text, "let $pad" ),
+         "a line of 20 KB: around the column", near_text.substr( 0, 800 ) );
+
   // A short line stays as it is.
   Json const short_r = call_tool( server, "run_query",
     Json::object( { { "query", "1 div 0" } } ) );

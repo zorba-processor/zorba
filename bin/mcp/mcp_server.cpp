@@ -188,11 +188,24 @@ std::string cut_middle( std::string const &text, std::size_t cap,
 }
 
 // A line of a query as it goes in an error: a long one, as the bytes around the
-// column of the error and a marker with its size.
+// column of the error and a marker with its size. A column is 16 bits in the
+// engine: past that it says nothing about the place, so a longer line shows its
+// two ends.
 std::string line_excerpt( std::string const &line, unsigned long column ) {
   std::size_t const around = 256;
   if ( line.size() <= 2 * around )
     return line;
+  std::string const marker( " [zorba-mcp: line of " +
+                            std::to_string( line.size() ) + " bytes]" );
+  std::string const dots( "\xE2\x80\xA6" );
+  if ( line.size() > 65535 ) {
+    std::size_t head = around, tail = line.size() - around;
+    while ( head && is_utf8_continuation( line[ head ] ) )
+      --head;
+    while ( tail < line.size() && is_utf8_continuation( line[ tail ] ) )
+      ++tail;
+    return line.substr( 0, head ) + dots + line.substr( tail ) + marker;
+  }
   std::size_t const at =
     std::min( static_cast<std::size_t>( column ? column - 1 : 0 ), line.size() );
   std::size_t begin = at > around ? at - around : 0;
@@ -202,9 +215,8 @@ std::string line_excerpt( std::string const &line, unsigned long column ) {
   while ( end > begin && end < line.size() &&
           is_utf8_continuation( line[ end ] ) )
     --end;
-  return ( begin ? "\xE2\x80\xA6" : "" ) + line.substr( begin, end - begin ) +
-    ( end < line.size() ? "\xE2\x80\xA6" : "" ) + " [zorba-mcp: line of " +
-    std::to_string( line.size() ) + " bytes]";
+  return ( begin ? dots : std::string() ) + line.substr( begin, end - begin ) +
+    ( end < line.size() ? dots : std::string() ) + marker;
 }
 
 std::string percent_encode_path( std::string const &path ) {
