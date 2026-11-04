@@ -292,6 +292,159 @@ static void test_exceptions() {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+// The short form of a value: what the tests below expect.
+static string short_form( string const &value, size_t head, size_t tail ) {
+  return value.substr( 0, head ) + "\xE2\x80\xA6" +
+    value.substr( value.size() - tail ) + " (" +
+    to_string( value.size() ) + " bytes)";
+}
+
+static string substituted( string template_text, string const &value ) {
+  parameters const p( MAKE_PARAMS( value ) );
+  p.substitute( &template_text );
+  return template_text;
+}
+
+static bool valid_utf8( string const &s ) {
+  for ( size_t i = 0; i < s.size(); ) {
+    unsigned char const b = static_cast<unsigned char>( s[i] );
+    size_t const len =
+      b < 0x80 ? 1 : ( b & 0xE0 ) == 0xC0 ? 2 : ( b & 0xF0 ) == 0xE0 ? 3 :
+      ( b & 0xF8 ) == 0xF0 ? 4 : 0;
+    if ( !len || i + len > s.size() )
+      return false;
+    for ( size_t j = 1; j < len; ++j )
+      if ( ( static_cast<unsigned char>( s[ i + j ] ) & 0xC0 ) != 0x80 )
+        return false;
+    i += len;
+  }
+  return true;
+}
+
+static void test_bound() {
+  string const at( 100, 'a' ), past( 101, 'a' ), big( 3000000, 'a' );
+  ASSERT_TRUE( substituted( "$1", at ) == at );
+  ASSERT_TRUE( substituted( "$1", past ) == short_form( past, 40, 40 ) );
+  ASSERT_TRUE( substituted( "$1", big ) == short_form( big, 40, 40 ) );
+  ASSERT_TRUE( substituted( "$1", big ).size() < 110 );
+
+  // The three forms of a template, with a value empty, at and past the bound.
+  ASSERT_TRUE( substituted( "x${: 1}y", "" ) == "xy" );
+  ASSERT_TRUE( substituted( "x${: 1}y", at ) == "x: " + at + "y" );
+  ASSERT_TRUE( substituted( "x${: 1}y", past ) ==
+               "x: " + short_form( past, 40, 40 ) + "y" );
+  ASSERT_TRUE( substituted( "$1?{[1]}:{none}", "" ) == "none" );
+  ASSERT_TRUE( substituted( "$1?{[1]}:{none}", at ) == "[" + at + "]" );
+  ASSERT_TRUE( substituted( "$1?{[1]}:{none}", past ) ==
+               "[" + short_form( past, 40, 40 ) + "]" );
+  ASSERT_TRUE( substituted( "\"$1\": text", "" ) == "\"\": text" );
+  ASSERT_TRUE( substituted( "\"$1\": text", past ) ==
+               "\"" + short_form( past, 40, 40 ) + "\": text" );
+
+  // Several parameters: each has its own bound, and a value can't use another.
+  {
+    string s( "$1 $2 $3" );
+    string const with_mark( string( 50, 'b' ) + "$3" + string( 50, 'b' ) );
+    parameters const p( MAKE_PARAMS( past, with_mark, string( "c" ) ) );
+    p.substitute( &s );
+    ASSERT_TRUE( s == short_form( past, 40, 40 ) + " " +
+                 short_form( with_mark, 40, 40 ) + " c" );
+  }
+}
+
+// The characters of the escapes at every place around the cuts.
+static void test_bound_escapes() {
+  string const marks( "$1\\${}?:\"" );
+  for ( size_t pad = 28; pad <= 44; ++pad ) {
+    string const value( string( pad, 'p' ) + marks + string( 200, 'y' ) + marks +
+                        string( pad, 'q' ) );
+    ASSERT_TRUE( substituted( "\"$1\": text", value ) ==
+                 "\"" + short_form( value, 40, 40 ) + "\": text" );
+    ASSERT_TRUE( substituted( "x${: 1}y", value ) ==
+                 "x: " + short_form( value, 40, 40 ) + "y" );
+  }
+  string const at( string( 50, '$' ) + string( 50, '\\' ) );
+  ASSERT_TRUE( substituted( "$1", at ) == at );
+  string const past( string( 51, '$' ) + string( 50, '\\' ) );
+  ASSERT_TRUE( substituted( "$1", past ) == short_form( past, 40, 40 ) );
+}
+
+// A cut falls between characters, wherever they start.
+static void test_bound_utf8() {
+  for ( string const &c : { string( "\xC3\xA9" ), string( "\xE2\x82\xAC" ),
+                            string( "\xF0\x9F\x98\x80" ) } ) {
+    for ( size_t shift = 0; shift < 4; ++shift ) {
+      string value( shift, 'a' );
+      for ( size_t i = 0; i < 80; ++i )
+        value += c;
+      value.append( shift, 'z' );
+      string const result( substituted( "$1", value ) );
+      ASSERT_TRUE( valid_utf8( result ) );
+      size_t const cut = result.find( "\xE2\x80\xA6" );
+      ASSERT_TRUE( cut >= 37 && cut <= 40 &&
+                   value.compare( 0, cut, result, 0, cut ) == 0 );
+      string const end( " (" + to_string( value.size() ) + " bytes)" );
+      size_t const tail_size = result.size() - cut - 3 - end.size();
+      ASSERT_TRUE( tail_size >= 37 && tail_size <= 40 &&
+                   value.compare( value.size() - tail_size, tail_size,
+                                  result, cut + 3, tail_size ) == 0 );
+    }
+  }
+  // Not UTF-8 at all: still a cut, and nothing read past the ends.
+  string const bytes( 300, '\x80' );
+  ASSERT_TRUE( substituted( "$1", bytes ).find( "(300 bytes)" ) !=
+               string::npos );
+}
+
+// A dictionary key is expanded when the message is built, after the bound.
+static void test_bound_keys() {
+  string const value( 3000, 'v' );
+  string s( "$1" );
+  parameters const p( MAKE_PARAMS( string( "~FORG0001_NoCastTo_234" ), value,
+                                   string( "xs:string" ),
+                                   string( "xs:integer" ) ) );
+  p.substitute( &s );
+  ASSERT_TRUE( s == "\"" + short_form( value, 40, 40 ) +
+               "\": value of type xs:string is not castable to type xs:integer" );
+  // Data that starts like a key is data.
+  string const tilde( "~" + string( 300, 'k' ) );
+  ASSERT_TRUE( substituted( "$1", tilde ) == short_form( tilde, 40, 40 ) );
+}
+
+// What names a resource stays whole up to the size of a path.
+static void test_bound_names() {
+  string const uri( "http://example.org/" + string( 400, 'u' ) );
+  string const path( "/data/" + string( 300, 'd' ) + "/a file.json" );
+  string const relative( string( 200, 'd' ) + "/" + string( 200, 'e' ) + ".xq" );
+  string const windows( "C:\\" + string( 200, 'd' ) + "\\file.xml" );
+  string const clark( "{http://example.org/" + string( 200, 'n' ) + "}local" );
+  for ( string const &name : { uri, path, relative, windows, clark } )
+    ASSERT_TRUE( substituted( "\"$1\"", name ) == "\"" + name + "\"" );
+
+  // At the size of a path, and past it.
+  string const at( "/" + string( 4095, 'd' ) ), past( "/" + string( 4096, 'd' ) );
+  ASSERT_TRUE( substituted( "$1", at ) == at );
+  ASSERT_TRUE( substituted( "$1", past ) == short_form( past, 40, 40 ) );
+
+  // Text with a slash or a colon in it is not a name.
+  string const sentence( "see: " + string( 100, 't' ) + " and/or " +
+                         string( 100, 't' ) );
+  ASSERT_TRUE( substituted( "$1", sentence ) == short_form( sentence, 40, 40 ) );
+}
+
+// A string in the code of Zorba is the text of the error, not data.
+static void test_bound_literals() {
+  char const literal[] =
+    "a message of Zorba written in its code, longer than the bound of a value, "
+    "which belongs to the error and has nothing of the data of a query in it";
+  string s( "$1" );
+  parameters const p( MAKE_PARAMS( literal ) );
+  p.substitute( &s );
+  ASSERT_TRUE( s == literal );
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 namespace zorba {
 namespace UnitTests {
 
@@ -302,6 +455,12 @@ int test_parameters( int, char*[] ) {
   test_escapes();
   test_literal_values();
   test_exceptions();
+  test_bound();
+  test_bound_escapes();
+  test_bound_utf8();
+  test_bound_keys();
+  test_bound_names();
+  test_bound_literals();
 
   cout << failures << " test(s) failed\n";
   return failures ? 1 : 0;

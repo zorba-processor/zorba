@@ -113,6 +113,14 @@ ZORBA_SET_TEST_PROPERTY(bin/zorba_hint_math_function PASS_REGULAR_EXPRESSION "XP
 # --disable-http-resolution denies the fetch, so this test needs no network.
 ZORBA_ADD_TEST(bin/zorba_hint_unknown_module zorbacmd --disable-http-resolution -f -q "${_hintdir}/hint_unknown_module.xq")
 ZORBA_SET_TEST_PROPERTY(bin/zorba_hint_unknown_module PASS_REGULAR_EXPRESSION "XQST0059.*hint: .*may hold no module")
+# The message of a failed cast shortens the value and keeps its own text.
+SET (_ten "abcdefghijabcdefghijabcdefghijabcdefghij")
+SET (_short "FORG0001.*\"${_ten}…${_ten} \\(3000000 bytes\\)\": value of type xs:string is not castable to type xs:integer")
+FOREACH (_t cast selector)
+  ZORBA_ADD_TEST(bin/zorba_error_value_${_t} zorbacmd -f -q "${_hintdir}/error_value_${_t}.jq")
+  ZORBA_SET_TEST_PROPERTY(bin/zorba_error_value_${_t} PASS_REGULAR_EXPRESSION "${_short}")
+  ZORBA_SET_TEST_PROPERTY(bin/zorba_error_value_${_t} FAIL_REGULAR_EXPRESSION "${_ten}abcdefghij")
+ENDFOREACH (_t)
 # A failed fetch (of the loopback, which refuses it) whose URI names the capability
 # is not a denied fetch.
 ZORBA_ADD_TEST(bin/zorba_no_hint_capability_uri zorbacmd -f -q "${_hintdir}/capability_uri.xq")
@@ -472,7 +480,9 @@ IF (ZORBA_WITH_FILE_ACCESS)
              hints_dash_forms hints_context_item hints_array_key
              hints_unknown_module hints_math_function hints_string_escape
              query_primer hints_document_value primer_json_content
-             xml_namespace_message
+             xml_namespace_message error_value_bound error_value_chars
+             error_names_whole error_user_description error_message_limit
+             error_query_line error_help
              hints_nodes hints_names deep_json deep_json_binary
              entity_expansion case_paths html_edge_cases memory_limit language
              language_binary no_write read_functions native_import reflection_random
