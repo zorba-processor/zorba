@@ -96,6 +96,9 @@ Rules this code depends on:
   - ICU crashes in `RegexPattern::zap()` (SIGSEGV) if an allocation fails while it
     compiles a regular expression. The directory module uses some on each call.
   - The flex scanner calls `exit(2)` if it cannot allocate, while a query compiles.
+  - While a query compiles, the parser reads and frees parse nodes it has already
+    freed after a failure (`release_hack` in `xquery_parser.cpp`, seen with ASan and
+    TSan), so the sweeps that include compilation do not run in those builds.
   - While a query compiles, a failure can be reported as an error of the query, for
     example that a module was not found; after some, a function stayed undeclared for
     the next calls (seen on arm64, `XPST0017` on `parse-xml`).

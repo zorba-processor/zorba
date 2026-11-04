@@ -401,9 +401,6 @@ Item DocumentCache::admit( std::string const &root, std::string const &path,
   Item const record( read( root, path, &bytes ) );
   if ( record.isNull() )
     return Item();
-  // Null is the engine failing, running out of memory for one, which says nothing
-  // about the file: it is tried again.
-  *seen = refused_tag( *seen );
 
   // Kept only if it holds no error (which can come from the moment rather
   // than the file), is not a small file that expands far beyond what files of
@@ -416,7 +413,12 @@ Item DocumentCache::admit( std::string const &root, std::string const &path,
        !file_id( full, &now ) ||
        !( now == id ) || !canonical_under_root( full, &canonical_now ) ||
        canonical_now != canonical )
+  {
+    // Null above, or running out of memory here, says nothing about the file:
+    // only this marks it as not to be tried again.
+    *seen = refused_tag( *seen );
     return record;
+  }
 
   while ( theEntries.size() >= theMaxFiles ) {
     erase( theEntries.find( theLru.back() ) );
