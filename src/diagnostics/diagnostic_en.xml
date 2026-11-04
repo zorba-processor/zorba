@@ -5361,7 +5361,7 @@
     </entry>
 
     <entry key="libxml_201"> <!-- XML_NS_ERR_UNDEFINED_NAMESPACE -->
-      <value>${"5": }namespace prefix${ for "7?6"}${ on "7?7:6"} not defined</value>
+      <value>${"5": }namespace prefix${ for "6"}${ on "7"} not defined</value>
     </entry>
 
     <entry key="libxml_202"> <!-- XML_NS_ERR_QNAME -->
