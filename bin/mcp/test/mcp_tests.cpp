@@ -1687,9 +1687,6 @@ std::string sweep_call( Server &server, std::string const &request_text,
     catch ( std::exception const &e ) {
       *count = inject_disarm();
       outcome = std::string( "handle() threw " ) + e.what();
-      // RED: current_id() comes with the fix of main().
-      if ( false &&
-        outcome += ", id";
     }
   };
   if ( s.new_thread ) {
