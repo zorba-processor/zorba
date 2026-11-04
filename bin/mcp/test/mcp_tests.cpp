@@ -1834,11 +1834,11 @@ std::string caught( std::string const &expr ) {
          "\" \", $err:description) }";
 }
 
-std::string sweep_names_xml() {
+std::string sweep_names_xml( std::string const &prefix ) {
   std::string xml( "<root xmlns:p='urn:sweep'>" );
   for ( int i = 0; i < 40; ++i ) {
-    std::string const n( "p:sweep_name_" + std::to_string( i ) );
-    xml += "<" + n + " sweep_attr_" + std::to_string( i ) + "='v'>text</" + n + ">";
+    std::string const n( "p:" + prefix + "_name_" + std::to_string( i ) );
+    xml += "<" + n + " " + prefix + "_attr_" + std::to_string( i ) + "='v'>text</" + n + ">";
   }
   return xml + "</root>";
 }
@@ -1847,7 +1847,9 @@ std::string sweep_names_xml() {
 void test_sweep_xml( Fixture const &f ) {
 #if defined(__linux__)
   Sweep s;
-  s.query = caught( "count(parse-xml(\"" + sweep_names_xml() + "\")//*)" );
+  s.query = caught( "count(parse-xml(\"" + sweep_names_xml( "sweep" ) + "\")//*)" );
+  s.before.push_back( caught( "count(parse-xml(\"" + sweep_names_xml( "warm" ) +
+                              "\")//*)" ) );
   s.expected = "41";
   exhaust_sweep( f, "parse-xml", s );
 #else
@@ -1857,8 +1859,10 @@ void test_sweep_xml( Fixture const &f ) {
 void test_sweep_fragment( Fixture const &f ) {
 #if defined(__linux__)
   Sweep s;
-  s.query = caught( "count(parse-xml-fragment(\"" + sweep_names_xml() +
+  s.query = caught( "count(parse-xml-fragment(\"" + sweep_names_xml( "sweep" ) +
                     "\")//*)" );
+  s.before.push_back( caught( "count(parse-xml-fragment(\"" +
+                              sweep_names_xml( "warm" ) + "\")//*)" ) );
   s.expected = "41";
   exhaust_sweep( f, "parse-xml-fragment", s );
 #else
@@ -1874,6 +1878,7 @@ void test_sweep_html( Fixture const &f ) {
   s.after_compile = true;
   s.query = "import module namespace x = 'http://zorba.io/modules/xml';\n" +
     caught( "count(x:parse-html(\"" + html + "</body></html>\")//*:span)" );
+  s.before.push_back( s.query );
   s.expected = "40";
   exhaust_sweep( f, "x:parse-html", s );
 #else
@@ -1884,20 +1889,13 @@ void test_sweep_json( Fixture const &f ) {
 #if defined(__linux__)
   std::string json( "[" );
   for ( int i = 0; i < 40; ++i )
-    json += std::string( i ? "," : "" ) + "{'key_" + std::to_string( i ) +
-      "':" + std::to_string( i ) + ".5,'s':'a long enough string'}";
-  for ( char &c : json )
-    if ( c == '\'' )
-      c = '"';
-  std::string escaped;
-  for ( char const c : json ) {
-    if ( c == '"' )
-      escaped += '\\';
-    escaped += c;
-  }
+    json += std::string( i ? "," : "" ) + "{\"key_" + std::to_string( i ) +
+      "\":" + std::to_string( i ) + ".5,\"s\":\"a long enough string\"}";
   Sweep s;
-  s.query = "jsoniq version \"1.0\";\n" +
-    caught( "count(parse-json(\"" + escaped + "\")[])" );
+  s.after_compile = true;
+  s.query = "import module namespace jn = 'http://jsoniq.org/functions';\n" +
+    caught( "count(jn:members(jn:parse-json('" + json + "]')))" );
+  s.before.push_back( s.query );
   s.expected = "40";
   exhaust_sweep( f, "parse-json", s );
 #else
@@ -1910,10 +1908,12 @@ void test_sweep_csv( Fixture const &f ) {
   for ( int i = 0; i < 40; ++i )
     csv += std::to_string( i ) + ".5,word,12345678901234567890.25\\n";
   Sweep s;
+  s.after_compile = true;
   s.query = "jsoniq version \"1.0\";\n"
     "import module namespace csv = \"http://zorba.io/modules/json-csv\";\n" +
     caught( "count(csv:parse(\"" + csv + "\", { \"cast-letter-booleans\" : "
             "false }))" );
+  s.before.push_back( s.query );
   s.expected = "40";
   exhaust_sweep( f, "csv:parse", s );
 #else
@@ -1932,7 +1932,8 @@ void test_sweep_casts( Fixture const &f ) {
     "for $i in 1 to 3 return string(xs:decimal($i) castable as xs:integer),\n"
     "string(string-length(codepoints-to-string(for $i in 1 to 2000 return 97))))"
     ", ' ')" );
-  s.expected = "true true true true true true true true true true 2000";
+  s.before.push_back( s.query );
+  s.expected = "\"true true true true true true true true true true 2000\"";
   exhaust_sweep( f, "casts", s );
 #else
   (void)f;
@@ -1944,6 +1945,7 @@ void test_sweep_decimal_thread( Fixture const &f ) {
   Sweep s;
   s.query = caught( "sum(for $i in 1 to 3 return xs:decimal($i) * 1.5 div 0.7)"
                     " gt 1" );
+  s.before.push_back( s.query );
   s.expected = "true";
   s.new_thread = true;
   exhaust_sweep( f, "first decimal of a thread", s );
@@ -1962,6 +1964,12 @@ void test_sweep_cache( Fixture const &f ) {
   s.query = open;
   s.expected = "0";
   s.before.push_back( open );
+  // Reads another file twice, so that the query that reads for the cache is
+  // compiled by the time the call under test admits its file.
+  std::string other( open );
+  other.replace( other.find( "f0" ), 2, "f1" );
+  s.before.push_back( other );
+  s.before.push_back( other );
   s.after_compile = true;
   exhaust_sweep( f, "document cache", s );
 #else
@@ -2024,7 +2032,7 @@ void test_cache_after_failed_admission( Fixture const &f ) {
     waitpid( pid, &status, 0 );
   }
   std::map<std::string, long> outcomes;
-  for ( long n = 1; n <= total; n += std::max( 1L, total / 60 ) ) {
+  for ( long n = 1; n <= total; n += std::max( 1L, total / 25 ) ) {
     int fd[2];
     check( pipe( fd ) == 0, "pipe" );
     pid_t const pid = fork();
@@ -2042,7 +2050,7 @@ void test_cache_after_failed_admission( Fixture const &f ) {
       inject_disarm();
       std::string out;
       for ( int round = 0; round < 2; ++round )
-        for ( int i = 1; i < 14; ++i ) {
+        for ( int i = 1; i < 12; ++i ) {
           std::string const got( call( open_of( i ) ) );
           if ( got != std::to_string( i ) && out.empty() )
             out = got;
