@@ -28,6 +28,7 @@
 #include <csignal>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <ctime>
 #include <filesystem>
 #include <fstream>
@@ -37,6 +38,7 @@
 #include <sstream>
 #include <string>
 #include <thread>
+#include <typeinfo>
 #include <vector>
 
 #include <fcntl.h>
@@ -48,6 +50,10 @@
 #include <sys/types.h>
 #include <sys/utsname.h>
 #include <sys/wait.h>
+#if defined(__linux__)
+# include <cxxabi.h>
+# include <dlfcn.h>
+#endif
 #if defined(__linux__)
 # include <execinfo.h>
 #endif
@@ -1629,18 +1635,54 @@ struct Sweep {
   bool after_compile = false;       // only the run of the query, not its compilation
   bool lenient = false;             // a compilation: any error, but no signal
   long points = 1500;               // at most this many allocations are tried
-  std::vector<std::string> known;   // other allowed outcomes, reported as limits
+  std::vector<std::string> known;   // other allowed outcomes, by prefix: limits
+  bool empty_answer = false;        // an empty answer is allowed too, a limit
   std::vector<std::string> before;  // calls before all of them, with no failure
 };
 
-// Where a child ended, for the log.
-void sweep_trace( int sig ) {
+// How a child ended, reported as its outcome: the exception that nothing could
+// catch, or the first library on the stack of a signal.
+int sweep_fd = -1;
+bool sweep_show_stack = false;
+
+void sweep_report( char const *what, char const *detail ) {
+  char msg[256];
+  int const n = snprintf( msg, sizeof msg, "0 0 %s%s", what, detail );
+  if ( n > 0 && write( sweep_fd, msg, static_cast<std::size_t>( n ) ) != n )
+    _exit( 1 );
+  _exit( 0 );
+}
+
+void sweep_on_terminate() {
+  inject_on = false;
+  std::type_info const *const t = abi::__cxa_current_exception_type();
+  sweep_report( "terminate ", t ? t->name() : "without an exception" );
+}
+
+void sweep_on_signal( int sig ) {
+  inject_on = false;
   void *frames[64];
   int const n = backtrace( frames, 64 );
-  backtrace_symbols_fd( frames, n, STDOUT_FILENO );
-  signal( sig, SIG_DFL );
-  raise( sig );
+  if ( sweep_show_stack )
+    backtrace_symbols_fd( frames, n, STDOUT_FILENO );
+  char const *lib = "unknown";
+  for ( int i = 1; i < n; ++i ) {
+    Dl_info info;
+    if ( !dladdr( frames[i], &info ) || !info.dli_fname )
+      continue;
+    char const *const slash = std::strrchr( info.dli_fname, '/' );
+    char const *const base = slash ? slash + 1 : info.dli_fname;
+    if ( std::strncmp( base, "libc.", 5 ) && std::strncmp( base, "libgcc", 6 ) &&
+         std::strncmp( base, "mcp_tests", 9 ) ) {
+      lib = base;
+      break;
+    }
+  }
+  char what[32];
+  snprintf( what, sizeof what, "signal %d in ", sig );
+  sweep_report( what, lib );
 }
+
 
 // With Sweep::after_compile, arms when the server is about to run the query.
 bool sweep_pending = false;
@@ -1744,12 +1786,13 @@ void exhaust_sweep( Fixture const &f, std::string const &name, Sweep const &s ) 
     if ( pid == 0 ) {
       close( fd[0] );
       alarm( 10 );
-      if ( trace ) {
-        void *frames[4];
-        backtrace( frames, 4 );
-        signal( SIGSEGV, sweep_trace );
-        signal( SIGABRT, sweep_trace );
-      }
+      sweep_fd = fd[1];
+      sweep_show_stack = trace;
+      void *frames[4];
+      backtrace( frames, 4 );   // loads what it needs, before any failure
+      signal( SIGSEGV, sweep_on_signal );
+      signal( SIGABRT, sweep_on_signal );
+      std::set_terminate( sweep_on_terminate );
       long const live0 = static_cast<long>( new_live.load() );
       long count = 0;
       std::string out( sweep_call( server, call, s, first, length, &count ) );
@@ -1758,10 +1801,15 @@ void exhaust_sweep( Fixture const &f, std::string const &name, Sweep const &s ) 
       if ( !parse_json( server.handle( next ), &r, &why ) ||
            text_of( r ) != "2" )
         out += " | next call: " + text_of( r );
-      long const k = static_cast<long>( new_live.load() ) - live0;
-      if ( first % 8 == 0 &&
-           ( !parse_json( server.handle( again ), &r, &why ) ||
-             text_of( r ) != s.expected ) )
+      // After the same call again, so that what it frees of the warm-up and
+      // what it caches do not count: a failed call then keeps only what it lost.
+      long k = 0;
+      if ( first % 8 == 0 ) {
+        if ( !parse_json( server.handle( again ), &r, &why ) ||
+             text_of( r ) != s.expected )
+          out += " | same call again: " + text_of( r );
+        k = static_cast<long>( new_live.load() ) - live0;
+      }
         out += " | same call again: " + text_of( r );
       std::string const msg( std::to_string( count ) + " " +
                              std::to_string( k ) + " " + out );
@@ -1824,8 +1872,13 @@ void exhaust_sweep( Fixture const &f, std::string const &name, Sweep const &s ) 
       bool const allowed = o.first == "answer" || o.first == "memory_limit" ||
         o.first == "internal error" ||
         o.first == "handle() threw std::bad_alloc" ||
-        std::find( s.known.begin(), s.known.end(), o.first ) != s.known.end() ||
-        ( s.lenient && o.first.rfind( "signal", 0 ) != 0 &&
+        o.first == "terminate St9bad_alloc" ||  // zorba-mcp: status 3
+        ( s.empty_answer && o.first.empty() ) ||
+        std::any_of( s.known.begin(), s.known.end(),
+          [&o]( std::string const &k ) {
+            return o.first.rfind( k, 0 ) == 0;
+          } ) ||
+        ( s.lenient && o.first.rfind( "error: ", 0 ) == 0 &&
           o.first.find( " | " ) == std::string::npos );
       std::cout << name << ", " << length << " failing: " << o.second.first
                 << " times (first at " << o.second.second << "): " << o.first
@@ -1895,6 +1948,7 @@ void test_sweep_html( Fixture const &f ) {
     caught( "count(x:parse-html(\"" + html + "</body></html>\")//*:span)" );
   s.before.push_back( s.query );
   s.expected = "40";
+  s.known = { "terminate N11xercesc" };   // releasing a schema
   exhaust_sweep( f, "x:parse-html", s );
 #else
   (void)f;
@@ -1950,6 +2004,8 @@ void test_sweep_casts( Fixture const &f ) {
   s.before.push_back( s.query );
   s.points = 400;
   s.expected = "\"true true true true true true true true true true 2000\"";
+  s.lenient = true;                 // the compilation is swept too
+  s.known = { "exit 2" };           // the scanner of the compiler
   exhaust_sweep( f, "casts", s );
 #else
   (void)f;
@@ -1965,6 +2021,8 @@ void test_sweep_compile( Fixture const &f ) {
   s.expected = "41";
   s.lenient = true;
   s.points = 200;
+  s.known = { "exit 2", "memory_limit | same call again: error: err:XPST0017",
+              "signal 6 in libstdc", "terminate N11xercesc" };
   exhaust_sweep( f, "compilation", s );
 #else
   (void)f;
@@ -1980,6 +2038,10 @@ void test_sweep_decimal_thread( Fixture const &f ) {
   s.expected = "true";
   s.new_thread = true;
   s.points = 300;
+  s.lenient = true;                 // the compilation is swept too
+  // A new thread: glibc gives up if it cannot register the first thread_local
+  // with a destructor of the thread.
+  s.known = { "exit 2", "signal 6 in libstdc", "terminate N11xercesc" };
   exhaust_sweep( f, "first decimal of a thread", s );
 #else
   (void)f;
@@ -2003,6 +2065,11 @@ void test_sweep_cache( Fixture const &f ) {
   s.before.push_back( other );
   s.before.push_back( other );
   s.after_compile = true;
+  // A query over dir:open: what is left of a failure in the checks of a path, and
+  // in libraries. See the limits of --max-memory in bin/mcp/README.md.
+  s.known = { "terminate N11xercesc", "signal 11 in libicu", "error: file:FOFL9999",
+              "error: dir:INVALID_PATH", "error: err:FOCH0002" };
+  s.empty_answer = true;
   exhaust_sweep( f, "document cache", s );
 #else
   (void)f;

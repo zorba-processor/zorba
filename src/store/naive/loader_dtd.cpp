@@ -604,9 +604,11 @@ FragmentIStream* FragmentXmlLoader::streamOf(void *ctx)
 // Nothing may leave these callbacks: libxml2 is C code.
 void FragmentXmlLoader::recordOutOfMemory(void *ctx) noexcept
 {
-  FragmentIStream &fs = *streamOf(ctx);
-  if (fs.current_loader)
-    static_cast<FragmentXmlLoader*>(fs.current_loader)->setOutOfMemory();
+  // While the context is being created, it has no stream yet.
+  if (FragmentIStream *const fs = streamOf(ctx))
+    if (fs->current_loader)
+      static_cast<FragmentXmlLoader*>(fs->current_loader)->setOutOfMemory();
+  xmlStopParser(static_cast<xmlParserCtxtPtr>(ctx));
   xmlStopParser(static_cast<xmlParserCtxtPtr>(ctx));
 }
 
@@ -772,9 +774,9 @@ catch (std::bad_alloc const&)
 void FragmentXmlLoader::recordError(void* ctx, ZORBA_XML_ERROR_PTR error)
 try
 {
-  FragmentIStream &fs = *streamOf(ctx);
-  if (fs.current_loader)
-    XmlLoader::error(fs.current_loader, error);
+  FragmentIStream *const fs = streamOf(ctx);
+  if (fs && fs->current_loader)
+    XmlLoader::error(fs->current_loader, error);
 }
 catch (std::bad_alloc const&)
 {

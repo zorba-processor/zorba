@@ -512,7 +512,7 @@ IF (ZORBA_WITH_FILE_ACCESS)
     ADD_TEST (NAME bin/mcp/max_memory_help
       COMMAND "$<TARGET_FILE:zorba_mcp${_mcp_suffix}>" --help)
     SET_TESTS_PROPERTIES (bin/mcp/max_memory_help PROPERTIES
-      PASS_REGULAR_EXPRESSION "fails with the tool error memory_limit, and the\n *server answers the next call[.] If memory runs out\n *where that cannot be done, for example while the\n *server starts, it exits with status 3 and a message\n *on stderr, with no response to the call")
+      PASS_REGULAR_EXPRESSION "fails with the tool error memory_limit, and the\n *server answers the next call[.] If memory runs out\n *where that cannot be done, for example while the\n *server starts, it exits with status 3 and a message\n *on stderr, with no response to the call[.] Libraries\n *end it in other ways: abort, with a core file if\n *the system keeps them [(]Xerces-C releasing a schema;\n *libxml2 or glibc on the first use by a thread[)];\n *SIGSEGV [(]ICU compiling a regular expression[)]; status\n *2 [(]the query scanner, while a query compiles[)]")
 
     # A --language value other than xquery and jsoniq is refused.
     ADD_TEST (NAME bin/mcp/language_invalid
