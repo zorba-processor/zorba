@@ -365,7 +365,7 @@ static void test_bound_escapes() {
   }
   string const at( string( 50, '$' ) + string( 50, '\\' ) );
   ASSERT_TRUE( substituted( "$1", at ) == at );
-  string const past( string( 51, '$' ) + string( 50, '\\' ) );
+  string const past( string( 51, '$' ) + ' ' + string( 49, '\\' ) );
   ASSERT_TRUE( substituted( "$1", past ) == short_form( past, 40, 40 ) );
 }
 

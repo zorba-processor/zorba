@@ -3186,13 +3186,6 @@ std::string cast_of( std::string const &text ) {
   return "xs:integer(\"" + literal + "\")";
 }
 
-std::string repeated( std::string const &part, std::size_t times ) {
-  std::string out;
-  for ( std::size_t i = 0; i < times; ++i )
-    out += part;
-  return out;
-}
-
 void test_error_value_bound( Fixture const &f ) {
   ServerConfig config;
   config.root = f.tree;
@@ -3434,7 +3427,8 @@ void test_error_help( Fixture const &f ) {
   for ( char const *text : { "the \"message\" of an error",
                              "loses its middle, keeps its end",
                              "with its total size", "the code, the hint and the",
-                             "shortens the data it quotes", "value over 100 bytes" } )
+                             "shortens the data it quotes", "value over 100 bytes",
+                             "a URI or a path" } )
     check( contains( err, text ), std::string( "--help says: " ) + text, err );
 }
 
