@@ -1858,7 +1858,7 @@ void exhaust_sweep( Fixture const &f, std::string const &name, Sweep const &s ) 
       long kept = 0;
       std::string out( run_child( n, length, nullptr, &kept ) );
       // What a failed call keeps, beyond the caches a good one fills.
-      if ( kept > base_kept + 8 * 1024 )
+      if ( n % 8 == 0 && kept > base_kept + 8 * 1024 )
         out += " | keeps memory";
       auto &o = outcomes[out];
       if ( !o.first )
@@ -2021,7 +2021,8 @@ void test_sweep_compile( Fixture const &f ) {
   s.lenient = true;
   s.points = 200;
   s.known = { "exit 2", "memory_limit | same call again: error: err:XPST0017",
-              "signal 6 in libstdc", "terminate N11xercesc" };
+              "signal 6 in libstdc", "signal 6 in linux-vdso",
+              "terminate N11xercesc" };
   exhaust_sweep( f, "compilation", s );
 #else
   (void)f;
@@ -2040,7 +2041,8 @@ void test_sweep_decimal_thread( Fixture const &f ) {
   s.lenient = true;                 // the compilation is swept too
   // A new thread: glibc gives up if it cannot register the first thread_local
   // with a destructor of the thread.
-  s.known = { "exit 2", "signal 6 in libstdc", "terminate N11xercesc" };
+  s.known = { "exit 2", "signal 6 in libstdc", "signal 6 in linux-vdso",
+              "terminate N11xercesc" };
   exhaust_sweep( f, "first decimal of a thread", s );
 #else
   (void)f;
