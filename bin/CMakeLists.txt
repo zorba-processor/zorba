@@ -455,7 +455,11 @@ IF (ZORBA_WITH_FILE_ACCESS)
              optional_params documents_stream hints_jsoniq hints_dash
              hints_nodes hints_names deep_json deep_json_binary
              entity_expansion case_paths html_edge_cases memory_limit
-             exhaust_at_start exhaust_generated exhaust_json exhaust_json_array exhaust_csv
+             exhaust_at_start exhaust_sweep_xml exhaust_sweep_fragment
+             exhaust_sweep_html exhaust_sweep_json exhaust_sweep_csv
+             exhaust_sweep_casts exhaust_sweep_decimal_thread exhaust_sweep_cache
+             exhaust_cache_after_failure exhaust_user_error exhaust_long_line
+             exhaust_stack_limit exhaust_generated exhaust_json exhaust_json_array exhaust_csv
              exhaust_xml exhaust_strings exhaust_numbers exhaust_try
              exhaust_injected_generated exhaust_injected_json
              exhaust_injected_json_array exhaust_injected_csv exhaust_injected_xml
@@ -492,6 +496,9 @@ IF (ZORBA_WITH_FILE_ACCESS)
                 exhaust_xml exhaust_strings exhaust_numbers exhaust_try)
       SET_TESTS_PROPERTIES (bin/mcp/${_t} PROPERTIES
         RESOURCE_LOCK mcp_memory_exhaustion TIMEOUT 400)
+    ENDFOREACH (_t)
+    FOREACH (_t xml fragment html json csv casts decimal_thread cache)
+      SET_TESTS_PROPERTIES (bin/mcp/exhaust_sweep_${_t} PROPERTIES TIMEOUT 400)
     ENDFOREACH (_t)
     FOREACH (_t generated json json_array csv xml strings numbers try)
       SET_TESTS_PROPERTIES (bin/mcp/exhaust_injected_${_t} PROPERTIES TIMEOUT 400)

@@ -249,7 +249,7 @@
       },
       "filter": {
         "include": {
-          "name": "bin/mcp/(scan_|exhaust_injected)"
+          "name": "bin/mcp/(scan_|exhaust_injected|exhaust_sweep)"
         }
       },
       "environment": {

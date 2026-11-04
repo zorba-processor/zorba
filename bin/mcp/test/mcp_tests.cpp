@@ -72,6 +72,57 @@ using namespace zorba::mcp;
 #endif
 
 #if defined(__linux__)
+// For the sweeps (exhaust_sweep_*): one allocation fails, the N-th since
+// inject_arm(), or a run of them. Where malloc can be replaced, that covers what
+// the C libraries and MAPM allocate; in sanitizer builds, only operator new.
+namespace {
+std::atomic<bool> inject_on{ false };
+std::atomic<long> inject_count{ 0 };
+std::atomic<long> inject_first{ 0 };  // 0: only count
+std::atomic<long> inject_length{ 0 };
+
+bool inject_fails() noexcept {
+  if ( !inject_on.load( std::memory_order_relaxed ) )
+    return false;
+  long const k = inject_count.fetch_add( 1, std::memory_order_relaxed ) + 1;
+  long const first = inject_first.load( std::memory_order_relaxed );
+  return first > 0 && k >= first &&
+    k < first + inject_length.load( std::memory_order_relaxed );
+}
+
+void inject_arm( long first, long length ) {
+  inject_count = 0;
+  inject_first = first;
+  inject_length = length;
+  inject_on = true;
+}
+
+long inject_disarm() {
+  inject_on = false;
+  return inject_count.load();
+}
+} // namespace
+
+# if !defined(ZORBA_TEST_SANITIZER)
+extern "C" {
+void* __libc_malloc( std::size_t );
+void* __libc_calloc( std::size_t, std::size_t );
+void* __libc_realloc( void*, std::size_t );
+
+void* malloc( std::size_t n ) noexcept {
+  return inject_fails() ? nullptr : __libc_malloc( n );
+}
+void* calloc( std::size_t n, std::size_t size ) noexcept {
+  return inject_fails() ? nullptr : __libc_calloc( n, size );
+}
+void* realloc( void *p, std::size_t n ) noexcept {
+  return inject_fails() ? nullptr : __libc_realloc( p, n );
+}
+} // extern "C"
+# endif
+#endif
+
+#if defined(__linux__)
 // For test_exhaust_injected: operator new fails above a budget of live bytes,
 // as it would at a memory limit, also in builds that cannot have one.
 namespace {
@@ -79,6 +130,10 @@ std::atomic<std::size_t> new_live{ 0 };
 std::atomic<std::size_t> new_budget{ 0 };  // 0: none
 
 void* budget_alloc( std::size_t n ) noexcept {
+# if defined(ZORBA_TEST_SANITIZER)
+  if ( inject_fails() )
+    return nullptr;
+# endif
   std::size_t const budget = new_budget.load( std::memory_order_relaxed );
   if ( budget && new_live.load( std::memory_order_relaxed ) + n > budget )
     return nullptr;
@@ -1555,6 +1610,507 @@ void exhaust_injected( Fixture const &f, char const *const inner ) {
 template<std::size_t N>
 void test_exhaust_injected( Fixture const &f ) {
   exhaust_injected( f, exhaustion_queries[N] );
+}
+
+#if defined(__linux__)
+// A call to the server with one allocation failing, for every allocation the
+// call makes: in a child process each, so that all outcomes are seen, and with
+// names new to the pools each time, as the parent never runs the query. Allowed:
+// the answer, memory_limit, or, if the failure is outside the query, an internal
+// error that says so. And in all cases the same server then answers correctly.
+struct Sweep {
+  std::string query;
+  std::string expected;
+  bool new_thread = false;          // the call is the first of a thread
+  std::vector<std::string> before;  // calls before it, with no failure
+};
+
+std::string text_of( Json const &r ) {
+  if ( r.find( "error" ) )
+    return "rpc: " + r.find( "error" )->find( "message" )->text();
+  if ( is_tool_error( r ) )
+    return "error: " + field( tool_error( r ), "code" ) + ": " +
+           field( tool_error( r ), "message" ).substr( 0, 90 );
+  return result_text( r );
+}
+
+std::string sweep_call( Server &server, std::string const &request_text,
+                        Sweep const &s, long first, long length, long *count ) {
+  std::string outcome;
+  auto armed = [&]() {
+    inject_arm( first, length );
+    try {
+      std::string const response( server.handle( request_text ) );
+      *count = inject_disarm();
+      Json r;
+      std::string why;
+      if ( !parse_json( response, &r, &why ) )
+        outcome = "unparsable response";
+      else if ( text_of( r ) == s.expected )
+        outcome = "answer";
+      else if ( is_tool_error( r ) && !r.find( "error" ) &&
+                field( tool_error( r ), "code" ) == "memory_limit" )
+        outcome = "memory_limit";
+      else if ( r.find( "error" ) &&
+                contains( text_of( r ), "bad_alloc" ) )
+        outcome = "internal error";
+      else
+        outcome = text_of( r );
+    }
+    catch ( std::exception const &e ) {
+      *count = inject_disarm();
+      outcome = std::string( "handle() threw " ) + e.what();
+    }
+  };
+  if ( s.new_thread ) {
+    std::thread t( armed );
+    t.join();
+  } else {
+    armed();
+  }
+  return outcome;
+}
+
+void exhaust_sweep( Fixture const &f, std::string const &name, Sweep const &s ) {
+  struct rlimit no_core = { 0, 0 };
+  check( setrlimit( RLIMIT_CORE, &no_core ) == 0, "no core files" );
+  TempTree t;
+  for ( int i = 0; i < 12; ++i )
+    t.write( "f" + std::to_string( i ) + ".json",
+             "{\"answer\":" + std::to_string( i ) + "}\n" );
+  std::this_thread::sleep_for( std::chrono::milliseconds( 50 ) );
+  ServerConfig config;
+  config.root = t.root;
+  config.scan = false;
+  std::ostringstream log;
+  Server server( f.zorba, config, log );
+  auto rq = [&]( int id, std::string const &query ) {
+    return request( id, "tools/call", Json::object( {
+      { "name", "run_query" },
+      { "arguments", Json::object( { { "query", query } } ) } } ) );
+  };
+  std::string const call( rq( 1, s.query ) );
+  std::string const next( rq( 2, "1 + 1" ) );
+  std::string const again( rq( 3, s.query ) );
+
+  // What one run in a child gives; first == 0 counts the allocations, and the
+  // memory that a run leaves behind.
+  auto run_child = [&]( long first, long length, long *total,
+                        long *kept ) -> std::string {
+    int fd[2];
+    if ( pipe( fd ) != 0 )
+      return "pipe failed";
+    pid_t const pid = fork();
+    if ( pid < 0 )
+      return "fork failed";
+    if ( pid == 0 ) {
+      close( fd[0] );
+      alarm( 60 );
+      for ( std::string const &b : s.before )
+        server.handle( rq( 9, b ) );
+      long const live0 = static_cast<long>( new_live.load() );
+      long count = 0;
+      std::string out( sweep_call( server, call, s, first, length, &count ) );
+      Json r;
+      std::string why;
+      if ( !parse_json( server.handle( next ), &r, &why ) ||
+           text_of( r ) != "2" )
+        out += " | next call: " + text_of( r );
+      if ( !parse_json( server.handle( again ), &r, &why ) ||
+           text_of( r ) != s.expected )
+        out += " | same call again: " + text_of( r );
+      long const k = static_cast<long>( new_live.load() ) - live0;
+      std::string const msg( std::to_string( count ) + " " +
+                             std::to_string( k ) + " " + out );
+      ssize_t const n = write( fd[1], msg.data(), msg.size() );
+      _exit( n == static_cast<ssize_t>( msg.size() ) ? 0 : 1 );
+    }
+    close( fd[1] );
+    std::string msg;
+    char buf[1024];
+    for ( ;; ) {
+      ssize_t const n = read( fd[0], buf, sizeof buf );
+      if ( n <= 0 )
+        break;
+      msg.append( buf, static_cast<std::size_t>( n ) );
+    }
+    close( fd[0] );
+    int status = 0;
+    waitpid( pid, &status, 0 );
+    if ( WIFSIGNALED( status ) )
+      return "signal " + std::to_string( WTERMSIG( status ) );
+    if ( !WIFEXITED( status ) || WEXITSTATUS( status ) != 0 )
+      return "exit " + std::to_string( WEXITSTATUS( status ) );
+    std::istringstream is( msg );
+    long c = 0, k = 0;
+    is >> c >> k;
+    std::string out;
+    std::getline( is, out );
+    if ( total )
+      *total = c;
+    if ( kept )
+      *kept = k;
+    return out.empty() ? out : out.substr( 1 );
+  };
+
+  long total = 0, base_kept = 0;
+  std::string const plain( run_child( 0, 0, &total, &base_kept ) );
+  check( plain == "answer", name + ": with no failure, the answer", plain );
+  std::cout << name << ": " << total << " allocations, " << base_kept
+            << " bytes kept" << std::endl;
+  if ( plain != "answer" || total <= 0 )
+    return;
+  // Every allocation, up to a bound on the time of the test.
+  long const stride = std::max( 1L, total / 1500 );
+  for ( long const length : { 1L, 16L } ) {
+    std::map<std::string, std::pair<long, long> > outcomes;
+    for ( long n = 1; n <= total; n += stride ) {
+      long kept = 0;
+      std::string out( run_child( n, length, nullptr, &kept ) );
+      // What a failed call keeps, beyond the caches a good one fills.
+      if ( kept > base_kept + 8 * 1024 )
+        out += " | keeps memory";
+      auto &o = outcomes[out];
+      if ( !o.first )
+        o.second = n;
+      ++o.first;
+    }
+    for ( auto const &o : outcomes ) {
+      bool const allowed = o.first == "answer" || o.first == "memory_limit" ||
+                           o.first == "internal error";
+      std::cout << name << ", " << length << " failing: " << o.second.first
+                << " times (first at " << o.second.second << "): " << o.first
+                << std::endl;
+      check( allowed, name + ": allowed outcome", o.first );
+    }
+  }
+}
+
+// The queries catch whatever a catch clause can: a failure that became an error
+// of the data shows as an answer of its own.
+std::string caught( std::string const &expr ) {
+  return "try { " + expr + " } catch * { concat('caught ', $err:code, ' ', "
+         "$err:description) }";
+}
+
+std::string sweep_names_xml() {
+  std::string xml( "<root xmlns:p='urn:sweep'>" );
+  for ( int i = 0; i < 40; ++i ) {
+    std::string const n( "p:sweep_name_" + std::to_string( i ) );
+    xml += "<" + n + " sweep_attr_" + std::to_string( i ) + "='v'>text</" + n + ">";
+  }
+  return xml + "</root>";
+}
+#endif
+
+void test_sweep_xml( Fixture const &f ) {
+#if defined(__linux__)
+  Sweep s;
+  s.query = caught( "count(parse-xml(\"" + sweep_names_xml() + "\")//*)" );
+  s.expected = "41";
+  exhaust_sweep( f, "parse-xml", s );
+#else
+  (void)f;
+#endif
+}
+void test_sweep_fragment( Fixture const &f ) {
+#if defined(__linux__)
+  Sweep s;
+  s.query = caught( "count(parse-xml-fragment(\"" + sweep_names_xml() +
+                    "\")//*)" );
+  s.expected = "41";
+  exhaust_sweep( f, "parse-xml-fragment", s );
+#else
+  (void)f;
+#endif
+}
+void test_sweep_html( Fixture const &f ) {
+#if defined(__linux__)
+  std::string html( "<html><body>" );
+  for ( int i = 0; i < 40; ++i )
+    html += "<div class='c'><span>text</span></div>";
+  Sweep s;
+  s.query = "import module namespace x = 'http://zorba.io/modules/xml';\n" +
+    caught( "count(x:parse-html(\"" + html + "</body></html>\")//*:span)" );
+  s.expected = "40";
+  exhaust_sweep( f, "x:parse-html", s );
+#else
+  (void)f;
+#endif
+}
+void test_sweep_json( Fixture const &f ) {
+#if defined(__linux__)
+  std::string json( "[" );
+  for ( int i = 0; i < 40; ++i )
+    json += std::string( i ? "," : "" ) + "{'key_" + std::to_string( i ) +
+      "':" + std::to_string( i ) + ".5,'s':'a long enough string'}";
+  for ( char &c : json )
+    if ( c == '\'' )
+      c = '"';
+  std::string escaped;
+  for ( char const c : json ) {
+    if ( c == '"' )
+      escaped += '\\';
+    escaped += c;
+  }
+  Sweep s;
+  s.query = "jsoniq version \"1.0\";\n" +
+    caught( "count(parse-json(\"" + escaped + "\")[])" );
+  s.expected = "40";
+  exhaust_sweep( f, "parse-json", s );
+#else
+  (void)f;
+#endif
+}
+void test_sweep_csv( Fixture const &f ) {
+#if defined(__linux__)
+  std::string csv( "a,b,c\\n" );
+  for ( int i = 0; i < 40; ++i )
+    csv += std::to_string( i ) + ".5,word,12345678901234567890.25\\n";
+  Sweep s;
+  s.query = "jsoniq version \"1.0\";\n"
+    "import module namespace csv = \"http://zorba.io/modules/json-csv\";\n" +
+    caught( "count(csv:parse(\"" + csv + "\", { \"cast-letter-booleans\" : "
+            "false }))" );
+  s.expected = "40";
+  exhaust_sweep( f, "csv:parse", s );
+#else
+  (void)f;
+#endif
+}
+void test_sweep_casts( Fixture const &f ) {
+#if defined(__linux__)
+  Sweep s;
+  s.query = caught(
+    "let $b := string-join(for $i in 1 to 2000 return 'QUJD')\n"
+    "return string-join(("
+    "string($b castable as xs:base64Binary),\n"
+    "for $i in 1 to 3 return string(xs:double($i) castable as xs:decimal),\n"
+    "for $i in 1 to 3 return string(xs:float($i) castable as xs:decimal),\n"
+    "for $i in 1 to 3 return string(xs:decimal($i) castable as xs:integer),\n"
+    "string(string-length(codepoints-to-string(for $i in 1 to 2000 return 97))))"
+    ", ' ')" );
+  s.expected = "true true true true true true true true true true 2000";
+  exhaust_sweep( f, "casts", s );
+#else
+  (void)f;
+#endif
+}
+// MAPM keeps state per thread, set up by the first decimal of the thread.
+void test_sweep_decimal_thread( Fixture const &f ) {
+#if defined(__linux__)
+  Sweep s;
+  s.query = caught( "sum(for $i in 1 to 3 return xs:decimal($i) * 1.5 div 0.7)"
+                    " gt 1" );
+  s.expected = "true";
+  s.new_thread = true;
+  exhaust_sweep( f, "first decimal of a thread", s );
+#else
+  (void)f;
+#endif
+}
+// The document cache: admission fails, then the cache fills and evicts.
+void test_sweep_cache( Fixture const &f ) {
+#if defined(__linux__)
+  std::string const open(
+    "jsoniq version \"1.0\";\n"
+    "import module namespace dir = \"http://zorba.io/modules/directory\";\n"
+    "dir:open($dir:root, \"f0.json\").content.answer" );
+  Sweep s;
+  s.query = open;
+  s.expected = "0";
+  s.before.push_back( open );
+  exhaust_sweep( f, "document cache", s );
+#else
+  (void)f;
+#endif
+}
+// After a failed admission the cache goes on working: filled, and then full.
+void test_cache_after_failed_admission( Fixture const &f ) {
+#if defined(__linux__)
+  TempTree t;
+  auto open_of = []( int i ) {
+    return "jsoniq version \"1.0\";\n"
+      "import module namespace dir = \"http://zorba.io/modules/directory\";\n"
+      "dir:open($dir:root, \"f" + std::to_string( i ) + ".json\").content.answer";
+  };
+  for ( int i = 0; i < 14; ++i )
+    t.write( "f" + std::to_string( i ) + ".json",
+             "{\"answer\":" + std::to_string( i ) + "}\n" );
+  std::this_thread::sleep_for( std::chrono::milliseconds( 50 ) );
+  ServerConfig config;
+  config.root = t.root;
+  config.scan = false;
+  std::ostringstream log;
+  Server server( f.zorba, config, log );
+  auto call = [&]( std::string const &query ) {
+    return text_of( roundtrip( server, request( 1, "tools/call", Json::object( {
+      { "name", "run_query" },
+      { "arguments", Json::object( { { "query", query } } ) } } ) ) ) );
+  };
+  check( call( open_of( 0 ) ) == "0", "first read" );
+  // Count what the admitting read allocates, in a child, so that it stays to do.
+  long total = 0;
+  {
+    int fd[2];
+    check( pipe( fd ) == 0, "pipe" );
+    pid_t const pid = fork();
+    if ( pid == 0 ) {
+      inject_arm( 0, 0 );
+      call( open_of( 0 ) );
+      long const c = inject_disarm();
+      ssize_t const n = write( fd[1], &c, sizeof c );
+      _exit( n == sizeof c ? 0 : 1 );
+    }
+    ssize_t const n = read( fd[0], &total, sizeof total );
+    check( n == sizeof total, "the count" );
+    close( fd[0] );
+    close( fd[1] );
+    int status = 0;
+    waitpid( pid, &status, 0 );
+  }
+  std::map<std::string, long> outcomes;
+  for ( long n = 1; n <= total; n += std::max( 1L, total / 400 ) ) {
+    int fd[2];
+    check( pipe( fd ) == 0, "pipe" );
+    pid_t const pid = fork();
+    if ( pid == 0 ) {
+      close( fd[0] );
+      alarm( 60 );
+      inject_arm( n, 1 );
+      try {
+        call( open_of( 0 ) );
+      }
+      catch ( std::exception const& ) {
+      }
+      inject_disarm();
+      std::string out;
+      for ( int round = 0; round < 3; ++round )
+        for ( int i = 1; i < 14; ++i ) {
+          std::string const got( call( open_of( i ) ) );
+          if ( got != std::to_string( i ) && out.empty() )
+            out = got;
+        }
+      if ( out.empty() ) {
+        // The file that failed is admitted again: it did not change.
+        for ( int round = 0; round < 3; ++round )
+          call( open_of( 0 ) );
+        std::size_t const before = server.cache_stats().hits;
+        call( open_of( 0 ) );
+        if ( server.cache_stats().hits <= before )
+          out = "the file is not cached any more";
+      }
+      ssize_t const w = write( fd[1], out.data(), out.size() );
+      _exit( w == static_cast<ssize_t>( out.size() ) ? 0 : 1 );
+    }
+    close( fd[1] );
+    std::string out;
+    char buf[512];
+    for ( ;; ) {
+      ssize_t const r = read( fd[0], buf, sizeof buf );
+      if ( r <= 0 )
+        break;
+      out.append( buf, static_cast<std::size_t>( r ) );
+    }
+    close( fd[0] );
+    int status = 0;
+    waitpid( pid, &status, 0 );
+    if ( WIFSIGNALED( status ) )
+      out = "signal " + std::to_string( WTERMSIG( status ) );
+    ++outcomes[out];
+  }
+  for ( auto const &o : outcomes ) {
+    std::cout << "cache: " << o.second << " times: [" << o.first << "]"
+              << std::endl;
+    check( o.first.empty(), "the cache works after a failed admission", o.first );
+  }
+#else
+  (void)f;
+#endif
+}
+// A catch clause catches an error a query raises, whatever its name and text.
+void test_user_error_named_like_memory( Fixture const &f ) {
+  ServerConfig config;
+  config.root = f.tree;
+  config.scan = false;
+  std::ostringstream log;
+  Server server( f.zorba, config, log );
+  auto call = [&]( std::string const &query ) {
+    return roundtrip( server, request( 1, "tools/call", Json::object( {
+      { "name", "run_query" },
+      { "arguments", Json::object( { { "query", query } } ) } } ) ) );
+  };
+  std::string const raise(
+    "error(QName('http://zorba.io/errors', 'zerr:ZXQP0003'), 'bad_alloc')" );
+  Json r( call( "try { " + raise + " } catch * { 'caught' }" ) );
+  check( !is_tool_error( r ) && contains( result_text( r ), "caught" ),
+         "the catch clause catches it", r.dump() );
+  r = call( raise );
+  check( is_tool_error( r ) &&
+         field( tool_error( r ), "code" ) != "memory_limit",
+         "it is not reported as memory_limit", r.dump() );
+}
+// A line longer than any message is refused without reading it into memory.
+void test_exhaust_long_line( Fixture const &f ) {
+#if defined(__linux__) && !defined(ZORBA_TEST_SANITIZER)
+  struct rlimit no_core = { 0, 0 };
+  check( setrlimit( RLIMIT_CORE, &no_core ) == 0, "no core files" );
+  auto call = [&]( int id, char const *query ) {
+    return request( id, "tools/call", Json::object( {
+      { "name", "run_query" },
+      { "arguments", Json::object( { { "query", query } } ) } } ) ) + "\n";
+  };
+  std::string input( std::string( 700 * 1024 * 1024, 'x' ) );
+  input += "\n";
+  input += call( 2, "1 + 1" );
+  std::string const output( run_binary( f, f.queries, input, {
+    "--max-memory", "500000000" } ) );
+  input.clear();
+  std::istringstream lines( output );
+  std::string line;
+  std::vector<Json> responses;
+  while ( std::getline( lines, line ) ) {
+    Json r;
+    std::string why;
+    if ( parse_json( line, &r, &why ) )
+      responses.push_back( r );
+  }
+  check( responses.size() == 2, "two responses", output.substr( 0, 500 ) );
+  if ( responses.size() == 2 ) {
+    check( responses[0].find( "error" ) &&
+           contains( responses[0].dump(), "too large" ),
+           "the long line is refused", responses[0].dump() );
+    check( text_of( responses[1] ) == "2", "the next call is answered",
+           responses[1].dump() );
+  }
+#else
+  (void)f;
+  std::cout << "--max-memory has no effect in this build" << std::endl;
+#endif
+}
+// A large stack limit does not use up --max-memory at the start.
+void test_exhaust_stack_limit( Fixture const &f ) {
+#if defined(__linux__) && !defined(ZORBA_TEST_SANITIZER)
+  struct rlimit old_stack;
+  check( getrlimit( RLIMIT_STACK, &old_stack ) == 0, "getrlimit" );
+  struct rlimit big = old_stack;
+  big.rlim_cur = old_stack.rlim_max == RLIM_INFINITY ||
+                 old_stack.rlim_max >= 1073741824 ? 1073741824 : old_stack.rlim_max;
+  check( setrlimit( RLIMIT_STACK, &big ) == 0, "setrlimit" );
+  std::string const input( request( 1, "tools/call", Json::object( {
+    { "name", "run_query" },
+    { "arguments", Json::object( { { "query", "1 + 1" } } ) } } ) ) + "\n" );
+  std::string const output( run_binary( f, f.queries, input, {
+    "--max-memory", "500000000" } ) );
+  check( setrlimit( RLIMIT_STACK, &old_stack ) == 0, "restore" );
+  Json r;
+  std::string why;
+  check( parse_json( output, &r, &why ) && text_of( r ) == "2",
+         "the server starts and answers", output );
+#else
+  (void)f;
+  std::cout << "--max-memory has no effect in this build" << std::endl;
+#endif
 }
 
 // The peak resident set size of this process so far, in bytes.
@@ -4494,6 +5050,18 @@ Test const tests[] = {
   { "windows", test_windows },
   { "memory_limit", test_memory_limit },
   { "exhaust_at_start", test_exhaust_at_start },
+  { "exhaust_sweep_xml", test_sweep_xml },
+  { "exhaust_sweep_fragment", test_sweep_fragment },
+  { "exhaust_sweep_html", test_sweep_html },
+  { "exhaust_sweep_json", test_sweep_json },
+  { "exhaust_sweep_csv", test_sweep_csv },
+  { "exhaust_sweep_casts", test_sweep_casts },
+  { "exhaust_sweep_decimal_thread", test_sweep_decimal_thread },
+  { "exhaust_sweep_cache", test_sweep_cache },
+  { "exhaust_cache_after_failure", test_cache_after_failed_admission },
+  { "exhaust_user_error", test_user_error_named_like_memory },
+  { "exhaust_long_line", test_exhaust_long_line },
+  { "exhaust_stack_limit", test_exhaust_stack_limit },
   { "exhaust_generated", test_exhaust_generated },
   { "exhaust_json", test_exhaust_json },
   { "exhaust_json_array", test_exhaust_json_array },
