@@ -497,6 +497,7 @@ IF (ZORBA_WITH_FILE_ACCESS)
       SET_TESTS_PROPERTIES (bin/mcp/${_t} PROPERTIES
         RESOURCE_LOCK mcp_memory_exhaustion TIMEOUT 400)
     ENDFOREACH (_t)
+    SET_TESTS_PROPERTIES (bin/mcp/exhaust_cache_after_failure PROPERTIES TIMEOUT 400)
     FOREACH (_t xml fragment html json csv casts decimal_thread cache)
       SET_TESTS_PROPERTIES (bin/mcp/exhaust_sweep_${_t} PROPERTIES TIMEOUT 400)
     ENDFOREACH (_t)

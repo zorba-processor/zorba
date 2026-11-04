@@ -19,6 +19,7 @@
 
 #include <chrono>
 #include <cstddef>
+#include <functional>
 #include <memory>
 #include <ostream>
 #include <string>
@@ -62,6 +63,8 @@ struct ServerConfig {
   bool scan = true;
   /** The limits of the scanner. */
   ScanLimits scan_limits;
+  /** For tests: called when a query is compiled, before it runs. */
+  std::function<void()> before_execute;
   /** For tests: see ScanHook. */
   ScanHook scan_hook;
   /** The memory limit of the process, in bytes (0: none; see zorba_mcp.cpp). */

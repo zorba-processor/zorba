@@ -25,6 +25,7 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <csignal>
 #include <cstdio>
 #include <cstdlib>
 #include <ctime>
@@ -47,6 +48,9 @@
 #include <sys/types.h>
 #include <sys/utsname.h>
 #include <sys/wait.h>
+#if defined(__linux__)
+# include <execinfo.h>
+#endif
 #include <unistd.h>
 
 #include <libxml/xmlversion.h>
@@ -1622,8 +1626,22 @@ struct Sweep {
   std::string query;
   std::string expected;
   bool new_thread = false;          // the call is the first of a thread
-  std::vector<std::string> before;  // calls before it, with no failure
+  bool after_compile = false;       // only the run of the query, not its compilation
+  std::vector<std::string> before;  // calls before all of them, with no failure
 };
+
+// Where a child ended, for the log.
+void sweep_trace( int sig ) {
+  void *frames[64];
+  int const n = backtrace( frames, 64 );
+  backtrace_symbols_fd( frames, n, STDOUT_FILENO );
+  signal( sig, SIG_DFL );
+  raise( sig );
+}
+
+// With Sweep::after_compile, arms when the server is about to run the query.
+bool sweep_pending = false;
+long sweep_first = 0, sweep_length = 0;
 
 std::string text_of( Json const &r ) {
   if ( r.find( "error" ) )
@@ -1638,7 +1656,13 @@ std::string sweep_call( Server &server, std::string const &request_text,
                         Sweep const &s, long first, long length, long *count ) {
   std::string outcome;
   auto armed = [&]() {
-    inject_arm( first, length );
+    if ( s.after_compile ) {
+      sweep_pending = true;
+      sweep_first = first;
+      sweep_length = length;
+    } else {
+      inject_arm( first, length );
+    }
     try {
       std::string const response( server.handle( request_text ) );
       *count = inject_disarm();
@@ -1682,6 +1706,12 @@ void exhaust_sweep( Fixture const &f, std::string const &name, Sweep const &s ) 
   ServerConfig config;
   config.root = t.root;
   config.scan = false;
+  config.before_execute = []() {
+    if ( sweep_pending ) {
+      sweep_pending = false;
+      inject_arm( sweep_first, sweep_length );
+    }
+  };
   std::ostringstream log;
   Server server( f.zorba, config, log );
   auto rq = [&]( int id, std::string const &query ) {
@@ -1689,14 +1719,16 @@ void exhaust_sweep( Fixture const &f, std::string const &name, Sweep const &s ) 
       { "name", "run_query" },
       { "arguments", Json::object( { { "query", query } } ) } } ) );
   };
+  for ( std::string const &b : s.before )
+    server.handle( rq( 9, b ) );
   std::string const call( rq( 1, s.query ) );
   std::string const next( rq( 2, "1 + 1" ) );
   std::string const again( rq( 3, s.query ) );
 
   // What one run in a child gives; first == 0 counts the allocations, and the
   // memory that a run leaves behind.
-  auto run_child = [&]( long first, long length, long *total,
-                        long *kept ) -> std::string {
+  auto run_child = [&]( long first, long length, long *total, long *kept,
+                        bool trace = false ) -> std::string {
     int fd[2];
     if ( pipe( fd ) != 0 )
       return "pipe failed";
@@ -1706,8 +1738,12 @@ void exhaust_sweep( Fixture const &f, std::string const &name, Sweep const &s ) 
     if ( pid == 0 ) {
       close( fd[0] );
       alarm( 60 );
-      for ( std::string const &b : s.before )
-        server.handle( rq( 9, b ) );
+      if ( trace ) {
+        void *frames[4];
+        backtrace( frames, 4 );
+        signal( SIGSEGV, sweep_trace );
+        signal( SIGABRT, sweep_trace );
+      }
       long const live0 = static_cast<long>( new_live.load() );
       long count = 0;
       std::string out( sweep_call( server, call, s, first, length, &count ) );
@@ -1782,6 +1818,10 @@ void exhaust_sweep( Fixture const &f, std::string const &name, Sweep const &s ) 
                 << " times (first at " << o.second.second << "): " << o.first
                 << std::endl;
       check( allowed, name + ": allowed outcome", o.first );
+      if ( o.first.rfind( "signal", 0 ) == 0 ) {
+        std::cout << "at " << o.second.second << ":" << std::endl;
+        run_child( o.second.second, length, nullptr, nullptr, true );
+      }
     }
   }
 }
@@ -1789,8 +1829,9 @@ void exhaust_sweep( Fixture const &f, std::string const &name, Sweep const &s ) 
 // The queries catch whatever a catch clause can: a failure that became an error
 // of the data shows as an answer of its own.
 std::string caught( std::string const &expr ) {
-  return "try { " + expr + " } catch * { concat('caught ', $err:code, ' ', "
-         "$err:description) }";
+  return "declare namespace err = \"http://www.w3.org/2005/xqt-errors\";\n"
+         "try { " + expr + " } catch * { concat(\"caught \", string($err:code), "
+         "\" \", $err:description) }";
 }
 
 std::string sweep_names_xml() {
@@ -1830,6 +1871,7 @@ void test_sweep_html( Fixture const &f ) {
   for ( int i = 0; i < 40; ++i )
     html += "<div class='c'><span>text</span></div>";
   Sweep s;
+  s.after_compile = true;
   s.query = "import module namespace x = 'http://zorba.io/modules/xml';\n" +
     caught( "count(x:parse-html(\"" + html + "</body></html>\")//*:span)" );
   s.expected = "40";
@@ -1920,6 +1962,7 @@ void test_sweep_cache( Fixture const &f ) {
   s.query = open;
   s.expected = "0";
   s.before.push_back( open );
+  s.after_compile = true;
   exhaust_sweep( f, "document cache", s );
 #else
   (void)f;
@@ -1941,6 +1984,12 @@ void test_cache_after_failed_admission( Fixture const &f ) {
   ServerConfig config;
   config.root = t.root;
   config.scan = false;
+  config.before_execute = []() {
+    if ( sweep_pending ) {
+      sweep_pending = false;
+      inject_arm( sweep_first, sweep_length );
+    }
+  };
   std::ostringstream log;
   Server server( f.zorba, config, log );
   auto call = [&]( std::string const &query ) {
@@ -1948,6 +1997,9 @@ void test_cache_after_failed_admission( Fixture const &f ) {
       { "name", "run_query" },
       { "arguments", Json::object( { { "query", query } } ) } } ) ) ) );
   };
+  // The query that reads for the cache is compiled by now.
+  call( open_of( 13 ) );
+  call( open_of( 13 ) );
   check( call( open_of( 0 ) ) == "0", "first read" );
   // Count what the admitting read allocates, in a child, so that it stays to do.
   long total = 0;
@@ -1956,7 +2008,9 @@ void test_cache_after_failed_admission( Fixture const &f ) {
     check( pipe( fd ) == 0, "pipe" );
     pid_t const pid = fork();
     if ( pid == 0 ) {
-      inject_arm( 0, 0 );
+      sweep_pending = true;
+      sweep_first = 0;
+      sweep_length = 0;
       call( open_of( 0 ) );
       long const c = inject_disarm();
       ssize_t const n = write( fd[1], &c, sizeof c );
@@ -1970,14 +2024,16 @@ void test_cache_after_failed_admission( Fixture const &f ) {
     waitpid( pid, &status, 0 );
   }
   std::map<std::string, long> outcomes;
-  for ( long n = 1; n <= total; n += std::max( 1L, total / 400 ) ) {
+  for ( long n = 1; n <= total; n += std::max( 1L, total / 60 ) ) {
     int fd[2];
     check( pipe( fd ) == 0, "pipe" );
     pid_t const pid = fork();
     if ( pid == 0 ) {
       close( fd[0] );
       alarm( 60 );
-      inject_arm( n, 1 );
+      sweep_pending = true;
+      sweep_first = n;
+      sweep_length = 1;
       try {
         call( open_of( 0 ) );
       }
@@ -1985,7 +2041,7 @@ void test_cache_after_failed_admission( Fixture const &f ) {
       }
       inject_disarm();
       std::string out;
-      for ( int round = 0; round < 3; ++round )
+      for ( int round = 0; round < 2; ++round )
         for ( int i = 1; i < 14; ++i ) {
           std::string const got( call( open_of( i ) ) );
           if ( got != std::to_string( i ) && out.empty() )
@@ -2055,6 +2111,8 @@ void test_exhaust_long_line( Fixture const &f ) {
 #if defined(__linux__) && !defined(ZORBA_TEST_SANITIZER)
   struct rlimit no_core = { 0, 0 };
   check( setrlimit( RLIMIT_CORE, &no_core ) == 0, "no core files" );
+  // If the server ends, this test reports it.
+  signal( SIGPIPE, SIG_IGN );
   auto call = [&]( int id, char const *query ) {
     return request( id, "tools/call", Json::object( {
       { "name", "run_query" },

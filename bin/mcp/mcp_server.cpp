@@ -601,6 +601,8 @@ Server::run( std::string const &source, std::string const &file_name,
     Zorba_SerializerOptions opts;
     opts.set( directory_config::serialization_params() );
     CappedBuf buf( theConfig.max_output );
+    if ( theConfig.before_execute )
+      theConfig.before_execute();
     std::ostream out( &buf );
     query->execute( out, &opts );
     query->close();
