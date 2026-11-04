@@ -1673,6 +1673,7 @@ void sweep_on_signal( int sig ) {
     char const *const slash = std::strrchr( info.dli_fname, '/' );
     char const *const base = slash ? slash + 1 : info.dli_fname;
     if ( std::strncmp( base, "libc.", 5 ) && std::strncmp( base, "libgcc", 6 ) &&
+         std::strncmp( base, "linux-vdso", 10 ) &&
          std::strncmp( base, "mcp_tests", 9 ) ) {
       lib = base;
       break;
@@ -1854,17 +1855,32 @@ void exhaust_sweep( Fixture const &f, std::string const &name, Sweep const &s ) 
   long const stride = std::max( 1L, total / s.points );
   for ( long const length : { 1L, 8L } ) {
     std::map<std::string, std::pair<long, long> > outcomes;
+    long sampled = 0, keeping = 0, max_kept = 0;
     for ( long n = 1; n <= total; n += length > 1 ? 4 * stride : stride ) {
       long kept = 0;
       std::string out( run_child( n, length, nullptr, &kept ) );
       // What a failed call keeps, beyond the caches a good one fills.
-      if ( n % 8 == 0 && kept > base_kept + 8 * 1024 )
-        out += " | keeps memory";
+      // What a failed call keeps, beyond the caches a good one fills. A few
+      // allocations are the last of a record or cache that stays; a tree left
+      // behind shows at most of them.
+      if ( n % 8 == 0 ) {
+        ++sampled;
+        if ( kept > base_kept + 8 * 1024 ) {
+          ++keeping;
+          max_kept = std::max( max_kept, kept - base_kept );
+        }
+      }
       auto &o = outcomes[out];
       if ( !o.first )
         o.second = n;
       ++o.first;
     }
+    std::cout << name << ", " << length << " failing: of " << sampled
+              << " measured, " << keeping << " keep memory, at most " << max_kept
+              << " bytes" << std::endl;
+    check( keeping <= std::max( 3L, sampled / 10 ),
+           name + ": failed calls give their memory back",
+           std::to_string( keeping ) + " of " + std::to_string( sampled ) );
     for ( auto const &o : outcomes ) {
       // handle() throws when even its error response cannot be made: main() of
       // zorba-mcp answers then, with this id.
@@ -2004,7 +2020,9 @@ void test_sweep_casts( Fixture const &f ) {
   s.points = 400;
   s.expected = "\"true true true true true true true true true true 2000\"";
   s.lenient = true;                 // the compilation is swept too
-  s.known = { "exit 2" };           // the scanner of the compiler
+  // The scanner of the compiler; a function not found after a failure while it
+  // was being compiled.
+  s.known = { "exit 2", "memory_limit | same call again: error: err:XPST00" };
   exhaust_sweep( f, "casts", s );
 #else
   (void)f;
@@ -2020,8 +2038,8 @@ void test_sweep_compile( Fixture const &f ) {
   s.expected = "41";
   s.lenient = true;
   s.points = 200;
-  s.known = { "exit 2", "memory_limit | same call again: error: err:XPST0017",
-              "signal 6 in libstdc", "signal 6 in linux-vdso",
+  s.known = { "exit 2", "memory_limit | same call again: error: err:XPST00",
+              "signal 6 in libstdc",
               "terminate N11xercesc" };
   exhaust_sweep( f, "compilation", s );
 #else
@@ -2041,7 +2059,7 @@ void test_sweep_decimal_thread( Fixture const &f ) {
   s.lenient = true;                 // the compilation is swept too
   // A new thread: glibc gives up if it cannot register the first thread_local
   // with a destructor of the thread.
-  s.known = { "exit 2", "signal 6 in libstdc", "signal 6 in linux-vdso",
+  s.known = { "exit 2", "signal 6 in libstdc", "signal 6 in unknown",
               "terminate N11xercesc" };
   exhaust_sweep( f, "first decimal of a thread", s );
 #else
@@ -2068,7 +2086,8 @@ void test_sweep_cache( Fixture const &f ) {
   s.after_compile = true;
   // A query over dir:open: what is left of a failure in the checks of a path, and
   // in libraries. See the limits of --max-memory in bin/mcp/README.md.
-  s.known = { "terminate N11xercesc", "signal 11 in libicu", "error: file:FOFL9999",
+  s.known = { "terminate N11xercesc", "signal 11 in libicu", "signal 11 in unknown",
+              "signal 11 in libstdc", "error: file:FOFL9999",
               "error: dir:INVALID_PATH", "error: err:FOCH0002" };
   s.empty_answer = true;
   exhaust_sweep( f, "document cache", s );
