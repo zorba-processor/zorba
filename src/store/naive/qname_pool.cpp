@@ -505,8 +505,9 @@ retry:
     normVictim->removeReference();
   }
 }
-  Return a qname slot for a new qname to be stored in. If the cache free list
-  is not empty, we use the 1st slot from tha list; the qname currently in that
+
+
+
 /*******************************************************************************
   An allocation failed between cacheInsert() and the insertion in the hash table:
   the slot goes back. The caller holds the lock, and removes a reference from the
