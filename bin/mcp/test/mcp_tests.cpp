@@ -1637,6 +1637,7 @@ struct Sweep {
   long points = 1500;               // at most this many allocations are tried
   std::vector<std::string> known;   // other allowed outcomes, by prefix: limits
   bool empty_answer = false;        // an empty answer is allowed too, a limit
+  bool needs_module = false;        // of a module that some builds leave out
   std::vector<std::string> before;  // calls before all of them, with no failure
 };
 
@@ -1846,6 +1847,10 @@ void exhaust_sweep( Fixture const &f, std::string const &name, Sweep const &s ) 
 
   long total = 0, base_kept = 0;
   std::string const plain( run_child( 0, 0, &total, &base_kept ) );
+  if ( s.needs_module && contains( plain, "XQST0059" ) ) {
+    std::cout << name << ": the module is not in this build" << std::endl;
+    return;
+  }
   check( plain == "answer", name + ": with no failure, the answer", plain );
   std::cout << name << ": " << total << " allocations, " << base_kept
             << " bytes kept" << std::endl;
@@ -1964,6 +1969,7 @@ void test_sweep_html( Fixture const &f ) {
   s.before.push_back( s.query );
   s.expected = "40";
   s.known = { "terminate N11xercesc" };   // releasing a schema
+  s.needs_module = true;
   exhaust_sweep( f, "x:parse-html", s );
 #else
   (void)f;
