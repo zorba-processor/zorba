@@ -76,10 +76,29 @@ Rules this code depends on:
   `Server::run()`, and is the tool error `memory_limit`. What makes this hold:
   destructors and what they call do not allocate (`JSONItem::destroy()`), or may
   throw and do not while unwinding (`string_appender`); MAPM throws instead of
-  calling `exit()`; a failure in a libxml2 callback is kept by the loader and
-  thrown after the parse; a catch clause of a query does not catch it. The main
-  stack takes its size before the limit is set, since at the limit it could not
-  grow. Whatever still leaves a `noexcept` function ends the process with status 3
+  calling `exit()`, and its per-thread setup can run again; a failure in a libxml2
+  callback is kept by the loader and thrown after the parse; the QName pool undoes
+  an insertion; casts and other handlers of `std::exception` let it through; a catch
+  clause of a query does not catch it. The main stack takes its size before the limit
+  is set, up to 64 MiB, since at the limit it could not grow. A line of input takes at
+  most the size of a message.
+
+  `exhaust_sweep_*` in `test/mcp_tests.cpp` make each allocation of a call fail in
+  turn. What is left, each of them listed in those tests:
+  - Whatever else leaves a `noexcept` function: status 3 and a message
+    (`on_terminate()`, `--help`).
+  - Xerces-C throws from a destructor releasing a schema, at the end of a query that
+    imports one, as the directory and xml modules do: abort.
+  - libxml2 and glibc abort if they cannot set up the first use by a thread. The main
+    thread and the scanner's do that at start.
+  - ICU crashes in `RegexPattern::zap()` (SIGSEGV) if an allocation fails while it
+    compiles a regular expression. The directory module uses some on each call.
+  - The flex scanner calls `exit(2)` if it cannot allocate, while a query compiles.
+  - While a query compiles, a failure can be reported as an error of the query, for
+    example that a module was not found; after some, a function stayed undeclared for
+    the next calls (seen on arm64, `XPST0017` on `parse-xml`).
+  - A failure in the checks of a path can be reported as a denied or invalid path, or
+    in a `dir:open` as an error record, which a query can read as no content.
   and a message (`on_terminate()`, `--help`).
 
 Tests hold the threads at known points with `ServerConfig::scan_hook`. Tests

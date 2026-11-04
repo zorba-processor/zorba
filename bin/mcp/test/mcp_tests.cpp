@@ -1809,7 +1809,6 @@ void exhaust_sweep( Fixture const &f, std::string const &name, Sweep const &s ) 
              text_of( r ) != s.expected )
           out += " | same call again: " + text_of( r );
         k = static_cast<long>( new_live.load() ) - live0;
-      }
         out += " | same call again: " + text_of( r );
       std::string const msg( std::to_string( count ) + " " +
                              std::to_string( k ) + " " + out );
