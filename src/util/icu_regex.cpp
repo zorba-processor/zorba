@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <new>
 #include <zorba/config.h>
 
 #ifndef ZORBA_NO_ICU
@@ -911,6 +912,12 @@ void regex::compile( string const &u_pattern, char const *flags,
   zre_ = nullptr;
   UErrorCode status = U_ZERO_ERROR;
   matcher_ = new RegexMatcher( u_pattern, icu_flags, status );
+  // ICU's operator new returns null when it cannot allocate.
+  if ( !matcher_ || status == U_MEMORY_ALLOCATION_ERROR ) {
+    delete matcher_;
+    matcher_ = nullptr;
+    throw std::bad_alloc();
+  }
   if ( U_FAILURE( status ) ) {
     delete matcher_;
     matcher_ = nullptr;

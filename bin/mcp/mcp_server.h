@@ -38,6 +38,9 @@ namespace mcp {
 /** The MCP revision this server implements per request (stateless). */
 extern char const protocol_version[];
 
+/** Larger messages are refused before parsing. */
+extern std::size_t const max_message_size;
+
 /** The handshake-based revisions served after an \c initialize request. */
 extern char const *const legacy_protocol_versions[];
 
@@ -100,6 +103,12 @@ public:
    */
   std::string handle( std::string const &message );
 
+  /**
+   * The id of the request being handled, as JSON ("null" if it has none or is
+   * not known yet), for a response made when handle() itself runs out of memory.
+   */
+  char const* current_id() const { return theCurrentId.c_str(); }
+
   /** The policy every query runs under. */
   SecurityPolicy const& policy() const { return thePolicy; }
 
@@ -157,6 +166,7 @@ private:
   std::vector<Predefined> thePredefined;
   DocumentCache theCache;
   std::string theLegacyVersion;         // set by initialize
+  std::string theCurrentId{ "null" };   // see current_id()
   std::unique_ptr<Scanner> theScanner;  // null with --no-scan
 };
 

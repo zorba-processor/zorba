@@ -40,6 +40,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include <libxml/dict.h>
 #include <libxml/parser.h>
 
 #include "scan_preview.h"
@@ -855,6 +856,9 @@ struct Scanner::Shared {
   }
 
   void sampler() {
+    // See Server::Server. The scan of a root starts with the server, before any
+    // query can have taken the memory.
+    xmlFreeDict( xmlDictCreate() );
     for ( ;; ) {
       try {
         sample();

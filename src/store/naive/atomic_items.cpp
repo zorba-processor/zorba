@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#include <new>
 #include "atomic_items.h"
 
 #include <algorithm>
@@ -145,6 +146,9 @@ bool AtomicItem::castToLong(store::Item_t& result) const
     {
       longValue = ztd::aton<xs_long>(item->theValue.c_str());
       GET_FACTORY().createLong(result, longValue);
+    }
+    catch ( std::bad_alloc const& ) {
+      throw;
     }
     catch (std::exception const&)
     {
@@ -534,6 +538,9 @@ bool UntypedAtomicItem::castToDouble(store::Item_t& result) const
     xs_double const doubleValue(theValue);
     return GET_FACTORY().createDouble(result, doubleValue);
   }
+  catch ( std::bad_alloc const& ) {
+    throw;
+  }
   catch ( std::exception const& ) 
   {
     result = NULL;
@@ -549,6 +556,9 @@ bool UntypedAtomicItem::castToDecimal(store::Item_t& result) const
     xs_decimal const decValue(theValue);
     return GET_FACTORY().createDecimal(result, decValue);
   }
+  catch ( std::bad_alloc const& ) {
+    throw;
+  }
   catch ( std::exception const& )
   {
     result = NULL;
@@ -563,6 +573,9 @@ bool UntypedAtomicItem::castToInteger(store::Item_t& result) const
   {
     xs_integer const intValue(theValue);
     return GET_FACTORY().createInteger(result, intValue);
+  }
+  catch ( std::bad_alloc const& ) {
+    throw;
   }
   catch ( std::exception const& )
   {
@@ -2932,6 +2945,9 @@ template<class I>
 xs_nonNegativeInteger IntegerItemImpl<I>::getUnsignedIntegerValue() const {
   try {
     return xs_nonNegativeInteger( theValue );
+  }
+  catch ( std::bad_alloc const& ) {
+    throw;
   }
   catch ( std::exception const& ) {
     throw XQUERY_EXCEPTION(

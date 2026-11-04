@@ -393,6 +393,7 @@ extern	char	*M_lowercase(char *);
 extern  void    M_apm_log_error_msg(int, char *);
 extern  void    M_apm_out_of_memory(void);   /* m_apm.cpp; does not return */
 extern  void    M_reset_stack(void);
+extern  void    M_reset_init(void);
 extern  void	M_apm_round_fixpt(M_APM, int, M_APM);
 
 #endif

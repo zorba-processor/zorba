@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <new>
 #include <vector>
 #include <cmath>
 
@@ -1116,6 +1117,9 @@ T1_TO_T2(flt, dec)
     aFactory->createDecimal(result, n);
     return true;
   }
+  catch ( std::bad_alloc const& ) {
+    throw;
+  }
   catch (const std::exception&) 
   {
     if ( throw_on_error )
@@ -1182,6 +1186,9 @@ T1_TO_T2(dbl, dec)
     xs_decimal const n( aItem->getDoubleValue() );
     aFactory->createDecimal(result, n);
     return true;
+  }
+  catch ( std::bad_alloc const& ) {
+    throw;
   }
   catch (const std::exception&) 
   {
@@ -1888,6 +1895,9 @@ T1_TO_T2(flt, uint)
     aFactory->createNonNegativeInteger(result, n);
     return true;
   }
+  catch ( std::bad_alloc const& ) {
+    throw;
+  }
   catch (const std::exception& ) 
   {
     if ( throw_on_error )
@@ -1927,6 +1937,9 @@ T1_TO_T2(uint, int)
     aFactory->createInteger(result, n);
     return true;
   }
+  catch ( std::bad_alloc const& ) {
+    throw;
+  }
   catch (const std::exception& ) 
   {
     // An xs:unsignedLong above 2^63-1 without big integers: too large for
@@ -1957,6 +1970,9 @@ T1_TO_T2(dbl, uint)
     aFactory->createInteger(result, n);
     return true;
   }
+  catch ( std::bad_alloc const& ) {
+    throw;
+  }
   catch (const std::exception& ) 
   {
     if ( throw_on_error )
@@ -1978,6 +1994,9 @@ T1_TO_T2(dec, uint)
     xs_nonNegativeInteger const n(aItem->getDecimalValue());
     aFactory->createNonNegativeInteger(result, n);
     return true;
+  }
+  catch ( std::bad_alloc const& ) {
+    throw;
   }
   catch ( const std::exception& ) 
   {
@@ -2176,6 +2195,9 @@ bool int_down(
       factory->createLong(result, n);
       return true;
     }
+    catch ( std::bad_alloc const& ) {
+      throw;
+    }
     catch (std::exception const&) 
     {
       // ignore
@@ -2191,6 +2213,9 @@ bool int_down(
       xs_int const n = ztd::aton<xs_int>(lString.c_str());
       factory->createInt(result, n);
       return true;
+    }
+    catch ( std::bad_alloc const& ) {
+      throw;
     }
     catch ( std::exception const& ) 
     {
@@ -2208,6 +2233,9 @@ bool int_down(
       factory->createShort(result, n);
       return true;
     }
+    catch ( std::bad_alloc const& ) {
+      throw;
+    }
     catch ( std::exception const& ) 
     {
       // ignore
@@ -2223,6 +2251,9 @@ bool int_down(
       xs_byte const n = ztd::aton<xs_byte>(lString.c_str());
       factory->createByte(result, n);
       return true;
+    }
+    catch ( std::bad_alloc const& ) {
+      throw;
     }
     catch ( std::exception const& ) 
     {
@@ -2241,6 +2272,9 @@ bool int_down(
         factory->createNonNegativeInteger(result, i);
         return true;
       }
+      catch ( std::bad_alloc const& ) {
+        throw;
+      }
       catch ( std::exception const& ) 
       {
         // ignore
@@ -2258,6 +2292,9 @@ bool int_down(
       factory->createUnsignedLong(result, n);
       return true;
     }
+    catch ( std::bad_alloc const& ) {
+      throw;
+    }
     catch ( std::exception const& ) 
     {
       // ignore
@@ -2273,6 +2310,9 @@ bool int_down(
       xs_unsignedInt const n = ztd::aton<xs_unsignedInt>(lString.c_str());
       factory->createUnsignedInt(result, n);
       return true;
+    }
+    catch ( std::bad_alloc const& ) {
+      throw;
     }
     catch ( std::exception const& ) 
     {
@@ -2290,6 +2330,9 @@ bool int_down(
       factory->createUnsignedShort(result, n);
       return true;
     }
+    catch ( std::bad_alloc const& ) {
+      throw;
+    }
     catch ( std::exception const& ) 
     {
       // ignore
@@ -2306,6 +2349,9 @@ bool int_down(
       factory->createUnsignedByte(result, n);
       return true;
     }
+    catch ( std::bad_alloc const& ) {
+      throw;
+    }
     catch ( std::exception const& ) 
     {
       // ignore
@@ -2319,6 +2365,9 @@ bool int_down(
       xs_positiveInteger const n = aItem->getUnsignedIntegerValue();
       factory->createPositiveInteger(result, n);
       return true;
+    }
+    catch ( std::bad_alloc const& ) {
+      throw;
     }
     catch ( std::exception const& )
     {

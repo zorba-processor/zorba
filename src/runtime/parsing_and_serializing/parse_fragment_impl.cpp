@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <new>
 #include "runtime/parsing_and_serializing/parse_fragment.h"
 
 #include <iostream>
@@ -438,6 +439,9 @@ bool FnZorbaCanonicalizeIterator::nextImpl(store::Item_t& result, PlanState& pla
   }
   catch ( ZorbaException const& )
   {
+    throw;
+  }
+  catch ( std::bad_alloc const& ) {
     throw;
   }
   catch ( std::exception const& )

@@ -329,6 +329,8 @@ protected:
 
   static FragmentIStream* streamOf(void* ctx);
 
+  static void recordOutOfMemory(void* ctx) noexcept;
+
   static void recordStartElement(
         void * ctx,
         const xmlChar * localname,

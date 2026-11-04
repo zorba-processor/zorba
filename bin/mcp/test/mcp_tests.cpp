@@ -1687,6 +1687,9 @@ std::string sweep_call( Server &server, std::string const &request_text,
     catch ( std::exception const &e ) {
       *count = inject_disarm();
       outcome = std::string( "handle() threw " ) + e.what();
+      if ( std::string( server.current_id() ) != "1" &&
+           std::string( server.current_id() ) != "null" )
+        outcome += ", id " + std::string( server.current_id() );
     }
   };
   if ( s.new_thread ) {
@@ -1740,7 +1743,7 @@ void exhaust_sweep( Fixture const &f, std::string const &name, Sweep const &s ) 
       return "fork failed";
     if ( pid == 0 ) {
       close( fd[0] );
-      alarm( 60 );
+      alarm( 10 );
       if ( trace ) {
         void *frames[4];
         backtrace( frames, 4 );
@@ -1945,7 +1948,7 @@ void test_sweep_casts( Fixture const &f ) {
     "string(string-length(codepoints-to-string(for $i in 1 to 2000 return 97))))"
     ", ' ')" );
   s.before.push_back( s.query );
-  s.after_compile = true;
+  s.points = 400;
   s.expected = "\"true true true true true true true true true true 2000\"";
   exhaust_sweep( f, "casts", s );
 #else
@@ -2067,7 +2070,7 @@ void test_cache_after_failed_admission( Fixture const &f ) {
     pid_t const pid = fork();
     if ( pid == 0 ) {
       close( fd[0] );
-      alarm( 60 );
+      alarm( 10 );
       sweep_pending = true;
       sweep_first = n;
       sweep_length = 1;

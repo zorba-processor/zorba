@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <new>
 #include <cctype>
 #include <cerrno>
 #include <climits>
@@ -469,6 +470,10 @@ Verdict check_file(
   {
     lPath = canonical_path(aPathOrURI);
   }
+  catch (const std::bad_alloc&)
+  {
+    throw;
+  }
   catch (const std::exception&)
   {
     return deny("malformed path");
@@ -492,6 +497,10 @@ Verdict check_file(
     {
       if (path_within(canonical_path(lDir.str()), lPath))
         return Verdict();
+    }
+    catch (const std::bad_alloc&)
+    {
+      throw;
     }
     catch (const std::exception&)
     {
@@ -841,6 +850,10 @@ std::unique_ptr<std::istream> open_file(
     std::string const lCwd = fs::curdir();
     lPath = fs::normalize_path(aPath.c_str(), lCwd.c_str());
   }
+  catch (const std::bad_alloc&)
+  {
+    throw;
+  }
   catch (const std::exception&)
   {
     oVerdict = deny("malformed path");
@@ -873,6 +886,10 @@ std::unique_ptr<std::istream> open_file(
     {
       lReal = canonical_path(lPath);
       oVerdict = check(aPolicy, lReal, aUse, false, aTrustedDirs);
+    }
+    catch (const std::bad_alloc&)
+    {
+      throw;
     }
     catch (const std::exception&)
     {

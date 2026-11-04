@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <new>
 #include "diagnostics/assert.h"
 #include "system/globalenv.h"
 
@@ -295,6 +296,7 @@ void QNamePool::insert(
     const char* ln)
 {
   QNameItem* qn;
+  QNameItem* fresh = NULL;  // not in the hash table yet
   QNameItem* normVictim = NULL;
   SYNC_CODE(bool haveLock = false;)
   store::Item_t normItem;
@@ -327,7 +329,7 @@ retry:
       if (normalized)
       {
         // Build a new QName (either new object or in cache).
-        qn = cacheInsert(normVictim);
+        fresh = qn = cacheInsert(normVictim);
         qn->initializeAsNormalizedQName(pooledNs, ln);
       }
       else
@@ -342,13 +344,14 @@ retry:
           goto retry;
         }
         // Build a new QName (either new object or in cache).
-        qn = cacheInsert(normVictim);
+        fresh = qn = cacheInsert(normVictim);
         qn->initializeAsUnnormalizedQName(normQName, pre);
       }
 
       bool found;
       entry = theHashSet.hashInsert(qn, hval, found);
       entry->key() = qn;
+      fresh = NULL;
       ZORBA_FATAL(!found, "");
     }
     else
@@ -362,6 +365,20 @@ retry:
 
     SYNC_CODE(theHashSet.theMutex.unlock();\
     haveLock = false;)
+  }
+  catch (std::bad_alloc const&)
+  {
+    QNameItem* freshVictim = NULL;
+    undoCacheInsert(fresh, &freshVictim);
+
+    SYNC_CODE(if (haveLock) \
+      theHashSet.theMutex.unlock();)
+
+    if (normVictim != NULL)
+      normVictim->removeReference();
+    if (freshVictim != NULL)
+      freshVictim->removeReference();
+    throw;
   }
   catch (...)
   {
@@ -391,6 +408,7 @@ void QNamePool::insert(
     const zstring& ln)
 {
   QNameItem* qn = NULL;
+  QNameItem* fresh = NULL;  // not in the hash table yet
   QNameItem* normVictim = NULL;
   SYNC_CODE(bool haveLock = false;)
   store::Item_t normItem;
@@ -422,7 +440,7 @@ retry:
       if (normalized)
       {
         // Build a new QName (either new object or in cache).
-        qn = cacheInsert(normVictim);
+        fresh = qn = cacheInsert(normVictim);
         qn->initializeAsNormalizedQName(pooledNs, ln);
       }
       else
@@ -439,13 +457,14 @@ retry:
           goto retry;
         }
         // Build a new QName (either new object or in cache).
-        qn = cacheInsert(normVictim);
+        fresh = qn = cacheInsert(normVictim);
         qn->initializeAsUnnormalizedQName(normQName, pre);
       }
 
       bool found;
       entry = theHashSet.hashInsert(qn, hval, found);
       entry->key() = qn;
+      fresh = NULL;
       ZORBA_FATAL(!found, "");
     }
     else
@@ -459,6 +478,19 @@ retry:
 
     SYNC_CODE(theHashSet.theMutex.unlock();\
     haveLock = false;)
+  }
+  catch (std::bad_alloc const&)
+  {
+    QNameItem* freshVictim = NULL;
+    undoCacheInsert(fresh, &freshVictim);
+
+    SYNC_CODE(if (haveLock) theHashSet.theMutex.unlock();)
+
+    if (normVictim != NULL)
+      normVictim->removeReference();
+    if (freshVictim != NULL)
+      freshVictim->removeReference();
+    throw;
   }
   catch (...)
   {
@@ -478,6 +510,26 @@ retry:
 /*******************************************************************************
   Return a qname slot for a new qname to be stored in. If the cache free list
   is not empty, we use the 1st slot from tha list; the qname currently in that
+/*******************************************************************************
+  An allocation failed between cacheInsert() and the insertion in the hash table:
+  the slot goes back. The caller holds the lock, and removes a reference from the
+  victim after it releases it.
+********************************************************************************/
+void QNamePool::undoCacheInsert(QNameItem* qn, QNameItem** normVictim)
+{
+  if (qn == NULL)
+    return;
+
+  if (qn->isValid())
+    qn->invalidate(true, normVictim);
+
+  if (qn->isInCache())
+    addInFreeList(qn);
+  else
+    delete qn;
+}
+
+
   slot (if any) is removed from the pool. If the cache free list is empty a new
   QNameItem is allocated from the heap.
 ********************************************************************************/

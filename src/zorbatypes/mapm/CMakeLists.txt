@@ -55,7 +55,7 @@ SET(MAPM_SRCS
 # An allocation that fails throws std::bad_alloc through these functions (see
 # M_apm_log_error_msg).
 FOREACH(MAPM_SRC ${MAPM_SRCS})
-  SET_SOURCE_FILES_PROPERTIES(${CMAKE_SOURCE_DIR}/src/zorbatypes/mapm/${MAPM_SRC}
+  SET_SOURCE_FILES_PROPERTIES(${CMAKE_CURRENT_LIST_DIR}/${MAPM_SRC}
     PROPERTIES COMPILE_OPTIONS "-fexceptions")
 ENDFOREACH(MAPM_SRC)
 

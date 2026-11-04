@@ -133,6 +133,8 @@ public:
 protected:
   QNameItem* cacheInsert(QNameItem*& normVictim);
 
+  void undoCacheInsert(QNameItem* qn, QNameItem** normVictim);
+
   void cachePin(QNameItem* qn);
 
   QNHashEntry* hashFind(

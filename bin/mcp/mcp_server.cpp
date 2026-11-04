@@ -28,6 +28,9 @@
 #include <streambuf>
 #include <utility>
 
+#include <libxml/dict.h>
+
+#include <zorba/user_exception.h>
 #include <zorba/diagnostic.h>
 #include <zorba/dynamic_context.h>
 #include <zorba/item.h>
@@ -47,6 +50,8 @@ namespace mcp {
 
 char const protocol_version[] = "2026-07-28";
 
+std::size_t const max_message_size = 4 * 1024 * 1024;
+
 char const *const legacy_protocol_versions[] = {
   "2025-11-25", "2025-06-18", "2025-03-26", nullptr
 };
@@ -61,8 +66,6 @@ int const METHOD_NOT_FOUND = -32601;
 int const INVALID_PARAMS = -32602;
 int const UNSUPPORTED_PROTOCOL_VERSION = -32022;
 
-// Larger messages are refused before parsing.
-std::size_t const max_message_size = 4 * 1024 * 1024;
 
 char const meta_version[] = "io.modelcontextprotocol/protocolVersion";
 char const meta_capabilities[] = "io.modelcontextprotocol/clientCapabilities";
@@ -335,6 +338,9 @@ Server::Server( Zorba *zorba, ServerConfig config, std::ostream &log ) :
   theCache( zorba, theConfig.root,
             std::uintmax_t( theConfig.cache_max_file_kb ) * 1024,
             theConfig.cache_max_files, &thePolicy, base_uri_of( theConfig.root ) ) {
+  // libxml2 ends the process if it cannot allocate its state for a thread, the
+  // first time the thread uses it: this thread does so now, before any query.
+  xmlFreeDict( xmlDictCreate() );
   directory_config::apply_policy( thePolicy, theConfig.root );
   if ( theConfig.timeout.count() > 0 )
     thePolicy.setTimeout( theConfig.timeout );
@@ -619,8 +625,10 @@ Server::run( std::string const &source, std::string const &file_name,
   }
   // The query is gone by now, and with it the memory it used.
   catch ( ZorbaException const &e ) {
-    // Zorba reports std::bad_alloc as an internal error.
-    if ( std::strcmp( e.diagnostic().qname().localname(), "ZXQP0003" ) == 0 &&
+    // Zorba reports std::bad_alloc as an internal error; fn:error() can raise
+    // that code too, as a UserException.
+    if ( !dynamic_cast<UserException const*>( &e ) &&
+         std::strcmp( e.diagnostic().qname().localname(), "ZXQP0003" ) == 0 &&
          std::strstr( e.what(), "bad_alloc" ) )
       outcome.text = out_of_memory_text( theConfig.max_memory );
     else
@@ -749,6 +757,7 @@ Json Server::call_tool( Json const &params, bool *protocol_error,
 
 std::string Server::handle( std::string const &message ) {
   Json request_id;
+  theCurrentId = "null";
   try {
     return handle_message( message, &request_id );
   }
@@ -778,7 +787,10 @@ std::string Server::handle_message( std::string const &message,
   Json const *const id = msg.find( "id" );
   Json const *const method = msg.find( "method" );
   if ( id && ( id->is_string() || id->is_integer() ) )
+  {
     *request_id = *id;
+    theCurrentId = id->dump();
+  }
   if ( !method ) {
     // A response from the client (we send no requests): nothing to answer.
     if ( !id || msg.find( "result" ) || msg.find( "error" ) )

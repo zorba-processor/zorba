@@ -1090,9 +1090,6 @@ retry:
   // collision list for its bucket. We place the new item right after the
   // headEntry for the bucket.
 
-  ++theNumEntries;
-  ++theNumCollisions;
-
   // If no free entry exists, we extend the collision area of the hash table.
   if (freelist()->getNext() == 0)
   {
@@ -1100,6 +1097,9 @@ retry:
     extendCollisionArea();
     headEntry = &theHashTab[0] + offset;
   }
+
+  ++theNumEntries;
+  ++theNumCollisions;
 
   currEntry = freelist()->getNext();
   freelist()->setNext(currEntry->getNext());

@@ -163,6 +163,7 @@ char const* XmlLoader::parserInputUri(
 
 ********************************************************************************/
 void XmlLoader::error(void* ctx, ZORBA_XML_ERROR_PTR error)
+try
 {
   if ( error->level == XML_ERR_NONE )
     return;
@@ -274,6 +275,10 @@ void XmlLoader::error(void* ctx, ZORBA_XML_ERROR_PTR error)
     default:
       ZORBA_ASSERT( false );
   } // switch
+}
+catch (std::bad_alloc const&)
+{
+  static_cast<XmlLoader*>( ctx )->setOutOfMemory();
 }
 
 
@@ -531,7 +536,7 @@ store::Item_t FastXmlLoader::loadXml(
     {
       xmlParseChunk(ctxt, theBuffer, static_cast<int>(numChars), 0);
 
-      if (!theXQueryDiagnostics->errors().empty())
+      if (theOutOfMemory || !theXQueryDiagnostics->errors().empty())
       {
         abortload();
         return NULL;
@@ -563,6 +568,12 @@ store::Item_t FastXmlLoader::loadXml(
     noteOutOfMemory();
     theXQueryDiagnostics->add_error(
       NEW_ZORBA_EXCEPTION(zerr::ZXQP0003_INTERNAL_ERROR));
+    abortload();
+    return NULL;
+  }
+
+  if (theOutOfMemory)
+  {
     abortload();
     return NULL;
   }

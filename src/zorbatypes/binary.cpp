@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <new>
 #include <cassert>
 #include <cctype>
 #include <zorba/error.h>
@@ -100,6 +101,9 @@ bool Base64::parseString( char const *s, size_type size, Base64 &b64 ) {
       b64.data_.resize( size );
       b64.data_.resize( copy_without_ws( s, size, b64.data_.data() ) );
     }
+    catch ( std::bad_alloc const& ) {
+      throw;
+    }
     catch ( std::exception const& ) {
       return false;
     }
@@ -151,6 +155,9 @@ bool Base16::parseString( char const *data, size_type size, Base16 &b16 ) {
       hexbinary::validate( data, size, hexbinary::dopt_ignore_ws );
       b16.data_.resize( size );
       b16.data_.resize( copy_without_ws( data, size, b16.data_.data() ) );
+    }
+    catch ( std::bad_alloc const& ) {
+      throw;
     }
     catch ( std::exception const& ) {
       return false;

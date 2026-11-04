@@ -397,11 +397,13 @@ Item DocumentCache::admit( std::string const &root, std::string const &path,
   // A read that yields nothing to keep is not tried again until the file
   // changes: a tree of such files must not pay for a second query per read.
   ++theStats.refused;
-  *seen = refused_tag( *seen );
   std::size_t bytes = 0;
   Item const record( read( root, path, &bytes ) );
   if ( record.isNull() )
     return Item();
+  // Null is the engine failing, running out of memory for one, which says nothing
+  // about the file: it is tried again.
+  *seen = refused_tag( *seen );
 
   // Kept only if it holds no error (which can come from the moment rather
   // than the file), is not a small file that expands far beyond what files of
@@ -420,9 +422,17 @@ Item DocumentCache::admit( std::string const &root, std::string const &path,
     erase( theEntries.find( theLru.back() ) );
     ++theStats.evictions;
   }
-  theLru.push_front( key );
-  theEntries.emplace( key,
-    Entry{ canonical, id, record, bytes, theQuery, theLru.begin() } );
+  // The map first: a key in the list and not in the map would break eviction.
+  auto const added = theEntries.emplace( key,
+    Entry{ canonical, id, record, bytes, theQuery, theLru.end() } );
+  try {
+    theLru.push_front( key );
+  }
+  catch ( ... ) {
+    theEntries.erase( added.first );
+    throw;
+  }
+  added.first->second.lru = theLru.begin();
   theStats.bytes += bytes;
   theStats.entries = theEntries.size();
   --theStats.refused;

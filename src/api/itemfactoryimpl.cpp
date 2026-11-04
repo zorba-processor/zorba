@@ -16,6 +16,7 @@
 
 #define  __STDC_LIMIT_MACROS
 
+#include <new>
 #include <atomic>
 #include <mutex>
 
@@ -364,6 +365,9 @@ Item ItemFactoryImpl::createDecimal (const String& aValue)
     xs_decimal const lDecimal(lString);
     theItemFactory->createDecimal(lItem, lDecimal);
   }
+  catch ( std::bad_alloc const& ) {
+    throw;
+  }
   catch ( std::exception const& ) {
     // ignore
   }
@@ -389,6 +393,9 @@ ItemFactoryImpl::createInteger(const String& aInteger)
   try {
     xs_integer const lInteger( lString );
     theItemFactory->createInteger(lItem, lInteger);
+  }
+  catch ( std::bad_alloc const& ) {
+    throw;
   }
   catch ( std::exception const& ) {
     // ignore
@@ -516,6 +523,9 @@ Item ItemFactoryImpl::createDouble ( const String& aValue )
     xs_double const lDouble(lString);
     theItemFactory->createDouble(lItem, lDouble);
   }
+  catch ( std::bad_alloc const& ) {
+    throw;
+  }
   catch ( std::exception const& ) {
     // ignore
   }
@@ -576,6 +586,9 @@ Item ItemFactoryImpl::createDocumentNode( const String& aBaseUri, const String& 
   try {
     theItemFactory->createDocumentNode(lItem, lBaseUri, lDocUri);
   }
+  catch ( std::bad_alloc const& ) {
+    throw;
+  }
   catch ( std::exception const& ) {
     // ignore
   }
@@ -589,6 +602,9 @@ Item ItemFactoryImpl::createFloat ( const String& aValue )
   try {
     xs_float const lFloat(lString);
     theItemFactory->createFloat(lItem, lFloat);
+  }
+  catch ( std::bad_alloc const& ) {
+    throw;
   }
   catch ( std::exception const& ) {
     // ignore
