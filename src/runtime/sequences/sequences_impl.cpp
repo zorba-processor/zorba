@@ -1626,7 +1626,7 @@ void load_document_from_uri(
     {
       // A denied document is not available.
       oResult = NULL;
-      throw XQUERY_EXCEPTION(err::FODC0002, ERROR_PARAMS(aUri, lDenied),
+      throw XQUERY_EXCEPTION(err::FODC0002, ERROR_PARAMS(aUri, ERROR_TEXT( lDenied )),
                              ERROR_LOC(loc));
     }
     return;

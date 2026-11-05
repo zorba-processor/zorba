@@ -428,7 +428,7 @@ bool FnZorbaCanonicalizeIterator::nextImpl(store::Item_t& result, PlanState& pla
     {
       zstring lErrorMsg;
       lErrorMsg = "\"" + lDocString + "\"";
-      throw XQUERY_EXCEPTION(err::FOCZ0001, ERROR_PARAMS("x:canonicalize()", ERROR_TEXT( lErrorMsg ) ), ERROR_LOC(loc));
+      throw XQUERY_EXCEPTION(err::FOCZ0001, ERROR_PARAMS("x:canonicalize()", lErrorMsg), ERROR_LOC(loc));
     }
 
     xmlC14NDocDumpMemory(lDoc, NULL, 2/*XML_C14N_1_1*/, NULL, 1, &lResult);
@@ -444,7 +444,7 @@ bool FnZorbaCanonicalizeIterator::nextImpl(store::Item_t& result, PlanState& pla
   {
       zstring lErrorMsg;
       lErrorMsg = "\"" + lDocString + "\"";
-      throw XQUERY_EXCEPTION(err::FOCZ0001, ERROR_PARAMS("x:canonicalize()", ERROR_TEXT( lErrorMsg ) ), ERROR_LOC(loc));
+      throw XQUERY_EXCEPTION(err::FOCZ0001, ERROR_PARAMS("x:canonicalize()", lErrorMsg), ERROR_LOC(loc));
   }
   STACK_PUSH(GENV_ITEMFACTORY->createString(result, lDocString), state);
   STACK_END(state);

@@ -1,3 +1,9 @@
+### Breaking changes
+
+- The private member `add_param` of `zorba::internal::diagnostic::parameters`,
+  which the inline templates of `<zorba/internal/diagnostic.h>` call, takes a
+  second argument: a module built against the older header must be rebuilt.
+
 ### Changed
 
 - Error messages shorten the data they quote. A value over 100 bytes becomes its
