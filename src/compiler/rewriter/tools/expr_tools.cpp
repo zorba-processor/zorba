@@ -24,6 +24,7 @@
 #include "compiler/expression/function_item_expr.h"
 #include "compiler/expression/expr_iter.h"
 #include "compiler/api/compilercb.h"
+#include "context/static_context.h"
 
 #include "functions/func_errors_and_diagnostics.h"
 #include "functions/udf.h"
@@ -1575,14 +1576,29 @@ public:
   bool theHasCalls;
   bool theResultsCanDiffer;
   bool theHasEffects;
+  // A node or JSON item can be updated: an update, an updating function, or code
+  // the walk cannot see.
+  bool theMayUpdate;
 
   explicit ClosedWorldWalk(TypeManager* tm)
     :
     theTM(tm),
     theHasCalls(false),
     theResultsCanDiffer(false),
-    theHasEffects(false)
+    theHasEffects(false),
+    theMayUpdate(false)
   {
+  }
+
+  void opaque()
+  {
+    theHasEffects = true;
+    theMayUpdate = true;
+  }
+
+  bool done() const
+  {
+    return theHasEffects && theHasCalls && theMayUpdate;
   }
 
   void walk(const expr* e);
@@ -1600,12 +1616,18 @@ void ClosedWorldWalk::walkFunction(const function* f)
 {
   if (f == NULL)
   {
-    theHasEffects = true;
+    opaque();
     return;
   }
 
-  if (f->isSequential() || f->isUpdating())
+  if (f->isSequential())
     theHasEffects = true;
+
+  if (f->isUpdating())
+  {
+    theHasEffects = true;
+    theMayUpdate = true;
+  }
 
   if (!f->isDeterministic())
     theResultsCanDiffer = true;
@@ -1620,7 +1642,7 @@ void ClosedWorldWalk::walkFunction(const function* f)
 
   // An external function, or one loaded from a plan: nothing says what it runs.
   if (body == NULL)
-    theHasEffects = true;
+    opaque();
   else
     walk(body);
 }
@@ -1631,7 +1653,7 @@ void ClosedWorldWalk::walkBuiltin(const fo_expr* fo)
   const function* f = fo->get_func();
 
   if (f->isExternal())
-    theHasEffects = true;
+    opaque();
 
   switch (f->getKind())
   {
@@ -1645,7 +1667,7 @@ void ClosedWorldWalk::walkBuiltin(const fo_expr* fo)
   case FunctionConsts::FN_ZORBA_EVAL_N_1:
   case FunctionConsts::FN_ZORBA_EVAL_U_1:
   case FunctionConsts::FN_ZORBA_EVAL_S_1:
-    theHasEffects = true;
+    opaque();
     break;
   case FunctionConsts::FN_TRACE_2:
     theResultsCanDiffer = true;
@@ -1681,7 +1703,7 @@ void ClosedWorldWalk::walkVar(const var_expr* var)
 
     if (!TypeOps::is_subtype(theTM, *type, *GENV_TYPESYSTEM.STRUCTURED_ITEM_TYPE_STAR) &&
         !TypeOps::is_subtype(theTM, *type, *GENV_TYPESYSTEM.ANY_ATOMIC_TYPE_STAR))
-      theHasEffects = true;
+      opaque();
   }
 
   for (csize i = 0; i < var->num_set_exprs(); ++i)
@@ -1701,7 +1723,7 @@ void ClosedWorldWalk::walk(const expr* e)
   // The kinds of expr and the functions below are all that gives an expr a sequential
   // or updating scripting kind. The kind of the expr itself cannot be used: a block
   // with the declaration of a prolog variable has one.
-  if (theHasEffects && theHasCalls)
+  if (done())
     return;
 
   switch (e->get_expr_kind())
@@ -1730,18 +1752,21 @@ void ClosedWorldWalk::walk(const expr* e)
     break;
 
   case var_set_expr_kind:
-  case apply_expr_kind:
   case exit_expr_kind:
   case exit_catcher_expr_kind:
   case flowctl_expr_kind:
   case while_expr_kind:
+    theHasEffects = true;
+    break;
+
+  case apply_expr_kind:
   case eval_expr_kind:
   case debugger_expr_kind:
   case delete_expr_kind:
   case insert_expr_kind:
   case rename_expr_kind:
   case replace_expr_kind:
-    theHasEffects = true;
+    opaque();
     break;
 
   case doc_expr_kind:
@@ -1763,7 +1788,7 @@ void ClosedWorldWalk::walk(const expr* e)
   }
 
   ExprConstIterator iter(e);
-  while (!iter.done() && !(theHasEffects && theHasCalls))
+  while (!iter.done() && !done())
   {
     const expr* child = iter.get_expr();
 
@@ -1790,8 +1815,9 @@ class BindingSequenceWalk
 public:
   bool walk(expr* e);
 
-private:
   void walkFunction(const function* f);
+
+private:
 
   void walkVar(const var_expr* var);
 };
@@ -1934,12 +1960,15 @@ void classify_calls(expr* root)
   if (ccb->theIsEval)
   {
     ccb->theCallEffects = CompilerCB::CALLS_HAVE_EFFECTS;
+    ccb->theCallsMayUpdate = true;
   }
   else
   {
     ClosedWorldWalk w(root->get_type_manager());
 
     w.walk(root);
+
+    ccb->theCallsMayUpdate = w.theMayUpdate;
 
     if (!w.theHasCalls)
       ccb->theCallEffects = CompilerCB::CALLS_ARE_PURE;
@@ -1955,7 +1984,42 @@ void classify_calls(expr* root)
   {
     BindingSequenceWalk w;
     w.walk(root);
+
+    // A function that the query does not name can still run: fn:function-lookup,
+    // an invoke function or eval can find it by name, and it is then optimized
+    // when it is first called. Its for clauses are decided here too, so that the
+    // decision does not depend on the level.
+    std::vector<static_context*> sctxs;
+    sctxs.push_back(ccb->theRootSctx);
+
+    CompilerCB::SctxMap::const_iterator ite = ccb->theSctxMap.begin();
+    for (; ite != ccb->theSctxMap.end(); ++ite)
+      sctxs.push_back(ite->second.getp());
+
+    for (csize i = 0; i < sctxs.size(); ++i)
+    {
+      if (sctxs[i] == NULL)
+        continue;
+
+      std::vector<function*> functions;
+      sctxs[i]->get_functions(functions);
+
+      for (csize j = 0; j < functions.size(); ++j)
+      {
+        if (functions[j]->isUdf())
+          w.walkFunction(functions[j]);
+      }
+    }
   }
+}
+
+
+bool calls_may_update(const expr* e)
+{
+  CompilerCB* ccb = const_cast<expr*>(e)->get_ccb();
+
+  return ccb->theCallEffects == CompilerCB::CALLS_HAVE_EFFECTS &&
+         ccb->theCallsMayUpdate;
 }
 
 

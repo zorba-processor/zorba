@@ -122,6 +122,8 @@ expr* HoistRule::apply(
 
   theHasUnprovenCalls = expr_tools::call_results_can_differ(node);
 
+  theStopAtUnprovenCalls = theHasUnprovenCalls && expr_tools::calls_may_update(node);
+
   PathHolder root;
   modified = hoistChildren(rCtx, node, &root);
 
@@ -143,6 +145,11 @@ expr* HoistRule::apply(
 bool HoistRule::hoistChildren(RewriterContext& rCtx, expr* e, PathHolder* path)
 {
   bool status = false;
+
+  // An update by such a call changes what a read of a node or JSON item next to it
+  // gives, and such a read is not a read of a state for depends_on_call_effects().
+  if (theStopAtUnprovenCalls && expr_tools::calls_unproven_function(e))
+    return false;
 
   if (e->get_expr_kind() == flwor_expr_kind)
   {
@@ -548,7 +555,8 @@ expr* HoistRule::hoistExpr(
 {
   // A call that can have a side effect, or give a different result per call, runs
   // per tuple: an expr that contains one stays. So does an expr that reads a state
-  // such a call can change. Any other expr can move across such a call.
+  // such a call can change. If no such call can update a node or JSON item, any other
+  // expr can move across such a call (see hoistChildren() otherwise).
   if (non_hoistable(e) ||
       e->constructsNodes() ||
       (theHasUnprovenCalls && expr_tools::call_results_can_differ(e)) ||

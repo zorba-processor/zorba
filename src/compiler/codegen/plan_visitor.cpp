@@ -556,7 +556,13 @@ void end_visit(dynamic_function_invocation_expr& v)
 
   std::reverse(argIters.begin(), argIters.end());
 
-  if (numArgs > 0 || v.get_input()->get_return_type()->max_card() <= 1)
+  // With no argument, JSONiq takes each item of the input, and an empty input gives an
+  // empty result, whatever the optimizer infers about the number of items. In XQuery
+  // the single-item iterator raises XPTY0004 for an empty input (the translator adds
+  // the same check for an input that can have several items).
+  if (numArgs > 0 ||
+      (v.get_input()->get_return_type()->max_card() <= 1 &&
+       v.get_sctx()->language_kind() != StaticContextConsts::language_kind_jsoniq))
     push_itstack(new SingleDynamicFnCallIterator(sctx, qloc, argIters, isPartialApply));
   else
     push_itstack(new MultiDynamicFnCallIterator(sctx, qloc, argIters[0]));
