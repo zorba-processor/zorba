@@ -1,8 +1,15 @@
 name: Benchmarks
 
-# Query-performance benchmark (XMark + JSONiq). Measures only.
-# With ref_b set, both refs are built and measured in the SAME job so that
-# runner noise affects both sides equally; the report gives the ratio B/A.
+# Query-performance benchmarks. Measures only; never commits or pushes.
+#
+# Without `suite`: the XMark + JSONiq benchmark (bench/run.py, weekly on master
+# and on demand). With ref_b set, both refs are built and measured in the SAME
+# job so that runner noise affects both sides equally; the report gives B/A.
+#
+# With `suite` (a directory under bench/): the comparison of two commits on the
+# queries of that suite (bench/compare.sh, see bench/README.md). Both commits are
+# built in Release with the same toolchain on this runner and measured in the
+# same job, alternating from run to run; the report gives head/base.
 on:
   workflow_dispatch:
     inputs:
@@ -19,9 +26,43 @@ on:
         required: false
         default: "5"
       timeout:
-        description: "Per-query timeout in seconds"
+        description: "Per-query timeout in seconds (every run of a query)"
         required: false
         default: "300"
+      suite:
+        description: "Compare two commits on this directory of bench/ (e.g. dynamic-calls); empty: XMark + JSONiq with ref_a/ref_b"
+        required: false
+        default: ""
+      base:
+        description: "suite: the commit to compare against (ref or SHA)"
+        required: false
+        default: ""
+      head:
+        description: "suite: the commit under test (ref or SHA); default: the ref the workflow runs on"
+        required: false
+        default: ""
+      filter:
+        description: "suite: space or comma separated query names (file names without extension, patterns allowed); empty: all"
+        required: false
+        default: ""
+      repeat:
+        description: "suite: timed runs per query and build (after one warm-up run)"
+        required: false
+        default: "5"
+      args:
+        description: "suite: extra zorba arguments for every query, e.g. -e n:=100000 -e source:=lines:$DATA/log.jsonl"
+        required: false
+        default: ""
+      setup:
+        description: "suite: shell command that prepares the data in $DATA before measuring ($ZORBA is the head build, $SUITE the suite directory)"
+        required: false
+        default: ""
+      suite_from:
+        description: "suite: where the suite directory and its queries come from"
+        required: false
+        type: choice
+        options: [head, base, workflow]
+        default: head
   schedule:
     - cron: "0 3 * * 0"
 
@@ -34,6 +75,7 @@ permissions:
 
 jobs:
   bench:
+    if: inputs.suite == ''
     runs-on: ubuntu-24.04
     timeout-minutes: 345
     env:
@@ -111,4 +153,149 @@ jobs:
         if: always()
         with:
           name: bench-results
+          path: out/
+
+  compare:
+    if: inputs.suite != ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 345
+    env:
+      SUITE: ${{ inputs.suite }}
+      BASE_REF: ${{ inputs.base }}
+      HEAD_REF: ${{ inputs.head || github.sha }}
+      SUITE_FROM: ${{ inputs.suite_from }}
+      FILTER: ${{ inputs.filter }}
+      REPEAT: ${{ inputs.repeat || '5' }}
+      TIMEOUT: ${{ inputs.timeout || '300' }}
+      ARGS: ${{ inputs.args }}
+      SETUP: ${{ inputs.setup }}
+    steps:
+      - name: Check the inputs
+        run: |
+          fail() { echo "::error::$1"; exit 1; }
+          [ -n "$BASE_REF" ] || fail "base is required"
+          case $SUITE in *[!A-Za-z0-9._-]* | .*) fail "suite must be a directory name under bench/" ;; esac
+          case $REPEAT in '' | *[!0-9]* | 0) fail "repeat must be a positive integer" ;; esac
+          case $TIMEOUT in '' | *[!0-9]* | 0) fail "timeout must be a positive integer" ;; esac
+
+      # The workflow's own ref provides the scripts (bench/compare.sh, ...).
+      - uses: actions/checkout@v7
+
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.base }}
+          path: src-base
+
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.head || github.sha }}
+          path: src-head
+
+      - name: Builder image
+        uses: ./.github/actions/builder-image
+        with:
+          context: docker/builder-latest
+          cache-scope: linux-amd64-latest
+
+      - uses: actions/cache@v6
+        with:
+          path: .ccache
+          key: ccache-v2-linux-amd64-latest-bench-${{ github.run_id }}
+          restore-keys: ccache-v2-linux-amd64-latest-
+
+      - name: Locate the suite
+        run: |
+          case $SUITE_FROM in
+            base) dir=src-base ;;
+            workflow) dir=. ;;
+            *) dir=src-head ;;
+          esac
+          test -d "$dir/bench/$SUITE" || { echo "::error::no bench/$SUITE in the $SUITE_FROM commit"; exit 1; }
+          mkdir -p out tools data
+          cp -r "$dir/bench/$SUITE" suite
+          echo "base $(git -C src-base rev-parse HEAD)  $(git -C src-base log -1 --format=%s)"
+          echo "head $(git -C src-head rev-parse HEAD)  $(git -C src-head log -1 --format=%s)"
+
+      # Both builds use the same image, preset and /src path, so ccache serves
+      # the files the two commits share and the runs of ci.yml.
+      - name: Build base
+        run: |
+          mkdir -p .ccache
+          docker run --rm \
+            -e CCACHE_DIR=/ccache -e CCACHE_SLOPPINESS=pch_defines,time_macros -e CCACHE_DEPEND=1 \
+            -v "$PWD/src-base":/src -v "$PWD/.ccache":/ccache -w /src zorba-builder:ci sh -ec '
+              cmake --preset full-release
+              cmake --build --preset full-release
+              ccache -s
+              ZORBA=$(find build/full-release/bin -maxdepth 1 -name zorba -type f | head -n 1)
+              test -n "$ZORBA"
+              "$ZORBA" --omit-xml-declaration -q "1+1"'
+
+      - name: Build head
+        run: |
+          docker run --rm \
+            -e CCACHE_DIR=/ccache -e CCACHE_SLOPPINESS=pch_defines,time_macros -e CCACHE_DEPEND=1 \
+            -v "$PWD/src-head":/src -v "$PWD/.ccache":/ccache -w /src zorba-builder:ci sh -ec '
+              cmake --preset full-release
+              cmake --build --preset full-release
+              ccache -s
+              ZORBA=$(find build/full-release/bin -maxdepth 1 -name zorba -type f | head -n 1)
+              test -n "$ZORBA"
+              "$ZORBA" --omit-xml-declaration -q "1+1"'
+
+      # Each build runs in its own container, where it was built (its libraries
+      # are found by path). The measuring tool runs inside, so the time is that
+      # of the query process and not of docker. /out, /suite, /data and /tools
+      # are the same directories in the containers and on the runner.
+      - name: Start the builds
+        run: |
+          docker run --rm -v "$PWD/tools":/tools -v "$PWD/bench":/bench:ro -w /tmp zorba-builder:ci \
+            c++ -std=c++23 -O2 -Wall -Wextra -Werror -o /tools/dirbench /bench/directory/dirbench.cpp
+          for d in out suite data tools; do sudo ln -s "$PWD/$d" "/$d"; done
+          for b in base head; do
+            docker run -d --name "zb-$b" \
+              -v "$PWD/src-$b":/src -v "$PWD/out":/out -v "$PWD/suite":/suite:ro \
+              -v "$PWD/data":/data -v "$PWD/tools":/tools:ro -v "$PWD/bench":/bench:ro \
+              -w /src zorba-builder:ci sleep infinity
+          done
+          {
+            echo "base: $(git -C src-base rev-parse HEAD)"
+            echo "head: $(git -C src-head rev-parse HEAD)"
+            echo "suite: $SUITE (from $SUITE_FROM)"
+            echo "filter: ${FILTER:-all}  repeat: $REPEAT  timeout: $TIMEOUT s"
+            echo "args: $ARGS"
+            echo "setup: $SETUP"
+            uname -a
+            lscpu | grep -E '^(Model name|CPU\(s\)|Thread|Core)'
+            free -b
+          } | tee out/runner.txt
+
+      - name: Prepare the data
+        if: env.SETUP != ''
+        run: |
+          docker exec -e SETUP -e DATA=/data -e SUITE=/suite \
+            -e ZORBA=/src/build/full-release/bin/zorba zb-head sh -ec 'eval "$SETUP"'
+
+      - name: Measure
+        run: |
+          Z=/src/build/full-release/bin/zorba
+          BASE_EXEC="docker exec -e DATA=/data zb-base" HEAD_EXEC="docker exec -e DATA=/data zb-head" \
+            DATA=/data BUDGET=12600 \
+            sh bench/compare.sh "$Z" "$Z" /tools/dirbench /suite /out
+
+      - name: Report
+        if: always()
+        run: |
+          test -f out/raw.tsv || { echo "no measurements" >> "$GITHUB_STEP_SUMMARY"; exit 0; }
+          docker exec zb-head /src/build/full-release/bin/zorba --no-logo --serialize-text -f \
+            -q /bench/compare_table.xq -e raw:=/out/raw.tsv \
+            -e "base:=$(git -C src-base rev-parse HEAD) ($BASE_REF)" \
+            -e "head:=$(git -C src-head rev-parse HEAD) ($HEAD_REF)" > out/table.md
+          cat out/table.md >> "$GITHUB_STEP_SUMMARY"
+          awk -F'\t' '$6 != "ok" { print "::warning title=" $1 " (" $2 ")::" $6 " in run " $3 }' out/raw.tsv
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: bench-compare
           path: out/
