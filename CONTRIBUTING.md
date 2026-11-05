@@ -21,6 +21,28 @@ runs the suite under AddressSanitizer and ThreadSanitizer. A pull request is
 ready for review when its CI is green. Add or adjust a test with every fix
 or feature where feasible.
 
+**Quick check.** `quick-check.yml` builds one configuration and runs only
+the tests you name, in a few minutes with a warm ccache, instead of the full
+CI (8 jobs). It is dispatched by hand, never replaces or weakens a CI job and
+is not a required check. It can run on a branch with an open pull request.
+The workflow file must be on `master` before it can be dispatched.
+
+```bash
+gh workflow run quick-check.yml --ref my-branch \
+  -f tests='^test/rbkt/Queries/zorba/fn/' [-f asan=true]
+gh run list --workflow quick-check.yml --branch my-branch --limit 1
+gh run watch <run-id> --interval 60 --exit-status
+```
+
+Inputs: `tests` (ctest `-R` regex; empty builds only; a regex that matches
+no test fails), `preset` (default `full-release`, the linux-amd64 job of
+`ci.yml`), `asan` (build the `asan` preset instead), `ctest_args`,
+`test_timeout` (seconds per test, default 300) and `save_cache` (keep this
+run's ccache for later quick checks of the branch; off by default because the
+repository cache quota is full). The job summary has the ctest summary and
+the truncated output of failed tests; the artifact `quick-check-log` has the
+full log. The final push of a pull request still needs the full CI.
+
 ## Pull requests
 
 - One commit per logical change. The commit message says why the change is
