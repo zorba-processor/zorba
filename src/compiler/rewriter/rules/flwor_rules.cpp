@@ -200,6 +200,7 @@ RULE_REWRITE_PRE(EliminateUnusedLetVars)
   assert(udf == rCtx.theUDF);
 
   theFlwor = static_cast<flwor_expr *>(node);
+  theFlworCallsUnproven = -1;
 
   csize numClauses = theFlwor->num_clauses();
 
@@ -221,7 +222,10 @@ RULE_REWRITE_PRE(EliminateUnusedLetVars)
     const forletwin_clause* flwc =
     static_cast<const forletwin_clause *>(theFlwor->get_clause(0));
 
-    if (theFlwor->get_return_expr()->get_var() == flwc->get_var())
+    // A for clause whose domain gives its binding sequence first stays.
+    if (theFlwor->get_return_expr()->get_var() == flwc->get_var() &&
+        !(flwc->get_kind() == flwor_clause::for_clause &&
+          expr_tools::is_binding_sequence(static_cast<const for_clause*>(flwc))))
     {
       return flwc->get_expr();
     }
@@ -289,6 +293,7 @@ RULE_REWRITE_PRE(EliminateUnusedLetVars)
 
       if (domExpr->is_sequential() ||
           domCount > 1 ||
+          expr_tools::is_binding_sequence(fc) ||
           expr_tools::calls_unproven_function(domExpr))
         continue;
 
@@ -583,6 +588,15 @@ bool EliminateUnusedLetVars::should_fold_var(int numRefs, expr* domExpr)
 /*****************************************************************************
 
 ******************************************************************************/
+bool EliminateUnusedLetVars::flwor_calls_unproven_function()
+{
+  if (theFlworCallsUnproven < 0)
+    theFlworCallsUnproven = expr_tools::calls_unproven_function(theFlwor) ? 1 : 0;
+
+  return theFlworCallsUnproven == 1;
+}
+
+
 bool EliminateUnusedLetVars::safe_to_fold_var(csize varPos, int& numRefs)
 {
   numRefs = 0;
@@ -632,7 +646,7 @@ bool EliminateUnusedLetVars::safe_to_fold_var(csize varPos, int& numRefs)
   // expr is what is evaluated right before it: "for $f in E return $f(...)", which is
   // how the translator writes a dynamic function call with arguments. E is the function
   // of the call, and without the for an empty E is the type error that it must be.
-  if (expr_tools::calls_unproven_function(theFlwor) &&
+  if (flwor_calls_unproven_function() &&
       !(theFlwor->num_clauses() == 1 &&
         theFlwor->get_return_expr()->get_expr_kind() == dynamic_function_invocation_expr_kind &&
         static_cast<dynamic_function_invocation_expr*>(theFlwor->get_return_expr())->
@@ -1783,8 +1797,10 @@ expr* MergeFLWOR::apply(RewriterContext& rCtx, expr* node, bool& modified)
 
         expr* domainExpr = fc->get_expr()->skip_wrappers();
 
+        // A domain that gives its binding sequence first is evaluated whole.
         if (domainExpr->get_expr_kind() == flwor_expr_kind &&
-            !domainExpr->is_sequential())
+            !domainExpr->is_sequential() &&
+            !expr_tools::is_binding_sequence(fc))
         {
           nestedFlwor = static_cast<flwor_expr*>(domainExpr);
           numNestedClauses = nestedFlwor->num_clauses();

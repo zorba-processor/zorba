@@ -971,10 +971,37 @@ bool may_run_side_effects(const expr* root)
 
 // Whether what this built-in function returns is atomic or comes from its input, so
 // that it returns nothing new. Otherwise it may return a new node or JSON item.
+//
+// fn:doc and fn:collection return the nodes of the store, the same for the same URI in
+// a query; they read a state that a side effect can change, which builtinHasImpurity()
+// says separately. A function that calls a function item returns what the calls return:
+// a call that is not proven is found by its arguments (ImpurityWalk::isUnprovenCall()),
+// and the closed world walks the function of every function item.
 static bool builtin_returns_existing_items(const function* f, TypeManager* tm)
 {
   switch (f->getKind())
   {
+  case FunctionConsts::OP_UNION_2:
+  case FunctionConsts::OP_INTERSECT_2:
+  case FunctionConsts::OP_EXCEPT_2:
+  case FunctionConsts::OP_CHECK_DISTINCT_NODES_1:
+  case FunctionConsts::FN_ID_1:
+  case FunctionConsts::FN_ID_2:
+  case FunctionConsts::FN_IDREF_1:
+  case FunctionConsts::FN_IDREF_2:
+  case FunctionConsts::FN_ELEMENT_WITH_ID_1:
+  case FunctionConsts::FN_ELEMENT_WITH_ID_2:
+  case FunctionConsts::FN_DOC_1:
+  case FunctionConsts::FN_COLLECTION_0:
+  case FunctionConsts::FN_COLLECTION_1:
+  case FunctionConsts::OP_ZORBA_SINGLE_OBJECT_LOOKUP_2:
+  case FunctionConsts::OP_ZORBA_SINGLE_ARRAY_LOOKUP_2:
+  case FunctionConsts::FN_JSONIQ_FLATTEN_1:
+  case FunctionConsts::FN_FOR_EACH_2:
+  case FunctionConsts::FN_FILTER_2:
+  case FunctionConsts::FN_FOLD_LEFT_3:
+  case FunctionConsts::FN_FOLD_RIGHT_3:
+  case FunctionConsts::FN_FOR_EACH_PAIR_3:
   case FunctionConsts::OP_CONCATENATE_N:
   case FunctionConsts::OP_HOIST_1:
   case FunctionConsts::OP_UNHOIST_1:
@@ -1745,6 +1772,157 @@ void ClosedWorldWalk::walk(const expr* e)
 }
 
 
+/*******************************************************************************
+  Marks, for every for clause reachable from the query, whether its domain has an
+  unproven call, on the tree before the optimizer runs. One walk, bottom up: the
+  answer for an expr is whether it or one of its children is an unproven call, and
+  the answer for a call of a user function covers its body (is_unproven_call()). The
+  bodies of the functions that the query names are marked as well, once.
+********************************************************************************/
+class BindingSequenceWalk
+{
+  std::set<const function*>       theFunctions;
+  std::set<const var_expr*>       theVars;
+
+public:
+  bool walk(expr* e);
+
+private:
+  void walkFunction(const function* f);
+
+  void walkVar(const var_expr* var);
+};
+
+
+void BindingSequenceWalk::walkFunction(const function* f)
+{
+  if (f == NULL || !f->isUdf() || !theFunctions.insert(f).second)
+    return;
+
+  expr* body = static_cast<const user_function*>(f)->getBody();
+
+  if (body != NULL)
+    walk(body);
+}
+
+
+void BindingSequenceWalk::walkVar(const var_expr* var)
+{
+  if ((var->get_kind() != var_expr::prolog_var &&
+       var->get_kind() != var_expr::local_var) ||
+      !theVars.insert(var).second)
+    return;
+
+  for (csize i = 0; i < var->num_set_exprs(); ++i)
+  {
+    var_set_expr* setExpr = var->get_set_expr(i);
+
+    if (setExpr->get_expr() != NULL)
+      walk(setExpr->get_expr());
+  }
+}
+
+
+bool BindingSequenceWalk::walk(expr* e)
+{
+  bool found = false;
+
+  switch (e->get_expr_kind())
+  {
+  case dynamic_function_invocation_expr_kind:
+    found = is_unproven_call(e);
+    break;
+
+  case fo_expr_kind:
+  {
+    const function* f = static_cast<const fo_expr*>(e)->get_func();
+    found = is_unproven_call(e);
+    walkFunction(f);
+    break;
+  }
+  case function_item_expr_kind:
+    walkFunction(static_cast<const function_item_expr*>(e)->get_function());
+    break;
+
+  case var_expr_kind:
+    walkVar(static_cast<const var_expr*>(e));
+    break;
+
+  default:
+    break;
+  }
+
+  if (e->get_expr_kind() == flwor_expr_kind)
+  {
+    flwor_expr* flwor = static_cast<flwor_expr*>(e);
+
+    // The domain of each for clause is walked on its own, for its answer. The rest
+    // of the flwor is walked below, with the domains of the for clauses skipped.
+    std::set<const expr*> domains;
+
+    for (csize i = 0; i < flwor->num_clauses(); ++i)
+    {
+      flwor_clause* c = flwor->get_clause(i);
+
+      if (c->get_kind() != flwor_clause::for_clause)
+        continue;
+
+      for_clause* fc = static_cast<for_clause*>(c);
+      bool const domainFound = walk(fc->get_expr());
+
+      fc->set_binding_sequence(domainFound ?
+                               for_clause::BINDING_SEQUENCE_YES :
+                               for_clause::BINDING_SEQUENCE_NO);
+
+      domains.insert(fc->get_expr());
+      found = found || domainFound;
+    }
+
+    ExprIterator iter(e);
+    while (!iter.done())
+    {
+      expr* child = **iter;
+
+      if (child != NULL && domains.find(child) == domains.end() && walk(child))
+        found = true;
+
+      iter.next();
+    }
+
+    return found;
+  }
+
+  ExprIterator iter(e);
+  while (!iter.done())
+  {
+    expr* child = **iter;
+
+    if (child != NULL && walk(child))
+      found = true;
+
+    iter.next();
+  }
+
+  return found;
+}
+
+
+bool is_binding_sequence(const for_clause* fc)
+{
+  switch (fc->get_binding_sequence())
+  {
+  case for_clause::BINDING_SEQUENCE_YES:
+    return true;
+  case for_clause::BINDING_SEQUENCE_NO:
+    return false;
+  default:
+    // A clause that a rewrite created, or one in code that the walk of
+    // classify_calls() did not reach.
+    return calls_unproven_function(fc->get_expr());
+  }
+}
+
+
 void classify_calls(expr* root)
 {
   CompilerCB* ccb = root->get_ccb();
@@ -1753,21 +1931,28 @@ void classify_calls(expr* root)
   if (ccb->theIsEval)
   {
     ccb->theCallEffects = CompilerCB::CALLS_HAVE_EFFECTS;
-    return;
+  }
+  else
+  {
+    ClosedWorldWalk w(root->get_type_manager());
+
+    w.walk(root);
+
+    if (!w.theHasCalls)
+      ccb->theCallEffects = CompilerCB::CALLS_ARE_PURE;
+    else if (w.theHasEffects)
+      ccb->theCallEffects = CompilerCB::CALLS_HAVE_EFFECTS;
+    else if (w.theResultsCanDiffer)
+      ccb->theCallEffects = CompilerCB::CALLS_RESULTS_CAN_DIFFER;
+    else
+      ccb->theCallEffects = CompilerCB::CALLS_ARE_PURE;
   }
 
-  ClosedWorldWalk w(root->get_type_manager());
-
-  w.walk(root);
-
-  if (!w.theHasCalls)
-    ccb->theCallEffects = CompilerCB::CALLS_ARE_PURE;
-  else if (w.theHasEffects)
-    ccb->theCallEffects = CompilerCB::CALLS_HAVE_EFFECTS;
-  else if (w.theResultsCanDiffer)
-    ccb->theCallEffects = CompilerCB::CALLS_RESULTS_CAN_DIFFER;
-  else
-    ccb->theCallEffects = CompilerCB::CALLS_ARE_PURE;
+  if (ccb->theCallEffects == CompilerCB::CALLS_HAVE_EFFECTS)
+  {
+    BindingSequenceWalk w;
+    w.walk(root);
+  }
 }
 
 

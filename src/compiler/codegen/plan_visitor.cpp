@@ -415,13 +415,13 @@ ftnode_visitor* get_ftnode_visitor()
 
 // XQSX 6.7: "The associated expression is evaluated first to produce the binding
 // sequence, then the next clause is evaluated once for each item in the binding
-// sequence." This applies to a domain with a call that can have a side effect. Any
-// other domain stays lazy.
+// sequence." This applies to a domain with a call that can have a side effect, as
+// decided before the optimizer runs. Any other domain stays lazy.
 PlanIter_t binding_sequence_iter(const for_clause* fc, PlanIter_t domainIter)
 {
   expr* domExpr = fc->get_expr();
 
-  if (expr_tools::calls_unproven_function(domExpr))
+  if (expr_tools::is_binding_sequence(fc))
     return new MaterializeIterator(domExpr->get_sctx(), domExpr->get_loc(), domainIter);
 
   return domainIter;

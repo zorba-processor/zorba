@@ -72,7 +72,9 @@ IndexJoinRule::IndexJoinRule(RewriterContext* rctx)
   :
   RewriteRule(RewriteRule::IndexJoin, "IndexJoin"),
   theRCtx(rctx),
-  theRootExpr(rctx->getRoot())
+  theRootExpr(rctx->getRoot()),
+  theCheckedOuterExpr(NULL),
+  theOuterCallsUnproven(false)
 {
   theVarIdMap = new expr_tools::VarIdMap;
   theIdVarMap = new expr_tools::IdVarMap;
@@ -135,6 +137,10 @@ expr* IndexJoinRule::apply(RewriterContext& rCtx, expr* node, bool& modified)
 {
   assert(node != theRootExpr || theVarDefExprs.empty());
   assert(node != theRootExpr || theChildPositions.empty());
+
+  // A new pass: a join in the previous one may have changed the tree.
+  if (theVarDefExprs.empty())
+    theCheckedOuterExpr = NULL;
 
   flwor_expr* flworExpr = NULL;
 
@@ -382,7 +388,13 @@ bool IndexJoinRule::isIndexJoinPredicate(PredicateInfo& predInfo)
 {
   // The join would move the evaluation of the predicate and of the domain of the
   // inner var, and a call in the outermost expr can change what they read.
-  if (expr_tools::calls_unproven_function(theVarDefExprs[0]))
+  if (theCheckedOuterExpr != theVarDefExprs[0])
+  {
+    theCheckedOuterExpr = theVarDefExprs[0];
+    theOuterCallsUnproven = expr_tools::calls_unproven_function(theVarDefExprs[0]);
+  }
+
+  if (theOuterCallsUnproven)
     return false;
 
   const fo_expr* foExpr = NULL;
@@ -541,6 +553,14 @@ bool IndexJoinRule::isIndexJoinPredicate(PredicateInfo& predInfo)
   // BV anmd OV. The checkVarDeps method finds BV and checks that BV is defined
   // before OV.
   expr* innerDomainExpr = innerVarClause->get_expr();
+
+  // The join evaluates the domain of the inner var once, not once per outer tuple, and
+  // each operand of the predicate once per item, not once per pair: a call that can
+  // give a different result or new nodes per evaluation must not be in them.
+  if (expr_tools::call_results_can_differ(innerDomainExpr) ||
+      expr_tools::call_results_can_differ(predInfo.thePredicate))
+    return false;
+
   csize boundaryVarId = 0;
   if (checkVarDeps(innerDomainExpr, predInfo.theOuterVarId, boundaryVarId))
     return false;

@@ -144,11 +144,6 @@ bool HoistRule::hoistChildren(RewriterContext& rCtx, expr* e, PathHolder* path)
 {
   bool status = false;
 
-  // A call that can have a side effect runs per tuple, interleaved with lazy clauses
-  // and with what consumes the expr: nothing below it can move across it.
-  if (theHasUnprovenCalls && expr_tools::calls_unproven_function(e))
-    return false;
-
   if (e->get_expr_kind() == flwor_expr_kind)
   {
     flwor_expr* flwor = static_cast<flwor_expr *>(e);
@@ -551,6 +546,9 @@ expr* HoistRule::hoistExpr(
     expr* e,
     struct PathHolder* path)
 {
+  // A call that can have a side effect, or give a different result per call, runs
+  // per tuple: an expr that contains one stays. So does an expr that reads a state
+  // such a call can change. Any other expr can move across such a call.
   if (non_hoistable(e) ||
       e->constructsNodes() ||
       (theHasUnprovenCalls && expr_tools::call_results_can_differ(e)) ||

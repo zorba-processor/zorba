@@ -12865,6 +12865,18 @@ void end_visit(const DynamicFunctionInvocation& v, void* /*visit_state*/)
   }
   else
   {
+    // With no argument and possibly more than one item, the iterator takes each item
+    // (a JSON item gives its keys or members). In XQuery an empty sequence is still the
+    // type error of a function that is not one item, as with arguments above.
+    if (numArgs == 0 &&
+        theSctx->language_kind() == StaticContextConsts::language_kind_xquery &&
+        srcType->max_card() > 1 &&
+        srcType->get_quantifier() != SequenceType::QUANT_PLUS)
+      sourceExpr = wrap_in_type_match(sourceExpr,
+                                      theRTM.ITEM_TYPE_PLUS,
+                                      loc,
+                                      TREAT_TYPE_MATCH);
+
     expr* dynFuncInvocation =
     CREATE(dynamic_function_invocation)(theRootSctx, theUDF, loc,
                                         sourceExpr,

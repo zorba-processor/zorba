@@ -90,6 +90,12 @@ bool call_results_can_differ(const expr* root);
 // The same for the call itself, without looking at its arguments.
 bool is_call_with_varying_result(const expr* call);
 
+// Whether the domain of the for clause gives its whole binding sequence before the
+// next clause runs (XQuery Scripting Extension 1.0, 6.7): it has a call that can have a
+// side effect. Decided by classify_calls() on the tree before the optimizer runs, so
+// that every level agrees; a rewrite must not remove such a for clause.
+bool is_binding_sequence(const for_clause* fc);
+
 // Whether "root" reads a state that a call can change, in a query with such calls.
 // Lazy evaluation interleaves it with those calls, even if they are outside of "root".
 bool depends_on_call_effects(const expr* root);
