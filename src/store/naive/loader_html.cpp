@@ -268,7 +268,7 @@ void HtmlXmlLoader::htmlStartElement(
                           ERROR_PARAMS(loader.theDocUri,
                                        xmlSAX2GetLineNumber(loader.ctxt),
                                        xmlSAX2GetColumnNumber(loader.ctxt),
-                                       lMessage.str())));
+                                       ERROR_TEXT( lMessage.str() ))));
     xmlStopParser(loader.ctxt);
     return;
   }

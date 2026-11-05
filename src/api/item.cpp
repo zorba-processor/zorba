@@ -50,7 +50,7 @@ namespace zorba {
   } catch (ZorbaException const & /* e */) { \
     throw; \
   } catch (std::exception const &e) { \
-    throw ZORBA_EXCEPTION(zerr::ZXQP0003_INTERNAL_ERROR, ERROR_PARAMS(e.what())); \
+    throw ZORBA_EXCEPTION(zerr::ZXQP0003_INTERNAL_ERROR, ERROR_PARAMS(ERROR_TEXT( e.what() ))); \
   } catch (...) { \
     throw ZORBA_EXCEPTION(zerr::ZXQP0003_INTERNAL_ERROR); \
   }

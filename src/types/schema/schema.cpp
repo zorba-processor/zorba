@@ -309,7 +309,7 @@ private:
           // resolve it its own way, which we don't want to happen.
           throw XQUERY_EXCEPTION(err::XQST0059,
           ERROR_PARAMS(ZED(XQST0059_UnknownSchema_23o), lResolved,
-                       lErrorMessage));
+                       ERROR_TEXT( lErrorMessage )));
         }
       }
       catch (ZorbaException const& e)
@@ -604,7 +604,7 @@ void Schema::registerXSD(
   catch (const XMLException& e)
   {
     RAISE_ERROR(zerr::ZXQP0033_SCHEMA_XML_ERROR, loc,
-    ERROR_PARAMS(xsdURL, StrX(e.getMessage()).localFormOrDefault("")));
+    ERROR_PARAMS(xsdURL, ERROR_TEXT( StrX(e.getMessage()).localFormOrDefault("") )));
   }
   catch (const ZorbaException&)
   {
@@ -1874,10 +1874,10 @@ bool Schema::parseUserAtomicTypes(
       {
         if ( isCasting )
           RAISE_ERROR(err::FORG0001, loc,
-          ERROR_PARAMS(ZED(FORG0001_NoTypeInCtx_2), targetType->toSchemaString()));
+          ERROR_PARAMS(ZED(FORG0001_NoTypeInCtx_2), ERROR_TEXT( targetType->toSchemaString() )));
         else
           RAISE_ERROR(err::XQDY0027, loc,
-          ERROR_PARAMS(ZED(XQDY0027_NoTypeInCtx_2), targetType->toSchemaString()));
+          ERROR_PARAMS(ZED(XQDY0027_NoTypeInCtx_2), ERROR_TEXT( targetType->toSchemaString() )));
       }
 
       // workaround for validating xs:NOTATION with Xerces
@@ -1985,12 +1985,12 @@ bool Schema::parseUserAtomicTypes(
       if ( isCasting )
       {
         RAISE_ERROR(err::FORG0001, loc,
-        ERROR_PARAMS(ZED(FORG0001_NoTypeInCtx_2), targetType->toSchemaString()));
+        ERROR_PARAMS(ZED(FORG0001_NoTypeInCtx_2), ERROR_TEXT( targetType->toSchemaString() )));
       }
       else
       {
         RAISE_ERROR(err::XQDY0027, loc,
-        ERROR_PARAMS(ZED(XQDY0027_NoTypeInCtx_2), targetType->toSchemaString()));
+        ERROR_PARAMS(ZED(XQDY0027_NoTypeInCtx_2), ERROR_TEXT( targetType->toSchemaString() )));
       }
     }
   }
@@ -2003,13 +2003,13 @@ bool Schema::parseUserAtomicTypes(
     {
       RAISE_ERROR(err::FORG0001, loc,
       ERROR_PARAMS(ZED(FORG0001_NoCastTo_234o), textValue,
-                   targetType->toSchemaString(), msg));
+                   ERROR_TEXT( targetType->toSchemaString() ), ERROR_TEXT( msg )));
     }
     else
     {
       RAISE_ERROR(err::XQDY0027, loc,
       ERROR_PARAMS(ZED(XQDY0027_InvalidValue), textValue,
-                   targetType->toSchemaString(), msg));
+                   ERROR_TEXT( targetType->toSchemaString() ), ERROR_TEXT( msg )));
     }
   }
   catch(const OutOfMemoryException&)
@@ -2084,12 +2084,12 @@ bool Schema::parseUserListTypes(
     if ( isCasting )
     {
       RAISE_ERROR(err::FORG0001, loc,
-      ERROR_PARAMS(ZED(FORG0001_NoCastTo_234o), textValue, udt->toSchemaString()));
+      ERROR_PARAMS(ZED(FORG0001_NoCastTo_234o), textValue, ERROR_TEXT( udt->toSchemaString() )));
     }
     else
     {
       RAISE_ERROR(err::XQDY0027, loc,
-      ERROR_PARAMS(ZED(XQDY0027_InvalidValue), textValue, udt->toSchemaString()));
+      ERROR_PARAMS(ZED(XQDY0027_InvalidValue), textValue, ERROR_TEXT( udt->toSchemaString() )));
     }
   }
 
@@ -2147,12 +2147,12 @@ bool Schema::parseUserUnionTypes(
   if ( isCasting )
   {
     RAISE_ERROR(err::FORG0001, loc,
-    ERROR_PARAMS(ZED(FORG0001_NoCastTo_234o), textValue, udt->toSchemaString()));
+    ERROR_PARAMS(ZED(FORG0001_NoCastTo_234o), textValue, ERROR_TEXT( udt->toSchemaString() )));
   }
   else
   {
     RAISE_ERROR(err::XQDY0027, loc,
-    ERROR_PARAMS(ZED(XQDY0027_InvalidValue), textValue, udt->toSchemaString()));
+    ERROR_PARAMS(ZED(XQDY0027_InvalidValue), textValue, ERROR_TEXT( udt->toSchemaString() )));
   }
 }
 

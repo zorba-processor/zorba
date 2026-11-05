@@ -180,7 +180,7 @@ bool SingleDynamicFnCallIterator::nextImpl(
     RAISE_ERROR(err::XPTY0004, loc, 
     ERROR_PARAMS(ZED(XPTY0004_NoTypePromote_23),
                  "empty-sequence()",
-                 GENV_TYPESYSTEM.ANY_FUNCTION_TYPE_ONE->toSchemaString()));
+                 ERROR_TEXT( GENV_TYPESYSTEM.ANY_FUNCTION_TYPE_ONE->toSchemaString() )));
   }
 
   if (targetItem->isFunction())
@@ -189,7 +189,7 @@ bool SingleDynamicFnCallIterator::nextImpl(
     {
       RAISE_ERROR(err::XPTY0004, loc, 
       ERROR_PARAMS(ZED(XPTY0004_NoMultiSeqTypePromotion_2),
-                   GENV_TYPESYSTEM.ANY_FUNCTION_TYPE_ONE->toSchemaString()));
+                   ERROR_TEXT( GENV_TYPESYSTEM.ANY_FUNCTION_TYPE_ONE->toSchemaString() )));
     }
 
     fnItem = static_cast<FunctionItem*>(targetItem.getp());
@@ -382,8 +382,8 @@ bool SingleDynamicFnCallIterator::nextImpl(
 
     RAISE_ERROR(err::XPTY0004, loc, 
     ERROR_PARAMS(ZED(XPTY0004_NoTypePromote_23),
-                 type->toSchemaString(),
-                 GENV_TYPESYSTEM.ANY_FUNCTION_TYPE_ONE->toSchemaString()));
+                 ERROR_TEXT( type->toSchemaString() ),
+                 ERROR_TEXT( GENV_TYPESYSTEM.ANY_FUNCTION_TYPE_ONE->toSchemaString() )));
   }
 #endif
 
@@ -603,8 +603,8 @@ bool MultiDynamicFnCallIterator::nextImpl(
 
       RAISE_ERROR(err::XPTY0004, loc, 
       ERROR_PARAMS(ZED(XPTY0004_NoTypePromote_23),
-                   type->toSchemaString(),
-                   GENV_TYPESYSTEM.ANY_FUNCTION_TYPE_ONE->toSchemaString()));
+                   ERROR_TEXT( type->toSchemaString() ),
+                   ERROR_TEXT( GENV_TYPESYSTEM.ANY_FUNCTION_TYPE_ONE->toSchemaString() )));
     }
 #endif
   }

@@ -101,7 +101,7 @@ castOrCheckIndexType(
               loc ) )
         {
           RAISE_ERROR(zerr::ZXQD0005_INVALID_KEY_FOR_MAP, loc,
-          ERROR_PARAMS(*searchKeyType, *indexKeyType, aQName->getStringValue()));
+          ERROR_PARAMS(ERROR_TEXT( *searchKeyType ), ERROR_TEXT( *indexKeyType ), aQName->getStringValue()));
         }
         else
         {
@@ -112,7 +112,7 @@ castOrCheckIndexType(
         if ( e.diagnostic() == err::FORG0001 )
         {
           RAISE_ERROR(zerr::ZXQD0005_INVALID_KEY_FOR_MAP, loc,
-          ERROR_PARAMS(*searchKeyType, *indexKeyType, aQName->getStringValue()));
+          ERROR_PARAMS(ERROR_TEXT( *searchKeyType ), ERROR_TEXT( *indexKeyType ), aQName->getStringValue()));
         }
         throw;
       }
@@ -353,9 +353,9 @@ checkMapTypes(
     {
       RAISE_ERROR(err::XPTY0004, aLoc,
         ERROR_PARAMS(ZED(SearchKeyTypeMismatch_234),
-                     *lAnyAtomicType,
+                     ERROR_TEXT( *lAnyAtomicType ),
                      aMapName->getStringValue(),
-                     *lIndexKeyType)
+                     ERROR_TEXT( *lIndexKeyType ))
       );
     }
   }

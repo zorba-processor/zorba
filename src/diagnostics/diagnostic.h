@@ -156,6 +156,18 @@ inline internal::diagnostic::location make_location( QueryLoc const *loc ) {
 #define ERROR_PARAMS(...) \
   (::zorba::internal::diagnostic::parameters(), __VA_ARGS__)
 
+/**
+ * Marks a parameter as the text of an error rather than as data.  The message
+ * of a parser, of another diagnostic or of a library goes through this.
+ * Example:
+ * \code
+ * throw XQUERY_EXCEPTION( XPST0001, ERROR_PARAMS( ERROR_TEXT( e.what() ) ) );
+ * \endcode
+ * \hideinitializer
+ */
+#define ERROR_TEXT(X) \
+  ::zorba::internal::diagnostic::parameters::text( X )
+
 ///////////////////////////////////////////////////////////////////////////////
 
 } // namespace diagnostic

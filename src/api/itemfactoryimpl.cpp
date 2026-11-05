@@ -279,7 +279,7 @@ Item ItemFactoryImpl::createBase64Binary(const char* aData, size_t aLength,
   }
   catch ( std::exception const &e ) {
     throw ZORBA_EXCEPTION(
-      zerr::ZSTR0040_TYPE_ERROR, ERROR_PARAMS( e.what() )
+      zerr::ZSTR0040_TYPE_ERROR, ERROR_PARAMS( ERROR_TEXT( e.what() ) )
     );
   }
 }

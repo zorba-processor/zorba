@@ -1992,15 +1992,18 @@ void test_hints_document_value( Fixture const &f ) {
   std::cout << "the message, " << message.size() << " bytes: "
             << message.substr( 0, 120 ) << std::endl;
 
-  // The message of any failed cast carries the value whole, selector or not.
-  check( contains( message, text ), "$arr($v): the message has the value",
-         message.substr( 0, 120 ) );
+  // The message of a failed cast quotes the value short, selector or not.
+  std::string const short_form(
+    "\"" + text.substr( 0, 40 ) + "\xE2\x80\xA6" + std::string( 40, 'x' ) + " (" +
+    std::to_string( text.size() ) + " bytes)\": value of type xs:string is not "
+    "castable to type xs:integer" );
+  check( message == short_form, "$arr($v): the message has the value short",
+         message.substr( 0, 300 ) );
   std::string const cast_message( message_of( jq, dir_import +
     "let $r := dir:open($dir:root, \"k.json\")(\"content\")\n"
     "return xs:integer($r(\"k\"))" ) );
-  check( contains( cast_message, text ),
-         "xs:integer($v): the message has the value",
-         cast_message.substr( 0, 120 ) );
+  check( cast_message == short_form, "xs:integer($v): the message has the value short",
+         cast_message.substr( 0, 300 ) );
 
   // A selector written in the query is the author's own: the hint repeats it.
   check_error( jq, dir_import +
@@ -3144,6 +3147,390 @@ void test_cache_counters( Fixture const &f ) {
                              "least recently used", "does not evict",
                              "the document cache: it holds previews" } )
     check( contains( err, text ), std::string( "--help says: " ) + text, err );
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// How much of a value an error message quotes.
+
+std::string const ellipsis( "\xE2\x80\xA6" );
+std::string const value_3mb(
+  "string-join(for $i in 1 to 300000 return \"abcdefghij\", \"\")" );
+std::string const value_ends( "abcdefghijabcdefghijabcdefghijabcdefghij" );
+std::string const not_integer(
+  ": value of type xs:string is not castable to type xs:integer" );
+
+bool valid_utf8( std::string const &s ) {
+  for ( std::size_t i = 0; i < s.size(); ) {
+    unsigned char const b = static_cast<unsigned char>( s[i] );
+    std::size_t const len =
+      b < 0x80 ? 1 : ( b & 0xE0 ) == 0xC0 ? 2 : ( b & 0xF0 ) == 0xE0 ? 3 :
+      ( b & 0xF8 ) == 0xF0 ? 4 : 0;
+    if ( !len || i + len > s.size() )
+      return false;
+    for ( std::size_t j = 1; j < len; ++j )
+      if ( ( static_cast<unsigned char>( s[ i + j ] ) & 0xC0 ) != 0x80 )
+        return false;
+    i += len;
+  }
+  return true;
+}
+
+// A query that casts the text to xs:integer, as an XQuery string literal.
+std::string cast_of( std::string const &text ) {
+  std::string literal;
+  for ( char const c : text ) {
+    if ( c == '"' )
+      literal += '"';
+    literal += c;
+  }
+  return "xs:integer(\"" + literal + "\")";
+}
+
+void test_error_value_bound( Fixture const &f ) {
+  ServerConfig config;
+  config.root = f.tree;
+  Server xq( f.zorba, config, std::cerr );
+  config.jsoniq_default = true;
+  Server jq( f.zorba, config, std::cerr );
+
+  std::string const expected(
+    "\"" + value_ends + ellipsis + value_ends + " (3000000 bytes)\"" +
+    not_integer );
+
+  // The code and the whole text of the message, with the data shortened.
+  for ( std::string const &query : {
+          "let $v := " + value_3mb + " return xs:integer($v)",
+          "let $arr := [ 1, 2 ] let $v := " + value_3mb + " return $arr($v)" } ) {
+    Json const r = call_tool( jq, "run_query",
+                              Json::object( { { "query", query } } ) );
+    Json const e( tool_error( r ) );
+    std::string const message( field( e, "message" ) );
+    std::cout << "the message, " << message.size() << " bytes: "
+              << message.substr( 0, 200 ) << std::endl;
+    check( is_tool_error( r ) && contains( field( e, "code" ), "FORG0001" ),
+           "a value of 3 MB: the code", query );
+    check( message == expected, "a value of 3 MB: the message",
+           message.substr( 0, 300 ) );
+    check( r.dump().size() < 2000, "a value of 3 MB: a small answer",
+           std::to_string( r.dump().size() ) );
+  }
+  check( message_of( xq, "let $v := " + value_3mb + " return xs:integer($v)" ) ==
+         expected, "the same in XQuery", "" );
+
+  // At the bound nothing changes; one past it, the short form.
+  std::string const at_bound( 100, 'x' );
+  check( message_of( xq, cast_of( at_bound ) ) ==
+         "\"" + at_bound + "\"" + not_integer, "a value at the bound", "" );
+  std::string const past_bound( 101, 'x' );
+  std::string const message_past( message_of( xq, cast_of( past_bound ) ) );
+  check( message_past == "\"" + std::string( 40, 'x' ) + ellipsis +
+         std::string( 40, 'x' ) + " (101 bytes)\"" + not_integer,
+         "a value one past the bound", message_past );
+  check( message_of( xq, cast_of( "" ) ) == "\"\"" + not_integer,
+         "an empty value", "" );
+
+  // Characters that mean something to the message template, short and long,
+  // at every place around the cuts.
+  std::string const marks( "$1\\${\"" );
+  std::string const short_message( message_of( xq, cast_of( "a" + marks + "b" ) ) );
+  check( short_message == "\"a" + marks + "b\"" + not_integer,
+         "a short value with $1, \\, ${ and a quote", short_message );
+  for ( std::size_t pad = 30; pad <= 42; ++pad ) {
+    std::string const value( std::string( pad, 'p' ) + marks +
+                             std::string( 200, 'y' ) + marks +
+                             std::string( pad, 'q' ) );
+    std::string const message( message_of( xq, cast_of( value ) ) );
+    check( message == "\"" + value.substr( 0, 40 ) + ellipsis +
+           value.substr( value.size() - 40 ) + " (" +
+           std::to_string( value.size() ) + " bytes)\"" + not_integer,
+           "a long value with $1, \\, ${ and a quote", message );
+  }
+}
+
+// A cut never falls inside a character.
+void test_error_value_chars( Fixture const &f ) {
+  ServerConfig config;
+  config.root = f.tree;
+  Server server( f.zorba, config, std::cerr );
+
+  for ( std::string const &c : { std::string( "\xC3\xA9" ),
+                                 std::string( "\xE2\x82\xAC" ),
+                                 std::string( "\xF0\x9F\x98\x80" ) } ) {
+    for ( std::size_t shift = 0; shift < 4; ++shift ) {
+      std::string const value( std::string( shift, 'a' ) + repeated( c, 80 ) +
+                               std::string( shift, 'z' ) );
+      std::string const message( message_of( server, cast_of( value ) ) );
+      check( valid_utf8( message ), "a cut between characters", message );
+      std::size_t const cut = message.find( ellipsis );
+      std::string const size_part(
+        " (" + std::to_string( value.size() ) + " bytes)\"" + not_integer );
+      check( cut != std::string::npos && contains( message, size_part ),
+             "the ellipsis and the size", message );
+      std::string const head( message.substr( 1, cut - 1 ) );
+      std::string const tail(
+        message.substr( cut + ellipsis.size(),
+                        message.size() - size_part.size() - cut -
+                          ellipsis.size() ) );
+      check( head.size() >= 37 && head.size() <= 40 &&
+             value.compare( 0, head.size(), head ) == 0,
+             "the head of the value", message );
+      check( tail.size() >= 37 && tail.size() <= 40 &&
+             value.compare( value.size() - tail.size(), tail.size(), tail ) == 0,
+             "the tail of the value", message );
+    }
+  }
+}
+
+// What is not data stays whole: URIs, paths, a parser message.
+void test_error_names_whole( Fixture const &f ) {
+  ServerConfig config;
+  config.root = f.tree;
+  Server server( f.zorba, config, std::cerr );
+
+  std::string const uri( "http://example.org/" + repeated( "segment/", 40 ) +
+                         "module" );
+  std::string const location( repeated( "directory/", 40 ) + "module.xq" );
+  std::string const module_message(
+    message_of( server, "import module namespace m = \"" + uri + "\" at \"" +
+                location + "\"; 1" ) );
+  std::cout << "a long module URI and path: " << module_message << std::endl;
+  check( contains( module_message, uri ) &&
+         contains( module_message, location ) &&
+         !contains( module_message, ellipsis ),
+         "a long module URI and path", module_message );
+
+  std::string const path( "/" + repeated( "directory/", 40 ) + "a file.xml" );
+  std::string const doc_message(
+    message_of( server, "doc(\"" + path + "\")" ) );
+  std::cout << "a long file path: " << doc_message << std::endl;
+  // The URI parameter itself, first in the message, not the resolver's text.
+  std::string const doc_start( "\"" + path + "\": cannot retrieve resource" );
+  check( doc_message.compare( 0, doc_start.size(), doc_start ) == 0 &&
+         !contains( doc_message, ellipsis ),
+         "a long file path", doc_message );
+
+  // A name in the message of the parser, whose text is complete.
+  std::string const name( 200, 'n' );
+  std::string const syntax_message(
+    message_of( server, "for " + name + " in (1) return 1" ) );
+  std::cout << "a parser message: " << syntax_message << std::endl;
+  check( contains( syntax_message, "syntax error" ) &&
+         contains( syntax_message, name ),
+         "a parser message", syntax_message );
+}
+
+// fn:error: the description is the query's own text.
+void test_error_user_description( Fixture const &f ) {
+  ServerConfig config;
+  config.root = f.tree;
+  Server server( f.zorba, config, std::cerr );
+
+  std::string const description( repeated( "0123456789", 500 ) );
+  std::string const message( message_of( server,
+    "fn:error(fn:QName(\"http://example.org/e\", \"e:code\"), \"" + description +
+    "\")" ) );
+  check( message == description, "a long description is unchanged",
+         message.substr( 0, 300 ) );
+}
+
+void test_error_message_limit( Fixture const &f ) {
+  ServerConfig config;
+  config.root = f.tree;
+  config.max_output = 400;
+  Server server( f.zorba, config, std::cerr );
+
+  std::string const description( "start of the text " +
+                                 repeated( "0123456789", 500 ) +
+                                 " end of the text" );
+  std::string const query(
+    "\nfn:error(fn:QName(\"http://example.org/e\", \"e:code\"), \"" +
+    description + "\")" );
+  Json const r = call_tool( server, "run_query",
+                            Json::object( { { "query", query } } ) );
+  Json const e( tool_error( r ) );
+  std::string const message( field( e, "message" ) );
+  std::cout << "the message: " << message << std::endl;
+  check( is_tool_error( r ) && contains( field( e, "code" ), "code" ),
+         "the code stays", r.dump().substr( 0, 300 ) );
+  check( message.size() <= 400, "the message fits --max-output",
+         std::to_string( message.size() ) );
+  check( contains( message, "[zorba-mcp: message cut, " +
+                   std::to_string( description.size() ) + " bytes in all]" ),
+         "the marker states the total", message );
+  check( message.compare( 0, 18, "start of the text " ) == 0,
+         "the start stays", message );
+  check( message.size() > 16 &&
+         message.compare( message.size() - 16, 16, " end of the text" ) == 0,
+         "the end stays", message );
+  check( e.find( "location" ) != nullptr, "the location stays", r.dump() );
+
+  // A limit smaller than the marker: the marker alone.
+  config.max_output = 10;
+  Server tiny( f.zorba, config, std::cerr );
+  check( message_of( tiny, query ) == "[zorba-mcp: message cut, " +
+         std::to_string( description.size() ) + " bytes in all]",
+         "a limit smaller than the marker", "" );
+
+  // A limit that holds the message changes nothing.
+  config.max_output = description.size();
+  Server roomy( f.zorba, config, std::cerr );
+  check( message_of( roomy, query ) == description, "a message at the limit",
+         "" );
+}
+
+// The failing line of a query, and hints that repeat the query.
+void test_error_query_line( Fixture const &f ) {
+  ServerConfig config;
+  config.root = f.tree;
+  config.jsoniq_default = true;
+  Server server( f.zorba, config, std::cerr );
+
+  std::string const pad( 1000000, 'p' );
+  std::string const query(
+    "let $pad := \"" + pad + "\" return string-length($pad) div 0" );
+  Json const r = call_tool( server, "run_query",
+                            Json::object( { { "query", query } } ) );
+  Json const e( tool_error( r ) );
+  Json const *const loc = e.find( "location" );
+  check( is_tool_error( r ) && loc, "a long line: the location",
+         r.dump().substr( 0, 300 ) );
+  std::string const text( field( *loc, "text" ) );
+  std::string const shown( text.substr( 0, 800 ) );
+  std::cout << "the failing line: " << shown << std::endl;
+  check( text.size() < 1000, "a long line: a short text",
+         std::to_string( text.size() ) );
+  check( contains( text, "div 0" ), "a long line: the place of the error", shown );
+  check( contains( text, "[zorba-mcp: line of " +
+                   std::to_string( query.size() ) + " bytes]" ),
+         "a long line: the marker states the total", shown );
+
+  // A column fits: the bytes around it, without the start of the line.
+  std::string const near_pad( 20000, 'p' );
+  std::string const near_query(
+    "let $pad := \"" + near_pad + "\" return string-length($pad) div 0" );
+  Json const near_r = call_tool( server, "run_query",
+    Json::object( { { "query", near_query } } ) );
+  Json const near_e( tool_error( near_r ) );
+  Json const *const near_loc = near_e.find( "location" );
+  check( is_tool_error( near_r ) && near_loc, "a line of 20 KB: the location",
+         near_r.dump().substr( 0, 300 ) );
+  std::string const near_text( field( *near_loc, "text" ) );
+  check( near_text.size() < 1000 && contains( near_text, "div 0" ) &&
+         !contains( near_text, "let $pad" ),
+         "a line of 20 KB: around the column", near_text.substr( 0, 800 ) );
+
+  // A short line stays as it is.
+  Json const short_r = call_tool( server, "run_query",
+    Json::object( { { "query", "1 div 0" } } ) );
+  Json const short_e( tool_error( short_r ) );
+  Json const *const short_loc = short_e.find( "location" );
+  check( short_loc && field( *short_loc, "text" ) == "1 div 0",
+         "a short line is whole", short_r.dump() );
+
+  // A literal selector: a long one gets the placeholder in the hint.
+  TempTree t;
+  t.write( "a.json", "[ { \"a\" : 1 } ]" );
+  ServerConfig tree_config;
+  tree_config.root = t.root;
+  tree_config.jsoniq_default = true;
+  Server tree_server( f.zorba, tree_config, std::cerr );
+  std::string const selector( 5000, 's' );
+  std::string const hint( hint_of( tree_server, dir_import +
+    "let $c := dir:open($dir:root, \"a.json\")(\"content\")\n"
+    "return $c(\"" + selector + "\")" ) );
+  check( !contains( hint, selector.substr( 0, 200 ) ) &&
+         contains( hint, "$x()(\"key\")" ), "a long selector in the hint",
+         hint.substr( 0, 300 ) );
+
+  // Any other hint: this one repeats the names of two variables.
+  ServerConfig xq_config;
+  xq_config.root = f.tree;
+  Server xq( f.zorba, xq_config, std::cerr );
+  std::string const name( 8000, 'q' );
+  std::string const long_hint( hint_of( xq, "let $" + name +
+    " := 3 let $b := 1 return $" + name + "-$b" ) );
+  std::cout << "the hint: " << long_hint.size() << " bytes" << std::endl;
+  check( long_hint.size() <= 4096, "a long hint is bounded",
+         std::to_string( long_hint.size() ) );
+  check( contains( long_hint, "[zorba-mcp: hint cut, " ),
+         "a long hint has the marker", long_hint.substr( 0, 300 ) );
+}
+
+// Data inside the message of a function: the short form.
+void test_error_canonicalize_input( Fixture const &f ) {
+  ServerConfig config;
+  config.root = f.tree;
+  Server server( f.zorba, config, std::cerr );
+
+  std::string const input( "<a>" + repeated( "0123456789", 300 ) );
+  std::string const message( message_of( server,
+    "import module namespace x = \"http://zorba.io/modules/xml\";\n"
+    "x:canonicalize(\"" + input + "\")" ) );
+  std::cout << "x:canonicalize: " << message.substr( 0, 400 ) << std::endl;
+  check( message == "invalid content passed to x:canonicalize(): \"" +
+         input.substr( 0, 39 ) + ellipsis + input.substr( input.size() - 39 ) +
+         "\" (" + std::to_string( input.size() + 2 ) + " bytes)",
+         "a long input of x:canonicalize", message.substr( 0, 400 ) );
+}
+
+// A document in the store that the policy of another session denies: the
+// denial, which names the path, stays whole.
+void test_error_cached_denial( Fixture const &f ) {
+  TempTree t;
+  std::string const rel( repeated( "directory/", 12 ) + "a.xml" );
+  std::filesystem::create_directories( t.root + "/" +
+                                       repeated( "directory/", 12 ) );
+  std::filesystem::create_directories( t.root + "/other" );
+  t.write( rel, "<a>1</a>" );
+  std::string const path( t.root + "/" + rel );
+
+  ServerConfig wide;
+  wide.root = t.root;
+  Server first( f.zorba, wide, std::cerr );
+  Json const r = call_tool( first, "run_query",
+    Json::object( { { "query", "string(doc(\"" + path + "\"))" } } ) );
+  check( !is_tool_error( r ) && contains( result_text( r ), "1" ),
+         "the document is read under its root", r.dump() );
+
+  ServerConfig narrow;
+  narrow.root = t.root + "/other";
+  Server second( f.zorba, narrow, std::cerr );
+  std::string const message(
+    message_of( second, "string(doc(\"" + path + "\"))" ) );
+  std::cout << "a denied document: " << message << std::endl;
+  check( contains( message, "access denied by security policy" ) &&
+         contains( message, path + "\" is outside the allowed read paths" ) &&
+         !contains( message, ellipsis ),
+         "the denial is whole", message );
+}
+
+void test_error_help( Fixture const &f ) {
+  TempTree t;
+  std::string out, err;
+  int const status = run_mcp( f, t, { "--help" }, "", &out, &err );
+  check( status == 0, "--help exits with 0", err );
+  // The whole paragraph of --max-output, as it reads.
+  std::string const max_output_help(
+    "  --max-output <bytes> limit of one tool call on the query output and on\n"
+    "                       the \"message\" of an error (default 131072). Longer\n"
+    "                       output is cut with a marker. A longer message\n"
+    "                       loses its middle, keeps its end and gets a marker\n"
+    "                       with its total size; under a limit smaller than\n"
+    "                       the marker, the message is the marker alone. The\n"
+    "                       code, the hint and the location are not cut by\n"
+    "                       this limit: a hint over 4096 bytes loses its\n"
+    "                       middle, and a failing line in \"location\" over 512\n"
+    "                       bytes shows about 512 bytes around the column of\n"
+    "                       the error, or both ends of a line over 65535 bytes.\n"
+    "                       Apart from this limit, a message shortens the data\n"
+    "                       it quotes: a value over 100 bytes becomes its head,\n"
+    "                       an ellipsis, its tail and its size in bytes. A URI,\n"
+    "                       a path, a QName or {uri}local stays whole up to\n"
+    "                       4096 bytes, and so does the text of an error, such\n"
+    "                       as the message of the parser; longer text keeps\n"
+    "                       2000 bytes at each end\n"
+  );
+  check( contains( err, max_output_help ), "--help: the paragraph of --max-output", err );
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -4894,6 +5281,15 @@ Test const tests[] = {
   { "hints_document_value", test_hints_document_value },
   { "primer_json_content", test_primer_json_content },
   { "xml_namespace_message", test_xml_namespace_message },
+  { "error_value_bound", test_error_value_bound },
+  { "error_value_chars", test_error_value_chars },
+  { "error_names_whole", test_error_names_whole },
+  { "error_user_description", test_error_user_description },
+  { "error_message_limit", test_error_message_limit },
+  { "error_query_line", test_error_query_line },
+  { "error_help", test_error_help },
+  { "error_canonicalize_input", test_error_canonicalize_input },
+  { "error_cached_denial", test_error_cached_denial },
   { "hints_nodes", test_hints_nodes },
   { "hints_names", test_hints_names },
   { "deep_json", test_deep_json },

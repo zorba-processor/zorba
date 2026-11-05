@@ -2408,7 +2408,7 @@ void* import_schema(
     if (lStream == NULL)
     {
       RAISE_ERROR(err::XQST0059, loc,
-      ERROR_PARAMS(ZED(XQST0059_UnknownSchema_23o), lNsURI, lErrorMessage));
+      ERROR_PARAMS(ZED(XQST0059_UnknownSchema_23o), lNsURI, ERROR_TEXT( lErrorMessage )));
     }
 
     // If we got this far, we have a valid StreamResource.
@@ -3739,7 +3739,7 @@ void end_visit(const ModuleImport& v, void* /*visit_state*/)
       else
       {
         XQueryException e(XQUERY_EXCEPTION(err::XQST0059,
-          ERROR_PARAMS(ZED(XQST0059_UnknownModule_234o), targetNS, compURI, errorMsg),
+          ERROR_PARAMS(ZED(XQST0059_UnknownModule_234o), targetNS, compURI, ERROR_TEXT( errorMsg )),
           ERROR_LOC(loc)));
         // A network URI under a policy without this capability: the fetch is
         // what the policy denied, not the module. This does not read errorMsg,
@@ -5659,7 +5659,7 @@ void end_visit(const IndexKeyList& v, void* /*visit_state*/)
         RAISE_ERROR(zerr::ZDST0027_INDEX_BAD_KEY_TYPE, kloc,
         ERROR_PARAMS(index->getName()->getStringValue(),
                      ZED(ZDST0027_NON_ORDERED_KEY_TYPE),
-                     ptype->toSchemaString()));
+                     ERROR_TEXT( ptype->toSchemaString() )));
       }
 
       if (!index->isGeneral() &&
@@ -9628,7 +9628,7 @@ expr* create_cast_expr(
     if (theSctx->xquery_version() < StaticContextConsts::xquery_version_3_0)
     {
       RAISE_ERROR(err::XPST0051, loc,
-      ERROR_PARAMS(ZED(XPST0051_Atomic_2), type->toSchemaString()));
+      ERROR_PARAMS(ZED(XPST0051_Atomic_2), ERROR_TEXT( type->toSchemaString() )));
     }
   }
 
@@ -11593,14 +11593,14 @@ void end_visit(const VarRef& v, void* /*visit_state*/)
         {
           RAISE_ERROR(err::XPTY0004, loc,
           ERROR_PARAMS(ZED(XPTY0004_NoVarTypeInMainModule_23),
-                       *declaredType,
+                       ERROR_TEXT( *declaredType ),
                        ve->get_name()->getStringValue()));
         }
         else
         {
           RAISE_ERROR(err::XPTY0004, loc,
           ERROR_PARAMS(ZED(XPTY0004_NoVarTypeInModule_234),
-                       *declaredType,
+                       ERROR_TEXT( *declaredType ),
                        ve->get_name()->getStringValue(),
                        theModuleNamespace));
         }
@@ -11611,14 +11611,14 @@ void end_visit(const VarRef& v, void* /*visit_state*/)
         {
           RAISE_ERROR(err::XQST0036, loc,
           ERROR_PARAMS(ZED(XQST0036_NoVarTypeInMainModule_23),
-                       *declaredType,
+                       ERROR_TEXT( *declaredType ),
                        ve->get_name()->getStringValue()));
         }
         else
         {
           RAISE_ERROR(err::XQST0036, loc,
           ERROR_PARAMS(ZED(XQST0036_NoVarTypeInModule_234),
-                       *declaredType,
+                       ERROR_TEXT( *declaredType ),
                        ve->get_name()->getStringValue(),
                        theModuleNamespace));
         }
@@ -11836,14 +11836,14 @@ void* begin_visit(const FunctionCall& v)
       {
         RAISE_ERROR(err::XQST0036, loc,
         ERROR_PARAMS(ZED(XQST0036_NoRetTypeInMainModule_23),
-                     *retType,
+                     ERROR_TEXT( *retType ),
                      f->getName()->getStringValue()));
       }
       else
       {
         RAISE_ERROR(err::XQST0036, loc,
         ERROR_PARAMS(ZED(XQST0036_NoRetTypeInModule_234),
-                     *retType,
+                     ERROR_TEXT( *retType ),
                      f->getName()->getStringValue(),
                      theModuleNamespace));
       }
@@ -11862,14 +11862,14 @@ void* begin_visit(const FunctionCall& v)
         {
           RAISE_ERROR(err::XQST0036, loc,
           ERROR_PARAMS(ZED(XQST0036_NoParamTypeInMainModule_23),
-                       *type,
+                       ERROR_TEXT( *type ),
                        f->getName()->getStringValue()));
         }
         else
         {
           RAISE_ERROR(err::XQST0036, loc,
           ERROR_PARAMS(ZED(XQST0036_NoParamTypeInModule_234),
-                       *retType,
+                       ERROR_TEXT( *retType ),
                        f->getName()->getStringValue(),
                        theModuleNamespace));
         }
@@ -16430,7 +16430,7 @@ void end_visit (const FTThesaurusID& v, void* /*visit_state*/) {
     theSctx->resolve_uri( uri, internal::EntityData::THESAURUS, error_msg )
   );
   if ( !rsrc.get() )
-    RAISE_ERROR(err::FTST0018, loc, ERROR_PARAMS( uri, error_msg ));
+    RAISE_ERROR(err::FTST0018, loc, ERROR_PARAMS( uri, ERROR_TEXT( error_msg ) ));
 
   ftrange *levels;
   if ( v.get_levels() ) {

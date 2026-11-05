@@ -165,6 +165,60 @@ void trim_utf8_tail( std::string *s ) {
   }
 }
 
+inline bool is_utf8_continuation( char c ) {
+  return ( static_cast<unsigned char>( c ) & 0xC0 ) == 0x80;
+}
+
+// A text with its middle replaced by a marker, within \a cap bytes if the
+// marker fits. The cuts fall between UTF-8 characters.
+std::string cut_middle( std::string const &text, std::size_t cap,
+                        char const *what ) {
+  if ( text.size() <= cap )
+    return text;
+  std::string const marker( std::string( "[zorba-mcp: " ) + what + " cut, " +
+                            std::to_string( text.size() ) + " bytes in all]" );
+  std::size_t const room = cap > marker.size() ? cap - marker.size() : 0;
+  std::size_t head = room / 2;
+  std::size_t tail = text.size() - ( room - head );
+  while ( head && is_utf8_continuation( text[ head ] ) )
+    --head;
+  while ( tail < text.size() && is_utf8_continuation( text[ tail ] ) )
+    ++tail;
+  return text.substr( 0, head ) + marker + text.substr( tail );
+}
+
+// A line of a query as it goes in an error: a long one, as the bytes around the
+// column of the error and a marker with its size. A column is 16 bits in the
+// engine: past that it says nothing about the place, so a longer line shows its
+// two ends.
+std::string line_excerpt( std::string const &line, unsigned long column ) {
+  std::size_t const around = 256;
+  if ( line.size() <= 2 * around )
+    return line;
+  std::string const marker( " [zorba-mcp: line of " +
+                            std::to_string( line.size() ) + " bytes]" );
+  std::string const dots( "\xE2\x80\xA6" );
+  if ( line.size() > 65535 ) {
+    std::size_t head = around, tail = line.size() - around;
+    while ( head && is_utf8_continuation( line[ head ] ) )
+      --head;
+    while ( tail < line.size() && is_utf8_continuation( line[ tail ] ) )
+      ++tail;
+    return line.substr( 0, head ) + dots + line.substr( tail ) + marker;
+  }
+  std::size_t const at =
+    std::min( static_cast<std::size_t>( column ? column - 1 : 0 ), line.size() );
+  std::size_t begin = at > around ? at - around : 0;
+  std::size_t end = std::min( at + around, line.size() );
+  while ( begin < end && is_utf8_continuation( line[ begin ] ) )
+    ++begin;
+  while ( end > begin && end < line.size() &&
+          is_utf8_continuation( line[ end ] ) )
+    --end;
+  return ( begin ? dots : std::string() ) + line.substr( begin, end - begin ) +
+    ( end < line.size() ? dots : std::string() ) + marker;
+}
+
 std::string percent_encode_path( std::string const &path ) {
   static char const hex[] = "0123456789ABCDEF";
   std::string out;
@@ -253,8 +307,12 @@ std::string out_of_memory_text( unsigned long long max_memory ) {
   } ) } } ).dump();
 }
 
+// The longest hint that goes whole. A hint can repeat names from the query.
+std::size_t const max_hint_bytes = 4096;
+
 Json diagnostic_json( ZorbaException const &e, std::string const &source,
-                      std::string const &file_name ) {
+                      std::string const &file_name,
+                      std::size_t max_output ) {
   diagnostic::QName const &qn = e.diagnostic().qname();
   std::string code( qn.localname() );
   if ( qn.prefix() && *qn.prefix() )
@@ -262,10 +320,10 @@ Json diagnostic_json( ZorbaException const &e, std::string const &source,
   Json err( Json::object( {
     { "code", code },
     { "namespace", qn.ns() ? qn.ns() : "" },
-    { "message", e.what() }
+    { "message", cut_middle( e.what(), max_output, "message" ) }
   } ) );
   if ( *e.hint() )
-    err.set( "hint", e.hint() );
+    err.set( "hint", cut_middle( e.hint(), max_hint_bytes, "hint" ) );
   if ( XQueryException const *const xe =
          dynamic_cast<XQueryException const*>( &e ) ) {
     if ( xe->has_source() ) {
@@ -289,7 +347,7 @@ Json diagnostic_json( ZorbaException const &e, std::string const &source,
       if ( in_query ) {
         std::string const text( source_line( source, xe->source_line() ) );
         if ( !text.empty() )
-          loc.set( "text", text );
+          loc.set( "text", line_excerpt( text, xe->source_column() ) );
       }
       err.set( "location", std::move( loc ) );
     }
@@ -633,14 +691,16 @@ Server::run( std::string const &source, std::string const &file_name,
          std::strstr( e.what(), "bad_alloc" ) )
       outcome.text = out_of_memory_text( theConfig.max_memory );
     else
-      outcome.text = diagnostic_json( e, source, file_name ).dump();
+      outcome.text =
+        diagnostic_json( e, source, file_name, theConfig.max_output ).dump();
   }
   catch ( std::bad_alloc const& ) {
     outcome.text = out_of_memory_text( theConfig.max_memory );
   }
   catch ( std::exception const &e ) {
     outcome.text = Json::object( { { "error", Json::object( {
-      { "code", "internal" }, { "message", e.what() }
+      { "code", "internal" },
+      { "message", cut_middle( e.what(), theConfig.max_output, "message" ) }
     } ) } } ).dump();
   }
   return outcome;
