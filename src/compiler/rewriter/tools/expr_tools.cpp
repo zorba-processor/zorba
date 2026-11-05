@@ -985,6 +985,9 @@ static bool builtin_returns_existing_items(const function* f, TypeManager* tm)
   case FunctionConsts::OP_INTERSECT_2:
   case FunctionConsts::OP_EXCEPT_2:
   case FunctionConsts::OP_CHECK_DISTINCT_NODES_1:
+  case FunctionConsts::OP_DISTINCT_NODES_1:
+  case FunctionConsts::OP_DISTINCT_NODES_OR_ATOMICS_1:
+  case FunctionConsts::OP_EITHER_NODES_OR_ATOMICS_1:
   case FunctionConsts::FN_ID_1:
   case FunctionConsts::FN_ID_2:
   case FunctionConsts::FN_IDREF_1:
