@@ -115,16 +115,17 @@ ZORBA_ADD_TEST(bin/zorba_hint_unknown_module zorbacmd --disable-http-resolution 
 ZORBA_SET_TEST_PROPERTY(bin/zorba_hint_unknown_module PASS_REGULAR_EXPRESSION "XQST0059.*hint: .*may hold no module")
 # The message of a failed cast shortens the value and keeps its own text. A
 # regression would write megabytes on one line, which ctest copies to the CI log:
-# the lines are cut before ctest reads them.
+# the lines are cut before ctest reads them. The exit status of zorba, 31 for an
+# error while the query runs, is printed and checked too.
 IF (UNIX)
   SET (_ten "abcdefghijabcdefghijabcdefghijabcdefghij")
   SET (_short "FORG0001.*\"${_ten}…${_ten} \\(3000000 bytes\\)\": value of type xs:string is not castable to type xs:integer")
   FOREACH (_t cast selector)
     ADD_TEST (NAME bin/zorba_error_value_${_t}
-      COMMAND sh -c "\"$0\" -f -q \"$1\" 2>&1 | cut -c1-2000"
+      COMMAND sh -c "out=$(mktemp) || exit 99; \"$0\" -f -q \"$1\" > \"$out\" 2>&1; status=$?; cut -c1-2000 \"$out\"; rm -f \"$out\"; echo \"zorba exit status: $status\"; exit $status"
         "$<TARGET_FILE:zorbacmd>" "${_hintdir}/error_value_${_t}.jq")
     SET_TESTS_PROPERTIES (bin/zorba_error_value_${_t} PROPERTIES
-      PASS_REGULAR_EXPRESSION "${_short}"
+      PASS_REGULAR_EXPRESSION "${_short}.*zorba exit status: 31\n"
       FAIL_REGULAR_EXPRESSION "${_ten}abcdefghij")
   ENDFOREACH (_t)
 ENDIF (UNIX)
@@ -489,7 +490,8 @@ IF (ZORBA_WITH_FILE_ACCESS)
              query_primer hints_document_value primer_json_content
              xml_namespace_message error_value_bound error_value_chars
              error_names_whole error_user_description error_message_limit
-             error_query_line error_help
+             error_query_line error_help error_canonicalize_input
+             error_cached_denial
              hints_nodes hints_names deep_json deep_json_binary
              entity_expansion case_paths html_edge_cases memory_limit language
              language_binary no_write read_functions native_import reflection_random

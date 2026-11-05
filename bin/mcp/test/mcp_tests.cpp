@@ -3303,7 +3303,11 @@ void test_error_names_whole( Fixture const &f ) {
   std::string const doc_message(
     message_of( server, "doc(\"" + path + "\")" ) );
   std::cout << "a long file path: " << doc_message << std::endl;
-  check( contains( doc_message, path ), "a long file path", doc_message );
+  // The URI parameter itself, first in the message, not the resolver's text.
+  std::string const doc_start( "\"" + path + "\": cannot retrieve resource" );
+  check( doc_message.compare( 0, doc_start.size(), doc_start ) == 0 &&
+         !contains( doc_message, ellipsis ),
+         "a long file path", doc_message );
 
   // A name in the message of the parser, whose text is complete.
   std::string const name( 200, 'n' );
@@ -3359,6 +3363,13 @@ void test_error_message_limit( Fixture const &f ) {
          message.compare( message.size() - 16, 16, " end of the text" ) == 0,
          "the end stays", message );
   check( e.find( "location" ) != nullptr, "the location stays", r.dump() );
+
+  // A limit smaller than the marker: the marker alone.
+  config.max_output = 10;
+  Server tiny( f.zorba, config, std::cerr );
+  check( message_of( tiny, query ) == "[zorba-mcp: message cut, " +
+         std::to_string( description.size() ) + " bytes in all]",
+         "a limit smaller than the marker", "" );
 
   // A limit that holds the message changes nothing.
   config.max_output = description.size();
@@ -3445,17 +3456,81 @@ void test_error_query_line( Fixture const &f ) {
          "a long hint has the marker", long_hint.substr( 0, 300 ) );
 }
 
+// Data inside the message of a function: the short form.
+void test_error_canonicalize_input( Fixture const &f ) {
+  ServerConfig config;
+  config.root = f.tree;
+  Server server( f.zorba, config, std::cerr );
+
+  std::string const input( "<a>" + repeated( "0123456789", 300 ) );
+  std::string const message( message_of( server,
+    "import module namespace x = \"http://zorba.io/modules/xml\";\n"
+    "x:canonicalize(\"" + input + "\")" ) );
+  std::cout << "x:canonicalize: " << message.substr( 0, 400 ) << std::endl;
+  check( message == "invalid content passed to x:canonicalize(): \"" +
+         input.substr( 0, 39 ) + ellipsis + input.substr( input.size() - 39 ) +
+         "\" (" + std::to_string( input.size() + 2 ) + " bytes)",
+         "a long input of x:canonicalize", message.substr( 0, 400 ) );
+}
+
+// A document in the store that the policy of another session denies: the
+// denial, which names the path, stays whole.
+void test_error_cached_denial( Fixture const &f ) {
+  TempTree t;
+  std::string const rel( repeated( "directory/", 12 ) + "a.xml" );
+  std::filesystem::create_directories( t.root + "/" +
+                                       repeated( "directory/", 12 ) );
+  std::filesystem::create_directories( t.root + "/other" );
+  t.write( rel, "<a>1</a>" );
+  std::string const path( t.root + "/" + rel );
+
+  ServerConfig wide;
+  wide.root = t.root;
+  Server first( f.zorba, wide, std::cerr );
+  Json const r = call_tool( first, "run_query",
+    Json::object( { { "query", "string(doc(\"" + path + "\"))" } } ) );
+  check( !is_tool_error( r ) && contains( result_text( r ), "1" ),
+         "the document is read under its root", r.dump() );
+
+  ServerConfig narrow;
+  narrow.root = t.root + "/other";
+  Server second( f.zorba, narrow, std::cerr );
+  std::string const message(
+    message_of( second, "string(doc(\"" + path + "\"))" ) );
+  std::cout << "a denied document: " << message << std::endl;
+  check( contains( message, "access denied by security policy" ) &&
+         contains( message, path + "\" is outside the allowed read paths" ) &&
+         !contains( message, ellipsis ),
+         "the denial is whole", message );
+}
+
 void test_error_help( Fixture const &f ) {
   TempTree t;
   std::string out, err;
   int const status = run_mcp( f, t, { "--help" }, "", &out, &err );
   check( status == 0, "--help exits with 0", err );
-  for ( char const *text : { "the \"message\" of an error",
-                             "loses its middle, keeps its end",
-                             "with its total size", "the code, the hint and the",
-                             "shortens the data it quotes", "value over 100 bytes",
-                             "a URI or a path" } )
-    check( contains( err, text ), std::string( "--help says: " ) + text, err );
+  // The whole paragraph of --max-output, as it reads.
+  std::string const max_output_help(
+    "  --max-output <bytes> limit of one tool call on the query output and on\n"
+    "                       the \"message\" of an error (default 131072). Longer\n"
+    "                       output is cut with a marker. A longer message\n"
+    "                       loses its middle, keeps its end and gets a marker\n"
+    "                       with its total size; under a limit smaller than\n"
+    "                       the marker, the message is the marker alone. The\n"
+    "                       code, the hint and the location are not cut by\n"
+    "                       this limit: a hint over 4096 bytes loses its\n"
+    "                       middle, and a failing line in \"location\" over 512\n"
+    "                       bytes shows about 512 bytes around the column of\n"
+    "                       the error, or both ends of a line over 65535 bytes.\n"
+    "                       Apart from this limit, a message shortens the data\n"
+    "                       it quotes: a value over 100 bytes becomes its head,\n"
+    "                       an ellipsis, its tail and its size in bytes. A URI,\n"
+    "                       a path, a QName or {uri}local stays whole up to\n"
+    "                       4096 bytes, and so does the text of an error, such\n"
+    "                       as the message of the parser; longer text keeps\n"
+    "                       2000 bytes at each end\n"
+  );
+  check( contains( err, max_output_help ), "--help: the paragraph of --max-output", err );
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -5213,6 +5288,8 @@ Test const tests[] = {
   { "error_message_limit", test_error_message_limit },
   { "error_query_line", test_error_query_line },
   { "error_help", test_error_help },
+  { "error_canonicalize_input", test_error_canonicalize_input },
+  { "error_cached_denial", test_error_cached_denial },
   { "hints_nodes", test_hints_nodes },
   { "hints_names", test_hints_names },
   { "deep_json", test_deep_json },
