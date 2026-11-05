@@ -482,6 +482,11 @@ IF (ZORBA_WITH_FILE_ACCESS)
     # Scripted JSON-RPC exchanges against the directory module's fixture
     # tree (see mcp/test/mcp_tests.cpp); "binary" runs zorba-mcp itself.
     SET (_mcpq "${CMAKE_CURRENT_SOURCE_DIR}/test/mcp/queries")
+    # x:canonicalize is in the xml module, which needs XML Schema.
+    SET (_mcp_xml_tests)
+    IF (NOT ZORBA_NO_XMLSCHEMA)
+      SET (_mcp_xml_tests error_canonicalize_input)
+    ENDIF (NOT ZORBA_NO_XMLSCHEMA)
     FOREACH (_t json protocol legacy tools_list list_documents join
              syntax_error escape network native_modules predefined limits binary windows
              optional_params documents_stream hints_jsoniq hints_dash
@@ -490,7 +495,7 @@ IF (ZORBA_WITH_FILE_ACCESS)
              query_primer hints_document_value primer_json_content
              xml_namespace_message error_value_bound error_value_chars
              error_names_whole error_user_description error_message_limit
-             error_query_line error_help error_canonicalize_input
+             error_query_line error_help ${_mcp_xml_tests}
              error_cached_denial
              hints_nodes hints_names deep_json deep_json_binary
              entity_expansion case_paths html_edge_cases memory_limit language
