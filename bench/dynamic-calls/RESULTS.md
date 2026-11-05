@@ -51,3 +51,29 @@ FLWOR expressions.
 | side effect, a call in each FLWOR, wide | 0.300 s | 0.627 s | 2.1 (RSS 81 to 123 MiB) |
 | side effect, a call, deep | 0.050 s | 0.126 s | 2.5 |
 | side effect, a call, nested | 0.030 s | 0.038 s | 1.27 |
+
+## After the fix pass (0ac7e1109), not yet measured with this method
+
+The tables above are for `4875e63da`. Later commits change three of the cases, and they
+have not been measured again with the method above:
+
+- An expression beside an unproven call is hoisted again when it contains no such call
+  and reads no state the call can change. `effects_beside_static` is expected near its
+  "before" time; the timed test `zorba/optim/hoist_proven_beside_unproven_call`
+  (10^5 iterations of a static call of 10^6 steps beside an unproven call) took 0.42 s
+  in CI run 42122387586 (`linux-amd64`, ctest wall time) and timed out at 120 s before.
+- A union, intersect, except, the distinct-node operators, `fn:id`, `fn:idref`,
+  `fn:element-with-id`, single JSON lookups, `fn:doc`, `fn:collection` and calls of
+  `fn:fold-left`, `fn:fold-right`, `fn:for-each-pair` with a known function no longer
+  count as code that creates nodes. New queries `pure_fold_hoistable`,
+  `effects_union_invariant`, `effects_lookup_invariant`. Timed tests in CI run
+  42124906784 (`linux-amd64-clang`, ctest wall time): `hoist_proven_union_after_assignment`
+  0.38 s, and in run 42122387586 `hoist_proven_lookup_after_assignment` 0.60 s and
+  `dyncall_pure_with_fold_left` 0.54 s; each timed out at 120 s before. `fn:doc` and
+  `fn:collection` still read a state that a side effect can change, so in a query with a
+  side effect a loop-invariant expression with them stays in its loop.
+- Compile time: `EliminateUnusedLetVars` walks a flwor once per application instead of
+  once per variable, and the index join walks the outermost expr once per pass instead
+  of once per predicate. The hoisting rule still walks each candidate expr, now in more
+  places (it no longer stops at an expr with an unproven call). The compile-time table
+  above is not measured again.
