@@ -2581,10 +2581,15 @@ long sweep_qname_table( std::string const &big ) {
   long size = 0;
   is >> size;
   std::string h;
-  for ( int i = 0; i < 4 && is >> h; ++i )
-    if ( sweep_function_of( h ).find(
-           "QNamePool::CompareFunction>::resizeHashTab" ) != std::string::npos )
+  // The allocation is a few frames down, by inlining: in resizeHashTab(),
+  // shrinkHashTab() or hashInsert() of the QName pool's HashMap.
+  for ( int i = 0; i < 8 && is >> h; ++i ) {
+    std::string const f( sweep_function_of( h ) );
+    if ( f.find( "QNamePool::CompareFunction>::" ) != std::string::npos &&
+         ( f.find( "HashTab" ) != std::string::npos ||
+           f.find( "hashInsert" ) != std::string::npos ) )
       return size;
+  }
   return 0;
 }
 

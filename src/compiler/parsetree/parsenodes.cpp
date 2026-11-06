@@ -147,10 +147,12 @@ void parsenode::free()
 
   tDestroying = true;
   delete this;
-  while (tPending != nullptr)
+  // A node is queued once, by the free() of its last reference, and leaves the
+  // queue before it is destroyed; its destructor may queue its children.
+  while (parsenode* const lNode = tPending)
   {
-    parsenode* lNode = tPending;
     tPending = lNode->theNextPending;
+    lNode->theNextPending = nullptr;
     delete lNode;
   }
   tDestroying = false;
