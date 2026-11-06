@@ -380,7 +380,10 @@ PlanIter_t fn_jsoniq_members::codegen(
 
     if (parse && options.read(parseCall->get_arg(1)) && options.streaming())
     {
-      std::vector<PlanIter_t> source(1, parse->getChildren()[0]);
+      // The options stay a child, not read: when the optimizer has hoisted
+      // them, their iterator is a reference to a FLWOR variable, which must
+      // stay in the plan as long as the variable does.
+      std::vector<PlanIter_t> source(parse->getChildren());
 
       QueryLoc relativeLoc = QueryLoc::null;
       if (SingletonIterator* literal =
