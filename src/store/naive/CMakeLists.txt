@@ -18,7 +18,6 @@
 SET(ZORBA_STORE_IMPL_SRCS
     atomic_items.cpp
     collection.cpp
-    content_reader.cpp
     dataguide.cpp
     inmemorystore.cpp
     inmemorystorec.cpp
