@@ -1089,6 +1089,23 @@ static void openParseMembers(
 }
 
 
+/**
+ * Whether the query being run allows the file stream. theStreamIsPrivate is
+ * decided by the query that compiled this iterator, which is not always the one
+ * that runs it: the body of a function loaded with StaticContext::loadProlog(),
+ * or of a function item made by another query, is compiled with the state of
+ * that prolog or query. The query being run must not be able to write either.
+ */
+static bool runningQueryCannotWrite(const PlanState& planState)
+{
+  const CompilerCB* ccb = planState.theCompilerCB;
+
+  return ccb != NULL &&
+         !ccb->isSequential() &&
+         !ccb->theMayRunSideEffectsOrUpdates;
+}
+
+
 bool JSONParseMembersIterator::nextImpl(
     store::Item_t& result,
     PlanState& planState) const
@@ -1100,7 +1117,10 @@ bool JSONParseMembersIterator::nextImpl(
 
   if (consumeNext(lInput, theChildren[0].getp(), planState))
   {
-    openParseMembers(state, lInput, theStreamIsPrivate, theRelativeLocation);
+    openParseMembers(state,
+                     lInput,
+                     theStreamIsPrivate && runningQueryCannotWrite(planState),
+                     theRelativeLocation);
 
     while (scanToNextTopLevelArray(state, planState, theAllowMultiple, loc))
     {
