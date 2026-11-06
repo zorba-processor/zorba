@@ -12,6 +12,12 @@
   functions and in external functions is no longer a false result or an error that a
   catch clause can catch, such as the one in `dir:open`: it ends the query, as a
   timeout does.
+- After an allocation failed while the QName pool's hash table was being resized,
+  entries not yet moved were lost: built-in functions and the variables of a catch
+  clause were then not found for the rest of the process (`XPST0017` on
+  `parse-xml`, `string-join`, `sum`; `XPST0008` on `$err:description`). The table
+  now keeps its old contents when a resize cannot allocate, and an erase no longer
+  fails when the shrink after it cannot.
 - `zorba-mcp`: a line of input longer than the message limit is refused without
   reading it into memory; a large stack limit no longer uses up `--max-memory` at the
   start.

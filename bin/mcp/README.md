@@ -78,8 +78,9 @@ Rules this code depends on:
   throw and do not while unwinding (`string_appender`); MAPM throws instead of
   calling `exit()`, and its per-thread setup can run again; a failure in a libxml2
   callback is kept by the loader and thrown after the parse; the QName pool undoes
-  an insertion; casts and other handlers of `std::exception` let it through; a catch
-  clause of a query does not catch it. The main stack takes its size before the limit
+  an insertion, and a hash table keeps its old table if a resize cannot allocate;
+  casts and other handlers of `std::exception` let it through; a catch clause of a
+  query does not catch it. The main stack takes its size before the limit
   is set, up to 64 MiB, since at the limit it could not grow. A line of input takes at
   most the size of a message.
 
@@ -100,8 +101,7 @@ Rules this code depends on:
     freed after a failure (`release_hack` in `xquery_parser.cpp`, seen with ASan and
     TSan), so the sweeps that include compilation do not run in those builds.
   - While a query compiles, a failure can be reported as an error of the query, for
-    example that a module was not found; after some, a function stayed undeclared for
-    the next calls (seen on arm64, `XPST0017` on `parse-xml`).
+    example that a module was not found.
   - A failure in the checks of a path can be reported as a denied or invalid path, or
     in a `dir:open` as an error record, which a query can read as no content.
   and a message (`on_terminate()`, `--help`).
