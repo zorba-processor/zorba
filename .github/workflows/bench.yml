@@ -6,19 +6,20 @@ name: Benchmarks
 # and on demand). With ref_b set, both refs are built and measured in the SAME
 # job so that runner noise affects both sides equally; the report gives B/A.
 #
-# With `suite` (a directory under bench/): the comparison of two commits on the
-# queries of that suite (bench/compare.sh, see bench/README.md). Both commits are
-# built in Release with the same toolchain on this runner and measured in the
-# same job, alternating from run to run; the report gives head/base.
+# With `suite` (a directory under bench/): the comparison of ref_a (base) and
+# ref_b (head) on the queries of that suite (bench/compare.sh, see
+# bench/README.md). Both are built in Release with the same toolchain on this
+# runner and measured in the same job, alternating from run to run; the report
+# gives head/base.
 on:
   workflow_dispatch:
     inputs:
       ref_a:
-        description: "Ref (branch/tag/SHA) to measure; default: the ref the workflow runs on"
+        description: "Ref (branch/tag/SHA) to measure; default: the ref the workflow runs on. With suite: the base"
         required: false
         default: ""
       ref_b:
-        description: "Optional second ref to compare against A (reports B/A)"
+        description: "Optional second ref to compare against A (reports B/A). Required with suite: the head"
         required: false
         default: ""
       runs:
@@ -26,29 +27,17 @@ on:
         required: false
         default: "5"
       timeout:
-        description: "Per-query timeout in seconds (every run of a query)"
+        description: "Per-query timeout in seconds"
         required: false
         default: "300"
       suite:
         description: "Compare two commits on this directory of bench/ (e.g. dynamic-calls); empty: XMark + JSONiq with ref_a/ref_b"
         required: false
         default: ""
-      base:
-        description: "suite: the commit to compare against (ref or SHA)"
-        required: false
-        default: ""
-      head:
-        description: "suite: the commit under test (ref or SHA); default: the ref the workflow runs on"
-        required: false
-        default: ""
       filter:
         description: "suite: space or comma separated query names (file names without extension, patterns allowed); empty: all"
         required: false
         default: ""
-      repeat:
-        description: "suite: timed runs per query and build (after one warm-up run)"
-        required: false
-        default: "5"
       args:
         description: "suite: extra zorba arguments for every query, e.g. -e n:=100000 -e source:=lines:$DATA/log.jsonl"
         required: false
@@ -161,11 +150,11 @@ jobs:
     timeout-minutes: 345
     env:
       SUITE: ${{ inputs.suite }}
-      BASE_REF: ${{ inputs.base }}
-      HEAD_REF: ${{ inputs.head || github.sha }}
+      BASE_REF: ${{ inputs.ref_a || github.sha }}
+      HEAD_REF: ${{ inputs.ref_b }}
       SUITE_FROM: ${{ inputs.suite_from }}
       FILTER: ${{ inputs.filter }}
-      REPEAT: ${{ inputs.repeat || '5' }}
+      REPEAT: ${{ inputs.runs || '5' }}
       TIMEOUT: ${{ inputs.timeout || '300' }}
       ARGS: ${{ inputs.args }}
       SETUP: ${{ inputs.setup }}
@@ -173,7 +162,7 @@ jobs:
       - name: Check the inputs
         run: |
           fail() { echo "::error::$1"; exit 1; }
-          [ -n "$BASE_REF" ] || fail "base is required"
+          [ -n "$HEAD_REF" ] || fail "ref_b (the head) is required with suite"
           case $SUITE in *[!A-Za-z0-9._-]* | .*) fail "suite must be a directory name under bench/" ;; esac
           case $REPEAT in '' | *[!0-9]* | 0) fail "repeat must be a positive integer" ;; esac
           case $TIMEOUT in '' | *[!0-9]* | 0) fail "timeout must be a positive integer" ;; esac
@@ -183,12 +172,12 @@ jobs:
 
       - uses: actions/checkout@v7
         with:
-          ref: ${{ inputs.base }}
+          ref: ${{ inputs.ref_a || github.sha }}
           path: src-base
 
       - uses: actions/checkout@v7
         with:
-          ref: ${{ inputs.head || github.sha }}
+          ref: ${{ inputs.ref_b }}
           path: src-head
 
       - name: Builder image

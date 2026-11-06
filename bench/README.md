@@ -13,7 +13,7 @@ branch (a `workflow_dispatch` workflow must be on it):
 
 ```sh
 gh workflow run bench.yml -R zorba-processor/zorba --ref master \
-  -f suite=dynamic-calls -f base=<base sha> -f head=<head sha> -f repeat=5
+  -f suite=dynamic-calls -f ref_a=<base sha> -f ref_b=<head sha> -f runs=5
 gh run watch -R zorba-processor/zorba            # then open the run's summary
 ```
 
@@ -21,11 +21,11 @@ Inputs:
 
 | Input | Meaning | Default |
 |---|---|---|
-| `suite` | A directory of `bench/`, e.g. `dynamic-calls`. Empty: the XMark + JSONiq benchmark (`ref_a`, `ref_b`, `runs`, below). | empty |
-| `base` | The commit to compare against (branch, tag or SHA). Required with `suite`. | |
-| `head` | The commit under test. | the ref the workflow runs on |
+| `suite` | A directory of `bench/`, e.g. `dynamic-calls`. Empty: the XMark + JSONiq benchmark (below). | empty |
+| `ref_a` | The base: the commit to compare against (branch, tag or SHA). | the ref the workflow runs on |
+| `ref_b` | The head: the commit under test. Required with `suite`. | |
 | `filter` | Space or comma separated query names (file name without extension; shell patterns such as `pure_*` work). | all |
-| `repeat` | Timed runs per query and build, after one warm-up run. | 5 |
+| `runs` | Timed runs per query and build, after one warm-up run. | 5 |
 | `timeout` | Seconds per run. A run over it is stopped and has status `timeout`. | 300 |
 | `args` | Extra zorba arguments for every query, split as the shell does, e.g. `-e n:=100000`. `$DATA` is the data directory. | none |
 | `setup` | Shell command that prepares data in `$DATA` before measuring. `$ZORBA` is the head build, `$SUITE` the suite directory. | none |
@@ -43,7 +43,7 @@ The queries are the `*.xq` and `*.jq` files directly in the suite directory; eac
 
 ```sh
 gh workflow run bench.yml -R zorba-processor/zorba --ref master \
-  -f suite=windows -f base=<sha> -f head=<sha> \
+  -f suite=windows -f ref_a=<base sha> -f ref_b=<head sha> \
   -f filter='baseline moving_points moving_minutes duration sessions' \
   -f setup='$ZORBA --omit-xml-declaration --serialize-text -f -q $SUITE/gen.jq -e n:=100000 -e form:=lines > $DATA/log.jsonl' \
   -f args='-e source:=lines:$DATA/log.jsonl'
@@ -55,7 +55,7 @@ Suites that are driven by their own script and server (`scale`, `directory`, `st
 
 ### How a comparison runs
 
-For each query: one warm-up run of each build (not in the statistics), then `repeat` timed
+For each query: one warm-up run of each build (not in the statistics), then `runs` timed
 runs of each. The builds alternate, and the build that goes first alternates from run to
 run. Wall time and peak RSS (`wait4`) are taken by `dirbench run` inside the container of
 the build. A build that fails or times out in its warm-up is not run again on that query;
