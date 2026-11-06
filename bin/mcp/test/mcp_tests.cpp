@@ -2539,6 +2539,56 @@ void sweep_show_frames( std::string const &title, std::string const &hex,
 }
 
 
+// The function at a return address the child sent, by addr2line (cached).
+std::string sweep_function_of( std::string const &hex ) {
+  static std::map<std::string, std::string> known;
+  auto const k = known.find( hex );
+  if ( k != known.end() )
+    return k->second;
+  std::string name;
+  void *const addr = reinterpret_cast<void*>( std::stoull( hex, nullptr, 16 ) );
+  Dl_info info;
+  if ( dladdr( addr, &info ) && info.dli_fname && info.dli_fbase ) {
+    char cmd[1200];
+    if ( snprintf( cmd, sizeof cmd, "addr2line -C -f -e '%s' 0x%lx 2>/dev/null",
+                   info.dli_fname, static_cast<unsigned long>(
+                     static_cast<char*>( addr ) -
+                     static_cast<char*>( info.dli_fbase ) - 1 ) ) > 0 ) {
+      if ( std::FILE *const p = popen( cmd, "r" ) ) {
+        char buf[1024];
+        if ( std::fgets( buf, sizeof buf, p ) )
+          name = buf;
+        while ( std::fgets( buf, sizeof buf, p ) ) {
+        }
+        if ( pclose( p ) == -1 )
+          name.clear();
+      }
+    }
+  }
+  known[hex] = name;
+  return name;
+}
+
+// The size of a big block (as the child sent it: "size frame frame ...") if it
+// is the hash table of the QName pool, else 0. That table halves and doubles
+// with the number of names it holds, cached ones included, and its size depends
+// on the order of insertions and erasures: a failed call can leave it one step
+// larger than the call without a failure does, also when the failure is the
+// first allocation of the call (seen: 39 KB for a 78 KB table, in the sweeps of
+// casts and of the first decimal of a thread).
+long sweep_qname_table( std::string const &big ) {
+  std::istringstream is( big );
+  long size = 0;
+  is >> size;
+  std::string h;
+  for ( int i = 0; i < 4 && is >> h; ++i )
+    if ( sweep_function_of( h ).find(
+           "QNamePool::CompareFunction>::resizeHashTab" ) != std::string::npos )
+      return size;
+  return 0;
+}
+
+
 // With Sweep::after_compile, arms when the server is about to run the query.
 bool sweep_pending = false;
 long sweep_first = 0, sweep_length = 0;
@@ -2800,6 +2850,7 @@ void exhaust_sweep( Fixture const &f, std::string const &name, Sweep const &s ) 
     std::map<std::string, std::pair<long, long> > outcomes;
     std::map<std::string, Stacks> stacks_of;
     long selected = 0, ended = 0, sampled = 0, keeping = 0, max_kept = 0, i = 0;
+    long table_only = 0;
     bool shown_kept = false;
     for ( long n = 1; n <= total; n += step, ++i ) {
       bool const measure = i % every == 0;
@@ -2813,7 +2864,16 @@ void exhaust_sweep( Fixture const &f, std::string const &name, Sweep const &s ) 
           ++ended;
         } else {
           ++sampled;
-          if ( kept > base_kept + sweep_kept_noise ) {
+          long table = 0;
+          if ( kept > base_kept + sweep_kept_noise )
+            for ( std::string const &b : st.big )
+              table += sweep_qname_table( b );
+          // One step larger, the table holds about twice the entries: at most half
+          // its block is the difference. The rest still counts.
+          if ( kept > base_kept + sweep_kept_noise &&
+               kept - table / 2 <= base_kept + sweep_kept_noise ) {
+            ++table_only;
+          } else if ( kept > base_kept + sweep_kept_noise ) {
             ++keeping;
             max_kept = std::max( max_kept, kept - base_kept );
             // Where the first of them allocated the big blocks it kept.
@@ -2841,7 +2901,8 @@ void exhaust_sweep( Fixture const &f, std::string const &name, Sweep const &s ) 
     }
     std::cout << name << ", " << length << " failing: of " << sampled
               << " measured (" << ended << " more ended first), " << keeping
-              << " keep memory, at most " << max_kept << " bytes" << std::endl;
+              << " keep memory, at most " << max_kept << " bytes; " << table_only
+              << " more only in the table of the QName pool" << std::endl;
     check( selected >= std::min( sweep_min_measured, tried ),
            name + ": enough points measured",
            std::to_string( selected ) + " selected of " + std::to_string( tried ) );

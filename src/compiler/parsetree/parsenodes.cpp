@@ -129,29 +129,30 @@ void parsenode_visitor::checkStack(const QueryLoc& loc, uint32_t aLevels)
   node releases its children from its destructor, so plain recursive
   destruction would overflow the stack for deep trees. Instead, a node whose
   last reference goes away while another node is being destroyed is queued,
-  and the outermost free() destroys the queued nodes one after the other.
+  and the outermost free() destroys the queued nodes one after the other. The
+  queue links the nodes themselves: it allocates nothing, so running out of
+  memory cannot leave a destructor.
 ********************************************************************************/
 void parsenode::free()
 {
-  thread_local std::vector<parsenode*> tPending;
+  thread_local parsenode* tPending = nullptr;
   thread_local bool tDestroying = false;
 
   if (tDestroying)
   {
-    tPending.push_back(this);
+    theNextPending = tPending;
+    tPending = this;
     return;
   }
 
   tDestroying = true;
   delete this;
-  while (!tPending.empty())
+  while (tPending != nullptr)
   {
-    parsenode* lNode = tPending.back();
-    tPending.pop_back();
+    parsenode* lNode = tPending;
+    tPending = lNode->theNextPending;
     delete lNode;
   }
-  if (tPending.capacity() > 4096)
-    std::vector<parsenode*>().swap(tPending);
   tDestroying = false;
 }
 

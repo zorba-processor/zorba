@@ -24,3 +24,6 @@
   is handled; before, the answer had `"id": null`. A request whose id could not be
   read for lack of memory, even when read once more, ends the server with status 3
   instead of getting an answer its client could not match.
+- Running out of memory while the parse tree of a query was released could end the
+  process (`std::terminate`, status 3 in `zorba-mcp`): the queue of nodes waiting to
+  be destroyed allocated.
