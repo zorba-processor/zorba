@@ -66,6 +66,44 @@ bool may_run_side_effects(const expr* root);
 // sequential or updating function (or of one the compiler does not know).
 bool may_run_side_effects_or_updates(const expr* root);
 
+// What a dynamic function call can do in this query, by what is reachable from the
+// query body (CompilerCB::CallEffects). It sets CompilerCB::theCallEffects, so that it
+// is one walk over the query. To be called before the optimizer runs.
+void classify_calls(expr* root);
+
+// Whether "root" can call a function that can have a side effect, as far as the
+// compiler can tell. Only a query in which something with a side effect is reachable
+// has such calls, and only a function item whose origin is not visible can be one
+// (a function item expression, reached through let and for variables and prolog
+// variables that cannot be assigned, is visible). Such a call, and anything that
+// contains it or calls a user function containing it, is not moved, merged, duplicated
+// or eliminated, and nothing moves across it. The scripting kind of the expr does not
+// say this, because a dynamic function call is a simple expr whatever it calls, and it
+// must remain one for simple functions to be able to make such calls.
+bool calls_unproven_function(const expr* root);
+
+// The same for the call itself, without looking at its arguments.
+bool is_unproven_call(const expr* call);
+
+// Whether a call in "root" can give a different result each time, or new nodes, so
+// that one evaluation cannot serve for several. This holds in a query with no side
+// effect too, if a nondeterministic function or a constructor is reachable. Such a
+// call is not hoisted, but it can be dropped or moved within its iteration.
+bool call_results_can_differ(const expr* root);
+
+// The same for the call itself, without looking at its arguments.
+bool is_call_with_varying_result(const expr* call);
+
+// Whether the domain of the for clause gives its whole binding sequence before the
+// next clause runs (XQuery Scripting Extension 1.0, 6.7): it has a call that can have a
+// side effect. Decided by classify_calls() on the tree before the optimizer runs, so
+// that every level agrees; a rewrite must not remove such a for clause.
+bool is_binding_sequence(const for_clause* fc);
+
+// Whether "root" reads a state that a call can change, in a query with such calls.
+// Lazy evaluation interleaves it with those calls, even if they are outside of "root".
+bool depends_on_call_effects(const expr* root);
+
 
 /*******************************************************************************
 

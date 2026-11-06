@@ -23,6 +23,7 @@
 #include "compiler/rewriter/tools/expr_tools.h"
 
 #include "compiler/expression/flwor_expr.h"
+#include "compiler/expression/function_item_expr.h"
 #include "compiler/expression/script_exprs.h"
 #include "compiler/expression/expr_iter.h"
 #include "compiler/expression/expr.h"
@@ -199,6 +200,7 @@ RULE_REWRITE_PRE(EliminateUnusedLetVars)
   assert(udf == rCtx.theUDF);
 
   theFlwor = static_cast<flwor_expr *>(node);
+  theFlworCallsUnproven = -1;
 
   csize numClauses = theFlwor->num_clauses();
 
@@ -220,7 +222,10 @@ RULE_REWRITE_PRE(EliminateUnusedLetVars)
     const forletwin_clause* flwc =
     static_cast<const forletwin_clause *>(theFlwor->get_clause(0));
 
-    if (theFlwor->get_return_expr()->get_var() == flwc->get_var())
+    // A for clause whose domain gives its binding sequence first stays.
+    if (theFlwor->get_return_expr()->get_var() == flwc->get_var() &&
+        !(flwc->get_kind() == flwor_clause::for_clause &&
+          expr_tools::is_binding_sequence(static_cast<const for_clause*>(flwc))))
     {
       return flwc->get_expr();
     }
@@ -286,7 +291,10 @@ RULE_REWRITE_PRE(EliminateUnusedLetVars)
         pvar = NULL;
       }
 
-      if (domExpr->is_sequential() || domCount > 1)
+      if (domExpr->is_sequential() ||
+          domCount > 1 ||
+          expr_tools::is_binding_sequence(fc) ||
+          expr_tools::calls_unproven_function(domExpr))
         continue;
 
       // FOR clause with 0 cardinality
@@ -437,6 +445,18 @@ RULE_REWRITE_PRE(EliminateUnusedLetVars)
       {
         whereCond = whereExpr;
       }
+      else if (expr_tools::calls_unproven_function(whereCond) ||
+               expr_tools::calls_unproven_function(whereExpr))
+      {
+        // In the order of the clauses, which an "and" keeps.
+        whereCond = rCtx.theEM->
+        create_fo_expr(sctx,
+                       udf,
+                       whereCond->get_loc(),
+                       BUILTIN_FUNC(OP_AND_N),
+                       whereCond,
+                       whereExpr);
+      }
       else if (whereCond->get_function_kind() == FunctionConsts::OP_AND_N)
       {
         static_cast<fo_expr*>(whereCond)->add_arg(whereExpr);
@@ -474,6 +494,28 @@ RULE_REWRITE_PRE(EliminateUnusedLetVars)
     }
     else if (clause->get_kind() == flwor_clause::orderby_clause)
     {
+      // There is at most one tuple to sort, so the keys are not needed, but a call
+      // in a key must still run.
+      orderby_clause* oc = static_cast<orderby_clause*>(clause);
+      csize numLets = 0;
+
+      for (csize i = 0; i < oc->num_columns(); ++i)
+      {
+        expr* key = oc->get_column_expr(i);
+
+        if (expr_tools::calls_unproven_function(key))
+        {
+          var_expr* keyVar = rCtx.createTempVar(sctx, key->get_loc(), var_expr::let_var);
+
+          let_clause* keyClause = rCtx.theEM->
+          create_let_clause(sctx, key->get_loc(), keyVar, key);
+
+          keyVar->set_flwor_clause(keyClause);
+
+          theFlwor->add_clause(++numLets, keyClause);
+        }
+      }
+
       theFlwor->remove_clause(0);
       continue;
     }
@@ -546,6 +588,15 @@ bool EliminateUnusedLetVars::should_fold_var(int numRefs, expr* domExpr)
 /*****************************************************************************
 
 ******************************************************************************/
+bool EliminateUnusedLetVars::flwor_calls_unproven_function()
+{
+  if (theFlworCallsUnproven < 0)
+    theFlworCallsUnproven = expr_tools::calls_unproven_function(theFlwor) ? 1 : 0;
+
+  return theFlworCallsUnproven == 1;
+}
+
+
 bool EliminateUnusedLetVars::safe_to_fold_var(csize varPos, int& numRefs)
 {
   numRefs = 0;
@@ -555,7 +606,8 @@ bool EliminateUnusedLetVars::safe_to_fold_var(csize varPos, int& numRefs)
   expr* varDomExpr = varClause->get_expr();
   var_expr* var = varClause->get_var();
 
-  if (varDomExpr->is_sequential())
+  if (varDomExpr->is_sequential() ||
+      expr_tools::calls_unproven_function(varDomExpr))
     return false;
 
   bool isSafeVar = 
@@ -588,6 +640,17 @@ bool EliminateUnusedLetVars::safe_to_fold_var(csize varPos, int& numRefs)
   bool unsafe = false;
 
   if (theFlwor->dereferencesNodes() && varDomExpr->constructsNodes())
+    unsafe = true;
+
+  // A call in this flwor can change what the domain expr reads, unless the domain
+  // expr is what is evaluated right before it: "for $f in E return $f(...)", which is
+  // how the translator writes a dynamic function call with arguments. E is the function
+  // of the call, and without the for an empty E is the type error that it must be.
+  if (flwor_calls_unproven_function() &&
+      !(theFlwor->num_clauses() == 1 &&
+        theFlwor->get_return_expr()->get_expr_kind() == dynamic_function_invocation_expr_kind &&
+        static_cast<dynamic_function_invocation_expr*>(theFlwor->get_return_expr())->
+        get_input()->skip_wrappers() == var))
     unsafe = true;
 
   bool safe = safe_to_fold_var_rec(theFlwor, varPos+1, var, unsafe, isSafeVar, numRefs);
@@ -667,9 +730,11 @@ bool EliminateUnusedLetVars::safe_to_fold_var_rec(
         {
           return false;
         }
-        else if (kind == flwor_clause::for_clause &&
-                 (*domExpr)->get_return_type()->max_card() >= 2)   
+        else if ((*domExpr)->is_sequential() ||
+                 (kind == flwor_clause::for_clause &&
+                  (*domExpr)->get_return_type()->max_card() >= 2))
         {
+          // A later clause runs after the side effects of a sequential one.
           unsafe = unsafe1 = true;
         }
 
@@ -1076,6 +1141,7 @@ RULE_REWRITE_PRE(RefactorPredFLWOR)
 
     if (!condExpr->is_sequential() &&
         !thenExpr->is_sequential() &&
+        !expr_tools::calls_unproven_function(flwor) &&
         (elseExpr->is_simple() || elseExpr->is_vacuous()) &&
         !elseExpr->isNonDiscardable() &&
         elseExpr->get_return_type()->is_empty())
@@ -1149,7 +1215,8 @@ RULE_REWRITE_PRE(RefactorPredFLWOR)
   // TODO: we should be able to apply the rule if all the sequential clauses
   // are before the clause that defines the pos var.
   // TODO: consider more than one positional preds in CNF
-  if (! flwor->has_sequential_clauses())
+  if (! flwor->has_sequential_clauses() &&
+      ! expr_tools::calls_unproven_function(flwor))
   {
     csize numClauses = flwor->num_clauses();
 
@@ -1221,7 +1288,8 @@ RULE_REWRITE_PRE(RefactorPredFLWOR)
   // "if E then flwor else ()", where flwor is the original flwor expr without the
   // where clause.
 
-  if (!flwor->has_sequential_clauses())
+  if (!flwor->has_sequential_clauses() &&
+      !expr_tools::calls_unproven_function(flwor))
   {
     expr* whereExpr = NULL;
     csize numClauses = flwor->num_clauses();
@@ -1628,6 +1696,10 @@ expr* MergeFLWOR::apply(RewriterContext& rCtx, expr* node, bool& modified)
   {
     flwor_expr* flwor = static_cast<flwor_expr *>(node);
 
+    // The clauses of a flwor with such a call are the order of its evaluation.
+    if (expr_tools::calls_unproven_function(flwor))
+      return NULL;
+
     // Try to merge an inner flwor that appears in the return clause of the
     // outer flwor.
     if (flwor->get_return_expr()->get_expr_kind() == flwor_expr_kind &&
@@ -1725,8 +1797,10 @@ expr* MergeFLWOR::apply(RewriterContext& rCtx, expr* node, bool& modified)
 
         expr* domainExpr = fc->get_expr()->skip_wrappers();
 
+        // A domain that gives its binding sequence first is evaluated whole.
         if (domainExpr->get_expr_kind() == flwor_expr_kind &&
-            !domainExpr->is_sequential())
+            !domainExpr->is_sequential() &&
+            !expr_tools::is_binding_sequence(fc))
         {
           nestedFlwor = static_cast<flwor_expr*>(domainExpr);
           numNestedClauses = nestedFlwor->num_clauses();

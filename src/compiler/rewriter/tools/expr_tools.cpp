@@ -24,9 +24,12 @@
 #include "compiler/expression/function_item_expr.h"
 #include "compiler/expression/expr_iter.h"
 #include "compiler/api/compilercb.h"
+#include "context/static_context.h"
 
 #include "functions/func_errors_and_diagnostics.h"
 #include "functions/udf.h"
+#include "runtime/hof/function_item.h"
+#include "system/globalenv.h"
 #include "types/typeimpl.h"
 
 #include "types/typeops.h"
@@ -904,9 +907,19 @@ static bool may_run_side_effects_rec(
   if (withUpdates && e->is_updating())
     return true;
 
+  CompilerCB* ccb = const_cast<expr*>(e)->get_ccb();
+
+  // Nothing with a side effect is reachable (classify_calls): a call has none.
+  bool const callsHaveEffects = ccb->theCallEffects == CompilerCB::CALLS_HAVE_EFFECTS;
+
   switch (e->get_expr_kind())
   {
   case dynamic_function_invocation_expr_kind:
+    if (callsHaveEffects)
+      return true;
+
+    break;
+
   case eval_expr_kind:
   case var_set_expr_kind:
   case apply_expr_kind:
@@ -920,7 +933,7 @@ static bool may_run_side_effects_rec(
   {
     const function* f = static_cast<const fo_expr*>(e)->get_func();
 
-    if (f->isSequential() || function_runs_opaque_code(f))
+    if (f->isSequential() || (callsHaveEffects && function_runs_opaque_code(f)))
       return true;
 
     if (f->isUdf() && visitedUdfs.insert(f).second)
@@ -980,6 +993,1065 @@ bool may_run_side_effects_or_updates(const expr* root)
   std::set<const function*> visitedUdfs;
 
   return may_run_side_effects_rec(root, visitedUdfs, true);
+}
+
+
+// Whether what this built-in function returns is atomic or comes from its input, so
+// that it returns nothing new. Otherwise it may return a new node or JSON item.
+//
+// fn:doc and fn:collection return the nodes of the store, the same for the same URI in
+// a query; they read a state that a side effect can change, which builtinHasImpurity()
+// says separately. A function that calls a function item returns what the calls return:
+// a call that is not proven is found by its arguments (ImpurityWalk::isUnprovenCall()),
+// and the closed world walks the function of every function item.
+static bool builtin_returns_existing_items(const function* f, TypeManager* tm)
+{
+  switch (f->getKind())
+  {
+  case FunctionConsts::OP_UNION_2:
+  case FunctionConsts::OP_INTERSECT_2:
+  case FunctionConsts::OP_EXCEPT_2:
+  case FunctionConsts::OP_CHECK_DISTINCT_NODES_1:
+  case FunctionConsts::OP_DISTINCT_NODES_1:
+  case FunctionConsts::OP_DISTINCT_NODES_OR_ATOMICS_1:
+  case FunctionConsts::OP_EITHER_NODES_OR_ATOMICS_1:
+  case FunctionConsts::FN_ID_1:
+  case FunctionConsts::FN_ID_2:
+  case FunctionConsts::FN_IDREF_1:
+  case FunctionConsts::FN_IDREF_2:
+  case FunctionConsts::FN_ELEMENT_WITH_ID_1:
+  case FunctionConsts::FN_ELEMENT_WITH_ID_2:
+  case FunctionConsts::FN_DOC_1:
+  case FunctionConsts::FN_COLLECTION_0:
+  case FunctionConsts::FN_COLLECTION_1:
+  case FunctionConsts::OP_ZORBA_SINGLE_OBJECT_LOOKUP_2:
+  case FunctionConsts::OP_ZORBA_SINGLE_ARRAY_LOOKUP_2:
+  case FunctionConsts::FN_JSONIQ_FLATTEN_1:
+  case FunctionConsts::FN_FOR_EACH_2:
+  case FunctionConsts::FN_FILTER_2:
+  case FunctionConsts::FN_FOLD_LEFT_3:
+  case FunctionConsts::FN_FOLD_RIGHT_3:
+  case FunctionConsts::FN_FOR_EACH_PAIR_3:
+  case FunctionConsts::OP_CONCATENATE_N:
+  case FunctionConsts::OP_HOIST_1:
+  case FunctionConsts::OP_UNHOIST_1:
+  case FunctionConsts::FN_HEAD_1:
+  case FunctionConsts::FN_TAIL_1:
+  case FunctionConsts::FN_REVERSE_1:
+  case FunctionConsts::FN_REMOVE_2:
+  case FunctionConsts::FN_INSERT_BEFORE_3:
+  case FunctionConsts::FN_SUBSEQUENCE_2:
+  case FunctionConsts::FN_SUBSEQUENCE_3:
+  case FunctionConsts::OP_ZORBA_SUBSEQUENCE_INT_3:
+  case FunctionConsts::OP_ZORBA_SEQUENCE_POINT_ACCESS_2:
+  case FunctionConsts::FN_EXACTLY_ONE_1:
+  case FunctionConsts::OP_EXACTLY_ONE_NORAISE_1:
+  case FunctionConsts::FN_ONE_OR_MORE_1:
+  case FunctionConsts::FN_ZERO_OR_ONE_1:
+  case FunctionConsts::FN_UNORDERED_1:
+  case FunctionConsts::FN_ROOT_1:
+  case FunctionConsts::OP_SORT_NODES_ASC_1:
+  case FunctionConsts::OP_SORT_NODES_ASC_OR_ATOMICS_1:
+  case FunctionConsts::OP_SORT_NODES_DESC_1:
+  case FunctionConsts::OP_SORT_NODES_DESC_OR_ATOMICS_1:
+  case FunctionConsts::OP_SORT_DISTINCT_NODES_ASC_1:
+  case FunctionConsts::OP_SORT_DISTINCT_NODES_ASC_OR_ATOMICS_1:
+  case FunctionConsts::OP_SORT_DISTINCT_NODES_DESC_1:
+  case FunctionConsts::OP_SORT_DISTINCT_NODES_DESC_OR_ATOMICS_1:
+  case FunctionConsts::OP_ZORBA_MULTI_OBJECT_LOOKUP_2:
+  case FunctionConsts::OP_ZORBA_MULTI_ARRAY_LOOKUP_2:
+  case FunctionConsts::FN_JSONIQ_MEMBERS_1:
+    return true;
+  default:
+    break;
+  }
+
+  return TypeOps::is_subtype(tm,
+                             *f->getSignature().returnType(),
+                             *GENV_TYPESYSTEM.ANY_ATOMIC_TYPE_STAR);
+}
+
+
+/*******************************************************************************
+  The walk behind calls_unproven_function() and the like. It looks for a call whose
+  target is not proven. In strict mode, used for the body of a target, it looks for
+  any impurity as well: a target is proven only if its body has none.
+
+  Any finding makes the whole walk answer true. So a walk that answers false has
+  cleared every function it visited, cycles included, and the compiler cb remembers
+  them. A rewrite only removes calls from a body or replaces them by what was already
+  reachable from it, so a remembered answer stays correct or conservative.
+********************************************************************************/
+class ImpurityWalk
+{
+  CompilerCB                    * theCCB;
+  TypeManager                   * theTM;
+  std::set<const function*>       theVisited[2];
+
+public:
+  explicit ImpurityWalk(const expr* e)
+    :
+    theCCB(const_cast<expr*>(e)->get_ccb()),
+    theTM(e->get_type_manager())
+  {
+  }
+
+  bool walk(const expr* e, bool strict);
+
+  bool isUnprovenCall(const expr* call);
+
+  bool functionHasImpurity(const function* f, bool strict);
+
+  // The answer for "f" alone, remembered whatever it is.
+  bool functionAnswer(const function* f, bool strict);
+
+  void remember()
+  {
+    for (int i = 0; i < 2; ++i)
+    {
+      std::set<const function*>::const_iterator ite = theVisited[i].begin();
+      for (; ite != theVisited[i].end(); ++ite)
+        theCCB->theFunctionPurity[i][*ite] = false;
+    }
+  }
+
+private:
+  bool varCanChange(const var_expr* var) const;
+
+  const expr* boundExpr(const var_expr* var) const;
+
+  bool isNeverFunctionItem(const expr* e) const;
+
+  bool targetIsProven(const expr* target);
+
+  bool builtinHasImpurity(const function* f) const;
+};
+
+
+static bool takes_function_item(const function* f, csize i)
+{
+  const signature& sig = f->getSignature();
+
+  if (i >= sig.paramCount())
+    return false;
+
+  XQType::TypeKind const kind = sig[static_cast<int>(i)]->type_kind();
+
+  return kind == XQType::FUNCTION_TYPE_KIND || kind == XQType::ANY_FUNCTION_TYPE_KIND;
+}
+
+
+// A prolog variable is assignable by default. It can only change if there is an
+// assignment to it, or if a query that eval compiles at run time can add one.
+bool ImpurityWalk::varCanChange(const var_expr* var) const
+{
+  if ((var->get_kind() != var_expr::prolog_var &&
+       var->get_kind() != var_expr::local_var) ||
+      !var->is_mutable())
+    return false;
+
+  return theCCB->theHasEval || var->num_set_exprs() != 1;
+}
+
+
+// What the value of the variable comes from, if a query cannot change it.
+const expr* ImpurityWalk::boundExpr(const var_expr* var) const
+{
+  if (varCanChange(var))
+    return NULL;
+
+  switch (var->get_kind())
+  {
+  case var_expr::for_var:
+  case var_expr::let_var:
+    return var->get_domain_expr();
+
+  case var_expr::prolog_var:
+  case var_expr::local_var:
+  {
+    if (var->is_external() || var->num_set_exprs() == 0)
+      return NULL;
+
+    const var_set_expr* decl = var->get_set_expr(0);
+
+    return decl->get_expr_kind() == var_decl_expr_kind ? decl->get_expr() : NULL;
+  }
+  default:
+    return NULL;
+  }
+}
+
+
+// $x(1) with an $x that is not a function item is a lookup in a JSON item, which
+// has no effect. Collections hold nodes and JSON items only, and a member of a
+// JSON item is never a function item.
+bool ImpurityWalk::isNeverFunctionItem(const expr* e) const
+{
+  while (e != NULL)
+  {
+    xqtref_t const type = const_cast<expr*>(e)->get_return_type();
+
+    if (TypeOps::is_subtype(theTM, *type, *GENV_TYPESYSTEM.STRUCTURED_ITEM_TYPE_STAR) ||
+        TypeOps::is_subtype(theTM, *type, *GENV_TYPESYSTEM.ANY_ATOMIC_TYPE_STAR))
+      return true;
+
+    switch (e->get_expr_kind())
+    {
+    case wrapper_expr_kind:
+      e = static_cast<const wrapper_expr*>(e)->get_input();
+      break;
+
+    case function_trace_expr_kind:
+      e = static_cast<const function_trace_expr*>(e)->get_input();
+      break;
+
+    case treat_expr_kind:
+    case promote_expr_kind:
+      e = static_cast<const cast_base_expr*>(e)->get_input();
+      break;
+
+    case flwor_expr_kind:
+      e = static_cast<const flwor_expr*>(e)->get_return_expr();
+      break;
+
+    case var_expr_kind:
+      e = boundExpr(static_cast<const var_expr*>(e));
+      break;
+
+    case dynamic_function_invocation_expr_kind:
+      e = static_cast<const dynamic_function_invocation_expr*>(e)->get_input();
+      break;
+
+    case fo_expr_kind:
+      switch (static_cast<const fo_expr*>(e)->get_func()->getKind())
+      {
+      case FunctionConsts::ZORBA_STORE_STATIC_COLLECTIONS_DML_COLLECTION_1:
+      case FunctionConsts::ZORBA_STORE_STATIC_COLLECTIONS_DML_COLLECTION_2:
+      case FunctionConsts::ZORBA_STORE_STATIC_COLLECTIONS_DML_COLLECTION_3:
+      case FunctionConsts::ZORBA_STORE_DYNAMIC_COLLECTIONS_DML_COLLECTION_1:
+      case FunctionConsts::ZORBA_STORE_DYNAMIC_COLLECTIONS_DML_COLLECTION_2:
+      case FunctionConsts::ZORBA_STORE_DYNAMIC_COLLECTIONS_DML_COLLECTION_3:
+        return true;
+      default:
+        return false;
+      }
+
+    default:
+      return false;
+    }
+  }
+
+  return false;
+}
+
+
+bool ImpurityWalk::targetIsProven(const expr* target)
+{
+  if (isNeverFunctionItem(target))
+    return true;
+
+  while (target != NULL)
+  {
+    switch (target->get_expr_kind())
+    {
+    case wrapper_expr_kind:
+      target = static_cast<const wrapper_expr*>(target)->get_input();
+      break;
+
+    case function_trace_expr_kind:
+      target = static_cast<const function_trace_expr*>(target)->get_input();
+      break;
+
+    case treat_expr_kind:
+    case promote_expr_kind:
+      target = static_cast<const cast_base_expr*>(target)->get_input();
+      break;
+
+    case flwor_expr_kind:
+      // The function item is what the return clause gives. The clauses are looked
+      // at as children of the call.
+      target = static_cast<const flwor_expr*>(target)->get_return_expr();
+      break;
+
+    case var_expr_kind:
+      target = boundExpr(static_cast<const var_expr*>(target));
+      break;
+
+    case function_item_expr_kind:
+    {
+      const function_item_expr* fi = static_cast<const function_item_expr*>(target);
+
+      // The body of a coercion calls the function item it wraps, which is the
+      // value of its only closure variable.
+      if (fi->is_coercion())
+      {
+        const std::vector<expr*>& values =
+        const_cast<function_item_expr*>(fi)->get_fi_info()->theInScopeVarValues;
+
+        if (values.size() != 1)
+          return false;
+
+        target = values[0];
+        break;
+      }
+
+      const function* f = fi->get_function();
+
+      return f != NULL && !functionHasImpurity(f, true);
+    }
+
+    default:
+      return false;
+    }
+  }
+
+  return false;
+}
+
+
+bool ImpurityWalk::isUnprovenCall(const expr* call)
+{
+  if (call->get_expr_kind() == dynamic_function_invocation_expr_kind)
+  {
+    return !targetIsProven(
+        static_cast<const dynamic_function_invocation_expr*>(call)->get_input());
+  }
+
+  if (call->get_expr_kind() != fo_expr_kind)
+    return false;
+
+  const fo_expr* fo = static_cast<const fo_expr*>(call);
+  const function* f = fo->get_func();
+
+  if (f->isUdf())
+    return functionHasImpurity(f, false);
+
+  switch (f->getKind())
+  {
+  case FunctionConsts::FN_FUNCTION_NAME_1:
+  case FunctionConsts::FN_FUNCTION_ARITY_1:
+    return false;
+  default:
+    break;
+  }
+
+  if (!function_runs_opaque_code(f))
+    return false;
+
+  bool checked = false;
+
+  for (csize i = 0; i < fo->num_args(); ++i)
+  {
+    if (takes_function_item(f, i))
+    {
+      checked = true;
+
+      if (!targetIsProven(fo->get_arg(i)))
+        return true;
+    }
+  }
+
+  // fn:invoke and the like find the function by name.
+  return !checked;
+}
+
+
+bool ImpurityWalk::builtinHasImpurity(const function* f) const
+{
+  if (!f->isDeterministic() || f->isSequential() || f->isUpdating() ||
+      f->accessesDynCtx())
+    return true;
+
+  switch (f->getKind())
+  {
+  case FunctionConsts::FN_TRACE_2:
+  case FunctionConsts::FN_ERROR_0:
+  case FunctionConsts::FN_ERROR_1:
+  case FunctionConsts::FN_ERROR_2:
+  case FunctionConsts::FN_ERROR_3:
+  case FunctionConsts::FN_COLLECTION_0:
+  case FunctionConsts::FN_COLLECTION_1:
+  case FunctionConsts::FN_URI_COLLECTION_0:
+  case FunctionConsts::FN_URI_COLLECTION_1:
+  case FunctionConsts::FN_DOC_1:
+  case FunctionConsts::FN_DOC_AVAILABLE_1:
+    return true;
+  default:
+    break;
+  }
+
+  // The stores of collections, documents, indexes and maps change while a query runs,
+  // and so do the references of nodes.
+  const zstring& ns = f->getName()->getNamespace();
+
+  if (ns.find("/modules/store/") != zstring::npos ||
+      ns == "http://zorba.io/modules/reference")
+    return true;
+
+  return !builtin_returns_existing_items(f, theTM);
+}
+
+
+bool ImpurityWalk::functionHasImpurity(const function* f, bool strict)
+{
+  if (strict &&
+      (!f->isDeterministic() || f->isSequential() || f->isUpdating()))
+    return true;
+
+  if (!f->isUdf())
+    return strict && builtinHasImpurity(f);
+
+  const CompilerCB::FunctionPurityMap& cache = theCCB->theFunctionPurity[strict ? 1 : 0];
+  CompilerCB::FunctionPurityMap::const_iterator cached = cache.find(f);
+
+  if (cached != cache.end())
+    return cached->second;
+
+  if (!theVisited[strict ? 1 : 0].insert(f).second)
+    return false;
+
+  const expr* body = static_cast<const user_function*>(f)->getBody();
+
+  return body == NULL || walk(body, strict);
+}
+
+
+bool ImpurityWalk::functionAnswer(const function* f, bool strict)
+{
+  bool const answer = functionHasImpurity(f, strict);
+
+  if (!answer)
+    remember();
+
+  theCCB->theFunctionPurity[strict ? 1 : 0][f] = answer;
+
+  return answer;
+}
+
+
+bool ImpurityWalk::walk(const expr* e, bool strict)
+{
+  switch (e->get_expr_kind())
+  {
+  case dynamic_function_invocation_expr_kind:
+  {
+    if (isUnprovenCall(e))
+      return true;
+
+    break;
+  }
+  case fo_expr_kind:
+  {
+    if (isUnprovenCall(e))
+      return true;
+
+    if (strict &&
+        functionHasImpurity(static_cast<const fo_expr*>(e)->get_func(), true))
+      return true;
+
+    break;
+  }
+  case var_expr_kind:
+  {
+    if (strict && varCanChange(static_cast<const var_expr*>(e)))
+      return true;
+
+    break;
+  }
+  case doc_expr_kind:
+  case elem_expr_kind:
+  case attr_expr_kind:
+  case namespace_expr_kind:
+  case text_expr_kind:
+  case pi_expr_kind:
+  case json_direct_object_expr_kind:
+  case json_object_expr_kind:
+  case json_array_expr_kind:
+  case validate_expr_kind:
+  case transform_expr_kind:
+  case delete_expr_kind:
+  case insert_expr_kind:
+  case rename_expr_kind:
+  case replace_expr_kind:
+  case var_set_expr_kind:
+  case apply_expr_kind:
+  case exit_expr_kind:
+  case exit_catcher_expr_kind:
+  case flowctl_expr_kind:
+  case while_expr_kind:
+  case eval_expr_kind:
+  {
+    if (strict)
+      return true;
+
+    break;
+  }
+  default:
+    break;
+  }
+
+  ExprConstIterator iter(e);
+  while (!iter.done())
+  {
+    const expr* child = iter.get_expr();
+
+    if (child != NULL && walk(child, strict))
+      return true;
+
+    iter.next();
+  }
+
+  return false;
+}
+
+
+static CompilerCB::CallEffects call_effects(const expr* e)
+{
+  return const_cast<expr*>(e)->get_ccb()->theCallEffects;
+}
+
+
+static bool has_unproven_call(const expr* root)
+{
+  ImpurityWalk w(root);
+
+  bool const answer = w.walk(root, false);
+
+  if (!answer)
+    w.remember();
+
+  return answer;
+}
+
+
+static bool is_unproven_call_itself(const expr* call)
+{
+  ImpurityWalk w(call);
+
+  if (call->get_expr_kind() == fo_expr_kind)
+  {
+    const function* f = static_cast<const fo_expr*>(call)->get_func();
+
+    if (f->isUdf())
+      return w.functionAnswer(f, false);
+  }
+
+  bool const answer = w.isUnprovenCall(call);
+
+  if (!answer)
+    w.remember();
+
+  return answer;
+}
+
+
+bool calls_unproven_function(const expr* root)
+{
+  return call_effects(root) == CompilerCB::CALLS_HAVE_EFFECTS && has_unproven_call(root);
+}
+
+
+bool is_unproven_call(const expr* call)
+{
+  return call_effects(call) == CompilerCB::CALLS_HAVE_EFFECTS &&
+         is_unproven_call_itself(call);
+}
+
+
+bool call_results_can_differ(const expr* root)
+{
+  return call_effects(root) != CompilerCB::CALLS_ARE_PURE && has_unproven_call(root);
+}
+
+
+bool is_call_with_varying_result(const expr* call)
+{
+  return call_effects(call) != CompilerCB::CALLS_ARE_PURE &&
+         is_unproven_call_itself(call);
+}
+
+
+bool depends_on_call_effects(const expr* root)
+{
+  if (call_effects(root) != CompilerCB::CALLS_HAVE_EFFECTS)
+    return false;
+
+  ImpurityWalk w(root);
+
+  bool const answer = w.walk(root, true);
+
+  if (!answer)
+    w.remember();
+
+  return answer;
+}
+
+
+/*******************************************************************************
+  The closed world of a query: the walk covers the query body, what its prolog
+  variables are initialized with, and every function that it names in a call or a
+  function item. A dynamic function call can only reach what this walk reaches,
+  unless something here brings in code that it cannot see. Anything that can do so,
+  or that can have a side effect itself, means CALLS_HAVE_EFFECTS. A query with no
+  dynamic call has no call to classify: its direct sequential calls have their own
+  rules, and CALLS_ARE_PURE leaves them alone at no cost.
+********************************************************************************/
+class ClosedWorldWalk
+{
+  TypeManager                   * theTM;
+  std::set<const function*>       theFunctions;
+  std::set<const var_expr*>       theVars;
+
+public:
+  bool theHasCalls;
+  bool theResultsCanDiffer;
+  bool theHasEffects;
+
+  explicit ClosedWorldWalk(TypeManager* tm)
+    :
+    theTM(tm),
+    theHasCalls(false),
+    theResultsCanDiffer(false),
+    theHasEffects(false)
+  {
+  }
+
+  void opaque()
+  {
+    theHasEffects = true;
+  }
+
+  bool done() const
+  {
+    return theHasEffects && theHasCalls;
+  }
+
+  void walk(const expr* e);
+
+private:
+  void walkFunction(const function* f);
+
+  void walkBuiltin(const fo_expr* fo);
+
+  void walkVar(const var_expr* var);
+};
+
+
+void ClosedWorldWalk::walkFunction(const function* f)
+{
+  if (f == NULL)
+  {
+    opaque();
+    return;
+  }
+
+  if (f->isSequential() || f->isUpdating())
+    theHasEffects = true;
+
+  if (!f->isDeterministic())
+    theResultsCanDiffer = true;
+
+  if (!f->isUdf())
+    return;
+
+  if (!theFunctions.insert(f).second)
+    return;
+
+  const expr* body = static_cast<const user_function*>(f)->getBody();
+
+  // An external function, or one loaded from a plan: nothing says what it runs.
+  if (body == NULL)
+    opaque();
+  else
+    walk(body);
+}
+
+
+void ClosedWorldWalk::walkBuiltin(const fo_expr* fo)
+{
+  const function* f = fo->get_func();
+
+  if (f->isExternal())
+    opaque();
+
+  switch (f->getKind())
+  {
+  case FunctionConsts::FN_FUNCTION_LOOKUP_2:
+  case FunctionConsts::OP_ZORBA_FUNCTION_LOOKUP_5:
+  case FunctionConsts::FN_ZORBA_INVOKE_N:
+  case FunctionConsts::FN_ZORBA_INVOKE_N_N:
+  case FunctionConsts::FN_ZORBA_INVOKE_U_N:
+  case FunctionConsts::FN_ZORBA_INVOKE_S_N:
+  case FunctionConsts::FN_ZORBA_EVAL_1:
+  case FunctionConsts::FN_ZORBA_EVAL_N_1:
+  case FunctionConsts::FN_ZORBA_EVAL_U_1:
+  case FunctionConsts::FN_ZORBA_EVAL_S_1:
+  // It gives a node a reference, which ref:has-reference reads, but it is declared
+  // neither sequential nor nondeterministic.
+  case FunctionConsts::FN_REFERENCE_REFERENCE_1:
+    opaque();
+    break;
+  case FunctionConsts::FN_TRACE_2:
+    theResultsCanDiffer = true;
+    break;
+  default:
+    break;
+  }
+
+  walkFunction(f);
+
+  if (function_runs_opaque_code(f))
+    theHasCalls = true;
+
+  if (!builtin_returns_existing_items(f, theTM))
+    theResultsCanDiffer = true;
+}
+
+
+void ClosedWorldWalk::walkVar(const var_expr* var)
+{
+  if (var->get_kind() != var_expr::prolog_var &&
+      var->get_kind() != var_expr::local_var)
+    return;
+
+  if (!theVars.insert(var).second)
+    return;
+
+  // The value comes from outside of the query. Only a type can say that it is not a
+  // function item that reaches code the walk does not see.
+  if (var->is_external())
+  {
+    xqtref_t type = const_cast<var_expr*>(var)->get_return_type();
+
+    if (!TypeOps::is_subtype(theTM, *type, *GENV_TYPESYSTEM.STRUCTURED_ITEM_TYPE_STAR) &&
+        !TypeOps::is_subtype(theTM, *type, *GENV_TYPESYSTEM.ANY_ATOMIC_TYPE_STAR))
+      opaque();
+  }
+
+  for (csize i = 0; i < var->num_set_exprs(); ++i)
+  {
+    const var_set_expr* setExpr = var->get_set_expr(i);
+
+    if (setExpr->get_expr_kind() != var_decl_expr_kind)
+      theHasEffects = true;
+    else if (setExpr->get_expr() != NULL)
+      walk(setExpr->get_expr());
+  }
+}
+
+
+void ClosedWorldWalk::walk(const expr* e)
+{
+  // The kinds of expr and the functions below are all that gives an expr a sequential
+  // or updating scripting kind. The kind of the expr itself cannot be used: a block
+  // with the declaration of a prolog variable has one.
+  if (done())
+    return;
+
+  switch (e->get_expr_kind())
+  {
+  case dynamic_function_invocation_expr_kind:
+    theHasCalls = true;
+    break;
+
+  case fo_expr_kind:
+  {
+    const fo_expr* fo = static_cast<const fo_expr*>(e);
+
+    if (fo->get_func()->isUdf())
+      walkFunction(fo->get_func());
+    else
+      walkBuiltin(fo);
+
+    break;
+  }
+  case function_item_expr_kind:
+    walkFunction(static_cast<const function_item_expr*>(e)->get_function());
+    break;
+
+  case var_expr_kind:
+    walkVar(static_cast<const var_expr*>(e));
+    break;
+
+  case var_set_expr_kind:
+  case exit_expr_kind:
+  case exit_catcher_expr_kind:
+  case flowctl_expr_kind:
+  case while_expr_kind:
+    theHasEffects = true;
+    break;
+
+  case apply_expr_kind:
+  case eval_expr_kind:
+  case debugger_expr_kind:
+  case delete_expr_kind:
+  case insert_expr_kind:
+  case rename_expr_kind:
+  case replace_expr_kind:
+    opaque();
+    break;
+
+  case doc_expr_kind:
+  case elem_expr_kind:
+  case attr_expr_kind:
+  case namespace_expr_kind:
+  case text_expr_kind:
+  case pi_expr_kind:
+  case json_direct_object_expr_kind:
+  case json_object_expr_kind:
+  case json_array_expr_kind:
+  case validate_expr_kind:
+  case transform_expr_kind:
+    theResultsCanDiffer = true;
+    break;
+
+  default:
+    break;
+  }
+
+  ExprConstIterator iter(e);
+  while (!iter.done() && !done())
+  {
+    const expr* child = iter.get_expr();
+
+    if (child != NULL)
+      walk(child);
+
+    iter.next();
+  }
+}
+
+
+/*******************************************************************************
+  Marks, for every for clause reachable from the query, whether its domain has an
+  unproven call, on the tree before the optimizer runs. One walk, bottom up: the
+  answer for an expr is whether it or one of its children is an unproven call, and
+  the answer for a call of a user function covers its body (is_unproven_call()). The
+  bodies of the functions that the query names are marked as well, once.
+********************************************************************************/
+class BindingSequenceWalk
+{
+  CompilerCB                    * theCCB;
+  std::set<const function*>       theFunctions;
+  std::set<const var_expr*>       theVars;
+
+public:
+  // Whether the walk found an unproven call.
+  bool                            theFoundCall;
+
+  explicit BindingSequenceWalk(CompilerCB* ccb) : theCCB(ccb), theFoundCall(false) {}
+
+  bool walk(expr* e);
+
+  void walkFunction(const function* f);
+
+private:
+
+  void walkVar(const var_expr* var);
+};
+
+
+void BindingSequenceWalk::walkFunction(const function* f)
+{
+  if (f == NULL || !f->isUdf() || !theFunctions.insert(f).second)
+    return;
+
+  const user_function* udf = static_cast<const user_function*>(f);
+
+  // A function of another compilation (the query that runs an eval, or a static
+  // context shared by several queries) was decided by it, and may be optimized or
+  // running: it is left as it is.
+  if (udf->getCCB() != theCCB || udf->isOptimized() || udf->getPlan() != NULL)
+    return;
+
+  expr* body = udf->getBody();
+
+  if (body != NULL)
+    walk(body);
+}
+
+
+void BindingSequenceWalk::walkVar(const var_expr* var)
+{
+  if ((var->get_kind() != var_expr::prolog_var &&
+       var->get_kind() != var_expr::local_var) ||
+      const_cast<var_expr*>(var)->get_ccb() != theCCB ||
+      !theVars.insert(var).second)
+    return;
+
+  for (csize i = 0; i < var->num_set_exprs(); ++i)
+  {
+    var_set_expr* setExpr = var->get_set_expr(i);
+
+    if (setExpr->get_expr() != NULL)
+      walk(setExpr->get_expr());
+  }
+}
+
+
+bool BindingSequenceWalk::walk(expr* e)
+{
+  bool found = false;
+
+  switch (e->get_expr_kind())
+  {
+  case dynamic_function_invocation_expr_kind:
+    found = is_unproven_call(e);
+    theFoundCall = theFoundCall || found;
+    break;
+
+  case fo_expr_kind:
+  {
+    const function* f = static_cast<const fo_expr*>(e)->get_func();
+    found = is_unproven_call(e);
+    theFoundCall = theFoundCall || found;
+    walkFunction(f);
+    break;
+  }
+  case function_item_expr_kind:
+    walkFunction(static_cast<const function_item_expr*>(e)->get_function());
+    break;
+
+  case var_expr_kind:
+    walkVar(static_cast<const var_expr*>(e));
+    break;
+
+  default:
+    break;
+  }
+
+  if (e->get_expr_kind() == flwor_expr_kind)
+  {
+    flwor_expr* flwor = static_cast<flwor_expr*>(e);
+
+    // The domain of each for clause is walked on its own, for its answer. The rest
+    // of the flwor is walked below, with the domains of the for clauses skipped.
+    std::set<const expr*> domains;
+
+    for (csize i = 0; i < flwor->num_clauses(); ++i)
+    {
+      flwor_clause* c = flwor->get_clause(i);
+
+      if (c->get_kind() != flwor_clause::for_clause)
+        continue;
+
+      for_clause* fc = static_cast<for_clause*>(c);
+      bool const domainFound = walk(fc->get_expr());
+
+      // Decided once: a clause already marked keeps its mark.
+      if (fc->get_binding_sequence() == for_clause::BINDING_SEQUENCE_UNKNOWN)
+        fc->set_binding_sequence(domainFound ?
+                                 for_clause::BINDING_SEQUENCE_YES :
+                                 for_clause::BINDING_SEQUENCE_NO);
+
+      domains.insert(fc->get_expr());
+      found = found || domainFound;
+    }
+
+    ExprIterator iter(e);
+    while (!iter.done())
+    {
+      expr* child = **iter;
+
+      if (child != NULL && domains.find(child) == domains.end() && walk(child))
+        found = true;
+
+      iter.next();
+    }
+
+    return found;
+  }
+
+  ExprIterator iter(e);
+  while (!iter.done())
+  {
+    expr* child = **iter;
+
+    if (child != NULL && walk(child))
+      found = true;
+
+    iter.next();
+  }
+
+  return found;
+}
+
+
+bool is_binding_sequence(const for_clause* fc)
+{
+  switch (fc->get_binding_sequence())
+  {
+  case for_clause::BINDING_SEQUENCE_YES:
+    return true;
+  case for_clause::BINDING_SEQUENCE_NO:
+    return false;
+  default:
+    // A clause that a rewrite created, or one in code that the walk of
+    // classify_calls() did not reach.
+    return calls_unproven_function(fc->get_expr());
+  }
+}
+
+
+void classify_calls(expr* root)
+{
+  CompilerCB* ccb = root->get_ccb();
+
+  // What an eval query can see comes from the query that runs it.
+  if (ccb->theIsEval)
+  {
+    ccb->theCallEffects = CompilerCB::CALLS_HAVE_EFFECTS;
+  }
+  else
+  {
+    ClosedWorldWalk w(root->get_type_manager());
+
+    w.walk(root);
+
+    if (!w.theHasCalls)
+      ccb->theCallEffects = CompilerCB::CALLS_ARE_PURE;
+    else if (w.theHasEffects)
+      ccb->theCallEffects = CompilerCB::CALLS_HAVE_EFFECTS;
+    else if (w.theResultsCanDiffer)
+      ccb->theCallEffects = CompilerCB::CALLS_RESULTS_CAN_DIFFER;
+    else
+      ccb->theCallEffects = CompilerCB::CALLS_ARE_PURE;
+  }
+
+  if (ccb->theCallEffects == CompilerCB::CALLS_HAVE_EFFECTS)
+  {
+    BindingSequenceWalk w(ccb);
+    w.walk(root);
+
+    // A function that the query does not name can still run: fn:function-lookup,
+    // an invoke function or eval can find it by name, and it is then optimized
+    // when it is first called. Its for clauses are decided here too, so that the
+    // decision does not depend on the level.
+    std::vector<static_context*> sctxs;
+    sctxs.push_back(ccb->theRootSctx);
+
+    CompilerCB::SctxMap::const_iterator ite = ccb->theSctxMap.begin();
+    for (; ite != ccb->theSctxMap.end(); ++ite)
+      sctxs.push_back(ite->second.getp());
+
+    std::set<const static_context*> visitedSctxs;
+    std::vector<function*> functions;
+
+    for (csize i = 0; i < sctxs.size(); ++i)
+    {
+      if (sctxs[i] != NULL)
+        sctxs[i]->get_udfs(functions, visitedSctxs);
+    }
+
+    for (csize j = 0; j < functions.size(); ++j)
+      w.walkFunction(functions[j]);
+
+    ccb->theNoHoisting = w.theFoundCall;
+  }
+  else
+  {
+    ccb->theNoHoisting = false;
+  }
 }
 
 

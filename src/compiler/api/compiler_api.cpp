@@ -407,6 +407,8 @@ expr* XQueryCompiler::optimize(expr* rootExpr, audit::ScopedRecord& auditRecord)
 
   theCompilerCB->setPhase(CompilerCB::OPTIMIZATION);
 
+  expr_tools::classify_calls(rootExpr);
+
   // Build the call-graph among the udfs that are actually used in the query
   // program.
   UDFGraph udfGraph(rootExpr);

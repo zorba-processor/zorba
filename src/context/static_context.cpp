@@ -3225,6 +3225,53 @@ function* static_context::lookup_local_fn(
 /***************************************************************************//**
   Find all the in-scope and non-disabled functions in this sctx and its ancestors.
 ********************************************************************************/
+void static_context::get_udfs(
+    std::vector<function*>& udfs,
+    std::set<const static_context*>& visited) const
+{
+  for (const static_context* sctx = this;
+       sctx != NULL && !sctx->is_global_root_sctx();
+       sctx = sctx->theParent)
+  {
+    if (!visited.insert(sctx).second)
+      break;
+
+    if (sctx->theFunctionMap != NULL)
+    {
+      FunctionMap::iterator ite = sctx->theFunctionMap->begin();
+      FunctionMap::iterator end = sctx->theFunctionMap->end();
+
+      for (; ite != end; ++ite)
+      {
+        function* f = (*ite).second.theFunction;
+
+        if (f != NULL && f->isUdf())
+          udfs.push_back(f);
+      }
+    }
+
+    if (sctx->theFunctionArityMap != NULL)
+    {
+      FunctionArityMap::iterator ite = sctx->theFunctionArityMap->begin();
+      FunctionArityMap::iterator end = sctx->theFunctionArityMap->end();
+
+      for (; ite != end; ++ite)
+      {
+        std::vector<FunctionInfo>* fv = (*ite).second;
+
+        for (csize i = 0; i < fv->size(); ++i)
+        {
+          function* f = (*fv)[i].theFunction;
+
+          if (f != NULL && f->isUdf())
+            udfs.push_back(f);
+        }
+      }
+    }
+  }
+}
+
+
 void static_context::get_functions(std::vector<function *>& functions) const
 {
   std::vector<function*> disabled;

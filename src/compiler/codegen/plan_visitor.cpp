@@ -413,6 +413,21 @@ ftnode_visitor* get_ftnode_visitor()
 #endif /* ZORBA_NO_FULL_TEXT */
 
 
+// XQSX 6.7: "The associated expression is evaluated first to produce the binding
+// sequence, then the next clause is evaluated once for each item in the binding
+// sequence." This applies to a domain with a call that can have a side effect, as
+// decided before the optimizer runs. Any other domain stays lazy.
+PlanIter_t binding_sequence_iter(const for_clause* fc, PlanIter_t domainIter)
+{
+  expr* domExpr = fc->get_expr();
+
+  if (expr_tools::is_binding_sequence(fc))
+    return new MaterializeIterator(domExpr->get_sctx(), domExpr->get_loc(), domainIter);
+
+  return domainIter;
+}
+
+
 PlanIter_t pop_itstack()
 {
   return plan_visitor_ns::pop_stack(itstack);
@@ -541,7 +556,13 @@ void end_visit(dynamic_function_invocation_expr& v)
 
   std::reverse(argIters.begin(), argIters.end());
 
-  if (numArgs > 0 || v.get_input()->get_return_type()->max_card() <= 1)
+  // With no argument, JSONiq takes each item of the input, and an empty input gives an
+  // empty result, whatever the optimizer infers about the number of items. In XQuery
+  // the single-item iterator raises XPTY0004 for an empty input (the translator adds
+  // the same check for an input that can have several items).
+  if (numArgs > 0 ||
+      (v.get_input()->get_return_type()->max_card() <= 1 &&
+       v.get_sctx()->language_kind() != StaticContextConsts::language_kind_jsoniq))
     push_itstack(new SingleDynamicFnCallIterator(sctx, qloc, argIters, isPartialApply));
   else
     push_itstack(new MultiDynamicFnCallIterator(sctx, qloc, argIters[0]));
@@ -1664,7 +1685,7 @@ PlanIter_t gflwor_codegen(flwor_expr& flworExpr, int currentClause)
 
     var_expr* var = fc->get_var();
 
-    PlanIter_t domainIter = pop_itstack();
+    PlanIter_t domainIter = binding_sequence_iter(fc, pop_itstack());
 
     std::vector<PlanIter_t>& varRefs = clauseVarMap->theVarRebinds[0]->theOutputVarRefs;
     std::vector<PlanIter_t>* posVarRefs = &no_var_iters;
@@ -2090,7 +2111,7 @@ void flwor_codegen(const flwor_expr& flworExpr)
 
       var_expr* var = fc->get_var();
 
-      PlanIter_t domainIter = pop_itstack();
+      PlanIter_t domainIter = binding_sequence_iter(fc, pop_itstack());
 
       std::vector<PlanIter_t>& varRefs =
       clauseVarMap->theVarRebinds[0]->theOutputVarRefs;
