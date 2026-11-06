@@ -47,8 +47,9 @@ namespace simplestore
   for the process: the engine is used from one thread at a time
   (doc/zorba/threading.dox).
 
-  A subclass must call stopReading() in its destructor, before its members
-  are destroyed, and must not read the key's storage after copyContent().
+  copyContent() must leave the iteration unchanged if it throws, and must
+  not read the key's storage after it returns. A subclass must call
+  stopReading() in its destructor, before its members are destroyed.
 ********************************************************************************/
 class ContentReader
 {

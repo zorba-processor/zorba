@@ -901,9 +901,11 @@ void SimpleJSONObject::KeyIterator::open()
 *******************************************************************************/
 void SimpleJSONObject::KeyIterator::copyContent()
 {
-  theCopy.reserve(theSize);
+  std::vector<store::Item_t> keys;
+  keys.reserve(theSize);
   for (size_type i = 0; i < theSize; ++i)
-    theCopy.push_back(theObject->thePairs[i].first);
+    keys.push_back(theObject->thePairs[i].first);
+  theCopy.swap(keys);
 }
 
 
@@ -913,7 +915,10 @@ void SimpleJSONObject::KeyIterator::copyContent()
 bool SimpleJSONObject::KeyIterator::next(store::Item_t& res)
 {
   if (thePos == theSize)
+  {
+    theCopy.clear();  // reset() reads the object again
     return false;
+  }
 
   if (isReading())
     res = theObject->thePairs[thePos].first;
@@ -1542,8 +1547,9 @@ void SimpleJSONArray::ValuesIterator::open()
 *******************************************************************************/
 void SimpleJSONArray::ValuesIterator::copyContent()
 {
-  theCopy.assign(theArray->theContent.begin(),
-                 theArray->theContent.begin() + theSize);
+  std::vector<store::Item_t> members(theArray->theContent.begin(),
+                                     theArray->theContent.begin() + theSize);
+  theCopy.swap(members);
 }
 
 
@@ -1553,7 +1559,10 @@ void SimpleJSONArray::ValuesIterator::copyContent()
 bool SimpleJSONArray::ValuesIterator::next(store::Item_t& res)
 {
   if (thePos == theSize)
+  {
+    theCopy.clear();  // reset() reads the array again
     return false;
+  }
 
   if (isReading())
     res = theArray->theContent[thePos];

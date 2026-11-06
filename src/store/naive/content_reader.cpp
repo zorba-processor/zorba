@@ -61,9 +61,11 @@ void ContentReader::unlink()
 }
 
 
-// Each reader of the key leaves the list before it copies, so a reader is
-// copied at most once per change; copyContent() only takes references, which
-// changes no list.
+// A reader leaves the list only after its copy is complete. If a copy throws
+// (out of memory), the exception leaves the mutator before anything changes:
+// that reader and the ones after it still read the unchanged storage, and the
+// ones before it read their complete copies. copyContent() only allocates and
+// takes references, which changes no list.
 void ContentReader::copyContents(const void* key)
 {
   ContentReader* reader = theReaders[bucket(key)];
@@ -74,8 +76,8 @@ void ContentReader::copyContents(const void* key)
 
     if (reader->theKey == key)
     {
-      reader->unlink();
       reader->copyContent();
+      reader->unlink();
     }
 
     reader = next;

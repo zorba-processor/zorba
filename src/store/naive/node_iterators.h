@@ -53,18 +53,22 @@ public:
 
   ~NodeCopy() { clear(); }
 
+  // If the allocation throws, the copy is unchanged.
   void assign(XmlNode* const* begin, XmlNode* const* end)
   {
-    clear();
-    theNodes.reserve(end - begin);
+    std::vector<XmlNode*> nodes;
+    nodes.reserve(end - begin);
     for (; begin != end; ++begin)
     {
       XmlNode* node = ((*begin)->isConnectorNode() ?
                        static_cast<ConnectorNode*>(*begin)->getNode() :
                        *begin);
       node->addReference();
-      theNodes.push_back(node);
+      nodes.push_back(node);
     }
+    nodes.swap(theNodes);
+    for (XmlNode* node : nodes)
+      node->removeReference();
   }
 
   void clear()
@@ -97,7 +101,10 @@ public:
 
   The iterator returns the children the node had when init() was called, and
   reset() or open() start them again (see ContentReader): if the node is
-  updated while the iterator is open, the iterator copies them first.
+  updated while the iterator is open, the iterator copies them first. The
+  copy holds references to the children, deleted ones included, until the
+  next init(), close() or the destruction of the iterator, also after the
+  last child was returned: reset() must be able to return them again.
 
   theParentNode : The element or doc node whose children are being retrieved.
   theStart      : The first child to return.
