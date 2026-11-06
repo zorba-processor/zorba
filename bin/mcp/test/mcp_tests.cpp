@@ -3214,6 +3214,53 @@ void test_sweep_streamable_text( Fixture const &f ) {
 }
 // ItemFactory::createBase64Binary(std::istream&) with each allocation failing in
 // turn: the whole value, or an exception; never a shorter value.
+void test_seekable_stream_out_of_memory( Fixture const &f ) {
+#if defined(__linux__)
+  std::string text;
+  for ( int i = 0; i < 2000; ++i )
+    text += "abcdefghi\n";
+  ItemFactory *const factory = f.zorba->getItemFactory();
+  auto release = []( std::istream *s ) { delete s; };
+  // Item::ensureSeekable() with each allocation failing in turn; then, whether
+  // it threw or not, the value is the whole text or an error, never a part.
+  auto attempt = [&]( long n, long length, long *count ) -> std::string {
+    Item item( factory->createStreamableString(
+      *new std::istringstream( text ), release ) );
+    inject_arm( n, length );
+    try {
+      item.ensureSeekable();
+    }
+    catch ( std::exception const& ) {
+    }
+    *count = inject_disarm();
+    try {
+      item.ensureSeekable();
+      String const value( item.getStringValue() );
+      return value.length() == text.size() ? "whole" :
+        "shorter: " + std::to_string( value.length() ) + " bytes";
+    }
+    catch ( std::exception const& ) {
+      return "error";
+    }
+  };
+  long total = 0;
+  check( attempt( 0, 0, &total ) == "whole",
+         "a seekable streamable string: the whole text" );
+  long shorter = 0;
+  for ( long const length : { 1L, 8L } )
+    for ( long n = 1; n <= total; ++n ) {
+      long count = 0;
+      std::string const got( attempt( n, length, &count ) );
+      if ( got != "whole" && got != "error" && ++shorter <= 3 )
+        std::cout << "at " << n << " of a run of " << length << ": " << got
+                  << std::endl;
+    }
+  check( shorter == 0, "ensureSeekable(): never a shorter value",
+         std::to_string( shorter ) + " points" );
+#else
+  (void)f;
+#endif
+}
 void test_base64_stream_out_of_memory( Fixture const &f ) {
 #if defined(__linux__)
   std::string encoded;
@@ -7153,6 +7200,7 @@ Test const tests[] = {
   { "exhaust_sweep_query_text", test_sweep_query_text },
   { "exhaust_sweep_streamable_text", test_sweep_streamable_text },
   { "exhaust_base64_stream", test_base64_stream_out_of_memory },
+  { "exhaust_seekable_stream", test_seekable_stream_out_of_memory },
   { "exhaust_sweep_matcher", test_sweep_matcher },
   { "exhaust_sweep_xml", test_sweep_xml },
   { "exhaust_sweep_fragment", test_sweep_fragment },
