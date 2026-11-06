@@ -31,6 +31,7 @@
 #include "store/api/iterator.h"
 
 #include "atomic_items.h"
+#include "content_reader.h"
 #include "collection_tree_info.h"
 #include "simple_collection.h"
 #include "structured_item.h"
@@ -264,14 +265,22 @@ public:
 
 protected:
 
-  class KeyIterator : public store::Iterator
+  // Returns the keys the object had when open() or reset() was called (see
+  // ContentReader): if the object changes while the iterator is open, the
+  // iterator copies them first.
+  class KeyIterator : public store::Iterator, public ContentReader
   {
     protected:
-      SimpleJSONObject_t  theObject;
-      Pairs::iterator     theIter;
+      SimpleJSONObject_t          theObject;
+      size_type                   thePos;
+      size_type                   theSize;
+      std::vector<store::Item_t>  theCopy;  // the keys, once the object changed
+
+      void copyContent();
 
     public:
-      KeyIterator(const SimpleJSONObject_t& aObject) : theObject(aObject) {}
+      KeyIterator(const SimpleJSONObject_t& aObject)
+        : theObject(aObject), thePos(0), theSize(0) {}
 
       virtual ~KeyIterator();
 
@@ -422,14 +431,22 @@ class SimpleJSONArray : public JSONArray
 protected:
   typedef std::vector<store::Item*> Members;
 
-  class ValuesIterator : public store::Iterator
+  // Returns the members the array had when open() or reset() was called (see
+  // ContentReader): if the array changes while the iterator is open, the
+  // iterator copies them first.
+  class ValuesIterator : public store::Iterator, public ContentReader
   {
   protected:
-    SimpleJSONArray_t theArray;
-    Members::iterator theIter;
+    SimpleJSONArray_t           theArray;
+    Members::size_type          thePos;
+    Members::size_type          theSize;
+    std::vector<store::Item_t>  theCopy;  // the members, once the array changed
+
+    void copyContent();
 
   public:
-    ValuesIterator(const SimpleJSONArray_t& anArray) : theArray(anArray) {}
+    ValuesIterator(const SimpleJSONArray_t& anArray)
+      : theArray(anArray), thePos(0), theSize(0) {}
 
     virtual ~ValuesIterator();
     
