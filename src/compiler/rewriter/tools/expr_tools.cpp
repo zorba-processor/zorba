@@ -23,7 +23,6 @@
 #include "compiler/expression/ftnode.h"
 #include "compiler/expression/function_item_expr.h"
 #include "compiler/expression/expr_iter.h"
-#include "compiler/expression/update_exprs.h"
 #include "compiler/api/compilercb.h"
 #include "context/static_context.h"
 
@@ -1576,53 +1575,34 @@ class ClosedWorldWalk
   TypeManager                   * theTM;
   std::set<const function*>       theFunctions;
   std::set<const var_expr*>       theVars;
-  // External variables, the context item among them, whose type allows a function
-  // item, and the function exprs of the calls: a value from outside can only run code
-  // if it reaches one of them (finish()).
-  std::set<const var_expr*>       theOutsideVars;
-  std::vector<const expr*>        theCallTargets;
-  // Inside the modify clause of a transform, an update can only change the copies.
-  int                             theInModify;
 
 public:
   bool theHasCalls;
   bool theResultsCanDiffer;
   bool theHasEffects;
-  // A node or JSON item can be updated: an update, an updating function, or code
-  // the walk cannot see.
-  bool theMayUpdate;
 
   explicit ClosedWorldWalk(TypeManager* tm)
     :
     theTM(tm),
     theHasCalls(false),
     theResultsCanDiffer(false),
-    theHasEffects(false),
-    theMayUpdate(false),
-    theInModify(0)
+    theHasEffects(false)
   {
   }
 
   void opaque()
   {
     theHasEffects = true;
-    theMayUpdate = true;
   }
 
   bool done() const
   {
-    return theHasEffects && theHasCalls && theMayUpdate;
+    return theHasEffects && theHasCalls;
   }
 
   void walk(const expr* e);
 
-  // After the walk: a value from outside that can reach a call is code the walk does
-  // not see.
-  void finish();
-
 private:
-  bool fromOutside(const expr* e, std::set<const expr*>& seen) const;
-
   void walkFunction(const function* f);
 
   void walkBuiltin(const fo_expr* fo);
@@ -1639,14 +1619,8 @@ void ClosedWorldWalk::walkFunction(const function* f)
     return;
   }
 
-  if (f->isSequential())
+  if (f->isSequential() || f->isUpdating())
     theHasEffects = true;
-
-  if (f->isUpdating() && theInModify == 0)
-  {
-    theHasEffects = true;
-    theMayUpdate = true;
-  }
 
   if (!f->isDeterministic())
     theResultsCanDiffer = true;
@@ -1674,12 +1648,6 @@ void ClosedWorldWalk::walkBuiltin(const fo_expr* fo)
   if (f->isExternal())
     opaque();
 
-  for (csize i = 0; i < fo->num_args(); ++i)
-  {
-    if (takes_function_item(f, i))
-      theCallTargets.push_back(fo->get_arg(i));
-  }
-
   switch (f->getKind())
   {
   case FunctionConsts::FN_FUNCTION_LOOKUP_2:
@@ -1697,20 +1665,9 @@ void ClosedWorldWalk::walkBuiltin(const fo_expr* fo)
   case FunctionConsts::FN_TRACE_2:
     theResultsCanDiffer = true;
     break;
-  // They give a node a reference, which ref:has-reference and ref:dereference read.
-  case FunctionConsts::FN_REFERENCE_REFERENCE_1:
-  case FunctionConsts::FN_REFERENCE_ASSIGN_REFERENCE_2:
-    theMayUpdate = true;
-    break;
   default:
     break;
   }
-
-  // A sequential store function (dml:apply-insert, for example) changes the store
-  // outside of a pending update list.
-  if (f->isSequential() &&
-      f->getName()->getNamespace().find("/modules/store/") != zstring::npos)
-    theMayUpdate = true;
 
   walkFunction(f);
 
@@ -1739,7 +1696,7 @@ void ClosedWorldWalk::walkVar(const var_expr* var)
 
     if (!TypeOps::is_subtype(theTM, *type, *GENV_TYPESYSTEM.STRUCTURED_ITEM_TYPE_STAR) &&
         !TypeOps::is_subtype(theTM, *type, *GENV_TYPESYSTEM.ANY_ATOMIC_TYPE_STAR))
-      theOutsideVars.insert(var);
+      opaque();
   }
 
   for (csize i = 0; i < var->num_set_exprs(); ++i)
@@ -1766,34 +1723,7 @@ void ClosedWorldWalk::walk(const expr* e)
   {
   case dynamic_function_invocation_expr_kind:
     theHasCalls = true;
-    theCallTargets.push_back(
-        static_cast<const dynamic_function_invocation_expr*>(e)->get_input());
     break;
-
-  case transform_expr_kind:
-  {
-    // XQUF 3.0, 2.4.4: an update in the modify clause whose target is not a copy is
-    // an error (XUDY0014), so it changes no node that exists outside of it.
-    const transform_expr* te = static_cast<const transform_expr*>(e);
-
-    theResultsCanDiffer = true;
-
-    std::vector<copy_clause*>::const_iterator ite = te->begin();
-    for (; ite != te->end() && !done(); ++ite)
-      walk((*ite)->getExpr());
-
-    if (te->getModifyExpr() != NULL && !done())
-    {
-      ++theInModify;
-      walk(te->getModifyExpr());
-      --theInModify;
-    }
-
-    if (te->getReturnExpr() != NULL && !done())
-      walk(te->getReturnExpr());
-
-    return;
-  }
 
   case fo_expr_kind:
   {
@@ -1825,15 +1755,11 @@ void ClosedWorldWalk::walk(const expr* e)
   case apply_expr_kind:
   case eval_expr_kind:
   case debugger_expr_kind:
-    opaque();
-    break;
-
   case delete_expr_kind:
   case insert_expr_kind:
   case rename_expr_kind:
   case replace_expr_kind:
-    if (theInModify == 0)
-      opaque();
+    opaque();
     break;
 
   case doc_expr_kind:
@@ -1846,6 +1772,7 @@ void ClosedWorldWalk::walk(const expr* e)
   case json_object_expr_kind:
   case json_array_expr_kind:
   case validate_expr_kind:
+  case transform_expr_kind:
     theResultsCanDiffer = true;
     break;
 
@@ -1862,131 +1789,6 @@ void ClosedWorldWalk::walk(const expr* e)
       walk(child);
 
     iter.next();
-  }
-}
-
-
-/*******************************************************************************
-  Whether the value of "e" can hold a function item that comes from outside of the
-  query (an external variable in theOutsideVars). It follows what gives "e" its
-  value, and answers true for anything it does not know.
-********************************************************************************/
-bool ClosedWorldWalk::fromOutside(const expr* e, std::set<const expr*>& seen) const
-{
-  if (e == NULL)
-    return true;
-
-  // On a cycle the value comes from somewhere else on the path.
-  if (!seen.insert(e).second)
-    return false;
-
-  xqtref_t const type = const_cast<expr*>(e)->get_return_type();
-
-  if (TypeOps::is_subtype(theTM, *type, *GENV_TYPESYSTEM.STRUCTURED_ITEM_TYPE_STAR) ||
-      TypeOps::is_subtype(theTM, *type, *GENV_TYPESYSTEM.ANY_ATOMIC_TYPE_STAR))
-    return false;
-
-  switch (e->get_expr_kind())
-  {
-  case const_expr_kind:
-  case function_item_expr_kind:
-    return false;
-
-  case wrapper_expr_kind:
-    return fromOutside(static_cast<const wrapper_expr*>(e)->get_input(), seen);
-
-  case function_trace_expr_kind:
-    return fromOutside(static_cast<const function_trace_expr*>(e)->get_input(), seen);
-
-  case treat_expr_kind:
-  case promote_expr_kind:
-    return fromOutside(static_cast<const cast_base_expr*>(e)->get_input(), seen);
-
-  case flwor_expr_kind:
-    return fromOutside(static_cast<const flwor_expr*>(e)->get_return_expr(), seen);
-
-  case if_expr_kind:
-  {
-    const if_expr* ie = static_cast<const if_expr*>(e);
-    return fromOutside(ie->get_then_expr(), seen) || fromOutside(ie->get_else_expr(), seen);
-  }
-
-  case var_expr_kind:
-  {
-    const var_expr* var = static_cast<const var_expr*>(e);
-
-    if (theOutsideVars.find(var) != theOutsideVars.end())
-      return true;
-
-    switch (var->get_kind())
-    {
-    case var_expr::for_var:
-    case var_expr::let_var:
-      return fromOutside(var->get_domain_expr(), seen);
-
-    case var_expr::prolog_var:
-    case var_expr::local_var:
-    {
-      // An external variable not in theOutsideVars has a type that excludes
-      // function items.
-      if (var->is_external())
-        return false;
-
-      for (csize i = 0; i < var->num_set_exprs(); ++i)
-      {
-        if (fromOutside(var->get_set_expr(i)->get_expr(), seen))
-          return true;
-      }
-
-      return false;
-    }
-
-    default:
-      return true;
-    }
-  }
-
-  case fo_expr_kind:
-  {
-    const fo_expr* fo = static_cast<const fo_expr*>(e);
-    const function* f = fo->get_func();
-
-    if (f->isUdf())
-      return fromOutside(static_cast<const user_function*>(f)->getBody(), seen);
-
-    // What a call of a function item returns is not followed.
-    if (function_runs_opaque_code(f))
-      return true;
-
-    for (csize i = 0; i < fo->num_args(); ++i)
-    {
-      if (fromOutside(fo->get_arg(i), seen))
-        return true;
-    }
-
-    return false;
-  }
-
-  default:
-    return true;
-  }
-}
-
-
-void ClosedWorldWalk::finish()
-{
-  if (theOutsideVars.empty() || done())
-    return;
-
-  for (csize i = 0; i < theCallTargets.size(); ++i)
-  {
-    std::set<const expr*> seen;
-
-    if (fromOutside(theCallTargets[i], seen))
-    {
-      opaque();
-      return;
-    }
   }
 }
 
@@ -2165,16 +1967,12 @@ void classify_calls(expr* root)
   if (ccb->theIsEval)
   {
     ccb->theCallEffects = CompilerCB::CALLS_HAVE_EFFECTS;
-    ccb->theCallsMayUpdate = true;
   }
   else
   {
     ClosedWorldWalk w(root->get_type_manager());
 
     w.walk(root);
-    w.finish();
-
-    ccb->theCallsMayUpdate = w.theMayUpdate;
 
     if (!w.theHasCalls)
       ccb->theCallEffects = CompilerCB::CALLS_ARE_PURE;
@@ -2214,15 +2012,6 @@ void classify_calls(expr* root)
     for (csize j = 0; j < functions.size(); ++j)
       w.walkFunction(functions[j]);
   }
-}
-
-
-bool calls_may_update(const expr* e)
-{
-  CompilerCB* ccb = const_cast<expr*>(e)->get_ccb();
-
-  return ccb->theCallEffects == CompilerCB::CALLS_HAVE_EFFECTS &&
-         ccb->theCallsMayUpdate;
 }
 
 

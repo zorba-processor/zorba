@@ -120,16 +120,16 @@ expr* HoistRule::apply(
   DynamicBitset freeset(numVars+1);
   expr_tools::build_expr_to_vars_map(node, theVarIdMap, freeset, theExprVarsMap);
 
-  theHasUnprovenCalls = expr_tools::call_results_can_differ(node);
-
-  // An update by such a call changes what a read of a node or JSON item next to it
-  // gives, and such a read is not a read of a state for depends_on_call_effects().
-  // Nothing is hoisted in this body (the query body, or the body of a function).
-  if (theHasUnprovenCalls && expr_tools::calls_may_update(node))
+  // A call that can have a side effect can change what any expr next to it reads, a
+  // path expression or a lookup included. Nothing is hoisted in a body (the query
+  // body, or the body of a function) that has such a call.
+  if (expr_tools::calls_unproven_function(node))
   {
     modified = false;
     return node;
   }
+
+  theHasUnprovenCalls = expr_tools::call_results_can_differ(node);
 
   PathHolder root;
   modified = hoistChildren(rCtx, node, &root);
@@ -555,10 +555,10 @@ expr* HoistRule::hoistExpr(
     expr* e,
     struct PathHolder* path)
 {
-  // A call that can have a side effect, or give a different result per call, runs
-  // per tuple: an expr that contains one stays. So does an expr that reads a state
-  // such a call can change. If no such call can update a node or JSON item, any other
-  // expr can move across such a call (see apply() otherwise).
+  // A call that can give a different result per call runs per tuple: an expr that
+  // contains one stays. So does an expr that reads a state a call with a side effect
+  // can change, since lazy evaluation can interleave it with such a call outside of
+  // this body. A body with such a call hoists nothing (see apply()).
   if (non_hoistable(e) ||
       e->constructsNodes() ||
       (theHasUnprovenCalls && expr_tools::call_results_can_differ(e)) ||

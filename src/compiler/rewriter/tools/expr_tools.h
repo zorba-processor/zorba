@@ -90,12 +90,6 @@ bool call_results_can_differ(const expr* root);
 // The same for the call itself, without looking at its arguments.
 bool is_call_with_varying_result(const expr* call);
 
-// Whether a node or JSON item can be updated while the query runs, in a query in
-// which a dynamic call can have a side effect (classify_calls()). A read of a node or
-// JSON item, such as a path expression, is not a read of a state for
-// depends_on_call_effects(); an expr next to an unproven call stays in place instead.
-bool calls_may_update(const expr* e);
-
 // Whether the domain of the for clause gives its whole binding sequence before the
 // next clause runs (XQuery Scripting Extension 1.0, 6.7): it has a call that can have a
 // side effect. Decided by classify_calls() on the tree before the optimizer runs, so

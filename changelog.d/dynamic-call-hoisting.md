@@ -5,12 +5,14 @@
   moved to the use of its `let` variable or removed, although the function was
   sequential or nondeterministic or created nodes. In a query where something with
   a side effect is reachable, such a call now stays where it is written unless the
-  optimizer can prove the function deterministic and free of side effects, and an
-  expression that reads a state the call can change stays with it; if a node or
-  JSON item can be updated, nothing is hoisted in the query body or function body
-  that has such a call. In a query with no side effect, it is only kept from
-  being evaluated once for several iterations if a nondeterministic function or a
-  constructor is reachable.
+  optimizer can prove the function deterministic and free of side effects, and
+  nothing is hoisted out of a loop in the query body or function body that has
+  such a call. This is a known limit: such a body loses all hoisting, also of
+  expressions the call cannot change. In a body without such a call, an expression
+  that reads a state such a call can change stays in its loop. In a query with no
+  side effect, a call is only kept from being evaluated once for several
+  iterations if a nondeterministic function or a constructor is reachable, and
+  other expressions are hoisted as before.
 - In a query where such a call can have a side effect, the domain of a `for` clause
   with the call gives its whole binding sequence first, at all levels, and later
   clauses run per tuple. This is decided before the optimizer runs, so a `for`

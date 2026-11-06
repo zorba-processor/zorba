@@ -296,12 +296,6 @@ ZORBA_DLL_PUBLIC void query_resources_fail_walk(unsigned long edge);
   expr_tools::classify_calls(). Until then, and in an eval query, it can have effects.
   Compile time only: not serialized.
 
-  theCallsMayUpdate :
-  -------------------
-  Set by expr_tools::classify_calls(): whether a node or JSON item can be updated
-  while the query runs, through what is reachable from it or through code the
-  compiler cannot see. Compile time only: not serialized.
-
   theHasEval :
   ------------
   True if there is an eval expr within the compilation unit covered by this CCB.
@@ -467,8 +461,6 @@ public:
   FunctionPurityMap         theFunctionPurity[2];
 
   CallEffects               theCallEffects = CALLS_HAVE_EFFECTS;
-
-  bool                      theCallsMayUpdate = true;
 
   bool                      theHaveTimeout;
 
