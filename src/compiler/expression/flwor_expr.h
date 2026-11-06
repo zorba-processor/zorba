@@ -180,11 +180,23 @@ class forlet_clause : public forletwin_clause
   friend class ExprManager;
   friend class ExprIterator;
 
+public:
+  // Whether the domain of a for clause gives its whole binding sequence before the
+  // next clause runs (expr_tools::is_binding_sequence()). It is decided once, on the
+  // tree before the optimizer runs, so that every optimization level agrees.
+  enum BindingSequence
+  {
+    BINDING_SEQUENCE_UNKNOWN,
+    BINDING_SEQUENCE_NO,
+    BINDING_SEQUENCE_YES
+  };
+
 protected:
-  var_expr    * thePosVarExpr;
-  var_expr    * theScoreVarExpr;
-  bool          theAllowingEmpty;
-  bool          theLazyEval;
+  var_expr        * thePosVarExpr;
+  var_expr        * theScoreVarExpr;
+  bool              theAllowingEmpty;
+  bool              theLazyEval;
+  BindingSequence   theBindingSequence;
 
 protected:
   forlet_clause(
@@ -209,6 +221,10 @@ public:
   void setLazyEval(bool v) { theLazyEval = v; }
 
   bool lazyEval() const { return theLazyEval; }
+
+  BindingSequence get_binding_sequence() const { return theBindingSequence; }
+
+  void set_binding_sequence(BindingSequence v) { theBindingSequence = v; }
 
   var_expr* get_pos_var() const;
 

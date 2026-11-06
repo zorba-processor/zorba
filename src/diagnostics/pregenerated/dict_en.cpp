@@ -924,9 +924,7 @@ extern entry const dict_en[] = {
 #if !defined(ZORBA_NO_ICU)
   { "~U_REGEX_MISSING_CLOSE_BRACKET", "missing ']'" },
 #endif
-#if !defined(ZORBA_NO_ICU)
   { "~U_REGEX_NUMBER_TOO_BIG", "decimal number is too large" },
-#endif
 #if !defined(ZORBA_NO_ICU)
   { "~U_REGEX_OCTAL_TOO_BIG", "octal character constants must be <= 0377" },
 #endif

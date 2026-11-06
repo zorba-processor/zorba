@@ -20,6 +20,7 @@
 #include "diagnostics/dict.h"
 #include "diagnostics/xquery_exception.h"
 
+#include "ascii_util.h"
 #include "stl_util.h"
 #include "zorba_regex.h"
 
@@ -170,7 +171,7 @@ bool regex::replace_all( char const *in, char const *replacement, zstring *resul
         temprepl++;
         index = 0;
         int   nr_digits = 0;
-        while(isdigit(*temprepl))
+        while(ascii::is_digit(*temprepl))
         {
           if(nr_digits && ((index*10 + (*temprepl)-'0') > subregex_count))
             break;

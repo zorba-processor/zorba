@@ -34,10 +34,12 @@
           <FnDataIterator>
             <FLWORIterator>
               <ForVariable name="$$context-item">
-                <SingleDynamicFnCallIterator>
-                  <ForVarIterator varname="$$context-item"/>
-                  <SingletonIterator value="xs:string(properties)"/>
-                </SingleDynamicFnCallIterator>
+                <TreatIterator quant="+">
+                  <SingleDynamicFnCallIterator>
+                    <ForVarIterator varname="$$context-item"/>
+                    <SingletonIterator value="xs:string(properties)"/>
+                  </SingleDynamicFnCallIterator>
+                </TreatIterator>
               </ForVariable>
               <ReturnClause>
                 <SingleDynamicFnCallIterator>

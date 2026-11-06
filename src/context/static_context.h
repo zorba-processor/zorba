@@ -1049,6 +1049,12 @@ public:
 
   void get_functions(std::vector<function*>& functions) const;
 
+  // The user functions declared in this sctx and its ancestors below the global root,
+  // disabled ones included, skipping the sctxs in "visited" and adding to it.
+  void get_udfs(
+      std::vector<function*>& udfs,
+      std::set<const static_context*>& visited) const;
+
   void find_functions(
         const store::Item* qname,
         std::vector<function*>& functions) const;

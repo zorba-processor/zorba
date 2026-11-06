@@ -255,14 +255,29 @@ FOREACH(TESTFILE ${TESTFILES})
   IF(NOT SKIP_TEST)
 
     ZORBA_ADD_TEST("${TESTNAME}" testdriver ${TESTFILE})
-    # The window, array member and iteration-updates tests must give the same results at every
-    # optimization level (the testdriver reads ZORBA_OPTLEVEL; the default is O1).
-    IF (TESTNAME MATCHES "^test/rbkt/zorba/(jsoniq-(windows|array-members)|iteration-updates)/")
+    # The window, array member, dynamic function call and iteration-updates tests
+    # must give the same results at every optimization level (the testdriver
+    # reads ZORBA_OPTLEVEL; the default is O1).
+    IF (TESTNAME MATCHES "^test/rbkt/zorba/(jsoniq-windows|jsoniq-array-members|dynamic-calls|iteration-updates)/")
       FOREACH (_optlevel O0 O2)
         ZORBA_ADD_TEST("${TESTNAME}-${_optlevel}" testdriver ${TESTFILE})
         SET_TESTS_PROPERTIES ("${TESTNAME}-${_optlevel}" PROPERTIES
           ENVIRONMENT "ZORBA_OPTLEVEL=${_optlevel}")
       ENDFOREACH ()
+    ENDIF ()
+    # A query with no side effect gets the same rewrites at O1 and O2.
+    IF (TESTNAME MATCHES "^test/rbkt/zorba/optim/dyncall_")
+      ZORBA_ADD_TEST("${TESTNAME}-O2" testdriver ${TESTFILE})
+      SET_TESTS_PROPERTIES ("${TESTNAME}-O2" PROPERTIES
+        ENVIRONMENT "ZORBA_OPTLEVEL=O2" TIMEOUT 120)
+      SET_TESTS_PROPERTIES ("${TESTNAME}" PROPERTIES TIMEOUT 120)
+    ENDIF ()
+    # Without hoisting these take hours, at O1 and O2.
+    IF (TESTNAME MATCHES "^test/rbkt/zorba/optim/hoist_proven_")
+      SET_TESTS_PROPERTIES ("${TESTNAME}" PROPERTIES TIMEOUT 120)
+      ZORBA_ADD_TEST("${TESTNAME}-O2" testdriver ${TESTFILE})
+      SET_TESTS_PROPERTIES ("${TESTNAME}-O2" PROPERTIES
+        ENVIRONMENT "ZORBA_OPTLEVEL=O2" TIMEOUT 120)
     ENDIF ()
     # Boundary-value tests: a regression (e.g. a range that never stops at
     # the largest xs:integer) loops forever, so fail fast.

@@ -4730,7 +4730,7 @@
       <value>missing ']'</value>
     </entry>
 
-    <entry key="U_REGEX_NUMBER_TOO_BIG" if="!defined(ZORBA_NO_ICU)">
+    <entry key="U_REGEX_NUMBER_TOO_BIG">
       <value>decimal number is too large</value>
     </entry>
 

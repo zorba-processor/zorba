@@ -1,0 +1,5 @@
+module namespace m = "http://zorba.io/tests/dynamic-calls";
+declare namespace an = "http://zorba.io/annotations";
+declare %an:assignable variable $m:g := 0;
+declare %an:sequential function m:bump() { $m:g := $m:g + 1; $m:g };
+declare variable $m:f := m:bump#0;

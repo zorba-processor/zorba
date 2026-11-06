@@ -317,6 +317,22 @@ While it contains statements, the outer construct is still an expression (it ret
 
 In short, an expression is sequential if it contains statements that have side effects (updating some XML, assigning a variable in scope outside of the expression) or that affect the control flow (break, continue, exit returning) - or if it calls a sequential function.
 
+A call through a function item, such as <tt>$f()</tt> or <tt>fn:for-each($s, $f)</tt>, can reach a sequential function, and the compiler accepts it in any function, because it cannot always know the function. If nothing that can have a side effect is reachable from the query (no sequential or updating function, update expression, assignment, eval, invoke, fn:function-lookup, ref:reference, external function, or external variable or context item whose type allows a function item), such a call is an ordinary pure expression, except that a nondeterministic function or a constructor reachable from the query keeps it from being evaluated once for several iterations.
+
+Otherwise, unless the compiler can see the function and prove it deterministic and free of side effects, the call runs where and as many times as it is written, at every optimization level. If the query has such a call anywhere, nothing at all is moved out of a loop anywhere in the query (the query body, the body of every function, inline functions included), and no join is evaluated through a temporary index: the call can update a node or JSON item that a path expression or a lookup reads, or change a state that another expression reads, and lazy evaluation interleaves the body of a function with the code that consumes its result. This is a known limit: a query with a side effect and any call through a function item that the compiler cannot prove loses hoisting everywhere, also of expressions the call cannot change. A query with no side effect is not affected. Keeping hoisting next to such a call needs the store to reject, in the modify clause of a transform, every update that does not target a copy (XUDY0014, XUDY0037), which it does not do yet. In a query with a side effect whose calls through function items are all proven, an expression that reads a state such a call can change (an assignable variable, a nondeterministic function, fn:doc, fn:collection, a store function or a reference function) stays in its loop; other expressions are moved out of the loop.
+
+A call through a function item runs per tuple, interleaved with the clauses around it. The domain of a for clause with such a call is the exception: it gives its whole binding sequence first (Scripting Extension 6.7), and the next clauses then run per tuple. A domain without such a call stays lazy.
+
+A direct call of a sequential function does not follow these rules yet: each clause with the call runs for all the tuples before the next one (see \ref ZWST0004). This is a known bug, to be fixed separately; the second line below is the intended order.
+
+\code
+for $i in 1 to 3 let $a := local:bump()  let $b := local:bump()  return ($a, $b)   (: 1 4 2 5 3 6, known bug :)
+for $i in 1 to 3 let $a := $f()          let $b := $f()          return ($a, $b)   (: 1 2 3 4 5 6 :)
+for $x in (for $j in 1 to 3 return $f()) return ($x, $g)                           (: 1 3 2 3 3 3 :)
+\endcode
+
+How many times a window clause evaluates a start or end condition with such a call is not defined.
+
 \subsection scripting_do_do Do-do-do-do-deliver
 
 This pattern of having, in a block, several statements followed by a single expression is the most general way of using statements together with expressions. The main program is built that way: it can be a single expression, it can be several statements followed by a single expression, or it can be just several statements (in which case it is as if the final expression were empty).

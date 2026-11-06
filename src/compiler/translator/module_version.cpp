@@ -19,6 +19,8 @@
 #include <limits>
 #include <zorbatypes/URI.h>
 
+#include "util/ascii_util.h"
+
 
 namespace zorba {
 
@@ -36,7 +38,7 @@ getInteger(zstring const& aStr, size_t& aPos, int& aInt)
   size_t const lOrigPos = aPos;
 
   aInt = 0;
-  while (aPos < lLen && isdigit(lChar = aStr[aPos])) {
+  while (aPos < lLen && ascii::is_digit(lChar = aStr[aPos])) {
     int const lDigit = lChar - '0';
     // Test before multiplying and adding (signed overflow is undefined
     // behavior). A number above INT_MAX saturates at INT_MAX; the remaining
