@@ -7,7 +7,10 @@
   pool, and in MAPM's decimal numbers (which ended the process with status 100, also
   in `zorba`). If memory runs out where nothing can recover, for example while the
   server starts, `zorba-mcp` exits with status 3 and a message on stderr; `--help`
-  lists what libraries do instead.
+  lists what libraries do instead. Known limit: after several consecutive failed
+  allocations, the XML, fragment and HTML parsers can keep 8 to 18 KB per failed
+  call; the cause is not established, and the tests report it but do not fail on
+  it.
 - Running out of memory while parsing XML, in casts, in regular expressions, in `file:`
   functions and in external functions is no longer a false result or an error that a
   catch clause can catch, such as the one in `dir:open`: it ends the query, as a

@@ -113,6 +113,10 @@ Rules this code depends on:
 
   The sweeps measure what a failed call keeps through `operator new` only: memory
   that libxml2 or MAPM keep through `malloc` is not counted.
+  After several consecutive failed allocations (runs of 8 in the sweeps), the XML,
+  fragment and HTML parsers can keep 8 to 18 KB per failed call. The cause is not
+  established. `exhaust_sweep_xml`, `_fragment` and `_html` report it for runs of 8
+  but do not fail on it; for single failures the check still fails.
 
 Tests hold the threads at known points with `ServerConfig::scan_hook`. Tests
 under ThreadSanitizer: the `tsan-mcp` job of `sanitizers.yml`.
