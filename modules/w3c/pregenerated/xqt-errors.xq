@@ -1735,6 +1735,16 @@ declare variable $err:XUDY0031 as xs:QName := fn:QName($err:NS, "err:XUDY0031");
 
 (:~
  :
+ : It is a dynamic error if the pending update list returned by the
+ : \c modify clause of a transform expression contains a \c upd:put
+ : update primitive.
+ : 
+ : @see http://www.w3.org/2005/xqt-errors
+:)
+declare variable $err:XUDY0037 as xs:QName := fn:QName($err:NS, "err:XUDY0037");
+
+(:~
+ :
  : It is a dynamic error if the first operand of \c fn:put() is not a node
  : of a supported kind.
  : 

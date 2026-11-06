@@ -563,6 +563,9 @@ XQueryErrorCode XUDY0030( "err:XUDY0030" );
 XQueryErrorCode XUDY0031( "err:XUDY0031" );
 
 
+XQueryErrorCode XUDY0037( "err:XUDY0037" );
+
+
 XQueryErrorCode FOUP0001( "err:FOUP0001" );
 
 
