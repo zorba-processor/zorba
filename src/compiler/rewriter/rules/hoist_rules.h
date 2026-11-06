@@ -40,11 +40,6 @@ protected:
   // Whether the root expr can have an unproven call. The walks are needed only then.
   bool                    theHasUnprovenCalls;
 
-  // Whether an unproven call can update a node or JSON item. Then nothing moves out
-  // of an expr that contains such a call: a path expression or a lookup beside it
-  // can read what the call changes.
-  bool                    theStopAtUnprovenCalls;
-
 public:
   HoistRule() : RewriteRule(RewriteRule::HoistExprsOutOfLoops, "Hoist") {}
 

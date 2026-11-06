@@ -23,6 +23,7 @@
 #include "compiler/expression/ftnode.h"
 #include "compiler/expression/function_item_expr.h"
 #include "compiler/expression/expr_iter.h"
+#include "compiler/expression/update_exprs.h"
 #include "compiler/api/compilercb.h"
 #include "context/static_context.h"
 
@@ -1354,8 +1355,12 @@ bool ImpurityWalk::builtinHasImpurity(const function* f) const
     break;
   }
 
-  // The stores of collections, documents, indexes and maps change while a query runs.
-  if (f->getName()->getNamespace().find("/modules/store/") != zstring::npos)
+  // The stores of collections, documents, indexes and maps change while a query runs,
+  // and so do the references of nodes.
+  const zstring& ns = f->getName()->getNamespace();
+
+  if (ns.find("/modules/store/") != zstring::npos ||
+      ns == "http://zorba.io/modules/reference")
     return true;
 
   return !builtin_returns_existing_items(f, theTM);
@@ -1571,6 +1576,13 @@ class ClosedWorldWalk
   TypeManager                   * theTM;
   std::set<const function*>       theFunctions;
   std::set<const var_expr*>       theVars;
+  // External variables, the context item among them, whose type allows a function
+  // item, and the function exprs of the calls: a value from outside can only run code
+  // if it reaches one of them (finish()).
+  std::set<const var_expr*>       theOutsideVars;
+  std::vector<const expr*>        theCallTargets;
+  // Inside the modify clause of a transform, an update can only change the copies.
+  int                             theInModify;
 
 public:
   bool theHasCalls;
@@ -1586,7 +1598,8 @@ public:
     theHasCalls(false),
     theResultsCanDiffer(false),
     theHasEffects(false),
-    theMayUpdate(false)
+    theMayUpdate(false),
+    theInModify(0)
   {
   }
 
@@ -1603,7 +1616,13 @@ public:
 
   void walk(const expr* e);
 
+  // After the walk: a value from outside that can reach a call is code the walk does
+  // not see.
+  void finish();
+
 private:
+  bool fromOutside(const expr* e, std::set<const expr*>& seen) const;
+
   void walkFunction(const function* f);
 
   void walkBuiltin(const fo_expr* fo);
@@ -1623,7 +1642,7 @@ void ClosedWorldWalk::walkFunction(const function* f)
   if (f->isSequential())
     theHasEffects = true;
 
-  if (f->isUpdating())
+  if (f->isUpdating() && theInModify == 0)
   {
     theHasEffects = true;
     theMayUpdate = true;
@@ -1655,6 +1674,12 @@ void ClosedWorldWalk::walkBuiltin(const fo_expr* fo)
   if (f->isExternal())
     opaque();
 
+  for (csize i = 0; i < fo->num_args(); ++i)
+  {
+    if (takes_function_item(f, i))
+      theCallTargets.push_back(fo->get_arg(i));
+  }
+
   switch (f->getKind())
   {
   case FunctionConsts::FN_FUNCTION_LOOKUP_2:
@@ -1672,9 +1697,20 @@ void ClosedWorldWalk::walkBuiltin(const fo_expr* fo)
   case FunctionConsts::FN_TRACE_2:
     theResultsCanDiffer = true;
     break;
+  // They give a node a reference, which ref:has-reference and ref:dereference read.
+  case FunctionConsts::FN_REFERENCE_REFERENCE_1:
+  case FunctionConsts::FN_REFERENCE_ASSIGN_REFERENCE_2:
+    theMayUpdate = true;
+    break;
   default:
     break;
   }
+
+  // A sequential store function (dml:apply-insert, for example) changes the store
+  // outside of a pending update list.
+  if (f->isSequential() &&
+      f->getName()->getNamespace().find("/modules/store/") != zstring::npos)
+    theMayUpdate = true;
 
   walkFunction(f);
 
@@ -1703,7 +1739,7 @@ void ClosedWorldWalk::walkVar(const var_expr* var)
 
     if (!TypeOps::is_subtype(theTM, *type, *GENV_TYPESYSTEM.STRUCTURED_ITEM_TYPE_STAR) &&
         !TypeOps::is_subtype(theTM, *type, *GENV_TYPESYSTEM.ANY_ATOMIC_TYPE_STAR))
-      opaque();
+      theOutsideVars.insert(var);
   }
 
   for (csize i = 0; i < var->num_set_exprs(); ++i)
@@ -1730,7 +1766,34 @@ void ClosedWorldWalk::walk(const expr* e)
   {
   case dynamic_function_invocation_expr_kind:
     theHasCalls = true;
+    theCallTargets.push_back(
+        static_cast<const dynamic_function_invocation_expr*>(e)->get_input());
     break;
+
+  case transform_expr_kind:
+  {
+    // XQUF 3.0, 2.4.4: an update in the modify clause whose target is not a copy is
+    // an error (XUDY0014), so it changes no node that exists outside of it.
+    const transform_expr* te = static_cast<const transform_expr*>(e);
+
+    theResultsCanDiffer = true;
+
+    std::vector<copy_clause*>::const_iterator ite = te->begin();
+    for (; ite != te->end() && !done(); ++ite)
+      walk((*ite)->getExpr());
+
+    if (te->getModifyExpr() != NULL && !done())
+    {
+      ++theInModify;
+      walk(te->getModifyExpr());
+      --theInModify;
+    }
+
+    if (te->getReturnExpr() != NULL && !done())
+      walk(te->getReturnExpr());
+
+    return;
+  }
 
   case fo_expr_kind:
   {
@@ -1762,11 +1825,15 @@ void ClosedWorldWalk::walk(const expr* e)
   case apply_expr_kind:
   case eval_expr_kind:
   case debugger_expr_kind:
+    opaque();
+    break;
+
   case delete_expr_kind:
   case insert_expr_kind:
   case rename_expr_kind:
   case replace_expr_kind:
-    opaque();
+    if (theInModify == 0)
+      opaque();
     break;
 
   case doc_expr_kind:
@@ -1779,7 +1846,6 @@ void ClosedWorldWalk::walk(const expr* e)
   case json_object_expr_kind:
   case json_array_expr_kind:
   case validate_expr_kind:
-  case transform_expr_kind:
     theResultsCanDiffer = true;
     break;
 
@@ -1801,6 +1867,131 @@ void ClosedWorldWalk::walk(const expr* e)
 
 
 /*******************************************************************************
+  Whether the value of "e" can hold a function item that comes from outside of the
+  query (an external variable in theOutsideVars). It follows what gives "e" its
+  value, and answers true for anything it does not know.
+********************************************************************************/
+bool ClosedWorldWalk::fromOutside(const expr* e, std::set<const expr*>& seen) const
+{
+  if (e == NULL)
+    return true;
+
+  // On a cycle the value comes from somewhere else on the path.
+  if (!seen.insert(e).second)
+    return false;
+
+  xqtref_t const type = const_cast<expr*>(e)->get_return_type();
+
+  if (TypeOps::is_subtype(theTM, *type, *GENV_TYPESYSTEM.STRUCTURED_ITEM_TYPE_STAR) ||
+      TypeOps::is_subtype(theTM, *type, *GENV_TYPESYSTEM.ANY_ATOMIC_TYPE_STAR))
+    return false;
+
+  switch (e->get_expr_kind())
+  {
+  case const_expr_kind:
+  case function_item_expr_kind:
+    return false;
+
+  case wrapper_expr_kind:
+    return fromOutside(static_cast<const wrapper_expr*>(e)->get_input(), seen);
+
+  case function_trace_expr_kind:
+    return fromOutside(static_cast<const function_trace_expr*>(e)->get_input(), seen);
+
+  case treat_expr_kind:
+  case promote_expr_kind:
+    return fromOutside(static_cast<const cast_base_expr*>(e)->get_input(), seen);
+
+  case flwor_expr_kind:
+    return fromOutside(static_cast<const flwor_expr*>(e)->get_return_expr(), seen);
+
+  case if_expr_kind:
+  {
+    const if_expr* ie = static_cast<const if_expr*>(e);
+    return fromOutside(ie->get_then_expr(), seen) || fromOutside(ie->get_else_expr(), seen);
+  }
+
+  case var_expr_kind:
+  {
+    const var_expr* var = static_cast<const var_expr*>(e);
+
+    if (theOutsideVars.find(var) != theOutsideVars.end())
+      return true;
+
+    switch (var->get_kind())
+    {
+    case var_expr::for_var:
+    case var_expr::let_var:
+      return fromOutside(var->get_domain_expr(), seen);
+
+    case var_expr::prolog_var:
+    case var_expr::local_var:
+    {
+      // An external variable not in theOutsideVars has a type that excludes
+      // function items.
+      if (var->is_external())
+        return false;
+
+      for (csize i = 0; i < var->num_set_exprs(); ++i)
+      {
+        if (fromOutside(var->get_set_expr(i)->get_expr(), seen))
+          return true;
+      }
+
+      return false;
+    }
+
+    default:
+      return true;
+    }
+  }
+
+  case fo_expr_kind:
+  {
+    const fo_expr* fo = static_cast<const fo_expr*>(e);
+    const function* f = fo->get_func();
+
+    if (f->isUdf())
+      return fromOutside(static_cast<const user_function*>(f)->getBody(), seen);
+
+    // What a call of a function item returns is not followed.
+    if (function_runs_opaque_code(f))
+      return true;
+
+    for (csize i = 0; i < fo->num_args(); ++i)
+    {
+      if (fromOutside(fo->get_arg(i), seen))
+        return true;
+    }
+
+    return false;
+  }
+
+  default:
+    return true;
+  }
+}
+
+
+void ClosedWorldWalk::finish()
+{
+  if (theOutsideVars.empty() || done())
+    return;
+
+  for (csize i = 0; i < theCallTargets.size(); ++i)
+  {
+    std::set<const expr*> seen;
+
+    if (fromOutside(theCallTargets[i], seen))
+    {
+      opaque();
+      return;
+    }
+  }
+}
+
+
+/*******************************************************************************
   Marks, for every for clause reachable from the query, whether its domain has an
   unproven call, on the tree before the optimizer runs. One walk, bottom up: the
   answer for an expr is whether it or one of its children is an unproven call, and
@@ -1809,10 +2000,13 @@ void ClosedWorldWalk::walk(const expr* e)
 ********************************************************************************/
 class BindingSequenceWalk
 {
+  CompilerCB                    * theCCB;
   std::set<const function*>       theFunctions;
   std::set<const var_expr*>       theVars;
 
 public:
+  explicit BindingSequenceWalk(CompilerCB* ccb) : theCCB(ccb) {}
+
   bool walk(expr* e);
 
   void walkFunction(const function* f);
@@ -1828,7 +2022,15 @@ void BindingSequenceWalk::walkFunction(const function* f)
   if (f == NULL || !f->isUdf() || !theFunctions.insert(f).second)
     return;
 
-  expr* body = static_cast<const user_function*>(f)->getBody();
+  const user_function* udf = static_cast<const user_function*>(f);
+
+  // A function of another compilation (the query that runs an eval, or a static
+  // context shared by several queries) was decided by it, and may be optimized or
+  // running: it is left as it is.
+  if (udf->getCCB() != theCCB || udf->isOptimized() || udf->getPlan() != NULL)
+    return;
+
+  expr* body = udf->getBody();
 
   if (body != NULL)
     walk(body);
@@ -1839,6 +2041,7 @@ void BindingSequenceWalk::walkVar(const var_expr* var)
 {
   if ((var->get_kind() != var_expr::prolog_var &&
        var->get_kind() != var_expr::local_var) ||
+      const_cast<var_expr*>(var)->get_ccb() != theCCB ||
       !theVars.insert(var).second)
     return;
 
@@ -1899,9 +2102,11 @@ bool BindingSequenceWalk::walk(expr* e)
       for_clause* fc = static_cast<for_clause*>(c);
       bool const domainFound = walk(fc->get_expr());
 
-      fc->set_binding_sequence(domainFound ?
-                               for_clause::BINDING_SEQUENCE_YES :
-                               for_clause::BINDING_SEQUENCE_NO);
+      // Decided once: a clause already marked keeps its mark.
+      if (fc->get_binding_sequence() == for_clause::BINDING_SEQUENCE_UNKNOWN)
+        fc->set_binding_sequence(domainFound ?
+                                 for_clause::BINDING_SEQUENCE_YES :
+                                 for_clause::BINDING_SEQUENCE_NO);
 
       domains.insert(fc->get_expr());
       found = found || domainFound;
@@ -1967,6 +2172,7 @@ void classify_calls(expr* root)
     ClosedWorldWalk w(root->get_type_manager());
 
     w.walk(root);
+    w.finish();
 
     ccb->theCallsMayUpdate = w.theMayUpdate;
 
@@ -1982,7 +2188,7 @@ void classify_calls(expr* root)
 
   if (ccb->theCallEffects == CompilerCB::CALLS_HAVE_EFFECTS)
   {
-    BindingSequenceWalk w;
+    BindingSequenceWalk w(ccb);
     w.walk(root);
 
     // A function that the query does not name can still run: fn:function-lookup,
@@ -1996,20 +2202,17 @@ void classify_calls(expr* root)
     for (; ite != ccb->theSctxMap.end(); ++ite)
       sctxs.push_back(ite->second.getp());
 
+    std::set<const static_context*> visitedSctxs;
+    std::vector<function*> functions;
+
     for (csize i = 0; i < sctxs.size(); ++i)
     {
-      if (sctxs[i] == NULL)
-        continue;
-
-      std::vector<function*> functions;
-      sctxs[i]->get_functions(functions);
-
-      for (csize j = 0; j < functions.size(); ++j)
-      {
-        if (functions[j]->isUdf())
-          w.walkFunction(functions[j]);
-      }
+      if (sctxs[i] != NULL)
+        sctxs[i]->get_udfs(functions, visitedSctxs);
     }
+
+    for (csize j = 0; j < functions.size(); ++j)
+      w.walkFunction(functions[j]);
   }
 }
 

@@ -7,8 +7,8 @@
   a side effect is reachable, such a call now stays where it is written unless the
   optimizer can prove the function deterministic and free of side effects, and an
   expression that reads a state the call can change stays with it; if a node or
-  JSON item can be updated, nothing moves out of an expression with such a call. In
-  a query with no side effect, it is only kept from
+  JSON item can be updated, nothing is hoisted in the query body or function body
+  that has such a call. In a query with no side effect, it is only kept from
   being evaluated once for several iterations if a nondeterministic function or a
   constructor is reachable.
 - In a query where such a call can have a side effect, the domain of a `for` clause
