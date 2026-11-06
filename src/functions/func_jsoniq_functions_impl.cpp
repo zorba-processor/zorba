@@ -29,6 +29,7 @@
 #include "compiler/expression/expr.h"
 #include "compiler/expression/fo_expr.h"
 #include "compiler/expression/json_exprs.h"
+#include "compiler/expression/var_expr.h"
 
 #include "types/typeops.h"
 
@@ -201,6 +202,41 @@ static const expr* skip_object_name_wrappers(const expr* e)
 }
 
 
+// The optimizer moves an expr that does not depend on a FLWOR loop out of it:
+// $$temp := op:hoist(e) before the loop, and op:unhoist($$temp) in its place.
+// The options object written in the call is then the hoisted expr.
+static const expr* skip_hoisting(const expr* e)
+{
+  if (e->get_expr_kind() != fo_expr_kind ||
+      static_cast<const fo_expr*>(e)->get_func()->getKind() !=
+        FunctionConsts::OP_UNHOIST_1)
+    return e;
+
+  const expr* arg = static_cast<const fo_expr*>(e)->get_arg(0);
+
+  if (arg->get_expr_kind() == wrapper_expr_kind)
+    arg = static_cast<const wrapper_expr*>(arg)->get_input();
+
+  if (arg->get_expr_kind() != var_expr_kind)
+    return e;
+
+  const var_expr* var = static_cast<const var_expr*>(arg);
+
+  if (var->get_kind() != var_expr::let_var && var->get_kind() != var_expr::for_var)
+    return e;
+
+  const expr* domain = var->get_domain_expr();
+
+  if (domain == NULL ||
+      domain->get_expr_kind() != fo_expr_kind ||
+      static_cast<const fo_expr*>(domain)->get_func()->getKind() !=
+        FunctionConsts::OP_HOIST_1)
+    return e;
+
+  return static_cast<const fo_expr*>(domain)->get_arg(0);
+}
+
+
 namespace {
 
 /**
@@ -248,7 +284,7 @@ class LiteralParseOptions
 public:
   bool read(const expr* options)
   {
-    options = skip_type_wrappers(options);
+    options = skip_type_wrappers(skip_hoisting(skip_type_wrappers(options)));
 
     if (options->get_expr_kind() == const_expr_kind)
     {
