@@ -56,10 +56,12 @@ case $TIMEOUT in '' | *[!0-9]*) echo "TIMEOUT must be a positive integer" >&2; e
 
 selected() { # NAME
   [ -n "$FILTER" ] || return 0
+  set -f  # the patterns are for case, not for the file system
   for pat in $(echo "$FILTER" | tr ',' ' '); do
     # shellcheck disable=SC2254
-    case $1 in $pat) return 0 ;; esac
+    case $1 in $pat) set +f; return 0 ;; esac
   done
+  set +f
   return 1
 }
 
