@@ -65,11 +65,39 @@ not do yet. In a body without such a call, an expression that reads a state the 
 change stays in its loop, and other expressions are hoisted. A query with no side effect
 is not affected.
 
-Expected cost: `effects_beside_static` near its "after" time in the first table, since the
-static call beside the call stays in the loop. Calls the compiler follows
-(`effects_union_invariant`, `effects_lookup_invariant`, `proven_*`) and pure queries keep
-their hoisting. These classes of operations no longer count as code that creates nodes,
-which keeps hoisting in queries with no side effect and lets more calls be proven: a
-union, intersect, except, the distinct-node operators, `fn:id`, `fn:idref`,
+Measured with `bench.yml` in suite mode (`bench/compare.sh`), run 42223320339, 2026-11-06:
+base `8b6dca1b1` (merge base), head `af5f34d5c` (the last commit that changes the
+compiler), Release builds measured in the same job, median of 5 timed runs after
+a warm-up, at O1. 19 queries, 0 failed, every output the same. The runner was
+faster than the one of the first table, so compare ratios, not times. `effects_beside_static`
+is back to its cost in the first table: the static call beside the call stays in the loop.
+Calls the compiler follows (`effects_union_invariant`, `effects_lookup_invariant`,
+`proven_*`) and pure queries keep their hoisting.
+
+| Query | Base median | Head median | Ratio | Peak RSS base, head |
+|---|---|---|---|---|
+| `effects_beside_static` | 0.032 s | 1.039 s | 32.98 | 36.0, 36.2 MiB |
+| `effects_binding_sequence` | 1.547 s | 1.759 s | 1.14 | 35.6, 193.1 MiB |
+| `effects_cheap` | 0.099 s | 0.420 s | 4.26 | 35.7, 35.7 MiB |
+| `effects_hoistable` | 0.021 s | 1.019 s | 47.83 | 35.7, 35.8 MiB |
+| `effects_lookup_invariant` | 0.030 s | 0.030 s | 1.01 | 35.7, 35.9 MiB |
+| `effects_per_item` | 0.424 s | 0.431 s | 1.02 | 35.7, 35.8 MiB |
+| `effects_streaming` | 1.221 s | 1.276 s | 1.04 | 35.7, 35.9 MiB |
+| `effects_union_invariant` | 0.029 s | 0.030 s | 1.00 | 36.0, 35.9 MiB |
+| `no_dynamic_call` | 0.521 s | 0.521 s | 1.00 | 37.5, 37.3 MiB |
+| `proven_for_each` | 0.021 s | 0.022 s | 1.03 | 35.7, 35.5 MiB |
+| `proven_hoistable` | 0.021 s | 0.022 s | 1.01 | 35.6, 35.9 MiB |
+| `pure_beside_static` | 0.030 s | 0.030 s | 0.98 | 35.9, 36.1 MiB |
+| `pure_cheap` | 0.099 s | 0.098 s | 0.98 | 35.7, 35.9 MiB |
+| `pure_constructor` | 2.175 s | 2.225 s | 1.02 | 35.7, 35.9 MiB |
+| `pure_fold_hoistable` | 0.038 s | 0.038 s | 0.99 | 35.7, 36.0 MiB |
+| `pure_hoistable` | 0.022 s | 0.022 s | 0.97 | 35.7, 35.9 MiB |
+| `pure_per_item` | 0.454 s | 0.399 s | 0.88 | 35.6, 35.9 MiB |
+| `pure_streaming` | 1.301 s | 1.166 s | 0.90 | 35.8, 35.9 MiB |
+| `window_pure_call` | 0.226 s | 0.076 s | 0.34 | 424.8, 36.7 MiB |
+
+These classes of operations no longer count as code that creates nodes, which keeps
+hoisting in queries with no side effect and lets more calls be proven: a union, intersect, except, the distinct-node operators, `fn:id`, `fn:idref`,
 `fn:element-with-id`, single JSON lookups, `fn:doc`, `fn:collection` and calls of
 `fn:fold-left`, `fn:fold-right`, `fn:for-each-pair` with a known function.
+The compile-time table above was not measured again.
