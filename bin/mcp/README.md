@@ -93,18 +93,26 @@ Rules this code depends on:
   - libxml2 and glibc abort if they cannot set up the first use by a thread. The main
     thread and the scanner's do that at start.
   - One allocation near the end of a `dir:open` query ended in SIGSEGV with no stack
-    to read (twice in 1990, not explained).
+    to read (twice in 1990, not explained): the process ends.
   - ICU crashes in `RegexPattern::zap()` (SIGSEGV) if an allocation fails while it
     compiles a regular expression. The directory module uses some on each call.
   - The flex scanner calls `exit(2)` if it cannot allocate, while a query compiles.
   - While a query compiles, the parser reads and frees parse nodes it has already
     freed after a failure (`release_hack` in `xquery_parser.cpp`, seen with ASan and
-    TSan), so the sweeps that include compilation do not run in those builds.
+    TSan), so the sweeps that include compilation do not run in those builds. In a
+    release build, a SIGSEGV in the engine while a query compiled was seen once in
+    2654 allocations (arm64): the process ends. The sweep prints its stack.
+  - Running out of memory before the id of a request is read, and again when the
+    message is read once more for its id: `zorba-mcp` cannot answer it, so it ends
+    with status 3 and a message. A notification is never answered, also when memory
+    runs out.
   - While a query compiles, a failure can be reported as an error of the query, for
     example that a module was not found.
   - A failure in the checks of a path can be reported as a denied or invalid path, or
     in a `dir:open` as an error record, which a query can read as no content.
-  and a message (`on_terminate()`, `--help`).
+
+  The sweeps measure what a failed call keeps through `operator new` only: memory
+  that libxml2 or MAPM keep through `malloc` is not counted.
 
 Tests hold the threads at known points with `ServerConfig::scan_hook`. Tests
 under ThreadSanitizer: the `tsan-mcp` job of `sanitizers.yml`.

@@ -26,6 +26,7 @@
 #include <atomic>
 #include <chrono>
 #include <csignal>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -92,9 +93,12 @@ std::atomic<bool> inject_on{ false };
 std::atomic<long> inject_count{ 0 };
 std::atomic<long> inject_first{ 0 };  // 0: only count
 std::atomic<long> inject_length{ 0 };
-// The stack of the first allocation made to fail, on stdout: where a failure
-// left something behind. backtrace() has been called once before.
+// With inject_trace, the stack of the first allocation made to fail is kept in
+// inject_frames, for the sweep to show where a failure left something behind.
+// backtrace() has been called once before, so that it does not allocate here.
 std::atomic<bool> inject_trace{ false };
+void *inject_frames[48];
+int inject_num_frames = 0;
 
 bool inject_fails() noexcept {
   if ( !inject_on.load( std::memory_order_relaxed ) )
@@ -103,11 +107,8 @@ bool inject_fails() noexcept {
   long const first = inject_first.load( std::memory_order_relaxed );
   bool const fails = first > 0 && k >= first &&
     k < first + inject_length.load( std::memory_order_relaxed );
-  if ( fails && k == first && inject_trace.load( std::memory_order_relaxed ) ) {
-    void *frames[64];
-    int const n = backtrace( frames, 64 );
-    backtrace_symbols_fd( frames, n, STDOUT_FILENO );
-  }
+  if ( fails && k == first && inject_trace.load( std::memory_order_relaxed ) )
+    inject_num_frames = backtrace( inject_frames, 48 );
   return fails;
 }
 
@@ -2259,6 +2260,22 @@ void test_exhaust_injected( Fixture const &f ) {
 // names new to the pools each time, as the parent never runs the query. Allowed:
 // the answer, memory_limit, or, if the failure is outside the query, an internal
 // error that says so. And in all cases the same server then answers correctly.
+// An outcome of a sweep that is a known limit, not the contract. It is matched
+// only on the failed call itself, with nothing failing after it: a crash or an
+// error in a later call is never a known limit.
+struct Known {
+  std::string text;
+  bool prefix = false;  // text starts the outcome (a library version follows)
+  long cap = -1;        // at most this many points per run length; -1: any
+  long length = 0;      // only in runs of this length; 0: any
+};
+Known exact( std::string const &text, long cap = -1, long length = 0 ) {
+  return Known{ text, false, cap, length };
+}
+Known starting( std::string const &text, long cap = -1, long length = 0 ) {
+  return Known{ text, true, cap, length };
+}
+
 struct Sweep {
   std::string query;
   std::string expected;
@@ -2266,7 +2283,7 @@ struct Sweep {
   bool after_compile = false;       // only the run of the query, not its compilation
   bool lenient = false;             // a compilation: any error, but no signal
   long points = 1500;               // at most this many allocations are tried
-  std::vector<std::string> known;   // other allowed outcomes, by prefix: limits
+  std::vector<Known> known;         // other allowed outcomes: limits
   bool empty_answer = false;        // an empty answer is allowed too, a limit
   bool needs_module = false;        // of a module that some builds leave out
   bool compiles = false;            // the sweep includes the compilation
@@ -2276,21 +2293,106 @@ struct Sweep {
   std::vector<std::pair<std::string, std::string> > probes;
 };
 
+bool known_matches( Known const &k, long length, std::string const &outcome ) {
+  if ( outcome.find( " | " ) != std::string::npos )
+    return false;
+  if ( k.length && k.length != length )
+    return false;
+  return k.prefix ? outcome.rfind( k.text, 0 ) == 0 : outcome == k.text;
+}
+
+// Whether an outcome of the failed call, and of the calls after it, is allowed.
+// Anything after " | " is a later call that did not answer as a fresh server
+// would: never allowed.
+bool sweep_allowed( Sweep const &s, long length, std::string const &outcome ) {
+  if ( outcome.find( " | " ) != std::string::npos )
+    return false;
+  // handle() throws when even its error response cannot be made: main() of
+  // zorba-mcp answers then, with this id.
+  // zorba-mcp: or it ends with status 3 if it could not read the id of the call.
+  if ( outcome == "answer" || outcome == "memory_limit" ||
+       outcome == "internal error" ||
+       outcome == "handle() threw std::bad_alloc" ||
+       outcome == "handle() threw std::bad_alloc, the process ends" )
+    return true;
+  if ( s.empty_answer && outcome.empty() )
+    return true;
+  if ( s.lenient && outcome.rfind( "error: ", 0 ) == 0 )
+    return true;
+  return std::any_of( s.known.begin(), s.known.end(),
+    [&]( Known const &k ) { return known_matches( k, length, outcome ); } );
+}
+
+// The known limits seen more often than their cap allows, for one run length.
+std::vector<std::string> sweep_over_cap(
+    Sweep const &s, long length,
+    std::map<std::string, std::pair<long, long> > const &outcomes ) {
+  std::vector<std::string> over;
+  for ( Known const &k : s.known ) {
+    if ( k.cap < 0 )
+      continue;
+    long n = 0;
+    for ( auto const &o : outcomes )
+      if ( known_matches( k, length, o.first ) )
+        n += o.second.first;
+    if ( n > k.cap )
+      over.push_back( k.text + ": " + std::to_string( n ) + " times, at most " +
+                      std::to_string( k.cap ) );
+  }
+  return over;
+}
+
 void sweep_close( int fd ) {
   if ( close( fd ) != 0 )
     _exit( 1 );
 }
 
-// How a child ended, reported as its outcome: the exception that nothing could
-// catch, or the first library on the stack of a signal.
+// How a child ended when it could not report normally: the exception that
+// nothing could catch, a signal with the first library on its stack, or exit().
+// The phase says in which call: only the failed call itself can be a known limit.
 int sweep_fd = -1;
-bool sweep_show_stack = false;
+char const *volatile sweep_phase = "failing call";
+char sweep_failed[256] = "";   // the outcome of the failed call, once known
 
-void sweep_report( char const *what, char const *detail ) {
-  char msg[256];
-  int const n = snprintf( msg, sizeof msg, "0 0 %s%s", what, detail );
-  if ( n > 0 && write( sweep_fd, msg, static_cast<std::size_t>( n ) ) != n )
+// Async-signal-safe: no allocation, only write().
+void sweep_write( char const *s, std::size_t n ) {
+  if ( n && write( sweep_fd, s, n ) != static_cast<ssize_t>( n ) )
     _exit( 1 );
+}
+void sweep_write( char const *s ) { sweep_write( s, std::strlen( s ) ); }
+
+void sweep_write_frames( char const *tag, void *const *frames, int n ) {
+  sweep_write( "\n" );
+  sweep_write( tag );
+  for ( int i = 0; i < n; ++i ) {
+    char hex[2 + 2 * sizeof( void* ) + 1];
+    std::uintptr_t v = reinterpret_cast<std::uintptr_t>( frames[i] );
+    char *p = hex + sizeof hex;
+    *--p = ' ';
+    do {
+      *--p = "0123456789abcdef"[v & 0xf];
+      v >>= 4;
+    } while ( v );
+    sweep_write( p, static_cast<std::size_t>( hex + sizeof hex - p ) );
+  }
+}
+
+[[noreturn]] void sweep_report( char const *what, char const *detail,
+                                void *const *frames = nullptr, int n = 0 ) {
+  inject_on = false;
+  sweep_write( "0 0 " );
+  if ( std::strcmp( sweep_phase, "failing call" ) != 0 ) {
+    sweep_write( sweep_failed );
+    sweep_write( " | " );
+    sweep_write( sweep_phase );
+    sweep_write( ": " );
+  }
+  sweep_write( what );
+  sweep_write( detail );
+  if ( frames )
+    sweep_write_frames( "crash ", frames, n );
+  if ( inject_num_frames )
+    sweep_write_frames( "alloc ", inject_frames, inject_num_frames );
   _exit( 0 );
 }
 
@@ -2300,12 +2402,17 @@ void sweep_on_terminate() {
   sweep_report( "terminate ", t ? t->name() : "without an exception" );
 }
 
+void sweep_on_exit( int status, void* ) {
+  char what[32];
+  if ( snprintf( what, sizeof what, "exit %d", status ) < 0 )
+    what[0] = 0;
+  sweep_report( what, "" );
+}
+
 void sweep_on_signal( int sig ) {
   inject_on = false;
-  void *frames[64];
-  int const n = backtrace( frames, 64 );
-  if ( sweep_show_stack )
-    backtrace_symbols_fd( frames, n, STDOUT_FILENO );
+  void *frames[48];
+  int const n = backtrace( frames, 48 );
   char const *lib = "unknown";
   for ( int i = 1; i < n; ++i ) {
     Dl_info info;
@@ -2323,7 +2430,74 @@ void sweep_on_signal( int sig ) {
   char what[32];
   if ( snprintf( what, sizeof what, "signal %d in ", sig ) < 0 )
     what[0] = 0;
-  sweep_report( what, lib );
+  sweep_report( what, lib, frames, n );
+}
+
+// A stack the child sent, in this process (the libraries are mapped at the same
+// addresses after fork()): function and line from addr2line where it can, one
+// run of addr2line per library.
+void sweep_show_frames( std::string const &title, std::string const &hex,
+                        bool symbolize ) {
+  std::cout << title << ":" << std::endl;
+  struct Frame { std::string hex, lib, where; unsigned long off = 0; };
+  std::vector<Frame> frames;
+  std::istringstream is( hex );
+  std::string h;
+  while ( is >> h && frames.size() < 32 ) {
+    Frame fr;
+    fr.hex = h;
+    void *const addr = reinterpret_cast<void*>( std::stoull( h, nullptr, 16 ) );
+    Dl_info info;
+    if ( dladdr( addr, &info ) && info.dli_fname && info.dli_fbase ) {
+      fr.lib = info.dli_fname;
+      // The return address: the call is the byte before it.
+      fr.off = static_cast<unsigned long>(
+        static_cast<char*>( addr ) - static_cast<char*>( info.dli_fbase ) - 1 );
+    }
+    frames.push_back( fr );
+  }
+  std::map<std::string, std::vector<std::size_t> > by_lib;
+  for ( std::size_t i = 0; i < frames.size(); ++i )
+    if ( !frames[i].lib.empty() )
+      by_lib[frames[i].lib].push_back( i );
+  for ( auto const &l : by_lib ) {
+    if ( !symbolize )
+      break;
+    std::string cmd( "addr2line -C -f -p -e '" + l.first + "'" );
+    for ( std::size_t const i : l.second ) {
+      char off[32];
+      if ( snprintf( off, sizeof off, " 0x%lx", frames[i].off ) > 0 )
+        cmd += off;
+    }
+    cmd += " 2>/dev/null";
+    std::FILE *const p = popen( cmd.c_str(), "r" );
+    if ( !p )
+      continue;
+    char buf[1024];
+    for ( std::size_t const i : l.second ) {
+      if ( !std::fgets( buf, sizeof buf, p ) )
+        break;
+      std::string w( buf );
+      while ( !w.empty() && w.back() == '\n' )
+        w.pop_back();
+      frames[i].where = w.substr( 0, 300 );
+    }
+    while ( std::fgets( buf, sizeof buf, p ) ) {
+    }
+    if ( pclose( p ) == -1 )
+      std::cout << "  (addr2line did not end normally)" << std::endl;
+  }
+  for ( std::size_t i = 0; i < frames.size(); ++i ) {
+    Frame const &fr = frames[i];
+    std::string::size_type const slash = fr.lib.rfind( '/' );
+    std::cout << "  #" << i << " " << fr.hex << " "
+              << ( slash == std::string::npos ? fr.lib : fr.lib.substr( slash + 1 ) )
+              << ": ";
+    if ( fr.where.empty() )
+      std::cout << "+0x" << std::hex << fr.off << std::dec << std::endl;
+    else
+      std::cout << fr.where << std::endl;
+  }
 }
 
 
@@ -2372,8 +2546,13 @@ std::string sweep_call( Server &server, std::string const &request_text,
     catch ( std::exception const &e ) {
       *count = inject_disarm();
       outcome = std::string( "handle() threw " ) + e.what();
-      if ( std::string( server.current_id() ) != "1" &&
-           std::string( server.current_id() ) != "null" )
+      // What main() of zorba-mcp does then.
+      Server::AfterFailure const after = server.after_failure();
+      if ( after == Server::AfterFailure::end )
+        outcome += ", the process ends";
+      else if ( after == Server::AfterFailure::nothing )
+        outcome += ", no response";
+      else if ( std::string( server.current_id() ) != "1" )
         outcome += ", id " + std::string( server.current_id() );
     }
   };
@@ -2385,6 +2564,18 @@ std::string sweep_call( Server &server, std::string const &request_text,
   }
   return outcome;
 }
+
+// A failed call keeps memory if it leaves more than this beyond what the same
+// call keeps with no failure (caches it fills, a record or slot that stays):
+// above the size of such a record, below that of a tree or document left behind.
+long const sweep_kept_noise = 8 * 1024;
+// At most this many bytes kept by any one failed call. Up to 39 KB were measured
+// on the document cache (the last allocations of an entry that stays); a document
+// or compiled query left behind is larger.
+long const sweep_kept_max = 64 * 1024;
+// Kept memory and the same call again are measured on at least this many points
+// of each run length (all of them when there are fewer).
+long const sweep_min_measured = 16;
 
 void exhaust_sweep( Fixture const &f, std::string const &name, Sweep const &s ) {
 # if defined(ZORBA_TEST_SANITIZER)
@@ -2424,9 +2615,13 @@ void exhaust_sweep( Fixture const &f, std::string const &name, Sweep const &s ) 
   std::string const next( rq( 2, "1 + 1" ) );
   std::string const again( rq( 3, s.query ) );
 
-  // What one run in a child gives; first == 0 counts the allocations, and the
-  // memory that a run leaves behind.
-  auto run_child = [&]( long first, long length, long *total, long *kept,
+  // The stacks a child sent with its outcome.
+  struct Stacks { std::string crash, alloc; };
+
+  // What one run in a child gives; first == 0 counts the allocations. With
+  // measure, the same call runs again, and what the run left behind is measured.
+  auto run_child = [&]( long first, long length, bool measure, long *total,
+                        long *kept, Stacks *stacks,
                         bool trace = false ) -> std::string {
     int fd[2];
     if ( pipe( fd ) != 0 )
@@ -2438,23 +2633,33 @@ void exhaust_sweep( Fixture const &f, std::string const &name, Sweep const &s ) 
       sweep_close( fd[0] );
       alarm( 10 );
       sweep_fd = fd[1];
-      sweep_show_stack = trace;
+      sweep_phase = "failing call";
+      sweep_failed[0] = 0;
       inject_trace = trace;
+      inject_num_frames = 0;
       void *frames[4];
       backtrace( frames, 4 );   // loads what it needs, before any failure
       if ( signal( SIGSEGV, sweep_on_signal ) == SIG_ERR ||
-           signal( SIGABRT, sweep_on_signal ) == SIG_ERR )
+           signal( SIGABRT, sweep_on_signal ) == SIG_ERR ||
+           signal( SIGBUS, sweep_on_signal ) == SIG_ERR ||
+           signal( SIGFPE, sweep_on_signal ) == SIG_ERR ||
+           on_exit( sweep_on_exit, nullptr ) != 0 )
         _exit( 1 );
       std::set_terminate( sweep_on_terminate );
       long const live0 = static_cast<long>( new_live.load() );
       long count = 0;
       std::string out( sweep_call( server, call, s, first, length, &count ) );
+      std::replace( out.begin(), out.end(), '\n', ' ' );  // one line
+      if ( snprintf( sweep_failed, sizeof sweep_failed, "%s", out.c_str() ) < 0 )
+        sweep_failed[0] = 0;
       Json r;
       std::string why;
+      sweep_phase = "next call";
       if ( !parse_json( server.handle( next ), &r, &why ) ||
            text_of( r ) != "2" )
         out += " | next call: " + text_of( r );
       int probe_id = 10;
+      sweep_phase = "probe";
       for ( auto const &p : s.probes ) {
         if ( !parse_json( server.handle( rq( probe_id++, p.first ) ), &r, &why ) ||
              text_of( r ) != p.second )
@@ -2463,16 +2668,20 @@ void exhaust_sweep( Fixture const &f, std::string const &name, Sweep const &s ) 
       // After the same call again, so that what it frees of the warm-up and
       // what it caches do not count: a failed call then keeps only what it lost.
       long k = 0;
-      if ( first % 8 == 0 ) {
+      if ( measure ) {
+        sweep_phase = "same call again";
         if ( !parse_json( server.handle( again ), &r, &why ) ||
              text_of( r ) != s.expected )
           out += " | same call again: " + text_of( r );
         k = static_cast<long>( new_live.load() ) - live0;
       }
-      std::string const msg( std::to_string( count ) + " " +
-                             std::to_string( k ) + " " + out );
-      ssize_t const n = write( fd[1], msg.data(), msg.size() );
-      _exit( n == static_cast<ssize_t>( msg.size() ) ? 0 : 1 );
+      std::replace( out.begin(), out.end(), '\n', ' ' );
+      std::string msg( std::to_string( count ) + " " + std::to_string( k ) + " " +
+                       out );
+      sweep_write( msg.data(), msg.size() );
+      if ( inject_num_frames )
+        sweep_write_frames( "alloc ", inject_frames, inject_num_frames );
+      _exit( 0 );
     }
     sweep_close( fd[1] );
     std::string msg;
@@ -2488,14 +2697,21 @@ void exhaust_sweep( Fixture const &f, std::string const &name, Sweep const &s ) 
     if ( waitpid( pid, &status, 0 ) != pid )
       status = -1;
     if ( WIFSIGNALED( status ) )
-      return "signal " + std::to_string( WTERMSIG( status ) );
+      return "signal " + std::to_string( WTERMSIG( status ) ) + ", not caught";
     if ( !WIFEXITED( status ) || WEXITSTATUS( status ) != 0 )
-      return "exit " + std::to_string( WEXITSTATUS( status ) );
+      return "child status " + std::to_string( status );
     std::istringstream is( msg );
     long c = 0, k = 0;
     is >> c >> k;
     std::string out;
     std::getline( is, out );
+    std::string extra;
+    while ( std::getline( is, extra ) && stacks ) {
+      if ( extra.rfind( "crash ", 0 ) == 0 )
+        stacks->crash = extra.substr( 6 );
+      else if ( extra.rfind( "alloc ", 0 ) == 0 )
+        stacks->alloc = extra.substr( 6 );
+    }
     if ( total )
       *total = c;
     if ( kept )
@@ -2504,7 +2720,7 @@ void exhaust_sweep( Fixture const &f, std::string const &name, Sweep const &s ) 
   };
 
   long total = 0, base_kept = 0;
-  std::string const plain( run_child( 0, 0, &total, &base_kept ) );
+  std::string const plain( run_child( 0, 0, true, &total, &base_kept, nullptr ) );
   if ( s.needs_module && contains( plain, "XQST0059" ) ) {
     std::cout << name << ": the module is not in this build" << std::endl;
     return;
@@ -2517,56 +2733,72 @@ void exhaust_sweep( Fixture const &f, std::string const &name, Sweep const &s ) 
   // Every allocation, up to a bound on the time of the test.
   long const stride = std::max( 1L, total / s.points );
   for ( long const length : { 1L, 8L } ) {
+    long const step = length > 1 ? 4 * stride : stride;
+    long const tried = ( total - 1 ) / step + 1;
+    // Every other point, or all of them when there are few.
+    long const every = tried < 2 * sweep_min_measured ? 1 : 2;
     std::map<std::string, std::pair<long, long> > outcomes;
-    long sampled = 0, keeping = 0, max_kept = 0;
-    for ( long n = 1; n <= total; n += length > 1 ? 4 * stride : stride ) {
+    std::map<std::string, Stacks> stacks_of;
+    long sampled = 0, keeping = 0, max_kept = 0, i = 0;
+    for ( long n = 1; n <= total; n += step, ++i ) {
+      bool const measure = i % every == 0;
       long kept = 0;
-      std::string out( run_child( n, length, nullptr, &kept ) );
-      // What a failed call keeps, beyond the caches a good one fills.
-      // What a failed call keeps, beyond the caches a good one fills. A few
-      // allocations are the last of a record or cache that stays; a tree left
-      // behind shows at most of them.
-      if ( n % 8 == 0 ) {
+      Stacks st;
+      std::string out( run_child( n, length, measure, nullptr, &kept, &st ) );
+      if ( measure ) {
         ++sampled;
-        if ( kept > base_kept + 8 * 1024 ) {
+        if ( kept > base_kept + sweep_kept_noise ) {
           ++keeping;
           max_kept = std::max( max_kept, kept - base_kept );
         }
       }
       auto &o = outcomes[out];
-      if ( !o.first )
+      if ( !o.first ) {
         o.second = n;
+        stacks_of[out] = st;
+      }
       ++o.first;
     }
     std::cout << name << ", " << length << " failing: of " << sampled
               << " measured, " << keeping << " keep memory, at most " << max_kept
               << " bytes" << std::endl;
-    check( keeping <= std::max( 3L, sampled / 10 ),
+    check( sampled >= std::min( sweep_min_measured, tried ),
+           name + ": enough points measured",
+           std::to_string( sampled ) + " of " + std::to_string( tried ) );
+    check( keeping <= std::max( 2L, sampled / 10 ),
            name + ": failed calls give their memory back",
            std::to_string( keeping ) + " of " + std::to_string( sampled ) );
+    check( max_kept <= sweep_kept_max,
+           name + ": no failed call keeps more than the bound",
+           std::to_string( max_kept ) + " bytes" );
+    for ( std::string const &over : sweep_over_cap( s, length, outcomes ) )
+      check( false, name + ": a known limit within its cap", over );
     for ( auto const &o : outcomes ) {
-      // handle() throws when even its error response cannot be made: main() of
-      // zorba-mcp answers then, with this id.
-      bool const allowed = o.first == "answer" || o.first == "memory_limit" ||
-        o.first == "internal error" ||
-        o.first == "handle() threw std::bad_alloc" ||
-        o.first == "terminate St9bad_alloc" ||  // zorba-mcp: status 3
-        ( s.empty_answer && o.first.empty() ) ||
-        std::any_of( s.known.begin(), s.known.end(),
-          [&o]( std::string const &k ) {
-            return o.first.rfind( k, 0 ) == 0;
-          } ) ||
-        ( s.lenient && o.first.rfind( "error: ", 0 ) == 0 &&
-          o.first.find( " | " ) == std::string::npos );
+      bool const allowed = sweep_allowed( s, length, o.first );
       std::cout << name << ", " << length << " failing: " << o.second.first
                 << " times (first at " << o.second.second << "): " << o.first
                 << std::endl;
       check( allowed, name + ": allowed outcome", o.first );
-      if ( o.first.rfind( "signal", 0 ) == 0 ||
-           ( !allowed && o.first.find( " | " ) != std::string::npos ) ) {
-        std::cout << "at " << o.second.second << ":" << std::endl;
-        run_child( o.second.second, length, nullptr, nullptr, true );
-      }
+      // The stacks of a crash, and of any outcome not allowed.
+      if ( allowed && o.first.find( "signal" ) == std::string::npos )
+        continue;
+      // Function names for an outcome not allowed and for a crash in the engine;
+      // offsets only for the known crashes in other libraries.
+      bool const symbolize = !allowed ||
+        o.first.find( "libzorba" ) != std::string::npos;
+      Stacks const &first_stacks = stacks_of[o.first];
+      if ( !first_stacks.crash.empty() )
+        sweep_show_frames( "crash at " + std::to_string( o.second.second ),
+                           first_stacks.crash, symbolize );
+      // Where the failing allocation was: the same point once more, traced.
+      Stacks traced;
+      std::string const again_out( run_child( o.second.second, length, false,
+                                              nullptr, nullptr, &traced, true ) );
+      if ( !traced.alloc.empty() )
+        sweep_show_frames( "failing allocation at " +
+                           std::to_string( o.second.second ) + " (traced run: " +
+                           again_out.substr( 0, 120 ) + ")", traced.alloc,
+                           symbolize );
     }
   }
 }
@@ -2627,7 +2859,7 @@ void test_sweep_html( Fixture const &f ) {
     caught( "count(x:parse-html(\"" + html + "</body></html>\")//*:span)" );
   s.before.push_back( s.query );
   s.expected = "40";
-  s.known = { "terminate N11xercesc" };   // releasing a schema
+  s.known = { starting( "terminate N11xercesc" ) };   // releasing a schema
   s.needs_module = true;
   exhaust_sweep( f, "x:parse-html", s );
 #else
@@ -2686,7 +2918,7 @@ void test_sweep_casts( Fixture const &f ) {
   s.expected = "\"true true true true true true true true true true 2000\"";
   s.lenient = true;                 // the compilation is swept too
   // The scanner of the compiler.
-  s.known = { "exit 2" };
+  s.known = { exact( "exit 2" ) };
   s.compiles = true;
   exhaust_sweep( f, "casts", s );
 #else
@@ -2703,7 +2935,11 @@ void test_sweep_compile( Fixture const &f ) {
   s.expected = "41";
   s.lenient = true;
   s.points = 200;
-  s.known = { "exit 2", "signal 6 in libstdc", "terminate N11xercesc" };
+  // The scanner calls exit(2); std::bad_alloc left a noexcept function, seen
+  // once in a run of 8.
+  s.known = { exact( "exit 2" ), starting( "signal 6 in libstdc" ),
+              starting( "terminate N11xercesc" ),
+              exact( "terminate St9bad_alloc", 2, 8 ) };
   s.compiles = true;
   exhaust_sweep( f, "compilation", s );
 #else
@@ -2722,12 +2958,14 @@ void test_sweep_builtins( Fixture const &f ) {
   s.expected = "41";
   s.lenient = true;
   s.points = 100000;                // all of them
-  // As in the sweep of the compilation; and, at every allocation, SIGSEGV after a
-  // failure in xquery_driver::parse_stream (once in 2654, arm64), not established
-  // but where the parser reads parse nodes it freed after a failure (see the limits
-  // in bin/mcp/README.md).
-  s.known = { "exit 2", "signal 6 in libstdc", "terminate N11xercesc",
-              "signal 11 in libzorba_simplestore" };
+  // As in the sweep of the compilation, where std::bad_alloc leaving a noexcept
+  // function was seen once alone and once in a run of 8; and, in the failed call
+  // only, a SIGSEGV in the engine seen once alone (arm64), whose stack the sweep
+  // prints.
+  s.known = { exact( "exit 2" ), starting( "signal 6 in libstdc" ),
+              starting( "terminate N11xercesc" ),
+              exact( "terminate St9bad_alloc", 2 ),
+              starting( "signal 11 in libzorba_simplestore", 2, 1 ) };
   s.compiles = true;
   s.probes = {
     { "string-join((\"a\", \"b\"), \"-\")", "\"a-b\"" },
@@ -2739,6 +2977,56 @@ void test_sweep_builtins( Fixture const &f ) {
   exhaust_sweep( f, "built-ins after a failed compilation", s );
 #else
   (void)f;
+#endif
+}
+// The matcher of the sweeps, on outcomes planted here. Each planted outcome is
+// one the matcher before this test accepted (by prefix, and with any follow-up
+// failure): shown with old_allowed, a copy of it.
+void test_sweep_matcher( Fixture const &f ) {
+  (void)f;
+#if defined(__linux__)
+  std::vector<std::string> const old_known = {
+    "exit 2", "memory_limit | same call again: error: err:XPST00",
+    "signal 11 in libzorba_simplestore", "terminate N11xercesc" };
+  auto old_allowed = [&]( std::string const &o ) {
+    return o == "answer" || o == "memory_limit" || o == "internal error" ||
+      o == "handle() threw std::bad_alloc" || o == "terminate St9bad_alloc" ||
+      std::any_of( old_known.begin(), old_known.end(),
+        [&o]( std::string const &k ) { return o.rfind( k, 0 ) == 0; } ) ||
+      ( o.rfind( "error: ", 0 ) == 0 && o.find( " | " ) == std::string::npos );
+  };
+  Sweep s;
+  s.lenient = true;
+  s.known = { exact( "exit 2" ), starting( "terminate N11xercesc" ),
+              starting( "signal 11 in libzorba_simplestore", 2, 1 ) };
+  std::string const bad[] = {
+    "memory_limit | same call again: error: err:XPST0017: \"parse-xml\"",
+    "exit 20", "exit 255", "exit 2 | next call: rpc: x",
+    "signal 11 in libzorba_simplestore.so.5.0.0 | next call: error: x",
+    "terminate N11xercesc_3_320OutOfMemoryExceptionE | probe: error: x",
+    "terminate St9bad_alloc" };
+  for ( std::string const &b : bad ) {
+    check( old_allowed( b ), "the old matcher accepted: " + b );
+    check( !sweep_allowed( s, 1, b ), "the matcher refuses: " + b );
+  }
+  // A crash in a later call now says so; before, it read as one of the failed
+  // call, "signal 11 in libzorba_simplestore.so.5.0.0".
+  check( !sweep_allowed( s, 1,
+           "answer | probe: signal 11 in libzorba_simplestore.so.5.0.0" ),
+         "the matcher refuses a crash in a probe" );
+  check( !sweep_allowed( s, 8, "signal 11 in libzorba_simplestore.so.5.0.0" ),
+         "a known limit only in its run length" );
+  check( sweep_allowed( s, 1, "signal 11 in libzorba_simplestore.so.5.0.0" ),
+         "a known limit in the failed call" );
+  check( sweep_allowed( s, 1, "exit 2" ), "an exit status, exactly" );
+  check( sweep_allowed( s, 1, "error: err:XPST0003: syntax" ),
+         "an error of the compilation, lenient" );
+  std::map<std::string, std::pair<long, long> > outcomes;
+  outcomes["signal 11 in libzorba_simplestore.so.5.0.0"] = { 3, 10 };
+  check( sweep_over_cap( s, 1, outcomes ).size() == 1,
+         "a known limit over its cap" );
+  outcomes["signal 11 in libzorba_simplestore.so.5.0.0"] = { 2, 10 };
+  check( sweep_over_cap( s, 1, outcomes ).empty(), "a known limit within its cap" );
 #endif
 }
 // MAPM keeps state per thread, set up by the first decimal of the thread.
@@ -2754,8 +3042,8 @@ void test_sweep_decimal_thread( Fixture const &f ) {
   s.lenient = true;                 // the compilation is swept too
   // A new thread: glibc gives up if it cannot register the first thread_local
   // with a destructor of the thread.
-  s.known = { "exit 2", "signal 6 in libstdc", "signal 6 in unknown",
-              "terminate N11xercesc" };
+  s.known = { exact( "exit 2" ), starting( "signal 6 in libstdc" ),
+              exact( "signal 6 in unknown" ), starting( "terminate N11xercesc" ) };
   s.compiles = true;
   exhaust_sweep( f, "first decimal of a thread", s );
 #else
@@ -2782,9 +3070,11 @@ void test_sweep_cache( Fixture const &f ) {
   s.after_compile = true;
   // A query over dir:open: what is left of a failure in the checks of a path, and
   // in libraries. See the limits of --max-memory in bin/mcp/README.md.
-  s.known = { "terminate N11xercesc", "signal 11 in libicu", "signal 11 in unknown",
-              "signal 11 in libstdc", "error: file:FOFL9999",
-              "error: dir:INVALID_PATH", "error: err:FOCH0002" };
+  s.known = { starting( "terminate N11xercesc" ), starting( "signal 11 in libicu" ),
+              exact( "signal 11 in unknown" ), starting( "signal 11 in libstdc" ),
+              starting( "error: file:FOFL9999: " ),
+              starting( "error: dir:INVALID_PATH: " ),
+              starting( "error: err:FOCH0002: " ) };
   s.empty_answer = true;
 # if defined(ZORBA_TEST_SANITIZER)
   s.points = 300;
@@ -2912,6 +3202,107 @@ void test_cache_after_failed_admission( Fixture const &f ) {
   (void)f;
 #endif
 }
+#if defined(__linux__)
+// One message to handle() with each of its allocations failing in turn (alone
+// and in runs of 8), in this process. fn gets what handle() returned, or that it
+// threw (std::bad_alloc, which main() of zorba-mcp handles by after_failure()).
+template<typename Fn>
+void each_failure( Server &server, std::string const &message, Fn fn ) {
+  inject_arm( 0, 0 );
+  server.handle( message );
+  long const total = inject_disarm();
+  for ( long const length : { 1L, 8L } ) {
+    for ( long n = 1; n <= total; ++n ) {
+      inject_arm( n, length );
+      std::string response;
+      bool threw = false;
+      try {
+        response = server.handle( message );
+      }
+      catch ( std::bad_alloc const& ) {
+        threw = true;
+      }
+      inject_disarm();
+      fn( n, length, threw, response );
+    }
+  }
+}
+#endif
+
+// A notification is never answered, also when handling it runs out of memory:
+// no response with "id": null that a client could take for its own.
+void test_notification_out_of_memory( Fixture const &f ) {
+#if defined(__linux__)
+  ServerConfig config;
+  config.root = f.tree;
+  config.scan = false;
+  Server server( f.zorba, config, std::cerr );
+  std::string const note(
+    "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/cancelled\","
+    "\"params\":{\"requestId\":7,\"reason\":\"" + std::string( 300, 'r' ) + "\"}}" );
+  long bad = 0;
+  each_failure( server, note,
+    [&]( long n, long length, bool threw, std::string const &response ) {
+      bool const answered = threw ?
+        server.after_failure() == Server::AfterFailure::answer :
+        !response.empty();
+      if ( answered && ++bad <= 3 )
+        std::cout << "at " << n << " of a run of " << length << ": "
+                  << ( threw ? "main() answers with id " +
+                                 std::string( server.current_id() )
+                             : response.substr( 0, 200 ) ) << std::endl;
+    } );
+  check( bad == 0, "a notification gets no response when memory runs out",
+         std::to_string( bad ) + " points" );
+  Json const r( roundtrip( server, request( 1, "tools/list" ) ) );
+  check( r.find( "result" ) != nullptr, "the next request is answered", r.dump() );
+#else
+  (void)f;
+#endif
+}
+
+// A request is answered with its own id, also when handling it runs out of
+// memory (even while its id is read), or the process ends: a client never waits
+// for a response that does not come.
+void test_request_id_out_of_memory( Fixture const &f ) {
+#if defined(__linux__)
+  ServerConfig config;
+  config.root = f.tree;
+  config.scan = false;
+  Server server( f.zorba, config, std::cerr );
+  std::string const id( "req-" + std::string( 600, 'i' ) );
+  std::string const id_json( Json( id ).dump() );
+  std::string const message( request( Json( id ), "no/such/method" ) );
+  long bad = 0;
+  each_failure( server, message,
+    [&]( long n, long length, bool threw, std::string const &response ) {
+      std::string got;
+      if ( threw ) {
+        Server::AfterFailure const a = server.after_failure();
+        if ( a == Server::AfterFailure::answer &&
+             std::string( server.current_id() ) != id_json )
+          got = "main() answers with id " +
+                std::string( server.current_id() ).substr( 0, 40 );
+        if ( a == Server::AfterFailure::nothing )
+          got = "main() does not answer";
+      } else {
+        Json r;
+        std::string why;
+        if ( !parse_json( response, &r, &why ) || !r.find( "id" ) ||
+             r.find( "id" )->dump() != id_json )
+          got = "response " + response.substr( 0, 120 );
+      }
+      if ( !got.empty() && ++bad <= 3 )
+        std::cout << "at " << n << " of a run of " << length << ": " << got
+                  << std::endl;
+    } );
+  check( bad == 0, "a request is answered with its id, or the process ends",
+         std::to_string( bad ) + " points" );
+#else
+  (void)f;
+#endif
+}
+
 // A catch clause catches an error a query raises, whatever its name and text.
 void test_user_error_named_like_memory( Fixture const &f ) {
   ServerConfig config;
@@ -6408,6 +6799,7 @@ Test const tests[] = {
   { "exhaust_at_start", test_exhaust_at_start },
   { "exhaust_sweep_compile", test_sweep_compile },
   { "exhaust_sweep_builtins", test_sweep_builtins },
+  { "exhaust_sweep_matcher", test_sweep_matcher },
   { "exhaust_sweep_xml", test_sweep_xml },
   { "exhaust_sweep_fragment", test_sweep_fragment },
   { "exhaust_sweep_html", test_sweep_html },
@@ -6418,6 +6810,8 @@ Test const tests[] = {
   { "exhaust_sweep_cache", test_sweep_cache },
   { "exhaust_cache_after_failure", test_cache_after_failed_admission },
   { "exhaust_user_error", test_user_error_named_like_memory },
+  { "exhaust_notification", test_notification_out_of_memory },
+  { "exhaust_request_id", test_request_id_out_of_memory },
   { "exhaust_long_line", test_exhaust_long_line },
   { "exhaust_stack_limit", test_exhaust_stack_limit },
   { "exhaust_generated", test_exhaust_generated },

@@ -109,6 +109,14 @@ public:
    */
   char const* current_id() const { return theCurrentId.c_str(); }
 
+  /** What to do when handle() threw: */
+  enum class AfterFailure {
+    nothing,  // no response: the message was a notification
+    answer,   // an error response with current_id()
+    end       // end the process: the request's id could not be read
+  };
+  AfterFailure after_failure() const { return AfterFailure::answer; }
+
   /** The policy every query runs under. */
   SecurityPolicy const& policy() const { return thePolicy; }
 

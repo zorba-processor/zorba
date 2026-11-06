@@ -500,11 +500,13 @@ IF (ZORBA_WITH_FILE_ACCESS)
              hints_nodes hints_names deep_json deep_json_binary
              entity_expansion case_paths html_edge_cases memory_limit
              exhaust_at_start exhaust_sweep_compile exhaust_sweep_builtins
+             exhaust_sweep_matcher
              exhaust_sweep_xml
              exhaust_sweep_fragment
              exhaust_sweep_html exhaust_sweep_json exhaust_sweep_csv
              exhaust_sweep_casts exhaust_sweep_decimal_thread exhaust_sweep_cache
              exhaust_cache_after_failure exhaust_user_error exhaust_long_line
+             exhaust_notification exhaust_request_id
              exhaust_stack_limit exhaust_generated exhaust_json exhaust_json_array exhaust_csv
              exhaust_xml exhaust_strings exhaust_numbers exhaust_try
              exhaust_injected_generated exhaust_injected_json
@@ -558,7 +560,7 @@ IF (ZORBA_WITH_FILE_ACCESS)
     ADD_TEST (NAME bin/mcp/max_memory_help
       COMMAND "$<TARGET_FILE:zorba_mcp${_mcp_suffix}>" --help)
     SET_TESTS_PROPERTIES (bin/mcp/max_memory_help PROPERTIES
-      PASS_REGULAR_EXPRESSION "fails with the tool error memory_limit, and the\n *server answers the next call[.] If memory runs out\n *where that cannot be done, for example while the\n *server starts, it exits with status 3 and a message\n *on stderr, with no response to the call[.] Libraries\n *end it in other ways: abort, with a core file if\n *the system keeps them [(]Xerces-C releasing a schema;\n *libxml2 or glibc on the first use by a thread[)];\n *SIGSEGV [(]ICU compiling a regular expression[)]; status\n *2 [(]the query scanner, while a query compiles[)]")
+      PASS_REGULAR_EXPRESSION "fails with the tool error memory_limit, and the\n *server answers the next call[.] If memory runs out\n *where that cannot be done, for example while the\n *server starts or before the id of a request is\n *read, it exits with status 3 and a message on\n *stderr, with no response to the call[.] Libraries\n *end it in other ways: abort, with a core file if\n *the system keeps them [(]Xerces-C releasing a schema;\n *libxml2 or glibc on the first use by a thread[)];\n *SIGSEGV [(]ICU compiling a regular expression; rarely\n *while a query compiles, or near the end of a\n *dir:open call[)]; status 2 [(]the query scanner, while\n *a query compiles[)]")
 
     # A --language value other than xquery and jsoniq is refused.
     ADD_TEST (NAME bin/mcp/language_invalid

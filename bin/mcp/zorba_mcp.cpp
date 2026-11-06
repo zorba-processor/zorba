@@ -90,13 +90,16 @@ char const usage[] =
   "                       fails with the tool error memory_limit, and the\n"
   "                       server answers the next call. If memory runs out\n"
   "                       where that cannot be done, for example while the\n"
-  "                       server starts, it exits with status 3 and a message\n"
-  "                       on stderr, with no response to the call. Libraries\n"
+  "                       server starts or before the id of a request is\n"
+  "                       read, it exits with status 3 and a message on\n"
+  "                       stderr, with no response to the call. Libraries\n"
   "                       end it in other ways: abort, with a core file if\n"
   "                       the system keeps them (Xerces-C releasing a schema;\n"
   "                       libxml2 or glibc on the first use by a thread);\n"
-  "                       SIGSEGV (ICU compiling a regular expression); status\n"
-  "                       2 (the query scanner, while a query compiles)\n"
+  "                       SIGSEGV (ICU compiling a regular expression; rarely\n"
+  "                       while a query compiles, or near the end of a\n"
+  "                       dir:open call); status 2 (the query scanner, while\n"
+  "                       a query compiles)\n"
   "  --no-scan            no background scan of the directory: list_documents\n"
   "                       takes no arguments and lists through dir:list\n"
   "  --scan-cache-mb <MiB> memory for the scan's file index and previews\n"
@@ -341,6 +344,16 @@ int main( int argc, char const *argv[] ) {
       catch ( std::bad_alloc const& ) {
         // Not even the error response of handle() could be made. The memory is
         // back by now if it was the call that held it. This allocates nothing.
+        mcp::Server::AfterFailure const after = server.after_failure();
+        if ( after == mcp::Server::AfterFailure::nothing )
+          continue;
+        if ( after == mcp::Server::AfterFailure::end ) {
+          std::cerr << "zorba-mcp: out of memory before the id of a request "
+                       "could be read; ending, so that no client waits for it"
+                    << std::endl;
+          status = 3;
+          break;
+        }
         if ( std::fprintf( out, "{\"jsonrpc\":\"2.0\",\"id\":%s,\"error\":{\"code\":-32603,"
                            "\"message\":\"Internal error: out of memory\"}}\n",
                            server.current_id() ) < 0 ||
