@@ -1,5 +1,5 @@
 (: The main body is not sequential, but it calls sequential functions through
- : function items: the first rewrites the file after the first member is taken.
+ : function items, one of which rewrites the file while the members are read.
  : The members are the ones of the file as it was when parse-json began. :)
 import module namespace file = "http://expath.org/ns/file";
 import module namespace jn = "http://jsoniq.org/functions";

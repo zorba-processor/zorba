@@ -48,9 +48,11 @@ public:
    * be returned.
    * @param strip_top_level_array If \c true, strips the top-level array, if
    * any.
+   * @param skip_bom If \c true, skips a byte order mark at the current
+   * position of \a is.  Two loaders that share a stream skip it only once.
    */
   loader( std::istream &is, bool allow_multiple = false,
-          bool strip_top_level_array = false );
+          bool strip_top_level_array = false, bool skip_bom = true );
 
   /**
    * Destroys this %loader.

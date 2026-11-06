@@ -84,7 +84,8 @@ void loader::stack_element::destroy() {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-loader::loader( istream &is, bool allow_multiple, bool strip_top_level_array ) :
+loader::loader( istream &is, bool allow_multiple, bool strip_top_level_array,
+                bool skip_bom ) :
   parser_( is, allow_multiple ),
   strip_top_level_array_( strip_top_level_array ),
   stripped_top_level_array_( false ),
@@ -96,7 +97,8 @@ loader::loader( istream &is, bool allow_multiple, bool strip_top_level_array ) :
 {
   // F&O 3.1 fn:parse-json: "If the input starts with a byte order mark, this
   // function ignores it."  Not in json::lexer, which also checks single values.
-  skip_utf8_bom( is, false );
+  if ( skip_bom )
+    skip_utf8_bom( is, false );
 }
 
 loader::~loader() {

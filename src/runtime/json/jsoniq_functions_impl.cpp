@@ -1062,8 +1062,10 @@ static void openParseMembers(
     state->theStream = state->theOwnedStream;
   }
 
+  // One byte order mark, as for one loader: the scanner skips it, and the
+  // loader starts where the scanner started.
   state->theScanner = new json::loader(*state->theStream, true);
-  state->theLoader = new json::loader(*state->theStream, true);
+  state->theLoader = new json::loader(*state->theStream, true, false, false);
   state->theScanner->unbox_top_level_arrays();
   state->theScanner->check_only();
   state->theLoader->unbox_top_level_arrays();

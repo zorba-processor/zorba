@@ -263,7 +263,10 @@ public:
       {
         store::Item_t value = object->getObjectValue(key);
         if (!add(key->getStringValue(), value_of(value.getp())))
+        {
+          keys->close();
           return false;
+        }
       }
       keys->close();
       return true;
