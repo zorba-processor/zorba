@@ -204,7 +204,12 @@ void transform_expr::setReturnExpr(expr* e)
 
   theScriptingKind = theReturnExpr->get_scripting_detail();
 
+  // The transform expr itself is never vacuous: it constructs the copies.
+  // A vacuous return expr (for example "()") leaves the transform simple.
   theScriptingKind &= ~VACUOUS_EXPR;
+
+  if (theScriptingKind == UNKNOWN_SCRIPTING_KIND)
+    theScriptingKind = SIMPLE_EXPR;
 }
 
 
