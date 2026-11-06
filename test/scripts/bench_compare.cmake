@@ -85,7 +85,8 @@ IF(NOT nargrows EQUAL 6)
   MESSAGE(FATAL_ERROR "arg.jq: expected 6 rows, got ${nargrows}")
 ENDIF()
 
-# FILTER selects by name; one that selects nothing is an error.
+# FILTER selects by name (ok and arg; arg fails in its warm-up here, with no ARGS:
+# 4 + 2 rows); one that selects nothing is an error.
 EXECUTE_PROCESS(
   COMMAND "${CMAKE_COMMAND}" -E env REPEAT=1 TIMEOUT=2 "FILTER=ok,a*"
           sh "${SRC_DIR}/bench/compare.sh" "${ZORBA_EXE}" "${ZORBA_EXE}"
@@ -96,8 +97,8 @@ IF(NOT rc EQUAL 0)
 ENDIF()
 FILE(STRINGS "${WORK_DIR}/out-filter/raw.tsv" frows)
 LIST(LENGTH frows nfrows)
-IF(NOT nfrows EQUAL 8)
-  MESSAGE(FATAL_ERROR "FILTER: expected 8 rows, got ${nfrows}:\n${frows}")
+IF(NOT nfrows EQUAL 6)
+  MESSAGE(FATAL_ERROR "FILTER: expected 6 rows, got ${nfrows}:\n${frows}")
 ENDIF()
 EXECUTE_PROCESS(
   COMMAND "${CMAKE_COMMAND}" -E env FILTER=nothing-like-this
