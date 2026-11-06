@@ -102,7 +102,7 @@ void throwXPTY0004Exception(const ErrorInfo& info)
   if (info.theSourceType)
   {                      
     RAISE_ERROR(err::XPTY0004, info.theLoc,
-    ERROR_PARAMS(*info.theSourceType, ZED(NoCastTo_34o), *info.theTargetType));
+    ERROR_PARAMS(ERROR_TEXT( *info.theSourceType ), ZED(NoCastTo_34o), ERROR_TEXT( *info.theTargetType )));
   }                                           
   else                                        
   {
@@ -117,7 +117,7 @@ void throwXPTY0004Exception(const ErrorInfo& info)
                                   SequenceType::QUANT_ONE);
 
     RAISE_ERROR(err::XPTY0004, info.theLoc,
-    ERROR_PARAMS(*sourceType, ZED(NoCastTo_34o), *targetType));
+    ERROR_PARAMS(ERROR_TEXT( *sourceType ), ZED(NoCastTo_34o), ERROR_TEXT( *targetType )));
   }                                           
 }
 
@@ -129,8 +129,8 @@ void throwFOCA0002Exception(const zstring& str, const ErrorInfo& info)
     RAISE_ERROR(err::FOCA0002, info.theLoc,
     ERROR_PARAMS(ZED(FOCA0002_NoCastTo_234),
                  str,
-                 info.theSourceType->toSchemaString(),
-                 info.theTargetType->toSchemaString()));
+                 ERROR_TEXT( info.theSourceType->toSchemaString() ),
+                 ERROR_TEXT( info.theTargetType->toSchemaString() )));
   }                                           
   else                                        
   {
@@ -147,8 +147,8 @@ void throwFOCA0002Exception(const zstring& str, const ErrorInfo& info)
     RAISE_ERROR(err::FOCA0002, info.theLoc,
     ERROR_PARAMS(ZED(FOCA0002_NoCastTo_234),
                  str,
-                 sourceType->toSchemaString(),
-                 targetType->toSchemaString()));
+                 ERROR_TEXT( sourceType->toSchemaString() ),
+                 ERROR_TEXT( targetType->toSchemaString() )));
   }                                           
 }
 
@@ -161,8 +161,8 @@ void throwFOCA0003Exception(const zstring& str, const ErrorInfo& info)
       err::FOCA0003,
       ERROR_PARAMS(
         str,
-        info.theSourceType->toSchemaString(),
-        info.theTargetType->toSchemaString()
+        ERROR_TEXT( info.theSourceType->toSchemaString() ),
+        ERROR_TEXT( info.theTargetType->toSchemaString() )
       ),
       ERROR_LOC( info.theLoc )
     );
@@ -183,8 +183,8 @@ void throwFOCA0003Exception(const zstring& str, const ErrorInfo& info)
       err::FOCA0003,
       ERROR_PARAMS(
         str,
-        sourceType->toSchemaString(),
-        targetType->toSchemaString()
+        ERROR_TEXT( sourceType->toSchemaString() ),
+        ERROR_TEXT( targetType->toSchemaString() )
       ),
       ERROR_LOC( info.theLoc )
     );
@@ -199,8 +199,8 @@ void throwFORG0001Exception(const zstring& str, const ErrorInfo& info)
     RAISE_ERROR(err::FORG0001, info.theLoc,
     ERROR_PARAMS(ZED(FORG0001_NoCastTo_234),
                  str,
-                 info.theSourceType->toSchemaString(),
-                 info.theTargetType->toSchemaString()));
+                 ERROR_TEXT( info.theSourceType->toSchemaString() ),
+                 ERROR_TEXT( info.theTargetType->toSchemaString() )));
   }                                           
   else                                        
   {
@@ -217,8 +217,8 @@ void throwFORG0001Exception(const zstring& str, const ErrorInfo& info)
     RAISE_ERROR(err::FORG0001, info.theLoc,
     ERROR_PARAMS(ZED(FORG0001_NoCastTo_234),
                  str,
-                 sourceType->toSchemaString(),
-                 targetType->toSchemaString()));
+                 ERROR_TEXT( sourceType->toSchemaString() ),
+                 ERROR_TEXT( targetType->toSchemaString() )));
   }                                           
 }
 
@@ -229,8 +229,8 @@ void throwFODT0001Exception(const zstring& str, const ErrorInfo& info)
     RAISE_ERROR(err::FODT0001, info.theLoc,
     ERROR_PARAMS(ZED(FORG0001_NoCastTo_234),
                  str,
-                 info.theSourceType->toSchemaString(),
-                 info.theTargetType->toSchemaString()));
+                 ERROR_TEXT( info.theSourceType->toSchemaString() ),
+                 ERROR_TEXT( info.theTargetType->toSchemaString() )));
   }
   else
   {
@@ -247,8 +247,8 @@ void throwFODT0001Exception(const zstring& str, const ErrorInfo& info)
     RAISE_ERROR(err::FODT0001, info.theLoc,
     ERROR_PARAMS(ZED(FORG0001_NoCastTo_234),
                  str,
-                 sourceType->toSchemaString(),
-                 targetType->toSchemaString()));
+                 ERROR_TEXT( sourceType->toSchemaString() ),
+                 ERROR_TEXT( targetType->toSchemaString() )));
   }
 }
 
@@ -260,8 +260,8 @@ void throwFODT0002Exception(const zstring& str, const ErrorInfo& info)
     RAISE_ERROR(err::FODT0002, info.theLoc,
     ERROR_PARAMS(ZED(FORG0001_NoCastTo_234),
                  str,
-                 info.theSourceType->toSchemaString(),
-                 info.theTargetType->toSchemaString()));
+                 ERROR_TEXT( info.theSourceType->toSchemaString() ),
+                 ERROR_TEXT( info.theTargetType->toSchemaString() )));
   }
   else
   {
@@ -278,8 +278,8 @@ void throwFODT0002Exception(const zstring& str, const ErrorInfo& info)
     RAISE_ERROR(err::FODT0002, info.theLoc,
     ERROR_PARAMS(ZED(FORG0001_NoCastTo_234),
                  str,
-                 sourceType->toSchemaString(),
-                 targetType->toSchemaString()));
+                 ERROR_TEXT( sourceType->toSchemaString() ),
+                 ERROR_TEXT( targetType->toSchemaString() )));
   }
 }
 
@@ -2639,7 +2639,7 @@ bool GenericCast::castToSimple(
         xqtref_t sourceType = tm->create_value_type(item);
 
         RAISE_ERROR(err::XPTY0004, loc,
-        ERROR_PARAMS(*sourceType, ZED(NoCastTo_34o), *targetType));
+        ERROR_PARAMS(ERROR_TEXT( *sourceType ), ZED(NoCastTo_34o), ERROR_TEXT( *targetType )));
       }
 
       return schema->parseUserListTypes(textValue, targetType, resultList, nsCtx, loc, true);
@@ -2685,8 +2685,8 @@ bool GenericCast::castToSimple(
       RAISE_ERROR(err::FORG0001, loc,
       ERROR_PARAMS(ZED(FORG0001_NoCastTo_234),
                    item->getStringValue(),
-                   sourceType->toSchemaString(),
-                   udt->toSchemaString()));
+                   ERROR_TEXT( sourceType->toSchemaString() ),
+                   ERROR_TEXT( udt->toSchemaString() )));
     } // union
 #endif // ZORBA_NO_XMLSCHEMA
   } // list or union
@@ -3125,7 +3125,7 @@ bool GenericCast::castToQName(
            !TypeOps::is_equal(tm, *sourceType, *rtm.UNTYPED_ATOMIC_TYPE_ONE))
   {
     RAISE_ERROR(err::XPTY0004, loc,
-    ERROR_PARAMS(ZED(BadType_23o), *sourceType, ZED(NoCastTo_45o), "QName"));
+    ERROR_PARAMS(ZED(BadType_23o), ERROR_TEXT( *sourceType ), ZED(NoCastTo_45o), "QName"));
   }
 
   ErrorInfo errInfo(sourceType.getp(), rtm.QNAME_TYPE_ONE.getp(), loc);

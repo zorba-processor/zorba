@@ -20,3 +20,15 @@ ADD_TEST(NAME "scripts/ast2dot"
     -D "WORK_DIR=${CMAKE_CURRENT_BINARY_DIR}"
     -P "${CMAKE_CURRENT_SOURCE_DIR}/ast2dot.cmake")
 SET_TESTS_PROPERTIES("scripts/ast2dot" PROPERTIES PASS_REGULAR_EXPRESSION "Passed!")
+
+# bench/compare.sh and bench/compare_table.xq: the comparison of two builds on a
+# benchmark suite (.github/workflows/bench.yml). The table script runs on a
+# sample of raw results everywhere; the driver runs on Linux, where it is used.
+ADD_TEST(NAME "scripts/bench_compare"
+  COMMAND "${CMAKE_COMMAND}"
+    -D "ZORBA_EXE=${ZORBA_EXE}"
+    -D "CXX=${CMAKE_CXX_COMPILER}"
+    -D "SRC_DIR=${CMAKE_SOURCE_DIR}"
+    -D "WORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/bench_compare"
+    -P "${CMAKE_CURRENT_SOURCE_DIR}/bench_compare.cmake")
+SET_TESTS_PROPERTIES("scripts/bench_compare" PROPERTIES PASS_REGULAR_EXPRESSION "Passed!")

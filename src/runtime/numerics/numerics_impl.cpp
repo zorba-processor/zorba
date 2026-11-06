@@ -130,7 +130,7 @@ AbsIterator::nextImpl(store::Item_t& result, PlanState& planState) const
     {
       xqtref_t type = tm->create_value_type(result);
       RAISE_ERROR(err::XPTY0004, loc,
-      ERROR_PARAMS(ZED(BadTypeFor_23), type->toSchemaString(), "fn:abs" ));
+      ERROR_PARAMS(ZED(BadTypeFor_23), ERROR_TEXT( type->toSchemaString() ), "fn:abs" ));
     }
 
     STACK_PUSH(true, state);

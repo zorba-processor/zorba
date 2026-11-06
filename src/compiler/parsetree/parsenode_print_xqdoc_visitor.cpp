@@ -496,7 +496,7 @@ void printCommentFragment(store::Item_t& aParent, string aString, zstring aTag, 
   {
     throw ZORBA_EXCEPTION(
       zerr::ZXQD0002_DOCUMENT_NOT_VALID,
-      ERROR_PARAMS( aString, ZED( BadXMLForXQDoc_3 ), e.what() )
+      ERROR_PARAMS( aString, ZED( BadXMLForXQDoc_3 ), ERROR_TEXT( e.what() ) )
     );
   }
 }

@@ -46,6 +46,7 @@ CREATE_TEST_SOURCELIST(APITests
   module_security.cpp
   invoke_module_globals.cpp
   function_item_lifetime.cpp
+  json_parse_members.cpp
   ${SchemaTests}
 )
 

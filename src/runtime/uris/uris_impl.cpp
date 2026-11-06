@@ -104,7 +104,7 @@ DecodeURIIterator::nextImpl(store::Item_t& result, PlanState& planState) const
     {
       throw XQUERY_EXCEPTION(
         zerr::ZOSE0006_TRANSCODING_ERROR,
-        ERROR_PARAMS( e.what() ),
+        ERROR_PARAMS( ERROR_TEXT( e.what() ) ),
         ERROR_LOC( loc )
       );
     }

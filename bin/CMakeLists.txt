@@ -90,6 +90,56 @@ ZORBA_ADD_TEST(bin/zorba_timeout zorbacmd --timeout 1 -q "count((1 to 9223372036
 ZORBA_SET_TEST_PROPERTY(bin/zorba_timeout PASS_REGULAR_EXPRESSION ".*ZXQP0068.*")
 ZORBA_ADD_TEST(bin/zorba_max_call_depth zorbacmd --max-udf-call-depth 10 -q "let $f := function($f, $n) { if ($n le 0) then 0 else $f($f, $n - 1) } return $f($f, 20)")
 ZORBA_SET_TEST_PROPERTY(bin/zorba_max_call_depth PASS_REGULAR_EXPRESSION ".*ZXQP0069.*")
+
+# The option zorba-streaming-members, written as a literal in a parse that is
+# unboxed directly, reads the members one at a time; anything else goes through
+# the store as a whole.
+SET (_plandir "${CMAKE_CURRENT_SOURCE_DIR}/test")
+ZORBA_ADD_TEST(bin/zorba_plan_parse_default zorbacmd --print-iterator-tree -f -q "${_plandir}/plan_parse_members.jq")
+ZORBA_SET_TEST_PROPERTY(bin/zorba_plan_parse_default PASS_REGULAR_EXPRESSION "MultiArrayMembersIterator")
+ZORBA_SET_TEST_PROPERTY(bin/zorba_plan_parse_default FAIL_REGULAR_EXPRESSION "JSONParseMembersIterator")
+FOREACH (_opt 0 1 2)
+  ZORBA_ADD_TEST(bin/zorba_plan_parse_streaming_O${_opt} zorbacmd --optimization-level ${_opt} --print-iterator-tree -f -q "${_plandir}/plan_parse_streaming.jq")
+  ZORBA_SET_TEST_PROPERTY(bin/zorba_plan_parse_streaming_O${_opt} PASS_REGULAR_EXPRESSION "JSONParseMembersIterator")
+  ZORBA_SET_TEST_PROPERTY(bin/zorba_plan_parse_streaming_O${_opt} FAIL_REGULAR_EXPRESSION "MultiArrayMembersIterator")
+ENDFOREACH ()
+FOREACH (_q plan_parse_streaming_off plan_parse_streaming_dynamic plan_parse_streaming_strip plan_parse_array_var)
+  ZORBA_ADD_TEST(bin/zorba_${_q} zorbacmd --print-iterator-tree -f -q "${_plandir}/${_q}.jq")
+  ZORBA_SET_TEST_PROPERTY(bin/zorba_${_q} PASS_REGULAR_EXPRESSION "MultiArrayMembersIterator")
+  ZORBA_SET_TEST_PROPERTY(bin/zorba_${_q} FAIL_REGULAR_EXPRESSION "JSONParseMembersIterator")
+ENDFOREACH ()
+# With the option, file:read-text stays in the file only when nothing in the query
+# can write during the evaluation: the plan shows which (file-stream). These tests
+# run zorbacmd through plan_check.cmake, which also requires exit status 0, so a
+# query that crashes or fails after printing its plan fails the test. Arguments
+# are separated by "|".
+ZORBA_TARGET_LOCATION (_zorbacmd zorbacmd)
+MACRO (ZORBA_PLAN_TEST NAME PATTERN ARGS)
+  ADD_TEST ("${NAME}" "${CMAKE_COMMAND}" "-DZORBACMD=${_zorbacmd}" "-DARGS=${ARGS}"
+    "-DPATTERN=${PATTERN}" -P "${_plandir}/plan_check.cmake")
+ENDMACRO (ZORBA_PLAN_TEST)
+SET (_planfile "|-e|f:=${_plandir}/plan_members.json")
+# At O0 the text of these queries is held in memory too, as before this check:
+# the tests that expect the file stream run at O1 and O2.
+FOREACH (_opt 1 2)
+  ZORBA_PLAN_TEST (bin/zorba_plan_parse_file_O${_opt} "JSONParseMembersIterator[^>]*file-stream=.true."
+    "--optimization-level|${_opt}|--print-iterator-tree|-f|-q|${_plandir}/plan_parse_file.jq${_planfile}")
+  # One query for each thing that makes the rule hold the text in memory.
+  FOREACH (_q update for_each eval udf seq_item)
+    ZORBA_PLAN_TEST (bin/zorba_plan_parse_file_${_q}_O${_opt} "JSONParseMembersIterator[^>]*file-stream=.false."
+      "--optimization-level|${_opt}|--print-iterator-tree|-f|-q|${_plandir}/plan_parse_file_${_q}.jq${_planfile}")
+  ENDFOREACH ()
+ENDFOREACH ()
+FOREACH (_opt 0 1 2)
+  ZORBA_PLAN_TEST (bin/zorba_plan_parse_file_dynamic_O${_opt} "JSONParseMembersIterator[^>]*file-stream=.false."
+    "--optimization-level|${_opt}|--print-iterator-tree|-f|-q|${_plandir}/plan_parse_file_dynamic.jq${_planfile}")
+  # p01-error-parity compares with and without the option: the side with it must
+  # reach JSONParseMembersIterator at every level.
+  ZORBA_PLAN_TEST (bin/zorba_plan_parity_O${_opt} "JSONParseMembersIterator"
+    "--optimization-level|${_opt}|--print-iterator-tree|-f|-q|${CMAKE_SOURCE_DIR}/test/rbkt/Queries/zorba/jsoniq-array-members/p01-error-parity.jq")
+ENDFOREACH ()
+ZORBA_ADD_TEST(bin/zorba_timeout_parse_members zorbacmd --timeout 1 -f -q "${_plandir}/timeout_parse_members.jq")
+ZORBA_SET_TEST_PROPERTY(bin/zorba_timeout_parse_members PASS_REGULAR_EXPRESSION ".*ZXQP0068.*")
 # --max-expr-depth sets the policy's expression nesting limit.
 ZORBA_ADD_TEST(bin/zorba_max_expr_depth zorbacmd --max-expr-depth 10 -q "((((((((((((1))))))))))))")
 ZORBA_SET_TEST_PROPERTY(bin/zorba_max_expr_depth PASS_REGULAR_EXPRESSION ".*ZXQP0070.*")
@@ -102,6 +152,38 @@ ZORBA_ADD_TEST(bin/zorba_hint_prefix zorbacmd -q "math:pi()")
 ZORBA_SET_TEST_PROPERTY(bin/zorba_hint_prefix PASS_REGULAR_EXPRESSION "XPST0081.*hint: .*import module namespace math")
 ZORBA_ADD_TEST(bin/zorba_hint_xml zorbacmd --print-errors-as-xml -q "let $x := 3 return $x-1")
 ZORBA_SET_TEST_PROPERTY(bin/zorba_hint_xml PASS_REGULAR_EXPRESSION "<hint>.*x - 1.*</hint>")
+# The hints come from the engine, so zorba prints them too.
+SET (_hintdir "${CMAKE_CURRENT_SOURCE_DIR}/test/language")
+ZORBA_ADD_TEST(bin/zorba_hint_context_item zorbacmd -f -q "${_hintdir}/hint_context_item.jq")
+ZORBA_SET_TEST_PROPERTY(bin/zorba_hint_context_item PASS_REGULAR_EXPRESSION "XPST0003.*hint: .*context item")
+ZORBA_ADD_TEST(bin/zorba_hint_string_escape zorbacmd -f -q "${_hintdir}/hint_string_escape.jq")
+ZORBA_SET_TEST_PROPERTY(bin/zorba_hint_string_escape PASS_REGULAR_EXPRESSION "XPST0003.*hint: .*starts an escape")
+ZORBA_ADD_TEST(bin/zorba_hint_math_function zorbacmd -f -q "${_hintdir}/hint_math_function.xq")
+ZORBA_SET_TEST_PROPERTY(bin/zorba_hint_math_function PASS_REGULAR_EXPRESSION "XPST0017.*hint: .*import module namespace math")
+# --disable-http-resolution denies the fetch, so this test needs no network.
+ZORBA_ADD_TEST(bin/zorba_hint_unknown_module zorbacmd --disable-http-resolution -f -q "${_hintdir}/hint_unknown_module.xq")
+ZORBA_SET_TEST_PROPERTY(bin/zorba_hint_unknown_module PASS_REGULAR_EXPRESSION "XQST0059.*hint: .*may hold no module")
+# The message of a failed cast shortens the value and keeps its own text. A
+# regression would write megabytes on one line, which ctest copies to the CI log:
+# the lines are cut before ctest reads them. The exit status of zorba, 31 for an
+# error while the query runs, is printed and checked too.
+IF (UNIX)
+  SET (_ten "abcdefghijabcdefghijabcdefghijabcdefghij")
+  SET (_short "FORG0001.*\"${_ten}…${_ten} \\(3000000 bytes\\)\": value of type xs:string is not castable to type xs:integer")
+  FOREACH (_t cast selector)
+    ADD_TEST (NAME bin/zorba_error_value_${_t}
+      COMMAND sh -c "out=$(mktemp) || exit 99; \"$0\" -f -q \"$1\" > \"$out\" 2>&1; status=$?; cut -c1-2000 \"$out\"; rm -f \"$out\"; echo \"zorba exit status: $status\"; exit $status"
+        "$<TARGET_FILE:zorbacmd>" "${_hintdir}/error_value_${_t}.jq")
+    SET_TESTS_PROPERTIES (bin/zorba_error_value_${_t} PROPERTIES
+      PASS_REGULAR_EXPRESSION "${_short}.*zorba exit status: 31\n"
+      FAIL_REGULAR_EXPRESSION "${_ten}abcdefghij")
+  ENDFOREACH (_t)
+ENDIF (UNIX)
+# A failed fetch (of the loopback, which refuses it) whose URI names the capability
+# is not a denied fetch.
+ZORBA_ADD_TEST(bin/zorba_no_hint_capability_uri zorbacmd -f -q "${_hintdir}/capability_uri.xq")
+ZORBA_SET_TEST_PROPERTY(bin/zorba_no_hint_capability_uri PASS_REGULAR_EXPRESSION "XQST0059")
+ZORBA_SET_TEST_PROPERTY(bin/zorba_no_hint_capability_uri FAIL_REGULAR_EXPRESSION "hint:")
 ZORBA_ADD_TEST(bin/zorba_hint_none zorbacmd -q "nosuchfunction(1)")
 ZORBA_SET_TEST_PROPERTY(bin/zorba_hint_none PASS_REGULAR_EXPRESSION "XPST0017")
 ZORBA_SET_TEST_PROPERTY(bin/zorba_hint_none FAIL_REGULAR_EXPRESSION "hint:")
@@ -450,15 +532,34 @@ IF (ZORBA_WITH_FILE_ACCESS)
     # Scripted JSON-RPC exchanges against the directory module's fixture
     # tree (see mcp/test/mcp_tests.cpp); "binary" runs zorba-mcp itself.
     SET (_mcpq "${CMAKE_CURRENT_SOURCE_DIR}/test/mcp/queries")
+    # x:canonicalize is in the xml module, which needs XML Schema.
+    SET (_mcp_xml_tests)
+    IF (NOT ZORBA_NO_XMLSCHEMA)
+      SET (_mcp_xml_tests error_canonicalize_input)
+    ENDIF (NOT ZORBA_NO_XMLSCHEMA)
     FOREACH (_t json protocol legacy tools_list list_documents join
              syntax_error escape network native_modules predefined limits binary windows
              optional_params documents_stream hints_jsoniq hints_dash
+             hints_dash_forms hints_context_item hints_array_key
+             hints_unknown_module hints_math_function hints_string_escape
+             query_primer hints_document_value primer_json_content
+             xml_namespace_message error_value_bound error_value_chars
+             error_names_whole error_user_description error_message_limit
+             error_query_line error_help ${_mcp_xml_tests}
+             error_cached_denial
              hints_nodes hints_names deep_json deep_json_binary
              entity_expansion case_paths html_edge_cases memory_limit language
              language_binary no_write read_functions native_import reflection_random
              cache_hit cache_invalidate cache_evict cache_off cache_policy
              cache_inject cache_size cache_default cache_abort cache_errors
-             cache_expansion cache_counters)
+             cache_expansion cache_counters cache_slack_size cache_slack_slots
+             cache_slack_many cache_same_file cache_root_spelling
+             cache_replace cache_turnover cache_invalidate_loop
+             cache_refused_loop cache_session_binary cache_same_output
+             cache_change_detect cache_change_during_read cache_change_at_once
+             cache_error_identical cache_xdm cache_xdm_properties
+             cache_no_effects cache_updates_bypass cache_timeout_state
+             cache_full_tracker cache_far_times)
       ADD_TEST (NAME bin/mcp/${_t}
         COMMAND "mcp_tests${_mcp_suffix}" ${_t} "${_dirtree}" "${_mcpq}"
           "${_dirq}/join.xq" "$<TARGET_FILE:zorba_mcp${_mcp_suffix}>")
@@ -471,7 +572,7 @@ IF (ZORBA_WITH_FILE_ACCESS)
     ADD_TEST (NAME bin/mcp/language_help
       COMMAND "$<TARGET_FILE:zorba_mcp${_mcp_suffix}>" --help)
     SET_TESTS_PROPERTIES (bin/mcp/language_help PROPERTIES
-      PASS_REGULAR_EXPRESSION "A [.]jq\n *file is JSONiq unless it declares xquery version;\n *[.]xq files are not loaded.*in this order: [(]1[)] a jsoniq\n *version or xquery version declaration at the very\n *start of the query [(]one preceded by a comment is\n *not detected[)]; [(]2[)] for a file, its extension [(][.]jq\n *is JSONiq[)]; [(]3[)] this option")
+      PASS_REGULAR_EXPRESSION "A [.]jq\n *file is JSONiq unless it declares xquery version;\n *[.]xq files are not loaded.*in this order: [(]1[)] a jsoniq\n *version or xquery version declaration at the very\n *start of the query [(]one preceded by a comment is\n *not detected[)]; [(]2[)] for a file, its extension [(][.]jq\n *is JSONiq[)]; [(]3[)] this option[.] jsoniq also\n *puts a JSONiq primer in the run_query description,\n *and a pointer to it in the server instructions")
 
     # A --language value other than xquery and jsoniq is refused.
     ADD_TEST (NAME bin/mcp/language_invalid
@@ -489,7 +590,7 @@ IF (ZORBA_WITH_FILE_ACCESS)
              scan_memory_stress scan_memory_option scan_thread_limit
              scan_thread_failure
              scan_no_scan scan_handshake scan_shutdown scan_binary scan_stress
-             scan_description)
+             scan_description scan_compact_listing scan_corpus_listing)
       ADD_TEST (NAME bin/mcp/${_t}
         COMMAND "mcp_scan_tests${_mcp_suffix}" ${_t}
           "$<TARGET_FILE:zorba_mcp${_mcp_suffix}>")

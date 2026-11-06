@@ -91,6 +91,7 @@ SET(UNIT_TESTS_SRCS
   collection.cpp
   test_audit.cpp
   streamable_string.cpp
+  serializer_bom.cpp
   main_sequential.cpp
   context_item.cpp
   datetime.cpp

@@ -61,7 +61,7 @@ void LoadSchemaErrorHandler::error(const XERCES_CPP_NAMESPACE::SAXParseException
       e.getColumnNumber(),
       system_id,
       public_id,
-      StrX( e.getMessage() ).localFormOrDefault( "" )
+      ERROR_TEXT( StrX( e.getMessage() ).localFormOrDefault( "" ) )
     ),
     ERROR_LOC( theQueryLoc )
   );

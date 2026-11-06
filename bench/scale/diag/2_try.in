@@ -1,0 +1,1 @@
+try { parse-json(file:read-text($dir:root || "/data.jsonl")) } catch * { () }

@@ -81,11 +81,11 @@ static xs_integer idiv_to_integer( QueryLoc const *loc, F &&f )
   }
   catch (std::range_error const& e)
   {
-    throw XQUERY_EXCEPTION(err::FOAR0002, ERROR_PARAMS(e.what()), ERROR_LOC(loc));
+    throw XQUERY_EXCEPTION(err::FOAR0002, ERROR_PARAMS(ERROR_TEXT( e.what() )), ERROR_LOC(loc));
   }
   catch (std::invalid_argument const& e)   // the quotient overflowed to INF
   {
-    throw XQUERY_EXCEPTION(err::FOAR0002, ERROR_PARAMS(e.what()), ERROR_LOC(loc));
+    throw XQUERY_EXCEPTION(err::FOAR0002, ERROR_PARAMS(ERROR_TEXT( e.what() )), ERROR_LOC(loc));
   }
 }
 
@@ -876,8 +876,8 @@ bool NumArithIterator<Operation>::computeAtomic(
 
     RAISE_ERROR(err::XPTY0004, aLoc,
     ERROR_PARAMS(ZED(ArithOpNotDefinedBetween_23),
-                 type0->toSchemaString(),
-                 type1->toSchemaString()));
+                 ERROR_TEXT( type0->toSchemaString() ),
+                 ERROR_TEXT( type1->toSchemaString() )));
   }
   }
 
@@ -1066,7 +1066,7 @@ bool OpNumericUnaryIterator::nextImpl(store::Item_t& result, PlanState& planStat
     {
       xqtref_t type = tm->create_value_type(item);
       RAISE_ERROR(err::XPTY0004, loc,
-      ERROR_PARAMS(ZED(BadTypeFor_23), type->toSchemaString(), ZED(UnaryArithOp)));
+      ERROR_PARAMS(ZED(BadTypeFor_23), ERROR_TEXT( type->toSchemaString() ), ZED(UnaryArithOp)));
     }
     
     STACK_PUSH(true, state);

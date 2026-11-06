@@ -214,7 +214,7 @@ FOREACH(TESTFILE ${TESTFILES})
     # (regex-backref-casefold).
     FILE(READ "${CMAKE_CURRENT_SOURCE_DIR}/${TESTFILE}" _icu_query_text)
     IF (_icu_query_text MATCHES "ISO-8859-|CP1252|windows-125"
-        OR TESTNAME MATCHES "^test/rbkt/zorba/(file/(cp1252|invalid_encoding)|string/Regex/(regex_m5[45]|regex_err2[01]|regex_q10|regex-xsd-syntax|regex-backref-casefold)|string/ReplaceFunc/replace(17|19|20)|functx/functx-x-call|durationdatetime/FormatDateTimeFunc/format-timezone-table|string/LowerCaseFunc/lower-case-final-sigma)$")
+        OR TESTNAME MATCHES "^test/rbkt/zorba/(bom/(utf16-mark|utf16-signature|utf16-first-char|read-twice-transcoded|lines-decode-error-fn|lines-decode-error-file)|file/(cp1252|invalid_encoding)|string/Regex/(regex_m5[45]|regex_err2[01]|regex_q10|regex-xsd-syntax|regex-backref-casefold)|string/ReplaceFunc/replace(17|19|20)|functx/functx-x-call|durationdatetime/FormatDateTimeFunc/format-timezone-table|string/LowerCaseFunc/lower-case-final-sigma)$")
       SET (SKIP_TEST 1)
     ENDIF ()
   ENDIF (ZORBA_NO_ICU)
@@ -255,10 +255,10 @@ FOREACH(TESTFILE ${TESTFILES})
   IF(NOT SKIP_TEST)
 
     ZORBA_ADD_TEST("${TESTNAME}" testdriver ${TESTFILE})
-    # The window tests and the tests of dynamic function calls must give the
+    # The window, array member and dynamic function call tests must give the
     # same results at every optimization level (the testdriver reads
     # ZORBA_OPTLEVEL; the default is O1).
-    IF (TESTNAME MATCHES "^test/rbkt/zorba/(jsoniq-windows|dynamic-calls)/")
+    IF (TESTNAME MATCHES "^test/rbkt/zorba/(jsoniq-windows|jsoniq-array-members|dynamic-calls)/")
       FOREACH (_optlevel O0 O2)
         ZORBA_ADD_TEST("${TESTNAME}-${_optlevel}" testdriver ${TESTFILE})
         SET_TESTS_PROPERTIES ("${TESTNAME}-${_optlevel}" PROPERTIES

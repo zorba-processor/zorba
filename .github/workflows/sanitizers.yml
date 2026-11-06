@@ -4,7 +4,8 @@ name: Sanitizers
 # latest-toolchain builder), and the thread-safety tests under ThreadSanitizer
 # (TSan cannot be combined with ASan, so it is a separate build).
 # It does not gate PRs (it does not run on them), but a run fails when any
-# test fails under the sanitizers, so failures cannot hide behind the summary.
+# test fails under the sanitizers or UBSan reports a UB site, so failures cannot
+# hide behind the summary.
 on:
   workflow_dispatch:
     inputs:
@@ -88,7 +89,8 @@ jobs:
           # UBSan reports are only in the test output (see the script).
           python3 scripts/summarize_sanitizer_logs.py \
             build/asan/sanitizer-logs /src 60 --junit build/asan/junit.xml \
-            | tee -a "$GITHUB_STEP_SUMMARY"
+            > "$RUNNER_TEMP/asan-summary.md"
+          tee -a "$GITHUB_STEP_SUMMARY" < "$RUNNER_TEMP/asan-summary.md"
 
       - uses: actions/upload-artifact@v7
         if: always()
@@ -98,6 +100,23 @@ jobs:
             build/asan/sanitizer-logs
             build/asan/ctest.log
             build/asan/junit.xml
+
+      # UBSan runs in recover mode, so a report does not fail its test. Any
+      # UB site in the summary fails the job; a summary without the count
+      # fails it too. Runs after the upload so the logs are always kept.
+      - name: Fail on undefined behavior
+        if: always()
+        run: |
+          ub=$(sed -n 's/.* \([0-9][0-9]*\) UB sites .*/\1/p' "$RUNNER_TEMP/asan-summary.md" | head -n 1)
+          if [ -z "$ub" ]; then
+            echo "::error::No UB site count in the sanitizer summary"
+            exit 1
+          fi
+          if [ "$ub" -ne 0 ]; then
+            echo "::error::UBSan reported undefined behavior at $ub site(s); see the Summarize step"
+            exit 1
+          fi
+          echo "UBSan: 0 UB sites"
 
   # ThreadSanitizer on the multithreaded tests (test/libunit/mapm_threads runs
   # concurrent decimal and integer arithmetic) plus a few existing tests, in

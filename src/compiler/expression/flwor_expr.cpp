@@ -187,7 +187,7 @@ forlet_clause::forlet_clause(
           if (TypeOps::is_equal(tm, *varType, *rtm.NONE_TYPE, loc))
           {
             RAISE_ERROR(err::XPTY0004, loc,
-            ERROR_PARAMS(ZED(BadType_23o), *domainType, ZED(NoTreatAs_4), *declaredType));
+            ERROR_PARAMS(ZED(BadType_23o), ERROR_TEXT( *domainType ), ZED(NoTreatAs_4), ERROR_TEXT( *declaredType )));
           }
 
           domainExpr = theCCB->theEM->

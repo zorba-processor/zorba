@@ -2840,7 +2840,7 @@ bool begin_visit(name_cast_expr& v)
 
   throw XQUERY_EXCEPTION(
     err::XPTY0004,
-    ERROR_PARAMS( ZED( BadType_23o ), *targetType ),
+    ERROR_PARAMS( ZED( BadType_23o ), ERROR_TEXT( *targetType ) ),
     ERROR_LOC( qloc )
   );
 }

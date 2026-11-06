@@ -165,6 +165,47 @@ zstring JSONParseIterator::getNameAsString() const {
 // </JSONParseIterator>
 
 
+// <JSONParseMembersIterator>
+SERIALIZABLE_CLASS_VERSIONS(JSONParseMembersIterator)
+
+void JSONParseMembersIterator::serialize(::zorba::serialization::Archiver& ar)
+{
+  serialize_baseclass(ar,
+  (NaryBaseIterator<JSONParseMembersIterator, JSONParseMembersIteratorState>*)this);
+
+    ar & theRelativeLocation;
+    ar & theStreamIsPrivate;
+    ar & theAllowMultiple;
+}
+
+
+void JSONParseMembersIterator::accept(PlanIterVisitor& v) const
+{
+  if (!v.hasToVisit(this))
+    return;
+
+  v.beginVisit(*this);
+
+  std::vector<PlanIter_t>::const_iterator lIter = theChildren.begin();
+  std::vector<PlanIter_t>::const_iterator lEnd = theChildren.end();
+  for ( ; lIter != lEnd; ++lIter ){
+    (*lIter)->accept(v);
+  }
+
+  v.endVisit(*this);
+}
+
+JSONParseMembersIterator::~JSONParseMembersIterator() {}
+
+JSONParseMembersIteratorState::JSONParseMembersIteratorState() {}
+
+
+zstring JSONParseMembersIterator::getNameAsString() const {
+  return "JSONParseMembersIterator";
+}
+// </JSONParseMembersIterator>
+
+
 // <MultiObjectKeysIterator>
 SERIALIZABLE_CLASS_VERSIONS(MultiObjectKeysIterator)
 

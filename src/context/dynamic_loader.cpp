@@ -144,7 +144,7 @@ DynamicLoader::loadModule(const zstring& aFile) const
   handle = dlopen(aFile.c_str(), RTLD_NOW);
   if (!handle)
     throw ZORBA_EXCEPTION(
-      zerr::ZOSE0005_DLL_LOAD_FAILED, ERROR_PARAMS( aFile, zstring(dlerror()) )
+      zerr::ZOSE0005_DLL_LOAD_FAILED, ERROR_PARAMS( aFile, ERROR_TEXT( zstring(dlerror()) ) )
     );
 
   theLibraries[aFile] = handle;
@@ -164,7 +164,7 @@ DynamicLoader::createModule(handle_t handle, const zstring& aFile) const
     dlclose(handle);
     throw ZORBA_EXCEPTION(
           zerr::ZAPI0015_CREATEMODULE_NOT_FOUND,
-          ERROR_PARAMS( aFile, dlerror() )
+          ERROR_PARAMS( aFile, ERROR_TEXT( dlerror() ) )
           );
   }
   return createModuleFunction();

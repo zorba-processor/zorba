@@ -169,13 +169,15 @@ declare function jn:parse-json($j as string?) as json-item* external;
  : <ul>
  :   <li>jsoniq-multiple-top-level-items: allow parsing of sequences of JSON Objects and Arrays (boolean; default: true)</li>
  :   <li>jsoniq-strip-top-level-array: if the top-level JSON item is an array, strip it and return its elements as multiple top-level items (boolean; default: false)</li>
+ :   <li>zorba-streaming-members: when the result is unboxed directly, as in <code>parse-json($j, $o)[]</code>, return the members of each top-level array one at a time instead of building the array (boolean; default: false). Each top-level array is parsed twice: the first time to check it, so that the errors and their order are the ones without the option, and the second time to return its members. A top-level value that is not an array is parsed once. The first parse does not hold the members. The text stays in the file, which is then read twice, only when the first argument is a call of <code>file:read-text</code> with no encoding argument or with the literal <code>"UTF-8"</code>, and nothing in the query, or in a function it calls, can write while it runs: no sequential expression, no update, no dynamic function call, no eval or invoke, no call of a function that takes a function as argument, and no function item of a sequential or updating function. This holds for the query that compiles the call and for the query that runs it (a function declared in a loaded prolog, or a function item made by another query). The check trusts the declarations: an external function that writes but is not declared sequential is not seen. At optimization level O0, the text of <code>file:read-text</code> called with one argument is held in memory. Another spelling of the encoding, an encoding given by a variable or any other expression, or any other first argument holds the text in memory. If the file changes in place between the two parses, the members returned, or an error raised, follow the new content, and the line and column of such an error may not match the content. It takes effect only when the options are an object written in the call whose values are all literals, and it has no effect with jsoniq-strip-top-level-array set to true or on a result that is not unboxed directly.</li>
  : </ul>
  :
  : @error jerr:JNDY0021 if the given string is not valid JSON or
  :   if jsoniq-multiple-top-level-items is false and there is additional
  :   content after the first JSON Object or Array.
  : @error jerr:JNTY0020 if the value for the option
- :   jsoniq-multiple-top-level-items is not of type boolean.
+ :   jsoniq-multiple-top-level-items, jsoniq-strip-top-level-array or
+ :   zorba-streaming-members is not of type boolean.
  :
  : @return a sequence of JSON Object or Array item.
  :)

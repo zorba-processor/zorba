@@ -1123,7 +1123,7 @@ extern entry const dict_en[] = {
   { "~libxml_2", "out of memory${: 9}" },
   { "~libxml_20", "PE reference in epilog" },
   { "~libxml_200", "${\"5\": }invalid namespace or prefix" },
-  { "~libxml_201", "${\"5\": }namespace prefix${ for \"7?6\"}${ on \"7?7:6\"} not defined" },
+  { "~libxml_201", "${\"5\": }namespace prefix${ for \"6\"}${ on \"7\"} not defined" },
   { "~libxml_202", "\"$5${:6}\": invalid XML QName" },
   { "~libxml_203", "\"$5\": attribute in namespace \"$6\" redefined" },
   { "~libxml_204", "empty namespace for prefix \"$5\"" },

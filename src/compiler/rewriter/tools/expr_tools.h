@@ -62,6 +62,10 @@ bool function_runs_opaque_code(const function* f);
 // of a simple expr whatever it calls. User functions are followed into their bodies.
 bool may_run_side_effects(const expr* root);
 
+// may_run_side_effects(), or "root" can update, or it holds a function item of a
+// sequential or updating function (or of one the compiler does not know).
+bool may_run_side_effects_or_updates(const expr* root);
+
 // What a dynamic function call can do in this query, by what is reachable from the
 // query body (CompilerCB::CallEffects). It sets CompilerCB::theCallEffects, so that it
 // is one walk over the query. To be called before the optimizer runs.

@@ -255,11 +255,14 @@ parsenode_t XQueryCompiler::parse(std::istream& aXQuery, const zstring& aFileNam
   {
     ParseErrorNode* pen = static_cast<ParseErrorNode *>(&*node);
     XQueryException e(XQUERY_EXCEPTION_VAR(pen->err,
-    ERROR_PARAMS(pen->msg), ERROR_LOC(pen->get_location())));
+    ERROR_PARAMS(ERROR_TEXT( pen->msg )), ERROR_LOC(pen->get_location())));
     e.set_hint(query_hints::syntax_error(xquery_stream.str(),
                                          pen->get_location().getLineBegin(),
                                          pen->get_location().getColumnBegin(),
-                                         lXQueryMode).c_str());
+                                         pen->get_location().getLineEnd(),
+                                         pen->get_location().getColumnEnd(),
+                                         lXQueryMode,
+                                         pen->msg.str()).c_str());
     throw e;
   }
 
@@ -280,7 +283,7 @@ ModuleInfo* XQueryCompiler::parseInfo(
   {
     ParseErrorNode* pen = static_cast<ParseErrorNode *>(lParseNode.getp());
     throw XQUERY_EXCEPTION_VAR(pen->err, 
-    ERROR_PARAMS(pen->msg), ERROR_LOC(pen->get_location()));
+    ERROR_PARAMS(ERROR_TEXT( pen->msg )), ERROR_LOC(pen->get_location()));
   }
 
   LibraryModule* lLibModule = dynamic_cast<LibraryModule*>(lParseNode.getp());
@@ -351,6 +354,10 @@ PlanIter_t XQueryCompiler::compile(
   theCompilerCB->theMayRunSideEffects =
     theCompilerCB->theOuterMayRunSideEffects ||
     expr_tools::may_run_side_effects(rootExpr);
+
+  theCompilerCB->theMayRunSideEffectsOrUpdates =
+    theCompilerCB->theMayRunSideEffects ||
+    expr_tools::may_run_side_effects_or_updates(rootExpr);
 
   return codegen(rootExpr, nextDynamicVarId, auditRecord);
 }

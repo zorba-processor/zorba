@@ -35,7 +35,7 @@ namespace zorba {
 void fxcharheap::ioexception( string const& msg ) const {
   throw ZORBA_EXCEPTION(
     zerr::ZXQP0013_FXCHARHEAP_EXCEPTION,
-    ERROR_PARAMS( msg, os_error::get_err_string() )
+    ERROR_PARAMS( ERROR_TEXT( msg ), ERROR_TEXT( os_error::get_err_string() ) )
   );
 }
 

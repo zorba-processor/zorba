@@ -97,9 +97,8 @@ public:
    * @param s The null-terminated C string to parse.  Leading and trailing
    * whitespace is ignored.
    * @throw std::invalid_argument if \a s does not contain a valid floating
-   * point number.
-   * @throw std::range_error if \a s contains a number that either underflows
-   * or overflows the smallest or largest representable floating point number.
+   * point number.  A number out of range is not an error: it becomes INF, -INF
+   * or zero.
    */
   explicit FloatImpl( char const *s );
 
@@ -109,9 +108,8 @@ public:
    * @tparam StringType The string type.
    * @param s The string to parse.  Leading and trailing whitespace is ignored.
    * @throw std::invalid_argument if \a s does not contain a valid floating
-   * point number.
-   * @throw std::range_error if \a s contains a number that either underflows
-   * or overflows the smallest or largest representable floating point number.
+   * point number.  A number out of range is not an error: it becomes INF, -INF
+   * or zero.
    */
   template<class StringType>
   explicit FloatImpl( StringType const &s,

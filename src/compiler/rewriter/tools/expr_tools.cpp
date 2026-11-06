@@ -901,8 +901,12 @@ bool function_runs_opaque_code(const function* f)
 
 static bool may_run_side_effects_rec(
     const expr* e,
-    std::set<const function*>& visitedUdfs)
+    std::set<const function*>& visitedUdfs,
+    bool withUpdates)
 {
+  if (withUpdates && e->is_updating())
+    return true;
+
   CompilerCB* ccb = const_cast<expr*>(e)->get_ccb();
 
   // Nothing with a side effect is reachable (classify_calls): a call has none.
@@ -936,9 +940,23 @@ static bool may_run_side_effects_rec(
     {
       const expr* body = static_cast<const user_function*>(f)->getBody();
 
-      if (body == NULL || may_run_side_effects_rec(body, visitedUdfs))
+      if (body == NULL || may_run_side_effects_rec(body, visitedUdfs, withUpdates))
         return true;
     }
+
+    break;
+  }
+
+  case function_item_expr_kind:
+  {
+    if (!withUpdates)
+      break;
+
+    // A function item can be called where the compiler does not see it.
+    const function* f = static_cast<const function_item_expr*>(e)->get_function();
+
+    if (f == NULL || f->isSequential() || f->isUpdating())
+      return true;
 
     break;
   }
@@ -952,7 +970,7 @@ static bool may_run_side_effects_rec(
   {
     const expr* child = iter.get_expr();
 
-    if (child != NULL && may_run_side_effects_rec(child, visitedUdfs))
+    if (child != NULL && may_run_side_effects_rec(child, visitedUdfs, withUpdates))
       return true;
 
     iter.next();
@@ -966,7 +984,15 @@ bool may_run_side_effects(const expr* root)
 {
   std::set<const function*> visitedUdfs;
 
-  return may_run_side_effects_rec(root, visitedUdfs);
+  return may_run_side_effects_rec(root, visitedUdfs, false);
+}
+
+
+bool may_run_side_effects_or_updates(const expr* root)
+{
+  std::set<const function*> visitedUdfs;
+
+  return may_run_side_effects_rec(root, visitedUdfs, true);
 }
 
 

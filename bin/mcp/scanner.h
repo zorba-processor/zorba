@@ -107,7 +107,9 @@ public:
    * Answers one list_documents call: arguments \c path, \c limit and
    * \c refresh. The first line is an object with the member \c scan
    * (the status) and either \c total, \c shown, maybe \c incomplete and \c dirs, followed
-   * by a line per file, or a file's members with \c preview, or \c error.
+   * by a line per file (path, format, size and the top-level \c fields, nothing
+   * nested), or a file's members with \c preview (the whole preview), or
+   * \c error.
    *
    * @param args the arguments of the call.
    * @param max_output the maximum size of the answer, in bytes (the first

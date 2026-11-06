@@ -34,10 +34,15 @@ namespace query_hints {
  * @param query The text of the module being parsed.
  * @param line The 1-based line of the error.
  * @param column The 1-based column (in bytes) of the error.
+ * @param line_end The 1-based line of the end of the error.
+ * @param column_end The 1-based column (in bytes) of the end of the error.
  * @param xquery_grammar Whether the module is parsed as XQuery, not JSONiq.
+ * @param message The message of the parser.
  */
 std::string syntax_error( std::string const &query, unsigned long line,
-                          unsigned long column, bool xquery_grammar );
+                          unsigned long column, unsigned long line_end,
+                          unsigned long column_end, bool xquery_grammar,
+                          std::string const &message );
 
 /**
  * The hint of an unprefixed call in XQuery of a function that exists without
@@ -65,7 +70,8 @@ std::string other_arity( std::string const &name,
  * The hint of a variable that is undeclared because "-" is part of its name.
  *
  * @param left The name of the variable in scope, without "$".
- * @param right What follows the "-" in the name; may be empty.
+ * @param right What follows the "-" in the name. Empty or only "-" means the
+ * operand is not known: the hint gives the form to continue from.
  */
 std::string dash_in_variable( std::string const &left,
                               std::string const &right );
@@ -76,9 +82,39 @@ std::string undeclared_prefix( std::string const &prefix );
 /**
  * The hint of a selector that is not an integer, on an array.
  *
- * @param key The selector.
+ * @param key The selector if the query has it literally, else a placeholder:
+ * a value computed at run time may hold the text of a document.
+ * @param jsoniq Whether the query is JSONiq, which has $x[].
  */
-std::string key_on_array( std::string const &key );
+std::string key_on_array( std::string const &key, bool jsoniq );
+
+/**
+ * The hint of a module import that found no module.
+ *
+ * @param uri The namespace of the module.
+ * @param fetch_denied Whether the security policy denied a network fetch.
+ */
+std::string unknown_module( std::string const &uri, bool fetch_denied );
+
+/**
+ * Whether a namespace is a math module, or a misspelling of one seen in practice:
+ * the W3C namespace or the Zorba module, under http or https, with or without
+ * "www.", and the old Zorba namespace. Any other URI that ends in "/math" says
+ * nothing about these functions.
+ */
+bool is_math_uri( std::string const &uri );
+
+/**
+ * The hint of a call, in another math namespace, of a function of the W3C math
+ * namespace.
+ *
+ * @param local The local name of the function.
+ * @param prefix_bound Whether the prefix "math" is bound to that namespace.
+ * @param prefix_taken Whether the prefix "math" is bound to another namespace,
+ * so that importing that namespace under this prefix would be another error.
+ */
+std::string math_function( std::string const &local, bool prefix_bound,
+                           bool prefix_taken );
 
 /**
  * The hint of a path whose left side is not a node.

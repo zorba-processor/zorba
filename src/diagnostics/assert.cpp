@@ -60,7 +60,8 @@ static void print_stack_trace( ostream &o ) {
     file, 
     line, 
     zerr::ZXQP0002_ASSERT_FAILED, 
-    ( msg ? ERROR_PARAMS( condition, msg ) : ERROR_PARAMS( condition ) )
+    ( msg ? ERROR_PARAMS( ERROR_TEXT( condition ), ERROR_TEXT( msg ) ) :
+            ERROR_PARAMS( ERROR_TEXT( condition ) ) )
   );
 }
 

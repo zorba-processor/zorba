@@ -202,6 +202,68 @@ public:
  * 
  * Author: 
  */
+class JSONParseMembersIteratorState : public PlanIteratorState
+{
+public:
+  store::Item_t theInput; //holds the stream
+  std::istream* theStream; //
+  std::istream* theOwnedStream; //
+  json::loader* theScanner; //checks a top-level value
+  json::loader* theLoader; //returns its members
+  bool theGotOne; //
+
+  JSONParseMembersIteratorState();
+
+  ~JSONParseMembersIteratorState();
+
+  void init(PlanState&);
+  void reset(PlanState&);
+};
+
+class JSONParseMembersIterator : public NaryBaseIterator<JSONParseMembersIterator, JSONParseMembersIteratorState>
+{ 
+protected:
+  QueryLoc theRelativeLocation; //
+  bool theStreamIsPrivate; //the stream of the input has no other reader
+  bool theAllowMultiple; //
+public:
+  SERIALIZABLE_CLASS(JSONParseMembersIterator);
+
+  SERIALIZABLE_CLASS_CONSTRUCTOR2T(JSONParseMembersIterator,
+    NaryBaseIterator<JSONParseMembersIterator, JSONParseMembersIteratorState>);
+
+  void serialize( ::zorba::serialization::Archiver& ar);
+
+  JSONParseMembersIterator(
+    static_context* sctx,
+    const QueryLoc& loc,
+    std::vector<PlanIter_t>& children,
+    QueryLoc aRelativeLocation,
+    bool aStreamIsPrivate,
+    bool aAllowMultiple)
+    : 
+    NaryBaseIterator<JSONParseMembersIterator, JSONParseMembersIteratorState>(sctx, loc, children),
+    theRelativeLocation(aRelativeLocation),
+    theStreamIsPrivate(aStreamIsPrivate),
+    theAllowMultiple(aAllowMultiple)
+  {}
+
+  virtual ~JSONParseMembersIterator();
+
+  bool streamIsPrivate() const { return theStreamIsPrivate; }
+
+  zstring getNameAsString() const;
+
+  void accept(PlanIterVisitor& v) const;
+
+  bool nextImpl(store::Item_t& result, PlanState& aPlanState) const;
+};
+
+
+/**
+ * 
+ * Author: 
+ */
 class MultiObjectKeysIteratorState : public PlanIteratorState
 {
 public:
