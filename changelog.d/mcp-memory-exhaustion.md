@@ -19,5 +19,8 @@
   now keeps its old contents when a resize cannot allocate, and an erase no longer
   fails when the shrink after it cannot.
 - `zorba-mcp`: a line of input longer than the message limit is refused without
-  reading it into memory; a large stack limit no longer uses up `--max-memory` at the
-  start.
+  reading it into memory.
+- `zorba-mcp`: a notification is never answered, also when memory runs out while it
+  is handled; before, the answer had `"id": null`. A request whose id could not be
+  read for lack of memory, even when read once more, ends the server with status 3
+  instead of getting an answer its client could not match.

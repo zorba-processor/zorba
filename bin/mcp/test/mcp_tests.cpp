@@ -25,6 +25,7 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <climits>
 #include <csignal>
 #include <cstdint>
 #include <cstdio>
@@ -151,6 +152,39 @@ namespace {
 std::atomic<std::size_t> new_live{ 0 };
 std::atomic<std::size_t> new_budget{ 0 };  // 0: none
 
+// For the sweeps, with big_track: the blocks of at least big_size bytes allocated
+// since, with their stacks, while they live. What a failed call keeps is then
+// shown with where it was allocated. One thread at a time (a sweep child).
+std::size_t const big_size = 4096;
+struct BigBlock {
+  void *p;
+  std::size_t n;
+  int num_frames;
+  void *frames[24];
+};
+BigBlock big_blocks[32];
+bool big_track = false;
+
+void big_note( void *p, std::size_t n ) noexcept {
+  if ( !big_track || n < big_size )
+    return;
+  big_track = false;   // backtrace() must not come back here
+  for ( BigBlock &b : big_blocks )
+    if ( !b.p ) {
+      b.p = p;
+      b.n = n;
+      b.num_frames = backtrace( b.frames, 24 );
+      break;
+    }
+  big_track = true;
+}
+
+void big_forget( void *p ) noexcept {
+  for ( BigBlock &b : big_blocks )
+    if ( b.p == p )
+      b.p = nullptr;
+}
+
 void* budget_alloc( std::size_t n ) noexcept {
 # if defined(ZORBA_TEST_SANITIZER)
   if ( inject_fails() )
@@ -160,13 +194,17 @@ void* budget_alloc( std::size_t n ) noexcept {
   if ( budget && new_live.load( std::memory_order_relaxed ) + n > budget )
     return nullptr;
   void *const p = std::malloc( n ? n : 1 );
-  if ( p )
+  if ( p ) {
     new_live.fetch_add( malloc_usable_size( p ), std::memory_order_relaxed );
+    big_note( p, n );
+  }
   return p;
 }
 
 void budget_free( void *p ) noexcept {
   if ( p ) {
+    if ( big_track )
+      big_forget( p );
     new_live.fetch_sub( malloc_usable_size( p ), std::memory_order_relaxed );
     std::free( p );
   }
@@ -2380,7 +2418,7 @@ void sweep_write_frames( char const *tag, void *const *frames, int n ) {
 [[noreturn]] void sweep_report( char const *what, char const *detail,
                                 void *const *frames = nullptr, int n = 0 ) {
   inject_on = false;
-  sweep_write( "0 0 " );
+  sweep_write( "0 none " );   // nothing measured
   if ( std::strcmp( sweep_phase, "failing call" ) != 0 ) {
     sweep_write( sweep_failed );
     sweep_write( " | " );
@@ -2576,6 +2614,8 @@ long const sweep_kept_max = 64 * 1024;
 // Kept memory and the same call again are measured on at least this many points
 // of each run length (all of them when there are fewer).
 long const sweep_min_measured = 16;
+// The kept memory of a child that ended before it could measure.
+long const sweep_not_measured = LONG_MIN;
 
 void exhaust_sweep( Fixture const &f, std::string const &name, Sweep const &s ) {
 # if defined(ZORBA_TEST_SANITIZER)
@@ -2615,8 +2655,11 @@ void exhaust_sweep( Fixture const &f, std::string const &name, Sweep const &s ) 
   std::string const next( rq( 2, "1 + 1" ) );
   std::string const again( rq( 3, s.query ) );
 
+  // What the same call keeps with no failure: measured first.
+  long base_kept = 0;
+
   // The stacks a child sent with its outcome.
-  struct Stacks { std::string crash, alloc; };
+  struct Stacks { std::string crash, alloc; std::vector<std::string> big; };
 
   // What one run in a child gives; first == 0 counts the allocations. With
   // measure, the same call runs again, and what the run left behind is measured.
@@ -2646,7 +2689,10 @@ void exhaust_sweep( Fixture const &f, std::string const &name, Sweep const &s ) 
            on_exit( sweep_on_exit, nullptr ) != 0 )
         _exit( 1 );
       std::set_terminate( sweep_on_terminate );
+      for ( BigBlock &b : big_blocks )
+        b.p = nullptr;
       long const live0 = static_cast<long>( new_live.load() );
+      big_track = measure;
       long count = 0;
       std::string out( sweep_call( server, call, s, first, length, &count ) );
       std::replace( out.begin(), out.end(), '\n', ' ' );  // one line
@@ -2675,12 +2721,21 @@ void exhaust_sweep( Fixture const &f, std::string const &name, Sweep const &s ) 
           out += " | same call again: " + text_of( r );
         k = static_cast<long>( new_live.load() ) - live0;
       }
+      big_track = false;
       std::replace( out.begin(), out.end(), '\n', ' ' );
       std::string msg( std::to_string( count ) + " " + std::to_string( k ) + " " +
                        out );
       sweep_write( msg.data(), msg.size() );
       if ( inject_num_frames )
         sweep_write_frames( "alloc ", inject_frames, inject_num_frames );
+      // The big blocks the call left, if it kept memory.
+      if ( measure && k > base_kept + sweep_kept_noise )
+        for ( BigBlock const &b : big_blocks )
+          if ( b.p ) {
+            char tag[48];
+            if ( snprintf( tag, sizeof tag, "big %zu ", b.n ) > 0 )
+              sweep_write_frames( tag, b.frames, b.num_frames );
+          }
       _exit( 0 );
     }
     sweep_close( fd[1] );
@@ -2701,8 +2756,11 @@ void exhaust_sweep( Fixture const &f, std::string const &name, Sweep const &s ) 
     if ( !WIFEXITED( status ) || WEXITSTATUS( status ) != 0 )
       return "child status " + std::to_string( status );
     std::istringstream is( msg );
-    long c = 0, k = 0;
-    is >> c >> k;
+    long c = 0, k = sweep_not_measured;
+    std::string kept_text;
+    is >> c >> kept_text;
+    if ( kept_text != "none" )
+      k = std::stol( kept_text );
     std::string out;
     std::getline( is, out );
     std::string extra;
@@ -2711,6 +2769,8 @@ void exhaust_sweep( Fixture const &f, std::string const &name, Sweep const &s ) 
         stacks->crash = extra.substr( 6 );
       else if ( extra.rfind( "alloc ", 0 ) == 0 )
         stacks->alloc = extra.substr( 6 );
+      else if ( extra.rfind( "big ", 0 ) == 0 )
+        stacks->big.push_back( extra.substr( 4 ) );
     }
     if ( total )
       *total = c;
@@ -2719,7 +2779,7 @@ void exhaust_sweep( Fixture const &f, std::string const &name, Sweep const &s ) 
     return out.empty() ? out : out.substr( 1 );
   };
 
-  long total = 0, base_kept = 0;
+  long total = 0;
   std::string const plain( run_child( 0, 0, true, &total, &base_kept, nullptr ) );
   if ( s.needs_module && contains( plain, "XQST0059" ) ) {
     std::cout << name << ": the module is not in this build" << std::endl;
@@ -2739,17 +2799,37 @@ void exhaust_sweep( Fixture const &f, std::string const &name, Sweep const &s ) 
     long const every = tried < 2 * sweep_min_measured ? 1 : 2;
     std::map<std::string, std::pair<long, long> > outcomes;
     std::map<std::string, Stacks> stacks_of;
-    long sampled = 0, keeping = 0, max_kept = 0, i = 0;
+    long selected = 0, ended = 0, sampled = 0, keeping = 0, max_kept = 0, i = 0;
+    bool shown_kept = false;
     for ( long n = 1; n <= total; n += step, ++i ) {
       bool const measure = i % every == 0;
       long kept = 0;
       Stacks st;
       std::string out( run_child( n, length, measure, nullptr, &kept, &st ) );
       if ( measure ) {
-        ++sampled;
-        if ( kept > base_kept + sweep_kept_noise ) {
-          ++keeping;
-          max_kept = std::max( max_kept, kept - base_kept );
+        ++selected;
+        // A child that ended in a known limit (abort, exit) measured nothing.
+        if ( kept == sweep_not_measured ) {
+          ++ended;
+        } else {
+          ++sampled;
+          if ( kept > base_kept + sweep_kept_noise ) {
+            ++keeping;
+            max_kept = std::max( max_kept, kept - base_kept );
+            // Where the first of them allocated the big blocks it kept.
+            if ( !shown_kept ) {
+              shown_kept = true;
+              std::cout << name << ", " << length << " failing, at " << n
+                        << ": " << ( kept - base_kept ) << " bytes kept; "
+                        << st.big.size() << " blocks of " << big_size
+                        << " bytes or more" << std::endl;
+              for ( std::string const &b : st.big ) {
+                std::string::size_type const sp = b.find( ' ' );
+                sweep_show_frames( "  a block of " + b.substr( 0, sp ) + " bytes",
+                                   b.substr( sp + 1 ), true );
+              }
+            }
+          }
         }
       }
       auto &o = outcomes[out];
@@ -2760,11 +2840,11 @@ void exhaust_sweep( Fixture const &f, std::string const &name, Sweep const &s ) 
       ++o.first;
     }
     std::cout << name << ", " << length << " failing: of " << sampled
-              << " measured, " << keeping << " keep memory, at most " << max_kept
-              << " bytes" << std::endl;
-    check( sampled >= std::min( sweep_min_measured, tried ),
+              << " measured (" << ended << " more ended first), " << keeping
+              << " keep memory, at most " << max_kept << " bytes" << std::endl;
+    check( selected >= std::min( sweep_min_measured, tried ),
            name + ": enough points measured",
-           std::to_string( sampled ) + " of " + std::to_string( tried ) );
+           std::to_string( selected ) + " selected of " + std::to_string( tried ) );
     check( keeping <= std::max( 2L, sampled / 10 ),
            name + ": failed calls give their memory back",
            std::to_string( keeping ) + " of " + std::to_string( sampled ) );

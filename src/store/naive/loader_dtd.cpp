@@ -609,7 +609,6 @@ void FragmentXmlLoader::recordOutOfMemory(void *ctx) noexcept
     if (fs->current_loader)
       static_cast<FragmentXmlLoader*>(fs->current_loader)->setOutOfMemory();
   xmlStopParser(static_cast<xmlParserCtxtPtr>(ctx));
-  xmlStopParser(static_cast<xmlParserCtxtPtr>(ctx));
 }
 
 

@@ -115,7 +115,7 @@ public:
     answer,   // an error response with current_id()
     end       // end the process: the request's id could not be read
   };
-  AfterFailure after_failure() const { return AfterFailure::answer; }
+  AfterFailure after_failure() const;
 
   /** The policy every query runs under. */
   SecurityPolicy const& policy() const { return thePolicy; }
@@ -157,6 +157,8 @@ private:
   StaticContext_t new_static_context( std::string const &file_name ) const;
 
   std::string handle_message( std::string const &message, Json *request_id );
+  // Sets theCurrentKind, and the id of a request.
+  void identify( Json const &msg, Json *request_id );
   void load_predefined();
   bool load_predefined( std::string const &path, std::string const &name );
 
@@ -175,6 +177,14 @@ private:
   DocumentCache theCache;
   std::string theLegacyVersion;         // set by initialize
   std::string theCurrentId{ "null" };   // see current_id()
+  enum class MessageKind {
+    unknown,       // not read yet
+    notification,  // no id: never answered
+    request,       // theCurrentId is its id
+    without_id,    // answered with id null (unreadable, or an invalid id)
+    id_lost        // memory ran out while its id was read
+  };
+  MessageKind theCurrentKind = MessageKind::unknown;
   std::unique_ptr<Scanner> theScanner;  // null with --no-scan
 };
 

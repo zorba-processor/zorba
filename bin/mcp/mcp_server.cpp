@@ -829,39 +829,95 @@ Json Server::call_tool( Json const &params, bool *protocol_error,
 std::string Server::handle( std::string const &message ) {
   Json request_id;
   theCurrentId = "null";
+  theCurrentKind = MessageKind::unknown;
   try {
     return handle_message( message, &request_id );
   }
   catch ( std::exception const &e ) {
     // Whatever it was (out of memory, most likely), the next request may work.
+    // If it came before or while the id was read, the message is read once more
+    // for it:
+    // the memory of the first attempt is back by now.
+    if ( theCurrentKind == MessageKind::unknown ||
+         theCurrentKind == MessageKind::id_lost ) {
+      try {
+        Json msg;
+        std::string why;
+        if ( message.size() <= max_message_size &&
+             parse_json( message, &msg, &why ) && msg.is_object() )
+          identify( msg, &request_id );
+        else
+          theCurrentKind = MessageKind::without_id;
+      }
+      catch ( std::bad_alloc const& ) {
+        theCurrentKind = MessageKind::id_lost;
+      }
+    }
+    if ( theCurrentKind == MessageKind::notification )
+      return std::string();
+    if ( theCurrentKind == MessageKind::id_lost )
+      throw std::bad_alloc();   // main() ends the process: see after_failure()
     return error_response( request_id, INTERNAL_ERROR,
       std::string( "Internal error: " ) + e.what() ).dump();
   }
 }
 
+void Server::identify( Json const &msg, Json *request_id ) {
+  Json const *const id = msg.find( "id" );
+  if ( !id ) {
+    // A notification, or a response from the client: never answered.
+    theCurrentKind = MessageKind::notification;
+    return;
+  }
+  if ( !id->is_string() && !id->is_integer() ) {
+    theCurrentKind = MessageKind::without_id;
+    return;
+  }
+  theCurrentKind = MessageKind::id_lost;   // until the id is copied
+  *request_id = *id;
+  theCurrentId = id->dump();
+  theCurrentKind = MessageKind::request;
+}
+
+Server::AfterFailure Server::after_failure() const {
+  switch ( theCurrentKind ) {
+    case MessageKind::notification:
+      return AfterFailure::nothing;
+    case MessageKind::request:
+    case MessageKind::without_id:
+      return AfterFailure::answer;
+    case MessageKind::unknown:
+    case MessageKind::id_lost:
+      break;
+  }
+  return AfterFailure::end;
+}
+
 std::string Server::handle_message( std::string const &message,
                                     Json *request_id ) {
   Json const null_id;
-  if ( message.size() > max_message_size )
+  if ( message.size() > max_message_size ) {
+    theCurrentKind = MessageKind::without_id;
     return error_response( null_id, INVALID_REQUEST,
                            "Invalid Request: message too large" ).dump();
+  }
 
   Json msg;
   std::string why;
-  if ( !parse_json( message, &msg, &why ) )
+  if ( !parse_json( message, &msg, &why ) ) {
+    theCurrentKind = MessageKind::without_id;
     return error_response( null_id, PARSE_ERROR, "Parse error: " + why ).dump();
-  if ( !msg.is_object() )
+  }
+  if ( !msg.is_object() ) {
+    theCurrentKind = MessageKind::without_id;
     return error_response( null_id, INVALID_REQUEST,
       "Invalid Request: expected a JSON-RPC object (batches are not "
       "supported)" ).dump();
+  }
 
+  identify( msg, request_id );
   Json const *const id = msg.find( "id" );
   Json const *const method = msg.find( "method" );
-  if ( id && ( id->is_string() || id->is_integer() ) )
-  {
-    *request_id = *id;
-    theCurrentId = id->dump();
-  }
   if ( !method ) {
     // A response from the client (we send no requests): nothing to answer.
     if ( !id || msg.find( "result" ) || msg.find( "error" ) )
