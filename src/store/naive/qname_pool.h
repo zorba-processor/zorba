@@ -116,6 +116,11 @@ public:
 
   ~QNamePool();
 
+  // The bytes of the hash table (its capacity in entries times their size), for
+  // tests that measure the memory a call leaves: see
+  // zorba_test_qname_table_bytes().
+  std::size_t tableBytes() const;
+
   void insert(
       store::Item_t& res,
       const char* ns,

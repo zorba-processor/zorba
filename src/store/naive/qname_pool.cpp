@@ -606,3 +606,23 @@ QNamePool::QNHashEntry* QNamePool::hashFind(
 } // namespace zorba
 
 /* vim:set et sw=2 ts=2: */
+
+namespace zorba { namespace simplestore {
+
+std::size_t QNamePool::tableBytes() const
+{
+  return theHashSet.theHashTab.capacity() * sizeof(QNHashEntry);
+}
+
+} // namespace simplestore
+} // namespace zorba
+
+/*******************************************************************************
+  A test hook: the bytes of the QName pool's hash table. Its size follows the
+  number of names it holds, cached ones included, by halving and doubling, so a
+  test that compares the memory two calls leave behind subtracts it.
+********************************************************************************/
+extern "C" ZORBA_DLL_PUBLIC std::size_t zorba_test_qname_table_bytes()
+{
+  return GET_STORE().getQNamePool().tableBytes();
+}
