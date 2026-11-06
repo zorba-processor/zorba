@@ -105,7 +105,7 @@ jobs:
           if [ -n "$QC_TESTS" ]; then
             docker network create zorba-test
             docker run -d --name zorba-http-test --network zorba-test zorba-http-test:ci
-            net="--network zorba-test"
+            net=zorba-test
           fi
           # SYS_PTRACE and seccomp=unconfined: LeakSanitizer needs ptrace.
           docker run --rm --network "$net" \
