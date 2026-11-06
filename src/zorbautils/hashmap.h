@@ -18,6 +18,7 @@
 
 #include <cassert>
 #include <cstddef>
+#include <new>
 #include <vector>
 
 #include <zorba/config.h>
@@ -1003,10 +1004,7 @@ void eraseEntry(HashEntry<K, V>* entry, HashEntry<K, V>* preventry)
 
     --theNumEntries;
 
-    if (theNumEntries < theMaxLoad / 2)
-    {
-      resizeHashTab(theNumBuckets / 2);
-    }
+    shrinkHashTab();
 
   }
   else
@@ -1018,9 +1016,26 @@ void eraseEntry(HashEntry<K, V>* entry, HashEntry<K, V>* preventry)
 
     --theNumEntries;
 
-    if (theNumEntries < theMaxLoad / 2)
+    shrinkHashTab();
+  }
+}
+
+
+/*******************************************************************************
+  After an erase: halve the table if it is less than half as full as it may be.
+  The erase is done either way. Shrinking only saves memory, so a failed
+  allocation leaves the table as it is, whole, instead of failing the erase.
+********************************************************************************/
+void shrinkHashTab()
+{
+  if (theNumEntries < theMaxLoad / 2)
+  {
+    try
     {
       resizeHashTab(theNumBuckets / 2);
+    }
+    catch (std::bad_alloc const&)
+    {
     }
   }
 }
@@ -1168,9 +1183,34 @@ void resizeHashTab(csize newSize)
   hash_tab_type oldTab(newcap);
   theHashTab.swap(oldTab);
 
+  csize const oldNumBuckets = theNumBuckets;
+  double const oldMaxLoad = theMaxLoad;
+
   theNumBuckets = newSize;
   theMaxLoad = theNumBuckets * theLoadFactor;
 
+  // The rehash only reads the old table. If it cannot allocate (extending the
+  // collision area), the old table comes back whole: otherwise the entries not
+  // yet moved would be lost, and a lookup would no longer find them.
+  try
+  {
+    rehashFrom(oldTab, oldcap);
+  }
+  catch (...)
+  {
+    theHashTab.swap(oldTab);
+    theNumBuckets = oldNumBuckets;
+    theMaxLoad = oldMaxLoad;
+    throw;
+  }
+}
+
+
+/*******************************************************************************
+  Part of resizeHashTab(): put every entry of oldTab in the (new) theHashTab.
+********************************************************************************/
+void rehashFrom(hash_tab_type& oldTab, csize oldcap)
+{
   formatCollisionArea();
 
   HashEntry<K, V>* entry;
