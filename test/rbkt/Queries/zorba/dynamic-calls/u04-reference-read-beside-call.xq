@@ -10,5 +10,5 @@ declare variable $f := local:set#1;
 ddl:create(xs:QName("e:foo"));
 iddl:create(xs:QName("e:by-id"));
 dml:insert(xs:QName("e:foo"), (<a id="1"/>, <a id="2"/>, <a id="3"/>));
-variable $ns := dml:collection(xs:QName("e:foo"));
+variable $ns as element(a)* := dml:collection(xs:QName("e:foo"));
 for $i in 1 to 3 return ($f($ns[$i]), count($ns[ref:has-reference(.)]))
