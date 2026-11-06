@@ -5,11 +5,12 @@
   moved to the use of its `let` variable or removed, although the function was
   sequential or nondeterministic or created nodes. In a query where something with
   a side effect is reachable, such a call now stays where it is written unless the
-  optimizer can prove the function deterministic and free of side effects, and
-  nothing is hoisted out of a loop in the query body or function body that has
-  such a call. This is a known limit: such a body loses all hoisting, also of
-  expressions the call cannot change. In a body without such a call, an expression
-  that reads a state such a call can change stays in its loop. In a query with no
+  optimizer can prove the function deterministic and free of side effects, and if
+  the query has such a call anywhere, nothing is hoisted out of a loop anywhere in
+  the query and no index join is made. This is a known limit: such a query loses
+  hoisting everywhere, also of expressions the call cannot change. In a query whose
+  calls through function items are all proven, an expression that reads a state
+  such a call can change stays in its loop. `ref:reference` counts as a side effect. In a query with no
   side effect, a call is only kept from being evaluated once for several
   iterations if a nondeterministic function or a constructor is reachable, and
   other expressions are hoisted as before.

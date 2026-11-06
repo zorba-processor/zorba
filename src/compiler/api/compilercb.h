@@ -296,6 +296,13 @@ ZORBA_DLL_PUBLIC void query_resources_fail_walk(unsigned long edge);
   expr_tools::classify_calls(). Until then, and in an eval query, it can have effects.
   Compile time only: not serialized.
 
+  theNoHoisting :
+  ---------------
+  Set by expr_tools::classify_calls(): CALLS_HAVE_EFFECTS, and a call that the
+  compiler cannot prove free of side effects is reachable somewhere in the query.
+  Then no body of the query is hoisted, and no index join is made. True until
+  then. Compile time only: not serialized.
+
   theHasEval :
   ------------
   True if there is an eval expr within the compilation unit covered by this CCB.
@@ -461,6 +468,8 @@ public:
   FunctionPurityMap         theFunctionPurity[2];
 
   CallEffects               theCallEffects = CALLS_HAVE_EFFECTS;
+
+  bool                      theNoHoisting = true;
 
   bool                      theHaveTimeout;
 

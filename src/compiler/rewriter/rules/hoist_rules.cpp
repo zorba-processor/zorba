@@ -22,6 +22,7 @@
 #include "functions/udf.h"
 
 #include "compiler/rewriter/rules/hoist_rules.h"
+#include "compiler/api/compilercb.h"
 #include "compiler/expression/flwor_expr.h"
 #include "compiler/expression/expr.h"
 #include "compiler/expression/expr_iter.h"
@@ -102,6 +103,18 @@ expr* HoistRule::apply(
 {
   assert(node == rCtx.getRoot());
 
+  CompilerCB* ccb = rCtx.getCompilerCB();
+
+  // A call that can have a side effect can change what any expr reads, a path
+  // expression or a lookup included, and lazy evaluation interleaves a body with
+  // the code that consumes its result: nothing is hoisted anywhere in a query
+  // with such a call (CompilerCB::theNoHoisting).
+  if (ccb->theNoHoisting)
+  {
+    modified = false;
+    return node;
+  }
+
   csize numVars = 0;
   theVarIdMap.clear();
   theExprVarsMap.clear();
@@ -120,16 +133,10 @@ expr* HoistRule::apply(
   DynamicBitset freeset(numVars+1);
   expr_tools::build_expr_to_vars_map(node, theVarIdMap, freeset, theExprVarsMap);
 
-  // A call that can have a side effect can change what any expr next to it reads, a
-  // path expression or a lookup included. Nothing is hoisted in a body (the query
-  // body, or the body of a function) that has such a call.
-  if (expr_tools::calls_unproven_function(node))
-  {
-    modified = false;
-    return node;
-  }
-
-  theHasUnprovenCalls = expr_tools::call_results_can_differ(node);
+  // With CALLS_HAVE_EFFECTS and no such call anywhere, no call here can differ.
+  theHasUnprovenCalls =
+      ccb->theCallEffects == CompilerCB::CALLS_RESULTS_CAN_DIFFER &&
+      expr_tools::call_results_can_differ(node);
 
   PathHolder root;
   modified = hoistChildren(rCtx, node, &root);
@@ -557,8 +564,7 @@ expr* HoistRule::hoistExpr(
 {
   // A call that can give a different result per call runs per tuple: an expr that
   // contains one stays. So does an expr that reads a state a call with a side effect
-  // can change, since lazy evaluation can interleave it with such a call outside of
-  // this body. A body with such a call hoists nothing (see apply()).
+  // can change. A query with such a call hoists nothing (see apply()).
   if (non_hoistable(e) ||
       e->constructsNodes() ||
       (theHasUnprovenCalls && expr_tools::call_results_can_differ(e)) ||

@@ -68,11 +68,6 @@ protected:
   expr_tools::IdVarMap     * theIdVarMap;
   expr_tools::ExprVarsMap  * theExprVarsMap;
 
-  // The outermost expr checked by isIndexJoinPredicate() in this pass over the
-  // tree, and the answer, so that it is walked once per pass and not per predicate.
-  const expr               * theCheckedOuterExpr;
-  bool                       theOuterCallsUnproven;
-
 public:
   IndexJoinRule(RewriterContext* rctx);
 

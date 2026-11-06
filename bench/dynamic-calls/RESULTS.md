@@ -56,13 +56,14 @@ FLWOR expressions.
 
 The tables above are for `4875e63da`. Later commits changed which hoisting is allowed
 beside a call that can have a side effect, and the final rule is the conservative one: in
-a query where something with a side effect is reachable, a query body or function body
-that contains a call the compiler cannot prove free of side effects hoists nothing. Such a
-call can update a node or JSON item that a path or a lookup next to it reads, and finer
-rules that keep hoisting next to it rely on the store rejecting, in the modify clause of a
+a query where something with a side effect is reachable and a call the compiler cannot
+prove free of side effects appears anywhere, no body hoists anything and no index join is
+made. Such a call can update a node or JSON item that a path or a lookup reads, also in a
+function whose result it consumes lazily, and finer rules that keep hoisting next to it rely on the store rejecting, in the modify clause of a
 transform, every update that does not target a copy (XUDY0014, XUDY0037), which it does
-not do yet. In a body without such a call, an expression that reads a state the call can
-change stays in its loop, and other expressions are hoisted. A query with no side effect
+not do yet. In a query whose calls through function items are all proven, an expression
+that reads a state such a call can change stays in its loop, and other expressions are
+hoisted. A query with no side effect
 is not affected.
 
 Measured with `bench.yml` in suite mode (`bench/compare.sh`), run 42223320339, 2026-11-06:

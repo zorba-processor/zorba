@@ -72,9 +72,7 @@ IndexJoinRule::IndexJoinRule(RewriterContext* rctx)
   :
   RewriteRule(RewriteRule::IndexJoin, "IndexJoin"),
   theRCtx(rctx),
-  theRootExpr(rctx->getRoot()),
-  theCheckedOuterExpr(NULL),
-  theOuterCallsUnproven(false)
+  theRootExpr(rctx->getRoot())
 {
   theVarIdMap = new expr_tools::VarIdMap;
   theIdVarMap = new expr_tools::IdVarMap;
@@ -137,10 +135,6 @@ expr* IndexJoinRule::apply(RewriterContext& rCtx, expr* node, bool& modified)
 {
   assert(node != theRootExpr || theVarDefExprs.empty());
   assert(node != theRootExpr || theChildPositions.empty());
-
-  // A new pass: a join in the previous one may have changed the tree.
-  if (theVarDefExprs.empty())
-    theCheckedOuterExpr = NULL;
 
   flwor_expr* flworExpr = NULL;
 
@@ -386,15 +380,11 @@ expr* IndexJoinRule::apply(RewriterContext& rCtx, expr* node, bool& modified)
 ********************************************************************************/
 bool IndexJoinRule::isIndexJoinPredicate(PredicateInfo& predInfo)
 {
-  // The join would move the evaluation of the predicate and of the domain of the
-  // inner var, and a call in the outermost expr can change what they read.
-  if (theCheckedOuterExpr != theVarDefExprs[0])
-  {
-    theCheckedOuterExpr = theVarDefExprs[0];
-    theOuterCallsUnproven = expr_tools::calls_unproven_function(theVarDefExprs[0]);
-  }
-
-  if (theOuterCallsUnproven)
+  // The join would evaluate the domain of the inner var and the predicate once,
+  // ahead of the tuples, and a call that can have a side effect, in this body or
+  // in the code that consumes its result lazily, can change what they read
+  // (CompilerCB::theNoHoisting).
+  if (theRCtx->getCompilerCB()->theNoHoisting)
     return false;
 
   const fo_expr* foExpr = NULL;

@@ -1660,6 +1660,9 @@ void ClosedWorldWalk::walkBuiltin(const fo_expr* fo)
   case FunctionConsts::FN_ZORBA_EVAL_N_1:
   case FunctionConsts::FN_ZORBA_EVAL_U_1:
   case FunctionConsts::FN_ZORBA_EVAL_S_1:
+  // It gives a node a reference, which ref:has-reference reads, but it is declared
+  // neither sequential nor nondeterministic.
+  case FunctionConsts::FN_REFERENCE_REFERENCE_1:
     opaque();
     break;
   case FunctionConsts::FN_TRACE_2:
@@ -1807,7 +1810,10 @@ class BindingSequenceWalk
   std::set<const var_expr*>       theVars;
 
 public:
-  explicit BindingSequenceWalk(CompilerCB* ccb) : theCCB(ccb) {}
+  // Whether the walk found an unproven call.
+  bool                            theFoundCall;
+
+  explicit BindingSequenceWalk(CompilerCB* ccb) : theCCB(ccb), theFoundCall(false) {}
 
   bool walk(expr* e);
 
@@ -1865,12 +1871,14 @@ bool BindingSequenceWalk::walk(expr* e)
   {
   case dynamic_function_invocation_expr_kind:
     found = is_unproven_call(e);
+    theFoundCall = theFoundCall || found;
     break;
 
   case fo_expr_kind:
   {
     const function* f = static_cast<const fo_expr*>(e)->get_func();
     found = is_unproven_call(e);
+    theFoundCall = theFoundCall || found;
     walkFunction(f);
     break;
   }
@@ -2011,6 +2019,12 @@ void classify_calls(expr* root)
 
     for (csize j = 0; j < functions.size(); ++j)
       w.walkFunction(functions[j]);
+
+    ccb->theNoHoisting = w.theFoundCall;
+  }
+  else
+  {
+    ccb->theNoHoisting = false;
   }
 }
 
