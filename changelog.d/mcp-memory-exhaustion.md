@@ -39,3 +39,6 @@
 - Running out of memory while a query object was created, while an expression was
   recorded for the compiler, or while an XML document was loaded (an element not
   yet on the loader's stack, or a load that an exception left) left memory behind.
+- `zorba-mcp`: a query whose output could not be collected for lack of memory was
+  answered with the part collected so far and a note that the output was
+  truncated; it now gets the tool error `memory_limit`.

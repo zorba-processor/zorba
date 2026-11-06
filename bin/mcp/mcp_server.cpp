@@ -140,9 +140,11 @@ protected:
     if ( n <= 0 )
       return 0;
     std::size_t const len = static_cast<std::size_t>( n );
-    theTotal += len;
+    // Counted after the append: an append that cannot allocate is not output
+    // beyond the limit (and std::bad_alloc reaches the caller, see run()).
     if ( theData.size() < theCap )
       theData.append( s, std::min( len, theCap - theData.size() ) );
+    theTotal += len;
     return n;
   }
 
@@ -681,6 +683,9 @@ Server::run( std::string const &source, std::string const &file_name,
     if ( theConfig.before_execute )
       theConfig.before_execute();
     std::ostream out( &buf );
+    // An exception from the buffer (std::bad_alloc) goes through the stream to
+    // here, instead of a bad stream and a shorter output reported as truncated.
+    out.exceptions( std::ios::badbit );
     query->execute( out, &opts );
     query->close();
 
