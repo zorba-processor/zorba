@@ -2722,7 +2722,12 @@ void test_sweep_builtins( Fixture const &f ) {
   s.expected = "41";
   s.lenient = true;
   s.points = 100000;                // all of them
-  s.known = { "exit 2", "signal 6 in libstdc", "terminate N11xercesc" };
+  // As in the sweep of the compilation; and, at every allocation, SIGSEGV after a
+  // failure in xquery_driver::parse_stream (once in 2654, arm64), not established
+  // but where the parser reads parse nodes it freed after a failure (see the limits
+  // in bin/mcp/README.md).
+  s.known = { "exit 2", "signal 6 in libstdc", "terminate N11xercesc",
+              "signal 11 in libzorba_simplestore" };
   s.compiles = true;
   s.probes = {
     { "string-join((\"a\", \"b\"), \"-\")", "\"a-b\"" },
