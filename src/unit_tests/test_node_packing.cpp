@@ -25,6 +25,7 @@
 
 #include <algorithm>
 #include <iostream>
+#include <new>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -190,6 +191,68 @@ void test_sizes() {
   CHECK_SIZE( InternalNode::NodeVector, 24 );
 }
 
+void ok( bool cond, char const *what ) {
+  if ( !cond ) {
+    ++failures;
+    cerr << "FAILED: " << what << endl;
+  }
+}
+
+// A ContentReader whose copy throws its first `fails` times, as when memory
+// runs out while an iterator copies the contents of a node or array.
+class TestReader : public ContentReader {
+public:
+  int fails = 0;
+  int copies = 0;
+
+  explicit TestReader( void const *key ) { startReading( key ); }
+  ~TestReader() { stopReading(); }
+
+  bool reading() const { return isReading(); }
+
+protected:
+  void copyContent() {
+    if ( fails > 0 ) {
+      --fails;
+      throw std::bad_alloc();
+    }
+    ++copies;
+  }
+};
+
+// A change whose copy fails changes nothing and leaves the failing reader
+// registered; the readers that copied before it are unregistered once.
+void test_reader_failure() {
+  Vec v;
+  v.push_back( cells + 0 );
+  TestReader failing( &v );
+  TestReader first( &v );   // registered last, notified first
+  failing.fails = 1;
+
+  bool threw = false;
+  try {
+    v.push_back( cells + 1 );
+  }
+  catch ( std::bad_alloc const& ) {
+    threw = true;
+  }
+  ok( threw, "a failing copy leaves push_back with the exception" );
+  expect( v, "0", "contents after a failing copy" );
+  ok( failing.reading(), "the failing reader is still registered" );
+  ok( !first.reading() && first.copies == 1,
+      "the reader notified before the failure copied once" );
+
+  v.push_back( cells + 1 );
+  expect( v, "0 1", "contents after the copy succeeds" );
+  ok( !failing.reading() && failing.copies == 1,
+      "the failing reader copied once and left the list" );
+  ok( first.copies == 1, "the other reader is not notified again" );
+
+  TestReader again( &v );
+  v.erase( v.begin() );
+  ok( !again.reading() && again.copies == 1, "erase notifies the reader" );
+}
+
 } // namespace
 
 namespace zorba {
@@ -199,6 +262,7 @@ int test_node_packing( int, char*[] ) {
   failures = 0;
   test_sizes();
   test_vector();
+  test_reader_failure();
   cout << ( failures ? "FAILED" : "passed" ) << endl;
   return failures ? 1 : 0;
 }

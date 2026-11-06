@@ -393,6 +393,7 @@ bool SimpleJSONObject::add(
     const store::Item_t& aValue,
     bool accumulate)
 {
+  ContentReader::contentWillChange(&thePairs);
   ASSERT_INVARIANT();
   zstring lBuf;
   zstring const &lName = keyString(aName.getp(), lBuf);
@@ -468,6 +469,7 @@ bool SimpleJSONObject::add(
 *******************************************************************************/
 store::Item_t SimpleJSONObject::remove(const store::Item_t& aName)
 {
+  ContentReader::contentWillChange(&thePairs);
   ASSERT_INVARIANT();
 
   zstring lBuf;
@@ -533,6 +535,7 @@ store::Item_t SimpleJSONObject::setValue(
     const store::Item_t& aName,
     const store::Item_t& aValue)
 {
+  ContentReader::contentWillChange(&thePairs);
   ASSERT_INVARIANT();
   zstring lBuf;
   zstring const &lName = keyString(aName.getp(), lBuf);
@@ -588,6 +591,7 @@ bool SimpleJSONObject::rename(
     const store::Item_t& aName,
     const store::Item_t& aNewName)
 {
+  ContentReader::contentWillChange(&thePairs);
   ASSERT_INVARIANT();
   zstring lBuf, lNewBuf;
   zstring const &lName = keyString(aName.getp(), lBuf);
@@ -630,8 +634,10 @@ bool SimpleJSONObject::rename(
 *******************************************************************************/
 void SimpleJSONObject::swap(store::Item* anotherItem)
 {
+  ContentReader::contentWillChange(&thePairs);
   SimpleJSONObject* lOther = dynamic_cast<SimpleJSONObject*>(anotherItem);
   assert(lOther);
+  ContentReader::contentWillChange(&lOther->thePairs);
   std::swap(theKeys, lOther->theKeys);
   std::swap(thePairs, lOther->thePairs);
   std::swap(theHeight, lOther->theHeight);
@@ -874,6 +880,7 @@ zstring SimpleJSONObject::show() const
 *******************************************************************************/
 SimpleJSONObject::KeyIterator::~KeyIterator() 
 {
+  stopReading();
 }
 
 
@@ -882,7 +889,23 @@ SimpleJSONObject::KeyIterator::~KeyIterator()
 *******************************************************************************/
 void SimpleJSONObject::KeyIterator::open()
 {
-  theIter = theObject->thePairs.begin();
+  theCopy.clear();
+  startReading(&theObject->thePairs);
+  thePos = 0;
+  theSize = theObject->thePairs.size();
+}
+
+
+/******************************************************************************
+
+*******************************************************************************/
+void SimpleJSONObject::KeyIterator::copyContent()
+{
+  std::vector<store::Item_t> keys;
+  keys.reserve(theSize);
+  for (size_type i = 0; i < theSize; ++i)
+    keys.push_back(theObject->thePairs[i].first);
+  theCopy.swap(keys);
 }
 
 
@@ -891,16 +914,19 @@ void SimpleJSONObject::KeyIterator::open()
 *******************************************************************************/
 bool SimpleJSONObject::KeyIterator::next(store::Item_t& res)
 {
-  if (theIter != theObject->thePairs.end())
+  if (thePos == theSize)
   {
-    res = theIter->first;
-    ++theIter;
-    return true;
-  }
-  else
-  {
+    theCopy.clear();  // reset() reads the object again
     return false;
   }
+
+  if (isReading())
+    res = theObject->thePairs[thePos].first;
+  else
+    res = theCopy[thePos];
+
+  ++thePos;
+  return true;
 }
 
 
@@ -918,7 +944,9 @@ void SimpleJSONObject::KeyIterator::reset()
 *******************************************************************************/
 void SimpleJSONObject::KeyIterator::close()
 {
-  theIter = theObject->thePairs.end();
+  stopReading();
+  theCopy.clear();
+  thePos = theSize = 0;
 }
 
 
@@ -983,6 +1011,7 @@ size_t SimpleJSONArray::dynamic_size() const
 *******************************************************************************/
 void SimpleJSONArray::push_back(const store::Item_t& aValue)
 {
+  ContentReader::contentWillChange(&theContent);
   ASSERT_INVARIANT();
 
   addHeightOf(aValue.getp());
@@ -1007,6 +1036,7 @@ void SimpleJSONArray::push_back(const store::Item_t& aValue)
 *******************************************************************************/
 void SimpleJSONArray::push_back(const std::vector<store::Item_t>& members)
 {
+  ContentReader::contentWillChange(&theContent);
   ASSERT_INVARIANT();
   theContent.reserve(theContent.size() + members.size());
   add(theContent.size(), members);
@@ -1019,6 +1049,7 @@ void SimpleJSONArray::push_back(const std::vector<store::Item_t>& members)
 *******************************************************************************/
 void SimpleJSONArray::push_front(const std::vector<store::Item_t>& members)
 {
+  ContentReader::contentWillChange(&theContent);
   ASSERT_INVARIANT();
   theContent.reserve(theContent.size() + members.size());
   add(0, members);
@@ -1033,6 +1064,7 @@ void SimpleJSONArray::insert_before(
     const xs_integer& pos,
     const store::Item_t& member)
 {
+  ContentReader::contentWillChange(&theContent);
   ASSERT_INVARIANT();
 
   addHeightOf(member.getp());
@@ -1061,6 +1093,7 @@ void SimpleJSONArray::insert_before(
     const xs_integer& aPos,
     const std::vector<store::Item_t>& members)
 {
+  ContentReader::contentWillChange(&theContent);
   ASSERT_INVARIANT();
   // need to reserve at the beginning because reserve invalidates
   // existing iterators
@@ -1079,6 +1112,7 @@ void SimpleJSONArray::insert_after(
     const xs_integer& aPos,
     const std::vector<store::Item_t>& members)
 {
+  ContentReader::contentWillChange(&theContent);
   ASSERT_INVARIANT();
   // need to reserve at the beginning because reserve invalidates
   // existing iterators
@@ -1096,6 +1130,7 @@ void SimpleJSONArray::add(
     uint64_t aTargetPos,
     const std::vector<store::Item_t>& aNewMembers)
 {
+  ContentReader::contentWillChange(&theContent);
   ASSERT_INVARIANT();
 
   // Before anything changes.
@@ -1129,6 +1164,7 @@ void SimpleJSONArray::add(
 *******************************************************************************/
 store::Item_t SimpleJSONArray::remove(const xs_integer& aPos)
 {
+  ContentReader::contentWillChange(&theContent);
   ASSERT_INVARIANT();
   store::Item_t lItem = getArrayValue(aPos);
 
@@ -1159,8 +1195,10 @@ store::Item_t SimpleJSONArray::remove(const xs_integer& aPos)
 *******************************************************************************/
 void SimpleJSONArray::swap(store::Item* anotherItem)
 {
+  ContentReader::contentWillChange(&theContent);
   SimpleJSONArray* lOther = dynamic_cast<SimpleJSONArray*>(anotherItem);
   assert(lOther);
+  ContentReader::contentWillChange(&lOther->theContent);
   std::swap(theContent, lOther->theContent);
   std::swap(theHeight, lOther->theHeight);
   setCollectionTreeInfo(theCollectionInfo);
@@ -1174,6 +1212,7 @@ store::Item_t SimpleJSONArray::replace(
     const xs_integer& aPos,
     const store::Item_t& value)
 {
+  ContentReader::contentWillChange(&theContent);
   ASSERT_INVARIANT();
   store::Item_t lItem = getArrayValue(aPos);
 
@@ -1487,6 +1526,7 @@ zstring SimpleJSONArray::show() const
 *******************************************************************************/
 SimpleJSONArray::ValuesIterator::~ValuesIterator() 
 {
+  stopReading();
 }
 
 
@@ -1495,7 +1535,21 @@ SimpleJSONArray::ValuesIterator::~ValuesIterator()
 *******************************************************************************/
 void SimpleJSONArray::ValuesIterator::open()
 {
-  theIter = theArray->theContent.begin();
+  theCopy.clear();
+  startReading(&theArray->theContent);
+  thePos = 0;
+  theSize = theArray->theContent.size();
+}
+
+
+/******************************************************************************
+
+*******************************************************************************/
+void SimpleJSONArray::ValuesIterator::copyContent()
+{
+  std::vector<store::Item_t> members(theArray->theContent.begin(),
+                                     theArray->theContent.begin() + theSize);
+  theCopy.swap(members);
 }
 
 
@@ -1504,16 +1558,19 @@ void SimpleJSONArray::ValuesIterator::open()
 *******************************************************************************/
 bool SimpleJSONArray::ValuesIterator::next(store::Item_t& res)
 {
-  if (theIter != theArray->theContent.end())
+  if (thePos == theSize)
   {
-    res = *theIter;
-    ++theIter;
-    return true;
-  }
-  else
-  {
+    theCopy.clear();  // reset() reads the array again
     return false;
   }
+
+  if (isReading())
+    res = theArray->theContent[thePos];
+  else
+    res = theCopy[thePos];
+
+  ++thePos;
+  return true;
 }
 
 
@@ -1531,7 +1588,9 @@ void SimpleJSONArray::ValuesIterator::reset()
 *******************************************************************************/
 void SimpleJSONArray::ValuesIterator::close()
 {
-  theIter = theArray->theContent.end();
+  stopReading();
+  theCopy.clear();
+  thePos = theSize = 0;
 }
 
 
