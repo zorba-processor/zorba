@@ -1,0 +1,142 @@
+name: Quick check
+
+# A fast loop for test-first work: one configuration, build, and only the
+# tests you name. It is dispatched by hand and is NOT part of the CI gate: it
+# never replaces ci.yml, is not a required check, and the final push of a
+# pull request still needs the full CI.
+#
+#   gh workflow run quick-check.yml --ref <branch> \
+#     -f tests='^test/rbkt/Queries/zorba/fn/' [-f asan=true] [-f preset=full-release]
+#   gh run watch <run-id> --interval 60 --exit-status
+#
+# Allowed on a branch with an open pull request (a separate concurrency
+# group from ci.yml, so it does not cancel or queue behind CI). The file
+# must be on the default branch before it can be dispatched.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tests:
+        description: 'ctest -R regex of the tests to run (empty: build only)'
+        type: string
+        default: ''
+      preset:
+        description: 'CMake preset (full-release is the linux-amd64 job of ci.yml)'
+        type: choice
+        options: [full-release, full-debug, full-nopch, bigint, embedded, embedded-noicu]
+        default: full-release
+      asan:
+        description: 'Build with the asan preset instead of preset (sanitizer check of the selected tests)'
+        type: boolean
+        default: false
+      ctest_args:
+        description: 'Extra ctest arguments, e.g. "--repeat until-fail:3"'
+        type: string
+        default: ''
+      test_timeout:
+        description: 'Seconds per test (ctest --timeout)'
+        type: string
+        default: '300'
+      save_cache:
+        description: 'Save this run''s ccache for later quick checks of this branch (uses repository cache quota)'
+        type: boolean
+        default: false
+
+concurrency:
+  group: quick-check-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  quick-check:
+    name: quick check (${{ inputs.asan && 'asan' || inputs.preset }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      # Inputs reach the shell only through the environment, never by
+      # interpolation into script text.
+      QC_PRESET: ${{ inputs.asan && 'asan' || inputs.preset }}
+      QC_TESTS: ${{ inputs.tests }}
+      QC_CTEST_ARGS: ${{ inputs.ctest_args }}
+      QC_TIMEOUT: ${{ inputs.test_timeout }}
+    steps:
+      - uses: actions/checkout@v7
+
+      # Same builder image and toolchain as the linux-amd64 job of ci.yml.
+      - name: Builder image
+        uses: ./.github/actions/builder-image
+        with:
+          context: docker/builder-latest
+          cache-scope: linux-amd64-latest
+
+      # Only needed by tests; same gha cache scope as ci.yml (read-only here).
+      - uses: docker/setup-buildx-action@v4
+        if: inputs.tests != ''
+
+      - name: Build the HTTP test server image
+        if: inputs.tests != ''
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: docker/http-test-server/Dockerfile
+          load: true
+          tags: zorba-http-test:ci
+          cache-from: type=gha,scope=http-test-linux-amd64-latest
+
+      # ccache restore only, in depend mode like every workflow. Order: this
+      # workflow's own cache for the same configuration, then the cache that
+      # CI saves for the same configuration (caches of the default branch are
+      # visible to every branch). CI's caches are never written from here.
+      - id: ccache
+        uses: actions/cache/restore@v6
+        with:
+          path: .ccache
+          key: ccache-v2-qck-${{ env.QC_PRESET }}-${{ github.sha }}
+          restore-keys: |
+            ccache-v2-qck-${{ env.QC_PRESET }}-
+            ${{ env.QC_PRESET == 'asan' && 'ccache-v2-asan-' || (env.QC_PRESET == 'full-release' && 'ccache-v2-linux-amd64-latest-' || format('ccache-v2-profile-{0}-', env.QC_PRESET)) }}
+
+      - name: Configure, build and test
+        timeout-minutes: 75
+        run: |
+          net=bridge
+          if [ -n "$QC_TESTS" ]; then
+            docker network create zorba-test
+            docker run -d --name zorba-http-test --network zorba-test zorba-http-test:ci
+            net=zorba-test
+          fi
+          # SYS_PTRACE and seccomp=unconfined: LeakSanitizer needs ptrace.
+          docker run --rm --network "$net" \
+            --cap-add SYS_PTRACE --security-opt seccomp=unconfined \
+            -e ZORBA_HTTP_TEST_SERVER=zorba-http-test:8080 \
+            -e QC_PRESET -e QC_TESTS -e QC_CTEST_ARGS -e QC_TIMEOUT \
+            -e CC=gcc -e CXX=g++ \
+            -e CCACHE_DIR=/src/.ccache \
+            -e CCACHE_SLOPPINESS=pch_defines,time_macros -e CCACHE_DEPEND=1 \
+            -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" \
+            -v "$PWD":/src -w /src zorba-builder:ci scripts/quick-check.sh run
+
+      - name: Summary
+        if: always()
+        run: scripts/quick-check.sh summary >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Save ccache
+        if: always() && inputs.save_cache && steps.ccache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: .ccache
+          key: ccache-v2-qck-${{ env.QC_PRESET }}-${{ github.sha }}
+
+      - name: Upload the full ctest log
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: quick-check-log
+          if-no-files-found: ignore
+          path: |
+            build/quick-check/
+            build/${{ env.QC_PRESET }}/Testing/Temporary/LastTest.log
+            build/${{ env.QC_PRESET }}/junit.xml
+            build/${{ env.QC_PRESET }}/sanitizer-logs

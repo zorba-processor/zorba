@@ -102,6 +102,38 @@ ZORBA_ADD_TEST(bin/zorba_hint_prefix zorbacmd -q "math:pi()")
 ZORBA_SET_TEST_PROPERTY(bin/zorba_hint_prefix PASS_REGULAR_EXPRESSION "XPST0081.*hint: .*import module namespace math")
 ZORBA_ADD_TEST(bin/zorba_hint_xml zorbacmd --print-errors-as-xml -q "let $x := 3 return $x-1")
 ZORBA_SET_TEST_PROPERTY(bin/zorba_hint_xml PASS_REGULAR_EXPRESSION "<hint>.*x - 1.*</hint>")
+# The hints come from the engine, so zorba prints them too.
+SET (_hintdir "${CMAKE_CURRENT_SOURCE_DIR}/test/language")
+ZORBA_ADD_TEST(bin/zorba_hint_context_item zorbacmd -f -q "${_hintdir}/hint_context_item.jq")
+ZORBA_SET_TEST_PROPERTY(bin/zorba_hint_context_item PASS_REGULAR_EXPRESSION "XPST0003.*hint: .*context item")
+ZORBA_ADD_TEST(bin/zorba_hint_string_escape zorbacmd -f -q "${_hintdir}/hint_string_escape.jq")
+ZORBA_SET_TEST_PROPERTY(bin/zorba_hint_string_escape PASS_REGULAR_EXPRESSION "XPST0003.*hint: .*starts an escape")
+ZORBA_ADD_TEST(bin/zorba_hint_math_function zorbacmd -f -q "${_hintdir}/hint_math_function.xq")
+ZORBA_SET_TEST_PROPERTY(bin/zorba_hint_math_function PASS_REGULAR_EXPRESSION "XPST0017.*hint: .*import module namespace math")
+# --disable-http-resolution denies the fetch, so this test needs no network.
+ZORBA_ADD_TEST(bin/zorba_hint_unknown_module zorbacmd --disable-http-resolution -f -q "${_hintdir}/hint_unknown_module.xq")
+ZORBA_SET_TEST_PROPERTY(bin/zorba_hint_unknown_module PASS_REGULAR_EXPRESSION "XQST0059.*hint: .*may hold no module")
+# The message of a failed cast shortens the value and keeps its own text. A
+# regression would write megabytes on one line, which ctest copies to the CI log:
+# the lines are cut before ctest reads them. The exit status of zorba, 31 for an
+# error while the query runs, is printed and checked too.
+IF (UNIX)
+  SET (_ten "abcdefghijabcdefghijabcdefghijabcdefghij")
+  SET (_short "FORG0001.*\"${_ten}…${_ten} \\(3000000 bytes\\)\": value of type xs:string is not castable to type xs:integer")
+  FOREACH (_t cast selector)
+    ADD_TEST (NAME bin/zorba_error_value_${_t}
+      COMMAND sh -c "out=$(mktemp) || exit 99; \"$0\" -f -q \"$1\" > \"$out\" 2>&1; status=$?; cut -c1-2000 \"$out\"; rm -f \"$out\"; echo \"zorba exit status: $status\"; exit $status"
+        "$<TARGET_FILE:zorbacmd>" "${_hintdir}/error_value_${_t}.jq")
+    SET_TESTS_PROPERTIES (bin/zorba_error_value_${_t} PROPERTIES
+      PASS_REGULAR_EXPRESSION "${_short}.*zorba exit status: 31\n"
+      FAIL_REGULAR_EXPRESSION "${_ten}abcdefghij")
+  ENDFOREACH (_t)
+ENDIF (UNIX)
+# A failed fetch (of the loopback, which refuses it) whose URI names the capability
+# is not a denied fetch.
+ZORBA_ADD_TEST(bin/zorba_no_hint_capability_uri zorbacmd -f -q "${_hintdir}/capability_uri.xq")
+ZORBA_SET_TEST_PROPERTY(bin/zorba_no_hint_capability_uri PASS_REGULAR_EXPRESSION "XQST0059")
+ZORBA_SET_TEST_PROPERTY(bin/zorba_no_hint_capability_uri FAIL_REGULAR_EXPRESSION "hint:")
 ZORBA_ADD_TEST(bin/zorba_hint_none zorbacmd -q "nosuchfunction(1)")
 ZORBA_SET_TEST_PROPERTY(bin/zorba_hint_none PASS_REGULAR_EXPRESSION "XPST0017")
 ZORBA_SET_TEST_PROPERTY(bin/zorba_hint_none FAIL_REGULAR_EXPRESSION "hint:")
@@ -450,9 +482,21 @@ IF (ZORBA_WITH_FILE_ACCESS)
     # Scripted JSON-RPC exchanges against the directory module's fixture
     # tree (see mcp/test/mcp_tests.cpp); "binary" runs zorba-mcp itself.
     SET (_mcpq "${CMAKE_CURRENT_SOURCE_DIR}/test/mcp/queries")
+    # x:canonicalize is in the xml module, which needs XML Schema.
+    SET (_mcp_xml_tests)
+    IF (NOT ZORBA_NO_XMLSCHEMA)
+      SET (_mcp_xml_tests error_canonicalize_input)
+    ENDIF (NOT ZORBA_NO_XMLSCHEMA)
     FOREACH (_t json protocol legacy tools_list list_documents join
              syntax_error escape network native_modules predefined limits binary windows
              optional_params documents_stream hints_jsoniq hints_dash
+             hints_dash_forms hints_context_item hints_array_key
+             hints_unknown_module hints_math_function hints_string_escape
+             query_primer hints_document_value primer_json_content
+             xml_namespace_message error_value_bound error_value_chars
+             error_names_whole error_user_description error_message_limit
+             error_query_line error_help ${_mcp_xml_tests}
+             error_cached_denial
              hints_nodes hints_names deep_json deep_json_binary
              entity_expansion case_paths html_edge_cases memory_limit
              exhaust_at_start exhaust_sweep_compile exhaust_sweep_xml
@@ -489,7 +533,7 @@ IF (ZORBA_WITH_FILE_ACCESS)
     ADD_TEST (NAME bin/mcp/language_help
       COMMAND "$<TARGET_FILE:zorba_mcp${_mcp_suffix}>" --help)
     SET_TESTS_PROPERTIES (bin/mcp/language_help PROPERTIES
-      PASS_REGULAR_EXPRESSION "A [.]jq\n *file is JSONiq unless it declares xquery version;\n *[.]xq files are not loaded.*in this order: [(]1[)] a jsoniq\n *version or xquery version declaration at the very\n *start of the query [(]one preceded by a comment is\n *not detected[)]; [(]2[)] for a file, its extension [(][.]jq\n *is JSONiq[)]; [(]3[)] this option")
+      PASS_REGULAR_EXPRESSION "A [.]jq\n *file is JSONiq unless it declares xquery version;\n *[.]xq files are not loaded.*in this order: [(]1[)] a jsoniq\n *version or xquery version declaration at the very\n *start of the query [(]one preceded by a comment is\n *not detected[)]; [(]2[)] for a file, its extension [(][.]jq\n *is JSONiq[)]; [(]3[)] this option[.] jsoniq also\n *puts a JSONiq primer in the run_query description,\n *and a pointer to it in the server instructions")
 
     # The queries of these tests take most of the address-space limit: one at a
     # time, and with time for the session after each of them.

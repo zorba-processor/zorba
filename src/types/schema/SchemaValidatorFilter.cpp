@@ -1594,7 +1594,7 @@ void SchemaValidatorFilter::error(
   //std::cout << "SchemaValidatorFilter::error " << XMLString::transcode(exc_msg.getRawBuffer()) << std::endl; std::cout.flush();
   throw XQUERY_EXCEPTION(
     err::XQDY0027,
-    ERROR_PARAMS( StrX(exc_msg.getRawBuffer()).localForm() ),
+    ERROR_PARAMS( ERROR_TEXT( StrX(exc_msg.getRawBuffer()).localForm() ) ),
     ERROR_LOC( theLoc )
   );
 }

@@ -262,7 +262,7 @@ bool FnZorbaParseXmlFragmentIterator::nextImpl(
             XQueryException xe(
               XQUERY_EXCEPTION(
                 err::FODC0006,
-                ERROR_PARAMS( "parse-xml:parse()", e.what() ),
+                ERROR_PARAMS( "parse-xml:parse()", ERROR_TEXT( e.what() ) ),
                 ERROR_LOC( loc )
               )
             );
@@ -302,7 +302,7 @@ bool FnZorbaParseXmlFragmentIterator::nextImpl(
           XQueryException xe(
             XQUERY_EXCEPTION(
               err::FODC0006,
-              ERROR_PARAMS( "parse-xml:parse()", e.what() ),
+              ERROR_PARAMS( "parse-xml:parse()", ERROR_TEXT( e.what() ) ),
               ERROR_LOC( loc )
             )
           );
@@ -423,13 +423,13 @@ bool FnZorbaCanonicalizeIterator::nextImpl(store::Item_t& result, PlanState& pla
       ZorbaException const lDenied(ZORBA_EXCEPTION(
         zerr::ZXQP0029_URI_ACCESS_DENIED, ERROR_PARAMS(lSecurity.deniedURI())));
       throw XQUERY_EXCEPTION(err::FOCZ0001,
-        ERROR_PARAMS("x:canonicalize()", lDenied.what()), ERROR_LOC(loc));
+        ERROR_PARAMS("x:canonicalize()", ERROR_TEXT( lDenied.what() )), ERROR_LOC(loc));
     }
     if (!lDoc)
     {
       zstring lErrorMsg;
       lErrorMsg = "\"" + lDocString + "\"";
-      throw XQUERY_EXCEPTION(err::FOCZ0001, ERROR_PARAMS("x:canonicalize()", lErrorMsg ), ERROR_LOC(loc));
+      throw XQUERY_EXCEPTION(err::FOCZ0001, ERROR_PARAMS("x:canonicalize()", lErrorMsg), ERROR_LOC(loc));
     }
 
     xmlC14NDocDumpMemory(lDoc, NULL, 2/*XML_C14N_1_1*/, NULL, 1, &lResult);
@@ -448,7 +448,7 @@ bool FnZorbaCanonicalizeIterator::nextImpl(store::Item_t& result, PlanState& pla
   {
       zstring lErrorMsg;
       lErrorMsg = "\"" + lDocString + "\"";
-      throw XQUERY_EXCEPTION(err::FOCZ0001, ERROR_PARAMS("x:canonicalize()", lErrorMsg ), ERROR_LOC(loc));
+      throw XQUERY_EXCEPTION(err::FOCZ0001, ERROR_PARAMS("x:canonicalize()", lErrorMsg), ERROR_LOC(loc));
   }
   STACK_PUSH(GENV_ITEMFACTORY->createString(result, lDocString), state);
   STACK_END(state);
@@ -510,7 +510,7 @@ bool FnParseXmlFragmentIterator::nextImpl(
       {
         XQueryException xe(
           XQUERY_EXCEPTION(err::FODC0006,
-          ERROR_PARAMS( "fn:parse-xml-fragment()", e.what() ),
+          ERROR_PARAMS( "fn:parse-xml-fragment()", ERROR_TEXT( e.what() ) ),
           ERROR_LOC( loc )));
 
         set_data( xe, e );
@@ -578,7 +578,7 @@ bool FnZorbaParseHtmlIterator::nextImpl(
         throw;
 
       XQueryException xe(XQUERY_EXCEPTION(err::FODC0006,
-      ERROR_PARAMS("x:parse-html()", e.what()), ERROR_LOC(loc)));
+      ERROR_PARAMS("x:parse-html()", ERROR_TEXT( e.what() )), ERROR_LOC(loc)));
 
       set_data(xe, e);
       throw xe;

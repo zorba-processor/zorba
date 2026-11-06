@@ -1224,7 +1224,7 @@ lookup_thesaurus( ftthesaurus_id const &t_id, zstring const &query_phrase,
   );
   // Not available, e.g. denied by the security policy.
   if ( !rsrc.get() )
-    throw XQUERY_EXCEPTION( err::FTST0018, ERROR_PARAMS( uri, error_msg ) );
+    throw XQUERY_EXCEPTION( err::FTST0018, ERROR_PARAMS( uri, ERROR_TEXT( error_msg ) ) );
 
   internal::ThesaurusProvider const *const t_provider =
     dynamic_cast<internal::ThesaurusProvider const*>( rsrc.get() );

@@ -142,7 +142,7 @@ void XmlLoader::reportUnreadableEntity()
   std::string const lMessage("failed to load external entity \"" + lURI + '"');
   theXQueryDiagnostics->add_error(
     NEW_XQUERY_EXCEPTION(zerr::ZSTR0021_LOADER_PARSING_ERROR,
-                         ERROR_PARAMS(lURI, 0, 0, lMessage)));
+                         ERROR_PARAMS(lURI, 0, 0, ERROR_TEXT( lMessage ))));
 }
 
 
@@ -239,7 +239,7 @@ try
     XQueryException *const xe =
     NEW_XQUERY_EXCEPTION(zerr::ZSTR0021_LOADER_PARSING_ERROR,
     ERROR_PARAMS(error->file, error->line, error->int2 /* column */,
-                 lMessage));
+                 ERROR_TEXT( lMessage )));
     xe->set_data( error->file, error->line, error->int2 /* column */ );
     loader->theXQueryDiagnostics->add_error( xe );
     loader->theUnreadableEntityReported = true;
@@ -255,7 +255,7 @@ try
       NEW_XQUERY_EXCEPTION(zerr::ZSTR0021_LOADER_PARSING_ERROR,
       ERROR_PARAMS(error->file, error->line, error->int2 /* column */,
                    libxml_dict_key_4, error_str1_5, error_str2_6, error_str3_7,
-                   error_int1_8, error_message_9));
+                   error_int1_8, ERROR_TEXT( error_message_9 )));
 
       xe->set_data( error->file, error->line, error->int2 /* column */ );
       loader->theXQueryDiagnostics->add_error( xe );
@@ -267,7 +267,7 @@ try
       NEW_XQUERY_WARNING(zwarn::ZWST0007_LOADER_PARSING_WARNING,
       WARN_PARAMS(error->file, error->line, error->int2 /* column */,
                   libxml_dict_key_4, error_str1_5, error_str2_6, error_str3_7,
-                  error_int1_8, error_message_9));
+                  error_int1_8, ERROR_TEXT( error_message_9 )));
       xw->set_data( error->file, error->line, error->int2 /* column */ );
       loader->theXQueryDiagnostics->add_warning( xw );
       break;
@@ -435,7 +435,7 @@ std::streamsize FastXmlLoader::readPacket(std::istream& stream, char* buf, long 
   {
     theXQueryDiagnostics->add_error(
       NEW_ZORBA_EXCEPTION(
-        zerr::ZSTR0020_LOADER_IO_ERROR, ERROR_PARAMS( e.what() )
+        zerr::ZSTR0020_LOADER_IO_ERROR, ERROR_PARAMS( ERROR_TEXT( e.what() ) )
       )
     );
   }

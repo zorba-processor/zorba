@@ -94,7 +94,7 @@ bool FnParseXmlIterator::nextImpl(store::Item_t& result, PlanState& planState) c
     catch (const ZorbaException& e)
     {
       XQueryException xe(XQUERY_EXCEPTION(err::FODC0006,
-      ERROR_PARAMS("fn:parse-xml()", e.what()), ERROR_LOC(loc)));
+      ERROR_PARAMS("fn:parse-xml()", ERROR_TEXT( e.what() )), ERROR_LOC(loc)));
 
       set_data(xe, e);
       throw xe;
@@ -162,7 +162,7 @@ FnSerializeIterator::setSerializationParams(
   }
   catch (XQueryException const& e)
   {
-    RAISE_ERROR(err::SEPM0017, aLoc, ERROR_PARAMS(e.what()));
+    RAISE_ERROR(err::SEPM0017, aLoc, ERROR_PARAMS(ERROR_TEXT( e.what() )));
   }
 #endif
 
@@ -246,7 +246,7 @@ FnSerializeIterator::setSerializationParams(
               << lAttributeQName->getLocalName() << "\"";
             throw XQUERY_EXCEPTION(
               err::XQDY0027,
-              ERROR_PARAMS(lSb.str()),
+              ERROR_PARAMS(ERROR_TEXT( lSb.str() )),
               ERROR_LOC( aLoc ));
           }
 #endif
@@ -261,7 +261,7 @@ FnSerializeIterator::setSerializationParams(
       lSb << "serialization-parameters element can only element child nodes";
       throw XQUERY_EXCEPTION(
         err::XQDY0027,
-        ERROR_PARAMS(lSb.str()),
+        ERROR_PARAMS(ERROR_TEXT( lSb.str() )),
         ERROR_LOC( aLoc ));
     }
 #endif
@@ -289,6 +289,10 @@ FnSerializeIterator::nextImpl(store::Item_t& aResult, PlanState& aPlanState) con
     {
       setSerializationParams(lSerializer, lParams, theSctx, loc);
     }
+
+    // F&O: "The final stage of serialization, that is, encoding, is skipped."
+    // The byte order mark belongs to that stage.
+    lSerializer.setParameter("byte-order-mark", "no");
 
     {
       // and now serialize

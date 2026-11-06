@@ -91,7 +91,7 @@ new_zorba_exception( char const *raise_file,
  * \hideinitializer
  */
 #define ZORBA_IO_EXCEPTION(FUNC,PATH) \
-  ZORBA_EXCEPTION( zerr::ZOSE0004_IO_ERROR, ERROR_PARAMS( PATH, ::zorba::os_error::get_err_string( FUNC ) ) )
+  ZORBA_EXCEPTION( zerr::ZOSE0004_IO_ERROR, ERROR_PARAMS( PATH, ERROR_TEXT( ::zorba::os_error::get_err_string( FUNC ) ) ) )
 
 ///////////////////////////////////////////////////////////////////////////////
 

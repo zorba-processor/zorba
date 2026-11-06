@@ -938,7 +938,7 @@ std::streamsize DtdXmlLoader::readPacket(std::istream& stream, char* buf, std::s
   {
     theXQueryDiagnostics->add_error(
       NEW_ZORBA_EXCEPTION(
-        zerr::ZSTR0020_LOADER_IO_ERROR, ERROR_PARAMS( e.what() )
+        zerr::ZSTR0020_LOADER_IO_ERROR, ERROR_PARAMS( ERROR_TEXT( e.what() ) )
       )
     );
   }

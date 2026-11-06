@@ -67,8 +67,24 @@ char const usage[] =
   "                       file is JSONiq unless it declares xquery version;\n"
   "                       .xq files are not loaded\n"
   "  --timeout <seconds>  time limit of one tool call (default 30, 0: none)\n"
-  "  --max-output <bytes> output size limit of one tool call (default\n"
-  "                       131072); longer output is cut with a marker\n"
+  "  --max-output <bytes> limit of one tool call on the query output and on\n"
+  "                       the \"message\" of an error (default 131072). Longer\n"
+  "                       output is cut with a marker. A longer message\n"
+  "                       loses its middle, keeps its end and gets a marker\n"
+  "                       with its total size; under a limit smaller than\n"
+  "                       the marker, the message is the marker alone. The\n"
+  "                       code, the hint and the location are not cut by\n"
+  "                       this limit: a hint over 4096 bytes loses its\n"
+  "                       middle, and a failing line in \"location\" over 512\n"
+  "                       bytes shows about 512 bytes around the column of\n"
+  "                       the error, or both ends of a line over 65535 bytes.\n"
+  "                       Apart from this limit, a message shortens the data\n"
+  "                       it quotes: a value over 100 bytes becomes its head,\n"
+  "                       an ellipsis, its tail and its size in bytes. A URI,\n"
+  "                       a path, a QName or {uri}local stays whole up to\n"
+  "                       4096 bytes, and so does the text of an error, such\n"
+  "                       as the message of the parser; longer text keeps\n"
+  "                       2000 bytes at each end\n"
   "  --max-memory <bytes> memory limit of the server (default 4294967296,\n"
   "                       0: none; Linux only): a query that needs more\n"
   "                       fails with the tool error memory_limit, and the\n"
@@ -110,7 +126,9 @@ char const usage[] =
   "                       version or xquery version declaration at the very\n"
   "                       start of the query (one preceded by a comment is\n"
   "                       not detected); (2) for a file, its extension (.jq\n"
-  "                       is JSONiq); (3) this option\n";
+  "                       is JSONiq); (3) this option. jsoniq also\n"
+  "                       puts a JSONiq primer in the run_query description,\n"
+  "                       and a pointer to it in the server instructions\n";
 
 bool parse_number( char const *s, unsigned long long *n ) {
   if ( !s || !*s )

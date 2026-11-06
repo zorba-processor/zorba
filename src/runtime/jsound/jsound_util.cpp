@@ -1393,7 +1393,7 @@ void atomic_type::load_pattern( store::Item_t const &pattern_item ) {
       ERROR_PARAMS(
         xquery_re, "$pattern",
         ZED( ILLEGAL_FACET_VALUE_BadPattern_45 ),
-        e.diagnostic().qname(), e.what()
+        e.diagnostic().qname(), ERROR_TEXT( e.what() )
       )
     );
   }
@@ -1666,7 +1666,7 @@ void object_type::catch_helper( ZorbaException const &e,
     ERROR_PARAMS(
       illegal_base_type->name_, name_,
       ZED( ILLEGAL_BASE_TYPE_BecauseOfKey_45 ),
-      key, e.what()
+      key, ERROR_TEXT( e.what() )
     )
   );
 }
@@ -1993,7 +1993,7 @@ void type::load_constraints( store::Item_t const &constraints_item,
         ERROR_PARAMS(
           constraint_str, "$constraints",
           ZED( ILLEGAL_FACET_VALUE_BadConstraint_45 ),
-          e.diagnostic().qname(), e.what()
+          e.diagnostic().qname(), ERROR_TEXT( e.what() )
         )
       );
     }
@@ -2168,7 +2168,7 @@ bool type::validate( store::Item_t const &validate_item, bool do_cast,
         ERROR_PARAMS(
           ZED( FACET_VIOLATION_BadConstraint_23o4o5o ),
           *query, t->name_,
-          e.diagnostic().qname(), e.what()
+          e.diagnostic().qname(), ERROR_TEXT( e.what() )
         )
       );
     }
@@ -2452,7 +2452,7 @@ void schema::load_import( store::Item_t const &import_item ) {
   if ( !stream_rsrc )
     throw XQUERY_EXCEPTION(
       jse::SCHEMA_NOT_FOUND,
-      ERROR_PARAMS( ns_str, location_str, error_msg )
+      ERROR_PARAMS( ns_str, location_str, ERROR_TEXT( error_msg ) )
     );
   json::loader loader( *stream_rsrc->getStream() );
   store::Item_t jsd;
@@ -2470,7 +2470,7 @@ void schema::load_import( store::Item_t const &import_item ) {
       throw;
     throw XQUERY_EXCEPTION(
       jse::ILLEGAL_SCHEMA,
-      ERROR_PARAMS( ns_str, location_str, e.diagnostic().qname(), e.what() )
+      ERROR_PARAMS( ns_str, location_str, e.diagnostic().qname(), ERROR_TEXT( e.what() ) )
     );
   }
 }

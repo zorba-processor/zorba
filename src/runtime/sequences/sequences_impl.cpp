@@ -33,6 +33,7 @@
 // For timing
 #include <zorba/util/time.h>
 
+#include <zorba/util/stream_util.h>
 #include <zorba/util/transcode_stream.h>
 
 #include <util/fs_util.h>
@@ -1038,7 +1039,7 @@ bool FnAvgIterator::nextImpl(store::Item_t& result, PlanState& planState) const
         xqtref_t type = tm->create_value_type(lRunningItem);
         RAISE_ERROR(err::FORG0006, loc,
                      ERROR_PARAMS(ZED(BadArgTypeForFn_2o34o),
-                     *type,
+                     ERROR_TEXT( *type ),
                      "fn:avg",
                      ZED(ExpectedType_5),
                      *rtm.YM_DURATION_TYPE_ONE));
@@ -1049,7 +1050,7 @@ bool FnAvgIterator::nextImpl(store::Item_t& result, PlanState& planState) const
         xqtref_t type = tm->create_value_type(lRunningItem);
         RAISE_ERROR(err::FORG0006, loc,
         ERROR_PARAMS(ZED( BadArgTypeForFn_2o34o ),
-                     *type,
+                     ERROR_TEXT( *type ),
                      "fn:avg",
                      ZED( ExpectedType_5 ),
                      *rtm.DT_DURATION_TYPE_ONE));
@@ -1064,7 +1065,7 @@ bool FnAvgIterator::nextImpl(store::Item_t& result, PlanState& planState) const
         xqtref_t type = tm->create_value_type(lRunningItem);
         RAISE_ERROR(err::FORG0006, loc,
         ERROR_PARAMS(ZED(BadArgTypeForFn_2o34o),
-                     *type,
+                     ERROR_TEXT( *type ),
                      "fn:avg",
                      ZED(ExpectedNumericType)));
       }
@@ -1074,7 +1075,7 @@ bool FnAvgIterator::nextImpl(store::Item_t& result, PlanState& planState) const
         xqtref_t type = tm->create_value_type(lRunningItem);
         RAISE_ERROR(err::FORG0006, loc,
         ERROR_PARAMS(ZED( BadArgTypeForFn_2o34o ),
-                     *type,
+                     ERROR_TEXT( *type ),
                      "fn:avg",
                      ZED( ExpectedType_5 ),
                      *rtm.DT_DURATION_TYPE_ONE));
@@ -1089,7 +1090,7 @@ bool FnAvgIterator::nextImpl(store::Item_t& result, PlanState& planState) const
         xqtref_t type = tm->create_value_type(lRunningItem);
         RAISE_ERROR(err::FORG0006, loc,
         ERROR_PARAMS(ZED(BadArgTypeForFn_2o34o),
-                     *type,
+                     ERROR_TEXT( *type ),
                      "fn:avg",
                      ZED(ExpectedNumericType)));
       }
@@ -1099,7 +1100,7 @@ bool FnAvgIterator::nextImpl(store::Item_t& result, PlanState& planState) const
         xqtref_t type = tm->create_value_type(lRunningItem);
         RAISE_ERROR(err::FORG0006, loc,
         ERROR_PARAMS(ZED(BadArgTypeForFn_2o34o),
-                     *type,
+                     ERROR_TEXT( *type ),
                      "fn:avg",
                      ZED(ExpectedType_5),
                      *rtm.YM_DURATION_TYPE_ONE));
@@ -1110,7 +1111,7 @@ bool FnAvgIterator::nextImpl(store::Item_t& result, PlanState& planState) const
       xqtref_t type = tm->create_value_type(lRunningItem);
       RAISE_ERROR(err::FORG0006, loc,
                    ERROR_PARAMS(ZED(BadArgTypeForFn_2o34o),
-                   *type,
+                   ERROR_TEXT( *type ),
                    "fn:avg",
                    ZED(ExpectedNumericOrDurationType)));
     }
@@ -1181,7 +1182,7 @@ bool FnSumIterator::nextImpl(store::Item_t& result, PlanState& planState) const
     {
       xqtref_t type = tm->create_value_type(result);
       RAISE_ERROR(err::FORG0006, loc,
-        ERROR_PARAMS(ZED(BadArgTypeForFn_2o34o), *type, "fn:sum"));
+        ERROR_PARAMS(ZED(BadArgTypeForFn_2o34o), ERROR_TEXT( *type ), "fn:sum"));
     }
 
     while (consumeNext(lRunningItem, theChildren[0].getp(), planState))
@@ -1226,7 +1227,7 @@ bool FnSumIterator::nextImpl(store::Item_t& result, PlanState& planState) const
         xqtref_t type1 = tm->create_value_type(result);
         xqtref_t type2 = tm->create_value_type(lRunningItem);
         RAISE_ERROR(err::FORG0006, loc,
-          ERROR_PARAMS(ZED( SumImpossibleWithTypes_23 ), *type1, *type2));
+          ERROR_PARAMS(ZED( SumImpossibleWithTypes_23 ), ERROR_TEXT( *type1 ), ERROR_TEXT( *type2 )));
       }
     }
 
@@ -1625,7 +1626,7 @@ void load_document_from_uri(
     {
       // A denied document is not available.
       oResult = NULL;
-      throw XQUERY_EXCEPTION(err::FODC0002, ERROR_PARAMS(aUri, lDenied),
+      throw XQUERY_EXCEPTION(err::FODC0002, ERROR_PARAMS(aUri, ERROR_TEXT( lDenied )),
                              ERROR_LOC(loc));
     }
     return;
@@ -1651,7 +1652,7 @@ void load_document_from_uri(
   if (lStreamResource == NULL)
   {
     throw XQUERY_EXCEPTION
-        (err::FODC0002, ERROR_PARAMS(aUri, lErrorMessage), ERROR_LOC(loc));
+        (err::FODC0002, ERROR_PARAMS(aUri, ERROR_TEXT( lErrorMessage )), ERROR_LOC(loc));
   }
 
   std::istream* lStream = lStreamResource->getStream();
@@ -1878,7 +1879,7 @@ static void readDocument(
 
   if (lStreamResource == NULL)
   {
-    throw XQUERY_EXCEPTION(err::FOUT1170, ERROR_PARAMS(aUri, lErrorMessage),
+    throw XQUERY_EXCEPTION(err::FOUT1170, ERROR_PARAMS(aUri, ERROR_TEXT( lErrorMessage )),
                            ERROR_LOC(loc));
   }
   StreamReleaser lStreamReleaser = lStreamResource->getStreamReleaser();
@@ -1896,6 +1897,8 @@ static void readDocument(
     }
     transcode::attach(*lStream.get(), aEncoding.c_str());
   }
+  else
+    skip_utf8_bom(*lStream);
   //creates stream item
   GENV_ITEMFACTORY->createStreamableString(
     oResult,
@@ -2001,6 +2004,7 @@ bool FnUnparsedTextLinesIterator::nextImpl(store::Item_t& result, PlanState& pla
   store::Item_t encodingItem;
   store::Item_t streamItem;
   zstring streamLine;
+  std::string lLine;
   zstring uriString;
   zstring encodingString("UTF-8");
   zstring lNormUri;
@@ -2033,7 +2037,7 @@ bool FnUnparsedTextLinesIterator::nextImpl(store::Item_t& result, PlanState& pla
 
     if (state->theStreamResource == NULL)
       throw XQUERY_EXCEPTION(err::FOUT1170,
-                             ERROR_PARAMS(uriString, lErrorMessage),
+                             ERROR_PARAMS(uriString, ERROR_TEXT( lErrorMessage )),
                              ERROR_LOC(loc));
 
     lStreamReleaser = state->theStreamResource->getStreamReleaser();
@@ -2051,10 +2055,28 @@ bool FnUnparsedTextLinesIterator::nextImpl(store::Item_t& result, PlanState& pla
       }
       transcode::attach(*state->theStream->get(), encodingString.c_str());
     }
+    else
+      skip_utf8_bom(**state->theStream);
 
-    while (state->theStream->get()->good())
+    while (true)
     {
-      getline(*state->theStream->get(), streamLine);
+      bool lGotLine;
+      try
+      {
+        lGotLine = get_text_line(**state->theStream, &lLine);
+      }
+      catch (ZorbaException const& e)
+      {
+        if (!(e.diagnostic() == zerr::ZOSE0006_TRANSCODING_ERROR))
+          throw;
+        // F&O: octets that cannot be decoded using the encoding.
+        throw XQUERY_EXCEPTION(err::FOUT1190,
+                               ERROR_PARAMS(uriString, encodingString),
+                               ERROR_LOC(loc));
+      }
+      if (!lGotLine)
+        break;
+      streamLine.assign(lLine.data(), lLine.size());
       STACK_PUSH(GENV_ITEMFACTORY->createString(result, streamLine), state);
     }
   }

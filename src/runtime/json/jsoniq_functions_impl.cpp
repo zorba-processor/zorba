@@ -825,7 +825,7 @@ bool JSONParseIterator::processBooleanOption(
       xqtref_t const option_type = tm->create_value_type( i_option_value, loc );
 
       RAISE_ERROR(jerr::JNTY0020, loc,
-      ERROR_PARAMS(option_type->toSchemaString(), option_name, "xs:boolean"));
+      ERROR_PARAMS(ERROR_TEXT( option_type->toSchemaString() ), option_name, "xs:boolean"));
     }
     *option_value = i_option_value->getBooleanValue();
     return true;

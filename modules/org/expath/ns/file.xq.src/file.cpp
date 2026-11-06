@@ -563,7 +563,8 @@ ReadTextFunction::evaluate(
       throw raiseFileError("FOFL0006", e.what(), lEncoding.c_str() );
     }
   }
-  skip_utf8_bom( *pin );
+  if ( !transcoding )
+    skip_utf8_bom( *pin );              // ICU handles the signature of UTF-16
   lResult = module_->getItemFactory()->createStreamableString(
     *pin, &FileModule::streamReleaser, path.c_str(), true
   );
@@ -668,6 +669,8 @@ void ReadTextLinesFunction::LinesItemSequence::LinesIterator::open() {
       theFunc->raiseFileError( "FOFL0006", e.what(), theEncoding.c_str() );
     }
   }
+  else if ( lStream->good() )
+    skip_utf8_bom( *lStream );
   theStream = lStream.release();
 }
 
@@ -677,10 +680,16 @@ ReadTextLinesFunction::LinesItemSequence::LinesIterator::next(Item& aRes) {
     return false;
 
   std::string s;
-  getline( *theStream, s );
-  if ( theStream->bad() )
-    return false;
-  
+  try {
+    if ( !get_text_line( *theStream, &s ) )
+      return false;
+  }
+  catch ( ZorbaException const &e ) {
+    // file:read-text-lines declares FOFL9999 for any other error, such as
+    // octets that cannot be decoded.
+    theFunc->raiseFileError( "FOFL9999", e.what(), theFile );
+  }
+
   aRes = theFunc->module_->getItemFactory()->createString( s );
   return true;
 }

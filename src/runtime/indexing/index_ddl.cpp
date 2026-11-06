@@ -112,7 +112,7 @@ static void checkKeyType(
     {
       RAISE_ERROR(err::XPTY0004, loc,
       ERROR_PARAMS(ZED(SearchKeyTypeNoProbeIndex_23),
-                   *searchKeyType,
+                   ERROR_TEXT( *searchKeyType ),
                    indexDecl->getName()->getStringValue()));
     }
   }
@@ -154,9 +154,9 @@ static void checkKeyType(
 
     RAISE_ERROR(err::XPTY0004, loc,
     ERROR_PARAMS(ZED(SearchKeyTypeMismatch_234),
-                 *searchKeyType,
+                 ERROR_TEXT( *searchKeyType ),
                  indexDecl->getName()->getStringValue(),
-                 *indexKeyType));
+                 ERROR_TEXT( *indexKeyType )));
   }
 }
 

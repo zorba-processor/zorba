@@ -217,7 +217,7 @@ store::Collection_t FnCollectionIterator::getCollection(PlanState& planState) co
 
   if (collResource == 0 || !(coll = collResource->getCollection()))
   {
-    RAISE_ERROR(err::FODC0002, loc, ERROR_PARAMS(resolvedURI, errorMessage));
+    RAISE_ERROR(err::FODC0002, loc, ERROR_PARAMS(resolvedURI, ERROR_TEXT( errorMessage )));
   }
 
   return coll;
@@ -2561,7 +2561,7 @@ bool FnURICollectionIterator::nextImpl(store::Item_t& result, PlanState& planSta
   {
     throw XQUERY_EXCEPTION(
       err::FODC0002,
-      ERROR_PARAMS( resolvedURIString, lErrorMessage ),
+      ERROR_PARAMS( resolvedURIString, ERROR_TEXT( lErrorMessage ) ),
       ERROR_LOC( loc )
     );
   }

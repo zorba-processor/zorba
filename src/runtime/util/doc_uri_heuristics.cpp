@@ -65,7 +65,7 @@ void normalizeInputUri(
       }
       catch ( std::invalid_argument const &e )
       {
-        throw XQUERY_EXCEPTION( err::XPTY0004, ERROR_PARAMS( e.what() ) );
+        throw XQUERY_EXCEPTION( err::XPTY0004, ERROR_PARAMS( ERROR_TEXT( e.what() ) ) );
       }
     }
     else

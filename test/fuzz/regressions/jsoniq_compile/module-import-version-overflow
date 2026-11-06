@@ -1,0 +1,2 @@
+import module namespace m = "http://example.org/m#99999999999.99999999999.99999999999-99999999999.0";
+1

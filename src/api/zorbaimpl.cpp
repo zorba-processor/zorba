@@ -300,7 +300,7 @@ void ZorbaImpl::notifyError( DiagnosticHandler *eh, ZorbaException const &ze )
 void ZorbaImpl::notifyError( DiagnosticHandler *eh, char const *what )
 {
   eh->error(
-    ZORBA_EXCEPTION( zerr::ZXQP0003_INTERNAL_ERROR, ERROR_PARAMS( what ) )
+    ZORBA_EXCEPTION( zerr::ZXQP0003_INTERNAL_ERROR, ERROR_PARAMS( ERROR_TEXT( what ) ) )
   );
 }
 

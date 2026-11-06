@@ -1,0 +1,1 @@
+dir:open($dir:root, "data.jsonl").content[]

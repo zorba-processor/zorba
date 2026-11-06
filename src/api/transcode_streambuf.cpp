@@ -65,8 +65,10 @@ streambuf::int_type streambuf::overflow( int_type c ) {
 }
 
 streambuf::int_type streambuf::pbackfail( int_type c ) {
+  // sungetc() of a streambuf with no get area of its own gets here with eof.
   return  traits_type::eq_int_type( c, traits_type::eof() ) ?
-          c : proxy_buf_->sputbackc( traits_type::to_char_type( c ) );
+          proxy_buf_->sungetc() :
+          proxy_buf_->sputbackc( traits_type::to_char_type( c ) );
 }
 
 streambuf::int_type streambuf::uflow() {

@@ -83,8 +83,10 @@ passthru_streambuf::int_type passthru_streambuf::overflow( int_type c ) {
 }
 
 passthru_streambuf::int_type passthru_streambuf::pbackfail( int_type c ) {
+  // sungetc() of a streambuf with no get area of its own gets here with eof.
   return  traits_type::eq_int_type( c, traits_type::eof() ) ?
-          c : original()->sputbackc( traits_type::to_char_type( c ) );
+          original()->sungetc() :
+          original()->sputbackc( traits_type::to_char_type( c ) );
 }
 
 passthru_streambuf::int_type passthru_streambuf::uflow() {

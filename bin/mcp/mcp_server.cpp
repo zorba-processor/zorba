@@ -15,6 +15,7 @@
  */
 
 #include "mcp_server.h"
+#include "query_primer.h"
 
 #include <algorithm>
 #include <cstring>
@@ -73,18 +74,25 @@ char const meta_server_info[] = "io.modelcontextprotocol/serverInfo";
 
 char const server_name[] = "zorba-mcp";
 
-char const instructions[] =
+// The JSONiq primer is only for a session whose queries are JSONiq by default.
+// Its examples mean something else in XQuery, or nothing.
+std::string instructions( bool jsoniq_default ) {
+  return std::string(
   "Queries a directory of XML, JSON, CSV and HTML documents with JSONiq/XQuery "
   "(Zorba). Start with list_documents. In run_query, import the directory "
   "module (import module namespace dir = \"http://zorba.io/modules/directory\";) "
   "and use $dir:root: dir:documents($dir:root, \"xml\") or "
   "dir:documents($dir:root, (\"json\", \"csv\")) return records "
   "{path, format, content} (or {path, format, error}); "
-  "dir:open($dir:root, $path) returns one. Results are JSON, one item per "
+  "dir:open($dir:root, $path) returns one. " ) +
+  ( jsoniq_default ? "Read the JSONiq primer in the run_query description "
+                     "before writing a query. " : "" ) +
+  "Results are JSON, one item per "
   "line; return JSON objects, arrays or atomic values, not XML nodes "
   "(convert with string() or data()). Only files under the directory can "
   "be read; network access, writes and environment variables are denied. "
   "Predefined query tools, when present, answer common questions directly.";
+}
 
 Json server_info() {
   return Json::object( {
@@ -158,6 +166,60 @@ void trim_utf8_tail( std::string *s ) {
       s->resize( n - back );
     return;
   }
+}
+
+inline bool is_utf8_continuation( char c ) {
+  return ( static_cast<unsigned char>( c ) & 0xC0 ) == 0x80;
+}
+
+// A text with its middle replaced by a marker, within \a cap bytes if the
+// marker fits. The cuts fall between UTF-8 characters.
+std::string cut_middle( std::string const &text, std::size_t cap,
+                        char const *what ) {
+  if ( text.size() <= cap )
+    return text;
+  std::string const marker( std::string( "[zorba-mcp: " ) + what + " cut, " +
+                            std::to_string( text.size() ) + " bytes in all]" );
+  std::size_t const room = cap > marker.size() ? cap - marker.size() : 0;
+  std::size_t head = room / 2;
+  std::size_t tail = text.size() - ( room - head );
+  while ( head && is_utf8_continuation( text[ head ] ) )
+    --head;
+  while ( tail < text.size() && is_utf8_continuation( text[ tail ] ) )
+    ++tail;
+  return text.substr( 0, head ) + marker + text.substr( tail );
+}
+
+// A line of a query as it goes in an error: a long one, as the bytes around the
+// column of the error and a marker with its size. A column is 16 bits in the
+// engine: past that it says nothing about the place, so a longer line shows its
+// two ends.
+std::string line_excerpt( std::string const &line, unsigned long column ) {
+  std::size_t const around = 256;
+  if ( line.size() <= 2 * around )
+    return line;
+  std::string const marker( " [zorba-mcp: line of " +
+                            std::to_string( line.size() ) + " bytes]" );
+  std::string const dots( "\xE2\x80\xA6" );
+  if ( line.size() > 65535 ) {
+    std::size_t head = around, tail = line.size() - around;
+    while ( head && is_utf8_continuation( line[ head ] ) )
+      --head;
+    while ( tail < line.size() && is_utf8_continuation( line[ tail ] ) )
+      ++tail;
+    return line.substr( 0, head ) + dots + line.substr( tail ) + marker;
+  }
+  std::size_t const at =
+    std::min( static_cast<std::size_t>( column ? column - 1 : 0 ), line.size() );
+  std::size_t begin = at > around ? at - around : 0;
+  std::size_t end = std::min( at + around, line.size() );
+  while ( begin < end && is_utf8_continuation( line[ begin ] ) )
+    ++begin;
+  while ( end > begin && end < line.size() &&
+          is_utf8_continuation( line[ end ] ) )
+    --end;
+  return ( begin ? dots : std::string() ) + line.substr( begin, end - begin ) +
+    ( end < line.size() ? dots : std::string() ) + marker;
 }
 
 std::string percent_encode_path( std::string const &path ) {
@@ -248,8 +310,12 @@ std::string out_of_memory_text( unsigned long long max_memory ) {
   } ) } } ).dump();
 }
 
+// The longest hint that goes whole. A hint can repeat names from the query.
+std::size_t const max_hint_bytes = 4096;
+
 Json diagnostic_json( ZorbaException const &e, std::string const &source,
-                      std::string const &file_name ) {
+                      std::string const &file_name,
+                      std::size_t max_output ) {
   diagnostic::QName const &qn = e.diagnostic().qname();
   std::string code( qn.localname() );
   if ( qn.prefix() && *qn.prefix() )
@@ -257,10 +323,10 @@ Json diagnostic_json( ZorbaException const &e, std::string const &source,
   Json err( Json::object( {
     { "code", code },
     { "namespace", qn.ns() ? qn.ns() : "" },
-    { "message", e.what() }
+    { "message", cut_middle( e.what(), max_output, "message" ) }
   } ) );
   if ( *e.hint() )
-    err.set( "hint", e.hint() );
+    err.set( "hint", cut_middle( e.hint(), max_hint_bytes, "hint" ) );
   if ( XQueryException const *const xe =
          dynamic_cast<XQueryException const*>( &e ) ) {
     if ( xe->has_source() ) {
@@ -284,7 +350,7 @@ Json diagnostic_json( ZorbaException const &e, std::string const &source,
       if ( in_query ) {
         std::string const text( source_line( source, xe->source_line() ) );
         if ( !text.empty() )
-          loc.set( "text", text );
+          loc.set( "text", line_excerpt( text, xe->source_column() ) );
       }
       err.set( "location", std::move( loc ) );
     }
@@ -537,7 +603,10 @@ Json Server::tools() const {
             "\"1.0\";` for JSONiq." ) +
       " Example: import module namespace dir = "
       "\"http://zorba.io/modules/directory\"; for $d in "
-      "dir:documents($dir:root, \"json\") return $d(\"path\"). On failure "
+      "dir:documents($dir:root, \"json\") return $d(\"path\"). " +
+      ( theConfig.jsoniq_default ? std::string( query_primer ) + " "
+                                 : std::string() ) +
+      "On failure "
       "the result is an error object with the Zorba error code, message "
       "and the line/column of the failing expression." },
     { "inputSchema", Json::object( {
@@ -632,14 +701,16 @@ Server::run( std::string const &source, std::string const &file_name,
          std::strstr( e.what(), "bad_alloc" ) )
       outcome.text = out_of_memory_text( theConfig.max_memory );
     else
-      outcome.text = diagnostic_json( e, source, file_name ).dump();
+      outcome.text =
+        diagnostic_json( e, source, file_name, theConfig.max_output ).dump();
   }
   catch ( std::bad_alloc const& ) {
     outcome.text = out_of_memory_text( theConfig.max_memory );
   }
   catch ( std::exception const &e ) {
     outcome.text = Json::object( { { "error", Json::object( {
-      { "code", "internal" }, { "message", e.what() }
+      { "code", "internal" },
+      { "message", cut_middle( e.what(), theConfig.max_output, "message" ) }
     } ) } } ).dump();
   }
   return outcome;
@@ -839,7 +910,7 @@ std::string Server::handle_message( std::string const &message,
       { "protocolVersion", negotiated },
       { "capabilities", Json::object( { { "tools", Json::object() } } ) },
       { "serverInfo", server_info() },
-      { "instructions", instructions }
+      { "instructions", instructions( theConfig.jsoniq_default ) }
     } );
     return Json::object( {
       { "jsonrpc", "2.0" }, { "id", *id }, { "result", result }
@@ -884,7 +955,7 @@ std::string Server::handle_message( std::string const &message,
       result = Json::object( {
         { "supportedVersions", all_versions() },
         { "capabilities", Json::object( { { "tools", Json::object() } } ) },
-        { "instructions", instructions }
+        { "instructions", instructions( theConfig.jsoniq_default ) }
       } );
     } else if ( m == "tools/list" ) {
       result = Json::object( { { "tools", tools() } } );

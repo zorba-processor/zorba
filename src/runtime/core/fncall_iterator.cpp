@@ -1245,7 +1245,7 @@ bool ExtFunctionCallIterator::countImpl( store::Item_t &result,
   {
     throw XQUERY_EXCEPTION(
       zerr::ZXQP0001_DYNAMIC_RUNTIME_ERROR,
-      ERROR_PARAMS(e.what()),
+      ERROR_PARAMS(ERROR_TEXT( e.what() )),
       ERROR_LOC(loc));
   }
 
@@ -1289,7 +1289,7 @@ bool ExtFunctionCallIterator::skipImpl( int64_t count, PlanState &planState ) co
   {
     throw XQUERY_EXCEPTION(
       zerr::ZXQP0001_DYNAMIC_RUNTIME_ERROR,
-      ERROR_PARAMS(e.what()),
+      ERROR_PARAMS(ERROR_TEXT( e.what() )),
       ERROR_LOC(loc));
   }
   return more_items;
@@ -1324,7 +1324,7 @@ bool ExtFunctionCallIterator::nextImpl(
   {
     throw XQUERY_EXCEPTION(
       zerr::ZXQP0001_DYNAMIC_RUNTIME_ERROR,
-      ERROR_PARAMS(e.what()),
+      ERROR_PARAMS(ERROR_TEXT( e.what() )),
       ERROR_LOC(loc));
   }
 }

@@ -15,6 +15,8 @@
  */
 
 #include "module_version.h"
+
+#include <limits>
 #include <zorbatypes/URI.h>
 
 
@@ -22,8 +24,8 @@ namespace zorba {
 
 /**
  * Utility function: Given a string aStr and position aPos, populate
- * aInt with the integer at that position in the string. aPos will be
- * updated to next character.
+ * aInt with the integer at that position in the string. A number above
+ * INT_MAX is stored as INT_MAX. aPos will be updated to next character.
  * @return true if an integer found, false if not.
  */
 static bool
@@ -35,7 +37,14 @@ getInteger(zstring const& aStr, size_t& aPos, int& aInt)
 
   aInt = 0;
   while (aPos < lLen && isdigit(lChar = aStr[aPos])) {
-    aInt = aInt * 10 + (lChar - '0');
+    int const lDigit = lChar - '0';
+    // Test before multiplying and adding (signed overflow is undefined
+    // behavior). A number above INT_MAX saturates at INT_MAX; the remaining
+    // digits are still consumed.
+    if (aInt > (std::numeric_limits<int>::max() - lDigit) / 10)
+      aInt = std::numeric_limits<int>::max();
+    else
+      aInt = aInt * 10 + lDigit;
     aPos++;
   }
   return (aPos != lOrigPos);

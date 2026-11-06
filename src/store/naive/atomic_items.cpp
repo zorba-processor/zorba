@@ -21,6 +21,7 @@
 
 #include <zorba/internal/unique_ptr.h>
 #include <zorba/util/base64_util.h>
+#include <zorba/util/stream_util.h>
 
 #include "diagnostics/assert.h"
 #include "diagnostics/xquery_diagnostics.h"
@@ -2238,16 +2239,21 @@ std::istream& StreamableStringItem::getStream()
   {
     throw ZORBA_EXCEPTION( zerr::ZSTR0055_STREAMABLE_STRING_CONSUMED );
   }
-  else
+  else if (theIsSeekable)
   {
     // if the stream is seekable, we seek to the beginning.
     // We are not using theIstream.seekg because the USER_ERROR that is thrown
     // by Zorba is lost possibly in an internal try/catch of the seekg
     std::streambuf * pbuf;
     pbuf = theIstream->rdbuf();
-    pbuf->pubseekoff(0, std::ios::beg);
+    std::streampos const lPos = pbuf->pubseekoff(0, std::ios::beg);
     theIstream->clear();
+    // A byte order mark is not part of the string.
+    if (lPos != std::streampos(std::streamoff(-1)))
+      skip_utf8_bom_again(*theIstream);
   }
+  // Not a seek on a stream that cannot: a transcoding streambuf would drop what
+  // it has already decoded, and the code that made the stream may have read it.
   theIsConsumed = true;
   return *theIstream;
 }

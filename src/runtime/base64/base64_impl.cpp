@@ -120,7 +120,7 @@ bool Base64DecodeIterator::nextImpl(
       {
         throw XQUERY_EXCEPTION(
           zerr::ZOSE0006_TRANSCODING_ERROR,
-          ERROR_PARAMS( e.what() ),
+          ERROR_PARAMS( ERROR_TEXT( e.what() ) ),
           ERROR_LOC( loc )
         );
       }
