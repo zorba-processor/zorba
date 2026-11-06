@@ -17,6 +17,7 @@
 #include <cctype>
 #include <cstdint>
 #include <cstring>
+#include <limits>
 #include <type_traits>
 
 #include <zorba/diagnostic_list.h>
@@ -976,6 +977,21 @@ CRegexXQuery_chargroup* CRegexXQuery_parser::readchargroup(const char *pattern, 
   return chargroup.release();
 }
 
+/**
+ * Appends a decimal digit to a quantifier bound. A bound above INT_MAX is
+ * rejected (FORX0002, as the ICU engine does) instead of overflowing.
+ */
+static int add_quantifier_digit(int bound, char digit, const char *pattern)
+{
+  int const d = digit - '0';
+  // Test before multiplying and adding: signed overflow is undefined behavior.
+  if(bound > (std::numeric_limits<int>::max() - d) / 10)
+  {
+    throw XQUERY_EXCEPTION( err::FORX0002, ERROR_PARAMS(pattern, ZED(U_REGEX_NUMBER_TOO_BIG)) );
+  }
+  return bound*10 + d;
+}
+
 void CRegexXQuery_parser::read_quantifier(CRegexXQuery_piece *piece,
                                          const char *pattern, int *quantif_len)
 {
@@ -1001,7 +1017,7 @@ void CRegexXQuery_parser::read_quantifier(CRegexXQuery_piece *piece,
     while(pattern[*quantif_len] && (pattern[*quantif_len] != ',') &&
       myisdigit(pattern[*quantif_len]) && (pattern[*quantif_len] != '}'))
     {
-      min = min*10 + pattern[*quantif_len] - '0';
+      min = add_quantifier_digit(min, pattern[*quantif_len], pattern);
       (*quantif_len)++;
     }
     if(pattern[*quantif_len] == '}')
@@ -1010,7 +1026,7 @@ void CRegexXQuery_parser::read_quantifier(CRegexXQuery_piece *piece,
       piece->set_quantifier_min_max(min, min, true);
       break;
     }
-    if((pattern[*quantif_len] == ',') && (!isdigit(pattern[*quantif_len+1])))
+    if((pattern[*quantif_len] == ',') && (!myisdigit(pattern[*quantif_len+1])))
     {
       (*quantif_len)++;
       piece->set_quantifier_min_max(min, -1, false);
@@ -1019,9 +1035,9 @@ void CRegexXQuery_parser::read_quantifier(CRegexXQuery_piece *piece,
     {
       (*quantif_len)++;
       while(pattern[*quantif_len] &&
-        isdigit(pattern[*quantif_len]) && (pattern[*quantif_len] != '}'))
+        myisdigit(pattern[*quantif_len]) && (pattern[*quantif_len] != '}'))
       {
-        max = max*10 + pattern[*quantif_len] - '0';
+        max = add_quantifier_digit(max, pattern[*quantif_len], pattern);
         (*quantif_len)++;
       }
       if(max < min)
