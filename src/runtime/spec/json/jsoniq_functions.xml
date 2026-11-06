@@ -223,7 +223,7 @@
   </zorba:constructor>
 
   <zorba:member type="QueryLoc" name="theRelativeLocation" />
-  <zorba:member type="bool" name="theStreamIsPrivate" brief="the stream of the input has no other reader"/>
+  <zorba:member type="bool" name="theStreamIsPrivate" getterName="streamIsPrivate" printName="file-stream" brief="the stream of the input has no other reader"/>
   <zorba:member type="bool" name="theAllowMultiple" brief=""/>
 
 </zorba:iterator>

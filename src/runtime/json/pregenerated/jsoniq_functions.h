@@ -250,6 +250,8 @@ public:
 
   virtual ~JSONParseMembersIterator();
 
+  bool streamIsPrivate() const { return theStreamIsPrivate; }
+
   zstring getNameAsString() const;
 
   void accept(PlanIterVisitor& v) const;

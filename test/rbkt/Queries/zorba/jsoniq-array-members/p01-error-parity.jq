@@ -1,17 +1,15 @@
 jsoniq version "1.0";
 (: Without the option and with it: the same members, or the same error code,
  : description and location. An error located in the JSON has the same line on both
- : sides; one located in the query is at the call, line 10 without the option and line
- : 13 with it, on the same column. :)
+ : sides; one located in the query is at the call, line 78 without the option and line
+ : 79 with it, on the same column. The calls are in the main module, not in a function,
+ : so that bin/zorba_plan_parity_O* can check that the plan streams at every
+ : optimization level. :)
 declare namespace err = "http://www.w3.org/2005/xqt-errors";
 declare function local:deep($open as string, $close as string, $n as integer) as string
 { string-join(for $i in 1 to $n return $open) || "1" || string-join(for $i in 1 to $n return $close) };
-declare function local:without($s as string)
-{ try { [ parse-json($s)[] ] }
-  catch * { { "e" : [ local-name-from-QName($err:code), $err:description, $err:column-number ], "l" : $err:line-number } } };
-declare function local:with($s as string)
-{ try { [ parse-json($s, { "zorba-streaming-members" : true })[] ] }
-  catch * { { "e" : [ local-name-from-QName($err:code), $err:description, $err:column-number ], "l" : $err:line-number } } };
+declare function local:error($code, $description, $column, $line)
+{ { "e" : [ local-name-from-QName($code), $description, $column ], "l" : $line } };
 declare variable $cases := (
   "[1,2,",
   "[1 2]",
@@ -74,8 +72,11 @@ declare variable $cases := (
   local:deep("{\"a\":", "}", 1500), local:deep("{\"a\":", "}", 1501) );
 declare function local:same($a, $b)
 { if ($a instance of array) then deep-equal($a, $b)
-  else $b instance of object and deep-equal($a.e, $b.e) and ($a.l eq $b.l or ($a.l eq 10 and $b.l eq 13)) };
-let $diff := for $s at $i in $cases
-             where not(local:same(local:without($s), local:with($s)))
-             return $i
-return "cases: " || count($cases) || ", more than 30 errors: " || string(count($cases[local:without($$) instance of object]) gt 30) || ", different: " || string-join($diff ! string($$), " ")
+  else $b instance of object and deep-equal($a.e, $b.e) and ($a.l eq $b.l or ($a.l eq 78 and $b.l eq 79)) };
+let $results :=
+  for $s in $cases
+  let $without := try { [ parse-json($s)[] ] } catch * { local:error($err:code, $err:description, $err:column-number, $err:line-number) }
+  let $with :=    try { [ parse-json($s, { "zorba-streaming-members" : true })[] ] } catch * { local:error($err:code, $err:description, $err:column-number, $err:line-number) }
+  return { "same" : local:same($without, $with), "error" : $without instance of object }
+let $diff := for $r at $i in $results where not($r.same) return $i
+return "cases: " || count($cases) || ", more than 30 errors: " || string(count($results[$$.error]) gt 30) || ", different: " || string-join($diff ! string($$), " ")

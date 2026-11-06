@@ -1709,6 +1709,7 @@ void PrinterVisitor::endVisit( const JSONParseIterator& ) {
 void PrinterVisitor::beginVisit( const JSONParseMembersIterator& a) {
   thePrinter.startBeginVisit("JSONParseMembersIterator", ++theId);
   printCommons( &a, theId );
+  thePrinter.addBoolAttribute( "file-stream", a.streamIsPrivate() );
   thePrinter.endBeginVisit( theId );
 }
 
