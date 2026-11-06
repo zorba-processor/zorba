@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#include <set>
+
 #include "functions/func_jsoniq_functions.h"
 #include "functions/func_jsoniq_functions_impl.h"
 
@@ -23,7 +25,11 @@
 
 #include "compiler/parser/query_loc.h"
 #include "compiler/expression/expr_consts.h"
+#include "compiler/api/compilercb.h"
+#include "compiler/expression/expr.h"
 #include "compiler/expression/fo_expr.h"
+#include "compiler/expression/json_exprs.h"
+#include "compiler/expression/var_expr.h"
 
 #include "types/typeops.h"
 
@@ -130,13 +136,279 @@ xqtref_t fn_jsoniq_trim::getReturnType(const fo_expr* caller) const
 /*******************************************************************************
 
 ********************************************************************************/
+static const expr* skip_type_wrappers(const expr* e)
+{
+  while (true)
+  {
+    if (e->get_expr_kind() == promote_expr_kind ||
+        e->get_expr_kind() == treat_expr_kind)
+      e = static_cast<const cast_base_expr*>(e)->get_input();
+    else if (e->get_expr_kind() == function_trace_expr_kind)
+      e = static_cast<const function_trace_expr*>(e)->get_input();
+    else
+      return e;
+  }
+}
+
+
+static bool is_read_text_utf8(const expr* e)
+{
+  e = skip_type_wrappers(e);
+
+  if (e->get_expr_kind() != fo_expr_kind)
+    return false;
+
+  const fo_expr* call = static_cast<const fo_expr*>(e);
+  const store::Item* name = call->get_func()->getName();
+
+  if (name->getNamespace() != "http://expath.org/ns/file" ||
+      name->getLocalName() != "read-text")
+    return false;
+
+  if (call->num_args() == 1)
+    return true;
+
+  const expr* encoding = call->get_arg(1);
+  return encoding->get_expr_kind() == const_expr_kind &&
+         static_cast<const const_expr*>(encoding)->get_val()->getStringValue() ==
+           "UTF-8";
+}
+
+
+// What the translator wraps around a literal in an object constructor, until the
+// optimizer removes it. Nothing here can raise on a literal; a cast or a treat
+// that a query writes around a value can, so it does not count as a literal.
+static const expr* skip_object_value_wrappers(const expr* e)
+{
+  while (e->get_expr_kind() == fo_expr_kind &&
+         static_cast<const fo_expr*>(e)->get_func()->getKind() ==
+           FunctionConsts::OP_ZORBA_JSON_BOX_1)
+    e = static_cast<const fo_expr*>(e)->get_arg(0);
+  return e;
+}
+
+
+static const expr* skip_object_name_wrappers(const expr* e)
+{
+  if (e->get_expr_kind() == cast_expr_kind)
+    e = static_cast<const cast_base_expr*>(e)->get_input();
+
+  if (e->get_expr_kind() == fo_expr_kind &&
+      static_cast<const fo_expr*>(e)->get_func()->getKind() ==
+        FunctionConsts::FN_DATA_1)
+    e = static_cast<const fo_expr*>(e)->get_arg(0);
+
+  return e;
+}
+
+
+// The optimizer moves an expr that does not depend on a FLWOR loop out of it:
+// $$temp := op:hoist(e) before the loop, and op:unhoist($$temp) in its place.
+// The options object written in the call is then the hoisted expr.
+static const expr* skip_hoisting(const expr* e)
+{
+  if (e->get_expr_kind() != fo_expr_kind ||
+      static_cast<const fo_expr*>(e)->get_func()->getKind() !=
+        FunctionConsts::OP_UNHOIST_1)
+    return e;
+
+  const expr* arg = static_cast<const fo_expr*>(e)->get_arg(0);
+
+  if (arg->get_expr_kind() == wrapper_expr_kind)
+    arg = static_cast<const wrapper_expr*>(arg)->get_input();
+
+  if (arg->get_expr_kind() != var_expr_kind)
+    return e;
+
+  const var_expr* var = static_cast<const var_expr*>(arg);
+
+  if (var->get_kind() != var_expr::let_var && var->get_kind() != var_expr::for_var)
+    return e;
+
+  const expr* domain = var->get_domain_expr();
+
+  if (domain == NULL ||
+      domain->get_expr_kind() != fo_expr_kind ||
+      static_cast<const fo_expr*>(domain)->get_func()->getKind() !=
+        FunctionConsts::OP_HOIST_1)
+    return e;
+
+  return static_cast<const fo_expr*>(domain)->get_arg(0);
+}
+
+
+namespace {
+
+/**
+ * The parse-json options of an object written as a literal.
+ */
+class LiteralParseOptions
+{
+  std::set<zstring> theSeen;
+  bool theStreaming = false;
+  bool theStrip = false;
+  bool theAllowMultiple = true;
+
+  enum Value { NOT_BOOLEAN, IS_FALSE, IS_TRUE };
+
+  // false if the object's value is not known here, or evaluating it raises.
+  bool add(const zstring& name, Value value)
+  {
+    if (!theSeen.insert(name).second)
+      return false;
+
+    bool* option = nullptr;
+    if (name == "zorba-streaming-members")
+      option = &theStreaming;
+    else if (name == "jsoniq-strip-top-level-array")
+      option = &theStrip;
+    else if (name == "jsoniq-multiple-top-level-items")
+      option = &theAllowMultiple;
+    else
+      return true;
+
+    if (value == NOT_BOOLEAN)
+      return false;
+
+    *option = (value == IS_TRUE);
+    return true;
+  }
+
+  static Value value_of(const store::Item* item)
+  {
+    if (!item->isAtomic() || item->getTypeCode() != store::XS_BOOLEAN)
+      return NOT_BOOLEAN;
+    return item->getBooleanValue() ? IS_TRUE : IS_FALSE;
+  }
+
+public:
+  bool read(const expr* options)
+  {
+    options = skip_type_wrappers(skip_hoisting(skip_type_wrappers(options)));
+
+    if (options->get_expr_kind() == const_expr_kind)
+    {
+      store::Item_t object = static_cast<const const_expr*>(options)->get_val();
+      if (!object->isObject())
+        return false;
+
+      store::Item_t key;
+      store::Iterator_t keys = object->getObjectKeys();
+      keys->open();
+      while (keys->next(key))
+      {
+        store::Item_t value = object->getObjectValue(key);
+        if (!add(key->getStringValue(), value_of(value.getp())))
+        {
+          keys->close();
+          return false;
+        }
+      }
+      keys->close();
+      return true;
+    }
+
+    if (options->get_expr_kind() != json_direct_object_expr_kind)
+      return false;
+
+    const json_direct_object_expr* object =
+      static_cast<const json_direct_object_expr*>(options);
+
+    for (csize i = 0; i < object->num_pairs(); ++i)
+    {
+      const expr* name = skip_object_name_wrappers(object->get_name_expr(i));
+      const expr* value = skip_object_value_wrappers(object->get_value_expr(i));
+
+      if (name->get_expr_kind() != const_expr_kind)
+        return false;
+
+      Value v;
+      if (value->get_expr_kind() == const_expr_kind)
+      {
+        v = value_of(static_cast<const const_expr*>(value)->get_val());
+      }
+      else if (value->get_expr_kind() == fo_expr_kind &&
+               static_cast<const fo_expr*>(value)->get_func()->getKind() ==
+                 FunctionConsts::FN_TRUE_0)
+      {
+        v = IS_TRUE;
+      }
+      else if (value->get_expr_kind() == fo_expr_kind &&
+               static_cast<const fo_expr*>(value)->get_func()->getKind() ==
+                 FunctionConsts::FN_FALSE_0)
+      {
+        v = IS_FALSE;
+      }
+      else
+      {
+        return false;
+      }
+
+      if (!add(static_cast<const const_expr*>(name)->get_val()->getStringValue(), v))
+        return false;
+    }
+    return true;
+  }
+
+  bool streaming() const { return theStreaming && !theStrip; }
+
+  bool allowMultiple() const { return theAllowMultiple; }
+};
+
+} // namespace
+
+
 PlanIter_t fn_jsoniq_members::codegen(
-  CompilerCB*,
+  CompilerCB* ccb,
   static_context* sctx,
   const QueryLoc& loc,
   std::vector<PlanIter_t>& argv,
   expr& arg) const
 {
+  // Unboxing a parse directly, with the option zorba-streaming-members written
+  // as a literal: no one else can see the top-level arrays, so they need not be
+  // built. See JSONParseMembersIterator.
+  const expr* input = static_cast<const fo_expr&>(arg).get_arg(0);
+
+  if (input->get_expr_kind() == fo_expr_kind &&
+      static_cast<const fo_expr*>(input)->get_func()->getKind() ==
+        FunctionConsts::FN_JSONIQ_PARSE_JSON_2)
+  {
+    const fo_expr* parseCall = static_cast<const fo_expr*>(input);
+    JSONParseIterator* parse = dynamic_cast<JSONParseIterator*>(argv[0].getp());
+    LiteralParseOptions options;
+
+    if (parse && options.read(parseCall->get_arg(1)) && options.streaming())
+    {
+      // The options stay a child, not read: when the optimizer has hoisted
+      // them, their iterator is a reference to a FLWOR variable, which must
+      // stay in the plan as long as the variable does.
+      std::vector<PlanIter_t> source(parse->getChildren());
+
+      QueryLoc relativeLoc = QueryLoc::null;
+      if (SingletonIterator* literal =
+            dynamic_cast<SingletonIterator*>(source[0].getp()))
+      {
+        if (literal->getValue()->isAtomic())
+          relativeLoc = literal->getLocation();
+      }
+
+      // Every call of file:read-text makes its own stream. Anything that can
+      // write during the evaluation could change the file between the two
+      // reads of it: a sequential expression, an update, a dynamic call, or a
+      // function item of a sequential or updating function, in the query or in
+      // a function it calls. If in doubt, the text is held in memory.
+      bool const streamIsPrivate =
+        !ccb->isSequential() &&
+        !ccb->theMayRunSideEffectsOrUpdates &&
+        is_read_text_utf8(parseCall->get_arg(0));
+
+      return new JSONParseMembersIterator(
+        sctx, parse->getLocation(), source, relativeLoc, streamIsPrivate,
+        options.allowMultiple());
+    }
+  }
+
   if (arg.get_return_type()->max_card() <= 1)
     return new SingleArrayMembersIterator(sctx, loc, argv[0]);
 

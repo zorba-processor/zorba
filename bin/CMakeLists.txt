@@ -90,6 +90,56 @@ ZORBA_ADD_TEST(bin/zorba_timeout zorbacmd --timeout 1 -q "count((1 to 9223372036
 ZORBA_SET_TEST_PROPERTY(bin/zorba_timeout PASS_REGULAR_EXPRESSION ".*ZXQP0068.*")
 ZORBA_ADD_TEST(bin/zorba_max_call_depth zorbacmd --max-udf-call-depth 10 -q "let $f := function($f, $n) { if ($n le 0) then 0 else $f($f, $n - 1) } return $f($f, 20)")
 ZORBA_SET_TEST_PROPERTY(bin/zorba_max_call_depth PASS_REGULAR_EXPRESSION ".*ZXQP0069.*")
+
+# The option zorba-streaming-members, written as a literal in a parse that is
+# unboxed directly, reads the members one at a time; anything else goes through
+# the store as a whole.
+SET (_plandir "${CMAKE_CURRENT_SOURCE_DIR}/test")
+ZORBA_ADD_TEST(bin/zorba_plan_parse_default zorbacmd --print-iterator-tree -f -q "${_plandir}/plan_parse_members.jq")
+ZORBA_SET_TEST_PROPERTY(bin/zorba_plan_parse_default PASS_REGULAR_EXPRESSION "MultiArrayMembersIterator")
+ZORBA_SET_TEST_PROPERTY(bin/zorba_plan_parse_default FAIL_REGULAR_EXPRESSION "JSONParseMembersIterator")
+FOREACH (_opt 0 1 2)
+  ZORBA_ADD_TEST(bin/zorba_plan_parse_streaming_O${_opt} zorbacmd --optimization-level ${_opt} --print-iterator-tree -f -q "${_plandir}/plan_parse_streaming.jq")
+  ZORBA_SET_TEST_PROPERTY(bin/zorba_plan_parse_streaming_O${_opt} PASS_REGULAR_EXPRESSION "JSONParseMembersIterator")
+  ZORBA_SET_TEST_PROPERTY(bin/zorba_plan_parse_streaming_O${_opt} FAIL_REGULAR_EXPRESSION "MultiArrayMembersIterator")
+ENDFOREACH ()
+FOREACH (_q plan_parse_streaming_off plan_parse_streaming_dynamic plan_parse_streaming_strip plan_parse_array_var)
+  ZORBA_ADD_TEST(bin/zorba_${_q} zorbacmd --print-iterator-tree -f -q "${_plandir}/${_q}.jq")
+  ZORBA_SET_TEST_PROPERTY(bin/zorba_${_q} PASS_REGULAR_EXPRESSION "MultiArrayMembersIterator")
+  ZORBA_SET_TEST_PROPERTY(bin/zorba_${_q} FAIL_REGULAR_EXPRESSION "JSONParseMembersIterator")
+ENDFOREACH ()
+# With the option, file:read-text stays in the file only when nothing in the query
+# can write during the evaluation: the plan shows which (file-stream). These tests
+# run zorbacmd through plan_check.cmake, which also requires exit status 0, so a
+# query that crashes or fails after printing its plan fails the test. Arguments
+# are separated by "|".
+ZORBA_TARGET_LOCATION (_zorbacmd zorbacmd)
+MACRO (ZORBA_PLAN_TEST NAME PATTERN ARGS)
+  ADD_TEST ("${NAME}" "${CMAKE_COMMAND}" "-DZORBACMD=${_zorbacmd}" "-DARGS=${ARGS}"
+    "-DPATTERN=${PATTERN}" -P "${_plandir}/plan_check.cmake")
+ENDMACRO (ZORBA_PLAN_TEST)
+SET (_planfile "|-e|f:=${_plandir}/plan_members.json")
+# At O0 the text of these queries is held in memory too, as before this check:
+# the tests that expect the file stream run at O1 and O2.
+FOREACH (_opt 1 2)
+  ZORBA_PLAN_TEST (bin/zorba_plan_parse_file_O${_opt} "JSONParseMembersIterator[^>]*file-stream=.true."
+    "--optimization-level|${_opt}|--print-iterator-tree|-f|-q|${_plandir}/plan_parse_file.jq${_planfile}")
+  # One query for each thing that makes the rule hold the text in memory.
+  FOREACH (_q update for_each eval udf seq_item)
+    ZORBA_PLAN_TEST (bin/zorba_plan_parse_file_${_q}_O${_opt} "JSONParseMembersIterator[^>]*file-stream=.false."
+      "--optimization-level|${_opt}|--print-iterator-tree|-f|-q|${_plandir}/plan_parse_file_${_q}.jq${_planfile}")
+  ENDFOREACH ()
+ENDFOREACH ()
+FOREACH (_opt 0 1 2)
+  ZORBA_PLAN_TEST (bin/zorba_plan_parse_file_dynamic_O${_opt} "JSONParseMembersIterator[^>]*file-stream=.false."
+    "--optimization-level|${_opt}|--print-iterator-tree|-f|-q|${_plandir}/plan_parse_file_dynamic.jq${_planfile}")
+  # p01-error-parity compares with and without the option: the side with it must
+  # reach JSONParseMembersIterator at every level.
+  ZORBA_PLAN_TEST (bin/zorba_plan_parity_O${_opt} "JSONParseMembersIterator"
+    "--optimization-level|${_opt}|--print-iterator-tree|-f|-q|${CMAKE_SOURCE_DIR}/test/rbkt/Queries/zorba/jsoniq-array-members/p01-error-parity.jq")
+ENDFOREACH ()
+ZORBA_ADD_TEST(bin/zorba_timeout_parse_members zorbacmd --timeout 1 -f -q "${_plandir}/timeout_parse_members.jq")
+ZORBA_SET_TEST_PROPERTY(bin/zorba_timeout_parse_members PASS_REGULAR_EXPRESSION ".*ZXQP0068.*")
 # --max-expr-depth sets the policy's expression nesting limit.
 ZORBA_ADD_TEST(bin/zorba_max_expr_depth zorbacmd --max-expr-depth 10 -q "((((((((((((1))))))))))))")
 ZORBA_SET_TEST_PROPERTY(bin/zorba_max_expr_depth PASS_REGULAR_EXPRESSION ".*ZXQP0070.*")

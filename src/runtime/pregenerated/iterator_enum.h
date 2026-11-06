@@ -146,6 +146,7 @@
   TYPE_JSONDecodeFromRoundtripIterator,
   TYPE_JSONEncodeForRoundtripIterator,
   TYPE_JSONParseIterator,
+  TYPE_JSONParseMembersIterator,
   TYPE_MultiObjectKeysIterator,
   TYPE_SingleObjectKeysIterator,
   TYPE_MultiObjectLookupIterator,

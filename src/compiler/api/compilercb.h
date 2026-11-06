@@ -280,6 +280,12 @@ ZORBA_DLL_PUBLIC void query_resources_fail_walk(unsigned long edge);
   False once the compiler has checked that no side effect can run during the
   evaluation of the query (expr_tools::may_run_side_effects). Until then it is true.
 
+  theMayRunSideEffectsOrUpdates :
+  -------------------------------
+  The same as theMayRunSideEffects, but also true if the query can update, or
+  holds a function item of a sequential or updating function
+  (expr_tools::may_run_side_effects_or_updates).
+
   theOuterMayRunSideEffects :
   ---------------------------
   The same, for the query that runs this one through eval.
@@ -433,6 +439,8 @@ public:
   bool                      theOuterMayRunSideEffects;
 
   bool                      theMayRunSideEffects;
+
+  bool                      theMayRunSideEffectsOrUpdates;
 
   bool                      theHaveTimeout;
 

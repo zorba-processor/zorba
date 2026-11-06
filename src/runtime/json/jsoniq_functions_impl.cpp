@@ -17,6 +17,8 @@
 
 
 #include <sstream>
+#include <string>
+#include <utility>
 
 #include "system/globalenv.h"
 
@@ -857,6 +859,11 @@ bool JSONParseIterator::nextImpl(
       processBooleanOption(
         lOptions, "jsoniq-strip-top-level-array", &lStripTopLevelArray
       );
+      // It takes effect in fn_jsoniq_members::codegen, or not at all.
+      bool lStreamingMembers = false;
+      processBooleanOption(
+        lOptions, "zorba-streaming-members", &lStreamingMembers
+      );
     }
 
     if (lInput->isStreamable())
@@ -903,6 +910,224 @@ bool JSONParseIterator::nextImpl(
       }
       state->theGotOne = true;
       STACK_PUSH( true, state );
+    }
+  }
+  STACK_END(state);
+}
+
+
+/*******************************************************************************
+  fn-jsoniq:members(fn-jsoniq:parse-json($source as xs:string?, $options)) with
+  the option zorba-streaming-members
+
+  Returns the members of the top-level arrays without building the arrays.
+
+  Unboxing a built array parses it whole before its first member, so a query
+  that stops early still gets any error in the rest of the array, and before any
+  other error that a member would cause. To keep that, each top-level value is
+  parsed twice: theScanner checks it without building items, which raises the
+  same errors in the same order, and then theLoader goes back and returns the
+  members. A value after the array is not read until the query asks for more than
+  the array holds, as with the built array. Peak memory is the largest member,
+  plus the text unless it stays in a file.
+
+  theStream is read twice, so it must not move in between: when the file stream
+  has another possible reader (a variable holding the text; a query that writes
+  files, which could change it between the two parses) or cannot seek, the text
+  is copied here first.
+********************************************************************************/
+static void releaseParseMembers(JSONParseMembersIteratorState* state)
+{
+  delete state->theLoader;
+  delete state->theScanner;
+  delete state->theOwnedStream;
+  state->theLoader = nullptr;
+  state->theScanner = nullptr;
+  state->theOwnedStream = nullptr;
+  state->theStream = nullptr;
+  state->theInput = nullptr;
+  state->theGotOne = false;
+}
+
+
+void JSONParseMembersIteratorState::init(PlanState& aState)
+{
+  PlanIteratorState::init(aState);
+  theStream = nullptr;
+  theOwnedStream = nullptr;
+  theScanner = nullptr;
+  theLoader = nullptr;
+  theGotOne = false;
+}
+
+
+void JSONParseMembersIteratorState::reset(PlanState& aState)
+{
+  PlanIteratorState::reset(aState);
+  releaseParseMembers(this);
+}
+
+
+JSONParseMembersIteratorState::~JSONParseMembersIteratorState()
+{
+  releaseParseMembers(this);
+}
+
+
+/**
+ * Checks the top-level values up to the end of the next array, and goes back to
+ * the start of that array.
+ *
+ * @return false if there is no other array.
+ */
+static bool scanToNextTopLevelArray(
+    JSONParseMembersIteratorState* state,
+    PlanState& planState,
+    bool allowMultiple,
+    const QueryLoc& loc)
+{
+  store::Item_t item;
+
+  while (true)
+  {
+    std::streampos const valueStart = state->theStream->tellg();
+
+    while (true)
+    {
+      if (!state->theScanner->next(&item))
+        return false;
+
+      if (!state->theScanner->in_top_level_array())
+        break;
+
+      planState.chargeWork(1, loc);
+    }
+
+    if (!allowMultiple && state->theGotOne)
+    {
+      throw XQUERY_EXCEPTION(
+        jerr::JNDY0021,
+        ERROR_PARAMS( ZED( JNDY0021_UnexpectedExtraContent ) ),
+        ERROR_LOC( loc )
+      );
+    }
+    state->theGotOne = true;
+
+    if (state->theScanner->last_value_was_array())
+    {
+      state->theStream->clear();
+      state->theStream->seekg(valueStart);
+      return true;
+    }
+    // A top-level object has no members: go on to the next value.
+  }
+}
+
+
+/**
+ * Sets up the stream and the two loaders of the input.
+ */
+static void openParseMembers(
+    JSONParseMembersIteratorState* state,
+    const store::Item_t& input,
+    bool streamIsPrivate,
+    const QueryLoc& relativeLocation)
+{
+  char const *stream_uri = nullptr;
+
+  if (input->isStreamable())
+  {
+    std::istream& lStream = input->getStream();
+    stream_uri = get_uri(lStream);
+
+    if (streamIsPrivate && lStream.tellg() != std::streampos(-1))
+    {
+      state->theInput = input;
+      state->theStream = &lStream;
+    }
+    else
+    {
+      std::string lText;
+      char lBuf[65536];
+      while (lStream.read(lBuf, sizeof lBuf) || lStream.gcount() > 0)
+        lText.append(lBuf, static_cast<size_t>(lStream.gcount()));
+      state->theOwnedStream = new std::istringstream(std::move(lText));
+      state->theStream = state->theOwnedStream;
+    }
+  }
+  else
+  {
+    state->theOwnedStream =
+      new std::stringstream(input->getStringValue().c_str());
+    state->theStream = state->theOwnedStream;
+  }
+
+  // One byte order mark, as for one loader: the scanner skips it, and the
+  // loader starts where the scanner started.
+  state->theScanner = new json::loader(*state->theStream, true);
+  state->theLoader = new json::loader(*state->theStream, true, false, false);
+  state->theScanner->unbox_top_level_arrays();
+  state->theScanner->check_only();
+  state->theLoader->unbox_top_level_arrays();
+
+  // The locations as in JSONParseIterator: of the string literal in the query,
+  // or of the file.
+  if (!input->isStreamable() && relativeLocation)
+  {
+    for (json::loader* lLoader : { state->theScanner, state->theLoader })
+      lLoader->set_loc(
+        relativeLocation.getFilename().c_str(),
+        relativeLocation.getLineBegin(),
+        relativeLocation.getColumnBegin());
+  }
+
+  if (stream_uri)
+  {
+    state->theScanner->set_loc(stream_uri, 1, 1);
+    state->theLoader->set_loc(stream_uri, 1, 1);
+  }
+}
+
+
+/**
+ * Whether the query being run allows the file stream. theStreamIsPrivate is
+ * decided by the query that compiled this iterator, which is not always the one
+ * that runs it: the body of a function loaded with StaticContext::loadProlog(),
+ * or of a function item made by another query, is compiled with the state of
+ * that prolog or query. The query being run must not be able to write either.
+ */
+static bool runningQueryCannotWrite(const PlanState& planState)
+{
+  const CompilerCB* ccb = planState.theCompilerCB;
+
+  return ccb != NULL &&
+         !ccb->isSequential() &&
+         !ccb->theMayRunSideEffectsOrUpdates;
+}
+
+
+bool JSONParseMembersIterator::nextImpl(
+    store::Item_t& result,
+    PlanState& planState) const
+{
+  store::Item_t lInput;
+
+  JSONParseMembersIteratorState* state;
+  DEFAULT_STACK_INIT(JSONParseMembersIteratorState, state, planState);
+
+  if (consumeNext(lInput, theChildren[0].getp(), planState))
+  {
+    openParseMembers(state,
+                     lInput,
+                     theStreamIsPrivate && runningQueryCannotWrite(planState),
+                     theRelativeLocation);
+
+    while (scanToNextTopLevelArray(state, planState, theAllowMultiple, loc))
+    {
+      while (state->theLoader->next(&result) && !result.isNull())
+      {
+        STACK_PUSH(true, state);
+      }
     }
   }
   STACK_END(state);

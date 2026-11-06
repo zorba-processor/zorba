@@ -26,6 +26,9 @@ Inputs:
   effect can run. A moving average over 10 points takes 38-39 MiB at 10^6 records from
   `gen`, `lines` or `whole`, against 1160, 1160 and 708 MiB before. `array` stays at
   724 MiB: the parser holds the input before any window sees it.
+- **With the option `zorba-streaming-members`, `parse-json(...)[]` takes 36 MiB**
+  instead of about 720 MiB at 10^6 records, with or without a window clause; see
+  [One large JSON array](#one-large-json-array).
 - **Windows that stay open cost linear time when the end condition is shared:** 10^6
   records take 15 s. The same query took 28.7 s at 16000 records.
 - **Items that a window can still return stay in memory:** with `$w` read by the return
@@ -219,6 +222,59 @@ in a temp sequence (`theDomainSeq`), and a window is a pair of positions in it.
 - A domain that does not depend on an enclosing `for` can be hoisted out of it by the
   optimizer: a `let` then holds the input for all the iterations.
 
+## One large JSON array
+
+`run_array.sh`, run 41645367526: three runs in one job on an `ubuntu-24.04` runner, the
+lowest time of 3 runs and the largest peak RSS. Before is `7c8d649f9`, after is
+`9fb980aba`. 10^6 records, a 78 MB array file. `filter` is `filter.jq`, `aggregate` is
+`baseline`, `tumbling` is `sessions`. The option is
+`{ "zorba-streaming-members" : true }`.
+
+| query | input | before ms | before MiB | after ms | after MiB |
+|---|---|---:|---:|---:|---:|
+| filter | `parse-json(file:read-text(F))[]` | 4346 | 722 | 4596 | 722 |
+| aggregate | same | 4807 | 722 | 4524 | 722 |
+| tumbling | same | 5454 | 722 | 5541 | 722 |
+| filter | same, with the option | - | - | 6177 | 36 |
+| aggregate | same, with the option | - | - | 6449 | 36 |
+| tumbling | same, with the option | - | - | 7909 | 36 |
+| filter | an ordinary string, with the option | - | - | 6046 | 365 |
+| aggregate | an ordinary string, with the option | - | - | 6344 | 365 |
+| tumbling | an ordinary string, with the option | - | - | 7674 | 365 |
+| filter | `dir:open(D, F).content[]` | 5190 | 985 | 5409 | 985 |
+| aggregate | same | 5426 | 985 | 5511 | 985 |
+| tumbling | same | 6337 | 986 | 6875 | 986 |
+| first member | `parse-json(file:read-text(F))[][1].id` | 3928 | 720 | 3954 | 720 |
+| first member | same, with the option | - | - | 2477 | 36 |
+
+With the option, a query that reads all the members takes 34% to 43% more time than the
+same build without it, for the second parse of each top-level value; one that stops at
+the first member takes 37% less. Without the option the plan is the one before; the time
+differences above are of both signs, between -6% and +9%.
+
+The first parse checks the JSON without building items. In the same job, with a first
+parse that built the items and dropped them:
+
+| query | with the option, building items: ms | not building them: ms |
+|---|---:|---:|
+| filter | 6819 | 6177 |
+| aggregate | 7111 | 6449 |
+| tumbling | 8385 | 7909 |
+| first member | 3148 | 2477 |
+
+Where the memory goes, as peak RSS without the option:
+
+| query | ms | peak RSS MiB |
+|---|---:|---:|
+| `1` (the process) | 22 | 35 |
+| `string-length(file:read-text(F))` (the text in memory) | 439 | 165 |
+| `size(parse-json(file:read-text(F)))` | 3930 | 720 |
+| `size(parse-json(file:read-text(N)))`, N holding 10^6 nulls | 173 | 53 |
+
+Of the 685 MiB above the process, the array takes about 18 MiB and the members about 667
+MiB, 700 bytes per record. `parse-json(file:read-text(F))` reads the text from the file,
+so it holds none of it.
+
 ## Optimization candidates
 
 None of these is implemented.
@@ -229,4 +285,3 @@ None of these is implemented.
 | Stop testing an open window once its condition cannot change (for example `$e - $s eq k` past k) | Avoids the quadratic cost only for conditions the compiler can prove monotonic. Only for `only end`: without it, the window is returned at the end. |
 | Keep in each window only the items its start and end variables read, when `$w` has no reference | Queries on `$s` and `$e` alone with many open windows, from the input to the items read. |
 | Incremental `count`, `sum` and `avg` on sliding windows | `moving_minutes` from records times window size to records. Only for these aggregates over `$w` or a navigation on it. |
-| Streaming `[]` on a top-level array in a file | `array` input at the 36 MiB of `whole`; `jsoniq-strip-top-level-array` is the existing path to measure first. |

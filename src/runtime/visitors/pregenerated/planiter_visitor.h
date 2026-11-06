@@ -297,6 +297,8 @@ namespace zorba{
 
     class JSONParseIterator;
 
+    class JSONParseMembersIterator;
+
     class MultiObjectKeysIterator;
 
     class SingleObjectKeysIterator;
@@ -1174,6 +1176,9 @@ public:
 
     virtual void beginVisit ( const JSONParseIterator& ) = 0;
     virtual void endVisit   ( const JSONParseIterator& ) = 0;
+
+    virtual void beginVisit ( const JSONParseMembersIterator& ) = 0;
+    virtual void endVisit   ( const JSONParseMembersIterator& ) = 0;
 
     virtual void beginVisit ( const MultiObjectKeysIterator& ) = 0;
     virtual void endVisit   ( const MultiObjectKeysIterator& ) = 0;

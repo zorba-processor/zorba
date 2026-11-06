@@ -468,6 +468,9 @@ namespace zorba {
     void beginVisit( const JSONParseIterator& );
     void endVisit  ( const JSONParseIterator& );
 
+    void beginVisit( const JSONParseMembersIterator& );
+    void endVisit  ( const JSONParseMembersIterator& );
+
     void beginVisit( const MultiObjectKeysIterator& );
     void endVisit  ( const MultiObjectKeysIterator& );
 

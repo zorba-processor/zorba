@@ -48,9 +48,11 @@ public:
    * be returned.
    * @param strip_top_level_array If \c true, strips the top-level array, if
    * any.
+   * @param skip_bom If \c true, skips a byte order mark at the current
+   * position of \a is.  Two loaders that share a stream skip it only once.
    */
   loader( std::istream &is, bool allow_multiple = false,
-          bool strip_top_level_array = false );
+          bool strip_top_level_array = false, bool skip_bom = true );
 
   /**
    * Destroys this %loader.
@@ -69,6 +71,43 @@ public:
    * @return Returns \c true only if an Item was gotten.
    */
   bool next( store::Item_t *result );
+
+  /**
+   * Makes next() return the members of each top-level array, one at a time and
+   * without building the array, and then a null Item for the end of that array.
+   * A top-level array counts for the nesting limit as it does when it is built.
+   * Top-level objects are returned as usual: in_top_level_array() tells them
+   * from members.
+   */
+  void unbox_top_level_arrays() {
+    unbox_top_level_arrays_ = true;
+  }
+
+  /**
+   * With unbox_top_level_arrays(), makes next() check the JSON without building
+   * Items: it raises what building them raises, in the same order, and returns
+   * a null Item for each member and for the end of each top-level value.
+   * in_top_level_array() and last_value_was_array() tell them apart.
+   */
+  void check_only() {
+    check_only_ = true;
+  }
+
+  /**
+   * Gets whether the top-level value that check_only() parsing has just ended
+   * was an array.
+   */
+  bool last_value_was_array() const {
+    return last_value_was_array_;
+  }
+
+  /**
+   * Gets whether the Item that next() returned is a member of a top-level array
+   * (see unbox_top_level_arrays()).
+   */
+  bool in_top_level_array() const {
+    return in_top_level_array_;
+  }
 
   /**
    * Sets the file location.
@@ -112,6 +151,7 @@ private:
 
   void check_depth( json::token const& );
   void add_value( store::Item_t const& );
+  void check_duplicate_keys( std::vector<store::Item_t> const& ) const;
   void clear_stack();
   void make_key( zstring const&, store::Item_t* );
 
@@ -127,6 +167,10 @@ private:
   parser parser_;
   bool const strip_top_level_array_;
   bool stripped_top_level_array_;
+  bool unbox_top_level_arrays_;
+  bool in_top_level_array_;
+  bool check_only_;
+  bool last_value_was_array_;
   uint32_t depth_;                      // arrays and objects on stack_
 
   //

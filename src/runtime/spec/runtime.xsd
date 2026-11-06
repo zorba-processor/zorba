@@ -196,6 +196,7 @@
         <xs:attribute name="brief" type="xs:string" use="required"/>
         <xs:attribute name="getterName" type="xs:string"/>
         <xs:attribute name="setterName" type="xs:string"/>
+        <xs:attribute name="printName" type="xs:string"/>
       </xs:extension>
     </xs:simpleContent>
   </xs:complexType>
