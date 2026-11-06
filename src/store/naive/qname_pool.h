@@ -121,6 +121,11 @@ public:
   // zorba_test_qname_table_bytes().
   std::size_t tableBytes() const;
 
+  // Drops the names no one holds (cached for reuse) from the pool, for the same
+  // tests: the names a call leaves cached depend on the order of its insertions,
+  // not on what it leaked. See zorba_test_qname_pool_flush().
+  void flushUnused();
+
   void insert(
       store::Item_t& res,
       const char* ns,

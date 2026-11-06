@@ -88,11 +88,12 @@ char const usage[] =
   "  --max-memory <bytes> memory limit of the server (default 4294967296,\n"
   "                       0: none; Linux only): a query that needs more\n"
   "                       fails with the tool error memory_limit, and the\n"
-  "                       server answers the next call. If memory runs out\n"
-  "                       where that cannot be done, for example while the\n"
-  "                       server starts or before the id of a request is\n"
-  "                       read, it exits with status 3 and a message on\n"
-  "                       stderr, with no response to the call. Libraries\n"
+  "                       server answers the next call; if the id of the\n"
+  "                       call could not be read, the error has \"id\": null,\n"
+  "                       and a notification gets no response. If memory runs\n"
+  "                       out where that cannot be done, for example while the\n"
+  "                       server starts, it exits with status 3 and a message\n"
+  "                       on stderr, with no response to the call. Libraries\n"
   "                       end it in other ways: abort, with a core file if\n"
   "                       the system keeps them (Xerces-C releasing a schema;\n"
   "                       libxml2 or glibc on the first use by a thread);\n"
@@ -347,13 +348,6 @@ int main( int argc, char const *argv[] ) {
         mcp::Server::AfterFailure const after = server.after_failure();
         if ( after == mcp::Server::AfterFailure::nothing )
           continue;
-        if ( after == mcp::Server::AfterFailure::end ) {
-          std::cerr << "zorba-mcp: out of memory before the id of a request "
-                       "could be read; ending, so that no client waits for it"
-                    << std::endl;
-          status = 3;
-          break;
-        }
         if ( std::fprintf( out, "{\"jsonrpc\":\"2.0\",\"id\":%s,\"error\":{\"code\":-32603,"
                            "\"message\":\"Internal error: out of memory\"}}\n",
                            server.current_id() ) < 0 ||

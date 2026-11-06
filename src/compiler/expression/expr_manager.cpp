@@ -114,6 +114,23 @@ ExprManager::~ExprManager()
 }
 
 
+namespace {
+template <class T>
+void room_for_one(std::vector<T>& v)
+{
+  if (v.size() == v.capacity())
+    v.reserve(v.empty() ? 16 : 2 * v.size());
+}
+}
+
+void ExprManager::make_room(expr*) { room_for_one(theExprs); }
+void ExprManager::make_room(flwor_clause*) { room_for_one(theFlworClauses); }
+void ExprManager::make_room(flwor_wincond*) { room_for_one(theWinconds); }
+void ExprManager::make_room(catch_clause*) { room_for_one(theCatchClauses); }
+void ExprManager::make_room(copy_clause*) { room_for_one(theCopyClauses); }
+void ExprManager::make_room(pragma*) { room_for_one(thePragmas); }
+
+
 void ExprManager::reg(expr* exp)
 {
   theExprs.push_back(exp);
@@ -153,11 +170,13 @@ void ExprManager::reg(pragma* pragma)
 ////////////////////////////////////////////////////////////////////////////////
 
 #define CREATE_AND_RETURN_EXPR(EXPRTYPE, ...)                          \
+  make_room(static_cast<EXPRTYPE*>(NULL));                             \
   EXPRTYPE* EXPPTR = new (theMemoryMgr) EXPRTYPE(theCCB, __VA_ARGS__); \
   reg(EXPPTR);                                                         \
   return EXPPTR
 
 #define CREATE_AND_RETURN(TYPE, ...)                   \
+  make_room(static_cast<TYPE*>(NULL));                 \
   TYPE* EXPPTR = new (theMemoryMgr) TYPE(__VA_ARGS__); \
   reg(EXPPTR);                                         \
   return EXPPTR
@@ -505,6 +524,7 @@ function_trace_expr* ExprManager::create_function_trace_expr(
     expr* aExpr)
 {
   //this function gets the ExprManager from the expression it recieves.
+  make_room(static_cast<expr*>(NULL));
   function_trace_expr* e = new (theMemoryMgr) function_trace_expr(udf, aExpr);
   reg(e);
   return e;
@@ -561,6 +581,7 @@ var_expr* ExprManager::create_var_expr(
     user_function* udf,
     const var_expr& source)
 {
+  make_room(static_cast<expr*>(NULL));
   var_expr* e = new (theMemoryMgr) var_expr(udf, source);
   reg(e);
   return e;

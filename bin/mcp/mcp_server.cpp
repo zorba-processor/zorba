@@ -18,6 +18,7 @@
 #include "query_primer.h"
 
 #include <algorithm>
+#include <iterator>
 #include <cstring>
 #include <exception>
 #include <filesystem>
@@ -481,8 +482,6 @@ bool Server::load_predefined( std::string const &path,
     return false;
   }
   std::ifstream in( path.c_str(), std::ios::binary );
-  std::stringstream buf;
-  buf << in.rdbuf();
   if ( !in ) {
     theLog << server_name << ": skipping " << path << ": cannot read it"
            << std::endl;
@@ -491,7 +490,10 @@ bool Server::load_predefined( std::string const &path,
   Predefined p;
   p.name = name;
   p.path = path;
-  p.source = buf.str();
+  // Not a stream insertion, which leaves a shorter text when it cannot grow:
+  // std::bad_alloc goes to the caller.
+  p.source.assign( std::istreambuf_iterator<char>( in ),
+                   std::istreambuf_iterator<char>() );
   p.description = leading_comment( p.source );
   if ( p.description.empty() )
     p.description = "Runs the predefined query " +
@@ -836,8 +838,7 @@ std::string Server::handle( std::string const &message ) {
   catch ( std::exception const &e ) {
     // Whatever it was (out of memory, most likely), the next request may work.
     // If it came before or while the id was read, the message is read once more
-    // for it:
-    // the memory of the first attempt is back by now.
+    // for it: the memory of the first attempt is back by now.
     if ( theCurrentKind == MessageKind::unknown ||
          theCurrentKind == MessageKind::id_lost ) {
       try {
@@ -855,8 +856,11 @@ std::string Server::handle( std::string const &message ) {
     }
     if ( theCurrentKind == MessageKind::notification )
       return std::string();
-    if ( theCurrentKind == MessageKind::id_lost )
-      throw std::bad_alloc();   // main() ends the process: see after_failure()
+    // An id that could not be read is null in the response (JSON-RPC 2.0, section
+    // 5); theCurrentId is still "null" then.
+    if ( theCurrentKind == MessageKind::id_lost ||
+         theCurrentKind == MessageKind::unknown )
+      request_id = Json();
     return error_response( request_id, INTERNAL_ERROR,
       std::string( "Internal error: " ) + e.what() ).dump();
   }
@@ -880,17 +884,8 @@ void Server::identify( Json const &msg, Json *request_id ) {
 }
 
 Server::AfterFailure Server::after_failure() const {
-  switch ( theCurrentKind ) {
-    case MessageKind::notification:
-      return AfterFailure::nothing;
-    case MessageKind::request:
-    case MessageKind::without_id:
-      return AfterFailure::answer;
-    case MessageKind::unknown:
-    case MessageKind::id_lost:
-      break;
-  }
-  return AfterFailure::end;
+  return theCurrentKind == MessageKind::notification ? AfterFailure::nothing
+                                                     : AfterFailure::answer;
 }
 
 std::string Server::handle_message( std::string const &message,

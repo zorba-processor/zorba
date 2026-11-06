@@ -91,6 +91,8 @@ using namespace zorba::mcp;
 // and doubling, and depends on the order of insertions and erasures: the memory
 // a call leaves is measured without it.
 extern "C" std::size_t zorba_test_qname_table_bytes();
+// Drops the names no one holds from the pool (another test hook).
+extern "C" void zorba_test_qname_pool_flush();
 #endif
 
 #if defined(__linux__)
@@ -2775,6 +2777,9 @@ void exhaust_sweep( Fixture const &f, std::string const &name, Sweep const &s ) 
         if ( !parse_json( server.handle( again ), &r, &why ) ||
              text_of( r ) != s.expected )
           out += " | same call again: " + text_of( r );
+        // The names cached for reuse depend on the order of insertions: dropped,
+        // in this run and in the one with no failure alike.
+        zorba_test_qname_pool_flush();
         k = static_cast<long>( new_live.load() ) - live0 -
           ( static_cast<long>( zorba_test_qname_table_bytes() ) - table0 );
       }
@@ -2919,10 +2924,11 @@ void exhaust_sweep( Fixture const &f, std::string const &name, Sweep const &s ) 
               << " measured, " << keeping << " keep memory, at most " << max_kept
               << " bytes; " << ended << " of " << tried
               << " points ended before they could measure" << std::endl;
-    check( sampled >= std::min( sweep_min_measured, completed ),
+    // Of the points whose child could measure, every other one at least.
+    check( sampled >= std::min( sweep_min_measured, completed / every ),
            name + ": enough points measured",
            std::to_string( sampled ) + " of " + std::to_string( completed ) +
-           " that could" );
+           " that could, every " + std::to_string( every ) );
     check( keeping <= std::max( 2L, sampled / 10 ),
            name + ": failed calls give their memory back",
            std::to_string( keeping ) + " of " + std::to_string( sampled ) );
@@ -3163,7 +3169,9 @@ void test_sweep_streamable_text( Fixture const &f ) {
   s.before.push_back( s.query );
   s.after_compile = true;
   s.expected = std::to_string( 2 * text.size() );
-  s.known = { starting( "terminate N11xercesc_", 4, 1, "OutOfMemoryExceptionE" ),
+  // The checks of a path, as in the sweep of the document cache.
+  s.known = { starting( "error: file:FOFL9999: ", 6 ),
+              starting( "terminate N11xercesc_", 4, 1, "OutOfMemoryExceptionE" ),
               starting( "terminate N11xercesc_", 250, 8, "OutOfMemoryExceptionE" ),
               library_crash( "signal 11 in libicu", true, 36 ) };
   exhaust_sweep( f, "string read from a file", s );

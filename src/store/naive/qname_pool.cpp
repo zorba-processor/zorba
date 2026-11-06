@@ -614,6 +614,28 @@ std::size_t QNamePool::tableBytes() const
   return theHashSet.theHashTab.capacity() * sizeof(QNHashEntry);
 }
 
+void QNamePool::flushUnused()
+{
+  // An unnormalized name holds its normalized one: that one is free only after,
+  // so this runs until a pass drops nothing.
+  for (bool dropped = true; dropped; )
+  {
+    dropped = false;
+    for (csize i = 1; i < theCacheSize; ++i)
+    {
+      QNameItem* qn = &theCache[i];
+      if (!qn->isValid() || qn->getRefCount() != 0)
+        continue;
+      QNameItem* victim = NULL;
+      theHashSet.eraseNoSync(qn, CompareFunction::hash(qn));
+      qn->invalidate(true, &victim);
+      if (victim != NULL)
+        victim->removeReference();
+      dropped = true;
+    }
+  }
+}
+
 } // namespace simplestore
 } // namespace zorba
 
@@ -625,4 +647,13 @@ std::size_t QNamePool::tableBytes() const
 extern "C" ZORBA_DLL_PUBLIC std::size_t zorba_test_qname_table_bytes()
 {
   return GET_STORE().getQNamePool().tableBytes();
+}
+
+/*******************************************************************************
+  A test hook: drops the names no one holds from the QName pool (see
+  QNamePool::flushUnused()).
+********************************************************************************/
+extern "C" ZORBA_DLL_PUBLIC void zorba_test_qname_pool_flush()
+{
+  GET_STORE().getQNamePool().flushUnused();
 }

@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#include <cassert>
+
 #include "util/stl_util.h"
 #include "diagnostics/assert.h"
 #include "diagnostics/util_macros.h"
@@ -140,6 +142,8 @@ void parsenode::free()
 
   if (tDestroying)
   {
+    // Queued once, by the free() of its last reference.
+    assert(getRefCount() == 0 && theNextPending == nullptr);
     theNextPending = tPending;
     tPending = this;
     return;

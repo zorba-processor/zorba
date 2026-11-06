@@ -562,7 +562,7 @@ IF (ZORBA_WITH_FILE_ACCESS)
     ADD_TEST (NAME bin/mcp/max_memory_help
       COMMAND "$<TARGET_FILE:zorba_mcp${_mcp_suffix}>" --help)
     SET_TESTS_PROPERTIES (bin/mcp/max_memory_help PROPERTIES
-      PASS_REGULAR_EXPRESSION "fails with the tool error memory_limit, and the\n *server answers the next call[.] If memory runs out\n *where that cannot be done, for example while the\n *server starts or before the id of a request is\n *read, it exits with status 3 and a message on\n *stderr, with no response to the call[.] Libraries\n *end it in other ways: abort, with a core file if\n *the system keeps them [(]Xerces-C releasing a schema;\n *libxml2 or glibc on the first use by a thread[)];\n *SIGSEGV [(]ICU compiling a regular expression; rarely\n *while a query compiles, or near the end of a\n *dir:open call[)]; status 2 [(]the query scanner, while\n *a query compiles[)]")
+      PASS_REGULAR_EXPRESSION "fails with the tool error memory_limit, and the\n *server answers the next call; if the id of the\n *call could not be read, the error has .id.: null,\n *and a notification gets no response[.] If memory runs\n *out where that cannot be done, for example while the\n *server starts, it exits with status 3 and a message\n *on stderr, with no response to the call[.] Libraries\n *end it in other ways: abort, with a core file if\n *the system keeps them [(]Xerces-C releasing a schema;\n *libxml2 or glibc on the first use by a thread[)];\n *SIGSEGV [(]ICU compiling a regular expression; rarely\n *while a query compiles, or near the end of a\n *dir:open call[)]; status 2 [(]the query scanner, while\n *a query compiles[)]")
 
     # A --language value other than xquery and jsoniq is refused.
     ADD_TEST (NAME bin/mcp/language_invalid

@@ -103,9 +103,9 @@ Rules this code depends on:
     release build, a SIGSEGV in the engine while a query compiled was seen once in
     2654 allocations (arm64): the process ends. The sweep prints its stack.
   - Running out of memory before the id of a request is read, and again when the
-    message is read once more for its id: `zorba-mcp` cannot answer it, so it ends
-    with status 3 and a message. A notification is never answered, also when memory
-    runs out.
+    message is read once more for its id: the error response has `"id": null`, as
+    JSON-RPC 2.0 (section 5) requires when the id cannot be determined. A
+    notification is never answered, also when memory runs out.
   - While a query compiles, a failure can be reported as an error of the query, for
     example that a module was not found.
   - A failure in the checks of a path can be reported as a denied or invalid path, or

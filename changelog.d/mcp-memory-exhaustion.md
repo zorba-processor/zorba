@@ -21,9 +21,17 @@
 - `zorba-mcp`: a line of input longer than the message limit is refused without
   reading it into memory.
 - `zorba-mcp`: a notification is never answered, also when memory runs out while it
-  is handled; before, the answer had `"id": null`. A request whose id could not be
-  read for lack of memory, even when read once more, ends the server with status 3
-  instead of getting an answer its client could not match.
+  is handled; before, an error with `"id": null` was sent for it. A request is
+  answered with its own id when memory runs out after its id is read; before, a
+  failure while the id was copied gave `"id": null`.
 - Running out of memory while the parse tree of a query was released could end the
   process (`std::terminate`, status 3 in `zorba-mcp`): the queue of nodes waiting to
   be destroyed allocated.
+- Running out of memory while the text of a query was copied for the compiler
+  compiled the part copied so far: `123456789012345678` could run as
+  `123456789012345`, a wrong answer reported as a success. The text is now copied
+  whole or the call fails. The same holds for a streamable string that is made
+  seekable or read whole, for `createBase64Binary` from a stream in the C++ API,
+  and for the source of a `zorba-mcp` predefined query.
+- Running out of memory while a query object was created, or while an expression
+  was recorded for the compiler, left memory behind.

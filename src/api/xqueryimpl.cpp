@@ -161,15 +161,31 @@ XQueryImpl::XQueryImpl()
   //      That is also the reason why we need static function in the error manager
   //      those should also go away and errors should be fired from the error manager
   //      into the error handler
-  theDiagnosticHandler = new DiagnosticHandler();
-  theXQueryDiagnostics = new XQueryDiagnostics();
+  // If an allocation fails, what was made before is freed: the destructor does
+  // not run for a constructor that throws.
+  theDiagnosticHandler = NULL;
+  theXQueryDiagnostics = NULL;
+  theCompilerCB = NULL;
+  try
+  {
+    theDiagnosticHandler = new DiagnosticHandler();
+    theXQueryDiagnostics = new XQueryDiagnostics();
 
-  theCompilerCB = new CompilerCB(theXQueryDiagnostics);
+    theCompilerCB = new CompilerCB(theXQueryDiagnostics);
 
-  theResources = new QueryResources();
-  theCompilerCB->theResources = theResources.getp();
+    theResources = new QueryResources();
+    theCompilerCB->theResources = theResources.getp();
 
-  theDynamicContext = new dynamic_context();
+    theDynamicContext = new dynamic_context();
+  }
+  catch (...)
+  {
+    theResources = NULL;
+    delete theCompilerCB;
+    delete theXQueryDiagnostics;
+    delete theDiagnosticHandler;
+    throw;
+  }
 }
 
 

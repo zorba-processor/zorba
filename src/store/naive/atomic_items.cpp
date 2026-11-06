@@ -17,6 +17,9 @@
 #include "atomic_items.h"
 
 #include <algorithm>
+#include <iterator>
+#include <sstream>
+#include <string>
 #include <limits.h>
 
 #include <zorba/internal/unique_ptr.h>
@@ -2215,8 +2218,12 @@ void StreamableStringItem::ensureSeekable()
   }
   else if (!theIsMaterialized && !theIsSeekable)
   {
-    std::stringstream* lStringStream = new std::stringstream();
-    (*lStringStream) << theIstream->rdbuf();
+    // Copied into a string first: a stream insertion that cannot grow only sets
+    // a state bit and leaves a shorter value. std::bad_alloc goes to the caller,
+    // with the item as it was.
+    std::string const lText((std::istreambuf_iterator<char>(*theIstream)),
+                            std::istreambuf_iterator<char>());
+    std::stringstream* const lStringStream = new std::stringstream(lText);
     if (theStreamReleaser)
       theStreamReleaser(theIstream);
     if (!theStreamableDependent.isNull())
@@ -2279,12 +2286,34 @@ void StreamableStringItem::materialize() const
   lSsi->theIsMaterialized = true;
   lSsi->theIsConsumed = true;
 
-  char lBuf[4096];
-  while (!theIstream->fail())
+  // An exception from the stream (std::bad_alloc in a transcoding stream, for
+  // one) goes to the caller instead of ending the loop with a shorter value.
+  std::ios::iostate const lMask = lStream.exceptions();
+  lStream.exceptions(lMask | std::ios::badbit);
+  zstring lValue;
+  try
   {
-    lStream.read(lBuf, sizeof(lBuf));
-    lSsi->theValue.append(lBuf, static_cast<unsigned int>(lStream.gcount()));
+    char lBuf[4096];
+    while (!lStream.fail())
+    {
+      lStream.read(lBuf, sizeof(lBuf));
+      lValue.append(lBuf, static_cast<unsigned int>(lStream.gcount()));
+    }
   }
+  catch (...)
+  {
+    lSsi->theIsMaterialized = false;
+    try
+    {
+      lStream.exceptions(lMask);
+    }
+    catch (...)
+    {
+    }
+    throw;
+  }
+  lStream.exceptions(lMask);
+  lSsi->theValue.swap(lValue);
 }
 
 

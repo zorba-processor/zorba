@@ -109,11 +109,14 @@ public:
    */
   char const* current_id() const { return theCurrentId.c_str(); }
 
-  /** What to do when handle() threw: */
+  /**
+   * What to do when handle() threw: no response for a notification, else an
+   * error response with current_id(), which is "null" if the id could not be
+   * read (JSON-RPC 2.0, section 5).
+   */
   enum class AfterFailure {
-    nothing,  // no response: the message was a notification
-    answer,   // an error response with current_id()
-    end       // end the process: the request's id could not be read
+    nothing,  // the message was a notification
+    answer    // an error response with current_id()
   };
   AfterFailure after_failure() const;
 
@@ -182,7 +185,7 @@ private:
     notification,  // no id: never answered
     request,       // theCurrentId is its id
     without_id,    // answered with id null (unreadable, or an invalid id)
-    id_lost        // memory ran out while its id was read
+    id_lost        // memory ran out while its id was read: answered with null
   };
   MessageKind theCurrentKind = MessageKind::unknown;
   std::unique_ptr<Scanner> theScanner;  // null with --no-scan
