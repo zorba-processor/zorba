@@ -26,63 +26,12 @@
 #include "shared_types.h"
 #include "node_items.h"
 #include "json_items.h"
-#include "content_reader.h"
 
 #include "zorbautils/hashfun.h"
 #include "zorbautils/hashset_structured_itemh.h"
 
 
 namespace zorba { namespace simplestore {
-
-
-/*******************************************************************************
-  The copy that an iterator over the children or the attributes of a node
-  takes when the node is about to change (see ContentReader): the nodes, in
-  the order of the node's storage, with each connector replaced by the node
-  it stands for, and each node held by a reference.
-********************************************************************************/
-class NodeCopy
-{
-  std::vector<XmlNode*> theNodes;
-
-public:
-  NodeCopy() = default;
-
-  NodeCopy(const NodeCopy&) = delete;
-  NodeCopy& operator=(const NodeCopy&) = delete;
-
-  ~NodeCopy() { clear(); }
-
-  // If the allocation throws, the copy is unchanged.
-  void assign(XmlNode* const* begin, XmlNode* const* end)
-  {
-    std::vector<XmlNode*> nodes;
-    nodes.reserve(end - begin);
-    for (; begin != end; ++begin)
-    {
-      XmlNode* node = ((*begin)->isConnectorNode() ?
-                       static_cast<ConnectorNode*>(*begin)->getNode() :
-                       *begin);
-      node->addReference();
-      nodes.push_back(node);
-    }
-    nodes.swap(theNodes);
-    for (XmlNode* node : nodes)
-      node->removeReference();
-  }
-
-  void clear()
-  {
-    std::vector<XmlNode*> nodes;
-    nodes.swap(theNodes);
-    for (XmlNode* node : nodes)
-      node->removeReference();
-  }
-
-  XmlNode** begin() { return theNodes.data(); }
-
-  XmlNode** end() { return theNodes.data() + theNodes.size(); }
-};
 
 
 /*******************************************************************************
@@ -99,21 +48,11 @@ public:
     These pointers should not be used beyond the lifetime of the ChildrenIterator
     object.
 
-  The iterator returns the children the node had when init() was called, and
-  reset() or open() start them again (see ContentReader): if the node is
-  updated while the iterator is open, the iterator copies them first. The
-  copy holds references to the children, deleted ones included, until the
-  next init(), close() or the destruction of the iterator, also after the
-  last child was returned: reset() must be able to return them again.
-
   theParentNode : The element or doc node whose children are being retrieved.
-  theStart      : The first child to return.
-  theEnd        : The end of the children.
-  theIte        : The next child to return.
-  theCopy       : The children, once the node changed after init().
+  theCurrentPos : The next child to be retrieved.
+  theNumChildren: The number of children.
 ********************************************************************************/
-class ChildrenIteratorImpl : public store::ChildrenIterator,
-                             public ContentReader
+class ChildrenIteratorImpl : public store::ChildrenIterator
 {
 protected:
   store::ItemHandle<InternalNode>  theParentNode;
@@ -122,18 +61,52 @@ protected:
   InternalNode::iterator           theStart;
   InternalNode::iterator           theIte;
 
-  NodeCopy                         theCopy;
+  // Copy of the children when the parent stores them inline; see setRange().
+  XmlNode                        * theInline[InternalNode::NodeVector::INLINE_CAPACITY];
 
-  void setRange(const store::Item* child)
+  // The first child, if any; see setRange().
+  store::Item_t                    theFirstNode;
+
+  // A collection edit swaps the contents of the parent with another node's
+  // while this iterator is open (InternalNode::swap). The iterator goes on with
+  // the children it started on:
+  // - a heap list keeps its address, and an inline list stays in the parent's
+  //   own storage, which takes the new contents, so the iterator copies it;
+  // - the old children and list then belong to the tree of the other node, which
+  //   nothing else may keep alive: the reference to theFirstNode does. It is a
+  //   reference to a node, not to the tree, because the store moves the
+  //   references of nodes when it merges or splits trees.
+  void setRange()
   {
-    startReading(theParentNode->nodesKey());
-
     theEnd = theParentNode->childrenEnd();
     theStart = theParentNode->childrenBegin();
 
+    if (theParentNode->nodesAreInline())
+    {
+      csize const numNodes = theEnd - theStart;
+      std::copy(theStart, theEnd, theInline);
+      theStart = theInline;
+      theEnd = theInline + numNodes;
+    }
+
+    theFirstNode = (theStart != theEnd ? *theStart : NULL);
+  }
+
+public:
+  ChildrenIteratorImpl() { }
+
+  // theStart, theEnd and theIte may point into this object.
+  ChildrenIteratorImpl(const ChildrenIteratorImpl&) = delete;
+  ChildrenIteratorImpl& operator=(const ChildrenIteratorImpl&) = delete;
+
+  void init(store::Item_t& parent, const store::Item* child = NULL)
+  {
+    theParentNode.transfer(parent);
+    setRange();
+
     if (child != NULL && theStart != theEnd)
     {
-      XmlNode* myChild = ((*theStart)->isConnectorNode() ?
+      XmlNode* myChild = ((*theStart)->isConnectorNode() ? 
                           static_cast<ConnectorNode*>(*theStart)->getNode() :
                           (*theStart));
 
@@ -141,7 +114,7 @@ protected:
       {
         ++theStart;
 
-        myChild = ((*theStart)->isConnectorNode() ?
+        myChild = ((*theStart)->isConnectorNode() ? 
                    static_cast<ConnectorNode*>(*theStart)->getNode() :
                    (*theStart));
       }
@@ -152,41 +125,33 @@ protected:
     theIte = theStart;
   }
 
-  // Stops reading the node before the iterator releases it.
-  void stop()
-  {
-    stopReading();
-    theCopy.clear();
-    theStart = theEnd = theIte = InternalNode::iterator();
-  }
-
-  void copyContent()
-  {
-    csize const pos = theIte - theStart;
-    theCopy.assign(theStart, theEnd);
-    theStart = theCopy.begin();
-    theEnd = theCopy.end();
-    theIte = theStart + pos;
-  }
-
-public:
-  ChildrenIteratorImpl() { }
-
-  ~ChildrenIteratorImpl() { stopReading(); }
-
-  void init(store::Item_t& parent, const store::Item* child = NULL)
-  {
-    stop();
-    theParentNode.transfer(parent);
-    setRange(child);
-  }
 
   void init(const store::Item* parent, const store::Item* child = NULL)
   {
-    stop();
     theParentNode = parent;
-    setRange(child);
+    setRange();
+
+    if (child != NULL && theStart != theEnd)
+    {
+      XmlNode* myChild = ((*theStart)->isConnectorNode() ? 
+                          static_cast<ConnectorNode*>(*theStart)->getNode() :
+                          (*theStart));
+
+      while (myChild != child)
+      {
+        ++theStart;
+
+        myChild = ((*theStart)->isConnectorNode() ? 
+                   static_cast<ConnectorNode*>(*theStart)->getNode() :
+                   (*theStart));
+      }
+
+      ++theStart;
+    }
+
+    theIte = theStart;
   }
+
 
   store::Item* next()
   {
@@ -205,11 +170,12 @@ public:
     }
   }
 
+
   void open() { theIte = theStart; }
 
   void reset() { theIte = theStart; }
 
-  void close() { stop(); theParentNode = NULL; }
+  void close() { theIte = theEnd; theParentNode = NULL; theFirstNode = NULL; }
 
   bool next(store::Item_t& result);
 };
@@ -229,18 +195,11 @@ public:
     These pointers should not be used beyond the lifetime of the ChildrenIterator
     object.
 
-  It returns the children the node had when init() was called, like
-  ChildrenIteratorImpl.
-
   theParentNode : The element or doc node whose children are being retrieved.
-  theStart      : The first child to return.
-  theEnd        : The end of the children.
-  theIte        : The next child to return.
-  theCopy       : The children in document order, once the node changed after
-                  init().
+  theCurrentPos : The next child to be retrieved.
+  theNumChildren: The number of children.
 ********************************************************************************/
-class ChildrenReverseIteratorImpl : public store::ChildrenReverseIterator,
-                                    public ContentReader
+class ChildrenReverseIteratorImpl : public store::ChildrenReverseIterator
 {
 protected:
   store::ItemHandle<InternalNode>  theParentNode;
@@ -249,18 +208,45 @@ protected:
   InternalNode::reverse_iterator   theStart;
   InternalNode::reverse_iterator   theIte;
 
-  NodeCopy                         theCopy;
+  // Copy of the children when the parent stores them inline; see
+  // ChildrenIteratorImpl::setRange().
+  XmlNode                        * theInline[InternalNode::NodeVector::INLINE_CAPACITY];
 
-  void setRange(const store::Item* child)
+  // The last child, if any; see ChildrenIteratorImpl::setRange().
+  store::Item_t                    theFirstNode;
+
+  void setRange()
   {
-    startReading(theParentNode->nodesKey());
-
     theEnd = theParentNode->childrenREnd();
     theStart = theParentNode->childrenRBegin();
 
+    if (theParentNode->nodesAreInline())
+    {
+      csize const numNodes = theParentNode->numChildren();
+      std::copy(theParentNode->childrenBegin(), theParentNode->childrenEnd(),
+                theInline);
+      theStart = InternalNode::reverse_iterator(theInline + numNodes);
+      theEnd = InternalNode::reverse_iterator(theInline);
+    }
+
+    theFirstNode = (theStart != theEnd ? *theStart : NULL);
+  }
+
+public:
+  ChildrenReverseIteratorImpl() { }
+
+  // theStart, theEnd and theIte may point into this object.
+  ChildrenReverseIteratorImpl(const ChildrenReverseIteratorImpl&) = delete;
+  ChildrenReverseIteratorImpl& operator=(const ChildrenReverseIteratorImpl&) = delete;
+
+  void init(store::Item_t& parent, const store::Item* child = NULL)
+  {
+    theParentNode.transfer(parent);
+    setRange();
+
     if (child != NULL && theStart != theEnd)
     {
-      XmlNode* myChild = ((*theStart)->isConnectorNode() ?
+      XmlNode* myChild = ((*theStart)->isConnectorNode() ? 
                           static_cast<ConnectorNode*>(*theStart)->getNode() :
                           (*theStart));
 
@@ -268,7 +254,7 @@ protected:
       {
         ++theStart;
 
-        myChild = ((*theStart)->isConnectorNode() ?
+        myChild = ((*theStart)->isConnectorNode() ? 
                    static_cast<ConnectorNode*>(*theStart)->getNode() :
                    (*theStart));
       }
@@ -279,40 +265,33 @@ protected:
     theIte = theStart;
   }
 
-  void stop()
-  {
-    stopReading();
-    theCopy.clear();
-    theStart = theEnd = theIte = InternalNode::reverse_iterator();
-  }
-
-  void copyContent()
-  {
-    csize const pos = theIte - theStart;
-    theCopy.assign(theEnd.base(), theStart.base());
-    theStart = InternalNode::reverse_iterator(theCopy.end());
-    theEnd = InternalNode::reverse_iterator(theCopy.begin());
-    theIte = theStart + pos;
-  }
-
-public:
-  ChildrenReverseIteratorImpl() { }
-
-  ~ChildrenReverseIteratorImpl() { stopReading(); }
-
-  void init(store::Item_t& parent, const store::Item* child = NULL)
-  {
-    stop();
-    theParentNode.transfer(parent);
-    setRange(child);
-  }
 
   void init(const store::Item* parent, const store::Item* child = NULL)
   {
-    stop();
     theParentNode = parent;
-    setRange(child);
+    setRange();
+
+    if (child != NULL && theStart != theEnd)
+    {
+      XmlNode* myChild = ((*theStart)->isConnectorNode() ? 
+                          static_cast<ConnectorNode*>(*theStart)->getNode() :
+                          (*theStart));
+
+      while (myChild != child)
+      {
+        ++theStart;
+
+        myChild = ((*theStart)->isConnectorNode() ? 
+                   static_cast<ConnectorNode*>(*theStart)->getNode() :
+                   (*theStart));
+      }
+
+      ++theStart;
+    }
+
+    theIte = theStart;
   }
+
 
   store::Item* next()
   {
@@ -331,11 +310,23 @@ public:
     }
   }
 
-  void open() { theIte = theStart; }
 
-  void reset() { theIte = theStart; }
+  void open()
+  {
+    theIte = theStart;
+  }
 
-  void close() { stop(); theParentNode = NULL; }
+  void reset()
+  {
+    theIte = theStart;
+  }
+
+  void close()
+  {
+    theIte = theEnd;
+    theParentNode = NULL;
+    theFirstNode = NULL;
+  }
 
   bool next(store::Item_t& result);
 };
@@ -345,17 +336,11 @@ public:
   This iterator is used during the getAttributes() method to set the parent
   pointer and the nodeid in each attribute node of an element node.
 
-  It returns the attributes the node had when init() was called, like
-  ChildrenIteratorImpl.
-
   theParentNode : The element node whose attributes are being retrieved.
-  theStart      : The first attribute.
-  theEnd        : The end of the attributes.
-  theIte        : The next attribute to return.
-  theCopy       : The attributes, once the node changed after init().
+  theCurrentPos : The next attribute to be retrieved.
+
 ********************************************************************************/
-class AttributesIteratorImpl : public store::AttributesIterator,
-                               public ContentReader
+class AttributesIteratorImpl : public store::AttributesIterator
 {
 protected:
   store::ItemHandle<ElementNode>  theParentNode;
@@ -364,48 +349,46 @@ protected:
   InternalNode::iterator          theStart;
   InternalNode::iterator          theIte;
 
-  NodeCopy                        theCopy;
+  // Copy of the attributes when the parent stores them inline; see
+  // ChildrenIteratorImpl::setRange().
+  XmlNode                       * theInline[InternalNode::NodeVector::INLINE_CAPACITY];
+
+  // The first attribute, if any; see ChildrenIteratorImpl::setRange().
+  store::Item_t                   theFirstNode;
 
   void setRange()
   {
-    startReading(theParentNode->nodesKey());
-
     theEnd = theParentNode->attrsEnd();
     theStart = theParentNode->attrsBegin();
+
+    if (theParentNode->nodesAreInline())
+    {
+      csize const numNodes = theEnd - theStart;
+      std::copy(theStart, theEnd, theInline);
+      theStart = theInline;
+      theEnd = theInline + numNodes;
+    }
+
     theIte = theStart;
-  }
 
-  void stop()
-  {
-    stopReading();
-    theCopy.clear();
-    theStart = theEnd = theIte = InternalNode::iterator();
-  }
-
-  void copyContent()
-  {
-    csize const pos = theIte - theStart;
-    theCopy.assign(theStart, theEnd);
-    theStart = theCopy.begin();
-    theEnd = theCopy.end();
-    theIte = theStart + pos;
+    theFirstNode = (theStart != theEnd ? *theStart : NULL);
   }
 
 public:
   AttributesIteratorImpl() { }
 
-  ~AttributesIteratorImpl() { stopReading(); }
+  // theStart, theEnd and theIte may point into this object.
+  AttributesIteratorImpl(const AttributesIteratorImpl&) = delete;
+  AttributesIteratorImpl& operator=(const AttributesIteratorImpl&) = delete;
 
   void init(store::Item_t& parent)
   {
-    stop();
     theParentNode.transfer(parent);
     setRange();
   }
 
   void init(const store::Item* parent)
   {
-    stop();
     theParentNode = parent;
     setRange();
   }
@@ -458,8 +441,8 @@ public:
 
   void close()
   {
-    stop();
     theParentNode = NULL;
+    theFirstNode = NULL;
   }
 
   bool next(store::Item_t& result);
