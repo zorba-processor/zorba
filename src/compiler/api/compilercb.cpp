@@ -122,6 +122,7 @@ CompilerCB::CompilerCB(XQueryDiagnostics* errmgr, long timeout)
   theIsSequential(false),
   theOuterMayRunSideEffects(false),
   theMayRunSideEffects(true),
+  theMayRunSideEffectsOrUpdates(true),
   theHaveTimeout(false),
   theTimeout(timeout),
   theFoldingMillis(0),
@@ -156,6 +157,7 @@ CompilerCB::CompilerCB(const CompilerCB& cb)
   theIsSequential(false),
   theOuterMayRunSideEffects(cb.theMayRunSideEffects),
   theMayRunSideEffects(true),
+  theMayRunSideEffectsOrUpdates(true),
   theHaveTimeout(cb.theHaveTimeout),
   theTimeout(cb.theTimeout),
   theFoldingMillis(0),
@@ -185,6 +187,7 @@ CompilerCB::CompilerCB(::zorba::serialization::Archiver& ar)
   theIsEval(false),
   theOuterMayRunSideEffects(true),
   theMayRunSideEffects(true),
+  theMayRunSideEffectsOrUpdates(true),
   theNextVisitId(1),
   theEM(new ExprManager(this)),
   theResources(NULL)

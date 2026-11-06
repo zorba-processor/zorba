@@ -355,6 +355,10 @@ PlanIter_t XQueryCompiler::compile(
     theCompilerCB->theOuterMayRunSideEffects ||
     expr_tools::may_run_side_effects(rootExpr);
 
+  theCompilerCB->theMayRunSideEffectsOrUpdates =
+    theCompilerCB->theMayRunSideEffects ||
+    expr_tools::may_run_side_effects_or_updates(rootExpr);
+
   return codegen(rootExpr, nextDynamicVarId, auditRecord);
 }
 

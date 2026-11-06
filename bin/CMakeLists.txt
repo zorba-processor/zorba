@@ -110,9 +110,12 @@ FOREACH (_q plan_parse_streaming_off plan_parse_streaming_dynamic plan_parse_str
 ENDFOREACH ()
 # With the option, file:read-text stays in the file only when nothing in the query
 # can write during the evaluation: the plan shows which (file-stream).
-FOREACH (_opt 0 1 2)
+# At O0 the text of this query is held in memory too, as before this check.
+FOREACH (_opt 1 2)
   ZORBA_ADD_TEST(bin/zorba_plan_parse_file_O${_opt} zorbacmd --optimization-level ${_opt} --print-iterator-tree -f -q "${_plandir}/plan_parse_file.jq" -e "f:=${_plandir}/plan_members.json")
   ZORBA_SET_TEST_PROPERTY(bin/zorba_plan_parse_file_O${_opt} PASS_REGULAR_EXPRESSION "JSONParseMembersIterator[^>]*file-stream=\"true\"")
+ENDFOREACH ()
+FOREACH (_opt 0 1 2)
   ZORBA_ADD_TEST(bin/zorba_plan_parse_file_dynamic_O${_opt} zorbacmd --optimization-level ${_opt} --print-iterator-tree -f -q "${_plandir}/plan_parse_file_dynamic.jq" -e "f:=${_plandir}/plan_members.json")
   ZORBA_SET_TEST_PROPERTY(bin/zorba_plan_parse_file_dynamic_O${_opt} PASS_REGULAR_EXPRESSION "JSONParseMembersIterator[^>]*file-stream=\"false\"")
   # p01-error-parity compares with and without the option: the side with it must

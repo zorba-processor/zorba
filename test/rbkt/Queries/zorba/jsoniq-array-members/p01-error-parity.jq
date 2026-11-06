@@ -1,11 +1,13 @@
 jsoniq version "1.0";
 (: Without the option and with it: the same members, or the same error code,
  : description and location. An error located in the JSON has the same line on both
- : sides; one located in the query is at the call, line 78 without the option and line
- : 79 with it, on the same column. The calls are in the main module, not in a function,
+ : sides; one located in the query is at the call, line 80 without the option and line
+ : 81 with it, on the same column. The calls are in the main module, not in a function,
  : so that bin/zorba_plan_parity_O* can check that the plan streams at every
  : optimization level. :)
 declare namespace err = "http://www.w3.org/2005/xqt-errors";
+(: External, so that the compiler does not fold the deep inputs into the plan. :)
+declare variable $limit external := 1500;
 declare function local:deep($open as string, $close as string, $n as integer) as string
 { string-join(for $i in 1 to $n return $open) || "1" || string-join(for $i in 1 to $n return $close) };
 declare function local:error($code, $description, $column, $line)
@@ -67,12 +69,12 @@ declare variable $cases := (
   "[[]]",
   "{\"a\":[1,2]}",
   "[1] {\"b\":2} [3]",
-  local:deep("[", "]", 1499), local:deep("[", "]", 1500), local:deep("[", "]", 1501),
-  "[" || local:deep("{\"a\":", "}", 1499) || "]", "[" || local:deep("{\"a\":", "}", 1500) || "]",
-  local:deep("{\"a\":", "}", 1500), local:deep("{\"a\":", "}", 1501) );
+  local:deep("[", "]", $limit - 1), local:deep("[", "]", $limit), local:deep("[", "]", $limit + 1),
+  "[" || local:deep("{\"a\":", "}", $limit - 1) || "]", "[" || local:deep("{\"a\":", "}", $limit) || "]",
+  local:deep("{\"a\":", "}", $limit), local:deep("{\"a\":", "}", $limit + 1) );
 declare function local:same($a, $b)
 { if ($a instance of array) then deep-equal($a, $b)
-  else $b instance of object and deep-equal($a.e, $b.e) and ($a.l eq $b.l or ($a.l eq 78 and $b.l eq 79)) };
+  else $b instance of object and deep-equal($a.e, $b.e) and ($a.l eq $b.l or ($a.l eq 80 and $b.l eq 81)) };
 let $results :=
   for $s in $cases
   let $without := try { [ parse-json($s)[] ] } catch * { local:error($err:code, $err:description, $err:column-number, $err:line-number) }

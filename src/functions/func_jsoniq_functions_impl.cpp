@@ -354,10 +354,15 @@ PlanIter_t fn_jsoniq_members::codegen(
           relativeLoc = literal->getLocation();
       }
 
-      // Every call of file:read-text makes its own stream. In a sequential
-      // query an expression can write to the file between two reads of it.
+      // Every call of file:read-text makes its own stream. Anything that can
+      // write during the evaluation could change the file between the two
+      // reads of it: a sequential expression, an update, a dynamic call, or a
+      // function item of a sequential or updating function, in the query or in
+      // a function it calls. If in doubt, the text is held in memory.
       bool const streamIsPrivate =
-        !ccb->isSequential() && is_read_text_utf8(parseCall->get_arg(0));
+        !ccb->isSequential() &&
+        !ccb->theMayRunSideEffectsOrUpdates &&
+        is_read_text_utf8(parseCall->get_arg(0));
 
       return new JSONParseMembersIterator(
         sctx, parse->getLocation(), source, relativeLoc, streamIsPrivate,
