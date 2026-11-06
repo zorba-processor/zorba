@@ -323,6 +323,18 @@ FastXmlLoader::FastXmlLoader(
 ********************************************************************************/
 FastXmlLoader::~FastXmlLoader()
 {
+  // A load that an exception left (std::bad_alloc while an error was reported,
+  // for one): its tree and nodes go with the loader.
+  if (theTree != NULL || ctxt != NULL || !theNodeStack.empty())
+  {
+    try
+    {
+      abortload();
+    }
+    catch (...)
+    {
+    }
+  }
   delete[] theBuffer;
 }
 
@@ -791,6 +803,8 @@ void FastXmlLoader::startElement(
   zorba::Stack<XmlNode*>& nodeStack = loader.theNodeStack;
   zorba::Stack<PathStepInfo>& pathStack = loader.thePathStack;
   zstring baseUri;
+  ElementNode* elemNode = NULL;
+  bool owned = false;   // by the node stack or the tree (as its root)
 
   try
   {
@@ -805,11 +819,14 @@ void FastXmlLoader::startElement(
                   reinterpret_cast<const char*>(lname));
     
     // Create the element node and push it to the node stack
-    ElementNode* elemNode = nfactory.createElementNode(nodeName,
-                                                       numBindings,
-                                                       numAttributes);
+    elemNode = nfactory.createElementNode(nodeName,
+                                          numBindings,
+                                          numAttributes);
     if (nodeStack.empty())
+    {
       loader.setRoot(elemNode);
+      owned = true;
+    }
     
 #ifdef DATAGUIDE
     nodeName = elemNode->getNodeName();
@@ -935,11 +952,10 @@ void FastXmlLoader::startElement(
         GET_STORE().getItemFactory()->createUntypedAtomic(typedValue, value);
 
         AttributeNode* attrNode = nfactory.createAttributeNode(qname);
+        attrNodes[i] = attrNode;   // first: the element destroys it
         attrNode->theParent = elemNode;
         attrNode->setId(loader.theTree, &loader.theOrdPath);
         attrNode->theTypedValue.transfer(typedValue);
-
-        attrNodes[i] = attrNode;
 
         if (attrNode->isBaseUri())
         {
@@ -988,22 +1004,45 @@ void FastXmlLoader::startElement(
     }
 
     nodeStack.push((XmlNode*)elemNode);
+    owned = true;
     nodeStack.push(NULL);
     pathStack.push(PathStepInfo(elemNode, baseUri));
   }
   catch (ZorbaException const& e)
   {
+    if (elemNode != NULL && !owned)
+      discardElement(elemNode);
     loader.theXQueryDiagnostics->add_error( e );
   }
   catch (std::bad_alloc const&)
   {
+    if (elemNode != NULL && !owned)
+      discardElement(elemNode);
     loader.setOutOfMemory();
   }
   catch (...)
   {
+    if (elemNode != NULL && !owned)
+      discardElement(elemNode);
     loader.theXQueryDiagnostics->
     add_error(NEW_ZORBA_EXCEPTION(zerr::ZXQP0003_INTERNAL_ERROR));
   }
+}
+
+
+void FastXmlLoader::discardElement(ElementNode* elemNode)
+{
+  // No children yet: the nodes are the attributes, those not made are null.
+  InternalNode::NodeVector& nodes = elemNode->nodes();
+  csize kept = 0;
+  for (csize i = 0; i < nodes.size(); ++i)
+  {
+    if (nodes[i] != NULL)
+      nodes[kept++] = nodes[i];
+  }
+  nodes.resize(kept);
+  elemNode->theNumAttrs = static_cast<uint32_t>(kept);
+  elemNode->destroy(true);
 }
 
 

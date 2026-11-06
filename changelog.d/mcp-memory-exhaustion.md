@@ -33,5 +33,6 @@
   whole or the call fails. The same holds for a streamable string that is made
   seekable or read whole, for `createBase64Binary` from a stream in the C++ API,
   and for the source of a `zorba-mcp` predefined query.
-- Running out of memory while a query object was created, or while an expression
-  was recorded for the compiler, left memory behind.
+- Running out of memory while a query object was created, while an expression was
+  recorded for the compiler, or while an XML document was loaded (an element not
+  yet on the loader's stack, or a load that an exception left) left memory behind.

@@ -165,14 +165,14 @@ std::atomic<std::size_t> new_budget{ 0 };  // 0: none
 // For the sweeps, with big_track: the blocks of at least big_size bytes allocated
 // meanwhile, with their stacks, while they live. What a failed call keeps is then
 // shown with where it was allocated. One thread at a time (a sweep child).
-std::size_t const big_size = 32;
+std::size_t const big_size = 256;
 struct BigBlock {
   void *p;
   std::size_t n;
   int num_frames;
   void *frames[24];
 };
-BigBlock big_blocks[1024];
+BigBlock big_blocks[128];
 bool big_track = false;
 int big_count = 0;   // blocks recorded and alive
 
