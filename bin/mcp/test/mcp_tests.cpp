@@ -165,14 +165,14 @@ std::atomic<std::size_t> new_budget{ 0 };  // 0: none
 // For the sweeps, with big_track: the blocks of at least big_size bytes allocated
 // meanwhile, with their stacks, while they live. What a failed call keeps is then
 // shown with where it was allocated. One thread at a time (a sweep child).
-std::size_t const big_size = 256;
+std::size_t const big_size = 32;
 struct BigBlock {
   void *p;
   std::size_t n;
   int num_frames;
   void *frames[24];
 };
-BigBlock big_blocks[128];
+BigBlock big_blocks[1024];
 bool big_track = false;
 int big_count = 0;   // blocks recorded and alive
 
@@ -2915,10 +2915,10 @@ void exhaust_sweep( Fixture const &f, std::string const &name, Sweep const &s ) 
                       << ": " << ( kept - base_kept ) << " bytes kept; "
                       << st.big.size() << " blocks of " << big_size
                       << " bytes or more that the failed call allocated; the first"
-                      << " 12:" << std::endl;
+                      << " 24:" << std::endl;
             std::size_t shown = 0;
             for ( std::string const &b : st.big ) {
-              if ( ++shown > 12 )
+              if ( ++shown > 24 )
                 break;
               std::string::size_type const sp = b.find( ' ' );
               sweep_show_frames( "  a block of " + b.substr( 0, sp ) + " bytes",
