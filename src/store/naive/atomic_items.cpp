@@ -2219,11 +2219,21 @@ void StreamableStringItem::ensureSeekable()
   else if (!theIsMaterialized && !theIsSeekable)
   {
     // Copied into a string first: a stream insertion that cannot grow only sets
-    // a state bit and leaves a shorter value. std::bad_alloc goes to the caller,
-    // with the item as it was.
-    std::string const lText((std::istreambuf_iterator<char>(*theIstream)),
-                            std::istreambuf_iterator<char>());
-    std::stringstream* const lStringStream = new std::stringstream(lText);
+    // a state bit and leaves a shorter value. If the copy fails, what it read
+    // is gone: the item counts as consumed, so a second try raises ZSTR0055
+    // instead of returning the rest of the stream as the value.
+    std::stringstream* lStringStream;
+    try
+    {
+      std::string lText((std::istreambuf_iterator<char>(*theIstream)),
+                        std::istreambuf_iterator<char>());
+      lStringStream = new std::stringstream(std::move(lText));
+    }
+    catch (...)
+    {
+      theIsConsumed = true;
+      throw;
+    }
     if (theStreamReleaser)
       theStreamReleaser(theIstream);
     if (!theStreamableDependent.isNull())
@@ -2288,11 +2298,13 @@ void StreamableStringItem::materialize() const
 
   // An exception from the stream (std::bad_alloc in a transcoding stream, for
   // one) goes to the caller instead of ending the loop with a shorter value.
+  // The mask is set inside the try: on a stream already bad it throws, and the
+  // item must not stay materialized and empty.
   std::ios::iostate const lMask = lStream.exceptions();
-  lStream.exceptions(lMask | std::ios::badbit);
   zstring lValue;
   try
   {
+    lStream.exceptions(lMask | std::ios::badbit);
     char lBuf[4096];
     while (!lStream.fail())
     {

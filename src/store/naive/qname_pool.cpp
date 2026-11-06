@@ -15,6 +15,7 @@
  */
 
 #include <new>
+#include <vector>
 #include "diagnostics/assert.h"
 #include "system/globalenv.h"
 
@@ -617,10 +618,15 @@ std::size_t QNamePool::tableBytes() const
 void QNamePool::flushUnused()
 {
   // An unnormalized name holds its normalized one: that one is free only after,
-  // so this runs until a pass drops nothing.
+  // so this runs until a pass drops nothing. As in remove(), the normalized
+  // names are released after the lock, since that can come back to remove().
+  std::vector<QNameItem*> victims;
+  victims.reserve(theCacheSize);   // push_back() cannot throw under the lock
   for (bool dropped = true; dropped; )
   {
     dropped = false;
+    victims.clear();
+    SYNC_CODE(theHashSet.theMutex.lock();)
     for (csize i = 1; i < theCacheSize; ++i)
     {
       QNameItem* qn = &theCache[i];
@@ -630,9 +636,12 @@ void QNamePool::flushUnused()
       theHashSet.eraseNoSync(qn, CompareFunction::hash(qn));
       qn->invalidate(true, &victim);
       if (victim != NULL)
-        victim->removeReference();
+        victims.push_back(victim);
       dropped = true;
     }
+    SYNC_CODE(theHashSet.theMutex.unlock();)
+    for (QNameItem* victim : victims)
+      victim->removeReference();
   }
 }
 

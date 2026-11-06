@@ -216,7 +216,19 @@ parsenode_t XQueryCompiler::parse(std::istream& aXQuery, const zstring& aFileNam
 #ifndef NDEBUG
     printf ("\n\n%s", converted_xquery_str);  // debug
 #endif
-    xquery_text = converted_xquery_str;
+    // Freed right after the copy, also when the copy fails.
+    try
+    {
+      xquery_text = converted_xquery_str;
+    }
+    catch (...)
+    {
+      xqxconvertor->freeResult(converted_xquery_str);
+      converted_xquery_str = NULL;
+      throw;
+    }
+    xqxconvertor->freeResult(converted_xquery_str);
+    converted_xquery_str = NULL;
   }
   else
   {
@@ -228,7 +240,7 @@ parsenode_t XQueryCompiler::parse(std::istream& aXQuery, const zstring& aFileNam
                      std::istreambuf_iterator<char>());
 #endif
 
-  std::stringstream xquery_stream(xquery_text);
+  std::stringstream xquery_stream(std::move(xquery_text));
 
   theCompilerCB->setPhase(CompilerCB::PARSING);
 
@@ -251,7 +263,7 @@ parsenode_t XQueryCompiler::parse(std::istream& aXQuery, const zstring& aFileNam
   }
 
 #ifdef ZORBA_XQUERYX
-  if (is_xqueryx)
+  if (is_xqueryx && converted_xquery_str != NULL)
   {
     xqxconvertor->freeResult(converted_xquery_str);
   }
