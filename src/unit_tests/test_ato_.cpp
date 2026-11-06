@@ -15,6 +15,7 @@
  */
 
 #include <iostream>
+#include <limits>
 #include <stdexcept>
 #include <string>
 
@@ -53,6 +54,16 @@ static void test_atoll( int no, string const &s ) {
   );
 }
 
+static void test_atoll_value( int no, string const &s, long long expected ) {
+  char const *last;
+  try {
+    ASSERT_TRUE( no, ztd::atoll( s.data(), s.data() + s.size(), &last ) == expected );
+  }
+  catch ( ... ) {
+    assert_true( no, s.c_str(), __LINE__, false );
+  }
+}
+
 static void test_atoull( int no, string const &s ) {
   char const *last;
   ASSERT_EXCEPTION(
@@ -79,6 +90,16 @@ int test_ato_( int, char*[] ) {
   s = ascii::itoa( numeric_limits<long long>::min(), buf );
   s += '0';
   test_atoll( test_no++, s );
+
+  // the limits themselves parse
+  s = ascii::itoa( numeric_limits<long long>::max(), buf );
+  test_atoll_value( test_no++, s, numeric_limits<long long>::max() );
+  s = ascii::itoa( numeric_limits<long long>::min(), buf );
+  test_atoll_value( test_no++, s, numeric_limits<long long>::min() );
+
+  // one past the limits
+  test_atoll( test_no++, "9223372036854775808" );
+  test_atoll( test_no++, "-9223372036854775809" );
 
   // test overflow
   s = ascii::itoa( numeric_limits<unsigned long long>::max(), buf );
