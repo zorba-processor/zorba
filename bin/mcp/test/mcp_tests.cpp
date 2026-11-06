@@ -92,14 +92,23 @@ std::atomic<bool> inject_on{ false };
 std::atomic<long> inject_count{ 0 };
 std::atomic<long> inject_first{ 0 };  // 0: only count
 std::atomic<long> inject_length{ 0 };
+// The stack of the first allocation made to fail, on stdout: where a failure
+// left something behind. backtrace() has been called once before.
+std::atomic<bool> inject_trace{ false };
 
 bool inject_fails() noexcept {
   if ( !inject_on.load( std::memory_order_relaxed ) )
     return false;
   long const k = inject_count.fetch_add( 1, std::memory_order_relaxed ) + 1;
   long const first = inject_first.load( std::memory_order_relaxed );
-  return first > 0 && k >= first &&
+  bool const fails = first > 0 && k >= first &&
     k < first + inject_length.load( std::memory_order_relaxed );
+  if ( fails && k == first && inject_trace.load( std::memory_order_relaxed ) ) {
+    void *frames[64];
+    int const n = backtrace( frames, 64 );
+    backtrace_symbols_fd( frames, n, STDOUT_FILENO );
+  }
+  return fails;
 }
 
 void inject_arm( long first, long length ) {
@@ -2262,6 +2271,9 @@ struct Sweep {
   bool needs_module = false;        // of a module that some builds leave out
   bool compiles = false;            // the sweep includes the compilation
   std::vector<std::string> before;  // calls before all of them, with no failure
+  // Calls after the failed one, with their answers: a failure leaves the server
+  // as a fresh one would be.
+  std::vector<std::pair<std::string, std::string> > probes;
 };
 
 void sweep_close( int fd ) {
@@ -2427,6 +2439,7 @@ void exhaust_sweep( Fixture const &f, std::string const &name, Sweep const &s ) 
       alarm( 10 );
       sweep_fd = fd[1];
       sweep_show_stack = trace;
+      inject_trace = trace;
       void *frames[4];
       backtrace( frames, 4 );   // loads what it needs, before any failure
       if ( signal( SIGSEGV, sweep_on_signal ) == SIG_ERR ||
@@ -2441,6 +2454,12 @@ void exhaust_sweep( Fixture const &f, std::string const &name, Sweep const &s ) 
       if ( !parse_json( server.handle( next ), &r, &why ) ||
            text_of( r ) != "2" )
         out += " | next call: " + text_of( r );
+      int probe_id = 10;
+      for ( auto const &p : s.probes ) {
+        if ( !parse_json( server.handle( rq( probe_id++, p.first ) ), &r, &why ) ||
+             text_of( r ) != p.second )
+          out += " | probe: " + text_of( r );
+      }
       // After the same call again, so that what it frees of the warm-up and
       // what it caches do not count: a failed call then keeps only what it lost.
       long k = 0;
@@ -2543,7 +2562,8 @@ void exhaust_sweep( Fixture const &f, std::string const &name, Sweep const &s ) 
                 << " times (first at " << o.second.second << "): " << o.first
                 << std::endl;
       check( allowed, name + ": allowed outcome", o.first );
-      if ( o.first.rfind( "signal", 0 ) == 0 ) {
+      if ( o.first.rfind( "signal", 0 ) == 0 ||
+           ( !allowed && o.first.find( " | " ) != std::string::npos ) ) {
         std::cout << "at " << o.second.second << ":" << std::endl;
         run_child( o.second.second, length, nullptr, nullptr, true );
       }
@@ -2665,9 +2685,8 @@ void test_sweep_casts( Fixture const &f ) {
   s.points = 400;
   s.expected = "\"true true true true true true true true true true 2000\"";
   s.lenient = true;                 // the compilation is swept too
-  // The scanner of the compiler; a function not found after a failure while it
-  // was being compiled.
-  s.known = { "exit 2", "memory_limit | same call again: error: err:XPST00" };
+  // The scanner of the compiler.
+  s.known = { "exit 2" };
   s.compiles = true;
   exhaust_sweep( f, "casts", s );
 #else
@@ -2684,11 +2703,35 @@ void test_sweep_compile( Fixture const &f ) {
   s.expected = "41";
   s.lenient = true;
   s.points = 200;
-  s.known = { "exit 2", "memory_limit | same call again: error: err:XPST00",
-              "signal 6 in libstdc",
-              "terminate N11xercesc" };
+  s.known = { "exit 2", "signal 6 in libstdc", "terminate N11xercesc" };
   s.compiles = true;
   exhaust_sweep( f, "compilation", s );
+#else
+  (void)f;
+#endif
+}
+// Every allocation of a compilation fails in turn; after each, the same server
+// finds the built-in functions and the variables of a catch clause, as a fresh
+// one does.
+void test_sweep_builtins( Fixture const &f ) {
+#if defined(__linux__)
+  Sweep s;
+  s.query = caught( "count(parse-xml(\"" + sweep_names_xml( "sweep" ) + "\")//*)" );
+  s.before.push_back( caught( "count(parse-xml(\"" + sweep_names_xml( "warm" ) +
+                              "\")//*)" ) );
+  s.expected = "41";
+  s.lenient = true;
+  s.points = 100000;                // all of them
+  s.known = { "exit 2", "signal 6 in libstdc", "terminate N11xercesc" };
+  s.compiles = true;
+  s.probes = {
+    { "string-join((\"a\", \"b\"), \"-\")", "\"a-b\"" },
+    { "sum((1, 2, 3))", "6" },
+    { "count(parse-xml(\"<a><b/></a>\")//*)", "2" },
+    { "declare namespace err = \"http://www.w3.org/2005/xqt-errors\";\n"
+      "try { error(xs:QName(\"err:FOER0000\"), \"probe\") } "
+      "catch * { $err:description }", "\"probe\"" } };
+  exhaust_sweep( f, "built-ins after a failed compilation", s );
 #else
   (void)f;
 #endif
@@ -6359,6 +6402,7 @@ Test const tests[] = {
   { "memory_limit", test_memory_limit },
   { "exhaust_at_start", test_exhaust_at_start },
   { "exhaust_sweep_compile", test_sweep_compile },
+  { "exhaust_sweep_builtins", test_sweep_builtins },
   { "exhaust_sweep_xml", test_sweep_xml },
   { "exhaust_sweep_fragment", test_sweep_fragment },
   { "exhaust_sweep_html", test_sweep_html },

@@ -499,7 +499,8 @@ IF (ZORBA_WITH_FILE_ACCESS)
              error_cached_denial
              hints_nodes hints_names deep_json deep_json_binary
              entity_expansion case_paths html_edge_cases memory_limit
-             exhaust_at_start exhaust_sweep_compile exhaust_sweep_xml
+             exhaust_at_start exhaust_sweep_compile exhaust_sweep_builtins
+             exhaust_sweep_xml
              exhaust_sweep_fragment
              exhaust_sweep_html exhaust_sweep_json exhaust_sweep_csv
              exhaust_sweep_casts exhaust_sweep_decimal_thread exhaust_sweep_cache
@@ -544,7 +545,8 @@ IF (ZORBA_WITH_FILE_ACCESS)
     ENDFOREACH (_t)
     SET_TESTS_PROPERTIES (bin/mcp/exhaust_cache_after_failure PROPERTIES
       RESOURCE_LOCK mcp_memory_exhaustion TIMEOUT 400)
-    FOREACH (_t compile xml fragment html json csv casts decimal_thread cache)
+    FOREACH (_t compile builtins xml fragment html json csv casts decimal_thread
+                cache)
       SET_TESTS_PROPERTIES (bin/mcp/exhaust_sweep_${_t} PROPERTIES
         RESOURCE_LOCK mcp_memory_exhaustion TIMEOUT 400)
     ENDFOREACH (_t)
