@@ -541,10 +541,10 @@ function file:read-text-lines( $file as xs:string )
  : Reads the content of a file using the specified encoding and returns a
  : sequence of strings representing the lines in the content of the file.
  :
- : This implementation considers the LF (&#xA;) character as the line
- : separator. If a resulting line ends with the CR (&#xD;) character, this is
- : trimmed as well. This implementation will uniformly treat LF and CRLF as
- : line separators.
+ : Lines end with LF (&#xA;), CRLF (&#xD;&#xA;) or CR (&#xD;) alone, as for
+ : fn:unparsed-text-lines. What follows the last end of line is a line only if
+ : it is not empty, so there is no trailing empty line and an empty file has no
+ : lines.
  :
  : @param $file The file to read.
  : @param $encoding The encoding used when reading the file.

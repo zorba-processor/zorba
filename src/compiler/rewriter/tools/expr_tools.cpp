@@ -26,6 +26,8 @@
 #include "compiler/api/compilercb.h"
 
 #include "functions/func_errors_and_diagnostics.h"
+#include "functions/udf.h"
+#include "types/typeimpl.h"
 
 #include "types/typeops.h"
 
@@ -856,6 +858,102 @@ bool count_var_uses_rec(
   }
 
   return true;
+}
+
+
+/*******************************************************************************
+
+********************************************************************************/
+bool function_runs_opaque_code(const function* f)
+{
+  switch (f->getKind())
+  {
+  case FunctionConsts::FN_ZORBA_INVOKE_N:
+  case FunctionConsts::FN_ZORBA_INVOKE_N_N:
+  case FunctionConsts::FN_ZORBA_INVOKE_U_N:
+  case FunctionConsts::FN_ZORBA_INVOKE_S_N:
+  case FunctionConsts::FN_ZORBA_EVAL_1:
+  case FunctionConsts::FN_ZORBA_EVAL_N_1:
+  case FunctionConsts::FN_ZORBA_EVAL_U_1:
+  case FunctionConsts::FN_ZORBA_EVAL_S_1:
+    return true;
+  default:
+    break;
+  }
+
+  const signature& sig = f->getSignature();
+  csize const numParams = sig.isVariadic() ? 1 : sig.paramCount();
+
+  for (csize i = 0; i < numParams; ++i)
+  {
+    XQType::TypeKind const kind = sig[static_cast<int>(i)]->type_kind();
+
+    if (kind == XQType::FUNCTION_TYPE_KIND || kind == XQType::ANY_FUNCTION_TYPE_KIND)
+      return true;
+  }
+
+  return false;
+}
+
+
+static bool may_run_side_effects_rec(
+    const expr* e,
+    std::set<const function*>& visitedUdfs)
+{
+  switch (e->get_expr_kind())
+  {
+  case dynamic_function_invocation_expr_kind:
+  case eval_expr_kind:
+  case var_set_expr_kind:
+  case apply_expr_kind:
+  case exit_expr_kind:
+  case exit_catcher_expr_kind:
+  case flowctl_expr_kind:
+  case while_expr_kind:
+    return true;
+
+  case fo_expr_kind:
+  {
+    const function* f = static_cast<const fo_expr*>(e)->get_func();
+
+    if (f->isSequential() || function_runs_opaque_code(f))
+      return true;
+
+    if (f->isUdf() && visitedUdfs.insert(f).second)
+    {
+      const expr* body = static_cast<const user_function*>(f)->getBody();
+
+      if (body == NULL || may_run_side_effects_rec(body, visitedUdfs))
+        return true;
+    }
+
+    break;
+  }
+
+  default:
+    break;
+  }
+
+  ExprConstIterator iter(e);
+  while (!iter.done())
+  {
+    const expr* child = iter.get_expr();
+
+    if (child != NULL && may_run_side_effects_rec(child, visitedUdfs))
+      return true;
+
+    iter.next();
+  }
+
+  return false;
+}
+
+
+bool may_run_side_effects(const expr* root)
+{
+  std::set<const function*> visitedUdfs;
+
+  return may_run_side_effects_rec(root, visitedUdfs);
 }
 
 

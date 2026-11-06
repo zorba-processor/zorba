@@ -115,7 +115,7 @@ ThesaurusURLResolver::resolveURL( zstring const &url, EntityData const *data ) {
         return new xqftts::provider( t_path );
       }
       catch ( invalid_argument const &e ) {
-        throw XQUERY_EXCEPTION( err::XPTY0004, ERROR_PARAMS( e.what() ) );
+        throw XQUERY_EXCEPTION( err::XPTY0004, ERROR_PARAMS( ERROR_TEXT( e.what() ) ) );
       }
     }
 #   endif /* ZORBA_WITH_FILE_ACCESS */

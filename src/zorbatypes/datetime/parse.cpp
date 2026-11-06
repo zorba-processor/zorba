@@ -17,6 +17,7 @@
 #include <sstream>
 #include <string>
 #include <iomanip>
+#include <limits>
 
 #include "util/ascii_util.h"
 #include "util/time_util.h"
@@ -69,14 +70,12 @@ int parse_long(
     return 1;
 
   while ( position + delta < len && ascii::is_digit( str[position+delta] ) ) {
-    int const tmp_prev = tmp_result;
-    tmp_result *= 10;
-    // See <http://stackoverflow.com/q/199333/99089>
-    if ( tmp_result / 10 != tmp_prev )
+    int const digit = str[position + delta] - '0';
+    // Test before multiplying and adding: signed overflow is undefined
+    // behavior, so it cannot be detected afterwards.
+    if ( tmp_result > (std::numeric_limits<int>::max() - digit) / 10 )
       return 2;                         // overflow
-    tmp_result += str[position + delta] - '0';
-    if ( tmp_result < tmp_prev )
-      return 2;                         // overflow
+    tmp_result = tmp_result * 10 + digit;
     ++digits;
     ++position;
   }

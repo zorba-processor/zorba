@@ -503,12 +503,12 @@ void AnnotationList::checkConflictingDeclarations(
       if (declKind == var_decl)
       {
         RAISE_ERROR(err::XQST0116, loc,
-        ERROR_PARAMS(ZED(XQST0116_Conflicting), lProblems.str()));
+        ERROR_PARAMS(ZED(XQST0116_Conflicting), ERROR_TEXT( lProblems.str() )));
       }
       else
       {
         RAISE_ERROR(err::XQST0106, loc,
-        ERROR_PARAMS(ZED(XQST0106_Conflicting), lProblems.str()));
+        ERROR_PARAMS(ZED(XQST0106_Conflicting), ERROR_TEXT( lProblems.str() )));
       }
     }
   }
@@ -548,14 +548,14 @@ void AnnotationList::checkRequiredDeclarations(
         RAISE_ERROR(err::XQST0116, loc,
         ERROR_PARAMS(ZED(XQST0116_Requirement),
             AnnotationInternal::lookup(lCurrAnn)->getStringValue(),
-            lProblems.str()));
+            ERROR_TEXT( lProblems.str() )));
       }
       else
       {
         RAISE_ERROR(err::XQST0106, loc,
         ERROR_PARAMS(ZED(XQST0106_Requirement),
             AnnotationInternal::lookup(lCurrAnn)->getStringValue(),
-            lProblems.str()));
+            ERROR_TEXT( lProblems.str() )));
       }
     }
   }

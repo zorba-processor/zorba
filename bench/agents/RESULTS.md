@@ -166,3 +166,191 @@ and B is a hypothesis; these runs have no variant with a shorter listing.
 
 Limits: one rerun per language, 3 runs per task, one model; B differs between
 two runs by up to 4.2% in tokens with no configuration change.
+
+## 2026-11-03, commits 7c8d649f9 and 27e952e2f (`list_documents` shorter)
+
+Backend `claude-code`, model `claude-sonnet-5-5`, `--language jsoniq`, 20 tasks,
+3 runs per task and configuration: 60 sessions per cell. 7c8d649f9 is master,
+run 41646733315. 27e952e2f adds the shorter `list_documents` listing to that
+master, run 41646738034. Per-task tables and the per-run records are in
+[`baselines/2026-11-03-7c8d649f9-jsoniq/`](baselines/2026-11-03-7c8d649f9-jsoniq/)
+and
+[`baselines/2026-11-03-27e952e2f-jsoniq/`](baselines/2026-11-03-27e952e2f-jsoniq/).
+Tokens are means per session; reported USD is the sum over the 60 sessions of
+the cost that Claude Code reports.
+
+| Config | Measure | 7c8d649f9 | 27e952e2f |
+|---|---|---:|---:|
+| A | accuracy | 1.00 | 1.00 |
+| A | tool calls | 3.7 | 3.9 |
+| A | tokens, mean | 23983 | 25108 |
+| A | tokens, median | 19762 | 17988 |
+| A | wall s | 19.4 | 18.5 |
+| A | reported USD | 2.1899 | 2.1799 |
+| A | failed `run_query` | 61 of 161 | 67 of 171 |
+| B | accuracy | 1.00 | 0.98 |
+| B | tokens, mean | 15436 | 13499 |
+| B | tokens, median | 11346 | 10812 |
+| B | wall s | 13.8 | 12.7 |
+| B | reported USD | 0.9715 | 0.9885 |
+
+The listing went from 4671 to 3986 characters (57 calls per run) and with
+`path=weather` from 2629 to 2574 (3 calls per run).
+
+**These two runs do not show a saving from the shorter listing.** Comparing the
+mean per task of 27e952e2f with that of 7c8d649f9:
+
+| Config | Tasks lower | Tasks higher | Median difference | Mean difference |
+|---|---:|---:|---:|---:|
+| A | 15 | 5 | -2344 | +1125 |
+| B | 11 | 7 | -7 | -1936 |
+
+B has no listing and no code change between the two runs, and its mean moved
+12.5%. That is larger than the 4.2% stated for the earlier reruns, and larger
+than the difference in A. The one wrong answer is `t13_cyclone_categories`,
+run 2, in B.
+
+### Query errors, both runs together
+
+128 of 332 `run_query` calls failed, in 74 of the 120 A sessions (62%), by
+cause:
+
+| Cause | Failed |
+|---|---:|
+| `.` as the context item (JSONiq uses `$$`) | 39 |
+| String lookup on an array (FORG0001) | 25 |
+| `math:` prefix not declared | 11 |
+| Returning a node (JNSE0014) | 10 |
+| `$a-$b` without spaces | 10 |
+| Other syntax | 8 |
+| Singleton expected | 8 |
+| `number` or `xs:null` as a type | 4 |
+| Names that do not exist | 4 |
+| `\s` in a string, backslash not escaped | 4 |
+| `[n]` on an array | 3 |
+| Single quotes | 2 |
+
+16 repeat a cause already seen in the session and 37 come right after another
+failure.
+
+| Failed queries in the session | Sessions | Median tokens |
+|---:|---:|---:|
+| 0 | 46 | 11447 |
+| 1 | 45 | 18299 |
+| 2 | 15 | 32834 |
+| 3 | 8 | 38432 |
+| 4 or more | 6 | 71340 |
+
+Harder tasks fail more, so this table overstates the cost of an error. Within
+one task, sessions with an error use a median of 1.46 times the tokens of
+sessions without one (14 tasks have both kinds). Over the 15 tasks with a
+session without errors, those sessions use a median of 1.19 times the tokens
+of B; over all sessions of both runs A uses 1.70 times the tokens of B.
+
+Limits: 3 runs per task, one model, 1.8 MB of data. The cache counters of these
+runs cannot be used: `zorba-mcp.log` keeps one process, with no queries.
+
+## 2026-11-03, commits 3d8fbf0cf and 8648d2de5 (JSONiq primer and query hints)
+
+Backend `claude-code`, model `claude-sonnet-5-5`, `--language jsoniq`, 20 tasks,
+3 runs per task and configuration: 60 sessions per cell. 3d8fbf0cf is master,
+run 41704489783. 8648d2de5 adds the 687-byte JSONiq primer in the `run_query`
+description and the query hints to the parent of 3d8fbf0cf, which only adds
+benchmark records, run 41704494854. Per-task tables and the per-run records are in
+[`baselines/2026-11-03-3d8fbf0cf-jsoniq/`](baselines/2026-11-03-3d8fbf0cf-jsoniq/)
+and
+[`baselines/2026-11-03-8648d2de5-jsoniq/`](baselines/2026-11-03-8648d2de5-jsoniq/).
+Tokens are means per session unless stated; reported USD is the sum over the 60
+sessions of the cost that Claude Code reports. Every figure is recomputed from
+`runs.jsonl` of the two runs.
+
+| Config | Measure | 3d8fbf0cf | 8648d2de5 |
+|---|---|---:|---:|
+| A | accuracy | 1.00 | 1.00 |
+| A | tool calls | 3.6 | 3.0 |
+| A | tokens, mean | 22104 | 19315 |
+| A | tokens, median | 18892 | 17456 |
+| A | wall s | 19.1 | 14.4 |
+| A | reported USD | 2.0463 | 1.8268 |
+| A | failed `run_query` | 52 of 155 | 27 of 121 |
+| A | sessions with a failed query | 36 of 60 | 20 of 60 |
+| B | accuracy | 1.00 | 1.00 |
+| B | tokens, mean | 13982 | 13916 |
+| B | tokens, median | 11987 | 11402 |
+| B | wall s | 12.0 | 13.5 |
+| B | reported USD | 0.8361 | 1.0428 |
+
+Failed `run_query` calls without the primer in the earlier runs: 61 of 161
+(7c8d649f9) and 67 of 171 (27e952e2f).
+
+Comparing the failed queries per task of 8648d2de5 with those of 3d8fbf0cf, 12
+tasks have fewer, 2 have more (`t17_gdacs_eq_match` 2 to 5,
+`t18_hot_cities_near_alerts` 2 to 5) and 6 are the same.
+
+**These two runs do not show a token saving.** Comparing the mean tokens per
+task of A:
+
+| Config | Tasks lower | Tasks higher | Median difference | Mean difference |
+|---:|---:|---:|---:|---:|
+| A | 10 | 10 | -54 | -2789 |
+
+The mean falls mostly on a few tasks (`t14_fires_near_quakes` alone is -27612 of
+the -55771 that the 20 differences add up to), and half of the tasks went up. No
+token saving is claimed.
+
+### Failed queries by code
+
+| code | 3d8fbf0cf | 8648d2de5 |
+|---|---:|---:|
+| `err:XPST0003` | 24 | 15 |
+| `err:FORG0001` | 13 | 0 |
+| `jerr:JNSE0014` | 7 | 2 |
+| `err:XPTY0004` | 2 | 5 |
+| `err:XPST0051` | 2 | 0 |
+| `jerr:JNTY0024` | 1 | 3 |
+| `err:FORG0006` | 1 | 2 |
+| `jerr:JNTY0004` | 1 | 0 |
+| `err:XPST0081` | 1 | 0 |
+| total | 52 | 27 |
+
+The 15 `err:XPST0003` of 8648d2de5, by cause, from reading each query:
+
+| Cause | Failed | Hint given |
+|---|---:|---|
+| `.` as the context item | 11 | all 11 |
+| `\s` in a string, backslash not escaped | 3 | all 3 |
+| `$x[1:1]`, a slice JSONiq does not have | 1 | none |
+
+The primer states the first two, and agents still wrote them; 14 of the 15 were
+followed by a query that succeeded, and the other (the slice) by a `.` failure
+and then a success.
+
+Limits: 3 runs per task, one model, 1.8 MB of data. The primer and the hints went
+in together, so these runs do not separate them. The tasks are the ones the list
+of common errors came from, so the fall in failures may not carry over to other
+tasks. Everything here is `--language jsoniq`; no run measures `--language
+xquery` with this work.
+
+The measured commit predates the review of this work. A later commit keeps the
+primer text and the instructions of a JSONiq session byte for byte, and an XQuery
+session no longer has either, which these runs did not measure. These later
+changes can affect a JSONiq session, and were not measured:
+
+- The hint on `\` also lists `\'`, and also fires on a literal over several
+  lines. The 3 `\s` failures above got the old text.
+- The hint on `.` fires only where an expression can start. All 11 `.` failures
+  above are in such a place, so they would get it.
+- A misspelled Zorba math namespace (`http://www.zorba.io/modules/math`) points
+  to `http://zorba.io/modules/math` instead of the W3C namespace, and any other
+  namespace that ends in `/math` gets no math pointer. No query of run 41704494854
+  imports such a namespace; 7c8d649f9 and 27e952e2f have 3 and 2 that do.
+- A function of the W3C namespace called with the prefix `math` bound to another
+  namespace gets different advice, and a wrong arity of a declared function comes
+  before the math pointer.
+- A selector computed at run time gets a placeholder in the hint of a key on an
+  array. Run 41704494854 has no `err:FORG0001`.
+- `$a--` gets `$a - -...`.
+- A hint that says to start the query with a version declaration says it must be
+  the very first characters, before any comment, and the hint on `.` is worded
+  around that. The 11 `.` failures above got the old wording.
+- A selector with `"`, `\` or a control character gets the placeholder too.

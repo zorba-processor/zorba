@@ -60,6 +60,11 @@ HtmlXmlLoader::HtmlXmlLoader(
   :
   FastXmlLoader(factory, xqueryDiagnostics, loadProperties, dataguide),
   theDepth(0)
+#if LIBXML_VERSION < 21400
+  ,
+  theRootClosed(false),
+  theDocumentEnded(false)
+#endif
 {
   // The HTML parser reports elements through the SAX1 callbacks only. It has
   // its own entity table and no DTD, so the entity callbacks are not needed.
@@ -75,6 +80,9 @@ HtmlXmlLoader::HtmlXmlLoader(
   theSaxHandler.getParameterEntity = NULL;
   theSaxHandler.entityDecl = NULL;
   theSaxHandler.serror = &HtmlXmlLoader::htmlError;
+#if LIBXML_VERSION < 21400
+  theSaxHandler.endDocument = &HtmlXmlLoader::htmlEndDocument;
+#endif
 }
 
 
@@ -167,6 +175,13 @@ store::Item_t HtmlXmlLoader::loadXml(
 
       htmlParseChunk(ctxt, NULL, 0, 1);
 
+#if LIBXML_VERSION < 21400
+      // A last piece of text that ends the input can leave the end of the
+      // document unreported.
+      if (theRootNode != NULL)
+        htmlEndDocument(this);
+#endif
+
       htmlFreeParserCtxt(ctxt);
       ctxt = NULL;
     }
@@ -209,7 +224,8 @@ store::Item_t HtmlXmlLoader::loadXml(
     if (theXQueryDiagnostics->errors().empty())
       theXQueryDiagnostics->add_error(
         NEW_ZORBA_EXCEPTION(zerr::ZSTR0021_LOADER_PARSING_ERROR,
-                            ERROR_PARAMS(ZED(BadXMLDocument_2o), theDocUri)));
+                            ERROR_PARAMS(doc_uri, 0, 0,
+                                         "the parser left elements open")));
     abortload();
     return NULL;
   }
@@ -236,6 +252,13 @@ void HtmlXmlLoader::htmlStartElement(
   if (!loader.theXQueryDiagnostics->errors().empty() || name == NULL)
     return;
 
+#if LIBXML_VERSION < 21400
+  // Before 2.14 the only elements after the end of the root are the html and p
+  // that libxml2 opens for a long run of blanks.
+  if (loader.theRootClosed)
+    return;
+#endif
+
   if (loader.theDepth >= MAX_DEPTH)
   {
     std::ostringstream lMessage;
@@ -245,7 +268,7 @@ void HtmlXmlLoader::htmlStartElement(
                           ERROR_PARAMS(loader.theDocUri,
                                        xmlSAX2GetLineNumber(loader.ctxt),
                                        xmlSAX2GetColumnNumber(loader.ctxt),
-                                       lMessage.str())));
+                                       ERROR_TEXT( lMessage.str() ))));
     xmlStopParser(loader.ctxt);
     return;
   }
@@ -316,8 +339,33 @@ void HtmlXmlLoader::htmlEndElement(void * ctx, const xmlChar * name)
     return;
 
   --loader.theDepth;
+#if LIBXML_VERSION < 21400
+  loader.theRootClosed = loader.theDepth == 0;
+#endif
   FastXmlLoader::endElement(ctx, name, NULL, NULL);
 }
+
+
+#if LIBXML_VERSION < 21400
+/*******************************************************************************
+  Before 2.14, libxml2 can report the end of the document with elements open, or
+  not at all: the elements still open end here, and the document once.
+********************************************************************************/
+void HtmlXmlLoader::htmlEndDocument(void * ctx)
+{
+  HtmlXmlLoader& loader = *(static_cast<HtmlXmlLoader *>(ctx));
+  if (loader.theDocumentEnded)
+    return;
+  loader.theDocumentEnded = true;
+
+  while (loader.theDepth > 0)
+  {
+    --loader.theDepth;
+    FastXmlLoader::endElement(ctx, NULL, NULL, NULL);
+  }
+  FastXmlLoader::endDocument(ctx);
+}
+#endif
 
 
 /*******************************************************************************

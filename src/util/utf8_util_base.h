@@ -54,7 +54,7 @@ typedef std::size_t size_type;
 /**
  * Byte Order Mark (BOM).
  */
-storage_type const BOM[] = "\xEF\xBB\xBF";
+storage_type const BOM[] = { '\xEF', '\xBB', '\xBF' };
 
 /**
  * The special value used to denote either (a) the maximum possible number as

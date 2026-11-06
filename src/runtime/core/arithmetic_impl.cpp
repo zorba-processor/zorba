@@ -326,7 +326,7 @@ bool GenericArithIterator<Operation>::compute(
     xqtref_t type1 = tm->create_value_type(n1);
 
     RAISE_ERROR(err::XPTY0004, aLoc,
-    ERROR_PARAMS(ZED(ArithOpNotDefinedBetween_23), *type0, *type1));
+    ERROR_PARAMS(ZED(ArithOpNotDefinedBetween_23), ERROR_TEXT( *type0 ), ERROR_TEXT( *type1 )));
   }
 
   return false; // suppresses wanring

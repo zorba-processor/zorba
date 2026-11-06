@@ -109,6 +109,7 @@
 #include "util/stl_util.h"
 #include "util/string_util.h"
 #include "util/tracer.h"
+#include "util/uri_util.h"
 #include "util/utf8_util.h"
 #include "util/xml_util.h"
 #include "util/hashmap.h"
@@ -1427,6 +1428,14 @@ void raise_undeclared_var(const store::Item* qname, const QueryLoc& loc)
     }
   }
 
+  // No variable can be meant by a name that ends in "-", in scope or not.
+  std::size_t const lastNonDash = local.find_last_not_of('-');
+  if (!*e.hint() && lastNonDash != std::string::npos &&
+      lastNonDash + 1 < local.size())
+    e.set_hint(query_hints::dash_in_variable(
+      prefix + local.substr(0, lastNonDash + 1),
+      local.substr(lastNonDash + 2)).c_str());
+
   throw e;
 }
 
@@ -2399,7 +2408,7 @@ void* import_schema(
     if (lStream == NULL)
     {
       RAISE_ERROR(err::XQST0059, loc,
-      ERROR_PARAMS(ZED(XQST0059_UnknownSchema_23o), lNsURI, lErrorMessage));
+      ERROR_PARAMS(ZED(XQST0059_UnknownSchema_23o), lNsURI, ERROR_TEXT( lErrorMessage )));
     }
 
     // If we got this far, we have a valid StreamResource.
@@ -3729,8 +3738,19 @@ void end_visit(const ModuleImport& v, void* /*visit_state*/)
       }
       else
       {
-        RAISE_ERROR(err::XQST0059, loc,
-        ERROR_PARAMS(ZED(XQST0059_UnknownModule_234o), targetNS, compURI, errorMsg));
+        XQueryException e(XQUERY_EXCEPTION(err::XQST0059,
+          ERROR_PARAMS(ZED(XQST0059_UnknownModule_234o), targetNS, compURI, ERROR_TEXT( errorMsg )),
+          ERROR_LOC(loc)));
+        // A network URI under a policy without this capability: the fetch is
+        // what the policy denied, not the module. This does not read errorMsg,
+        // which can quote the URI.
+        uri::scheme const lScheme = uri::get_scheme(compURI);
+        e.set_hint(query_hints::unknown_module(
+          targetNS.str(),
+          (lScheme == uri::http || lScheme == uri::https || lScheme == uri::ftp) &&
+          !theSctx->get_security_policy().allows(Capability::RemoteImport)
+          ).c_str());
+        throw e;
       }
 
       // Get the parent of the query root sctx. This is the user-specified sctx
@@ -5639,7 +5659,7 @@ void end_visit(const IndexKeyList& v, void* /*visit_state*/)
         RAISE_ERROR(zerr::ZDST0027_INDEX_BAD_KEY_TYPE, kloc,
         ERROR_PARAMS(index->getName()->getStringValue(),
                      ZED(ZDST0027_NON_ORDERED_KEY_TYPE),
-                     ptype->toSchemaString()));
+                     ERROR_TEXT( ptype->toSchemaString() )));
       }
 
       if (!index->isGeneral() &&
@@ -9608,7 +9628,7 @@ expr* create_cast_expr(
     if (theSctx->xquery_version() < StaticContextConsts::xquery_version_3_0)
     {
       RAISE_ERROR(err::XPST0051, loc,
-      ERROR_PARAMS(ZED(XPST0051_Atomic_2), type->toSchemaString()));
+      ERROR_PARAMS(ZED(XPST0051_Atomic_2), ERROR_TEXT( type->toSchemaString() )));
     }
   }
 
@@ -11573,14 +11593,14 @@ void end_visit(const VarRef& v, void* /*visit_state*/)
         {
           RAISE_ERROR(err::XPTY0004, loc,
           ERROR_PARAMS(ZED(XPTY0004_NoVarTypeInMainModule_23),
-                       *declaredType,
+                       ERROR_TEXT( *declaredType ),
                        ve->get_name()->getStringValue()));
         }
         else
         {
           RAISE_ERROR(err::XPTY0004, loc,
           ERROR_PARAMS(ZED(XPTY0004_NoVarTypeInModule_234),
-                       *declaredType,
+                       ERROR_TEXT( *declaredType ),
                        ve->get_name()->getStringValue(),
                        theModuleNamespace));
         }
@@ -11591,14 +11611,14 @@ void end_visit(const VarRef& v, void* /*visit_state*/)
         {
           RAISE_ERROR(err::XQST0036, loc,
           ERROR_PARAMS(ZED(XQST0036_NoVarTypeInMainModule_23),
-                       *declaredType,
+                       ERROR_TEXT( *declaredType ),
                        ve->get_name()->getStringValue()));
         }
         else
         {
           RAISE_ERROR(err::XQST0036, loc,
           ERROR_PARAMS(ZED(XQST0036_NoVarTypeInModule_234),
-                       *declaredType,
+                       ERROR_TEXT( *declaredType ),
                        ve->get_name()->getStringValue(),
                        theModuleNamespace));
         }
@@ -11816,14 +11836,14 @@ void* begin_visit(const FunctionCall& v)
       {
         RAISE_ERROR(err::XQST0036, loc,
         ERROR_PARAMS(ZED(XQST0036_NoRetTypeInMainModule_23),
-                     *retType,
+                     ERROR_TEXT( *retType ),
                      f->getName()->getStringValue()));
       }
       else
       {
         RAISE_ERROR(err::XQST0036, loc,
         ERROR_PARAMS(ZED(XQST0036_NoRetTypeInModule_234),
-                     *retType,
+                     ERROR_TEXT( *retType ),
                      f->getName()->getStringValue(),
                      theModuleNamespace));
       }
@@ -11842,14 +11862,14 @@ void* begin_visit(const FunctionCall& v)
         {
           RAISE_ERROR(err::XQST0036, loc,
           ERROR_PARAMS(ZED(XQST0036_NoParamTypeInMainModule_23),
-                       *type,
+                       ERROR_TEXT( *type ),
                        f->getName()->getStringValue()));
         }
         else
         {
           RAISE_ERROR(err::XQST0036, loc,
           ERROR_PARAMS(ZED(XQST0036_NoParamTypeInModule_234),
-                       *retType,
+                       ERROR_TEXT( *retType ),
                        f->getName()->getStringValue(),
                        theModuleNamespace));
         }
@@ -11948,7 +11968,34 @@ std::string undeclared_function_hint(
     signatures.push_back(text);
   }
 
-  return query_hints::other_arity(display, signatures);
+  // A declared function: its forms are what this call got wrong.
+  if (!signatures.empty())
+    return query_hints::other_arity(display, signatures);
+
+  // A math module that is not the W3C one, and that lacks the function.
+  const zstring fnNs = qnameItem->getNamespace();
+  if (fnNs != static_context::XQUERY_MATH_FN_NS &&
+      query_hints::is_math_uri(fnNs.str()))
+  {
+    store::Item_t name;
+    GENV_ITEMFACTORY->createQName(name,
+                                  zstring(static_context::XQUERY_MATH_FN_NS),
+                                  zstring(),
+                                  qnameItem->getLocalName());
+
+    if (theSctx->lookup_fn(name.getp(), numArgs))
+    {
+      zstring bound;
+      bool const prefixKnown =
+        theSctx->lookup_ns(bound, zstring("math"), QueryLoc::null, false);
+      bool const isMath = bound == static_context::XQUERY_MATH_FN_NS;
+      return query_hints::math_function(qnameItem->getLocalName().str(),
+                                        prefixKnown && isMath,
+                                        prefixKnown && !isMath);
+    }
+  }
+
+  return std::string();
 }
 
 
@@ -16383,7 +16430,7 @@ void end_visit (const FTThesaurusID& v, void* /*visit_state*/) {
     theSctx->resolve_uri( uri, internal::EntityData::THESAURUS, error_msg )
   );
   if ( !rsrc.get() )
-    RAISE_ERROR(err::FTST0018, loc, ERROR_PARAMS( uri, error_msg ));
+    RAISE_ERROR(err::FTST0018, loc, ERROR_PARAMS( uri, ERROR_TEXT( error_msg ) ));
 
   ftrange *levels;
   if ( v.get_levels() ) {

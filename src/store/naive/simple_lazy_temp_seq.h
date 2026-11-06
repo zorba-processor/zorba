@@ -16,7 +16,7 @@
 #ifndef ZORBA_STORE_SIMPLE_LAZY_TEMP_SEQ_H
 #define ZORBA_STORE_SIMPLE_LAZY_TEMP_SEQ_H
 
-#include <vector>
+#include <deque>
 
 #include "diagnostics/zorba_exception.h"
 #include "zorba/diagnostic_list.h"
@@ -50,7 +50,8 @@ typedef rchandle<class SimpleLazyTempSeq> SimpleLazyTempSeq_t;
 
   theItems :
   ----------
-  Vector storing the cached items.
+  The cached items. Purging removes them from the front, in time proportional
+  to the number of items purged.
 ********************************************************************************/
 class SimpleLazyTempSeq : public store::TempSeq 
 {
@@ -61,7 +62,7 @@ class SimpleLazyTempSeq : public store::TempSeq
 
   xs_long                    thePurgedUpTo;
   
-  std::vector<store::Item*>  theItems; // ref-counting is done manually
+  std::deque<store::Item*>   theItems; // ref-counting is done manually
 
  private:
   void clear();

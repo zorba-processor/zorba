@@ -166,7 +166,7 @@ bool FnBooleanIterator::effectiveBooleanValue(
         ERROR_PARAMS(ZED(BadArgTypeForFn_2o34o),
                      "", "fn:boolean",
                      ZED(EBVNotDefSeq_5),
-                     *type));
+                     ERROR_TEXT( *type )));
       }
       else
       {
@@ -941,7 +941,7 @@ bool CompareIterator::equal(
       xqtref_t type1 = tm->create_value_type(item1.getp());
 
       RAISE_ERROR(err::XPTY0004, loc,
-      ERROR_PARAMS(ZED(BadType_23o), *type0, ZED(NoCompareWithType_4), *type1));
+      ERROR_PARAMS(ZED(BadType_23o), ERROR_TEXT( *type0 ), ZED(NoCompareWithType_4), ERROR_TEXT( *type1 )));
     }
     else
       return false;
@@ -989,7 +989,7 @@ long CompareIterator::compare(
     xqtref_t type1 = tm->create_value_type(item1.getp());
 
     RAISE_ERROR(err::XPTY0004, loc,
-    ERROR_PARAMS(ZED(BadType_23o), *type0, ZED(NoCompareWithType_4), *type1));
+    ERROR_PARAMS(ZED(BadType_23o), ERROR_TEXT( *type0 ), ZED(NoCompareWithType_4), ERROR_TEXT( *type1 )));
   }
 
   try
@@ -1007,7 +1007,7 @@ long CompareIterator::compare(
         xqtref_t type1 = tm->create_value_type(item1.getp());
 
         RAISE_ERROR(err::XPTY0004, loc,
-        ERROR_PARAMS(ZED(BadType_23o), *type0, ZED(NoCompareWithType_4), *type1));
+        ERROR_PARAMS(ZED(BadType_23o), ERROR_TEXT( *type0 ), ZED(NoCompareWithType_4), ERROR_TEXT( *type1 )));
       }
     }
     else if (TypeOps::is_subtype(type1, type0))
@@ -1043,7 +1043,7 @@ long CompareIterator::compare(
         xqtref_t type1 = tm->create_value_type(item1.getp());
 
         RAISE_ERROR(err::XPTY0004, loc,
-        ERROR_PARAMS(ZED(BadType_23o), *type0, ZED(NoCompareWithType_4), *type1));
+        ERROR_PARAMS(ZED(BadType_23o), ERROR_TEXT( *type0 ), ZED(NoCompareWithType_4), ERROR_TEXT( *type1 )));
       }
     }
   }
@@ -1056,7 +1056,7 @@ long CompareIterator::compare(
       xqtref_t type1 = tm->create_value_type(item1.getp());
 
       RAISE_ERROR(err::XPTY0004, loc,
-      ERROR_PARAMS(ZED(BadType_23o), *type0, ZED(NoStrictCompareWithType_4), *type1));
+      ERROR_PARAMS(ZED(BadType_23o), ERROR_TEXT( *type0 ), ZED(NoStrictCompareWithType_4), ERROR_TEXT( *type1 )));
     }
 
     throw;

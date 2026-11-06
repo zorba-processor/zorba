@@ -52,6 +52,13 @@ Zorba Version 2.0
   (macOS CI) the rbkt tests zorba/schemas/choice-empty-sequence and
   zorba/schemas/union-whitespace are expected to fail.
 
+* HTML parsed with libxml2 before 2.14 differs from libxml2 2.14 and later at
+  two points that belong to the parser. Text or elements after </html> are
+  dropped; from 2.14 they are a second root html element. A run of 1000 or more
+  blanks outside the body, as between </body> and </html> or between </head>
+  and <body>, is a p element of blanks; from 2.14 it is text of the html
+  element, so that //p counts one more before 2.14.
+
 * XQuery Full-Text is mostly, but not completely, implemented.
   For details, see following bugs:
   - 3172383 <https://bugs.launchpad.net/zorba/+bug/sf-3172383>
