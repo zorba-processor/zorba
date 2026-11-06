@@ -109,19 +109,34 @@ FOREACH (_q plan_parse_streaming_off plan_parse_streaming_dynamic plan_parse_str
   ZORBA_SET_TEST_PROPERTY(bin/zorba_${_q} FAIL_REGULAR_EXPRESSION "JSONParseMembersIterator")
 ENDFOREACH ()
 # With the option, file:read-text stays in the file only when nothing in the query
-# can write during the evaluation: the plan shows which (file-stream).
-# At O0 the text of this query is held in memory too, as before this check.
+# can write during the evaluation: the plan shows which (file-stream). These tests
+# run zorbacmd through plan_check.cmake, which also requires exit status 0, so a
+# query that crashes or fails after printing its plan fails the test. Arguments
+# are separated by "|".
+ZORBA_TARGET_LOCATION (_zorbacmd zorbacmd)
+MACRO (ZORBA_PLAN_TEST NAME PATTERN ARGS)
+  ADD_TEST ("${NAME}" "${CMAKE_COMMAND}" "-DZORBACMD=${_zorbacmd}" "-DARGS=${ARGS}"
+    "-DPATTERN=${PATTERN}" -P "${_plandir}/plan_check.cmake")
+ENDMACRO (ZORBA_PLAN_TEST)
+SET (_planfile "|-e|f:=${_plandir}/plan_members.json")
+# At O0 the text of these queries is held in memory too, as before this check:
+# the tests that expect the file stream run at O1 and O2.
 FOREACH (_opt 1 2)
-  ZORBA_ADD_TEST(bin/zorba_plan_parse_file_O${_opt} zorbacmd --optimization-level ${_opt} --print-iterator-tree -f -q "${_plandir}/plan_parse_file.jq" -e "f:=${_plandir}/plan_members.json")
-  ZORBA_SET_TEST_PROPERTY(bin/zorba_plan_parse_file_O${_opt} PASS_REGULAR_EXPRESSION "JSONParseMembersIterator[^>]*file-stream=\"true\"")
+  ZORBA_PLAN_TEST (bin/zorba_plan_parse_file_O${_opt} "JSONParseMembersIterator[^>]*file-stream=.true."
+    "--optimization-level|${_opt}|--print-iterator-tree|-f|-q|${_plandir}/plan_parse_file.jq${_planfile}")
+  # One query for each thing that makes the rule hold the text in memory.
+  FOREACH (_q update for_each eval udf seq_item)
+    ZORBA_PLAN_TEST (bin/zorba_plan_parse_file_${_q}_O${_opt} "JSONParseMembersIterator[^>]*file-stream=.false."
+      "--optimization-level|${_opt}|--print-iterator-tree|-f|-q|${_plandir}/plan_parse_file_${_q}.jq${_planfile}")
+  ENDFOREACH ()
 ENDFOREACH ()
 FOREACH (_opt 0 1 2)
-  ZORBA_ADD_TEST(bin/zorba_plan_parse_file_dynamic_O${_opt} zorbacmd --optimization-level ${_opt} --print-iterator-tree -f -q "${_plandir}/plan_parse_file_dynamic.jq" -e "f:=${_plandir}/plan_members.json")
-  ZORBA_SET_TEST_PROPERTY(bin/zorba_plan_parse_file_dynamic_O${_opt} PASS_REGULAR_EXPRESSION "JSONParseMembersIterator[^>]*file-stream=\"false\"")
+  ZORBA_PLAN_TEST (bin/zorba_plan_parse_file_dynamic_O${_opt} "JSONParseMembersIterator[^>]*file-stream=.false."
+    "--optimization-level|${_opt}|--print-iterator-tree|-f|-q|${_plandir}/plan_parse_file_dynamic.jq${_planfile}")
   # p01-error-parity compares with and without the option: the side with it must
   # reach JSONParseMembersIterator at every level.
-  ZORBA_ADD_TEST(bin/zorba_plan_parity_O${_opt} zorbacmd --optimization-level ${_opt} --print-iterator-tree -f -q "${CMAKE_SOURCE_DIR}/test/rbkt/Queries/zorba/jsoniq-array-members/p01-error-parity.jq")
-  ZORBA_SET_TEST_PROPERTY(bin/zorba_plan_parity_O${_opt} PASS_REGULAR_EXPRESSION "JSONParseMembersIterator")
+  ZORBA_PLAN_TEST (bin/zorba_plan_parity_O${_opt} "JSONParseMembersIterator"
+    "--optimization-level|${_opt}|--print-iterator-tree|-f|-q|${CMAKE_SOURCE_DIR}/test/rbkt/Queries/zorba/jsoniq-array-members/p01-error-parity.jq")
 ENDFOREACH ()
 ZORBA_ADD_TEST(bin/zorba_timeout_parse_members zorbacmd --timeout 1 -f -q "${_plandir}/timeout_parse_members.jq")
 ZORBA_SET_TEST_PROPERTY(bin/zorba_timeout_parse_members PASS_REGULAR_EXPRESSION ".*ZXQP0068.*")

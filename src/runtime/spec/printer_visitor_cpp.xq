@@ -96,7 +96,12 @@ declare function local:printer-visitor-definition($iter) as xs:string
     $gen:indent,'thePrinter.startBeginVisit("',$iter/@name,'", ++theId);',$gen:newline,
     $gen:indent,'printCommons( &amp;a, theId );',$gen:newline,
     for $member in $iter/zorba:member[@printName]
-    return ($gen:indent,'thePrinter.addBoolAttribute( "',string($member/@printName),
+    return
+      if (empty($member/@getterName) or string($member/@type) ne "bool")
+      then fn:error(xs:QName("local:printName"),
+                    concat("member ", string($member/@name), " of ", string($iter/@name),
+                           ": printName needs a getterName and type bool"))
+      else ($gen:indent,'thePrinter.addBoolAttribute( "',string($member/@printName),
             '", a.',string($member/@getterName),'() );',$gen:newline),
     $gen:indent,'thePrinter.endBeginVisit( theId );',$gen:newline,'}',$gen:newline,
     $gen:newline,'void PrinterVisitor::endVisit( const ',$iter/@name,'&amp; ) {',$gen:newline,

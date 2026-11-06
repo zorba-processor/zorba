@@ -21,16 +21,22 @@
 #include <exception>
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <iostream>
 #include <string>
+#include <vector>
 
 #if defined(__unix__) || defined(__APPLE__)
 # include <sys/resource.h>
 # include <unistd.h>
 #endif
 
+#include <zorba/dynamic_context.h>
+#include <zorba/item_sequence.h>
 #include <zorba/iterator.h>
 #include <zorba/security.h>
+#include <zorba/static_context.h>
+#include <zorba/vector_item_sequence.h>
 #include <zorba/store_manager.h>
 #include <zorba/xquery.h>
 #include <zorba/zorba.h>
@@ -174,13 +180,14 @@ struct Read
 };
 
 // Reads the first member, changes the file, and reads the rest.
-Read read_with_change(Zorba* z, const std::string& aPath, bool aStreaming,
-                      long aOffset, const std::string& aBytes)
+Read read_with_change(const std::function<XQuery_t()>& aCompile,
+                      const std::string& aPath, long aOffset,
+                      const std::string& aBytes)
 {
   Read r;
   try
   {
-    XQuery_t q = compile(z, text_of(aPath, aStreaming));
+    XQuery_t q = aCompile();
     Iterator_t it = q->iterator();
     it->open();
     Item item;
@@ -199,6 +206,14 @@ Read read_with_change(Zorba* z, const std::string& aPath, bool aStreaming,
     r.theError = e.diagnostic().qname().localname();
   }
   return r;
+}
+
+Read read_with_change(Zorba* z, const std::string& aPath, bool aStreaming,
+                      long aOffset, const std::string& aBytes)
+{
+  return read_with_change(
+    [&]() { return compile(z, text_of(aPath, aStreaming)); },
+    aPath, aOffset, aBytes);
 }
 
 // The offset is past any stream buffer: what the second parse reads there is
@@ -232,6 +247,112 @@ void check_changed_file(Zorba* z, const std::string& aPath)
          " members and error '" + r.theError + "'");
 }
 
+// The function that parses is recursive, so that the optimizer does not inline
+// it into the calling query: its body is compiled by the query that declares it.
+std::string members_function(const std::string& aPrefix)
+{
+  return
+    "declare function " + aPrefix + ":members($p as xs:string, $n as xs:integer) {\n"
+    "  if ($n gt 0) then " + aPrefix + ":members($p, $n - 1)\n"
+    "  else jn:members(jn:parse-json(file:read-text($p),\n"
+    "                                { \"zorba-streaming-members\" : true() }))\n"
+    "};\n";
+}
+
+// A statement that never writes, but makes the query sequential.
+std::string never_writes(const std::string& aPath)
+{
+  return
+    "declare variable $w external := false();\n"
+    "if ($w) then file:write-text(\"" + aPath + "\", \"\"); else ();\n";
+}
+
+const char* const theImports =
+  "import module namespace file = \"http://expath.org/ns/file\";\n"
+  "import module namespace jn = \"http://jsoniq.org/functions\";\n";
+
+// The file stream is chosen when the code is generated, with the compiler
+// state of the query that compiles the function body; the query that runs it
+// must also allow it. A function loaded with StaticContext::loadProlog() is
+// compiled with the state of that prolog, which has no query body; here a
+// sequential query calls it, and its members must not follow the file.
+void check_prolog_function(Zorba* z, const std::string& aPath)
+{
+  int const count = 1000;
+  int const size = 1024;
+  long const middle = 1 + (count / 2) * size;
+
+  StaticContext_t sctx = z->createStaticContext();
+  sctx->setSecurityPolicy(SecurityPolicy::unrestricted());
+  Zorba_CompilerHints_t hints;
+  sctx->loadProlog(std::string(theImports) +
+                   "declare namespace p = \"urn:json-parse-members\";\n" +
+                   members_function("p"), hints);
+
+  write_array(aPath, count, size);
+  Read r = read_with_change(
+    [&]() {
+      return z->compileQuery(
+        std::string(theImports) +
+        "declare namespace p = \"urn:json-parse-members\";\n" +
+        never_writes(aPath) +
+        "p:members#2(\"" + aPath + "\", 2)", sctx);
+    },
+    aPath, middle, "@");
+  if (!r.theError.empty() || r.theCount != count + 1)
+    fail("function of a loaded prolog, sequential query: got " +
+         std::to_string(r.theCount) + " members and error '" + r.theError + "'");
+}
+
+// A function item made by one query and run by another: its body is compiled
+// with the state of the first query, which cannot write; the second one is
+// sequential, so the members must not follow the file.
+void check_foreign_function_item(Zorba* z, const std::string& aPath)
+{
+  int const count = 1000;
+  int const size = 1024;
+  long const middle = 1 + (count / 2) * size;
+
+  StaticContext_t sctx = z->createStaticContext();
+  sctx->setSecurityPolicy(SecurityPolicy::unrestricted());
+
+  std::vector<Item> items;
+  {
+    XQuery_t q = z->compileQuery(std::string(theImports) +
+                                 members_function("local") +
+                                 "local:members#2", sctx);
+    Iterator_t it = q->iterator();
+    it->open();
+    Item item;
+    while (it->next(item))
+      items.push_back(item);
+    it->close();
+    q->close();
+  }
+  if (items.size() != 1)
+  {
+    fail("function item: expected one item");
+    return;
+  }
+
+  write_array(aPath, count, size);
+  Read r = read_with_change(
+    [&]() {
+      XQuery_t q = z->compileQuery(
+        std::string(theImports) +
+        "declare variable $g external;\n" +
+        never_writes(aPath) +
+        "$g(\"" + aPath + "\", 2)", sctx);
+      ItemSequence_t seq = new VectorItemSequence(items);
+      q->getDynamicContext()->setVariable("g", seq->getIterator());
+      return q;
+    },
+    aPath, middle, "@");
+  if (!r.theError.empty() || r.theCount != count + 1)
+    fail("function item of another query, sequential query: got " +
+         std::to_string(r.theCount) + " members and error '" + r.theError + "'");
+}
+
 } // namespace
 
 
@@ -251,6 +372,8 @@ json_parse_members(int, char*[])
 #endif
              ".json")).string();
     check_changed_file(z, path);
+    check_prolog_function(z, path);
+    check_foreign_function_item(z, path);
     check_memory(z, path);
   }
   catch (std::exception const& e)
