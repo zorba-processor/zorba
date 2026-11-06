@@ -3400,7 +3400,9 @@ void test_sweep_decimal_thread( Fixture const &f ) {
   // glibc also crashes in pthread_getattr_np() when calloc() fails in it, on
   // the first compilation of a thread (the stack limit reads the thread's
   // bounds): seen once alone, in the embedded profiles.
-  s.known = { exact( "exit 2", 2 ),
+  // As in the other sweeps of compilation: std::bad_alloc leaving a noexcept
+  // function while the parser is set up (xquery_parser's constructor), seen once.
+  s.known = { exact( "exit 2", 2 ), exact( "terminate St9bad_alloc", 2 ),
               library_crash( "signal 11 in libc.", true, 2 ),
               library_crash( "signal 6 in libstdc", true, 2, 1 ),
               library_crash( "signal 6 in libstdc", true, 80, 8 ),
