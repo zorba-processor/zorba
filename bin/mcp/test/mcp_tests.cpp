@@ -163,17 +163,18 @@ std::atomic<std::size_t> new_live{ 0 };
 std::atomic<std::size_t> new_budget{ 0 };  // 0: none
 
 // For the sweeps, with big_track: the blocks of at least big_size bytes allocated
-// since, with their stacks, while they live. What a failed call keeps is then
+// meanwhile, with their stacks, while they live. What a failed call keeps is then
 // shown with where it was allocated. One thread at a time (a sweep child).
-std::size_t const big_size = 4096;
+std::size_t const big_size = 256;
 struct BigBlock {
   void *p;
   std::size_t n;
   int num_frames;
   void *frames[24];
 };
-BigBlock big_blocks[32];
+BigBlock big_blocks[128];
 bool big_track = false;
+int big_count = 0;   // blocks recorded and alive
 
 void big_note( void *p, std::size_t n ) noexcept {
   if ( !big_track || n < big_size )
@@ -184,6 +185,7 @@ void big_note( void *p, std::size_t n ) noexcept {
       b.p = p;
       b.n = n;
       b.num_frames = backtrace( b.frames, 24 );
+      ++big_count;
       break;
     }
   big_track = true;
@@ -191,8 +193,10 @@ void big_note( void *p, std::size_t n ) noexcept {
 
 void big_forget( void *p ) noexcept {
   for ( BigBlock &b : big_blocks )
-    if ( b.p == p )
+    if ( b.p == p ) {
       b.p = nullptr;
+      --big_count;
+    }
 }
 
 void* budget_alloc( std::size_t n ) noexcept {
@@ -213,7 +217,7 @@ void* budget_alloc( std::size_t n ) noexcept {
 
 void budget_free( void *p ) noexcept {
   if ( p ) {
-    if ( big_track )
+    if ( big_count )
       big_forget( p );
     new_live.fetch_sub( malloc_usable_size( p ), std::memory_order_relaxed );
     std::free( p );
@@ -2477,16 +2481,20 @@ void sweep_on_signal( int sig ) {
   inject_on = false;
   void *frames[48];
   int const n = backtrace( frames, 48 );
+  // The library of the faulting frame (the one after the handler and the
+  // signal trampoline). For SIGABRT that is raise() or abort() in libc: the
+  // first frame outside libc and libgcc is the one that gave up.
   char const *lib = "unknown";
-  for ( int i = 1; i < n; ++i ) {
+  for ( int i = 2; i < n; ++i ) {
     Dl_info info;
     if ( !dladdr( frames[i], &info ) || !info.dli_fname )
       continue;
     char const *const slash = std::strrchr( info.dli_fname, '/' );
     char const *const base = slash ? slash + 1 : info.dli_fname;
-    if ( std::strncmp( base, "libc.", 5 ) && std::strncmp( base, "libgcc", 6 ) &&
-         std::strncmp( base, "linux-vdso", 10 ) &&
-         std::strncmp( base, "mcp_tests", 9 ) ) {
+    if ( sig != SIGABRT ||
+         ( std::strncmp( base, "libc.", 5 ) && std::strncmp( base, "libgcc", 6 ) &&
+           std::strncmp( base, "linux-vdso", 10 ) &&
+           std::strncmp( base, "mcp_tests", 9 ) ) ) {
       lib = base;
       break;
     }
@@ -2565,18 +2573,17 @@ void sweep_show_frames( std::string const &title, std::string const &hex,
 }
 
 
-// Whether a crash stack the child sent has a frame of the engine (libzorba*)
-// before the first frame of another library, as seen from the signal: the
-// crash was then in the engine. With whole, any frame of the engine counts.
-bool sweep_engine_crash( std::string const &hex, bool whole ) {
+// Whether a crash the child sent was in the engine (libzorba*): its faulting
+// frame, the first one after the handler and the signal trampoline, is; for
+// SIGABRT (abort), the first frame outside libc and libgcc. With whole (a crash
+// in no known library), any frame of the engine counts.
+bool sweep_engine_crash( std::string const &hex, bool aborted, bool whole ) {
   std::istringstream is( hex );
   std::string h;
-  bool first = true;
+  int i = 0;
   while ( is >> h ) {
-    if ( first ) {   // the handler
-      first = false;
+    if ( i++ < 2 )   // the handler and the trampoline
       continue;
-    }
     Dl_info info;
     void *const addr = reinterpret_cast<void*>( std::stoull( h, nullptr, 16 ) );
     if ( !dladdr( addr, &info ) || !info.dli_fname )
@@ -2585,8 +2592,10 @@ bool sweep_engine_crash( std::string const &hex, bool whole ) {
     std::string const base( slash ? slash + 1 : info.dli_fname );
     if ( base.rfind( "libzorba", 0 ) == 0 )
       return true;
-    if ( whole || base.rfind( "libc.", 0 ) == 0 || base.rfind( "libgcc", 0 ) == 0 ||
-         base.rfind( "linux-vdso", 0 ) == 0 || base.rfind( "mcp_tests", 0 ) == 0 )
+    if ( whole || ( aborted && ( base.rfind( "libc.", 0 ) == 0 ||
+                               base.rfind( "libgcc", 0 ) == 0 ||
+                               base.rfind( "linux-vdso", 0 ) == 0 ||
+                               base.rfind( "mcp_tests", 0 ) == 0 ) ) )
       continue;
     return false;
   }
@@ -2748,11 +2757,13 @@ void exhaust_sweep( Fixture const &f, std::string const &name, Sweep const &s ) 
       std::set_terminate( sweep_on_terminate );
       for ( BigBlock &b : big_blocks )
         b.p = nullptr;
+      big_count = 0;
       long const live0 = static_cast<long>( new_live.load() );
       long const table0 = static_cast<long>( zorba_test_qname_table_bytes() );
       big_track = measure;
       long count = 0;
       std::string out( sweep_call( server, call, s, first, length, &count ) );
+      big_track = false;   // what the failed call itself allocated
       std::replace( out.begin(), out.end(), '\n', ' ' );  // one line
       if ( snprintf( sweep_failed, sizeof sweep_failed, "%s", out.c_str() ) < 0 )
         sweep_failed[0] = 0;
@@ -2903,8 +2914,12 @@ void exhaust_sweep( Fixture const &f, std::string const &name, Sweep const &s ) 
             std::cout << name << ", " << length << " failing, at " << n
                       << ": " << ( kept - base_kept ) << " bytes kept; "
                       << st.big.size() << " blocks of " << big_size
-                      << " bytes or more" << std::endl;
+                      << " bytes or more that the failed call allocated; the first"
+                      << " 12:" << std::endl;
+            std::size_t shown = 0;
             for ( std::string const &b : st.big ) {
+              if ( ++shown > 12 )
+                break;
               std::string::size_type const sp = b.find( ' ' );
               sweep_show_frames( "  a block of " + b.substr( 0, sp ) + " bytes",
                                  b.substr( sp + 1 ), true );
@@ -2951,8 +2966,9 @@ void exhaust_sweep( Fixture const &f, std::string const &name, Sweep const &s ) 
         if ( k.not_in_engine && known_matches( k, length, o.first ) ) {
           std::string const &crash = stacks_of[o.first].crash;
           check( !crash.empty() &&
-                 !sweep_engine_crash( crash, o.first.find( "unknown" ) !=
-                                             std::string::npos ),
+                 !sweep_engine_crash( crash,
+                   o.first.find( "signal 6 " ) != std::string::npos,
+                   o.first.find( "unknown" ) != std::string::npos ),
                  name + ": a crash of a library, not in the engine", o.first );
         }
     for ( auto const &o : outcomes ) {
@@ -3317,7 +3333,11 @@ void test_sweep_decimal_thread( Fixture const &f ) {
   // A new thread: glibc gives up if it cannot register the first thread_local
   // with a destructor of the thread.
   // Caps: about 1.5 times the most seen in CI (glibc: 1 alone, 53 in runs of 8).
+  // glibc also crashes in pthread_getattr_np() when calloc() fails in it, on
+  // the first compilation of a thread (the stack limit reads the thread's
+  // bounds): seen once alone, in the embedded profiles.
   s.known = { exact( "exit 2", 2 ),
+              library_crash( "signal 11 in libc.", true, 2 ),
               library_crash( "signal 6 in libstdc", true, 2, 1 ),
               library_crash( "signal 6 in libstdc", true, 80, 8 ),
               library_crash( "signal 6 in unknown", false, 2 ),
@@ -3524,19 +3544,38 @@ void test_notification_out_of_memory( Fixture const &f ) {
   std::string const note(
     "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/cancelled\","
     "\"params\":{\"requestId\":7,\"reason\":\"" + std::string( 300, 'r' ) + "\"}}" );
+  // The allocations of parsing the message: while it cannot be parsed, it is not
+  // known to be a notification, and the error has "id": null (JSON-RPC 2.0,
+  // section 5).
+  inject_arm( 0, 0 );
+  {
+    Json m;
+    std::string why;
+    if ( parse_json( note, &m, &why ) ) {
+    }
+  }
+  long const message_allocations = inject_disarm();
   long bad = 0;
   each_failure( server, note,
     [&]( long n, long length, bool threw, std::string const &response ) {
-      bool const answered = threw ?
-        server.after_failure() == Server::AfterFailure::answer :
-        !response.empty();
+      std::string id;
+      Json r;
+      std::string why;
+      if ( threw && server.after_failure() == Server::AfterFailure::answer )
+        id = server.current_id();
+      else if ( !threw && !response.empty() )
+        id = parse_json( response, &r, &why ) && r.find( "id" ) ?
+          r.find( "id" )->dump() : "?";
+      bool const answered = !id.empty() &&
+        !( id == "null" && n <= message_allocations );
       if ( answered && ++bad <= 3 )
         std::cout << "at " << n << " of a run of " << length << ": "
                   << ( threw ? "main() answers with id " +
                                  std::string( server.current_id() )
                              : response.substr( 0, 200 ) ) << std::endl;
     } );
-  check( bad == 0, "a notification gets no response when memory runs out",
+  check( bad == 0, "a notification gets no response when memory runs out "
+         "(id null only while it cannot be parsed)",
          std::to_string( bad ) + " points" );
   Json const r( roundtrip( server, request( 1, "tools/list" ) ) );
   check( r.find( "result" ) != nullptr, "the next request is answered", r.dump() );
@@ -3564,7 +3603,8 @@ void test_request_id_out_of_memory( Fixture const &f ) {
     Json m;
     std::string why;
     if ( parse_json( message, &m, &why ) && m.find( "id" ) ) {
-      std::string const text( m.find( "id" )->dump() );
+      Json const copy( *m.find( "id" ) );   // as handle() keeps it
+      std::string const text( copy.dump() );
       (void)text;
     }
   }
