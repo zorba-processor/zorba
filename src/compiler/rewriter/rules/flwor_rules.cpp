@@ -401,6 +401,10 @@ RULE_REWRITE_PRE(EliminateUnusedLetVars)
     {
       groupby_clause* gc = static_cast<groupby_clause*>(clause);
 
+      // The vars keep their group-by kinds in the let clauses: as let_vars,
+      // an unreferenced grouping var would be dropped together with the
+      // check that its key is at most one atomic value (XPTY0004).
+      // var_expr::get_domain_expr goes by the kind of the clause.
       const flwor_clause::rebind_list_t& gVars = gc->get_grouping_vars();
 
       flwor_clause::rebind_list_t::const_iterator ite = gVars.begin();
