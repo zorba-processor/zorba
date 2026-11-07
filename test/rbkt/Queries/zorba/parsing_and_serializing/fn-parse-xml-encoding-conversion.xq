@@ -1,11 +1,12 @@
 declare namespace err = "http://www.w3.org/2005/xqt-errors";
-(: The declared encoding does not cover a character of the document: the
- : parser stops part way through, after some elements were started. The
- : error is fn:parse-xml's own, not an internal one. More than one input
+(: UTF-7 has no direct form for '~': the conversion of the input fails part
+ : way through the document, after some elements were started, and libxml2
+ : stops the parser. The error is fn:parse-xml's own, not an internal one.
+ : (A converter that accepts '~' parses the document.) More than one input
  : packet, so the parser had started before the conversion failed. :)
-let $doc := concat('<?xml version="1.0" encoding="US-ASCII"?><a>',
+let $doc := concat('<?xml version="1.0" encoding="UTF-7"?><a>',
                    string-join(for $i in 1 to 3000 return '<b/>', ''),
-                   '<c>&#xE9;</c></a>')
+                   '<c>~</c></a>')
 return
-  try { concat("PARSED ", count(fn:parse-xml($doc)//*)) }
-  catch * { concat("DIAG ", $err:code, " ", $err:description) }
+  try { exists(fn:parse-xml($doc)) }
+  catch err:FODC0006 { not(contains($err:description, "assertion failed")) }
