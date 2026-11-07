@@ -23,6 +23,7 @@
 // standard
 #include <cctype>
 #include <cstring>
+#include <exception>
 #include <limits>
 #include <sstream>
 #include <stdexcept>
@@ -61,13 +62,19 @@ public:
    *
    * @param s A pointer to the string to append to.
    */
-  string_appender( value_type *s ) : buf_size_( 0 ),  s_( s ) { }
+  string_appender( value_type *s ) :
+    buf_size_( 0 ), s_( s ), uncaught_( std::uncaught_exceptions() ) { }
 
   /**
    * Destroys the appender and appends any unappended characters to the string.
    */
-  ~string_appender() {
-    flush();
+  ~string_appender() noexcept( false ) {
+    // Flushing can allocate, and so throw: when the end of a scope is normal,
+    // that goes to the caller (a destructor is noexcept by default: it would
+    // end the process). While an exception unwinds the stack, a second one
+    // would end it too, and the string is not going to be used.
+    if ( std::uncaught_exceptions() == uncaught_ )
+      flush();
   }
 
   /**
@@ -114,6 +121,7 @@ private:
   char_type buf_[ BufCapacity ];
   size_type buf_size_;
   value_type *s_;
+  int const uncaught_;
 };
 
 ////////// String building ////////////////////////////////////////////////////

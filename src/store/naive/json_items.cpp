@@ -106,28 +106,34 @@ void JSONItem::destroy()
 {
   // Deleting an item releases its members, which may be the last reference to
   // them. Nested calls leave the members to the outermost call, so that the
-  // stack it takes does not depend on how deep the value is.
-  static thread_local std::vector<JSONItem*>* tPending = nullptr;
+  // stack it takes does not depend on how deep the value is. This runs in
+  // destructors, also while an exception unwinds the stack when memory has run
+  // out, so it must not allocate: the items waiting form a list, linked through
+  // their reference counts, which are 0 and which nothing reads any more.
+  static_assert(sizeof(theRefCount) >= sizeof(JSONItem*));
+  static thread_local bool tActive = false;
+  static thread_local JSONItem* tPending = nullptr;
 
-  if (tPending != nullptr)
+  if (tActive)
   {
-    tPending->push_back(this);
+    theRefCount = reinterpret_cast<long>(tPending);
+    tPending = this;
     return;
   }
 
-  std::vector<JSONItem*> lPending;
-  tPending = &lPending;
+  tActive = true;
   JSONItem* lItem = this;
   for (;;)
   {
     GET_STORE().unregisterReferenceToUnusedNode(lItem);
     delete lItem;
-    if (lPending.empty())
+    if (tPending == nullptr)
       break;
-    lItem = lPending.back();
-    lPending.pop_back();
+    lItem = tPending;
+    tPending = reinterpret_cast<JSONItem*>(lItem->theRefCount);
+    lItem->theRefCount = 0;
   }
-  tPending = nullptr;
+  tActive = false;
 }
 
 

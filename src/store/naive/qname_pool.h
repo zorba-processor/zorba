@@ -116,6 +116,16 @@ public:
 
   ~QNamePool();
 
+  // The bytes of the hash table (its capacity in entries times their size), for
+  // tests that measure the memory a call leaves: see
+  // zorba_test_qname_table_bytes().
+  std::size_t tableBytes() const;
+
+  // Drops the names no one holds (cached for reuse) from the pool, for the same
+  // tests: the names a call leaves cached depend on the order of its insertions,
+  // not on what it leaked. See zorba_test_qname_pool_flush().
+  void flushUnused();
+
   void insert(
       store::Item_t& res,
       const char* ns,
@@ -132,6 +142,8 @@ public:
 
 protected:
   QNameItem* cacheInsert(QNameItem*& normVictim);
+
+  void undoCacheInsert(QNameItem* qn, QNameItem** normVictim);
 
   void cachePin(QNameItem* qn);
 

@@ -15,10 +15,17 @@
  */
 #include <zorba/config.h>
 
+#include <new>
+
 #include "zorbatypes/m_apm.h"
 
 // MAPM has no global lock: its internal state is per-thread (see M_APM_TLS
 // and MAPM::threadInit() in m_apm.h).
+
+// MAPM is out of memory: see M_apm_log_error_msg.
+extern "C" void M_apm_out_of_memory() {
+  throw std::bad_alloc();
+}
 
 
 #if 0

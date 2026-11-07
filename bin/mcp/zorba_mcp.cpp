@@ -17,12 +17,15 @@
 // zorba-mcp: an MCP server (stdio transport) that lets an AI agent query a
 // directory of XML, JSON, CSV and HTML documents with JSONiq/XQuery.
 
+#include <algorithm>
 #include <csignal>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <exception>
 #include <iostream>
+#include <new>
 #include <string>
 
 #include <sys/resource.h>
@@ -84,7 +87,22 @@ char const usage[] =
   "                       2000 bytes at each end\n"
   "  --max-memory <bytes> memory limit of the server (default 4294967296,\n"
   "                       0: none; Linux only): a query that needs more\n"
-  "                       fails with a tool error\n"
+  "                       fails with the tool error memory_limit, and the\n"
+  "                       server answers the next call. A notification gets\n"
+  "                       no response when it can be recognized as one; while\n"
+  "                       the message cannot be parsed, the error has \"id\":\n"
+  "                       null. If memory runs\n"
+  "                       out where that cannot be done, for example while the\n"
+  "                       server starts, it exits with status 3 and a message\n"
+  "                       on stderr, with no response to the call. Libraries\n"
+  "                       end it in other ways: abort, with a core file if\n"
+  "                       the system keeps them (Xerces-C releasing a schema;\n"
+  "                       libxml2 or glibc on the first use by a thread,\n"
+  "                       glibc also with SIGSEGV);\n"
+  "                       SIGSEGV (ICU compiling a regular expression; rarely\n"
+  "                       while a query compiles, or near the end of a\n"
+  "                       dir:open call); status 2 (the query scanner, while\n"
+  "                       a query compiles)\n"
   "  --no-scan            no background scan of the directory: list_documents\n"
   "                       takes no arguments and lists through dir:list\n"
   "  --scan-cache-mb <MiB> memory for the scan's file index and previews\n"
@@ -126,6 +144,60 @@ bool parse_number( char const *s, unsigned long long *n ) {
   return *end == '\0' && *s != '-';
 }
 
+// The exit status when memory ran out where nothing can recover from it.
+int const out_of_memory_status = 3;
+
+std::terminate_handler default_terminate = nullptr;
+
+// std::bad_alloc that nothing can catch ends the process here, without a core
+// file of the size of the limit: see --help. Any other exception keeps the
+// default behavior, which shows a defect.
+[[noreturn]] void on_terminate() {
+  bool out_of_memory = false;
+  try {
+    if ( std::exception_ptr const e = std::current_exception() )
+      std::rethrow_exception( e );
+  }
+  catch ( std::bad_alloc const& ) {
+    out_of_memory = true;
+  }
+  catch ( ... ) {
+  }
+  if ( !out_of_memory )
+    default_terminate();
+  static char const msg[] =
+    "zorba-mcp: out of memory where it cannot be recovered from; exiting\n";
+  // Nothing else can report a failing write to stderr.
+  [[maybe_unused]] ssize_t const n = write( STDERR_FILENO, msg, sizeof msg - 1 );
+  std::_Exit( out_of_memory_status );
+}
+
+#if defined(__linux__) && !defined(ZORBA_MCP_SANITIZER)
+// The stack grows on demand, within the address-space limit: at the limit a
+// call deeper than any before would get SIGSEGV instead of an allocation that
+// fails. So the stack takes its size now, up to 64 MiB, with one page of it in
+// memory: a larger limit would use up --max-memory before any query runs. The
+// arguments and environment, at most a quarter of its size, are also on it. A
+// stack with no size limit reserves what the usual limit would.
+__attribute__((noinline)) void reserve_stack() {
+  struct rlimit lim;
+  if ( getrlimit( RLIMIT_STACK, &lim ) != 0 ) {
+    std::perror( "zorba-mcp: getrlimit" );
+    return;
+  }
+  std::uintptr_t const usual = 8 * 1024 * 1024;
+  std::uintptr_t const size = lim.rlim_cur == RLIM_INFINITY ?
+    usual : static_cast<std::uintptr_t>( lim.rlim_cur );
+  std::uintptr_t const margin = size / 4 + 64 * 1024;
+  if ( size <= margin )
+    return;
+  char here;
+  *reinterpret_cast<char volatile*>(
+    reinterpret_cast<std::uintptr_t>( &here ) -
+    std::min<std::uintptr_t>( size - margin, 64 * 1024 * 1024 ) ) = 0;
+}
+#endif
+
 // A query that needs more memory than the machine has would get the server
 // killed, with no answer for the client. With an address-space limit,
 // allocation fails first: the query ends with std::bad_alloc, its memory is
@@ -136,6 +208,7 @@ void limit_memory( unsigned long long bytes ) {
 #if defined(__linux__) && !defined(ZORBA_MCP_SANITIZER)
   if ( bytes == 0 )
     return;
+  reserve_stack();
   struct rlimit lim;
   if ( getrlimit( RLIMIT_AS, &lim ) != 0 ) {
     std::perror( "zorba-mcp: getrlimit" );
@@ -148,6 +221,23 @@ void limit_memory( unsigned long long bytes ) {
 #else
   (void)bytes;
 #endif
+}
+
+// Reads one line. Of a line longer than max, only max + 1 characters are kept:
+// that much memory is all a line takes, and handle() refuses it by its size.
+bool read_line( std::streambuf *in, std::string *line, std::size_t max ) {
+  line->clear();
+  bool any = false;
+  for ( ;; ) {
+    int const c = in->sbumpc();
+    if ( c == std::char_traits<char>::eof() )
+      return any;
+    any = true;
+    if ( c == '\n' )
+      return true;
+    if ( line->size() <= max )
+      line->push_back( static_cast<char>( c ) );
+  }
 }
 
 int fail( std::string const &msg ) {
@@ -231,6 +321,7 @@ int main( int argc, char const *argv[] ) {
     return 1;
   }
 
+  default_terminate = std::set_terminate( on_terminate );
   limit_memory( config.max_memory );
 
   void *const store = StoreManager::getStore();
@@ -243,12 +334,32 @@ int main( int argc, char const *argv[] ) {
               << mcp::protocol_version << ")" << std::endl;
 
     std::string line;
-    while ( std::getline( std::cin, line ) ) {
+    line.reserve( mcp::max_message_size + 1 );
+    while ( read_line( std::cin.rdbuf(), &line, mcp::max_message_size ) ) {
       if ( !line.empty() && line.back() == '\r' )
         line.pop_back();
       if ( line.find_first_not_of( " \t" ) == std::string::npos )
         continue;
-      std::string const response( server.handle( line ) );
+      std::string response;
+      try {
+        response = server.handle( line );
+      }
+      catch ( std::bad_alloc const& ) {
+        // Not even the error response of handle() could be made. The memory is
+        // back by now if it was the call that held it. This allocates nothing.
+        mcp::Server::AfterFailure const after = server.after_failure();
+        if ( after == mcp::Server::AfterFailure::nothing )
+          continue;
+        if ( std::fprintf( out, "{\"jsonrpc\":\"2.0\",\"id\":%s,\"error\":{\"code\":-32603,"
+                           "\"message\":\"Internal error: out of memory\"}}\n",
+                           server.current_id() ) < 0 ||
+             std::fflush( out ) == EOF ) {
+          std::cerr << "zorba-mcp: cannot write to stdout" << std::endl;
+          status = 1;
+          break;
+        }
+        continue;
+      }
       if ( response.empty() )
         continue;
       if ( std::fputs( response.c_str(), out ) == EOF ||

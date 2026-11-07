@@ -19,6 +19,7 @@
 
 #include <chrono>
 #include <cstddef>
+#include <functional>
 #include <memory>
 #include <ostream>
 #include <string>
@@ -36,6 +37,9 @@ namespace mcp {
 
 /** The MCP revision this server implements per request (stateless). */
 extern char const protocol_version[];
+
+/** Larger messages are refused before parsing. */
+extern std::size_t const max_message_size;
 
 /** The handshake-based revisions served after an \c initialize request. */
 extern char const *const legacy_protocol_versions[];
@@ -62,6 +66,8 @@ struct ServerConfig {
   bool scan = true;
   /** The limits of the scanner. */
   ScanLimits scan_limits;
+  /** For tests: called when a query is compiled, before it runs. */
+  std::function<void()> before_execute;
   /** For tests: see ScanHook. */
   ScanHook scan_hook;
   /** The memory limit of the process, in bytes (0: none; see zorba_mcp.cpp). */
@@ -96,6 +102,23 @@ public:
    * if the message is a notification (no response).
    */
   std::string handle( std::string const &message );
+
+  /**
+   * The id of the request being handled, as JSON ("null" if it has none or is
+   * not known yet), for a response made when handle() itself runs out of memory.
+   */
+  char const* current_id() const { return theCurrentId.c_str(); }
+
+  /**
+   * What to do when handle() threw: no response for a notification, else an
+   * error response with current_id(), which is "null" if the id could not be
+   * read (JSON-RPC 2.0, section 5).
+   */
+  enum class AfterFailure {
+    nothing,  // the message was a notification
+    answer    // an error response with current_id()
+  };
+  AfterFailure after_failure() const;
 
   /** The policy every query runs under. */
   SecurityPolicy const& policy() const { return thePolicy; }
@@ -137,6 +160,8 @@ private:
   StaticContext_t new_static_context( std::string const &file_name ) const;
 
   std::string handle_message( std::string const &message, Json *request_id );
+  // Sets theCurrentKind, and the id of a request.
+  void identify( Json const &msg, Json *request_id );
   void load_predefined();
   bool load_predefined( std::string const &path, std::string const &name );
 
@@ -154,6 +179,15 @@ private:
   std::vector<Predefined> thePredefined;
   DocumentCache theCache;
   std::string theLegacyVersion;         // set by initialize
+  std::string theCurrentId{ "null" };   // see current_id()
+  enum class MessageKind {
+    unknown,       // not read yet
+    notification,  // no id: never answered
+    request,       // theCurrentId is its id
+    without_id,    // answered with id null (unreadable, or an invalid id)
+    id_lost        // memory ran out while its id was read: answered with null
+  };
+  MessageKind theCurrentKind = MessageKind::unknown;
   std::unique_ptr<Scanner> theScanner;  // null with --no-scan
 };
 

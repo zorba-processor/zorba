@@ -161,6 +161,8 @@ store::Item_t HtmlXmlLoader::loadXml(
                                         XML_CHAR_ENCODING_NONE);
       if (ctxt == NULL)
       {
+        // Only a failed allocation makes this fail.
+        setOutOfMemory();
         theXQueryDiagnostics->
         add_error(NEW_ZORBA_EXCEPTION(zerr::ZSTR0021_LOADER_PARSING_ERROR,
                                       ERROR_PARAMS(ZED(XMLParserInitFailed))));
@@ -196,6 +198,7 @@ store::Item_t HtmlXmlLoader::loadXml(
   }
   catch (...)
   {
+    noteOutOfMemory();
     theXQueryDiagnostics->add_error(
       NEW_ZORBA_EXCEPTION(zerr::ZXQP0003_INTERNAL_ERROR));
     abortload();
@@ -320,6 +323,10 @@ void HtmlXmlLoader::htmlStartElement(
   catch (ZorbaException const& e)
   {
     loader.theXQueryDiagnostics->add_error(e);
+  }
+  catch (std::bad_alloc const&)
+  {
+    loader.setOutOfMemory();
   }
   catch (...)
   {

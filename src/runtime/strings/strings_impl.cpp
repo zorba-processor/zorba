@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <new>
 #include <cstdio>
 #include <iostream>
 #include <sstream>
@@ -115,6 +116,9 @@ CodepointsToStringIterator::nextImpl(store::Item_t& result, PlanState& planState
           if (!xml::is_valid(lCode))
             throw std::invalid_argument( lUtf8Code.str() );
           utf8::encode( lCode, &resStr );
+        }
+        catch ( std::bad_alloc const& ) {
+          throw;
         }
         catch ( std::exception const& )
         {
@@ -520,6 +524,9 @@ bool SubstringIterator::nextImpl(
             {
               resStr = utf8_string<zstring>(strval).substr(istart-1);
             }
+            catch ( std::bad_alloc const& ) {
+              throw;
+            }
             catch (...)
             {
               zstring::size_type numChars = utf8_string<zstring>(strval).length();
@@ -579,6 +586,9 @@ bool SubstringIterator::nextImpl(
                   try
                   {
                     resStr = utf8_string<zstring>(strval).substr(istart-1, ilen);
+                  }
+                  catch ( std::bad_alloc const& ) {
+                    throw;
                   }
                   catch (...)
                   {
@@ -673,6 +683,9 @@ bool SubstringIntOptIterator::nextImpl(
           {
             resStr = utf8_string<zstring>(strval).substr(start-1);
           }
+          catch ( std::bad_alloc const& ) {
+            throw;
+          }
           catch (...)
           {
             zstring::size_type numChars = utf8_string<zstring>(strval).length();
@@ -719,6 +732,9 @@ bool SubstringIntOptIterator::nextImpl(
             try
             {
               resStr = utf8_string<zstring>(strval).substr(start-1, len);
+            }
+            catch ( std::bad_alloc const& ) {
+              throw;
             }
             catch (...)
             {

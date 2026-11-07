@@ -215,11 +215,11 @@ void m_apm_set_string(M_APM ctmp, char* s_in)
 
   if (M_lbuf == 0)
   {
-    M_lbuf = 256;
     if ((M_buf = (char *)MAPM_MALLOC(256)) == NULL)
     {
       M_apm_log_error_msg(M_APM_FATAL, M_set_string_error_msg);
     }
+    M_lbuf = 256;
   }
 
   // Note: We may need at least 2 bytes more than strlen(s_in): to insert
@@ -227,13 +227,13 @@ void m_apm_set_string(M_APM ctmp, char* s_in)
   // not even (see below).
   if ((i = (int)strlen(s_in)) > (M_lbuf - 4))
   {
-    M_lbuf = i + 32;
-    if ((vp = MAPM_REALLOC(M_buf, M_lbuf)) == NULL)
+    if ((vp = MAPM_REALLOC(M_buf, i + 32)) == NULL)
     {
       M_apm_log_error_msg(M_APM_FATAL, M_set_string_error_msg);
     }
 
     M_buf = (char *)vp;
+    M_lbuf = i + 32;
   }
 
   s = M_buf;

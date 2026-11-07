@@ -96,39 +96,52 @@ M_APM	M_get_stack_var()
 
   if (++M_stack_ptr > M_last_init)
   {
+    int k;
+
     if (M_stack_size == 0)
     {
-      M_stack_size = 18;
-      if ((vp = MAPM_MALLOC(M_stack_size * sizeof(M_APM))) == NULL)
+      if ((vp = MAPM_MALLOC(18 * sizeof(M_APM))) == NULL)
       {
         M_apm_log_error_msg(M_APM_FATAL, M_stack_err_msg);
       }
 
       M_stack_array = (M_APM *)vp;
+      M_stack_size = 18;
     }
 
     if ((M_last_init + 4) >= M_stack_size)
     {
-      M_stack_size += 12;
-      if ((vp = MAPM_REALLOC(M_stack_array, (M_stack_size * sizeof(M_APM)))) == NULL)
+      if ((vp = MAPM_REALLOC(M_stack_array, ((M_stack_size + 12) * sizeof(M_APM)))) == NULL)
       {
         M_apm_log_error_msg(M_APM_FATAL, M_stack_err_msg);
       }
 
       M_stack_array = (M_APM *)vp;
+      M_stack_size += 12;
     }
 
-    M_stack_array[M_stack_ptr]     = m_apm_init();
-    M_stack_array[M_stack_ptr + 1] = m_apm_init();
-    M_stack_array[M_stack_ptr + 2] = m_apm_init();
-    M_stack_array[M_stack_ptr + 3] = m_apm_init();
-    
-    M_last_init = M_stack_ptr + 3;
+    /* One at a time: any of them can leave this function with no return. */
+    for (k = 0; k < 4; k++)
+    {
+      M_stack_array[M_last_init + 1] = m_apm_init();
+      M_last_init++;
+    }
 
     /* printf("M_last_init = %d \n",M_last_init); */
   }
 
   return(M_stack_array[M_stack_ptr]);
+}
+
+
+/****************************************************************************/
+/*
+ *  Zorba: the functions that took variables from the stack are all being left
+ *  with no return (see M_apm_log_error_msg), so none of them is in use.
+ */
+void	M_reset_stack()
+{
+  M_stack_ptr = -1;
 }
 
 

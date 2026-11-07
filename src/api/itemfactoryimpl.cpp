@@ -16,8 +16,11 @@
 
 #define  __STDC_LIMIT_MACROS
 
+#include <new>
 #include <atomic>
 #include <mutex>
+#include <iterator>
+#include <string>
 
 #include <zorba/item.h>
 #include <zorba/zorba_string.h>
@@ -277,6 +280,9 @@ Item ItemFactoryImpl::createBase64Binary(const char* aData, size_t aLength,
     theItemFactory->createBase64Binary( result, b64 );
     return result.getp();
   }
+  catch ( std::bad_alloc const& ) {
+    throw;
+  }
   catch ( std::exception const &e ) {
     throw ZORBA_EXCEPTION(
       zerr::ZSTR0040_TYPE_ERROR, ERROR_PARAMS( ERROR_TEXT( e.what() ) )
@@ -287,9 +293,10 @@ Item ItemFactoryImpl::createBase64Binary(const char* aData, size_t aLength,
 
 Item ItemFactoryImpl::createBase64Binary(std::istream& aEncodedStream)
 {
-  std::ostringstream oss;
-  oss << aEncodedStream.rdbuf();
-  std::string const temp( oss.str() );
+  // Not a stream insertion, which leaves a shorter value when it cannot grow:
+  // std::bad_alloc goes to the caller.
+  std::string const temp( ( std::istreambuf_iterator<char>( aEncodedStream ) ),
+                          std::istreambuf_iterator<char>() );
   return createBase64Binary( temp.data(), temp.size(), true );
 }
 
@@ -364,6 +371,9 @@ Item ItemFactoryImpl::createDecimal (const String& aValue)
     xs_decimal const lDecimal(lString);
     theItemFactory->createDecimal(lItem, lDecimal);
   }
+  catch ( std::bad_alloc const& ) {
+    throw;
+  }
   catch ( std::exception const& ) {
     // ignore
   }
@@ -389,6 +399,9 @@ ItemFactoryImpl::createInteger(const String& aInteger)
   try {
     xs_integer const lInteger( lString );
     theItemFactory->createInteger(lItem, lInteger);
+  }
+  catch ( std::bad_alloc const& ) {
+    throw;
   }
   catch ( std::exception const& ) {
     // ignore
@@ -516,6 +529,9 @@ Item ItemFactoryImpl::createDouble ( const String& aValue )
     xs_double const lDouble(lString);
     theItemFactory->createDouble(lItem, lDouble);
   }
+  catch ( std::bad_alloc const& ) {
+    throw;
+  }
   catch ( std::exception const& ) {
     // ignore
   }
@@ -576,6 +592,9 @@ Item ItemFactoryImpl::createDocumentNode( const String& aBaseUri, const String& 
   try {
     theItemFactory->createDocumentNode(lItem, lBaseUri, lDocUri);
   }
+  catch ( std::bad_alloc const& ) {
+    throw;
+  }
   catch ( std::exception const& ) {
     // ignore
   }
@@ -589,6 +608,9 @@ Item ItemFactoryImpl::createFloat ( const String& aValue )
   try {
     xs_float const lFloat(lString);
     theItemFactory->createFloat(lItem, lFloat);
+  }
+  catch ( std::bad_alloc const& ) {
+    throw;
   }
   catch ( std::exception const& ) {
     // ignore

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#include <new>
 #include "runtime/core/fncall_iterator.h"
 
 #include "zorba/item.h"
@@ -1236,6 +1237,10 @@ bool ExtFunctionCallIterator::countImpl( store::Item_t &result,
     set_source( e, loc );
     throw;
   }
+  catch (std::bad_alloc const&)
+  {
+    throw;
+  }
   catch (std::exception const& e)
   {
     throw XQUERY_EXCEPTION(
@@ -1276,6 +1281,10 @@ bool ExtFunctionCallIterator::skipImpl( int64_t count, PlanState &planState ) co
     set_source( e, loc );
     throw;
   }
+  catch (std::bad_alloc const&)
+  {
+    throw;
+  }
   catch (std::exception const& e)
   {
     throw XQUERY_EXCEPTION(
@@ -1305,6 +1314,10 @@ bool ExtFunctionCallIterator::nextImpl(
   catch (ZorbaException& e)
   {
     set_source( e, loc );
+    throw;
+  }
+  catch (std::bad_alloc const&)
+  {
     throw;
   }
   catch (std::exception const& e)

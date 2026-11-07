@@ -164,13 +164,13 @@ int	dplaces, nn, ii;
 
 if (MM_firsttime1)
   {
-   MM_firsttime1 = FALSE;
-
    MM_exp_log2R = m_apm_init();
    MM_exp_512R  = m_apm_init();
 
    m_apm_set_string(MM_exp_log2R, "1.44269504089");   /* ~ 1 / log(2) */
    m_apm_set_string(MM_exp_512R,  "1.953125E-3");     /*   1 / 512    */
+
+   MM_firsttime1 = FALSE;
   }
 
 tmp7 = M_get_stack_var();

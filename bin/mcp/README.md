@@ -72,5 +72,53 @@ Rules this code depends on:
   allocation ends the scan as at `memory_limit`; it must not leave a libxml2
   callback, which is C code.
 
+- On the main thread a failed allocation ends the query: std::bad_alloc reaches
+  `Server::run()`, and is the tool error `memory_limit`. What makes this hold:
+  destructors and what they call do not allocate (`JSONItem::destroy()`), or may
+  throw and do not while unwinding (`string_appender`); MAPM throws instead of
+  calling `exit()`, and its per-thread setup can run again; a failure in a libxml2
+  callback is kept by the loader and thrown after the parse; the QName pool undoes
+  an insertion, and a hash table keeps its old table if a resize cannot allocate;
+  casts and other handlers of `std::exception` let it through; a catch clause of a
+  query does not catch it. The main stack takes its size before the limit
+  is set, up to 64 MiB, since at the limit it could not grow. A line of input takes at
+  most the size of a message.
+
+  `exhaust_sweep_*` in `test/mcp_tests.cpp` make each allocation of a call fail in
+  turn. What is left, each of them listed in those tests:
+  - Whatever else leaves a `noexcept` function: status 3 and a message
+    (`on_terminate()`, `--help`).
+  - Xerces-C throws from a destructor releasing a schema, at the end of a query that
+    imports one, as the directory and xml modules do: abort.
+  - libxml2 and glibc abort if they cannot set up the first use by a thread. The main
+    thread and the scanner's do that at start.
+  - One allocation near the end of a `dir:open` query ended in SIGSEGV with no stack
+    to read (twice in 1990, not explained): the process ends.
+  - ICU crashes in `RegexPattern::zap()` (SIGSEGV) if an allocation fails while it
+    compiles a regular expression. The directory module uses some on each call.
+  - The flex scanner calls `exit(2)` if it cannot allocate, while a query compiles.
+  - While a query compiles, the parser reads and frees parse nodes it has already
+    freed after a failure (`release_hack` in `xquery_parser.cpp`, seen with ASan and
+    TSan), so the sweeps that include compilation do not run in those builds. In a
+    release build it ended in SIGSEGV twice (arm64): the parser released a parse
+    node a second time while it destroyed the symbols on its stack after a failed
+    allocation. The process ends.
+  - Running out of memory while the message cannot be parsed (before its id is read,
+    and again when it is read once more for its id): the error response has
+    `"id": null`, as JSON-RPC 2.0 (section 5) requires when the id cannot be
+    determined. A notification gets no response when it can be recognized as one,
+    also when memory runs out.
+  - While a query compiles, a failure can be reported as an error of the query, for
+    example that a module was not found.
+  - A failure in the checks of a path can be reported as a denied or invalid path, or
+    in a `dir:open` as an error record, which a query can read as no content.
+
+  The sweeps measure what a failed call keeps through `operator new` only: memory
+  that libxml2 or MAPM keep through `malloc` is not counted.
+  After several consecutive failed allocations (runs of 8 in the sweeps), the XML,
+  fragment and HTML parsers can keep 8 to 18 KB per failed call. The cause is not
+  established. `exhaust_sweep_xml`, `_fragment` and `_html` report it for runs of 8
+  but do not fail on it; for single failures the check still fails.
+
 Tests hold the threads at known points with `ServerConfig::scan_hook`. Tests
 under ThreadSanitizer: the `tsan-mcp` job of `sanitizers.yml`.

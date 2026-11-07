@@ -127,6 +127,17 @@ static M_APM_TLS	UCHAR  M_mul_rem_10[100];
 
 static M_APM_TLS	int	M_util_firsttime = TRUE;
 static M_APM_TLS	int M_firsttime3 = TRUE;
+/* M_init_trig_globals() calls m_apm_init(). */
+static M_APM_TLS	int M_init_in_progress = FALSE;
+
+/*
+ *  Zorba: the first m_apm_init() of this thread was left with no return, so it
+ *  runs again at the next one (see M_apm_log_error_msg).
+ */
+void	M_reset_init()
+{
+  M_init_in_progress = FALSE;
+}
 
 static M_APM_TLS	M_APM	M_work_0_5;
 
@@ -154,11 +165,13 @@ M_APM	m_apm_init()
 {
   M_APM	atmp;
 
-  if (M_firsttime3)
+  if (M_firsttime3 && !M_init_in_progress)
   {
-    M_firsttime3 = FALSE;
+    M_init_in_progress = TRUE;
     M_init_util_data();
     M_init_trig_globals();
+    M_init_in_progress = FALSE;
+    M_firsttime3 = FALSE;
   }
 
   if ((atmp = (M_APM)MAPM_MALLOC(sizeof(M_APM_struct) + 84)) == NULL)
@@ -336,6 +349,12 @@ void	M_init_util_data()
   
   if (M_mul_div == NULL || M_mul_rem == NULL)
   {
+    /* The test above must not find the first one without the second. */
+    MAPM_FREE(M_mul_div);
+    MAPM_FREE(M_mul_rem);
+    M_mul_div = NULL;
+    M_mul_rem = NULL;
+
     /* fatal, this does not return */
     
     M_apm_log_error_msg(M_APM_FATAL, "\'M_init_util_data\', Out of memory");
@@ -428,10 +447,10 @@ void	m_apm_round(M_APM btmp, int places, M_APM atmp)
 
   if (M_util_firsttime)
   {
-    M_util_firsttime = FALSE;
-
     M_work_0_5 = m_apm_init();
     m_apm_set_string(M_work_0_5, "5");
+
+    M_util_firsttime = FALSE;
   }
 
   ii = places + 1;

@@ -63,18 +63,20 @@ public:
     // the end of a fresh page.
     if (size > thePageSize)
     {
+      reservePage();
       char* block = new char[size];
-      thePages.push_back(block);
+      thePages.push_back(block);   // cannot throw: reserved
       return block;
     }
 
     if (theFreeSize < size)
     {
+      reservePage();
       thePageStart = new char[thePageSize];
 
       thePageEnd = thePageStart + thePageSize;
       theFreeSize = thePageSize;
-      thePages.push_back(thePageStart);
+      thePages.push_back(thePageStart);   // cannot throw: reserved
     }
 
     void* allocation = (void*)(thePageEnd - theFreeSize);
@@ -84,6 +86,14 @@ public:
   }
 
 private:
+  // Room in thePages for one more page, before the page is allocated: a page
+  // that could not be recorded would never be freed.
+  void reservePage()
+  {
+    if (thePages.size() == thePages.capacity())
+      thePages.reserve(thePages.empty() ? 16 : 2 * thePages.size());
+  }
+
   // A memory manager is the only existing object handling memory
   // Since it's all data that it contains, there is no sense in copying it.
   MemoryManager(const MemoryManager&);

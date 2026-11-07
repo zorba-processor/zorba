@@ -63,9 +63,9 @@ int	j, carry, sign, aexp, bexp, adigits, bdigits;
 
 if (M_add_firsttime)
   {
-   M_add_firsttime = FALSE;
    M_work1 = m_apm_init();
    M_work2 = m_apm_init();
+   M_add_firsttime = FALSE;
   }
 
 if (a->m_apm_sign == 0)
@@ -189,9 +189,9 @@ int	itmp, j, flag, icompare, sign, aexp, bexp,
 
 if (M_add_firsttime)
   {
-   M_add_firsttime = FALSE;
    M_work1 = m_apm_init();
    M_work2 = m_apm_init();
+   M_add_firsttime = FALSE;
   }
 
 if (b->m_apm_sign == 0)

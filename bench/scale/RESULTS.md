@@ -454,3 +454,16 @@ takes 816 MiB at 100 MB, when `dir-lines`, of the same shape, takes 37 MiB.
 - `sliding_time` at 10 GB on `window-performance` reached the 1200 s limit on every path
   that did not run out of memory first.
 - At 1 GB and 10 GB each cell is one run.
+
+## Running out of memory: before and after PR #178
+
+1 GB, default limits (`--max-memory 4294967296`), one run per cell, inputs `csv-open`,
+`jsonl-open`, `array-open`, 8 operations each. Peak RSS was about 3.9 GB in all cells.
+
+| run | engine | `memory_limit`, server answers | no response, session closed |
+|---|---|---:|---:|
+| 41659837513 | `7c8d649f97` | 6 | 18 |
+| 41728338941 | `669ba8cf81`, in PR #178 | 24 | 0 |
+
+The cells that reached the limit took 12 to 17 s in the second run. In the first, the
+cells whose session closed took 27 to 39 s, and ended with `dumped core`.

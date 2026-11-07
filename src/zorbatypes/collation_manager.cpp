@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <new>
 #include "common/common.h"
 
 #ifndef ZORBA_NO_ICU
@@ -127,6 +128,9 @@ CollationFactory::createCollator(const std::string& aCollationURI)
                                                 lTokens[2].c_str()),
                                          lError);
   }
+
+  if (lError == U_MEMORY_ALLOCATION_ERROR)
+    throw std::bad_alloc();
 
   if( U_FAILURE(lError) ) 
   {

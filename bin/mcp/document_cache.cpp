@@ -397,7 +397,6 @@ Item DocumentCache::admit( std::string const &root, std::string const &path,
   // A read that yields nothing to keep is not tried again until the file
   // changes: a tree of such files must not pay for a second query per read.
   ++theStats.refused;
-  *seen = refused_tag( *seen );
   std::size_t bytes = 0;
   Item const record( read( root, path, &bytes ) );
   if ( record.isNull() )
@@ -414,15 +413,28 @@ Item DocumentCache::admit( std::string const &root, std::string const &path,
        !file_id( full, &now ) ||
        !( now == id ) || !canonical_under_root( full, &canonical_now ) ||
        canonical_now != canonical )
+  {
+    // Null above, or running out of memory here, says nothing about the file:
+    // only this marks it as not to be tried again.
+    *seen = refused_tag( *seen );
     return record;
+  }
 
   while ( theEntries.size() >= theMaxFiles ) {
     erase( theEntries.find( theLru.back() ) );
     ++theStats.evictions;
   }
-  theLru.push_front( key );
-  theEntries.emplace( key,
-    Entry{ canonical, id, record, bytes, theQuery, theLru.begin() } );
+  // The map first: a key in the list and not in the map would break eviction.
+  auto const added = theEntries.emplace( key,
+    Entry{ canonical, id, record, bytes, theQuery, theLru.end() } );
+  try {
+    theLru.push_front( key );
+  }
+  catch ( ... ) {
+    theEntries.erase( added.first );
+    throw;
+  }
+  added.first->second.lru = theLru.begin();
   theStats.bytes += bytes;
   theStats.entries = theEntries.size();
   --theStats.refused;
