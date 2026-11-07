@@ -167,6 +167,138 @@ class AssembleTest(unittest.TestCase):
         self.assertEqual(ca.main(["--root", self.root, "--check"]), 1)
 
 
+L = "https://github.com/zorba-processor/zorba/pull/"
+
+OLD_CL = """# Changelog
+
+## [5.0.0] - Unreleased
+
+### At a glance
+
+| a | b |
+
+### Added
+
+- Old feature ([#1](%s1)).
+
+### Fixed
+
+- Old fix, first line
+  continuation ([#2](%s2)).
+- Old fix without a link.
+
+### Removed
+
+- Old removal ([#3](%s3)).
+
+## Before 5.0
+
+- Not part of the section ([#99](%s99)).
+""" % (L, L, L, L)
+
+NEW_CL = """# Changelog
+
+## [5.0.0] - Unreleased
+
+### At a glance
+
+| a | b |
+
+### Added
+
+- Old feature, reworded ([#1](%s1)).
+- New feature
+  with a continuation ([#4](%s4)).
+
+### Fixed
+
+- Old fix, reworded after the tag
+  continuation ([#2](%s2)).
+- Old fix without a link.
+- New fix ([#5](%s5)).
+
+### Removed
+
+- Old removal ([#3](%s3)).
+
+## Before 5.0
+
+- Not part of the section ([#98](%s98)).
+""" % (L, L, L, L, L, L)
+
+
+class NotesSinceTest(unittest.TestCase):
+    def test_new_entries_only_in_current_order(self):
+        r = ca.new_entries(OLD_CL, NEW_CL, "5.0.0")
+        self.assertEqual([h for h, _ in r], ["Added", "Fixed"])
+        self.assertEqual(r[0][1], [["- New feature", "  with a continuation ([#4](%s4))." % L]])
+        self.assertEqual(r[1][1], [["- New fix ([#5](%s5))." % L]])
+
+    def test_edited_entry_with_same_pr_is_not_new(self):
+        flat = [b for _h, bs in ca.new_entries(OLD_CL, NEW_CL, "5.0.0") for b in bs]
+        self.assertNotIn("- Old feature, reworded ([#1](%s1))." % L, [b[0] for b in flat])
+        self.assertFalse(any("reworded" in l for b in flat for l in b))
+
+    def test_entry_without_pr_compared_by_text(self):
+        flat = [b[0] for _h, bs in ca.new_entries(OLD_CL, NEW_CL, "5.0.0") for b in bs]
+        self.assertNotIn("- Old fix without a link.", flat)
+        edited = NEW_CL.replace("- Old fix without a link.", "- Another fix without a link.")
+        flat = [b[0] for _h, bs in ca.new_entries(OLD_CL, edited, "5.0.0") for b in bs]
+        self.assertIn("- Another fix without a link.", flat)
+
+    def test_empty_subsection_and_non_bullet_content_omitted(self):
+        text = ca.notes_since(OLD_CL, NEW_CL, "5.0.0", "5.0.0-alpha.1", "v5.0.0-alpha.2")
+        self.assertNotIn("### Removed", text)
+        self.assertNotIn("At a glance", text.split("## Changes since")[1])
+        self.assertNotIn("| a | b |", text)
+        self.assertNotIn("#98", text)
+
+    def test_notes_text(self):
+        text = ca.notes_since(OLD_CL, NEW_CL, "5.0.0", "5.0.0-alpha.1", "v5.0.0-alpha.2")
+        self.assertTrue(text.startswith(
+            "Prerelease of Zorba 5.0.0. These notes list what changed since 5.0.0-alpha.1. "
+            "The full list of changes in 5.0.0 so far, including the \"At a glance\" table, is in "
+            "[CHANGELOG.md](https://github.com/zorba-processor/zorba/blob/v5.0.0-alpha.2/CHANGELOG.md).\n\n"
+            "## Changes since 5.0.0-alpha.1\n\n### Added\n\n- New feature\n"))
+
+    def test_missing_old_section_lists_everything(self):
+        r = ca.new_entries("# Changelog\n", NEW_CL, "5.0.0")
+        self.assertEqual([h for h, _ in r], ["Added", "Fixed", "Removed"])
+
+    def test_missing_current_section_is_empty(self):
+        self.assertEqual(ca.new_entries(OLD_CL, NEW_CL, "6.0.0"), [])
+
+
+class NotesSinceGitTest(unittest.TestCase):
+    def git(self, root, *a):
+        subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", *a], cwd=root,
+                       check=True, capture_output=True)
+
+    def test_main_reads_old_changelog_from_tag(self):
+        with tempfile.TemporaryDirectory() as root:
+            self.git(root, "init", "-q", "-b", "master")
+            write(os.path.join(root, "CHANGELOG.md"), OLD_CL)
+            self.git(root, "add", "."); self.git(root, "commit", "-qm", "old")
+            self.git(root, "tag", "v5.0.0-alpha.1")
+            write(os.path.join(root, "CHANGELOG.md"), NEW_CL)
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                rc = ca.main(["--root", root, "--version", "5.0.0-alpha.2", "--notes-since", "v5.0.0-alpha.1"])
+            self.assertEqual(rc, 0)
+            self.assertIn("## Changes since 5.0.0-alpha.1", out.getvalue())
+            self.assertIn("- New fix", out.getvalue())
+            self.assertNotIn("Old feature", out.getvalue())
+            self.assertIn("blob/v5.0.0-alpha.2/CHANGELOG.md", out.getvalue())
+
+    def test_main_unknown_ref_fails(self):
+        with tempfile.TemporaryDirectory() as root:
+            self.git(root, "init", "-q", "-b", "master")
+            write(os.path.join(root, "CHANGELOG.md"), NEW_CL)
+            with contextlib.redirect_stderr(io.StringIO()):
+                rc = ca.main(["--root", root, "--version", "5.0.0-alpha.2", "--notes-since", "v0.0.0"])
+            self.assertEqual(rc, 1)
+
+
 class GitLookupTest(unittest.TestCase):
     def git(self, *a):
         subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", *a], cwd=self.root,

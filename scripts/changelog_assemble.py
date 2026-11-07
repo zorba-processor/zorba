@@ -8,6 +8,8 @@ the fragment format and RELEASING.md for when this runs.
 Usage:
   changelog_assemble.py --version 5.0.0 [--date 2026-11-01] [--dry-run]
   changelog_assemble.py --check        # validate fragments only
+  changelog_assemble.py --notes-since v5.0.0-alpha.2 --version 5.0.0-alpha.3 [--tag v5.0.0-alpha.3]
+                                       # release notes: entries not in CHANGELOG.md at the ref
 """
 
 import argparse
@@ -152,6 +154,99 @@ def insert_entries(changelog, base, entries, date=None):
     return "\n".join(lines)
 
 
+PR_RE = re.compile(r"/pull/(\d+)\)")
+
+
+def section_entries(changelog, base):
+    """Return [(subsection heading, [bullet, ...])] of the [base] section.
+
+    A bullet is a list of lines: a top-level '- ' line plus its indented
+    continuation lines. Subsections without bullets (for example the "At a
+    glance" table) are returned with an empty bullet list. A missing section
+    gives [].
+    """
+    lines = changelog.split("\n")
+    start = _find_release(lines, base)
+    if start is None:
+        return []
+    result = []
+    bullet = None
+    pending_blank = []
+    for line in lines[start + 1:]:
+        if line.startswith("## "):
+            break
+        if line.startswith("### "):
+            result.append((line[4:].strip(), []))
+            bullet = None
+            pending_blank = []
+        elif line.startswith("- ") and result:
+            bullet = [line.rstrip()]
+            result[-1][1].append(bullet)
+            pending_blank = []
+        elif not line.strip():
+            pending_blank.append(line)
+        elif line[0] in " \t" and bullet is not None:
+            bullet.extend(pending_blank)
+            bullet.append(line.rstrip())
+            pending_blank = []
+        else:
+            bullet = None
+            pending_blank = []
+    return result
+
+
+def _entry_prs(bullet):
+    return {int(n) for n in PR_RE.findall(" ".join(bullet))}
+
+
+def _entry_text_key(bullet):
+    return " ".join(" ".join(bullet).split()).lower()
+
+
+def new_entries(old_changelog, new_changelog, base):
+    """Entries of the [base] section of new_changelog that are not in old_changelog.
+
+    Identity is the pull request number in the entry's link: an entry is old
+    when it shares a pull request number with an old entry, so an entry edited
+    between the two versions is not new. Entries without a link are compared by
+    normalized text. Returns [(subsection, [bullet, ...])] in the current order,
+    only subsections with new bullets.
+    """
+    old = [b for _h, bullets in section_entries(old_changelog, base) for b in bullets]
+    old_prs = set()
+    old_texts = set()
+    for b in old:
+        old_prs |= _entry_prs(b)
+        old_texts.add(_entry_text_key(b))
+    result = []
+    for heading, bullets in section_entries(new_changelog, base):
+        fresh = []
+        for b in bullets:
+            prs = _entry_prs(b)
+            is_old = bool(prs & old_prs) if prs else _entry_text_key(b) in old_texts
+            if not is_old:
+                fresh.append(b)
+        if fresh:
+            result.append((heading, fresh))
+    return result
+
+
+def notes_since(old_changelog, new_changelog, base, prev_version, tag, repo=REPO):
+    """Release notes text listing what changed in [base] since prev_version."""
+    out = [
+        "Prerelease of Zorba %s. These notes list what changed since %s. The full list of "
+        "changes in %s so far, including the \"At a glance\" table, is in "
+        "[CHANGELOG.md](https://github.com/%s/blob/%s/CHANGELOG.md)."
+        % (base, prev_version, base, repo, tag),
+        "",
+        "## Changes since %s" % prev_version,
+    ]
+    for heading, bullets in new_entries(old_changelog, new_changelog, base):
+        out += ["", "### " + heading, ""]
+        out += [l for b in bullets for l in b]
+    return "\n".join(out) + "\n"
+
+
 def list_fragments(directory):
     if not os.path.isdir(directory):
         return []
@@ -188,6 +283,10 @@ def main(argv=None):
     ap.add_argument("--version", help="target release X.Y.Z[-pre]; a prerelease uses the X.Y.Z section")
     ap.add_argument("--date", help="YYYY-MM-DD; sets the section date (default: keep the heading, new sections say Unreleased)")
     ap.add_argument("--dry-run", action="store_true", help="print the resulting CHANGELOG.md, change nothing")
+    ap.add_argument("--notes-since", metavar="REF",
+                    help="print release notes for --version: the entries of the [X.Y.Z] section of CHANGELOG.md "
+                         "that are not in CHANGELOG.md at git REF (a tag such as v5.0.0-alpha.2)")
+    ap.add_argument("--tag", help="tag the notes link to (default: v<version>)")
     ap.add_argument("--check", action="store_true", help="only validate the fragments")
     ap.add_argument("--root", default=os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."),
                     help="repository root (default: parent of scripts/)")
@@ -214,6 +313,20 @@ def main(argv=None):
     if args.date and not DATE_RE.match(args.date):
         ap.error("--date must be YYYY-MM-DD")
     base = "%s.%s.%s" % m.groups()[:3]
+
+    if args.notes_since:
+        try:
+            old = subprocess.run(["git", "show", "%s:CHANGELOG.md" % args.notes_since], cwd=root,
+                                 capture_output=True, text=True, check=True).stdout
+        except (OSError, subprocess.CalledProcessError) as e:
+            print("error: cannot read CHANGELOG.md at %s: %s" % (args.notes_since, getattr(e, "stderr", e)),
+                  file=sys.stderr)
+            return 1
+        with open(os.path.join(root, "CHANGELOG.md"), encoding="utf-8") as f:
+            new = f.read()
+        prev = args.notes_since[1:] if args.notes_since.startswith("v") else args.notes_since
+        sys.stdout.write(notes_since(old, new, base, prev, args.tag or "v" + args.version, args.repo))
+        return 0
 
     try:
         text, frags = assemble(root, base, args.date, args.repo)
