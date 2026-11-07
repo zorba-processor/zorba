@@ -65,6 +65,24 @@ void smart_owners(std::vector<zorba::rchandle<Node>>& v, bool flag) {
   (void)a; (void)b; (void)d; (void)e; (void)f; (void)g; (void)i; (void)j;
 }
 
+// A class derived from a smart pointer.
+struct NodeHandle : zorba::rchandle<Node> {
+  using zorba::rchandle<Node>::rchandle;
+};
+
+void derived_handle() {
+  NodeHandle h(new Node);
+  NodeHandle k = NodeHandle(new DerivedNode);
+}
+
+// Ownership passed to a legacy interface through release().
+void take_raw(Plain* p);
+
+void legacy_interface() {
+  auto p = std::make_unique<Plain>();
+  take_raw(p.release());
+}
+
 // Arena and placement new: the memory is owned by the arena or the buffer.
 Plain* arena_new(zorba::MemoryManager& mem) {
   return new (mem) Plain;

@@ -56,6 +56,65 @@ full log. The final push of a pull request still needs the full CI.
 
 **Review comments.** State proposals directly: what should change, and why. A pull request is the preferred form. Questions are welcome when you need information, not as a way to suggest a change.
 
+## Coding rules
+
+### Owning memory
+
+New and changed code does not manage memory with raw owning `new` and
+`delete`. Existing code is not rewritten for this rule; it follows the rule
+when it is changed.
+
+Reported (check `zorba-owning-memory`):
+
+- every `delete` and `delete[]` expression;
+- every `new` expression whose result is not handed straight to a smart
+  pointer: a raw pointer variable, member, return value, container element or
+  function argument initialized from `new`.
+
+Allowed:
+
+- `new` passed straight to a smart pointer (`rchandle`, `const_rchandle`,
+  `SmartPtr`, `std::unique_ptr`, `std::shared_ptr`, or a class derived from
+  one): construction, copy-initialization, assignment, `reset()`, a return
+  value or argument of smart pointer type, `emplace` into a container of
+  smart pointers. For `std::unique_ptr` and `std::shared_ptr`,
+  `modernize-make-unique` and `modernize-make-shared` still ask for
+  `std::make_unique` and `std::make_shared`.
+- placement new: the expression arena (`new (theMemoryMgr) T(...)`,
+  `src/compiler/expression/mem_manager.h`) and construction in a buffer.
+  `new (std::nothrow)` is an owning `new` and is reported.
+
+Converting:
+
+| Instead of | Write |
+|---|---|
+| `T* p = new T(a);` ... `delete p;` | `auto p = std::make_unique<T>(a);` |
+| member `T* theP;` set with `new`, deleted in the destructor | `std::unique_ptr<T> theP;` |
+| `std::vector<T*>` that deletes its elements | `std::vector<std::unique_ptr<T>>` |
+| `T* f() { return new T; }` (caller owns) | `std::unique_ptr<T> f() { return std::make_unique<T>(); }` |
+| reference-counted `T` (derives from `SimpleRCObject` or `SyncedRCObject`) | `rchandle<T> h(new T);` or `rchandle<T> h = new T;` |
+| legacy API that takes ownership of a `T*` | `auto p = std::make_unique<T>(a);` ... `api(p.release());` |
+
+A justified exception (for example a class that deletes itself, or a
+third-party interface) carries `// NOLINT(zorba-owning-memory)` with the
+reason on the same line.
+
+The check is a clang-tidy plugin in `scripts/clang-tidy` (see its
+`CMakeLists.txt`). `clang-tidy.yml` runs it on every pull request that
+touches C or C++ sources, on the lines the pull request adds or changes
+relative to `master`, and fails on any finding. To run it locally on a
+change, with a `compile_commands.json` from a configured build:
+
+```bash
+cmake -S scripts/clang-tidy -B build/clang-tidy-plugin && cmake --build build/clang-tidy-plugin
+git diff -U0 origin/master... > /tmp/changes.diff
+clang-tidy -p build/full-release -load=build/clang-tidy-plugin/ZorbaTidyModule.so \
+  --config="{Checks: '-*,zorba-owning-memory', HeaderFilterRegex: '.*', \
+    CheckOptions: {zorba-owning-memory.DiffFile: /tmp/changes.diff}}" src/path/to/file.cpp
+```
+
+Without `DiffFile` every line is reported.
+
 ## License and file headers
 
 Zorba is licensed under the Apache License 2.0 (`LICENSE.txt`). By

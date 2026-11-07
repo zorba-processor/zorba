@@ -76,4 +76,10 @@ void instantiate() {
   delete p; // VIOLATION
 }
 
+// The escape hatch: NOLINT with the check name is not reported.
+void justified() {
+  Plain* n = new Plain; // NOLINT(zorba-owning-memory): fixture
+  delete n; // NOLINT(zorba-owning-memory): fixture
+}
+
 } // namespace fixture

@@ -7,7 +7,7 @@ name: clang-tidy
 # (WarningsAsErrors). Not a required check.
 #
 # zorba-owning-memory (scripts/clang-tidy, a clang-tidy plugin; rule in
-# doc/coding-rules.md) runs only on the lines this change adds or modifies
+# CONTRIBUTING.md) runs only on the lines this change adds or modifies
 # relative to master: the plugin is built against the image's LLVM, its
 # fixture tests run, and the check is applied to the translation units that
 # contain or include a changed file, reporting only changed lines.
@@ -68,16 +68,18 @@ jobs:
           cache-scope: linux-amd64-latest
 
       # The plugin needs the LLVM development files (package llvm) of the
-      # exact version of the image's llvm-libs, taken from the Arch Linux
-      # Archive. The fixtures in scripts/clang-tidy/test must give exactly the
-      # expected findings. Runs before the build so that a broken check fails
-      # fast.
+      # exact version of the image's llvm-libs; the image has them, otherwise
+      # they are taken from the Arch Linux Archive. The fixtures in
+      # scripts/clang-tidy/test must give exactly the expected findings. Runs
+      # before the build so that a broken check fails fast.
       - name: Build and test the Zorba clang-tidy plugin
         run: |
           docker run --rm -v "$PWD":/src -w /src zorba-builder:ci sh -ec '
             v=$(pacman -Q llvm-libs | cut -d" " -f2)
-            pacman -U --noconfirm --needed \
-              "https://archive.archlinux.org/packages/l/llvm/llvm-$v-x86_64.pkg.tar.zst"
+            if [ "$(pacman -Q llvm 2>/dev/null | cut -d" " -f2)" != "$v" ]; then
+              pacman -U --noconfirm \
+                "https://archive.archlinux.org/packages/l/llvm/llvm-$v-x86_64.pkg.tar.zst"
+            fi
             cmake -S scripts/clang-tidy -B build/clang-tidy-plugin -G Ninja \
               -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
             cmake --build build/clang-tidy-plugin
