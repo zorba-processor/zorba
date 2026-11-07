@@ -292,6 +292,9 @@ jobs:
   # would fail to link (debug containers have their own mangled names); the
   # step lists the C++ libraries and any std container in their headers, where
   # a class member would not.
+  # The test preset excludes test/api/timeout_bounds: it bounds how late a
+  # query timeout may fire, and debug mode's checks (linear in the container
+  # size on some operations) make a timed operation miss that bound.
   glibcxx-debug:
     if: github.event_name != 'workflow_dispatch' || inputs.jobs == 'all' || inputs.jobs == 'glibcxx-debug'
     runs-on: ubuntu-24.04

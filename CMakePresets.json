@@ -242,6 +242,11 @@
       },
       "execution": {
         "timeout": 300
+      },
+      "filter": {
+        "exclude": {
+          "name": "^test/api/timeout_bounds$"
+        }
       }
     },
     {
