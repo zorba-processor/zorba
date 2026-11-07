@@ -6,6 +6,12 @@ name: clang-tidy
 # of the linux-amd64-clang CI job). Any finding fails the job
 # (WarningsAsErrors). Not a required check.
 #
+# zorba-owning-memory (scripts/clang-tidy, a clang-tidy plugin; rule in
+# CONTRIBUTING.md) runs only on the lines this change adds or modifies
+# relative to master: the plugin is built against the image's LLVM, its
+# fixture tests run, and the check is applied to the translation units that
+# contain or include a changed file, reporting only changed lines.
+#
 # Generated sources are not analyzed: the Bison/Flex output in
 # src/compiler/parser, */pregenerated/* and anything under build/. Headers
 # are filtered by ExcludeHeaderFilterRegex in .clang-tidy.
@@ -31,6 +37,7 @@ on:
       - 'bin/**/*.cpp'
       - 'bin/**/*.h'
       - 'bin/**/*.hpp'
+      - 'scripts/clang-tidy/**'
       - '.clang-tidy'
       - '.github/workflows/clang-tidy.yml'
   workflow_dispatch:
@@ -44,17 +51,39 @@ permissions:
 
 jobs:
   clang-tidy:
-    name: clang-tidy (unchecked return values)
+    name: clang-tidy (unchecked return values, owning memory)
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     steps:
+      # Full history: the owning-memory step diffs against the merge base
+      # with master.
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - name: Builder image
         uses: ./.github/actions/builder-image
         with:
           context: docker/builder-latest
           cache-scope: linux-amd64-latest
+
+      # The plugin needs the LLVM development files (package llvm) of the
+      # exact version of the image's llvm-libs; the image has them, otherwise
+      # they are taken from the Arch Linux Archive. The fixtures in
+      # scripts/clang-tidy/test must give exactly the expected findings. Runs
+      # before the build so that a broken check fails fast.
+      - name: Build and test the Zorba clang-tidy plugin
+        run: |
+          docker run --rm -v "$PWD":/src -w /src zorba-builder:ci sh -ec '
+            v=$(pacman -Q llvm-libs | cut -d" " -f2)
+            if [ "$(pacman -Q llvm 2>/dev/null | cut -d" " -f2)" != "$v" ]; then
+              pacman -U --noconfirm \
+                "https://archive.archlinux.org/packages/l/llvm/llvm-$v-x86_64.pkg.tar.zst"
+            fi
+            cmake -S scripts/clang-tidy -B build/clang-tidy-plugin -G Ninja \
+              -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
+            cmake --build build/clang-tidy-plugin
+            ctest --test-dir build/clang-tidy-plugin --output-on-failure'
 
       - uses: actions/cache@v6
         with:
@@ -99,6 +128,82 @@ jobs:
             sed -nE "/clang-diagnostic-error|Error while processing/p" build/tidy/clang-tidy.log | head -50
             exit $rc'
 
+      # The diff of src/, modules/, bin/ and include/ against the merge base
+      # with the pull request's base branch (master outside pull requests),
+      # without the generated sources; whitespace-only changes are not
+      # counted. The translation units to analyze are the ones whose ninja
+      # dependencies (the source and every header it includes) contain a
+      # changed file. DiffFile restricts the findings to the changed lines.
+      # A changed C/C++ file that no analyzed translation unit covers (not in
+      # the Linux full-release build) gets a warning annotation.
+      - name: Run zorba-owning-memory on the changed lines
+        shell: bash
+        env:
+          BASE_BRANCH: ${{ github.base_ref || 'master' }}
+        run: |
+          out="$RUNNER_TEMP/owning-memory"
+          mkdir -p "$out"
+          base=$(git merge-base "origin/$BASE_BRANCH" HEAD)
+          echo "base: origin/$BASE_BRANCH $base"
+          git diff -U0 --no-color --ignore-space-change "$base" HEAD -- src modules bin include \
+            ':(exclude,glob)**/pregenerated/**' \
+            ':(exclude)src/compiler/parser/xquery_parser.cpp' \
+            ':(exclude)src/compiler/parser/xquery_parser.hpp' \
+            ':(exclude)src/compiler/parser/jsoniq_parser.cpp' \
+            ':(exclude)src/compiler/parser/jsoniq_parser.hpp' \
+            ':(exclude)src/compiler/parser/xquery_scanner.cpp' \
+            ':(exclude)src/compiler/parser/xquery_scanner.h' \
+            ':(exclude)src/compiler/parser/jsoniq_scanner.cpp' \
+            ':(exclude)src/compiler/parser/jsoniq_scanner.h' \
+            ':(exclude)src/compiler/parser/location.hh' \
+            ':(exclude)src/compiler/parser/FlexLexer.h' \
+            > "$out/changes.diff"
+          sed -n 's#^+++ b/#/src/#p' "$out/changes.diff" | sort -u > "$out/changed-files.txt"
+          echo "changed files: $(wc -l < "$out/changed-files.txt")"
+          docker run --rm -v "$PWD":/src -w /src zorba-builder:ci \
+            ninja -C build/full-release -t deps > "$out/ninja-deps.txt"
+          # Pairs "<translation unit> TAB <changed file it depends on>", kept
+          # for the analyzed units (src/, modules/, bin/ minus generated).
+          # grep exits 1 when no pair is kept; that is not an error.
+          awk 'NR == FNR { changed[$0] = 1; next }
+               /^[^ \t].*: #deps/ { first = 1; next }
+               /^[ \t]+[^ \t]/ { f = $1
+                                 gsub(/\/\.\//, "/", f)
+                                 while (sub(/\/[^\/.][^\/]*\/\.\.\//, "/", f)) {}
+                                 if (first) { src = f; first = 0 }
+                                 if (f in changed) print src "\t" f }' \
+            "$out/changed-files.txt" "$out/ninja-deps.txt" \
+            | { grep -P '^/src/(src|modules|bin)/(?!(.*/)?pregenerated/)(?!(.*/)?compiler/parser/(xquery|jsoniq)_(parser|scanner)[.]cpp\t)' || [ $? -eq 1 ]; } \
+            > "$out/units-files.txt"
+          cut -f1 "$out/units-files.txt" | sort -u > "$out/units.txt"
+          cut -f2 "$out/units-files.txt" | sort -u > "$out/covered-files.txt"
+          echo "translation units: $(wc -l < "$out/units.txt")"
+          { grep -E '[.](c|cc|cpp|h|hpp)$' "$out/changed-files.txt" || [ $? -eq 1 ]; } \
+            | comm -23 - "$out/covered-files.txt" > "$out/uncovered-files.txt"
+          while read -r f; do
+            echo "::warning file=${f#/src/}::not checked by zorba-owning-memory: no translation unit of the Linux full-release build includes this file"
+          done < "$out/uncovered-files.txt"
+          if [ ! -s "$out/units.txt" ]; then
+            echo "no translation unit contains a changed line"
+            exit 0
+          fi
+          # run-clang-tidy takes regular expressions; source paths contain no
+          # regex metacharacters other than . and +.
+          sed -e 's/[.+]/\\&/g' -e 's/.*/^&$/' "$out/units.txt" > "$out/units-regex.txt"
+          docker run --rm -v "$PWD":/src -v "$out":/owning -w /src zorba-builder:ci sh -ec '
+            rc=0
+            run-clang-tidy -p build/full-release -j"$(nproc)" -quiet \
+              -load build/clang-tidy-plugin/ZorbaTidyModule.so \
+              -config "{Checks: \"-*,zorba-owning-memory\", WarningsAsErrors: \"*\", HeaderFilterRegex: \".*\", CheckOptions: {zorba-owning-memory.DiffFile: /owning/changes.diff}}" \
+              $(cat /owning/units-regex.txt) \
+              > /owning/owning-memory.log 2>&1 || rc=$?
+            sed -nE "/: (warning|error): .*\[[a-z0-9.,-]+\]$/p" /owning/owning-memory.log \
+              | sort -u > /owning/findings.txt
+            echo "findings: $(wc -l < /owning/findings.txt)"
+            cat /owning/findings.txt
+            sed -nE "/clang-diagnostic-error|Error while processing/p" /owning/owning-memory.log | head -50
+            exit $rc'
+
       - name: Upload the clang-tidy log
         if: always()
         uses: actions/upload-artifact@v7
@@ -107,3 +212,4 @@ jobs:
           path: |
             build/tidy/clang-tidy.log
             build/tidy/findings.txt
+            ${{ runner.temp }}/owning-memory/

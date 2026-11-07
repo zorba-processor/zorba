@@ -1,0 +1,22 @@
+diff --git a/src/other.cpp b/src/other.cpp
+--- a/src/other.cpp
++++ b/src/other.cpp
+@@ -30,0 +31 @@
++  int* p = new int;
+diff --git a/scripts/clang-tidy/test/owning_memory_violations.cpp b/scripts/clang-tidy/test/owning_memory_violations.cpp
+--- a/scripts/clang-tidy/test/owning_memory_violations.cpp
++++ b/scripts/clang-tidy/test/owning_memory_violations.cpp
+@@ -29 +29 @@
+-Plain* make_raw() { return nullptr; }
++Plain* make_raw() { return new Plain; } // VIOLATION
+@@ -36 +35,0 @@
+-  Holder() : theRaw(new Plain), theArray(new int[8]) {} // VIOLATION
+@@ -51,0 +52,2 @@
++  Plain* a = new Plain; // VIOLATION
++  Plain* b;
+diff --git a/scripts/clang-tidy/test/removed.cpp b/scripts/clang-tidy/test/removed.cpp
+deleted file mode 100644
+--- a/scripts/clang-tidy/test/removed.cpp
++++ /dev/null
+@@ -1 +0,0 @@
+-delete x;
