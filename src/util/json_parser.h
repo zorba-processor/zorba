@@ -606,11 +606,6 @@ private:
 
 ///////////////////////////////////////////////////////////////////////////////
 
-inline void owning_memory_probe() {
-  int* p = new int(0);
-  delete p;
-}
-
 } // namespace json
 } // namespace zorba
 
