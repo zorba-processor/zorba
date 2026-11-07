@@ -56,6 +56,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0  # the changelog assembler reads git history for PR numbers
+          fetch-tags: true  # the notes of a prerelease are taken against the previous tag
 
       - name: Determine version, prerelease and image tags
         id: v
@@ -163,6 +164,7 @@ jobs:
           set -euo pipefail
           # 5.0.0-alpha.1 uses the "## [5.0.0]" section.
           base="${VERSION%%-*}"
+          link="See [CHANGELOG.md](https://github.com/${GITHUB_REPOSITORY}/blob/${TAG}/CHANGELOG.md) for the changes in $base."
           heading="$(grep -m1 -F "## [$base]" CHANGELOG.md || true)"
           if [ -z "$heading" ]; then
             echo "::error::CHANGELOG.md has no '## [$base]' section"; exit 1
@@ -177,12 +179,29 @@ jobs:
           if grep -qF '(open PR)' <<< "$section"; then
             echo "::warning::The [$base] section still has entries marked (open PR)"
           fi
-          {
+          # A prerelease with an earlier prerelease of the same base lists only
+          # what changed since that one. The previous tag is the highest
+          # v<base>-* tag reachable from here and older than this one; a dry
+          # run ("<base>-dryrun") takes the newest.
+          prev=""
+          if [ "$PRERELEASE" = true ]; then
+            prev="$( { git tag --merged HEAD -l "v$base-*" | grep -vxF "$TAG" || true; echo "$TAG"; } \
+                     | sort -V | awk -v t="$TAG" -v d="${VERSION##*-}" \
+                         '$0==t{if(d!="dryrun")exit} $0!=t{p=$0} END{print p}')"
+          fi
+          if [ -n "$prev" ]; then
+            echo "Release notes list the changes since $prev"
+            section="$(python3 scripts/changelog_assemble.py --version "$VERSION" --tag "$TAG" \
+                         --repo "$GITHUB_REPOSITORY" --notes-since "$prev")"
+          else
             if [ "$PRERELEASE" = true ]; then
-              echo "Prerelease of Zorba $base. The notes below list all changes in $base so far."
-              echo
+              section="Prerelease of Zorba $base. The notes below list all changes in $base so far.
+
+$section"
             fi
-            echo "$section"
+          fi
+          write_notes() {
+            echo "$1"
             echo
             echo "### Container image"
             echo
@@ -197,7 +216,16 @@ jobs:
             echo "gh attestation verify zorba-${VERSION}.tar.gz -R ${GITHUB_REPOSITORY}"
             echo "gh attestation verify oci://${IMAGE}:${VERSION} -R ${GITHUB_REPOSITORY}"
             echo '```'
-          } > release-notes.md
+          }
+          write_notes "$section" > release-notes.md
+          # GitHub limits a release body to 125,000 characters; never fail the release on size.
+          size="$(wc -m < release-notes.md | tr -d ' ')"
+          if [ "$size" -gt 120000 ]; then
+            echo "::warning::Release notes are $size characters (GitHub limit: 125,000); the notes link to CHANGELOG.md instead of listing the changes"
+            write_notes "$link" > release-notes.md
+            size="$(wc -m < release-notes.md | tr -d ' ')"
+          fi
+          echo "Release notes: $size characters"
           { echo; echo "<details><summary>Release notes</summary>"; echo; cat release-notes.md; echo; echo "</details>"; } >> "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/upload-artifact@v7

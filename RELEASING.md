@@ -31,7 +31,11 @@ tags.
    keep `Unreleased`. Then edit `CHANGELOG.md` by hand: update the "At a
    glance" table, resolve entries marked **(open PR)**, and for a stable
    release make sure the heading is `## [X.Y.Z] - YYYY-MM-DD`. The release
-   notes are taken from this section.
+   notes are taken from this section: the notes of a prerelease list only the
+   entries that are not in `CHANGELOG.md` at the previous prerelease tag of the
+   same version (the whole section for the first prerelease and for the final
+   release). Notes over 120,000 characters link to `CHANGELOG.md` instead (the
+   GitHub limit is 125,000).
 3. Merge this pull request (and the version change) and wait for CI to pass on master.
 4. Optional: rehearse with a dry run, which pushes nothing:
 
