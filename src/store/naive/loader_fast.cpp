@@ -285,6 +285,20 @@ catch (std::bad_alloc const&)
 /*******************************************************************************
 
 ********************************************************************************/
+bool XmlLoader::parsedWellFormed(xmlParserCtxtPtr ctxt)
+{
+#if LIBXML_VERSION >= 21400
+  bool const stopped = xmlCtxtIsStopped(ctxt) != 0;
+#else
+  bool const stopped = ctxt->disableSAX != 0;
+#endif
+  return ctxt->wellFormed != 0 && !stopped;
+}
+
+
+/*******************************************************************************
+
+********************************************************************************/
 FastXmlLoader::FastXmlLoader(
     store::ItemFactory* factory,
     XQueryDiagnostics* xqueryDiagnostics,
@@ -590,7 +604,7 @@ store::Item_t FastXmlLoader::loadXml(
     return NULL;
   }
 
-  bool ok = ctxt->wellFormed != 0;
+  bool ok = parsedWellFormed(ctxt);
 
   // Free parser resources
   xmlCtxtReset(ctxt);
