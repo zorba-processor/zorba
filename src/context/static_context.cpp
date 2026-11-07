@@ -5044,5 +5044,10 @@ std::string static_context::toString()
 #endif
 
 
+[[maybe_unused]] static void owning_memory_probe_cpp() {
+  int* p = new int(0);
+  delete p;
+}
+
 } // namespace zorba
 /* vim:set et sw=2 ts=2: */
