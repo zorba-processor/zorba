@@ -26,6 +26,8 @@
 
 #include "store/api/shared_types.h"
 
+#include "content_reader.h"
+
 namespace zorba
 {
 namespace simplestore
@@ -43,8 +45,12 @@ namespace simplestore
   Iterators are plain pointers. As with std::vector, insert, erase, resize,
   reserve and shrink_to_fit invalidate them. Unlike std::vector, swap() does
   not carry the iterators of an inline vector to the other vector: they stay
-  in this object and see its new contents. Code that must iterate across a
-  swap copies an inline vector first (see ChildrenIteratorImpl).
+  in this object and see its new contents. Every member function that
+  changes the contents or the storage (including swap) first calls
+  ContentReader::contentWillChange(this), so an iteration that registered
+  this vector copies what it still needs before its iterators go stale (see
+  ChildrenIteratorImpl). Writing through operator[], front(), back() or an
+  iterator does not: only the loaders do that, on nodes they are building.
 
   The size and capacity are 32-bit: growing past them, which doubling reaches
   at about 2^31 elements, throws std::length_error.
@@ -174,12 +180,16 @@ public:
   void reserve(csize n)
   {
     if (n > theCapacity)
+    {
+      ContentReader::contentWillChange(this);
       reallocate(n);
+    }
   }
 
   // New elements are NULL. Shrinking keeps the capacity, like std::vector.
   void resize(csize n)
   {
+    ContentReader::contentWillChange(this);
     if (n > theSize)
     {
       grow(n - theSize);
@@ -190,16 +200,24 @@ public:
     theSize = static_cast<uint32_t>(n);
   }
 
-  void clear() { theSize = 0; }
+  void clear()
+  {
+    ContentReader::contentWillChange(this);
+    theSize = 0;
+  }
 
   void shrink_to_fit()
   {
     if (!isInline() && theSize < theCapacity)
+    {
+      ContentReader::contentWillChange(this);
       reallocate(theSize);
+    }
   }
 
   void push_back(T* value)
   {
+    ContentReader::contentWillChange(this);
     grow(1);
     data()[theSize] = value;
     ++theSize;
@@ -209,6 +227,7 @@ public:
   {
     csize index = pos - begin();
     assert(index <= theSize);
+    ContentReader::contentWillChange(this);
     grow(1);
     T** d = data();
     std::memmove(d + index + 1, d + index, (theSize - index) * sizeof(T*));
@@ -224,6 +243,7 @@ public:
     csize index = pos - begin();
     assert(index <= theSize);
     csize count = static_cast<csize>(std::distance(first, last));
+    ContentReader::contentWillChange(this);
     grow(count);
     T** d = data();
     std::memmove(d + index + count, d + index, (theSize - index) * sizeof(T*));
@@ -240,6 +260,7 @@ public:
 
   iterator erase(iterator first, iterator last)
   {
+    ContentReader::contentWillChange(this);
     T** d = data();
     csize index = first - d;
     csize count = last - first;
@@ -254,6 +275,8 @@ public:
   // inline contents and heap ownership.
   void swap(PtrVector& other)
   {
+    ContentReader::contentWillChange(this);
+    ContentReader::contentWillChange(&other);
     unsigned char tmp[sizeof(theInline)];
     std::memcpy(tmp, theInline, sizeof(theInline));
     std::memcpy(theInline, other.theInline, sizeof(theInline));
