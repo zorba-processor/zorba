@@ -411,6 +411,10 @@ RULE_REWRITE_PRE(EliminateUnusedLetVars)
         var_expr* gVar = ite->second;
         expr* inputExpr = ite->first;
 
+        // The var is now bound by a let clause; its kind must say so
+        // (var_expr::get_domain_expr and codegen go by the kind).
+        gVar->set_kind(var_expr::let_var);
+
         let_clause* letClause = rCtx.theEM->
         create_let_clause(sctx, gVar->get_loc(), gVar, inputExpr);
 
@@ -426,6 +430,8 @@ RULE_REWRITE_PRE(EliminateUnusedLetVars)
       {
         var_expr* ngVar = ite->second;
         expr* inputExpr = ite->first;
+
+        ngVar->set_kind(var_expr::let_var);
 
         let_clause* letClause = rCtx.theEM->
         create_let_clause(sctx, ngVar->get_loc(), ngVar, inputExpr);
