@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <new>
 #include "common/common.h"
 #ifndef ZORBA_NO_XMLSCHEMA
 
@@ -467,6 +468,9 @@ bool XercesParseUtils::parseXSFloat(
       xs_float const n(textValue2);
       return GENV_ITEMFACTORY->createFloat(result, n);
     }
+    catch ( std::bad_alloc const& ) {
+      throw;
+    }
     catch ( std::exception const& ) {
       // ignore
     }
@@ -504,6 +508,9 @@ bool XercesParseUtils::parseXSDouble(
     try {
       xs_double const n(textValue2);
       return factory->createDouble(result, n);
+    }
+    catch ( std::bad_alloc const& ) {
+      throw;
     }
     catch ( std::exception const& ) {
       // ignore

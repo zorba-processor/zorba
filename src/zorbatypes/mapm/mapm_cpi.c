@@ -54,7 +54,6 @@ dplaces = places + 2;
 
 if (dplaces > MM_lc_PI_digits)
   {
-   MM_lc_PI_digits = dplaces + 2;
 
    /* compute PI using the AGM  (see right below) */
 
@@ -62,6 +61,9 @@ if (dplaces > MM_lc_PI_digits)
 
    m_apm_multiply(MM_lc_HALF_PI, MM_0_5, MM_lc_PI);
    m_apm_multiply(MM_lc_2_PI, MM_Two, MM_lc_PI);
+
+   /* Last: a failure above leaves the constants of the precision declared. */
+   MM_lc_PI_digits = dplaces + 2;
   }
 }
 /****************************************************************************/

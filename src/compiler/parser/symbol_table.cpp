@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <new>
 #include "zorbatypes/decimal.h"
 #include "zorbatypes/float.h"
 #include "zorbatypes/integer.h"
@@ -288,6 +289,8 @@ std::string symbol_table::get(off_t id)
   size_t n = heap.get_length0(id);  
   char *buf;
   buf = (char*)malloc(n+1);
+  if (!buf)
+    throw std::bad_alloc();
   heap.get0(id, buf, 0, n+1);
   std::string retstr = string(buf, 0, n);
   free(buf);

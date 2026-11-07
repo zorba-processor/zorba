@@ -83,6 +83,18 @@ public:
   void reg(pragma*);
 
 private:
+  // Room in the registry of the type for one more object, made before the object
+  // is: reg() then cannot throw, and an object that is made is always destroyed.
+  void make_room(expr*);
+  void make_room(flwor_clause*);
+  void make_room(flwor_wincond*);
+  void make_room(catch_clause*);
+  void make_room(copy_clause*);
+  void make_room(pragma*);
+
+public:
+
+private:
   //An ExprManager is the only object to handle a collection of Exprs and
   //the memory in which they recide. Copying it in a senseful way would.
   //require copying all the memory, which is costly and useless.

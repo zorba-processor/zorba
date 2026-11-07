@@ -145,6 +145,7 @@ IF(ZORBA_WITH_UNIT_TESTS)
   ZORBA_GENERATE_EXE(LibUnitTest lib_unit_test.cpp "" "" "")
 
   # ADD NEW UNIT TESTS HERE
+  ZORBA_ADD_TEST("test/libunit/ato" LibUnitTest ato)
   ZORBA_ADD_TEST("test/libunit/base64" LibUnitTest base64)
   ZORBA_ADD_TEST("test/libunit/base64_streambuf" LibUnitTest base64_streambuf)
   # disabled because of bug lp:867271

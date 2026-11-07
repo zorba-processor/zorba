@@ -182,8 +182,6 @@ void	m_apm_get_random(M_APM mrnd)
 
 if (M_firsttime2)         /* use the system time as the initial seed value */
   {
-   M_firsttime2 = FALSE;
-   
    M_rnd_aa = m_apm_init();
    M_rnd_XX = m_apm_init();
    M_rnd_mm = m_apm_init();
@@ -196,6 +194,8 @@ if (M_firsttime2)         /* use the system time as the initial seed value */
    m_apm_set_string(M_rnd_mm, "1.0E15");
 
    M_get_rnd_seed(M_rnd_XX);
+
+   M_firsttime2 = FALSE;
   }
 
 m_apm_multiply(M_rtmp0, M_rnd_XX, M_rnd_aa);

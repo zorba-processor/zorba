@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#include <new>
+#include <vector>
 #include "diagnostics/assert.h"
 #include "system/globalenv.h"
 
@@ -295,6 +297,7 @@ void QNamePool::insert(
     const char* ln)
 {
   QNameItem* qn;
+  QNameItem* fresh = NULL;  // not in the hash table yet
   QNameItem* normVictim = NULL;
   SYNC_CODE(bool haveLock = false;)
   store::Item_t normItem;
@@ -327,7 +330,7 @@ retry:
       if (normalized)
       {
         // Build a new QName (either new object or in cache).
-        qn = cacheInsert(normVictim);
+        fresh = qn = cacheInsert(normVictim);
         qn->initializeAsNormalizedQName(pooledNs, ln);
       }
       else
@@ -342,13 +345,14 @@ retry:
           goto retry;
         }
         // Build a new QName (either new object or in cache).
-        qn = cacheInsert(normVictim);
+        fresh = qn = cacheInsert(normVictim);
         qn->initializeAsUnnormalizedQName(normQName, pre);
       }
 
       bool found;
       entry = theHashSet.hashInsert(qn, hval, found);
       entry->key() = qn;
+      fresh = NULL;
       ZORBA_FATAL(!found, "");
     }
     else
@@ -362,6 +366,20 @@ retry:
 
     SYNC_CODE(theHashSet.theMutex.unlock();\
     haveLock = false;)
+  }
+  catch (std::bad_alloc const&)
+  {
+    QNameItem* freshVictim = NULL;
+    undoCacheInsert(fresh, &freshVictim);
+
+    SYNC_CODE(if (haveLock) \
+      theHashSet.theMutex.unlock();)
+
+    if (normVictim != NULL)
+      normVictim->removeReference();
+    if (freshVictim != NULL)
+      freshVictim->removeReference();
+    throw;
   }
   catch (...)
   {
@@ -391,6 +409,7 @@ void QNamePool::insert(
     const zstring& ln)
 {
   QNameItem* qn = NULL;
+  QNameItem* fresh = NULL;  // not in the hash table yet
   QNameItem* normVictim = NULL;
   SYNC_CODE(bool haveLock = false;)
   store::Item_t normItem;
@@ -422,7 +441,7 @@ retry:
       if (normalized)
       {
         // Build a new QName (either new object or in cache).
-        qn = cacheInsert(normVictim);
+        fresh = qn = cacheInsert(normVictim);
         qn->initializeAsNormalizedQName(pooledNs, ln);
       }
       else
@@ -439,13 +458,14 @@ retry:
           goto retry;
         }
         // Build a new QName (either new object or in cache).
-        qn = cacheInsert(normVictim);
+        fresh = qn = cacheInsert(normVictim);
         qn->initializeAsUnnormalizedQName(normQName, pre);
       }
 
       bool found;
       entry = theHashSet.hashInsert(qn, hval, found);
       entry->key() = qn;
+      fresh = NULL;
       ZORBA_FATAL(!found, "");
     }
     else
@@ -460,6 +480,19 @@ retry:
     SYNC_CODE(theHashSet.theMutex.unlock();\
     haveLock = false;)
   }
+  catch (std::bad_alloc const&)
+  {
+    QNameItem* freshVictim = NULL;
+    undoCacheInsert(fresh, &freshVictim);
+
+    SYNC_CODE(if (haveLock) theHashSet.theMutex.unlock();)
+
+    if (normVictim != NULL)
+      normVictim->removeReference();
+    if (freshVictim != NULL)
+      freshVictim->removeReference();
+    throw;
+  }
   catch (...)
   {
     SYNC_CODE(if (haveLock) theHashSet.theMutex.unlock();)
@@ -472,6 +505,27 @@ retry:
     assert(normVictim->getRefCount() > 0 && normVictim->getRefCount() < 10000);
     normVictim->removeReference();
   }
+}
+
+
+
+/*******************************************************************************
+  An allocation failed between cacheInsert() and the insertion in the hash table:
+  the slot goes back. The caller holds the lock, and removes a reference from the
+  victim after it releases it.
+********************************************************************************/
+void QNamePool::undoCacheInsert(QNameItem* qn, QNameItem** normVictim)
+{
+  if (qn == NULL)
+    return;
+
+  if (qn->isValid())
+    qn->invalidate(true, normVictim);
+
+  if (qn->isInCache())
+    addInFreeList(qn);
+  else
+    delete qn;
 }
 
 
@@ -553,3 +607,62 @@ QNamePool::QNHashEntry* QNamePool::hashFind(
 } // namespace zorba
 
 /* vim:set et sw=2 ts=2: */
+
+namespace zorba { namespace simplestore {
+
+std::size_t QNamePool::tableBytes() const
+{
+  return theHashSet.theHashTab.capacity() * sizeof(QNHashEntry);
+}
+
+void QNamePool::flushUnused()
+{
+  // An unnormalized name holds its normalized one: that one is free only after,
+  // so this runs until a pass drops nothing. As in remove(), the normalized
+  // names are released after the lock, since that can come back to remove().
+  std::vector<QNameItem*> victims;
+  victims.reserve(theCacheSize);   // push_back() cannot throw under the lock
+  for (bool dropped = true; dropped; )
+  {
+    dropped = false;
+    victims.clear();
+    SYNC_CODE(theHashSet.theMutex.lock();)
+    for (csize i = 1; i < theCacheSize; ++i)
+    {
+      QNameItem* qn = &theCache[i];
+      if (!qn->isValid() || qn->getRefCount() != 0)
+        continue;
+      QNameItem* victim = NULL;
+      theHashSet.eraseNoSync(qn, CompareFunction::hash(qn));
+      qn->invalidate(true, &victim);
+      if (victim != NULL)
+        victims.push_back(victim);
+      dropped = true;
+    }
+    SYNC_CODE(theHashSet.theMutex.unlock();)
+    for (QNameItem* victim : victims)
+      victim->removeReference();
+  }
+}
+
+} // namespace simplestore
+} // namespace zorba
+
+/*******************************************************************************
+  A test hook: the bytes of the QName pool's hash table. Its size follows the
+  number of names it holds, cached ones included, by halving and doubling, so a
+  test that compares the memory two calls leave behind subtracts it.
+********************************************************************************/
+extern "C" ZORBA_DLL_PUBLIC std::size_t zorba_test_qname_table_bytes()
+{
+  return GET_STORE().getQNamePool().tableBytes();
+}
+
+/*******************************************************************************
+  A test hook: drops the names no one holds from the QName pool (see
+  QNamePool::flushUnused()).
+********************************************************************************/
+extern "C" ZORBA_DLL_PUBLIC void zorba_test_qname_pool_flush()
+{
+  GET_STORE().getQNamePool().flushUnused();
+}

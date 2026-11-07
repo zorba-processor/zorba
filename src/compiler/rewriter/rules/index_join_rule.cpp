@@ -380,6 +380,13 @@ expr* IndexJoinRule::apply(RewriterContext& rCtx, expr* node, bool& modified)
 ********************************************************************************/
 bool IndexJoinRule::isIndexJoinPredicate(PredicateInfo& predInfo)
 {
+  // The join would evaluate the domain of the inner var and the predicate once,
+  // ahead of the tuples, and a call that can have a side effect, in this body or
+  // in the code that consumes its result lazily, can change what they read
+  // (CompilerCB::theNoHoisting).
+  if (theRCtx->getCompilerCB()->theNoHoisting)
+    return false;
+
   const fo_expr* foExpr = NULL;
   const function* fn;
   const expr* predExpr = predInfo.thePredicate;
@@ -536,6 +543,14 @@ bool IndexJoinRule::isIndexJoinPredicate(PredicateInfo& predInfo)
   // BV anmd OV. The checkVarDeps method finds BV and checks that BV is defined
   // before OV.
   expr* innerDomainExpr = innerVarClause->get_expr();
+
+  // The join evaluates the domain of the inner var once, not once per outer tuple, and
+  // each operand of the predicate once per item, not once per pair: a call that can
+  // give a different result or new nodes per evaluation must not be in them.
+  if (expr_tools::call_results_can_differ(innerDomainExpr) ||
+      expr_tools::call_results_can_differ(predInfo.thePredicate))
+    return false;
+
   csize boundaryVarId = 0;
   if (checkVarDeps(innerDomainExpr, predInfo.theOuterVarId, boundaryVarId))
     return false;

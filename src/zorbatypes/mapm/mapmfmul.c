@@ -317,8 +317,6 @@ int	ii, k, nexp, sign;
 
 if (M_firsttimef)
   {
-   M_firsttimef = FALSE;
-
    for (k=0; k < M_STACK_SIZE; k++)
      mul_stack_data_size[k] = 0;
 
@@ -327,6 +325,8 @@ if (M_firsttimef)
 
    M_ain = m_apm_init();
    M_bin = m_apm_init();
+
+   M_firsttimef = FALSE;
   }
 
 exp_stack_ptr   = -1;

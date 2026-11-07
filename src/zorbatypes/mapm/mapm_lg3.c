@@ -83,13 +83,14 @@
 void	M_check_log_places(int places)
 {
 M_APM   tmp6, tmp7, tmp8, tmp9;
-int     dplaces;
+int     dplaces, digits;
 
 dplaces = places + 4;
 
 if (dplaces > MM_lc_log_digits)
   {
-   MM_lc_log_digits = dplaces + 4;
+   /* Set last: a failure leaves the constants of the precision declared. */
+   digits = dplaces + 4;
    
    tmp6 = M_get_stack_var();
    tmp7 = M_get_stack_var();
@@ -117,6 +118,8 @@ if (dplaces > MM_lc_log_digits)
    m_apm_reciprocal(MM_lc_log10R, dplaces, MM_lc_log10); /* 1 / log(10) */
 
    M_restore_stack(4);
+
+   MM_lc_log_digits = digits;
   }
 }
 /****************************************************************************/

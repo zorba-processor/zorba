@@ -15,6 +15,9 @@
  */
 
 #include <istream>
+#include <iterator>
+#include <sstream>
+#include <string>
 
 #include "compiler/api/compiler_api.h"
 #include "diagnostics/xquery_diagnostics.h"
@@ -170,7 +173,10 @@ parsenode_t XQueryCompiler::parse(std::istream& aXQuery, const zstring& aFileNam
     theCompilerCB->theConfig.parse_cb = print_ast_tree;
   }
 
-  std::stringstream xquery_stream;
+  // The text is copied into a std::string, never through a stream insertion:
+  // a stream that cannot grow only sets a state bit, and a cut text could still
+  // be a valid query. std::bad_alloc goes to the caller.
+  std::string xquery_text;
 
 #ifdef ZORBA_XQUERYX
   char* converted_xquery_str = NULL;
@@ -210,16 +216,31 @@ parsenode_t XQueryCompiler::parse(std::istream& aXQuery, const zstring& aFileNam
 #ifndef NDEBUG
     printf ("\n\n%s", converted_xquery_str);  // debug
 #endif
-    xquery_stream << converted_xquery_str;
+    // Freed right after the copy, also when the copy fails.
+    try
+    {
+      xquery_text = converted_xquery_str;
+    }
+    catch (...)
+    {
+      xqxconvertor->freeResult(converted_xquery_str);
+      converted_xquery_str = NULL;
+      throw;
+    }
+    xqxconvertor->freeResult(converted_xquery_str);
+    converted_xquery_str = NULL;
   }
   else
   {
-    xquery_stream << xquery_str;
+    xquery_text.swap(xquery_str);
   }
 #else // ZORBA_XQUERYX
 
-  xquery_stream << aXQuery.rdbuf();
+  xquery_text.assign(std::istreambuf_iterator<char>(aXQuery),
+                     std::istreambuf_iterator<char>());
 #endif
+
+  std::stringstream xquery_stream(std::move(xquery_text));
 
   theCompilerCB->setPhase(CompilerCB::PARSING);
 
@@ -242,7 +263,7 @@ parsenode_t XQueryCompiler::parse(std::istream& aXQuery, const zstring& aFileNam
   }
 
 #ifdef ZORBA_XQUERYX
-  if (is_xqueryx)
+  if (is_xqueryx && converted_xquery_str != NULL)
   {
     xqxconvertor->freeResult(converted_xquery_str);
   }
@@ -406,6 +427,8 @@ expr* XQueryCompiler::optimize(expr* rootExpr, audit::ScopedRecord& auditRecord)
                 timer);
 
   theCompilerCB->setPhase(CompilerCB::OPTIMIZATION);
+
+  expr_tools::classify_calls(rootExpr);
 
   // Build the call-graph among the udfs that are actually used in the query
   // program.

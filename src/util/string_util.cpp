@@ -16,6 +16,7 @@
 
 #include <cerrno>
 #include <cstdlib>
+#include <limits>
 
 #include <zorba/internal/cxx_util.h>
 
@@ -139,19 +140,27 @@ long long atoll( char const *buf, char const *end, char const **last ) {
         s0 = ++s;
         break;
     }
+    //
+    // Accumulate the magnitude as unsigned and test before multiplying and
+    // adding: signed overflow is undefined behavior, so it cannot be detected
+    // afterwards.  The magnitude of the minimum is one more than the maximum.
+    //
+    unsigned long long const limit = minus ?
+      static_cast<unsigned long long>( std::numeric_limits<long long>::max() ) + 1 :
+      static_cast<unsigned long long>( std::numeric_limits<long long>::max() );
+    unsigned long long u = 0;
     for ( ; s < end && ascii::is_digit( *s ); ++s ) {
-      long long const n_prev = n;
-      n *= 10;
-      if ( n / 10 != n_prev ) // see <http://stackoverflow.com/q/199333/99089>
+      unsigned const digit = *s - '0';
+      if ( u > (limit - digit) / 10 )
         throw_range_error( buf, end );
-      n += *s - '0';
-      if ( n < n_prev )
-        throw_range_error( buf, end );
+      u = u * 10 + digit;
     }
     if ( s == s0 )
       s = buf;
     else if ( minus )
-      n = -n;
+      n = u ? -static_cast<long long>( u - 1 ) - 1 : 0;
+    else
+      n = static_cast<long long>( u );
   }
 
   *last = s;

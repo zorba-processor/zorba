@@ -59,6 +59,11 @@ protected:
   flwor_expr           * theFlwor;
   std::vector<expr**>    theRefs;
 
+  // Whether theFlwor has an unproven call (expr_tools::calls_unproven_function()):
+  // -1 until it is needed, once per application of the rule. Folding and removing
+  // clauses only move or drop exprs of the flwor, so a true answer stays safe.
+  int                    theFlworCallsUnproven;
+
   /*
    * The maximum size (1+subexpressions) a FLWR expression is allowed to increase
    * as an effect of a variable folding.
@@ -75,7 +80,8 @@ public:
   EliminateUnusedLetVars()
     :
     PrePostRewriteRule(RewriteRule::EliminateUnusedLetVars, "EliminateUnusedLetVars"),
-    theFlwor(NULL)
+    theFlwor(NULL),
+    theFlworCallsUnproven(-1)
   {
     theRefs.reserve(32);
   }
@@ -84,6 +90,8 @@ protected:
   expr* rewritePre(expr* node, RewriterContext& rCtx);
 
   expr* rewritePost(expr* node, RewriterContext& rCtx);
+
+  bool flwor_calls_unproven_function();
 
   bool safe_to_fold_var(csize varPos, int& numRefs);
 

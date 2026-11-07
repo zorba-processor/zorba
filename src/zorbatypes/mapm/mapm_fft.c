@@ -129,20 +129,23 @@ unsigned long   ul;
 
 if (M_size < 0)                  /* if first time in, setup working arrays */
   {
-   if (M_get_sizeof_int() == 2)  /* if still using 16 bit compilers */
-     M_size = 516;
-   else
-     M_size = 8200;
+   i = M_get_sizeof_int() == 2 ? 516   /* if still using 16 bit compilers */
+                               : 8200;
 
-   M_aa_array = (double *)MAPM_MALLOC(M_size * sizeof(double));
-   M_bb_array = (double *)MAPM_MALLOC(M_size * sizeof(double));
+   M_aa_array = (double *)MAPM_MALLOC(i * sizeof(double));
+   M_bb_array = (double *)MAPM_MALLOC(i * sizeof(double));
    
    if ((M_aa_array == NULL) || (M_bb_array == NULL))
      {
+      MAPM_FREE(M_aa_array);
+      MAPM_FREE(M_bb_array);
+
       /* fatal, this does not return */
 
       M_apm_log_error_msg(M_APM_FATAL, M_fft_error_msg);
      }
+
+   M_size = i;
   }
 
 nn  = nbytes;
@@ -157,6 +160,9 @@ if (nn > M_size)
    
    if ((a == NULL) || (b == NULL))
      {
+      MAPM_FREE(a);
+      MAPM_FREE(b);
+
       /* fatal, this does not return */
 
       M_apm_log_error_msg(M_APM_FATAL, M_fft_error_msg);

@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <new>
 #include "util/fx/fxcharheap.h"
 
   #include <sys/types.h>
@@ -137,6 +138,8 @@ off_t fxcharheap::put(    // return the target offset
     while (id+len+1 > fxary_p->get_eofoff()) expand();
     memcpy(&data[id], &buf[start_offset], len);
     data[id+len] = 0;
+  } catch (std::bad_alloc const&) {
+    throw;
   } catch (...) {
     ioexception("exception in expanding before put()");
   }

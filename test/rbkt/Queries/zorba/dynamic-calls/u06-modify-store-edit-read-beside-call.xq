@@ -1,0 +1,11 @@
+(: dml:edit in the modify clause of a transform, in a function called through a function item, changes a node of a collection. The target of a collection update is never a node created by the copy clause, so the copy modify expressions raise XUDY0014 (XQuery Update Facility 3.0) at every optimization level, before any call or read; the first is the one that initializes $created. The query has no statement (a statement is applied as an update, which already counts as a side effect). Each transform returns $c[false()], an empty sequence: a return clause of () trips an assertion on the scripting kind in debug builds. $n is a for variable, which is not folded into its use, and the count of its children next to the call reads them per tuple. :)
+import module namespace e = "http://zorba.io/tests/dynamic-calls-index" at "e16-index-probe.xqlib";
+import module namespace ddl = "http://zorba.io/modules/store/static/collections/ddl";
+import module namespace dml = "http://zorba.io/modules/store/static/collections/dml";
+declare function local:grow($k) { copy $c := <x/> modify dml:edit(dml:collection(xs:QName("e:foo"))[1], <a id="1">{for $j in 1 to $k return <b/>}</a>) return $c[false()] };
+declare variable $f := local:grow#1;
+declare variable $created := copy $c := <x/> modify ddl:create(xs:QName("e:foo")) return $c[false()];
+declare variable $inserted := copy $c := <x/> modify dml:insert(xs:QName("e:foo"), <a id="1"/>) return $c[false()];
+$created, $inserted,
+for $n in dml:collection(xs:QName("e:foo"))
+return for $i in 1 to 3 return ($f($i), count($n/b))

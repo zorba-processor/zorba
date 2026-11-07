@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <new>
 #include "file.h"
 
 // standard
@@ -135,6 +136,9 @@ CopyFileImplFunction::evaluate(
       fout.write( buf, fin->gcount() );
     }  
   }
+  catch ( std::bad_alloc const& ) {
+    throw;
+  }
   catch ( std::exception const &e ) {
     throw raiseFileError( "FOFL9999", e.what(), src_path );
   }
@@ -161,6 +165,9 @@ CreateDirectoryFunction::evaluate(
   if ( !fs_type ) {
     try {
       fs::mkdir( path, true );
+    }
+    catch ( std::bad_alloc const& ) {
+      throw;
     }
     catch ( std::exception const &e ) {
       throw raiseFileError( "FOFL9999", e.what(), path );
@@ -195,6 +202,9 @@ DeleteFileImplFunction::evaluate(
 
   try {
     fs::remove( path );
+  }
+  catch ( std::bad_alloc const& ) {
+    throw;
   }
   catch ( std::exception const &e ) {
     throw raiseFileError( "FOFL9999", e.what(), path );
@@ -373,6 +383,9 @@ LastModifiedFunction::evaluate(
       )
     );
   }
+  catch ( std::bad_alloc const& ) {
+    throw;
+  }
   catch ( std::exception const &e ) {
     throw raiseFileError( "FOFL9999", e.what(), path );
   }
@@ -416,6 +429,9 @@ ListFunction::evaluate(
     return ItemSequence_t(
       new IteratorBackedItemSequence( path, module_->getItemFactory() )
     );
+  }
+  catch ( std::bad_alloc const& ) {
+    throw;
   }
   catch ( std::exception const &e ) {
     throw raiseFileError( "FOFL9999", e.what(), path );
@@ -496,6 +512,9 @@ ReadBinaryFunction::evaluate(
     (void)pin.release(); // owned by the streamable item now
     return ItemSequence_t( new SingletonItemSequence( item ) );
   }
+  catch ( std::bad_alloc const& ) {
+    throw;
+  }
   catch ( std::exception const &e ) {
     throw raiseFileError( "FOFL9999", e.what(), path );
   }
@@ -536,6 +555,9 @@ ReadTextFunction::evaluate(
   if ( transcoding ) {
     try {
       transcode::attach( *pin, lEncoding.c_str() );
+    }
+    catch ( std::bad_alloc const& ) {
+      throw;
     }
     catch ( std::exception const &e ) {
       throw raiseFileError("FOFL0006", e.what(), lEncoding.c_str() );

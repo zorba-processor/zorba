@@ -135,7 +135,8 @@ forlet_clause::forlet_clause(
   thePosVarExpr(posVarExpr),
   theScoreVarExpr(scoreVarExpr),
   theAllowingEmpty(isAllowingEmpty),
-  theLazyEval(lazy)
+  theLazyEval(lazy),
+  theBindingSequence(BINDING_SEQUENCE_UNKNOWN)
 {
   if (thePosVarExpr != NULL)
     thePosVarExpr->set_flwor_clause(this);
@@ -267,13 +268,15 @@ flwor_clause* forlet_clause::clone(user_function* udf, expr::substitution_t& sub
 
   if (theKind == flwor_clause::for_clause)
   {
-    return theCCB->theEM->create_for_clause(theContext,
-                                            get_loc(),
-                                            varCopy,
-                                            domainCopy,
-                                            posvarCopy,
-                                            scorevarCopy,
-                                            theAllowingEmpty);
+    forlet_clause* copy = theCCB->theEM->create_for_clause(theContext,
+                                                           get_loc(),
+                                                           varCopy,
+                                                           domainCopy,
+                                                           posvarCopy,
+                                                           scorevarCopy,
+                                                           theAllowingEmpty);
+    copy->theBindingSequence = theBindingSequence;
+    return copy;
   }
   else
   {

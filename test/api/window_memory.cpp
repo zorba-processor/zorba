@@ -48,6 +48,16 @@ using namespace zorba;
 # endif
 #endif
 
+// Length of the loops with a dynamic call. Off sanitizers, a materialized loop of
+// this length is far above the 64 MiB bound. Under a sanitizer the bound is not
+// checked, and the loop is shorter so that the result check stays well inside the
+// query timeout (each node costs several allocations through ASan's allocator).
+#ifdef ZORBA_TEST_SANITIZER
+# define LOOP_LENGTH "500000"
+#else
+# define LOOP_LENGTH "5000000"
+#endif
+
 namespace {
 
 int theFailures = 0;
@@ -120,6 +130,26 @@ const Case BOUNDED[] =
     "      only end at $e when $e - $s eq 9\n"
     "    return count($w))",
     "199910" },
+  { "sliding over 10 items, a dynamic call in a query with no side effect",
+    "declare function local:inc($x) { $x + 1 };\n"
+    "declare variable $fs := (local:inc#1, local:inc#1);\n"
+    "sum(for sliding window $w in local:d()\n"
+    "      start at $s when true\n"
+    "      only end at $e when $e - $s eq 9\n"
+    "    return $fs[1](count($w)))",
+    "219901" },
+  // Dynamic calls in a query with no side effect stay lazy: a materialized loop
+  // holds LOOP_LENGTH tuples, or LOOP_LENGTH nodes.
+  { "first of a loop with a dynamic call",
+    "declare function local:id($x) { $x };\n"
+    "declare variable $fs := (local:id#1, local:id#1);\n"
+    "(for $i in 1 to " LOOP_LENGTH " return $fs[1]($i))[1]",
+    "1" },
+  { "loop over constructed nodes with a dynamic call",
+    "declare function local:id($x) { $x };\n"
+    "declare variable $fs := (local:id#1, local:id#1);\n"
+    "count(for $i in 1 to " LOOP_LENGTH " let $n := <n/> return $fs[1]($n))",
+    LOOP_LENGTH },
   { "sliding over 10 items, end on the current item",
     "sum(for sliding window $w in local:d()\n"
     "      start at $s when $s mod 10 eq 1\n"

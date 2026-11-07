@@ -45,6 +45,11 @@ protected:
 
   friend class ParseNodePrintXMLVisitor;
 
+private:
+  // The next node waiting to be destroyed by free(): the queue allocates nothing,
+  // since free() runs in destructors.
+  parsenode* theNextPending = nullptr;
+
 public:
   parsenode(const QueryLoc& loc_) : loc(loc_) { }
   virtual ~parsenode() {}

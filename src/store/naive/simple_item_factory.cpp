@@ -170,8 +170,9 @@ bool BasicItemFactory::createStreamableString(
     char const *uri,
     bool seekable) 
 {
-  result = new StreamableStringItem(store::XS_STRING, stream, streamReleaser, seekable);
+  // First: if this cannot allocate, the stream is still the caller's.
   set_uri( stream, uri );
+  result = new StreamableStringItem(store::XS_STRING, stream, streamReleaser, seekable);
   return true;
 }
 

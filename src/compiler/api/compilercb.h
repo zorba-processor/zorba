@@ -290,6 +290,25 @@ ZORBA_DLL_PUBLIC void query_resources_fail_walk(unsigned long edge);
   ---------------------------
   The same, for the query that runs this one through eval.
 
+  theFunctionPurity :
+  -------------------
+  What the walk of expr_tools::calls_unproven_function() found for each function so
+  far: [0] whether it makes an unproven call, [1] whether it has any impurity.
+  Compile time only: not serialized.
+
+  theCallEffects :
+  ----------------
+  What a dynamic function call can do in this query, set by
+  expr_tools::classify_calls(). Until then, and in an eval query, it can have effects.
+  Compile time only: not serialized.
+
+  theNoHoisting :
+  ---------------
+  Set by expr_tools::classify_calls(): CALLS_HAVE_EFFECTS, and a call that the
+  compiler cannot prove free of side effects is reachable somewhere in the query.
+  Then no body of the query is hoisted, and no index join is made. True until
+  then. Compile time only: not serialized.
+
   theHasEval :
   ------------
   True if there is an eval expr within the compilation unit covered by this CCB.
@@ -409,6 +428,18 @@ public:
 
   typedef std::map<csize, static_context_t> SctxMap;
 
+  typedef std::map<const function*, bool> FunctionPurityMap;
+
+  enum CallEffects
+  {
+    // Something with a side effect, or code the compiler cannot see, is reachable.
+    CALLS_HAVE_EFFECTS,
+    // No side effect, but a nondeterministic function or a constructor is reachable.
+    CALLS_RESULTS_CAN_DIFFER,
+    // Neither, or no dynamic call: a call is an ordinary pure expression.
+    CALLS_ARE_PURE
+  };
+
   typedef std::multimap<const expr*, pragma*>  PragmaMap;
 
   typedef PragmaMap::const_iterator PragmaMapIter;
@@ -441,6 +472,12 @@ public:
   bool                      theMayRunSideEffects;
 
   bool                      theMayRunSideEffectsOrUpdates;
+
+  FunctionPurityMap         theFunctionPurity[2];
+
+  CallEffects               theCallEffects = CALLS_HAVE_EFFECTS;
+
+  bool                      theNoHoisting = true;
 
   bool                      theHaveTimeout;
 

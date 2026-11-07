@@ -18,6 +18,7 @@
 #include "query_primer.h"
 
 #include <algorithm>
+#include <iterator>
 #include <cstring>
 #include <exception>
 #include <filesystem>
@@ -29,6 +30,9 @@
 #include <streambuf>
 #include <utility>
 
+#include <libxml/parser.h>
+
+#include <zorba/user_exception.h>
 #include <zorba/diagnostic.h>
 #include <zorba/dynamic_context.h>
 #include <zorba/item.h>
@@ -48,6 +52,8 @@ namespace mcp {
 
 char const protocol_version[] = "2026-07-28";
 
+std::size_t const max_message_size = 4 * 1024 * 1024;
+
 char const *const legacy_protocol_versions[] = {
   "2025-11-25", "2025-06-18", "2025-03-26", nullptr
 };
@@ -62,8 +68,6 @@ int const METHOD_NOT_FOUND = -32601;
 int const INVALID_PARAMS = -32602;
 int const UNSUPPORTED_PROTOCOL_VERSION = -32022;
 
-// Larger messages are refused before parsing.
-std::size_t const max_message_size = 4 * 1024 * 1024;
 
 char const meta_version[] = "io.modelcontextprotocol/protocolVersion";
 char const meta_capabilities[] = "io.modelcontextprotocol/clientCapabilities";
@@ -136,9 +140,11 @@ protected:
     if ( n <= 0 )
       return 0;
     std::size_t const len = static_cast<std::size_t>( n );
-    theTotal += len;
+    // Counted after the append: an append that cannot allocate is not output
+    // beyond the limit (and std::bad_alloc reaches the caller, see run()).
     if ( theData.size() < theCap )
       theData.append( s, std::min( len, theCap - theData.size() ) );
+    theTotal += len;
     return n;
   }
 
@@ -401,6 +407,9 @@ Server::Server( Zorba *zorba, ServerConfig config, std::ostream &log ) :
   theCache( zorba, theConfig.root,
             std::uintmax_t( theConfig.cache_max_file_kb ) * 1024,
             theConfig.cache_max_files, &thePolicy, base_uri_of( theConfig.root ) ) {
+  // libxml2 ends the process if it cannot allocate its state for a thread, the
+  // first time the thread uses it: this thread does so now, before any query.
+  xmlDictFree( xmlDictCreate() );
   directory_config::apply_policy( thePolicy, theConfig.root );
   if ( theConfig.timeout.count() > 0 )
     thePolicy.setTimeout( theConfig.timeout );
@@ -475,8 +484,6 @@ bool Server::load_predefined( std::string const &path,
     return false;
   }
   std::ifstream in( path.c_str(), std::ios::binary );
-  std::stringstream buf;
-  buf << in.rdbuf();
   if ( !in ) {
     theLog << server_name << ": skipping " << path << ": cannot read it"
            << std::endl;
@@ -485,7 +492,10 @@ bool Server::load_predefined( std::string const &path,
   Predefined p;
   p.name = name;
   p.path = path;
-  p.source = buf.str();
+  // Not a stream insertion, which leaves a shorter text when it cannot grow:
+  // std::bad_alloc goes to the caller.
+  p.source.assign( std::istreambuf_iterator<char>( in ),
+                   std::istreambuf_iterator<char>() );
   p.description = leading_comment( p.source );
   if ( p.description.empty() )
     p.description = "Runs the predefined query " +
@@ -670,7 +680,12 @@ Server::run( std::string const &source, std::string const &file_name,
     Zorba_SerializerOptions opts;
     opts.set( directory_config::serialization_params() );
     CappedBuf buf( theConfig.max_output );
+    if ( theConfig.before_execute )
+      theConfig.before_execute();
     std::ostream out( &buf );
+    // An exception from the buffer (std::bad_alloc) goes through the stream to
+    // here, instead of a bad stream and a shorter output reported as truncated.
+    out.exceptions( std::ios::badbit );
     query->execute( out, &opts );
     query->close();
 
@@ -686,8 +701,10 @@ Server::run( std::string const &source, std::string const &file_name,
   }
   // The query is gone by now, and with it the memory it used.
   catch ( ZorbaException const &e ) {
-    // Zorba reports std::bad_alloc as an internal error.
-    if ( std::strcmp( e.diagnostic().qname().localname(), "ZXQP0003" ) == 0 &&
+    // Zorba reports std::bad_alloc as an internal error; fn:error() can raise
+    // that code too, as a UserException.
+    if ( !dynamic_cast<UserException const*>( &e ) &&
+         std::strcmp( e.diagnostic().qname().localname(), "ZXQP0003" ) == 0 &&
          std::strstr( e.what(), "bad_alloc" ) )
       outcome.text = out_of_memory_text( theConfig.max_memory );
     else
@@ -818,36 +835,89 @@ Json Server::call_tool( Json const &params, bool *protocol_error,
 
 std::string Server::handle( std::string const &message ) {
   Json request_id;
+  theCurrentId = "null";
+  theCurrentKind = MessageKind::unknown;
   try {
     return handle_message( message, &request_id );
   }
   catch ( std::exception const &e ) {
     // Whatever it was (out of memory, most likely), the next request may work.
+    // If it came before or while the id was read, the message is read once more
+    // for it: the memory of the first attempt is back by now.
+    if ( theCurrentKind == MessageKind::unknown ||
+         theCurrentKind == MessageKind::id_lost ) {
+      try {
+        Json msg;
+        std::string why;
+        if ( message.size() <= max_message_size &&
+             parse_json( message, &msg, &why ) && msg.is_object() )
+          identify( msg, &request_id );
+        else
+          theCurrentKind = MessageKind::without_id;
+      }
+      catch ( std::bad_alloc const& ) {
+        theCurrentKind = MessageKind::id_lost;
+      }
+    }
+    if ( theCurrentKind == MessageKind::notification )
+      return std::string();
+    // An id that could not be read is null in the response (JSON-RPC 2.0, section
+    // 5); theCurrentId is still "null" then.
+    if ( theCurrentKind == MessageKind::id_lost ||
+         theCurrentKind == MessageKind::unknown )
+      request_id = Json();
     return error_response( request_id, INTERNAL_ERROR,
       std::string( "Internal error: " ) + e.what() ).dump();
   }
 }
 
+void Server::identify( Json const &msg, Json *request_id ) {
+  Json const *const id = msg.find( "id" );
+  if ( !id ) {
+    // A notification, or a response from the client: never answered.
+    theCurrentKind = MessageKind::notification;
+    return;
+  }
+  if ( !id->is_string() && !id->is_integer() ) {
+    theCurrentKind = MessageKind::without_id;
+    return;
+  }
+  theCurrentKind = MessageKind::id_lost;   // until the id is copied
+  *request_id = *id;
+  theCurrentId = id->dump();
+  theCurrentKind = MessageKind::request;
+}
+
+Server::AfterFailure Server::after_failure() const {
+  return theCurrentKind == MessageKind::notification ? AfterFailure::nothing
+                                                     : AfterFailure::answer;
+}
+
 std::string Server::handle_message( std::string const &message,
                                     Json *request_id ) {
   Json const null_id;
-  if ( message.size() > max_message_size )
+  if ( message.size() > max_message_size ) {
+    theCurrentKind = MessageKind::without_id;
     return error_response( null_id, INVALID_REQUEST,
                            "Invalid Request: message too large" ).dump();
+  }
 
   Json msg;
   std::string why;
-  if ( !parse_json( message, &msg, &why ) )
+  if ( !parse_json( message, &msg, &why ) ) {
+    theCurrentKind = MessageKind::without_id;
     return error_response( null_id, PARSE_ERROR, "Parse error: " + why ).dump();
-  if ( !msg.is_object() )
+  }
+  if ( !msg.is_object() ) {
+    theCurrentKind = MessageKind::without_id;
     return error_response( null_id, INVALID_REQUEST,
       "Invalid Request: expected a JSON-RPC object (batches are not "
       "supported)" ).dump();
+  }
 
+  identify( msg, request_id );
   Json const *const id = msg.find( "id" );
   Json const *const method = msg.find( "method" );
-  if ( id && ( id->is_string() || id->is_integer() ) )
-    *request_id = *id;
   if ( !method ) {
     // A response from the client (we send no requests): nothing to answer.
     if ( !id || msg.find( "result" ) || msg.find( "error" ) )

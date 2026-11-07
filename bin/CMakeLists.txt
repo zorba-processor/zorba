@@ -548,7 +548,23 @@ IF (ZORBA_WITH_FILE_ACCESS)
              error_query_line error_help ${_mcp_xml_tests}
              error_cached_denial
              hints_nodes hints_names deep_json deep_json_binary
-             entity_expansion case_paths html_edge_cases memory_limit language
+             entity_expansion case_paths html_edge_cases memory_limit
+             exhaust_at_start exhaust_sweep_compile exhaust_sweep_builtins
+             exhaust_sweep_matcher exhaust_sweep_query_text
+             exhaust_sweep_streamable_text exhaust_base64_stream
+             exhaust_seekable_stream
+             exhaust_sweep_xml
+             exhaust_sweep_fragment
+             exhaust_sweep_html exhaust_sweep_json exhaust_sweep_csv
+             exhaust_sweep_casts exhaust_sweep_decimal_thread exhaust_sweep_cache
+             exhaust_cache_after_failure exhaust_user_error exhaust_long_line
+             exhaust_notification exhaust_request_id
+             exhaust_stack_limit exhaust_generated exhaust_json exhaust_json_array exhaust_csv
+             exhaust_xml exhaust_strings exhaust_numbers exhaust_try
+             exhaust_injected_generated exhaust_injected_json
+             exhaust_injected_json_array exhaust_injected_csv exhaust_injected_xml
+             exhaust_injected_strings exhaust_injected_numbers exhaust_injected_try
+             language
              language_binary no_write read_functions native_import reflection_random
              cache_hit cache_invalidate cache_evict cache_off cache_policy
              cache_inject cache_size cache_default cache_abort cache_errors
@@ -573,6 +589,31 @@ IF (ZORBA_WITH_FILE_ACCESS)
       COMMAND "$<TARGET_FILE:zorba_mcp${_mcp_suffix}>" --help)
     SET_TESTS_PROPERTIES (bin/mcp/language_help PROPERTIES
       PASS_REGULAR_EXPRESSION "A [.]jq\n *file is JSONiq unless it declares xquery version;\n *[.]xq files are not loaded.*in this order: [(]1[)] a jsoniq\n *version or xquery version declaration at the very\n *start of the query [(]one preceded by a comment is\n *not detected[)]; [(]2[)] for a file, its extension [(][.]jq\n *is JSONiq[)]; [(]3[)] this option[.] jsoniq also\n *puts a JSONiq primer in the run_query description,\n *and a pointer to it in the server instructions")
+
+    # The queries of these tests take most of the address-space limit: one at a
+    # time, and with time for the session after each of them.
+    FOREACH (_t exhaust_generated exhaust_json exhaust_json_array exhaust_csv
+                exhaust_xml exhaust_strings exhaust_numbers exhaust_try)
+      SET_TESTS_PROPERTIES (bin/mcp/${_t} PROPERTIES
+        RESOURCE_LOCK mcp_memory_exhaustion TIMEOUT 400)
+    ENDFOREACH (_t)
+    SET_TESTS_PROPERTIES (bin/mcp/exhaust_cache_after_failure PROPERTIES
+      RESOURCE_LOCK mcp_memory_exhaustion TIMEOUT 400)
+    FOREACH (_t compile builtins query_text streamable_text xml fragment html
+                json csv casts decimal_thread
+                cache)
+      SET_TESTS_PROPERTIES (bin/mcp/exhaust_sweep_${_t} PROPERTIES
+        RESOURCE_LOCK mcp_memory_exhaustion TIMEOUT 400)
+    ENDFOREACH (_t)
+    FOREACH (_t generated json json_array csv xml strings numbers try)
+      SET_TESTS_PROPERTIES (bin/mcp/exhaust_injected_${_t} PROPERTIES TIMEOUT 400)
+    ENDFOREACH (_t)
+
+    # The help states what happens when memory runs out.
+    ADD_TEST (NAME bin/mcp/max_memory_help
+      COMMAND "$<TARGET_FILE:zorba_mcp${_mcp_suffix}>" --help)
+    SET_TESTS_PROPERTIES (bin/mcp/max_memory_help PROPERTIES
+      PASS_REGULAR_EXPRESSION "fails with the tool error memory_limit, and the\n *server answers the next call[.] A notification gets\n *no response when it can be recognized as one; while\n *the message cannot be parsed, the error has .id.:\n *null[.] If memory runs\n *out where that cannot be done, for example while the\n *server starts, it exits with status 3 and a message\n *on stderr, with no response to the call[.] Libraries\n *end it in other ways: abort, with a core file if\n *the system keeps them [(]Xerces-C releasing a schema;\n *libxml2 or glibc on the first use by a thread,\n *glibc also with SIGSEGV[)];\n *SIGSEGV [(]ICU compiling a regular expression; rarely\n *while a query compiles, or near the end of a\n *dir:open call[)]; status 2 [(]the query scanner, while\n *a query compiles[)]")
 
     # A --language value other than xquery and jsoniq is refused.
     ADD_TEST (NAME bin/mcp/language_invalid
