@@ -7,5 +7,5 @@ let $frag := concat('<?xml encoding="UTF-7"?><a>',
                     string-join(for $i in 1 to 3000 return '<b/>', ''),
                     '<c>~</c></a>')
 return
-  try { exists(fn:parse-xml-fragment($frag)) }
+  try { count(fn:parse-xml-fragment($frag)/a/*) eq 3001 }
   catch err:FODC0006 { not(contains($err:description, "assertion failed")) }
