@@ -888,7 +888,7 @@ static_context::~static_context()
   for (std::vector<internal::URIMapper*>::const_iterator mapper =
          theURIMappers.begin();
        mapper != theURIMappers.end(); mapper++) {
-      delete *mapper;
+    delete *mapper;
   }
   for (std::vector<internal::URLResolver*>::const_iterator resolver =
          theURLResolvers.begin();
@@ -5043,11 +5043,6 @@ std::string static_context::toString()
 }
 #endif
 
-
-[[maybe_unused]] static void owning_memory_probe_cpp() {
-  int* p = new int(0);
-  delete p;
-}
 
 } // namespace zorba
 /* vim:set et sw=2 ts=2: */
