@@ -301,9 +301,9 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
   a file as `path` gives, unchanged. ([#168](https://github.com/zorba-processor/zorba/pull/168))
 - A sliding window clause reads its input as it goes and releases the items that no
   open window can reach, as a tumbling window clause already did, in a query where no
-  side effect can run: a sequential expression or function, a dynamic function call, a
-  built-in function that takes a function, or eval keep the input of sliding windows in
-  memory, as before. An error in the input now surfaces when the clause reaches it, after
+  side effect can run: a sequential expression or function or eval keep the input of
+  sliding windows in memory, as before. For a dynamic function call or a built-in
+  function that takes a function, see the sliding window entry under Fixed. An error in the input now surfaces when the clause reaches it, after
   any windows returned before it. ([#169](https://github.com/zorba-processor/zorba/pull/169))
 - A window clause releases the items before and between windows while it reads them,
   and keeps no items for open windows if the query refers to neither the window
