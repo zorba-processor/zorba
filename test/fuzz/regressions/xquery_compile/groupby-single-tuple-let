@@ -1,0 +1,7 @@
+declare variable $d external;
+for $p in $d
+return
+  let $c := $p/c
+  group by $c
+  order by $c
+  return <c n="{$c}">{ $p/n }</c>

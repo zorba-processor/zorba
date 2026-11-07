@@ -256,12 +256,18 @@ expr* var_expr::get_domain_expr() const
     }
     else if (theVarKind == groupby_var)
     {
-      return reinterpret_cast<groupby_clause*>(theFlworClause)->
+      // A rewrite that moves the var to another kind of clause must change
+      // its kind too.
+      ZORBA_ASSERT(theFlworClause->get_kind() == flwor_clause::groupby_clause);
+
+      return static_cast<groupby_clause*>(theFlworClause)->
              get_input_for_group_var(this);
     }
     else if (theVarKind == non_groupby_var)
     {
-      return reinterpret_cast<groupby_clause*>(theFlworClause)->
+      ZORBA_ASSERT(theFlworClause->get_kind() == flwor_clause::groupby_clause);
+
+      return static_cast<groupby_clause*>(theFlworClause)->
              get_input_for_nongroup_var(this);
     }
   }
