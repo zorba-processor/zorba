@@ -65,6 +65,18 @@ void smart_owners(std::vector<zorba::rchandle<Node>>& v, bool flag) {
   (void)a; (void)b; (void)d; (void)e; (void)f; (void)g; (void)i; (void)j;
 }
 
+// The store's item handle (store::Item_t is an ItemHandle<Item>).
+zorba::store::ItemHandle<Node> make_item() { return new Node; }
+
+void item_handles() {
+  zorba::store::ItemHandle<Node> a(new Node);
+  zorba::store::ItemHandle<Node> b = new Node;
+  b = new Node;
+  std::vector<zorba::store::ItemHandle<Node>> v;
+  v.push_back(new Node);
+  v.emplace_back(new Node);
+}
+
 // A class derived from a smart pointer.
 struct NodeHandle : zorba::rchandle<Node> {
   using zorba::rchandle<Node>::rchandle;

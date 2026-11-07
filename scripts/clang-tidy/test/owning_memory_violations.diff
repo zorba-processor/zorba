@@ -9,8 +9,8 @@ diff --git a/scripts/clang-tidy/test/owning_memory_violations.cpp b/scripts/clan
 @@ -29 +29 @@
 -Plain* make_raw() { return nullptr; }
 +Plain* make_raw() { return new Plain; } // VIOLATION
-@@ -38 +37,0 @@
--    delete theRaw; // VIOLATION
+@@ -36 +35,0 @@
+-  Holder() : theRaw(new Plain), theArray(new int[8]) {} // VIOLATION
 @@ -51,0 +52,2 @@
 +  Plain* a = new Plain; // VIOLATION
 +  Plain* b;

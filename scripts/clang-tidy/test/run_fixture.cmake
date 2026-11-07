@@ -20,11 +20,14 @@
 #
 # DIFF sets the check's DiffFile option (a "git diff -U0" output); EXPECTED
 # (a list of line numbers, "-" for none) then replaces the marked lines as
-# the expected set.
+# the expected set. MARKERS names the file whose lines are compared (default
+# FIXTURE; a header the fixture includes) and HEADER_FILTER the
+# HeaderFilterRegex (default: none; CI uses '.*').
 #
 #   cmake -DCLANG_TIDY=<clang-tidy> -DPLUGIN=<module> -DCHECK=<name>
 #         -DFIXTURE=<file.cpp> [-DSYSROOT=<sysroot>]
-#         [-DDIFF=<file.diff> -DEXPECTED=<line,...>]
+#         [-DDIFF=<file.diff>] [-DEXPECTED=<line,...>]
+#         [-DMARKERS=<file>] [-DHEADER_FILTER=<regex>]
 #         -P run_fixture.cmake
 
 foreach(var CLANG_TIDY PLUGIN CHECK FIXTURE)
@@ -34,7 +37,10 @@ foreach(var CLANG_TIDY PLUGIN CHECK FIXTURE)
 endforeach()
 
 get_filename_component(fixture_dir "${FIXTURE}" DIRECTORY)
-get_filename_component(fixture_name "${FIXTURE}" NAME)
+if(NOT MARKERS)
+  set(MARKERS "${FIXTURE}")
+endif()
+get_filename_component(fixture_name "${MARKERS}" NAME)
 
 set(extra_args)
 if(SYSROOT)
@@ -48,7 +54,7 @@ endif()
 
 execute_process(
   COMMAND "${CLANG_TIDY}" "-load=${PLUGIN}"
-    "--config={Checks: '-*,${CHECK}', WarningsAsErrors: '*', HeaderFilterRegex: ''${check_options}}"
+    "--config={Checks: '-*,${CHECK}', WarningsAsErrors: '*', HeaderFilterRegex: '${HEADER_FILTER}'${check_options}}"
     "${FIXTURE}" -- -std=c++23 "-I${fixture_dir}" ${extra_args}
   RESULT_VARIABLE rc
   OUTPUT_VARIABLE out
@@ -76,7 +82,7 @@ if(DEFINED EXPECTED)
   string(REPLACE "," ";" expected "${EXPECTED}")
   list(REMOVE_ITEM expected "-")
 else()
-  file(STRINGS "${FIXTURE}" fixture_lines)
+  file(STRINGS "${MARKERS}" fixture_lines)
   set(n 0)
   foreach(line IN LISTS fixture_lines)
     math(EXPR n "${n} + 1")

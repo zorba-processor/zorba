@@ -24,6 +24,7 @@
 #define ZORBA_CLANG_TIDY_OWNING_MEMORY_MOCKS_H
 
 #include <cstddef>
+#include <map>
 #include <memory>
 #include <new>
 #include <vector>
@@ -46,6 +47,7 @@ public:
   rchandle& operator=(const T* rhs) { p = const_cast<T*>(rhs); return *this; }
   rchandle& operator=(rchandle const& rhs) { p = rhs.p; return *this; }
   T* getp() const { return p; }
+  bool operator<(const rchandle& h) const { return p < h.p; }
 };
 
 template<class T> class const_rchandle : protected rchandle<T> {
@@ -59,6 +61,24 @@ public:
   SmartPtr(T* ptr = nullptr) : p(ptr) {}
   SmartPtr& operator=(T* rhs) { p = rhs; return *this; }
 };
+
+namespace store {
+
+// src/store/api/item_handle.h: the handle store::Item_t and the other item
+// handles are made of.
+template<class T> class ItemHandle {
+protected:
+  T* p;
+public:
+  ItemHandle() : p(nullptr) {}
+  ItemHandle(T* ptr) : p(ptr) { if (p) p->addReference(); }
+  ItemHandle(const ItemHandle& rhs) : p(rhs.p) { if (p) p->addReference(); }
+  ~ItemHandle() { if (p) p->removeReference(); }
+  ItemHandle& operator=(const T* rhs) { p = const_cast<T*>(rhs); return *this; }
+  ItemHandle& operator=(const ItemHandle& rhs) { p = rhs.p; return *this; }
+};
+
+} // namespace store
 
 class MemoryManager {
   char theBuffer[4096];

@@ -76,6 +76,13 @@ void instantiate() {
   delete p; // VIOLATION
 }
 
+// emplace into a map: the new goes to the raw mapped value, even though the
+// key type is a smart pointer.
+void map_emplace(std::map<zorba::rchandle<Node>, Plain*>& m,
+                 const zorba::rchandle<Node>& key) {
+  m.emplace(key, new Plain); // VIOLATION
+}
+
 // The escape hatch: NOLINT with the check name is not reported.
 void justified() {
   Plain* n = new Plain; // NOLINT(zorba-owning-memory): fixture

@@ -1,0 +1,12 @@
+diff --git a/scripts/clang-tidy/test/owning_memory_macros.cpp b/scripts/clang-tidy/test/owning_memory_macros.cpp
+--- a/scripts/clang-tidy/test/owning_memory_macros.cpp
++++ b/scripts/clang-tidy/test/owning_memory_macros.cpp
+@@ -31 +31 @@
+-#define CHANGED_BODY(T) do { T* q = nullptr; (void)q; } while (0)
++#define CHANGED_BODY(T) do { T* q = new T; delete q; } while (0)
+@@ -34,0 +35,3 @@
++  MAKE_AND_DROP(MacroPlain);
++  MacroPlain* r = PASS(new MacroPlain);
++  PASS(delete r);
+@@ -38,0 +39 @@
++  MacroPlain* s = OUTER(MacroPlain);

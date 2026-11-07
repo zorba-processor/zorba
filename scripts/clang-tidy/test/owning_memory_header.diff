@@ -1,0 +1,9 @@
+diff --git a/scripts/clang-tidy/test/owning_memory_header.h b/scripts/clang-tidy/test/owning_memory_header.h
+--- a/scripts/clang-tidy/test/owning_memory_header.h
++++ b/scripts/clang-tidy/test/owning_memory_header.h
+@@ -32,0 +33,3 @@
++inline zorba::rchandle<HeaderNode> header_make_handle() { return new HeaderNode; }
++
++inline void header_release(HeaderPlain* p) {
+@@ -35,0 +36 @@
++  delete p; // VIOLATION

@@ -69,15 +69,42 @@ foreach(fixture owning_memory_violations owning_memory_allowed)
       "-DSYSROOT=${fixture_sysroot}"
       -P "${CMAKE_CURRENT_SOURCE_DIR}/test/run_fixture.cmake")
 endforeach()
+# zorba_fixture_test(<name> <fixture.cpp> [args...]): extra args are -D
+# definitions for run_fixture.cmake (DIFF, EXPECTED, MARKERS, HEADER_FILTER).
+function(zorba_fixture_test name fixture)
+  set(defs)
+  foreach(arg IN LISTS ARGN)
+    list(APPEND defs "-D${arg}")
+  endforeach()
+  add_test(NAME ${name}
+    COMMAND "${CMAKE_COMMAND}"
+      "-DCLANG_TIDY=${CLANG_TIDY}"
+      "-DPLUGIN=$<TARGET_FILE:ZorbaTidyModule>"
+      "-DCHECK=zorba-owning-memory"
+      "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/test/${fixture}"
+      "-DSYSROOT=${fixture_sysroot}"
+      ${defs}
+      -P "${CMAKE_CURRENT_SOURCE_DIR}/test/run_fixture.cmake")
+endfunction()
+
+set(t "${CMAKE_CURRENT_SOURCE_DIR}/test")
+
 # DiffFile: only the changed lines of owning_memory_violations.diff (29 and
-# 52) are reported.
-add_test(NAME owning_memory_diff
-  COMMAND "${CMAKE_COMMAND}"
-    "-DCLANG_TIDY=${CLANG_TIDY}"
-    "-DPLUGIN=$<TARGET_FILE:ZorbaTidyModule>"
-    "-DCHECK=zorba-owning-memory"
-    "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/test/owning_memory_violations.cpp"
-    "-DSYSROOT=${fixture_sysroot}"
-    "-DDIFF=${CMAKE_CURRENT_SOURCE_DIR}/test/owning_memory_violations.diff"
-    "-DEXPECTED=29,52"
-    -P "${CMAKE_CURRENT_SOURCE_DIR}/test/run_fixture.cmake")
+# 52) are reported; its zero-count hunk at line 36 reports nothing.
+zorba_fixture_test(owning_memory_diff owning_memory_violations.cpp
+  "DIFF=${t}/owning_memory_violations.diff" "EXPECTED=29,52")
+
+# Macros with DiffFile: a changed macro body (31) and a raw new/delete
+# written as macro argument on a changed line (36, 37) are reported; changed
+# invocations of macros whose unchanged body has the raw new (35, 39) are
+# not.
+zorba_fixture_test(owning_memory_macros owning_memory_macros.cpp
+  "DIFF=${t}/owning_memory_macros.diff" "EXPECTED=31,36,37")
+
+# A header, with HeaderFilterRegex '.*' as in CI: every line, then only the
+# changed ones.
+zorba_fixture_test(owning_memory_header owning_memory_header.cpp
+  "MARKERS=${t}/owning_memory_header.h" "HEADER_FILTER=.*")
+zorba_fixture_test(owning_memory_header_diff owning_memory_header.cpp
+  "MARKERS=${t}/owning_memory_header.h" "HEADER_FILTER=.*"
+  "DIFF=${t}/owning_memory_header.diff" "EXPECTED=36")
