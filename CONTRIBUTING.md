@@ -21,8 +21,8 @@ environments.
 CI runs on GitHub Actions (`.github/workflows/`). `ci.yml` builds and tests
 every pull request on Linux x86_64, Linux arm64 and macOS; `sanitizers.yml`
 runs the suite under AddressSanitizer, ThreadSanitizer and libstdc++ debug
-mode. A pull request is ready for review when its CI is green. Add or adjust a test with every fix
-or feature where feasible.
+mode. A pull request is ready for review when its CI is green. Add or adjust
+a test with every fix or feature where feasible.
 
 **Quick check.** `quick-check.yml` builds one configuration and runs only
 the tests you name, in a few minutes with a warm ccache, instead of the full
