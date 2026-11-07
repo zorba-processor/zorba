@@ -920,7 +920,9 @@ public:
 
   bool is_external() const { return theIsExternal; }
 
-  rchandle<ItemType> get_type() const { return theType; }
+  // The ItemType rule yields the node of the specific item type (for example
+  // GeneralizedAtomicType), not an ItemType node.
+  rchandle<parsenode> get_type() const { return theType; }
 
   void accept(parsenode_visitor&) const;
 };
