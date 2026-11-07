@@ -22,13 +22,20 @@
 //   - every delete and delete[] expression;
 //   - every new expression whose result is not handed straight to a smart
 //     pointer (option SmartPointers): constructing one, assigning to one,
-//     reset() of one, or emplacing into a container of them.
+//     reset() of one, or emplacing into a container whose value_type is one
+//     (not a map: its value_type is a pair).
 // Placement new (the expression arena of MemoryManager, a buffer) is not
 // reported; new (std::nothrow) is.
 //
 // Option DiffFile: the output of "git diff -U0". When set, only expressions
 // on the lines that the diff adds or changes are reported, so existing code
 // is not reported until it is changed.
+//
+// Macros: an expression is located where its new or delete token is written
+// (its spelling location): in the macro body, or at the invocation when it
+// is written in a macro argument. It is reported there, and with DiffFile
+// only when that line is changed: a changed invocation of an unchanged macro
+// whose body has a raw new is not reported.
 
 #include "clang-tidy/ClangTidyCheck.h"
 #include "clang-tidy/ClangTidyModule.h"
@@ -59,7 +66,7 @@ namespace {
 
 const char DefaultSmartPointers[] =
   "::zorba::rchandle;::zorba::const_rchandle;::zorba::SmartPtr;"
-  "::std::unique_ptr;::std::shared_ptr";
+  "::zorba::store::ItemHandle;::std::unique_ptr;::std::shared_ptr";
 
 // The lines that a "git diff -U0" adds or changes, by path relative to the
 // repository root.
@@ -250,17 +257,17 @@ private:
                   *rd, ctx).empty();
   }
 
-  // The element type of a container specialization (first template
-  // argument), for emplace calls.
+  // A container whose value_type is a smart pointer, for emplace calls.
+  // A map's value_type is a pair, so emplace into a map is not allowed.
   bool isContainerOfSmart(QualType type, ASTContext& ctx) const
   {
-    const auto* spec = llvm::dyn_cast_or_null<ClassTemplateSpecializationDecl>(
-      type.getNonReferenceType()->getAsCXXRecordDecl());
-    if (!spec || spec->getTemplateArgs().size() == 0)
+    const CXXRecordDecl* rd = type.getNonReferenceType()->getAsCXXRecordDecl();
+    if (!rd)
       return false;
-    const TemplateArgument& arg = spec->getTemplateArgs()[0];
-    return arg.getKind() == TemplateArgument::Type &&
-           isSmart(arg.getAsType(), ctx);
+    for (const NamedDecl* d : rd->lookup(&ctx.Idents.get("value_type")))
+      if (const auto* td = llvm::dyn_cast<TypedefNameDecl>(d))
+        return isSmart(td->getUnderlyingType(), ctx);
+    return false;
   }
 
   Consumer consumer(const CXXNewExpr& nw, ASTContext& ctx) const
@@ -323,17 +330,15 @@ private:
   void report(SourceLocation loc, const SourceManager& sm,
               llvm::StringRef message, Arg arg)
   {
-    if (theHaveDiff) {
-      SourceLocation spelling = sm.getSpellingLoc(loc);
-      SourceLocation expansion = sm.getExpansionLoc(loc);
-      if (isChanged(spelling, sm)) {
-        // reported where written
-      } else if (isChanged(expansion, sm)) {
-        loc = expansion;
-      } else {
-        return;
-      }
-    }
+    // Where the token is written: the location itself outside macros, the
+    // invocation for a macro argument (isMacroArgExpansion), the macro body
+    // otherwise. getSpellingLoc gives all three.
+    if (loc.isMacroID() && sm.isMacroArgExpansion(loc))
+      loc = sm.getSpellingLoc(sm.getImmediateSpellingLoc(loc));
+    else
+      loc = sm.getSpellingLoc(loc);
+    if (theHaveDiff && !isChanged(loc, sm))
+      return;
     diag(loc, message) << arg;
   }
 

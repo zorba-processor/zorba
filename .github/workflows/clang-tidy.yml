@@ -129,17 +129,23 @@ jobs:
             exit $rc'
 
       # The diff of src/, modules/, bin/ and include/ against the merge base
-      # with master, without the generated sources. The translation units to
-      # analyze are the ones whose ninja dependencies (the source and every
-      # header it includes) contain a changed file. DiffFile restricts the
-      # findings to the changed lines.
+      # with the pull request's base branch (master outside pull requests),
+      # without the generated sources; whitespace-only changes are not
+      # counted. The translation units to analyze are the ones whose ninja
+      # dependencies (the source and every header it includes) contain a
+      # changed file. DiffFile restricts the findings to the changed lines.
+      # A changed C/C++ file that no analyzed translation unit covers (not in
+      # the Linux full-release build) gets a warning annotation.
       - name: Run zorba-owning-memory on the changed lines
+        shell: bash
+        env:
+          BASE_BRANCH: ${{ github.base_ref || 'master' }}
         run: |
           out="$RUNNER_TEMP/owning-memory"
           mkdir -p "$out"
-          base=$(git merge-base origin/master HEAD)
-          echo "base: $base"
-          git diff -U0 --no-color "$base" HEAD -- src modules bin include \
+          base=$(git merge-base "origin/$BASE_BRANCH" HEAD)
+          echo "base: origin/$BASE_BRANCH $base"
+          git diff -U0 --no-color --ignore-space-change "$base" HEAD -- src modules bin include \
             ':(exclude,glob)**/pregenerated/**' \
             ':(exclude)src/compiler/parser/xquery_parser.cpp' \
             ':(exclude)src/compiler/parser/xquery_parser.hpp' \
@@ -156,18 +162,27 @@ jobs:
           echo "changed files: $(wc -l < "$out/changed-files.txt")"
           docker run --rm -v "$PWD":/src -w /src zorba-builder:ci \
             ninja -C build/full-release -t deps > "$out/ninja-deps.txt"
-          # grep exits 1 when no unit is selected; that is not an error.
+          # Pairs "<translation unit> TAB <changed file it depends on>", kept
+          # for the analyzed units (src/, modules/, bin/ minus generated).
+          # grep exits 1 when no pair is kept; that is not an error.
           awk 'NR == FNR { changed[$0] = 1; next }
                /^[^ \t].*: #deps/ { first = 1; next }
                /^[ \t]+[^ \t]/ { f = $1
                                  gsub(/\/\.\//, "/", f)
                                  while (sub(/\/[^\/.][^\/]*\/\.\.\//, "/", f)) {}
                                  if (first) { src = f; first = 0 }
-                                 if (f in changed) print src }' \
+                                 if (f in changed) print src "\t" f }' \
             "$out/changed-files.txt" "$out/ninja-deps.txt" \
-            | { grep -P '^/src/(src|modules|bin)/(?!(.*/)?pregenerated/)(?!(.*/)?compiler/parser/(xquery|jsoniq)_(parser|scanner)[.]cpp$)' || [ $? -eq 1 ]; } \
-            | sort -u > "$out/units.txt"
+            | { grep -P '^/src/(src|modules|bin)/(?!(.*/)?pregenerated/)(?!(.*/)?compiler/parser/(xquery|jsoniq)_(parser|scanner)[.]cpp\t)' || [ $? -eq 1 ]; } \
+            > "$out/units-files.txt"
+          cut -f1 "$out/units-files.txt" | sort -u > "$out/units.txt"
+          cut -f2 "$out/units-files.txt" | sort -u > "$out/covered-files.txt"
           echo "translation units: $(wc -l < "$out/units.txt")"
+          { grep -E '[.](c|cc|cpp|h|hpp)$' "$out/changed-files.txt" || [ $? -eq 1 ]; } \
+            | comm -23 - "$out/covered-files.txt" > "$out/uncovered-files.txt"
+          while read -r f; do
+            echo "::warning file=${f#/src/}::not checked by zorba-owning-memory: no translation unit of the Linux full-release build includes this file"
+          done < "$out/uncovered-files.txt"
           if [ ! -s "$out/units.txt" ]; then
             echo "no translation unit contains a changed line"
             exit 0

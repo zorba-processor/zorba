@@ -74,10 +74,12 @@ Reported (check `zorba-owning-memory`):
 Allowed:
 
 - `new` passed straight to a smart pointer (`rchandle`, `const_rchandle`,
-  `SmartPtr`, `std::unique_ptr`, `std::shared_ptr`, or a class derived from
-  one): construction, copy-initialization, assignment, `reset()`, a return
-  value or argument of smart pointer type, `emplace` into a container of
-  smart pointers. For `std::unique_ptr` and `std::shared_ptr`,
+  `SmartPtr`, `store::ItemHandle` (the base of `store::Item_t`),
+  `std::unique_ptr`, `std::shared_ptr`, or a class derived from one):
+  construction, copy-initialization, assignment, `reset()`, a return value or
+  argument of smart pointer type, `emplace` into a container whose
+  `value_type` is a smart pointer. `emplace` into a map is reported (its
+  `value_type` is a pair): write `m.emplace(k, std::make_unique<T>())`. For `std::unique_ptr` and `std::shared_ptr`,
   `modernize-make-unique` and `modernize-make-shared` still ask for
   `std::make_unique` and `std::make_shared`.
 - placement new: the expression arena (`new (theMemoryMgr) T(...)`,
@@ -99,15 +101,35 @@ A justified exception (for example a class that deletes itself, or a
 third-party interface) carries `// NOLINT(zorba-owning-memory)` with the
 reason on the same line.
 
+A `new` or `delete` written in a macro is located where its token is
+written: in the macro body, or at the invocation when it is in a macro
+argument. A changed line that only invokes a macro whose unchanged body has a
+raw `new` is not reported.
+
 The check is a clang-tidy plugin in `scripts/clang-tidy` (see its
 `CMakeLists.txt`). `clang-tidy.yml` runs it on every pull request that
 touches C or C++ sources, on the lines the pull request adds or changes
-relative to `master`, and fails on any finding. To run it locally on a
-change, with a `compile_commands.json` from a configured build:
+relative to the merge base with its base branch, and fails on any finding.
+Its scope:
+
+- files under `src/`, `modules/`, `bin/` and `include/`, without the
+  generated sources the full clang-tidy run also skips (`*/pregenerated/*`,
+  the Bison and Flex output in `src/compiler/parser`);
+- only files that a translation unit of the Linux `full-release` build (with
+  the debugger) compiles or includes. A changed file outside that build (for
+  example a Windows or macOS only source) gets a warning annotation and is
+  not checked;
+- not `test/` or `bench/`, not the actions in `.y` and `.l` grammar files,
+  not code disabled by the preprocessor in that build, not templates that
+  are never instantiated;
+- whitespace-only changes do not count; moved code counts as changed.
+
+To run it locally on a change (working tree included), with a
+`compile_commands.json` from a configured build:
 
 ```bash
 cmake -S scripts/clang-tidy -B build/clang-tidy-plugin && cmake --build build/clang-tidy-plugin
-git diff -U0 origin/master... > /tmp/changes.diff
+git diff -U0 --no-color --ignore-space-change $(git merge-base origin/master HEAD) > /tmp/changes.diff
 clang-tidy -p build/full-release -load=build/clang-tidy-plugin/ZorbaTidyModule.so \
   --config="{Checks: '-*,zorba-owning-memory', HeaderFilterRegex: '.*', \
     CheckOptions: {zorba-owning-memory.DiffFile: /tmp/changes.diff}}" src/path/to/file.cpp
