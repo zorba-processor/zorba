@@ -20,6 +20,7 @@
 #include <zorba/internal/unique_ptr.h>
 
 using namespace std;
+// owning-memory probe: a file outside the build
 
 namespace zorba{
 
