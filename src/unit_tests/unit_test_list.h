@@ -40,6 +40,10 @@ namespace UnitTests {
   int test_icu_streambuf( int, char*[] );
 #endif /* ZORBA_NO_ICU */
 
+#ifdef ZORBA_CONTAINER_CHECKS
+  int test_container_checks( int, char*[] );
+#endif /* ZORBA_CONTAINER_CHECKS */
+
   int test_decimal_storage( int, char*[] );
   int test_json_object( int, char*[] );
   int test_json_parser( int, char*[] );

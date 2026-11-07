@@ -41,6 +41,10 @@ void initializeTestList()
   libunittests["ato"] = test_ato_;
   libunittests["base64"] = test_base64;
   libunittests["base64_streambuf"] = test_base64_streambuf;
+#ifdef ZORBA_CONTAINER_CHECKS
+  libunittests["container_checks"] = test_container_checks;
+#endif /* ZORBA_CONTAINER_CHECKS */
+
   libunittests["decimal_storage"] = test_decimal_storage;
   libunittests["fs_util"] = test_fs_util;
   libunittests["hashmaps"] = test_hashmaps;

@@ -9,16 +9,19 @@ platform notes are in `README.md`):
 cmake --workflow --preset full-release-offline   # configure, build, test
 ```
 
-Other presets: `core-release` (no XML Schema), `full-debug`, `bigint`, and
-the sanitizer builds `asan`, `tsan` and `tsan-bigint`. `docker/builder` and
-`docker/builder-latest` provide ready-made build environments.
+Other presets: `core-release` (no XML Schema), `full-debug`, `bigint`, the
+sanitizer builds `asan`, `tsan` and `tsan-bigint`, and `glibcxx-debug`
+(libstdc++ debug mode plus `ZORBA_CONTAINER_CHECKS`, which makes a use of an
+invalidated iterator of the store's node vectors fail with an assertion).
+`docker/builder` and `docker/builder-latest` provide ready-made build
+environments.
 
 ## Continuous integration
 
 CI runs on GitHub Actions (`.github/workflows/`). `ci.yml` builds and tests
 every pull request on Linux x86_64, Linux arm64 and macOS; `sanitizers.yml`
-runs the suite under AddressSanitizer and ThreadSanitizer. A pull request is
-ready for review when its CI is green. Add or adjust a test with every fix
+runs the suite under AddressSanitizer, ThreadSanitizer and libstdc++ debug
+mode. A pull request is ready for review when its CI is green. Add or adjust a test with every fix
 or feature where feasible.
 
 **Quick check.** `quick-check.yml` builds one configuration and runs only
