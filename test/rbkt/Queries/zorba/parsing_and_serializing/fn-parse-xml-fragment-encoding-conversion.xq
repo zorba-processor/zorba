@@ -6,5 +6,5 @@ let $frag := concat('<?xml encoding="US-ASCII"?><a>',
                     string-join(for $i in 1 to 3000 return '<b/>', ''),
                     '<c>&#xE9;</c></a>')
 return
-  try { fn:parse-xml-fragment($frag) }
-  catch err:FODC0006 { not(contains($err:description, "assertion failed")) }
+  try { concat("PARSED ", count(fn:parse-xml-fragment($frag)//*)) }
+  catch * { concat("DIAG ", $err:code, " ", $err:description) }
