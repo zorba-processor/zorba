@@ -1,6 +1,6 @@
 ### Fixed
 
-- Fix an invalid read in the optimizer when a FLWOR expression whose
-  `group by` clause sees at most one tuple is rewritten: the grouping and
-  non-grouping variables were moved into `let` clauses but kept their
-  group-by kind.
+- Fix an invalid read in the optimizer after it rewrites a `group by`
+  clause that sees at most one tuple into `let` clauses: the domain of a
+  grouping or non-grouping variable was then read as if its clause were
+  still a `group by` clause.

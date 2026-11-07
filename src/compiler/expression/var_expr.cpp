@@ -250,25 +250,36 @@ expr* var_expr::get_domain_expr() const
         theVarKind == let_var ||
         theVarKind == win_var ||
         theVarKind == wincond_in_var ||
-        theVarKind == wincond_out_var)
+        theVarKind == wincond_out_var ||
+        theVarKind == groupby_var ||
+        theVarKind == non_groupby_var)
     {
-      return reinterpret_cast<forletwin_clause*>(theFlworClause)->get_expr();
-    }
-    else if (theVarKind == groupby_var)
-    {
-      // A rewrite that moves the var to another kind of clause must change
-      // its kind too.
-      ZORBA_ASSERT(theFlworClause->get_kind() == flwor_clause::groupby_clause);
+      // Go by the kind of the clause, not of the var: when a group by clause
+      // sees at most one tuple, EliminateUnusedLetVars rebinds its vars with
+      // let clauses and they keep their group-by kinds.
+      switch (theFlworClause->get_kind())
+      {
+      case flwor_clause::for_clause:
+      case flwor_clause::let_clause:
+      case flwor_clause::window_clause:
+      {
+        return static_cast<forletwin_clause*>(theFlworClause)->get_expr();
+      }
+      case flwor_clause::groupby_clause:
+      {
+        groupby_clause* gc = static_cast<groupby_clause*>(theFlworClause);
 
-      return static_cast<groupby_clause*>(theFlworClause)->
-             get_input_for_group_var(this);
-    }
-    else if (theVarKind == non_groupby_var)
-    {
-      ZORBA_ASSERT(theFlworClause->get_kind() == flwor_clause::groupby_clause);
+        if (theVarKind == groupby_var)
+          return gc->get_input_for_group_var(this);
 
-      return static_cast<groupby_clause*>(theFlworClause)->
-             get_input_for_nongroup_var(this);
+        ZORBA_ASSERT(theVarKind == non_groupby_var);
+        return gc->get_input_for_nongroup_var(this);
+      }
+      default:
+      {
+        ZORBA_ASSERT(false);
+      }
+      }
     }
   }
   else if (theCopyClause)
