@@ -811,6 +811,9 @@ public:
   // To be used by the loader ONLY!
   NodeVector& nodes() { return theNodes; }
 
+  // The key of the attributes and children for a ContentReader.
+  const void* nodesKey() const { return &theNodes; }
+
   // True if the attributes and children are stored in this object.
   bool nodesAreInline() const { return theNodes.isInline(); }
 

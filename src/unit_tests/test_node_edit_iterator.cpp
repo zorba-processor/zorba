@@ -15,14 +15,15 @@
  */
 
 // An iterator over the children or attributes of a node stays open while the
-// collection module's edit function replaces that node: edit swaps the contents
-// of the node with the new content (UpdEditInCollection, InternalNode::swap).
-// The iterator goes on with the nodes it started on, while an iterator opened
-// after the edit sees the new content. Every case runs twice: with the first
-// node returned still referenced by the caller and with no reference at all,
-// where only the iterator can keep the replaced nodes alive. The cases cross
-// the sizes at which element nodes change how they store their nodes, in both
-// directions.
+// node is updated: the collection module's edit function replaces the node,
+// which swaps its contents with the new content (UpdEditInCollection,
+// InternalNode::swap), or an update inserts or deletes its children or
+// attributes. The iterator goes on with the nodes the node had when it
+// started, while an iterator opened after the update sees the new content.
+// Every case runs twice: with the first node returned still referenced by the
+// caller and with no reference at all, where only the iterator can keep the
+// replaced or deleted nodes alive. The cases cross the sizes at which element
+// nodes change how they store their nodes, in both directions.
 //
 // The test also prints, without checking them, the time of one iterator
 // start and close and of one reference to a node, taken in the same process.
@@ -118,7 +119,7 @@ void expect( string const &name, char const *what, string const &got,
 struct Case {
   Kind kind;
   char const *before;
-  char const *content;
+  char const *update;   // an update of $n, the node
   char const *first;    // what the iterator returns before the edit
   char const *rest;     // what it returns after the edit
   char const *all;      // what it returns after a reset()
@@ -133,7 +134,7 @@ void test_case( Case const &c, int n, bool hold_first ) {
   ostringstream label;
   label << ( c.kind == CHILDREN ? "children" :
              c.kind == REVERSE ? "reverse" : "attributes" )
-        << ' ' << c.before << " -> " << c.content
+        << ' ' << c.before << ": " << c.update
         << ( hold_first ? "" : " (no reference)" );
   string const name( label.str() );
 
@@ -156,7 +157,8 @@ void test_case( Case const &c, int n, bool hold_first ) {
       if ( !hold_first )
         first = NULL;
 
-      run( "dml:edit(dml:collection(" + qname + "), " + c.content + ");\n()" );
+      run( "let $n := dml:collection(" + qname + ") return " + c.update
+           + ";\n()" );
 
       expect( name, "rest of the open iterator", drain( it ), c.rest );
       if ( c.kind != ATTRIBUTES ) {
@@ -183,29 +185,47 @@ void test_case( Case const &c, int n, bool hold_first ) {
 // the storage of the node it holds.
 Case const cases[] = {
   // inline to inline
-  { CHILDREN,   "<r><a/><b/></r>",        "<n><x/><y/></n>",  "a", "b", "a b", "x y" },
-  { REVERSE,    "<r><a/><b/></r>",        "<n><x/><y/></n>",  "b", "a", "b a", "y x" },
-  { ATTRIBUTES, "<r a='1' b='2'/>",       "<n x='1' y='2'/>", "a", "b", "",    "x y" },
-  { CHILDREN,   "<r><a/></r>",            "<n><x/></n>",      "a", "",  "a",   "x" },
-  { REVERSE,    "<r><a/></r>",            "<n><x/></n>",      "a", "",  "a",   "x" },
-  { CHILDREN,   "<r p='1'><a/></r>",      "<n><x/><y/></n>",  "a", "",  "a",   "x y" },
-  { CHILDREN,   "<r><a/><b/></r>",        "<n><x/></n>",      "a", "b", "a b", "x" },
-  { REVERSE,    "<r><a/><b/></r>",        "<n><x/></n>",      "b", "a", "b a", "x" },
-  { ATTRIBUTES, "<r a='1' b='2'/>",       "<n x='1'/>",       "a", "b", "",    "x" },
-  { CHILDREN,   "<r><a/><b/></r>",        "<n/>",             "a", "b", "a b", "" },
-  { REVERSE,    "<r><a/><b/></r>",        "<n/>",             "b", "a", "b a", "" },
+  { CHILDREN,   "<r><a/><b/></r>",        "dml:edit($n, <n><x/><y/></n>)",  "a", "b", "a b", "x y" },
+  { REVERSE,    "<r><a/><b/></r>",        "dml:edit($n, <n><x/><y/></n>)",  "b", "a", "b a", "y x" },
+  { ATTRIBUTES, "<r a='1' b='2'/>",       "dml:edit($n, <n x='1' y='2'/>)", "a", "b", "",    "x y" },
+  { CHILDREN,   "<r><a/></r>",            "dml:edit($n, <n><x/></n>)",      "a", "",  "a",   "x" },
+  { REVERSE,    "<r><a/></r>",            "dml:edit($n, <n><x/></n>)",      "a", "",  "a",   "x" },
+  { CHILDREN,   "<r p='1'><a/></r>",      "dml:edit($n, <n><x/><y/></n>)",  "a", "",  "a",   "x y" },
+  { CHILDREN,   "<r><a/><b/></r>",        "dml:edit($n, <n><x/></n>)",      "a", "b", "a b", "x" },
+  { REVERSE,    "<r><a/><b/></r>",        "dml:edit($n, <n><x/></n>)",      "b", "a", "b a", "x" },
+  { ATTRIBUTES, "<r a='1' b='2'/>",       "dml:edit($n, <n x='1'/>)",       "a", "b", "",    "x" },
+  { CHILDREN,   "<r><a/><b/></r>",        "dml:edit($n, <n/>)",             "a", "b", "a b", "" },
+  { REVERSE,    "<r><a/><b/></r>",        "dml:edit($n, <n/>)",             "b", "a", "b a", "" },
   // inline to heap
-  { CHILDREN,   "<r><a/></r>",            "<n><x/><y/><z/></n>", "a", "",  "a",   "x y z" },
-  { CHILDREN,   "<r><a/><b/></r>",        "<n><x/><y/><z/></n>", "a", "b", "a b", "x y z" },
-  { REVERSE,    "<r><a/><b/></r>",        "<n><x/><y/><z/></n>", "b", "a", "b a", "z y x" },
-  { ATTRIBUTES, "<r a='1' b='2'/>",       "<n x='1' y='2' z='3'/>", "a", "b", "", "x y z" },
+  { CHILDREN,   "<r><a/></r>",            "dml:edit($n, <n><x/><y/><z/></n>)", "a", "",  "a",   "x y z" },
+  { CHILDREN,   "<r><a/><b/></r>",        "dml:edit($n, <n><x/><y/><z/></n>)", "a", "b", "a b", "x y z" },
+  { REVERSE,    "<r><a/><b/></r>",        "dml:edit($n, <n><x/><y/><z/></n>)", "b", "a", "b a", "z y x" },
+  { ATTRIBUTES, "<r a='1' b='2'/>",       "dml:edit($n, <n x='1' y='2' z='3'/>)", "a", "b", "", "x y z" },
   // heap to inline
-  { CHILDREN,   "<r><a/><b/><c/></r>",    "<n><x/></n>",      "a", "b c", "a b c", "x" },
-  { REVERSE,    "<r><a/><b/><c/></r>",    "<n><x/></n>",      "c", "b a", "c b a", "x" },
-  { ATTRIBUTES, "<r a='1' b='2' c='3'/>", "<n x='1'/>",       "a", "b c", "",      "x" },
-  { CHILDREN,   "<r p='1'><a/><b/></r>",  "<n><x/><y/></n>",  "a", "b",   "a b",   "x y" },
+  { CHILDREN,   "<r><a/><b/><c/></r>",    "dml:edit($n, <n><x/></n>)",      "a", "b c", "a b c", "x" },
+  { REVERSE,    "<r><a/><b/><c/></r>",    "dml:edit($n, <n><x/></n>)",      "c", "b a", "c b a", "x" },
+  { ATTRIBUTES, "<r a='1' b='2' c='3'/>", "dml:edit($n, <n x='1'/>)",       "a", "b c", "",      "x" },
+  { CHILDREN,   "<r p='1'><a/><b/></r>",  "dml:edit($n, <n><x/><y/></n>)",  "a", "b",   "a b",   "x y" },
   // heap to heap
-  { CHILDREN,   "<r><a/><b/><c/></r>",    "<n><x/><y/><z/><w/></n>", "a", "b c", "a b c", "x y z w" },
+  { CHILDREN,   "<r><a/><b/><c/></r>",    "dml:edit($n, <n><x/><y/><z/><w/></n>)", "a", "b c", "a b c", "x y z w" },
+
+  // Updates that insert or delete children or attributes of the node.
+  { CHILDREN,   "<r><a/><b/></r>",        "insert node <x/> as first into $n", "a", "b",   "a b",   "x a b" },
+  { CHILDREN,   "<r><a/><b/><c/></r>",    "insert node <x/> as first into $n", "a", "b c", "a b c", "x a b c" },
+  { CHILDREN,   "<r><a/><b/><c/></r>",    "insert node <x/> as last into $n",  "a", "b c", "a b c", "a b c x" },
+  { CHILDREN,   "<r><a/><b/><c/></r>",    "insert node (<x/>, <y/>, <z/>, <w/>) after $n/a",
+                                          "a", "b c", "a b c", "a x y z w b c" },
+  { CHILDREN,   "<r><a/><b/><c/></r>",    "delete node $n/b",                  "a", "b c", "a b c", "a c" },
+  { CHILDREN,   "<r><a/><b/><c/></r>",    "delete node $n/*",                  "a", "b c", "a b c", "" },
+  { CHILDREN,   "<r><a/><b/><c/></r>",    "replace node $n/b with <x/>",       "a", "b c", "a b c", "a x c" },
+  { CHILDREN,   "<r p='1' q='2'><a/><b/><c/></r>", "delete node $n/@p",        "a", "b c", "a b c", "a b c" },
+  { CHILDREN,   "<r p='1'><a/><b/><c/></r>", "insert node attribute q {'2'} into $n",
+                                          "a", "b c", "a b c", "a b c" },
+  { REVERSE,    "<r><a/><b/><c/></r>",    "insert node <x/> as last into $n",  "c", "b a", "c b a", "x c b a" },
+  { REVERSE,    "<r><a/><b/><c/></r>",    "delete node $n/b",                  "c", "b a", "c b a", "c a" },
+  { ATTRIBUTES, "<r a='1' b='2' c='3'/>", "insert node attribute x {'4'} into $n", "a", "b c", "", "a b c x" },
+  { ATTRIBUTES, "<r a='1' b='2' c='3'/>", "delete node $n/@b",                 "a", "b c", "",      "a c" },
+  { ATTRIBUTES, "<r a='1' b='2' c='3'/>", "insert node <x/> as first into $n", "a", "b c", "",      "a b c" },
 };
 
 // Median of 5, in ns per call of f.
