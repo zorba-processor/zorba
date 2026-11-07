@@ -195,9 +195,7 @@ jobs:
                          --repo "$GITHUB_REPOSITORY" --notes-since "$prev")"
           else
             if [ "$PRERELEASE" = true ]; then
-              section="Prerelease of Zorba $base. The notes below list all changes in $base so far.
-
-$section"
+              section="$(printf 'Prerelease of Zorba %s. The notes below list all changes in %s so far.\n\n%s' "$base" "$base" "$section")"
             fi
           fi
           write_notes() {
