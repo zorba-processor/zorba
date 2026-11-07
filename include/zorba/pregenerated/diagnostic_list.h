@@ -387,6 +387,8 @@ extern ZORBA_DLL_PUBLIC XQueryErrorCode XUDY0030;
 
 extern ZORBA_DLL_PUBLIC XQueryErrorCode XUDY0031;
 
+extern ZORBA_DLL_PUBLIC XQueryErrorCode XUDY0037;
+
 extern ZORBA_DLL_PUBLIC XQueryErrorCode FOUP0001;
 
 extern ZORBA_DLL_PUBLIC XQueryErrorCode FOUP0002;

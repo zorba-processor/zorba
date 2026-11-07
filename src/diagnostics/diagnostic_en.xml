@@ -2142,6 +2142,15 @@
       <value>"$1": same URI used in multiple calls to fn:put() in same snapshot</value>
     </diagnostic>
 
+    <diagnostic code="XUDY0037">
+      <comment>
+       It is a dynamic error if the pending update list returned by the
+       \c modify clause of a transform expression contains a \c upd:put
+       update primitive.
+      </comment>
+      <value>"modify" can not call fn:put()</value>
+    </diagnostic>
+
     <diagnostic code="FOUP0001">
       <comment>
        It is a dynamic error if the first operand of \c fn:put() is not a node

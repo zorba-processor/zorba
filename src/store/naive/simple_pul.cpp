@@ -2250,13 +2250,25 @@ void PULImpl::mergeCollectionUpdateLists(
 
 
 /*******************************************************************************
-  Check that each target node of this pul is inside one of the trees rooted at
-  the given root nodes (the root nodes are the copies of the nodes produced by
-  the source expr of a transform expr).
+  Check the pul of the modify clause of a transform expr against the root nodes
+  (the copies of the nodes produced by the source exprs of the copy clauses).
+
+  XQUF 3.0, copy modify expression: every target node of an update primitive
+  must be inside one of the trees rooted at the root nodes (XUDY0014), and the
+  pul must not contain a upd:put primitive (XUDY0037). The collection, index,
+  integrity constraint and document primitives of Zorba target a collection,
+  an index, a constraint or a document of the store, never a node created by
+  the copy clause, so they raise XUDY0014 too.
 ********************************************************************************/
 void PULImpl::checkTransformUpdates(const std::vector<store::Item*>& rootNodes) const
 {
   csize numRoots = rootNodes.size();
+
+  auto checkNoTransformUpdates = [](const std::vector<UpdatePrimitive*>& list)
+  {
+    if (!list.empty())
+      RAISE_ERROR_NO_PARAMS(err::XUDY0014, list[0]->theLoc);
+  };
 
   std::vector<CollectionPul*>::const_iterator collIte = theCollectionPuls.begin();
   std::vector<CollectionPul*>::const_iterator collEnd = theCollectionPuls.end();
@@ -2268,8 +2280,6 @@ void PULImpl::checkTransformUpdates(const std::vector<store::Item*>& rootNodes) 
     NodeToUpdatesMap::iterator it = pul->theNodeToUpdatesMap.begin();
     NodeToUpdatesMap::iterator end = pul->theNodeToUpdatesMap.end();
 
-    bool found = false;
-    
     for (; it != end; ++it)
     {
       zorba::store::Item* lItem = (*it).first;
@@ -2277,23 +2287,53 @@ void PULImpl::checkTransformUpdates(const std::vector<store::Item*>& rootNodes) 
       const StructuredItem* lStructuredItem =
           static_cast<const StructuredItem*>(lItem);
 
+      // Each target node is checked on its own: a target found under a root
+      // says nothing about the next one.
+      bool found = false;
+
       for (csize i = 0; i < numRoots; i++)
       {
         assert(dynamic_cast<const StructuredItem*>(rootNodes[i]));
         StructuredItem* lRootStructuredItem =
             static_cast<StructuredItem*>(rootNodes[i]);
-        
+
         if (lRootStructuredItem->isInSubtree(lStructuredItem))
         {
           found = true;
           break;
         }
       }
-        
+
       if (!found)
-        throw XQUERY_EXCEPTION(err::XUDY0014);
+      {
+        const NodeUpdates* updates = (*it).second;
+        const QueryLoc* loc =
+            (updates != NULL && !updates->empty() ? (*updates)[0]->theLoc : NULL);
+        RAISE_ERROR_NO_PARAMS(err::XUDY0014, loc);
+      }
     }
+
+    checkNoTransformUpdates(pul->theCreateCollectionList);
+    checkNoTransformUpdates(pul->theInsertIntoCollectionList);
+    checkNoTransformUpdates(pul->theDeleteFromCollectionList);
+    checkNoTransformUpdates(pul->theEditInCollectionList);
+    checkNoTransformUpdates(pul->theTruncateCollectionList);
+    checkNoTransformUpdates(pul->theDeleteCollectionList);
   }
+
+  checkNoTransformUpdates(theCreateIndexList);
+  checkNoTransformUpdates(theDeleteIndexList);
+  checkNoTransformUpdates(theRefreshIndexList);
+  checkNoTransformUpdates(theICActivationList);
+  checkNoTransformUpdates(theCreateDocumentList);
+  checkNoTransformUpdates(theDeleteDocumentList);
+  checkNoTransformUpdates(theCreateHashMapList);
+  checkNoTransformUpdates(theDestroyHashMapList);
+  checkNoTransformUpdates(theInsertIntoHashMapList);
+  checkNoTransformUpdates(theRemoveFromHashMapList);
+
+  if (!thePutList.empty())
+    RAISE_ERROR_NO_PARAMS(err::XUDY0037, thePutList[0]->theLoc);
 }
 
 

@@ -236,6 +236,7 @@ extern entry const dict_en[] = {
   { "err:XUDY0029", "node has no parent in \"insert\" expression (with \"before\" or \"after\")" },
   { "err:XUDY0030", "insertion of attrhbute node before or after document node child" },
   { "err:XUDY0031", "\"$1\": same URI used in multiple calls to fn:put() in same snapshot" },
+  { "err:XUDY0037", "\"modify\" can not call fn:put()" },
   { "err:XUST0001", "$1" },
   { "err:XUST0002", "simple expression not allowed here" },
   { "err:XUST0003", "multiple revalidation declarations" },

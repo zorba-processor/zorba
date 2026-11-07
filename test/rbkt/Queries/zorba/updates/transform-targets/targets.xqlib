@@ -1,0 +1,14 @@
+module namespace t = "http://zorba.io/tests/transform-targets";
+
+import module namespace dml = "http://zorba.io/modules/store/static/collections/dml";
+
+declare namespace ann = "http://zorba.io/annotations";
+
+declare collection t:c as node()*;
+
+declare %ann:manual %ann:value-equality index t:idx
+on nodes dml:collection(xs:QName("t:c"))/a
+by xs:string(./@id) as xs:string;
+
+declare integrity constraint t:ic
+  on collection t:c $all check count($all) le 100;
