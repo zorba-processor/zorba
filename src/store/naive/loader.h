@@ -148,6 +148,15 @@ public:
   static void error( void *ctx, ZORBA_XML_ERROR_PTR );
 
   /**
+   * True if libxml2 parsed the input to its end and found it well-formed.
+   * libxml2 can stop the parser without an error reaching error(): libxml2
+   * 2.9 does so when the input does not convert from its declared encoding,
+   * and reports that to the generic error handler only. The document has not
+   * ended then, though ctxt->wellFormed is still set.
+   */
+  static bool parsedWellFormed(xmlParserCtxtPtr ctxt);
+
+  /**
    * If the security policy refused an external resource during the parse,
    * adds zerr:ZXQP0029 for it ahead of the parser errors it caused and
    * returns true.

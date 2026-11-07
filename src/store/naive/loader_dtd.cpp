@@ -549,7 +549,7 @@ store::Item_t FragmentXmlLoader::loadXml(
         break;
     }
 
-    if (fs.parser_done && fs.events.empty() && !fs.ctxt->wellFormed)
+    if (fs.parser_done && fs.events.empty() && !parsedWellFormed(fs.ctxt))
     {
       theXQueryDiagnostics->add_error(theDocUri.empty() ?
           NEW_ZORBA_EXCEPTION(zerr::ZSTR0021_LOADER_PARSING_ERROR, ERROR_PARAMS( ZED( BadXMLDocument_2o ))) :
