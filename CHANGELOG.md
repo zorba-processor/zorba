@@ -18,7 +18,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 | Compiler warnings | 1,897 to 5,949 per platform | Dozens or fewer |
 | Build options tested | Full build only; other options had rotted | `embedded`, `embedded-noicu`, `full-nopch`, debugger in CI; XQueryX and big-integer profiles |
 | Test timeouts | Never enforced (`NORMAL_TIMEOUT_VALUE` macro bug) | Enforced |
-| W3C conformance | QT3 harness present but inactive | Weekly QT3 run in CI: 26,367 of 27,055 applicable test cases pass (97.5%) |
+| W3C conformance | QT3 harness present but inactive | Weekly QT3 run in CI: 26,729 of 27,053 applicable test cases pass (98.8%) |
 | Performance | Not measured | XMark and JSONiq benchmarks with A/B comparison; cold build 795 s → 376 s; hash join example 22 s → 0.5 s |
 | Toolchain | `auto_ptr`, TR1, CMake 2.8-era checks, Flex 2.5.35 | C++23, CMake 3.28, Bison 3.8, Flex 2.6.4, ICU 78, libxml2 2.15, Xerces-C 3.3 |
 
@@ -48,6 +48,11 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - `fn:format-date`, `fn:format-dateTime` and `fn:format-time` with an Olson timezone name as `$place` adjust the value to that timezone (12:00-10:00 with `America/New_York` formats as 17:00 EST). ([#86](https://github.com/zorba-processor/zorba/pull/86))
 - The library default security policy is now `SecurityPolicy::secure()`. A program that embeds Zorba and does not call `Zorba::setSecurityPolicy()` runs queries that cannot read or write files, use the network, import modules or schemas over the network, expand external entities, load native modules or read environment variables: `fn:doc` and `fn:unparsed-text` on files or URLs fail with the error the specification prescribes for an unavailable resource (for example `err:FODC0002`), importing the file, http-client, ftp-client or another native module fails with `zerr:ZXQP0067`, the environment functions return the empty sequence, and `ZORBA_URI_PATH` / `ZORBA_LIB_PATH` are ignored. Allow what the application needs with `SecurityPolicy::secure().allow(...)`, or call `zorba->setSecurityPolicy(SecurityPolicy::unrestricted())` to keep the behavior of earlier versions. The `zorba` command line still runs queries unrestricted unless `--secure` is given. See the new "Security Policy" documentation page. ([#103](https://github.com/zorba-processor/zorba/pull/103))
 - Windows is no longer a supported platform. Supported platforms are Linux (amd64, arm64) and macOS (arm64). Configuring on a non-UNIX system now stops with an error. The .NET (C#) bindings are not affected. ([#109](https://github.com/zorba-processor/zorba/pull/109))
+- Query plans saved by an earlier version are rejected with ZCSE0012: the plan of a
+  window clause changed. ([#169](https://github.com/zorba-processor/zorba/pull/169))
+- The private member `add_param` of `zorba::internal::diagnostic::parameters`,
+  which the inline templates of `<zorba/internal/diagnostic.h>` call, takes a
+  second argument: a module built against the older header must be rebuilt. ([#180](https://github.com/zorba-processor/zorba/pull/180))
 
 ### Security
 
@@ -122,6 +127,75 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Agent benchmark (`bench/agents/`): the same model answers 20 situational-awareness tasks over a frozen, multi-format snapshot of public geospatial feeds (USGS earthquakes as GeoJSON, CSV and QuakeML; CelesTrak OMM XML and CSV; GDACS RSS; Open-Meteo JSON; NASA FIRMS CSV; an NHC HTML table; one deliberately truncated JSON file) with either the `zorba-mcp` tools or a sandboxed bash tool, measuring correctness, tool calls, tokens, cost, wall time and repeatability. The ground truth is computed twice, by a Python reference and by JSONiq queries run with `zorba --directory`, and the `Agent benchmark` workflow checks that both agree and runs the harness with a scripted model on pull requests; the real benchmark runs from `workflow_dispatch`. ([#117](https://github.com/zorba-processor/zorba/pull/117))
 - The `ghcr.io/zorba-processor/zorba` image runs `zorba-mcp`: `docker run -i --rm -v "$PWD:/data:ro" ghcr.io/zorba-processor/zorba zorba-mcp --root /data` serves a folder of XML, JSON and CSV files to an MCP client. Any other arguments still go to `zorba`. The image workflow smoke-tests the server (`initialize`, `server/discover`, `tools/list`, `tools/call`) before it pushes. ([#123](https://github.com/zorba-processor/zorba/pull/123))
 - The documentation site has a page on querying a folder from an AI agent (`zorba --directory` and `zorba-mcp`). ([#123](https://github.com/zorba-processor/zorba/pull/123))
+- `zorba-mcp` keeps a few small parsed documents across tool calls, for the documents that `dir:open` and `dir:documents` read repeatedly. This document cache is separate from the background scan's memory (`--scan-cache-mb`), which holds the listing and previews for `list_documents` and serves no query. `--cache-max-file-kb <KB>` (default 16) is the largest file kept and `--cache-max-files <N>` (default 10) how many documents stay, least recently used out first; `0` in either turns the cache off. A document enters on its second read; the first read does the work it does without a cache, and a larger file gets one `stat`. A document is served only while its file has the same canonical path, device, inode, size, modification time and change time. Records with an error, and records that take more than 128 times the size of their file in memory (as internal XML entities can make them), are not kept. Updating and sequential queries do not use the cache, and the security policy is unchanged. A query cannot store content in the cache. `hits`, `misses`, `admissions`, `evictions` and `bytes_retained` go to stderr in one line when the server exits, not to tool responses. ([#126](https://github.com/zorba-processor/zorba/pull/126))
+- Module `http://zorba.io/modules/directory-cache` (`dc:get`): the hook through which the directory module looks up parsed documents. The installed implementation returns nothing, so `zorba --directory` and embedders read every file as before; an embedding application can resolve the module to its own external function. ([#126](https://github.com/zorba-processor/zorba/pull/126))
+- The directory module no longer triggers a deprecation warning (`ZWST0008`) each time it compiles. ([#126](https://github.com/zorba-processor/zorba/pull/126))
+- The agent benchmark (`bench/agents/`) can drive the model with Claude Code
+  headless (`harness.py --backend claude-code`, authenticated with the
+  runner's own `CLAUDE_CODE_OAUTH_TOKEN`) besides the Anthropic API
+  (`--backend api`, with the runner's own `ANTHROPIC_API_KEY`). In the
+  `claude-code` backend the zorba-mcp configuration has no built-in tools and
+  the bash configuration runs Claude Code inside the sandbox container, whose
+  only network route is a proxy that allows the Anthropic API; runs also
+  record the cost Claude Code reports. The `Agent benchmark` workflow chooses
+  the backend at dispatch, and its pull-request dry run covers both backends. ([#131](https://github.com/zorba-processor/zorba/pull/131))
+- Publish a Markdown version of every documentation page on the GitHub Pages site next to the HTML (`foo.html` and `foo.md`), generated at deploy time, plus `llms.txt` at the site root that lists the pages for AI agents. ([#133](https://github.com/zorba-processor/zorba/pull/133))
+- Add the `cast-letter-booleans` option to `csv:parse`. With `false`, the
+  unquoted single letters `T`, `Y`, `F` and `N` stay strings instead of being
+  cast to booleans; `true`/`false` words and numbers are still cast. The
+  default is `true`, so existing calls behave as before. ([#139](https://github.com/zorba-processor/zorba/pull/139))
+- Add a hint to errors that come from a form valid elsewhere: `ZorbaException::hint()` holds what to write instead,
+  `zorba` prints it after the message and `zorba-mcp` returns it in a separate `hint` field. Error codes and messages
+  do not change. Hints cover `$x[]`, `$$`, `$x[[]]`, `keys()`/`size()`/`flatten()`/`members()`/`pi()` without a prefix in
+  XQuery, `$a-$b` and `$x-1`, a function called with the wrong number of arguments (with its declared forms), the
+  prefixes `math:` and `map:`, a path over a JSON object or array (XPTY0019), a string selector on an array (FORG0001)
+  and a node in JSON output (JNSE0014). ([#149](https://github.com/zorba-processor/zorba/pull/149))
+- `zorba-mcp` scans the directory in the background: `list_documents` answers
+  at once with what is known and a status, takes `path`, `limit` and `refresh`,
+  and gives a short preview of a file (CSV columns, JSON key paths, XML element
+  paths, HTML tables) with samples, read from at most 1 MiB of the file. A
+  request waits a bounded time for a preview and otherwise says it is pending. ([#151](https://github.com/zorba-processor/zorba/pull/151))
+- Add the `--no-scan` option to `zorba-mcp` to keep the previous behavior, and
+  `--scan-cache-mb` to limit the memory of the scan's file index and previews,
+  with least-recently-used replacement of previews on request. ([#151](https://github.com/zorba-processor/zorba/pull/151))
+- Add the `--max-memory` option to `zorba-mcp` (default 4 GiB; Linux only): a
+  query that needs more ends with a tool error with code `memory_limit` and the
+  server keeps answering, instead of being killed by the system. ([#153](https://github.com/zorba-processor/zorba/pull/153))
+- Add the `--language xquery|jsoniq` option to `zorba` and `zorba-mcp`: the
+  language of a query that has no `jsoniq version` or `xquery version`
+  declaration and is not read from a `.jq` or `.xq` file. The default is
+  `xquery`. `zorba-mcp` names the language in the description of `run_query`. ([#154](https://github.com/zorba-processor/zorba/pull/154))
+- Add JSONiq window examples to the site, with moving averages, sessions and
+  change detection over irregular records. ([#163](https://github.com/zorba-processor/zorba/pull/163))
+- The agent benchmark (`bench/agents/`) can choose the query language of the
+  zorba-mcp configuration: `harness.py --language xquery|jsoniq` (default
+  `xquery`) is passed to `zorba-mcp --language` and recorded in the results,
+  and the `Agent benchmark` workflow has a matching `language` input. ([#164](https://github.com/zorba-processor/zorba/pull/164))
+- Add the option `zorba-streaming-members` of `parse-json`. With it,
+  `parse-json($text, { "zorba-streaming-members" : true })[]` reads the members of
+  a top-level array one at a time, without building the array, so that peak memory
+  follows the largest member, plus the text unless it is read directly with
+  `file:read-text` in a query where nothing can write while it runs: no sequential
+  expression, no update, no dynamic function call, no eval or invoke, no call of a
+  function that takes a function as argument, and no function item of a sequential
+  or updating function, in the query or in a function it calls, both in the query
+  that compiles the call and in the query that runs it. The check trusts the
+  declarations: an external function that writes but is not declared sequential
+  is not seen. At optimization level O0, the text of `file:read-text` called with
+  one argument is held in memory. Each top-level array is parsed twice: first to
+  check it, so that errors and their order stay the same, then to return its
+  members. Without the option nothing changes. ([#171](https://github.com/zorba-processor/zorba/pull/171))
+- Add the manually dispatched `quick-check.yml` workflow: it builds one
+  configuration and runs only the selected tests (optionally under ASan),
+  and is documented in `CONTRIBUTING.md`. It does not change or replace any
+  CI job. ([#183](https://github.com/zorba-processor/zorba/pull/183))
+- The `Benchmarks` workflow compares two commits on one benchmark suite of
+  `bench/` when it is dispatched with `suite` and `ref_b`: both are
+  built in Release in one job and each query runs alternately on both, with
+  a timeout per run. The job summary has the median and minimum wall time and
+  the peak RSS of each build, the ratio head/base, and every failed, timed
+  out or not run query. Without `suite` the workflow measures XMark and
+  JSONiq as before. ([#184](https://github.com/zorba-processor/zorba/pull/184))
 
 ### Changed
 
@@ -164,6 +238,113 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
   per-file error record. Builds without XML Schema support report HTML files
   as an unsupported format. ([#122](https://github.com/zorba-processor/zorba/pull/122))
 - The directory module reads `.geojson` files as JSON. ([#122](https://github.com/zorba-processor/zorba/pull/122))
+- The agent benchmark's JSONiq ground-truth queries read GeoJSON, HTML and
+  several CSV files through the directory module (`dir:open`,
+  `dir:documents`) now that it handles them. ([#131](https://github.com/zorba-processor/zorba/pull/131))
+- Make `dir:documents` and `dir:open` keep the unquoted letters `T`, `Y`, `F`
+  and `N` in CSV files as strings. Before, a column such as `D`/`N`
+  (day/night) silently became booleans (`N` became `false`). ([#139](https://github.com/zorba-processor/zorba/pull/139))
+- Share one store item per xs:integer value from -128 to 1023, as the boolean
+  items are shared, instead of allocating an item for every value. Parsing the
+  store benchmark's 100 MiB files takes 169 MiB less heap for JSON and 59 MiB
+  less for CSV; the savings depend on how many of a document's integers fall in
+  the range. Each store holds about 64 KB more for the table. ([#140](https://github.com/zorba-processor/zorba/pull/140))
+- Reduce the memory of `xs:decimal` items: a stored value takes one heap block
+  sized to fit (40 B up to 16 significant digits) instead of two blocks of
+  144 B together, which cuts the heap of a parsed document by 7% for the CSV
+  and 2% for the JSON file of `bench/store`. Results do not change. ([#141](https://github.com/zorba-processor/zorba/pull/141))
+- Reduce the memory of parsed XML by 15% (a 106 MiB benchmark file goes from
+  1603 MiB to 1367 MiB, 15.1x to 12.9x the file): element nodes are 8 bytes
+  smaller and keep up to two attributes and children inline instead of in a
+  separate allocation. ([#145](https://github.com/zorba-processor/zorba/pull/145))
+- Reduce the memory of parsed JSON by 56% and of `csv:parse` results by 37% on
+  the `bench/store` inputs, and their parse time by 12%: the objects of one
+  `jn:parse-json` share their key items, and objects of at most 16 pairs have
+  no key hash map. ([#146](https://github.com/zorba-processor/zorba/pull/146))
+- `zorba-mcp` predeclares the namespace prefix `math:`; a query can still import it or bind it to another namespace. ([#149](https://github.com/zorba-processor/zorba/pull/149))
+- Documentation: the examples of the README, the container README and the web site show runnable commands (`-r` for `-q '1 + 1'`, a query file created in the snippet, the C++ compile command), the thread-safety text states only the current behavior, and the site examples are checked against the `edge` image. ([#150](https://github.com/zorba-processor/zorba/pull/150))
+- `list_documents` in `zorba-mcp` starts with a status line, lists 100 files by
+  default with the total, and no longer gives `modified` (use `--no-scan` or
+  `dir:list`). Its listing can miss files while the status says `running`;
+  query results do not depend on it. ([#151](https://github.com/zorba-processor/zorba/pull/151))
+- Limit JSON nesting depth to 1500 levels of arrays and objects. `jn:parse-json`
+  and the directory module refuse deeper documents, and array and object
+  constructors, updates and copies refuse to make deeper values, with
+  `zerr:ZXQP0071`; in `zorba-mcp` a file that is too deep gets its own error
+  record and the other files are not affected. ([#152](https://github.com/zorba-processor/zorba/pull/152))
+- A query is compiled in the language of its own `jsoniq version` or
+  `xquery version` declaration, else of its file extension (`.jq` is JSONiq,
+  `.xq` is XQuery), else of `--language`. `zorba -f query.xq --jsoniq` now
+  compiles `query.xq` as XQuery. The `.jq` files of `zorba-mcp --queries` are
+  compiled as JSONiq (they were compiled as XQuery unless they declared
+  JSONiq). ([#154](https://github.com/zorba-processor/zorba/pull/154))
+- Reword the file and I/O error messages (FODC0001, FODC0002, FODC0004, FODC0007, FOUT1170, FOUT1190, ZOSE0002,
+  ZOSE0003, URI_UNRESOLVED_OR_NOSTREAM) to say what failed in fewer words. FOUT1190 names the unsupported encoding,
+  and FOUT1170 says when the URI has a fragment identifier or is not a valid URI. Error codes do not change. ([#156](https://github.com/zorba-processor/zorba/pull/156))
+- Reword the module and import error messages to say what to fix: XQST0059 for a module that is not a library module
+  or has another target namespace, XQST0048 (use the prefix of the module declaration), XQST0045 for a function
+  name in a reserved namespace (use another prefix, `local:` in a main module), XQST0036 and the matching XPTY0004
+  forms (import the schema that defines the type), XQST0047, XQST0070 and ZXQP0008. Error codes do not change. ([#157](https://github.com/zorba-processor/zorba/pull/157))
+- Schema validation errors (XQDY0027) give the validator's message alone, without the quotes and the "unexpected
+  validity property" suffix. XQST0059 for an invalid schema reads "error in schema at line L, column C of "uri": ...".
+  XQDY0084, XQST0035 and the XQDY0027 "type not defined" form are reworded. Error codes do not change. ([#157](https://github.com/zorba-processor/zorba/pull/157))
+- Reword the JSON and JSONiq error messages: JNDY0003, JNTY0004, JNTY0011, JNTY0018, JNTY0020, JNTY0024, JNUP0017,
+  JNSE0013 and the "illegal JSON literal" parse error (JNDY0021, ZJPE0004), which now lists the valid literals.
+  JNSE0012 says to wrap the items in an array or set the serialization parameter `jsoniq-multiple-items` to `yes`.
+  Error codes do not change. ([#158](https://github.com/zorba-processor/zorba/pull/158))
+- Reword the type error messages: the XPTY0004 promotion, treat-as, cast and grouping-key forms, XPTY0018, XPTY0020,
+  XPTY0117, XPDY0050, FOCA0005 (which now says it comes from a duration operation), FORG0003, FORG0004, FORG0005
+  and FORG0008. FORG0003 no longer misspells "sequence". Error codes do not change. ([#159](https://github.com/zorba-processor/zorba/pull/159))
+- `zorba-mcp`: the files of the `list_documents` listing name their top-level
+  fields only (CSV columns, the keys of a JSON object, the root of an XML file
+  and what it holds directly). Nested names and samples are in the preview that
+  a file as `path` gives, unchanged. ([#168](https://github.com/zorba-processor/zorba/pull/168))
+- A sliding window clause reads its input as it goes and releases the items that no
+  open window can reach, as a tumbling window clause already did, in a query where no
+  side effect can run: a sequential expression or function or eval keep the input of
+  sliding windows in memory, as before. For a dynamic function call or a built-in
+  function that takes a function, see the sliding window entry under Fixed. An error in the input now surfaces when the clause reaches it, after
+  any windows returned before it. ([#169](https://github.com/zorba-processor/zorba/pull/169))
+- A window clause releases the items before and between windows while it reads them,
+  and keeps no items for open windows if the query refers to neither the window
+  variable nor the items of its start and end variables. ([#169](https://github.com/zorba-processor/zorba/pull/169))
+- `zorba-mcp --language jsoniq`: the `run_query` description carries a short
+  JSONiq primer: the context item is `$$`, the `content` of a CSV or of a
+  top-level JSON array is an array, `-` belongs to names, `\` escapes in strings,
+  `math:` needs no import, there is no type `number`, and a window clause. Its
+  examples run in the test suite. The server instructions point to it. A session
+  in XQuery, the default, has neither. ([#173](https://github.com/zorba-processor/zorba/pull/173))
+- Errors gain hints, and existing error codes and the message of a query error do
+  not change: `.` in JSONiq, where an expression can start, points to `$$`; `\` in
+  a JSONiq string that does not start an escape; a module import whose network
+  fetch the security policy denied says that the URI may hold no module; a
+  misspelled Zorba math namespace, denied or not, points to
+  `http://zorba.io/modules/math`; a function of
+  `http://www.w3.org/2005/xpath-functions/math` called in the Zorba math namespace
+  points to it, unless that namespace declares the function with another arity;
+  `$a- $b` and undeclared names that end in `-` explain that `-` belongs to names.
+  The hint for a string selector on an array also offers `$x[]` in JSONiq, and
+  does not repeat a selector computed at run time, or one with `"`, `\` or a
+  control character. ([#173](https://github.com/zorba-processor/zorba/pull/173))
+- Error messages shorten the data they quote. A value over 100 bytes becomes its
+  head, an ellipsis, its tail and its size in bytes, as in
+  `"abcdefghij…abcdefghij (3000000 bytes)": value of type xs:string is not
+  castable to type xs:integer`; `$err:description` in a `catch` clause holds the
+  same text. The rest of the message stays complete. A URI, a path or a QName
+  stays whole up to 4096 bytes, and so does the text of an error, such as the
+  message of the parser, of a library or of a nested error, or the name of a
+  type. The description given to `fn:error` is not shortened. ([#180](https://github.com/zorba-processor/zorba/pull/180))
+- `zorba-mcp`: `--max-output` also limits the `message` of an error: a longer
+  one loses its middle and keeps its end, with a marker that states its total
+  size. A hint is at most 4 KB, and `location.text` shows about 512 bytes around
+  the column of the error when the line is longer than that, or the two ends of
+  a line over 65535 bytes, where a column cannot be trusted. A selector over 100
+  bytes is not repeated in the hint for a string selector on an array. ([#180](https://github.com/zorba-processor/zorba/pull/180))
+- A CI job that stalls now ends after 45 minutes instead of running for
+  hours, and the Linux and macOS jobs write the ctest log to a file and print
+  it with passed tests removed and each line cut to 1000 characters. ([#182](https://github.com/zorba-processor/zorba/pull/182))
+- The sanitizer workflow now fails when UBSan reports undefined behavior at
+  one or more sites. Before, those reports only appeared in the summary. ([#182](https://github.com/zorba-processor/zorba/pull/182))
 
 ### Fixed
 
@@ -302,6 +483,247 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
   on every later lookup, which could drop or garble object fields or crash.
   Objects now own their key strings. ([#127](https://github.com/zorba-processor/zorba/pull/127))
 - `dir:documents` no longer keeps every parsed document in memory until the query ends: it sorted the records with an `order by` over the loaded documents, which holds the result of every tuple until the last one is loaded. It now sorts the paths first and parses each document when the caller asks for it, so a query that consumes the documents one at a time holds one of them (peak RSS of a scan of 1000 files of 200 KB: 4610 MiB before, 55 MiB after). ([#128](https://github.com/zorba-processor/zorba/pull/128))
+- Make `zorba-mcp` reject tool arguments that the tool's input schema does not declare (for example a `variables` argument to `run_query`) with an `invalid-arguments` tool error naming them, instead of ignoring them and returning a result computed without them. ([#135](https://github.com/zorba-processor/zorba/pull/135))
+- Make `zorba-mcp` answer `ping` with "method not found" to requests of protocol revision 2026-07-28, which removed it; `ping` still works in sessions opened with `initialize`. ([#135](https://github.com/zorba-processor/zorba/pull/135))
+- Raise an error when a parsed document refers to an external parsed entity
+  that cannot be loaded (e.g. its file does not exist): `fn:doc` raises
+  FODC0002, `fn:parse-xml` and `x:parse` raise FODC0006. Before, the entity
+  was silently left out of the document, which XDM does not allow (all
+  external parsed entities must be expanded). ([#138](https://github.com/zorba-processor/zorba/pull/138))
+- Fix the documentation: the site's quick start now uses the `edge` container image instead of the untagged one (an older build without `zorba-mcp`); the MCP page sets the installation prefix at configure time (installing with `cmake --install --prefix` produced binaries that did not find their libraries); the security section names the errors a denied access actually raises and no longer says that `--secure` searches the current directory for modules; the README's Debian/Ubuntu instructions run `apt-get update` first, and its testing section lists the tests that fail against stock Xerces-C and the locales the datetime tests need. ([#143](https://github.com/zorba-processor/zorba/pull/143))
+- Fix the order of the external variables reported by `getExternalVariables`
+  (C++ API) and of the tool parameters in `zorba-mcp`'s `tools/list`: they
+  follow declaration order instead of an order that varied between runs. ([#144](https://github.com/zorba-processor/zorba/pull/144))
+- Fix a memory leak in `jn:parse-json` when an object has a duplicate key
+  (JNDY0003). ([#146](https://github.com/zorba-processor/zorba/pull/146))
+- Compare `xs:integer` with `xs:decimal` by value in `group by`, `order by`,
+  `fn:index-of`, joins, typed value comparisons and `unordered-maps` keys:
+  the decimal was converted to an integer first, which truncated it (so `1` and
+  `1.5` compared equal) or raised an internal error beyond 2^63. ([#148](https://github.com/zorba-processor/zorba/pull/148))
+- Fix an internal error when comparing a negative integer with an
+  `xs:nonNegativeInteger`. ([#148](https://github.com/zorba-processor/zorba/pull/148))
+- Give `xs:long` and `xs:unsignedLong` values above 2^53 the same hash as an
+  equal `xs:integer`, `xs:decimal` or `xs:double`: `fn:distinct-values` and
+  `group by` kept them as separate values. ([#148](https://github.com/zorba-processor/zorba/pull/148))
+- Order `order by` keys that mix numeric types in their least common type:
+  each pair was promoted on its own, which gave no consistent order around the
+  xs:double rounding limits. ([#148](https://github.com/zorba-processor/zorba/pull/148))
+- Fix `--module-path` with a relative path such as `.` under `--secure` or any restricted read policy: the module was refused with XQST0059 and "requires capability RemoteImport" because the relative path was not resolved against the current directory. A path with `..` that leaves the granted directory is still refused. ([#150](https://github.com/zorba-processor/zorba/pull/150))
+- Fix `--profile json` (and the XML and DOT profile outputs) printing garbage counters, such as `"prof-next-calls": 4294967295` with `"prof-calls": 0`, and `nan` CPU times, for iterators that were never opened, such as the body of a cached function call. The profile counters now start at zero and the JSON printer never writes `nan` or `inf`. ([#150](https://github.com/zorba-processor/zorba/pull/150))
+- Fix an installation made with `cmake --install --prefix <dir>` or moved after installing: the binaries failed with `libzorba_simplestore.so: cannot open shared object file`. The RPATH is now relative to the binary, so the binaries start from any prefix. The module and library directories are still fixed at configure time. ([#150](https://github.com/zorba-processor/zorba/pull/150))
+- Correct the description that `zorba-mcp` sends to MCP clients: it lists HTML among the supported formats. ([#150](https://github.com/zorba-processor/zorba/pull/150))
+- Fix crashes on deeply nested JSON values: serializing, `fn:deep-equal`,
+  copying, function result caching, `item:size`, `jn:encode-for-roundtrip`,
+  `jn:decode-from-roundtrip`, JSound and destroying a value no longer run out
+  of stack; on a thread with too little stack they raise `zerr:ZXQP0071`. ([#152](https://github.com/zorba-processor/zorba/pull/152))
+- Stop recursive functions at the time limit (`--timeout`, `zerr:ZXQP0068`):
+  the deadline count restarted with each function call, so a recursion that did
+  little per call was never checked and ran until it ran out of memory. Function
+  calls and external functions now read the clock, and the check runs every 64
+  iterator calls instead of 1024. ([#153](https://github.com/zorba-processor/zorba/pull/153))
+- Release the memory of a completed function call: a recursion kept about 11 KB
+  per call made until the query ended, so peak memory doubled with each level of
+  a tree recursion. Peak memory now follows the depth of the recursion. A call
+  abandoned by `head()` or a positional filter is released with its caller. ([#153](https://github.com/zorba-processor/zorba/pull/153))
+- Count string operations and sort comparisons against the time limit: a query
+  doing long string operations ran for tens of seconds past the limit. ([#153](https://github.com/zorba-processor/zorba/pull/153))
+- Stop constant folding from using up the time limit: the optimizer ran each
+  constant expression under the time limit and tried each enclosing expression
+  first, so a query ran for the limit once per level of nesting before it
+  started. Folding now has a budget of 500 ms per query. ([#153](https://github.com/zorba-processor/zorba/pull/153))
+- Stop leaving an expression behind for each dynamic function call, about 400
+  bytes until the query ended. ([#153](https://github.com/zorba-processor/zorba/pull/153))
+- Fix `xquery version` in a query compiled with the JSONiq static context
+  (`zorba --jsoniq`): the query now follows XQuery name resolution instead of
+  JSONiq's. ([#154](https://github.com/zorba-processor/zorba/pull/154))
+- `fn:distinct-values` and `group by` now merge an `xs:integer` or `xs:decimal`
+  with the `xs:float` it equals after promotion: `16777217 eq xs:float(16777216)`
+  is true and they are one value. A container that sees an `xs:float` key hashes
+  all its numeric keys on their `xs:float` rounding from then on, so large
+  integers share buckets only there; a container without `xs:float` keys costs
+  the same as before. ([#155](https://github.com/zorba-processor/zorba/pull/155))
+- A join on operands of static type `xs:anyAtomicType` no longer loses pairs with an
+  `xs:float` on one side. When an `xs:float` takes part it runs as a nested loop. ([#155](https://github.com/zorba-processor/zorba/pull/155))
+- `map:create` accepts the key type `"anyAtomicType"`; such a map no longer raises
+  `ZSTR0040` when keys of different types meet. ([#155](https://github.com/zorba-processor/zorba/pull/155))
+- Comparing numeric items of different types directly (index and map keys, some
+  `group by` keys) goes by value: `5` no longer equals `5.5e0`, and both
+  directions agree. ([#155](https://github.com/zorba-processor/zorba/pull/155))
+- `xs:unsignedLong` holds its full range without big integers: casts from strings,
+  numbers and `xs:untypedAtomic` up to 18446744073709551615, comparisons, hashing,
+  promotion to `xs:decimal`, `xs:double` and `xs:float`, and serialization.
+  `xs:unsignedLong` values above 2^63-1 used in `xs:integer` arithmetic still
+  raise `FOAR0002` in that build. ([#155](https://github.com/zorba-processor/zorba/pull/155))
+- Fix a signed overflow in the conversion of the largest `long long` to a string. ([#155](https://github.com/zorba-processor/zorba/pull/155))
+- `fn:collection()` without an argument and no default collection reported "default collation" instead of
+  "default collection". ([#156](https://github.com/zorba-processor/zorba/pull/156))
+- The functions of the `http://zorba.io/modules/store/documents` module (`put`, `remove`, `document`,
+  `is-available-document`) reported an empty URI in FODC0004 when the URI could not be resolved. ([#156](https://github.com/zorba-processor/zorba/pull/156))
+- JNTY0020 from `jn:parse-json()` left the option name out of the message. ([#158](https://github.com/zorba-processor/zorba/pull/158))
+- Fix typos and unclear wording in the messages of XPST0080, XQDY0026, XQDY0041, XQDY0044, FOER0000, FOCH0002 and
+  FORX0003. Error codes do not change. ([#161](https://github.com/zorba-processor/zorba/pull/161))
+- Compile a `group by` after a window clause without an end condition or whose
+  conditions bind no variables, in builds where it failed. ([#163](https://github.com/zorba-processor/zorba/pull/163))
+- Bind a sliding window to its own start item when an earlier window with
+  `only end` never closed. It was bound to the start item of that earlier window. ([#163](https://github.com/zorba-processor/zorba/pull/163))
+- Return nothing for a position past the end of a window variable, as in
+  `$w[2]` on a window of one item. It returned the next item of the input. ([#163](https://github.com/zorba-processor/zorba/pull/163))
+- Accept `fn:tail`, `subsequence($w, 2)` and `$w[position() gt 1]` on a tumbling
+  window. They failed with an internal error. ([#163](https://github.com/zorba-processor/zorba/pull/163))
+- Count the windows of a FLWOR whose return clause is a constant, as in
+  `count(for sliding window ... return 1)`. It gave 1 at any number of windows. ([#163](https://github.com/zorba-processor/zorba/pull/163))
+- Count a FLWOR with `allowing empty` over an empty sequence. ([#163](https://github.com/zorba-processor/zorba/pull/163))
+- Return nothing for `$x[0]` and `$x[-1]` on a variable. They returned the
+  whole value of the variable. ([#163](https://github.com/zorba-processor/zorba/pull/163))
+- Raise XPST0003 for a window clause whose conditions are not a start condition
+  followed by an end condition, or for a sliding window without an end condition. ([#163](https://github.com/zorba-processor/zorba/pull/163))
+- Fix a crash when a query stopped during an `order by` sort, by the time limit
+  or by a type error in the comparison of two keys: the sort keys were released
+  incorrectly afterwards. ([#165](https://github.com/zorba-processor/zorba/pull/165))
+- A sliding window clause no longer evaluates its end condition once per open window
+  when the condition reads no start variable and is made of repeatable built-in functions:
+  one evaluation per item, with the same results. Other conditions, such as those that
+  call a user function or make a node, are still evaluated once per window. ([#169](https://github.com/zorba-processor/zorba/pull/169))
+- `zorba-mcp` document cache: a query gets its own copy of a kept document, so its results are those of reading the file. Before, a kept document had one node identity for all reads, and its place in the order of documents came from when it was kept, so path expressions and unions over several documents could return another order, and two reads of a file counted as one. ([#170](https://github.com/zorba-processor/zorba/pull/170))
+- `zorba-mcp` document cache: a kept XML or HTML document has the base URI of a document read from the file. ([#170](https://github.com/zorba-processor/zorba/pull/170))
+- `zorba-mcp` document cache: a file changed in the last 20 ms is not kept yet. A write right after such a read could carry the same timestamps, and the old content stayed in the cache. ([#170](https://github.com/zorba-processor/zorba/pull/170))
+- `zorba-mcp` document cache: files read repeatedly enter it. Two files could take the same slot of the table that counts first reads and never enter; about 2 in 100 files did at 100 files. A file can still need more than two reads to enter when the table is full, and with far more files than the table's 4096 tags many stay out. The table keeps its size, 32 KiB. ([#170](https://github.com/zorba-processor/zorba/pull/170))
+- `zorba-mcp` document cache: file times past the year 2262 no longer overflow a signed integer. ([#170](https://github.com/zorba-processor/zorba/pull/170))
+- `zorba-mcp` document cache: a file read through another spelling of its root shares the record of that root. ([#170](https://github.com/zorba-processor/zorba/pull/170))
+- A copy of a document with a generated document URI gets its own generated URI. ([#170](https://github.com/zorba-processor/zorba/pull/170))
+- HTML with libxml2 before 2.14 (Ubuntu 24.04 has 2.9.14): `x:parse-html` and `dir:open` reported an error for a document with 1000 or more blanks after `</html>`, or that ended, unclosed, on a run of text or blanks of a length that is a multiple of 1000. libxml2 could report the end of the document with elements open or not at all. These documents now parse, on every libxml2 version. ([#172](https://github.com/zorba-processor/zorba/pull/172))
+- `x:parse-html` reports a failed internal check as what it is, not as invalid content in FODC0006, and its message for a document left with open elements no longer holds a generated document URI. ([#172](https://github.com/zorba-processor/zorba/pull/172))
+- Fix diagnostic message substitution, which left a `$n` literal when it came
+  after a `${...m...}` with a higher `m`. The message of the libxml2 error
+  `XML_DTD_ID_SUBSET` changes: its second name was printed as `$6`. ([#173](https://github.com/zorba-processor/zorba/pull/173))
+- Fix the message of an undefined namespace prefix in XML, which printed its
+  template (`${ for "7?6"}${ on "7?7:6"}`) instead of the names. ([#173](https://github.com/zorba-processor/zorba/pull/173))
+- At O1 and O2, a dynamic function call or a call of `fn:fold-left`, `fn:fold-right`
+  or `fn:for-each-pair` could be moved out of a loop, merged with another call,
+  moved to the use of its `let` variable or removed, although the function was
+  sequential or nondeterministic or created nodes. In a query where something with
+  a side effect is reachable, such a call now stays where it is written unless the
+  optimizer can prove the function deterministic and free of side effects, and if
+  the query has such a call anywhere, nothing is hoisted out of a loop anywhere in
+  the query and no index join is made. This is a known limit: such a query loses
+  hoisting everywhere, also of expressions the call cannot change. In a query whose
+  calls through function items are all proven, an expression that reads a state
+  such a call can change stays in its loop. `ref:reference` counts as a side effect. In a query with no
+  side effect, a call is only kept from being evaluated once for several
+  iterations if a nondeterministic function or a constructor is reachable, and
+  other expressions are hoisted as before. ([#174](https://github.com/zorba-processor/zorba/pull/174))
+- In a query where such a call can have a side effect, the domain of a `for` clause
+  with the call gives its whole binding sequence first, at all levels, and later
+  clauses run per tuple. This is decided before the optimizer runs, so a `for`
+  clause that only returns its variable, or a call that inlining proves pure, gives
+  the same result at O0, O1 and O2. ([#174](https://github.com/zorba-processor/zorba/pull/174))
+- An index join is not used when the domain of the inner variable or the join
+  predicate has a dynamic call whose result can differ per call. ([#174](https://github.com/zorba-processor/zorba/pull/174))
+- A sliding window clause in a query with a dynamic call and nothing with a side
+  effect reachable reads its input lazily and releases it. ([#174](https://github.com/zorba-processor/zorba/pull/174))
+- A dynamic function call with an empty sequence as the function raises XPTY0004 in
+  XQuery at all levels, with or without arguments; this includes a lookup such as
+  `$o("a")("b")` or `$o("a")()` when `$o("a")` is empty, which gave an empty result.
+  In JSONiq, a lookup over an empty sequence stays empty, also at O1 and O2 when the
+  optimizer finds that the sequence has at most one item. ([#174](https://github.com/zorba-processor/zorba/pull/174))
+- At O1 and O2, a `let` that reads a variable could be moved after a later `let`
+  with a direct call of a sequential function, and an argument with such a call
+  could run after the part of the function body before the use of the parameter. ([#174](https://github.com/zorba-processor/zorba/pull/174))
+- Fix a UTF-8 byte order mark at the start of a text resource staying in the
+  string: `utf8::BOM` was four bytes long, so `skip_utf8_bom` never found a mark,
+  and each read of a streamed string went back to position 0. `jn:parse-json`
+  raised `JNDY0021`, `csv:parse` and `dir:open` had it in the first key, and the
+  string value started with U+FEFF. `file:read-text`, `file:read-text-lines`,
+  `fn:unparsed-text`, `fn:unparsed-text-lines` and `fetch:content` now skip the
+  mark, only when the resource is decoded as UTF-8: in `UTF-16LE` and `UTF-16BE`
+  a leading U+FEFF is text. `base64:decode` keeps it. Over HTTP, `fetch:content`
+  and `fn:unparsed-text` decode the resource as ISO-8859-1, so a mark there
+  arrives as three characters. ([#176](https://github.com/zorba-processor/zorba/pull/176))
+- `jn:parse-json` ignores a byte order mark at the start of its input, as
+  `fn:parse-json` does in F&O 3.1. ([#176](https://github.com/zorba-processor/zorba/pull/176))
+- `byte-order-mark="yes"` with the `xml`, `xhtml` and `text` methods and the
+  encodings `UTF-8`, `UTF-16`, `UTF-16LE` and `UTF-16BE`, in any case: write the
+  two octets of the mark in the right order for `UTF-16LE` and `UTF-16BE` (it
+  wrote four, swapped), no NUL after the UTF-8 mark, no second mark for `UTF-16`,
+  and with the `text` method too. `fn:serialize` no longer writes the mark itself;
+  an explicit `encoding` parameter still applies to its string. ([#176](https://github.com/zorba-processor/zorba/pull/176))
+- `fn:unparsed-text-lines` and `file:read-text-lines`: lines also end with x0D, and
+  a last empty line does not count, as F&O defines it. An empty file has no lines. ([#176](https://github.com/zorba-processor/zorba/pull/176))
+- `fn:unparsed-text-lines` and `file:read-text-lines` raise `FOUT1190` and
+  `FOFL9999` on octets that cannot be decoded, instead of ending the lines there. ([#176](https://github.com/zorba-processor/zorba/pull/176))
+- The `text` output method and an HTTP request body no longer go back to position 0
+  of a streamed string, which brought the mark back. ([#176](https://github.com/zorba-processor/zorba/pull/176))
+- JSON serialization of `-INF` no longer loses the sign. ([#176](https://github.com/zorba-processor/zorba/pull/176))
+- `zorba-mcp`: a query that runs out of memory under `--max-memory` gets the tool
+  error `memory_limit` and the same server answers the next call. Before, depending
+  on which allocation failed, the server could end with no response: allocations in
+  the JSON string lexers and CSV parser, in the release of JSON values, in the QName
+  pool, and in MAPM's decimal numbers (which ended the process with status 100, also
+  in `zorba`). If memory runs out where nothing can recover, for example while the
+  server starts, `zorba-mcp` exits with status 3 and a message on stderr; `--help`
+  lists what libraries do instead. Known limit: after several consecutive failed
+  allocations, the XML, fragment and HTML parsers can keep 8 to 18 KB per failed
+  call; the cause is not established, and the tests report it but do not fail on
+  it. ([#178](https://github.com/zorba-processor/zorba/pull/178))
+- Running out of memory while parsing XML, in casts, in regular expressions, in `file:`
+  functions and in external functions is no longer a false result or an error that a
+  catch clause can catch, such as the one in `dir:open`: it ends the query, as a
+  timeout does. ([#178](https://github.com/zorba-processor/zorba/pull/178))
+- After an allocation failed while the QName pool's hash table was being resized,
+  entries not yet moved were lost: built-in functions and the variables of a catch
+  clause were then not found for the rest of the process (`XPST0017` on
+  `parse-xml`, `string-join`, `sum`; `XPST0008` on `$err:description`). The table
+  now keeps its old contents when a resize cannot allocate, and an erase no longer
+  fails when the shrink after it cannot. ([#178](https://github.com/zorba-processor/zorba/pull/178))
+- `zorba-mcp`: a line of input longer than the message limit is refused without
+  reading it into memory. ([#178](https://github.com/zorba-processor/zorba/pull/178))
+- `zorba-mcp`: a notification is never answered, also when memory runs out while it
+  is handled; before, an error with `"id": null` was sent for it. A request is
+  answered with its own id when memory runs out after its id is read; before, a
+  failure while the id was copied gave `"id": null`. ([#178](https://github.com/zorba-processor/zorba/pull/178))
+- Running out of memory while the parse tree of a query was released could end the
+  process (`std::terminate`, status 3 in `zorba-mcp`): the queue of nodes waiting to
+  be destroyed allocated. ([#178](https://github.com/zorba-processor/zorba/pull/178))
+- Running out of memory while the text of a query was copied for the compiler
+  compiled the part copied so far: `123456789012345678` could run as
+  `123456789012345`, a wrong answer reported as a success. The text is now copied
+  whole or the call fails. The same holds for a streamable string that is made
+  seekable or read whole, for `createBase64Binary` from a stream in the C++ API,
+  and for the source of a `zorba-mcp` predefined query. ([#178](https://github.com/zorba-processor/zorba/pull/178))
+- Running out of memory while a query object was created, while an expression was
+  recorded for the compiler, or while an XML document was loaded (an element not
+  yet on the loader's stack, or a load that an exception left) left memory behind. ([#178](https://github.com/zorba-processor/zorba/pull/178))
+- `zorba-mcp`: a query whose output could not be collected for lack of memory was
+  answered with the part collected so far and a note that the output was
+  truncated; it now gets the tool error `memory_limit`. ([#178](https://github.com/zorba-processor/zorba/pull/178))
+- Fix `jsoniq-strip-top-level-array` also stripping an array nested in a
+  top-level object: `{"a":[1,2]}` returned no object. ([#179](https://github.com/zorba-processor/zorba/pull/179))
+- Fix a signed integer overflow when a date, time or duration value contains
+  a very long run of digits. The value is still rejected with the same
+  date/time overflow error as before. ([#181](https://github.com/zorba-processor/zorba/pull/181))
+- Fix a signed integer overflow when a module version or a `zorba-version`
+  option contains a number above 2147483647. Such a number is now treated as
+  2147483647. ([#181](https://github.com/zorba-processor/zorba/pull/181))
+- The modify clause of a copy modify expression raises `XUDY0014` for every
+  update whose target is not a node created by its copy clause. Collection
+  updates (`ddl:create`, `ddl:delete`, `dml:insert-*`, `dml:delete*`,
+  `dml:edit`, `dml:truncate`), `doc:put`, `doc:remove`, the creation, deletion
+  and refresh of an index and the activation of an integrity constraint no
+  longer change the store from there. Before, only node targets were checked,
+  and a node target outside the copy could pass when another target was
+  checked first. ([#186](https://github.com/zorba-processor/zorba/pull/186))
+- `fn:put` in the modify clause raises `XUDY0037` (XQuery Update Facility 3.0)
+  instead of storing the document. ([#186](https://github.com/zorba-processor/zorba/pull/186))
+- Fix a signed integer overflow in builds without ICU when a regular
+  expression quantifier bound (`{n}` or `{n,m}`) is above 2147483647. Such a
+  pattern is now rejected with `err:FORX0002`, as in builds with ICU. ([#187](https://github.com/zorba-processor/zorba/pull/187))
+- Fix an assertion failure in debug builds for a `copy ... modify ... return ()`
+  expression whose return expression is the empty sequence. ([#188](https://github.com/zorba-processor/zorba/pull/188))
+- Fix iteration over the children or attributes of a node, the members of an
+  array or the keys of an object while a sequential expression updates that
+  item: the iteration read storage the update had freed or moved, and
+  returned wrong items or crashed. It now returns the contents the item had
+  when the iteration started, the same result as at optimization level O0. ([#189](https://github.com/zorba-processor/zorba/pull/189))
 
 ### Removed
 

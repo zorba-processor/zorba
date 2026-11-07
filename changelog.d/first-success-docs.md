@@ -1,3 +1,0 @@
-### Fixed
-
-- Fix the documentation: the site's quick start now uses the `edge` container image instead of the untagged one (an older build without `zorba-mcp`); the MCP page sets the installation prefix at configure time (installing with `cmake --install --prefix` produced binaries that did not find their libraries); the security section names the errors a denied access actually raises and no longer says that `--secure` searches the current directory for modules; the README's Debian/Ubuntu instructions run `apt-get update` first, and its testing section lists the tests that fail against stock Xerces-C and the locales the datetime tests need.
