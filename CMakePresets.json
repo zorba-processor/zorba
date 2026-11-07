@@ -244,6 +244,9 @@
         "timeout": 300
       },
       "filter": {
+        "include": {
+          "name": "iteration-updates|test/libunit/(node_edit_iterator|container_checks)$"
+        },
         "exclude": {
           "name": "^test/api/timeout_bounds$"
         }

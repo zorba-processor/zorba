@@ -128,7 +128,7 @@ protected:
 
   void setRange(const store::Item* child)
   {
-    startReading(theParentNode->nodesKey());
+    // PROBE: the iterator does not register (the defect fixed by #189)
 
     theEnd = theParentNode->childrenEnd();
     theStart = theParentNode->childrenBegin();
@@ -255,7 +255,7 @@ protected:
 
   void setRange(const store::Item* child)
   {
-    startReading(theParentNode->nodesKey());
+    // PROBE: the iterator does not register (the defect fixed by #189)
 
     theEnd = theParentNode->childrenREnd();
     theStart = theParentNode->childrenRBegin();
@@ -370,7 +370,7 @@ protected:
 
   void setRange()
   {
-    startReading(theParentNode->nodesKey());
+    // PROBE: the iterator does not register (the defect fixed by #189)
 
     theEnd = theParentNode->attrsEnd();
     theStart = theParentNode->attrsBegin();
