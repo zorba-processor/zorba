@@ -3067,6 +3067,36 @@ std::string sweep_dtd_query( std::string const &prefix ) {
          "try { count(doc(concat($dir:root, '/" + prefix + ".xml'))//*) } "
          "catch * { concat('caught ', string($err:code), ' ', $err:description) }";
 }
+
+// A document with a DOCTYPE whose tree holds every kind of node the loader
+// reads back from libxml2 (text, CDATA, comment, processing instruction), an
+// empty comment and a processing instruction with no data among them, and
+// attributes with long values. The answer
+// weighs the length of every node by its position, so that a node that lost its
+// content to a failed allocation is not mistaken for an empty one.
+std::string sweep_dtd_nodes_xml( std::string const &prefix ) {
+  std::string const attribute( prefix + "_big" );
+  std::string items;
+  for ( int i = 1; i <= 6; ++i )
+    items += "<item " + attribute + "='" + std::string( 20000, 'v' ) + "'>t" +
+             std::to_string( i ) + "</item>";
+  return "<!DOCTYPE root [<!ELEMENT root (#PCDATA|item)*><!ELEMENT item (#PCDATA)>"
+         "<!ATTLIST item " + attribute + " CDATA #IMPLIED>]><root>" + items +
+         "<!--note--><?target data?><![CDATA[cdata]]><!----><?empty?></root>";
+}
+std::string sweep_dtd_nodes_query( std::string const &prefix ) {
+  return "import module namespace dir = 'http://zorba.io/modules/directory';\n"
+         "declare namespace f = 'http://zorba.io/options/features';\n"
+         "declare namespace err = 'http://www.w3.org/2005/xqt-errors';\n"
+         "declare option f:enable 'dtd';\n"
+         "try { let $d := doc(concat($dir:root, '/" + prefix + ".xml')) "
+         "return count($d//node()) * 1000000000000 + "
+         "sum(for $a in $d//item/@*[ends-with(name(), '_big')] "
+         "return string-length($a)) * 1000 + "
+         "sum(for $n at $i in $d//node()[not(. instance of element())] "
+         "return $i * string-length($n)) } "
+         "catch * { concat('caught ', string($err:code), ' ', $err:description) }";
+}
 #endif
 
 void test_sweep_xml_dtd( Fixture const &f ) {
@@ -3092,6 +3122,53 @@ void test_sweep_xml_dtd( Fixture const &f ) {
               starting( "terminate N11xercesc_", 105, 8, "OutOfMemoryExceptionE" ) };
   s.kept_runs_of_8_reported = true;   // the known limit, see Sweep
   exhaust_sweep( f, "parse-xml with DTD validation", s );
+#else
+  (void)f;
+#endif
+}
+// Every allocation of the load fails in turn (a point for each: the document is
+// small). The loader gives the answer or memory_limit, never a document with a
+// node that has no content, and, as for every sweep, a failed call keeps no
+// more than the bound of what operator new allocated. That does not cover what
+// libxml2 allocates with malloc, such as the value xmlGetProp returns: its
+// release in startElement is not checked by this test.
+void test_sweep_xml_dtd_nodes( Fixture const &f ) {
+#if defined(__linux__)
+  // libxml2 2.9.14 (Ubuntu 24.04) makes a text, CDATA or comment node with no
+  // content, or drops a node, when its own allocation fails, and reports no
+  // error: the loader cannot tell such a tree from a document. libxml2 2.13.0
+  // (NEWS, "Major changes"): "Most of the core code should now report malloc
+  // failures reliably." The sweep runs from 2.13.
+  if ( void *const version = dlsym( RTLD_DEFAULT, "xmlParserVersion" ) ) {
+    char const *const text = *static_cast<char const *const *>( version );
+    if ( text && std::atoi( text ) < 21300 ) {
+      std::cout << "parse-xml with DTD validation, every kind of node: not with"
+                << " libxml2 " << text << std::endl;
+      return;
+    }
+  }
+  Sweep s;
+  s.files = { { "nodes.xml", sweep_dtd_nodes_xml( "nodes" ) },
+              { "nodes_warm.xml", sweep_dtd_nodes_xml( "warm" ) } };
+  s.query = sweep_dtd_nodes_query( "nodes" );
+  s.before.push_back( sweep_dtd_nodes_query( "nodes_warm" ) );
+  s.after_compile = true;
+  s.points = 1000000;
+  // 18 nodes, 120000 characters of attributes, and the sum of position times
+  // length over the 11 nodes that are not elements: 2 * (1 + .. + 6) + 4 * 7 +
+  // 4 * 8 + 5 * 9 + 0 + 0 = 147. A number,
+  // as a string built by the query is cut short when its buffer cannot grow.
+  s.expected = "18000120000147";
+  // The known limits of test_sweep_xml_dtd: libxml2 failing to allocate while it
+  // parses, and Xerces-C. Caps: about 1.5 times the most seen in CI run
+  // 42487120094 (runs of 1 / of 8: 41 file; 76 tree creation; 2 / 143 Xerces-C;
+  // the 143 is from its bigint profile, which makes the most allocations).
+  s.known = { starting( "\"caught err:FODC0002 \\\"/tmp/mcp-tree", 62, 1 ),
+              starting( "\"caught err:FODC0002 \\\"XML tree creation failed\\\"", 115, 1 ),
+              starting( "terminate N11xercesc_", 4, 1, "OutOfMemoryExceptionE" ),
+              starting( "terminate N11xercesc_", 215, 8, "OutOfMemoryExceptionE" ) };
+  s.kept_runs_of_8_reported = true;   // the known limit, see Sweep
+  exhaust_sweep( f, "parse-xml with DTD validation, every kind of node", s );
 #else
   (void)f;
 #endif
@@ -7265,6 +7342,7 @@ Test const tests[] = {
   { "exhaust_sweep_matcher", test_sweep_matcher },
   { "exhaust_sweep_xml", test_sweep_xml },
   { "exhaust_sweep_xml_dtd", test_sweep_xml_dtd },
+  { "exhaust_sweep_xml_dtd_nodes", test_sweep_xml_dtd_nodes },
   { "exhaust_sweep_fragment", test_sweep_fragment },
   { "exhaust_sweep_html", test_sweep_html },
   { "exhaust_sweep_json", test_sweep_json },
