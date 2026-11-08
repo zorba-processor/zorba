@@ -200,6 +200,20 @@ Outcome parse_xml(Zorba* z, StaticContext_t sctx, const std::string& aXml)
              "input", aXml);
 }
 
+// x:parse with DTD validation builds the document from a libxml2 tree, not
+// from SAX events (the store's DtdXmlLoader).
+[[maybe_unused]] Outcome parse_dtd_valid(Zorba* z, StaticContext_t sctx,
+                                         const std::string& aXml)
+{
+  return run(z, sctx,
+             "import module namespace x = \"http://zorba.io/modules/xml\";\n"
+             "declare namespace opt = \"http://zorba.io/modules/xml-options\";\n"
+             "declare variable $input as xs:string external;\n"
+             "x:parse($input, <opt:options><opt:DTD-validate/></opt:options>)"
+             "/string()",
+             "input", aXml);
+}
+
 Outcome doc(Zorba* z, StaticContext_t sctx, const std::string& aURI)
 {
   return run(z, sctx,
@@ -410,6 +424,56 @@ void test_instance_default(Zorba* z, const Files& f)
   z->setSecurityPolicy(SecurityPolicy::unrestricted());
 }
 
+#ifndef ZORBA_NO_XMLSCHEMA
+bool failed(const Outcome& o, const char* aCode)
+{
+  if (o.ok || o.code != aCode)
+  {
+    std::cerr << "  expected " << aCode << ", got " << o << std::endl;
+    return false;
+  }
+  return true;
+}
+
+// With DTD validation, an entity reference in the content either gets the
+// entity's replacement text or fails the parse; the text around it is never
+// returned alone.
+void test_dtd_entities(Zorba* z, const Files& f)
+{
+  auto const lDoc = [](const std::string& aDecl)
+  {
+    return "<?xml version=\"1.0\"?>\n"
+           "<!DOCTYPE r [<!ELEMENT r (#PCDATA)>" + aDecl + "]>\n"
+           "<r>[&e;]</r>";
+  };
+  std::string const lInternal = lDoc("<!ENTITY e \"hello\">");
+  std::string const lExternal =
+    lDoc("<!ENTITY e SYSTEM \"" + f.secretURI + "\">");
+  std::string const lMissingURI =
+    "file://" + (f.dir / "missing.txt").generic_string();
+  std::string const lMissing =
+    lDoc("<!ENTITY e SYSTEM \"" + lMissingURI + "\">");
+  // Declared only in an external subset that does not exist.
+  std::string const lUndeclared =
+    "<?xml version=\"1.0\"?>\n"
+    "<!DOCTYPE r SYSTEM \"file://" +
+    (f.dir / "missing.dtd").generic_string() + "\">\n"
+    "<r>[&e;]</r>";
+
+  StaticContext_t secure = context(z, SecurityPolicy::secure());
+  CHECK(expanded(parse_dtd_valid(z, secure, lInternal), "[hello]"));
+  CHECK(denied(parse_dtd_valid(z, secure, lExternal), "FODC0006",
+               f.secretURI));
+
+  StaticContext_t open = context(z, SecurityPolicy::unrestricted());
+  CHECK(expanded(parse_dtd_valid(z, open, lInternal), "[hello]"));
+  CHECK(expanded(parse_dtd_valid(z, open, lExternal),
+                 (std::string("[") + SECRET + "]").c_str()));
+  CHECK(failed(parse_dtd_valid(z, open, lMissing), "FODC0006"));
+  CHECK(failed(parse_dtd_valid(z, open, lUndeclared), "FODC0006"));
+}
+#endif
+
 #ifdef ZORBA_XQUERYX
 // XQueryX query text is parsed by libxml2 too. The query uses an entity from
 // an external DTD subset (the XQueryX detection does not accept an internal
@@ -500,6 +564,9 @@ xml_parser_security(int argc, char* argv[])
     test_unrestricted(lZorba, lFiles);
     test_relative_entity(lZorba, lFiles);
     test_instance_default(lZorba, lFiles);
+#ifndef ZORBA_NO_XMLSCHEMA
+    test_dtd_entities(lZorba, lFiles);
+#endif
 #ifdef ZORBA_XQUERYX
     test_xqueryx(lZorba, lFiles);
 #endif
