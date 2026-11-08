@@ -2929,6 +2929,14 @@ void exhaust_sweep( Fixture const &f, std::string const &name, Sweep const &s ) 
               sweep_show_frames( "  a block of " + b.substr( 0, sp ) + " bytes",
                                  b.substr( sp + 1 ), true );
             }
+            // Where the failing allocation was: the same point once more, traced.
+            Stacks traced;
+            std::string const traced_out( run_child( n, length, false, nullptr,
+                                                     nullptr, &traced, true ) );
+            if ( !traced.alloc.empty() )
+              sweep_show_frames( "failing allocation at " + std::to_string( n ) +
+                                 " (traced run: " + traced_out.substr( 0, 120 ) +
+                                 ")", traced.alloc, true );
           }
         }
       }
