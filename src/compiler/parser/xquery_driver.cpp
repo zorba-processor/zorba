@@ -170,6 +170,10 @@ bool xquery_driver::parse_stream(std::istream& in, const zstring& aFilename)
   theFilename = aFilename;
   theFilename2 = theFilename.str();
 
+  // Declared before the parser: the nodes it keeps are freed after the parser
+  // has released the values on its stack.
+  parsenode::DeferFree deferFree;
+
   // process the UTF16 Byte Order Mark = \xEF\xBB\xBF
   if (in.peek() == 0xEF)
   {

@@ -125,6 +125,18 @@ void parsenode_visitor::checkStack(const QueryLoc& loc, uint32_t aLevels)
 }
 
 
+namespace
+{
+thread_local parsenode::DeferFree* tDeferFree = nullptr;
+}
+
+parsenode::~parsenode()
+{
+  if (theDeferredBy != nullptr)
+    theDeferredBy->forget(this);
+}
+
+
 /*******************************************************************************
   Parse trees can be as deep as the query is long (1 + 1 + ... + 1 is a chain
   of AdditiveExpr nodes), and they are built without recursion. Destroying a
@@ -139,6 +151,16 @@ void parsenode::free()
 {
   thread_local parsenode* tPending = nullptr;
   thread_local bool tDestroying = false;
+
+  // Kept already: freed, if still unreferenced, when its DeferFree ends.
+  if (theDeferredBy != nullptr)
+    return;
+
+  if (tDeferFree != nullptr)
+  {
+    tDeferFree->keep(this);
+    return;
+  }
 
   if (tDestroying)
   {
@@ -160,6 +182,45 @@ void parsenode::free()
     delete lNode;
   }
   tDestroying = false;
+}
+
+
+parsenode::DeferFree::DeferFree() : thePrevious(tDeferFree)
+{
+  tDeferFree = this;
+}
+
+parsenode::DeferFree::~DeferFree()
+{
+  tDeferFree = thePrevious;
+  // Oldest first. Freeing a node can free others kept here: a destroyed node
+  // leaves the list in its destructor.
+  while (parsenode* const lNode = theFirst)
+  {
+    forget(lNode);
+    if (lNode->getRefCount() == 0)
+      lNode->free();
+  }
+}
+
+void parsenode::DeferFree::keep(parsenode* node)
+{
+  node->theDeferredBy = this;
+  node->thePrevDeferred = theLast;
+  node->theNextDeferred = nullptr;
+  (theLast != nullptr ? theLast->theNextDeferred : theFirst) = node;
+  theLast = node;
+}
+
+void parsenode::DeferFree::forget(parsenode* node)
+{
+  (node->thePrevDeferred != nullptr ? node->thePrevDeferred->theNextDeferred
+                                    : theFirst) = node->theNextDeferred;
+  (node->theNextDeferred != nullptr ? node->theNextDeferred->thePrevDeferred
+                                    : theLast) = node->thePrevDeferred;
+  node->theDeferredBy = nullptr;
+  node->thePrevDeferred = nullptr;
+  node->theNextDeferred = nullptr;
 }
 
 int printdepth = 0;
