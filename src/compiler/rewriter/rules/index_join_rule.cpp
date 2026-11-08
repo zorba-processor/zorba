@@ -32,6 +32,8 @@
 
 #include "diagnostics/assert.h"
 
+#include <optional>
+
 
 namespace zorba
 {
@@ -107,6 +109,40 @@ IndexJoinRule::~IndexJoinRule()
 
 
 /*******************************************************************************
+  Pushes a var-defining expr on theVarDefExprs and theChildPositions, and pops
+  both when the scope ends, also when an exception leaves it.
+********************************************************************************/
+class IndexJoinRule::VarDefScope
+{
+  IndexJoinRule& theRule;
+
+public:
+  VarDefScope(IndexJoinRule& rule, expr* varDefExpr) : theRule(rule)
+  {
+    theRule.theVarDefExprs.push_back(varDefExpr);
+    try
+    {
+      theRule.theChildPositions.push_back(0);
+    }
+    catch (...)
+    {
+      theRule.theVarDefExprs.pop_back();
+      throw;
+    }
+  }
+
+  VarDefScope(const VarDefScope&) = delete;
+  VarDefScope& operator=(const VarDefScope&) = delete;
+
+  ~VarDefScope()
+  {
+    theRule.theVarDefExprs.pop_back();
+    theRule.theChildPositions.pop_back();
+  }
+};
+
+
+/*******************************************************************************
   Whether an expr is or contains a probe of a value index: see
   createNormalizedProbe(), whose shape later rewrites may simplify.
 ********************************************************************************/
@@ -140,13 +176,13 @@ expr* IndexJoinRule::apply(RewriterContext& rCtx, expr* node, bool& modified)
 
   expr_kind_t nodeKind = node->get_expr_kind();
 
+  std::optional<VarDefScope> flworScope;
+
   if (nodeKind == flwor_expr_kind)
   {
     flworExpr = static_cast<flwor_expr *>(node);
 
-    // Push the flwor expr into the stack
-    theVarDefExprs.push_back(flworExpr);
-    theChildPositions.push_back(0);
+    flworScope.emplace(*this, flworExpr);
 
     csize numClauses = flworExpr->num_clauses();
     for (csize i = 0; i < numClauses; ++i)
@@ -172,11 +208,8 @@ expr* IndexJoinRule::apply(RewriterContext& rCtx, expr* node, bool& modified)
         if (!predInfo.theNormalizeKeys)
           predInfo.theFlworExpr->remove_clause(c, i);
 
-        expr* e = theVarDefExprs.back();
-        ZORBA_ASSERT(e == node);
-        theVarDefExprs.pop_back();
-        theChildPositions.pop_back();
-        return e;
+        ZORBA_ASSERT(theVarDefExprs.back() == node);
+        return node;
       }
       else if (whereExpr->get_function_kind() == FunctionConsts::OP_AND_N)
       {
@@ -206,11 +239,8 @@ expr* IndexJoinRule::apply(RewriterContext& rCtx, expr* node, bool& modified)
               (**iter) = trueExpr;
             }
               
-            expr* e = theVarDefExprs.back();
-            ZORBA_ASSERT(e == node);
-            theVarDefExprs.pop_back();
-            theChildPositions.pop_back();
-            return e;
+            ZORBA_ASSERT(theVarDefExprs.back() == node);
+            return node;
           }
 
           iter.next();
@@ -295,18 +325,12 @@ expr* IndexJoinRule::apply(RewriterContext& rCtx, expr* node, bool& modified)
       ++clausePos;
     }
 
-    // drill out
-    expr* e = theVarDefExprs.back();
-    ZORBA_ASSERT(e == node);
-    theVarDefExprs.pop_back();
-    theChildPositions.pop_back();
-    return e;
+    ZORBA_ASSERT(theVarDefExprs.back() == node);
+    return node;
   }
   else if (nodeKind == trycatch_expr_kind)
   {
-    // drill in
-    theVarDefExprs.push_back(node);
-    theChildPositions.push_back(0);
+    VarDefScope trycatchScope(*this, node);
 
     ExprIterator iter(node);
     while (!iter.done())
@@ -321,17 +345,11 @@ expr* IndexJoinRule::apply(RewriterContext& rCtx, expr* node, bool& modified)
       iter.next();
     }
 
-    // drill out
-    theVarDefExprs.pop_back();
-    theChildPositions.pop_back();
-
     return node;
   }
   else if (nodeKind == block_expr_kind)
   {
-    // drill in
-    theVarDefExprs.push_back(node);
-    theChildPositions.push_back(0);
+    VarDefScope blockScope(*this, node);
 
     block_expr* block = static_cast<block_expr*>(node);
     csize numArgs = block->size();
@@ -347,11 +365,7 @@ expr* IndexJoinRule::apply(RewriterContext& rCtx, expr* node, bool& modified)
         break;
     }
 
-    // drill out
     ZORBA_ASSERT(theVarDefExprs.back() == node);
-    theVarDefExprs.pop_back();
-    theChildPositions.pop_back();
-
     return node;
   }
   else

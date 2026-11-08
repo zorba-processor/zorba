@@ -57,6 +57,8 @@ struct PredicateInfo;
 class IndexJoinRule : public RewriteRule
 {
 protected:
+  class VarDefScope;
+
   RewriterContext          * theRCtx;
 
   expr                     * theRootExpr;
