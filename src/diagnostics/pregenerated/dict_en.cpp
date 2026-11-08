@@ -223,7 +223,7 @@ extern entry const dict_en[] = {
   { "err:XQTY0105", "element constructor must not contain a function item" },
   { "err:XTDE1310", "\"$1\": picture string does not satisfy format-number() function rules" },
   { "err:XUDY0009", "node has no parent in \"replace\" expression (without \"value of\")" },
-  { "err:XUDY0014", "\"modify\" can not modify node not created by \"copy\"" },
+  { "err:XUDY0014", "\"modify\" can not apply an update to $1; it can only update nodes created by \"copy\"" },
   { "err:XUDY0015", "node is target of multiple \"rename\" expressions in same query" },
   { "err:XUDY0016", "node is target of multiple \"replace\" expressions (without \"value of\") in same query" },
   { "err:XUDY0017", "node is target of multiple \"replace value of\" expressions in same query" },

@@ -2244,10 +2244,11 @@ void PULImpl::checkTransformUpdates(const std::vector<store::Item*>& rootNodes) 
 {
   csize numRoots = rootNodes.size();
 
-  auto checkNoTransformUpdates = [](const std::vector<UpdatePrimitive*>& list)
+  auto checkNoTransformUpdates = [](const std::vector<UpdatePrimitive*>& list,
+                                    const char* target)
   {
     if (!list.empty())
-      RAISE_ERROR_NO_PARAMS(err::XUDY0014, list[0]->theLoc);
+      RAISE_ERROR(err::XUDY0014, list[0]->theLoc, ERROR_PARAMS(target));
   };
 
   std::vector<CollectionPul*>::const_iterator collIte = theCollectionPuls.begin();
@@ -2259,6 +2260,11 @@ void PULImpl::checkTransformUpdates(const std::vector<store::Item*>& rootNodes) 
 
     NodeToUpdatesMap::iterator it = pul->theNodeToUpdatesMap.begin();
     NodeToUpdatesMap::iterator end = pul->theNodeToUpdatesMap.end();
+
+    // The map is in hash order: of the targets outside the roots, report the
+    // first one in the query text.
+    const QueryLoc* firstOutsideLoc = NULL;
+    bool foundOutside = false;
 
     for (; it != end; ++it)
     {
@@ -2289,28 +2295,37 @@ void PULImpl::checkTransformUpdates(const std::vector<store::Item*>& rootNodes) 
         const NodeUpdates* updates = (*it).second;
         const QueryLoc* loc =
             (updates != NULL && !updates->empty() ? (*updates)[0]->theLoc : NULL);
-        RAISE_ERROR_NO_PARAMS(err::XUDY0014, loc);
+
+        if (!foundOutside ||
+            (loc != NULL && (firstOutsideLoc == NULL || *loc < *firstOutsideLoc)))
+        {
+          firstOutsideLoc = loc;
+        }
+        foundOutside = true;
       }
     }
 
-    checkNoTransformUpdates(pul->theCreateCollectionList);
-    checkNoTransformUpdates(pul->theInsertIntoCollectionList);
-    checkNoTransformUpdates(pul->theDeleteFromCollectionList);
-    checkNoTransformUpdates(pul->theEditInCollectionList);
-    checkNoTransformUpdates(pul->theTruncateCollectionList);
-    checkNoTransformUpdates(pul->theDeleteCollectionList);
+    if (foundOutside)
+      RAISE_ERROR(err::XUDY0014, firstOutsideLoc, ERROR_PARAMS("a node"));
+
+    checkNoTransformUpdates(pul->theCreateCollectionList, "a collection");
+    checkNoTransformUpdates(pul->theInsertIntoCollectionList, "a collection");
+    checkNoTransformUpdates(pul->theDeleteFromCollectionList, "a collection");
+    checkNoTransformUpdates(pul->theEditInCollectionList, "a collection");
+    checkNoTransformUpdates(pul->theTruncateCollectionList, "a collection");
+    checkNoTransformUpdates(pul->theDeleteCollectionList, "a collection");
   }
 
-  checkNoTransformUpdates(theCreateIndexList);
-  checkNoTransformUpdates(theDeleteIndexList);
-  checkNoTransformUpdates(theRefreshIndexList);
-  checkNoTransformUpdates(theICActivationList);
-  checkNoTransformUpdates(theCreateDocumentList);
-  checkNoTransformUpdates(theDeleteDocumentList);
-  checkNoTransformUpdates(theCreateHashMapList);
-  checkNoTransformUpdates(theDestroyHashMapList);
-  checkNoTransformUpdates(theInsertIntoHashMapList);
-  checkNoTransformUpdates(theRemoveFromHashMapList);
+  checkNoTransformUpdates(theCreateIndexList, "an index");
+  checkNoTransformUpdates(theDeleteIndexList, "an index");
+  checkNoTransformUpdates(theRefreshIndexList, "an index");
+  checkNoTransformUpdates(theICActivationList, "an integrity constraint");
+  checkNoTransformUpdates(theCreateDocumentList, "a document");
+  checkNoTransformUpdates(theDeleteDocumentList, "a document");
+  checkNoTransformUpdates(theCreateHashMapList, "a hash map");
+  checkNoTransformUpdates(theDestroyHashMapList, "a hash map");
+  checkNoTransformUpdates(theInsertIntoHashMapList, "a hash map");
+  checkNoTransformUpdates(theRemoveFromHashMapList, "a hash map");
 
   if (!thePutList.empty())
     RAISE_ERROR_NO_PARAMS(err::XUDY0037, thePutList[0]->theLoc);
