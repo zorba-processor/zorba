@@ -17,6 +17,7 @@
 // standard
 #include <cstdio>
 #include <cstdlib>
+#include <new>
 #include <sstream>
 #include <unistd.h>
 
@@ -28,6 +29,7 @@
 #include <zorba/singleton_item_sequence.h>
 #include <zorba/store_consts.h>
 #include <zorba/user_exception.h>
+#include <zorba/zorba_exception.h>
 #include <zorba/util/base64_util.h>
 #include <zorba/util/fs_util.h>
 #include <zorba/util/transcode_stream.h>
@@ -103,6 +105,35 @@ namespace {
 SecurityPolicy policyOf( StaticContext const *aSctx ) {
   return aSctx ? aSctx->getSecurityPolicy()
                : Zorba::getInstance( nullptr )->getSecurityPolicy();
+}
+
+// Not "out << in.rdbuf()", which hides read errors and fails on empty input.
+bool copyStream( istream &in, ostream &out ) {
+  char buf[ 8192 ];
+  ios_base::iostate const old_mask = in.exceptions();
+  in.exceptions( ios_base::badbit );
+  try {
+    while ( in.read( buf, sizeof buf ) || in.gcount() > 0 ) {
+      out.write( buf, in.gcount() );
+      if ( !out )
+        break;
+    }
+  }
+  catch ( bad_alloc const& ) {
+    in.exceptions( old_mask );
+    throw;
+  }
+  catch ( ZorbaException const& ) {
+    in.exceptions( old_mask );
+    throw;
+  }
+  catch ( ... ) {
+    in.clear();
+    in.exceptions( old_mask );
+    return false;
+  }
+  in.exceptions( old_mask );
+  return true;
 }
 
 } // anonymous namespace
@@ -209,8 +240,8 @@ ItemSequence_t WriteBinaryFunctionImpl::evaluate(
     if ( item.isStreamable() ) {
       if ( item.isEncoded() )
         base64::decode( item.getStream(), ofs );
-      else
-        ofs << item.getStream().rdbuf();
+      else if ( !copyStream( item.getStream(), ofs ) )
+        raiseFileError( "FOFL9999", "can not read the content", path );
     } else {
       size_t b64_size;
       char const *const b64_value = item.getBase64BinaryValue( b64_size );
@@ -219,8 +250,14 @@ ItemSequence_t WriteBinaryFunctionImpl::evaluate(
       else
         ofs.write( b64_value, b64_size );
     }
+    if ( !ofs )
+      raiseFileError( "FOFL9999", "can not write to file", path );
   }
   it->close();
+
+  ofs.close();
+  if ( !ofs )
+    raiseFileError( "FOFL9999", "can not write to file", path );
 
   return ItemSequence_t( new EmptySequence() );
 }
@@ -270,15 +307,24 @@ ItemSequence_t WriteTextFunctionImpl::evaluate(
   Item item;
   while ( it->next( item ) ) {
     if ( item.isStreamable() ) {
-      ofs << item.getStream().rdbuf();
+      if ( !copyStream( item.getStream(), ofs ) )
+        raiseFileError( "FOFL9999", "can not read the content", path );
     } else {
       zorba::String const s( item.getStringValue() );
       ofs.write( s.data(), s.size() );
     }
     if ( newlines_ )
       ofs << fs::newline;
+    if ( !ofs )
+      raiseFileError( "FOFL9999", "can not write to file", path );
   }
   it->close();
+
+  // The encoding is detached first: it holds what is not yet written.
+  transcoder.detach();
+  ofs.close();
+  if ( !ofs )
+    raiseFileError( "FOFL9999", "can not write to file", path );
 
   return ItemSequence_t( new EmptySequence() );
 }
