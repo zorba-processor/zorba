@@ -1713,10 +1713,10 @@ void PULImpl::mergeUpdates(store::Item* other)
                                thisPul->theDeleteList,
                                otherPul->theDeleteList);
 
-      // Merge revalidation primitives
-      mergeCollectionUpdateLists(thisPul,
-                                 thisPul->theRevalidateList,
-                                 otherPul->theRevalidateList);
+      // Revalidation targets are nodes: register them as addRevalidate does.
+      mergeTargetedUpdateLists(thisPul,
+                               thisPul->theRevalidateList,
+                               otherPul->theRevalidateList);
 
       // Merge collection primitives
       mergeCollectionUpdateLists(thisPul,
@@ -1878,9 +1878,7 @@ void PULImpl::mergeSimpleUpdateLists(
           ERROR_PARAMS(myUpd->getName()->getStringValue()));
         }
       }
-      // FIXME: suspected missing break: falls into UP_PUT and reinterprets
-      // myList[j] as UpdPut (behavior intentionally left unchanged)
-      [[fallthrough]];
+      break;
     }
     case store::UpdateConsts::UP_PUT:
     {
