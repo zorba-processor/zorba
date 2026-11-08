@@ -105,6 +105,11 @@ void placement_new(void* buffer) {
   p->~Plain();
 }
 
+// Aligned allocation handed straight to a smart pointer.
+void aligned_to_smart() {
+  std::unique_ptr<Plain> p(new (std::align_val_t(64)) Plain);
+}
+
 // A template with a dependent new expression into a smart pointer, and its
 // instantiation.
 template<class T> zorba::rchandle<T> make_in_template() { return new T; }

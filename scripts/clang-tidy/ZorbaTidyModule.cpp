@@ -25,11 +25,13 @@
 //     reset() of one, or emplacing into a container whose value_type is one
 //     (not a map: its value_type is a pair).
 // Placement new (the expression arena of MemoryManager, a buffer) is not
-// reported; new (std::nothrow) is.
+// reported; new (std::nothrow) and new (std::align_val_t(N)) are.
 //
 // Option DiffFile: the output of "git diff -U0". When set, only expressions
-// on the lines that the diff adds or changes are reported, so existing code
-// is not reported until it is changed.
+// with a line that the diff adds or changes are reported, so existing code
+// is not reported until it is changed. A new expression counts with all the
+// lines it spans (a changed argument line reports it); a delete expression
+// with the line of its delete token.
 //
 // Macros: an expression is located where its new or delete token is written
 // (its spelling location): in the macro body, or at the invocation when it
@@ -53,6 +55,7 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 
+#include <algorithm>
 #include <string>
 #include <utility>
 #include <vector>
@@ -114,6 +117,11 @@ public:
 
   bool contains(llvm::StringRef path, unsigned line) const
   {
+    return intersects(path, line, line);
+  }
+
+  bool intersects(llvm::StringRef path, unsigned first, unsigned last) const
+  {
     llvm::SmallString<256> normalized(path);
     llvm::sys::path::remove_dots(normalized, /*remove_dot_dot=*/true);
     llvm::StringRef file = normalized;
@@ -124,7 +132,7 @@ public:
              file[file.size() - rel.size() - 1] == '/')))
         continue;
       for (const auto& range : entry.getValue())
-        if (line >= range.first && line <= range.second)
+        if (first <= range.second && last >= range.first)
           return true;
     }
     return false;
@@ -185,7 +193,7 @@ public:
       if (del->getArgument()->isTypeDependent() &&
           isInPrimaryTemplate(*del, *Result.Context))
         return; // reported, if at all, in the instantiations
-      report(del->getBeginLoc(), *Result.SourceManager,
+      report(del->getBeginLoc(), *Result.SourceManager, del->getBeginLoc(),
              "%select{delete|delete[]}0 expression: own the object with a "
              "smart pointer (std::unique_ptr, rchandle) instead",
              del->isArrayForm() ? 1 : 0);
@@ -200,7 +208,7 @@ public:
     case Consumer::Dependent:
       return;
     case Consumer::Other:
-      report(nw->getBeginLoc(), *Result.SourceManager,
+      report(nw->getBeginLoc(), *Result.SourceManager, nw->getEndLoc(),
              "%select{new|new[]}0 expression whose result is not handed "
              "straight to a smart pointer: use std::make_unique, or construct "
              "the std::unique_ptr or rchandle from it",
@@ -227,17 +235,16 @@ private:
     return false;
   }
 
-  // Placement new with a non-nothrow argument: an arena or a buffer owns
-  // the memory.
+  // Placement new with an argument other than std::nothrow or
+  // std::align_val_t (which select an allocation function): an arena or a
+  // buffer owns the memory.
   static bool isPlacement(const CXXNewExpr& nw)
   {
-    if (nw.getNumPlacementArgs() == 0)
-      return false;
     for (const Expr* arg : nw.placement_arguments()) {
-      const CXXRecordDecl* rd =
-        arg->getType().getNonReferenceType()->getAsCXXRecordDecl();
-      if (!(rd && rd->getName() == "nothrow_t" &&
-            rd->getDeclContext()->isStdNamespace()))
+      const TagDecl* td =
+        arg->getType().getNonReferenceType()->getAsTagDecl();
+      if (!(td && td->getDeclContext()->isStdNamespace() &&
+            (td->getName() == "nothrow_t" || td->getName() == "align_val_t")))
         return true;
     }
     return false;
@@ -328,25 +335,36 @@ private:
 
   template<class Arg>
   void report(SourceLocation loc, const SourceManager& sm,
-              llvm::StringRef message, Arg arg)
+              SourceLocation end, llvm::StringRef message, Arg arg)
   {
     // Where the token is written: the location itself outside macros, the
     // invocation for a macro argument (isMacroArgExpansion), the macro body
     // otherwise. getSpellingLoc gives all three.
+    bool inMacro = loc.isMacroID() || end.isMacroID();
     if (loc.isMacroID() && sm.isMacroArgExpansion(loc))
       loc = sm.getSpellingLoc(sm.getImmediateSpellingLoc(loc));
     else
       loc = sm.getSpellingLoc(loc);
-    if (theHaveDiff && !isChanged(loc, sm))
+    // Outside macros the whole expression counts: a change to a later line
+    // of its text is a change to it.
+    if (theHaveDiff &&
+        !isChanged(loc, inMacro ? loc : sm.getSpellingLoc(end), sm))
       return;
     diag(loc, message) << arg;
   }
 
-  bool isChanged(SourceLocation loc, const SourceManager& sm) const
+  bool isChanged(SourceLocation first, SourceLocation last,
+                 const SourceManager& sm) const
   {
-    PresumedLoc presumed = sm.getPresumedLoc(loc, /*UseLineDirectives=*/false);
-    return presumed.isValid() &&
-           theChangedLines.contains(presumed.getFilename(), presumed.getLine());
+    PresumedLoc begin = sm.getPresumedLoc(first, /*UseLineDirectives=*/false);
+    PresumedLoc end = sm.getPresumedLoc(last, /*UseLineDirectives=*/false);
+    if (!begin.isValid())
+      return false;
+    unsigned lastLine = end.isValid() &&
+                        llvm::StringRef(end.getFilename()) == begin.getFilename()
+                        ? end.getLine() : begin.getLine();
+    return theChangedLines.intersects(begin.getFilename(), begin.getLine(),
+                                      std::max(begin.getLine(), lastLine));
   }
 
   std::string theSmartPointersOption;

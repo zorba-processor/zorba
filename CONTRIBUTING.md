@@ -87,7 +87,8 @@ Allowed:
   `std::make_unique` and `std::make_shared`.
 - placement new: the expression arena (`new (theMemoryMgr) T(...)`,
   `src/compiler/expression/mem_manager.h`) and construction in a buffer.
-  `new (std::nothrow)` is an owning `new` and is reported.
+  `new (std::nothrow)` and the aligned allocation `new (std::align_val_t(N))`
+  are owning `new` and are reported.
 
 Converting:
 
@@ -125,7 +126,9 @@ Its scope:
 - not `test/` or `bench/`, not the actions in `.y` and `.l` grammar files,
   not code disabled by the preprocessor in that build, not templates that
   are never instantiated;
-- whitespace-only changes do not count; moved code counts as changed.
+- whitespace-only changes do not count; moved code counts as changed. A
+  `new` expression that spans several lines is reported when any of its
+  lines is changed, so a changed argument line reports the allocation.
 
 To run it locally on a change (working tree included), with a
 `compile_commands.json` from a configured build:

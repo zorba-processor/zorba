@@ -1,0 +1,20 @@
+diff --git a/scripts/clang-tidy/test/owning_memory_multiline.cpp b/scripts/clang-tidy/test/owning_memory_multiline.cpp
+--- a/scripts/clang-tidy/test/owning_memory_multiline.cpp
++++ b/scripts/clang-tidy/test/owning_memory_multiline.cpp
+@@ -33 +33 @@
+-                                   0);
++                                   2);
+@@ -36,2 +36,2 @@
+-  Pair* wholeChanged = new Pair(0,
+-                                0);
++  Pair* wholeChanged = new Pair(5,
++                                6);
+@@ -40 +40 @@
+-  int changedAbove = 1;
++  int changedAbove = 0;
+@@ -42 +42 @@
+-    0, 0));
++    9, 10));
+@@ -44 +44 @@
+-                                       0));
++                                       12));

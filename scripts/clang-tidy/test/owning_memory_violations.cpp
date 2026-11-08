@@ -89,4 +89,14 @@ void justified() {
   delete n; // NOLINT(zorba-owning-memory): fixture
 }
 
+// Aligned allocation allocates owning memory, with or without nothrow.
+void aligned_new() {
+  Plain* a = new (std::align_val_t(64)) Plain; // VIOLATION
+  int* b = new (std::align_val_t(32)) int[4]; // VIOLATION
+  Plain* c = new (std::align_val_t(64), std::nothrow) Plain; // VIOLATION
+  delete a; // VIOLATION
+  delete[] b; // VIOLATION
+  delete c; // VIOLATION
+}
+
 } // namespace fixture

@@ -108,3 +108,10 @@ zorba_fixture_test(owning_memory_header owning_memory_header.cpp
 zorba_fixture_test(owning_memory_header_diff owning_memory_header.cpp
   "MARKERS=${t}/owning_memory_header.h" "HEADER_FILTER=.*"
   "DIFF=${t}/owning_memory_header.diff" "EXPECTED=36")
+
+# A new expression is reported when any of its lines is changed: line 32
+# (only its second argument line, 33, changed), 36 (both lines changed) and
+# 41 (its last line, 42). Lines 34 (a change on the line above), 38 (a change
+# on the line below the statement) and 43 (a smart pointer) are not.
+zorba_fixture_test(owning_memory_multiline owning_memory_multiline.cpp
+  "DIFF=${t}/owning_memory_multiline.diff" "EXPECTED=32,36,41")
