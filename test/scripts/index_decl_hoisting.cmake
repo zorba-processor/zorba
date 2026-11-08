@@ -25,7 +25,7 @@ ENDFUNCTION()
 FUNCTION(compile query result)
   EXECUTE_PROCESS(
     COMMAND "${ZORBA_EXE}" --no-logo --compile-only --print-optimized
-            -f -q"${DIR}/${query}"
+            -f -q "${DIR}/${query}"
     WORKING_DIRECTORY "${DIR}"
     RESULT_VARIABLE rc
     OUTPUT_VARIABLE out
