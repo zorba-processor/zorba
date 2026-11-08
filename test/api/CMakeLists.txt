@@ -47,6 +47,7 @@ CREATE_TEST_SOURCELIST(APITests
   invoke_module_globals.cpp
   function_item_lifetime.cpp
   json_parse_members.cpp
+  file_write_checks.cpp
   ${SchemaTests}
 )
 
