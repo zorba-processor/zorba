@@ -70,7 +70,7 @@ namespace zorba { namespace simplestore {
 
 #define ZORBA_LOADER_CHECK_ERROR(loader) \
   do { \
-    if (!loader.theXQueryDiagnostics->errors().empty()) \
+    if (loader.theOutOfMemory || !loader.theXQueryDiagnostics->errors().empty()) \
       return; \
   } while (0);
 
