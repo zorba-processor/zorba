@@ -1231,13 +1231,13 @@ struct XmlFreeDeleter
 // A string that libxml2 allocated.
 typedef std::unique_ptr<xmlChar, XmlFreeDeleter> XmlString;
 
-// The content of a node. NULL for a node that has content is a failed
-// allocation: loading it as an empty node would give a wrong document. A PI
-// with no data has no content, and gives NULL.
+// The content of a node. NULL is a failed allocation, in xmlNodeGetContent() or
+// earlier, when libxml2 made the node: loading it as an empty node would give a
+// wrong document. Only a PI with no data has no content.
 bool getContent(XmlLoader &loader, xmlNode *node, XmlString &content)
 {
   content.reset(xmlNodeGetContent(node));
-  if (content == NULL && node->content != NULL)
+  if (content == NULL && (node->type != XML_PI_NODE || node->content != NULL))
   {
     loader.setOutOfMemory();
     return false;

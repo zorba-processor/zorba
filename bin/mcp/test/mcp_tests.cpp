@@ -3140,6 +3140,18 @@ void test_sweep_xml_dtd( Fixture const &f ) {
 // may keep less than one attribute value).
 void test_sweep_xml_dtd_nodes( Fixture const &f ) {
 #if defined(__linux__)
+  // libxml2 2.9.14 (Ubuntu 24.04) makes a text, CDATA or comment node with no
+  // content, or drops a node, when its own allocation fails, and reports no
+  // error: the loader cannot tell such a tree from a document. 2.15 reports it.
+  // Versions between are not known; the sweep runs from 2.13.
+  if ( void *const version = dlsym( RTLD_DEFAULT, "xmlParserVersion" ) ) {
+    char const *const text = *static_cast<char const *const *>( version );
+    if ( text && std::atoi( text ) < 21300 ) {
+      std::cout << "parse-xml with DTD validation, every kind of node: not with"
+                << " libxml2 " << text << std::endl;
+      return;
+    }
+  }
   Sweep s;
   s.files = { { "nodes.xml", sweep_dtd_nodes_xml( "nodes" ) },
               { "nodes_warm.xml", sweep_dtd_nodes_xml( "warm" ) } };
@@ -3153,11 +3165,12 @@ void test_sweep_xml_dtd_nodes( Fixture const &f ) {
   // as a string built by the query is cut short when its buffer cannot grow.
   s.expected = "18000120000147";
   // The known limits of test_sweep_xml_dtd: libxml2 failing to allocate while it
-  // parses, and Xerces-C. Caps are set after the first run.
-  s.known = { starting( "\"caught err:FODC0002 \\\"/tmp/mcp-tree", 100000 ),
-              starting( "\"caught err:FODC0002 \\\"XML tree creation failed\\\"", 100000 ),
-              starting( "\"caught err:FODC0002 \\\"malformed XML document\\\"", 100000 ),
-              starting( "terminate N11xercesc_", 100000, 0, "OutOfMemoryExceptionE" ) };
+  // parses, and Xerces-C. Caps: about 1.5 times the most seen in CI run
+  // 42485059314 (runs of 1 / of 8: 41 file; 76 tree creation; 2 / 72 Xerces-C).
+  s.known = { starting( "\"caught err:FODC0002 \\\"/tmp/mcp-tree", 62, 1 ),
+              starting( "\"caught err:FODC0002 \\\"XML tree creation failed\\\"", 115, 1 ),
+              starting( "terminate N11xercesc_", 4, 1, "OutOfMemoryExceptionE" ),
+              starting( "terminate N11xercesc_", 105, 8, "OutOfMemoryExceptionE" ) };
   s.kept_runs_of_8_reported = true;   // the known limit, see Sweep
   exhaust_sweep( f, "parse-xml with DTD validation, every kind of node", s );
 #else
