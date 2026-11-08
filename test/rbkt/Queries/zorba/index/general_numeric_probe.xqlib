@@ -1,0 +1,101 @@
+module namespace m = "http://www.example.com/general-numeric-probe";
+
+import module namespace ddl =
+  "http://zorba.io/modules/store/static/collections/ddl";
+
+import module namespace dml =
+  "http://zorba.io/modules/store/static/collections/dml";
+
+import module namespace iddl =
+  "http://zorba.io/modules/store/static/indexes/ddl";
+
+import module namespace idml =
+  "http://zorba.io/modules/store/static/indexes/dml";
+
+declare namespace an = "http://zorba.io/annotations";
+
+declare collection m:c as node()*;
+
+(: xs:integer keys and one xs:double key. :)
+declare %an:general-range %an:manual index m:Num
+on nodes dml:collection(xs:QName("m:c"))//e
+by (if (./@t eq "d") then xs:double(./@v) else xs:integer(./@v));
+
+declare function m:key($e as element(e)) as xs:anyAtomicType
+{
+  if ($e/@t eq "d") then xs:double($e/@v) else xs:integer($e/@v)
+};
+
+declare %an:sequential function m:init()
+{
+  ddl:create(xs:QName("m:c"));
+
+  dml:insert(xs:QName("m:c"),
+             <r>
+               <e id="1" v="-3"/>
+               <e id="2" v="-2"/>
+               <e id="3" v="1"/>
+               <e id="4" t="d" v="1.5"/>
+               <e id="5" v="2"/>
+               <e id="6" v="3"/>
+             </r>);
+
+  iddl:create(xs:QName("m:Num"));
+};
+
+declare function m:ids($nodes as node()*) as xs:string
+{
+  fn:string-join(
+    for $e in $nodes
+    order by xs:integer($e/@id)
+    return fn:string($e/@id),
+    " ")
+};
+
+(: The same selection without the index, by general comparison on the key. :)
+declare function m:unindexed($lower as xs:anyAtomicType?,
+                             $upper as xs:anyAtomicType?) as xs:string
+{
+  m:ids(for $e in dml:collection(xs:QName("m:c"))/r/e
+        let $k := m:key($e)
+        where (fn:empty($lower) or $k >= $lower) and
+              (fn:empty($upper) or $k <= $upper)
+        return $e)
+};
+
+declare function m:indexed($lower as xs:anyAtomicType?,
+                           $upper as xs:anyAtomicType?) as xs:string
+{
+  m:ids(idml:probe-index-range-general(xs:QName("m:Num"),
+                                       $lower,
+                                       $upper,
+                                       fn:exists($lower),
+                                       fn:exists($upper),
+                                       fn:true(),
+                                       fn:true()))
+};
+
+declare function m:range($name as xs:string,
+                         $lower as xs:anyAtomicType?,
+                         $upper as xs:anyAtomicType?) as xs:string
+{
+  let $indexed := m:indexed($lower, $upper)
+  let $unindexed := m:unindexed($lower, $upper)
+  return fn:concat($name, ": ", $indexed,
+                   if ($indexed eq $unindexed) then ""
+                   else fn:concat(" (unindexed: ", $unindexed, ")"))
+};
+
+declare function m:point($name as xs:string,
+                         $key as xs:anyAtomicType) as xs:string
+{
+  let $indexed :=
+    m:ids(idml:probe-index-point-general(xs:QName("m:Num"), $key))
+  let $unindexed :=
+    m:ids(for $e in dml:collection(xs:QName("m:c"))/r/e
+          where m:key($e) = $key
+          return $e)
+  return fn:concat($name, ": ", $indexed,
+                   if ($indexed eq $unindexed) then ""
+                   else fn:concat(" (unindexed: ", $unindexed, ")"))
+};
