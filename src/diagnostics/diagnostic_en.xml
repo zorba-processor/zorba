@@ -2018,7 +2018,7 @@
        In a transform expression, it is a dynamic error if the \c modify clause
        modifies any node that was not created by the \c copy clause.
       </comment>
-      <value>"modify" can not modify node not created by "copy"</value>
+      <value>"modify" can not apply an update to $1; it can only update nodes created by "copy"</value>
     </diagnostic>
 
     <diagnostic code="XUDY0015">
