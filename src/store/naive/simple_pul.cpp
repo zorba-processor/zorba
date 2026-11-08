@@ -1495,7 +1495,7 @@ void PULImpl::addJSONArrayAppend(
 
     for (; ite != end; ++ite)
     {
-      if ((*ite)->getKind() != store::UpdateConsts::UP_JSON_ARRAY_INSERT)
+      if ((*ite)->getKind() != store::UpdateConsts::UP_JSON_ARRAY_APPEND)
         continue;
 
       UpdJSONArrayAppend* upd = static_cast<UpdJSONArrayAppend*>(*ite);
@@ -1566,8 +1566,7 @@ void PULImpl::addJSONArrayDelete(
 
     for (; ite != end; ++ite)
     {
-      if ((*ite)->getKind() != store::UpdateConsts::UP_JSON_ARRAY_DELETE &&
-          (*ite)->getKind() != store::UpdateConsts::UP_JSON_ARRAY_REPLACE_VALUE)
+      if ((*ite)->getKind() != store::UpdateConsts::UP_JSON_ARRAY_DELETE)
         continue;
 
       UpdJSONArrayUpdate* upd = static_cast<UpdJSONArrayUpdate*>(*ite);
@@ -1623,7 +1622,7 @@ void PULImpl::addJSONArrayReplaceValue(
   NodeUpdates* updates = 0;
   bool found = pul->theNodeToUpdatesMap.get(arr, updates);
 
-  // raise error if duplicate positions and skip if same position as delete
+  // raise error if duplicate positions
   if (found)
   {
     NodeUpdates::iterator ite = updates->begin();
@@ -1631,23 +1630,14 @@ void PULImpl::addJSONArrayReplaceValue(
 
     for (; ite != end; ++ite)
     {
-      if ((*ite)->getKind() == store::UpdateConsts::UP_JSON_ARRAY_REPLACE_VALUE)
-      {
-        UpdJSONArrayUpdate* upd = static_cast<UpdJSONArrayUpdate*>(*ite);
+      if ((*ite)->getKind() != store::UpdateConsts::UP_JSON_ARRAY_REPLACE_VALUE)
+        continue;
 
-        if (upd->thePosition == pos)
-        {
-          RAISE_ERROR(jerr::JNUP0009, loc, ERROR_PARAMS(pos.toString()));
-        }
-      }
-      else if ((*ite)->getKind() == store::UpdateConsts::UP_JSON_ARRAY_DELETE)
+      UpdJSONArrayUpdate* upd = static_cast<UpdJSONArrayUpdate*>(*ite);
+
+      if (upd->thePosition == pos)
       {
-        UpdJSONArrayUpdate* upd = static_cast<UpdJSONArrayUpdate*>(*ite);
-        
-        if (upd->thePosition == pos)
-        {
-          ite = updates->erase(ite);
-        }
+        RAISE_ERROR(jerr::JNUP0009, loc, ERROR_PARAMS(pos.toString()));
       }
     }
 
@@ -2133,8 +2123,7 @@ void PULImpl::mergeTargetedUpdateLists(
 
         for (; ite != end; ++ite)
         {
-          if ((*ite)->getKind() != store::UpdateConsts::UP_JSON_ARRAY_DELETE &&
-              (*ite)->getKind() != store::UpdateConsts::UP_JSON_ARRAY_REPLACE_VALUE)
+          if ((*ite)->getKind() != store::UpdateConsts::UP_JSON_ARRAY_DELETE)
             continue;
 
           UpdJSONArrayUpdate* myUpd = static_cast<UpdJSONArrayUpdate*>(*ite);
@@ -2149,7 +2138,7 @@ void PULImpl::mergeTargetedUpdateLists(
         break;
       }
 
-      // raise error if duplicate positions and skip if same position as delete
+      // raise error if duplicate positions
       case store::UpdateConsts::UP_JSON_ARRAY_REPLACE_VALUE:
       {
         UpdJSONArrayUpdate* otherUpd2 = static_cast<UpdJSONArrayUpdate*>(otherUpd);
@@ -2159,22 +2148,15 @@ void PULImpl::mergeTargetedUpdateLists(
 
         for (; ite != end; ++ite)
         {
+          if ((*ite)->getKind() != store::UpdateConsts::UP_JSON_ARRAY_REPLACE_VALUE)
+            continue;
+
           UpdJSONArrayUpdate* myUpd = static_cast<UpdJSONArrayUpdate*>(*ite);
 
-          if ((*ite)->getKind() == store::UpdateConsts::UP_JSON_ARRAY_REPLACE_VALUE)
+          if (myUpd->thePosition == otherUpd2->thePosition)
           {
-            if (myUpd->thePosition == otherUpd2->thePosition)
-            {
-              RAISE_ERROR(jerr::JNUP0009, otherUpd->theLoc, 
-              ERROR_PARAMS(myUpd->thePosition.toString()));
-            }
-          }
-          else if ((*ite)->getKind() == store::UpdateConsts::UP_JSON_ARRAY_DELETE)
-          {
-            if (myUpd->thePosition == otherUpd2->thePosition)
-            {
-              ite = targetUpdates->erase(ite);
-            }
+            RAISE_ERROR(jerr::JNUP0009, otherUpd->theLoc,
+            ERROR_PARAMS(myUpd->thePosition.toString()));
           }
         }
 
@@ -3520,6 +3502,15 @@ void CollectionPul::applyUpdates()
         NodeUpdates::iterator updEnd = updates->end();
         for (; updIte != updEnd; ++updIte)
         {
+          // A replace at a deleted position is omitted (JSONiq merging rule);
+          // the sort puts the delete right before it.
+          if ((*updIte)->getKind() == store::UpdateConsts::UP_JSON_ARRAY_REPLACE_VALUE &&
+              updIte != updates->begin() &&
+              (*(updIte - 1))->getKind() == store::UpdateConsts::UP_JSON_ARRAY_DELETE &&
+              static_cast<UpdJSONArrayUpdate*>(*(updIte - 1))->thePosition ==
+              static_cast<UpdJSONArrayUpdate*>(*updIte)->thePosition)
+            continue;
+
           (*updIte)->apply();
         }
       }
