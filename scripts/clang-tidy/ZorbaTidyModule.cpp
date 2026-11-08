@@ -411,7 +411,8 @@ public:
       cxxRecordDecl(isSameOrDerivedFrom(hasName("::std::basic_streambuf")));
     Finder->addMatcher(
       cxxOperatorCallExpr(hasOverloadedOperatorName("<<"), argumentCountIs(2),
-                          hasArgument(1, hasType(pointsTo(streambuf))),
+                          hasArgument(1, hasType(hasCanonicalType(
+                                           pointsTo(streambuf)))),
                           unless(isInstantiationDependent()))
         .bind("copy"),
       this);
