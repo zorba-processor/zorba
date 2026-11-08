@@ -884,6 +884,12 @@ bool function_runs_opaque_code(const function* f)
     break;
   }
 
+  // zq:evaluate runs a query prepared from a string, in the store of this query.
+  if (f->isExternal() &&
+      f->getName()->getNamespace() == "http://zorba.io/modules/zorba-query" &&
+      f->getName()->getLocalName() == "evaluate")
+    return true;
+
   const signature& sig = f->getSignature();
   csize const numParams = sig.isVariadic() ? 1 : sig.paramCount();
 
@@ -1356,7 +1362,7 @@ bool ImpurityWalk::isUnprovenCall(const expr* call)
     }
   }
 
-  // fn:invoke and the like find the function by name.
+  // fn:invoke and the like find the function by name; zq:evaluate runs a prepared query.
   return !checked;
 }
 
@@ -1691,8 +1697,7 @@ void ClosedWorldWalk::walkBuiltin(const fo_expr* fo)
   case FunctionConsts::FN_ZORBA_EVAL_N_1:
   case FunctionConsts::FN_ZORBA_EVAL_U_1:
   case FunctionConsts::FN_ZORBA_EVAL_S_1:
-  // It gives a node a reference, which ref:has-reference reads, but it is declared
-  // neither sequential nor nondeterministic.
+  // Nondeterministic does not say that it gives a node a reference ref:has-reference reads.
   case FunctionConsts::FN_REFERENCE_REFERENCE_1:
     opaque();
     break;
