@@ -304,7 +304,9 @@ struct Fixture {
 std::string read_file( std::string const &path ) {
   std::ifstream in( path.c_str(), std::ios::binary );
   std::stringstream s;
-  s << in.rdbuf();
+  // An empty file copies nothing, which sets failbit but not badbit.
+  if ( !in || ( s << in.rdbuf() ).bad() )
+    check( false, "read " + path );
   return s.str();
 }
 
