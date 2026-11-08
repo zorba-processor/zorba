@@ -15,6 +15,7 @@
  */
 
 #include <zorba/diagnostic_list.h>
+#include "diagnostics/assert.h"
 #include "diagnostics/diagnostic.h"
 #include "diagnostics/dict.h"
 #include "diagnostics/util_macros.h"
@@ -285,7 +286,8 @@ SimpleTempSeqIter::SimpleTempSeqIter(const SimpleTempSeq* tempSeq)
 ********************************************************************************/	
 void SimpleTempSeqIter::init(const store::TempSeq_t& tempSeq)
 {
-  theTempSeq = tempSeq;
+  theTempSeq = tempSeq.dyn_cast<SimpleTempSeq>();
+  ZORBA_ASSERT(theTempSeq != NULL);
 
   theCurPos = 0;
   theBeginPos = 0;
@@ -301,7 +303,8 @@ void SimpleTempSeqIter::init(
     xs_integer startPos,
     xs_integer endPos)
 {
-  theTempSeq = tempSeq;
+  theTempSeq = tempSeq.dyn_cast<SimpleTempSeq>();
+  ZORBA_ASSERT(theTempSeq != NULL);
 
   xs_long start = 0;
   xs_long end = 0;

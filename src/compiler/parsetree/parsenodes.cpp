@@ -3639,7 +3639,10 @@ Literal::Literal(exprnode* expression)
     type = (LITERAL_TYPE)1;
   }
   else
-    numeric_literal = expression;
+  {
+    numeric_literal = dynamic_cast<NumericLiteral*>(expression);
+    ZORBA_ASSERT(numeric_literal != NULL);
+  }
 }
 
 void Literal::accept( parsenode_visitor &v ) const
