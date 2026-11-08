@@ -2222,26 +2222,59 @@ UpdJSONArrayUpdate::UpdJSONArrayUpdate(
 }
 
 
+/*******************************************************************************
+  Order in which the array primitives on one array are applied.
+
+  Every position refers to the array before any primitive of the PUL is
+  applied (JSONiq update facility, update primitives on arrays). The
+  primitives are applied one by one, so this order makes each primitive see
+  its original members at their original positions:
+  1. appends first: they add members after the last original member and move
+     no original member;
+  2. then by decreasing position: a primitive at position p moves only the
+     members after p, which no later primitive refers to;
+  3. at one position, a delete or replace before an insert: an insert at p
+     moves the original member p to the right, so the delete or replace must
+     find it at p first. A delete and a replace never share a position (the
+     PUL keeps one of them).
+  This is a strict weak ordering; std::stable_sort keeps the PUL order of
+  primitives that compare equal (several appends, or inserts at one position).
+********************************************************************************/
+static int arrayUpdateKindRank(store::UpdateConsts::UpdPrimKind kind)
+{
+  switch (kind)
+  {
+  case store::UpdateConsts::UP_JSON_ARRAY_DELETE:
+    return 0;
+  case store::UpdateConsts::UP_JSON_ARRAY_REPLACE_VALUE:
+    return 1;
+  default:
+    return 2;
+  }
+}
+
+
 bool UpdJSONArrayUpdate::Comparator::operator() (
     const UpdatePrimitive* lhs,
-    const UpdatePrimitive* rhs)
+    const UpdatePrimitive* rhs) const
 {
   const UpdJSONArrayUpdate* l = static_cast<const UpdJSONArrayUpdate*>(lhs);
   const UpdJSONArrayUpdate* r = static_cast<const UpdJSONArrayUpdate*>(rhs);
-  
-  if (l->thePosition == 0) // lhs is an appending UP
-    return true;
 
-  if (l->thePosition > r->thePosition)
-    return true;
+  // Position 0 marks an append.
+  bool lAppend = (l->thePosition == 0);
+  bool rAppend = (r->thePosition == 0);
 
-  if (l->thePosition == r->thePosition)
-  {
-    if (l->getKind() == store::UpdateConsts::UP_JSON_ARRAY_DELETE)
-      return true;
-  }
+  if (lAppend != rAppend)
+    return lAppend;
 
-  return false;
+  if (lAppend)
+    return false;
+
+  if (l->thePosition != r->thePosition)
+    return l->thePosition > r->thePosition;
+
+  return arrayUpdateKindRank(l->getKind()) < arrayUpdateKindRank(r->getKind());
 }
 
 

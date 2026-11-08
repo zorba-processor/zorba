@@ -3515,7 +3515,8 @@ void CollectionPul::applyUpdates()
 
         NodeUpdates* updates = (*ite).second;
 
-        std::sort(updates->begin(), updates->end(), UpdJSONArrayUpdate::Comparator());
+        std::stable_sort(updates->begin(), updates->end(),
+                         UpdJSONArrayUpdate::Comparator());
 
         NodeUpdates::iterator updIte = updates->begin();
         NodeUpdates::iterator updEnd = updates->end();
