@@ -46,6 +46,23 @@ repository cache quota is full). The job summary has the ctest summary and
 the truncated output of failed tests; the artifact `quick-check-log` has the
 full log. The final push of a pull request still needs the full CI.
 
+**Sanitizer baselines.** `sanitizers.yml` fails a job only on a failure that
+`test/baselines/sanitizers-<job>.txt` does not list (`asan`, `tsan`,
+`tsan-bigint`, `glibcxx-debug`), so a job with known failures still catches
+new ones. QT3 works the same way in the other direction:
+`test/fots/qt3-baseline-pass.txt` lists the cases that must pass. Each line is
+`test name | kind | reason`: the ctest name, the failure kind ctest prints
+(`Failed`, `Subprocess aborted`, `Timeout`, `SEGFAULT`, ...) or `flaky`
+(allowed to pass or fail in any way), and the reason (a backlog item or
+issue). The job fails on a failure that is not listed and on a listed test
+that fails with a different kind. A listed test that passes (or no longer
+exists) is a `::warning::` and a "Remove from the baseline" list in the job
+summary, not a failure, so fixes merge in any order. A pull request that fixes
+a listed test removes its entries from the baseline in the same pull request.
+The comparison also fails the job when the ctest log has no summary line, when
+the number of failures in the list differs from ctest's count, or when ctest's
+exit code does not fit the log (it must be 0 without failures and 8 with them).
+
 ## Pull requests
 
 - One commit per logical change. The commit message says why the change is
