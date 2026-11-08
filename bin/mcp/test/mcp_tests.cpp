@@ -3032,8 +3032,8 @@ std::string sweep_names_xml( std::string const &prefix ) {
   return xml + "</root>";
 }
 
-// A document with a DOCTYPE, parsed with DTD validation: the loader that walks
-// the tree libxml2 validated.
+// A document with a DOCTYPE, read by fn:doc with the dtd feature: the loader
+// that walks the tree libxml2 validated.
 std::string sweep_dtd_xml( std::string const &prefix ) {
   std::string dtd( "<!DOCTYPE root [<!ELEMENT root ANY>" );
   std::string body( "<root>" );
@@ -3046,25 +3046,25 @@ std::string sweep_dtd_xml( std::string const &prefix ) {
   }
   return dtd + "]>" + body + "</root>";
 }
+// The file is read once per document name: a document that loaded stays in the
+// store, so the warm-up reads another file.
 std::string sweep_dtd_query( std::string const &prefix ) {
-  return "import module namespace x = 'http://zorba.io/modules/xml';\n"
-         "import schema namespace opt = 'http://zorba.io/modules/xml-options';\n" +
-         caught( "count(x:parse(\"" + sweep_dtd_xml( prefix ) +
-                 "\", <opt:options><opt:DTD-validate/></opt:options>)//*)" );
+  return "import module namespace dir = 'http://zorba.io/modules/directory';\n"
+         "declare namespace f = 'http://zorba.io/options/features';\n"
+         "declare option f:enable 'dtd';\n" +
+         caught( "count(doc(concat($dir:root, '/" + prefix + ".xml'))//*)" );
 }
 #endif
 
 void test_sweep_xml_dtd( Fixture const &f ) {
 #if defined(__linux__)
   Sweep s;
+  s.files = { { "sweep.xml", sweep_dtd_xml( "sweep" ) },
+              { "warm.xml", sweep_dtd_xml( "warm" ) } };
   s.query = sweep_dtd_query( "sweep" );
   s.before.push_back( sweep_dtd_query( "warm" ) );
   s.after_compile = true;
   s.expected = "41";
-  // Xerces-C releasing the schema of the options, as in x:parse-html.
-  s.known = { starting( "terminate N11xercesc_", 4, 1, "OutOfMemoryExceptionE" ),
-              starting( "terminate N11xercesc_", 250, 8, "OutOfMemoryExceptionE" ) };
-  s.needs_module = true;
   s.kept_runs_of_8_reported = true;   // the known limit, see Sweep
   exhaust_sweep( f, "parse-xml with DTD validation", s );
 #else
