@@ -53,13 +53,22 @@
 //     or passed to a function;
 //   - no reference to os after the copy, in source order within the
 //     function, examines it before a clear() of it: fail(), bad(), good(),
-//     rdstate(), operator bool, operator!, exceptions(mask), returning it or
-//     passing it to a function (including through a "<<" chain or a member
-//     that returns the stream, such as flush());
+//     rdstate(), operator bool, operator!, exceptions(mask), returning it,
+//     taking its address or passing it to a function (including through a
+//     "<<" chain or a member that returns the stream, such as flush());
 //   - os.exceptions(mask) is not called before the copy.
 // A clear() of os after the copy and before any examination is reported
-// too: it discards the copy's failbit. Copies in templates are analyzed in
-// their instantiations.
+// too: it discards the copy's failbit. Copies in templates are judged in
+// their instantiations only.
+//
+// Known limits. Reported although examined: through a reference or pointer
+// to os created before the copy, in a lambda defined before the copy, or
+// before the copy in source order inside a loop that runs the copy again
+// (a loop condition). A clear() after the copy ends the search even in a
+// branch (an error path) that the later examination is not on: the copy
+// and that clear() are reported. Not reported: a "<<" chain whose head is not a variable name
+// ("os.write(...) << buf", "*ptr << buf"), and an explicit
+// "os.operator<<(buf)" call.
 
 #include "clang-tidy/ClangTidyCheck.h"
 #include "clang-tidy/ClangTidyModule.h"
@@ -431,7 +440,9 @@ public:
     if (!stream)
       return;
     const auto* function = llvm::dyn_cast<FunctionDecl>(stream->getDeclContext());
-    if (!function || !function->getBody())
+    // In a template, judged in the instantiations only: an examination may
+    // depend on the template parameters.
+    if (!function || !function->getBody() || function->isDependentContext())
       return;
 
     const CXXMemberCallExpr* clear = nullptr;
@@ -570,6 +581,8 @@ private:
         }
         return Use::None;
       }
+      if (const auto* uo = llvm::dyn_cast<UnaryOperator>(parent))
+        return uo->getOpcode() == UO_AddrOf ? Use::Examine : Use::None;
       // Passed on to a function, which may examine it.
       if (const auto* call = llvm::dyn_cast<CallExpr>(parent))
         return call->getCallee() == cur ? Use::None : Use::Examine;
