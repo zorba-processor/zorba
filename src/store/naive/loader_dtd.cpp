@@ -1163,6 +1163,15 @@ store::Item_t DtdXmlLoader::loadXml(
   }
 
   loadDocument(doc);
+
+  // A callback that failed left the tree incomplete: no document.
+  if (theOutOfMemory || !theXQueryDiagnostics->errors().empty())
+  {
+    abortload();
+    thePathStack.clear();
+    return NULL;
+  }
+
   /* no need to free the document since is in ctxt */
   //xmlFreeDoc(doc);
 
