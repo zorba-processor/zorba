@@ -1,0 +1,5 @@
+err:XUDY0014: "modify" can not apply an update to a node; it can only update nodes created by "copy"
+err:XUDY0014: "modify" can not apply an update to a collection; it can only update nodes created by "copy"
+err:XUDY0014: "modify" can not apply an update to an index; it can only update nodes created by "copy"
+err:XUDY0014: "modify" can not apply an update to an integrity constraint; it can only update nodes created by "copy"
+err:XUDY0014: "modify" can not apply an update to a document; it can only update nodes created by "copy"
