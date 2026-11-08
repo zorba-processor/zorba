@@ -24,6 +24,7 @@
 #include <libxml/uri.h>
 #include <libxml/SAX2.h>
 #include <cstring>
+#include <memory>
 #include <utility>
 
 #include <zorba/store_consts.h>
@@ -1220,12 +1221,41 @@ void DtdXmlLoader::loadDocument(xmlDoc *doc)
 }
 
 
+namespace {
+
+struct XmlFreeDeleter
+{
+  void operator()(xmlChar *p) const noexcept { xmlFree(p); }
+};
+
+// A string that libxml2 allocated.
+typedef std::unique_ptr<xmlChar, XmlFreeDeleter> XmlString;
+
+// The content of a node. NULL for a node that has content is a failed
+// allocation: loading it as an empty node would give a wrong document. A PI
+// with no data has no content, and gives NULL.
+bool getContent(XmlLoader &loader, xmlNode *node, XmlString &content)
+{
+  content.reset(xmlNodeGetContent(node));
+  if (content == NULL && node->content != NULL)
+  {
+    loader.setOutOfMemory();
+    return false;
+  }
+  return true;
+}
+
+}
+
+
 void DtdXmlLoader::loadNode(xmlNode *a_node)
 {
   xmlNode *cur_node = NULL;
 
-  for (cur_node = a_node; cur_node; cur_node = cur_node->next)
+  for (cur_node = a_node; cur_node && !theOutOfMemory; cur_node = cur_node->next)
   {
+    XmlString content;
+
     switch( cur_node->type )
     {
       case XML_ELEMENT_NODE:
@@ -1238,30 +1268,30 @@ void DtdXmlLoader::loadNode(xmlNode *a_node)
       }
       case XML_TEXT_NODE:
       {
-        xmlChar * content = xmlNodeGetContent(cur_node);
-        characters(this, content, xmlStrlen(content));
-        xmlFree(content);
+        if (!getContent(*this, cur_node, content))
+          return;
+        characters(this, content.get(), xmlStrlen(content.get()));
         break;
       }
       case XML_CDATA_SECTION_NODE:
       {
-        xmlChar * content = xmlNodeGetContent(cur_node);
-        cdataBlock(this, content, xmlStrlen(content));
-        xmlFree(content);
+        if (!getContent(*this, cur_node, content))
+          return;
+        cdataBlock(this, content.get(), xmlStrlen(content.get()));
         break;
       }
       case XML_PI_NODE:
       {
-        xmlChar * content = xmlNodeGetContent(cur_node);
-        processingInstruction(this, cur_node->name, content);
-        xmlFree(content);
+        if (!getContent(*this, cur_node, content))
+          return;
+        processingInstruction(this, cur_node->name, content.get());
         break;
       }
       case XML_COMMENT_NODE:
       {
-        xmlChar * content = xmlNodeGetContent(cur_node);
-        comment(this, content);
-        xmlFree(content);
+        if (!getContent(*this, cur_node, content))
+          return;
+        comment(this, content.get());
         break;
       }
 
@@ -1624,10 +1654,10 @@ void DtdXmlLoader::startElement(
       AttributeNode* attrNode = nfactory.createAttributeNode(qname);
       attrNodes[i] = attrNode;   // first: the element destroys it
 
-      xmlChar* val = xmlGetProp(node, attr->name);
+      XmlString val(xmlGetProp(node, attr->name));
       if (val == NULL)   // an attribute with no value gives "": only memory fails
         throw std::bad_alloc();
-      const char* valu = reinterpret_cast<const char*>(val);
+      const char* valu = reinterpret_cast<const char*>(val.get());
       zstring value(valu);
 
       store::Item_t typeName;
@@ -1724,7 +1754,6 @@ void DtdXmlLoader::startElement(
                     << attrNode->getOrdPath().show() << std::endl);
 
 
-      xmlFree(val);
       i++;
     }
 
