@@ -56,7 +56,7 @@ declare function m:ids($nodes as node()*) as xs:string
 declare function m:unindexed($lower as xs:anyAtomicType?,
                              $upper as xs:anyAtomicType?) as xs:string
 {
-  m:ids(for $e in dml:collection(xs:QName("m:c"))/r/e
+  m:ids(for $e in dml:collection(xs:QName("m:c"))/e
         let $k := m:key($e)
         where (fn:empty($lower) or $k >= $lower) and
               (fn:empty($upper) or $k <= $upper)
@@ -92,7 +92,7 @@ declare function m:point($name as xs:string,
   let $indexed :=
     m:ids(idml:probe-index-point-general(xs:QName("m:Num"), $key))
   let $unindexed :=
-    m:ids(for $e in dml:collection(xs:QName("m:c"))/r/e
+    m:ids(for $e in dml:collection(xs:QName("m:c"))/e
           where m:key($e) = $key
           return $e)
   return fn:concat($name, ": ", $indexed,
