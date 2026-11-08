@@ -70,7 +70,7 @@ namespace zorba { namespace simplestore {
 
 #define ZORBA_LOADER_CHECK_ERROR(loader) \
   do { \
-    if (!loader.theXQueryDiagnostics->errors().empty()) \
+    if (loader.theOutOfMemory || !loader.theXQueryDiagnostics->errors().empty()) \
       return; \
   } while (0);
 
@@ -841,22 +841,37 @@ void DtdXmlLoader::setRoot(XmlNode* root)
 ********************************************************************************/
 void DtdXmlLoader::abortload()
 {
-  theBaseUri.clear();
-  theDocUri.clear();
+  // Not clear(): it may allocate, and a failure here would skip the cleanup.
+  zstring().swap(theBaseUri);
+  zstring().swap(theDocUri);
 
-  delete theTree;
-  theTree = NULL;
-
-  theOrdPath.init();
-  theRootNode = NULL;
-
+  // The nodes on the stack first: destroying one with a type (an ID attribute,
+  // say) removes the type from its tree.
+  bool rootDestroyed = false;
   while(!theNodeStack.empty())
   {
     XmlNode* node = theNodeStack.top();
     theNodeStack.pop();
     if (node != NULL)
+    {
+      if (node == theRootNode)
+        rootDestroyed = true;
       node->destroy(true);
+    }
   }
+
+  if (theTree != NULL)
+  {
+    // The tree destroys its root unless the stack held it (a root not yet on
+    // the stack when a callback failed), and its table of types.
+    if (rootDestroyed)
+      theTree->setRoot(NULL);
+    theTree->destroy();
+    theTree = NULL;
+  }
+
+  theOrdPath.init();
+  theRootNode = NULL;
 
   thePathStack.clear();
 
@@ -893,8 +908,10 @@ void DtdXmlLoader::abortload()
 ********************************************************************************/
 void DtdXmlLoader::reset()
 {
-  theBaseUri.clear();
-  theDocUri.clear();
+  // Not clear(): on a string that is shared it allocates, and a failure here
+  // would lose the tree that loadXml() is about to return.
+  zstring().swap(theBaseUri);
+  zstring().swap(theDocUri);
 
   theTree = NULL;
   theOrdPath.init();
@@ -1163,6 +1180,15 @@ store::Item_t DtdXmlLoader::loadXml(
   }
 
   loadDocument(doc);
+
+  // A callback that failed left the tree incomplete: no document.
+  if (theOutOfMemory || !theXQueryDiagnostics->errors().empty())
+  {
+    abortload();
+    thePathStack.clear();
+    return NULL;
+  }
+
   /* no need to free the document since is in ctxt */
   //xmlFreeDoc(doc);
 
@@ -1449,6 +1475,8 @@ void DtdXmlLoader::startElement(
   zorba::Stack<XmlNode*>& nodeStack = loader.theNodeStack;
   zorba::Stack<PathStepInfo>& pathStack = loader.thePathStack;
   zstring baseUri;
+  ElementNode* elemNode = NULL;
+  bool owned = false;   // by the node stack or the tree (as its root)
 
   try
   {
@@ -1463,11 +1491,14 @@ void DtdXmlLoader::startElement(
                   reinterpret_cast<const char*>(lname));
 
     // Create the element node and push it to the node stack
-    ElementNode* elemNode = nfactory.createElementNode(nodeName,
-                                                       numBindings,
-                                                       numAttributes);
+    elemNode = nfactory.createElementNode(nodeName,
+                                          numBindings,
+                                          numAttributes);
     if (nodeStack.empty())
+    {
       loader.setRoot(elemNode);
+      owned = true;
+    }
 
 #ifdef DATAGUIDE
     nodeName = elemNode->getNodeName();
@@ -1591,8 +1622,11 @@ void DtdXmlLoader::startElement(
       qnpool.insert(qname, uri, prefix, lname);
 
       AttributeNode* attrNode = nfactory.createAttributeNode(qname);
+      attrNodes[i] = attrNode;   // first: the element destroys it
 
       xmlChar* val = xmlGetProp(node, attr->name);
+      if (val == NULL)   // an attribute with no value gives "": only memory fails
+        throw std::bad_alloc();
       const char* valu = reinterpret_cast<const char*>(val);
       zstring value(valu);
 
@@ -1656,8 +1690,6 @@ void DtdXmlLoader::startElement(
       attrNode->theTypedValue.transfer(typedValue);
       attrNode->setType(typeName);
 
-      attrNodes[i] = attrNode;
-
       if (attrNode->isBaseUri())
       {
         baseUri = pathStack.top().theBaseUri;
@@ -1697,19 +1729,26 @@ void DtdXmlLoader::startElement(
     }
 
     nodeStack.push((XmlNode*)elemNode);
+    owned = true;
     nodeStack.push(NULL);
     pathStack.push(PathStepInfo(elemNode, baseUri));
   }
   catch (ZorbaException const& e)
   {
+    if (elemNode != NULL && !owned)
+      FastXmlLoader::discardElement(elemNode);
     loader.theXQueryDiagnostics->add_error( e );
   }
   catch (std::bad_alloc const&)
   {
+    if (elemNode != NULL && !owned)
+      FastXmlLoader::discardElement(elemNode);
     loader.setOutOfMemory();
   }
   catch (...)
   {
+    if (elemNode != NULL && !owned)
+      FastXmlLoader::discardElement(elemNode);
     loader.theXQueryDiagnostics->
     add_error(NEW_ZORBA_EXCEPTION( zerr::ZXQP0003_INTERNAL_ERROR));
   }

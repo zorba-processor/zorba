@@ -2929,6 +2929,14 @@ void exhaust_sweep( Fixture const &f, std::string const &name, Sweep const &s ) 
               sweep_show_frames( "  a block of " + b.substr( 0, sp ) + " bytes",
                                  b.substr( sp + 1 ), true );
             }
+            // Where the failing allocation was: the same point once more, traced.
+            Stacks traced;
+            std::string const traced_out( run_child( n, length, false, nullptr,
+                                                     nullptr, &traced, true ) );
+            if ( !traced.alloc.empty() )
+              sweep_show_frames( "failing allocation at " + std::to_string( n ) +
+                                 " (traced run: " + traced_out.substr( 0, 120 ) +
+                                 ")", traced.alloc, true );
           }
         }
       }
@@ -3031,8 +3039,71 @@ std::string sweep_names_xml( std::string const &prefix ) {
   }
   return xml + "</root>";
 }
+
+// A document with a DOCTYPE, read by fn:doc with the dtd feature: the loader
+// that walks the tree libxml2 validated. The attributes of an element have long
+// values, so that a failure after the element is made, and before it is on the
+// node stack, leaves more than the sweep allows a failed call to keep. Ten of
+// them: libxml2 grows its array of attributes beyond that, and some versions
+// corrupt the heap when that allocation fails.
+std::string sweep_dtd_xml( std::string const &prefix ) {
+  std::string attlist( "<!ATTLIST item" );
+  std::string attributes;
+  for ( int i = 0; i < 10; ++i ) {
+    std::string const a( prefix + "_attr_" + std::to_string( i ) );
+    attlist += " " + a + " CDATA #IMPLIED";
+    attributes += " " + a + "='" + std::string( 3000, 'v' ) + "'";
+  }
+  // ID attributes, on the root and on the items: the tree keeps their types, and
+  // destroying a half-built tree removes them from it.
+  attlist += " id ID #IMPLIED";
+  auto const item = [&]( int n ) {
+    return "<item id='" + prefix + "_item_" + std::to_string( n ) + "'" +
+           attributes + ">text</item>";
+  };
+  return "<!DOCTYPE root [<!ELEMENT root (item+)><!ELEMENT item (#PCDATA)>"
+         "<!ATTLIST root id ID #IMPLIED>" + attlist + ">]><root id='" + prefix +
+         "_root'>" + item( 1 ) + item( 2 ) + item( 3 ) + "</root>";
+}
+// The file is read once per document name: a document that loaded stays in the
+// store, so the warm-up reads another file.
+std::string sweep_dtd_query( std::string const &prefix ) {
+  return "import module namespace dir = 'http://zorba.io/modules/directory';\n"
+         "declare namespace f = 'http://zorba.io/options/features';\n"
+         "declare namespace err = 'http://www.w3.org/2005/xqt-errors';\n"
+         "declare option f:enable 'dtd';\n"   // after the namespace declarations
+         "try { count(doc(concat($dir:root, '/" + prefix + ".xml'))//*) } "
+         "catch * { concat('caught ', string($err:code), ' ', $err:description) }";
+}
 #endif
 
+void test_sweep_xml_dtd( Fixture const &f ) {
+#if defined(__linux__)
+  Sweep s;
+  s.files = { { "sweep.xml", sweep_dtd_xml( "sweep" ) },
+              { "warm.xml", sweep_dtd_xml( "warm" ) } };
+  s.query = sweep_dtd_query( "sweep" );
+  s.before.push_back( sweep_dtd_query( "warm" ) );
+  s.after_compile = true;
+  s.expected = "4";
+  // Known limits, not of the loader's tree: reading the file under a failing
+  // allocation, libxml2 failing to allocate while it parses (an error of the
+  // load, not memory_limit), Xerces-C releasing a schema. Caps: about 1.5 times
+  // the most seen in the 8 test jobs of CI run 42450607400 (runs of 1 / of 8:
+  // 41 file; 189 / 35 tree creation; 55 / 13 malformed; 2 / 69 Xerces-C).
+  s.known = { starting( "\"caught err:FODC0002 \\\"/tmp/mcp-tree", 62, 1 ),
+              starting( "\"caught err:FODC0002 \\\"XML tree creation failed\\\"", 285, 1 ),
+              starting( "\"caught err:FODC0002 \\\"XML tree creation failed\\\"", 53, 8 ),
+              starting( "\"caught err:FODC0002 \\\"malformed XML document\\\"", 83, 1 ),
+              starting( "\"caught err:FODC0002 \\\"malformed XML document\\\"", 20, 8 ),
+              starting( "terminate N11xercesc_", 4, 1, "OutOfMemoryExceptionE" ),
+              starting( "terminate N11xercesc_", 105, 8, "OutOfMemoryExceptionE" ) };
+  s.kept_runs_of_8_reported = true;   // the known limit, see Sweep
+  exhaust_sweep( f, "parse-xml with DTD validation", s );
+#else
+  (void)f;
+#endif
+}
 void test_sweep_xml( Fixture const &f ) {
 #if defined(__linux__)
   Sweep s;
@@ -7207,6 +7278,7 @@ Test const tests[] = {
   { "exhaust_seekable_stream", test_seekable_stream_out_of_memory },
   { "exhaust_sweep_matcher", test_sweep_matcher },
   { "exhaust_sweep_xml", test_sweep_xml },
+  { "exhaust_sweep_xml_dtd", test_sweep_xml_dtd },
   { "exhaust_sweep_fragment", test_sweep_fragment },
   { "exhaust_sweep_html", test_sweep_html },
   { "exhaust_sweep_json", test_sweep_json },
