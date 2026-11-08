@@ -300,6 +300,10 @@ RULE_REWRITE_PRE(EliminateUnusedLetVars)
       // FOR clause with 0 cardinality
       if (domCount == 0)
       {
+        // Not the non-discardable mark: a domain that can only raise an error is still dropped.
+        if (domExpr->is_nondeterministic())
+          continue;
+
         if (! outerFor)
         {
           return rCtx.theEM->create_seq(sctx, udf, LOC(node));
@@ -668,7 +672,9 @@ bool EliminateUnusedLetVars::safe_to_fold_var(csize varPos, int& numRefs)
     }
     else if (varDomExpr->isNonDiscardable())
     {
-      if (var->get_kind() == var_expr::let_var && var->get_num_refs() == 0)
+      // O0 binds a let domain eagerly: a nondeterministic call in it runs.
+      if (var->get_kind() == var_expr::let_var && var->get_num_refs() == 0 &&
+          !varDomExpr->is_nondeterministic())
         return true;
 
       return false;

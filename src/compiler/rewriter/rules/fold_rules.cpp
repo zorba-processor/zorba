@@ -81,6 +81,9 @@ static bool maybe_needs_implicit_timezone(const fo_expr* fo);
   does not have the corect type. We flag such exprs as non-discardable so that
   no (partial) evaluation of parent exprs is done.
 
+  A call of a nondeterministic function is non-discardable too: it may change
+  what a later call returns (ref:reference and ref:has-reference).
+
   The NON_DISCARDABLE property is used during the application of the PartialEval
   rule below.
 ********************************************************************************/
@@ -162,6 +165,10 @@ expr* MarkExprs::apply(RewriterContext& rCtx, expr* node, bool& modified)
     fo_expr* fo = static_cast<fo_expr *>(node);
     function* f = fo->get_func();
     FunctionConsts::FunctionKind fkind = f->getKind();
+
+    // Its static type does not say what else the call does: a rewrite must not drop it.
+    if (!f->isDeterministic())
+      curNonDiscardable = ANNOTATION_TRUE;
 
     if (!f->isUdf())
     {
@@ -954,8 +961,9 @@ static expr* partial_eval_eq(RewriterContext& rCtx, fo_expr& fo)
   {
     xs_integer ival = val->getIntegerValue();
 
-    // Every call in the argument must run.
-    if (expr_tools::calls_unproven_function(count_expr))
+    // Every call in the argument must run: fn:count reads all of it.
+    if (expr_tools::calls_unproven_function(count_expr) ||
+        count_expr->is_nondeterministic())
       return NULL;
 
     if (ival < 0)
@@ -1047,7 +1055,8 @@ static expr* partial_eval_return_clause(
           return static_cast<for_clause*>(c)->get_expr();
         }
       }
-      else if (c->get_kind() == flwor_clause::let_clause)
+      else if (c->get_kind() == flwor_clause::let_clause &&
+               !static_cast<let_clause*>(c)->get_expr()->is_nondeterministic())
       {
         modified = true;
         return rCtx.theEM->create_const_expr(sctx, udf, loc, 1);

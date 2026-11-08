@@ -137,7 +137,10 @@ RULE_REWRITE_PRE(EliminateTypeEnforcingOperations)
       if (arg_type->get_quantifier() == SequenceType::QUANT_ONE)
         return arg;
 
-      if (arg_type->max_card() == 0)
+      // The type rules run before MarkExprs: the mark of a nondeterministic call may not be there yet.
+      if (arg_type->max_card() == 0 &&
+          !arg->is_nondeterministic() &&
+          !expr_tools::calls_unproven_function(arg))
       {
         store::Item_t null;
         GENV_STORE.getItemFactory()->createJSONNull(null);
