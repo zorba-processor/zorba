@@ -1,0 +1,68 @@
+# Known ctest failures of the glibcxx-debug job in .github/workflows/sanitizers.yml.
+# One line per test: test name | failure kind (as ctest prints it, or "flaky") | reason.
+# Source: master 37f2fe60e3, run 42455096364 (62 failures); the flaky entries
+# also from runs 42438857916, 42439348086, 42439414632.
+# A fix removes its entries in the same pull request. See CONTRIBUTING.md.
+bin/mcp/cache_errors | Subprocess aborted | backlog 29: SimpleTempSeqIter keeps iterators into the temp sequence vector (attribution inferred)
+bin/mcp/cache_no_effects | Subprocess aborted | backlog 27: UpdJSONArrayUpdate::Comparator is not a strict weak ordering (attribution inferred)
+bin/mcp/cache_updates_bypass | Subprocess aborted | backlog 27: UpdJSONArrayUpdate::Comparator is not a strict weak ordering (attribution inferred)
+bin/mcp/deep_json | Subprocess aborted | backlog 29: SimpleTempSeqIter keeps iterators into the temp sequence vector (attribution inferred)
+bin/mcp/deep_json_binary | Failed | backlog 29: SimpleTempSeqIter keeps iterators into the temp sequence vector (attribution inferred)
+bin/mcp/exhaust_injected_xml | flaky | backlog 30: asserts on allocation-failure paths; memory not returned (varies between runs)
+bin/mcp/exhaust_sweep_builtins | flaky | backlog 30: asserts on allocation-failure paths; memory not returned (varies between runs)
+bin/mcp/exhaust_sweep_casts | flaky | backlog 30: asserts on allocation-failure paths; memory not returned (varies between runs)
+bin/mcp/exhaust_sweep_decimal_thread | flaky | backlog 30: asserts on allocation-failure paths; memory not returned (varies between runs)
+iterators/zorba/index/match_veq_08b.plan.xml | Failed | backlog 28: IndexMatchingRule erases from the predicate list through an invalidated iterator
+iterators/zorba/index/match_veq_09.plan.xml | Failed | backlog 28: IndexMatchingRule erases from the predicate list through an invalidated iterator
+iterators/zorba/index/match_veq_10.plan.xml | Failed | backlog 28: IndexMatchingRule erases from the predicate list through an invalidated iterator
+iterators/zorba/index/match_vrange_01.plan.xml | Failed | backlog 28: IndexMatchingRule erases from the predicate list through an invalidated iterator
+iterators/zorba/index/match_vrange_02.plan.xml | Failed | backlog 28: IndexMatchingRule erases from the predicate list through an invalidated iterator
+iterators/zorba/index/match_vrange_02a.plan.xml | Failed | backlog 28: IndexMatchingRule erases from the predicate list through an invalidated iterator
+iterators/zorba/index/match_vrange_02b.plan.xml | Failed | backlog 28: IndexMatchingRule erases from the predicate list through an invalidated iterator
+iterators/zorba/index/match_vrange_03.plan.xml | Failed | backlog 28: IndexMatchingRule erases from the predicate list through an invalidated iterator
+iterators/zorba/index/match_vrange_04.plan.xml | Failed | backlog 28: IndexMatchingRule erases from the predicate list through an invalidated iterator
+iterators/zorba/index/match_vrange_05.plan.xml | Failed | backlog 28: IndexMatchingRule erases from the predicate list through an invalidated iterator
+iterators/zorba/index/match_vrange_06.plan.xml | Failed | backlog 28: IndexMatchingRule erases from the predicate list through an invalidated iterator
+test/api/json_depth_limit/update | Subprocess aborted | backlog 27: UpdJSONArrayUpdate::Comparator is not a strict weak ordering (attribution inferred)
+test/rbkt/zorba/caching/snapshots-01 | Subprocess aborted | backlog 27: UpdJSONArrayUpdate::Comparator is not a strict weak ordering (attribution inferred)
+test/rbkt/zorba/caching/snapshots-02 | Subprocess aborted | backlog 27: UpdJSONArrayUpdate::Comparator is not a strict weak ordering (attribution inferred)
+test/rbkt/zorba/caching/snapshots-03 | Subprocess aborted | backlog 27: UpdJSONArrayUpdate::Comparator is not a strict weak ordering (attribution inferred)
+test/rbkt/zorba/caching/snapshots-04 | Subprocess aborted | backlog 27: UpdJSONArrayUpdate::Comparator is not a strict weak ordering (attribution inferred)
+test/rbkt/zorba/caching/snapshots-05 | Subprocess aborted | backlog 27: UpdJSONArrayUpdate::Comparator is not a strict weak ordering (attribution inferred)
+test/rbkt/zorba/caching/snapshots-06 | Subprocess aborted | backlog 27: UpdJSONArrayUpdate::Comparator is not a strict weak ordering (attribution inferred)
+test/rbkt/zorba/dynamic-calls/u03-json-update-read-beside-call | Subprocess aborted | backlog 27: UpdJSONArrayUpdate::Comparator is not a strict weak ordering (attribution inferred)
+test/rbkt/zorba/dynamic-calls/u03-json-update-read-beside-call-O0 | Subprocess aborted | backlog 27: UpdJSONArrayUpdate::Comparator is not a strict weak ordering (attribution inferred)
+test/rbkt/zorba/dynamic-calls/u03-json-update-read-beside-call-O2 | Subprocess aborted | backlog 27: UpdJSONArrayUpdate::Comparator is not a strict weak ordering (attribution inferred)
+test/rbkt/zorba/index/match_veq_08 | Subprocess aborted | backlog 28: IndexMatchingRule erases from the predicate list through an invalidated iterator
+test/rbkt/zorba/index/match_veq_08b | Subprocess aborted | backlog 28: IndexMatchingRule erases from the predicate list through an invalidated iterator
+test/rbkt/zorba/index/match_veq_09 | Subprocess aborted | backlog 28: IndexMatchingRule erases from the predicate list through an invalidated iterator
+test/rbkt/zorba/index/match_veq_10 | Subprocess aborted | backlog 28: IndexMatchingRule erases from the predicate list through an invalidated iterator
+test/rbkt/zorba/index/match_vrange_01 | Subprocess aborted | backlog 28: IndexMatchingRule erases from the predicate list through an invalidated iterator
+test/rbkt/zorba/index/match_vrange_02 | Subprocess aborted | backlog 28: IndexMatchingRule erases from the predicate list through an invalidated iterator
+test/rbkt/zorba/index/match_vrange_02a | Subprocess aborted | backlog 28: IndexMatchingRule erases from the predicate list through an invalidated iterator
+test/rbkt/zorba/index/match_vrange_02b | Subprocess aborted | backlog 28: IndexMatchingRule erases from the predicate list through an invalidated iterator
+test/rbkt/zorba/index/match_vrange_03 | Subprocess aborted | backlog 28: IndexMatchingRule erases from the predicate list through an invalidated iterator
+test/rbkt/zorba/index/match_vrange_04 | Subprocess aborted | backlog 28: IndexMatchingRule erases from the predicate list through an invalidated iterator
+test/rbkt/zorba/index/match_vrange_05 | Subprocess aborted | backlog 28: IndexMatchingRule erases from the predicate list through an invalidated iterator
+test/rbkt/zorba/index/match_vrange_06 | Subprocess aborted | backlog 28: IndexMatchingRule erases from the predicate list through an invalidated iterator
+test/rbkt/zorba/iteration-updates/array-members-delete | Subprocess aborted | backlog 27: UpdJSONArrayUpdate::Comparator is not a strict weak ordering (attribution inferred)
+test/rbkt/zorba/iteration-updates/array-members-delete-O0 | Subprocess aborted | backlog 27: UpdJSONArrayUpdate::Comparator is not a strict weak ordering (attribution inferred)
+test/rbkt/zorba/iteration-updates/array-members-delete-O2 | Subprocess aborted | backlog 27: UpdJSONArrayUpdate::Comparator is not a strict weak ordering (attribution inferred)
+test/rbkt/zorba/iteration-updates/array-members-delete-function-item | Subprocess aborted | backlog 27: UpdJSONArrayUpdate::Comparator is not a strict weak ordering (attribution inferred)
+test/rbkt/zorba/iteration-updates/array-members-delete-function-item-O0 | Subprocess aborted | backlog 27: UpdJSONArrayUpdate::Comparator is not a strict weak ordering (attribution inferred)
+test/rbkt/zorba/iteration-updates/array-members-delete-function-item-O2 | Subprocess aborted | backlog 27: UpdJSONArrayUpdate::Comparator is not a strict weak ordering (attribution inferred)
+test/rbkt/zorba/jsoniq/arr_append_01 | Subprocess aborted | backlog 27: UpdJSONArrayUpdate::Comparator is not a strict weak ordering (attribution inferred)
+test/rbkt/zorba/jsoniq/arr_delete_01 | Subprocess aborted | backlog 27: UpdJSONArrayUpdate::Comparator is not a strict weak ordering (attribution inferred)
+test/rbkt/zorba/jsoniq/arr_delete_01.jq | Subprocess aborted | backlog 27: UpdJSONArrayUpdate::Comparator is not a strict weak ordering (attribution inferred)
+test/rbkt/zorba/jsoniq/arr_delete_06 | Subprocess aborted | backlog 27: UpdJSONArrayUpdate::Comparator is not a strict weak ordering (attribution inferred)
+test/rbkt/zorba/jsoniq/arr_delete_06.jq | Subprocess aborted | backlog 27: UpdJSONArrayUpdate::Comparator is not a strict weak ordering (attribution inferred)
+test/rbkt/zorba/jsoniq/arr_delete_09 | Subprocess aborted | backlog 27: UpdJSONArrayUpdate::Comparator is not a strict weak ordering (attribution inferred)
+test/rbkt/zorba/jsoniq/arr_delete_09.jq | Subprocess aborted | backlog 27: UpdJSONArrayUpdate::Comparator is not a strict weak ordering (attribution inferred)
+test/rbkt/zorba/jsoniq/dataguide | Subprocess aborted | backlog 27: UpdJSONArrayUpdate::Comparator is not a strict weak ordering (attribution inferred)
+test/rbkt/zorba/jsoniq/dataguide1.jq | Subprocess aborted | backlog 27: UpdJSONArrayUpdate::Comparator is not a strict weak ordering (attribution inferred)
+test/rbkt/zorba/jsoniq/mixed-delete-01 | Subprocess aborted | backlog 27: UpdJSONArrayUpdate::Comparator is not a strict weak ordering (attribution inferred)
+test/rbkt/zorba/jsoniq/obj_insert_09 | Subprocess aborted | backlog 27: UpdJSONArrayUpdate::Comparator is not a strict weak ordering (attribution inferred)
+test/rbkt/zorba/jsoniq/obj_insert_09.jq | Subprocess aborted | backlog 27: UpdJSONArrayUpdate::Comparator is not a strict weak ordering (attribution inferred)
+test/rbkt/zorba/jsoniq/obj_insert_10 | Subprocess aborted | backlog 27: UpdJSONArrayUpdate::Comparator is not a strict weak ordering (attribution inferred)
+test/rbkt/zorba/jsoniq/obj_insert_10.jq | Subprocess aborted | backlog 27: UpdJSONArrayUpdate::Comparator is not a strict weak ordering (attribution inferred)
+test/rbkt/zorba/jsoniq/use_case11 | Subprocess aborted | backlog 27: UpdJSONArrayUpdate::Comparator is not a strict weak ordering (attribution inferred)

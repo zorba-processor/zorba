@@ -5,9 +5,12 @@ name: Sanitizers
 # (TSan cannot be combined with ASan, so it is a separate build), and the full
 # test suite under libstdc++'s debug mode with the store's checked iterators
 # (glibcxx-debug: a use of an invalidated iterator fails its test).
-# It does not gate PRs (it does not run on them), but a run fails when any
-# test fails under the sanitizers or UBSan reports a UB site, so failures cannot
-# hide behind the summary.
+# It does not gate PRs (it does not run on them), but a run fails when a test
+# fails that test/baselines/sanitizers-<job>.txt does not list as a known
+# failure, or UBSan reports a UB site, so failures cannot hide behind the
+# summary. The ctest step itself does not fail on test failures: the
+# "Compare with the baseline" step of each job judges them (see
+# CONTRIBUTING.md).
 on:
   workflow_dispatch:
     inputs:
@@ -61,6 +64,7 @@ jobs:
 
       # LeakSanitizer needs ptrace, which Docker's default seccomp profile blocks.
       - name: Build and test under sanitizers
+        id: test
         run: |
           docker network create zorba-test
           docker run -d --name zorba-http-test --network zorba-test zorba-http-test:ci
@@ -83,7 +87,8 @@ jobs:
               # hand them to the runner user so later steps can read them.
               chown -R "$HOST_UID:$HOST_GID" build/asan/sanitizer-logs \
                 build/asan/ctest.log build/asan/junit.xml .ccache || true
-              exit $rc'
+              # Test failures are judged against the baseline in a later step.
+              exit 0'
 
       - name: Summarize
         if: always()
@@ -119,6 +124,13 @@ jobs:
             exit 1
           fi
           echo "UBSan: 0 UB sites"
+
+      - name: Compare with the baseline
+        if: always() && steps.test.outcome == 'success'
+        run: |
+          python3 scripts/summarize_sanitizer_logs.py \
+            --baseline test/baselines/sanitizers-asan.txt \
+            --ctest-log build/asan/ctest.log --summary "$GITHUB_STEP_SUMMARY"
 
   # ThreadSanitizer on the multithreaded tests (test/libunit/mapm_threads runs
   # concurrent decimal and integer arithmetic) plus a few existing tests, in
@@ -157,6 +169,7 @@ jobs:
         run: sudo sysctl -w vm.mmap_rnd_bits=28
 
       - name: Build and test under ThreadSanitizer
+        id: test
         env:
           PRESET: ${{ matrix.preset }}
         run: |
@@ -176,7 +189,8 @@ jobs:
               sed -n "/tests passed/,\$p" "build/$PRESET/ctest.log"
               chown -R "$HOST_UID:$HOST_GID" "build/$PRESET/sanitizer-logs" \
                 "build/$PRESET/ctest.log" "build/$PRESET/junit.xml" .ccache || true
-              exit $rc'
+              # Test failures are judged against the baseline in a later step.
+              exit 0'
 
       - name: Summarize
         if: always()
@@ -206,6 +220,14 @@ jobs:
             build/${{ matrix.preset }}/sanitizer-logs
             build/${{ matrix.preset }}/ctest.log
             build/${{ matrix.preset }}/junit.xml
+
+      - name: Compare with the baseline
+        if: always() && steps.test.outcome == 'success'
+        run: |
+          python3 scripts/summarize_sanitizer_logs.py \
+            --baseline "test/baselines/sanitizers-${{ matrix.preset }}.txt" \
+            --ctest-log "build/${{ matrix.preset }}/ctest.log" \
+            --summary "$GITHUB_STEP_SUMMARY"
 
   # ThreadSanitizer on zorba-mcp's background scanner (bin/mcp/scan_* tests).
   # The tests have a PASS_REGULAR_EXPRESSION, which makes ctest ignore TSan's
@@ -331,6 +353,7 @@ jobs:
           restore-keys: ccache-v2-glibcxx-debug-
 
       - name: Build and test under debug mode
+        id: test
         run: |
           docker network create zorba-test
           docker run -d --name zorba-http-test --network zorba-test zorba-http-test:ci
@@ -375,7 +398,8 @@ jobs:
               sed -n "/tests passed/,\$p" build/glibcxx-debug/ctest.log
               chown -R "$HOST_UID:$HOST_GID" build/glibcxx-debug/ctest.log \
                 build/glibcxx-debug/junit.xml "$out" .ccache || true
-              exit $rc'
+              # Test failures are judged against the baseline in a later step.
+              exit 0'
 
       - uses: actions/upload-artifact@v7
         if: always()
@@ -385,3 +409,11 @@ jobs:
             build/glibcxx-debug/abi.txt
             build/glibcxx-debug/ctest.log
             build/glibcxx-debug/junit.xml
+
+      - name: Compare with the baseline
+        if: always() && steps.test.outcome == 'success'
+        run: |
+          python3 scripts/summarize_sanitizer_logs.py \
+            --baseline test/baselines/sanitizers-glibcxx-debug.txt \
+            --ctest-log build/glibcxx-debug/ctest.log \
+            --summary "$GITHUB_STEP_SUMMARY"

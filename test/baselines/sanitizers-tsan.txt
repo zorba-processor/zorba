@@ -1,0 +1,3 @@
+# Known ctest failures of the tsan job in .github/workflows/sanitizers.yml.
+# One line per test: test name | failure kind (as ctest prints it, or "flaky") | reason.
+# Empty on purpose: the latest master run had no failing test. See CONTRIBUTING.md.
