@@ -100,10 +100,12 @@
             <ForIterator>
               <ForVariable name="x"/>
               <TupleSourceIterator/>
-              <ProbeIndexPointValueIterator>
-                <SingletonIterator value="xs:QName(www.items.com,items,items-index)"/>
-                <SingletonIterator value="xs:string(b)"/>
-              </ProbeIndexPointValueIterator>
+              <NodeSortIterator distinct="false" ascending="true">
+                <ProbeIndexPointValueIterator>
+                  <SingletonIterator value="xs:QName(www.items.com,items,items-index)"/>
+                  <SingletonIterator value="xs:string(b)"/>
+                </ProbeIndexPointValueIterator>
+              </NodeSortIterator>
             </ForIterator>
           </CountIterator>
           <TypedValueCompareIterator_INTEGER>
