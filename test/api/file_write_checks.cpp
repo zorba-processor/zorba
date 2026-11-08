@@ -35,6 +35,7 @@
 #include <zorba/iterator.h>
 #include <zorba/security.h>
 #include <zorba/store_manager.h>
+#include <zorba/user_exception.h>
 #include <zorba/xquery.h>
 #include <zorba/zorba.h>
 #include <zorba/zorba_exception.h>
@@ -55,11 +56,13 @@ int theFailures = 0;
     }                                                                   \
   } while (0)
 
-// Delivers its text, then fails to read.
+// Delivers its text, then fails to read: with a plain failure, or with an
+// error of the query when aQueryError is set.
 class FailingBuf : public std::streambuf
 {
 public:
-  explicit FailingBuf(std::string const& aText) : theText(aText)
+  FailingBuf(std::string const& aText, Zorba* aQueryError)
+    : theText(aText), theQueryError(aQueryError)
   {
     setg(&theText[0], &theText[0], &theText[0] + theText.size());
   }
@@ -67,18 +70,25 @@ public:
 protected:
   int_type underflow() override
   {
+    if (theQueryError)
+      throw USER_EXCEPTION(
+        theQueryError->getItemFactory()->createQName(
+          "http://example.org/errors", "e", "STREAM0001"),
+        "error of the stream");
     throw std::runtime_error("read error");
   }
 
 private:
   std::string theText;
+  Zorba* theQueryError;
 };
 
 class FailingStream : public std::istream
 {
 public:
-  explicit FailingStream(std::string const& aText)
-    : std::istream(nullptr), theBuf(aText)
+  explicit FailingStream(std::string const& aText,
+                         Zorba* aQueryError = nullptr)
+    : std::istream(nullptr), theBuf(aText, aQueryError)
   {
     rdbuf(&theBuf);
   }
@@ -222,6 +232,23 @@ void test_read_error(Zorba* z, std::string const& aDir)
   }
 }
 
+// An error of the query raised while the stream is read reaches the caller as it
+// is.
+void test_stream_query_error(Zorba* z, std::string const& aDir)
+{
+  std::string const lPath = aDir + "/stream-error";
+  for (int k = 0; k < 3; ++k)
+  {
+    Outcome o = write(z, kinds[k], false, lPath,
+                      new FailingStream("some text", z));
+    if (o.ok || o.code != "STREAM0001")
+      report(kindNames[k], o);
+    CHECK(!o.ok);
+    CHECK(o.code == "STREAM0001");
+    CHECK(o.message.find("error of the stream") != std::string::npos);
+  }
+}
+
 // A write error on the file is reported. A file of /proc whose write is
 // refused by the kernel is the portable way to make one; elsewhere the check
 // is skipped.
@@ -281,6 +308,7 @@ file_write_checks(int argc, char* argv[])
     test_valid(lZorba, lDir.generic_string());
     test_empty(lZorba, lDir.generic_string());
     test_read_error(lZorba, lDir.generic_string());
+    test_stream_query_error(lZorba, lDir.generic_string());
     test_write_error(lZorba);
   }
   catch (ZorbaException const& e)
