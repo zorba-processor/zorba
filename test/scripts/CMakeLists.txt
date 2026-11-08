@@ -32,3 +32,12 @@ ADD_TEST(NAME "scripts/bench_compare"
     -D "WORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/bench_compare"
     -P "${CMAKE_CURRENT_SOURCE_DIR}/bench_compare.cmake")
 SET_TESTS_PROPERTIES("scripts/bench_compare" PROPERTIES PASS_REGULAR_EXPRESSION "Passed!")
+
+# The expressions of an index declaration are optimized with hoisting and index
+# joins, whatever the query that imports the declaration does.
+ADD_TEST(NAME "scripts/index_decl_hoisting"
+  COMMAND "${CMAKE_COMMAND}"
+    -D "ZORBA_EXE=${ZORBA_EXE}"
+    -D "SRC_DIR=${CMAKE_SOURCE_DIR}"
+    -P "${CMAKE_CURRENT_SOURCE_DIR}/index_decl_hoisting.cmake")
+SET_TESTS_PROPERTIES("scripts/index_decl_hoisting" PROPERTIES PASS_REGULAR_EXPRESSION "Passed!")

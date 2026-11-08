@@ -1,0 +1,16 @@
+module namespace t = "http://zorba.io/test/index-decl-hoisting";
+
+import module namespace dml = "http://zorba.io/modules/store/static/collections/dml";
+
+declare namespace ann = "http://zorba.io/annotations";
+
+declare collection t:left;
+declare collection t:right;
+
+(: The domain joins two collections: the optimizer must make an index join of it. :)
+declare %ann:value-equality index t:joined
+on nodes (for $a in dml:collection(xs:QName("t:left"))/a
+          for $b in dml:collection(xs:QName("t:right"))/b
+          where $a/@k eq $b/@k
+          return $a)
+by (fn:data(./@d)) as xs:string;

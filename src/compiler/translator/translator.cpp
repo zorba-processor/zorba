@@ -123,6 +123,34 @@ namespace zorba
 class ModulesInfo;
 class TranslatorImpl;
 
+
+/*******************************************************************************
+  Optimizes the expressions of an index declaration before classify_calls() has
+  decided CompilerCB::theNoHoisting for the query. An index expression is
+  deterministic, so it hoists and joins unless it makes a call that the compiler
+  cannot prove free of side effects. The query keeps its own decision.
+********************************************************************************/
+class IndexExprHoisting
+{
+  CompilerCB * theCCB;
+  bool         theSavedNoHoisting;
+
+public:
+  IndexExprHoisting(CompilerCB* ccb, const expr* indexExpr)
+    :
+    theCCB(ccb),
+    theSavedNoHoisting(ccb->theNoHoisting)
+  {
+    theCCB->theNoHoisting = expr_tools::calls_unproven_function(indexExpr);
+  }
+
+  ~IndexExprHoisting()
+  {
+    theCCB->theNoHoisting = theSavedNoHoisting;
+  }
+};
+
+
 static expr* translate_aux(
     TranslatorImpl* rootTranslator,
     const parsenode& root,
@@ -5545,6 +5573,8 @@ void* begin_visit(const IndexKeyList& v)
   // Optimize the domain expr. We do this even if the optimizer is off.
   // if (theCCB->theConfig.opt_level == CompilerCB::config::O1)
   {
+    IndexExprHoisting hoisting(theCCB, domainExpr);
+
     RewriterContext rCtx(theCCB, domainExpr, NULL, msg, false);
     rCtx.setForSerializationOnly(false);
 
@@ -5725,6 +5755,8 @@ void end_visit(const IndexKeyList& v, void* /*visit_state*/)
     // Optimize the key expr. We do this even if the optimizer is off.
     // if (theCCB->theConfig.opt_level == CompilerCB::config::O1)
     {
+      IndexExprHoisting hoisting(theCCB, keyExpr);
+
       RewriterContext rCtx(theCCB, keyExpr, NULL, msg.str(), false);
 
       GENV_COMPILERSUBSYS.getDefaultOptimizingRewriter()->rewrite(rCtx);
