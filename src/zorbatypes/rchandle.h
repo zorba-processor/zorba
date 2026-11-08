@@ -19,6 +19,7 @@
 
 #include <errno.h>
 #include <string>
+#include <type_traits>
 
 #include <zorba/config.h>
 
@@ -252,17 +253,25 @@ public:
     return rchandle<otherT> (dynamic_cast<otherT *> (p));
   }  
 
-  template <class otherT> operator rchandle<otherT> () 
+  // Implicit conversions only upcast (Derived -> Base); a downcast must name
+  // cast<D>() or dyn_cast<D>().
+  template <class otherT,
+            class = typename std::enable_if<
+                std::is_convertible<T*, otherT*>::value>::type>
+  operator rchandle<otherT> ()
   {
     return cast<otherT> ();
   }
 
-  template <class otherT> operator const rchandle<otherT> () const 
+  template <class otherT,
+            class = typename std::enable_if<
+                std::is_convertible<T*, otherT*>::value>::type>
+  operator const rchandle<otherT> () const
   {
     return cast<otherT> ();
   }
 
-  rchandle& operator=(const T* rhs) 
+  rchandle& operator=(const T* rhs)
   {
     if (p != rhs)
     {
@@ -276,7 +285,10 @@ public:
     return *this;
   }
 
-  template <class otherT> rchandle& operator=(const otherT* rhs)
+  template <class otherT,
+            class = typename std::enable_if<
+                std::is_convertible<const otherT*, const T*>::value>::type>
+  rchandle& operator=(const otherT* rhs)
   {
     if (p != rhs)
     {
@@ -295,12 +307,18 @@ public:
     return assign (rhs);
   }
 
-  template <class otherT> rchandle& operator=(rchandle<otherT> const& rhs) 
+  template <class otherT,
+            class = typename std::enable_if<
+                std::is_convertible<otherT*, T*>::value>::type>
+  rchandle& operator=(rchandle<otherT> const& rhs)
   {
     return assign (rhs);
   }
 
-  template <class otherT> rchandle& transfer(rchandle<otherT>& rhs)
+  template <class otherT,
+            class = typename std::enable_if<
+                std::is_convertible<otherT*, T*>::value>::type>
+  rchandle& transfer(rchandle<otherT>& rhs)
   {
     if (p != rhs.getp())
     {
