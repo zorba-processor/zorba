@@ -3051,8 +3051,10 @@ std::string sweep_dtd_xml( std::string const &prefix ) {
 std::string sweep_dtd_query( std::string const &prefix ) {
   return "import module namespace dir = 'http://zorba.io/modules/directory';\n"
          "declare namespace f = 'http://zorba.io/options/features';\n"
-         "declare option f:enable 'dtd';\n" +
-         caught( "count(doc(concat($dir:root, '/" + prefix + ".xml'))//*)" );
+         "declare namespace err = 'http://www.w3.org/2005/xqt-errors';\n"
+         "declare option f:enable 'dtd';\n"   // after the namespace declarations
+         "try { count(doc(concat($dir:root, '/" + prefix + ".xml'))//*) } "
+         "catch * { concat('caught ', string($err:code), ' ', $err:description) }";
 }
 #endif
 
