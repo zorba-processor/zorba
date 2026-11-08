@@ -3061,6 +3061,9 @@ void test_sweep_xml_dtd( Fixture const &f ) {
   s.before.push_back( sweep_dtd_query( "warm" ) );
   s.after_compile = true;
   s.expected = "41";
+  // Xerces-C releasing the schema of the options, as in x:parse-html.
+  s.known = { starting( "terminate N11xercesc_", 4, 1, "OutOfMemoryExceptionE" ),
+              starting( "terminate N11xercesc_", 250, 8, "OutOfMemoryExceptionE" ) };
   s.needs_module = true;
   s.kept_runs_of_8_reported = true;   // the known limit, see Sweep
   exhaust_sweep( f, "parse-xml with DTD validation", s );
