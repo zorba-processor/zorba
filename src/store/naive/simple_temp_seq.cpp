@@ -272,10 +272,11 @@ store::Iterator_t SimpleTempSeq::getIterator() const
 ********************************************************************************/	
 SimpleTempSeqIter::SimpleTempSeqIter(const SimpleTempSeq* tempSeq)
 	:
-  theTempSeq(const_cast<SimpleTempSeq*>(tempSeq))
+  theTempSeq(const_cast<SimpleTempSeq*>(tempSeq)),
+  theCurPos(0),
+  theBeginPos(0),
+  theEndPos(theTempSeq->theItems.size())
 {
-  theBegin = theTempSeq->theItems.begin();
-  theEnd = theTempSeq->theItems.end();
 }
 
 
@@ -286,8 +287,9 @@ void SimpleTempSeqIter::init(const store::TempSeq_t& tempSeq)
 {
   theTempSeq = tempSeq;
 
-  theBegin = theTempSeq->theItems.begin();
-  theEnd = theTempSeq->theItems.end();
+  theCurPos = 0;
+  theBeginPos = 0;
+  theEndPos = theTempSeq->theItems.size();
 }
 
 
@@ -329,14 +331,16 @@ void SimpleTempSeqIter::init(
 
   if (start > 0 && end > 0)
   {
-    theBegin = theTempSeq->theItems.begin() + static_cast<std::vector<store::Item*>::size_type>(start - 1);
-    theEnd = theTempSeq->theItems.begin() + static_cast<std::vector<store::Item*>::size_type>(end);
+    theBeginPos = static_cast<Pos>(start - 1);
+    theEndPos = static_cast<Pos>(end);
   }
   else
   {
-    theBegin = theTempSeq->theItems.end();
-    theEnd = theTempSeq->theItems.end();
+    theBeginPos = 0;
+    theEndPos = 0;
   }
+
+  theCurPos = theBeginPos;
 }
 
 
@@ -345,7 +349,7 @@ void SimpleTempSeqIter::init(
 ********************************************************************************/	
 void SimpleTempSeqIter::open()
 {
-  theIte = theBegin;
+  theCurPos = theBeginPos;
 }
 
 
@@ -354,10 +358,10 @@ void SimpleTempSeqIter::open()
 ********************************************************************************/	
 bool SimpleTempSeqIter::next(store::Item_t& result)
 {
-  if (theIte != theEnd)
+  if (theCurPos < theEndPos && theCurPos < theTempSeq->theItems.size())
   {
-    result = *theIte;
-    ++theIte;
+    result = theTempSeq->theItems[theCurPos];
+    ++theCurPos;
     return true;
   }
 
@@ -371,7 +375,7 @@ bool SimpleTempSeqIter::next(store::Item_t& result)
 ********************************************************************************/	
 void SimpleTempSeqIter::reset()
 {
-  theIte = theBegin;
+  theCurPos = theBeginPos;
 }
 
 
@@ -390,7 +394,7 @@ void SimpleTempSeqIter::close()
 std::string SimpleTempSeqIter::toString() const
 {
   std::stringstream ss;
-  ss << this << " = SimpleTempSeqIter current pos: " << (theIte - theBegin) << " sequence: ";
+  ss << this << " = SimpleTempSeqIter current pos: " << (theCurPos - theBeginPos) << " sequence: ";
   if (theTempSeq.getp() != NULL)
     ss << theTempSeq->toString();
   else

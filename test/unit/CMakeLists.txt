@@ -150,6 +150,7 @@ IF(ZORBA_WITH_UNIT_TESTS)
   ZORBA_ADD_TEST("test/libunit/base64_streambuf" LibUnitTest base64_streambuf)
   # disabled because of bug lp:867271
   ZORBA_ADD_TEST("test/libunit/string" LibUnitTest string)
+  ZORBA_ADD_TEST("test/libunit/temp_seq_iterator" LibUnitTest temp_seq_iterator)
   ZORBA_ADD_TEST("test/libunit/uri" LibUnitTest uri)
   EXPECTED_FAILURE(test/libunit/uri 3118348)
   IF (NOT ZORBA_NO_ICU)
