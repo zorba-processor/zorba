@@ -46,6 +46,11 @@ SET(UNIT_TEST_SRCS
   unit_tests.cpp
 )
 
+IF (ZORBA_CONTAINER_CHECKS)
+  LIST (APPEND UNIT_TEST_SRCS
+    test_container_checks.cpp)
+ENDIF (ZORBA_CONTAINER_CHECKS)
+
 IF (NOT ZORBA_NO_XMLSCHEMA)
   LIST (APPEND UNIT_TEST_SRCS
     test_xerces_utf8.cpp)

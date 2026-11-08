@@ -53,8 +53,10 @@ public:
 
   ~NodeCopy() { clear(); }
 
-  // If the allocation throws, the copy is unchanged.
-  void assign(XmlNode* const* begin, XmlNode* const* end)
+  // If the allocation throws, the copy is unchanged. Iter is a node vector
+  // iterator.
+  template <class Iter>
+  void assign(Iter begin, Iter end)
   {
     std::vector<XmlNode*> nodes;
     nodes.reserve(end - begin);

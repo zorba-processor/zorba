@@ -1,8 +1,10 @@
 name: Sanitizers
 
 # Full test suite under AddressSanitizer, LeakSanitizer and UBSan (GCC, Arch
-# latest-toolchain builder), and the thread-safety tests under ThreadSanitizer
-# (TSan cannot be combined with ASan, so it is a separate build).
+# latest-toolchain builder), the thread-safety tests under ThreadSanitizer
+# (TSan cannot be combined with ASan, so it is a separate build), and the full
+# test suite under libstdc++'s debug mode with the store's checked iterators
+# (glibcxx-debug: a use of an invalidated iterator fails its test).
 # It does not gate PRs (it does not run on them), but a run fails when any
 # test fails under the sanitizers or UBSan reports a UB site, so failures cannot
 # hide behind the summary.
@@ -12,7 +14,7 @@ on:
       jobs:
         description: "Which sanitizer jobs to run"
         type: choice
-        options: [all, asan, tsan]
+        options: [all, asan, tsan, glibcxx-debug]
         default: all
   schedule:
     - cron: '0 6 * * 1'
@@ -24,7 +26,7 @@ permissions:
 
 jobs:
   asan:
-    if: github.event_name != 'workflow_dispatch' || inputs.jobs != 'tsan'
+    if: github.event_name != 'workflow_dispatch' || inputs.jobs == 'all' || inputs.jobs == 'asan'
     runs-on: ubuntu-24.04
     timeout-minutes: 240
     steps:
@@ -122,7 +124,7 @@ jobs:
   # concurrent decimal and integer arithmetic) plus a few existing tests, in
   # the default and the big-integer configuration.
   tsan:
-    if: github.event_name != 'workflow_dispatch' || inputs.jobs != 'asan'
+    if: github.event_name != 'workflow_dispatch' || inputs.jobs == 'all' || inputs.jobs == 'tsan'
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     strategy:
@@ -209,7 +211,7 @@ jobs:
   # The tests have a PASS_REGULAR_EXPRESSION, which makes ctest ignore TSan's
   # exit code, so any report in the logs fails the job here.
   tsan-mcp:
-    if: github.event_name != 'workflow_dispatch' || inputs.jobs != 'asan'
+    if: github.event_name != 'workflow_dispatch' || inputs.jobs == 'all' || inputs.jobs == 'tsan'
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     steps:
@@ -280,3 +282,106 @@ jobs:
             build/tsan/sanitizer-logs
             build/tsan/ctest.log
             build/tsan/junit.xml
+
+  # The full suite with _GLIBCXX_DEBUG (checked std containers and iterators)
+  # and ZORBA_CONTAINER_CHECKS (checked PtrVector iterators in the store).
+  # _GLIBCXX_DEBUG changes the layout of the std containers, so no std
+  # container may cross into a library built without it. libxml2, libxslt,
+  # curl, zlib and libuuid are C libraries; the C++ ones are ICU and Xerces-C.
+  # A std container as a function parameter would fail to link (debug
+  # containers have their own mangled names), but one as a return type or a
+  # class member would not, hence the header scan: the job fails if a std
+  # container appears in an ICU or Xerces-C header other than ICU's
+  # unicode/messageformat2_*.h, which Zorba does not include.
+  # The test preset excludes test/api/timeout_bounds: it bounds how late a
+  # query timeout may fire, and debug mode's checks (linear in the container
+  # size on some operations) make a timed operation miss that bound.
+  glibcxx-debug:
+    if: github.event_name != 'workflow_dispatch' || inputs.jobs == 'all' || inputs.jobs == 'glibcxx-debug'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Build the builder image
+        uses: docker/build-push-action@v7
+        with:
+          context: docker/builder-latest
+          load: true
+          tags: zorba-builder:ci
+          cache-from: type=gha,scope=builder-linux-amd64-latest
+          cache-to: type=gha,mode=max,scope=builder-linux-amd64-latest
+
+      - name: Build the HTTP test server image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: docker/http-test-server/Dockerfile
+          load: true
+          tags: zorba-http-test:ci
+          cache-from: type=gha,scope=http-test-linux-amd64-latest
+          cache-to: type=gha,mode=max,scope=http-test-linux-amd64-latest
+
+      - uses: actions/cache@v6
+        with:
+          path: .ccache
+          key: ccache-v2-glibcxx-debug-${{ github.sha }}
+          restore-keys: ccache-v2-glibcxx-debug-
+
+      - name: Build and test under debug mode
+        run: |
+          docker network create zorba-test
+          docker run -d --name zorba-http-test --network zorba-test zorba-http-test:ci
+          docker run --rm --network zorba-test \
+            -e ZORBA_HTTP_TEST_SERVER=zorba-http-test:8080 \
+            -e CCACHE_DIR=/src/.ccache \
+            -e CCACHE_SLOPPINESS=pch_defines,time_macros -e CCACHE_DEPEND=1 \
+            -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" \
+            -v "$PWD":/src -w /src zorba-builder:ci sh -c '
+              set -e
+              cmake --preset glibcxx-debug
+              cmake --build --preset glibcxx-debug
+              out=build/glibcxx-debug/abi.txt
+              (
+                echo "C++ libraries that libzorba links:"
+                lib=$(find build/glibcxx-debug -name "libzorba_simplestore.so*" -type f | head -n 1)
+                for dep in $(ldd "$lib" | sed -n "s/.*=> \(\/[^ ]*\) .*/\1/p"); do
+                  if readelf -d "$dep" | grep -q "NEEDED.*libstdc++"; then
+                    echo "  $dep"
+                  fi
+                done
+                echo "std containers in the headers of ICU and Xerces-C:"
+                for d in /usr/include/unicode /usr/local/include/xercesc; do
+                  test -d "$d" || { echo "missing header directory $d"; exit 1; }
+                done
+                grc=0
+                grep -rnE "std::(vector|deque|list|forward_list|map|multimap|set|multiset|unordered_[a-z]+|bitset)[[:space:]]*<" \
+                  /usr/include/unicode /usr/local/include/xercesc > build/glibcxx-debug/abi-grep.txt || grc=$?
+                if [ "$grc" -gt 1 ]; then echo "grep failed ($grc)"; exit 1; fi
+                cat build/glibcxx-debug/abi-grep.txt
+                if grep -v "^/usr/include/unicode/messageformat2_" build/glibcxx-debug/abi-grep.txt; then
+                  echo "std container in a header outside unicode/messageformat2_*.h (above)"
+                  exit 1
+                fi
+                echo "none outside unicode/messageformat2_*.h"
+              ) > "$out" 2>&1 || abi=$?
+              cat "$out"
+              test -z "${abi:-}"
+              rc=0
+              ctest --preset glibcxx-debug -j"$(nproc)" --output-junit junit.xml \
+                > build/glibcxx-debug/ctest.log 2>&1 || rc=$?
+              sed -n "/tests passed/,\$p" build/glibcxx-debug/ctest.log
+              chown -R "$HOST_UID:$HOST_GID" build/glibcxx-debug/ctest.log \
+                build/glibcxx-debug/junit.xml "$out" .ccache || true
+              exit $rc'
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: glibcxx-debug-logs
+          path: |
+            build/glibcxx-debug/abi.txt
+            build/glibcxx-debug/ctest.log
+            build/glibcxx-debug/junit.xml

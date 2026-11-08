@@ -118,6 +118,13 @@ ENDIF (NOT ZORBA_DEBUG_STRING)
 SET (ZORBA_DEBUG_STRING ${ZORBA_DEBUG_STRING} CACHE BOOL "debug strings")
 MESSAGE (STATUS "ZORBA_DEBUG_STRING:                   " ${ZORBA_DEBUG_STRING})
 
+# Checked iterators for the store's PtrVector (src/store/naive/ptr_vector.h):
+# using an iterator after a change of the vector prints where and aborts. For
+# test builds only (the glibcxx-debug preset): it enlarges every element and
+# document node and slows down iteration. OFF adds no code.
+SET(ZORBA_CONTAINER_CHECKS OFF CACHE BOOL "check the iterators of the store's node vectors")
+MESSAGE(STATUS "ZORBA_CONTAINER_CHECKS:               " ${ZORBA_CONTAINER_CHECKS})
+
 SET(ZORBA_NO_ICU OFF CACHE BOOL "disable ICU")
 MESSAGE(STATUS "ZORBA_NO_ICU:                         " ${ZORBA_NO_ICU})
 

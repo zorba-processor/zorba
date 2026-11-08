@@ -182,13 +182,19 @@ void check( bool ok, char const *what, size_t actual, size_t limit ) {
 void test_sizes() {
   if ( sizeof( void* ) != 8 )
     return;
+#ifndef ZORBA_CONTAINER_CHECKS
+  // ZORBA_CONTAINER_CHECKS (test builds only) adds a generation number to
+  // PtrVector.
   CHECK_SIZE( ElementNode, 88 );
+#endif
   CHECK_SIZE( AttributeNode, 64 );
 #ifndef ZORBA_DEBUG_STRING
   // ZORBA_DEBUG_STRING (on for Debug and RelWithDebInfo) enlarges zstring.
   CHECK_SIZE( TextNode, 48 );
 #endif
+#ifndef ZORBA_CONTAINER_CHECKS
   CHECK_SIZE( InternalNode::NodeVector, 24 );
+#endif
 }
 
 void ok( bool cond, char const *what ) {

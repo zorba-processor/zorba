@@ -76,6 +76,17 @@
       }
     },
     {
+      "name": "glibcxx-debug",
+      "displayName": "Full, libstdc++ debug mode and checked store iterators (Linux, libstdc++)",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "CMAKE_C_FLAGS_RELWITHDEBINFO": "-O1 -g",
+        "CMAKE_CXX_FLAGS_RELWITHDEBINFO": "-O1 -g -D_GLIBCXX_DEBUG -D_GLIBCXX_DEBUG_PEDANTIC",
+        "ZORBA_CONTAINER_CHECKS": "ON"
+      }
+    },
+    {
       "name": "tsan-bigint",
       "displayName": "Full, ThreadSanitizer, arbitrary-precision xs:integer (Linux)",
       "inherits": "tsan",
@@ -155,6 +166,10 @@
       "configurePreset": "tsan-bigint"
     },
     {
+      "name": "glibcxx-debug",
+      "configurePreset": "glibcxx-debug"
+    },
+    {
       "name": "embedded",
       "configurePreset": "embedded"
     },
@@ -216,6 +231,22 @@
         "ASAN_OPTIONS": "detect_leaks=1:log_path=${sourceDir}/build/asan/sanitizer-logs/asan",
         "LSAN_OPTIONS": "suppressions=${sourceDir}/test/sanitizers/lsan.supp",
         "UBSAN_OPTIONS": "print_stacktrace=1:log_path=${sourceDir}/build/asan/sanitizer-logs/ubsan"
+      }
+    },
+    {
+      "name": "glibcxx-debug",
+      "displayName": "All tests under libstdc++ debug mode and checked store iterators (needs the HTTP test server)",
+      "configurePreset": "glibcxx-debug",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "timeout": 300
+      },
+      "filter": {
+        "exclude": {
+          "name": "^test/api/timeout_bounds$"
+        }
       }
     },
     {

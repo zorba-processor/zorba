@@ -146,6 +146,9 @@
 #cmakedefine ZORBA_DEBUG_PARSER 
 #cmakedefine ZORBA_DEBUG_STRING 
 
+// Iterator checks of Zorba's own containers (test builds only)
+#cmakedefine ZORBA_CONTAINER_CHECKS
+
 // Zorba runtime configuration parameters
 #define ZORBA_FLOAT_POINT_PRECISION ${ZORBA_FLOAT_POINT_PRECISION}
 
