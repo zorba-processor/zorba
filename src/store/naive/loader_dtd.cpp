@@ -845,19 +845,33 @@ void DtdXmlLoader::abortload()
   zstring().swap(theBaseUri);
   zstring().swap(theDocUri);
 
-  delete theTree;
-  theTree = NULL;
-
-  theOrdPath.init();
-  theRootNode = NULL;
-
+  // The nodes on the stack first: destroying one with a type (an ID attribute,
+  // say) removes the type from its tree.
+  bool rootDestroyed = false;
   while(!theNodeStack.empty())
   {
     XmlNode* node = theNodeStack.top();
     theNodeStack.pop();
     if (node != NULL)
+    {
+      if (node == theRootNode)
+        rootDestroyed = true;
       node->destroy(true);
+    }
   }
+
+  if (theTree != NULL)
+  {
+    // The tree destroys its root unless the stack held it (a root not yet on
+    // the stack when a callback failed), and its table of types.
+    if (rootDestroyed)
+      theTree->setRoot(NULL);
+    theTree->destroy();
+    theTree = NULL;
+  }
+
+  theOrdPath.init();
+  theRootNode = NULL;
 
   thePathStack.clear();
 
@@ -1611,6 +1625,8 @@ void DtdXmlLoader::startElement(
       attrNodes[i] = attrNode;   // first: the element destroys it
 
       xmlChar* val = xmlGetProp(node, attr->name);
+      if (val == NULL)   // an attribute with no value gives "": only memory fails
+        throw std::bad_alloc();
       const char* valu = reinterpret_cast<const char*>(val);
       zstring value(valu);
 
