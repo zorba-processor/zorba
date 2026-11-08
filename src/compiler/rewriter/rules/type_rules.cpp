@@ -137,7 +137,7 @@ RULE_REWRITE_PRE(EliminateTypeEnforcingOperations)
       if (arg_type->get_quantifier() == SequenceType::QUANT_ONE)
         return arg;
 
-      if (arg_type->max_card() == 0)
+      if (arg_type->max_card() == 0 && !arg->isNonDiscardable())
       {
         store::Item_t null;
         GENV_STORE.getItemFactory()->createJSONNull(null);

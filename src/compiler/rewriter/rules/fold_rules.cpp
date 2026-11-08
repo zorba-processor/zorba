@@ -81,6 +81,9 @@ static bool maybe_needs_implicit_timezone(const fo_expr* fo);
   does not have the corect type. We flag such exprs as non-discardable so that
   no (partial) evaluation of parent exprs is done.
 
+  A call of a nondeterministic function is non-discardable too: it may change
+  what a later call returns (ref:reference and ref:has-reference).
+
   The NON_DISCARDABLE property is used during the application of the PartialEval
   rule below.
 ********************************************************************************/
@@ -162,6 +165,10 @@ expr* MarkExprs::apply(RewriterContext& rCtx, expr* node, bool& modified)
     fo_expr* fo = static_cast<fo_expr *>(node);
     function* f = fo->get_func();
     FunctionConsts::FunctionKind fkind = f->getKind();
+
+    // Its static type does not say what else the call does: a rewrite must not drop it.
+    if (!f->isDeterministic())
+      curNonDiscardable = ANNOTATION_TRUE;
 
     if (!f->isUdf())
     {

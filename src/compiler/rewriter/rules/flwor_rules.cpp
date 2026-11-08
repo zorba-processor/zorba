@@ -300,6 +300,9 @@ RULE_REWRITE_PRE(EliminateUnusedLetVars)
       // FOR clause with 0 cardinality
       if (domCount == 0)
       {
+        if (domExpr->isNonDiscardable())
+          continue;
+
         if (! outerFor)
         {
           return rCtx.theEM->create_seq(sctx, udf, LOC(node));
