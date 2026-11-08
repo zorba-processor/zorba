@@ -38,13 +38,6 @@
     </ReturnClause>
   </FLWORIterator>
 </iterator-tree>
-<iterator-tree description="const-folded expr">
-  <OrIterator>
-    <SingletonIterator value="xs:boolean(false)"/>
-    <SingletonIterator value="xs:boolean(false)"/>
-    <SingletonIterator value="xs:boolean(false)"/>
-  </OrIterator>
-</iterator-tree>
 <iterator-tree description="main query">
   <SequentialIterator>
     <CtxVarDeclareIterator varid="4" varname="doc">
@@ -101,36 +94,35 @@
           </ApplyIterator>
         </ReturnClause>
       </FLWORIterator>
-      <FLWORIterator>
-        <ForVariable name="x">
-          <ProbeIndexPointValueIterator>
-            <SingletonIterator value="xs:QName(www.items.com,items,items-index)"/>
-            <SingletonIterator value="xs:string(b)"/>
-          </ProbeIndexPointValueIterator>
-        </ForVariable>
-        <CountClause varname="c"/>
-        <WhereClause>
+      <TupleStreamIterator>
+        <WhereIterator>
+          <CountIterator>
+            <ForIterator>
+              <ForVariable name="x"/>
+              <TupleSourceIterator/>
+              <ProbeIndexPointValueIterator>
+                <SingletonIterator value="xs:QName(www.items.com,items,items-index)"/>
+                <SingletonIterator value="xs:string(b)"/>
+              </ProbeIndexPointValueIterator>
+            </ForIterator>
+          </CountIterator>
           <TypedValueCompareIterator_INTEGER>
             <ForVarIterator varname="c"/>
             <SingletonIterator value="xs:integer(1)"/>
           </TypedValueCompareIterator_INTEGER>
-        </WhereClause>
-        <ReturnClause>
-          <ElementIterator>
-            <SingletonIterator value="xs:QName(,,r)"/>
-            <FnConcatIterator>
-              <AttributeIterator qname="xs:QName(,,c)">
-                <EnclosedIterator attr_cont="true">
-                  <ForVarIterator varname="c"/>
-                </EnclosedIterator>
-              </AttributeIterator>
-              <EnclosedIterator attr_cont="false">
-                <ForVarIterator varname="x"/>
-              </EnclosedIterator>
-            </FnConcatIterator>
-          </ElementIterator>
-        </ReturnClause>
-      </FLWORIterator>
+        </WhereIterator>
+        <ElementIterator>
+          <SingletonIterator value="xs:QName(,,r)"/>
+          <AttributeIterator qname="xs:QName(,,c)">
+            <EnclosedIterator attr_cont="true">
+              <ForVarIterator varname="c"/>
+            </EnclosedIterator>
+          </AttributeIterator>
+          <EnclosedIterator attr_cont="false">
+            <ForVarIterator varname="x"/>
+          </EnclosedIterator>
+        </ElementIterator>
+      </TupleStreamIterator>
     </SequentialIterator>
   </SequentialIterator>
 </iterator-tree>
