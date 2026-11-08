@@ -265,6 +265,14 @@ FOREACH(TESTFILE ${TESTFILES})
           ENVIRONMENT "ZORBA_OPTLEVEL=${_optlevel}")
       ENDFOREACH ()
     ENDIF ()
+    # The reference function tests must give the same results at every optimization level.
+    IF (TESTNAME MATCHES "^test/rbkt/zorba/reference/opt_")
+      FOREACH (_optlevel O0 O2)
+        ZORBA_ADD_TEST("${TESTNAME}-${_optlevel}" testdriver ${TESTFILE})
+        SET_TESTS_PROPERTIES ("${TESTNAME}-${_optlevel}" PROPERTIES
+          ENVIRONMENT "ZORBA_OPTLEVEL=${_optlevel}")
+      ENDFOREACH ()
+    ENDIF ()
     # A query with no side effect gets the same rewrites at O1 and O2.
     IF (TESTNAME MATCHES "^test/rbkt/zorba/optim/dyncall_")
       ZORBA_ADD_TEST("${TESTNAME}-O2" testdriver ${TESTFILE})
