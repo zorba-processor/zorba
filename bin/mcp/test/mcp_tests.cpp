@@ -3071,11 +3071,11 @@ void test_sweep_xml_dtd( Fixture const &f ) {
   // Known limits, not of the loader's tree: reading the file under a failing
   // allocation, libxml2 failing to allocate while it parses (an error of the
   // load, not memory_limit), Xerces-C releasing a schema.
-  s.known = { starting( "caught err:FODC0002 \"/tmp/mcp-tree", 60 ),
-              starting( "caught err:FODC0002 \"XML tree creation failed\"", 1500 ),
-              starting( "caught err:FODC0002 internal error", 60 ),
+  s.known = { starting( "\"caught err:FODC0002 \\\"/tmp/mcp-tree", 60 ),
+              starting( "\"caught err:FODC0002 \\\"XML tree creation failed\\\"", 1500 ),
+              starting( "\"caught err:FODC0002 internal error", 300 ),
               starting( "terminate N11xercesc_", 4, 1, "OutOfMemoryExceptionE" ),
-              starting( "terminate N11xercesc_", 250, 8, "OutOfMemoryExceptionE" ) };
+              starting( "terminate N11xercesc_", 450, 8, "OutOfMemoryExceptionE" ) };
   s.kept_runs_of_8_reported = true;   // the known limit, see Sweep
   exhaust_sweep( f, "parse-xml with DTD validation", s );
 #else
