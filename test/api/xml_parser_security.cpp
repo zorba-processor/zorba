@@ -207,9 +207,10 @@ Outcome parse_xml(Zorba* z, StaticContext_t sctx, const std::string& aXml)
 {
   return run(z, sctx,
              "import module namespace x = \"http://zorba.io/modules/xml\";\n"
-             "declare namespace opt = \"http://zorba.io/modules/xml-options\";\n"
+             "import schema namespace opt = "
+             "\"http://zorba.io/modules/xml-options\";\n"
              "declare variable $input as xs:string external;\n"
-             "x:parse($input, <opt:options><opt:DTD-validate/></opt:options>)"
+             "x:parse($input,<opt:options><opt:DTD-validate/></opt:options>)"
              "/string()",
              "input", aXml);
 }
