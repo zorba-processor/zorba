@@ -16,6 +16,7 @@
 
 // Zorba's clang-tidy checks, loaded as a plugin:
 //   clang-tidy -load=ZorbaTidyModule.so -checks=-*,zorba-owning-memory ...
+//   clang-tidy -load=ZorbaTidyModule.so -checks=-*,zorba-unchecked-stream-copy ...
 //
 // zorba-owning-memory reports raw owning memory management (see
 // CONTRIBUTING.md):
@@ -38,6 +39,27 @@
 // is written in a macro argument. It is reported there, and with DiffFile
 // only when that line is changed: a changed invocation of an unchanged macro
 // whose body has a raw new is not reported.
+//
+// zorba-unchecked-stream-copy reports a stream copy, "os << p" where p is a
+// pointer to a std::basic_streambuf (typically "os << is.rdbuf()"), whose
+// result is never examined. Such a copy sets failbit on os when it inserts
+// nothing (an empty or unreadable source) or reading throws, and reports
+// nothing else. A copy is reported when all of these hold:
+//   - os, the start of the "<<" chain, is a local stream object of the
+//     function: not a parameter, reference, static or global variable, nor a
+//     member, whose state other code can still examine;
+//   - the result of the copy expression (with the rest of its "<<" chain) is
+//     discarded or cast to void, not tested, returned, bound to a reference
+//     or passed to a function;
+//   - no reference to os after the copy, in source order within the
+//     function, examines it before a clear() of it: fail(), bad(), good(),
+//     rdstate(), operator bool, operator!, exceptions(mask), returning it or
+//     passing it to a function (including through a "<<" chain or a member
+//     that returns the stream, such as flush());
+//   - os.exceptions(mask) is not called before the copy.
+// A clear() of os after the copy and before any examination is reported
+// too: it discards the copy's failbit. Copies in templates are analyzed in
+// their instantiations.
 
 #include "clang-tidy/ClangTidyCheck.h"
 #include "clang-tidy/ClangTidyModule.h"
@@ -381,6 +403,175 @@ public:
   bool isLanguageVersionSupported(const LangOptions& LangOpts) const override
   {
     return LangOpts.CPlusPlus;
+  }
+
+  void registerMatchers(MatchFinder* Finder) override
+  {
+    auto streambuf =
+      cxxRecordDecl(isSameOrDerivedFrom(hasName("::std::basic_streambuf")));
+    Finder->addMatcher(
+      cxxOperatorCallExpr(hasOverloadedOperatorName("<<"), argumentCountIs(2),
+                          hasArgument(1, hasType(pointsTo(streambuf))),
+                          unless(isInstantiationDependent()))
+        .bind("copy"),
+      this);
+  }
+
+  void check(const MatchFinder::MatchResult& Result) override
+  {
+    const auto* copy = Result.Nodes.getNodeAs<CXXOperatorCallExpr>("copy");
+    ASTContext& ctx = *Result.Context;
+    const SourceManager& sm = *Result.SourceManager;
+
+    const VarDecl* stream = localStream(copy->getArg(0));
+    if (!stream)
+      return;
+    const auto* function = llvm::dyn_cast<FunctionDecl>(stream->getDeclContext());
+    if (!function || !function->getBody())
+      return;
+
+    const CXXMemberCallExpr* clear = nullptr;
+    switch (use(copy, ctx, clear)) {
+    case Use::Examine:
+    case Use::SetExceptions:
+      return;
+    case Use::Clear:
+    case Use::None:
+      break;
+    }
+
+    std::vector<const DeclRefExpr*> later;
+    for (const BoundNodes& m :
+         match(findAll(declRefExpr(to(varDecl(equalsNode(stream)))).bind("ref")),
+               *function->getBody(), ctx)) {
+      const auto* ref = m.getNodeAs<DeclRefExpr>("ref");
+      const CXXMemberCallExpr* ignored = nullptr;
+      if (sm.isBeforeInTranslationUnit(copy->getEndLoc(), ref->getBeginLoc()))
+        later.push_back(ref);
+      else if (sm.isBeforeInTranslationUnit(ref->getBeginLoc(),
+                                            copy->getBeginLoc()) &&
+               use(ref, ctx, ignored) == Use::SetExceptions)
+        return;
+    }
+    std::sort(later.begin(), later.end(),
+              [&sm](const DeclRefExpr* a, const DeclRefExpr* b) {
+                return sm.isBeforeInTranslationUnit(a->getBeginLoc(),
+                                                    b->getBeginLoc());
+              });
+    for (const DeclRefExpr* ref : later) {
+      if (clear)
+        break;
+      switch (use(ref, ctx, clear)) {
+      case Use::Examine:
+      case Use::SetExceptions:
+        return;
+      case Use::Clear:
+      case Use::None:
+        break;
+      }
+    }
+
+    diag(copy->getOperatorLoc(),
+         "stream copy (operator<< of a streambuf) whose result is never "
+         "examined: it sets failbit when nothing is copied or reading fails; "
+         "check the destination stream afterwards (fail(), operator bool)");
+    if (clear)
+      diag(clear->getExprLoc(),
+           "clear() discards the state of the stream copy at line %0 before "
+           "it is examined")
+        << sm.getPresumedLineNumber(copy->getOperatorLoc());
+  }
+
+private:
+  enum class Use { None, Examine, SetExceptions, Clear };
+
+  // The destination of a "<<" chain when it is a local stream object of
+  // the function (not a parameter, reference, static, member or global).
+  static const VarDecl* localStream(const Expr* e)
+  {
+    e = e->IgnoreParenImpCasts();
+    while (const auto* oc = llvm::dyn_cast<CXXOperatorCallExpr>(e)) {
+      if (oc->getOperator() != OO_LessLess || oc->getNumArgs() != 2)
+        return nullptr;
+      e = oc->getArg(0)->IgnoreParenImpCasts();
+    }
+    const auto* ref = llvm::dyn_cast<DeclRefExpr>(e);
+    const auto* var = ref ? llvm::dyn_cast<VarDecl>(ref->getDecl()) : nullptr;
+    if (!var || llvm::isa<ParmVarDecl>(var) || !var->hasLocalStorage() ||
+        var->getType()->isReferenceType())
+      return nullptr;
+    return var;
+  }
+
+  // What the code around e (a reference to the stream, or a "<<" chain on
+  // it) does with the stream: examines its state, sets exceptions(), clears
+  // it (clear is then set to the call), or none of these.
+  static Use use(const Expr* e, ASTContext& ctx, const CXXMemberCallExpr*& clear)
+  {
+    const Expr* cur = e;
+    for (;;) {
+      DynTypedNodeList parents = ctx.getParents(*cur);
+      if (parents.empty())
+        return Use::None;
+      const DynTypedNode& p = parents[0];
+      if (p.get<ReturnStmt>())
+        return Use::Examine;
+      if (const auto* vd = p.get<VarDecl>())
+        return vd->getType()->isReferenceType() ? Use::Examine : Use::None;
+      const auto* parent = p.get<Expr>();
+      if (!parent)
+        return Use::None;
+
+      if (llvm::isa<ParenExpr, ImplicitCastExpr, MaterializeTemporaryExpr,
+                    CXXBindTemporaryExpr, ExprWithCleanups>(parent)) {
+        cur = parent;
+        continue;
+      }
+      if (llvm::isa<MemberExpr>(parent)) {
+        DynTypedNodeList calls = ctx.getParents(*parent);
+        const auto* call =
+          calls.empty() ? nullptr : calls[0].get<CXXMemberCallExpr>();
+        const CXXMethodDecl* md = call ? call->getMethodDecl() : nullptr;
+        if (!md)
+          return Use::None;
+        if (llvm::isa<CXXConversionDecl>(md))
+          return Use::Examine;
+        if (md->getIdentifier()) {
+          llvm::StringRef name = md->getName();
+          if (name == "fail" || name == "bad" || name == "good" ||
+              name == "rdstate")
+            return Use::Examine;
+          if (name == "exceptions" && call->getNumArgs() == 1)
+            return Use::SetExceptions;
+          if (name == "clear") {
+            clear = call;
+            return Use::Clear;
+          }
+        }
+        // flush(), write(), put(), seekp() return the stream.
+        if (md->getReturnType()->isReferenceType()) {
+          cur = call;
+          continue;
+        }
+        return Use::None;
+      }
+      if (const auto* oc = llvm::dyn_cast<CXXOperatorCallExpr>(parent)) {
+        if (oc->getOperator() == OO_Exclaim)
+          return Use::Examine;
+        if (oc->getOperator() == OO_LessLess && oc->getNumArgs() == 2 &&
+            oc->getArg(0) == cur) {
+          cur = parent;
+          continue;
+        }
+        return Use::None;
+      }
+      // Passed on to a function, which may examine it.
+      if (const auto* call = llvm::dyn_cast<CallExpr>(parent))
+        return call->getCallee() == cur ? Use::None : Use::Examine;
+      if (llvm::isa<CXXConstructExpr>(parent))
+        return Use::Examine;
+      return Use::None;
+    }
   }
 };
 
