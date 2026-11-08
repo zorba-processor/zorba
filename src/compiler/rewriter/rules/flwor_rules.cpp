@@ -300,7 +300,8 @@ RULE_REWRITE_PRE(EliminateUnusedLetVars)
       // FOR clause with 0 cardinality
       if (domCount == 0)
       {
-        if (domExpr->isNonDiscardable())
+        // Not the non-discardable mark: a domain that can only raise an error is still dropped.
+        if (domExpr->is_nondeterministic())
           continue;
 
         if (! outerFor)

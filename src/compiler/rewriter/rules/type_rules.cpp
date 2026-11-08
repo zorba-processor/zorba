@@ -138,9 +138,7 @@ RULE_REWRITE_PRE(EliminateTypeEnforcingOperations)
         return arg;
 
       // The type rules run before MarkExprs: the mark of a nondeterministic call may not be there yet.
-      if (arg_type->max_card() == 0 &&
-          !arg->isNonDiscardable() &&
-          !arg->is_nondeterministic())
+      if (arg_type->max_card() == 0 && !arg->is_nondeterministic())
       {
         store::Item_t null;
         GENV_STORE.getItemFactory()->createJSONNull(null);
