@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef ZORBA_MCP_DOCUMENT_CACHE_H
-#define ZORBA_MCP_DOCUMENT_CACHE_H
+#ifndef ZORBA_DB_DOCUMENT_CACHE_H
+#define ZORBA_DB_DOCUMENT_CACHE_H
 
 #include <cstddef>
 #include <cstdint>
@@ -32,7 +32,7 @@
 #include <zorba/zorba.h>
 
 namespace zorba {
-namespace mcp {
+namespace db {
 
 /**
  * A small cache of the document records that the directory module parses
@@ -219,8 +219,8 @@ private:
   std::unique_ptr<Resolver> theResolver;
 };
 
-} // namespace mcp
+} // namespace db
 } // namespace zorba
 
-#endif /* ZORBA_MCP_DOCUMENT_CACHE_H */
+#endif /* ZORBA_DB_DOCUMENT_CACHE_H */
 /* vim:set et sw=2 ts=2: */

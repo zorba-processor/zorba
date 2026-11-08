@@ -18,37 +18,18 @@
 #include "query_primer.h"
 
 #include <algorithm>
-#include <iterator>
-#include <cstring>
+#include <cstdlib>
 #include <exception>
 #include <filesystem>
-#include <fstream>
-#include <memory>
-#include <new>
-#include <set>
-#include <sstream>
-#include <streambuf>
 #include <utility>
+#include <vector>
 
-#include <libxml/parser.h>
-
-#include <zorba/user_exception.h>
-#include <zorba/diagnostic.h>
-#include <zorba/dynamic_context.h>
-#include <zorba/item.h>
-#include <zorba/item_factory.h>
-#include <zorba/iterator.h>
-#include <zorba/options.h>
-#include <zorba/static_context.h>
 #include <zorba/version.h>
-#include <zorba/xquery.h>
-#include <zorba/xquery_exception.h>
-#include <zorba/zorba_exception.h>
-
-#include "directory_config.h"
 
 namespace zorba {
 namespace mcp {
+
+using db::parse_json;
 
 char const protocol_version[] = "2026-07-28";
 
@@ -118,42 +99,6 @@ Json all_versions() {
   return versions;
 }
 
-// Collects a query's output up to a limit, counting what goes beyond it.
-class CappedBuf : public std::streambuf {
-public:
-  explicit CappedBuf( std::size_t cap ) : theCap( cap ), theTotal( 0 ) { }
-
-  std::string const& data() const { return theData; }
-  std::size_t total() const { return theTotal; }
-  bool truncated() const { return theTotal > theData.size(); }
-
-protected:
-  int_type overflow( int_type c ) override {
-    if ( !traits_type::eq_int_type( c, traits_type::eof() ) ) {
-      char const ch = traits_type::to_char_type( c );
-      xsputn( &ch, 1 );
-    }
-    return traits_type::not_eof( c );
-  }
-
-  std::streamsize xsputn( char const *s, std::streamsize n ) override {
-    if ( n <= 0 )
-      return 0;
-    std::size_t const len = static_cast<std::size_t>( n );
-    // Counted after the append: an append that cannot allocate is not output
-    // beyond the limit (and std::bad_alloc reaches the caller, see run()).
-    if ( theData.size() < theCap )
-      theData.append( s, std::min( len, theCap - theData.size() ) );
-    theTotal += len;
-    return n;
-  }
-
-private:
-  std::size_t const theCap;
-  std::size_t theTotal;
-  std::string theData;
-};
-
 // Drops an incomplete UTF-8 sequence at the end of a truncated text.
 void trim_utf8_tail( std::string *s ) {
   std::size_t const n = s->size();
@@ -170,6 +115,38 @@ void trim_utf8_tail( std::string *s ) {
     return;
   }
 }
+
+// Collects a query's output up to a limit, counting what goes beyond it; at the
+// end, a truncated text gets a marker.
+class CappedSink : public db::ResultSink {
+public:
+  explicit CappedSink( std::size_t cap ) : theCap( cap ), theTotal( 0 ) { }
+
+  void write( char const *s, std::size_t len ) override {
+    // Counted after the append: an append that cannot allocate is not output
+    // beyond the limit (and std::bad_alloc fails the query).
+    if ( theData.size() < theCap )
+      theData.append( s, std::min( len, theCap - theData.size() ) );
+    theTotal += len;
+  }
+
+  void end() override {
+    if ( theTotal <= theData.size() )
+      return;
+    trim_utf8_tail( &theData );
+    theData += "\n[zorba-mcp: output truncated after " +
+      std::to_string( theData.size() ) + " of " +
+      std::to_string( theTotal ) + " bytes; narrow the query (fewer "
+      "fields, a filter, or subsequence()) to see the rest]";
+  }
+
+  std::string take() { return std::move( theData ); }
+
+private:
+  std::size_t const theCap;
+  std::size_t theTotal;
+  std::string theData;
+};
 
 inline bool is_utf8_continuation( char c ) {
   return ( static_cast<unsigned char>( c ) & 0xC0 ) == 0x80;
@@ -225,84 +202,6 @@ std::string line_excerpt( std::string const &line, unsigned long column ) {
     ( end < line.size() ? dots : std::string() ) + marker;
 }
 
-std::string percent_encode_path( std::string const &path ) {
-  static char const hex[] = "0123456789ABCDEF";
-  std::string out;
-  for ( char const c : path ) {
-    unsigned char const u = static_cast<unsigned char>( c );
-    if ( ( u >= 'A' && u <= 'Z' ) || ( u >= 'a' && u <= 'z' ) ||
-         ( u >= '0' && u <= '9' ) || std::strchr( "-._~/", c ) ) {
-      out += c;
-    } else {
-      out += '%';
-      out += hex[ u >> 4 ];
-      out += hex[ u & 0x0F ];
-    }
-  }
-  return out;
-}
-
-// The base URI of the queries, and of what the directory module parses for them.
-std::string base_uri_of( std::string const &root ) {
-  return "file://" + percent_encode_path( root ) + "/";
-}
-
-// Line n (1-based) of a text, or the empty string.
-std::string source_line( std::string const &source, unsigned long n ) {
-  std::istringstream in( source );
-  std::string line;
-  for ( unsigned long i = 1; std::getline( in, line ); ++i )
-    if ( i == n )
-      return line;
-  return std::string();
-}
-
-// The leading comment of a query, flattened to one line: "(: a\n : b :)"
-// gives "a b". A version declaration may come first.
-std::string leading_comment( std::string const &source ) {
-  std::size_t pos = source.find_first_not_of( " \t\r\n" );
-  if ( pos == std::string::npos )
-    return std::string();
-  for ( char const *decl : { "xquery version", "jsoniq version" } ) {
-    if ( source.compare( pos, std::strlen( decl ), decl ) == 0 ) {
-      std::size_t const semi = source.find( ';', pos );
-      if ( semi == std::string::npos )
-        return std::string();
-      pos = source.find_first_not_of( " \t\r\n", semi + 1 );
-      if ( pos == std::string::npos )
-        return std::string();
-      break;
-    }
-  }
-  if ( source.compare( pos, 2, "(:" ) != 0 )
-    return std::string();
-  std::size_t const end = source.find( ":)", pos + 2 );
-  if ( end == std::string::npos )
-    return std::string();
-  std::istringstream in( source.substr( pos + 2, end - pos - 2 ) );
-  std::string word, out;
-  while ( in >> word ) {
-    if ( word == ":" )
-      continue;                         // the " : " of continuation lines
-    if ( !out.empty() )
-      out += ' ';
-    out += word;
-  }
-  return out;
-}
-
-std::string tool_name( std::string const &stem ) {
-  std::string name;
-  for ( char const c : stem ) {
-    bool const ok = ( c >= 'A' && c <= 'Z' ) || ( c >= 'a' && c <= 'z' ) ||
-      ( c >= '0' && c <= '9' ) || c == '_' || c == '-' || c == '.';
-    name += ok ? c : '_';
-  }
-  if ( name.size() > 128 )
-    name.resize( 128 );
-  return name;
-}
-
 std::string out_of_memory_text( unsigned long long max_memory ) {
   return Json::object( { { "error", Json::object( {
     { "code", "memory_limit" },
@@ -316,49 +215,39 @@ std::string out_of_memory_text( unsigned long long max_memory ) {
 // The longest hint that goes whole. A hint can repeat names from the query.
 std::size_t const max_hint_bytes = 4096;
 
-Json diagnostic_json( ZorbaException const &e, std::string const &source,
-                      std::string const &file_name,
-                      std::size_t max_output ) {
-  diagnostic::QName const &qn = e.diagnostic().qname();
-  std::string code( qn.localname() );
-  if ( qn.prefix() && *qn.prefix() )
-    code = std::string( qn.prefix() ) + ':' + code;
+// The text of a tool error for a query that failed.
+std::string error_text( db::QueryError const &e, std::size_t max_output,
+                        unsigned long long max_memory ) {
+  if ( e.kind == db::QueryError::Kind::memory_limit )
+    return out_of_memory_text( max_memory );
+  if ( e.kind == db::QueryError::Kind::internal )
+    return Json::object( { { "error", Json::object( {
+      { "code", "internal" },
+      { "message", cut_middle( e.message, max_output, "message" ) }
+    } ) } } ).dump();
   Json err( Json::object( {
-    { "code", code },
-    { "namespace", qn.ns() ? qn.ns() : "" },
-    { "message", cut_middle( e.what(), max_output, "message" ) }
+    { "code", e.code },
+    { "namespace", e.ns },
+    { "message", cut_middle( e.message, max_output, "message" ) }
   } ) );
-  if ( *e.hint() )
-    err.set( "hint", cut_middle( e.hint(), max_hint_bytes, "hint" ) );
-  if ( XQueryException const *const xe =
-         dynamic_cast<XQueryException const*>( &e ) ) {
-    if ( xe->has_source() ) {
-      std::string const uri( xe->source_uri() ? xe->source_uri() : "" );
-      Json loc( Json::object() );
-      if ( !uri.empty() )
-        loc.set( "uri", uri );
-      loc.set( "line", static_cast<unsigned long long>( xe->source_line() ) );
-      loc.set( "column",
-               static_cast<unsigned long long>( xe->source_column() ) );
-      if ( xe->source_line_end() ) {
-        loc.set( "lineEnd",
-                 static_cast<unsigned long long>( xe->source_line_end() ) );
-        loc.set( "columnEnd",
-                 static_cast<unsigned long long>( xe->source_column_end() ) );
-      }
-      // The text of the failing line, when the error is in the query itself
-      // (not in a module it imports).
-      bool const in_query = uri.empty() ||
-        ( !file_name.empty() && uri.find( file_name ) != std::string::npos );
-      if ( in_query ) {
-        std::string const text( source_line( source, xe->source_line() ) );
-        if ( !text.empty() )
-          loc.set( "text", line_excerpt( text, xe->source_column() ) );
-      }
-      err.set( "location", std::move( loc ) );
+  if ( !e.hint.empty() )
+    err.set( "hint", cut_middle( e.hint, max_hint_bytes, "hint" ) );
+  if ( e.location ) {
+    db::SourceLocation const &l = *e.location;
+    Json loc( Json::object() );
+    if ( !l.uri.empty() )
+      loc.set( "uri", l.uri );
+    loc.set( "line", static_cast<unsigned long long>( l.line ) );
+    loc.set( "column", static_cast<unsigned long long>( l.column ) );
+    if ( l.line_end ) {
+      loc.set( "lineEnd", static_cast<unsigned long long>( l.line_end ) );
+      loc.set( "columnEnd", static_cast<unsigned long long>( l.column_end ) );
     }
+    if ( !l.text.empty() )
+      loc.set( "text", line_excerpt( l.text, l.column ) );
+    err.set( "location", std::move( loc ) );
   }
-  return Json::object( { { "error", std::move( err ) } } );
+  return Json::object( { { "error", std::move( err ) } } ).dump();
 }
 
 // The names of the arguments that the tool's inputSchema does not declare
@@ -399,149 +288,35 @@ Json read_only_annotations() {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+namespace {
+
+db::DatabaseConfig database_config( ServerConfig const &config ) {
+  db::DatabaseConfig c;
+  c.root = config.root;
+  c.queries_dir = config.queries_dir;
+  c.jsoniq_default = config.jsoniq_default;
+  c.timeout = config.timeout;
+  c.cache_max_file_kb = config.cache_max_file_kb;
+  c.cache_max_files = config.cache_max_files;
+  c.scan = config.scan;
+  c.scan_limits = config.scan_limits;
+  c.before_execute = config.before_execute;
+  c.scan_hook = config.scan_hook;
+  return c;
+}
+
+} // namespace
+
 Server::Server( Zorba *zorba, ServerConfig config, std::ostream &log ) :
-  theZorba( zorba ),
   theConfig( std::move( config ) ),
   theLog( log ),
-  thePolicy( SecurityPolicy::secure() ),
-  theCache( zorba, theConfig.root,
-            std::uintmax_t( theConfig.cache_max_file_kb ) * 1024,
-            theConfig.cache_max_files, &thePolicy, base_uri_of( theConfig.root ) ) {
-  // libxml2 ends the process if it cannot allocate its state for a thread, the
-  // first time the thread uses it: this thread does so now, before any query.
-  xmlDictFree( xmlDictCreate() );
-  directory_config::apply_policy( thePolicy, theConfig.root );
-  if ( theConfig.timeout.count() > 0 )
-    thePolicy.setTimeout( theConfig.timeout );
-  load_predefined();
-  if ( theConfig.scan ) {
-    try {
-      theScanner = std::make_unique<Scanner>(
-        theConfig.root, theConfig.scan_limits, theConfig.scan_hook );
-    }
-    // Threads may not start under --max-memory, which is applied before this:
-    // the server then works as with --no-scan.
-    catch ( std::exception const &e ) {
-      theLog << server_name << ": no background scan: " << e.what() << std::endl;
-    }
-  }
-}
-
-Server::~Server() {
-  (void)stop_scan();
-  if ( theScanner )
-    theLog << server_name << ": the scan cache holds "
-           << theScanner->cache_summary() << std::endl;
-}
-
-bool Server::stop_scan() {
-  return !theScanner || theScanner->stop();
-}
-
-std::size_t Server::scan_cache_bytes() const {
-  return theScanner ? theScanner->cache_bytes() : 0;
-}
-
-// The static context a query is compiled in. The language of a query without
-// a version declaration is JSONiq for a .jq file, else the configured default;
-// a declaration in the query wins.
-StaticContext_t Server::new_static_context( std::string const &file_name )
-    const {
-  StaticContext_t sctx = theZorba->createStaticContext();
-  sctx->setSecurityPolicy( thePolicy );
-  std::string const ext( std::filesystem::path( file_name ).extension() );
-  if ( ext == ".jq" || ( ext != ".xq" && theConfig.jsoniq_default ) )
-    sctx->setJSONiqVersion( jsoniq_version_1_0 );
-  return sctx;
-}
-
-void Server::load_predefined() {
-  if ( theConfig.queries_dir.empty() )
-    return;
-  namespace stdfs = std::filesystem;
-  std::vector<stdfs::path> files;
-  std::error_code ec;
-  for ( stdfs::directory_iterator i( theConfig.queries_dir, ec ), end;
-        !ec && i != end; i.increment( ec ) ) {
-    if ( i->path().extension() == ".jq" && i->is_regular_file( ec ) )
-      files.push_back( i->path() );
-  }
-  if ( ec )
-    theLog << server_name << ": cannot list " << theConfig.queries_dir
-           << ": " << ec.message() << std::endl;
-  std::sort( files.begin(), files.end() );
-  for ( stdfs::path const &file : files )
-    load_predefined( file.string(), tool_name( file.stem().string() ) );
-}
-
-bool Server::load_predefined( std::string const &path,
-                              std::string const &name ) {
-  if ( name.empty() || name == "list_documents" || name == "run_query" ||
-       std::any_of( thePredefined.begin(), thePredefined.end(),
-                    [&]( Predefined const &p ) { return p.name == name; } ) ) {
-    theLog << server_name << ": skipping " << path
-           << ": tool name \"" << name << "\" is already taken" << std::endl;
-    return false;
-  }
-  std::ifstream in( path.c_str(), std::ios::binary );
-  if ( !in ) {
-    theLog << server_name << ": skipping " << path << ": cannot read it"
-           << std::endl;
-    return false;
-  }
-  Predefined p;
-  p.name = name;
-  p.path = path;
-  // Not a stream insertion, which leaves a shorter text when it cannot grow:
-  // std::bad_alloc goes to the caller.
-  p.source.assign( std::istreambuf_iterator<char>( in ),
-                   std::istreambuf_iterator<char>() );
-  p.description = leading_comment( p.source );
-  if ( p.description.empty() )
-    p.description = "Runs the predefined query " +
-      std::filesystem::path( path ).filename().string() + ".";
-
-  // Compile once to find the external variables (in no namespace) that
-  // become the tool's parameters.
-  try {
-    StaticContext_t sctx = new_static_context( path );
-    XQuery_t query = theZorba->createQuery();
-    query->setFileName( path );
-    std::istringstream qs( p.source );
-    Zorba_CompilerHints_t hints;
-    query->compile( qs, sctx, hints );
-    Iterator_t vars;
-    query->getExternalVariables( vars );
-    std::set<std::string> seen;
-    Item qname;
-    vars->open();
-    while ( vars->next( qname ) ) {
-      if ( !qname.getNamespace().empty() )
-        continue;
-      std::string const local( qname.getLocalName().str() );
-      if ( !seen.insert( local ).second )
-        continue;
-      bool const has_default =
-        query->getDynamicContext()->isBoundExternalVariable( "", local );
-      p.params.push_back( Param{ local, !has_default } );
-    }
-    vars->close();
-    query->close();
-  }
-  catch ( ZorbaException const &e ) {
-    theLog << server_name << ": skipping " << path << ": " << e << std::endl;
-    return false;
-  }
-  theLog << server_name << ": predefined query tool " << p.name << " ("
-         << p.params.size() << " parameters)" << std::endl;
-  thePredefined.push_back( std::move( p ) );
-  return true;
+  theDatabase( zorba, database_config( theConfig ), log ) {
 }
 
 Json Server::tools() const {
   Json list( Json::array() );
 
-  if ( theScanner ) {
+  if ( theDatabase.scanning() ) {
     list.push( Json::object( {
       { "name", "list_documents" },
       { "title", "List documents" },
@@ -622,10 +397,10 @@ Json Server::tools() const {
     { "annotations", read_only_annotations() }
   } ) );
 
-  for ( Predefined const &p : thePredefined ) {
+  for ( db::PredefinedQuery const &p : theDatabase.predefined() ) {
     Json props( Json::object() );
     Json required( Json::array() );
-    for ( Param const &param : p.params ) {
+    for ( db::PredefinedQuery::Param const &param : p.params ) {
       props.set( param.name, Json::object( {
         { "type", "string" },
         { "description", "The value of $" + param.name + " (a string)." }
@@ -641,7 +416,10 @@ Json Server::tools() const {
     schema.set( "additionalProperties", false );
     list.push( Json::object( {
       { "name", p.name },
-      { "description", p.description },
+      { "description", p.description.empty()
+          ? "Runs the predefined query " +
+            std::filesystem::path( p.path ).filename().string() + "."
+          : p.description },
       { "inputSchema", schema },
       { "annotations", read_only_annotations() }
     } ) );
@@ -649,78 +427,43 @@ Json Server::tools() const {
   return list;
 }
 
-Server::QueryOutcome
-Server::run( std::string const &source, std::string const &file_name,
-             std::vector<std::pair<std::string,std::string> > const &vars ) {
+template<typename Run>
+Server::QueryOutcome Server::run( Run const &query ) {
+  CappedSink sink( theConfig.max_output );
+  db::QueryResult const result( query( sink ) );
   QueryOutcome outcome;
-  try {
-    StaticContext_t sctx = new_static_context( file_name );
-    // Relative URIs, e.g. doc("orders/q1.xml"), resolve against the root.
-    sctx->setBaseURI( base_uri_of( theConfig.root ) );
-    theCache.attach( sctx );
-    // An implementation may add predeclared namespace prefixes (XQuery 3.0,
-    // 4.13); a query can still bind this one to something else.
-    sctx->addNamespace( "math", "http://www.w3.org/2005/xpath-functions/math" );
-
-    XQuery_t query = theZorba->createQuery();
-    if ( !file_name.empty() )
-      query->setFileName( file_name );
-    std::istringstream qs( source );
-    Zorba_CompilerHints_t hints;
-    query->compile( qs, sctx, hints );
-    // A query that can apply updates could modify cached documents.
-    theCache.set_active( !query->isUpdating() && !query->isSequential() );
-
-    DynamicContext *const dctx = query->getDynamicContext();
-    directory_config::bind_root( theZorba, dctx, theConfig.root );
-    for ( auto const &var : vars )
-      dctx->setVariable( "", var.first,
-        theZorba->getItemFactory()->createString( var.second ), true );
-
-    Zorba_SerializerOptions opts;
-    opts.set( directory_config::serialization_params() );
-    CappedBuf buf( theConfig.max_output );
-    if ( theConfig.before_execute )
-      theConfig.before_execute();
-    std::ostream out( &buf );
-    // An exception from the buffer (std::bad_alloc) goes through the stream to
-    // here, instead of a bad stream and a shorter output reported as truncated.
-    out.exceptions( std::ios::badbit );
-    query->execute( out, &opts );
-    query->close();
-
-    outcome.ok = true;
-    outcome.text = buf.data();
-    if ( buf.truncated() ) {
-      trim_utf8_tail( &outcome.text );
-      outcome.text += "\n[zorba-mcp: output truncated after " +
-        std::to_string( outcome.text.size() ) + " of " +
-        std::to_string( buf.total() ) + " bytes; narrow the query (fewer "
-        "fields, a filter, or subsequence()) to see the rest]";
-    }
-  }
-  // The query is gone by now, and with it the memory it used.
-  catch ( ZorbaException const &e ) {
-    // Zorba reports std::bad_alloc as an internal error; fn:error() can raise
-    // that code too, as a UserException.
-    if ( !dynamic_cast<UserException const*>( &e ) &&
-         std::strcmp( e.diagnostic().qname().localname(), "ZXQP0003" ) == 0 &&
-         std::strstr( e.what(), "bad_alloc" ) )
-      outcome.text = out_of_memory_text( theConfig.max_memory );
-    else
-      outcome.text =
-        diagnostic_json( e, source, file_name, theConfig.max_output ).dump();
-  }
-  catch ( std::bad_alloc const& ) {
-    outcome.text = out_of_memory_text( theConfig.max_memory );
-  }
-  catch ( std::exception const &e ) {
-    outcome.text = Json::object( { { "error", Json::object( {
-      { "code", "internal" },
-      { "message", cut_middle( e.what(), theConfig.max_output, "message" ) }
-    } ) } } ).dump();
-  }
+  outcome.ok = result.ok;
+  outcome.text = result.ok ? sink.take()
+    : error_text( result.error, theConfig.max_output, theConfig.max_memory );
   return outcome;
+}
+
+std::string Server::list_documents( Json const &args, bool *is_error ) {
+  auto fail = [&]( std::string const &message ) {
+    *is_error = true;
+    return theDatabase.list_documents_error( "invalid-arguments", message );
+  };
+  for ( auto const &m : args.members() )
+    if ( m.first != "path" && m.first != "limit" && m.first != "refresh" )
+      return fail( "list_documents has no argument " + m.first );
+  db::ListRequest request;
+  if ( Json const *const p = args.find( "path" ) ) {
+    if ( !p->is_string() )
+      return fail( "path must be a string" );
+    request.path = p->text();
+  }
+  if ( Json const *const l = args.find( "limit" ) ) {
+    if ( !l->is_integer() || l->text()[0] == '-' )
+      return fail( "limit must be an integer of 0 or more" );
+    request.limit =
+      static_cast<std::size_t>( std::strtoull( l->text().c_str(), nullptr, 10 ) );
+  }
+  if ( Json const *const r = args.find( "refresh" ) ) {
+    if ( !r->is_bool() )
+      return fail( "refresh must be a boolean" );
+    request.refresh = r->as_bool();
+  }
+  return theDatabase.list_documents( request, theConfig.max_output, is_error );
 }
 
 Json Server::tool_result( QueryOutcome const &outcome ) const {
@@ -750,18 +493,11 @@ Json Server::call_tool( Json const &params, bool *protocol_error,
   }
 
   std::string const &tool = name->text();
-  std::vector<std::pair<std::string,std::string> > const no_vars;
   QueryOutcome outcome;
   std::string unexpected;
-  if ( tool == "list_documents" && theScanner ) {
+  if ( tool == "list_documents" && theDatabase.scanning() ) {
     bool is_error = false;
-    // A request does not wait past its time limit, nor long without one.
-    std::chrono::milliseconds const longest( std::chrono::seconds( 10 ) );
-    std::chrono::milliseconds const wait(
-      theConfig.timeout.count() > 0 ? std::min( theConfig.timeout, longest )
-                                    : longest );
-    outcome.text = theScanner->answer( *args, theConfig.max_output, wait,
-                                       &is_error );
+    outcome.text = list_documents( *args, &is_error );
     outcome.ok = !is_error;
   } else if ( tool == "list_documents" ) {
     unexpected = undeclared_arguments( *args, {} );
@@ -769,10 +505,9 @@ Json Server::call_tool( Json const &params, bool *protocol_error,
       outcome.text = invalid_arguments_text(
         "list_documents takes no arguments; unexpected: " + unexpected );
     } else {
-      outcome = run(
-        std::string( "import module namespace dir = \"" ) +
-          directory_config::module_ns + "\";\ndir:list($dir:root)\n",
-        std::string(), no_vars );
+      outcome = run( [&]( db::ResultSink &sink ) {
+        return theDatabase.list_files( sink );
+      } );
     }
   } else if ( tool == "run_query" ) {
     Json const *const q = args->find( "query" );
@@ -787,23 +522,24 @@ Json Server::call_tool( Json const &params, bool *protocol_error,
         { "message", "run_query requires the argument \"query\" (a string)" }
       } ) } } ).dump();
     } else {
-      outcome = run( q->text(), std::string(), no_vars );
+      outcome = run( [&]( db::ResultSink &sink ) {
+        return theDatabase.run( q->text(), sink );
+      } );
     }
   } else {
-    auto const p = std::find_if( thePredefined.begin(), thePredefined.end(),
-      [&]( Predefined const &x ) { return x.name == tool; } );
-    if ( p == thePredefined.end() ) {
+    db::PredefinedQuery const *const p = theDatabase.find_predefined( tool );
+    if ( !p ) {
       *protocol_error = true;
       *error = Json( "Unknown tool: " + tool );
       return Json();
     }
-    std::vector<std::pair<std::string,std::string> > vars;
+    db::Variables vars;
     std::string missing;
     std::vector<std::string> declared;
-    for ( Param const &param : p->params )
+    for ( db::PredefinedQuery::Param const &param : p->params )
       declared.push_back( param.name );
     unexpected = undeclared_arguments( *args, declared );
-    for ( Param const &param : p->params ) {
+    for ( db::PredefinedQuery::Param const &param : p->params ) {
       Json const *const v = args->find( param.name );
       if ( !v || v->is_null() ) {
         if ( param.required )
@@ -825,7 +561,9 @@ Json Server::call_tool( Json const &params, bool *protocol_error,
       outcome.text = invalid_arguments_text(
         tool + " requires the arguments: " + missing );
     } else {
-      outcome = run( p->source, p->path, vars );
+      outcome = run( [&]( db::ResultSink &sink ) {
+        return theDatabase.run_predefined( tool, vars, sink );
+      } );
     }
   }
   theLog << server_name << ": tools/call " << tool << ": "

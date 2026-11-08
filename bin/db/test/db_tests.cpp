@@ -111,16 +111,14 @@ void test_streaming( Fixture const &f ) {
   std::ostringstream log;
   Database db( f.zorba, config_of( f ), log );
   RecordingSink sink;
-  QueryResult const r( db.run( "for $i in 1 to 1000 return { \"n\": $i }",
-                               sink ) );
+  QueryResult const r( db.run( "1 to 1000", sink ) );
   check( r.ok, "the query succeeds", r.error.message );
   check( sink.writes() > 1, "the results arrive in several writes",
          std::to_string( sink.writes() ) );
-  std::size_t const first = sink.text().find( "\"n\"" );
-  std::size_t const last = sink.text().find( "1000" );
-  check( first != std::string::npos && last != std::string::npos &&
-         first < last, "the whole result, in order",
-         sink.text().substr( 0, 200 ) );
+  std::string const &text = sink.text();
+  check( text.compare( 0, 2, "1\n" ) == 0 &&
+         contains( text, "\n999\n1000" ), "the whole result, in order",
+         text.substr( 0, 200 ) );
 }
 
 void test_query_error( Fixture const &f ) {

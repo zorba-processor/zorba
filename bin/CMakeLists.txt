@@ -512,11 +512,20 @@ IF (ZORBA_WITH_FILE_ACCESS)
       SET (_mcp_suffix "_${ZORBA_STORE_NAME}")
     ENDIF (NOT ${ZORBA_STORE_NAME} STREQUAL "simplestore")
 
-    # The scanner's threads use libxml2 directly.
+    # bin/db: the queries, the document cache and the scan, without the
+    # protocol. The scanner's threads use libxml2 directly.
     FIND_PACKAGE (Threads REQUIRED)
-    SET (MCP_LIBS "${LIBXML2_LIBRARIES};Threads::Threads")
-    SET (MCP_COMMON_SRCS mcp/json.cpp mcp/mcp_server.cpp mcp/document_cache.cpp
-         mcp/scanner.cpp mcp/scan_preview.cpp directory_config.cpp)
+    ADD_LIBRARY ("zorba_db${_mcp_suffix}" STATIC
+      db/database.cpp db/document_cache.cpp db/json.cpp db/scanner.cpp
+      db/scan_preview.cpp directory_config.cpp)
+    TARGET_LINK_LIBRARIES ("zorba_db${_mcp_suffix}" PUBLIC
+      "zorba_${ZORBA_STORE_NAME}" ${LIBXML2_LIBRARIES} Threads::Threads)
+    TARGET_INCLUDE_DIRECTORIES ("zorba_db${_mcp_suffix}"
+      PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/db")
+
+    # bin/mcp: the protocol over bin/db.
+    SET (MCP_LIBS "zorba_db${_mcp_suffix}")
+    SET (MCP_COMMON_SRCS mcp/mcp_server.cpp)
     ZORBA_GENERATE_EXE("zorba_mcp" "mcp/zorba_mcp.cpp;${MCP_COMMON_SRCS}"
       "${MCP_LIBS}" "zorba-mcp" "bin")
     ZORBA_GENERATE_EXE("mcp_tests" "mcp/test/mcp_tests.cpp;${MCP_COMMON_SRCS}"

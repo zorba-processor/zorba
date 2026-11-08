@@ -39,7 +39,7 @@
 #include "json.h"
 
 namespace zorba {
-namespace mcp {
+namespace db {
 
 namespace {
 
@@ -1606,6 +1606,6 @@ std::string scan_valid_utf8( std::string const &s ) {
   return short_text( s, s.size() + 1 + 3 * s.size() );
 }
 
-} // namespace mcp
+} // namespace db
 } // namespace zorba
 /* vim:set et sw=2 ts=2: */

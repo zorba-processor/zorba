@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef ZORBA_MCP_JSON_H
-#define ZORBA_MCP_JSON_H
+#ifndef ZORBA_DB_JSON_H
+#define ZORBA_DB_JSON_H
 
 #include <cstddef>
 #include <cstdint>
@@ -25,10 +25,10 @@
 #include <vector>
 
 namespace zorba {
-namespace mcp {
+namespace db {
 
 /**
- * A JSON value for the MCP protocol messages: small, self-contained and
+ * A JSON value for messages and answers: small, self-contained and
  * strict (RFC 8259). Numbers keep their source text, so a request id is
  * echoed exactly as received; object members keep their order.
  */
@@ -112,8 +112,8 @@ bool parse_json( std::string const &text, Json *result, std::string *error,
 /** Appends \a s to \a out as a JSON string literal. */
 void append_json_string( std::string &out, std::string const &s );
 
-} // namespace mcp
+} // namespace db
 } // namespace zorba
 
-#endif /* ZORBA_MCP_JSON_H */
+#endif /* ZORBA_DB_JSON_H */
 /* vim:set et sw=2 ts=2: */

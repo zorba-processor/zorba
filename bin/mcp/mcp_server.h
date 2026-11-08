@@ -20,20 +20,19 @@
 #include <chrono>
 #include <cstddef>
 #include <functional>
-#include <memory>
 #include <ostream>
 #include <string>
-#include <vector>
 
 #include <zorba/security.h>
 #include <zorba/zorba.h>
 
-#include "document_cache.h"
+#include "database.h"
 #include "json.h"
-#include "scanner.h"
 
 namespace zorba {
 namespace mcp {
+
+using db::Json;
 
 /** The MCP revision this server implements per request (stateless). */
 extern char const protocol_version[];
@@ -65,21 +64,19 @@ struct ServerConfig {
   /** Whether to scan the root in the background (see scanner.h). */
   bool scan = true;
   /** The limits of the scanner. */
-  ScanLimits scan_limits;
+  db::ScanLimits scan_limits;
   /** For tests: called when a query is compiled, before it runs. */
   std::function<void()> before_execute;
-  /** For tests: see ScanHook. */
-  ScanHook scan_hook;
+  /** For tests: see db::ScanHook. */
+  db::ScanHook scan_hook;
   /** The memory limit of the process, in bytes (0: none; see zorba_mcp.cpp). */
   unsigned long long max_memory = 4ULL << 30;
 };
 
 /**
- * An MCP server over the Zorba C++ API: answers one JSON-RPC message at a
- * time. Every query runs under SecurityPolicy::secure() narrowed to reading
- * the root directory (see directory_config), with \c $dir:root bound. Unless
- * configured otherwise, list_documents answers from a background scan of the
- * root (see Scanner); queries never depend on it.
+ * An MCP server over a db::Database: answers one JSON-RPC message at a time.
+ * The tools run the database's queries and listings; this class checks their
+ * arguments and turns results and errors into tool results.
  *
  * Serves the modern revision (per-request \c _meta, \c server/discover) and,
  * once a client sends \c initialize, the legacy handshake-based revisions.
@@ -92,8 +89,6 @@ public:
    * @param log where diagnostics go (never the protocol stream).
    */
   Server( Zorba *zorba, ServerConfig config, std::ostream &log );
-
-  ~Server();
 
   /**
    * Handles one message (one line of the stdio transport).
@@ -121,63 +116,49 @@ public:
   AfterFailure after_failure() const;
 
   /** The policy every query runs under. */
-  SecurityPolicy const& policy() const { return thePolicy; }
+  SecurityPolicy const& policy() const { return theDatabase.policy(); }
 
   /** The counters of the document cache. */
-  DocumentCache::Stats cache_stats() const { return theCache.stats(); }
+  db::DocumentCache::Stats cache_stats() const {
+    return theDatabase.cache_stats();
+  }
 
   /** The counters as one line for the log; empty without a cache. */
-  std::string cache_stats_line() const { return theCache.stats_line(); }
+  std::string cache_stats_line() const {
+    return theDatabase.cache_stats_line();
+  }
   /**
    * Stops the background scan, if any; the destructor does it too.
    *
    * @return whether every thread was joined.
    */
-  bool stop_scan();
+  bool stop_scan() { return theDatabase.stop_scan(); }
 
   /** The bytes the scan cache accounts for, or 0 without a scan. */
-  std::size_t scan_cache_bytes() const;
+  std::size_t scan_cache_bytes() const {
+    return theDatabase.scan_cache_bytes();
+  }
 
 private:
-  struct Param {
-    std::string name;
-    bool required;
-  };
-
-  struct Predefined {
-    std::string name;
-    std::string description;
-    std::string path;
-    std::string source;
-    std::vector<Param> params;
-  };
-
   struct QueryOutcome {
     bool ok = false;
     std::string text;
   };
 
-  StaticContext_t new_static_context( std::string const &file_name ) const;
-
   std::string handle_message( std::string const &message, Json *request_id );
   // Sets theCurrentKind, and the id of a request.
   void identify( Json const &msg, Json *request_id );
-  void load_predefined();
-  bool load_predefined( std::string const &path, std::string const &name );
 
   Json tools() const;
   Json call_tool( Json const &params, bool *protocol_error, Json *error );
-  QueryOutcome run( std::string const &source, std::string const &file_name,
-                    std::vector<std::pair<std::string,std::string> > const
-                      &vars );
+  std::string list_documents( Json const &args, bool *is_error );
+  // Runs a query of the database with the output capped at --max-output.
+  template<typename Run> QueryOutcome run( Run const &query );
   Json tool_result( QueryOutcome const &outcome ) const;
 
-  Zorba *const theZorba;
   ServerConfig const theConfig;
   std::ostream &theLog;
-  SecurityPolicy thePolicy;
-  std::vector<Predefined> thePredefined;
-  DocumentCache theCache;
+  db::Database theDatabase;
   std::string theLegacyVersion;         // set by initialize
   std::string theCurrentId{ "null" };   // see current_id()
   enum class MessageKind {
@@ -188,7 +169,6 @@ private:
     id_lost        // memory ran out while its id was read: answered with null
   };
   MessageKind theCurrentKind = MessageKind::unknown;
-  std::unique_ptr<Scanner> theScanner;  // null with --no-scan
 };
 
 } // namespace mcp

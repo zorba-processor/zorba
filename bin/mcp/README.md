@@ -6,11 +6,19 @@ An MCP server (JSON-RPC over stdio) over the Zorba C++ API. User documentation:
 | File | What it is |
 |---|---|
 | `zorba_mcp.cpp` | `main`: arguments, the stdio loop |
-| `mcp_server.*` | the protocol and the tools; the only code that uses the engine |
-| `json.*` | a small JSON value and parser, without engine types |
-| `scanner.*` | the background scan behind `list_documents` |
-| `scan_preview.*` | previews of CSV, JSON, XML and HTML files |
+| `mcp_server.*` | the protocol and the tools: arguments, tool results, output limit |
 | `test/` | `mcp_tests.cpp`, and `scan_tests.cpp` for the scanner |
+| `../db/database.*` | queries, predefined queries, policy, limits; the only code that uses the engine |
+| `../db/document_cache.*` | the document cache of the directory module |
+| `../db/json.*` | a small JSON value and parser, without engine types |
+| `../db/scanner.*` | the background scan behind `list_documents` |
+| `../db/scan_preview.*` | previews of CSV, JSON, XML and HTML files |
+| `../db/test/` | `db_tests.cpp`: the database without the protocol |
+
+`bin/db` is a static library with no protocol code: queries write their result
+to a `ResultSink` and fail with a structured `QueryError`. `bin/mcp` checks the
+arguments of each tool, caps the output at `--max-output` with its own sink, and
+turns results and errors into tool results.
 
 ## The background scan
 
@@ -26,7 +34,7 @@ Rules this code depends on:
   stdout and runs queries.
 - libxml2's global state is initialized once, on the main thread, in the
   `Scanner` constructor. Each parse has its own context. `Zorba::shutdown()`
-  cleans up libxml2, so `Server` stops the scanner first. Zorba changes the
+  cleans up libxml2, so `Database` stops the scanner first. Zorba changes the
   process-wide external entity loader; the scanner never reaches it, because
   it parses without loading anything.
 - The request thread never parses. A file with no preview goes to the sampler
@@ -68,12 +76,12 @@ Rules this code depends on:
   there is no data favoring anything else.
 
 - `--max-memory` (`RLIMIT_AS`) is applied before the threads start. If they
-  cannot start, `Server` works as with `--no-scan`. In the threads a failed
+  cannot start, `Database` works as with `--no-scan`. In the threads a failed
   allocation ends the scan as at `memory_limit`; it must not leave a libxml2
   callback, which is C code.
 
 - On the main thread a failed allocation ends the query: std::bad_alloc reaches
-  `Server::run()`, and is the tool error `memory_limit`. What makes this hold:
+  `Database::run()`, and is the tool error `memory_limit`. What makes this hold:
   destructors and what they call do not allocate (`JSONItem::destroy()`), or may
   throw and do not while unwinding (`string_appender`); MAPM throws instead of
   calling `exit()`, and its per-thread setup can run again; a failure in a libxml2
