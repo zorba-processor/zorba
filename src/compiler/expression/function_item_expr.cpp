@@ -52,11 +52,10 @@ dynamic_function_invocation_expr::dynamic_function_invocation_expr(
 
 void dynamic_function_invocation_expr::compute_scripting_kind()
 {
-  // TODO ????
+  // Simple whatever it calls, so that a simple function body, a where clause or an
+  // order by key can call a function item (XSST0004, XSST0006); the optimizer sees its
+  // effects through expr_tools::calls_unproven_function().
   theScriptingKind = SIMPLE_EXPR;
-#if 0
-  theScriptingKind = (APPLYING_EXPR | SEQUENTIAL_FUNC_EXPR)
-#endif
 }
 
 

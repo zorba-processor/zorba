@@ -75,7 +75,8 @@ void classify_calls(expr* root);
 // compiler can tell. Only a query in which something with a side effect is reachable
 // has such calls, and only a function item whose origin is not visible can be one
 // (a function item expression, reached through let and for variables and prolog
-// variables that cannot be assigned, is visible). Such a call, and anything that
+// variables that cannot be assigned, is visible), or an eval, whose query is compiled
+// at run time. Such a call, and anything that
 // contains it or calls a user function containing it, is not moved, merged, duplicated
 // or eliminated, and nothing moves across it. The scripting kind of the expr does not
 // say this, because a dynamic function call is a simple expr whatever it calls, and it

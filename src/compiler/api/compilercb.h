@@ -309,6 +309,11 @@ ZORBA_DLL_PUBLIC void query_resources_fail_walk(unsigned long edge);
   Then no body of the query is hoisted, and no index join is made. True until
   then. Compile time only: not serialized.
 
+  theOuterNoHoisting :
+  --------------------
+  The same, for the query that runs this one through eval: an eval query hoists
+  nothing if that query hoists nothing.
+
   theHasEval :
   ------------
   True if there is an eval expr within the compilation unit covered by this CCB.
@@ -478,6 +483,8 @@ public:
   CallEffects               theCallEffects = CALLS_HAVE_EFFECTS;
 
   bool                      theNoHoisting = true;
+
+  bool                      theOuterNoHoisting = false;
 
   bool                      theHaveTimeout;
 
