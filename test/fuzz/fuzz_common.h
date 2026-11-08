@@ -52,13 +52,19 @@
 
 namespace zorba_fuzz {
 
+inline bool is_internal_error(zorba::ZorbaException const& e)
+{
+  zorba::Diagnostic const& d = e.diagnostic();
+  return d == zorba::zerr::ZXQP0002_ASSERT_FAILED ||
+         d == zorba::zerr::ZXQP0003_INTERNAL_ERROR;
+}
+
 // Abort on internal errors so libFuzzer reports them; ignore everything else.
 inline void check_internal(zorba::ZorbaException const& e)
 {
-  zorba::Diagnostic const& d = e.diagnostic();
-  if (d == zorba::zerr::ZXQP0002_ASSERT_FAILED ||
-      d == zorba::zerr::ZXQP0003_INTERNAL_ERROR)
+  if (is_internal_error(e))
   {
+    zorba::Diagnostic const& d = e.diagnostic();
     std::fprintf(stderr, "zorba internal error: %s: %s (%s:%lu)\n",
                  d.qname().localname(), e.what(), e.raise_file(),
                  static_cast<unsigned long>(e.raise_line()));
