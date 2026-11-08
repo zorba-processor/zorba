@@ -88,7 +88,7 @@ jobs:
               # hand them to the runner user so later steps can read them.
               chown -R "$HOST_UID:$HOST_GID" build/asan/sanitizer-logs \
                 build/asan/ctest.log build/asan/ctest.rc build/asan/junit.xml .ccache || true
-              # The compare step judges ctest's result and exit code.
+              # The compare step judges the ctest result and exit code.
               exit 0'
 
       - name: Summarize
@@ -200,7 +200,7 @@ jobs:
               echo "$rc" > "build/$PRESET/ctest.rc"
               chown -R "$HOST_UID:$HOST_GID" "build/$PRESET/sanitizer-logs" \
                 "build/$PRESET/ctest.log" "build/$PRESET/ctest.rc" "build/$PRESET/junit.xml" .ccache || true
-              # The compare step judges ctest's result and exit code.
+              # The compare step judges the ctest result and exit code.
               exit 0'
 
       - name: Summarize
@@ -412,7 +412,7 @@ jobs:
               echo "$rc" > build/glibcxx-debug/ctest.rc
               chown -R "$HOST_UID:$HOST_GID" build/glibcxx-debug/ctest.log \
                 build/glibcxx-debug/junit.xml build/glibcxx-debug/ctest.rc "$out" .ccache || true
-              # The compare step judges ctest's result and exit code.
+              # The compare step judges the ctest result and exit code.
               exit 0'
 
       - uses: actions/upload-artifact@v7
