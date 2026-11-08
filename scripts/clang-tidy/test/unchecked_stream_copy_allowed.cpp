@@ -27,6 +27,7 @@
 namespace fixture {
 
 void report(std::ostream& os);
+void report_pointer(std::ostream* os);
 
 // The result of the copy expression itself.
 bool in_condition(std::istream& in) {
@@ -114,6 +115,42 @@ void passed_on(std::istream& in) {
   std::ostringstream out;
   out << in.rdbuf();
   report(out);
+}
+
+void address_passed_on(std::istream& in) {
+  std::ostringstream out;
+  out << in.rdbuf();
+  report_pointer(&out);
+}
+
+bool later_contextual_bool(std::istream& in) {
+  std::ostringstream out;
+  out << in.rdbuf();
+  if (out)
+    return true;
+  return false;
+}
+
+bool examined_in_later_lambda(std::istream& in) {
+  std::ostringstream out;
+  out << in.rdbuf();
+  auto ok = [&out]() { return out.good(); };
+  return ok();
+}
+
+// A copy that does not depend on T, examined through an expression that
+// does: judged in the instantiation only.
+template<class T>
+bool examined_dependently(std::istream& in, const T& t) {
+  std::ostringstream out;
+  out << in.rdbuf();
+  if (!(out << t))
+    return false;
+  return true;
+}
+
+bool instantiate(std::istream& in) {
+  return examined_dependently(in, 1);
 }
 
 std::ostringstream returned_stream(std::istream& in) {

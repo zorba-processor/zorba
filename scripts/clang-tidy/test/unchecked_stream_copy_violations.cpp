@@ -92,4 +92,62 @@ std::string instantiate(std::istream& in) {
   return in_template<std::ostringstream>(in);
 }
 
+void read_write_file(const char* path, std::istream& in) {
+  std::fstream out(path, std::ios::in | std::ios::out | std::ios::binary);
+  out << in.rdbuf(); // VIOLATION
+}
+
+std::wstring wide(std::wstreambuf* buf) {
+  std::wostringstream out;
+  out << buf; // VIOLATION
+  return out.str();
+}
+
+#define STATEMENT(e) e
+#define COPY_ALL(dest, src) dest << (src).rdbuf()
+
+std::string copy_in_macro_argument(std::istream& in) {
+  std::ostringstream out;
+  STATEMENT(out << in.rdbuf()); // VIOLATION
+  return out.str();
+}
+
+std::string copy_in_macro_body(std::istream& in) {
+  std::ostringstream out;
+  COPY_ALL(out, in); // VIOLATION
+  return out.str();
+}
+
+std::string lambda_local(std::istream& in) {
+  auto copy = [&in]() {
+    std::ostringstream out;
+    out << in.rdbuf(); // VIOLATION
+    return out.str();
+  };
+  return copy();
+}
+
+std::string cleared_result(std::istream& in) {
+  std::ostringstream out;
+  (out << in.rdbuf()).clear(); // VIOLATION
+  return out.str();
+}
+
+std::string exceptions_read(std::istream& in) {
+  std::ostringstream out;
+  out << in.rdbuf(); // VIOLATION
+  if (out.exceptions() == std::ios::goodbit)
+    return "";
+  return out.str();
+}
+
+// Known limitation: the loop condition examines out after each copy, but it
+// is written before the copy, and only references after it in source order
+// count.
+void examined_by_loop_condition(std::istream& in) {
+  std::ostringstream out;
+  while (out)
+    out << in.rdbuf(); // VIOLATION
+}
+
 } // namespace fixture
