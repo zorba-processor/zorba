@@ -781,7 +781,15 @@ void URI::initializeAuthority(const zstring& uri)
 
     if ( !lPortString.empty() )
     {
-      lPort = atoi(lPortString.c_str());
+      // -2 (invalid) for a non-digit or a value above 65535
+      lPort = 0;
+      for (zstring::size_type i = 0; i < lPortString.size() && lPort != -2; ++i)
+      {
+        const char c = lPortString[i];
+        lPort = (c >= '0' && c <= '9') ? lPort * 10 + (c - '0') : -2;
+        if (lPort > 65535)
+          lPort = -2;
+      }
     }
   }
   else if ( lStart >= lEnd && lIndex != zstring::npos ) 
