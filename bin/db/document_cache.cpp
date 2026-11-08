@@ -37,7 +37,7 @@
 #include <zorba/zorba_exception.h>
 
 namespace zorba {
-namespace mcp {
+namespace db {
 
 namespace {
 
@@ -517,6 +517,6 @@ Item DocumentCache::read( std::string const &root, std::string const &path,
   }
 }
 
-} // namespace mcp
+} // namespace db
 } // namespace zorba
 /* vim:set et sw=2 ts=2: */

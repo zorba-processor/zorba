@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef ZORBA_MCP_SCANNER_H
-#define ZORBA_MCP_SCANNER_H
+#ifndef ZORBA_DB_SCANNER_H
+#define ZORBA_DB_SCANNER_H
 
 #include <chrono>
 #include <cstddef>
@@ -24,10 +24,8 @@
 #include <string>
 #include <thread>
 
-#include "json.h"
-
 namespace zorba {
-namespace mcp {
+namespace db {
 
 /** What the scanner may use. */
 struct ScanLimits {
@@ -49,6 +47,16 @@ struct ScanLimits {
  */
 typedef std::function<void( char const *stage, std::string const &path )>
   ScanHook;
+
+/** What a listing asks for (see Scanner::answer()). */
+struct ListRequest {
+  /** A subdirectory or a file, relative to the root; empty: the root. */
+  std::string path;
+  /** The most files listed. */
+  std::size_t limit = 100;
+  /** Whether to restart the scan first. */
+  bool refresh = false;
+};
 
 /**
  * The background scan of a directory for list_documents: one thread walks the
@@ -104,14 +112,13 @@ public:
   bool stop();
 
   /**
-   * Answers one list_documents call: arguments \c path, \c limit and
-   * \c refresh. The first line is an object with the member \c scan
-   * (the status) and either \c total, \c shown, maybe \c incomplete and \c dirs, followed
-   * by a line per file (path, format, size and the top-level \c fields, nothing
-   * nested), or a file's members with \c preview (the whole preview), or
-   * \c error.
+   * Answers one listing request. The first line is an object with the member
+   * \c scan (the status) and either \c total, \c shown, maybe \c incomplete and
+   * \c dirs, followed by a line per file (path, format, size and the top-level
+   * \c fields, nothing nested), or a file's members with \c preview (the whole
+   * preview), or \c error.
    *
-   * @param args the arguments of the call.
+   * @param request what to list.
    * @param max_output the maximum size of the answer, in bytes (the first
    * line can go over it, if smaller than that).
    * @param wait how long to wait for the sampler to read a file asked for, and
@@ -120,8 +127,14 @@ public:
    * @param is_error set to whether the answer is an error.
    * @return the answer.
    */
-  std::string answer( Json const &args, std::size_t max_output,
+  std::string answer( ListRequest const &request, std::size_t max_output,
                       std::chrono::milliseconds wait, bool *is_error );
+
+  /**
+   * The status as answers carry it: the member \c "scan":{...}, as JSON text
+   * without braces around it.
+   */
+  std::string status() const;
 
   /** The bytes the cache accounts for (see ScanLimits::max_memory). */
   std::size_t cache_bytes() const;
@@ -137,8 +150,8 @@ private:
   std::thread theSampler;
 };
 
-} // namespace mcp
+} // namespace db
 } // namespace zorba
 
-#endif /* ZORBA_MCP_SCANNER_H */
+#endif /* ZORBA_DB_SCANNER_H */
 /* vim:set et sw=2 ts=2: */

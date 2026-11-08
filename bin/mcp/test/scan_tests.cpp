@@ -66,6 +66,7 @@
 #endif
 
 using namespace zorba;
+using namespace zorba::db;
 using namespace zorba::mcp;
 namespace stdfs = std::filesystem;
 

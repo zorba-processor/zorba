@@ -42,15 +42,14 @@
 
 #include <libxml/parser.h>
 
+#include "json.h"
 #include "scan_preview.h"
 
 namespace zorba {
-namespace mcp {
+namespace db {
 
 namespace {
 
-// Files listed when a call does not say how many.
-std::size_t const default_limit = 100;
 // Subdirectories named in an answer that the limit cuts.
 std::size_t const max_dirs_shown = 50;
 // How long stop() waits for the threads.
@@ -1336,53 +1335,30 @@ bool Scanner::stop() {
   return walker_done && sampler_done;
 }
 
-std::string Scanner::answer( Json const &args, std::size_t max_output,
+std::string Scanner::status() const {
+  std::lock_guard<std::mutex> lock( theShared->theMutex );
+  return theShared->status();
+}
+
+std::string Scanner::answer( ListRequest const &request, std::size_t max_output,
                              std::chrono::milliseconds wait, bool *is_error ) {
   Shared &s = *theShared;
-  auto status = [&s]() {
-    std::lock_guard<std::mutex> lock( s.theMutex );
-    return s.status();
-  };
   auto fail = [&]( char const *code, std::string const &message ) {
     *is_error = true;
     return error_line( status(), code, message );
   };
   *is_error = false;
 
-  // The arguments.
-  for ( auto const &m : args.members() )
-    if ( m.first != "path" && m.first != "limit" && m.first != "refresh" )
-      return fail( "invalid-arguments",
-                   "list_documents has no argument " + m.first );
-  std::string path;
-  if ( Json const *const p = args.find( "path" ) ) {
-    if ( !p->is_string() )
-      return fail( "invalid-arguments", "path must be a string" );
-    path = p->text();
-  }
-  std::size_t limit = default_limit;
-  if ( Json const *const l = args.find( "limit" ) ) {
-    if ( !l->is_integer() || l->text()[0] == '-' )
-      return fail( "invalid-arguments", "limit must be an integer of 0 or more" );
-    limit = static_cast<std::size_t>( std::strtoull( l->text().c_str(), nullptr, 10 ) );
-  }
-  bool refresh = false;
-  if ( Json const *const r = args.find( "refresh" ) ) {
-    if ( !r->is_bool() )
-      return fail( "invalid-arguments", "refresh must be a boolean" );
-    refresh = r->as_bool();
-  }
-
   std::string rel;
-  if ( !normalize_request_path( path, &rel ) )
+  if ( !normalize_request_path( request.path, &rel ) )
     return fail( "invalid-path",
                  "a path is relative to the root, without .. or hidden segments" );
 
-  if ( refresh )
+  if ( request.refresh )
     s.refresh();
 
   if ( rel.empty() )
-    return s.directory_answer( rel, limit, max_output, wait, is_error );
+    return s.directory_answer( rel, request.limit, max_output, wait, is_error );
 
   // What is there now decides, and only a stat looks at it. A link gets the
   // answer of a missing file: it says nothing about its target.
@@ -1400,7 +1376,7 @@ std::string Scanner::answer( Json const &args, std::size_t max_output,
   if ( error == 0 && S_ISREG( st.st_mode ) )
     return s.file_answer( st, rel, max_output, wait );
   if ( error == 0 && S_ISDIR( st.st_mode ) )
-    return s.directory_answer( rel, limit, max_output, wait, is_error );
+    return s.directory_answer( rel, request.limit, max_output, wait, is_error );
   if ( is_denied( error ) )
     return fail( "permission-denied", "the path cannot be read" );
   {
@@ -1410,6 +1386,6 @@ std::string Scanner::answer( Json const &args, std::size_t max_output,
   return fail( "not-found", "no such file or directory under the root" );
 }
 
-} // namespace mcp
+} // namespace db
 } // namespace zorba
 /* vim:set et sw=2 ts=2: */

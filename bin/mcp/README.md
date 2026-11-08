@@ -6,11 +6,21 @@ An MCP server (JSON-RPC over stdio) over the Zorba C++ API. User documentation:
 | File | What it is |
 |---|---|
 | `zorba_mcp.cpp` | `main`: arguments, the stdio loop |
-| `mcp_server.*` | the protocol and the tools; the only code that uses the engine |
-| `json.*` | a small JSON value and parser, without engine types |
-| `scanner.*` | the background scan behind `list_documents` |
-| `scan_preview.*` | previews of CSV, JSON, XML and HTML files |
+| `mcp_server.*` | the protocol and the tools: arguments, tool results, output limit |
 | `test/` | `mcp_tests.cpp`, and `scan_tests.cpp` for the scanner |
+| `../db/database.*` | queries, predefined queries, policy, limits; the only code that uses the engine |
+| `../db/document_cache.*` | the document cache of the directory module |
+| `../db/json.*` | a small JSON value and parser, without engine types |
+| `../db/scanner.*` | the background scan behind `list_documents` |
+| `../db/scan_preview.*` | previews of CSV, JSON, XML and HTML files |
+| `../db/test/` | `db_tests.cpp`: the database without the protocol |
+
+`bin/db` is a static library with no protocol code: queries write their result
+to a `ResultSink` and fail with a structured `QueryError`. `Database` starts no
+threads; the `Scanner` is a separate object that needs no engine. `Server` in
+`bin/mcp` owns both, checks the arguments of each tool, caps the output at
+`--max-output` with its own sink, and turns results and errors into tool
+results.
 
 ## The background scan
 
@@ -72,8 +82,8 @@ Rules this code depends on:
   allocation ends the scan as at `memory_limit`; it must not leave a libxml2
   callback, which is C code.
 
-- On the main thread a failed allocation ends the query: std::bad_alloc reaches
-  `Server::run()`, and is the tool error `memory_limit`. What makes this hold:
+- On the main thread a failed allocation ends the query: std::bad_alloc is
+  caught in `Database::execute()`, and is the tool error `memory_limit`. What makes this hold:
   destructors and what they call do not allocate (`JSONItem::destroy()`), or may
   throw and do not while unwinding (`string_appender`); MAPM throws instead of
   calling `exit()`, and its per-thread setup can run again; a failure in a libxml2

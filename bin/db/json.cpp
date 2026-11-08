@@ -19,7 +19,7 @@
 #include <cstdio>
 
 namespace zorba {
-namespace mcp {
+namespace db {
 
 ///////////////////////////////////////////////////////////////////////////////
 // Json
@@ -491,6 +491,6 @@ bool parse_json( std::string const &text, Json *result, std::string *error,
   return true;
 }
 
-} // namespace mcp
+} // namespace db
 } // namespace zorba
 /* vim:set et sw=2 ts=2: */

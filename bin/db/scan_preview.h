@@ -14,14 +14,14 @@
  * limitations under the License.
  */
 
-#ifndef ZORBA_MCP_SCAN_PREVIEW_H
-#define ZORBA_MCP_SCAN_PREVIEW_H
+#ifndef ZORBA_DB_SCAN_PREVIEW_H
+#define ZORBA_DB_SCAN_PREVIEW_H
 
 #include <atomic>
 #include <string>
 
 namespace zorba {
-namespace mcp {
+namespace db {
 
 /** The formats of the directory module (see dir:format). */
 enum class ScanFormat { none, xml, json, csv, html };
@@ -74,8 +74,8 @@ std::string scan_path_from_text( std::string const &text );
 /** \a s with every invalid UTF-8 sequence replaced by U+FFFD. */
 std::string scan_valid_utf8( std::string const &s );
 
-} // namespace mcp
+} // namespace db
 } // namespace zorba
 
-#endif /* ZORBA_MCP_SCAN_PREVIEW_H */
+#endif /* ZORBA_DB_SCAN_PREVIEW_H */
 /* vim:set et sw=2 ts=2: */

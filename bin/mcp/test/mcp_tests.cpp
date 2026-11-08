@@ -73,6 +73,7 @@
 #include "query_primer.h"
 
 using namespace zorba;
+using namespace zorba::db;
 using namespace zorba::mcp;
 
 // AddressSanitizer and ThreadSanitizer need far more address space than the
