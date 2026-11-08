@@ -3048,7 +3048,7 @@ std::string sweep_dtd_xml( std::string const &prefix ) {
 }
 std::string sweep_dtd_query( std::string const &prefix ) {
   return "import module namespace x = 'http://zorba.io/modules/xml';\n"
-         "declare namespace opt = 'http://zorba.io/modules/xml-options';\n" +
+         "import schema namespace opt = 'http://zorba.io/modules/xml-options';\n" +
          caught( "count(x:parse(\"" + sweep_dtd_xml( prefix ) +
                  "\", <opt:options><opt:DTD-validate/></opt:options>)//*)" );
 }
