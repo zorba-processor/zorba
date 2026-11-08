@@ -72,6 +72,7 @@ void initializeTestList()
   libunittests["numeric_items"] = test_numeric_items;
   libunittests["small_integers"] = test_small_integers;
   libunittests["string"] = test_string;
+  libunittests["temp_seq_iterator"] = test_temp_seq_iterator;
   libunittests["time"] = test_time;
   libunittests["time_parse"] = test_time_parse;
 

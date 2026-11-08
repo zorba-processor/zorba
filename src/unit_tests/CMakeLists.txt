@@ -38,6 +38,7 @@ SET(UNIT_TEST_SRCS
   test_security_policy.cpp
   test_small_integers.cpp
   test_string.cpp
+  test_temp_seq_iterator.cpp
   test_time.cpp
   test_time_parse.cpp
   test_uri.cpp

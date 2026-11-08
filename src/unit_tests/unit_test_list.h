@@ -61,6 +61,7 @@ namespace UnitTests {
   int test_security_policy( int, char*[] );
   int test_small_integers( int, char*[] );
   int test_string( int, char*[] );
+  int test_temp_seq_iterator( int, char*[] );
   int test_time( int, char*[] );
   int test_time_parse( int, char*[] );
 
