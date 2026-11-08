@@ -12,7 +12,7 @@ cmake --workflow --preset full-release-offline   # configure, build, test
 Other presets: `core-release` (no XML Schema), `full-debug`, `bigint`, the
 sanitizer builds `asan`, `tsan` and `tsan-bigint`, and `glibcxx-debug`
 (libstdc++ debug mode plus `ZORBA_CONTAINER_CHECKS`, which makes a use of an
-invalidated iterator of the store's node vectors fail with an assertion).
+invalidated iterator of the store's node vectors abort with a diagnostic).
 `docker/builder` and `docker/builder-latest` provide ready-made build
 environments.
 

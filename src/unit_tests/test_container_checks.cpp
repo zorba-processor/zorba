@@ -16,19 +16,33 @@
 
 // Built only with ZORBA_CONTAINER_CHECKS (the glibcxx-debug preset): an
 // iterator of a PtrVector (store/naive/ptr_vector.h) that is used after a
-// change of the vector's contents or storage fails with ZORBA_ASSERT
-// (ZXQP0002). Every member function that notifies the vector's readers
-// (ContentReader::contentWillChange) is such a change. Writing through an
-// iterator, operator[], front() or back() is not, and an iterator into a copy
-// of the contents (a plain pointer, as the node iterators use after
+// change of the vector's contents or storage fails. Every member function
+// that notifies the vector's readers (ContentReader::contentWillChange) is
+// such a change, once it can no longer fail. Writing through an iterator,
+// operator[], front() or back() is not, and an iterator into a copy of the
+// contents (a plain pointer, as the node iterators use after
 // ContentReader::copyContent) is not checked.
+//
+// A failed check aborts the process. The test sets PtrVectorCheck::theThrow
+// to see each failure as a PtrVectorCheckFailure, and checks the abort itself
+// in a child process.
 
+#include <cstdint>
+#include <cstdlib>
+#include <cstring>
 #include <iostream>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
 #include <zorba/config.h>
-#include <zorba/zorba_exception.h>
+
+#if defined(__unix__) || defined(__APPLE__)
+#include <sys/wait.h>
+#include <unistd.h>
+#include <csignal>
+#define CONTAINER_CHECKS_FORK 1
+#endif
 
 #include "store/naive/ptr_vector.h"
 
@@ -51,25 +65,23 @@ void ok( bool cond, char const *what ) {
   }
 }
 
-// Calls f and returns the local name of the error it raised, or "".
+// Calls f and returns the condition of the check that failed, or "".
 template<class F>
 string error_of( F f ) {
   try {
     f();
   }
-  catch ( ZorbaException const &e ) {
-    return e.diagnostic().qname().localname();
+  catch ( PtrVectorCheckFailure const &e ) {
+    return e.what();
   }
   return "";
 }
 
 template<class F>
 void stale( F f, char const *what ) {
-  string const err( error_of( f ) );
-  if ( err != "ZXQP0002" ) {
+  if ( error_of( f ).empty() ) {
     ++failures;
-    cerr << "FAILED: " << what << ": want ZXQP0002, got \""
-         << err << '"' << endl;
+    cerr << "FAILED: " << what << ": the check did not fail" << endl;
   }
 }
 
@@ -166,18 +178,69 @@ void test_stale() {
     v.erase( v.begin() );
     stale( [&]{ return *r; }, "erase: reverse_iterator" );
   }
+  {
+    Vec v; fill( v, 4 );
+    Vec::iterator i = v.begin() + 3;
+    v.erase( v.begin(), v.begin() + 2 );
+    stale( [&]{ return *i; }, "erase of a range" );
+    Vec::iterator j = v.begin();
+    v.push_back( cells + 5 );
+    stale( [&]{ v.erase( j, v.end() ); }, "erase of a range from a stale first" );
+  }
+  {
+    // Every operation of a stale iterator fails, a converted one included.
+    Vec v; fill( v, 3 );
+    Vec::iterator i = v.begin() + 1;
+    Vec::const_iterator c = i;   // iterator to const_iterator
+    v.push_back( cells + 4 );
+    stale( [&]{ return *c; }, "const_iterator converted from a stale iterator" );
+    stale( [&]{ --i; }, "stale: decrement" );
+    stale( [&]{ i += 1; }, "stale: +=" );
+    stale( [&]{ return i[0]; }, "stale: []" );
+    stale( [&]{ return i.operator->(); }, "stale: ->" );
+    stale( [&]{ return i < v.end(); }, "stale: <" );
+    stale( [&]{ return v.end() - c; }, "stale: difference with a const_iterator" );
+  }
 }
 
 // An iterator of another vector passed to insert or erase. Without the
 // checks this corrupts memory, so it runs last.
 void test_foreign() {
   Vec v, w; fill( v, 3 ); fill( w, 3 );
+  stale( [&]{ return v.begin() == w.begin(); },
+         "comparison of two vectors' iterators" );
+  stale( [&]{ return v.end() - w.begin(); },
+         "difference of two vectors' iterators" );
   stale( [&]{ v.erase( w.begin() ); }, "erase with another vector's iterator" );
   stale( [&]{ v.insert( w.begin(), cells + 7 ); },
          "insert with another vector's iterator" );
 }
 
 void test_valid() {
+  {
+    // A converted const_iterator keeps the vector and the generation: valid
+    // until the next change.
+    Vec v; fill( v, 3 );
+    Vec::const_iterator c = v.begin();
+    valid( [&]{ ok( *c == cells + 0 && v.end() - c == 3, "converted" ); },
+           "const_iterator converted from a valid iterator" );
+  }
+  {
+    // A change that throws before it changes anything (here reserve beyond
+    // the 32-bit capacity) leaves the iterators valid.
+    Vec v; fill( v, 3 );
+    Vec::iterator i = v.begin();
+    bool threw = false;
+    try {
+      v.reserve( static_cast<zorba::csize>( UINT32_MAX ) + 1 );
+    }
+    catch ( std::length_error const& ) {
+      threw = true;
+    }
+    ok( threw, "reserve beyond the capacity throws" );
+    valid( [&]{ ok( *i == cells + 0, "after a failed reserve" ); },
+           "iterator after a reserve that threw" );
+  }
   {
     // The iterators that insert and erase return, and those taken after the
     // change, are valid.
@@ -229,6 +292,48 @@ void test_valid() {
   }
 }
 
+// Without theThrow a failed check prints its condition and aborts, so that
+// a query cannot catch it (try/catch * catches ZXQP0002).
+void test_abort() {
+#ifdef CONTAINER_CHECKS_FORK
+  int fds[2];
+  if ( pipe( fds ) != 0 ) {
+    ok( false, "abort: pipe" );
+    return;
+  }
+  pid_t const pid = fork();
+  if ( pid == 0 ) {
+    dup2( fds[1], 2 );
+    close( fds[0] );
+    Vec v; fill( v, 3 );
+    Vec::iterator i = v.begin();
+    v.push_back( cells + 3 );
+    try {
+      int *volatile p = *i;
+      (void)p;
+    }
+    catch ( ... ) {
+      _exit( 3 );   // caught: the check must not throw
+    }
+    _exit( 0 );     // not detected
+  }
+  close( fds[1] );
+  string err;
+  char buf[512];
+  ssize_t n;
+  while ( ( n = read( fds[0], buf, sizeof buf ) ) > 0 )
+    err.append( buf, n );
+  close( fds[0] );
+  int status = 0;
+  waitpid( pid, &status, 0 );
+  ok( WIFSIGNALED( status ) && WTERMSIG( status ) == SIGABRT,
+      "abort: a stale iterator aborts the process" );
+  ok( err.find( "PtrVector iterator check failed" ) != string::npos &&
+      err.find( "ptr_vector.h:" ) != string::npos,
+      "abort: the message names the check and its location" );
+#endif
+}
+
 } // namespace
 
 namespace zorba {
@@ -236,9 +341,12 @@ namespace UnitTests {
 
 int test_container_checks( int, char*[] ) {
   failures = 0;
+  PtrVectorCheck::theThrow = true;
   test_stale();
   test_valid();
   test_foreign();
+  PtrVectorCheck::theThrow = false;
+  test_abort();
   cout << ( failures ? "FAILED" : "passed" ) << endl;
   return failures ? 1 : 0;
 }

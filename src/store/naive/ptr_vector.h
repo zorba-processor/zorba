@@ -29,9 +29,6 @@
 #include <zorba/config.h>
 
 #include "store/api/shared_types.h"
-#ifdef ZORBA_CONTAINER_CHECKS
-#include "diagnostics/assert.h"
-#endif
 
 #include "content_reader.h"
 
@@ -42,12 +39,40 @@ namespace simplestore
 
 #ifdef ZORBA_CONTAINER_CHECKS
 /*******************************************************************************
+  A failed PtrVector iterator check prints the check's location and
+  condition and a backtrace to stderr and aborts, like libstdc++'s debug
+  mode: an exception could be caught by the query (try/catch *) and the
+  failure lost. Only test/libunit/container_checks sets theThrow, to observe
+  the failures as PtrVectorCheckFailure exceptions instead.
+********************************************************************************/
+class PtrVectorCheckFailure : public std::logic_error
+{
+public:
+  explicit PtrVectorCheckFailure(const char* what) : std::logic_error(what) {}
+};
+
+struct PtrVectorCheck
+{
+  static bool theThrow;
+
+  [[noreturn]] static void fail(const char* cond, const char* file, int line);
+};
+
+#define ZORBA_PTR_VECTOR_CHECK(COND)                                         \
+  do {                                                                       \
+    if (!(COND))                                                             \
+      zorba::simplestore::PtrVectorCheck::fail(#COND, __FILE__, __LINE__);   \
+  } while (0)
+
+
+/*******************************************************************************
   The iterator of a PtrVector with ZORBA_CONTAINER_CHECKS: a pointer into the
   vector's storage plus the vector's generation number when the iterator was
   made. The vector increments its generation at every change of its contents
   or storage (see PtrVector), and dereferencing, moving, comparing or
   subtracting an iterator whose generation is not the vector's current one
-  fails with ZORBA_ASSERT.
+  fails (PtrVectorCheck), and so does comparing or subtracting iterators of
+  two different vectors.
 
   An iterator made from a plain pointer (or default-constructed) has no
   vector and is not checked: the node iterators point into their own copy of
@@ -69,7 +94,7 @@ class PtrVectorIterator
 
   void check() const
   {
-    ZORBA_ASSERT(theOwnerGen == NULL || *theOwnerGen == theGen);
+    ZORBA_PTR_VECTOR_CHECK(theOwnerGen == NULL || *theOwnerGen == theGen);
   }
 
   template <class Q>
@@ -77,6 +102,8 @@ class PtrVectorIterator
   {
     check();
     other.check();
+    ZORBA_PTR_VECTOR_CHECK(theOwnerGen == NULL || other.theOwnerGen == NULL ||
+                           theOwnerGen == other.theOwnerGen);
   }
 
 public:
@@ -249,10 +276,13 @@ public:
   (PtrVectorIterator): every member function that calls contentWillChange()
   makes all iterators taken before it stale, even where std::vector would
   keep some valid (push_back without reallocation, the elements before the
-  position of insert or erase), and using a stale iterator fails with
-  ZORBA_ASSERT. insert and erase also check that the iterator they get
-  belongs to this vector. Without the option the iterators are plain
-  pointers and nothing is checked.
+  position of insert or erase), and using a stale iterator aborts
+  (PtrVectorCheck). The generation changes only once the change can no
+  longer fail: a push_back, insert or reserve whose allocation throws leaves
+  the iterators valid (the readers have copied by then, which is harmless).
+  insert and erase also check that the iterator they get belongs to this
+  vector. Without the option the iterators are plain pointers and nothing is
+  checked.
 
   The size and capacity are 32-bit: growing past them, which doubling reaches
   at about 2^31 elements, throws std::length_error.
@@ -284,7 +314,9 @@ private:
   uint32_t theSize;
   uint32_t theCapacity;   // <= INLINE_CAPACITY means inline storage
 #ifdef ZORBA_CONTAINER_CHECKS
-  uint32_t theGeneration = 0;   // see PtrVectorIterator
+  // See PtrVectorIterator. It wraps after 2^32 changes: an iterator taken
+  // exactly 2^32 changes earlier would pass the check.
+  uint32_t theGeneration = 0;
 #endif
 
   T** data() { return isInline() ? theInline : theHeap; }
@@ -302,7 +334,7 @@ private:
   // The index of a valid iterator of this vector.
   csize indexOf(iterator pos)
   {
-    ZORBA_ASSERT(pos.owner() == &theGeneration);
+    ZORBA_PTR_VECTOR_CHECK(pos.owner() == &theGeneration);
     return pos.get() - data();
   }
 #else
@@ -313,10 +345,17 @@ private:
   csize indexOf(iterator pos) { return pos - data(); }
 #endif
 
-  // Called before every change of the contents or the storage.
+  // Called before every change of the contents or the storage: the readers
+  // copy what they need.
   void willChange()
   {
     ContentReader::contentWillChange(this);
+  }
+
+  // Called once the change can no longer fail (after any allocation): the
+  // iterators taken before it are stale.
+  void changed()
+  {
 #ifdef ZORBA_CONTAINER_CHECKS
     ++theGeneration;
 #endif
@@ -424,6 +463,7 @@ public:
     {
       willChange();
       reallocate(n);
+      changed();
     }
   }
 
@@ -432,8 +472,10 @@ public:
   {
     willChange();
     if (n > theSize)
-    {
       grow(n - theSize);
+    changed();
+    if (n > theSize)
+    {
       T** d = data();
       for (csize i = theSize; i < n; ++i)
         d[i] = NULL;
@@ -444,6 +486,7 @@ public:
   void clear()
   {
     willChange();
+    changed();
     theSize = 0;
   }
 
@@ -453,6 +496,7 @@ public:
     {
       willChange();
       reallocate(theSize);
+      changed();
     }
   }
 
@@ -460,6 +504,7 @@ public:
   {
     willChange();
     grow(1);
+    changed();
     data()[theSize] = value;
     ++theSize;
   }
@@ -470,6 +515,7 @@ public:
     assert(index <= theSize);
     willChange();
     grow(1);
+    changed();
     T** d = data();
     std::memmove(d + index + 1, d + index, (theSize - index) * sizeof(T*));
     d[index] = value;
@@ -486,6 +532,7 @@ public:
     csize count = static_cast<csize>(std::distance(first, last));
     willChange();
     grow(count);
+    changed();
     T** d = data();
     std::memmove(d + index + count, d + index, (theSize - index) * sizeof(T*));
     for (csize i = index; first != last; ++first, ++i)
@@ -505,6 +552,7 @@ public:
     csize count = indexOf(last) - index;
     assert(index + count <= theSize);
     willChange();
+    changed();
     T** d = data();
     std::memmove(d + index, d + index + count,
                  (theSize - index - count) * sizeof(T*));
@@ -519,6 +567,8 @@ public:
   {
     willChange();
     other.willChange();
+    changed();
+    other.changed();
     unsigned char tmp[sizeof(theInline)];
     std::memcpy(tmp, theInline, sizeof(theInline));
     std::memcpy(theInline, other.theInline, sizeof(theInline));

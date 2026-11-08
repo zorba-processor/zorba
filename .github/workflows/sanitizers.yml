@@ -286,12 +286,13 @@ jobs:
   # The full suite with _GLIBCXX_DEBUG (checked std containers and iterators)
   # and ZORBA_CONTAINER_CHECKS (checked PtrVector iterators in the store).
   # _GLIBCXX_DEBUG changes the layout of the std containers, so no std
-  # container may cross into a library built without it: libxml2, libxslt,
-  # curl, zlib and libuuid are C libraries, and the C++ ones (ICU, Xerces-C)
-  # take no std container in their interfaces. A function parameter mismatch
-  # would fail to link (debug containers have their own mangled names); the
-  # step lists the C++ libraries and any std container in their headers, where
-  # a class member would not.
+  # container may cross into a library built without it. libxml2, libxslt,
+  # curl, zlib and libuuid are C libraries; the C++ ones are ICU and Xerces-C.
+  # A std container as a function parameter would fail to link (debug
+  # containers have their own mangled names), but one as a return type or a
+  # class member would not, hence the header scan: the job fails if a std
+  # container appears in an ICU or Xerces-C header other than ICU's
+  # unicode/messageformat2_*.h, which Zorba does not include.
   # The test preset excludes test/api/timeout_bounds: it bounds how late a
   # query timeout may fire, and debug mode's checks (linear in the container
   # size on some operations) make a timed operation miss that bound.
@@ -343,7 +344,7 @@ jobs:
               cmake --preset glibcxx-debug
               cmake --build --preset glibcxx-debug
               out=build/glibcxx-debug/abi.txt
-              {
+              (
                 echo "C++ libraries that libzorba links:"
                 lib=$(find build/glibcxx-debug -name "libzorba_simplestore.so*" -type f | head -n 1)
                 for dep in $(ldd "$lib" | sed -n "s/.*=> \(\/[^ ]*\) .*/\1/p"); do
@@ -352,10 +353,22 @@ jobs:
                   fi
                 done
                 echo "std containers in the headers of ICU and Xerces-C:"
+                for d in /usr/include/unicode /usr/local/include/xercesc; do
+                  test -d "$d" || { echo "missing header directory $d"; exit 1; }
+                done
+                grc=0
                 grep -rnE "std::(vector|deque|list|forward_list|map|multimap|set|multiset|unordered_[a-z]+|bitset)[[:space:]]*<" \
-                  /usr/include/unicode /usr/local/include/xercesc || echo "  none"
-              } > "$out" 2>&1
+                  /usr/include/unicode /usr/local/include/xercesc > build/glibcxx-debug/abi-grep.txt || grc=$?
+                if [ "$grc" -gt 1 ]; then echo "grep failed ($grc)"; exit 1; fi
+                cat build/glibcxx-debug/abi-grep.txt
+                if grep -v "^/usr/include/unicode/messageformat2_" build/glibcxx-debug/abi-grep.txt; then
+                  echo "std container in a header outside unicode/messageformat2_*.h (above)"
+                  exit 1
+                fi
+                echo "none outside unicode/messageformat2_*.h"
+              ) > "$out" 2>&1 || abi=$?
               cat "$out"
+              test -z "${abi:-}"
               rc=0
               ctest --preset glibcxx-debug -j"$(nproc)" --output-junit junit.xml \
                 > build/glibcxx-debug/ctest.log 2>&1 || rc=$?
