@@ -158,6 +158,7 @@ CompilerCB::CompilerCB(const CompilerCB& cb)
   theOuterMayRunSideEffects(cb.theMayRunSideEffects),
   theMayRunSideEffects(true),
   theMayRunSideEffectsOrUpdates(true),
+  theOuterNoHoisting(cb.theNoHoisting),
   theHaveTimeout(cb.theHaveTimeout),
   theTimeout(cb.theTimeout),
   theFoldingMillis(0),

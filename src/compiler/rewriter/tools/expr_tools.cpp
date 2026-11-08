@@ -1317,6 +1317,11 @@ bool ImpurityWalk::isUnprovenCall(const expr* call)
         static_cast<const dynamic_function_invocation_expr*>(call)->get_input());
   }
 
+  // The query that eval compiles, and the function an invoke function finds by name
+  // (written as an eval), are not known until run time.
+  if (call->get_expr_kind() == eval_expr_kind)
+    return true;
+
   if (call->get_expr_kind() != fo_expr_kind)
     return false;
 
@@ -1434,6 +1439,7 @@ bool ImpurityWalk::walk(const expr* e, bool strict)
   switch (e->get_expr_kind())
   {
   case dynamic_function_invocation_expr_kind:
+  case eval_expr_kind:
   {
     if (isUnprovenCall(e))
       return true;
@@ -1479,7 +1485,6 @@ bool ImpurityWalk::walk(const expr* e, bool strict)
   case exit_catcher_expr_kind:
   case flowctl_expr_kind:
   case while_expr_kind:
-  case eval_expr_kind:
   {
     if (strict)
       return true;
@@ -1781,8 +1786,12 @@ void ClosedWorldWalk::walk(const expr* e)
     theHasEffects = true;
     break;
 
-  case apply_expr_kind:
   case eval_expr_kind:
+    theHasCalls = true;
+    opaque();
+    break;
+
+  case apply_expr_kind:
   case debugger_expr_kind:
   case delete_expr_kind:
   case insert_expr_kind:
@@ -1896,6 +1905,7 @@ bool BindingSequenceWalk::walk(expr* e)
   switch (e->get_expr_kind())
   {
   case dynamic_function_invocation_expr_kind:
+  case eval_expr_kind:
     found = is_unproven_call(e);
     theFoundCall = theFoundCall || found;
     break;
@@ -2046,7 +2056,7 @@ void classify_calls(expr* root)
     for (csize j = 0; j < functions.size(); ++j)
       w.walkFunction(functions[j]);
 
-    ccb->theNoHoisting = w.theFoundCall;
+    ccb->theNoHoisting = w.theFoundCall || ccb->theOuterNoHoisting;
   }
   else
   {

@@ -310,6 +310,9 @@
       <ForVariable name="temp_invoke_var1">
         <CtxVarIterator varid="4" varname="xxx-func-name" varkind="global"/>
       </ForVariable>
+      <LetVariable name="temp_invoke_var2" materialize="true">
+        <CtxVarIterator varid="5" varname="arg0" varkind="global"/>
+      </LetVariable>
       <ReturnClause>
         <EvalIterator>
           <ConcatStrIterator>
@@ -328,7 +331,7 @@
             <SingletonIterator value="xs:string(($temp_invoke_var2))"/>
           </ConcatStrIterator>
           <ForVarIterator varname="temp_invoke_var1"/>
-          <CtxVarIterator varid="5" varname="arg0" varkind="global"/>
+          <LetVarIterator varname="temp_invoke_var2"/>
         </EvalIterator>
       </ReturnClause>
     </FLWORIterator>
@@ -355,6 +358,9 @@
       <ForVariable name="temp_invoke_var1">
         <CtxVarIterator varid="4" varname="xxx-func-name" varkind="global"/>
       </ForVariable>
+      <LetVariable name="temp_invoke_var2" materialize="true">
+        <CtxVarIterator varid="5" varname="arg0" varkind="global"/>
+      </LetVariable>
       <ReturnClause>
         <EvalIterator>
           <ConcatStrIterator>
@@ -373,7 +379,7 @@
             <SingletonIterator value="xs:string(($temp_invoke_var2))"/>
           </ConcatStrIterator>
           <ForVarIterator varname="temp_invoke_var1"/>
-          <CtxVarIterator varid="5" varname="arg0" varkind="global"/>
+          <LetVarIterator varname="temp_invoke_var2"/>
         </EvalIterator>
       </ReturnClause>
     </FLWORIterator>
@@ -400,6 +406,9 @@
       <ForVariable name="temp_invoke_var1">
         <CtxVarIterator varid="4" varname="xxx-func-name" varkind="global"/>
       </ForVariable>
+      <LetVariable name="temp_invoke_var2" materialize="true">
+        <CtxVarIterator varid="5" varname="arg0" varkind="global"/>
+      </LetVariable>
       <ReturnClause>
         <EvalIterator>
           <ConcatStrIterator>
@@ -418,7 +427,7 @@
             <SingletonIterator value="xs:string(($temp_invoke_var2))"/>
           </ConcatStrIterator>
           <ForVarIterator varname="temp_invoke_var1"/>
-          <CtxVarIterator varid="5" varname="arg0" varkind="global"/>
+          <LetVarIterator varname="temp_invoke_var2"/>
         </EvalIterator>
       </ReturnClause>
     </FLWORIterator>
