@@ -3033,18 +3033,19 @@ std::string sweep_names_xml( std::string const &prefix ) {
 }
 
 // A document with a DOCTYPE, read by fn:doc with the dtd feature: the loader
-// that walks the tree libxml2 validated.
+// that walks the tree libxml2 validated. One element has so many attributes
+// that a failure after it is made, and before it is on the node stack, leaves
+// more than the sweep allows a failed call to keep.
 std::string sweep_dtd_xml( std::string const &prefix ) {
-  std::string dtd( "<!DOCTYPE root [<!ELEMENT root ANY>" );
-  std::string body( "<root>" );
-  for ( int i = 0; i < 40; ++i ) {
-    std::string const n( prefix + "_name_" + std::to_string( i ) );
+  std::string attlist( "<!ATTLIST item" );
+  std::string attributes;
+  for ( int i = 0; i < 300; ++i ) {
     std::string const a( prefix + "_attr_" + std::to_string( i ) );
-    dtd += "<!ELEMENT " + n + " (#PCDATA)><!ATTLIST " + n + " " + a +
-           " CDATA #IMPLIED>";
-    body += "<" + n + " " + a + "='v'>text</" + n + ">";
+    attlist += " " + a + " CDATA #IMPLIED";
+    attributes += " " + a + "='value'";
   }
-  return dtd + "]>" + body + "</root>";
+  return "<!DOCTYPE root [<!ELEMENT root (item)><!ELEMENT item (#PCDATA)>" +
+         attlist + ">]><root><item" + attributes + ">text</item></root>";
 }
 // The file is read once per document name: a document that loaded stays in the
 // store, so the warm-up reads another file.
@@ -3066,7 +3067,15 @@ void test_sweep_xml_dtd( Fixture const &f ) {
   s.query = sweep_dtd_query( "sweep" );
   s.before.push_back( sweep_dtd_query( "warm" ) );
   s.after_compile = true;
-  s.expected = "41";
+  s.expected = "2";
+  // Known limits, not of the loader's tree: reading the file under a failing
+  // allocation, libxml2 failing to allocate while it parses (an error of the
+  // load, not memory_limit), Xerces-C releasing a schema.
+  s.known = { starting( "caught err:FODC0002 \"/tmp/mcp-tree", 60 ),
+              starting( "caught err:FODC0002 \"XML tree creation failed\"", 1500 ),
+              starting( "caught err:FODC0002 internal error", 60 ),
+              starting( "terminate N11xercesc_", 4, 1, "OutOfMemoryExceptionE" ),
+              starting( "terminate N11xercesc_", 250, 8, "OutOfMemoryExceptionE" ) };
   s.kept_runs_of_8_reported = true;   // the known limit, see Sweep
   exhaust_sweep( f, "parse-xml with DTD validation", s );
 #else
