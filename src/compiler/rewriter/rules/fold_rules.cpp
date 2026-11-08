@@ -961,14 +961,14 @@ static expr* partial_eval_eq(RewriterContext& rCtx, fo_expr& fo)
   {
     xs_integer ival = val->getIntegerValue();
 
-    // Every call in the argument must run.
-    if (expr_tools::calls_unproven_function(count_expr))
+    // Every call in the argument must run: fn:count reads all of it.
+    if (expr_tools::calls_unproven_function(count_expr) ||
+        count_expr->isNonDiscardable())
       return NULL;
 
     if (ival < 0)
     {
-      if (!count_expr->isNonDiscardable())
-        return rCtx.theEM->create_const_expr(sctx, udf, LOC(val_expr), false);
+      return rCtx.theEM->create_const_expr(sctx, udf, LOC(val_expr), false);
     }
     else if (ival == 0)
     {
@@ -1054,7 +1054,8 @@ static expr* partial_eval_return_clause(
           return static_cast<for_clause*>(c)->get_expr();
         }
       }
-      else if (c->get_kind() == flwor_clause::let_clause)
+      else if (c->get_kind() == flwor_clause::let_clause &&
+               !static_cast<let_clause*>(c)->get_expr()->is_nondeterministic())
       {
         modified = true;
         return rCtx.theEM->create_const_expr(sctx, udf, loc, 1);

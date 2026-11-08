@@ -6,5 +6,6 @@
   calling `ref:reference`, so a later `ref:has-reference($n)` returned false.
   A rewrite no longer drops an expression that contains such a call (`fn:exists`,
   `fn:empty`, `fn:count`, `fn:boolean`, `instance of`, `castable as`, `and`/`or`
-  with a constant operand, unused `for` variables, a `for` over an empty
-  sequence type, and an empty object value).
+  with a constant operand, unused `for` and `let` variables, a `for` over an
+  empty sequence type, and an empty object value), and `count(E) = 0`, `= 1` or
+  `= n` no longer reads only part of such an E.

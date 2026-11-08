@@ -672,7 +672,9 @@ bool EliminateUnusedLetVars::safe_to_fold_var(csize varPos, int& numRefs)
     }
     else if (varDomExpr->isNonDiscardable())
     {
-      if (var->get_kind() == var_expr::let_var && var->get_num_refs() == 0)
+      // O0 binds a let domain eagerly: a nondeterministic call in it runs.
+      if (var->get_kind() == var_expr::let_var && var->get_num_refs() == 0 &&
+          !varDomExpr->is_nondeterministic())
         return true;
 
       return false;
