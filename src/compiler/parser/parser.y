@@ -6437,7 +6437,7 @@ FTWindow :
         {
             $$ = new FTWindow(
                 LOC(@$),
-                static_cast<AdditiveExpr*>($2),
+                $2,
                 static_cast<FTUnit*>($3)
             );
         }
@@ -6877,7 +6877,7 @@ FTBigUnit :
 FTIgnoreOption :
         WITHOUT CONTENT UnionExpr
         {
-            $$ = new FTIgnoreOption( LOC(@$), static_cast<UnionExpr*>($3) );
+            $$ = new FTIgnoreOption( LOC(@$), $3 );
         }
     ;
 

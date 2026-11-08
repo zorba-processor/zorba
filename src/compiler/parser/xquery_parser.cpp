@@ -6977,7 +6977,7 @@ namespace zorba {
         {
             (yylhs.value.node) = new FTWindow(
                 LOC(yylhs.location),
-                static_cast<AdditiveExpr*>((yystack_[1].value.expr)),
+                (yystack_[1].value.expr),
                 static_cast<FTUnit*>((yystack_[0].value.node))
             );
         }
@@ -7441,7 +7441,7 @@ namespace zorba {
 
   case 788: // FTIgnoreOption: "'without'" "'content'" UnionExpr
         {
-            (yylhs.value.node) = new FTIgnoreOption( LOC(yylhs.location), static_cast<UnionExpr*>((yystack_[0].value.expr)) );
+            (yylhs.value.node) = new FTIgnoreOption( LOC(yylhs.location), (yystack_[0].value.expr) );
         }
     break;
 

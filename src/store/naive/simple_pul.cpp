@@ -3426,7 +3426,7 @@ void CollectionPul::truncateIndexes()
 
   for (csize idx = 0; idx < numTruncatedIndices; ++idx)
   {
-    ValueIndex* index = static_cast<ValueIndex*>(theTruncatedIndices[idx]);
+    IndexImpl* index = theTruncatedIndices[idx];
     index->clear();
   }
 }

@@ -378,7 +378,7 @@ nextImpl( store::Item_t &result, PlanState &plan_state ) const {
   StringList* namespaces = nullptr;
   const XMLCh* nameSpace;
   XSNamedMap<XSObject>* xsElements;
-  XSElementDeclaration* xsElement;
+  XSObject* xsElement;
   const XMLCh* elemNameSpace;
 
   schema = theSctx->get_typemanager()->getSchema();
@@ -411,7 +411,7 @@ nextImpl( store::Item_t &result, PlanState &plan_state ) const {
       continue;
     }
 
-    xsElement = (XSElementDeclaration*)xsElements->item(state->elem_pos);
+    xsElement = xsElements->item(state->elem_pos);
     elemNameSpace = xsElement->getNamespace();
     if (elemNameSpace && (XMLString::stringLen(elemNameSpace )>0))
       qname_ns = StrX(elemNameSpace).localForm();
@@ -451,7 +451,7 @@ nextImpl( store::Item_t &result, PlanState &plan_state) const {
   StringList* namespaces = nullptr;
   const XMLCh* nameSpace;
   XSNamedMap<XSObject>* xsElements;
-  XSElementDeclaration* xsElement;
+  XSObject* xsElement;
   const XMLCh* elemNameSpace;
 
   schema = theSctx->get_typemanager()->getSchema();
@@ -484,7 +484,7 @@ nextImpl( store::Item_t &result, PlanState &plan_state) const {
       continue;
     }
 
-    xsElement = (XSElementDeclaration*)xsElements->item(state->elem_pos);
+    xsElement = xsElements->item(state->elem_pos);
     elemNameSpace = xsElement->getNamespace();
     if (elemNameSpace && (XMLString::stringLen(elemNameSpace )>0))
       qname_ns = StrX(elemNameSpace).localForm();
@@ -603,7 +603,7 @@ bool SctxInScopeElementGroupsIterator::nextImpl(
   StringList* namespaces = nullptr;
   const XMLCh* nameSpace;
   XSNamedMap<XSObject>* xsElements;
-  XSElementDeclaration* xsElement;
+  XSObject* xsElement;
   const XMLCh* elemNameSpace;
 
   schema = theSctx->get_typemanager()->getSchema();
@@ -636,7 +636,7 @@ bool SctxInScopeElementGroupsIterator::nextImpl(
       continue;
     }
 
-    xsElement = (XSElementDeclaration*)xsElements->item(state->elem_pos);
+    xsElement = xsElements->item(state->elem_pos);
     elemNameSpace = xsElement->getNamespace();
     if (elemNameSpace && (XMLString::stringLen(elemNameSpace )>0))
       qname_ns = StrX(elemNameSpace).localForm();
@@ -674,7 +674,7 @@ bool SctxInScopeSchemaTypesIterator::nextImpl( store::Item_t &result,
   StringList* namespaces = nullptr;
   const XMLCh* nameSpace;
   XSNamedMap<XSObject>* xsElements;
-  XSElementDeclaration* xsElement;
+  XSObject* xsElement;
   const XMLCh* elemNameSpace;
 
   schema = theSctx->get_typemanager()->getSchema();
@@ -712,7 +712,7 @@ bool SctxInScopeSchemaTypesIterator::nextImpl( store::Item_t &result,
       continue;
     }
 
-    xsElement = (XSElementDeclaration*)xsElements->item(state->elem_pos);
+    xsElement = xsElements->item(state->elem_pos);
     elemNameSpace = xsElement->getNamespace();
     if (elemNameSpace && (XMLString::stringLen(elemNameSpace ) > 0))
       qname_ns = StrX(elemNameSpace).localForm();

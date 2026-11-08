@@ -5950,7 +5950,7 @@ void FTExtensionSelection::accept( parsenode_visitor &v ) const
 
 FTWindow::FTWindow(
   QueryLoc const &loc,
-  AdditiveExpr const *window,
+  exprnode const *window,
   FTUnit const *unit
 ) :
   FTPosFilter( loc ),

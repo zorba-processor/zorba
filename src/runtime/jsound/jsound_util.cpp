@@ -1561,7 +1561,7 @@ void min_max_type::load_maxLength( store::Item_t const &maxLength_item ) {
   maxLength_ = to_xs_int( maxLength_item );
   if ( maxLength_ < 0 )
     throw FACET_VALUE_EXCEPTION( maxLength, MustBeGE0 );
-  ASSERT_BASE_FACET( atomic, maxLength, maxLength_ <= bt->maxLength_ );
+  ASSERT_BASE_FACET( min_max, maxLength, maxLength_ <= bt->maxLength_ );
   ADD_FACET( maxLength );
 }
 
@@ -1570,7 +1570,7 @@ void min_max_type::load_minLength( store::Item_t const &minLength_item ) {
   minLength_ = to_xs_int( minLength_item );
   if ( minLength_ < 0 )
     throw FACET_VALUE_EXCEPTION( minLength, MustBeGE0 );
-  ASSERT_BASE_FACET( atomic, minLength, minLength_ >= bt->minLength_ );
+  ASSERT_BASE_FACET( min_max, minLength, minLength_ >= bt->minLength_ );
   ADD_FACET( minLength );
 }
 
