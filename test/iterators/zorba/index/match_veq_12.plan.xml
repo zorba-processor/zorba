@@ -1,0 +1,136 @@
+<iterator-tree description="doc indexer">
+  <FLWORIterator>
+    <ForVariable name="$$context-item">
+      <CtxVarIterator varid="1" varname="$$idx_doc_var" varkind="global"/>
+    </ForVariable>
+    <ReturnClause>
+      <ValueIndexEntryBuilderIterator>
+        <ForVarIterator varname="$$context-item"/>
+        <CastIterator type="xs:string">
+          <FnDataIterator>
+            <AttributeAxisIterator test-kind="match_name_test" qname="xs:QName(,,id)" typename="*" nill-allowed="false">
+              <ForVarIterator varname="$$context-item"/>
+            </AttributeAxisIterator>
+          </FnDataIterator>
+        </CastIterator>
+      </ValueIndexEntryBuilderIterator>
+    </ReturnClause>
+  </FLWORIterator>
+</iterator-tree>
+<iterator-tree description="index">
+  <FLWORIterator>
+    <ForVariable name="$$context-item">
+      <ZorbaCollectionIterator>
+        <SingletonIterator value="xs:QName(www.items.com,items,items)"/>
+      </ZorbaCollectionIterator>
+    </ForVariable>
+    <ReturnClause>
+      <ValueIndexEntryBuilderIterator>
+        <ForVarIterator varname="$$context-item"/>
+        <CastIterator type="xs:string">
+          <FnDataIterator>
+            <AttributeAxisIterator test-kind="match_name_test" qname="xs:QName(,,id)" typename="*" nill-allowed="false">
+              <ForVarIterator varname="$$context-item"/>
+            </AttributeAxisIterator>
+          </FnDataIterator>
+        </CastIterator>
+      </ValueIndexEntryBuilderIterator>
+    </ReturnClause>
+  </FLWORIterator>
+</iterator-tree>
+<iterator-tree description="const-folded expr">
+  <OrIterator>
+    <SingletonIterator value="xs:boolean(false)"/>
+    <SingletonIterator value="xs:boolean(false)"/>
+    <SingletonIterator value="xs:boolean(false)"/>
+  </OrIterator>
+</iterator-tree>
+<iterator-tree description="main query">
+  <SequentialIterator>
+    <CtxVarDeclareIterator varid="4" varname="doc">
+      <ElementIterator>
+        <SingletonIterator value="xs:QName(,,items)"/>
+        <FnConcatIterator>
+          <ElementIterator>
+            <SingletonIterator value="xs:QName(,,item)"/>
+            <AttributeIterator qname="xs:QName(,,id)">
+              <SingletonIterator value="xs:string(a)"/>
+            </AttributeIterator>
+          </ElementIterator>
+          <ElementIterator>
+            <SingletonIterator value="xs:QName(,,item)"/>
+            <AttributeIterator qname="xs:QName(,,id)">
+              <SingletonIterator value="xs:string(b)"/>
+            </AttributeIterator>
+          </ElementIterator>
+          <ElementIterator>
+            <SingletonIterator value="xs:QName(,,item)"/>
+            <AttributeIterator qname="xs:QName(,,id)">
+              <SingletonIterator value="xs:string(c)"/>
+            </AttributeIterator>
+          </ElementIterator>
+        </FnConcatIterator>
+      </ElementIterator>
+    </CtxVarDeclareIterator>
+    <SequentialIterator>
+      <ApplyIterator>
+        <ZorbaCreateCollectionIterator>
+          <SingletonIterator value="xs:QName(www.items.com,items,items)"/>
+        </ZorbaCreateCollectionIterator>
+      </ApplyIterator>
+      <ApplyIterator>
+        <CreateIndexIterator>
+          <SingletonIterator value="xs:QName(www.items.com,items,items-index)"/>
+        </CreateIndexIterator>
+      </ApplyIterator>
+      <FLWORIterator>
+        <ForVariable name="item">
+          <ChildAxisIterator test-kind="match_name_test" qname="xs:QName(,,item)" typename="*" nill-allowed="false">
+            <CtxVarIterator varid="4" varname="doc" varkind="global"/>
+          </ChildAxisIterator>
+        </ForVariable>
+        <MaterializeClause>
+          <MaterializeForVariable inputVar="item"/>
+        </MaterializeClause>
+        <ReturnClause>
+          <ApplyIterator>
+            <ZorbaInsertIterator need-to-copy="true">
+              <SingletonIterator value="xs:QName(www.items.com,items,items)"/>
+              <ForVarIterator varname="item"/>
+            </ZorbaInsertIterator>
+          </ApplyIterator>
+        </ReturnClause>
+      </FLWORIterator>
+      <FLWORIterator>
+        <ForVariable name="x">
+          <ProbeIndexPointValueIterator>
+            <SingletonIterator value="xs:QName(www.items.com,items,items-index)"/>
+            <SingletonIterator value="xs:string(b)"/>
+          </ProbeIndexPointValueIterator>
+        </ForVariable>
+        <CountClause varname="c"/>
+        <WhereClause>
+          <TypedValueCompareIterator_INTEGER>
+            <ForVarIterator varname="c"/>
+            <SingletonIterator value="xs:integer(1)"/>
+          </TypedValueCompareIterator_INTEGER>
+        </WhereClause>
+        <ReturnClause>
+          <ElementIterator>
+            <SingletonIterator value="xs:QName(,,r)"/>
+            <FnConcatIterator>
+              <AttributeIterator qname="xs:QName(,,c)">
+                <EnclosedIterator attr_cont="true">
+                  <ForVarIterator varname="c"/>
+                </EnclosedIterator>
+              </AttributeIterator>
+              <EnclosedIterator attr_cont="false">
+                <ForVarIterator varname="x"/>
+              </EnclosedIterator>
+            </FnConcatIterator>
+          </ElementIterator>
+        </ReturnClause>
+      </FLWORIterator>
+    </SequentialIterator>
+  </SequentialIterator>
+</iterator-tree>

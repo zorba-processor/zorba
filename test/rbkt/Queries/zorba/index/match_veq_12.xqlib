@@ -1,0 +1,14 @@
+module namespace items = "www.items.com";
+
+import module namespace dml = 
+  "http://zorba.io/modules/store/static/collections/dml";
+
+declare namespace an = "http://zorba.io/annotations";
+
+
+declare %an:ordered collection items:items as element(item);
+
+
+declare %an:automatic %an:value-equality index items:items-index
+on nodes dml:collection(xs:QName('items:items'))
+by xs:string(@id) as xs:string?;
