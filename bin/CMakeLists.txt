@@ -529,6 +529,19 @@ IF (ZORBA_WITH_FILE_ACCESS)
     TARGET_INCLUDE_DIRECTORIES ("mcp_scan_tests${_mcp_suffix}"
       PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/mcp")
 
+    # The database used directly, without the protocol (see db/test/db_tests.cpp).
+    ZORBA_GENERATE_EXE("db_tests" "db/test/db_tests.cpp"
+      "zorba_db${_mcp_suffix}" "" "")
+    FOREACH (_t run_query streaming query_error sink_failure predefined
+             list_files policy scan_listing document_cache)
+      ADD_TEST (NAME bin/db/${_t}
+        COMMAND "db_tests${_mcp_suffix}" ${_t} "${_dirtree}"
+          "${CMAKE_CURRENT_SOURCE_DIR}/test/mcp/params_queries")
+      SET_TESTS_PROPERTIES (bin/db/${_t} PROPERTIES
+        PASS_REGULAR_EXPRESSION "PASSED: ${_t}"
+        FAIL_REGULAR_EXPRESSION "FAILED")
+    ENDFOREACH (_t)
+
     # Scripted JSON-RPC exchanges against the directory module's fixture
     # tree (see mcp/test/mcp_tests.cpp); "binary" runs zorba-mcp itself.
     SET (_mcpq "${CMAKE_CURRENT_SOURCE_DIR}/test/mcp/queries")
