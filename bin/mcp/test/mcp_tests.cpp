@@ -3033,19 +3033,22 @@ std::string sweep_names_xml( std::string const &prefix ) {
 }
 
 // A document with a DOCTYPE, read by fn:doc with the dtd feature: the loader
-// that walks the tree libxml2 validated. One element has so many attributes
-// that a failure after it is made, and before it is on the node stack, leaves
-// more than the sweep allows a failed call to keep.
+// that walks the tree libxml2 validated. The attributes of an element have long
+// values, so that a failure after the element is made, and before it is on the
+// node stack, leaves more than the sweep allows a failed call to keep. Ten of
+// them: libxml2 grows its array of attributes beyond that, and some versions
+// corrupt the heap when that allocation fails.
 std::string sweep_dtd_xml( std::string const &prefix ) {
   std::string attlist( "<!ATTLIST item" );
   std::string attributes;
-  for ( int i = 0; i < 300; ++i ) {
+  for ( int i = 0; i < 10; ++i ) {
     std::string const a( prefix + "_attr_" + std::to_string( i ) );
     attlist += " " + a + " CDATA #IMPLIED";
-    attributes += " " + a + "='value'";
+    attributes += " " + a + "='" + std::string( 3000, 'v' ) + "'";
   }
-  return "<!DOCTYPE root [<!ELEMENT root (item)><!ELEMENT item (#PCDATA)>" +
-         attlist + ">]><root><item" + attributes + ">text</item></root>";
+  std::string const item( "<item" + attributes + ">text</item>" );
+  return "<!DOCTYPE root [<!ELEMENT root (item+)><!ELEMENT item (#PCDATA)>" +
+         attlist + ">]><root>" + item + item + item + "</root>";
 }
 // The file is read once per document name: a document that loaded stays in the
 // store, so the warm-up reads another file.
@@ -3067,12 +3070,13 @@ void test_sweep_xml_dtd( Fixture const &f ) {
   s.query = sweep_dtd_query( "sweep" );
   s.before.push_back( sweep_dtd_query( "warm" ) );
   s.after_compile = true;
-  s.expected = "2";
+  s.expected = "4";
   // Known limits, not of the loader's tree: reading the file under a failing
   // allocation, libxml2 failing to allocate while it parses (an error of the
   // load, not memory_limit), Xerces-C releasing a schema.
   s.known = { starting( "\"caught err:FODC0002 \\\"/tmp/mcp-tree", 60 ),
               starting( "\"caught err:FODC0002 \\\"XML tree creation failed\\\"", 1500 ),
+              starting( "\"caught err:FODC0002 \\\"malformed XML document\\\"", 1500 ),
               starting( "\"caught err:FODC0002 internal error", 300 ),
               starting( "terminate N11xercesc_", 4, 1, "OutOfMemoryExceptionE" ),
               starting( "terminate N11xercesc_", 450, 8, "OutOfMemoryExceptionE" ) };
