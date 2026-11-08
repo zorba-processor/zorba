@@ -1654,10 +1654,10 @@ void DtdXmlLoader::startElement(
       AttributeNode* attrNode = nfactory.createAttributeNode(qname);
       attrNodes[i] = attrNode;   // first: the element destroys it
 
-      XmlString val(xmlGetProp(node, attr->name));
+      xmlChar* val = xmlGetProp(node, attr->name);
       if (val == NULL)   // an attribute with no value gives "": only memory fails
         throw std::bad_alloc();
-      const char* valu = reinterpret_cast<const char*>(val.get());
+      const char* valu = reinterpret_cast<const char*>(val);
       zstring value(valu);
 
       store::Item_t typeName;
@@ -1754,6 +1754,7 @@ void DtdXmlLoader::startElement(
                     << attrNode->getOrdPath().show() << std::endl);
 
 
+      xmlFree(val);
       i++;
     }
 
