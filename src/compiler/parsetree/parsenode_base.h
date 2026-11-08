@@ -45,14 +45,22 @@ protected:
 
   friend class ParseNodePrintXMLVisitor;
 
+public:
+  class DeferFree;
+
 private:
   // The next node waiting to be destroyed by free(): the queue allocates nothing,
   // since free() runs in destructors.
   parsenode* theNextPending = nullptr;
 
+  // The DeferFree keeping this node, and its neighbours in that DeferFree's list.
+  DeferFree* theDeferredBy = nullptr;
+  parsenode* thePrevDeferred = nullptr;
+  parsenode* theNextDeferred = nullptr;
+
 public:
   parsenode(const QueryLoc& loc_) : loc(loc_) { }
-  virtual ~parsenode() {}
+  virtual ~parsenode();
 
   // Destroys the node without recursing into its subtree (see parsenodes.cpp).
   void free() override;
@@ -62,6 +70,34 @@ public:
 
   virtual void accept(parsenode_visitor&) const = 0;
 
+};
+
+
+/**
+ * While a DeferFree is alive, a parse node of its thread whose last reference
+ * goes away is kept instead of freed; when the DeferFree ends, it frees each
+ * kept node that still has no reference. The parser holds one: its semantic
+ * values are nodes nobody holds a reference to, and when an exception leaves a
+ * rule's action, a handle the action had taken on such a node may already
+ * have freed it before the parser releases the node again.
+ */
+class ZORBA_DLL_PUBLIC parsenode::DeferFree
+{
+  friend class parsenode;
+
+  DeferFree* thePrevious;
+  parsenode* theFirst = nullptr;
+  parsenode* theLast = nullptr;
+
+  void keep(parsenode* node);
+  void forget(parsenode* node);
+
+public:
+  DeferFree();
+  ~DeferFree();
+
+  DeferFree(const DeferFree&) = delete;
+  DeferFree& operator=(const DeferFree&) = delete;
 };
 
 /**
