@@ -354,11 +354,13 @@ bool IndexMatchingRule::matchIndex()
       if (expr_tools::match_exact(qpredExpr, vpredExpr, subst))
       {
         matched = true;
-        theMatchedQPreds.push_back(qpred);
-        theUnmatchedQPreds.erase(qpredIte);
 
+        // Read qpred before the erase: the erase invalidates the reference.
         if (qpred.theClausePos > lastMatchedWHEREpos)
           lastMatchedWHEREpos = qpred.theClausePos;
+
+        theMatchedQPreds.push_back(qpred);
+        theUnmatchedQPreds.erase(qpredIte);
 
         break;
       }
@@ -742,12 +744,15 @@ bool IndexMatchingRule::matchKeyExprsForRangeIndex(
     bool boundsIncluded[2] = { false };
     expr* keyExpr = (*keyIte)->get_expr();
 
-    std::vector<PredInfo>::iterator qpredIte = theUnmatchedQPreds.begin();
-    std::vector<PredInfo>::iterator qpredEnd = theUnmatchedQPreds.end();
+    // Index-based loop: matched preds are erased from theUnmatchedQPreds
+    // while it is scanned, so iterators and the end position do not survive
+    // an erase. After an erase, i already names the next pred.
+    csize i = 0;
 
-    for (; qpredIte != qpredEnd; ++qpredIte)
+    while (i < theUnmatchedQPreds.size())
     {
-      PredInfo& qpred = *qpredIte;
+      PredInfo& qpred = theUnmatchedQPreds[i];
+      ++i;
 
       if (qpred.theExpr->get_expr_kind() != fo_expr_kind)
         continue;
@@ -827,12 +832,13 @@ bool IndexMatchingRule::matchKeyExprsForRangeIndex(
         
         if (matched == 2)
         {
-          theMatchedQPreds.push_back(qpred);
-          theUnmatchedQPreds.erase(qpredIte);
-          --qpredIte;
-
+          // Read qpred before the erase: the erase invalidates the reference.
           if (qpred.theClausePos > lastMatchedWHEREpos)
             lastMatchedWHEREpos = qpred.theClausePos;
+
+          theMatchedQPreds.push_back(qpred);
+          --i;
+          theUnmatchedQPreds.erase(theUnmatchedQPreds.begin() + i);
         }
         
         if ((bounds[0] != NULL && bounds[1] != NULL) || theUnmatchedQPreds.empty())
@@ -939,11 +945,13 @@ bool IndexMatchingRule::matchKeyExprsForEqIndex(
 
       if (matched >= 0)
       {
-        theMatchedQPreds.push_back(qpred);
-        theUnmatchedQPreds.erase(qpredIte);
-
+        // Read qpred before the erase: the erase invalidates the reference.
+        // qpredExpr points into the expression tree, not into the vector.
         if (qpred.theClausePos > lastMatchedWHEREpos)
           lastMatchedWHEREpos = qpred.theClausePos;
+
+        theMatchedQPreds.push_back(qpred);
+        theUnmatchedQPreds.erase(qpredIte);
 
         theProbeArgs.push_back(qpredExpr->get_arg(1 - matched));
 
