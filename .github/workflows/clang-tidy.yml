@@ -6,11 +6,15 @@ name: clang-tidy
 # of the linux-amd64-clang CI job). Any finding fails the job
 # (WarningsAsErrors). Not a required check.
 #
-# zorba-owning-memory (scripts/clang-tidy, a clang-tidy plugin; rule in
-# CONTRIBUTING.md) runs only on the lines this change adds or modifies
-# relative to master: the plugin is built against the image's LLVM, its
-# fixture tests run, and the check is applied to the translation units that
-# contain or include a changed file, reporting only changed lines.
+# The Zorba clang-tidy plugin (scripts/clang-tidy) is built against the
+# image's LLVM and its fixture tests run first. The whole-tree run loads it,
+# so the plugin checks that .clang-tidy enables (zorba-unchecked-stream-copy)
+# run over the whole tree; the job fails if the plugin does not load.
+#
+# zorba-owning-memory (a check of the same plugin; rule in CONTRIBUTING.md)
+# runs only on the lines this change adds or modifies relative to master:
+# the check is applied to the translation units that contain or include a
+# changed file, reporting only changed lines.
 #
 # Generated sources are not analyzed: the Bison/Flex output in
 # src/compiler/parser, */pregenerated/* and anything under build/. Headers
@@ -51,7 +55,7 @@ permissions:
 
 jobs:
   clang-tidy:
-    name: clang-tidy (unchecked return values, owning memory)
+    name: clang-tidy (unchecked return values, stream copies, owning memory)
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     steps:
@@ -110,12 +114,20 @@ jobs:
       # and bin/ minus the generated ones. The summary prints the number of
       # findings by check and by top-level directory, then every finding.
       - name: Run clang-tidy
+        id: tidy
         run: |
           docker run --rm -v "$PWD":/src -w /src zorba-builder:ci sh -ec '
             clang-tidy --version
+            plugin=build/clang-tidy-plugin/ZorbaTidyModule.so
+            # A plugin that fails to load would silently disable its checks.
+            clang-tidy -load "$plugin" -list-checks | grep -q zorba-unchecked-stream-copy || {
+              echo "zorba-unchecked-stream-copy is not loaded from $plugin"
+              exit 1
+            }
             mkdir -p build/tidy
             rc=0
             run-clang-tidy -p build/full-release -j"$(nproc)" -quiet \
+              -load "$plugin" \
               -source-filter "^/src/(src|modules|bin)/(?!(.*/)?pregenerated/)(?!(.*/)?compiler/parser/(xquery|jsoniq)_(parser|scanner)[.]cpp$)" \
               > build/tidy/clang-tidy.log 2>&1 || rc=$?
             sed -nE "/: (warning|error): .*\[[a-z0-9.,-]+\]$/p" build/tidy/clang-tidy.log \
@@ -136,7 +148,10 @@ jobs:
       # changed file. DiffFile restricts the findings to the changed lines.
       # A changed C/C++ file that no analyzed translation unit covers (not in
       # the Linux full-release build) gets a warning annotation.
+      # Runs also when the whole-tree step failed (the job still fails), but
+      # not when that step did not run because the build failed.
       - name: Run zorba-owning-memory on the changed lines
+        if: ${{ !cancelled() && steps.tidy.conclusion != 'skipped' }}
         shell: bash
         env:
           BASE_BRANCH: ${{ github.base_ref || 'master' }}
@@ -204,6 +219,8 @@ jobs:
             sed -nE "/clang-diagnostic-error|Error while processing/p" /owning/owning-memory.log | head -50
             exit $rc'
 
+      # Two artifacts: paths under the workspace and under runner.temp in one
+      # artifact would be nested below their common ancestor directory.
       - name: Upload the clang-tidy log
         if: always()
         uses: actions/upload-artifact@v7
@@ -212,4 +229,10 @@ jobs:
           path: |
             build/tidy/clang-tidy.log
             build/tidy/findings.txt
-            ${{ runner.temp }}/owning-memory/
+
+      - name: Upload the zorba-owning-memory log
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: owning-memory-log
+          path: ${{ runner.temp }}/owning-memory/

@@ -303,9 +303,15 @@ struct Fixture {
 
 std::string read_file( std::string const &path ) {
   std::ifstream in( path.c_str(), std::ios::binary );
-  std::stringstream s;
-  s << in.rdbuf();
-  return s.str();
+  std::string content;
+  char buf[ 8192 ];
+  while ( in.read( buf, sizeof buf ) || in.gcount() > 0 )
+    content.append( buf, static_cast<size_t>( in.gcount() ) );
+  // Only the end of the file stops the loop with eofbit set: a failed open
+  // or a read error (badbit) does not.
+  if ( !in.eof() )
+    check( false, "read " + path );
+  return content;
 }
 
 Json meta() {
