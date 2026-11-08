@@ -53,7 +53,8 @@ int count_variable_uses(expr* root, var_expr* v, int limit, std::vector<expr**>*
 int estimate_expression_size(expr* root, int limit);
 
 // Whether a call to this function can run code it receives as an argument or
-// finds by name: a function type among its parameters, or fn:invoke and the like.
+// finds by name: a function type among its parameters, fn:invoke and the like, or
+// zq:evaluate.
 bool function_runs_opaque_code(const function* f);
 
 // Whether a side effect can run during the evaluation of "root": a sequential
