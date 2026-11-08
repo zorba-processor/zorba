@@ -1739,7 +1739,7 @@ bool StructuralAnyUriItem::isParent(const store::Item_t& aOther) const
 
   ZORBA_ASSERT(aOther->isAtomic());
 
-  AnyUriItem* lOtherUriP = static_cast<AnyUriItem *>(aOther.getp());
+  AtomicItem* lOtherUriP = static_cast<AtomicItem *>(aOther.getp());
 
   if (lOtherUriP->getAnyUriTypeCode() != STRUCTURAL_INFORMATION_ANY_URI)
   {
@@ -1861,7 +1861,7 @@ bool StructuralAnyUriItem::isSibling(const store::Item_t& aOther) const
 {
   ZORBA_ASSERT(aOther->isAtomic());
 
-  AnyUriItem* lOtherUriP = static_cast<AnyUriItem *>(aOther.getp());
+  AtomicItem* lOtherUriP = static_cast<AtomicItem *>(aOther.getp());
 
   if (lOtherUriP->getAnyUriTypeCode() != STRUCTURAL_INFORMATION_ANY_URI)
   {
@@ -1897,7 +1897,7 @@ bool StructuralAnyUriItem::inSameTree(const store::Item_t& aOther) const
 {
   ZORBA_ASSERT(aOther->isAtomic());
 
-  AnyUriItem* lOtherUriP = static_cast<AnyUriItem *>(aOther.getp());
+  AtomicItem* lOtherUriP = static_cast<AtomicItem *>(aOther.getp());
 
   if (lOtherUriP->getAnyUriTypeCode() != STRUCTURAL_INFORMATION_ANY_URI)
   {
@@ -1925,7 +1925,7 @@ bool StructuralAnyUriItem::inSameCollection(const store::Item_t& aOther) const
 {
   ZORBA_ASSERT(aOther->isAtomic());
 
-  AnyUriItem* lOtherUriP = static_cast<AnyUriItem *>(aOther.getp());
+  AtomicItem* lOtherUriP = static_cast<AtomicItem *>(aOther.getp());
 
   if (lOtherUriP->getAnyUriTypeCode() != STRUCTURAL_INFORMATION_ANY_URI)
   {

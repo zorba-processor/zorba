@@ -1,0 +1,61 @@
+module namespace m = "http://www.example.com/untyped-probe-mixed";
+
+import module namespace ddl =
+  "http://zorba.io/modules/store/static/collections/ddl";
+
+import module namespace dml =
+  "http://zorba.io/modules/store/static/collections/dml";
+
+import module namespace iddl =
+  "http://zorba.io/modules/store/static/indexes/ddl";
+
+import module namespace idml =
+  "http://zorba.io/modules/store/static/indexes/dml";
+
+declare namespace an = "http://zorba.io/annotations";
+
+declare collection m:c as node()*;
+
+(: Typed xs:date keys and xs:string keys, no numeric key. :)
+declare %an:general-range %an:manual index m:Mixed
+on nodes dml:collection(xs:QName("m:c"))//e
+by (if (./@t eq "d") then xs:date(./@v) else xs:string(./@v));
+
+declare %an:sequential function m:init()
+{
+  ddl:create(xs:QName("m:c"));
+
+  dml:insert(xs:QName("m:c"),
+             <r>
+               <e id="1" t="d" v="2001-06-01"/>
+               <e id="2" t="s" v="abc"/>
+               <e id="3" t="d" v="1999-01-01"/>
+             </r>);
+
+  iddl:create(xs:QName("m:Mixed"));
+};
+
+declare function m:ids($nodes as node()*) as xs:string
+{
+  fn:string-join(
+    for $e in $nodes
+    order by xs:integer($e/@id)
+    return fn:string($e/@id),
+    " ")
+};
+
+declare function m:range-from($lower as xs:anyAtomicType) as xs:string
+{
+  m:ids(idml:probe-index-range-general(xs:QName("m:Mixed"),
+                                       $lower,
+                                       (),
+                                       fn:true(),
+                                       fn:false(),
+                                       fn:true(),
+                                       fn:true()))
+};
+
+declare function m:point($key as xs:anyAtomicType) as xs:string
+{
+  m:ids(idml:probe-index-point-general(xs:QName("m:Mixed"), $key))
+};

@@ -6817,18 +6817,18 @@ class FTWindow : public FTPosFilter
 public:
   FTWindow(
     QueryLoc const&,
-    AdditiveExpr const *window,
+    exprnode const *window,
     FTUnit const *unit
   );
   ~FTWindow();
 
   FTUnit const* get_unit() const { return unit_; }
-  AdditiveExpr const* get_window() const { return window_; }
+  exprnode const* get_window() const { return window_; }
 
   void accept( parsenode_visitor& ) const;
 
 private:
-  AdditiveExpr const *const window_;
+  exprnode const *const window_;
   FTUnit const *const unit_;
 };
 
