@@ -179,7 +179,7 @@ void test_predefined( Fixture const &f ) {
   RecordingSink sink;
   QueryResult const r( db.run_predefined( "greet", { { "name", "world" } },
                                           sink ) );
-  check( r.ok && sink.text() == "hello, world", "runs with its variables",
+  check( r.ok && sink.text() == "\"hello, world\"", "runs with its variables",
          r.ok ? sink.text() : r.error.message );
 }
 
