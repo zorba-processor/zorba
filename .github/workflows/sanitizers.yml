@@ -83,11 +83,12 @@ jobs:
               ctest --preset asan -j"$(nproc)" --output-junit junit.xml \
                 > build/asan/ctest.log 2>&1 || rc=$?
               sed -n "/tests passed/,\$p" build/asan/ctest.log
+              echo "$rc" > build/asan/ctest.rc
               # The sanitizer runtime writes logs as root with mode 0600;
               # hand them to the runner user so later steps can read them.
               chown -R "$HOST_UID:$HOST_GID" build/asan/sanitizer-logs \
-                build/asan/ctest.log build/asan/junit.xml .ccache || true
-              # Test failures are judged against the baseline in a later step.
+                build/asan/ctest.log build/asan/ctest.rc build/asan/junit.xml .ccache || true
+              # The compare step judges ctest's result and exit code.
               exit 0'
 
       - name: Summarize
@@ -106,6 +107,7 @@ jobs:
           path: |
             build/asan/sanitizer-logs
             build/asan/ctest.log
+            build/asan/ctest.rc
             build/asan/junit.xml
 
       # UBSan runs in recover mode, so a report does not fail its test. Any
@@ -119,6 +121,13 @@ jobs:
             echo "::error::No UB site count in the sanitizer summary"
             exit 1
           fi
+          # No test output means the junit file was missing or empty, so
+          # UBSan reports could not have been read.
+          outputs=$(sed -n 's/.* \([0-9][0-9]*\) test outputs;.*/\1/p' "$RUNNER_TEMP/asan-summary.md" | head -n 1)
+          if [ -z "$outputs" ] || [ "$outputs" -eq 0 ]; then
+            echo "::error::The sanitizer summary read no test outputs; UBSan reports were not checked"
+            exit 1
+          fi
           if [ "$ub" -ne 0 ]; then
             echo "::error::UBSan reported undefined behavior at $ub site(s); see the Summarize step"
             exit 1
@@ -130,7 +139,8 @@ jobs:
         run: |
           python3 scripts/summarize_sanitizer_logs.py \
             --baseline test/baselines/sanitizers-asan.txt \
-            --ctest-log build/asan/ctest.log --summary "$GITHUB_STEP_SUMMARY"
+            --ctest-log build/asan/ctest.log --ctest-exit-code build/asan/ctest.rc \
+            --summary "$GITHUB_STEP_SUMMARY"
 
   # ThreadSanitizer on the multithreaded tests (test/libunit/mapm_threads runs
   # concurrent decimal and integer arithmetic) plus a few existing tests, in
@@ -187,9 +197,10 @@ jobs:
               ctest --preset "$PRESET" -j2 --output-junit junit.xml \
                 > "build/$PRESET/ctest.log" 2>&1 || rc=$?
               sed -n "/tests passed/,\$p" "build/$PRESET/ctest.log"
+              echo "$rc" > "build/$PRESET/ctest.rc"
               chown -R "$HOST_UID:$HOST_GID" "build/$PRESET/sanitizer-logs" \
-                "build/$PRESET/ctest.log" "build/$PRESET/junit.xml" .ccache || true
-              # Test failures are judged against the baseline in a later step.
+                "build/$PRESET/ctest.log" "build/$PRESET/ctest.rc" "build/$PRESET/junit.xml" .ccache || true
+              # The compare step judges ctest's result and exit code.
               exit 0'
 
       - name: Summarize
@@ -219,6 +230,7 @@ jobs:
           path: |
             build/${{ matrix.preset }}/sanitizer-logs
             build/${{ matrix.preset }}/ctest.log
+            build/${{ matrix.preset }}/ctest.rc
             build/${{ matrix.preset }}/junit.xml
 
       - name: Compare with the baseline
@@ -227,6 +239,7 @@ jobs:
           python3 scripts/summarize_sanitizer_logs.py \
             --baseline "test/baselines/sanitizers-${{ matrix.preset }}.txt" \
             --ctest-log "build/${{ matrix.preset }}/ctest.log" \
+            --ctest-exit-code "build/${{ matrix.preset }}/ctest.rc" \
             --summary "$GITHUB_STEP_SUMMARY"
 
   # ThreadSanitizer on zorba-mcp's background scanner (bin/mcp/scan_* tests).
@@ -396,9 +409,10 @@ jobs:
               ctest --preset glibcxx-debug -j"$(nproc)" --output-junit junit.xml \
                 > build/glibcxx-debug/ctest.log 2>&1 || rc=$?
               sed -n "/tests passed/,\$p" build/glibcxx-debug/ctest.log
+              echo "$rc" > build/glibcxx-debug/ctest.rc
               chown -R "$HOST_UID:$HOST_GID" build/glibcxx-debug/ctest.log \
-                build/glibcxx-debug/junit.xml "$out" .ccache || true
-              # Test failures are judged against the baseline in a later step.
+                build/glibcxx-debug/junit.xml build/glibcxx-debug/ctest.rc "$out" .ccache || true
+              # The compare step judges ctest's result and exit code.
               exit 0'
 
       - uses: actions/upload-artifact@v7
@@ -408,6 +422,7 @@ jobs:
           path: |
             build/glibcxx-debug/abi.txt
             build/glibcxx-debug/ctest.log
+            build/glibcxx-debug/ctest.rc
             build/glibcxx-debug/junit.xml
 
       - name: Compare with the baseline
@@ -416,4 +431,5 @@ jobs:
           python3 scripts/summarize_sanitizer_logs.py \
             --baseline test/baselines/sanitizers-glibcxx-debug.txt \
             --ctest-log build/glibcxx-debug/ctest.log \
+            --ctest-exit-code build/glibcxx-debug/ctest.rc \
             --summary "$GITHUB_STEP_SUMMARY"

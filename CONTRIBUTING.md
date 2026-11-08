@@ -59,6 +59,9 @@ that fails with a different kind. A listed test that passes (or no longer
 exists) is a `::warning::` and a "Remove from the baseline" list in the job
 summary, not a failure, so fixes merge in any order. A pull request that fixes
 a listed test removes its entries from the baseline in the same pull request.
+The comparison also fails the job when the ctest log has no summary line, when
+the number of failures in the list differs from ctest's count, or when ctest's
+exit code does not fit the log (it must be 0 without failures and 8 with them).
 
 ## Pull requests
 

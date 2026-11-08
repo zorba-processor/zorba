@@ -4,7 +4,7 @@
 usage: summarize_sanitizer_logs.py <log-dir> <source-root> [max-rows]
                                    [--junit <ctest-junit.xml>]
        summarize_sanitizer_logs.py --baseline <file> --ctest-log <ctest.log>
-                                   [--summary <file>]
+                                   [--summary <file>] [--ctest-exit-code <file>]
 
 Reads the sanitizer log files in <log-dir> and, with --junit, the test output
 recorded by `ctest --output-junit`. The latter is needed for UBSan: with GCC,
@@ -22,6 +22,10 @@ and exits 1 on any failure that the baseline does not allow:
   - a test that fails and is not in the baseline;
   - a baseline test that fails with a different failure kind than recorded
     (ctest prints the kind: Failed, Subprocess aborted, Timeout, SEGFAULT, ...).
+The comparison is refused (exit 1) when the log has no summary line, when the
+number of listed failures differs from the summary's count, or when the exit
+code in --ctest-exit-code does not fit the log (0 with failures; 8 without
+failures; anything but 0 or 8).
 A baseline test that passes (or no longer exists) is only a warning: it
 should be removed from the baseline, but a fix that merges first must not turn
 the job red. Baseline lines are `test name | kind | reason`; kind `flaky`
@@ -89,8 +93,13 @@ class Report:
                 site[2][NUMBER.sub('N', m.group(3))[:100]] += 1
 
 
-FAILED_TEST = re.compile(r'^\s*\d+ - (\S+) \((.+)\)\s*$')
-RAN_TEST = re.compile(r'^\s*\d+/\d+ Test\s+#\d+: (\S+) \.+')
+# A name may contain spaces; ctest may append labels after the kind.
+FAILED_TEST = re.compile(r'^\s*\d+ - (.+?) \(([^()]+)\)(?:\s+\S.*)?$')
+FAILED_LIST_ENTRY = re.compile(r'^\s*\d+ - ')
+SUMMARY = re.compile(r'^\s*(\d+)% tests passed(?:, (\d+) tests failed)? '
+                     r'out of (\d+)\s*$')
+RAN_TEST = re.compile(r'^\s*\d+/\d+ Test\s+#\d+: (.+?) \.{3,}')
+CTEST_EXIT_FAILED_TESTS = 8
 FLAKY = 'flaky'
 
 
@@ -113,14 +122,16 @@ def read_baseline(path):
 
 
 def read_ctest_log(path):
-    """Returns (ran tests, {failed test: failure kind}, summary line seen)."""
-    ran, failed, summary = set(), {}, False
+    """Returns (ran tests, {failed test: kind}, unparsed list entries,
+    (failed, total) from the last summary line or None)."""
+    ran, failed, unparsed, summary = set(), {}, [], None
     in_failed_list = False
     with open(path, errors='replace') as f:
         for line in f:
             line = line.rstrip('\n')
-            if 'tests passed' in line:
-                summary = True
+            m = SUMMARY.match(line)
+            if m:
+                summary = (int(m.group(2) or 0), int(m.group(3)))
             if line.startswith('The following tests FAILED'):
                 in_failed_list = True
                 continue
@@ -128,20 +139,64 @@ def read_ctest_log(path):
                 m = FAILED_TEST.match(line)
                 if m:
                     failed[m.group(1)] = m.group(2)
-                else:
-                    in_failed_list = False
+                    continue
+                if FAILED_LIST_ENTRY.match(line):
+                    unparsed.append(line.strip())
+                    continue
+                in_failed_list = False
             m = RAN_TEST.match(line)
             if m:
                 ran.add(m.group(1))
-    return ran, failed, summary
+    return ran, failed, unparsed, summary
 
 
-def compare(baseline_path, log_path, summary_path):
+def read_exit_code(path):
+    try:
+        with open(path) as f:
+            return int(f.read().strip())
+    except (OSError, ValueError):
+        return None
+
+
+def check_run(log_path, failed, unparsed, summary, exit_code_path):
+    """Returns the errors that make the log untrustworthy."""
+    if summary is None:
+        return [f'no ctest summary line in {log_path}; the run did not '
+                'finish, so it cannot be compared with the baseline']
+    errors = []
+    count = summary[0]
+    if unparsed:
+        errors.append(f'{len(unparsed)} line(s) of the failed-test list '
+                      f'could not be parsed: {unparsed[0]}')
+    if len(failed) + len(unparsed) != count:
+        errors.append(f'ctest reports {count} failed test(s) but the log '
+                      f'lists {len(failed) + len(unparsed)}')
+    if exit_code_path:
+        rc = read_exit_code(exit_code_path)
+        if rc is None:
+            errors.append(f'no ctest exit code in {exit_code_path}')
+        elif rc == 0 and count:
+            errors.append(f'ctest exited 0 but reports {count} failure(s)')
+        elif rc == CTEST_EXIT_FAILED_TESTS and not count:
+            errors.append(f'ctest exited {rc} (tests failed) but reports no '
+                          'failure; a failed test is missing from the log')
+        elif rc not in (0, CTEST_EXIT_FAILED_TESTS):
+            errors.append(f'ctest exited {rc}, which is not "all passed" (0) '
+                          f'or "tests failed" ({CTEST_EXIT_FAILED_TESTS})')
+    return errors
+
+
+def compare(baseline_path, log_path, summary_path, exit_code_path=None):
     baseline = read_baseline(baseline_path)
-    ran, failed, summary = read_ctest_log(log_path)
-    if not summary:
-        print(f'::error::no ctest summary in {log_path}; the run did not '
-              'finish, so it cannot be compared with the baseline')
+    ran, failed, unparsed, summary = read_ctest_log(log_path)
+    errors = check_run(log_path, failed, unparsed, summary, exit_code_path)
+    if errors:
+        for e in errors:
+            print(f'::error::{e}')
+        if summary_path:
+            with open(summary_path, 'a') as f:
+                f.write('## :x: ctest result cannot be trusted\n\n'
+                        + ''.join(f'- {e}\n' for e in errors))
         return 1
 
     new = sorted(t for t in failed if t not in baseline)
@@ -197,13 +252,15 @@ def main():
     ap.add_argument('--baseline', help='file of known failing tests')
     ap.add_argument('--ctest-log', help='ctest output to compare')
     ap.add_argument('--summary', help='file to append the comparison to')
+    ap.add_argument('--ctest-exit-code', help='file with the ctest exit code')
     args = ap.parse_args()
 
     if args.baseline or args.ctest_log:
         if not (args.baseline and args.ctest_log):
             ap.error('--baseline and --ctest-log go together')
         try:
-            sys.exit(compare(args.baseline, args.ctest_log, args.summary))
+            sys.exit(compare(args.baseline, args.ctest_log, args.summary,
+                             args.ctest_exit_code))
         except ValueError as e:
             print(f'::error::{e}')
             sys.exit(1)
