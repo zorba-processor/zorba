@@ -1818,7 +1818,7 @@ class UpdJSONArrayUpdate : public UpdatePrimitive
 public:
   struct Comparator
   {
-    bool operator() (const UpdatePrimitive* lhs, const UpdatePrimitive* rhs);
+    bool operator() (const UpdatePrimitive* lhs, const UpdatePrimitive* rhs) const;
   };
 
 protected:
