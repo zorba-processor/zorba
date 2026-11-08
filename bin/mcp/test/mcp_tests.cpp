@@ -2687,14 +2687,6 @@ long const sweep_min_measured = 16;
 long const sweep_not_measured = LONG_MIN;
 
 void exhaust_sweep( Fixture const &f, std::string const &name, Sweep const &s ) {
-# if defined(ZORBA_TEST_SANITIZER)
-  // The compiler reads and frees parse nodes it has freed after a failure, which
-  // these builds report; see the limits in bin/mcp/README.md.
-  if ( s.compiles ) {
-    std::cout << name << ": not in this build" << std::endl;
-    return;
-  }
-# endif
   struct rlimit no_core = { 0, 0 };
   check( setrlimit( RLIMIT_CORE, &no_core ) == 0, "no core files" );
   TempTree t;
@@ -3249,8 +3241,7 @@ void test_sweep_query_text( Fixture const &f ) {
   s.points = 100000;                // all of them
   s.known = { exact( "exit 2", 6 ),
               starting( "terminate N11xercesc_", 2, 0, "OutOfMemoryExceptionE" ),
-              exact( "terminate St9bad_alloc", 2 ),
-              starting( "signal 11 in libzorba_simplestore", 2 ) };
+              exact( "terminate St9bad_alloc", 2 ) };
   s.compiles = true;
   exhaust_sweep( f, "text of the query", s );
 #else
@@ -3384,15 +3375,10 @@ void test_sweep_builtins( Fixture const &f ) {
   s.lenient = true;
   s.points = 100000;                // all of them
   // As in the sweep of the compilation, where std::bad_alloc leaving a noexcept
-  // function was seen once alone and once in a run of 8; and, in the failed call
-  // only, a SIGSEGV in the engine: the parser destroys the symbols on its stack
-  // after a failed push_back() in xquery_parser::parse() and releases a parse
-  // node already released (yy_destroy_, RCHelper::removeReference; crash stack in
-  // CI run 42302547384, arm64, a run of 8). Seen once alone and once in a run of 8.
+  // function was seen once alone and once in a run of 8.
   s.known = { exact( "exit 2", 6 ), library_crash( "signal 6 in libstdc", true, 2 ),
               starting( "terminate N11xercesc_", 2, 0, "OutOfMemoryExceptionE" ),
-              exact( "terminate St9bad_alloc", 2 ),
-              starting( "signal 11 in libzorba_simplestore", 2 ) };
+              exact( "terminate St9bad_alloc", 2 ) };
   s.compiles = true;
   s.probes = {
     { "string-join((\"a\", \"b\"), \"-\")", "\"a-b\"" },
