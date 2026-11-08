@@ -1231,9 +1231,11 @@ struct XmlFreeDeleter
 // A string that libxml2 allocated.
 typedef std::unique_ptr<xmlChar, XmlFreeDeleter> XmlString;
 
-// The content of a node. NULL is a failed allocation, in xmlNodeGetContent() or
-// earlier, when libxml2 made the node: loading it as an empty node would give a
-// wrong document. Only a PI with no data has no content.
+// The content of a node. With libxml2 2.13 or later, NULL comes only from the
+// failed xmlStrdup() in xmlNodeGetContent(), or for a PI with no data. Before
+// 2.13, libxml2 may also have made the node with no content when its own
+// allocation failed. Either way, loading it as an empty node would give a wrong
+// document; only a PI with no data has no content.
 bool getContent(XmlLoader &loader, xmlNode *node, XmlString &content)
 {
   content.reset(xmlNodeGetContent(node));
@@ -1654,10 +1656,10 @@ void DtdXmlLoader::startElement(
       AttributeNode* attrNode = nfactory.createAttributeNode(qname);
       attrNodes[i] = attrNode;   // first: the element destroys it
 
-      xmlChar* val = xmlGetProp(node, attr->name);
+      XmlString val(xmlGetProp(node, attr->name));
       if (val == NULL)   // an attribute with no value gives "": only memory fails
         throw std::bad_alloc();
-      const char* valu = reinterpret_cast<const char*>(val);
+      const char* valu = reinterpret_cast<const char*>(val.get());
       zstring value(valu);
 
       store::Item_t typeName;
@@ -1754,7 +1756,6 @@ void DtdXmlLoader::startElement(
                     << attrNode->getOrdPath().show() << std::endl);
 
 
-      xmlFree(val);
       i++;
     }
 

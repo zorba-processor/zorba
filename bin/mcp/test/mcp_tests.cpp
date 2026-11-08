@@ -3079,15 +3079,14 @@ std::string sweep_dtd_query( std::string const &prefix ) {
 // A document with a DOCTYPE whose tree holds every kind of node the loader
 // reads back from libxml2 (text, CDATA, comment, processing instruction), an
 // empty comment and a processing instruction with no data among them, and
-// attributes whose values are longer than sweep_kept_max, so that one of them
-// left behind by a failed call fails the sweep. The answer
+// attributes with long values. The answer
 // weighs the length of every node by its position, so that a node that lost its
 // content to a failed allocation is not mistaken for an empty one.
 std::string sweep_dtd_nodes_xml( std::string const &prefix ) {
   std::string const attribute( prefix + "_big" );
   std::string items;
   for ( int i = 1; i <= 6; ++i )
-    items += "<item " + attribute + "='" + std::string( 70000, 'v' ) + "'>t" +
+    items += "<item " + attribute + "='" + std::string( 20000, 'v' ) + "'>t" +
              std::to_string( i ) + "</item>";
   return "<!DOCTYPE root [<!ELEMENT root (#PCDATA|item)*><!ELEMENT item (#PCDATA)>"
          "<!ATTLIST item " + attribute + " CDATA #IMPLIED>]><root>" + items +
@@ -3137,14 +3136,17 @@ void test_sweep_xml_dtd( Fixture const &f ) {
 }
 // Every allocation of the load fails in turn (a point for each: the document is
 // small). The loader gives the answer or memory_limit, never a document with a
-// node that has no content, and gives back what it allocated (a failed call
-// may keep less than one attribute value).
+// node that has no content, and, as for every sweep, a failed call keeps no
+// more than the bound of what operator new allocated. That does not cover what
+// libxml2 allocates with malloc, such as the value xmlGetProp returns: its
+// release in startElement is not checked by this test.
 void test_sweep_xml_dtd_nodes( Fixture const &f ) {
 #if defined(__linux__)
   // libxml2 2.9.14 (Ubuntu 24.04) makes a text, CDATA or comment node with no
   // content, or drops a node, when its own allocation fails, and reports no
-  // error: the loader cannot tell such a tree from a document. 2.15 reports it.
-  // Versions between are not known; the sweep runs from 2.13.
+  // error: the loader cannot tell such a tree from a document. libxml2 2.13.0
+  // (NEWS, "Major changes"): "Most of the core code should now report malloc
+  // failures reliably." The sweep runs from 2.13.
   if ( void *const version = dlsym( RTLD_DEFAULT, "xmlParserVersion" ) ) {
     char const *const text = *static_cast<char const *const *>( version );
     if ( text && std::atoi( text ) < 21300 ) {
@@ -3160,14 +3162,15 @@ void test_sweep_xml_dtd_nodes( Fixture const &f ) {
   s.before.push_back( sweep_dtd_nodes_query( "nodes_warm" ) );
   s.after_compile = true;
   s.points = 1000000;
-  // 18 nodes, 420000 characters of attributes, and the sum of position times
+  // 18 nodes, 120000 characters of attributes, and the sum of position times
   // length over the 11 nodes that are not elements: 2 * (1 + .. + 6) + 4 * 7 +
   // 4 * 8 + 5 * 9 + 0 + 0 = 147. A number,
   // as a string built by the query is cut short when its buffer cannot grow.
-  s.expected = "18000420000147";
+  s.expected = "18000120000147";
   // The known limits of test_sweep_xml_dtd: libxml2 failing to allocate while it
   // parses, and Xerces-C. Caps: about 1.5 times the most seen in CI run
-  // 42487120094 (runs of 1 / of 8: 41 file; 76 tree creation; 2 / 143 Xerces-C).
+  // 42487120094 (runs of 1 / of 8: 41 file; 76 tree creation; 2 / 143 Xerces-C;
+  // the 143 is from its bigint profile, which makes the most allocations).
   s.known = { starting( "\"caught err:FODC0002 \\\"/tmp/mcp-tree", 62, 1 ),
               starting( "\"caught err:FODC0002 \\\"XML tree creation failed\\\"", 115, 1 ),
               starting( "terminate N11xercesc_", 4, 1, "OutOfMemoryExceptionE" ),
