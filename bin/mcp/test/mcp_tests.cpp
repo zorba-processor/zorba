@@ -3054,9 +3054,16 @@ std::string sweep_dtd_xml( std::string const &prefix ) {
     attlist += " " + a + " CDATA #IMPLIED";
     attributes += " " + a + "='" + std::string( 3000, 'v' ) + "'";
   }
-  std::string const item( "<item" + attributes + ">text</item>" );
-  return "<!DOCTYPE root [<!ELEMENT root (item+)><!ELEMENT item (#PCDATA)>" +
-         attlist + ">]><root>" + item + item + item + "</root>";
+  // ID attributes, on the root and on the items: the tree keeps their types, and
+  // destroying a half-built tree removes them from it.
+  attlist += " id ID #IMPLIED";
+  auto const item = [&]( int n ) {
+    return "<item id='" + prefix + "_item_" + std::to_string( n ) + "'" +
+           attributes + ">text</item>";
+  };
+  return "<!DOCTYPE root [<!ELEMENT root (item+)><!ELEMENT item (#PCDATA)>"
+         "<!ATTLIST root id ID #IMPLIED>" + attlist + ">]><root id='" + prefix +
+         "_root'>" + item( 1 ) + item( 2 ) + item( 3 ) + "</root>";
 }
 // The file is read once per document name: a document that loaded stays in the
 // store, so the warm-up reads another file.
@@ -3081,13 +3088,16 @@ void test_sweep_xml_dtd( Fixture const &f ) {
   s.expected = "4";
   // Known limits, not of the loader's tree: reading the file under a failing
   // allocation, libxml2 failing to allocate while it parses (an error of the
-  // load, not memory_limit), Xerces-C releasing a schema.
-  s.known = { starting( "\"caught err:FODC0002 \\\"/tmp/mcp-tree", 60 ),
-              starting( "\"caught err:FODC0002 \\\"XML tree creation failed\\\"", 1500 ),
-              starting( "\"caught err:FODC0002 \\\"malformed XML document\\\"", 1500 ),
-              starting( "\"caught err:FODC0002 internal error", 300 ),
+  // load, not memory_limit), Xerces-C releasing a schema. Caps: about 1.5 times
+  // the most seen in the 8 test jobs of CI run 42450607400 (runs of 1 / of 8:
+  // 41 file; 189 / 35 tree creation; 55 / 13 malformed; 2 / 69 Xerces-C).
+  s.known = { starting( "\"caught err:FODC0002 \\\"/tmp/mcp-tree", 62, 1 ),
+              starting( "\"caught err:FODC0002 \\\"XML tree creation failed\\\"", 285, 1 ),
+              starting( "\"caught err:FODC0002 \\\"XML tree creation failed\\\"", 53, 8 ),
+              starting( "\"caught err:FODC0002 \\\"malformed XML document\\\"", 83, 1 ),
+              starting( "\"caught err:FODC0002 \\\"malformed XML document\\\"", 20, 8 ),
               starting( "terminate N11xercesc_", 4, 1, "OutOfMemoryExceptionE" ),
-              starting( "terminate N11xercesc_", 450, 8, "OutOfMemoryExceptionE" ) };
+              starting( "terminate N11xercesc_", 105, 8, "OutOfMemoryExceptionE" ) };
   s.kept_runs_of_8_reported = true;   // the known limit, see Sweep
   exhaust_sweep( f, "parse-xml with DTD validation", s );
 #else
