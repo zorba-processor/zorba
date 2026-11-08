@@ -307,7 +307,8 @@ ZORBA_DLL_PUBLIC void query_resources_fail_walk(unsigned long edge);
   Set by expr_tools::classify_calls(): CALLS_HAVE_EFFECTS, and a call that the
   compiler cannot prove free of side effects is reachable somewhere in the query.
   Then no body of the query is hoisted, and no index join is made. True until
-  then. Compile time only: not serialized.
+  then, except while the translator optimizes the expressions of an index
+  declaration (see IndexExprHoisting). Compile time only: not serialized.
 
   theOuterNoHoisting :
   --------------------
