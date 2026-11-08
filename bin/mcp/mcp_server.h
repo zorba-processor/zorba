@@ -20,6 +20,7 @@
 #include <chrono>
 #include <cstddef>
 #include <functional>
+#include <memory>
 #include <ostream>
 #include <string>
 
@@ -28,6 +29,7 @@
 
 #include "database.h"
 #include "json.h"
+#include "scanner.h"
 
 namespace zorba {
 namespace mcp {
@@ -75,8 +77,10 @@ struct ServerConfig {
 
 /**
  * An MCP server over a db::Database: answers one JSON-RPC message at a time.
- * The tools run the database's queries and listings; this class checks their
- * arguments and turns results and errors into tool results.
+ * The tools run the database's queries; unless configured otherwise,
+ * list_documents answers from a db::Scanner of the root, which queries never
+ * depend on. This class checks the arguments of the tools and turns results
+ * and errors into tool results.
  *
  * Serves the modern revision (per-request \c _meta, \c server/discover) and,
  * once a client sends \c initialize, the legacy handshake-based revisions.
@@ -89,6 +93,8 @@ public:
    * @param log where diagnostics go (never the protocol stream).
    */
   Server( Zorba *zorba, ServerConfig config, std::ostream &log );
+
+  ~Server();
 
   /**
    * Handles one message (one line of the stdio transport).
@@ -132,12 +138,10 @@ public:
    *
    * @return whether every thread was joined.
    */
-  bool stop_scan() { return theDatabase.stop_scan(); }
+  bool stop_scan();
 
   /** The bytes the scan cache accounts for, or 0 without a scan. */
-  std::size_t scan_cache_bytes() const {
-    return theDatabase.scan_cache_bytes();
-  }
+  std::size_t scan_cache_bytes() const;
 
 private:
   struct QueryOutcome {
@@ -151,7 +155,8 @@ private:
 
   Json tools() const;
   Json call_tool( Json const &params, bool *protocol_error, Json *error );
-  std::string list_documents( Json const &args, bool *is_error );
+  std::string list_documents( db::Scanner &scanner, Json const &args,
+                              bool *is_error );
   // Runs a query of the database with the output capped at --max-output.
   template<typename Run> QueryOutcome run( Run const &query );
   Json tool_result( QueryOutcome const &outcome ) const;
@@ -169,6 +174,7 @@ private:
     id_lost        // memory ran out while its id was read: answered with null
   };
   MessageKind theCurrentKind = MessageKind::unknown;
+  std::unique_ptr<db::Scanner> theScanner;  // null with --no-scan
 };
 
 } // namespace mcp

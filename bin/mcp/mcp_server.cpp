@@ -16,8 +16,10 @@
 
 #include "mcp_server.h"
 #include "query_primer.h"
+#include "scan_preview.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cstdlib>
 #include <exception>
 #include <filesystem>
@@ -298,10 +300,7 @@ db::DatabaseConfig database_config( ServerConfig const &config ) {
   c.timeout = config.timeout;
   c.cache_max_file_kb = config.cache_max_file_kb;
   c.cache_max_files = config.cache_max_files;
-  c.scan = config.scan;
-  c.scan_limits = config.scan_limits;
   c.before_execute = config.before_execute;
-  c.scan_hook = config.scan_hook;
   return c;
 }
 
@@ -311,12 +310,38 @@ Server::Server( Zorba *zorba, ServerConfig config, std::ostream &log ) :
   theConfig( std::move( config ) ),
   theLog( log ),
   theDatabase( zorba, database_config( theConfig ), log ) {
+  if ( theConfig.scan ) {
+    try {
+      theScanner = std::make_unique<db::Scanner>(
+        theConfig.root, theConfig.scan_limits, theConfig.scan_hook );
+    }
+    // Threads may not start under --max-memory, which is applied before this:
+    // the server then works as with --no-scan.
+    catch ( std::exception const &e ) {
+      theLog << server_name << ": no background scan: " << e.what() << std::endl;
+    }
+  }
+}
+
+Server::~Server() {
+  (void)stop_scan();
+  if ( theScanner )
+    theLog << server_name << ": the scan cache holds "
+           << theScanner->cache_summary() << std::endl;
+}
+
+bool Server::stop_scan() {
+  return !theScanner || theScanner->stop();
+}
+
+std::size_t Server::scan_cache_bytes() const {
+  return theScanner ? theScanner->cache_bytes() : 0;
 }
 
 Json Server::tools() const {
   Json list( Json::array() );
 
-  if ( theDatabase.scanning() ) {
+  if ( theScanner ) {
     list.push( Json::object( {
       { "name", "list_documents" },
       { "title", "List documents" },
@@ -438,10 +463,14 @@ Server::QueryOutcome Server::run( Run const &query ) {
   return outcome;
 }
 
-std::string Server::list_documents( Json const &args, bool *is_error ) {
+std::string Server::list_documents( db::Scanner &scanner, Json const &args,
+                                    bool *is_error ) {
+  // The shape of the scanner's own errors, with the status after the error.
   auto fail = [&]( std::string const &message ) {
     *is_error = true;
-    return theDatabase.list_documents_error( "invalid-arguments", message );
+    std::string out( "{\"error\":{\"code\":\"invalid-arguments\",\"message\":" );
+    db::append_json_string( out, db::scan_valid_utf8( message ) );
+    return out + "}," + scanner.status() + "}";
   };
   for ( auto const &m : args.members() )
     if ( m.first != "path" && m.first != "limit" && m.first != "refresh" )
@@ -463,7 +492,12 @@ std::string Server::list_documents( Json const &args, bool *is_error ) {
       return fail( "refresh must be a boolean" );
     request.refresh = r->as_bool();
   }
-  return theDatabase.list_documents( request, theConfig.max_output, is_error );
+  // A request does not wait past its time limit, nor long without one.
+  std::chrono::milliseconds const longest( std::chrono::seconds( 10 ) );
+  std::chrono::milliseconds const wait(
+    theConfig.timeout.count() > 0 ? std::min( theConfig.timeout, longest )
+                                  : longest );
+  return scanner.answer( request, theConfig.max_output, wait, is_error );
 }
 
 Json Server::tool_result( QueryOutcome const &outcome ) const {
@@ -495,9 +529,9 @@ Json Server::call_tool( Json const &params, bool *protocol_error,
   std::string const &tool = name->text();
   QueryOutcome outcome;
   std::string unexpected;
-  if ( tool == "list_documents" && theDatabase.scanning() ) {
+  if ( tool == "list_documents" && theScanner ) {
     bool is_error = false;
-    outcome.text = list_documents( *args, &is_error );
+    outcome.text = list_documents( *theScanner, *args, &is_error );
     outcome.ok = !is_error;
   } else if ( tool == "list_documents" ) {
     unexpected = undeclared_arguments( *args, {} );

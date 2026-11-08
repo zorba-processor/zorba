@@ -20,7 +20,6 @@
 #include <chrono>
 #include <cstddef>
 #include <functional>
-#include <memory>
 #include <optional>
 #include <ostream>
 #include <string>
@@ -31,7 +30,6 @@
 #include <zorba/zorba.h>
 
 #include "document_cache.h"
-#include "scanner.h"
 
 namespace zorba {
 namespace db {
@@ -52,20 +50,19 @@ struct DatabaseConfig {
   std::size_t cache_max_file_kb = 16;
   /** How many documents the document cache keeps (0: no cache). */
   std::size_t cache_max_files = 10;
-  /** Whether to scan the root in the background (see scanner.h). */
-  bool scan = true;
-  /** The limits of the scanner. */
-  ScanLimits scan_limits;
   /** For tests: called when a query is compiled, before it runs. */
   std::function<void()> before_execute;
-  /** For tests: see ScanHook. */
-  ScanHook scan_hook;
 };
 
 /**
  * Where the serialized result of a query goes, as the engine produces it.
- * An exception from write() or end() fails the query: std::bad_alloc gives a
- * memory_limit error, like an allocation of the engine.
+ *
+ * An exception from write() or end() fails the query, and reaches the caller
+ * as its QueryError: memory_limit if it is std::bad_alloc, or if the engine
+ * reports it as zerr:ZXQP0003 with "bad_alloc" in the message; otherwise
+ * ZXQP0003 (kind query) with the exception's what() in the message, or
+ * internal. When a query fails, writes made before the failure have already
+ * reached the sink.
  */
 class ResultSink {
 public:
@@ -137,8 +134,7 @@ typedef std::vector<std::pair<std::string,std::string> > Variables;
  * Queries over a directory with the Zorba C++ API, one at a time. Every query
  * runs under SecurityPolicy::secure() narrowed to reading the root directory
  * (see directory_config), with \c $dir:root bound and the document cache
- * attached. Unless configured otherwise, a background scan of the root answers
- * list_documents(); queries never depend on it.
+ * attached. It starts no threads: the background scan (Scanner) is separate.
  *
  * Callers pass plain values that they have checked; results go to a
  * ResultSink and failures come back as a QueryError.
@@ -146,16 +142,13 @@ typedef std::vector<std::pair<std::string,std::string> > Variables;
 class Database {
 public:
   /**
-   * Compiles the predefined queries and starts the scan. Call on the thread
-   * that runs the queries (see Scanner).
+   * Compiles the predefined queries. Call on the thread that runs the queries.
    *
    * @param zorba the engine.
    * @param config the configuration.
    * @param log where diagnostics go.
    */
   Database( Zorba *zorba, DatabaseConfig config, std::ostream &log );
-
-  ~Database();
 
   Database( Database const& ) = delete;
   Database& operator=( Database const& ) = delete;
@@ -181,20 +174,6 @@ public:
   /** The predefined query of that name, or nullptr. */
   PredefinedQuery const* find_predefined( std::string const &name ) const;
 
-  /** Whether the background scan runs, and list_documents() can be called. */
-  bool scanning() const { return theScanner != nullptr; }
-
-  /**
-   * Answers a listing from the scan (see Scanner::answer()). It waits for the
-   * scan at most the timeout, and at most 10 s.
-   */
-  std::string list_documents( ListRequest const &request,
-                              std::size_t max_output, bool *is_error );
-
-  /** A listing error with the scan's status (see Scanner::error_answer()). */
-  std::string list_documents_error( char const *code,
-                                    std::string const &message );
-
   /** The policy every query runs under. */
   SecurityPolicy const& policy() const { return thePolicy; }
 
@@ -203,16 +182,6 @@ public:
 
   /** The counters as one line for the log; empty without a cache. */
   std::string cache_stats_line() const { return theCache.stats_line(); }
-
-  /**
-   * Stops the background scan, if any; the destructor does it too.
-   *
-   * @return whether every thread was joined.
-   */
-  bool stop_scan();
-
-  /** The bytes the scan cache accounts for, or 0 without a scan. */
-  std::size_t scan_cache_bytes() const;
 
 private:
   StaticContext_t new_static_context( std::string const &file_name ) const;
@@ -227,7 +196,6 @@ private:
   SecurityPolicy thePolicy;
   std::vector<PredefinedQuery> thePredefined;
   DocumentCache theCache;
-  std::unique_ptr<Scanner> theScanner;  // null without a scan
 };
 
 } // namespace db

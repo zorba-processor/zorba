@@ -1335,14 +1335,9 @@ bool Scanner::stop() {
   return walker_done && sampler_done;
 }
 
-std::string Scanner::error_answer( char const *code,
-                                   std::string const &message ) {
-  std::string status;
-  {
-    std::lock_guard<std::mutex> lock( theShared->theMutex );
-    status = theShared->status();
-  }
-  return error_line( status, code, message );
+std::string Scanner::status() const {
+  std::lock_guard<std::mutex> lock( theShared->theMutex );
+  return theShared->status();
 }
 
 std::string Scanner::answer( ListRequest const &request, std::size_t max_output,
@@ -1350,7 +1345,7 @@ std::string Scanner::answer( ListRequest const &request, std::size_t max_output,
   Shared &s = *theShared;
   auto fail = [&]( char const *code, std::string const &message ) {
     *is_error = true;
-    return error_answer( code, message );
+    return error_line( status(), code, message );
   };
   *is_error = false;
 

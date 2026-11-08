@@ -131,10 +131,10 @@ public:
                       std::chrono::milliseconds wait, bool *is_error );
 
   /**
-   * An answer that is the error \a code with \a message, after the status, as
-   * answer() gives its errors.
+   * The status as answers carry it: the member \c "scan":{...}, as JSON text
+   * without braces around it.
    */
-  std::string error_answer( char const *code, std::string const &message );
+  std::string status() const;
 
   /** The bytes the cache accounts for (see ScanLimits::max_memory). */
   std::size_t cache_bytes() const;

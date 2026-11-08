@@ -20,6 +20,7 @@
 // Usage: db_tests <test> <tree-dir> <queries-dir>
 // where <test> is one of the names in the table at the end.
 
+#include <chrono>
 #include <cstddef>
 #include <iostream>
 #include <new>
@@ -32,6 +33,7 @@
 
 #include "database.h"
 #include "directory_config.h"
+#include "scanner.h"
 
 using namespace zorba;
 using namespace zorba::db;
@@ -89,7 +91,6 @@ public:
 DatabaseConfig config_of( Fixture const &f ) {
   DatabaseConfig config;
   config.root = f.tree;
-  config.scan = false;
   return config;
 }
 
@@ -186,7 +187,6 @@ void test_predefined( Fixture const &f ) {
 void test_list_files( Fixture const &f ) {
   std::ostringstream log;
   Database db( f.zorba, config_of( f ), log );
-  check( !db.scanning(), "no scan when not configured" );
   RecordingSink sink;
   QueryResult const r( db.list_files( sink ) );
   check( r.ok, "the listing succeeds", r.error.message );
@@ -199,45 +199,47 @@ void test_list_files( Fixture const &f ) {
 void test_policy( Fixture const &f ) {
   std::ostringstream log;
   Database db( f.zorba, config_of( f ), log );
+  // Both files exist; only the one under the root may be read.
   RecordingSink inside;
   QueryResult const ok( db.run( dir_import +
-    "dir:open($dir:root, \"customers.csv\")(\"format\")", inside ) );
-  check( ok.ok && contains( inside.text(), "csv" ), "a file under the root",
+    "name(doc(concat($dir:root, \"/orders/2026/q1.xml\"))/*)", inside ) );
+  check( ok.ok && !inside.text().empty(), "a file under the root",
          ok.ok ? inside.text() : ok.error.message );
   RecordingSink outside;
-  QueryResult const denied( db.run(
-    "import module namespace file = \"http://expath.org/ns/file\";\n"
-    "file:read-text(\"" + f.tree + "/../list.jq\")", outside ) );
-  check( !denied.ok && denied.error.kind == QueryError::Kind::query,
-         "nothing outside the root", outside.text() );
+  QueryResult const denied( db.run( dir_import +
+    "doc(concat($dir:root, \"/../outside/secret.xml\"))", outside ) );
+  check( !denied.ok && denied.error.kind == QueryError::Kind::query &&
+         contains( denied.error.code, "FODC0002" ) &&
+         contains( denied.error.message, "access denied by security policy" ),
+         "a file outside the root: denied by the policy",
+         denied.error.code + " " + denied.error.message );
+  check( !contains( outside.text(), "SECRET" ), "nothing of it in the sink",
+         outside.text() );
 }
 
+// The scan needs no Database: it never touches the engine.
 void test_scan_listing( Fixture const &f ) {
-  DatabaseConfig config( config_of( f ) );
-  config.scan = true;
-  std::ostringstream log;
-  Database db( f.zorba, config, log );
-  check( db.scanning(), "a scan when configured" );
+  Scanner scanner( f.tree, ScanLimits(), ScanHook() );
+  std::chrono::milliseconds const wait( std::chrono::seconds( 10 ) );
   bool is_error = true;
-  std::string const all( db.list_documents( ListRequest(), 1 << 20,
-                                            &is_error ) );
+  std::string const all( scanner.answer( ListRequest(), 1 << 20, wait,
+                                         &is_error ) );
   check( !is_error && contains( all, "\"scan\"" ) &&
          contains( all, "customers.csv" ), "the files, after a status line",
          all );
   ListRequest one;
   one.path = "customers.csv";
-  std::string const file( db.list_documents( one, 1 << 20, &is_error ) );
+  std::string const file( scanner.answer( one, 1 << 20, wait, &is_error ) );
   check( !is_error && contains( file, "customers.csv" ), "one file", file );
   ListRequest bad;
   bad.path = "../outside";
-  std::string const refused( db.list_documents( bad, 1 << 20, &is_error ) );
+  std::string const refused( scanner.answer( bad, 1 << 20, wait, &is_error ) );
   check( is_error && contains( refused, "invalid-path" ),
          "a path out of the root", refused );
-  std::string const error( db.list_documents_error( "invalid-arguments",
-                                                    "limit must be..." ) );
-  check( contains( error, "\"scan\"" ) && contains( error, "invalid-arguments" ),
-         "an error made for the caller has the status", error );
-  check( db.stop_scan(), "the scan stops" );
+  std::string const status( scanner.status() );
+  check( status.compare( 0, 8, "\"scan\":{" ) == 0 && status.back() == '}',
+         "the status as a member", status );
+  check( scanner.stop(), "the scan stops" );
 }
 
 void test_document_cache( Fixture const &f ) {

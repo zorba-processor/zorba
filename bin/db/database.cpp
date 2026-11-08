@@ -204,32 +204,6 @@ Database::Database( Zorba *zorba, DatabaseConfig config, std::ostream &log ) :
   if ( theConfig.timeout.count() > 0 )
     thePolicy.setTimeout( theConfig.timeout );
   load_predefined();
-  if ( theConfig.scan ) {
-    try {
-      theScanner = std::make_unique<Scanner>(
-        theConfig.root, theConfig.scan_limits, theConfig.scan_hook );
-    }
-    // Threads may not start under --max-memory, which is applied before this:
-    // the database then works as with --no-scan.
-    catch ( std::exception const &e ) {
-      theLog << log_name << ": no background scan: " << e.what() << std::endl;
-    }
-  }
-}
-
-Database::~Database() {
-  (void)stop_scan();
-  if ( theScanner )
-    theLog << log_name << ": the scan cache holds "
-           << theScanner->cache_summary() << std::endl;
-}
-
-bool Database::stop_scan() {
-  return !theScanner || theScanner->stop();
-}
-
-std::size_t Database::scan_cache_bytes() const {
-  return theScanner ? theScanner->cache_bytes() : 0;
 }
 
 // The static context a query is compiled in. The language of a query without
@@ -353,21 +327,6 @@ QueryResult Database::list_files( ResultSink &sink ) {
     std::string( "import module namespace dir = \"" ) +
       directory_config::module_ns + "\";\ndir:list($dir:root)\n",
     std::string(), Variables(), sink );
-}
-
-std::string Database::list_documents( ListRequest const &request,
-                                      std::size_t max_output, bool *is_error ) {
-  // A request does not wait past its time limit, nor long without one.
-  std::chrono::milliseconds const longest( std::chrono::seconds( 10 ) );
-  std::chrono::milliseconds const wait(
-    theConfig.timeout.count() > 0 ? std::min( theConfig.timeout, longest )
-                                  : longest );
-  return theScanner->answer( request, max_output, wait, is_error );
-}
-
-std::string Database::list_documents_error( char const *code,
-                                            std::string const &message ) {
-  return theScanner->error_answer( code, message );
 }
 
 QueryResult Database::execute( std::string const &source,
