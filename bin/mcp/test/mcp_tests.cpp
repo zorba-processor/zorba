@@ -3031,8 +3031,43 @@ std::string sweep_names_xml( std::string const &prefix ) {
   }
   return xml + "</root>";
 }
+
+// A document with a DOCTYPE, parsed with DTD validation: the loader that walks
+// the tree libxml2 validated.
+std::string sweep_dtd_xml( std::string const &prefix ) {
+  std::string dtd( "<!DOCTYPE root [<!ELEMENT root ANY>" );
+  std::string body( "<root>" );
+  for ( int i = 0; i < 40; ++i ) {
+    std::string const n( prefix + "_name_" + std::to_string( i ) );
+    std::string const a( prefix + "_attr_" + std::to_string( i ) );
+    dtd += "<!ELEMENT " + n + " (#PCDATA)><!ATTLIST " + n + " " + a +
+           " CDATA #IMPLIED>";
+    body += "<" + n + " " + a + "='v'>text</" + n + ">";
+  }
+  return dtd + "]>" + body + "</root>";
+}
+std::string sweep_dtd_query( std::string const &prefix ) {
+  return "import module namespace x = 'http://zorba.io/modules/xml';\n"
+         "declare namespace opt = 'http://zorba.io/modules/xml-options';\n" +
+         caught( "count(x:parse(\"" + sweep_dtd_xml( prefix ) +
+                 "\", <opt:options><opt:DTD-validate/></opt:options>)//*)" );
+}
 #endif
 
+void test_sweep_xml_dtd( Fixture const &f ) {
+#if defined(__linux__)
+  Sweep s;
+  s.query = sweep_dtd_query( "sweep" );
+  s.before.push_back( sweep_dtd_query( "warm" ) );
+  s.after_compile = true;
+  s.expected = "41";
+  s.needs_module = true;
+  s.kept_runs_of_8_reported = true;   // the known limit, see Sweep
+  exhaust_sweep( f, "parse-xml with DTD validation", s );
+#else
+  (void)f;
+#endif
+}
 void test_sweep_xml( Fixture const &f ) {
 #if defined(__linux__)
   Sweep s;
@@ -7207,6 +7242,7 @@ Test const tests[] = {
   { "exhaust_seekable_stream", test_seekable_stream_out_of_memory },
   { "exhaust_sweep_matcher", test_sweep_matcher },
   { "exhaust_sweep_xml", test_sweep_xml },
+  { "exhaust_sweep_xml_dtd", test_sweep_xml_dtd },
   { "exhaust_sweep_fragment", test_sweep_fragment },
   { "exhaust_sweep_html", test_sweep_html },
   { "exhaust_sweep_json", test_sweep_json },

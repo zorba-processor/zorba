@@ -553,7 +553,7 @@ IF (ZORBA_WITH_FILE_ACCESS)
              exhaust_sweep_matcher exhaust_sweep_query_text
              exhaust_sweep_streamable_text exhaust_base64_stream
              exhaust_seekable_stream
-             exhaust_sweep_xml
+             exhaust_sweep_xml exhaust_sweep_xml_dtd
              exhaust_sweep_fragment
              exhaust_sweep_html exhaust_sweep_json exhaust_sweep_csv
              exhaust_sweep_casts exhaust_sweep_decimal_thread exhaust_sweep_cache
