@@ -3080,8 +3080,8 @@ std::string sweep_dtd_query( std::string const &prefix ) {
 // reads back from libxml2 (text, CDATA, comment, processing instruction), an
 // empty comment and a processing instruction with no data among them, and
 // attributes whose values are longer than a failed call may keep. The answer
-// shows the content of every node, so that a node that lost its content to a
-// failed allocation is not mistaken for an empty one.
+// weighs the length of every node by its position, so that a node that lost its
+// content to a failed allocation is not mistaken for an empty one.
 std::string sweep_dtd_nodes_xml( std::string const &prefix ) {
   std::string const attribute( prefix + "_big" );
   std::string items;
@@ -3098,11 +3098,11 @@ std::string sweep_dtd_nodes_query( std::string const &prefix ) {
          "declare namespace err = 'http://www.w3.org/2005/xqt-errors';\n"
          "declare option f:enable 'dtd';\n"
          "try { let $d := doc(concat($dir:root, '/" + prefix + ".xml')) "
-         "return concat(count($d//node()), ' ', "
+         "return count($d//node()) * 1000000000000 + "
          "sum(for $a in $d//item/@*[ends-with(name(), '_big')] "
-         "return string-length($a)), ' ', "
-         "string-join(for $n in $d//node() where not($n instance of element()) "
-         "return string($n), '|')) } "
+         "return string-length($a)) * 1000 + "
+         "sum(for $n at $i in $d//node()[not(. instance of element())] "
+         "return $i * string-length($n)) } "
          "catch * { concat('caught ', string($err:code), ' ', $err:description) }";
 }
 #endif
@@ -3147,7 +3147,11 @@ void test_sweep_xml_dtd_nodes( Fixture const &f ) {
   s.before.push_back( sweep_dtd_nodes_query( "nodes_warm" ) );
   s.after_compile = true;
   s.points = 1000000;
-  s.expected = "\"18 120000 t1|t2|t3|t4|t5|t6|note|data|cdata||\"";
+  // 18 nodes, 120000 characters of attributes, and the sum of position times
+  // length over the 11 nodes that are not elements: 2 * (1 + .. + 6) + 4 * 7 +
+  // 4 * 8 + 5 * 9 + 0 + 0 = 147. A number,
+  // as a string built by the query is cut short when its buffer cannot grow.
+  s.expected = "18000120000147";
   // The known limits of test_sweep_xml_dtd: libxml2 failing to allocate while it
   // parses, and Xerces-C. Caps are set after the first run.
   s.known = { starting( "\"caught err:FODC0002 \\\"/tmp/mcp-tree", 100000 ),
