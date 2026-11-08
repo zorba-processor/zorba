@@ -477,8 +477,9 @@ public:
 
     diag(copy->getOperatorLoc(),
          "stream copy (operator<< of a streambuf) whose result is never "
-         "examined: it sets failbit when nothing is copied or reading fails; "
-         "check the destination stream afterwards (fail(), operator bool)");
+         "examined: a copy that inserts nothing or fails reading only sets "
+         "failbit, so check the destination stream afterwards (fail(), "
+         "operator bool)");
     if (clear)
       diag(clear->getExprLoc(),
            "clear() discards the state of the stream copy at line %0 before "
