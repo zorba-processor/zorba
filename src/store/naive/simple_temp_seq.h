@@ -84,19 +84,26 @@ public:
 
 
 /*******************************************************************************
-
+  An iterator over the positions [theBeginPos, theEndPos) of a SimpleTempSeq,
+  taken when the iterator is initialized. The positions are indexes, not
+  iterators of theItems: the sequence may change while the iterator exists
+  (append() can move the vector's storage, init() replaces its contents and
+  purge() releases them). next() stops at the current end of the sequence, so
+  it never returns an item the sequence no longer holds.
 ********************************************************************************/
 class SimpleTempSeqIter : public store::TempSeqIterator
 {
  private:
-  SimpleTempSeq_t                      theTempSeq;
+  typedef std::vector<store::Item*>::size_type Pos;
 
-  std::vector<store::Item*>::iterator  theIte;
-  std::vector<store::Item*>::iterator  theBegin;
-  std::vector<store::Item*>::iterator  theEnd;
+  SimpleTempSeq_t  theTempSeq;
+
+  Pos              theCurPos;
+  Pos              theBeginPos;
+  Pos              theEndPos;
 
  public:
-  SimpleTempSeqIter() {}
+  SimpleTempSeqIter() : theCurPos(0), theBeginPos(0), theEndPos(0) {}
 
   SimpleTempSeqIter(const SimpleTempSeq* seq);
 
