@@ -1702,6 +1702,10 @@ void ClosedWorldWalk::walkBuiltin(const fo_expr* fo)
   case FunctionConsts::FN_ZORBA_EVAL_N_1:
   case FunctionConsts::FN_ZORBA_EVAL_U_1:
   case FunctionConsts::FN_ZORBA_EVAL_S_1:
+  // Built in, not external, and they run code the walk does not see.
+  case FunctionConsts::FN_ZORBA_JSOUND_ANNOTATE_4:
+  case FunctionConsts::FN_ZORBA_JSOUND_VALIDATE_4:
+  case FunctionConsts::ZORBA_STORE_STATIC_INTEGRITY_CONSTRAINTS_DML_CHECK_INTEGRITY_CONSTRAINT_1:
   // Nondeterministic does not say that it gives a node a reference ref:has-reference reads.
   case FunctionConsts::FN_REFERENCE_REFERENCE_1:
     opaque();
