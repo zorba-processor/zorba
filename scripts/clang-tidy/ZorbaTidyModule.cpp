@@ -407,12 +407,8 @@ public:
 
   void registerMatchers(MatchFinder* Finder) override
   {
-    auto streambuf =
-      cxxRecordDecl(isSameOrDerivedFrom(hasName("::std::basic_streambuf")));
     Finder->addMatcher(
       cxxOperatorCallExpr(hasOverloadedOperatorName("<<"), argumentCountIs(2),
-                          hasArgument(1, hasType(hasCanonicalType(
-                                           pointsTo(streambuf)))),
                           unless(isInstantiationDependent()))
         .bind("copy"),
       this);
@@ -421,6 +417,13 @@ public:
   void check(const MatchFinder::MatchResult& Result) override
   {
     const auto* copy = Result.Nodes.getNodeAs<CXXOperatorCallExpr>("copy");
+    // The argument has the parameter's type, std::basic_streambuf<...>*,
+    // usually spelled through a typedef (std::streambuf, __streambuf_type).
+    const CXXRecordDecl* source =
+      copy->getArg(1)->getType()->getPointeeCXXRecordDecl();
+    if (!(source && source->getIdentifier() &&
+          source->getName() == "basic_streambuf" && source->isInStdNamespace()))
+      return;
     ASTContext& ctx = *Result.Context;
     const SourceManager& sm = *Result.SourceManager;
 
