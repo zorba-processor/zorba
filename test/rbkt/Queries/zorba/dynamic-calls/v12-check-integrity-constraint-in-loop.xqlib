@@ -1,0 +1,11 @@
+module namespace e = "http://zorba.io/tests/dynamic-calls-ic";
+import module namespace dml = "http://zorba.io/modules/store/static/collections/dml";
+declare namespace an = "http://zorba.io/annotations";
+declare collection e:foo as node()*;
+declare collection e:log as node()*;
+declare %an:sequential function e:note() as xs:boolean
+{
+  dml:insert(xs:QName("e:log"), <n/>);
+  true()
+};
+declare integrity constraint e:ic on collection e:foo $c check e:note();
