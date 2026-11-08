@@ -29,6 +29,7 @@
 #include <zorba/singleton_item_sequence.h>
 #include <zorba/store_consts.h>
 #include <zorba/user_exception.h>
+#include <zorba/zorba_exception.h>
 #include <zorba/util/base64_util.h>
 #include <zorba/util/fs_util.h>
 #include <zorba/util/transcode_stream.h>
@@ -106,10 +107,7 @@ SecurityPolicy policyOf( StaticContext const *aSctx ) {
                : Zorba::getInstance( nullptr )->getSecurityPolicy();
 }
 
-// Not a stream insertion of the input's streambuf, which sets a state bit when
-// it cannot read or when the input is empty, and returns. An empty input is
-// not an error; false is a failure to read. std::bad_alloc goes to the caller.
-// A write error is left in the state of the output.
+// Not "out << in.rdbuf()", which hides read errors and fails on empty input.
 bool copyStream( istream &in, ostream &out ) {
   char buf[ 8192 ];
   ios_base::iostate const old_mask = in.exceptions();
@@ -122,6 +120,10 @@ bool copyStream( istream &in, ostream &out ) {
     }
   }
   catch ( bad_alloc const& ) {
+    in.exceptions( old_mask );
+    throw;
+  }
+  catch ( ZorbaException const& ) {
     in.exceptions( old_mask );
     throw;
   }
