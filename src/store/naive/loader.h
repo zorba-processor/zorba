@@ -245,14 +245,13 @@ protected:
 
   void setRoot(XmlNode* root);
 
+  // startElement() failed before the element reached the node stack: nothing
+  // else will destroy it. Its attributes not made yet are dropped first.
+  static void discardElement(ElementNode* elemNode);
+
   void* getElementNode();
 
 public:
-  // startElement() failed before the element reached the node stack: nothing
-  // else will destroy it. Its attributes not made yet are dropped first. Also
-  // used by DtdXmlLoader::startElement().
-  static void discardElement(ElementNode* elemNode);
-
   static void	startDocument(void * ctx);
 
   static void endDocument(void * ctx);
