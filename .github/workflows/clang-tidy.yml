@@ -118,7 +118,7 @@ jobs:
         run: |
           docker run --rm -v "$PWD":/src -w /src zorba-builder:ci sh -ec '
             clang-tidy --version
-            plugin=build/clang-tidy-plugin/ZorbaTidyModule.so
+            plugin=build/clang-tidy-plugin/NoSuchModule.so
             # A plugin that fails to load would silently disable its checks.
             clang-tidy -load "$plugin" -list-checks | grep -q zorba-unchecked-stream-copy || {
               echo "zorba-unchecked-stream-copy is not loaded from $plugin"
