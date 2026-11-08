@@ -374,11 +374,23 @@ private:
   bool theHaveDiff = false;
 };
 
+class UncheckedStreamCopyCheck : public tidy::ClangTidyCheck {
+public:
+  using ClangTidyCheck::ClangTidyCheck;
+
+  bool isLanguageVersionSupported(const LangOptions& LangOpts) const override
+  {
+    return LangOpts.CPlusPlus;
+  }
+};
+
 class ZorbaTidyModule : public tidy::ClangTidyModule {
 public:
   void addCheckFactories(tidy::ClangTidyCheckFactories& Factories) override
   {
     Factories.registerCheck<OwningMemoryCheck>("zorba-owning-memory");
+    Factories.registerCheck<UncheckedStreamCopyCheck>(
+      "zorba-unchecked-stream-copy");
   }
 };
 

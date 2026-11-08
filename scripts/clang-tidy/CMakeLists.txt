@@ -69,6 +69,16 @@ foreach(fixture owning_memory_violations owning_memory_allowed)
       "-DSYSROOT=${fixture_sysroot}"
       -P "${CMAKE_CURRENT_SOURCE_DIR}/test/run_fixture.cmake")
 endforeach()
+foreach(fixture unchecked_stream_copy_violations unchecked_stream_copy_allowed)
+  add_test(NAME ${fixture}
+    COMMAND "${CMAKE_COMMAND}"
+      "-DCLANG_TIDY=${CLANG_TIDY}"
+      "-DPLUGIN=$<TARGET_FILE:ZorbaTidyModule>"
+      "-DCHECK=zorba-unchecked-stream-copy"
+      "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/test/${fixture}.cpp"
+      "-DSYSROOT=${fixture_sysroot}"
+      -P "${CMAKE_CURRENT_SOURCE_DIR}/test/run_fixture.cmake")
+endforeach()
 # zorba_fixture_test(<name> <fixture.cpp> [args...]): extra args are -D
 # definitions for run_fixture.cmake (DIFF, EXPECTED, MARKERS, HEADER_FILTER).
 function(zorba_fixture_test name fixture)
