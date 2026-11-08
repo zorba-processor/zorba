@@ -2312,7 +2312,7 @@ void ProbeGeneralIndexIterator::initBox()
       if ((idx->theMaps[store::XS_LONG] ||
            idx->theMaps[store::XS_DOUBLE] ||
            idx->theMaps[store::XS_DECIMAL]) &&
-          untypedItem->castToLong(altKey), altKey != NULL)
+          (untypedItem->castToLong(altKey), altKey != NULL))
       {
         store::ItemHandle<LongItem> longItem = 
         static_cast<LongItem*>(altKey.getp());
@@ -2341,7 +2341,7 @@ void ProbeGeneralIndexIterator::initBox()
       else if ((idx->theMaps[store::XS_LONG] ||
                 idx->theMaps[store::XS_DOUBLE] ||
                 idx->theMaps[store::XS_DECIMAL]) &&
-               untypedItem->castToDecimal(altKey), altKey != NULL)
+               (untypedItem->castToDecimal(altKey), altKey != NULL))
       {
         store::ItemHandle<DecimalItem> decimalItem = 
         static_cast<DecimalItem*>(altKey.getp());
@@ -2367,7 +2367,7 @@ void ProbeGeneralIndexIterator::initBox()
       // try casting to xs:double
       else if ((idx->theMaps[store::XS_LONG] ||
                idx->theMaps[store::XS_DOUBLE]) &&
-               untypedItem->castToDouble(altKey), altKey != NULL)
+               (untypedItem->castToDouble(altKey), altKey != NULL))
       {
         store::ItemHandle<DoubleItem> doubleItem = 
         static_cast<DoubleItem*>(altKey.getp());
