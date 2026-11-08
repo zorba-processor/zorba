@@ -3075,6 +3075,36 @@ std::string sweep_dtd_query( std::string const &prefix ) {
          "try { count(doc(concat($dir:root, '/" + prefix + ".xml'))//*) } "
          "catch * { concat('caught ', string($err:code), ' ', $err:description) }";
 }
+
+// A document with a DOCTYPE whose tree holds every kind of node the loader
+// reads back from libxml2 (text, CDATA, comment, processing instruction), an
+// empty comment and a processing instruction with no data among them, and
+// attributes whose values are longer than a failed call may keep. The answer
+// shows the content of every node, so that a node that lost its content to a
+// failed allocation is not mistaken for an empty one.
+std::string sweep_dtd_nodes_xml( std::string const &prefix ) {
+  std::string const attribute( prefix + "_big" );
+  std::string items;
+  for ( int i = 1; i <= 6; ++i )
+    items += "<item " + attribute + "='" + std::string( 20000, 'v' ) + "'>t" +
+             std::to_string( i ) + "</item>";
+  return "<!DOCTYPE root [<!ELEMENT root (#PCDATA|item)*><!ELEMENT item (#PCDATA)>"
+         "<!ATTLIST item " + attribute + " CDATA #IMPLIED>]><root>" + items +
+         "<!--note--><?target data?><![CDATA[cdata]]><!----><?empty?></root>";
+}
+std::string sweep_dtd_nodes_query( std::string const &prefix ) {
+  return "import module namespace dir = 'http://zorba.io/modules/directory';\n"
+         "declare namespace f = 'http://zorba.io/options/features';\n"
+         "declare namespace err = 'http://www.w3.org/2005/xqt-errors';\n"
+         "declare option f:enable 'dtd';\n"
+         "try { let $d := doc(concat($dir:root, '/" + prefix + ".xml')) "
+         "return concat(count($d//node()), ' ', "
+         "sum(for $a in $d//item/@*[ends-with(name(), '_big')] "
+         "return string-length($a)), ' ', "
+         "string-join(for $n in $d//node() where not($n instance of element()) "
+         "return string($n), '|')) } "
+         "catch * { concat('caught ', string($err:code), ' ', $err:description) }";
+}
 #endif
 
 void test_sweep_xml_dtd( Fixture const &f ) {
@@ -3100,6 +3130,32 @@ void test_sweep_xml_dtd( Fixture const &f ) {
               starting( "terminate N11xercesc_", 105, 8, "OutOfMemoryExceptionE" ) };
   s.kept_runs_of_8_reported = true;   // the known limit, see Sweep
   exhaust_sweep( f, "parse-xml with DTD validation", s );
+#else
+  (void)f;
+#endif
+}
+// Every allocation of the load fails in turn (a point for each: the document is
+// small). The loader gives the answer or memory_limit, never a document with a
+// node that has no content, and gives back what it allocated (a failed call
+// may keep less than one attribute value).
+void test_sweep_xml_dtd_nodes( Fixture const &f ) {
+#if defined(__linux__)
+  Sweep s;
+  s.files = { { "nodes.xml", sweep_dtd_nodes_xml( "nodes" ) },
+              { "nodes_warm.xml", sweep_dtd_nodes_xml( "warm" ) } };
+  s.query = sweep_dtd_nodes_query( "nodes" );
+  s.before.push_back( sweep_dtd_nodes_query( "nodes_warm" ) );
+  s.after_compile = true;
+  s.points = 1000000;
+  s.expected = "\"18 120000 t1|t2|t3|t4|t5|t6|note|data|cdata||\"";
+  // The known limits of test_sweep_xml_dtd: libxml2 failing to allocate while it
+  // parses, and Xerces-C. Caps are set after the first run.
+  s.known = { starting( "\"caught err:FODC0002 \\\"/tmp/mcp-tree", 100000 ),
+              starting( "\"caught err:FODC0002 \\\"XML tree creation failed\\\"", 100000 ),
+              starting( "\"caught err:FODC0002 \\\"malformed XML document\\\"", 100000 ),
+              starting( "terminate N11xercesc_", 100000, 0, "OutOfMemoryExceptionE" ) };
+  s.kept_runs_of_8_reported = true;   // the known limit, see Sweep
+  exhaust_sweep( f, "parse-xml with DTD validation, every kind of node", s );
 #else
   (void)f;
 #endif
@@ -7279,6 +7335,7 @@ Test const tests[] = {
   { "exhaust_sweep_matcher", test_sweep_matcher },
   { "exhaust_sweep_xml", test_sweep_xml },
   { "exhaust_sweep_xml_dtd", test_sweep_xml_dtd },
+  { "exhaust_sweep_xml_dtd_nodes", test_sweep_xml_dtd_nodes },
   { "exhaust_sweep_fragment", test_sweep_fragment },
   { "exhaust_sweep_html", test_sweep_html },
   { "exhaust_sweep_json", test_sweep_json },
