@@ -65,3 +65,4 @@ test/rbkt/zorba/jsoniq/obj_insert_09 | Subprocess aborted | backlog 27: UpdJSONA
 test/rbkt/zorba/jsoniq/obj_insert_09.jq | Subprocess aborted | backlog 27: UpdJSONArrayUpdate::Comparator is not a strict weak ordering (attribution inferred)
 test/rbkt/zorba/jsoniq/obj_insert_10 | Subprocess aborted | backlog 27: UpdJSONArrayUpdate::Comparator is not a strict weak ordering (attribution inferred)
 test/rbkt/zorba/jsoniq/obj_insert_10.jq | Subprocess aborted | backlog 27: UpdJSONArrayUpdate::Comparator is not a strict weak ordering (attribution inferred)
+test/rbkt/zorba/jsoniq/use_case11 | Subprocess aborted | backlog 27: UpdJSONArrayUpdate::Comparator is not a strict weak ordering (attribution inferred)
