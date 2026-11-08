@@ -963,12 +963,13 @@ static expr* partial_eval_eq(RewriterContext& rCtx, fo_expr& fo)
 
     // Every call in the argument must run: fn:count reads all of it.
     if (expr_tools::calls_unproven_function(count_expr) ||
-        count_expr->isNonDiscardable())
+        count_expr->is_nondeterministic())
       return NULL;
 
     if (ival < 0)
     {
-      return rCtx.theEM->create_const_expr(sctx, udf, LOC(val_expr), false);
+      if (!count_expr->isNonDiscardable())
+        return rCtx.theEM->create_const_expr(sctx, udf, LOC(val_expr), false);
     }
     else if (ival == 0)
     {
