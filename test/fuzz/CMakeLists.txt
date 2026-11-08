@@ -40,6 +40,12 @@ FOREACH(target ${ZORBA_FUZZ_TARGETS})
                    "${CMAKE_CURRENT_SOURCE_DIR}/regressions/${target}")
 ENDFOREACH(target)
 
+# The harness's own internal-error detection.
+ADD_EXECUTABLE(check_internal_selftest check_internal_selftest.cpp fuzz_common.h)
+TARGET_LINK_LIBRARIES(check_internal_selftest zorba_${ZORBA_STORE_NAME})
+SET_TARGET_PROPERTIES(check_internal_selftest PROPERTIES FOLDER "Fuzz")
+ADD_TEST(NAME "fuzz/check_internal_selftest" COMMAND check_internal_selftest)
+
 IF(ZORBA_BUILD_FUZZERS)
   SEPARATE_ARGUMENTS(_zorba_fuzz_engine UNIX_COMMAND "${ZORBA_FUZZING_ENGINE}")
   FOREACH(target ${ZORBA_FUZZ_TARGETS})
