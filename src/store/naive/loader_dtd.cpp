@@ -841,8 +841,9 @@ void DtdXmlLoader::setRoot(XmlNode* root)
 ********************************************************************************/
 void DtdXmlLoader::abortload()
 {
-  theBaseUri.clear();
-  theDocUri.clear();
+  // Not clear(): it may allocate, and a failure here would skip the cleanup.
+  zstring().swap(theBaseUri);
+  zstring().swap(theDocUri);
 
   delete theTree;
   theTree = NULL;
@@ -893,8 +894,10 @@ void DtdXmlLoader::abortload()
 ********************************************************************************/
 void DtdXmlLoader::reset()
 {
-  theBaseUri.clear();
-  theDocUri.clear();
+  // Not clear(): on a string that is shared it allocates, and a failure here
+  // would lose the tree that loadXml() is about to return.
+  zstring().swap(theBaseUri);
+  zstring().swap(theDocUri);
 
   theTree = NULL;
   theOrdPath.init();
