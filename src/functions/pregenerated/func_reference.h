@@ -47,7 +47,6 @@ public:
     : 
     function(sig, kind)
   {
-setDeterministic(false);
 
   }
 
@@ -65,7 +64,6 @@ public:
     : 
     function(sig, kind)
   {
-setDeterministic(false);
 
   }
 

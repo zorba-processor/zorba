@@ -20,7 +20,7 @@
       declare function ref:reference($item as item()) as xs:string
     </zorba:description>
     
-    <zorba:function isDeterministic="false">
+    <zorba:function>
     
       <zorba:signature localname="reference" prefix="fn-reference">
         <zorba:param>structured-item()</zorba:param>   
@@ -45,7 +45,7 @@
       declare function ref:has-reference($item as item()) as xs:boolean
     </zorba:description>
 
-    <zorba:function isDeterministic="false">
+    <zorba:function>
 
       <zorba:signature localname="has-reference" prefix="fn-reference">
         <zorba:param>structured-item()</zorba:param>
