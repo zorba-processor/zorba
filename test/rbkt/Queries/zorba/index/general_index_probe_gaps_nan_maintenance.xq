@@ -32,6 +32,12 @@ variable $rangeNaN :=
 variable $equalityOne :=
   m:unique("UEquality 1 twice", xs:QName("m:UEquality"),
            <e id="1" t="d" v="1"/>, <e id="2" t="d" v="1"/>);
+variable $diagEq :=
+  m:unique("UEquality 1 and 2", xs:QName("m:UEquality"),
+           <e id="1" t="d" v="1"/>, <e id="2" t="d" v="2"/>);
+variable $diagRange :=
+  m:unique("URange 1 and 2", xs:QName("m:URange"),
+           <e id="1" t="d" v="1"/>, <e id="2" t="d" v="2"/>);
 variable $rangeOne :=
   m:unique("URange 1 twice", xs:QName("m:URange"),
            <e id="1" t="d" v="1"/>, <e id="2" t="d" v="1"/>);
@@ -44,5 +50,7 @@ fn:string-join((
   $equalityNaN,
   $rangeNaN,
   $equalityOne,
-  $rangeOne),
+  $rangeOne,
+  $diagEq,
+  $diagRange),
   "&#10;")
