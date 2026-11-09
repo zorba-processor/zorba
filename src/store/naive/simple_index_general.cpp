@@ -1679,7 +1679,7 @@ void ProbeGeneralIndexIterator::doubleToLongProbe(
   {
     double doubleFloor = ::floor(doubleValue);
     longValue = static_cast<int64_t>(doubleFloor);
-    
+
     bool lossy = (doubleFloor != doubleValue);
 
     assert(doubleFloor + 1.0 > doubleValue);

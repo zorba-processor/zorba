@@ -70,6 +70,12 @@ namespace zorba {
 namespace simplestore {
 
 
+// 2^63 and 2^64 are exact doubles; converting a double outside [-2^63, 2^63)
+// to xs_long, or outside [0, 2^64) to xs_unsignedLong, is undefined behavior.
+static const double twoPow63 = 9223372036854775808.0;
+static const double twoPow64 = 18446744073709551616.0;
+
+
 /*******************************************************************************
   Numeric items of different kinds (see atomic_items.h).
 ********************************************************************************/
@@ -165,10 +171,13 @@ bool AtomicItem::castToLong(store::Item_t& result) const
   case store::XS_FLOAT:
   {
     double doubleValue = item1->getDoubleValue().getNumber();
-    longValue = static_cast<xs_long>(doubleValue);
+    if (doubleValue >= -twoPow63 && doubleValue < twoPow63)
+    {
+      longValue = static_cast<xs_long>(doubleValue);
 
-    if (doubleValue == static_cast<double>(longValue))
-      GET_FACTORY().createLong(result, longValue);
+      if (doubleValue == static_cast<double>(longValue))
+        GET_FACTORY().createLong(result, longValue);
+    }
 
     break;
   }
@@ -280,9 +289,11 @@ void AtomicItem::coerceToDouble(store::Item_t& result, bool force, bool& lossy) 
 
     doubleValue = item->theValue;
 
-    xs_unsignedLong ulongValue = static_cast<xs_unsignedLong>(doubleValue.getNumber());
+    double number = doubleValue.getNumber();
 
-    lossy = (ulongValue != item->theValue);
+    // The nearest double of a value close to 2^64 can be 2^64 itself.
+    lossy = (number >= twoPow64 ||
+             static_cast<xs_unsignedLong>(number) != item->theValue);
     break;
   }
 
@@ -301,15 +312,11 @@ void AtomicItem::coerceToDouble(store::Item_t& result, bool force, bool& lossy) 
 
     doubleValue = item->theValue;
 
-    xs_long longValue = static_cast<xs_long>(doubleValue.getNumber());
+    double number = doubleValue.getNumber();
 
-    /*
-    std::cout << "original long value = " << item->theValue << std::endl
-              << "double value        = " << doubleValue << std::endl
-              << "new long value      = " << longValue << std::endl << std::endl;
-    
-    */
-    lossy = (longValue != item->theValue);
+    // The nearest double of a value close to 2^63 can be 2^63 itself.
+    lossy = (number >= twoPow63 ||
+             static_cast<xs_long>(number) != item->theValue);
 
     /*    
     std::cout << "original long value = " << item->theValue << std::endl
