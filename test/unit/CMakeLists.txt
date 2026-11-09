@@ -100,6 +100,7 @@ SET(UNIT_TESTS_SRCS
   xmldatamanager.cpp
   staticcollectionmanager.cpp
   test_static_context.cpp
+  user_typed_item.cpp
 )
 
 # multithread_simple.cpp

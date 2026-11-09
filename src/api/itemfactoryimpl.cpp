@@ -1076,6 +1076,19 @@ zorba::Item ItemFactoryImpl::createUserTypedAtomicItem(
     Item& aBaseItem,
     Item& aTypeName)
 {
+  if (aBaseItem.isNull())
+  {
+    throw ZORBA_EXCEPTION(
+      zerr::ZAPI0014_INVALID_ARGUMENT, ERROR_PARAMS( "aBaseItem", "empty item" )
+    );
+  }
+  if (aTypeName.isNull())
+  {
+    throw ZORBA_EXCEPTION(
+      zerr::ZAPI0014_INVALID_ARGUMENT, ERROR_PARAMS( "aTypeName", "empty item" )
+    );
+  }
+
   store::Item_t lRes;
   store::Item_t lBaseItem = Unmarshaller::getInternalItem(aBaseItem);
   store::Item_t lTypeName = Unmarshaller::getInternalItem(aTypeName);
