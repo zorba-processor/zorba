@@ -26,6 +26,9 @@ declare function m:key($e as element(e)) as xs:anyAtomicType
   case "f" return xs:float($e/@v)
   case "d" return xs:double($e/@v)
   case "dec" return xs:decimal($e/@v)
+  case "dt" return xs:dateTime($e/@v)
+  case "dts" return xs:dateTimeStamp($e/@v)
+  case "n" return jn:null()
   default return fn:data($e/@v)
 };
 
@@ -118,6 +121,23 @@ by xs:double(./@v) as xs:double;
 declare %an:unique %an:general-range %an:automatic index m:URange
 on nodes dml:collection(xs:QName("m:u"))
 by xs:double(./@v) as xs:double;
+
+(: xs:dateTime, xs:dateTimeStamp and jn:null() keys. :)
+declare collection m:s as node()*;
+
+declare %an:general-equality %an:manual index m:SEquality
+on nodes dml:collection(xs:QName("m:s"))//e
+by (switch (fn:string(./@t))
+    case "dts" return xs:dateTimeStamp(./@v)
+    case "n" return jn:null()
+    default return xs:dateTime(./@v));
+
+declare %an:general-range %an:manual index m:SRange
+on nodes dml:collection(xs:QName("m:s"))//e
+by (switch (fn:string(./@t))
+    case "dts" return xs:dateTimeStamp(./@v)
+    case "n" return jn:null()
+    default return xs:dateTime(./@v));
 
 declare %an:sequential function m:create($coll as xs:QName,
                                          $rows as element(e)*,
