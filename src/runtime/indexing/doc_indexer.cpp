@@ -161,7 +161,7 @@ void DocIndexer::createIndexEntries(
 
     theDctx->unset_variable(theNodeVarId, theNodeVarName, QueryLoc::null);
 
-    thePlanWrapper->reset();
+    restartPlan();
 
     throw;
   }
@@ -170,7 +170,18 @@ void DocIndexer::createIndexEntries(
 
   theDctx->unset_variable(theNodeVarId, theNodeVarName, QueryLoc::null);
 
-  thePlanWrapper->reset();
+  restartPlan();
+}
+
+
+/*******************************************************************************
+  Closes and reopens the plan: a reset plan keeps the last indexed document
+  referenced, which ddl:delete reports as ZDDY0015.
+********************************************************************************/
+void DocIndexer::restartPlan()
+{
+  thePlanWrapper->close();
+  thePlanWrapper->open();
 }
 
 

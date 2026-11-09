@@ -42,7 +42,9 @@ protected:
 
   dynamic_context   * theDctx;
   store::Iterator_t   thePlanWrapper;
-  
+
+  void restartPlan();
+
 public:
   DocIndexer(
       bool general,
