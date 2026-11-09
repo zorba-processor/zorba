@@ -176,7 +176,8 @@ declare function m:range($name as xs:string,
                          $coll as xs:QName,
                          $index as xs:QName,
                          $lower as xs:anyAtomicType?,
-                         $upper as xs:anyAtomicType?) as xs:string
+                         $upper as xs:anyAtomicType?,
+                         $inclusive as xs:boolean) as xs:string
 {
   m:result($name,
            m:ids(idml:probe-index-range-general($index,
@@ -184,29 +185,49 @@ declare function m:range($name as xs:string,
                                                 $upper,
                                                 fn:exists($lower),
                                                 fn:exists($upper),
-                                                fn:true(),
-                                                fn:true())),
+                                                $inclusive,
+                                                $inclusive)),
            m:ids(for $e in m:elements($coll)
                  let $k := m:key($e)
-                 where (fn:empty($lower) or $k >= $lower) and
-                       (fn:empty($upper) or $k <= $upper)
+                 where (fn:empty($lower) or
+                        (if ($inclusive) then $k >= $lower else $k > $lower))
+                       and
+                       (fn:empty($upper) or
+                        (if ($inclusive) then $k <= $upper else $k < $upper))
                  return $e))
 };
 
-(: Both bounds, inclusive, by value comparison. :)
+(: Both bounds, by value comparison. :)
 declare function m:range-value($name as xs:string,
                                $coll as xs:QName,
                                $index as xs:QName,
                                $lower as xs:anyAtomicType,
-                               $upper as xs:anyAtomicType) as xs:string
+                               $upper as xs:anyAtomicType,
+                               $lowerIncl as xs:boolean,
+                               $upperIncl as xs:boolean) as xs:string
 {
   m:result($name,
            m:ids(idml:probe-index-range-value($index, $lower, $upper,
                                               fn:true(), fn:true(),
-                                              fn:true(), fn:true())),
+                                              $lowerIncl, $upperIncl)),
            m:ids(for $e in m:elements($coll)
                  let $k := m:key($e)
-                 where $k ge $lower and $k le $upper
+                 where (if ($lowerIncl) then $k ge $lower else $k gt $lower)
+                       and
+                       (if ($upperIncl) then $k le $upper else $k lt $upper)
+                 return $e))
+};
+
+(: The same selection without the index, by value comparison on the key. :)
+declare function m:point-value($name as xs:string,
+                               $coll as xs:QName,
+                               $index as xs:QName,
+                               $key as xs:anyAtomicType) as xs:string
+{
+  m:result($name,
+           m:ids(idml:probe-index-point-value($index, $key)),
+           m:ids(for $e in m:elements($coll)
+                 where m:key($e) eq $key
                  return $e))
 };
 

@@ -15,11 +15,20 @@ iddl:create(xs:QName("m:AEquality"));
 iddl:create(xs:QName("m:ARange"));
 dml:insert(xs:QName("m:a"),
            (<e id="1" t="d" v="NaN"/>, <e id="2" v="NaN"/>,
-            <e id="3" t="d" v="1"/>, <e id="4" t="d" v="NaN"/>));
+            <e id="3" t="d" v="1"/>, <e id="4" t="d" v="NaN"/>,
+            <e id="5" v="1234"/>));
 
 variable $inserted := m:keys("AEquality keys", xs:QName("m:AEquality"));
+variable $equalityNaNPoint :=
+  m:point("AEquality NaN", xs:QName("m:a"), xs:QName("m:AEquality"),
+          xs:double("NaN"));
+variable $equalityUntypedNaNPoint :=
+  m:point("AEquality untyped NaN", xs:QName("m:a"), xs:QName("m:AEquality"),
+          xs:untypedAtomic("NaN"));
 
-dml:delete(dml:collection(xs:QName("m:a"))[@id = ("1", "2", "4")]);
+(: Deleting every untyped key removes all its entries, so value probes are
+   allowed again. :)
+dml:delete(dml:collection(xs:QName("m:a"))[@id = ("1", "2", "4", "5")]);
 
 (: Two NaN keys are not equal, so they do not violate uniqueness. :)
 ddl:create(xs:QName("m:u"));
@@ -38,9 +47,13 @@ variable $rangeOne :=
 
 fn:string-join((
   $inserted,
+  $equalityNaNPoint,
+  $equalityUntypedNaNPoint,
   m:keys("AEquality keys after delete", xs:QName("m:AEquality")),
   m:range("ARange no bounds after delete", xs:QName("m:a"),
-          xs:QName("m:ARange"), (), ()),
+          xs:QName("m:ARange"), (), (), true()),
+  m:point-value("AEquality value after delete", xs:QName("m:a"),
+                xs:QName("m:AEquality"), 1e0),
   $equalityNaN,
   $rangeNaN,
   $equalityOne,

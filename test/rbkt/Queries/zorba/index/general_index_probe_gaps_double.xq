@@ -14,7 +14,7 @@ fn:string-join((
   return m:point(fn:concat($n, " ", $probe(1)), xs:QName("m:p"), $index,
                  $probe(2)),
   m:range("PRange lower 1e-20", xs:QName("m:p"), xs:QName("m:PRange"),
-          1e-20, ()),
+          1e-20, (), true()),
   m:range("PRange upper 0e0", xs:QName("m:p"), xs:QName("m:PRange"),
-          (), 0e0)),
+          (), 0e0, true())),
   "&#10;")
