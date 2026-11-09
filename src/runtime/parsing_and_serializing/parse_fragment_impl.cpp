@@ -41,6 +41,7 @@
 #include <libxml/parser.h>
 #include <libxml/xmlreader.h>
 #include <libxml/c14n.h>
+#include <libxml/globals.h>
 #include <libxml/xmlIO.h>
 
 namespace zorba
@@ -403,17 +404,27 @@ void recordXmlError(void* aData, ZORBA_C14N_ERROR_PTR aError)
 }
 #undef ZORBA_C14N_ERROR_PTR
 
-// Sends the libxml2 errors of this thread to a XmlReportedError.
+// Sends the libxml2 errors of this thread to a XmlReportedError, and puts back
+// the handler the thread had.
 class XmlErrorRecorder
 {
 public:
   explicit XmlErrorRecorder(XmlReportedError& aReported)
+    : thePreviousHandler(xmlStructuredError),
+      thePreviousContext(xmlStructuredErrorContext)
   {
     xmlSetStructuredErrorFunc(&aReported, &recordXmlError);
   }
-  ~XmlErrorRecorder() { xmlSetStructuredErrorFunc(NULL, NULL); }
+  ~XmlErrorRecorder()
+  {
+    xmlSetStructuredErrorFunc(thePreviousContext, thePreviousHandler);
+  }
   XmlErrorRecorder(const XmlErrorRecorder&) = delete;
   XmlErrorRecorder& operator=(const XmlErrorRecorder&) = delete;
+
+private:
+  xmlStructuredErrorFunc thePreviousHandler;
+  void* thePreviousContext;
 };
 
 } // anonymous namespace
