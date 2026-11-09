@@ -117,13 +117,21 @@ ZORBA_TARGET_LOCATION (_zorbacmd zorbacmd)
 MACRO (ZORBA_PLAN_TEST NAME PATTERN ARGS)
   ADD_TEST ("${NAME}" "${CMAKE_COMMAND}" "-DZORBACMD=${_zorbacmd}" "-DARGS=${ARGS}"
     "-DPATTERN=${PATTERN}" -P "${_plandir}/plan_check.cmake")
+  ZORBA_SET_TEST_DEFAULTS ("${NAME}")
 ENDMACRO (ZORBA_PLAN_TEST)
 SET (_planfile "|-e|f:=${_plandir}/plan_members.json")
-# At O0 the text of these queries is held in memory too, as before this check:
-# the tests that expect the file stream run at O1 and O2.
+# At O0 the argument of parse-json keeps the fn:data that the translator wraps
+# around it and that only the optimizer removes, so the call of file:read-text is
+# not recognized and the text is held in memory, with one argument or with two.
+ZORBA_PLAN_TEST (bin/zorba_plan_parse_file_O0 "JSONParseMembersIterator[^>]*file-stream=.false."
+  "--optimization-level|0|--print-iterator-tree|-f|-q|${_plandir}/plan_parse_file.jq${_planfile}")
+ZORBA_PLAN_TEST (bin/zorba_plan_parse_file_encoding_O0 "JSONParseMembersIterator[^>]*file-stream=.false."
+  "--optimization-level|0|--print-iterator-tree|-f|-q|${_plandir}/plan_parse_file_encoding.jq${_planfile}")
 FOREACH (_opt 1 2)
   ZORBA_PLAN_TEST (bin/zorba_plan_parse_file_O${_opt} "JSONParseMembersIterator[^>]*file-stream=.true."
     "--optimization-level|${_opt}|--print-iterator-tree|-f|-q|${_plandir}/plan_parse_file.jq${_planfile}")
+  ZORBA_PLAN_TEST (bin/zorba_plan_parse_file_encoding_O${_opt} "JSONParseMembersIterator[^>]*file-stream=.true."
+    "--optimization-level|${_opt}|--print-iterator-tree|-f|-q|${_plandir}/plan_parse_file_encoding.jq${_planfile}")
   # One query for each thing that makes the rule hold the text in memory.
   FOREACH (_q update for_each eval udf seq_item)
     ZORBA_PLAN_TEST (bin/zorba_plan_parse_file_${_q}_O${_opt} "JSONParseMembersIterator[^>]*file-stream=.false."

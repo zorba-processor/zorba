@@ -395,9 +395,13 @@ PlanIter_t fn_jsoniq_members::codegen(
 
       // Every call of file:read-text makes its own stream. Anything that can
       // write during the evaluation could change the file between the two
-      // reads of it: a sequential expression, an update, a dynamic call, or a
-      // function item of a sequential or updating function, in the query or in
-      // a function it calls. If in doubt, the text is held in memory.
+      // reads of it: a sequential expression, an update, a function item of a
+      // sequential or updating function, or an eval. A dynamic call, an invoke
+      // and a call of a function that takes a function as argument count when
+      // the query can have calls with effects (CALLS_HAVE_EFFECTS); a query
+      // that reads a file always can, since file:read-text is an external
+      // function, so here they always count, even for a function item that
+      // cannot write. The query and the functions it calls are checked.
       bool const streamIsPrivate =
         !ccb->isSequential() &&
         !ccb->theMayRunSideEffectsOrUpdates &&
