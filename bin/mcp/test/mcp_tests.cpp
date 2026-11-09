@@ -86,6 +86,9 @@ using namespace zorba::mcp;
 #  define ZORBA_TEST_SANITIZER 1
 # endif
 #endif
+#if defined(__linux__) && defined(ZORBA_TEST_SANITIZER)
+# include <sanitizer/allocator_interface.h>
+#endif
 
 #if defined(__linux__)
 // The bytes of the QName pool's hash table (a test hook of the store). Its size
@@ -101,6 +104,7 @@ extern "C" void zorba_test_qname_pool_flush();
 // For the sweeps (exhaust_sweep_*): one allocation fails, the N-th since
 // inject_arm(), or a run of them. Where malloc can be replaced, that covers what
 // the C libraries and MAPM allocate; in sanitizer builds, only operator new.
+// What a failed call keeps is counted over the malloc family in both (heap_live).
 namespace {
 std::atomic<bool> inject_on{ false };
 std::atomic<long> inject_count{ 0 };
@@ -144,23 +148,6 @@ bool inject_fired() {
 }
 } // namespace
 
-# if !defined(ZORBA_TEST_SANITIZER)
-extern "C" {
-void* __libc_malloc( std::size_t );
-void* __libc_calloc( std::size_t, std::size_t );
-void* __libc_realloc( void*, std::size_t );
-
-void* malloc( std::size_t n ) noexcept {
-  return inject_fails() ? nullptr : __libc_malloc( n );
-}
-void* calloc( std::size_t n, std::size_t size ) noexcept {
-  return inject_fails() ? nullptr : __libc_calloc( n, size );
-}
-void* realloc( void *p, std::size_t n ) noexcept {
-  return inject_fails() ? nullptr : __libc_realloc( p, n );
-}
-} // extern "C"
-# endif
 #endif
 
 #if defined(__linux__)
@@ -169,6 +156,10 @@ void* realloc( void *p, std::size_t n ) noexcept {
 namespace {
 std::atomic<std::size_t> new_live{ 0 };
 std::atomic<std::size_t> new_budget{ 0 };  // 0: none
+
+// For the sweeps: the bytes of the live blocks of the malloc family, which
+// libxml2, ICU and Xerces-C allocate with, and operator new uses too.
+std::atomic<long> heap_live{ 0 };
 
 // For the sweeps, with big_track: the blocks of at least big_size bytes allocated
 // meanwhile, with their stacks, while they live. What a failed call keeps is then
@@ -218,20 +209,120 @@ void* budget_alloc( std::size_t n ) noexcept {
   void *const p = std::malloc( n ? n : 1 );
   if ( p ) {
     new_live.fetch_add( malloc_usable_size( p ), std::memory_order_relaxed );
+# if defined(ZORBA_TEST_SANITIZER)
     big_note( p, n );
+# endif
   }
   return p;
 }
 
 void budget_free( void *p ) noexcept {
   if ( p ) {
+# if defined(ZORBA_TEST_SANITIZER)
     if ( big_count )
       big_forget( p );
+# endif
     new_live.fetch_sub( malloc_usable_size( p ), std::memory_order_relaxed );
     std::free( p );
   }
 }
 } // namespace
+
+# if defined(ZORBA_TEST_SANITIZER)
+// The sanitizer owns malloc: its hooks count the blocks.
+extern "C" {
+void __sanitizer_malloc_hook( void const volatile*, std::size_t n ) {
+  heap_live.fetch_add( static_cast<long>( n ), std::memory_order_relaxed );
+}
+void __sanitizer_free_hook( void const volatile *p ) {
+  if ( __sanitizer_get_ownership( p ) )
+    heap_live.fetch_sub( static_cast<long>( __sanitizer_get_allocated_size( p ) ),
+                         std::memory_order_relaxed );
+}
+} // extern "C"
+# else
+namespace {
+void* heap_add( void *p, std::size_t n ) noexcept {
+  if ( p ) {
+    heap_live.fetch_add( static_cast<long>( malloc_usable_size( p ) ),
+                         std::memory_order_relaxed );
+    big_note( p, n );
+  }
+  return p;
+}
+
+// p, of usable_size bytes, has been freed.
+void heap_freed( void *p, std::size_t usable_size ) noexcept {
+  if ( big_count )
+    big_forget( p );
+  heap_live.fetch_sub( static_cast<long>( usable_size ),
+                       std::memory_order_relaxed );
+}
+
+template <class F> F libc_next( char const *name ) noexcept {
+  return reinterpret_cast<F>( dlsym( RTLD_NEXT, name ) );
+}
+} // namespace
+
+extern "C" {
+void* __libc_malloc( std::size_t );
+void* __libc_calloc( std::size_t, std::size_t );
+void* __libc_realloc( void*, std::size_t );
+void __libc_free( void* );
+
+void* malloc( std::size_t n ) noexcept {
+  return inject_fails() ? nullptr : heap_add( __libc_malloc( n ), n );
+}
+void* calloc( std::size_t n, std::size_t size ) noexcept {
+  return inject_fails() ? nullptr : heap_add( __libc_calloc( n, size ), n * size );
+}
+void* realloc( void *p, std::size_t n ) noexcept {
+  if ( inject_fails() )
+    return nullptr;
+  std::size_t const old = p ? malloc_usable_size( p ) : 0;
+  void *const q = __libc_realloc( p, n );
+  // A null result with n > 0 leaves p as it was; with n == 0, p is freed.
+  if ( q || n == 0 ) {
+    if ( p )
+      heap_freed( p, old );
+    heap_add( q, n );
+  }
+  return q;
+}
+void free( void *p ) noexcept {
+  if ( p )
+    heap_freed( p, malloc_usable_size( p ) );
+  __libc_free( p );
+}
+// Counted only, as free() counts what they allocate.
+void* memalign( std::size_t alignment, std::size_t n ) noexcept {
+  static auto const next =
+    libc_next<void* (*)( std::size_t, std::size_t )>( "memalign" );
+  return heap_add( next( alignment, n ), n );
+}
+void* aligned_alloc( std::size_t alignment, std::size_t n ) noexcept {
+  static auto const next =
+    libc_next<void* (*)( std::size_t, std::size_t )>( "aligned_alloc" );
+  return heap_add( next( alignment, n ), n );
+}
+int posix_memalign( void **p, std::size_t alignment, std::size_t n ) noexcept {
+  static auto const next =
+    libc_next<int (*)( void**, std::size_t, std::size_t )>( "posix_memalign" );
+  int const r = next( p, alignment, n );
+  if ( r == 0 )
+    heap_add( *p, n );
+  return r;
+}
+void* valloc( std::size_t n ) noexcept {
+  static auto const next = libc_next<void* (*)( std::size_t )>( "valloc" );
+  return heap_add( next( n ), n );
+}
+void* pvalloc( std::size_t n ) noexcept {
+  static auto const next = libc_next<void* (*)( std::size_t )>( "pvalloc" );
+  return heap_add( next( n ), n );
+}
+} // extern "C"
+# endif
 
 void* operator new( std::size_t n ) {
   if ( void *const p = budget_alloc( n ) )
@@ -2771,7 +2862,7 @@ void exhaust_sweep( Fixture const &f, std::string const &name, Sweep const &s ) 
       for ( BigBlock &b : big_blocks )
         b.p = nullptr;
       big_count = 0;
-      long const live0 = static_cast<long>( new_live.load() );
+      long const live0 = heap_live.load();
       long const table0 = static_cast<long>( zorba_test_qname_table_bytes() );
       big_track = measure;
       long count = 0;
@@ -2806,7 +2897,7 @@ void exhaust_sweep( Fixture const &f, std::string const &name, Sweep const &s ) 
         // The names cached for reuse depend on the order of insertions: dropped,
         // in this run and in the one with no failure alike.
         zorba_test_qname_pool_flush();
-        k = static_cast<long>( new_live.load() ) - live0 -
+        k = heap_live.load() - live0 -
           ( static_cast<long>( zorba_test_qname_table_bytes() ) - table0 );
       }
       big_track = false;
@@ -3162,9 +3253,8 @@ void test_sweep_xml_dtd( Fixture const &f ) {
 // Every allocation of the load fails in turn (a point for each: the document is
 // small). The loader gives the answer or memory_limit, never a document with a
 // node that has no content, and, as for every sweep, a failed call keeps no
-// more than the bound of what operator new allocated. That does not cover what
-// libxml2 allocates with malloc, such as the value xmlGetProp returns: its
-// release in startElement is not checked by this test.
+// more than the bound of what it allocated, with malloc (libxml2, such as the
+// value xmlGetProp returns) or operator new.
 void test_sweep_xml_dtd_nodes( Fixture const &f ) {
 #if defined(__linux__)
   // libxml2 2.9.14 (Ubuntu 24.04) makes a text, CDATA or comment node with no

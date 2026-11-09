@@ -117,8 +117,8 @@ Rules this code depends on:
   - A failure in the checks of a path can be reported as a denied or invalid path, or
     in a `dir:open` as an error record, which a query can read as no content.
 
-  The sweeps measure what a failed call keeps through `operator new` only: memory
-  that libxml2 or MAPM keep through `malloc` is not counted.
+  The sweeps measure what a failed call keeps over the `malloc` family, which
+  libxml2, ICU, Xerces-C and MAPM allocate with and `operator new` uses too.
   After several consecutive failed allocations (runs of 8 in the sweeps), the XML,
   fragment and HTML parsers can keep 8 to 18 KB per failed call. The cause is not
   established. `exhaust_sweep_xml`, `_fragment` and `_html` report it for runs of 8
