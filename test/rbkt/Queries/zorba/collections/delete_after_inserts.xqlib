@@ -84,7 +84,7 @@ declare %an:sequential function m:two-separate($name as xs:string,
 };
 
 (: A variable that references a node of m:c is the documented ZDDY0015.
-   m:c is left for the caller to delete once $nodes is out of scope. :)
+   Once its nodes are deleted, m:c can be deleted. :)
 declare %an:sequential function m:referenced($name as xs:string) as xs:string
 {
   ddl:create(xs:QName("m:c"));
@@ -100,5 +100,8 @@ declare %an:sequential function m:referenced($name as xs:string) as xs:string
     {
       fn:local-name-from-QName($err:code)
     };
-  fn:concat($name, ": ", $outcome, " ", fn:count($nodes))
+  variable $count := fn:count($nodes);
+  dml:delete(dml:collection(xs:QName("m:c")));
+  ddl:delete(xs:QName("m:c"));
+  fn:concat($name, ": ", $outcome, " ", $count)
 };

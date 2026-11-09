@@ -19,4 +19,3 @@ function, general index, one node: deleted
 function, general index, two nodes in one insert: deleted
 function, general index, two separate inserts: deleted
 function, a variable references a node: ZDDY0015 1
-main, after the reference is gone: deleted

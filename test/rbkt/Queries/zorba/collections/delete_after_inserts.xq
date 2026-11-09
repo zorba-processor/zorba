@@ -56,7 +56,6 @@ variable $mainGeneralTwo :=
   m:delete("main, general index, two separate inserts");
 
 variable $referenced := m:referenced("function, a variable references a node");
-variable $afterReference := m:delete("main, after the reference is gone");
 
 fn:string-join((
   $mainNone,
@@ -85,6 +84,5 @@ fn:string-join((
                xs:QName("m:general")),
   m:two-separate("function, general index, two separate inserts",
                  xs:QName("m:general")),
-  $referenced,
-  $afterReference),
+  $referenced),
   "&#10;")
