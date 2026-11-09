@@ -114,7 +114,9 @@ bool ApplyIterator::nextImpl(store::Item_t& result, PlanState& planState) const
       }
       else
       {
-        pul.transfer(item);
+        // isPul() holds only for store::PUL items.
+        pul = static_cast<store::PUL*>(item.getp());
+        item = NULL;
       }
     }
     else if (!theDiscardXDM)
