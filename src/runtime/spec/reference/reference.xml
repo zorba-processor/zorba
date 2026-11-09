@@ -19,11 +19,11 @@
     <zorba:description author="Federico Cavalieri">       
       declare function ref:reference($item as item()) as xs:anyURI
     </zorba:description>
-
+    
     <zorba:function isDeterministic="false">
-
+    
       <zorba:signature localname="reference" prefix="fn-reference">
-        <zorba:param>structured-item()</zorba:param>
+        <zorba:param>structured-item()</zorba:param>   
         <zorba:output>xs:anyURI</zorba:output>
       </zorba:signature>
       

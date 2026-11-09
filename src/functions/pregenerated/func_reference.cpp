@@ -78,7 +78,7 @@ void populate_context_reference(static_context* sctx)
       {
     DECL_WITH_KIND(sctx, fn_reference_reference,
         (createQName("http://zorba.io/modules/reference","","reference"), 
-        GENV_TYPESYSTEM.STRUCTURED_ITEM_TYPE_ONE,
+        GENV_TYPESYSTEM.STRUCTURED_ITEM_TYPE_ONE, 
         GENV_TYPESYSTEM.ANY_URI_TYPE_ONE),
         FunctionConsts::FN_REFERENCE_REFERENCE_1);
 
