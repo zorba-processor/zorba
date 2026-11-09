@@ -245,7 +245,9 @@ declare %an:sequential function m:unique($name as xs:string,
                                          $first as element(e),
                                          $second as element(e)) as xs:string
 {
-  ddl:create(xs:QName("m:u"));
+  if (ddl:is-available-collection(xs:QName("m:u")))
+  then ()
+  else ddl:create(xs:QName("m:u"));
   iddl:create($index);
   dml:insert(xs:QName("m:u"), $first);
 
@@ -261,7 +263,21 @@ declare %an:sequential function m:unique($name as xs:string,
     };
 
   iddl:delete($index);
-  ddl:delete(xs:QName("m:u"));
 
-  fn:concat($name, ": ", $outcome)
+  variable $deleted :=
+    try
+    {{
+      ddl:delete(xs:QName("m:u"));
+      ""
+    }}
+    catch *
+    {
+      fn:concat(" ", fn:local-name-from-QName($err:code))
+    };
+
+  if (ddl:is-available-collection(xs:QName("m:u")))
+  then dml:delete(dml:collection(xs:QName("m:u")))
+  else ();
+
+  fn:concat($name, ": ", $outcome, $deleted)
 };
