@@ -77,7 +77,7 @@ protected:
 
   std::unique_ptr<dynamic_context> theDynamicContext;
 
-  PlanState          * thePlanState;
+  std::unique_ptr<PlanState> thePlanState;
 
   bool                 theIsOpen;
 

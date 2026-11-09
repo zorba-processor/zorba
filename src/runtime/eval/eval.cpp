@@ -188,7 +188,7 @@ void EvalIteratorState::addXMLQueryProfile(EvalProfile& aProfile)
 {
   std::stringstream lProfileStream;
   XMLIterPrinter lPrinter(lProfileStream, "", true);
-  print_iter_plan( lPrinter, thePlanWrapper->theIterator, thePlanWrapper->thePlanState );
+  print_iter_plan( lPrinter, thePlanWrapper->theIterator, thePlanWrapper->thePlanState.get() );
 
   aProfile.theProfile = lProfileStream.str();
 }
@@ -197,7 +197,7 @@ void EvalIteratorState::addJSONQueryProfile(EvalProfile& aProfile)
 {
   std::stringstream lProfileStream;
   JSONIterPrinter lPrinter(lProfileStream, "", true);
-  print_iter_plan( lPrinter, thePlanWrapper->theIterator, thePlanWrapper->thePlanState );
+  print_iter_plan( lPrinter, thePlanWrapper->theIterator, thePlanWrapper->thePlanState.get() );
 
   aProfile.theProfile = lProfileStream.str();
 }
@@ -206,7 +206,7 @@ void EvalIteratorState::addDOTQueryProfile(EvalProfile& aProfile)
 {
   std::stringstream lProfileStream;
   DOTIterPrinter lPrinter(lProfileStream, "", true);
-  print_iter_plan( lPrinter, thePlanWrapper->theIterator, thePlanWrapper->thePlanState );
+  print_iter_plan( lPrinter, thePlanWrapper->theIterator, thePlanWrapper->thePlanState.get() );
 
   aProfile.theProfile = lProfileStream.str();
 }
