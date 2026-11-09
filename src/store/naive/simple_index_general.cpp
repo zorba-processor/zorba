@@ -175,12 +175,28 @@ bool GeneralIndexValue::removeNode(const store::Item_t& node)
 /******************************************************************************
 
 *******************************************************************************/
-void GeneralIndexValue::addNode(store::Item_t& node, bool untyped)
+bool GeneralIndexValue::imagesOnly() const
+{
+  for (const_iterator ite = theNodes.begin(); ite != theNodes.end(); ++ite)
+  {
+    if (!(*ite).theImage)
+      return false;
+  }
+
+  return true;
+}
+
+
+/******************************************************************************
+
+*******************************************************************************/
+void GeneralIndexValue::addNode(store::Item_t& node, bool untyped, bool image)
 {
   csize numNodes = theNodes.size();
   theNodes.resize(numNodes + 1);
   theNodes[numNodes].theNode.transfer(node);
   theNodes[numNodes].theUntyped = untyped;
+  theNodes[numNodes].theImage = image;
 }
 
 
@@ -375,17 +391,15 @@ bool GeneralIndex::insert(store::Item_t& key, store::Item_t& node)
       goto longmap;
     }
 
-    // Coerce to xs:double 
+    // The exact key serves xs:decimal probes; its xs:double image serves
+    // xs:double probes.
     keyItem->coerceToDouble(castItem, true, lossy);
 
-    found = insertInMap(key, node, store::XS_DOUBLE, false);
+    node2 = node;
+    found = insertInMap(key, node2, store::XS_DECIMAL, false);
 
-    if (lossy)
-    {
-      node2 = node;
-      if (insertInMap(castItem, node2, store::XS_DECIMAL, false))
-        found = true;
-    }
+    if (insertInMap(castItem, node, store::XS_DOUBLE, false, true))
+      found = true;
 
     return found;
   }
@@ -420,7 +434,7 @@ longmap:
         node2 = node;
         found = insertInMap(key, node2, store::XS_LONG, false);
 
-        if (insertInMap(castItem, node, store::XS_DOUBLE, false))
+        if (insertInMap(castItem, node, store::XS_DOUBLE, false, true))
           found = true;
       }
       else
@@ -525,19 +539,13 @@ longmap:
       store::ItemHandle<DecimalItem> decimalItem = 
       static_cast<DecimalItem*>(castItem.getp());
 
+      // Compared with a numeric key or probe, an untyped value is cast to
+      // xs:double, so only the xs:double image is stored.
       decimalItem->coerceToDouble(castItem, true, lossy);
 
       node2 = node;
       if (insertInMap(castItem, node2, store::XS_DOUBLE, true))
         found = true;
-
-      if (lossy)
-      {
-        castItem.transfer(decimalItem);
-        node2 = node;
-        if (insertInMap(castItem, node2, store::XS_DECIMAL, true))
-          found = true;
-      }
 
       // may also be hexBinary or base64Binary
       if (sorted)
@@ -666,7 +674,8 @@ bool GeneralIndex::insertInMap(
     store::Item_t& key,
     store::Item_t& node,
     store::SchemaTypeCode targetMap,
-    bool untyped)
+    bool untyped,
+    bool image)
 {
   if (untyped)
     ++theNumUntypedEntries;
@@ -674,12 +683,12 @@ bool GeneralIndex::insertInMap(
   if (isSorted())
   {
     GeneralTreeIndex* idx = static_cast<GeneralTreeIndex*>(this);
-    return idx->insertInMap(key, node, idx->theMaps[targetMap], untyped);
+    return idx->insertInMap(key, node, idx->theMaps[targetMap], untyped, image);
   }
   else
   {
     GeneralHashIndex* idx = static_cast<GeneralHashIndex*>(this);
-    return idx->insertInMap(key, node, idx->theMaps[targetMap], untyped);
+    return idx->insertInMap(key, node, idx->theMaps[targetMap], untyped, image);
   }
 }
 
@@ -793,16 +802,12 @@ bool GeneralIndex::remove(const store::Item_t& key, const store::Item_t& node)
       goto longmap;
     }
 
-    // Coerce to xs:double 
     keyItem->coerceToDouble(castItem, true, lossy);
 
-    found = removeFromMap(key, node, store::XS_DOUBLE, false);
+    found = removeFromMap(key, node, store::XS_DECIMAL, false);
 
-    if (lossy)
-    {
-      if (removeFromMap(castItem, node, store::XS_DECIMAL, false))
-        found = true;
-    }
+    if (removeFromMap(castItem, node, store::XS_DOUBLE, false))
+      found = true;
 
     return found;
   }
@@ -937,13 +942,6 @@ longmap:
 
       if (removeFromMap(castItem, node, store::XS_DOUBLE, true))
         found = true;
-
-      if (lossy)
-      {
-        castItem.transfer(decimalItem);
-        if (removeFromMap(castItem, node, store::XS_DECIMAL, true))
-          found = true;
-      }
 
       // may also be hexBinary or base64Binary
       if (sorted)
@@ -1187,7 +1185,8 @@ bool GeneralHashIndex::insertInMap(
     store::Item_t& key,
     store::Item_t& node,
     IndexMap*& targetMap,
-    bool untyped)
+    bool untyped,
+    bool image)
 {
   GeneralIndexValue* valueSet = NULL;
 
@@ -1196,19 +1195,20 @@ bool GeneralHashIndex::insertInMap(
 
   if (targetMap->get(key, valueSet))
   {
-    if (isUnique())
+    // Distinct exact keys may share an image; the exact maps check those.
+    if (isUnique() && !(image && valueSet->imagesOnly()))
     {
       RAISE_ERROR_NO_LOC(zerr::ZDDY0024_INDEX_UNIQUE_VIOLATION,
       ERROR_PARAMS(theQname->getStringValue()));
     }
-    
-    valueSet->addNode(node, untyped);
+
+    valueSet->addNode(node, untyped, image);
 
     return true;
   }
 
   valueSet = new GeneralIndexValue();
-  valueSet->addNode(node, untyped);
+  valueSet->addNode(node, untyped, image);
   
   //std::cout << "Index Entry Insert [" << key << "," 
   //          << valueSet << "]" << std::endl;
@@ -1432,7 +1432,8 @@ bool GeneralTreeIndex::insertInMap(
     store::Item_t& key,
     store::Item_t& node,
     IndexMap*& targetMap,
-    bool untyped)
+    bool untyped,
+    bool image)
 {
   GeneralIndexValue* valueSet = NULL;
 
@@ -1443,19 +1444,20 @@ bool GeneralTreeIndex::insertInMap(
 
   if (pos != targetMap->end())
   {
-    if (isUnique())
+    // Distinct exact keys may share an image; the exact maps check those.
+    if (isUnique() && !(image && pos->second->imagesOnly()))
     {
       RAISE_ERROR_NO_LOC(zerr::ZDDY0024_INDEX_UNIQUE_VIOLATION,
       ERROR_PARAMS(theQname->getStringValue()));
     }
-    
-    pos->second->addNode(node, untyped);
+
+    pos->second->addNode(node, untyped, image);
 
     return true;
   }
 
   valueSet = new GeneralIndexValue();
-  valueSet->addNode(node, untyped);
+  valueSet->addNode(node, untyped, image);
   
   //std::cout << "Index Entry Insert [" << key << "," 
   //          << valueSet << "]" << std::endl;
@@ -1560,7 +1562,8 @@ ProbeGeneralIndexIterator::ProbeGeneralIndexIterator(const store::Index_t& idx)
   :
   theIndex(static_cast<GeneralIndex*>(idx.getp())),
   theIsUntypedProbe(false),
-  theIsFullProbe(false)
+  theIsFullProbe(false),
+  theIsExactProbe(false)
 {
 }
 
@@ -1671,6 +1674,7 @@ void ProbeGeneralIndexIterator::init(const store::IndexCondition_t& cond,
 {
   theProbeKind = cond->getKind();
   theCondition = static_cast<GeneralIndexCondition*>(cond.getp());
+  theIsExactProbe = false;
 
   if (theProbeKind == store::IndexCondition::POINT_VALUE ||
       theProbeKind == store::IndexCondition::BOX_VALUE)
@@ -1819,10 +1823,11 @@ void ProbeGeneralIndexIterator::initPoint()
     case store::XS_POSITIVE_INTEGER:
     case store::XS_UNSIGNED_LONG:
     {
+      theIsExactProbe = true;
+
       key->coerceToDouble(castItem, true, lossy);
 
-      if (lossy)
-        probeMap(store::XS_DECIMAL, key.getp());
+      probeMap(store::XS_DECIMAL, key.getp());
 
       probeMap(store::XS_DOUBLE, castItem.getp());
 
@@ -1840,6 +1845,8 @@ void ProbeGeneralIndexIterator::initPoint()
     case store::XS_UNSIGNED_SHORT:
     case store::XS_UNSIGNED_BYTE:
     {
+      theIsExactProbe = true;
+
       probeMap(store::XS_LONG, key.getp());
 
       if (haveMap(store::XS_DOUBLE))
@@ -1930,12 +1937,6 @@ void ProbeGeneralIndexIterator::initPoint()
             static_cast<AtomicItem*>(castItem.getp())->castToLong(longItem))
         {
           probeMap(store::XS_LONG, longItem.getp());
-        }
-
-        if (lossy && haveMap(store::XS_DECIMAL))
-        {
-          castItem.transfer(decimalItem);
-          probeMap(store::XS_DOUBLE, castItem.getp());
         }
 
         // may also be hexBinary or base64Binary
@@ -2211,6 +2212,8 @@ void ProbeGeneralIndexIterator::initBox()
     case store::XS_POSITIVE_INTEGER:
     case store::XS_UNSIGNED_LONG:
     {
+      theIsExactProbe = true;
+
       probeMap(store::XS_DECIMAL, lowerKey, upperKey);
 
       if (idx->theMaps[store::XS_LONG])
@@ -2246,6 +2249,8 @@ void ProbeGeneralIndexIterator::initBox()
     case store::XS_UNSIGNED_SHORT:
     case store::XS_UNSIGNED_BYTE:
     {
+      theIsExactProbe = true;
+
       probeMap(store::XS_LONG, lowerKey, upperKey);
 
       if (idx->theMaps[store::XS_DECIMAL])
@@ -2331,13 +2336,6 @@ void ProbeGeneralIndexIterator::initBox()
           GET_FACTORY().createDouble(altKey, doubleValue);
           probeMap(store::XS_DOUBLE, altKey, altKey);
         }
-
-        if (idx->theMaps[store::XS_DECIMAL])
-        {
-          xs_decimal const decimalValue( longItem->getLongValue() );
-          GET_FACTORY().createDecimal(altKey, decimalValue);
-          probeMap(store::XS_DECIMAL, altKey, altKey);
-        }
       }
 
       // try casting to xs:decimal
@@ -2348,11 +2346,6 @@ void ProbeGeneralIndexIterator::initBox()
       {
         store::ItemHandle<DecimalItem> decimalItem = 
         static_cast<DecimalItem*>(altKey.getp());
-
-        if (idx->theMaps[store::XS_DECIMAL])
-        {
-          probeMap(store::XS_DECIMAL, altKey, altKey);
-        }
 
         // Compared with a numeric key, an untyped value is cast to xs:double.
         xs_double const doubleValue( decimalItem->getDecimalValue() );
@@ -2584,6 +2577,12 @@ bool ProbeGeneralIndexIterator::next(store::Item_t& result)
           continue;
         }
 
+        if (theIsExactProbe && (*theIte).theImage)
+        {
+          ++theIte;
+          continue;
+        }
+
         result = (*theIte).theNode;
         
         ++theIte;
@@ -2608,6 +2607,12 @@ bool ProbeGeneralIndexIterator::next(store::Item_t& result)
         while (theIte != theEnd)
         {
           if ((theIsFullProbe || theIsUntypedProbe) && (*theIte).theUntyped)
+          {
+            ++theIte;
+            continue;
+          }
+
+          if ((theIsFullProbe || theIsExactProbe) && (*theIte).theImage)
           {
             ++theIte;
             continue;

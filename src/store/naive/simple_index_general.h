@@ -63,9 +63,11 @@ public:
 
 /**************************************************************************//**
   Stores all the domain nodes associated with a key K. For each such node N, a
-  boolean flag is also stored. The flag is true if  K was produced by 
+  boolean flag is also stored. The flag is true if  K was produced by
   casting an untypedAtomic key that was found in the result of the key expr
-  for node N.
+  for node N. A second flag is true if K is the xs:double image of a typed
+  xs:decimal (or subtype) key of N that is also stored exactly in the xs:long
+  or xs:decimal map.
 *******************************************************************************/
 class GeneralIndexValue
 {
@@ -74,6 +76,7 @@ public:
   {
     store::Item_t theNode;
     bool          theUntyped;
+    bool          theImage;
   };
 
   typedef std::vector<NodeInfo>::const_iterator const_iterator;
@@ -94,9 +97,11 @@ public:
 
   const_iterator end() const { return theNodes.end(); }
 
-  void addNode(store::Item_t& node, bool untyped);
+  void addNode(store::Item_t& node, bool untyped, bool image);
 
   bool removeNode(const store::Item_t& node);
+
+  bool imagesOnly() const;
 };
 
 
@@ -167,7 +172,8 @@ protected:
       store::Item_t& key,
       store::Item_t& node,
       store::SchemaTypeCode targetMap,
-      bool untyped);
+      bool untyped,
+      bool image = false);
 
   bool removeFromMap(
       const store::Item_t& key,
@@ -253,7 +259,8 @@ protected:
       store::Item_t& key,
       store::Item_t& node,
       IndexMap*& targetMap,
-      bool untyped);
+      bool untyped,
+      bool image);
 
   bool removeFromMap(
       const store::Item_t& key,
@@ -311,7 +318,8 @@ protected:
       store::Item_t& key,
       store::Item_t& node,
       IndexMap*& targetMap,
-      bool untyped);
+      bool untyped,
+      bool image);
 
   bool removeFromMap(
       const store::Item_t& key,
@@ -356,7 +364,15 @@ public:
   domain nodes that appear in the index with their associated "untyped" flag set
   to true must be skipped from the result because they will be just duplicates
   (they appear for sure in the STRING map). This is used for range probes only.
- 
+  Image entries are skipped too, because their exact keys are in the LONG or
+  DECIMAL map.
+
+  theIsExactProbe:
+  ----------------
+  Set to true if the search key is an xs:decimal (or a subtype). Such a key is
+  compared exactly with typed xs:decimal keys, which are probed in the LONG and
+  DECIMAL maps, so their xs:double images in the DOUBLE map are skipped.
+
   theResultSets:
   --------------
   The node sets associated with the keys that match the condition. This is used
@@ -418,6 +434,8 @@ protected:
   bool                                  theIsUntypedProbe;
 
   bool                                  theIsFullProbe;
+
+  bool                                  theIsExactProbe;
 
   ResultSets                            theResultSets;
 
