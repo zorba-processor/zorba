@@ -22,6 +22,7 @@
 #ifndef ZORBA_NO_XMLSCHEMA
 #include <xercesc/sax/EntityResolver.hpp>
 #include <iostream>
+#include "types/schema/OwningMemoryManager.h"
 #endif // ZORBA_NO_XMLSCHEMA
 
 #include <zorba/api_shared_types.h>
@@ -69,6 +70,7 @@ private:
 
   bool                                       theHasXSD;
 #ifndef ZORBA_NO_XMLSCHEMA
+  OwningMemoryManager                        theGrammarPoolMemoryManager;
   XERCES_CPP_NAMESPACE::XMLGrammarPool     * theGrammarPool;
 
   UdTypesCache                             * theUdTypesCache;

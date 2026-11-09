@@ -21,6 +21,7 @@
 #ifndef ZORBA_NO_XMLSCHEMA
 
 #include <cstddef>
+#include <mutex>
 
 #include <xercesc/framework/MemoryManager.hpp>
 
@@ -30,9 +31,9 @@ namespace zorba
 /*******************************************************************************
   A Xerces-C memory manager that frees, when it is destroyed, every block still
   allocated through it. Xerces-C constructors keep what they allocated when an
-  allocation fails (for example SchemaGrammar and XMLScanner), so the objects of
-  one validation allocate through one of these, and nothing of them outlives it.
-  Not thread-safe: one user at a time.
+  allocation fails (SchemaGrammar, XMLScanner, XSModel), so a schema's grammar
+  pool and the objects of one validation each allocate through one of these, and
+  nothing of them outlives it.
 ********************************************************************************/
 class OwningMemoryManager : public XERCES_CPP_NAMESPACE::MemoryManager
 {
@@ -56,6 +57,7 @@ private:
     Block* next;
   };
 
+  std::mutex theMutex;
   Block* theFirst = nullptr;
 };
 

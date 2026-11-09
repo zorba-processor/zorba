@@ -64,6 +64,7 @@ void* OwningMemoryManager::allocate(XMLSize_t size)
     throw OutOfMemoryException();
   }
 
+  std::lock_guard<std::mutex> lock(theMutex);
   block->prev = nullptr;
   block->next = theFirst;
   if (theFirst)
@@ -79,12 +80,15 @@ void OwningMemoryManager::deallocate(void* p)
     return;
 
   Block* const block = static_cast<Block*>(p) - 1;
-  if (block->prev)
-    block->prev->next = block->next;
-  else
-    theFirst = block->next;
-  if (block->next)
-    block->next->prev = block->prev;
+  {
+    std::lock_guard<std::mutex> lock(theMutex);
+    if (block->prev)
+      block->prev->next = block->next;
+    else
+      theFirst = block->next;
+    if (block->next)
+      block->next->prev = block->prev;
+  }
   ::operator delete(block);
 }
 

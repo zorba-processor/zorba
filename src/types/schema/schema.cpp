@@ -380,7 +380,8 @@ Schema::Schema(TypeManager* tm)
   {
     SYNC_CODE(AutoMutex(GENV_TYPESYSTEM.getXercesMutex());)
 
-   theGrammarPool = new XMLGrammarPoolImpl(XMLPlatformUtils::fgMemoryManager);
+   theGrammarPool = new (&theGrammarPoolMemoryManager)
+                    XMLGrammarPoolImpl(&theGrammarPoolMemoryManager);
   }
 
   theUdTypesCache = 
@@ -398,7 +399,8 @@ Schema::Schema(::zorba::serialization::Archiver& ar)
 #ifndef ZORBA_NO_XMLSCHEMA
   SYNC_CODE(AutoMutex(GENV_TYPESYSTEM.getXercesMutex());)
 
-  theGrammarPool = new XMLGrammarPoolImpl(XMLPlatformUtils::fgMemoryManager);
+  theGrammarPool = new (&theGrammarPoolMemoryManager)
+                   XMLGrammarPoolImpl(&theGrammarPoolMemoryManager);
 
   theHasXSD = false;
 #endif
