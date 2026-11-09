@@ -20,6 +20,7 @@ IF (NOT ZORBA_NO_XMLSCHEMA)
         LoadSchemaErrorHandler.cpp
         PrintSchema.cpp
         EventSchemaValidator.cpp
+        OwningMemoryManager.cpp
         SchemaValidatorFilter.cpp
         StrX.cpp
         ValidationEventHandler.cpp

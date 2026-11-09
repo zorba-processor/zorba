@@ -36,6 +36,9 @@
 #include "zorbatypes/duration.h"
 #include "zorbatypes/datetime.h"
 
+#include <new>
+#include <xercesc/util/OutOfMemoryException.hpp>
+
 #endif
 
 #include "api/unmarshaller.h"
@@ -89,6 +92,12 @@ bool Validator::effectiveValidationValue(
     }
     throw;
   }
+#ifndef ZORBA_NO_XMLSCHEMA
+  catch (const XERCES_CPP_NAMESPACE::OutOfMemoryException&)
+  {
+    throw std::bad_alloc();
+  }
+#endif
 }
 
 

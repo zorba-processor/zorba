@@ -27,6 +27,9 @@
 #ifndef ZORBA_NO_XMLSCHEMA
 
 
+#include <memory>
+
+#include "types/schema/OwningMemoryManager.h"
 #include "types/schema/ValidationEventHandler.h"
 #include "common/shared_types.h"
 
@@ -46,9 +49,11 @@ class EventSchemaValidator
 {
 private:
   TypeManager                            * theTypeManager;
-  SchemaValidatorFilter                  * theSchemaValidatorFilter;
-  XERCES_CPP_NAMESPACE::GrammarResolver  * theGrammarResolver;
+  // Declared first: what the Xerces-C objects below leave is freed last.
+  OwningMemoryManager                      theMemoryManager;
   ValidationEventHandler                   theValidationEventHandler;
+  std::unique_ptr<XERCES_CPP_NAMESPACE::GrammarResolver> theGrammarResolver;
+  std::unique_ptr<SchemaValidatorFilter>   theSchemaValidatorFilter;
     
 public:
   EventSchemaValidator(
