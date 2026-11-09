@@ -124,25 +124,6 @@
           <CtxVarIterator varid="7" varname="ca:index-custaccs-int" varkind="global"/>
         </CreateIndexIterator>
       </ApplyIterator>
-      <CreateInternalIndexIterator name="xs:QName(,,tempIndex0)">
-        <FLWORIterator>
-          <ForVariable name="$$opt_temp_0">
-            <ZorbaCollectionIterator>
-              <CtxVarIterator varid="5" varname="ca:orders" varkind="global"/>
-            </ZorbaCollectionIterator>
-          </ForVariable>
-          <ReturnClause>
-            <GeneralIndexEntryBuilderIterator>
-              <ForVarIterator varname="$$opt_temp_0"/>
-              <FnDataIterator>
-                <AttributeAxisIterator test-kind="match_name_test" qname="xs:QName(,,Acct)" typename="*" nill-allowed="false">
-                  <ForVarIterator varname="$$opt_temp_0"/>
-                </AttributeAxisIterator>
-              </FnDataIterator>
-            </GeneralIndexEntryBuilderIterator>
-          </ReturnClause>
-        </FLWORIterator>
-      </CreateInternalIndexIterator>
       <FnMinMaxIterator type="max">
         <FnDataIterator>
           <FLWORIterator>
@@ -167,13 +148,20 @@
               </FnStringIterator>
             </ForVariable>
             <ForVariable name="ord">
-              <NodeSortIterator distinct="true" ascending="true">
-                <ProbeIndexPointGeneralIterator>
-                  <SingletonIterator value="xs:QName(,,tempIndex0)"/>
-                  <ForVarIterator varname="acct-id"/>
-                </ProbeIndexPointGeneralIterator>
-              </NodeSortIterator>
+              <ZorbaCollectionIterator>
+                <CtxVarIterator varid="5" varname="ca:orders" varkind="global"/>
+              </ZorbaCollectionIterator>
             </ForVariable>
+            <WhereClause>
+              <CompareIterator>
+                <FnDataIterator>
+                  <AttributeAxisIterator test-kind="match_name_test" qname="xs:QName(,,Acct)" typename="*" nill-allowed="false">
+                    <ForVarIterator varname="ord"/>
+                  </AttributeAxisIterator>
+                </FnDataIterator>
+                <ForVarIterator varname="acct-id"/>
+              </CompareIterator>
+            </WhereClause>
             <ReturnClause>
               <AttributeAxisIterator test-kind="match_name_test" qname="xs:QName(,,Cash)" typename="*" nill-allowed="false">
                 <ChildAxisIterator test-kind="match_name_test" qname="xs:QName(,,OrdQty)" typename="*" nill-allowed="false">

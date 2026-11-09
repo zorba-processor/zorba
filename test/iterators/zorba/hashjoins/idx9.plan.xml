@@ -28,35 +28,23 @@
       <TupleStreamIterator>
         <WhereIterator>
           <WhereIterator>
-            <ForIterator>
-              <ForVariable name="$$context-item"/>
-              <LetIterator>
-                <LetVariable name="$$opt_temp_3" materialize="true"/>
+            <LetIterator>
+              <LetVariable name="$$opt_temp_0" materialize="true"/>
+              <ForIterator>
+                <ForVariable name="$$context-item"/>
                 <TupleSourceIterator/>
-                <CreateInternalIndexIterator name="xs:QName(,,tempIndex0)">
-                  <FLWORIterator>
-                    <ForVariable name="$$opt_temp_1">
-                      <ZorbaCollectionIterator>
-                        <SingletonIterator value="xs:QName(http://foo.com,foo,game)"/>
-                      </ZorbaCollectionIterator>
-                    </ForVariable>
-                    <ReturnClause>
-                      <GeneralIndexEntryBuilderIterator>
-                        <ForVarIterator varname="$$opt_temp_1"/>
-                        <FnDataIterator>
-                          <AttributeAxisIterator test-kind="match_name_test" qname="xs:QName(,,gid)" typename="*" nill-allowed="false">
-                            <ForVarIterator varname="$$opt_temp_1"/>
-                          </AttributeAxisIterator>
-                        </FnDataIterator>
-                      </GeneralIndexEntryBuilderIterator>
-                    </ReturnClause>
-                  </FLWORIterator>
-                </CreateInternalIndexIterator>
-              </LetIterator>
-              <ZorbaCollectionIterator>
-                <SingletonIterator value="xs:QName(http://foo.com,foo,bet)"/>
-              </ZorbaCollectionIterator>
-            </ForIterator>
+                <ZorbaCollectionIterator>
+                  <SingletonIterator value="xs:QName(http://foo.com,foo,bet)"/>
+                </ZorbaCollectionIterator>
+              </ForIterator>
+              <HoistIterator>
+                <FnDataIterator>
+                  <AttributeAxisIterator test-kind="match_name_test" qname="xs:QName(,,gid)" typename="*" nill-allowed="false">
+                    <ForVarIterator varname="$$context-item"/>
+                  </AttributeAxisIterator>
+                </FnDataIterator>
+              </HoistIterator>
+            </LetIterator>
             <CompareIterator>
               <FnDataIterator>
                 <AttributeAxisIterator test-kind="match_name_test" qname="xs:QName(,,uid)" typename="*" nill-allowed="false">
@@ -68,18 +56,28 @@
           </WhereIterator>
           <FnBooleanIterator>
             <ChildAxisIterator test-kind="match_name_test" qname="xs:QName(,,result)" typename="*" nill-allowed="false">
-              <ProbeIndexPointGeneralIterator>
-                <SingletonIterator value="xs:QName(,,tempIndex0)"/>
-                <UnhoistIterator>
-                  <HoistIterator>
+              <FLWORIterator>
+                <ForVariable name="$$context-item">
+                  <ZorbaCollectionIterator>
+                    <SingletonIterator value="xs:QName(http://foo.com,foo,game)"/>
+                  </ZorbaCollectionIterator>
+                </ForVariable>
+                <WhereClause>
+                  <CompareIterator>
                     <FnDataIterator>
                       <AttributeAxisIterator test-kind="match_name_test" qname="xs:QName(,,gid)" typename="*" nill-allowed="false">
                         <ForVarIterator varname="$$context-item"/>
                       </AttributeAxisIterator>
                     </FnDataIterator>
-                  </HoistIterator>
-                </UnhoistIterator>
-              </ProbeIndexPointGeneralIterator>
+                    <UnhoistIterator>
+                      <LetVarIterator varname="$$opt_temp_0"/>
+                    </UnhoistIterator>
+                  </CompareIterator>
+                </WhereClause>
+                <ReturnClause>
+                  <ForVarIterator varname="$$context-item"/>
+                </ReturnClause>
+              </FLWORIterator>
             </ChildAxisIterator>
           </FnBooleanIterator>
         </WhereIterator>
