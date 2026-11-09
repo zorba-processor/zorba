@@ -15,7 +15,8 @@
 # do not take mapm into the coverage analysis
 SET (CTEST_CUSTOM_COVERAGE_EXCLUDE "mapm.*")
 SET (CTEST_CUSTOM_MAXIMUM_PASSED_TEST_OUTPUT_SIZE 1048576)
-SET (CTEST_CUSTOM_MAXIMUM_FAILED_TEST_OUTPUT_SIZE 102400)
+# ctest keeps the head of an over-long output; the sanitizer summary reads UBSan reports from it.
+SET (CTEST_CUSTOM_MAXIMUM_FAILED_TEST_OUTPUT_SIZE 1048576)
 
 # other possible options
 #  CTEST_CUSTOM_ERROR_MATCH  Regular expression for errors during build process
