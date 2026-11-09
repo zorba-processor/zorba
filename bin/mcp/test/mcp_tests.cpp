@@ -3524,6 +3524,48 @@ void test_seekable_stream_out_of_memory( Fixture const &f ) {
   (void)f;
 #endif
 }
+// XQuery::iterator() and open() with each allocation failing in turn: an
+// iterator or an exception; then, in an AddressSanitizer build, nothing is left
+// unreachable.
+#if defined(__linux__) && ( defined(__SANITIZE_ADDRESS__) || \
+    ( defined(__has_feature) && __has_feature(address_sanitizer) ) )
+extern "C" int __lsan_do_recoverable_leak_check();
+#endif
+void test_plan_wrapper_out_of_memory( Fixture const &f ) {
+#if defined(__linux__)
+  auto attempt = [&]( long n, long length, long *count ) {
+    XQuery_t const query( f.zorba->compileQuery(
+      "for $i in 1 to 3 return string($i)" ) );
+    inject_arm( n, length );
+    try {
+      Iterator_t const iterator( query->iterator() );
+      iterator->open();
+      Item item;
+      while ( iterator->next( item ) ) {
+      }
+      iterator->close();
+    }
+    catch ( std::exception const& ) {
+    }
+    *count = inject_disarm();
+  };
+  long total = 0;
+  attempt( 0, 0, &total );
+  check( total > 0, "iterator() and open() allocate", std::to_string( total ) );
+  for ( long const length : { 1L, 8L } )
+    for ( long n = 1; n <= total; ++n ) {
+      long count = 0;
+      attempt( n, length, &count );
+    }
+#if defined(__SANITIZE_ADDRESS__) || \
+    ( defined(__has_feature) && __has_feature(address_sanitizer) )
+  check( __lsan_do_recoverable_leak_check() == 0,
+         "iterator() and open() failing: nothing is left behind" );
+#endif
+#else
+  (void)f;
+#endif
+}
 void test_base64_stream_out_of_memory( Fixture const &f ) {
 #if defined(__linux__)
   std::string encoded;
@@ -7498,6 +7540,7 @@ Test const tests[] = {
   { "exhaust_sweep_streamable_text", test_sweep_streamable_text },
   { "exhaust_base64_stream", test_base64_stream_out_of_memory },
   { "exhaust_seekable_stream", test_seekable_stream_out_of_memory },
+  { "exhaust_plan_wrapper", test_plan_wrapper_out_of_memory },
   { "exhaust_sweep_matcher", test_sweep_matcher },
   { "exhaust_sweep_xml", test_sweep_xml },
   { "exhaust_sweep_xml_dtd", test_sweep_xml_dtd },
