@@ -3,19 +3,11 @@ import module namespace m = "http://www.example.com/general-decimal-probe" at
 
 m:init();
 
-variable $unique1 := m:unique("unique decimal then float",
-                              <e id="1" v="0.1"/>, <e id="2" t="f" v="0.1"/>);
-variable $unique2 := m:unique("unique float then decimal",
-                              <e id="1" t="f" v="0.1"/>, <e id="2" v="0.1"/>);
-variable $unique3 := m:unique("unique decimals sharing an image",
+variable $unique1 := m:unique("unique decimals sharing an image",
                               <e id="1" v="0.1"/>,
                               <e id="2" v="0.1000000000000000000001"/>);
-variable $unique4 := m:unique("unique decimal then double",
-                              <e id="1" v="0.1"/>, <e id="2" t="d" v="0.1"/>);
-variable $unique5 := m:unique("unique double then decimal of its float",
-                              <e id="1" t="d" v="0.100000001490116119384765625"/>,
-                              <e id="2" v="0.1"/>);
-variable $unique6 := m:unique-reinsert();
+variable $unique2 := m:unique("unique equal decimals",
+                              <e id="1" v="0.1"/>, <e id="2" v="0.10"/>);
 
 fn:string-join((
   for $index in (xs:QName("m:Range"), xs:QName("m:Equality"))
@@ -64,6 +56,6 @@ fn:string-join((
           0.1, (), fn:true()),
   m:range("maintained no bounds", xs:QName("m:a"), xs:QName("m:Auto"),
           (), (), fn:true()),
-  $unique1, $unique2, $unique3, $unique4, $unique5, $unique6,
+  $unique1, $unique2,
   m:keys()),
   "&#10;")

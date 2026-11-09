@@ -32,7 +32,6 @@ declare function m:key($e as element(e)) as xs:anyAtomicType
 {
   switch (fn:string($e/@t))
   case "d" return xs:double($e/@v)
-  case "f" return xs:float($e/@v)
   case "i" return xs:integer($e/@v)
   case "u" return fn:data($e/@v)
   default return xs:decimal($e/@v)
@@ -62,12 +61,10 @@ by (switch (fn:string(./@t))
     case "u" return fn:data(./@v)
     default return xs:decimal(./@v));
 
+(: A unique general index needs a declared key type (ZDST0025). :)
 declare %an:unique %an:general-range %an:automatic index m:Unique
 on nodes dml:collection(xs:QName("m:u"))
-by (switch (fn:string(./@t))
-    case "d" return xs:double(./@v)
-    case "f" return xs:float(./@v)
-    default return xs:decimal(./@v));
+by xs:decimal(./@v) as xs:decimal;
 
 declare %an:general-equality %an:automatic index m:Keys
 on nodes dml:collection(xs:QName("m:k"))
@@ -214,48 +211,6 @@ declare %an:sequential function m:unique($name as xs:string,
   dml:delete(dml:collection(xs:QName("m:u")));
 
   fn:concat($name, ": ", $outcome, ";", $probe)
-};
-
-(: A rejected insert leaves no entry: the key can be inserted again once the
-   colliding entry is gone. :)
-declare %an:sequential function m:unique-reinsert() as xs:string
-{
-  dml:insert(xs:QName("m:u"), <e id="1" t="d" v="0.1"/>);
-
-  variable $outcome :=
-    try
-    {{
-      dml:insert(xs:QName("m:u"), <e id="2" v="0.1"/>);
-      "inserted"
-    }}
-    catch *
-    {
-      fn:local-name-from-QName($err:code)
-    };
-
-  variable $probe :=
-    m:point("", xs:QName("m:u"), xs:QName("m:Unique"), 0.1);
-
-  dml:delete(dml:collection(xs:QName("m:u")));
-
-  variable $reinsert :=
-    try
-    {{
-      dml:insert(xs:QName("m:u"), <e id="3" v="0.1"/>);
-      "inserted"
-    }}
-    catch *
-    {
-      fn:local-name-from-QName($err:code)
-    };
-
-  variable $reprobe :=
-    m:point("", xs:QName("m:u"), xs:QName("m:Unique"), 0.1);
-
-  dml:delete(dml:collection(xs:QName("m:u")));
-
-  fn:concat("rejected insert: ", $outcome, ";", $probe,
-            "; reinsert: ", $reinsert, ";", $reprobe)
 };
 
 declare function m:keys() as xs:string

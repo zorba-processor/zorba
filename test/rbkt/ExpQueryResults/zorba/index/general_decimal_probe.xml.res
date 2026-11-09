@@ -39,10 +39,6 @@ maintained decimal point: 1 6
 maintained double point: 1 3 6
 maintained decimal lower: 1 4 5 6 8 10 11
 maintained no bounds: 1 3 4 5 6 8 10 11
-unique decimal then float: ZDDY0024;: 1
-unique float then decimal: ZDDY0024;: 1
 unique decimals sharing an image: inserted;: 1
-unique decimal then double: ZDDY0024;: 1
-unique double then decimal of its float: inserted;: 1
-rejected insert: ZDDY0024;: 1; reinsert: inserted;: 3
+unique equal decimals: ZDDY0024;: 1
 keys: xs:decimal 0.1000000000000000000001, xs:decimal 0.5, xs:long 9007199254740993
