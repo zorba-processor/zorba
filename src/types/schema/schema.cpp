@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <new>
 #include <string>
 
 #include "compiler/parser/query_loc.h"
@@ -601,7 +602,7 @@ void Schema::registerXSD(
   }
   catch (const OutOfMemoryException&)
   {
-    RAISE_ERROR(zerr::ZXQP0014_OUT_OF_MEMORY, loc, ERROR_PARAMS(xsdURL));
+    throw std::bad_alloc();
   }
   catch (const XMLException& e)
   {

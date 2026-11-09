@@ -145,6 +145,7 @@ SchemaValidatorFilter::~SchemaValidatorFilter()
   delete theSchemaGrammar;
   delete theICHandler;
   delete theElemNonDeclPool;
+  XMLString::release(&theProcessorStipulatedTypeName, fMemoryManager);
 }
 
 
@@ -165,7 +166,7 @@ void SchemaValidatorFilter::reset()
 
   theErrorOccurred = false;
 
-  theProcessorStipulatedTypeName = NULL;
+  XMLString::release(&theProcessorStipulatedTypeName, fMemoryManager);
   theProcessorStipulatedTypeUriId = -1;
 }
 
@@ -991,7 +992,7 @@ void SchemaValidatorFilter::startTypeEvent(
   reset();
 
   theProcessorStipulatedTypeUriId = fURIStringPool->addOrFind(typeUri);
-  theProcessorStipulatedTypeName = XMLString::replicate(typeName);
+  theProcessorStipulatedTypeName = XMLString::replicate(typeName, fMemoryManager);
   //std::cout << "  startTypeEvent:  " <<  StrX(typeName) << " @ " <<
   //  StrX(typeUri) << "\n";
 }
@@ -1001,8 +1002,7 @@ void SchemaValidatorFilter::endTypeEvent()
 {
   if (theProcessorStipulatedTypeName)
   {
-    XMLString::release(&theProcessorStipulatedTypeName);
-    theProcessorStipulatedTypeName = NULL;
+    XMLString::release(&theProcessorStipulatedTypeName, fMemoryManager);
     theProcessorStipulatedTypeUriId = -1;
   }
 
