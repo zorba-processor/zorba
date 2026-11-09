@@ -1,0 +1,56 @@
+module namespace m = "http://www.example.com/truncate-other-collection";
+
+import module namespace ddl = "http://zorba.io/modules/store/static/collections/ddl";
+import module namespace dml = "http://zorba.io/modules/store/static/collections/dml";
+import module namespace iddl = "http://zorba.io/modules/store/static/indexes/ddl";
+import module namespace idml = "http://zorba.io/modules/store/static/indexes/dml";
+
+declare namespace an = "http://zorba.io/annotations";
+
+declare collection m:x as node()*;
+declare collection m:y as node()*;
+
+declare %an:automatic %an:value-equality index m:x-by-key
+  on nodes dml:collection(xs:QName("m:x"))
+  by xs:string(./@k) as xs:string;
+
+declare %an:automatic %an:value-equality index m:y-by-key
+  on nodes dml:collection(xs:QName("m:y"))
+  by xs:string(./@k) as xs:string;
+
+declare %an:sequential function m:init()
+{
+  ddl:create(xs:QName("m:x"));
+  ddl:create(xs:QName("m:y"));
+  iddl:create(xs:QName("m:x-by-key"));
+  iddl:create(xs:QName("m:y-by-key"));
+  dml:insert(xs:QName("m:x"), <n k="1"/>);
+  dml:insert(xs:QName("m:y"), <n k="1"/>);
+};
+
+declare function m:probe($index as xs:QName, $key as xs:string) as xs:integer
+{
+  fn:count(idml:probe-index-point-value($index, $key))
+};
+
+declare function m:state() as xs:string
+{
+  fn:string-join(
+    (fn:string(m:probe(xs:QName("m:x-by-key"), "1")),
+     fn:string(m:probe(xs:QName("m:x-by-key"), "2")),
+     fn:string(m:probe(xs:QName("m:y-by-key"), "1")),
+     fn:string(m:probe(xs:QName("m:y-by-key"), "2")),
+     fn:string(fn:count(dml:collection(xs:QName("m:x")))),
+     fn:string(fn:count(dml:collection(xs:QName("m:y"))))),
+    " ")
+};
+
+declare %an:sequential function m:insert-x-truncate-y()
+{
+  (dml:insert(xs:QName("m:x"), <n k="2"/>), dml:truncate(xs:QName("m:y")));
+};
+
+declare %an:sequential function m:insert-y-truncate-x()
+{
+  (dml:insert(xs:QName("m:y"), <n k="2"/>), dml:truncate(xs:QName("m:x")));
+};
