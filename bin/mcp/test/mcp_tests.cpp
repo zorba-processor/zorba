@@ -3220,6 +3220,11 @@ void test_sweep_canonicalize( Fixture const &f ) {
             "count(tokenize($c, '_name_')) = 81" );
   s.before.push_back( s.query );
   s.expected = "true";
+  // Importing the module loads its options schema with Xerces-C: the same
+  // known limit, with the same caps, as x:parse-html. 431 seen in runs of 8 in
+  // the first run, so the cap here is larger.
+  s.known = { starting( "terminate N11xercesc_", 4, 1, "OutOfMemoryExceptionE" ),
+              starting( "terminate N11xercesc_", 650, 8, "OutOfMemoryExceptionE" ) };
   s.needs_module = true;
   s.kept_runs_of_8_reported = true;   // the known limit, see Sweep
   exhaust_sweep( f, "x:canonicalize", s );
