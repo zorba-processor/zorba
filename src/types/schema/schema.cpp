@@ -380,7 +380,8 @@ Schema::Schema(TypeManager* tm)
   {
     SYNC_CODE(AutoMutex(GENV_TYPESYSTEM.getXercesMutex());)
 
-   theGrammarPool = new XMLGrammarPoolImpl(XMLPlatformUtils::fgMemoryManager);
+   theGrammarPool = new (&theGrammarPoolMemoryManager)
+                    XMLGrammarPoolImpl(&theGrammarPoolMemoryManager);
   }
 
   theUdTypesCache = 
@@ -398,7 +399,8 @@ Schema::Schema(::zorba::serialization::Archiver& ar)
 #ifndef ZORBA_NO_XMLSCHEMA
   SYNC_CODE(AutoMutex(GENV_TYPESYSTEM.getXercesMutex());)
 
-  theGrammarPool = new XMLGrammarPoolImpl(XMLPlatformUtils::fgMemoryManager);
+  theGrammarPool = new (&theGrammarPoolMemoryManager)
+                   XMLGrammarPoolImpl(&theGrammarPoolMemoryManager);
 
   theHasXSD = false;
 #endif
@@ -1935,8 +1937,9 @@ bool Schema::parseUserAtomicTypes(
                * We need to canonicalize the value we are trying to validate respect
                * to the base type and validate the canonicalized value.
                */
+              // Allocated where XMLChArray releases it, not by the grammar pool.
               XMLChArray canonicalValue((XMLCh*) xsiTypeDV->getCanonicalRepresentation(
-                  xchTextValue.get(), NULL, false));
+                  xchTextValue.get(), XMLPlatformUtils::fgMemoryManager, false));
               if (canonicalValue.get())
               {
                 /*

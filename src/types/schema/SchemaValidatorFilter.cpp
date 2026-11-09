@@ -99,8 +99,7 @@ SchemaValidatorFilter::SchemaValidatorFilter(
   theEventBuffer(eventBuffer),
   theErrorOccurred(false)
 {
-  theSchemaGrammar = new (fGrammarPoolMemoryManager)
-                    SchemaGrammar(fGrammarPoolMemoryManager);
+  theSchemaGrammar = new (fMemoryManager) SchemaGrammar(fMemoryManager);
 
   theICHandler = new (fMemoryManager)
                 IdentityConstraintHandler(this, fMemoryManager);

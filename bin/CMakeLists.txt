@@ -554,10 +554,12 @@ IF (ZORBA_WITH_FILE_ACCESS)
     # Scripted JSON-RPC exchanges against the directory module's fixture
     # tree (see mcp/test/mcp_tests.cpp); "binary" runs zorba-mcp itself.
     SET (_mcpq "${CMAKE_CURRENT_SOURCE_DIR}/test/mcp/queries")
-    # x:canonicalize is in the xml module, which needs XML Schema.
+    # The xml module (x:canonicalize) and validate need XML Schema.
     SET (_mcp_xml_tests)
+    SET (_mcp_schema_sweeps)
     IF (NOT ZORBA_NO_XMLSCHEMA)
-      SET (_mcp_xml_tests error_canonicalize_input)
+      SET (_mcp_xml_tests error_canonicalize_input exhaust_sweep_validate)
+      SET (_mcp_schema_sweeps validate)
     ENDIF (NOT ZORBA_NO_XMLSCHEMA)
     FOREACH (_t json protocol legacy tools_list list_documents join
              syntax_error escape network native_modules predefined limits binary windows
@@ -621,8 +623,8 @@ IF (ZORBA_WITH_FILE_ACCESS)
     ENDFOREACH (_t)
     SET_TESTS_PROPERTIES (bin/mcp/exhaust_cache_after_failure PROPERTIES
       RESOURCE_LOCK mcp_memory_exhaustion TIMEOUT 400)
-    FOREACH (_t compile builtins query_text streamable_text xml fragment html
-                json csv casts decimal_thread
+    FOREACH (_t compile builtins query_text streamable_text xml fragment
+                ${_mcp_schema_sweeps} html json csv casts decimal_thread
                 cache kept_malloc)
       SET_TESTS_PROPERTIES (bin/mcp/exhaust_sweep_${_t} PROPERTIES
         RESOURCE_LOCK mcp_memory_exhaustion TIMEOUT 400)
