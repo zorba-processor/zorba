@@ -2455,6 +2455,7 @@ struct Sweep {
   bool new_thread = false;          // the call is the first of a thread
   bool after_compile = false;       // only the run of the query, not its compilation
   bool lenient = false;             // a compilation: any error, but no signal
+  std::vector<std::string> wrong;   // an outcome with one of these: never allowed
   long points = 1500;               // at most this many allocations are tried
   std::vector<Known> known;         // other allowed outcomes: limits
   bool empty_answer = false;        // an empty answer is allowed too, a limit
@@ -2493,6 +2494,9 @@ bool known_matches( Known const &k, long length, std::string const &outcome ) {
 // would: never allowed.
 bool sweep_allowed( Sweep const &s, long length, std::string const &outcome ) {
   if ( outcome.find( " | " ) != std::string::npos )
+    return false;
+  if ( std::any_of( s.wrong.begin(), s.wrong.end(),
+         [&]( std::string const &w ) { return contains( outcome, w ); } ) )
     return false;
   // handle() throws when even its error response cannot be made: main() of
   // zorba-mcp answers then, with this id. Where the id could not be read, the
@@ -3347,6 +3351,43 @@ void test_sweep_validate( Fixture const &f ) {
   s.after_compile = true;
   s.expected = "20";
   exhaust_sweep( f, "validate", s );
+#else
+  (void)f;
+#endif
+}
+std::string sweep_schema( std::string const &ns ) {
+  return "<xs:schema xmlns:xs='http://www.w3.org/2001/XMLSchema'"
+         " targetNamespace='" + ns + "' xmlns='" + ns + "'"
+         " elementFormDefault='qualified'>"
+         "<xs:complexType name='T'><xs:sequence>"
+         "<xs:element name='a' type='xs:integer' maxOccurs='unbounded'/>"
+         "</xs:sequence></xs:complexType>"
+         "<xs:element name='r' type='T'/></xs:schema>";
+}
+// A schema imported while the query compiles: Xerces-C running out of memory
+// while it loads the schema is out of memory, not an error of the schema.
+void test_sweep_schema_import( Fixture const &f ) {
+#if defined(__linux__)
+  auto const query = []( std::string const &name ) {
+    return "import schema namespace my = 'urn:" + name + "' at '" + name +
+           ".xsd';\n1 + 2";
+  };
+  Sweep s;
+  s.files = { { "sweep.xsd", sweep_schema( "urn:sweep" ) },
+              { "warm.xsd", sweep_schema( "urn:warm" ) } };
+  s.query = query( "sweep" );
+  s.before.push_back( query( "warm" ) );
+  s.expected = "3";
+  s.lenient = true;
+  s.wrong = { "ZXQP0014", "ZXQP0035" };
+  s.points = 400;
+  // As in test_sweep_compile, and Xerces-C releasing a schema.
+  s.known = { exact( "exit 2", 2 ), library_crash( "signal 6 in libstdc", true, 2 ),
+              starting( "terminate N11xercesc_", 4, 1, "OutOfMemoryExceptionE" ),
+              starting( "terminate N11xercesc_", 250, 8, "OutOfMemoryExceptionE" ),
+              exact( "terminate St9bad_alloc", 2, 8 ) };
+  s.compiles = true;
+  exhaust_sweep( f, "schema import", s );
 #else
   (void)f;
 #endif
@@ -5785,6 +5826,27 @@ void test_error_canonicalize_input( Fixture const &f ) {
          "a long input of x:canonicalize", message.substr( 0, 400 ) );
 }
 
+// validate type with an error between the start and the end of the type: the
+// validator frees its copy of the type's name, which LeakSanitizer checks here.
+void test_validate_type_error( Fixture const &f ) {
+  TempTree t;
+  t.write( "t.xsd", sweep_schema( "urn:t" ) );
+  ServerConfig config;
+  config.root = t.root;
+  config.scan = false;
+  Server server( f.zorba, config, std::cerr );
+  Json const r = call_tool( server, "run_query", Json::object( { { "query",
+    "import schema namespace my = 'urn:t' at 't.xsd';\n"
+    "validate type my:T { <my:r><my:a>x</my:a></my:r> }" } } ) );
+  check( is_tool_error( r ) &&
+         contains( field( tool_error( r ), "code" ), "XQDY0027" ),
+         "validate type: an invalid value", r.dump() );
+#if defined(__SANITIZE_ADDRESS__)
+  check( __lsan_do_recoverable_leak_check() == 0,
+         "validate type: an error leaks nothing" );
+#endif
+}
+
 // A document in the store that the policy of another session denies: the
 // denial, which names the path, stays whole.
 void test_error_cached_denial( Fixture const &f ) {
@@ -7584,6 +7646,7 @@ Test const tests[] = {
   { "exhaust_sweep_xml_dtd_nodes", test_sweep_xml_dtd_nodes },
   { "exhaust_sweep_fragment", test_sweep_fragment },
   { "exhaust_sweep_validate", test_sweep_validate },
+  { "exhaust_sweep_schema_import", test_sweep_schema_import },
   { "exhaust_sweep_html", test_sweep_html },
   { "exhaust_sweep_json", test_sweep_json },
   { "exhaust_sweep_csv", test_sweep_csv },
@@ -7635,6 +7698,7 @@ Test const tests[] = {
   { "error_query_line", test_error_query_line },
   { "error_help", test_error_help },
   { "error_canonicalize_input", test_error_canonicalize_input },
+  { "validate_type_error", test_validate_type_error },
   { "error_cached_denial", test_error_cached_denial },
   { "hints_nodes", test_hints_nodes },
   { "hints_names", test_hints_names },

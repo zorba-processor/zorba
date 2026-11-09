@@ -558,8 +558,9 @@ IF (ZORBA_WITH_FILE_ACCESS)
     SET (_mcp_xml_tests)
     SET (_mcp_schema_sweeps)
     IF (NOT ZORBA_NO_XMLSCHEMA)
-      SET (_mcp_xml_tests error_canonicalize_input exhaust_sweep_validate)
-      SET (_mcp_schema_sweeps validate)
+      SET (_mcp_xml_tests error_canonicalize_input exhaust_sweep_validate
+                          exhaust_sweep_schema_import validate_type_error)
+      SET (_mcp_schema_sweeps validate schema_import)
     ENDIF (NOT ZORBA_NO_XMLSCHEMA)
     FOREACH (_t json protocol legacy tools_list list_documents join
              syntax_error escape network native_modules predefined limits binary windows
