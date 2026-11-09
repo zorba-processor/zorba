@@ -1924,9 +1924,12 @@ void ProbeGeneralIndexIterator::initPoint()
 
         probeMap(store::XS_DOUBLE, castItem.getp());
 
-        if (haveMap(store::XS_LONG) && decimalItem->castToLong(castItem))
+        // Compared with a numeric key, an untyped value is cast to xs:double.
+        store::Item_t longItem;
+        if (haveMap(store::XS_LONG) &&
+            static_cast<AtomicItem*>(castItem.getp())->castToLong(longItem))
         {
-          probeMap(store::XS_LONG, castItem.getp());
+          probeMap(store::XS_LONG, longItem.getp());
         }
 
         if (lossy && haveMap(store::XS_DECIMAL))
@@ -2189,11 +2192,11 @@ void ProbeGeneralIndexIterator::initBox()
         if (haveLower && haveUpper)
         {
           if (lowerAltKey && upperAltKey)
-            probeMap(store::XS_ANY_URI, lowerAltKey, upperAltKey);    
+            probeMap(store::XS_LONG, lowerAltKey, upperAltKey);
         }
         else if ((haveLower && lowerAltKey) || (haveUpper && upperAltKey))
         {
-          probeMap(store::XS_ANY_URI, lowerAltKey, upperAltKey);
+          probeMap(store::XS_LONG, lowerAltKey, upperAltKey);
         }
       }
 
@@ -2351,16 +2354,28 @@ void ProbeGeneralIndexIterator::initBox()
           probeMap(store::XS_DECIMAL, altKey, altKey);
         }
 
-        if (idx->theMaps[store::XS_LONG])
-        {
-          probeMap(store::XS_LONG, altKey, altKey);
-        }
+        // Compared with a numeric key, an untyped value is cast to xs:double.
+        xs_double const doubleValue( decimalItem->getDecimalValue() );
+        store::Item_t doubleKey;
+        GET_FACTORY().createDouble(doubleKey, doubleValue);
 
         if (idx->theMaps[store::XS_DOUBLE])
         {
-          xs_double const doubleValue( decimalItem->getDecimalValue() );
-          GET_FACTORY().createDouble(altKey, doubleValue);
-          probeMap(store::XS_DOUBLE, altKey, altKey);
+          probeMap(store::XS_DOUBLE, doubleKey, doubleKey);
+        }
+
+        // Last: doubleToLongProbe adjusts the bound inclusion flag.
+        if (idx->theMaps[store::XS_LONG])
+        {
+          doubleToLongProbe(altKey,
+                            static_cast<AtomicItem*>(doubleKey.getp()),
+                            haveLower,
+                            haveUpper);
+
+          if (altKey)
+          {
+            probeMap(store::XS_LONG, altKey, altKey);
+          }
         }
       }
 

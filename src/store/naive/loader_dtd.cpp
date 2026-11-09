@@ -1656,7 +1656,9 @@ void DtdXmlLoader::startElement(
       AttributeNode* attrNode = nfactory.createAttributeNode(qname);
       attrNodes[i] = attrNode;   // first: the element destroys it
 
-      XmlString val(xmlGetProp(node, attr->name));
+      // From the attribute itself: xmlGetProp() finds an attribute by local
+      // name only, so a:x and b:x would both get the value of the first.
+      XmlString val(xmlNodeGetContent(reinterpret_cast<xmlNode*>(attr)));
       if (val == NULL)   // an attribute with no value gives "": only memory fails
         throw std::bad_alloc();
       const char* valu = reinterpret_cast<const char*>(val.get());
