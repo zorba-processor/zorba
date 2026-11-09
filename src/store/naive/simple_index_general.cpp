@@ -96,6 +96,10 @@ bool GeneralIndexCompareFunction::equal(
   if (key1 == NULL || key2 == NULL)
     return false;
 
+  // NaN is equal to no number, but its entries are kept under one key.
+  if (key1->isNaN() || key2->isNaN())
+    return key1->isNaN() && key2->isNaN();
+
   if (! key1->equals(key2, theTimezone, theCollator))
     return false;
   
@@ -137,6 +141,14 @@ long GeneralIndexCompareFunction::compare(
   else if (key2 == IndexConditionImpl::thePosInf)
   {
     return -1;
+  }
+  else if (key1->isNaN() || key2->isNaN())
+  {
+    // NaN is ordered with no number; its entries are kept first in a map.
+    if (!key1->isNaN())
+      return +1;
+
+    return (key2->isNaN() ? 0 : -1);
   }
   else if ((result = key1->compare(key2, theTimezone, theCollator)))
   {
@@ -496,79 +508,9 @@ bool GeneralIndex::insert(store::Item_t& key, store::Item_t& node)
     // with xs:anyUri, or with xs:untypedAtomic, we unconditionally probe both
     // the STRING and the ANY_URI tables.
  
-    // try casting to xs:long
-    if (untypedItem->castToLong(castItem))
-    {
-      // Compared with a numeric key or probe, an untyped value is cast to
-      // xs:double.
-      untypedItem->castToDouble(castItem);
-
-      node2 = node;
-      if (insertInMap(castItem, node2, store::XS_DOUBLE, true))
-        found = true;
-
-      // may also be gYear, hexBinary, base64Binary, or boolean
-      if (!sorted)
-      {
-        if (untypedItem->castToGYear(castItem))
-        {
-          node2 = node;
-          if (insertInMap(castItem, node2, store::XS_GYEAR, true))
-            found = true;
-        }
-
-        if (untypedItem->castToHexBinary(castItem))
-        {
-          node2 = node;
-          if (insertInMap(castItem, node2, store::XS_HEXBINARY, true))
-            found = true;
-        }
-
-        if (untypedItem->castToBase64Binary(castItem))
-        {
-          node2 = node;
-          if (insertInMap(castItem, node2, store::XS_BASE64BINARY, true))
-            found = true;
-        }
-      }
-    }
-
-    // try casting to xs:decimal
-    else if (untypedItem->castToDecimal(castItem))
-    {
-      store::ItemHandle<DecimalItem> decimalItem = 
-      static_cast<DecimalItem*>(castItem.getp());
-
-      // Compared with a numeric key or probe, an untyped value is cast to
-      // xs:double, so only the xs:double image is stored.
-      GET_FACTORY().createDouble(castItem,
-                                 xs_double(decimalItem->getDecimalValue()));
-
-      node2 = node;
-      if (insertInMap(castItem, node2, store::XS_DOUBLE, true))
-        found = true;
-
-      // may also be hexBinary or base64Binary
-      if (sorted)
-      {
-        if (untypedItem->castToHexBinary(castItem))
-        {
-          node2 = node;
-          if (insertInMap(castItem, node2, store::XS_HEXBINARY, true))
-            found = true;
-        }
-
-        if (untypedItem->castToBase64Binary(castItem))
-        {
-          node2 = node;
-          if (insertInMap(castItem, node2, store::XS_BASE64BINARY, true))
-            found = true;
-        }
-      }
-    }
-
-    // try casting to xs:double
-    else if (untypedItem->castToDouble(castItem))
+    // Compared with a numeric key or probe, an untyped value is cast to
+    // xs:double.
+    if (untypedItem->castToDouble(castItem))
     {
       node2 = node;
       if (insertInMap(castItem, node2, store::XS_DOUBLE, true))
@@ -639,16 +581,22 @@ bool GeneralIndex::insert(store::Item_t& key, store::Item_t& node)
         found = true;
     }
 
-    // try casting to xs:hexBinary
-    else if (!sorted && untypedItem->castToHexBinary(castItem))
+    // These casts can succeed together with one of the casts above.
+    if (!sorted && untypedItem->castToGYear(castItem))
+    {
+      node2 = node;
+      if (insertInMap(castItem, node2, store::XS_GYEAR, true))
+        found = true;
+    }
+
+    if (!sorted && untypedItem->castToHexBinary(castItem))
     {
       node2 = node;
       if (insertInMap(castItem, node2, store::XS_HEXBINARY, true))
         found = true;
     }
 
-    // try casting to xs:base64Binary
-    else if (!sorted && untypedItem->castToBase64Binary(castItem))
+    if (!sorted && untypedItem->castToBase64Binary(castItem))
     {
       node2 = node;
       if (insertInMap(castItem, node2, store::XS_BASE64BINARY, true))
@@ -929,68 +877,7 @@ bool GeneralIndex::remove(const store::Item_t& key, const store::Item_t& node)
 
     found = removeFromMap(castItem, node, store::XS_STRING, false);
 
-    // try casting to xs:long
-    if (untypedItem->castToLong(castItem))
-    {
-      untypedItem->castToDouble(castItem);
-
-      if (removeFromMap(castItem, node, store::XS_DOUBLE, true))
-        found = true;
-
-      // may also be gYear, hexBinary, base64Binary, or boolean
-      if (!sorted)
-      {
-        if (untypedItem->castToGYear(castItem))
-        {
-          if (removeFromMap(castItem, node, store::XS_GYEAR, true))
-            found = true;
-        }
-
-        if (untypedItem->castToHexBinary(castItem))
-        {
-          if (removeFromMap(castItem, node, store::XS_HEXBINARY, true))
-            found = true;
-        }
-
-        if (untypedItem->castToBase64Binary(castItem))
-        {
-          if (removeFromMap(castItem, node, store::XS_BASE64BINARY, true))
-            found = true;
-        }
-      }
-    }
-
-    // try casting to xs:decimal
-    else if (untypedItem->castToDecimal(castItem))
-    {
-      store::ItemHandle<DecimalItem> decimalItem = 
-      static_cast<DecimalItem*>(castItem.getp());
-
-      GET_FACTORY().createDouble(castItem,
-                                 xs_double(decimalItem->getDecimalValue()));
-
-      if (removeFromMap(castItem, node, store::XS_DOUBLE, true))
-        found = true;
-
-      // may also be hexBinary or base64Binary
-      if (sorted)
-      {
-        if (untypedItem->castToHexBinary(castItem))
-        {
-          if (removeFromMap(castItem, node, store::XS_HEXBINARY, true))
-            found = true;
-        }
-
-        if (untypedItem->castToBase64Binary(castItem))
-        {
-          if (removeFromMap(castItem, node, store::XS_BASE64BINARY, true))
-            found = true;
-        }
-      }
-    }
-
-    // try casting to xs:double
-    else if (untypedItem->castToDouble(castItem))
+    if (untypedItem->castToDouble(castItem))
     {
       if (removeFromMap(castItem, node, store::XS_DOUBLE, true))
         found = true;
@@ -1052,15 +939,19 @@ bool GeneralIndex::remove(const store::Item_t& key, const store::Item_t& node)
         found = true;
     }
 
-    // try casting to xs:hexBinary
-    else if (!sorted && untypedItem->castToHexBinary(castItem))
+    if (!sorted && untypedItem->castToGYear(castItem))
+    {
+      if (removeFromMap(castItem, node, store::XS_GYEAR, true))
+        found = true;
+    }
+
+    if (!sorted && untypedItem->castToHexBinary(castItem))
     {
       if (removeFromMap(castItem, node, store::XS_HEXBINARY, true))
         found = true;
     }
 
-    // try casting to xs:base64Binary
-    else if (!sorted && untypedItem->castToBase64Binary(castItem))
+    if (!sorted && untypedItem->castToBase64Binary(castItem))
     {
       if (removeFromMap(castItem, node, store::XS_BASE64BINARY, true))
         found = true;
@@ -1099,19 +990,23 @@ bool GeneralIndex::removeFromMap(
     bool untyped,
     GeneralIndexValue::ImageKind image)
 {
-  if (untyped)
-    --theNumUntypedEntries;
+  bool found;
 
   if (isSorted())
   {
     GeneralTreeIndex* idx = static_cast<GeneralTreeIndex*>(this);
-    return idx->removeFromMap(key, node, idx->theMaps[targetMap], untyped, image);
+    found = idx->removeFromMap(key, node, idx->theMaps[targetMap], untyped, image);
   }
   else
   {
     GeneralHashIndex* idx = static_cast<GeneralHashIndex*>(this);
-    return idx->removeFromMap(key, node, idx->theMaps[targetMap], untyped, image);
+    found = idx->removeFromMap(key, node, idx->theMaps[targetMap], untyped, image);
   }
+
+  if (found && untyped)
+    --theNumUntypedEntries;
+
+  return found;
 }
 
 
@@ -1225,7 +1120,8 @@ bool GeneralHashIndex::insertInMap(
 
   if (targetMap->get(key, valueSet))
   {
-    if (isUnique())
+    // NaN keys share an entry but are not equal to each other.
+    if (isUnique() && !key->isNaN())
     {
       RAISE_ERROR_NO_LOC(zerr::ZDDY0024_INDEX_UNIQUE_VIOLATION,
       ERROR_PARAMS(theQname->getStringValue()));
@@ -1495,7 +1391,8 @@ bool GeneralTreeIndex::insertInMap(
 
   if (pos != targetMap->end())
   {
-    if (isUnique())
+    // NaN keys share an entry but are not equal to each other.
+    if (isUnique() && !key->isNaN())
     {
       RAISE_ERROR_NO_LOC(zerr::ZDDY0024_INDEX_UNIQUE_VIOLATION,
       ERROR_PARAMS(theQname->getStringValue()));
@@ -1842,60 +1739,7 @@ void ProbeGeneralIndexIterator::initPoint()
                           haveMap(store::XS_DOUBLE) ||
                           haveMap(store::XS_FLOAT));
 
-      // try casting to xs:long
-      if (haveNumbers && untypedItem->castToLong(castItem))
-      {
-        untypedItem->castToDouble(castItem);
-        probeNumber(static_cast<AtomicItem*>(castItem.getp()));
-
-        // may also be gYear, hexBinary, base64Binary, or boolean
-        if (!sorted)
-        {
-          if (haveMap(store::XS_GYEAR))
-          {
-            untypedItem->castToGYear(castItem);
-            probeMap(store::XS_GYEAR, castItem.getp());
-          }
-
-          if (haveMap(store::XS_HEXBINARY))
-          {
-            untypedItem->castToHexBinary(castItem); 
-            probeMap(store::XS_HEXBINARY, castItem.getp());
-          }
-
-          if (haveMap(store::XS_BASE64BINARY))
-          {
-            untypedItem->castToBase64Binary(castItem); 
-            probeMap(store::XS_BASE64BINARY, castItem.getp());
-          }
-        }
-      }
-
-      // try casting to xs:decimal
-      else if (haveNumbers && untypedItem->castToDecimal(castItem))
-      {
-        untypedItem->castToDouble(castItem);
-        probeNumber(static_cast<AtomicItem*>(castItem.getp()));
-
-        // may also be hexBinary or base64Binary
-        if (!sorted)
-        {
-          if (haveMap(store::XS_HEXBINARY))
-          {
-            untypedItem->castToHexBinary(castItem); 
-            probeMap(store::XS_HEXBINARY, castItem.getp());
-          }
-
-          if (haveMap(store::XS_BASE64BINARY))
-          {
-            untypedItem->castToBase64Binary(castItem); 
-            probeMap(store::XS_BASE64BINARY, castItem.getp());
-          }
-        }
-      }
-
-      // try casting to xs:double
-      else if (haveNumbers && untypedItem->castToDouble(castItem))
+      if (haveNumbers && untypedItem->castToDouble(castItem))
       {
         probeNumber(static_cast<AtomicItem*>(castItem.getp()));
       }
@@ -1959,19 +1803,25 @@ void ProbeGeneralIndexIterator::initPoint()
       {
         probeMap(store::XS_DURATION, castItem.getp());
       }
-      
-      // try casting to xs:hexBinary
-      else if (!sorted &&
-               haveMap(store::XS_HEXBINARY) &&
-               untypedItem->castToHexBinary(castItem))
+
+      // These casts can succeed together with one of the casts above.
+      if (!sorted &&
+          haveMap(store::XS_GYEAR) &&
+          untypedItem->castToGYear(castItem))
+      {
+        probeMap(store::XS_GYEAR, castItem.getp());
+      }
+
+      if (!sorted &&
+          haveMap(store::XS_HEXBINARY) &&
+          untypedItem->castToHexBinary(castItem))
       {
         probeMap(store::XS_HEXBINARY, castItem.getp());
       }
-      
-      // try casting to xs:base64Binary
-      else if (!sorted &&
-               haveMap(store::XS_BASE64BINARY) &&
-               untypedItem->castToBase64Binary(castItem))
+
+      if (!sorted &&
+          haveMap(store::XS_BASE64BINARY) &&
+          untypedItem->castToBase64Binary(castItem))
       {
         probeMap(store::XS_BASE64BINARY, castItem.getp());
       }
@@ -2299,6 +2149,10 @@ void ProbeGeneralIndexIterator::probeMap(
     store::SchemaTypeCode targetMap,
     const store::Item* key)
 {
+  // NaN is equal to no number, although NaN keys share a map entry.
+  if (key->isNaN())
+    return;
+
   if (theIndex->isSorted())
   {
     static_cast<ProbeGeneralTreeIndexIterator*>(this)->
@@ -2643,40 +2497,45 @@ void ProbeGeneralTreeIndexIterator::probeMap(
   assert(theProbeKind != store::IndexCondition::BOX_GENERAL ||
          !(haveLower && haveUpper));
 
-  if (haveLower && haveUpper)
-  {
-    long cmp = lowerKey->compare(upperKey);
+  // NaN is less than and greater than no number.
+  if ((haveLower && lowerKey->isNaN()) || (haveUpper && upperKey->isNaN()))
+    return;
 
-    if (cmp > 0)
-      return;
-
-    if (cmp == 0 && (!lowerIncl || !upperIncl))
-      return;
-  }
+  GeneralTreeIndex::EntryIterator begin;
+  GeneralTreeIndex::EntryIterator end;
 
   if (haveLower)
   {
-    if (lowerIncl)
-      theMapBegins.push_back(map->lower_bound(lowerKey));
-    else
-      theMapBegins.push_back(map->upper_bound(lowerKey));
+    begin = (lowerIncl ? map->lower_bound(lowerKey) : map->upper_bound(lowerKey));
   }
   else
   {
-    theMapBegins.push_back(map->begin());
+    // NaN keys come first in a map (see GeneralIndexCompareFunction); only a
+    // probe without bounds selects them.
+    begin = map->begin();
+    if (haveUpper && begin != map->end() && begin->first->isNaN())
+      ++begin;
   }
- 
+
   if (haveUpper)
   {
-    if (upperIncl)
-      theMapEnds.push_back(map->upper_bound(upperKey));
-    else
-      theMapEnds.push_back(map->lower_bound(upperKey));
+    end = (upperIncl ? map->upper_bound(upperKey) : map->lower_bound(upperKey));
+
+    // begin lies past end if its key is above the upper bound. The bounds
+    // are not compared with each other: out of order as given, they can be
+    // equal once promoted to the type of the keys.
+    if (begin != end &&
+        (begin == map->end() ||
+         theIndex->theCompFunction.compare(begin->first, upperKey) > 0))
+      end = begin;
   }
   else
   {
-    theMapEnds.push_back(map->end());
+    end = map->end();
   }
+
+  theMapBegins.push_back(begin);
+  theMapEnds.push_back(end);
 }
 
 
