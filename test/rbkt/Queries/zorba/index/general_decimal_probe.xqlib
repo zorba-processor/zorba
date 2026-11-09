@@ -13,11 +13,31 @@ import module namespace idml =
   "http://zorba.io/modules/store/static/indexes/dml";
 
 declare namespace an = "http://zorba.io/annotations";
+declare namespace err = "http://www.w3.org/2005/xqt-errors";
 
+(: Probed after a manual index build. :)
 declare collection m:c as node()*;
 
-(: xs:decimal keys whose xs:double images collide, an xs:double key, xs:integer
-   keys and an xs:untypedAtomic key. :)
+(: Maintained by an automatic index created before the data. :)
+declare collection m:a as node()*;
+
+(: Maintained by a unique automatic index. :)
+declare collection m:u as node()*;
+
+(: Listed by idml:keys. :)
+declare collection m:k as node()*;
+
+(: The key of e: xs:decimal unless @t names another type. :)
+declare function m:key($e as element(e)) as xs:anyAtomicType
+{
+  switch (fn:string($e/@t))
+  case "d" return xs:double($e/@v)
+  case "f" return xs:float($e/@v)
+  case "i" return xs:integer($e/@v)
+  case "u" return fn:data($e/@v)
+  default return xs:decimal($e/@v)
+};
+
 declare %an:general-range %an:manual index m:Range
 on nodes dml:collection(xs:QName("m:c"))//e
 by (switch (fn:string(./@t))
@@ -34,34 +54,63 @@ by (switch (fn:string(./@t))
     case "u" return fn:data(./@v)
     default return xs:decimal(./@v));
 
-declare function m:key($e as element(e)) as xs:anyAtomicType
+declare %an:general-range %an:automatic index m:Auto
+on nodes dml:collection(xs:QName("m:a"))
+by (switch (fn:string(./@t))
+    case "d" return xs:double(./@v)
+    case "i" return xs:integer(./@v)
+    case "u" return fn:data(./@v)
+    default return xs:decimal(./@v));
+
+declare %an:unique %an:general-range %an:automatic index m:Unique
+on nodes dml:collection(xs:QName("m:u"))
+by (switch (fn:string(./@t))
+    case "d" return xs:double(./@v)
+    case "f" return xs:float(./@v)
+    default return xs:decimal(./@v));
+
+declare %an:general-equality %an:automatic index m:Keys
+on nodes dml:collection(xs:QName("m:k"))
+by (switch (fn:string(./@t))
+    case "i" return xs:integer(./@v)
+    default return xs:decimal(./@v));
+
+declare function m:rows() as element(e)*
 {
-  switch (fn:string($e/@t))
-  case "d" return xs:double($e/@v)
-  case "i" return xs:integer($e/@v)
-  case "u" return fn:data($e/@v)
-  default return xs:decimal($e/@v)
+  <e id="1" v="0.1"/>,
+  <e id="2" v="0.1000000000000000000001"/>,
+  <e id="3" v="0.0999999999999999999999"/>,
+  <e id="4" v="0.5"/>,
+  <e id="5" v="0.5000000000000000000001"/>,
+  <e id="6" t="d" v="0.1"/>,
+  <e id="7" t="i" v="100000000000"/>,
+  <e id="8" t="i" v="3"/>,
+  <e id="9" t="u" v="0.1000000000000000000002"/>,
+  <e id="10" v="100000000000000000000"/>,
+  <e id="11" t="u" v="7"/>,
+  <e id="12" t="i" v="9007199254740993"/>
 };
 
 declare %an:sequential function m:init()
 {
   ddl:create(xs:QName("m:c"));
-
-  dml:insert(xs:QName("m:c"),
-             <r>
-               <e id="1" v="0.1"/>
-               <e id="2" v="0.1000000000000000000001"/>
-               <e id="3" v="0.0999999999999999999999"/>
-               <e id="4" v="0.5"/>
-               <e id="5" v="0.5000000000000000000001"/>
-               <e id="6" t="d" v="0.1"/>
-               <e id="7" t="i" v="100000000000"/>
-               <e id="8" t="i" v="3"/>
-               <e id="9" t="u" v="0.1000000000000000000002"/>
-             </r>);
-
+  dml:insert(xs:QName("m:c"), <r>{ m:rows() }</r>);
   iddl:create(xs:QName("m:Range"));
   iddl:create(xs:QName("m:Equality"));
+
+  ddl:create(xs:QName("m:a"));
+  iddl:create(xs:QName("m:Auto"));
+  dml:insert(xs:QName("m:a"), m:rows());
+  dml:delete(dml:collection(xs:QName("m:a"))[@id = ("2", "7", "9", "12")]);
+
+  ddl:create(xs:QName("m:u"));
+  iddl:create(xs:QName("m:Unique"));
+
+  ddl:create(xs:QName("m:k"));
+  iddl:create(xs:QName("m:Keys"));
+  dml:insert(xs:QName("m:k"), (<e id="1" v="0.5"/>,
+                               <e id="2" v="0.1000000000000000000001"/>,
+                               <e id="3" t="i" v="9007199254740993"/>));
 };
 
 declare function m:ids($nodes as node()*) as xs:string
@@ -82,23 +131,54 @@ declare function m:result($name as xs:string,
             else fn:concat(" (unindexed: ", $unindexed, ")"))
 };
 
+declare function m:elements($coll as xs:QName) as element(e)*
+{
+  dml:collection($coll)/descendant-or-self::e
+};
+
 (: The same selection without the index, by general comparison on the key. :)
 declare function m:range($name as xs:string,
+                         $coll as xs:QName,
+                         $index as xs:QName,
                          $lower as xs:anyAtomicType?,
-                         $upper as xs:anyAtomicType?) as xs:string
+                         $upper as xs:anyAtomicType?,
+                         $inclusive as xs:boolean) as xs:string
 {
   m:result($name,
-           m:ids(idml:probe-index-range-general(xs:QName("m:Range"),
+           m:ids(idml:probe-index-range-general($index,
                                                 $lower,
                                                 $upper,
                                                 fn:exists($lower),
                                                 fn:exists($upper),
-                                                fn:true(),
-                                                fn:true())),
-           m:ids(for $e in dml:collection(xs:QName("m:c"))/e
+                                                $inclusive,
+                                                $inclusive)),
+           m:ids(for $e in m:elements($coll)
                  let $k := m:key($e)
-                 where (fn:empty($lower) or $k >= $lower) and
-                       (fn:empty($upper) or $k <= $upper)
+                 where (fn:empty($lower) or
+                        (if ($inclusive) then $k >= $lower else $k > $lower))
+                       and
+                       (fn:empty($upper) or
+                        (if ($inclusive) then $k <= $upper else $k < $upper))
+                 return $e))
+};
+
+declare function m:range($name as xs:string,
+                         $lower as xs:anyAtomicType?,
+                         $upper as xs:anyAtomicType?) as xs:string
+{
+  m:range($name, xs:QName("m:c"), xs:QName("m:Range"), $lower, $upper,
+          fn:true())
+};
+
+declare function m:point($name as xs:string,
+                         $coll as xs:QName,
+                         $index as xs:QName,
+                         $key as xs:anyAtomicType) as xs:string
+{
+  m:result($name,
+           m:ids(idml:probe-index-point-general($index, $key)),
+           m:ids(for $e in m:elements($coll)
+                 where m:key($e) = $key
                  return $e))
 };
 
@@ -106,9 +186,85 @@ declare function m:point($name as xs:string,
                          $index as xs:QName,
                          $key as xs:anyAtomicType) as xs:string
 {
-  m:result($name,
-           m:ids(idml:probe-index-point-general($index, $key)),
-           m:ids(for $e in dml:collection(xs:QName("m:c"))/e
-                 where m:key($e) = $key
-                 return $e))
+  m:point($name, xs:QName("m:c"), $index, $key)
+};
+
+(: Inserts $first, then $second into the unique index, reports whether the
+   second insert raised, the entries of the first key, and empties m:u. :)
+declare %an:sequential function m:unique($name as xs:string,
+                                         $first as element(e),
+                                         $second as element(e)) as xs:string
+{
+  dml:insert(xs:QName("m:u"), $first);
+
+  variable $outcome :=
+    try
+    {{
+      dml:insert(xs:QName("m:u"), $second);
+      "inserted"
+    }}
+    catch *
+    {
+      fn:local-name-from-QName($err:code)
+    };
+
+  variable $probe :=
+    m:point("", xs:QName("m:u"), xs:QName("m:Unique"), m:key($first));
+
+  dml:delete(dml:collection(xs:QName("m:u")));
+
+  fn:concat($name, ": ", $outcome, ";", $probe)
+};
+
+(: A rejected insert leaves no entry: the key can be inserted again once the
+   colliding entry is gone. :)
+declare %an:sequential function m:unique-reinsert() as xs:string
+{
+  dml:insert(xs:QName("m:u"), <e id="1" t="d" v="0.1"/>);
+
+  variable $outcome :=
+    try
+    {{
+      dml:insert(xs:QName("m:u"), <e id="2" v="0.1"/>);
+      "inserted"
+    }}
+    catch *
+    {
+      fn:local-name-from-QName($err:code)
+    };
+
+  variable $probe :=
+    m:point("", xs:QName("m:u"), xs:QName("m:Unique"), 0.1);
+
+  dml:delete(dml:collection(xs:QName("m:u")));
+
+  variable $reinsert :=
+    try
+    {{
+      dml:insert(xs:QName("m:u"), <e id="3" v="0.1"/>);
+      "inserted"
+    }}
+    catch *
+    {
+      fn:local-name-from-QName($err:code)
+    };
+
+  variable $reprobe :=
+    m:point("", xs:QName("m:u"), xs:QName("m:Unique"), 0.1);
+
+  dml:delete(dml:collection(xs:QName("m:u")));
+
+  fn:concat("rejected insert: ", $outcome, ";", $probe,
+            "; reinsert: ", $reinsert, ";", $reprobe)
+};
+
+declare function m:keys() as xs:string
+{
+  fn:concat("keys: ",
+    fn:string-join(
+      for $a in idml:keys(xs:QName("m:Keys"))/*:attribute
+      let $k := fn:concat(fn:string($a/@type), " ", fn:string($a/@value))
+      order by $k
+      return $k,
+      ", "))
 };
