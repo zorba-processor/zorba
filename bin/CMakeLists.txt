@@ -117,11 +117,10 @@ ZORBA_TARGET_LOCATION (_zorbacmd zorbacmd)
 MACRO (ZORBA_PLAN_TEST NAME PATTERN ARGS)
   ADD_TEST ("${NAME}" "${CMAKE_COMMAND}" "-DZORBACMD=${_zorbacmd}" "-DARGS=${ARGS}"
     "-DPATTERN=${PATTERN}" -P "${_plandir}/plan_check.cmake")
+  ZORBA_SET_TEST_DEFAULTS ("${NAME}")
 ENDMACRO (ZORBA_PLAN_TEST)
 SET (_planfile "|-e|f:=${_plandir}/plan_members.json")
-# At O0 the text of these queries is held in memory too, as before this check:
-# the tests that expect the file stream run at O1 and O2.
-FOREACH (_opt 1 2)
+FOREACH (_opt 0 1 2)
   ZORBA_PLAN_TEST (bin/zorba_plan_parse_file_O${_opt} "JSONParseMembersIterator[^>]*file-stream=.true."
     "--optimization-level|${_opt}|--print-iterator-tree|-f|-q|${_plandir}/plan_parse_file.jq${_planfile}")
   # One query for each thing that makes the rule hold the text in memory.
