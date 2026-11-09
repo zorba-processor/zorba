@@ -1,0 +1,107 @@
+module namespace m = "http://www.example.com/delete-after-inserts";
+
+import module namespace ddl =
+  "http://zorba.io/modules/store/static/collections/ddl";
+import module namespace dml =
+  "http://zorba.io/modules/store/static/collections/dml";
+import module namespace iddl =
+  "http://zorba.io/modules/store/static/indexes/ddl";
+
+declare namespace an = "http://zorba.io/annotations";
+declare namespace err = "http://www.w3.org/2005/xqt-errors";
+
+declare collection m:c as node()*;
+
+declare %an:automatic %an:value-equality index m:value
+on nodes dml:collection(xs:QName("m:c"))
+by xs:string(./@v) as xs:string;
+
+declare %an:automatic %an:general-equality index m:general
+on nodes dml:collection(xs:QName("m:c"))
+by xs:string(./@v) as xs:string;
+
+(: Deletes m:c and reports the error code, if any; on an error m:c is
+   emptied and deleted, so every case starts without m:c. :)
+declare %an:sequential function m:delete($name as xs:string) as xs:string
+{
+  variable $outcome :=
+    try
+    {{
+      ddl:delete(xs:QName("m:c"));
+      "deleted"
+    }}
+    catch *
+    {{
+      dml:delete(dml:collection(xs:QName("m:c")));
+      ddl:delete(xs:QName("m:c"));
+      fn:local-name-from-QName($err:code)
+    }};
+  fn:concat($name, ": ", $outcome)
+};
+
+(: Each case creates m:c and $indexes, inserts its nodes, deletes $indexes
+   (an available index on m:c is ZDDY0013) and then deletes m:c. :)
+declare %an:sequential function m:none($name as xs:string,
+                                       $indexes as xs:QName*) as xs:string
+{
+  ddl:create(xs:QName("m:c"));
+  for $index in $indexes return iddl:create($index);
+  for $index in $indexes return iddl:delete($index);
+  m:delete($name)
+};
+
+declare %an:sequential function m:one($name as xs:string,
+                                      $indexes as xs:QName*) as xs:string
+{
+  ddl:create(xs:QName("m:c"));
+  for $index in $indexes return iddl:create($index);
+  dml:insert(xs:QName("m:c"), <e v="1"/>);
+  for $index in $indexes return iddl:delete($index);
+  m:delete($name)
+};
+
+declare %an:sequential function m:two-in-one($name as xs:string,
+                                             $indexes as xs:QName*)
+  as xs:string
+{
+  ddl:create(xs:QName("m:c"));
+  for $index in $indexes return iddl:create($index);
+  dml:insert(xs:QName("m:c"), (<e v="1"/>, <e v="2"/>));
+  for $index in $indexes return iddl:delete($index);
+  m:delete($name)
+};
+
+declare %an:sequential function m:two-separate($name as xs:string,
+                                               $indexes as xs:QName*)
+  as xs:string
+{
+  ddl:create(xs:QName("m:c"));
+  for $index in $indexes return iddl:create($index);
+  dml:insert(xs:QName("m:c"), <e v="1"/>);
+  dml:insert(xs:QName("m:c"), <e v="2"/>);
+  for $index in $indexes return iddl:delete($index);
+  m:delete($name)
+};
+
+(: A variable that references a node of m:c is the documented ZDDY0015.
+   Once its nodes are deleted, m:c can be deleted. :)
+declare %an:sequential function m:referenced($name as xs:string) as xs:string
+{
+  ddl:create(xs:QName("m:c"));
+  dml:insert(xs:QName("m:c"), <e v="1"/>);
+  variable $nodes := dml:collection(xs:QName("m:c"));
+  variable $outcome :=
+    try
+    {{
+      ddl:delete(xs:QName("m:c"));
+      "deleted"
+    }}
+    catch *
+    {
+      fn:local-name-from-QName($err:code)
+    };
+  variable $count := fn:count($nodes);
+  dml:delete(dml:collection(xs:QName("m:c")));
+  ddl:delete(xs:QName("m:c"));
+  fn:concat($name, ": ", $outcome, " ", $count)
+};
