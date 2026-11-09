@@ -1835,9 +1835,13 @@ void ProbeGeneralIndexIterator::initPoint()
       }
 
       // Compared with a number, an untyped value is cast to xs:double.
+      bool haveNumbers = (haveMap(store::XS_LONG) ||
+                          haveMap(store::XS_DECIMAL) ||
+                          haveMap(store::XS_DOUBLE) ||
+                          haveMap(store::XS_FLOAT));
 
       // try casting to xs:long
-      if (untypedItem->castToLong(castItem))
+      if (haveNumbers && untypedItem->castToLong(castItem))
       {
         untypedItem->castToDouble(castItem);
         probeNumber(static_cast<AtomicItem*>(castItem.getp()));
@@ -1866,7 +1870,7 @@ void ProbeGeneralIndexIterator::initPoint()
       }
 
       // try casting to xs:decimal
-      else if (untypedItem->castToDecimal(castItem))
+      else if (haveNumbers && untypedItem->castToDecimal(castItem))
       {
         untypedItem->castToDouble(castItem);
         probeNumber(static_cast<AtomicItem*>(castItem.getp()));
@@ -1889,7 +1893,7 @@ void ProbeGeneralIndexIterator::initPoint()
       }
 
       // try casting to xs:double
-      else if (untypedItem->castToDouble(castItem))
+      else if (haveNumbers && untypedItem->castToDouble(castItem))
       {
         probeNumber(static_cast<AtomicItem*>(castItem.getp()));
       }
