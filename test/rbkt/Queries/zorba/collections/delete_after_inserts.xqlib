@@ -35,44 +35,44 @@ declare %an:sequential function m:delete($name as xs:string) as xs:string
 };
 
 declare %an:sequential function m:none($name as xs:string,
-                                       $indexed as xs:boolean) as xs:string
+                                       $indexes as xs:QName*) as xs:string
 {
   ddl:create(xs:QName("m:c"));
-  if ($indexed) then iddl:create(xs:QName("m:i")) else ();
-  if ($indexed) then iddl:delete(xs:QName("m:i")) else ();
+  for $index in $indexes return iddl:create($index);
+  for $index in $indexes return iddl:delete($index);
   m:delete($name)
 };
 
 declare %an:sequential function m:one($name as xs:string,
-                                      $indexed as xs:boolean) as xs:string
+                                      $indexes as xs:QName*) as xs:string
 {
   ddl:create(xs:QName("m:c"));
-  if ($indexed) then iddl:create(xs:QName("m:i")) else ();
+  for $index in $indexes return iddl:create($index);
   dml:insert(xs:QName("m:c"), <e v="1"/>);
-  if ($indexed) then iddl:delete(xs:QName("m:i")) else ();
+  for $index in $indexes return iddl:delete($index);
   m:delete($name)
 };
 
 declare %an:sequential function m:two-in-one($name as xs:string,
-                                             $indexed as xs:boolean)
+                                             $indexes as xs:QName*)
   as xs:string
 {
   ddl:create(xs:QName("m:c"));
-  if ($indexed) then iddl:create(xs:QName("m:i")) else ();
+  for $index in $indexes return iddl:create($index);
   dml:insert(xs:QName("m:c"), (<e v="1"/>, <e v="2"/>));
-  if ($indexed) then iddl:delete(xs:QName("m:i")) else ();
+  for $index in $indexes return iddl:delete($index);
   m:delete($name)
 };
 
 declare %an:sequential function m:two-separate($name as xs:string,
-                                               $indexed as xs:boolean)
+                                               $indexes as xs:QName*)
   as xs:string
 {
   ddl:create(xs:QName("m:c"));
-  if ($indexed) then iddl:create(xs:QName("m:i")) else ();
+  for $index in $indexes return iddl:create($index);
   dml:insert(xs:QName("m:c"), <e v="1"/>);
   dml:insert(xs:QName("m:c"), <e v="2"/>);
-  if ($indexed) then iddl:delete(xs:QName("m:i")) else ();
+  for $index in $indexes return iddl:delete($index);
   m:delete($name)
 };
 
