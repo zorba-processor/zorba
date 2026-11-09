@@ -8,6 +8,7 @@ import module namespace iddl =
   "http://zorba.io/modules/store/static/indexes/ddl";
 
 declare namespace an = "http://zorba.io/annotations";
+declare namespace err = "http://www.w3.org/2005/xqt-errors";
 
 declare collection m:c as node()*;
 
