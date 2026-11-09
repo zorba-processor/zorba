@@ -3381,10 +3381,11 @@ void test_sweep_schema_import( Fixture const &f ) {
   s.lenient = true;
   s.wrong = { "ZXQP0014", "ZXQP0035" };
   s.points = 400;
-  // As in test_sweep_compile, and Xerces-C releasing a schema.
+  // As in test_sweep_compile, and Xerces-C releasing a schema. Caps: about 1.5
+  // times the most seen (1 alone, 17 in runs of 8, quick-check run 42693936525).
   s.known = { exact( "exit 2", 2 ), library_crash( "signal 6 in libstdc", true, 2 ),
               starting( "terminate N11xercesc_", 4, 1, "OutOfMemoryExceptionE" ),
-              starting( "terminate N11xercesc_", 250, 8, "OutOfMemoryExceptionE" ),
+              starting( "terminate N11xercesc_", 26, 8, "OutOfMemoryExceptionE" ),
               exact( "terminate St9bad_alloc", 2, 8 ) };
   s.compiles = true;
   exhaust_sweep( f, "schema import", s );
@@ -5826,8 +5827,9 @@ void test_error_canonicalize_input( Fixture const &f ) {
          "a long input of x:canonicalize", message.substr( 0, 400 ) );
 }
 
-// validate type with an error between the start and the end of the type: the
-// validator frees its copy of the type's name, which LeakSanitizer checks here.
+// validate type with an error between the start and the end of the type (an
+// attribute and text that T does not allow): the validator frees its copy of
+// the type's name, which LeakSanitizer checks here.
 void test_validate_type_error( Fixture const &f ) {
   TempTree t;
   t.write( "t.xsd", sweep_schema( "urn:t" ) );
@@ -5837,7 +5839,7 @@ void test_validate_type_error( Fixture const &f ) {
   Server server( f.zorba, config, std::cerr );
   Json const r = call_tool( server, "run_query", Json::object( { { "query",
     "import schema namespace my = 'urn:t' at 't.xsd';\n"
-    "validate type my:T { <my:r><my:a>x</my:a></my:r> }" } } ) );
+    "validate type my:T { <my:r b='1'>text<my:a>1</my:a></my:r> }" } } ) );
   check( is_tool_error( r ) &&
          contains( field( tool_error( r ), "code" ), "XQDY0027" ),
          "validate type: an invalid value", r.dump() );
