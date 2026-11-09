@@ -58,7 +58,7 @@ int user_typed_item(int, char*[])
 
   std::cout << "valid arguments" << std::endl;
   Item result = factory->createUserTypedAtomicItem(base, typeName);
-  if (result.isNull() || result.getIntValue() != 7)
+  if (result.isNull() || result.getStringValue() != "7")
     return 3;
 
   zorba->shutdown();
