@@ -36,7 +36,7 @@ namespace zorba {
 
 /**
  *        
- *      declare function ref:reference($item as item()) as xs:string
+ *      declare function ref:reference($item as item()) as xs:anyURI
  *    
  * Author: Federico Cavalieri
  */
