@@ -3223,9 +3223,12 @@ void test_sweep_canonicalize( Fixture const &f ) {
   s.expected = "true";
   // Importing the module loads its options schema with Xerces-C: the same
   // known limit, with the same caps, as x:parse-html. 431 seen in runs of 8 in
-  // the first run, so the cap here is larger.
+  // the first run, so the cap here is larger. The same Xerces-C failing while
+  // the call validates its options is an internal error (run 42559003393: 913
+  // in runs of 1); that validation is outside x:canonicalize.
   s.known = { starting( "terminate N11xercesc_", 4, 1, "OutOfMemoryExceptionE" ),
-              starting( "terminate N11xercesc_", 650, 8, "OutOfMemoryExceptionE" ) };
+              starting( "terminate N11xercesc_", 650, 8, "OutOfMemoryExceptionE" ),
+              exact( "error: zerr:ZXQP0003: internal error", 1400 ) };
   s.needs_module = true;
   s.kept_runs_of_8_reported = true;   // the known limit, see Sweep
   exhaust_sweep( f, "x:canonicalize", s );
