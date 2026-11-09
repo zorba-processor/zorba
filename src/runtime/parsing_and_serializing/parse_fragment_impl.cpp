@@ -41,6 +41,7 @@
 #include <libxml/parser.h>
 #include <libxml/xmlreader.h>
 #include <libxml/c14n.h>
+#include <libxml/xmlIO.h>
 
 namespace zorba
 {
@@ -367,9 +368,9 @@ struct XmlDocDeleter
 {
   void operator()(xmlDocPtr p) const noexcept { xmlFreeDoc(p); }
 };
-struct XmlStringDeleter
+struct XmlOutputDeleter
 {
-  void operator()(xmlChar* p) const noexcept { xmlFree(p); }
+  void operator()(xmlOutputBufferPtr p) const noexcept { xmlOutputBufferClose(p); }
 };
 
 // The first error libxml2 reported to the handler below. Plain storage: the
@@ -489,21 +490,37 @@ bool FnZorbaCanonicalizeIterator::nextImpl(store::Item_t& result, PlanState& pla
       throw XQUERY_EXCEPTION(err::FOCZ0001, ERROR_PARAMS("x:canonicalize()", lErrorMsg), ERROR_LOC(loc));
     }
 
-    xmlChar* lCanonical = NULL;
+    std::unique_ptr<xmlOutputBuffer, XmlOutputDeleter> lOutput(
+      xmlAllocOutputBuffer(NULL));
+    if (!lOutput)
+      throw std::bad_alloc();
     XmlReportedError lReported;
-    int lLength;
+    int lStatus;
     {
       XmlErrorRecorder lRecorder(lReported);
-      lLength = xmlC14NDocDumpMemory(lDoc.get(), NULL, XML_C14N_1_1, NULL, 1,
-                                     &lCanonical);
+      lStatus = xmlC14NDocSaveTo(lDoc.get(), NULL, XML_C14N_1_1, NULL, 1,
+                                 lOutput.get());
     }
-    std::unique_ptr<xmlChar, XmlStringDeleter> lOwnedCanonical(lCanonical);
-    if (lLength < 0 || !lOwnedCanonical)
+    zstring lCanonical;
+    if (lStatus >= 0)
+    {
+      xmlChar const* const lContent = xmlOutputBufferGetContent(lOutput.get());
+      lCanonical.assign(reinterpret_cast<char const*>(lContent),
+                        static_cast<zstring::size_type>(
+                          xmlOutputBufferGetSize(lOutput.get())));
+    }
+    // Closing the buffer reports an error of the buffer that the
+    // canonicalization did not: a negative xmlParserErrors code.
+    int const lClosed = xmlOutputBufferClose(lOutput.release());
+    if (lStatus < 0 || lClosed < 0)
     {
       // The input is well formed, so a failure of the canonicalization is
       // either an allocation that failed or a document that the canonical form
       // cannot represent (a relative namespace URI): the error says which.
-      if (lReported.code == 0 || lReported.code == XML_ERR_NO_MEMORY)
+      int lCode = lReported.code;
+      if (lCode == 0 && lClosed < -1)
+        lCode = -lClosed;
+      if (lCode == 0 || lCode == XML_ERR_NO_MEMORY)
         throw std::bad_alloc();
       zstring lCause(lReported.message);
       while (!lCause.empty() && (lCause[lCause.size() - 1] == '\n'))
@@ -511,8 +528,7 @@ bool FnZorbaCanonicalizeIterator::nextImpl(store::Item_t& result, PlanState& pla
       throw XQUERY_EXCEPTION(err::FOCZ0001,
         ERROR_PARAMS("x:canonicalize()", ERROR_TEXT( lCause )), ERROR_LOC(loc));
     }
-    lDocString = zstring(reinterpret_cast<char*>(lOwnedCanonical.get()),
-                         static_cast<zstring::size_type>(lLength));
+    lDocString = lCanonical;
   }
   catch ( ZorbaException const& )
   {
