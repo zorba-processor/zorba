@@ -1,0 +1,116 @@
+module namespace m = "http://www.example.com/delete-after-inserts";
+
+import module namespace ddl =
+  "http://zorba.io/modules/store/static/collections/ddl";
+import module namespace dml =
+  "http://zorba.io/modules/store/static/collections/dml";
+import module namespace iddl =
+  "http://zorba.io/modules/store/static/indexes/ddl";
+
+declare namespace an = "http://zorba.io/annotations";
+
+declare collection m:c as node()*;
+
+declare %an:automatic %an:value-equality index m:i
+on nodes dml:collection(xs:QName("m:c"))
+by xs:string(./@v) as xs:string;
+
+(: Deletes m:c and reports the error code, if any; on an error m:c is
+   emptied and deleted, so every case starts without m:c. :)
+declare %an:sequential function m:delete($name as xs:string) as xs:string
+{
+  variable $outcome :=
+    try
+    {{
+      ddl:delete(xs:QName("m:c"));
+      "deleted"
+    }}
+    catch *
+    {{
+      dml:delete(dml:collection(xs:QName("m:c")));
+      ddl:delete(xs:QName("m:c"));
+      fn:local-name-from-QName($err:code)
+    }};
+  fn:concat($name, ": ", $outcome)
+};
+
+declare %an:sequential function m:none($name as xs:string,
+                                       $indexed as xs:boolean) as xs:string
+{
+  ddl:create(xs:QName("m:c"));
+  if ($indexed) then iddl:create(xs:QName("m:i")) else ();
+  if ($indexed) then iddl:delete(xs:QName("m:i")) else ();
+  m:delete($name)
+};
+
+declare %an:sequential function m:one($name as xs:string,
+                                      $indexed as xs:boolean) as xs:string
+{
+  ddl:create(xs:QName("m:c"));
+  if ($indexed) then iddl:create(xs:QName("m:i")) else ();
+  dml:insert(xs:QName("m:c"), <e v="1"/>);
+  if ($indexed) then iddl:delete(xs:QName("m:i")) else ();
+  m:delete($name)
+};
+
+declare %an:sequential function m:two-in-one($name as xs:string,
+                                             $indexed as xs:boolean)
+  as xs:string
+{
+  ddl:create(xs:QName("m:c"));
+  if ($indexed) then iddl:create(xs:QName("m:i")) else ();
+  dml:insert(xs:QName("m:c"), (<e v="1"/>, <e v="2"/>));
+  if ($indexed) then iddl:delete(xs:QName("m:i")) else ();
+  m:delete($name)
+};
+
+declare %an:sequential function m:two-separate($name as xs:string,
+                                               $indexed as xs:boolean)
+  as xs:string
+{
+  ddl:create(xs:QName("m:c"));
+  if ($indexed) then iddl:create(xs:QName("m:i")) else ();
+  dml:insert(xs:QName("m:c"), <e v="1"/>);
+  dml:insert(xs:QName("m:c"), <e v="2"/>);
+  if ($indexed) then iddl:delete(xs:QName("m:i")) else ();
+  m:delete($name)
+};
+
+(: The nodes are parameters, as in the case that first showed ZDDY0015. :)
+declare %an:sequential function m:two-params($name as xs:string,
+                                             $first as element(e),
+                                             $second as element(e))
+  as xs:string
+{
+  ddl:create(xs:QName("m:c"));
+  dml:insert(xs:QName("m:c"), $first);
+  dml:insert(xs:QName("m:c"), $second);
+  m:delete($name)
+};
+
+declare %an:sequential function m:one-param($name as xs:string,
+                                            $first as element(e))
+  as xs:string
+{
+  ddl:create(xs:QName("m:c"));
+  dml:insert(xs:QName("m:c"), $first);
+  m:delete($name)
+};
+
+(: The second insert is inside a try block, as in the first case. :)
+declare %an:sequential function m:two-try($name as xs:string) as xs:string
+{
+  ddl:create(xs:QName("m:c"));
+  dml:insert(xs:QName("m:c"), <e v="1"/>);
+  variable $inserted :=
+    try
+    {{
+      dml:insert(xs:QName("m:c"), <e v="2"/>);
+      "inserted"
+    }}
+    catch *
+    {
+      fn:local-name-from-QName($err:code)
+    };
+  m:delete(fn:concat($name, " (", $inserted, ")"))
+};
