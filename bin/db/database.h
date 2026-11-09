@@ -52,6 +52,8 @@ struct DatabaseConfig {
   std::size_t cache_max_files = 10;
   /** For tests: called when a query is compiled, before it runs. */
   std::function<void()> before_execute;
+  /** For tests: see the after_read parameter of DocumentCache. */
+  std::function<void()> cache_after_read;
 };
 
 /**

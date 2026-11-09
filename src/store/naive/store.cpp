@@ -993,7 +993,7 @@ store::Item_t Store::loadDocument(
   XQueryDiagnostics lXQueryDiagnostics;
   std::unique_ptr<XmlLoader> loader(getXmlLoader(&lXQueryDiagnostics, loadProperties));
 
-  root = loader->loadXml(baseUri, docUri, stream);
+  root = static_cast<XmlNode*>(loader->loadXml(baseUri, docUri, stream).getp());
 
   if (loader->outOfMemory())
     throw std::bad_alloc();

@@ -17,6 +17,7 @@
 #define ZORBA_STORE_ITEM_HANDLE_H
 
 #include <string>
+#include <type_traits>
 
 namespace zorba 
 {
@@ -33,13 +34,6 @@ template<class T> class ItemHandle
 {
 protected:
   T  * p;
-
-public:
-  union union_T
-  {
-    T** t;
-    void** v;
-  };
 
 public:
   ItemHandle() : p(0)
@@ -74,8 +68,6 @@ public:
   T* getp() const { return p; }
   T* get() const { return p; }          // synonym to match unique_ptr
 
-  union_T getp_ref() { union_T u_t; u_t.t = &p; return u_t;}
-
   operator T* () { return getp(); }
 
   operator const T* () const { return getp(); }
@@ -100,12 +92,25 @@ public:
     return ItemHandle<otherT> (static_cast<otherT *>(p));
   }
 
-  template <class otherT> operator ItemHandle<otherT> () 
+  template <class otherT> ItemHandle<otherT> dyn_cast() const
+  {
+    return ItemHandle<otherT> (dynamic_cast<otherT *>(p));
+  }
+
+  // Implicit conversions only upcast (Derived -> Base); a downcast must name
+  // cast<D>() or dyn_cast<D>().
+  template <class otherT,
+            class = typename std::enable_if<
+                std::is_convertible<T*, otherT*>::value>::type>
+  operator ItemHandle<otherT> ()
   {
     return cast<otherT>();
   }
 
-  template <class otherT> operator const ItemHandle<otherT> () const 
+  template <class otherT,
+            class = typename std::enable_if<
+                std::is_convertible<T*, otherT*>::value>::type>
+  operator const ItemHandle<otherT> () const
   {
     return cast<otherT>();
   }
@@ -128,7 +133,10 @@ public:
 		return *this;
   }
 
-  template <class otherT> ItemHandle& operator=(const otherT* rhs)
+  template <class otherT,
+            class = typename std::enable_if<
+                std::is_convertible<const otherT*, const T*>::value>::type>
+  ItemHandle& operator=(const otherT* rhs)
   {
 		if (p != rhs)
     {
@@ -150,12 +158,18 @@ public:
     return assign(rhs);
   }
 
-	template <class otherT> ItemHandle& operator=(const ItemHandle<otherT>& rhs) 
+  template <class otherT,
+            class = typename std::enable_if<
+                std::is_convertible<otherT*, T*>::value>::type>
+  ItemHandle& operator=(const ItemHandle<otherT>& rhs)
   {
     return assign(rhs);
 	}
 
-  template <class otherT> ItemHandle& transfer(ItemHandle<otherT>& rhs)
+  template <class otherT,
+            class = typename std::enable_if<
+                std::is_convertible<otherT*, T*>::value>::type>
+  ItemHandle& transfer(ItemHandle<otherT>& rhs)
   {
 		if (p != rhs.getp())
     {

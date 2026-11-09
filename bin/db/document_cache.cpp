@@ -23,6 +23,7 @@
 #include <ctime>
 #include <iterator>
 #include <sstream>
+#include <utility>
 
 #include <sys/stat.h>
 
@@ -201,13 +202,15 @@ DocumentCache::DocumentCache( Zorba *zorba, std::string const &root,
                               std::uintmax_t max_file_bytes,
                               std::size_t max_files,
                               SecurityPolicy const *policy,
-                              std::string const &base_uri ) :
+                              std::string const &base_uri,
+                              std::function<void()> after_read ) :
   theZorba( zorba ),
   theGivenRoot( root ),
   theBaseUri( base_uri ),
   theMaxFileBytes( max_file_bytes ),
   theMaxFiles( max_files ),
   thePolicy( policy ),
+  theAfterRead( std::move( after_read ) ),
   theModule( new Module( this ) ),
   theMapper( new Mapper() ),
   theResolver( new Resolver() ) {
@@ -401,6 +404,8 @@ Item DocumentCache::admit( std::string const &root, std::string const &path,
   Item const record( read( root, path, &bytes ) );
   if ( record.isNull() )
     return Item();
+  if ( theAfterRead )
+    theAfterRead();
 
   // Kept only if it holds no error (which can come from the moment rather
   // than the file), is not a small file that expands far beyond what files of

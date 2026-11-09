@@ -34,6 +34,7 @@
 #include <ctime>
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <iostream>
 #include <map>
 #include <new>
@@ -100,6 +101,7 @@ extern "C" void zorba_test_qname_pool_flush();
 // For the sweeps (exhaust_sweep_*): one allocation fails, the N-th since
 // inject_arm(), or a run of them. Where malloc can be replaced, that covers what
 // the C libraries and MAPM allocate; in sanitizer builds, only operator new.
+// What a failed call keeps is counted over the malloc family in both (heap_live).
 namespace {
 std::atomic<bool> inject_on{ false };
 std::atomic<long> inject_count{ 0 };
@@ -135,25 +137,14 @@ long inject_disarm() {
   inject_on = false;
   return inject_count.load();
 }
+
+// Whether the run armed last made an allocation fail.
+bool inject_fired() {
+  long const first = inject_first.load();
+  return first > 0 && inject_count.load() >= first;
+}
 } // namespace
 
-# if !defined(ZORBA_TEST_SANITIZER)
-extern "C" {
-void* __libc_malloc( std::size_t );
-void* __libc_calloc( std::size_t, std::size_t );
-void* __libc_realloc( void*, std::size_t );
-
-void* malloc( std::size_t n ) noexcept {
-  return inject_fails() ? nullptr : __libc_malloc( n );
-}
-void* calloc( std::size_t n, std::size_t size ) noexcept {
-  return inject_fails() ? nullptr : __libc_calloc( n, size );
-}
-void* realloc( void *p, std::size_t n ) noexcept {
-  return inject_fails() ? nullptr : __libc_realloc( p, n );
-}
-} // extern "C"
-# endif
 #endif
 
 #if defined(__linux__)
@@ -162,6 +153,10 @@ void* realloc( void *p, std::size_t n ) noexcept {
 namespace {
 std::atomic<std::size_t> new_live{ 0 };
 std::atomic<std::size_t> new_budget{ 0 };  // 0: none
+
+// For the sweeps: the bytes of the live blocks of the malloc family, which
+// libxml2, ICU and Xerces-C allocate with, and operator new uses too.
+std::atomic<long> heap_live{ 0 };
 
 // For the sweeps, with big_track: the blocks of at least big_size bytes allocated
 // meanwhile, with their stacks, while they live. What a failed call keeps is then
@@ -211,20 +206,127 @@ void* budget_alloc( std::size_t n ) noexcept {
   void *const p = std::malloc( n ? n : 1 );
   if ( p ) {
     new_live.fetch_add( malloc_usable_size( p ), std::memory_order_relaxed );
+# if defined(ZORBA_TEST_SANITIZER)
     big_note( p, n );
+# endif
   }
   return p;
 }
 
 void budget_free( void *p ) noexcept {
   if ( p ) {
+# if defined(ZORBA_TEST_SANITIZER)
     if ( big_count )
       big_forget( p );
+# endif
     new_live.fetch_sub( malloc_usable_size( p ), std::memory_order_relaxed );
     std::free( p );
   }
 }
 } // namespace
+
+# if defined(ZORBA_TEST_SANITIZER)
+// The sanitizer owns malloc: its hooks count the blocks. Declared here, as in
+// <sanitizer/allocator_interface.h>, which not every compiler package installs;
+// visible to a shared sanitizer runtime despite -fvisibility=hidden.
+extern "C" {
+int __sanitizer_get_ownership( void const volatile *p );
+std::size_t __sanitizer_get_allocated_size( void const volatile *p );
+
+__attribute__(( visibility( "default" ) ))
+void __sanitizer_malloc_hook( void const volatile*, std::size_t n ) {
+  heap_live.fetch_add( static_cast<long>( n ), std::memory_order_relaxed );
+}
+__attribute__(( visibility( "default" ) ))
+void __sanitizer_free_hook( void const volatile *p ) {
+  if ( __sanitizer_get_ownership( p ) )
+    heap_live.fetch_sub( static_cast<long>( __sanitizer_get_allocated_size( p ) ),
+                         std::memory_order_relaxed );
+}
+} // extern "C"
+# else
+namespace {
+void* heap_add( void *p, std::size_t n ) noexcept {
+  if ( p ) {
+    heap_live.fetch_add( static_cast<long>( malloc_usable_size( p ) ),
+                         std::memory_order_relaxed );
+    big_note( p, n );
+  }
+  return p;
+}
+
+// p, of usable_size bytes, has been freed.
+void heap_freed( void *p, std::size_t usable_size ) noexcept {
+  if ( big_count )
+    big_forget( p );
+  heap_live.fetch_sub( static_cast<long>( usable_size ),
+                       std::memory_order_relaxed );
+}
+
+template <class F> F libc_next( char const *name ) noexcept {
+  return reinterpret_cast<F>( dlsym( RTLD_NEXT, name ) );
+}
+} // namespace
+
+extern "C" {
+void* __libc_malloc( std::size_t );
+void* __libc_calloc( std::size_t, std::size_t );
+void* __libc_realloc( void*, std::size_t );
+void __libc_free( void* );
+
+void* malloc( std::size_t n ) noexcept {
+  return inject_fails() ? nullptr : heap_add( __libc_malloc( n ), n );
+}
+void* calloc( std::size_t n, std::size_t size ) noexcept {
+  return inject_fails() ? nullptr : heap_add( __libc_calloc( n, size ), n * size );
+}
+void* realloc( void *p, std::size_t n ) noexcept {
+  if ( inject_fails() )
+    return nullptr;
+  std::size_t const old = p ? malloc_usable_size( p ) : 0;
+  void *const q = __libc_realloc( p, n );
+  // A null result with n > 0 leaves p as it was; with n == 0, p is freed.
+  if ( q || n == 0 ) {
+    if ( p )
+      heap_freed( p, old );
+    heap_add( q, n );
+  }
+  return q;
+}
+void free( void *p ) noexcept {
+  if ( p )
+    heap_freed( p, malloc_usable_size( p ) );
+  __libc_free( p );
+}
+// Counted only, as free() counts what they allocate.
+void* memalign( std::size_t alignment, std::size_t n ) noexcept {
+  static auto const next =
+    libc_next<void* (*)( std::size_t, std::size_t )>( "memalign" );
+  return heap_add( next( alignment, n ), n );
+}
+void* aligned_alloc( std::size_t alignment, std::size_t n ) noexcept {
+  static auto const next =
+    libc_next<void* (*)( std::size_t, std::size_t )>( "aligned_alloc" );
+  return heap_add( next( alignment, n ), n );
+}
+int posix_memalign( void **p, std::size_t alignment, std::size_t n ) noexcept {
+  static auto const next =
+    libc_next<int (*)( void**, std::size_t, std::size_t )>( "posix_memalign" );
+  int const r = next( p, alignment, n );
+  if ( r == 0 )
+    heap_add( *p, n );
+  return r;
+}
+void* valloc( std::size_t n ) noexcept {
+  static auto const next = libc_next<void* (*)( std::size_t )>( "valloc" );
+  return heap_add( next( n ), n );
+}
+void* pvalloc( std::size_t n ) noexcept {
+  static auto const next = libc_next<void* (*)( std::size_t )>( "pvalloc" );
+  return heap_add( next( n ), n );
+}
+} // extern "C"
+# endif
 
 void* operator new( std::size_t n ) {
   if ( void *const p = budget_alloc( n ) )
@@ -2366,6 +2468,8 @@ struct Sweep {
   std::vector<std::pair<std::string, std::string> > probes;
   // Files in the root, by name: content.
   std::vector<std::pair<std::string, std::string> > files;
+  // For the test of the sweep itself: runs in the child after the failed call.
+  std::function<void()> after_call;
 };
 
 bool known_matches( Known const &k, long length, std::string const &outcome ) {
@@ -2762,12 +2866,14 @@ void exhaust_sweep( Fixture const &f, std::string const &name, Sweep const &s ) 
       for ( BigBlock &b : big_blocks )
         b.p = nullptr;
       big_count = 0;
-      long const live0 = static_cast<long>( new_live.load() );
+      long const live0 = heap_live.load();
       long const table0 = static_cast<long>( zorba_test_qname_table_bytes() );
       big_track = measure;
       long count = 0;
       std::string out( sweep_call( server, call, s, first, length, &count ) );
       big_track = false;   // what the failed call itself allocated
+      if ( s.after_call )
+        s.after_call();
       std::replace( out.begin(), out.end(), '\n', ' ' );  // one line
       if ( snprintf( sweep_failed, sizeof sweep_failed, "%s", out.c_str() ) < 0 )
         sweep_failed[0] = 0;
@@ -2795,7 +2901,7 @@ void exhaust_sweep( Fixture const &f, std::string const &name, Sweep const &s ) 
         // The names cached for reuse depend on the order of insertions: dropped,
         // in this run and in the one with no failure alike.
         zorba_test_qname_pool_flush();
-        k = static_cast<long>( new_live.load() ) - live0 -
+        k = heap_live.load() - live0 -
           ( static_cast<long>( zorba_test_qname_table_bytes() ) - table0 );
       }
       big_track = false;
@@ -3151,9 +3257,8 @@ void test_sweep_xml_dtd( Fixture const &f ) {
 // Every allocation of the load fails in turn (a point for each: the document is
 // small). The loader gives the answer or memory_limit, never a document with a
 // node that has no content, and, as for every sweep, a failed call keeps no
-// more than the bound of what operator new allocated. That does not cover what
-// libxml2 allocates with malloc, such as the value xmlGetProp returns: its
-// release in startElement is not checked by this test.
+// more than the bound of what it allocated, with malloc (libxml2, such as the
+// value xmlGetProp returns) or operator new.
 void test_sweep_xml_dtd_nodes( Fixture const &f ) {
 #if defined(__linux__)
   // libxml2 2.9.14 (Ubuntu 24.04) makes a text, CDATA or comment node with no
@@ -3587,6 +3692,50 @@ void test_sweep_decimal_thread( Fixture const &f ) {
               starting( "terminate N11xercesc_", 2, 0, "OutOfMemoryExceptionE" ) };
   s.compiles = true;
   exhaust_sweep( f, "first decimal of a thread", s );
+#else
+  (void)f;
+#endif
+}
+// The sweep itself: a failed call that keeps a block allocated with malloc, as
+// libxml2, ICU and Xerces-C allocate, fails its check of kept memory.
+void *volatile sweep_kept_block = nullptr;
+void test_sweep_kept_malloc( Fixture const &f ) {
+#if defined(__linux__)
+  std::string const name( "kept malloc" );
+  Sweep s;
+  s.query = "string-length(string-join(for $i in 1 to 300 return string($i), ','))";
+  s.before.push_back( s.query );
+  s.after_compile = true;
+  s.expected = "1091";
+  s.after_call = []() {
+    if ( inject_fired() )
+      sweep_kept_block = std::malloc( 100 * 1024 );
+  };
+  std::ostringstream out;
+  std::streambuf *const cout_buf = std::cout.rdbuf( out.rdbuf() );
+  int const failures0 = failures;
+  exhaust_sweep( f, name, s );
+  std::cout.rdbuf( cout_buf );
+  failures = failures0;
+  // Only the checks of kept memory fail, and at least one does.
+  std::string const kept_failure( "FAILED: " + name + ": no failed call keeps more"
+                                  " than the bound" );
+  std::string const give_back( "FAILED: " + name + ": failed calls give their"
+                               " memory back" );
+  std::istringstream lines( out.str() );
+  std::string line, summary;
+  int kept = 0, other = 0;
+  while ( std::getline( lines, line ) ) {
+    if ( line == kept_failure )
+      ++kept;
+    else if ( line.rfind( "FAILED: ", 0 ) == 0 && line != give_back )
+      ++other;
+    if ( contains( line, " measured, " ) )
+      summary += " [" + line + "]";
+  }
+  check( kept > 0 && other == 0, name + ": the sweep sees the block",
+         std::to_string( kept ) + " kept-memory and " + std::to_string( other ) +
+         " other failures;" + summary );
 #else
   (void)f;
 #endif
@@ -6356,55 +6505,46 @@ void test_cache_change_detect( Fixture const &f ) {
 }
 
 // A file that changes while it is read to be admitted is not kept: its first
-// read has seen the same metadata, and the change comes during the second.
+// read has seen the same metadata, and the change comes during the second,
+// between the read and the check after it.
 void test_cache_change_during_read( Fixture const &f ) {
+  namespace stdfs = std::filesystem;
   TempTree t;
-  std::string big( "v,pad\n" );
-  std::string const row( "1,xxxxxxxxxxxxxxxxxxxxxxxx\n" );
-  while ( big.size() < 4u << 20 )
-    big += row;
-  t.write( "big.csv", big );
-  std::string const path( t.root + "/big.csv" );
-  Server server( f.zorba, cache_config( t.root, 64 * 1024, 10 ), std::cerr );
-  std::string const q( dir_import + jn_import +
-    "count(jn:members(dir:open($dir:root, \"big.csv\")(\"content\")))" );
-
-  std::string const rows( query_text( server, q ) );
-  check( rows != "0" && !contains( rows, "error" ), "the rows of the file", rows );
-  auto touch = [&path]() {
-    struct timespec const times[2] = { { 0, UTIME_NOW }, { 0, UTIME_NOW } };
-    utimensat( AT_FDCWD, path.c_str(), times, 0 );
+  t.write( "a.json", json_of_size( 1, 40 ) );
+  std::string const path( t.root + "/a.json" );
+  bool change = false;
+  int reads = 0;
+  ServerConfig config( cache_config( t.root, 16, 10 ) );
+  // A modification time one second on: a change whatever the resolution of
+  // file times.
+  config.cache_after_read = [&]() {
+    ++reads;
+    if ( change )
+      stdfs::last_write_time( path, stdfs::last_write_time( path ) +
+                                    std::chrono::seconds( 1 ) );
   };
-  // How long a query takes to reach the file depends on the build: a change
-  // too early is a first read of new metadata, and one too late finds a record
-  // kept. Each try starts from new metadata seen once.
-  bool during = false;
-  for ( int delay = 30; !during && delay < 4000; delay *= 2 ) {
-    touch();
-    changed_files();
-    check( query_text( server, q ) == rows, "the first read of the try" );
-    std::thread toucher( [&touch, delay]() {
-      std::this_thread::sleep_for( std::chrono::milliseconds( delay ) );
-      touch();
-    } );
-    std::string const v( query_text( server, q ) );
-    toucher.join();
-    changed_files();
-    check( v == rows, "the read while the file changes", v );
-    during = server.cache_stats().refused > 0;
-  }
+  Server server( f.zorba, config, std::cerr );
+
+  check( open_value( server, "a.json" ) == "1", "the first read" );
+  change = true;
+  std::string const v( open_value( server, "a.json" ) );
+  change = false;
+  changed_files();
+  check( v == "1", "the read while the file changes", v );
   DocumentCache::Stats s = server.cache_stats();
-  check( during && s.refused == 1 && s.entries == 0 && s.bytes == 0,
+  check( reads == 1 && s.refused == 1 && s.entries == 0 && s.bytes == 0,
          "read to be admitted, and not kept", stats_text( s ) + ", refused " +
-         std::to_string( s.refused ) );
+         std::to_string( s.refused ) + ", reads " + std::to_string( reads ) );
 
   // Once it holds still, it is an ordinary file again.
   std::size_t const admissions = s.admissions, hits = s.hits;
   for ( int i = 0; i < 3; ++i )
-    check( query_text( server, q ) == rows, "the value afterwards" );
+    check( open_value( server, "a.json" ) == "1", "the value afterwards" );
   s = server.cache_stats();
-  check( s.admissions == admissions + 1 && s.hits == hits + 1 && s.entries == 1,
-         "it enters once it holds still", stats_text( s ) );
+  check( reads == 2 && s.admissions == admissions + 1 &&
+         s.hits == hits + 1 && s.entries == 1,
+         "it enters once it holds still", stats_text( s ) + ", reads " +
+         std::to_string( reads ) );
 }
 
 // The last write wins, however close it is to the read that was kept.
@@ -7392,6 +7532,7 @@ Test const tests[] = {
   { "exhaust_sweep_casts", test_sweep_casts },
   { "exhaust_sweep_decimal_thread", test_sweep_decimal_thread },
   { "exhaust_sweep_cache", test_sweep_cache },
+  { "exhaust_sweep_kept_malloc", test_sweep_kept_malloc },
   { "exhaust_cache_after_failure", test_cache_after_failed_admission },
   { "exhaust_user_error", test_user_error_named_like_memory },
   { "exhaust_notification", test_notification_out_of_memory },

@@ -301,6 +301,7 @@ db::DatabaseConfig database_config( ServerConfig const &config ) {
   c.cache_max_file_kb = config.cache_max_file_kb;
   c.cache_max_files = config.cache_max_files;
   c.before_execute = config.before_execute;
+  c.cache_after_read = config.cache_after_read;
   return c;
 }
 

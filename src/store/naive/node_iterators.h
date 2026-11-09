@@ -22,6 +22,7 @@
 #include <set>
 #include <vector>
 
+#include "diagnostics/assert.h"
 #include "store/api/iterator.h"
 #include "shared_types.h"
 #include "node_items.h"
@@ -179,14 +180,17 @@ public:
   void init(store::Item_t& parent, const store::Item* child = NULL)
   {
     stop();
-    theParentNode.transfer(parent);
+    theParentNode = dynamic_cast<InternalNode*>(parent.getp());
+    ZORBA_ASSERT(theParentNode != NULL);
+    parent = NULL;
     setRange(child);
   }
 
   void init(const store::Item* parent, const store::Item* child = NULL)
   {
     stop();
-    theParentNode = parent;
+    theParentNode = dynamic_cast<const InternalNode*>(parent);
+    ZORBA_ASSERT(theParentNode != NULL);
     setRange(child);
   }
 
@@ -305,14 +309,17 @@ public:
   void init(store::Item_t& parent, const store::Item* child = NULL)
   {
     stop();
-    theParentNode.transfer(parent);
+    theParentNode = dynamic_cast<InternalNode*>(parent.getp());
+    ZORBA_ASSERT(theParentNode != NULL);
+    parent = NULL;
     setRange(child);
   }
 
   void init(const store::Item* parent, const store::Item* child = NULL)
   {
     stop();
-    theParentNode = parent;
+    theParentNode = dynamic_cast<const InternalNode*>(parent);
+    ZORBA_ASSERT(theParentNode != NULL);
     setRange(child);
   }
 
@@ -401,14 +408,17 @@ public:
   void init(store::Item_t& parent)
   {
     stop();
-    theParentNode.transfer(parent);
+    theParentNode = dynamic_cast<ElementNode*>(parent.getp());
+    ZORBA_ASSERT(theParentNode != NULL);
+    parent = NULL;
     setRange();
   }
 
   void init(const store::Item* parent)
   {
     stop();
-    theParentNode = parent;
+    theParentNode = dynamic_cast<const ElementNode*>(parent);
+    ZORBA_ASSERT(theParentNode != NULL);
     setRange();
   }
 

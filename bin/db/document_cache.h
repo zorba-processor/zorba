@@ -19,6 +19,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <list>
 #include <memory>
 #include <string>
@@ -93,10 +94,13 @@ public:
    * first record is built, so it may be set up after construction).
    * @param base_uri the base URI of the records, the one of the server's
    * queries.
+   * @param after_read for tests: called when a read to admit a file has
+   * returned a record, before the file is checked to be unchanged.
    */
   DocumentCache( Zorba *zorba, std::string const &root,
                  std::uintmax_t max_file_bytes, std::size_t max_files,
-                 SecurityPolicy const *policy, std::string const &base_uri );
+                 SecurityPolicy const *policy, std::string const &base_uri,
+                 std::function<void()> after_read = {} );
   ~DocumentCache();
 
   DocumentCache( DocumentCache const& ) = delete;
@@ -200,6 +204,7 @@ private:
   std::uintmax_t const theMaxFileBytes;
   std::size_t const theMaxFiles;
   SecurityPolicy const *const thePolicy;
+  std::function<void()> const theAfterRead;
   XQuery_t theReader;                   // dir:open($root, $path)
   XQuery_t theCopier;                   // a copy of $record
   bool theActive = true;

@@ -28,6 +28,7 @@
 #include <zorba/tokenizer.h>
 #endif /* ZORBA_NO_FULL_TEXT */
 
+#include "diagnostics/assert.h"
 #include "store/api/item.h"
 #include "store/api/item_handle.h"
 #include <zorba/store_consts.h>
@@ -129,7 +130,9 @@ protected:
     :
     AtomicItem(baseItem->getTypeCode())
   {
-    theBaseItem.transfer(baseItem);
+    theBaseItem = dynamic_cast<AtomicItem*>(baseItem.getp());
+    ZORBA_ASSERT(theBaseItem != NULL);
+    baseItem = NULL;
     theTypeName.transfer(typeName);
   }
 

@@ -563,6 +563,13 @@ public:
   const XQPCollator                  * theCollator;
   xqtref_t                             theKeyType;
 
+  // Kept here, not in locals of nextImpl, which do not survive a STACK_PUSH.
+  bool                                 theHaveLower;
+  bool                                 theHaveUpper;
+  bool                                 theInclLower;
+  bool                                 theInclUpper;
+  store::IndexCondition_t              theCondition;
+
   std::vector<store::Item_t>           theSearchItems;
   std::vector<store::Item_t>::iterator theSearchItemsIte;
   std::vector<store::Item_t>::iterator theSearchItemsEnd;

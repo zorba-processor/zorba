@@ -295,11 +295,13 @@ void GeneralIndexCondition::pushItem(store::Item_t& item)
   assert(!theIsSet);
   assert(item && item->isAtomic());
 
-  theKey.transfer(item);
+  theKey = dynamic_cast<AtomicItem*>(item.getp());
+  ZORBA_ASSERT(theKey != NULL);
+  item = NULL;
 
   store::Item* baseItem = theKey->getBaseItem();
   if (baseItem != NULL)
-    theKey = baseItem;
+    theKey = static_cast<AtomicItem*>(baseItem);
 
   theIsSet = true;
 }
@@ -328,20 +330,24 @@ void GeneralIndexCondition::pushRange(
 
   if (haveLower)
   {
-    theLowerBound.transfer(lower);
+    theLowerBound = dynamic_cast<AtomicItem*>(lower.getp());
+    ZORBA_ASSERT(theLowerBound != NULL);
+    lower = NULL;
 
     store::Item* baseItem = theLowerBound->getBaseItem();
     if (baseItem != NULL)
-      theLowerBound = baseItem;
+      theLowerBound = static_cast<AtomicItem*>(baseItem);
   }
 
   if (haveUpper)
   {
-    theUpperBound.transfer(upper);
+    theUpperBound = dynamic_cast<AtomicItem*>(upper.getp());
+    ZORBA_ASSERT(theUpperBound != NULL);
+    upper = NULL;
 
     store::Item* baseItem = theUpperBound->getBaseItem();
     if (baseItem != NULL)
-      theUpperBound = baseItem;
+      theUpperBound = static_cast<AtomicItem*>(baseItem);
   }
 
   theIsSet = true;
@@ -366,22 +372,26 @@ void GeneralIndexCondition::pushBound(
     theRangeFlags.theHaveLowerBound = true;
     theRangeFlags.theHaveUpperBound = false;
 
-    theLowerBound.transfer(bound);
+    theLowerBound = dynamic_cast<AtomicItem*>(bound.getp());
+    ZORBA_ASSERT(theLowerBound != NULL);
+    bound = NULL;
 
     store::Item* baseItem = theLowerBound->getBaseItem();
     if (baseItem != NULL)
-      theLowerBound = baseItem;
+      theLowerBound = static_cast<AtomicItem*>(baseItem);
   }
   else
   {
     theRangeFlags.theHaveLowerBound = false;
     theRangeFlags.theHaveUpperBound = true;
 
-    theUpperBound.transfer(bound);
+    theUpperBound = dynamic_cast<AtomicItem*>(bound.getp());
+    ZORBA_ASSERT(theUpperBound != NULL);
+    bound = NULL;
 
     store::Item* baseItem = theUpperBound->getBaseItem();
     if (baseItem != NULL)
-      theUpperBound = baseItem;
+      theUpperBound = static_cast<AtomicItem*>(baseItem);
   }
 
   theRangeFlags.theLowerBoundIncl = boundIncl;
