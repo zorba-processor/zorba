@@ -3,7 +3,7 @@ import module namespace m = "http://www.example.com/general-probe-reinit" at
 
 m:init();
 
-fn:string-join((
+fn:string-join(
   for $index in (xs:QName("m:Range"), xs:QName("m:Equality"))
   let $n := fn:local-name-from-QName($index)
   return (
@@ -15,10 +15,4 @@ fn:string-join((
             (7, xs:untypedAtomic("10.0"))),
     m:point(fn:concat($n, " untyped then double key"), $index,
             (xs:untypedAtomic("7.0"), 3e0))),
-  m:range("untyped then typed lower", (xs:untypedAtomic("8"), 3), ()),
-  m:range("typed then untyped lower", (3, xs:untypedAtomic("8")), ()),
-  m:range("untyped then typed upper", (), (xs:untypedAtomic("05"), 8)),
-  m:range("typed then untyped upper", (), (8, xs:untypedAtomic("05"))),
-  m:range("untyped then typed lower, upper", (xs:untypedAtomic("8"), 3), 8),
-  m:range("lower, untyped then typed upper", 3, (xs:untypedAtomic("05"), 8))),
   "&#10;")

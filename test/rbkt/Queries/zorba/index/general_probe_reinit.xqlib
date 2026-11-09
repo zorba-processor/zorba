@@ -120,3 +120,20 @@ declare function m:range($name as xs:string,
                        (fn:empty($upper) or $k <= $upper)
                  return $e))
 };
+
+(: One probe call per lower bound in $bounds, the same call each time. :)
+declare function m:range-each($name as xs:string,
+                              $bounds as xs:anyAtomicType*) as xs:string
+{
+  fn:concat($name, ": ", fn:string-join(
+    for $bound in $bounds
+    return m:result(fn:string($bound),
+                    m:ids(idml:probe-index-range-general(xs:QName("m:Range"),
+                                                         $bound, (),
+                                                         fn:true(), fn:false(),
+                                                         fn:true(), fn:false())),
+                    m:ids(for $e in m:elements()
+                          where m:key($e) >= $bound
+                          return $e)),
+    "; "))
+};
