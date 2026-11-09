@@ -1075,7 +1075,15 @@ store::Item_t DtdXmlLoader::loadXml(
     new_props.setSubstituteEntities(true);
     applyLoadOptions(new_props, ctxt);
 
-    if ( xmlParseDocument(ctxt)==-1 )
+    int const parsed = xmlParseDocument(ctxt);
+
+    // libxml2 keeps this code once one of its allocations failed (from 2.13
+    // for all of them).
+    if (ctxt->errNo == XML_ERR_NO_MEMORY)
+    {
+      setOutOfMemory();
+    }
+    else if (parsed == -1)
     {
       // std::cout << "  xmlParseDocument: Error: Unable to create tree: " << xmlCtxtGetLastError(ctxt)->message << std::endl;
       theXQueryDiagnostics->add_error(NEW_ZORBA_EXCEPTION(zerr::ZSTR0021_LOADER_PARSING_ERROR,ERROR_PARAMS( ZED( XMLParserNoCreateTree ) )));
