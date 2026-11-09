@@ -3517,8 +3517,10 @@ void CollectionPul::applyUpdates()
         NodeUpdates::iterator updEnd = updates->end();
         for (; updIte != updEnd; ++updIte)
         {
-          // A replace at a deleted position is omitted (JSONiq merging rule);
-          // the sort puts the delete right before it.
+          // A replace at a deleted position is omitted (JSONiq merging rule).
+          // This relies on the comparator ranking the delete right before the
+          // replace and on at most one delete per position
+          // (addJSONArrayDelete, mergeTargetedUpdateLists).
           if ((*updIte)->getKind() == store::UpdateConsts::UP_JSON_ARRAY_REPLACE_VALUE &&
               updIte != updates->begin() &&
               (*(updIte - 1))->getKind() == store::UpdateConsts::UP_JSON_ARRAY_DELETE &&
