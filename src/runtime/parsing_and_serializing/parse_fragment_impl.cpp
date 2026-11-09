@@ -512,7 +512,9 @@ bool FnZorbaCanonicalizeIterator::nextImpl(store::Item_t& result, PlanState& pla
     // Closing the buffer reports an error of the buffer that the
     // canonicalization did not: a negative xmlParserErrors code.
     int const lClosed = xmlOutputBufferClose(lOutput.release());
-    if (lStatus < 0 || lClosed < 0)
+    // libxml2 can report an error and still return success, with output that
+    // lacks what it failed to write: an error reported counts as a failure.
+    if (lStatus < 0 || lClosed < 0 || lReported.code != 0)
     {
       // The input is well formed, so a failure of the canonicalization is
       // either an allocation that failed or a document that the canonical form
