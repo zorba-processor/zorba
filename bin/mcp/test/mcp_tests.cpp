@@ -34,6 +34,7 @@
 #include <ctime>
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <iostream>
 #include <map>
 #include <new>
@@ -134,6 +135,12 @@ void inject_arm( long first, long length ) {
 long inject_disarm() {
   inject_on = false;
   return inject_count.load();
+}
+
+// Whether the run armed last made an allocation fail.
+bool inject_fired() {
+  long const first = inject_first.load();
+  return first > 0 && inject_count.load() >= first;
 }
 } // namespace
 
@@ -2366,6 +2373,8 @@ struct Sweep {
   std::vector<std::pair<std::string, std::string> > probes;
   // Files in the root, by name: content.
   std::vector<std::pair<std::string, std::string> > files;
+  // For the test of the sweep itself: runs in the child after the failed call.
+  std::function<void()> after_call;
 };
 
 bool known_matches( Known const &k, long length, std::string const &outcome ) {
@@ -2768,6 +2777,8 @@ void exhaust_sweep( Fixture const &f, std::string const &name, Sweep const &s ) 
       long count = 0;
       std::string out( sweep_call( server, call, s, first, length, &count ) );
       big_track = false;   // what the failed call itself allocated
+      if ( s.after_call )
+        s.after_call();
       std::replace( out.begin(), out.end(), '\n', ' ' );  // one line
       if ( snprintf( sweep_failed, sizeof sweep_failed, "%s", out.c_str() ) < 0 )
         sweep_failed[0] = 0;
@@ -3565,6 +3576,50 @@ void test_sweep_decimal_thread( Fixture const &f ) {
               starting( "terminate N11xercesc_", 2, 0, "OutOfMemoryExceptionE" ) };
   s.compiles = true;
   exhaust_sweep( f, "first decimal of a thread", s );
+#else
+  (void)f;
+#endif
+}
+// The sweep itself: a failed call that keeps a block allocated with malloc, as
+// libxml2, ICU and Xerces-C allocate, fails its check of kept memory.
+void *volatile sweep_kept_block = nullptr;
+void test_sweep_kept_malloc( Fixture const &f ) {
+#if defined(__linux__)
+  std::string const name( "kept malloc" );
+  Sweep s;
+  s.query = "string-length(string-join(for $i in 1 to 300 return string($i), ','))";
+  s.before.push_back( s.query );
+  s.after_compile = true;
+  s.expected = "1091";
+  s.after_call = []() {
+    if ( inject_fired() )
+      sweep_kept_block = std::malloc( 100 * 1024 );
+  };
+  std::ostringstream out;
+  std::streambuf *const cout_buf = std::cout.rdbuf( out.rdbuf() );
+  int const failures0 = failures;
+  exhaust_sweep( f, name, s );
+  std::cout.rdbuf( cout_buf );
+  failures = failures0;
+  // Only the checks of kept memory fail, and at least one does.
+  std::string const kept_failure( "FAILED: " + name + ": no failed call keeps more"
+                                  " than the bound" );
+  std::string const give_back( "FAILED: " + name + ": failed calls give their"
+                               " memory back" );
+  std::istringstream lines( out.str() );
+  std::string line, summary;
+  int kept = 0, other = 0;
+  while ( std::getline( lines, line ) ) {
+    if ( line == kept_failure )
+      ++kept;
+    else if ( line.rfind( "FAILED: ", 0 ) == 0 && line != give_back )
+      ++other;
+    if ( contains( line, " measured, " ) )
+      summary += " [" + line + "]";
+  }
+  check( kept > 0 && other == 0, name + ": the sweep sees the block",
+         std::to_string( kept ) + " kept-memory and " + std::to_string( other ) +
+         " other failures;" + summary );
 #else
   (void)f;
 #endif
@@ -7369,6 +7424,7 @@ Test const tests[] = {
   { "exhaust_sweep_casts", test_sweep_casts },
   { "exhaust_sweep_decimal_thread", test_sweep_decimal_thread },
   { "exhaust_sweep_cache", test_sweep_cache },
+  { "exhaust_sweep_kept_malloc", test_sweep_kept_malloc },
   { "exhaust_cache_after_failure", test_cache_after_failed_admission },
   { "exhaust_user_error", test_user_error_named_like_memory },
   { "exhaust_notification", test_notification_out_of_memory },
