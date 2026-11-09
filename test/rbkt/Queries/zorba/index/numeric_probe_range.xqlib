@@ -1,0 +1,77 @@
+module namespace m = "http://www.example.com/numeric-probe-range";
+
+import module namespace ddl =
+  "http://zorba.io/modules/store/static/collections/ddl";
+
+import module namespace dml =
+  "http://zorba.io/modules/store/static/collections/dml";
+
+import module namespace iddl =
+  "http://zorba.io/modules/store/static/indexes/ddl";
+
+import module namespace idml =
+  "http://zorba.io/modules/store/static/indexes/dml";
+
+declare namespace an = "http://zorba.io/annotations";
+
+declare collection m:c as node()*;
+
+declare function m:key($e as element()) as xs:anyAtomicType
+{
+  if ($e/@t eq "l") then xs:long($e/@v) else xs:double($e/@v)
+};
+
+(: Long keys and a double key, so both numeric maps exist. :)
+declare %an:general-range %an:manual index m:Numbers
+on nodes dml:collection(xs:QName("m:c"))//e
+by (if (./@t eq "l") then xs:long(./@v) else xs:double(./@v));
+
+declare %an:sequential function m:init()
+{
+  ddl:create(xs:QName("m:c"));
+
+  dml:insert(xs:QName("m:c"),
+             <r>
+               <e id="1" t="l" v="1"/>
+               <e id="2" t="l" v="2"/>
+               <e id="3" t="d" v="3.5"/>
+             </r>);
+
+  iddl:create(xs:QName("m:Numbers"));
+};
+
+declare function m:ids($nodes as node()*) as xs:string
+{
+  fn:string-join(
+    for $e in $nodes
+    order by xs:integer($e/@id)
+    return fn:string($e/@id),
+    " ")
+};
+
+declare function m:point($key as xs:anyAtomicType) as xs:string
+{
+  fn:concat(
+    m:ids(idml:probe-index-point-general(xs:QName("m:Numbers"), $key)),
+    " | ",
+    m:ids(dml:collection(xs:QName("m:c"))//e[m:key(.) eq $key]))
+};
+
+declare function m:range-from($lower as xs:anyAtomicType) as xs:string
+{
+  fn:concat(
+    m:ids(idml:probe-index-range-general(xs:QName("m:Numbers"),
+                                         $lower,
+                                         (),
+                                         fn:true(),
+                                         fn:false(),
+                                         fn:true(),
+                                         fn:true())),
+    " | ",
+    m:ids(dml:collection(xs:QName("m:c"))//e[m:key(.) ge $lower]))
+};
+
+declare function m:point-untyped($key as xs:untypedAtomic) as xs:string
+{
+  m:ids(idml:probe-index-point-general(xs:QName("m:Numbers"), $key))
+};
