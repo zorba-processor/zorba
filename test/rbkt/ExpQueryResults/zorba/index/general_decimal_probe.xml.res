@@ -3,7 +3,7 @@ Range exact decimal point: 4
 Range colliding decimal point: 5
 Range untyped-equal decimal point: 6 9
 Range large integer point: 7
-Range inexact integer point:
+Range inexact integer point: none
 Range inexact integer double point: 12
 Range double point: 1 2 3 6 9
 Range large decimal float point: 10
@@ -15,7 +15,7 @@ Equality exact decimal point: 4
 Equality colliding decimal point: 5
 Equality untyped-equal decimal point: 6 9
 Equality large integer point: 7
-Equality inexact integer point:
+Equality inexact integer point: none
 Equality inexact integer double point: 12
 Equality double point: 1 2 3 6 9
 Equality large decimal float point: 10
@@ -33,8 +33,8 @@ untyped upper: 1 2 3 6
 no bounds: 1 2 3 4 5 6 7 8 9 10 11 12
 exclusive decimal lower: 2 4 5 7 8 10 11 12
 exclusive decimal upper: 3
-exclusive double upper:
-exclusive float both:
+exclusive double upper: none
+exclusive float both: none
 unique decimals sharing an image: inserted;: 1
 unique equal decimals: ZDDY0024;: 1
 keys: xs:decimal 0.3, xs:decimal 0.5, xs:long 9007199254740993

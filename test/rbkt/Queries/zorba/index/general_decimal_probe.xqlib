@@ -128,9 +128,15 @@ declare function m:result($name as xs:string,
                           $indexed as xs:string,
                           $unindexed as xs:string) as xs:string
 {
-  fn:concat($name, ": ", $indexed,
+  fn:concat($name, ": ", m:shown($indexed),
             if ($indexed eq $unindexed) then ""
-            else fn:concat(" (unindexed: ", $unindexed, ")"))
+            else fn:concat(" (unindexed: ", m:shown($unindexed), ")"))
+};
+
+(: An empty selection is shown as "none", so no line ends with a space. :)
+declare function m:shown($ids as xs:string) as xs:string
+{
+  if ($ids eq "") then "none" else $ids
 };
 
 declare function m:elements($coll as xs:QName) as element(e)*
