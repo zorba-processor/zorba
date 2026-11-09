@@ -537,6 +537,8 @@ void Schema::registerXSD(
     internal::StreamResource* stream,
     const QueryLoc& loc)
 {
+  // Frees, after the parser, what its constructors keep when an allocation fails.
+  OwningMemoryManager parserMemoryManager;
   std::unique_ptr<SAX2XMLReader> parser;
 
   TRACE("url=" << xsdURL << " loc=" << loc);
@@ -548,8 +550,8 @@ void Schema::registerXSD(
     // The implementation class (what XMLReaderFactory::createXMLReader()
     // returns) is used directly for setXMLEntityResolver(), which the
     // SAX2XMLReader interface does not have.
-    SAX2XMLReaderImpl* reader =
-    new SAX2XMLReaderImpl(XMLPlatformUtils::fgMemoryManager, theGrammarPool);
+    SAX2XMLReaderImpl* reader = new (&parserMemoryManager)
+    SAX2XMLReaderImpl(&parserMemoryManager, theGrammarPool);
 
     parser.reset(reader);
     // Perform namespace processing
@@ -603,6 +605,10 @@ void Schema::registerXSD(
   catch (const OutOfMemoryException&)
   {
     throw std::bad_alloc();
+  }
+  catch (const std::bad_alloc&)
+  {
+    throw;
   }
   catch (const XMLException& e)
   {

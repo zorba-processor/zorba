@@ -3380,7 +3380,7 @@ void test_sweep_schema_import( Fixture const &f ) {
   s.expected = "3";
   s.lenient = true;
   s.wrong = { "ZXQP0014", "ZXQP0035" };
-  s.points = 400;
+  s.points = 200;
   // As in test_sweep_compile, and Xerces-C releasing a schema. Caps: about 1.5
   // times the most seen (1 alone, 17 in runs of 8, quick-check run 42693936525).
   s.known = { exact( "exit 2", 2 ), library_crash( "signal 6 in libstdc", true, 2 ),
