@@ -127,12 +127,14 @@ void loader::add_value( store::Item_t const &value ) {
       // name.
       //
       stack_.pop();
+      // top is off the stack, so clear_stack() will not free it: free it also
+      // when push_back() throws std::bad_alloc.
+      destroyer const destroy_top{ top };
       stack_element &top2 = stack_.top();
       assert( top2.type_ == stack_element::object_type );
       top2.object_->keys_.push_back( top.key_ );
       if ( !check_only_ )
         top2.object_->values_.push_back( value );
-      top.destroy();
       break;
     }
     default:
@@ -245,10 +247,7 @@ bool loader::next( store::Item_t *result ) {
           --depth_;
           // top is off the stack, so clear_stack() will not free it: free it
           // also when createJSONObject() raises JNDY0003 for a duplicate key.
-          struct destroyer {
-            stack_element &e_;
-            ~destroyer() { e_.destroy(); }
-          } const destroy_top{ top };
+          destroyer const destroy_top{ top };
           switch ( top.type_ ) {
             case stack_element::array_type:
               if ( !check_only_ )

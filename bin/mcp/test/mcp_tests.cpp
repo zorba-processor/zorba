@@ -61,6 +61,9 @@
 #if defined(__linux__)
 # include <execinfo.h>
 #endif
+#if defined(__SANITIZE_ADDRESS__)
+# include <sanitizer/lsan_interface.h>
+#endif
 #include <unistd.h>
 
 #include <libxml/xmlversion.h>
@@ -3559,6 +3562,60 @@ void test_base64_stream_out_of_memory( Fixture const &f ) {
     }
   check( shorter == 0, "createBase64Binary from a stream: never a shorter value",
          std::to_string( shorter ) + " points" );
+#else
+  (void)f;
+#endif
+}
+// jn:parse-json with each allocation failing in turn, in this process: what a
+// failed parse made is freed, which LeakSanitizer checks here, where the sweeps'
+// children cannot.
+void test_json_loader_out_of_memory( Fixture const &f ) {
+#if defined(__linux__)
+  std::string json( "[" );
+  for ( int i = 0; i < 4; ++i )
+    json += std::string( i ? "," : "" ) + "{\"a" + std::to_string( i ) +
+      "\":1,\"b\":\"x\",\"c\":[true,null],\"d\":{\"e\":2.5},\"f\":3,\"g\":4}";
+  json += "]";
+  Item const input( f.zorba->getItemFactory()->createString( json ) );
+  auto attempt = [&]( long n, long length, long *count ) -> std::string {
+    XQuery_t const query( f.zorba->compileQuery(
+      "import module namespace jn = 'http://jsoniq.org/functions';\n"
+      "declare variable $s as xs:string external;\n"
+      "count(jn:members(jn:parse-json($s)))" ) );
+    query->getDynamicContext()->setVariable( "s", input );
+    // Made before the failures: they are for the parse, not the API.
+    Iterator_t const it( query->iterator() );
+    std::string out( "error" );
+    inject_arm( n, length );
+    try {
+      it->open();
+      Item item;
+      if ( it->next( item ) )
+        out = item.getStringValue().str();
+      it->close();
+    }
+    catch ( std::exception const& ) {
+    }
+    *count = inject_disarm();
+    return out;
+  };
+  long total = 0;
+  check( attempt( 0, 0, &total ) == "4", "jn:parse-json: the answer" );
+  long wrong = 0;
+  for ( long const length : { 1L, 8L } )
+    for ( long n = 1; n <= total; ++n ) {
+      long count = 0;
+      std::string const got( attempt( n, length, &count ) );
+      if ( got != "4" && got != "error" && ++wrong <= 3 )
+        std::cout << "at " << n << " of a run of " << length << ": " << got
+                  << std::endl;
+    }
+  check( wrong == 0, "jn:parse-json: the answer or an error",
+         std::to_string( wrong ) + " points" );
+# if defined(__SANITIZE_ADDRESS__)
+  check( __lsan_do_recoverable_leak_check() == 0,
+         "jn:parse-json: a failed parse leaks nothing" );
+# endif
 #else
   (void)f;
 #endif
@@ -7498,6 +7555,7 @@ Test const tests[] = {
   { "exhaust_sweep_streamable_text", test_sweep_streamable_text },
   { "exhaust_base64_stream", test_base64_stream_out_of_memory },
   { "exhaust_seekable_stream", test_seekable_stream_out_of_memory },
+  { "exhaust_json_loader", test_json_loader_out_of_memory },
   { "exhaust_sweep_matcher", test_sweep_matcher },
   { "exhaust_sweep_xml", test_sweep_xml },
   { "exhaust_sweep_xml_dtd", test_sweep_xml_dtd },
