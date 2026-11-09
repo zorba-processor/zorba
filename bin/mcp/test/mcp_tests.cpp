@@ -3478,10 +3478,11 @@ void test_json_loader_out_of_memory( Fixture const &f ) {
       "declare variable $s as xs:string external;\n"
       "count(jn:members(jn:parse-json($s)))" ) );
     query->getDynamicContext()->setVariable( "s", input );
+    // Made before the failures: they are for the parse, not the API.
+    Iterator_t const it( query->iterator() );
     std::string out( "error" );
     inject_arm( n, length );
     try {
-      Iterator_t const it( query->iterator() );
       it->open();
       Item item;
       if ( it->next( item ) )
