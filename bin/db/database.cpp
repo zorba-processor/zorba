@@ -196,7 +196,8 @@ Database::Database( Zorba *zorba, DatabaseConfig config, std::ostream &log ) :
   thePolicy( SecurityPolicy::secure() ),
   theCache( zorba, theConfig.root,
             std::uintmax_t( theConfig.cache_max_file_kb ) * 1024,
-            theConfig.cache_max_files, &thePolicy, base_uri_of( theConfig.root ) ) {
+            theConfig.cache_max_files, &thePolicy, base_uri_of( theConfig.root ),
+            theConfig.cache_after_read ) {
   // libxml2 ends the process if it cannot allocate its state for a thread, the
   // first time the thread uses it: this thread does so now, before any query.
   xmlDictFree( xmlDictCreate() );
