@@ -12,7 +12,11 @@ declare namespace err = "http://www.w3.org/2005/xqt-errors";
 
 declare collection m:c as node()*;
 
-declare %an:automatic %an:value-equality index m:i
+declare %an:automatic %an:value-equality index m:value
+on nodes dml:collection(xs:QName("m:c"))
+by xs:string(./@v) as xs:string;
+
+declare %an:automatic %an:general-equality index m:general
 on nodes dml:collection(xs:QName("m:c"))
 by xs:string(./@v) as xs:string;
 
@@ -35,6 +39,8 @@ declare %an:sequential function m:delete($name as xs:string) as xs:string
   fn:concat($name, ": ", $outcome)
 };
 
+(: Each case creates m:c and $indexes, inserts its nodes, deletes $indexes
+   (an available index on m:c is ZDDY0013) and then deletes m:c. :)
 declare %an:sequential function m:none($name as xs:string,
                                        $indexes as xs:QName*) as xs:string
 {
@@ -77,41 +83,22 @@ declare %an:sequential function m:two-separate($name as xs:string,
   m:delete($name)
 };
 
-(: The nodes are parameters, as in the case that first showed ZDDY0015. :)
-declare %an:sequential function m:two-params($name as xs:string,
-                                             $first as element(e),
-                                             $second as element(e))
-  as xs:string
-{
-  ddl:create(xs:QName("m:c"));
-  dml:insert(xs:QName("m:c"), $first);
-  dml:insert(xs:QName("m:c"), $second);
-  m:delete($name)
-};
-
-declare %an:sequential function m:one-param($name as xs:string,
-                                            $first as element(e))
-  as xs:string
-{
-  ddl:create(xs:QName("m:c"));
-  dml:insert(xs:QName("m:c"), $first);
-  m:delete($name)
-};
-
-(: The second insert is inside a try block, as in the first case. :)
-declare %an:sequential function m:two-try($name as xs:string) as xs:string
+(: A variable that references a node of m:c is the documented ZDDY0015.
+   m:c is left for the caller to delete once $nodes is out of scope. :)
+declare %an:sequential function m:referenced($name as xs:string) as xs:string
 {
   ddl:create(xs:QName("m:c"));
   dml:insert(xs:QName("m:c"), <e v="1"/>);
-  variable $inserted :=
+  variable $nodes := dml:collection(xs:QName("m:c"));
+  variable $outcome :=
     try
     {{
-      dml:insert(xs:QName("m:c"), <e v="2"/>);
-      "inserted"
+      ddl:delete(xs:QName("m:c"));
+      "deleted"
     }}
     catch *
     {
       fn:local-name-from-QName($err:code)
     };
-  m:delete(fn:concat($name, " (", $inserted, ")"))
+  fn:concat($name, ": ", $outcome, " ", fn:count($nodes))
 };
