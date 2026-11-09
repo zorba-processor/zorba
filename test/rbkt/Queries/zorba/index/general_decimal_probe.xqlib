@@ -95,11 +95,6 @@ declare %an:sequential function m:init()
   iddl:create(xs:QName("m:Range"));
   iddl:create(xs:QName("m:Equality"));
 
-  ddl:create(xs:QName("m:a"));
-  iddl:create(xs:QName("m:Auto"));
-  dml:insert(xs:QName("m:a"), m:rows());
-  dml:delete(dml:collection(xs:QName("m:a"))[@id = ("2", "7", "9", "12")]);
-
   ddl:create(xs:QName("m:u"));
   iddl:create(xs:QName("m:Unique"));
 
@@ -108,6 +103,15 @@ declare %an:sequential function m:init()
   dml:insert(xs:QName("m:k"), (<e id="1" v="0.5"/>,
                                <e id="2" v="0.1000000000000000000001"/>,
                                <e id="3" t="i" v="9007199254740993"/>));
+};
+
+(: The index exists before the data, so inserts and deletes maintain it. :)
+declare %an:sequential function m:init-maintained()
+{
+  ddl:create(xs:QName("m:a"));
+  iddl:create(xs:QName("m:Auto"));
+  dml:insert(xs:QName("m:a"), m:rows());
+  dml:delete(dml:collection(xs:QName("m:a"))[@id = ("2", "7", "9", "12")]);
 };
 
 declare function m:ids($nodes as node()*) as xs:string

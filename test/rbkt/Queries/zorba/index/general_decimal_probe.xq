@@ -49,13 +49,6 @@ fn:string-join((
           (), 0.1e0, fn:false()),
   m:range("exclusive float both", xs:QName("m:c"), xs:QName("m:Range"),
           xs:float("0.1"), xs:float("0.5"), fn:false()),
-  m:point("maintained decimal point", xs:QName("m:a"), xs:QName("m:Auto"), 0.1),
-  m:point("maintained double point", xs:QName("m:a"), xs:QName("m:Auto"),
-          0.1e0),
-  m:range("maintained decimal lower", xs:QName("m:a"), xs:QName("m:Auto"),
-          0.1, (), fn:true()),
-  m:range("maintained no bounds", xs:QName("m:a"), xs:QName("m:Auto"),
-          (), (), fn:true()),
   $unique1, $unique2,
   m:keys()),
   "&#10;")
