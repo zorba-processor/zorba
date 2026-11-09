@@ -3,6 +3,6 @@
     <CtxVarDeclareIterator varid="4" varname="ext">
       <SingletonIterator value="xs:integer(1)"/>
     </CtxVarDeclareIterator>
-    <EmptyIterator/>
+    <FnConcatIterator/>
   </SequentialIterator>
 </iterator-tree>
