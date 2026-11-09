@@ -70,7 +70,7 @@ declare option ver:module-version "1.0";
  :)
 declare function ref:reference(
   $arg as item()
-) as xs:string external;
+) as xs:anyURI external;
 
 (:~
  : <p>Returns the node, object, or array identified by the given reference.</p>

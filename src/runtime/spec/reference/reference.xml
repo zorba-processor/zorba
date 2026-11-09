@@ -17,14 +17,14 @@
   <zorba:iterator name="ReferenceIterator">
 
     <zorba:description author="Federico Cavalieri">       
-      declare function ref:reference($item as item()) as xs:string
+      declare function ref:reference($item as item()) as xs:anyURI
     </zorba:description>
-    
+
     <zorba:function isDeterministic="false">
-    
+
       <zorba:signature localname="reference" prefix="fn-reference">
-        <zorba:param>structured-item()</zorba:param>   
-        <zorba:output>xs:string</zorba:output>
+        <zorba:param>structured-item()</zorba:param>
+        <zorba:output>xs:anyURI</zorba:output>
       </zorba:signature>
       
       <zorba:methods>
