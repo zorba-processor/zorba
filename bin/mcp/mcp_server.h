@@ -69,6 +69,8 @@ struct ServerConfig {
   db::ScanLimits scan_limits;
   /** For tests: called when a query is compiled, before it runs. */
   std::function<void()> before_execute;
+  /** For tests: see the after_read parameter of db::DocumentCache. */
+  std::function<void()> cache_after_read;
   /** For tests: see db::ScanHook. */
   db::ScanHook scan_hook;
   /** The memory limit of the process, in bytes (0: none; see zorba_mcp.cpp). */

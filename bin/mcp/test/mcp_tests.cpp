@@ -6483,55 +6483,46 @@ void test_cache_change_detect( Fixture const &f ) {
 }
 
 // A file that changes while it is read to be admitted is not kept: its first
-// read has seen the same metadata, and the change comes during the second.
+// read has seen the same metadata, and the change comes during the second,
+// between the read and the check after it.
 void test_cache_change_during_read( Fixture const &f ) {
+  namespace stdfs = std::filesystem;
   TempTree t;
-  std::string big( "v,pad\n" );
-  std::string const row( "1,xxxxxxxxxxxxxxxxxxxxxxxx\n" );
-  while ( big.size() < 4u << 20 )
-    big += row;
-  t.write( "big.csv", big );
-  std::string const path( t.root + "/big.csv" );
-  Server server( f.zorba, cache_config( t.root, 64 * 1024, 10 ), std::cerr );
-  std::string const q( dir_import + jn_import +
-    "count(jn:members(dir:open($dir:root, \"big.csv\")(\"content\")))" );
-
-  std::string const rows( query_text( server, q ) );
-  check( rows != "0" && !contains( rows, "error" ), "the rows of the file", rows );
-  auto touch = [&path]() {
-    struct timespec const times[2] = { { 0, UTIME_NOW }, { 0, UTIME_NOW } };
-    utimensat( AT_FDCWD, path.c_str(), times, 0 );
+  t.write( "a.json", json_of_size( 1, 40 ) );
+  std::string const path( t.root + "/a.json" );
+  bool change = false;
+  int reads = 0;
+  ServerConfig config( cache_config( t.root, 16, 10 ) );
+  // A modification time one second on: a change whatever the resolution of
+  // file times.
+  config.cache_after_read = [&]() {
+    ++reads;
+    if ( change )
+      stdfs::last_write_time( path, stdfs::last_write_time( path ) +
+                                    std::chrono::seconds( 1 ) );
   };
-  // How long a query takes to reach the file depends on the build: a change
-  // too early is a first read of new metadata, and one too late finds a record
-  // kept. Each try starts from new metadata seen once.
-  bool during = false;
-  for ( int delay = 30; !during && delay < 4000; delay *= 2 ) {
-    touch();
-    changed_files();
-    check( query_text( server, q ) == rows, "the first read of the try" );
-    std::thread toucher( [&touch, delay]() {
-      std::this_thread::sleep_for( std::chrono::milliseconds( delay ) );
-      touch();
-    } );
-    std::string const v( query_text( server, q ) );
-    toucher.join();
-    changed_files();
-    check( v == rows, "the read while the file changes", v );
-    during = server.cache_stats().refused > 0;
-  }
+  Server server( f.zorba, config, std::cerr );
+
+  check( open_value( server, "a.json" ) == "1", "the first read" );
+  change = true;
+  std::string const v( open_value( server, "a.json" ) );
+  change = false;
+  changed_files();
+  check( v == "1", "the read while the file changes", v );
   DocumentCache::Stats s = server.cache_stats();
-  check( during && s.refused == 1 && s.entries == 0 && s.bytes == 0,
+  check( reads == 1 && s.refused == 1 && s.entries == 0 && s.bytes == 0,
          "read to be admitted, and not kept", stats_text( s ) + ", refused " +
-         std::to_string( s.refused ) );
+         std::to_string( s.refused ) + ", reads " + std::to_string( reads ) );
 
   // Once it holds still, it is an ordinary file again.
   std::size_t const admissions = s.admissions, hits = s.hits;
   for ( int i = 0; i < 3; ++i )
-    check( query_text( server, q ) == rows, "the value afterwards" );
+    check( open_value( server, "a.json" ) == "1", "the value afterwards" );
   s = server.cache_stats();
-  check( s.admissions == admissions + 1 && s.hits == hits + 1 && s.entries == 1,
-         "it enters once it holds still", stats_text( s ) );
+  check( reads == 2 && s.admissions == admissions + 1 &&
+         s.hits == hits + 1 && s.entries == 1,
+         "it enters once it holds still", stats_text( s ) + ", reads " +
+         std::to_string( reads ) );
 }
 
 // The last write wins, however close it is to the read that was kept.
