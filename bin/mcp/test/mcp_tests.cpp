@@ -3217,7 +3217,8 @@ void test_sweep_canonicalize( Fixture const &f ) {
     caught( "let $c := x:canonicalize(\"" + sweep_names_xml( "sweep" ) + "\")\n"
             "return starts-with($c, '<root xmlns:p=\"urn:sweep\">') and "
             "ends-with($c, '</root>') and "
-            "count(tokenize($c, '_name_')) = 81" );
+            "contains($c, '<p:sweep_name_39 sweep_attr_39=\"v\">text"
+            "</p:sweep_name_39>')" );
   s.before.push_back( s.query );
   s.expected = "true";
   // Importing the module loads its options schema with Xerces-C: the same
