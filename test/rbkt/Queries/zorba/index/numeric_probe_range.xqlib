@@ -57,9 +57,9 @@ declare function m:point-indexed($key as xs:anyAtomicType) as xs:string
 declare function m:point($key as xs:anyAtomicType) as xs:string
 {
   fn:concat(
-    m:point-indexed($key),
-    " | ",
-    m:ids(dml:collection(xs:QName("m:c"))//e[m:key(.) eq $key]))
+    "[", m:point-indexed($key),
+    "] [",
+    m:ids(dml:collection(xs:QName("m:c"))//e[m:key(.) eq $key]), "]")
 };
 
 declare function m:range-from-indexed($lower as xs:anyAtomicType) as xs:string
@@ -76,9 +76,9 @@ declare function m:range-from-indexed($lower as xs:anyAtomicType) as xs:string
 declare function m:range-from($lower as xs:anyAtomicType) as xs:string
 {
   fn:concat(
-    m:range-from-indexed($lower),
-    " | ",
-    m:ids(dml:collection(xs:QName("m:c"))//e[m:key(.) ge $lower]))
+    "[", m:range-from-indexed($lower),
+    "] [",
+    m:ids(dml:collection(xs:QName("m:c"))//e[m:key(.) ge $lower]), "]")
 };
 
 declare function m:point-untyped($key as xs:untypedAtomic) as xs:string
