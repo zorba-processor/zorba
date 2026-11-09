@@ -1,0 +1,287 @@
+module namespace m = "http://www.example.com/general-index-probe-gaps";
+
+import module namespace ddl =
+  "http://zorba.io/modules/store/static/collections/ddl";
+
+import module namespace dml =
+  "http://zorba.io/modules/store/static/collections/dml";
+
+import module namespace iddl =
+  "http://zorba.io/modules/store/static/indexes/ddl";
+
+import module namespace idml =
+  "http://zorba.io/modules/store/static/indexes/dml";
+
+declare namespace an = "http://zorba.io/annotations";
+declare namespace err = "http://www.w3.org/2005/xqt-errors";
+
+(: Every collection holds e elements whose key is untyped unless @t names a
+   type. :)
+declare function m:key($e as element(e)) as xs:anyAtomicType
+{
+  switch (fn:string($e/@t))
+  case "y" return xs:gYear($e/@v)
+  case "x" return xs:hexBinary($e/@v)
+  case "b" return xs:base64Binary($e/@v)
+  case "f" return xs:float($e/@v)
+  case "d" return xs:double($e/@v)
+  case "dec" return xs:decimal($e/@v)
+  default return fn:data($e/@v)
+};
+
+(: gYear keys only. :)
+declare collection m:y as node()*;
+
+declare %an:general-equality %an:manual index m:YEquality
+on nodes dml:collection(xs:QName("m:y"))//e
+by xs:gYear(./@v);
+
+(: Untyped keys, each castable to xs:hexBinary and to xs:base64Binary. :)
+declare collection m:h as node()*;
+
+declare %an:general-equality %an:manual index m:HEquality
+on nodes dml:collection(xs:QName("m:h"))//e
+by fn:data(./@v);
+
+declare %an:general-range %an:manual index m:HRange
+on nodes dml:collection(xs:QName("m:h"))//e
+by fn:data(./@v);
+
+(: An untyped key that is an xs:duration and an xs:base64Binary. :)
+declare collection m:d as node()*;
+
+declare %an:general-equality %an:manual index m:DEquality
+on nodes dml:collection(xs:QName("m:d"))//e
+by fn:data(./@v);
+
+(: xs:hexBinary and xs:base64Binary keys. :)
+declare collection m:t as node()*;
+
+declare %an:general-equality %an:manual index m:TEquality
+on nodes dml:collection(xs:QName("m:t"))//e
+by (if (./@t eq "x") then xs:hexBinary(./@v) else xs:base64Binary(./@v));
+
+(: Typed numeric keys, so value probes are allowed. :)
+declare collection m:r as node()*;
+
+declare %an:general-range %an:manual index m:RRange
+on nodes dml:collection(xs:QName("m:r"))//e
+by (switch (fn:string(./@t))
+    case "f" return xs:float(./@v)
+    case "d" return xs:double(./@v)
+    default return xs:decimal(./@v));
+
+(: Untyped keys with more fractional digits than an xs:decimal keeps when it
+   is cast to xs:double. :)
+declare collection m:p as node()*;
+
+declare %an:general-equality %an:manual index m:PEquality
+on nodes dml:collection(xs:QName("m:p"))//e
+by fn:data(./@v);
+
+declare %an:general-range %an:manual index m:PRange
+on nodes dml:collection(xs:QName("m:p"))//e
+by fn:data(./@v);
+
+(: NaN keys, typed and untyped. :)
+declare collection m:n as node()*;
+
+declare %an:general-range %an:manual index m:NRange
+on nodes dml:collection(xs:QName("m:n"))//e
+by (if (./@t eq "d") then xs:double(./@v) else fn:data(./@v));
+
+(: xs:double keys, NaN among them, in an index with a declared key type. :)
+declare collection m:nt as node()*;
+
+declare %an:general-range %an:manual index m:NTypedRange
+on nodes dml:collection(xs:QName("m:nt"))//e
+by xs:double(./@v) as xs:double;
+
+(: NaN keys maintained by automatic indexes. :)
+declare collection m:a as node()*;
+
+declare %an:general-equality %an:automatic index m:AEquality
+on nodes dml:collection(xs:QName("m:a"))
+by (if (./@t eq "d") then xs:double(./@v) else fn:data(./@v));
+
+declare %an:general-range %an:automatic index m:ARange
+on nodes dml:collection(xs:QName("m:a"))
+by (if (./@t eq "d") then xs:double(./@v) else fn:data(./@v));
+
+(: NaN keys in unique indexes. :)
+declare collection m:u as node()*;
+
+declare %an:unique %an:general-equality %an:automatic index m:UEquality
+on nodes dml:collection(xs:QName("m:u"))
+by xs:double(./@v) as xs:double;
+
+declare %an:unique %an:general-range %an:automatic index m:URange
+on nodes dml:collection(xs:QName("m:u"))
+by xs:double(./@v) as xs:double;
+
+declare %an:sequential function m:create($coll as xs:QName,
+                                         $rows as element(e)*,
+                                         $indexes as xs:QName*)
+{
+  ddl:create($coll);
+  dml:insert($coll, <r>{ $rows }</r>);
+  for $index in $indexes
+  return iddl:create($index);
+};
+
+declare function m:ids($nodes as node()*) as xs:string
+{
+  fn:string-join(
+    for $e in $nodes
+    order by xs:integer($e/@id)
+    return fn:string($e/@id),
+    " ")
+};
+
+(: An empty selection is shown as "none", so no line ends with a space. :)
+declare function m:shown($ids as xs:string) as xs:string
+{
+  if ($ids eq "") then "none" else $ids
+};
+
+declare function m:result($name as xs:string,
+                          $indexed as xs:string,
+                          $unindexed as xs:string) as xs:string
+{
+  fn:concat($name, ": ", m:shown($indexed),
+            if ($indexed eq $unindexed) then ""
+            else fn:concat(" (unindexed: ", m:shown($unindexed), ")"))
+};
+
+declare function m:elements($coll as xs:QName) as element(e)*
+{
+  dml:collection($coll)/descendant-or-self::e
+};
+
+(: The same selection without the index, by general comparison on the key. :)
+declare function m:point($name as xs:string,
+                         $coll as xs:QName,
+                         $index as xs:QName,
+                         $key as xs:anyAtomicType) as xs:string
+{
+  m:result($name,
+           m:ids(idml:probe-index-point-general($index, $key)),
+           m:ids(for $e in m:elements($coll)
+                 where m:key($e) = $key
+                 return $e))
+};
+
+(: One bound or none: the general range probe takes one bound at a time. :)
+declare function m:range($name as xs:string,
+                         $coll as xs:QName,
+                         $index as xs:QName,
+                         $lower as xs:anyAtomicType?,
+                         $upper as xs:anyAtomicType?,
+                         $inclusive as xs:boolean) as xs:string
+{
+  m:result($name,
+           m:ids(idml:probe-index-range-general($index,
+                                                $lower,
+                                                $upper,
+                                                fn:exists($lower),
+                                                fn:exists($upper),
+                                                $inclusive,
+                                                $inclusive)),
+           m:ids(for $e in m:elements($coll)
+                 let $k := m:key($e)
+                 where (fn:empty($lower) or
+                        (if ($inclusive) then $k >= $lower else $k > $lower))
+                       and
+                       (fn:empty($upper) or
+                        (if ($inclusive) then $k <= $upper else $k < $upper))
+                 return $e))
+};
+
+(: Both bounds, by value comparison. :)
+declare function m:range-value($name as xs:string,
+                               $coll as xs:QName,
+                               $index as xs:QName,
+                               $lower as xs:anyAtomicType,
+                               $upper as xs:anyAtomicType,
+                               $lowerIncl as xs:boolean,
+                               $upperIncl as xs:boolean) as xs:string
+{
+  m:result($name,
+           m:ids(idml:probe-index-range-value($index, $lower, $upper,
+                                              fn:true(), fn:true(),
+                                              $lowerIncl, $upperIncl)),
+           m:ids(for $e in m:elements($coll)
+                 let $k := m:key($e)
+                 where (if ($lowerIncl) then $k ge $lower else $k gt $lower)
+                       and
+                       (if ($upperIncl) then $k le $upper else $k lt $upper)
+                 return $e))
+};
+
+(: The same selection without the index, by value comparison on the key. :)
+declare function m:point-value($name as xs:string,
+                               $coll as xs:QName,
+                               $index as xs:QName,
+                               $key as xs:anyAtomicType) as xs:string
+{
+  m:result($name,
+           m:ids(idml:probe-index-point-value($index, $key)),
+           m:ids(for $e in m:elements($coll)
+                 where m:key($e) eq $key
+                 return $e))
+};
+
+(: The error a probe raises, or its result. :)
+declare function m:point-error($name as xs:string,
+                               $index as xs:QName,
+                               $key as xs:anyAtomicType) as xs:string
+{
+  fn:concat($name, ": ",
+            try
+            {
+              m:shown(m:ids(idml:probe-index-point-general($index, $key)))
+            }
+            catch *
+            {
+              fn:local-name-from-QName($err:code)
+            })
+};
+
+(: The keys idml:keys lists, sorted. :)
+declare function m:keys($name as xs:string, $index as xs:QName) as xs:string
+{
+  fn:concat($name, ": ",
+    m:shown(fn:string-join(
+      for $a in idml:keys($index)/*:attribute
+      let $k := fn:concat(fn:string($a/@type), " ", fn:string($a/@value))
+      order by $k
+      return $k,
+      ", ")))
+};
+
+(: Inserts $first, then $second into m:u, which must exist, under the unique
+   index $index and reports whether the second insert raised; empties m:u. :)
+declare %an:sequential function m:unique($name as xs:string,
+                                         $index as xs:QName,
+                                         $first as element(e),
+                                         $second as element(e)) as xs:string
+{
+  iddl:create($index);
+  dml:insert(xs:QName("m:u"), $first);
+
+  variable $outcome :=
+    try
+    {{
+      dml:insert(xs:QName("m:u"), $second);
+      "inserted"
+    }}
+    catch *
+    {
+      fn:local-name-from-QName($err:code)
+    };
+
+  dml:delete(dml:collection(xs:QName("m:u")));
+  iddl:delete($index);
+
+  fn:concat($name, ": ", $outcome)
+};
