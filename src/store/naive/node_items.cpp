@@ -4430,8 +4430,8 @@ TextNode::TextNode(
   XmlNode(tree, parent, store::StoreConsts::textNode)
 #endif
 {
-  setText(content);
-
+  // The text is taken after insertChild: if that throws, ~TextNode does not run
+  // to free it, and the caller keeps the text.
   if (parent)
   {
 #ifndef NDEBUG
@@ -4447,6 +4447,8 @@ TextNode::TextNode(
 
     parent->insertChild(this, pos);
   }
+
+  setText(content);
 
 #ifdef TEXT_ORDPATH
   STORE_TRACE1("Constructed text node " << this << " parent = "
@@ -4503,11 +4505,12 @@ TextNode::TextNode(
 
   ZORBA_ASSERT(p->haveTypedValue() && !p->haveEmptyTypedValue());
 
+  // The value is taken after insertChild, as in the constructor above.
+  p->insertChild(this, p->numChildren());
+
   setTypedValue(content);
   if (isListValue)
     setHaveListValue();
-
-  p->insertChild(this, p->numChildren());
 
 #ifdef TEXT_ORDPATH
   STORE_TRACE1("Constructed text node " << this << " parent = "
