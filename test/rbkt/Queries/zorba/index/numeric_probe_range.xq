@@ -18,10 +18,8 @@ fn:string-join(
     "untyped 2: ["        || m:point-untyped(xs:untypedAtomic("2")) || "]",
     "untyped 1e300: ["    || m:point-untyped(xs:untypedAtomic("1e300")) || "]",
     "untyped -INF: ["     || m:point-untyped(xs:untypedAtomic("-INF")) || "]",
-    "from double -2.5 finds the double key: " ||
-      fn:contains(m:range-from-indexed(-2.5e0), "3"),
-    "from double -1e300 finds the double key: " ||
-      fn:contains(m:range-from-indexed(-1e300), "3"),
+    "from double -2.5: "  || m:range-from(-2.5e0),
+    "from double -1e300: " || m:range-from(-1e300),
     "from double 1e300: " || m:range-from(1e300),
     "from double INF: "   || m:range-from(xs:double("INF"))
   ),
