@@ -3329,23 +3329,28 @@ void test_sweep_fragment( Fixture const &f ) {
   (void)f;
 #endif
 }
-// The schema validator alone: built for each validate expression. No text
-// nodes: a failed allocation while a text node is attached to its parent is
-// another limit of the store. Twenty elements: under ASan, in the time of a test.
+// The schema validator alone: built for each validate expression, with a text
+// node under each element, attached to its parent when the element is made and
+// when it is validated. Twenty elements: under ASan, in the time of a test.
 void test_sweep_validate( Fixture const &f ) {
 #if defined(__linux__)
   auto const query = []( std::string const &prefix ) {
     std::string xml( "<root>" );
-    for ( int i = 0; i < 20; ++i )
-      xml += "<" + prefix + "_name_" + std::to_string( i ) + " " + prefix +
-             "_attr_" + std::to_string( i ) + "='v'/>";
-    return caught( "count((validate lax { " + xml + "</root> })//*)" );
+    for ( int i = 0; i < 20; ++i ) {
+      std::string const n( prefix + "_name_" + std::to_string( i ) );
+      xml += "<" + n + " " + prefix + "_attr_" + std::to_string( i ) +
+             "='v'>text</" + n + ">";
+    }
+    return caught( "let $v := validate lax { " + xml + "</root> }\n"
+                   "return count($v//*) * 1000 + string-length(string($v))" );
   };
   Sweep s;
   s.query = query( "sweep" );
   s.before.push_back( query( "warm" ) );
   s.after_compile = true;
-  s.expected = "20";
+  // 20 elements, and the 4 characters of each text node. A number, as a string
+  // built by the query is cut short when its buffer cannot grow.
+  s.expected = "20080";
   exhaust_sweep( f, "validate", s );
 #else
   (void)f;
