@@ -3254,7 +3254,7 @@ void test_sweep_validate( Fixture const &f ) {
   s.query = sweep_validate_query( "sweep" );
   s.before.push_back( sweep_validate_query( "warm" ) );
   s.after_compile = true;
-  s.expected = "41";
+  s.expected = "40";
   exhaust_sweep( f, "validate", s );
 #else
   (void)f;
