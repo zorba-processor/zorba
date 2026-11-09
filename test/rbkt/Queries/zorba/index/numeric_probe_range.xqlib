@@ -49,10 +49,15 @@ declare function m:ids($nodes as node()*) as xs:string
     " ")
 };
 
+declare function m:point-indexed($key as xs:anyAtomicType) as xs:string
+{
+  m:ids(idml:probe-index-point-general(xs:QName("m:Numbers"), $key))
+};
+
 declare function m:point($key as xs:anyAtomicType) as xs:string
 {
   fn:concat(
-    m:ids(idml:probe-index-point-general(xs:QName("m:Numbers"), $key)),
+    m:point-indexed($key),
     " | ",
     m:ids(dml:collection(xs:QName("m:c"))//e[m:key(.) eq $key]))
 };

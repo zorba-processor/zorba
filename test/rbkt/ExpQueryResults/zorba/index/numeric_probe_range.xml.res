@@ -6,7 +6,7 @@ double -INF:  |
 float INF:  | 
 long max:  | 
 long min:  | 
-unsignedLong max:  | 
+unsignedLong max:
 untyped 2: 2
 untyped 1e300: 
 untyped -INF: 
