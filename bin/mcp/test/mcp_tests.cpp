@@ -3104,6 +3104,15 @@ std::string sweep_dtd_nodes_query( std::string const &prefix ) {
          "return $i * string-length($n)) } "
          "catch * { concat('caught ', string($err:code), ' ', $err:description) }";
 }
+
+// The version of libxml2 in the process, as its xmlParserVersion gives it
+// (20914 for 2.9.14), or 0 if it cannot be read.
+int libxml2_version() {
+  void *const version = dlsym( RTLD_DEFAULT, "xmlParserVersion" );
+  char const *const text =
+    version ? *static_cast<char const *const *>( version ) : nullptr;
+  return text ? std::atoi( text ) : 0;
+}
 #endif
 
 void test_sweep_xml_dtd( Fixture const &f ) {
@@ -3116,17 +3125,23 @@ void test_sweep_xml_dtd( Fixture const &f ) {
   s.after_compile = true;
   s.expected = "4";
   // Known limits, not of the loader's tree: reading the file under a failing
-  // allocation, libxml2 failing to allocate while it parses (an error of the
-  // load, not memory_limit), Xerces-C releasing a schema. Caps: about 1.5 times
-  // the most seen in the 8 test jobs of CI run 42450607400 (runs of 1 / of 8:
-  // 41 file; 189 / 35 tree creation; 55 / 13 malformed; 2 / 69 Xerces-C).
+  // allocation, Xerces-C releasing a schema. Caps: about 1.5 times the most seen
+  // in the 8 test jobs of CI run 42450607400 (runs of 1 / of 8: 41 file; 2 / 69
+  // Xerces-C).
   s.known = { starting( "\"caught err:FODC0002 \\\"/tmp/mcp-tree", 62, 1 ),
-              starting( "\"caught err:FODC0002 \\\"XML tree creation failed\\\"", 285, 1 ),
-              starting( "\"caught err:FODC0002 \\\"XML tree creation failed\\\"", 53, 8 ),
-              starting( "\"caught err:FODC0002 \\\"malformed XML document\\\"", 83, 1 ),
-              starting( "\"caught err:FODC0002 \\\"malformed XML document\\\"", 20, 8 ),
               starting( "terminate N11xercesc_", 4, 1, "OutOfMemoryExceptionE" ),
               starting( "terminate N11xercesc_", 105, 8, "OutOfMemoryExceptionE" ) };
+  // libxml2 before 2.13 does not report every allocation of its own that failed
+  // (see test_sweep_xml_dtd_nodes): the load then fails as a document that
+  // libxml2 could not parse. Caps from the same run (189 / 35 tree creation;
+  // 55 / 13 malformed).
+  int const version = libxml2_version();
+  if ( version && version < 21300 )
+    s.known.insert( s.known.end(), {
+      starting( "\"caught err:FODC0002 \\\"XML tree creation failed\\\"", 285, 1 ),
+      starting( "\"caught err:FODC0002 \\\"XML tree creation failed\\\"", 53, 8 ),
+      starting( "\"caught err:FODC0002 \\\"malformed XML document\\\"", 83, 1 ),
+      starting( "\"caught err:FODC0002 \\\"malformed XML document\\\"", 20, 8 ) } );
   s.kept_runs_of_8_reported = true;   // the known limit, see Sweep
   exhaust_sweep( f, "parse-xml with DTD validation", s );
 #else
@@ -3146,13 +3161,11 @@ void test_sweep_xml_dtd_nodes( Fixture const &f ) {
   // error: the loader cannot tell such a tree from a document. libxml2 2.13.0
   // (NEWS, "Major changes"): "Most of the core code should now report malloc
   // failures reliably." The sweep runs from 2.13.
-  if ( void *const version = dlsym( RTLD_DEFAULT, "xmlParserVersion" ) ) {
-    char const *const text = *static_cast<char const *const *>( version );
-    if ( text && std::atoi( text ) < 21300 ) {
-      std::cout << "parse-xml with DTD validation, every kind of node: not with"
-                << " libxml2 " << text << std::endl;
-      return;
-    }
+  int const version = libxml2_version();
+  if ( version && version < 21300 ) {
+    std::cout << "parse-xml with DTD validation, every kind of node: not with"
+              << " libxml2 " << version << std::endl;
+    return;
   }
   Sweep s;
   s.files = { { "nodes.xml", sweep_dtd_nodes_xml( "nodes" ) },
@@ -3166,12 +3179,11 @@ void test_sweep_xml_dtd_nodes( Fixture const &f ) {
   // 4 * 8 + 5 * 9 + 0 + 0 = 147. A number,
   // as a string built by the query is cut short when its buffer cannot grow.
   s.expected = "18000120000147";
-  // The known limits of test_sweep_xml_dtd: libxml2 failing to allocate while it
-  // parses, and Xerces-C. Caps: about 1.5 times the most seen in CI run
-  // 42487120094 (runs of 1 / of 8: 41 file; 76 tree creation; 2 / 143 Xerces-C;
-  // the 143 is from its bigint profile, which makes the most allocations).
+  // The known limits of test_sweep_xml_dtd from libxml2 2.13. Caps: about 1.5
+  // times the most seen in CI run 42487120094 (runs of 1 / of 8: 41 file; 2 / 143
+  // Xerces-C; the 143 is from its bigint profile, which makes the most
+  // allocations).
   s.known = { starting( "\"caught err:FODC0002 \\\"/tmp/mcp-tree", 62, 1 ),
-              starting( "\"caught err:FODC0002 \\\"XML tree creation failed\\\"", 115, 1 ),
               starting( "terminate N11xercesc_", 4, 1, "OutOfMemoryExceptionE" ),
               starting( "terminate N11xercesc_", 215, 8, "OutOfMemoryExceptionE" ) };
   s.kept_runs_of_8_reported = true;   // the known limit, see Sweep
