@@ -80,6 +80,76 @@ static void fix_if_annotations(if_expr* ifExpr)
 }
 
 
+/******************************************************************************
+  True for an expression whose evaluation cannot raise an error: a constant, a
+  sequence of such expressions, or a reference to a variable whose value is
+  already computed. A let or argument variable may be evaluated lazily, when it
+  is referenced, so a reference to it can raise the error of its binding.
+*******************************************************************************/
+static bool cannot_raise_error(const expr* e)
+{
+  switch (e->get_expr_kind())
+  {
+  case const_expr_kind:
+    return true;
+
+  case wrapper_expr_kind:
+    return cannot_raise_error(static_cast<const wrapper_expr*>(e)->get_input());
+
+  case var_expr_kind:
+  {
+    var_expr::var_kind k = static_cast<const var_expr*>(e)->get_kind();
+
+    return (k == var_expr::for_var ||
+            k == var_expr::pos_var ||
+            k == var_expr::count_var ||
+            k == var_expr::prolog_var);
+  }
+
+  case fo_expr_kind:
+  {
+    const fo_expr* fo = static_cast<const fo_expr*>(e);
+
+    if (fo->get_func()->getKind() != FunctionConsts::OP_CONCATENATE_N)
+      return false;
+
+    for (csize i = 0; i < fo->num_args(); ++i)
+    {
+      if (!cannot_raise_error(fo->get_arg(i)))
+        return false;
+    }
+
+    return true;
+  }
+
+  default:
+    return false;
+  }
+}
+
+
+/******************************************************************************
+  True if the clauses before the clause at clausePos are for or let clauses
+  whose domains cannot raise an error.
+*******************************************************************************/
+static bool clauses_before_cannot_raise_error(const flwor_expr* flwor, csize clausePos)
+{
+  for (csize i = 0; i < clausePos; ++i)
+  {
+    const flwor_clause* c = flwor->get_clause(i);
+
+    if (c->get_kind() != flwor_clause::for_clause &&
+        c->get_kind() != flwor_clause::let_clause)
+      return false;
+
+    if (!cannot_raise_error(static_cast<const forlet_clause*>(c)->get_expr()))
+      return false;
+  }
+
+  return true;
+}
+
+
 ////////////////////////////////////////////////////////////////////////////////
 //                                                                            //
 //  SubstVars                                                                 //
@@ -300,8 +370,11 @@ RULE_REWRITE_PRE(EliminateUnusedLetVars)
       // FOR clause with 0 cardinality
       if (domCount == 0)
       {
-        // Not the non-discardable mark: a domain that can only raise an error is still dropped.
-        if (domExpr->is_nondeterministic())
+        // Without tuples the clauses after this one and the return clause are not
+        // evaluated at any level; this domain, and without allowing empty the
+        // clauses before it, are evaluated at O0 and may raise an error.
+        if (!cannot_raise_error(domExpr) ||
+            (!outerFor && !clauses_before_cannot_raise_error(theFlwor, i)))
           continue;
 
         if (! outerFor)
