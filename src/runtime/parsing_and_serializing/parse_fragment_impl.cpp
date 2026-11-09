@@ -17,6 +17,7 @@
 #include <new>
 #include "runtime/parsing_and_serializing/parse_fragment.h"
 
+#include <cstring>
 #include <iostream>
 #include <memory>
 #include <sstream>
@@ -40,6 +41,8 @@
 #include <libxml/parser.h>
 #include <libxml/xmlreader.h>
 #include <libxml/c14n.h>
+#include <libxml/globals.h>
+#include <libxml/xmlIO.h>
 
 namespace zorba
 {
@@ -356,11 +359,79 @@ bool FnZorbaParseXmlFragmentIterator::nextImpl(
 /*******************************************************************************
   14.9.1.1 fn-zorba-xml:canonicalize
 ********************************************************************************/
+namespace {
+
+struct XmlCtxtDeleter
+{
+  void operator()(xmlParserCtxtPtr p) const noexcept { xmlFreeParserCtxt(p); }
+};
+struct XmlDocDeleter
+{
+  void operator()(xmlDocPtr p) const noexcept { xmlFreeDoc(p); }
+};
+struct XmlOutputDeleter
+{
+  void operator()(xmlOutputBufferPtr p) const noexcept { xmlOutputBufferClose(p); }
+};
+
+// The first error libxml2 reported to the handler below. Plain storage: the
+// handler is called from C code and must not throw.
+struct XmlReportedError
+{
+  int code = 0;
+  char message[256] = "";
+};
+
+// libxml2 2.12 made the structured error handler take a const xmlError*.
+#if LIBXML_VERSION >= 21200
+# define ZORBA_C14N_ERROR_PTR const xmlError*
+#else
+# define ZORBA_C14N_ERROR_PTR xmlErrorPtr
+#endif
+
+void recordXmlError(void* aData, ZORBA_C14N_ERROR_PTR aError)
+{
+  XmlReportedError& lReported = *static_cast<XmlReportedError*>(aData);
+  if (lReported.code != 0 || aError == NULL)
+    return;
+  lReported.code = aError->code != 0 ? aError->code : -1;
+  if (aError->message != NULL)
+  {
+    std::strncpy(lReported.message, aError->message,
+                 sizeof(lReported.message) - 1);
+    lReported.message[sizeof(lReported.message) - 1] = '\0';
+  }
+}
+#undef ZORBA_C14N_ERROR_PTR
+
+// Sends the libxml2 errors of this thread to a XmlReportedError, and puts back
+// the handler the thread had.
+class XmlErrorRecorder
+{
+public:
+  explicit XmlErrorRecorder(XmlReportedError& aReported)
+    : thePreviousHandler(xmlStructuredError),
+      thePreviousContext(xmlStructuredErrorContext)
+  {
+    xmlSetStructuredErrorFunc(&aReported, &recordXmlError);
+  }
+  ~XmlErrorRecorder()
+  {
+    xmlSetStructuredErrorFunc(thePreviousContext, thePreviousHandler);
+  }
+  XmlErrorRecorder(const XmlErrorRecorder&) = delete;
+  XmlErrorRecorder& operator=(const XmlErrorRecorder&) = delete;
+
+private:
+  xmlStructuredErrorFunc thePreviousHandler;
+  void* thePreviousContext;
+};
+
+} // anonymous namespace
+
 bool FnZorbaCanonicalizeIterator::nextImpl(store::Item_t& result, PlanState& planState) const
 {
   zstring lDocString;
-  xmlDocPtr lDoc;
-  xmlChar* lResult;
   std::istream* lInstream = NULL;
   char buf[1024];
   store::Item_t tempItem;
@@ -397,26 +468,24 @@ bool FnZorbaCanonicalizeIterator::nextImpl(store::Item_t& result, PlanState& pla
     // A push parser with the default (tree building) SAX handler, so that
     // the context can be configured before anything is parsed.
     xml::ParserSecurity lSecurity(theSctx->get_security_policy());
+    std::unique_ptr<xmlDoc, XmlDocDeleter> lDoc;
     {
       xml::ParserSecurity::Scope lSecurityScope(lSecurity);
-      xmlParserCtxtPtr lCtxt =
-        xmlCreatePushParserCtxt(NULL, NULL, NULL, 0, "input.xml");
-      lDoc = NULL;
-      if (lCtxt != NULL)
-      {
-        lSecurity.configure(lCtxt, XML_PARSE_NOERROR |
-                                   state->theProperties.toLibXmlOptions());
-        xmlParseChunk(lCtxt, lDocString.c_str(),
-                      static_cast<int>(lDocString.size()), 1);
-        lDoc = lCtxt->myDoc;
-        lCtxt->myDoc = NULL;
-        if (lDoc != NULL && (!lCtxt->wellFormed || lSecurity.denied()))
-        {
-          xmlFreeDoc(lDoc);
-          lDoc = NULL;
-        }
-        xmlFreeParserCtxt(lCtxt);
-      }
+      std::unique_ptr<xmlParserCtxt, XmlCtxtDeleter> lCtxt(
+        xmlCreatePushParserCtxt(NULL, NULL, NULL, 0, "input.xml"));
+      // No context: libxml2 could not allocate it.
+      if (!lCtxt)
+        throw std::bad_alloc();
+      lSecurity.configure(lCtxt.get(), XML_PARSE_NOERROR |
+                                       state->theProperties.toLibXmlOptions());
+      int const lParseStatus = xmlParseChunk(
+        lCtxt.get(), lDocString.c_str(), static_cast<int>(lDocString.size()), 1);
+      lDoc.reset(lCtxt->myDoc);
+      lCtxt->myDoc = NULL;
+      if (lParseStatus == XML_ERR_NO_MEMORY || lCtxt->errNo == XML_ERR_NO_MEMORY)
+        throw std::bad_alloc();
+      if (lDoc && (!lCtxt->wellFormed || lSecurity.denied()))
+        lDoc.reset();
     }
     if (lSecurity.denied())
     {
@@ -432,10 +501,47 @@ bool FnZorbaCanonicalizeIterator::nextImpl(store::Item_t& result, PlanState& pla
       throw XQUERY_EXCEPTION(err::FOCZ0001, ERROR_PARAMS("x:canonicalize()", lErrorMsg), ERROR_LOC(loc));
     }
 
-    xmlC14NDocDumpMemory(lDoc, NULL, 2/*XML_C14N_1_1*/, NULL, 1, &lResult);
-    lDocString = zstring((char*)lResult);    
-    xmlFree(lResult);
-    xmlFreeDoc(lDoc);
+    std::unique_ptr<xmlOutputBuffer, XmlOutputDeleter> lOutput(
+      xmlAllocOutputBuffer(NULL));
+    if (!lOutput)
+      throw std::bad_alloc();
+    XmlReportedError lReported;
+    int lStatus;
+    {
+      XmlErrorRecorder lRecorder(lReported);
+      lStatus = xmlC14NDocSaveTo(lDoc.get(), NULL, XML_C14N_1_1, NULL, 1,
+                                 lOutput.get());
+    }
+    zstring lCanonical;
+    if (lStatus >= 0)
+    {
+      xmlChar const* const lContent = xmlOutputBufferGetContent(lOutput.get());
+      lCanonical.assign(reinterpret_cast<char const*>(lContent),
+                        static_cast<zstring::size_type>(
+                          xmlOutputBufferGetSize(lOutput.get())));
+    }
+    // Closing the buffer reports an error of the buffer that the
+    // canonicalization did not: a negative xmlParserErrors code.
+    int const lClosed = xmlOutputBufferClose(lOutput.release());
+    // libxml2 can report an error and still return success, with output that
+    // lacks what it failed to write: an error reported counts as a failure.
+    if (lStatus < 0 || lClosed < 0 || lReported.code != 0)
+    {
+      // The input is well formed, so a failure of the canonicalization is
+      // either an allocation that failed or a document that the canonical form
+      // cannot represent (a relative namespace URI): the error says which.
+      int lCode = lReported.code;
+      if (lCode == 0 && lClosed < -1)
+        lCode = -lClosed;
+      if (lCode == 0 || lCode == XML_ERR_NO_MEMORY)
+        throw std::bad_alloc();
+      zstring lCause(lReported.message);
+      while (!lCause.empty() && (lCause[lCause.size() - 1] == '\n'))
+        lCause.erase(lCause.size() - 1);
+      throw XQUERY_EXCEPTION(err::FOCZ0001,
+        ERROR_PARAMS("x:canonicalize()", ERROR_TEXT( lCause )), ERROR_LOC(loc));
+    }
+    lDocString = lCanonical;
   }
   catch ( ZorbaException const& )
   {

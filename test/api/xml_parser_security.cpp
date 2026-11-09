@@ -27,6 +27,10 @@
 #include <sstream>
 #include <string>
 
+#include <libxml/globals.h>
+#include <libxml/xmlerror.h>
+#include <libxml/xmlversion.h>
+
 #include <zorba/config.h>
 #include <zorba/diagnostic_list.h>
 #include <zorba/item.h>
@@ -548,6 +552,35 @@ void test_billion_laughs(Zorba* z)
   }
 }
 
+#ifndef ZORBA_NO_XMLSCHEMA
+// libxml2 2.12 made the structured error handler take a const xmlError*.
+#if LIBXML_VERSION >= 21200
+void embedderHandler(void*, const xmlError*) {}
+#else
+void embedderHandler(void*, xmlErrorPtr) {}
+#endif
+
+// x:canonicalize records the libxml2 errors of its own call: the structured
+// error handler an embedding application installed on the thread is back after
+// the call, whether it succeeded or failed.
+void test_embedder_error_handler(Zorba* z)
+{
+  int lContext = 0;
+  xmlSetStructuredErrorFunc(&lContext, &embedderHandler);
+  StaticContext_t sctx = context(z, SecurityPolicy::secure());
+
+  CHECK(canonicalize(z, sctx, "<a/>").ok);
+  CHECK(xmlStructuredError == &embedderHandler);
+  CHECK(xmlStructuredErrorContext == &lContext);
+
+  CHECK(!canonicalize(z, sctx, "<a xmlns:p=\"relative\"><p:b/></a>").ok);
+  CHECK(xmlStructuredError == &embedderHandler);
+  CHECK(xmlStructuredErrorContext == &lContext);
+
+  xmlSetStructuredErrorFunc(NULL, NULL);
+}
+#endif
+
 } // anonymous namespace
 
 
@@ -572,6 +605,9 @@ xml_parser_security(int argc, char* argv[])
     test_xqueryx(lZorba, lFiles);
 #endif
     test_billion_laughs(lZorba);
+#ifndef ZORBA_NO_XMLSCHEMA
+    test_embedder_error_handler(lZorba);
+#endif
   }
   catch (ZorbaException const& e)
   {
