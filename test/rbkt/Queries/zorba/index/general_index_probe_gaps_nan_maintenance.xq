@@ -22,6 +22,7 @@ variable $inserted := m:keys("AEquality keys", xs:QName("m:AEquality"));
 dml:delete(dml:collection(xs:QName("m:a"))[@id = ("1", "2", "4")]);
 
 (: Two NaN keys are not equal, so they do not violate uniqueness. :)
+ddl:create(xs:QName("m:u"));
 variable $equalityNaN :=
   m:unique("UEquality NaN twice", xs:QName("m:UEquality"),
            <e id="1" t="d" v="NaN"/>, <e id="2" t="d" v="NaN"/>);

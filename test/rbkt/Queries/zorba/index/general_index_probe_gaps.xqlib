@@ -239,15 +239,12 @@ declare function m:keys($name as xs:string, $index as xs:QName) as xs:string
 };
 
 (: Inserts $first, then $second into m:u under the unique index $index and
-   reports whether the second insert raised; empties m:u. :)
+   reports whether the second insert raised; empties m:u, which must exist. :)
 declare %an:sequential function m:unique($name as xs:string,
                                          $index as xs:QName,
                                          $first as element(e),
                                          $second as element(e)) as xs:string
 {
-  if (ddl:is-available-collection(xs:QName("m:u")))
-  then ()
-  else ddl:create(xs:QName("m:u"));
   iddl:create($index);
   dml:insert(xs:QName("m:u"), $first);
 
@@ -271,13 +268,13 @@ declare %an:sequential function m:unique($name as xs:string,
       ""
     }}
     catch *
-    {
+    {{
+      dml:delete(dml:collection(xs:QName("m:u")));
+      ddl:delete(xs:QName("m:u"));
       fn:concat(" ", fn:local-name-from-QName($err:code))
-    };
+    }};
 
-  if (ddl:is-available-collection(xs:QName("m:u")))
-  then dml:delete(dml:collection(xs:QName("m:u")))
-  else ();
+  ddl:create(xs:QName("m:u"));
 
   fn:concat($name, ": ", $outcome, $deleted)
 };
