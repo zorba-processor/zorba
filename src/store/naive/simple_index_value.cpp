@@ -511,6 +511,8 @@ void ProbeValueHashIndexIterator::init(const store::IndexCondition_t& cond,
 
   theIndex->theMap.compareFunction().prepare(theIndex->theMap, key);
 
+  // get leaves theResultSet unchanged when the key is absent.
+  theResultSet = NULL;
   theIndex->theMap.get(key, theResultSet);
 
   if (theResultSet)
@@ -841,12 +843,14 @@ void ProbeValueTreeIndexIterator::init(
   if (cond->getKind() == store::IndexCondition::POINT_VALUE)
   {
     thePointCond = reinterpret_cast<IndexPointCondition*>(cond.getp());
+    theBoxCond = NULL;
 
     initExact();
   }
   else
   {
     theBoxCond = reinterpret_cast<IndexBoxValueCondition*>(cond.getp());
+    thePointCond = NULL;
 
     initBox();
   }

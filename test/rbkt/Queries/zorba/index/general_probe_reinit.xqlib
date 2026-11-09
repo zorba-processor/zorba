@@ -1,0 +1,141 @@
+module namespace m = "http://www.example.com/general-probe-reinit";
+
+import module namespace ddl =
+  "http://zorba.io/modules/store/static/collections/ddl";
+
+import module namespace dml =
+  "http://zorba.io/modules/store/static/collections/dml";
+
+import module namespace iddl =
+  "http://zorba.io/modules/store/static/indexes/ddl";
+
+import module namespace idml =
+  "http://zorba.io/modules/store/static/indexes/dml";
+
+declare namespace an = "http://zorba.io/annotations";
+
+declare collection m:c as node()*;
+
+(: The key of e: untyped unless @t names a type. :)
+declare function m:key($e as element(e)) as xs:anyAtomicType
+{
+  switch (fn:string($e/@t))
+  case "d" return xs:double($e/@v)
+  case "i" return xs:integer($e/@v)
+  case "dec" return xs:decimal($e/@v)
+  default return fn:data($e/@v)
+};
+
+declare %an:general-range %an:manual index m:Range
+on nodes dml:collection(xs:QName("m:c"))//e
+by (switch (fn:string(./@t))
+    case "d" return xs:double(./@v)
+    case "i" return xs:integer(./@v)
+    case "dec" return xs:decimal(./@v)
+    default return fn:data(./@v));
+
+declare %an:general-equality %an:manual index m:Equality
+on nodes dml:collection(xs:QName("m:c"))//e
+by (switch (fn:string(./@t))
+    case "d" return xs:double(./@v)
+    case "i" return xs:integer(./@v)
+    case "dec" return xs:decimal(./@v)
+    default return fn:data(./@v));
+
+declare %an:sequential function m:init()
+{
+  ddl:create(xs:QName("m:c"));
+  dml:insert(xs:QName("m:c"),
+             <r>
+               <e id="1" v="7"/>
+               <e id="2" v="10"/>
+               <e id="3" t="i" v="3"/>
+               <e id="4" t="i" v="7"/>
+               <e id="5" t="dec" v="0.1"/>
+               <e id="6" t="dec" v="0.1000000000000000000001"/>
+               <e id="7" t="dec" v="0.5"/>
+               <e id="8" t="d" v="0.1"/>
+             </r>);
+  iddl:create(xs:QName("m:Range"));
+  iddl:create(xs:QName("m:Equality"));
+};
+
+declare function m:ids($nodes as node()*) as xs:string
+{
+  fn:string-join(
+    for $e in $nodes
+    order by xs:integer($e/@id)
+    return fn:string($e/@id),
+    " ")
+};
+
+(: An empty selection is shown as "none", so no line ends with a space. :)
+declare function m:shown($ids as xs:string) as xs:string
+{
+  if ($ids eq "") then "none" else $ids
+};
+
+declare function m:result($name as xs:string,
+                          $indexed as xs:string,
+                          $unindexed as xs:string) as xs:string
+{
+  fn:concat($name, ": ", m:shown($indexed),
+            if ($indexed eq $unindexed) then ""
+            else fn:concat(" (unindexed: ", m:shown($unindexed), ")"))
+};
+
+declare function m:elements() as element(e)*
+{
+  dml:collection(xs:QName("m:c"))/descendant-or-self::e
+};
+
+(: One probe call with several search keys, against the same selection by
+   general comparison on the key without the index. :)
+declare function m:point($name as xs:string,
+                         $index as xs:QName,
+                         $keys as xs:anyAtomicType*) as xs:string
+{
+  m:result($name,
+           m:ids(idml:probe-index-point-general($index, $keys)),
+           m:ids(for $e in m:elements()
+                 where m:key($e) = $keys
+                 return $e))
+};
+
+declare function m:range($name as xs:string,
+                         $lower as xs:anyAtomicType*,
+                         $upper as xs:anyAtomicType*) as xs:string
+{
+  m:result($name,
+           m:ids(idml:probe-index-range-general(xs:QName("m:Range"),
+                                                $lower,
+                                                $upper,
+                                                fn:exists($lower),
+                                                fn:exists($upper),
+                                                fn:true(),
+                                                fn:true())),
+           m:ids(for $e in m:elements()
+                 let $k := m:key($e)
+                 where (fn:empty($lower) or $k >= $lower) and
+                       (fn:empty($upper) or $k <= $upper)
+                 return $e))
+};
+
+(: One probe call per lower bound in $bounds, the same call each time. :)
+declare function m:range-each($name as xs:string,
+                              $bounds as xs:anyAtomicType*,
+                              $upper as xs:anyAtomicType?) as xs:string
+{
+  fn:concat($name, ": ", fn:string-join(
+    for $bound in $bounds
+    return m:result(fn:string($bound),
+                    m:ids(idml:probe-index-range-general(xs:QName("m:Range"),
+                                                         $bound, $upper,
+                                                         fn:true(), fn:exists($upper),
+                                                         fn:true(), fn:true())),
+                    m:ids(for $e in m:elements()
+                          where m:key($e) >= $bound and
+                                (fn:empty($upper) or m:key($e) <= $upper)
+                          return $e)),
+    "; "))
+};

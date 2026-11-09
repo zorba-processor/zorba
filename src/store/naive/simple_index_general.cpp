@@ -1706,8 +1706,15 @@ void ProbeGeneralIndexIterator::init(const store::IndexCondition_t& cond,
 {
   theProbeKind = cond->getKind();
   theCondition = static_cast<GeneralIndexCondition*>(cond.getp());
+
+  // The runtime calls init once per search item on the same iterator.
+  theIsUntypedProbe = false;
+  theIsFullProbe = false;
   theIsExactProbe = false;
   theIsFloatProbe = false;
+  theResultSets.clear();
+  theMapBegins.clear();
+  theMapEnds.clear();
 
   if (theProbeKind == store::IndexCondition::POINT_VALUE ||
       theProbeKind == store::IndexCondition::BOX_VALUE)
@@ -2118,9 +2125,6 @@ void ProbeGeneralIndexIterator::initBox()
   store::Item_t upperAltKey;
 
   zstring tmp;
-
-  theMapBegins.clear();
-  theMapEnds.clear();
 
   if (idx->isTyped())
   {

@@ -1362,6 +1362,10 @@ ProbeIndexRangeGeneralIteratorState::ProbeIndexRangeGeneralIteratorState()
   :
   theTimezone(0),
   theCollator(NULL),
+  theHaveLower(false),
+  theHaveUpper(false),
+  theInclLower(false),
+  theInclUpper(false),
   theNodeHashSet(NULL)
 {
 }
@@ -1393,6 +1397,7 @@ void ProbeIndexRangeGeneralIteratorState::reset(PlanState& state)
   theQname = 0;
   theIndex = 0;
   theIterator = NULL;
+  theSearchItems.clear();
 
   if (theNodeHashSet)
     theNodeHashSet->clear();
@@ -1430,13 +1435,6 @@ bool ProbeIndexRangeGeneralIterator::nextImpl(
     store::Item_t& result, 
     PlanState& planState) const
 {
-  store::IndexCondition_t cond;
-  bool haveLower = false;
-  bool haveUpper = false;
-  bool inclLower = false;
-  bool inclUpper = false;
-  bool inclBound = false;
-
   try
   {
     ProbeIndexRangeGeneralIteratorState* state;
@@ -1464,27 +1462,29 @@ bool ProbeIndexRangeGeneralIterator::nextImpl(
       if (!consumeNext(itemInclUpper, theChildren[6], planState))
         ZORBA_ASSERT(false);
       
-      haveLower = itemHaveLower->getBooleanValue();
-      haveUpper = itemHaveUpper->getBooleanValue();
-      inclLower = itemInclLower->getBooleanValue();
-      inclUpper = itemInclUpper->getBooleanValue();
+      state->theHaveLower = itemHaveLower->getBooleanValue();
+      state->theHaveUpper = itemHaveUpper->getBooleanValue();
+      state->theInclLower = itemInclLower->getBooleanValue();
+      state->theInclUpper = itemInclUpper->getBooleanValue();
     }
     
-    cond = state->theIndex->createCondition(store::IndexCondition::BOX_GENERAL);
+    state->theCondition =
+    state->theIndex->createCondition(store::IndexCondition::BOX_GENERAL);
 
-    if (haveLower && haveUpper)
+    if (state->theHaveLower && state->theHaveUpper)
     {
       //
       // Build hashmap from the nodes satisfying the lower bound condition
       //
       
-      if (!getSearchItems(planState, state, true, false, inclLower, false))
+      if (!getSearchItems(planState, state, true, false, state->theInclLower, false))
         goto done;
       
       assert(state->theSearchItems.size() >= 1);
       assert(state->theKeyType == NULL || state->theSearchItems.size() == 1);
       
-      state->theNodeHashSet = new StructuredItemHandleHashSet(1024, false);
+      if (state->theNodeHashSet == NULL)
+        state->theNodeHashSet = new StructuredItemHandleHashSet(1024, false);
       
       state->theSearchItemsIte = state->theSearchItems.begin();
       state->theSearchItemsEnd = state->theSearchItems.end();
@@ -1493,10 +1493,10 @@ bool ProbeIndexRangeGeneralIterator::nextImpl(
            state->theSearchItemsIte != state->theSearchItemsEnd;
            ++state->theSearchItemsIte)
       {
-        cond->clear();
-        cond->pushBound(*state->theSearchItemsIte, true, inclLower);
+        state->theCondition->clear();
+        state->theCondition->pushBound(*state->theSearchItemsIte, true, state->theInclLower);
         
-        state->theIterator->init(cond);
+        state->theIterator->init(state->theCondition);
         state->theIterator->open();
         
         while (state->theIterator->next(result)) 
@@ -1508,14 +1508,14 @@ bool ProbeIndexRangeGeneralIterator::nextImpl(
       }
       
       state->theSearchItems.clear();
-      cond->clear();
+      state->theCondition->clear();
 
       //
       // Compute the nodes satisfying the upper bound condition and probe the
       // node hashmap.
       //
       
-      if (!getSearchItems(planState, state, false, true, false, inclUpper))
+      if (!getSearchItems(planState, state, false, true, false, state->theInclUpper))
         goto done;
 
       assert(state->theSearchItems.size() >= 1);
@@ -1528,10 +1528,10 @@ bool ProbeIndexRangeGeneralIterator::nextImpl(
            state->theSearchItemsIte != state->theSearchItemsEnd;
            ++state->theSearchItemsIte)
       {
-        cond->clear();
-        cond->pushBound(*state->theSearchItemsIte, false, inclUpper);
+        state->theCondition->clear();
+        state->theCondition->pushBound(*state->theSearchItemsIte, false, state->theInclUpper);
 
-        state->theIterator->init(cond);
+        state->theIterator->init(state->theCondition);
 
         state->theIterator->open();
 
@@ -1545,15 +1545,15 @@ bool ProbeIndexRangeGeneralIterator::nextImpl(
       }
     }
     
-    else if (haveLower || haveUpper)
+    else if (state->theHaveLower || state->theHaveUpper)
     {
-      if (!getSearchItems(planState, state, haveLower, haveUpper, inclLower, inclUpper))
+      if (!getSearchItems(planState, state,
+                          state->theHaveLower, state->theHaveUpper,
+                          state->theInclLower, state->theInclUpper))
         goto done;
       
       assert(state->theSearchItems.size() >= 1);
       assert(state->theKeyType == NULL || state->theSearchItems.size() == 1);
-      
-      inclBound = (haveLower ? inclLower : inclUpper);
       
       state->theSearchItemsIte = state->theSearchItems.begin();
       state->theSearchItemsEnd = state->theSearchItems.end();
@@ -1562,10 +1562,14 @@ bool ProbeIndexRangeGeneralIterator::nextImpl(
            state->theSearchItemsIte != state->theSearchItemsEnd;
            ++state->theSearchItemsIte)
       {
-        cond->clear();
-        cond->pushBound(*state->theSearchItemsIte, haveLower, inclBound);
+        state->theCondition->clear();
+        state->theCondition->pushBound(*state->theSearchItemsIte,
+                                       state->theHaveLower,
+                                       (state->theHaveLower ?
+                                        state->theInclLower :
+                                        state->theInclUpper));
         
-        state->theIterator->init(cond);
+        state->theIterator->init(state->theCondition);
 
         state->theIterator->open();
           
@@ -1582,7 +1586,7 @@ bool ProbeIndexRangeGeneralIterator::nextImpl(
     {
       getSearchItems(planState, state, false, false, false, false);
 
-      state->theIterator->init(cond);
+      state->theIterator->init(state->theCondition);
 
       state->theIterator->open();
         
