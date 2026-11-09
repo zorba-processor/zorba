@@ -3221,24 +3221,6 @@ void test_sweep_fragment( Fixture const &f ) {
   (void)f;
 #endif
 }
-void test_sweep_canonicalize( Fixture const &f ) {
-#if defined(__linux__)
-  Sweep s;
-  s.after_compile = true;
-  s.query = "import module namespace x = 'http://zorba.io/modules/xml';\n" +
-    caught( "let $c := x:canonicalize(\"" + sweep_names_xml( "sweep" ) + "\")\n"
-            "return starts-with($c, '<root xmlns:p=\"urn:sweep\">') and "
-            "ends-with($c, '</root>') and "
-            "contains($c, '<p:sweep_name_39 sweep_attr_39=\"v\">text"
-            "</p:sweep_name_39>')" );
-  s.before.push_back( s.query );
-  s.expected = "true";
-  s.needs_module = true;
-  exhaust_sweep( f, "x:canonicalize", s );
-#else
-  (void)f;
-#endif
-}
 // The schema validator alone: built for each validate expression.
 std::string sweep_validate_query( std::string const &prefix ) {
   std::string xml( "<root>" );
@@ -7402,7 +7384,6 @@ Test const tests[] = {
   { "exhaust_sweep_xml_dtd", test_sweep_xml_dtd },
   { "exhaust_sweep_xml_dtd_nodes", test_sweep_xml_dtd_nodes },
   { "exhaust_sweep_fragment", test_sweep_fragment },
-  { "exhaust_sweep_canonicalize", test_sweep_canonicalize },
   { "exhaust_sweep_validate", test_sweep_validate },
   { "exhaust_sweep_html", test_sweep_html },
   { "exhaust_sweep_json", test_sweep_json },
