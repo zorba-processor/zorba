@@ -62,16 +62,21 @@ declare function m:point($key as xs:anyAtomicType) as xs:string
     m:ids(dml:collection(xs:QName("m:c"))//e[m:key(.) eq $key]))
 };
 
+declare function m:range-from-indexed($lower as xs:anyAtomicType) as xs:string
+{
+  m:ids(idml:probe-index-range-general(xs:QName("m:Numbers"),
+                                       $lower,
+                                       (),
+                                       fn:true(),
+                                       fn:false(),
+                                       fn:true(),
+                                       fn:true()))
+};
+
 declare function m:range-from($lower as xs:anyAtomicType) as xs:string
 {
   fn:concat(
-    m:ids(idml:probe-index-range-general(xs:QName("m:Numbers"),
-                                         $lower,
-                                         (),
-                                         fn:true(),
-                                         fn:false(),
-                                         fn:true(),
-                                         fn:true())),
+    m:range-from-indexed($lower),
     " | ",
     m:ids(dml:collection(xs:QName("m:c"))//e[m:key(.) ge $lower]))
 };
