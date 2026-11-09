@@ -146,6 +146,11 @@ private:
     void destroy();
   };
 
+  struct destroyer {
+    stack_element &e_;
+    ~destroyer() { e_.destroy(); }
+  };
+
   typedef std::stack<stack_element> stack_type;
   stack_type stack_;
 

@@ -48,6 +48,7 @@ CREATE_TEST_SOURCELIST(APITests
   function_item_lifetime.cpp
   json_parse_members.cpp
   file_write_checks.cpp
+  itemfactory_empty_items.cpp
   ${SchemaTests}
 )
 
@@ -70,6 +71,17 @@ FOREACH (_c parse_arrays parse_objects parse_mixed parse_truncated
          chain_walkers chain_collection measure second_thread)
   ZORBA_ADD_TEST("test/api/json_depth_limit/${_c}" APITests json_depth_limit
     ${_c})
+ENDFOREACH (_c)
+
+# itemfactory_empty_items runs case by case, so that a case that crashes
+# reports itself
+LIST (FILTER TestsToRun EXCLUDE REGEX "(^|/)itemfactory_empty_items\\.cpp$")
+FOREACH (_c element_name attribute_name attribute_value attribute_list_name
+         attribute_list_value assign_element assign_value assign_list_element
+         assign_list_value json_object_name json_object_value json_array
+         legal_arguments)
+  ZORBA_ADD_TEST("test/api/itemfactory_empty_items/${_c}" APITests
+    itemfactory_empty_items ${_c})
 ENDFOREACH (_c)
 
 # add all the ADD_TEST for each testing

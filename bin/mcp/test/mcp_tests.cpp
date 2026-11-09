@@ -61,6 +61,9 @@
 #if defined(__linux__)
 # include <execinfo.h>
 #endif
+#if defined(__SANITIZE_ADDRESS__)
+# include <sanitizer/lsan_interface.h>
+#endif
 #include <unistd.h>
 
 #include <libxml/xmlversion.h>
@@ -3326,6 +3329,28 @@ void test_sweep_fragment( Fixture const &f ) {
   (void)f;
 #endif
 }
+// The schema validator alone: built for each validate expression. No text
+// nodes: a failed allocation while a text node is attached to its parent is
+// another limit of the store. Twenty elements: under ASan, in the time of a test.
+void test_sweep_validate( Fixture const &f ) {
+#if defined(__linux__)
+  auto const query = []( std::string const &prefix ) {
+    std::string xml( "<root>" );
+    for ( int i = 0; i < 20; ++i )
+      xml += "<" + prefix + "_name_" + std::to_string( i ) + " " + prefix +
+             "_attr_" + std::to_string( i ) + "='v'/>";
+    return caught( "count((validate lax { " + xml + "</root> })//*)" );
+  };
+  Sweep s;
+  s.query = query( "sweep" );
+  s.before.push_back( query( "warm" ) );
+  s.after_compile = true;
+  s.expected = "20";
+  exhaust_sweep( f, "validate", s );
+#else
+  (void)f;
+#endif
+}
 void test_sweep_html( Fixture const &f ) {
 #if defined(__linux__)
   std::string html( "<html><body>" );
@@ -3595,6 +3620,60 @@ void test_base64_stream_out_of_memory( Fixture const &f ) {
     }
   check( shorter == 0, "createBase64Binary from a stream: never a shorter value",
          std::to_string( shorter ) + " points" );
+#else
+  (void)f;
+#endif
+}
+// jn:parse-json with each allocation failing in turn, in this process: what a
+// failed parse made is freed, which LeakSanitizer checks here, where the sweeps'
+// children cannot.
+void test_json_loader_out_of_memory( Fixture const &f ) {
+#if defined(__linux__)
+  std::string json( "[" );
+  for ( int i = 0; i < 4; ++i )
+    json += std::string( i ? "," : "" ) + "{\"a" + std::to_string( i ) +
+      "\":1,\"b\":\"x\",\"c\":[true,null],\"d\":{\"e\":2.5},\"f\":3,\"g\":4}";
+  json += "]";
+  Item const input( f.zorba->getItemFactory()->createString( json ) );
+  auto attempt = [&]( long n, long length, long *count ) -> std::string {
+    XQuery_t const query( f.zorba->compileQuery(
+      "import module namespace jn = 'http://jsoniq.org/functions';\n"
+      "declare variable $s as xs:string external;\n"
+      "count(jn:members(jn:parse-json($s)))" ) );
+    query->getDynamicContext()->setVariable( "s", input );
+    // Made before the failures: they are for the parse, not the API.
+    Iterator_t const it( query->iterator() );
+    std::string out( "error" );
+    inject_arm( n, length );
+    try {
+      it->open();
+      Item item;
+      if ( it->next( item ) )
+        out = item.getStringValue().str();
+      it->close();
+    }
+    catch ( std::exception const& ) {
+    }
+    *count = inject_disarm();
+    return out;
+  };
+  long total = 0;
+  check( attempt( 0, 0, &total ) == "4", "jn:parse-json: the answer" );
+  long wrong = 0;
+  for ( long const length : { 1L, 8L } )
+    for ( long n = 1; n <= total; ++n ) {
+      long count = 0;
+      std::string const got( attempt( n, length, &count ) );
+      if ( got != "4" && got != "error" && ++wrong <= 3 )
+        std::cout << "at " << n << " of a run of " << length << ": " << got
+                  << std::endl;
+    }
+  check( wrong == 0, "jn:parse-json: the answer or an error",
+         std::to_string( wrong ) + " points" );
+# if defined(__SANITIZE_ADDRESS__)
+  check( __lsan_do_recoverable_leak_check() == 0,
+         "jn:parse-json: a failed parse leaks nothing" );
+# endif
 #else
   (void)f;
 #endif
@@ -7534,12 +7613,14 @@ Test const tests[] = {
   { "exhaust_sweep_streamable_text", test_sweep_streamable_text },
   { "exhaust_base64_stream", test_base64_stream_out_of_memory },
   { "exhaust_seekable_stream", test_seekable_stream_out_of_memory },
+  { "exhaust_json_loader", test_json_loader_out_of_memory },
   { "exhaust_plan_wrapper", test_plan_wrapper_out_of_memory },
   { "exhaust_sweep_matcher", test_sweep_matcher },
   { "exhaust_sweep_xml", test_sweep_xml },
   { "exhaust_sweep_xml_dtd", test_sweep_xml_dtd },
   { "exhaust_sweep_xml_dtd_nodes", test_sweep_xml_dtd_nodes },
   { "exhaust_sweep_fragment", test_sweep_fragment },
+  { "exhaust_sweep_validate", test_sweep_validate },
   { "exhaust_sweep_html", test_sweep_html },
   { "exhaust_sweep_json", test_sweep_json },
   { "exhaust_sweep_csv", test_sweep_csv },

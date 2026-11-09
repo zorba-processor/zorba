@@ -43,24 +43,23 @@ EventSchemaValidator::EventSchemaValidator(
     const QueryLoc& loc)
   :
   theTypeManager(typeManager),
-  theValidationEventHandler()
+  theValidationEventHandler(),
+  theGrammarResolver(new (&theMemoryManager)
+                     XERCES_CPP_NAMESPACE::GrammarResolver(grammarPool,
+                                                           &theMemoryManager))
 {
-  XERCES_CPP_NAMESPACE::MemoryManager* memoryManager =
-  XERCES_CPP_NAMESPACE::XMLPlatformUtils::fgMemoryManager;
-
-  theGrammarResolver = new (memoryManager)
-                     XERCES_CPP_NAMESPACE::GrammarResolver(grammarPool, memoryManager);
   theGrammarResolver->useCachedGrammarInParse(true);
 
 #if 0 // enable this to debug registered user defined schema types
   PrintSchema::printInfo(true, grammarPool);
 #endif
 
-  theSchemaValidatorFilter = new SchemaValidatorFilter(!isLax,
-                                                     &theValidationEventHandler,
-                                                     theGrammarResolver,
-                                                     memoryManager,
-                                                     loc);
+  theSchemaValidatorFilter.reset(
+    new (&theMemoryManager) SchemaValidatorFilter(!isLax,
+                                                  &theValidationEventHandler,
+                                                  theGrammarResolver.get(),
+                                                  &theMemoryManager,
+                                                  loc));
 #if _XERCES_VERSION >= 30000
   // this will enable Integrity Constraint errors
   theSchemaValidatorFilter->setValidationScheme(XMLScanner::Val_Always);
@@ -68,11 +67,7 @@ EventSchemaValidator::EventSchemaValidator(
 }
 
 
-EventSchemaValidator::~EventSchemaValidator()
-{
-  delete theSchemaValidatorFilter;
-  delete theGrammarResolver;
-}
+EventSchemaValidator::~EventSchemaValidator() = default;
 
 
 void EventSchemaValidator::startDoc()

@@ -24,6 +24,9 @@
 
 #include "zorbatypes/float.h"
 
+#include <cmath>
+#include <limits>
+
 namespace zorba 
 { 
 
@@ -154,14 +157,19 @@ long GeneralIndexCompareFunction::compare(
 /******************************************************************************
 
 *******************************************************************************/
-bool GeneralIndexValue::removeNode(const store::Item_t& node, ImageKind image)
+bool GeneralIndexValue::removeNode(
+    const store::Item_t& node,
+    bool untyped,
+    ImageKind image)
 {
   GeneralIndexValue::iterator ite = theNodes.begin();
   GeneralIndexValue::iterator end = theNodes.end();
 
   for (; ite != end; ++ite)
   {
-    if ((*ite).theNode == node && (*ite).theImage == image)
+    if ((*ite).theNode == node &&
+        (*ite).theUntyped == untyped &&
+        (*ite).theImage == image)
     {
       theNodes.erase(ite);
       return true;
@@ -211,12 +219,75 @@ void GeneralIndexValue::addNode(
 
 
 /******************************************************************************
+  Whether keys of this type are stored in the xs:long map as they are.
+*******************************************************************************/
+static bool isLongMapType(store::SchemaTypeCode type)
+{
+  switch (type)
+  {
+  case store::XS_LONG:
+  case store::XS_INT:
+  case store::XS_SHORT:
+  case store::XS_BYTE:
+  case store::XS_UNSIGNED_INT:
+  case store::XS_UNSIGNED_SHORT:
+  case store::XS_UNSIGNED_BYTE:
+    return true;
+  default:
+    return false;
+  }
+}
+
+
+/******************************************************************************
+  The xs:double and xs:float values that an item of xs:decimal or a derived
+  type is promoted to, rounded as the item comparisons round them.
+*******************************************************************************/
+static void promoteExact(
+    const AtomicItem* item,
+    xs_double& doubleValue,
+    xs_float& floatValue)
+{
+  if (isLongMapType(item->getTypeCode()))
+  {
+    xs_long longValue = item->getLongValue();
+    doubleValue = xs_double(static_cast<double>(longValue));
+    floatValue = xs_float(static_cast<float>(longValue));
+  }
+  else
+  {
+    xs_decimal decimalValue = item->getDecimalValue();
+    doubleValue = xs_double(decimalValue);
+    floatValue = xs_float(decimalValue);
+  }
+}
+
+
+/******************************************************************************
 
 *******************************************************************************/
-const int64_t  GeneralIndex::theMaxLong       =  99999999999LL;
-const int64_t  GeneralIndex::theMinLong       = -99999999999LL;
-const double   GeneralIndex::theDoubleMaxLong =  99999999999.0;
-const double   GeneralIndex::theDoubleMinLong = -99999999999.0;
+static bool equalsLong(double doubleValue, xs_long longValue)
+{
+  static const double twoPow63 = 9223372036854775808.0;
+
+  return (doubleValue >= -twoPow63 &&
+          doubleValue < twoPow63 &&
+          static_cast<xs_long>(doubleValue) == longValue);
+}
+
+
+/******************************************************************************
+  The xs:float value that is equal to an xs:double value, if there is one.
+*******************************************************************************/
+static bool exactFloat(double doubleValue, float& floatValue)
+{
+  if (!(std::fabs(doubleValue) <= std::numeric_limits<float>::max()) &&
+      !std::isinf(doubleValue))
+    return false;
+
+  floatValue = static_cast<float>(doubleValue);
+  return static_cast<double>(floatValue) == doubleValue;
+}
 
 
 /******************************************************************************
@@ -290,7 +361,6 @@ bool GeneralIndex::insert(store::IndexKey*& key, store::Item_t& value)
 *******************************************************************************/
 bool GeneralIndex::insert(store::Item_t& key, store::Item_t& node)
 {
-  bool lossy = false;
   bool found = false;
   store::Item_t castItem;
   store::Item_t node2;
@@ -371,9 +441,13 @@ bool GeneralIndex::insert(store::Item_t& key, store::Item_t& node)
   }
 
   case store::XS_DOUBLE:
-  case store::XS_FLOAT:
   {
     return insertInMap(key, node, store::XS_DOUBLE, false);
+  }
+
+  case store::XS_FLOAT:
+  {
+    return insertInMap(key, node, store::XS_FLOAT, false);
   }
 
   case store::XS_DECIMAL:
@@ -389,72 +463,14 @@ bool GeneralIndex::insert(store::Item_t& key, store::Item_t& node)
 
     if (castItem != NULL)
     {
-      keyItem = static_cast<AtomicItem*>(castItem.getp());
       key.transfer(castItem);
-      goto longmap;
+      return insertExact(key, node, store::XS_LONG);
     }
 
-    // The exact key serves xs:decimal and xs:float probes; its xs:double image
-    // serves xs:double probes.
-    GET_FACTORY().createDouble(castItem, xs_double(keyItem->getDecimalValue()));
-
-    node2 = node;
-    found = insertInMap(key, node2, store::XS_DECIMAL, false);
-
-    if (insertInMap(castItem, node, store::XS_DOUBLE, false,
-                    GeneralIndexValue::DECIMAL_IMAGE))
-      found = true;
-
-    return found;
+    return insertExact(key, node, store::XS_DECIMAL);
   }
 
   case store::XS_LONG:
-  {
-longmap:
-    xs_long longValue = static_cast<LongItem*>(keyItem)->getLongValue();
-
-    if (longValue > theMaxLong || longValue < theMinLong)
-    {
-      if (sorted)
-      {
-        lossy = true;
-        xs_double doubleValue(longValue);
-        GET_FACTORY().createDouble(castItem, doubleValue);
-      }
-      else
-      {
-        keyItem->coerceToDouble(castItem, false, lossy);
-      }
-
-      if (lossy)
-      {
-        /*
-        std::cout << "Lossy LONG insertion in index" << getName()->getStringValue()
-                  << std::endl
-                  << "long value = " << longValue
-                  << " double value = " << castItem->getDoubleValue()
-                  << std::endl << std::endl;
-        */
-        node2 = node;
-        found = insertInMap(key, node2, store::XS_LONG, false);
-
-        if (insertInMap(castItem, node, store::XS_DOUBLE, false,
-                        GeneralIndexValue::LONG_IMAGE))
-          found = true;
-      }
-      else
-      {
-        found = insertInMap(key, node, store::XS_LONG, false);
-      }
-    }
-    else
-    {
-      found = insertInMap(key, node, store::XS_LONG, false);
-    }
-
-    return found;
-  }
-
   case store::XS_INT:
   case store::XS_SHORT:
   case store::XS_BYTE:
@@ -462,7 +478,7 @@ longmap:
   case store::XS_UNSIGNED_SHORT:
   case store::XS_UNSIGNED_BYTE:
   {
-    return insertInMap(key, node, store::XS_LONG, false);
+    return insertExact(key, node, store::XS_LONG);
   }
 
   case store::XS_UNTYPED_ATOMIC:
@@ -483,34 +499,13 @@ longmap:
     // try casting to xs:long
     if (untypedItem->castToLong(castItem))
     {
-      store::ItemHandle<LongItem> longItem = static_cast<LongItem*>(castItem.getp());
-
-      xs_long longValue = longItem->getLongValue();
+      // Compared with a numeric key or probe, an untyped value is cast to
+      // xs:double.
+      untypedItem->castToDouble(castItem);
 
       node2 = node;
-      if (insertInMap(castItem, node2, store::XS_LONG, true))
+      if (insertInMap(castItem, node2, store::XS_DOUBLE, true))
         found = true;
-
-      if (longValue > theMaxLong || longValue < theMinLong)
-      {
-        if (sorted)
-        {
-          lossy = true;
-          xs_double doubleValue(longValue);
-          GET_FACTORY().createDouble(castItem, doubleValue);
-        }
-        else
-        {
-          longItem->coerceToDouble(castItem, false, lossy);
-        }
-
-        if (lossy)
-        {
-          node2 = node;
-          if (insertInMap(castItem, node2, store::XS_DOUBLE, true))
-            found = true;
-        }
-      }
 
       // may also be gYear, hexBinary, base64Binary, or boolean
       if (!sorted)
@@ -700,14 +695,114 @@ bool GeneralIndex::insertInMap(
 
 
 /******************************************************************************
+  The images (see GeneralIndex) of a key that goes into the xs:long or the
+  xs:decimal map: none in a tree index, and in a hash index the promotions of
+  the key to xs:double and xs:float, except one that is equal to an xs:long key
+  exactly.
+*******************************************************************************/
+void GeneralIndex::getImages(
+    const AtomicItem* key,
+    store::SchemaTypeCode targetMap,
+    store::Item_t& doubleImage,
+    store::Item_t& floatImage) const
+{
+  doubleImage = NULL;
+  floatImage = NULL;
+
+  if (isSorted())
+    return;
+
+  xs_double doubleValue;
+  xs_float floatValue;
+  promoteExact(key, doubleValue, floatValue);
+
+  bool longKey = (targetMap == store::XS_LONG);
+
+  if (!longKey || !equalsLong(doubleValue.getNumber(), key->getLongValue()))
+    GET_FACTORY().createDouble(doubleImage, doubleValue);
+
+  if (!longKey || !equalsLong(floatValue.getNumber(), key->getLongValue()))
+    GET_FACTORY().createFloat(floatImage, floatValue);
+}
+
+
+/******************************************************************************
+  Inserts a key of xs:decimal or a derived type in the xs:long or the
+  xs:decimal map, with its images.
+*******************************************************************************/
+bool GeneralIndex::insertExact(
+    store::Item_t& key,
+    store::Item_t& node,
+    store::SchemaTypeCode targetMap)
+{
+  bool found = false;
+  store::Item_t doubleImage;
+  store::Item_t floatImage;
+  store::Item_t node2;
+
+  getImages(static_cast<AtomicItem*>(key.getp()), targetMap,
+            doubleImage, floatImage);
+
+  if (doubleImage != NULL)
+  {
+    node2 = node;
+    if (insertInMap(doubleImage, node2, store::XS_DOUBLE, false,
+                    GeneralIndexValue::DOUBLE_IMAGE))
+      found = true;
+  }
+
+  if (floatImage != NULL)
+  {
+    node2 = node;
+    if (insertInMap(floatImage, node2, store::XS_FLOAT, false,
+                    GeneralIndexValue::FLOAT_IMAGE))
+      found = true;
+  }
+
+  if (insertInMap(key, node, targetMap, false))
+    found = true;
+
+  return found;
+}
+
+
+/******************************************************************************
+  Removes what insertExact() inserted.
+*******************************************************************************/
+bool GeneralIndex::removeExact(
+    const store::Item_t& key,
+    const store::Item_t& node,
+    store::SchemaTypeCode targetMap)
+{
+  store::Item_t doubleImage;
+  store::Item_t floatImage;
+
+  getImages(static_cast<AtomicItem*>(key.getp()), targetMap,
+            doubleImage, floatImage);
+
+  bool found = removeFromMap(key, node, targetMap, false);
+
+  if (doubleImage != NULL &&
+      removeFromMap(doubleImage, node, store::XS_DOUBLE, false,
+                    GeneralIndexValue::DOUBLE_IMAGE))
+    found = true;
+
+  if (floatImage != NULL &&
+      removeFromMap(floatImage, node, store::XS_FLOAT, false,
+                    GeneralIndexValue::FLOAT_IMAGE))
+    found = true;
+
+  return found;
+}
+
+
+/******************************************************************************
 
 *******************************************************************************/
 bool GeneralIndex::remove(const store::Item_t& key, const store::Item_t& node)
 {
-  bool lossy = false;
   bool found = false;
   store::Item_t castItem;
-  store::Item_t longItem;
 
   bool sorted = isSorted();
 
@@ -787,9 +882,13 @@ bool GeneralIndex::remove(const store::Item_t& key, const store::Item_t& node)
   }
 
   case store::XS_DOUBLE:
-  case store::XS_FLOAT:
   {
     return removeFromMap(key, node, store::XS_DOUBLE, false);
+  }
+
+  case store::XS_FLOAT:
+  {
+    return removeFromMap(key, node, store::XS_FLOAT, false);
   }
 
   case store::XS_DECIMAL:
@@ -804,72 +903,12 @@ bool GeneralIndex::remove(const store::Item_t& key, const store::Item_t& node)
     keyItem->castToLong(castItem);
 
     if (castItem != NULL)
-    {
-      // Held apart from castItem, which the long map path reuses.
-      longItem.transfer(castItem);
-      keyItem = static_cast<AtomicItem*>(longItem.getp());
-      goto longmap;
-    }
+      return removeExact(castItem, node, store::XS_LONG);
 
-    GET_FACTORY().createDouble(castItem, xs_double(keyItem->getDecimalValue()));
-
-    found = removeFromMap(key, node, store::XS_DECIMAL, false);
-
-    if (removeFromMap(castItem, node, store::XS_DOUBLE, false,
-                      GeneralIndexValue::DECIMAL_IMAGE))
-      found = true;
-
-    return found;
+    return removeExact(keyItem, node, store::XS_DECIMAL);
   }
 
   case store::XS_LONG:
-  {
-    // NOTE: here we use KeyItem, instead of key, as arg to removeFromMap, because
-    // we can reach here from the store::XS_DECIMAL case.
-longmap:
-    xs_long longValue = static_cast<LongItem*>(keyItem)->getLongValue();
-
-    if (longValue > theMaxLong || longValue < theMinLong)
-    {
-      if (sorted)
-      {
-        lossy = true;
-        xs_double doubleValue(longValue);
-        GET_FACTORY().createDouble(castItem, doubleValue);
-      }
-      else
-      {
-        keyItem->coerceToDouble(castItem, false, lossy);
-      }
-
-      if (lossy)
-      {
-        /*
-        std::cout << "Lossy LONG insertion in index" << getName()->getStringValue()
-                  << std::endl
-                  << "long value = " << longValue
-                  << " double value = " << castItem->getDoubleValue()
-                  << std::endl << std::endl;
-        */
-        found = removeFromMap(keyItem, node, store::XS_LONG, false);
-
-        if (removeFromMap(castItem, node, store::XS_DOUBLE, false,
-                          GeneralIndexValue::LONG_IMAGE))
-          found = true;
-      }
-      else
-      {
-        found = removeFromMap(keyItem, node, store::XS_LONG, false);
-      }
-    }
-    else
-    {
-      found = removeFromMap(keyItem, node, store::XS_LONG, false);
-    }
-
-    return found;
-  }
-
   case store::XS_INT:
   case store::XS_SHORT:
   case store::XS_BYTE:
@@ -877,7 +916,7 @@ longmap:
   case store::XS_UNSIGNED_SHORT:
   case store::XS_UNSIGNED_BYTE:
   {
-    return removeFromMap(key, node, store::XS_LONG, false);
+    return removeExact(keyItem, node, store::XS_LONG);
   }
 
   case store::XS_UNTYPED_ATOMIC:
@@ -893,32 +932,10 @@ longmap:
     // try casting to xs:long
     if (untypedItem->castToLong(castItem))
     {
-      store::ItemHandle<LongItem> longItem = static_cast<LongItem*>(castItem.getp());
+      untypedItem->castToDouble(castItem);
 
-      xs_long longValue = longItem->getLongValue();
-
-      if (removeFromMap(castItem, node, store::XS_LONG, true))
+      if (removeFromMap(castItem, node, store::XS_DOUBLE, true))
         found = true;
-
-      if (longValue > theMaxLong || longValue < theMinLong)
-      {
-        if (sorted)
-        {
-          lossy = true;
-          xs_double doubleValue(longValue);
-          GET_FACTORY().createDouble(castItem, doubleValue);
-        }
-        else
-        {
-          longItem->coerceToDouble(castItem, false, lossy);
-        }
-
-        if (lossy)
-        {
-          if (removeFromMap(castItem, node, store::XS_DOUBLE, true))
-            found = true;
-        }
-      }
 
       // may also be gYear, hexBinary, base64Binary, or boolean
       if (!sorted)
@@ -1088,12 +1105,12 @@ bool GeneralIndex::removeFromMap(
   if (isSorted())
   {
     GeneralTreeIndex* idx = static_cast<GeneralTreeIndex*>(this);
-    return idx->removeFromMap(key, node, idx->theMaps[targetMap], image);
+    return idx->removeFromMap(key, node, idx->theMaps[targetMap], untyped, image);
   }
   else
   {
     GeneralHashIndex* idx = static_cast<GeneralHashIndex*>(this);
-    return idx->removeFromMap(key, node, idx->theMaps[targetMap], image);
+    return idx->removeFromMap(key, node, idx->theMaps[targetMap], untyped, image);
   }
 }
 
@@ -1239,6 +1256,7 @@ bool GeneralHashIndex::removeFromMap(
     const store::Item_t& key,
     const store::Item_t& node,
     IndexMap* targetMap,
+    bool untyped,
     GeneralIndexValue::ImageKind image)
 {
   assert(targetMap);
@@ -1250,13 +1268,15 @@ bool GeneralHashIndex::removeFromMap(
   {
     GeneralIndexValue* valueSet = (*pos).second;
 
-    bool found = valueSet->removeNode(node, image);
+    bool found = valueSet->removeNode(node, untyped, image);
 
     if (valueSet->empty())
     {
-      const_cast<store::Item*>((*pos).first)->removeReference();
+      // Released after the erase, which hashes the key.
+      const store::Item* mapKey = (*pos).first;
       delete valueSet;
       targetMap->erase(pos);
+      const_cast<store::Item*>(mapKey)->removeReference();
     }
 
     return found;
@@ -1268,7 +1288,7 @@ bool GeneralHashIndex::removeFromMap(
 
 /////////////////////////////////////////////////////////////////////////////////
 //                                                                             //
-//  GeneralHashIndex::KeyIterator                                              //
+//  GeneralHashIndex::KeyIterator                                             //
 //                                                                             //
 /////////////////////////////////////////////////////////////////////////////////
 
@@ -1506,6 +1526,7 @@ bool GeneralTreeIndex::removeFromMap(
     const store::Item_t& key,
     const store::Item_t& node,
     IndexMap* targetMap,
+    bool untyped,
     GeneralIndexValue::ImageKind image)
 {
   assert(targetMap);
@@ -1517,7 +1538,7 @@ bool GeneralTreeIndex::removeFromMap(
   {
     GeneralIndexValue* valueSet = (*pos).second;
 
-    bool found = valueSet->removeNode(node, image);
+    bool found = valueSet->removeNode(node, untyped, image);
 
     if (valueSet->empty())
     {
@@ -1594,8 +1615,7 @@ ProbeGeneralIndexIterator::ProbeGeneralIndexIterator(const store::Index_t& idx)
   theIndex(static_cast<GeneralIndex*>(idx.getp())),
   theIsUntypedProbe(false),
   theIsFullProbe(false),
-  theIsExactProbe(false),
-  theIsFloatProbe(false)
+  theNumberKind(NOT_NUMBER)
 {
 }
 
@@ -1630,75 +1650,6 @@ void ProbeGeneralIndexIterator::checkStringKeyType(const AtomicItem* key) const
 
 
 /*******************************************************************************
-
-********************************************************************************/
-void ProbeGeneralIndexIterator::doubleToLongProbe(
-    store::Item_t& result,
-    const AtomicItem* doubleItem,
-    bool haveLower,
-    bool haveUpper) const
-{
-  assert(!(haveLower && haveUpper));
-
-  xs_double doubleObj = doubleItem->getDoubleValue();
-
-  if (doubleObj.isNaN())
-    throw ZORBA_EXCEPTION(zerr::ZSTR0041_NAN_COMPARISON);
-
-  double doubleValue = doubleObj.getNumber();
-
-  int64_t longValue;
-
-  result = NULL;
-
-  if (doubleObj.isPosInf() || doubleValue > GeneralTreeIndex::theDoubleMaxLong)
-  {
-    if (haveLower)
-    {
-      return;
-    }
-    else
-    {
-      longValue = GeneralTreeIndex::theMaxLong;
-      theCondition->theRangeFlags.theUpperBoundIncl = true;
-    }
-  }
-  else if (doubleObj.isNegInf() || doubleValue < GeneralTreeIndex::theDoubleMinLong)
-  {
-    if (haveLower)
-    {
-      longValue = GeneralTreeIndex::theMinLong;
-      theCondition->theRangeFlags.theLowerBoundIncl = true;
-    }
-    else
-    {
-      return;
-    }
-  }
-  else
-  {
-    double doubleFloor = ::floor(doubleValue);
-    longValue = static_cast<int64_t>(doubleFloor);
-
-    bool lossy = (doubleFloor != doubleValue);
-
-    assert(doubleFloor + 1.0 > doubleValue);
-
-    if (haveLower && lossy)
-    {
-      theCondition->theRangeFlags.theLowerBoundIncl = false;
-    }
-    else if (haveUpper && lossy)
-    {
-      theCondition->theRangeFlags.theUpperBoundIncl = true;
-    }
-  }
-
-  GET_FACTORY().createLong(result, longValue);
-}
-
-
-/*******************************************************************************
   
 ********************************************************************************/
 void ProbeGeneralIndexIterator::init(const store::IndexCondition_t& cond,
@@ -1710,8 +1661,7 @@ void ProbeGeneralIndexIterator::init(const store::IndexCondition_t& cond,
   // The runtime calls init once per search item on the same iterator.
   theIsUntypedProbe = false;
   theIsFullProbe = false;
-  theIsExactProbe = false;
-  theIsFloatProbe = false;
+  theNumberKind = NOT_NUMBER;
   theResultSets.clear();
   theMapBegins.clear();
   theMapEnds.clear();
@@ -1765,7 +1715,6 @@ void ProbeGeneralIndexIterator::initPoint()
   }
   else
   {
-    bool lossy;
     store::Item_t castItem;
 
     store::SchemaTypeCode keyType = key->getTypeCode();
@@ -1846,21 +1795,6 @@ void ProbeGeneralIndexIterator::initPoint()
 
     case store::XS_DOUBLE:
     case store::XS_FLOAT:
-    {
-      probeMap(store::XS_DOUBLE, key.getp());
-
-      if (keyType == store::XS_FLOAT)
-      {
-        theIsFloatProbe = true;
-        probeMap(store::XS_DECIMAL, key.getp());
-      }
-
-      if (haveMap(store::XS_LONG) && key->castToLong(castItem))
-        probeMap(store::XS_LONG, castItem.getp());
-
-      break;
-    }
-
     case store::XS_DECIMAL:
     case store::XS_INTEGER:
     case store::XS_NON_POSITIVE_INTEGER:
@@ -1868,21 +1802,6 @@ void ProbeGeneralIndexIterator::initPoint()
     case store::XS_NON_NEGATIVE_INTEGER:
     case store::XS_POSITIVE_INTEGER:
     case store::XS_UNSIGNED_LONG:
-    {
-      theIsExactProbe = true;
-
-      GET_FACTORY().createDouble(castItem, xs_double(key->getDecimalValue()));
-
-      probeMap(store::XS_DECIMAL, key.getp());
-
-      probeMap(store::XS_DOUBLE, castItem.getp());
-
-      if (haveMap(store::XS_LONG) && key->castToLong(castItem))
-        probeMap(store::XS_LONG, castItem.getp());
-
-      break;
-    }
-
     case store::XS_LONG:
     case store::XS_INT:
     case store::XS_SHORT:
@@ -1891,16 +1810,7 @@ void ProbeGeneralIndexIterator::initPoint()
     case store::XS_UNSIGNED_SHORT:
     case store::XS_UNSIGNED_BYTE:
     {
-      theIsExactProbe = true;
-
-      probeMap(store::XS_LONG, key.getp());
-
-      if (haveMap(store::XS_DOUBLE))
-      {
-        key->coerceToDouble(castItem, true, lossy);
-        probeMap(store::XS_DOUBLE, castItem.getp());
-      }
-
+      probeNumber(key.getp());
       break;
     }
 
@@ -1926,20 +1836,17 @@ void ProbeGeneralIndexIterator::initPoint()
         probeMap(store::XS_ANY_URI, castItem.getp());
       }
 
+      // Compared with a number, an untyped value is cast to xs:double.
+      bool haveNumbers = (haveMap(store::XS_LONG) ||
+                          haveMap(store::XS_DECIMAL) ||
+                          haveMap(store::XS_DOUBLE) ||
+                          haveMap(store::XS_FLOAT));
+
       // try casting to xs:long
-      if ((haveMap(store::XS_LONG) || haveMap(store::XS_DOUBLE)) &&
-          (untypedItem->castToLong(castItem), castItem != NULL))
+      if (haveNumbers && untypedItem->castToLong(castItem))
       {
-        store::ItemHandle<LongItem> longItem = 
-        static_cast<LongItem*>(castItem.getp());
-
-        probeMap(store::XS_LONG, castItem.getp());
-
-        if (haveMap(store::XS_DOUBLE))
-        {
-          longItem->coerceToDouble(castItem, true, lossy);
-          probeMap(store::XS_DOUBLE, castItem.getp());
-        }
+        untypedItem->castToDouble(castItem);
+        probeNumber(static_cast<AtomicItem*>(castItem.getp()));
 
         // may also be gYear, hexBinary, base64Binary, or boolean
         if (!sorted)
@@ -1965,26 +1872,10 @@ void ProbeGeneralIndexIterator::initPoint()
       }
 
       // try casting to xs:decimal
-      else if ((haveMap(store::XS_DECIMAL) ||
-                haveMap(store::XS_LONG) ||
-                haveMap(store::XS_DOUBLE)) &&
-               untypedItem->castToDecimal(castItem))
+      else if (haveNumbers && untypedItem->castToDecimal(castItem))
       {
-        store::ItemHandle<DecimalItem> decimalItem = 
-        static_cast<DecimalItem*>(castItem.getp());
-
-        GET_FACTORY().createDouble(castItem,
-                                   xs_double(decimalItem->getDecimalValue()));
-
-        probeMap(store::XS_DOUBLE, castItem.getp());
-
-        // Compared with a numeric key, an untyped value is cast to xs:double.
-        store::Item_t longItem;
-        if (haveMap(store::XS_LONG) &&
-            static_cast<AtomicItem*>(castItem.getp())->castToLong(longItem))
-        {
-          probeMap(store::XS_LONG, longItem.getp());
-        }
+        untypedItem->castToDouble(castItem);
+        probeNumber(static_cast<AtomicItem*>(castItem.getp()));
 
         // may also be hexBinary or base64Binary
         if (!sorted)
@@ -2004,18 +1895,9 @@ void ProbeGeneralIndexIterator::initPoint()
       }
 
       // try casting to xs:double
-      else if ((haveMap(store::XS_LONG) || haveMap(store::XS_DOUBLE)) &&
-               untypedItem->castToDouble(castItem))
+      else if (haveNumbers && untypedItem->castToDouble(castItem))
       {
-        store::ItemHandle<DoubleItem> doubleItem = 
-        static_cast<DoubleItem*>(castItem.getp());
-
-        probeMap(store::XS_DOUBLE, castItem.getp());
-
-        if (haveMap(store::XS_LONG) && doubleItem->castToLong(castItem))
-        {
-          probeMap(store::XS_LONG, castItem.getp());
-        }
+        probeNumber(static_cast<AtomicItem*>(castItem.getp()));
       }
 
       // try casting to xs:datetime
@@ -2223,38 +2105,6 @@ void ProbeGeneralIndexIterator::initBox()
 
     case store::XS_DOUBLE:
     case store::XS_FLOAT:
-    {
-      probeMap(store::XS_DOUBLE, lowerKey, upperKey);
-
-      // Before the LONG map: doubleToLongProbe adjusts the bound flags.
-      if (keyType == store::XS_FLOAT)
-      {
-        theIsFloatProbe = true;
-        probeMap(store::XS_DECIMAL, lowerKey, upperKey);
-      }
-
-      if (idx->theMaps[store::XS_LONG])
-      {
-        if (haveLower)
-          doubleToLongProbe(lowerAltKey, lowerKey, true, false);
-
-        if (haveUpper)
-          doubleToLongProbe(upperAltKey, upperKey, false, true);
-
-        if (haveLower && haveUpper)
-        {
-          if (lowerAltKey && upperAltKey)
-            probeMap(store::XS_LONG, lowerAltKey, upperAltKey);
-        }
-        else if ((haveLower && lowerAltKey) || (haveUpper && upperAltKey))
-        {
-          probeMap(store::XS_LONG, lowerAltKey, upperAltKey);
-        }
-      }
-
-      break;
-    }
-
     case store::XS_DECIMAL:
     case store::XS_INTEGER:
     case store::XS_NON_POSITIVE_INTEGER:
@@ -2262,36 +2112,6 @@ void ProbeGeneralIndexIterator::initBox()
     case store::XS_NON_NEGATIVE_INTEGER:
     case store::XS_POSITIVE_INTEGER:
     case store::XS_UNSIGNED_LONG:
-    {
-      theIsExactProbe = true;
-
-      probeMap(store::XS_DECIMAL, lowerKey, upperKey);
-
-      if (idx->theMaps[store::XS_LONG])
-      {
-        probeMap(store::XS_LONG, lowerKey, upperKey);
-      }
-
-      if (idx->theMaps[store::XS_DOUBLE])
-      {
-        if (haveLower)
-        {
-          xs_double const doubleValue( lowerKey->getDecimalValue() );
-          GET_FACTORY().createDouble(lowerAltKey, doubleValue);
-        }
-
-        if (haveUpper)
-        {
-          xs_double const doubleValue( upperKey->getDecimalValue() );
-          GET_FACTORY().createDouble(upperAltKey, doubleValue);
-        }
-
-        probeMap(store::XS_DOUBLE, lowerAltKey, upperAltKey);
-      }
-
-      break;
-    }
-
     case store::XS_LONG:
     case store::XS_INT:
     case store::XS_SHORT:
@@ -2300,44 +2120,7 @@ void ProbeGeneralIndexIterator::initBox()
     case store::XS_UNSIGNED_SHORT:
     case store::XS_UNSIGNED_BYTE:
     {
-      theIsExactProbe = true;
-
-      probeMap(store::XS_LONG, lowerKey, upperKey);
-
-      if (idx->theMaps[store::XS_DECIMAL])
-      {
-        if (haveLower)
-        {
-          xs_decimal const decimalValue( lowerKey->getLongValue() );
-          GET_FACTORY().createDecimal(lowerAltKey, decimalValue);
-        }
-
-        if (haveUpper)
-        {
-          xs_decimal const decimalValue( upperKey->getLongValue() );
-          GET_FACTORY().createDecimal(upperAltKey, decimalValue);
-        }
-
-        probeMap(store::XS_DECIMAL, lowerAltKey, upperAltKey);
-      }
-
-      if (idx->theMaps[store::XS_DOUBLE])
-      {
-        if (haveLower)
-        {
-          xs_double doubleValue( lowerKey->getLongValue() );
-          GET_FACTORY().createDouble(lowerAltKey, doubleValue);
-        }
-
-        if (haveUpper)
-        {
-          xs_double const doubleValue( upperKey->getLongValue() );
-          GET_FACTORY().createDouble(upperAltKey, doubleValue);
-        }
-
-        probeMap(store::XS_DOUBLE, lowerAltKey, upperAltKey);
-      }
-
+      probeNumberRange(lowerKey.getp(), upperKey.getp());
       break;
     }
 
@@ -2367,84 +2150,10 @@ void ProbeGeneralIndexIterator::initBox()
         probeMap(store::XS_ANY_URI, altKey, altKey);
       }
 
-      // try casting to xs:long
-      if ((idx->theMaps[store::XS_LONG] ||
-           idx->theMaps[store::XS_DOUBLE] ||
-           idx->theMaps[store::XS_DECIMAL]) &&
-          (untypedItem->castToLong(altKey), altKey != NULL))
+      // Compared with a number, an untyped value is cast to xs:double.
+      if (untypedItem->castToDouble(altKey))
       {
-        store::ItemHandle<LongItem> longItem = 
-        static_cast<LongItem*>(altKey.getp());
-
-        if (idx->theMaps[store::XS_LONG])
-        {
-          probeMap(store::XS_LONG, altKey, altKey);
-        }
-
-        if (idx->theMaps[store::XS_DOUBLE])
-        {
-          xs_double const doubleValue( longItem->getLongValue() );
-          GET_FACTORY().createDouble(altKey, doubleValue);
-          probeMap(store::XS_DOUBLE, altKey, altKey);
-        }
-      }
-
-      // try casting to xs:decimal
-      else if ((idx->theMaps[store::XS_LONG] ||
-                idx->theMaps[store::XS_DOUBLE] ||
-                idx->theMaps[store::XS_DECIMAL]) &&
-               (untypedItem->castToDecimal(altKey), altKey != NULL))
-      {
-        store::ItemHandle<DecimalItem> decimalItem = 
-        static_cast<DecimalItem*>(altKey.getp());
-
-        // Compared with a numeric key, an untyped value is cast to xs:double.
-        xs_double const doubleValue( decimalItem->getDecimalValue() );
-        store::Item_t doubleKey;
-        GET_FACTORY().createDouble(doubleKey, doubleValue);
-
-        if (idx->theMaps[store::XS_DOUBLE])
-        {
-          probeMap(store::XS_DOUBLE, doubleKey, doubleKey);
-        }
-
-        // Last: doubleToLongProbe adjusts the bound inclusion flag.
-        if (idx->theMaps[store::XS_LONG])
-        {
-          doubleToLongProbe(altKey,
-                            static_cast<AtomicItem*>(doubleKey.getp()),
-                            haveLower,
-                            haveUpper);
-
-          if (altKey)
-          {
-            probeMap(store::XS_LONG, altKey, altKey);
-          }
-        }
-      }
-
-      // try casting to xs:double
-      else if ((idx->theMaps[store::XS_LONG] ||
-               idx->theMaps[store::XS_DOUBLE]) &&
-               (untypedItem->castToDouble(altKey), altKey != NULL))
-      {
-        store::ItemHandle<DoubleItem> doubleItem = 
-        static_cast<DoubleItem*>(altKey.getp());
-
-        if (idx->theMaps[store::XS_DOUBLE])
-        {
-          probeMap(store::XS_DOUBLE, altKey, altKey);
-        }
-
-        if (idx->theMaps[store::XS_LONG])
-        {
-          doubleToLongProbe(altKey, doubleItem.getp(), haveLower, haveUpper);
-
-          if (altKey)
-          {
-            probeMap(store::XS_LONG, altKey, altKey);
-          }
-        }
+        probeNumberRange(altKey, altKey);
       }
 
       // try casting to xs:datetime
@@ -2491,6 +2200,95 @@ void ProbeGeneralIndexIterator::initBox()
       theMapEnds.push_back(idx->theMaps[i]->end());
     }
   }
+}
+
+
+/******************************************************************************
+  Probes the numeric maps (see GeneralIndex) with a numeric search key.
+********************************************************************************/
+void ProbeGeneralIndexIterator::probeNumber(const AtomicItem* key)
+{
+  store::SchemaTypeCode keyType = key->getTypeCode();
+
+  theNumberKind = (keyType == store::XS_DOUBLE ? DOUBLE_NUMBER :
+                   keyType == store::XS_FLOAT ? FLOAT_NUMBER :
+                   EXACT_NUMBER);
+
+  // NaN is equal to no number.
+  if (key->isNaN())
+    return;
+
+  if (theIndex->isSorted())
+  {
+    probeMap(store::XS_LONG, key);
+    probeMap(store::XS_DECIMAL, key);
+    probeMap(store::XS_DOUBLE, key);
+    probeMap(store::XS_FLOAT, key);
+    return;
+  }
+
+  store::Item_t castItem;
+
+  // An xs:long key that the search key is equal to but not exactly is found
+  // by its image.
+  if (isLongMapType(keyType))
+    probeMap(store::XS_LONG, key);
+  else if (key->castToLong(castItem))
+    probeMap(store::XS_LONG, castItem.getp());
+  else if (theNumberKind == EXACT_NUMBER)
+    probeMap(store::XS_DECIMAL, key);
+
+  if (theNumberKind == EXACT_NUMBER)
+  {
+    xs_double doubleValue;
+    xs_float floatValue;
+    promoteExact(key, doubleValue, floatValue);
+
+    GET_FACTORY().createDouble(castItem, doubleValue);
+    probeMap(store::XS_DOUBLE, castItem.getp());
+
+    GET_FACTORY().createFloat(castItem, floatValue);
+    probeMap(store::XS_FLOAT, castItem.getp());
+  }
+  else if (theNumberKind == DOUBLE_NUMBER)
+  {
+    probeMap(store::XS_DOUBLE, key);
+
+    float floatValue;
+    if (exactFloat(key->getDoubleValue().getNumber(), floatValue))
+    {
+      GET_FACTORY().createFloat(castItem, xs_float(floatValue));
+      probeMap(store::XS_FLOAT, castItem.getp());
+    }
+  }
+  else
+  {
+    GET_FACTORY().createDouble(castItem, key->getDoubleValue());
+    probeMap(store::XS_DOUBLE, castItem.getp());
+
+    probeMap(store::XS_FLOAT, key);
+  }
+}
+
+
+/******************************************************************************
+  Probes the numeric maps of a tree index with numeric bounds.
+********************************************************************************/
+void ProbeGeneralIndexIterator::probeNumberRange(
+    const store::Item* lowerKey,
+    const store::Item* upperKey)
+{
+  GeneralIndexCondition::RangeFlags& flags = theCondition->theRangeFlags;
+
+  // NaN is less than and greater than no number.
+  if ((flags.theHaveLowerBound && lowerKey->isNaN()) ||
+      (flags.theHaveUpperBound && upperKey->isNaN()))
+    return;
+
+  probeMap(store::XS_LONG, lowerKey, upperKey);
+  probeMap(store::XS_DECIMAL, lowerKey, upperKey);
+  probeMap(store::XS_DOUBLE, lowerKey, upperKey);
+  probeMap(store::XS_FLOAT, lowerKey, upperKey);
 }
 
 
@@ -2614,13 +2412,17 @@ void ProbeGeneralIndexIterator::close()
 bool ProbeGeneralIndexIterator::skipsImage(
     GeneralIndexValue::ImageKind image) const
 {
-  if (image == GeneralIndexValue::NOT_IMAGE)
+  switch (image)
+  {
+  case GeneralIndexValue::DOUBLE_IMAGE:
+    return theIsFullProbe || theNumberKind != DOUBLE_NUMBER;
+
+  case GeneralIndexValue::FLOAT_IMAGE:
+    return theIsFullProbe || theNumberKind != FLOAT_NUMBER;
+
+  default:
     return false;
-
-  if (theIsFullProbe || theIsExactProbe)
-    return true;
-
-  return theIsFloatProbe && image == GeneralIndexValue::DECIMAL_IMAGE;
+  }
 }
 
 

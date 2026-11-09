@@ -65,14 +65,15 @@ public:
   Stores all the domain nodes associated with a key K. For each such node N, a
   boolean flag is also stored. The flag is true if  K was produced by
   casting an untypedAtomic key that was found in the result of the key expr
-  for node N. A second field says whether K is the xs:double image of a typed
-  key of N that is also stored exactly in the xs:long map (LONG_IMAGE) or in
-  the xs:decimal map (DECIMAL_IMAGE).
+  for node N. A second field says whether K is not a key of N but the xs:double
+  (DOUBLE_IMAGE) or xs:float (FLOAT_IMAGE) value of a key of N that is stored
+  exactly in the xs:long or xs:decimal map (hash indexes only, see
+  GeneralIndex).
 *******************************************************************************/
 class GeneralIndexValue
 {
 public:
-  enum ImageKind { NOT_IMAGE, LONG_IMAGE, DECIMAL_IMAGE };
+  enum ImageKind { NOT_IMAGE, DOUBLE_IMAGE, FLOAT_IMAGE };
 
   struct NodeInfo
   {
@@ -101,7 +102,7 @@ public:
 
   void addNode(store::Item_t& node, bool untyped, ImageKind image);
 
-  bool removeNode(const store::Item_t& node, ImageKind image);
+  bool removeNode(const store::Item_t& node, bool untyped, ImageKind image);
 
   bool imagesOnly() const;
 };
@@ -135,6 +136,21 @@ public:
   --------------------
   The number of domain nodes for which the key expression returns more than one
   items. If > 0, then any value probes on the general index raise an error.
+
+  Numeric keys (if the index is not typed):
+  -----------------------------------------
+  Each numeric map holds keys of one type: the xs:long map the xs:decimal keys
+  within the xs:long range, the xs:decimal map the other xs:decimal keys, the
+  xs:double map the xs:double keys and the untyped keys cast to xs:double, and
+  the xs:float map the xs:float keys. A key and a search key of another type
+  compare as in a general comparison: the one that is not an xs:double is
+  promoted to xs:double, else the one that is not an xs:float to xs:float.
+  Promotion keeps the order, so a tree map is probed with the search key as is.
+  A hash map is probed with the promotion of the search key to the type of its
+  keys. Several xs:decimal keys can be equal to one xs:double or xs:float value,
+  so in a hash index the xs:double and xs:float maps also hold, as images, the
+  promotions of the xs:decimal keys that a probe of the xs:long map with the
+  exact value of an xs:double or xs:float search key does not find.
 *******************************************************************************/
 class GeneralIndex : public IndexImpl
 {
@@ -145,12 +161,6 @@ class GeneralIndex : public IndexImpl
   friend class ProbeGeneralTreeIndexIterator;
 
   typedef std::pair<const store::Item*, GeneralIndexValue*> IndexMapPair;
-
-private:
-  static const int64_t        theMaxLong;
-  static const int64_t        theMinLong;
-  static const double         theDoubleMaxLong;
-  static const double         theDoubleMinLong;
 
 protected:
   store::SchemaTypeCode       theKeyTypeCode;
@@ -184,7 +194,21 @@ protected:
       bool untyped,
       GeneralIndexValue::ImageKind image = GeneralIndexValue::NOT_IMAGE);
 
-  bool probeMap(const store::Item* key, store::SchemaTypeCode targetMap);
+  void getImages(
+      const AtomicItem* key,
+      store::SchemaTypeCode targetMap,
+      store::Item_t& doubleImage,
+      store::Item_t& floatImage) const;
+
+  bool insertExact(
+      store::Item_t& key,
+      store::Item_t& node,
+      store::SchemaTypeCode targetMap);
+
+  bool removeExact(
+      const store::Item_t& key,
+      const store::Item_t& node,
+      store::SchemaTypeCode targetMap);
 
 public:
   const XQPCollator* getCollator(csize i) const;
@@ -271,6 +295,7 @@ protected:
       const store::Item_t& key,
       const store::Item_t& node,
       IndexMap* targetMap,
+      bool untyped,
       GeneralIndexValue::ImageKind image);
 
 public:
@@ -331,6 +356,7 @@ protected:
       const store::Item_t& key,
       const store::Item_t& item,
       IndexMap* targetMap,
+      bool untyped,
       GeneralIndexValue::ImageKind image);
 
 public:
@@ -374,17 +400,11 @@ public:
   Image entries are skipped too, because their exact keys are in the LONG or
   DECIMAL map.
 
-  theIsExactProbe:
-  ----------------
-  Set to true if the search key is an xs:decimal (or a subtype). Such a key is
-  compared exactly with typed xs:decimal keys, which are probed in the LONG and
-  DECIMAL maps, so their xs:double images in the DOUBLE map are skipped.
-
-  theIsFloatProbe:
-  ----------------
-  Set to true if the search key is an xs:float. Compared with an xs:float, an
-  xs:decimal key is promoted to xs:float, not to xs:double, so typed xs:decimal
-  keys are probed in the DECIMAL map and their xs:double images are skipped.
+  theNumberKind:
+  --------------
+  Whether the search key is an xs:decimal (or a subtype), an xs:double (or an
+  untyped value cast to xs:double), or an xs:float. A probe uses only the
+  images of its own type (see GeneralIndex).
 
   theResultSets:
   --------------
@@ -437,6 +457,8 @@ class ProbeGeneralIndexIterator : public store::IndexProbeIterator
 
   typedef std::vector<EntryIterator> EntryIterators;
 
+  enum NumberKind { NOT_NUMBER, EXACT_NUMBER, DOUBLE_NUMBER, FLOAT_NUMBER };
+
 protected:
   rchandle<GeneralIndex>                theIndex;
 
@@ -448,9 +470,7 @@ protected:
 
   bool                                  theIsFullProbe;
 
-  bool                                  theIsExactProbe;
-
-  bool                                  theIsFloatProbe;
+  NumberKind                            theNumberKind;
 
   ResultSets                            theResultSets;
 
@@ -487,13 +507,11 @@ protected:
       const store::Item* lowerKey,
       const store::Item* upperKey);
 
-  void checkStringKeyType(const AtomicItem* keyItem) const;
+  void probeNumber(const AtomicItem* key);
 
-  void doubleToLongProbe(
-      store::Item_t& result,
-      const AtomicItem* doubleItem,
-      bool haveLower,
-      bool haveUpper) const;
+  void probeNumberRange(const store::Item* lowerKey, const store::Item* upperKey);
+
+  void checkStringKeyType(const AtomicItem* keyItem) const;
 
 public:
   void init(const store::IndexCondition_t& cond, const xs_integer& aSkip);

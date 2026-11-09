@@ -37,6 +37,11 @@
 #include "diagnostics/xquery_diagnostics.h"
 #include "diagnostics/assert.h"
 
+#ifndef ZORBA_NO_XMLSCHEMA
+#include <new>
+#include <xercesc/util/OutOfMemoryException.hpp>
+#endif
+
 
 //using namespace std;
 
@@ -56,9 +61,16 @@ void SchemaValidatorImpl::validate(
 #ifndef ZORBA_NO_XMLSCHEMA  
   std::set<zorba::store::Item*>::const_iterator it = nodes.begin();
   std::set<zorba::store::Item*>::const_iterator end = nodes.end();
-  for (; it != end; it++)
+  try
   {
-    validateAfterUpdate(*it, &pul, QueryLoc::null);
+    for (; it != end; it++)
+    {
+      validateAfterUpdate(*it, &pul, QueryLoc::null);
+    }
+  }
+  catch (const XERCES_CPP_NAMESPACE::OutOfMemoryException&)
+  {
+    throw std::bad_alloc();
   }
 #endif
 }
