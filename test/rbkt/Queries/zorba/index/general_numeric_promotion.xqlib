@@ -24,10 +24,17 @@ declare collection m:a as node()*;
 (: Maintained by a unique automatic index. :)
 declare collection m:u as node()*;
 
+(: Typed keys only, so value probes are allowed. :)
+declare collection m:v as node()*;
+
+(: Listed by idml:keys. :)
+declare collection m:k as node()*;
+
 (: The key of e: untyped unless @t names a type. :)
 declare function m:key($e as element(e)) as xs:anyAtomicType
 {
   switch (fn:string($e/@t))
+  case "ul" return xs:unsignedLong($e/@v)
   case "f" return xs:float($e/@v)
   case "d" return xs:double($e/@v)
   case "i" return xs:integer($e/@v)
@@ -67,6 +74,32 @@ on nodes dml:collection(xs:QName("m:a"))
 by (switch (fn:string(./@t))
     case "f" return xs:float(./@v)
     case "d" return xs:double(./@v)
+    case "i" return xs:integer(./@v)
+    case "dec" return xs:decimal(./@v)
+    default return fn:data(./@v));
+
+declare %an:general-range %an:manual index m:VRange
+on nodes dml:collection(xs:QName("m:v"))//e
+by (switch (fn:string(./@t))
+    case "ul" return xs:unsignedLong(./@v)
+    case "f" return xs:float(./@v)
+    case "d" return xs:double(./@v)
+    case "i" return xs:integer(./@v)
+    default return xs:decimal(./@v));
+
+declare %an:general-equality %an:manual index m:VEquality
+on nodes dml:collection(xs:QName("m:v"))//e
+by (switch (fn:string(./@t))
+    case "ul" return xs:unsignedLong(./@v)
+    case "f" return xs:float(./@v)
+    case "d" return xs:double(./@v)
+    case "i" return xs:integer(./@v)
+    default return xs:decimal(./@v));
+
+declare %an:general-equality %an:automatic index m:Keys
+on nodes dml:collection(xs:QName("m:k"))
+by (switch (fn:string(./@t))
+    case "f" return xs:float(./@v)
     case "i" return xs:integer(./@v)
     case "dec" return xs:decimal(./@v)
     default return fn:data(./@v));
@@ -207,4 +240,73 @@ declare %an:sequential function m:unique($name as xs:string,
   ddl:delete(xs:QName("m:u"));
 
   fn:concat($name, ": ", $outcome)
+};
+
+(: Keys at the limits of the numeric types; none is untyped. :)
+declare %an:sequential function m:init-limits()
+{
+  ddl:create(xs:QName("m:v"));
+  dml:insert(xs:QName("m:v"),
+             <r>
+               <e id="1" t="i" v="9223372036854775807"/>
+               <e id="2" t="i" v="-9223372036854775808"/>
+               <e id="3" t="ul" v="18446744073709551615"/>
+               <e id="4" t="dec" v="9223372036854775808"/>
+               <e id="5" t="i" v="9007199254740993"/>
+               <e id="6" t="dec" v="9007199254740993.4"/>
+               <e id="7" t="dec" v="9007199254740994.6"/>
+               <e id="8" t="i" v="0"/>
+               <e id="9" t="d" v="-0"/>
+               <e id="10" t="d" v="INF"/>
+               <e id="11" t="d" v="-INF"/>
+               <e id="12" t="dec" v="1000000000000000000000000000000000000000"/>
+               <e id="13" t="f" v="0.5"/>
+             </r>);
+  iddl:create(xs:QName("m:VRange"));
+  iddl:create(xs:QName("m:VEquality"));
+};
+
+(: The same selection without the index, by value comparison on the key. :)
+declare function m:point-value($name as xs:string,
+                               $index as xs:QName,
+                               $key as xs:anyAtomicType) as xs:string
+{
+  m:result($name,
+           m:ids(idml:probe-index-point-value($index, $key)),
+           m:ids(for $e in m:elements(xs:QName("m:v"))
+                 where m:key($e) eq $key
+                 return $e))
+};
+
+declare function m:range-value($name as xs:string,
+                               $lower as xs:anyAtomicType?,
+                               $upper as xs:anyAtomicType?) as xs:string
+{
+  m:result($name,
+           m:ids(idml:probe-index-range-value(xs:QName("m:VRange"),
+                                              $lower, $upper,
+                                              fn:exists($lower),
+                                              fn:exists($upper),
+                                              fn:true(), fn:true())),
+           m:ids(for $e in m:elements(xs:QName("m:v"))
+                 let $k := m:key($e)
+                 where (fn:empty($lower) or $k ge $lower) and
+                       (fn:empty($upper) or $k le $upper)
+                 return $e))
+};
+
+declare %an:sequential function m:keys() as xs:string
+{
+  ddl:create(xs:QName("m:k"));
+  dml:insert(xs:QName("m:k"), (<e id="1" t="f" v="0.5"/>,
+                               <e id="2" v="7"/>,
+                               <e id="3" t="dec" v="0.25"/>,
+                               <e id="4" t="i" v="16777217"/>));
+  fn:concat("keys: ",
+    fn:string-join(
+      for $a in idml:keys(xs:QName("m:Keys"))/*:attribute
+      let $k := fn:concat(fn:string($a/@type), " ", fn:string($a/@value))
+      order by $k
+      return $k,
+      ", "))
 };
