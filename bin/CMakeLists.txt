@@ -576,8 +576,8 @@ IF (ZORBA_WITH_FILE_ACCESS)
              exhaust_sweep_streamable_text exhaust_base64_stream
              exhaust_seekable_stream
              exhaust_sweep_xml exhaust_sweep_xml_dtd exhaust_sweep_xml_dtd_nodes
-             exhaust_sweep_fragment
-             exhaust_sweep_html exhaust_sweep_json exhaust_sweep_csv
+             exhaust_sweep_fragment exhaust_sweep_canonicalize
+             exhaust_sweep_htmlexhaust_sweep_json exhaust_sweep_csv
              exhaust_sweep_casts exhaust_sweep_decimal_thread exhaust_sweep_cache
              exhaust_cache_after_failure exhaust_user_error exhaust_long_line
              exhaust_notification exhaust_request_id
