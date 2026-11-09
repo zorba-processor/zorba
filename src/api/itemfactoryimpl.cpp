@@ -850,6 +850,26 @@ Item ItemFactoryImpl::createUnsignedShort(unsigned short aValue)
   return lItem.getp();
 }
 
+namespace {
+
+void rejectEmptyItem(const Item& aItem, const char* aArgument)
+{
+  if (aItem.isNull())
+  {
+    throw ZORBA_EXCEPTION(
+      zerr::ZAPI0014_INVALID_ARGUMENT, ERROR_PARAMS( aArgument, "empty item" )
+    );
+  }
+}
+
+void rejectEmptyItems(const std::vector<Item>& aItems, const char* aArgument)
+{
+  for (const Item& lItem : aItems)
+    rejectEmptyItem(lItem, aArgument);
+}
+
+} // namespace
+
 void convertNsBindings(
     zorba::NsBindings& aInBindings,
     store::NsBindings& aOutBindings)
@@ -883,6 +903,8 @@ zorba::Item ItemFactoryImpl::createElementNode(
     bool aHasEmptyValue,
     NsBindings aNsBindings)
 {
+  rejectEmptyItem(aNodeName, "aNodeName");
+
   store::Item_t lItem;
   store::Item_t lNodeName = Unmarshaller::getInternalItem(aNodeName);
   store::Item_t lTypeName = Unmarshaller::getInternalItem(aTypeName);
@@ -905,6 +927,9 @@ void ItemFactoryImpl::assignElementTypedValue(
     Item &aElement,
     Item aTypedValue)
 {
+  rejectEmptyItem(aElement, "aElement");
+  rejectEmptyItem(aTypedValue, "aTypedValue");
+
   store::Item_t lStoreElement = Unmarshaller::getInternalItem(aElement);
 
   // Create the internal text node where the Zorba store holds the typed value.
@@ -917,6 +942,9 @@ void ItemFactoryImpl::assignElementTypedValue(
     Item &aElement,
     std::vector<Item> &aTypedValue)
 {
+  rejectEmptyItem(aElement, "aElement");
+  rejectEmptyItems(aTypedValue, "aTypedValue");
+
   store::Item_t lStoreElement = Unmarshaller::getInternalItem(aElement);
 
   // Convert typed value vector.
@@ -935,6 +963,9 @@ zorba::Item ItemFactoryImpl::createAttributeNode(
     Item aTypeName,
     Item aTypedValue)
 {
+  rejectEmptyItem(aNodeName, "aNodeName");
+  rejectEmptyItem(aTypedValue, "aTypedValue");
+
   store::Item_t lItem;
   store::Item_t lNodeName = Unmarshaller::getInternalItem(aNodeName);
   store::Item_t lTypeName = Unmarshaller::getInternalItem(aTypeName);
@@ -954,6 +985,9 @@ zorba::Item ItemFactoryImpl::createAttributeNode(
     Item aTypeName,
     std::vector<Item> aTypedValue )
 {
+  rejectEmptyItem(aNodeName, "aNodeName");
+  rejectEmptyItems(aTypedValue, "aTypedValue");
+
   store::Item_t lItem;
   store::Item_t lNodeName = Unmarshaller::getInternalItem(aNodeName);
   store::Item_t lTypeName = Unmarshaller::getInternalItem(aTypeName);
@@ -1023,6 +1057,12 @@ zorba::Item ItemFactoryImpl::createJSONNull()
 zorba::Item ItemFactoryImpl::createJSONObject(
     std::vector<std::pair<Item, Item> >& aPairs)
 {
+  for (const std::pair<Item, Item>& lPair : aPairs)
+  {
+    rejectEmptyItem(lPair.first, "aPairs name");
+    rejectEmptyItem(lPair.second, "aPairs value");
+  }
+
   csize numPairs = aPairs.size();
 
   // Convert vector of pairs to a vector of names and a vector of values
@@ -1048,6 +1088,8 @@ zorba::Item ItemFactoryImpl::createJSONObject(
 
 zorba::Item ItemFactoryImpl::createJSONArray(std::vector<Item>& aItems)
 {
+  rejectEmptyItems(aItems, "aItems");
+
   csize numItems = aItems.size();
 
   std::vector<store::CopyMode> copyModes(numItems);
