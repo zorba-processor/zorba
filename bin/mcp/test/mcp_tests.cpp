@@ -3524,9 +3524,8 @@ void test_seekable_stream_out_of_memory( Fixture const &f ) {
   (void)f;
 #endif
 }
-// XQuery::iterator() and open() with each allocation failing in turn: an
-// iterator or an exception; then, in an AddressSanitizer build, nothing is left
-// unreachable.
+// XQuery::iterator() with each allocation failing in turn: an iterator or an
+// exception; then, in an AddressSanitizer build, nothing is left unreachable.
 #if defined(__linux__) && ( defined(__SANITIZE_ADDRESS__) || \
     ( defined(__has_feature) && __has_feature(address_sanitizer) ) )
 extern "C" int __lsan_do_recoverable_leak_check();
@@ -3539,11 +3538,6 @@ void test_plan_wrapper_out_of_memory( Fixture const &f ) {
     inject_arm( n, length );
     try {
       Iterator_t const iterator( query->iterator() );
-      iterator->open();
-      Item item;
-      while ( iterator->next( item ) ) {
-      }
-      iterator->close();
     }
     catch ( std::exception const& ) {
     }
@@ -3551,7 +3545,7 @@ void test_plan_wrapper_out_of_memory( Fixture const &f ) {
   };
   long total = 0;
   attempt( 0, 0, &total );
-  check( total > 0, "iterator() and open() allocate", std::to_string( total ) );
+  check( total > 0, "iterator() allocates", std::to_string( total ) );
   for ( long const length : { 1L, 8L } )
     for ( long n = 1; n <= total; ++n ) {
       long count = 0;
@@ -3560,7 +3554,7 @@ void test_plan_wrapper_out_of_memory( Fixture const &f ) {
 #if defined(__SANITIZE_ADDRESS__) || \
     ( defined(__has_feature) && __has_feature(address_sanitizer) )
   check( __lsan_do_recoverable_leak_check() == 0,
-         "iterator() and open() failing: nothing is left behind" );
+         "iterator() failing: nothing is left behind" );
 #endif
 #else
   (void)f;

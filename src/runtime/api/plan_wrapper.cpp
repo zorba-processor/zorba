@@ -57,11 +57,11 @@ PlanWrapper::PlanWrapper(
 
   uint32_t lStateSize = theIterator->getStateSizeOfSubtree();
 
-  thePlanState = new PlanState(aDynamicContext,
-                               aDynamicContext,
-                               lStateSize,
-                               aParentState ?
-                                 aParentState->theStackDepth + 1 : 0);
+  thePlanState = std::make_unique<PlanState>(aDynamicContext,
+                                             aDynamicContext,
+                                             lStateSize,
+                                             aParentState ?
+                                               aParentState->theStackDepth + 1 : 0);
 
   if (aParentState)
     thePlanState->inheritLimits(*aParentState);
@@ -87,8 +87,7 @@ PlanWrapper::~PlanWrapper()
   if (theIsOpen)
     theIterator->close(*thePlanState);
 
-  delete thePlanState; 
-  thePlanState = NULL;
+  thePlanState.reset();
 
   // De-allocate the locally allocated dctx, if any, right after the plan
   // state and before the remaining members.
@@ -227,7 +226,7 @@ void PlanWrapper::profile() const {
       default: // to silence warning
         break;
     } // switch
-  print_iter_plan( *printer, theIterator, thePlanState );
+  print_iter_plan( *printer, theIterator, thePlanState.get() );
   }
 }
 
