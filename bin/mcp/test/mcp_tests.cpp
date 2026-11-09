@@ -3222,19 +3222,19 @@ void test_sweep_fragment( Fixture const &f ) {
 #endif
 }
 // The schema validator alone: built for each validate expression.
-std::string sweep_validate_query( std::string const &prefix ) {
-  std::string xml( "<root>" );
-  for ( int i = 0; i < 40; ++i ) {
-    std::string const n( prefix + "_name_" + std::to_string( i ) );
-    xml += "<" + n + " " + prefix + "_attr_" + std::to_string( i ) + "='v'>text</" + n + ">";
-  }
-  return caught( "count((validate lax { " + xml + "</root> })//*)" );
-}
 void test_sweep_validate( Fixture const &f ) {
 #if defined(__linux__)
+  auto const query = []( std::string const &prefix ) {
+    std::string xml( "<root>" );
+    for ( int i = 0; i < 40; ++i ) {
+      std::string const n( prefix + "_name_" + std::to_string( i ) );
+      xml += "<" + n + " " + prefix + "_attr_" + std::to_string( i ) + "='v'>text</" + n + ">";
+    }
+    return caught( "count((validate lax { " + xml + "</root> })//*)" );
+  };
   Sweep s;
-  s.query = sweep_validate_query( "sweep" );
-  s.before.push_back( sweep_validate_query( "warm" ) );
+  s.query = query( "sweep" );
+  s.before.push_back( query( "warm" ) );
   s.after_compile = true;
   s.expected = "40";
   exhaust_sweep( f, "validate", s );
