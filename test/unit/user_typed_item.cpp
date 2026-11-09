@@ -39,12 +39,10 @@ rejectsEmptyArgument(ItemFactory* factory, Item base, Item typeName)
   return false;
 }
 
-int user_typed_item(int, char*[])
+// Items must be released before the store shuts down.
+static int
+run(ItemFactory* factory)
 {
-  void* store = StoreManager::getStore();
-  Zorba* zorba = Zorba::getInstance(store);
-  ItemFactory* factory = zorba->getItemFactory();
-
   Item base = factory->createInteger(7);
   Item typeName = factory->createQName("http://www.example.com", "myInt");
 
@@ -61,8 +59,18 @@ int user_typed_item(int, char*[])
   if (result.isNull() || result.getStringValue() != "7")
     return 3;
 
+  return 0;
+}
+
+int user_typed_item(int, char*[])
+{
+  void* store = StoreManager::getStore();
+  Zorba* zorba = Zorba::getInstance(store);
+
+  int result = run(zorba->getItemFactory());
+
   zorba->shutdown();
   StoreManager::shutdownStore(store);
-  return 0;
+  return result;
 }
 /* vim:set et sw=2 ts=2: */
