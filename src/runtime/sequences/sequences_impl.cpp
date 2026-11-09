@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <cmath>
 #include <string>
 #include <fstream>
 #include <mutex>
@@ -474,88 +475,67 @@ void FnSubsequenceIterator::resetImpl(PlanState& planState) const
   }
 }
 
+// Rounds a double position or length per fn:round, leaving values at or above
+// 2^52 (always integral) and non-finite values untouched.
+static double roundPosition(const xs_double& d)
+{
+  double v = d.getNumber();
+  if (std::isnan(v) || std::fabs(v) >= 4503599627370496.0)
+    return v;
+  return d.round().getNumber();
+}
+
+// Largest double below 2^63: casting a smaller double to xs_long is in range.
+static const double theMaxConvertible = 9223372036854774784.0;
+
 bool FnSubsequenceIterator::nextImpl(store::Item_t& result, PlanState& planState) const
 {
   store::Item_t item;
-  xs_long startPos;
-  xs_double startPosDouble; 
-  xs_double lengthDouble;
+  double first;
+  double lowest;
+  double end;
+  xs_long skipCount;
 
   FnSubsequenceIteratorState* state;
   DEFAULT_STACK_INIT(FnSubsequenceIteratorState, state, planState);
 
   state->theIsChildReset = false;
-  
-  CONSUME(item, 1);
-  startPosDouble = item->getDoubleValue();
 
-  //If starting position is set to +INF return empty sequence
-  if (startPosDouble.isPosInf() || startPosDouble.isNaN())
+  CONSUME(item, 1);
+  first = roundPosition(item->getDoubleValue());
+
+  // Positions p qualify when first <= p and, with a length, p < first + length,
+  // compared in xs:double arithmetic (F&O 3.1 fn:subsequence). Every
+  // comparison below is false for NaN, so a NaN bound qualifies nothing.
+  if (!(first < theMaxConvertible))
     goto done;
 
-  //Removed startpos - 1, since if a -INF is present it overflows it to a positive number
-  startPos =
-    static_cast<xs_long>(startPosDouble.round().getNumber());
+  lowest = first > 1 ? first : 1;
+  state->theRemaining = numeric_limits<xs_long>::max();
 
   if (theChildren.size() == 3)
   {
     CONSUME(item, 2);
-    lengthDouble = item->getDoubleValue();
-    if ( lengthDouble.isPosInf() ) {
-      if ( startPosDouble.isNegInf() ) {
-        //
-        // XQuery F&0 3.0 14.1.9: ... if $startingLoc is -INF and $length is
-        // +INF, then fn:round($startingLoc) + fn:round($length) is NaN; since
-        // position() lt NaN is always false, the result is an empty sequence.
-        //
-        goto done;
-      }
+    end = first + roundPosition(item->getDoubleValue());
 
-      state->theRemaining = 1;
-    }
-    else
-    {
-      state->theRemaining =
-        static_cast<xs_long>(lengthDouble.round().getNumber());
-      if ( state->theRemaining < 0 && lengthDouble > 0 ) {
-        // overflow happened
-        state->theRemaining = numeric_limits<xs_long>::max();
-      }
-    }
+    if (!(end > lowest))
+      goto done;
+
+    if (end - lowest < theMaxConvertible)
+      state->theRemaining = static_cast<xs_long>(end - lowest);
   }
 
-  if (startPos < 1)
-  {
-    if ( theChildren.size() == 3 &&
-         state->theRemaining != numeric_limits<xs_long>::max() ) {
-      state->theRemaining += startPos - 1;
-    }
-    startPos = 0;
-  }
+  skipCount = static_cast<xs_long>(lowest) - 1;
 
-  // If a length is specified and it is <= 0, return the empty sequence
-  if (theChildren.size() == 3 && state->theRemaining <= 0)
+  // Consume and skip all input items that are before the first position
+  if (!theChildren[0]->skip(skipCount, planState))
     goto done;
 
-  // Consume and skip all input items that are before the startPos
-  if (!theChildren[0]->skip(startPos-1, planState))
-    goto done;
-
-  if (theChildren.size() < 3 || lengthDouble.isPosInf())
+  while (state->theRemaining > 0 && CONSUME(result, 0))
   {
-    while (CONSUME(result, 0))
-    {
-      STACK_PUSH(true, state);
-    }
-  }
-  else
-  {
-    while (state->theRemaining > 0 && CONSUME(result, 0))
-    {
-      state->theRemaining--;
+    state->theRemaining--;
 
-      STACK_PUSH(true, state);
-    }
+    STACK_PUSH(true, state);
   }
 
 done:
@@ -591,8 +571,10 @@ void SubsequenceIntIterator::resetImpl(PlanState& planState) const
 bool SubsequenceIntIterator::nextImpl(store::Item_t& result, PlanState& planState) const
 {
   store::Item_t startPosItem;
-  xs_long startPos;
+  xs_long first;
+  xs_long lowest;
   store::Item_t lengthItem;
+  xs_long length;
 
   SubsequenceIntIteratorState* state;
   DEFAULT_STACK_INIT(SubsequenceIntIteratorState, state, planState);
@@ -600,45 +582,35 @@ bool SubsequenceIntIterator::nextImpl(store::Item_t& result, PlanState& planStat
   state->theIsChildReset = false;
 
   CONSUME(startPosItem, 1);
-  startPos = startPosItem->getLongValue() - 1;
+  first = startPosItem->getLongValue();
+  lowest = first < 1 ? 1 : first;
+  state->theRemaining = numeric_limits<xs_long>::max();
 
   if (theChildren.size() == 3)
   {
     CONSUME(lengthItem, 2);
-    state->theRemaining = lengthItem->getLongValue();
+    length = lengthItem->getLongValue();
+
+    // The end position first + length, saturated so that it cannot overflow
+    if (length > 0 && first > numeric_limits<xs_long>::max() - length)
+      state->theRemaining = numeric_limits<xs_long>::max() - lowest;
+    else if (length < 0 && first < numeric_limits<xs_long>::min() - length)
+      goto done;
+    else if (first + length <= lowest)
+      goto done;
+    else
+      state->theRemaining = first + length - lowest;
   }
 
-  if (startPos < 0)
-  {
-    if (theChildren.size() >= 3)
-      state->theRemaining += startPos;
-
-    startPos = 0;
-  }
-
-  // If a length is specified and it is <= 0, return the empty sequence
-  if (theChildren.size() == 3 && state->theRemaining <= 0)
+  // Consume and skip all input items that are before the first position
+  if (!theChildren[0]->skip(lowest - 1, planState))
     goto done;
 
-  // Consume and skip all input items that are before the startPos
-  if (!theChildren[0]->skip(startPos, planState))
-    goto done;
-
-  if (theChildren.size() < 3)
+  while (state->theRemaining > 0 && CONSUME(result, 0))
   {
-    while (CONSUME(result, 0))
-    {
-      STACK_PUSH(true, state);
-    }
-  }
-  else
-  {
-    while (state->theRemaining > 0 && CONSUME(result, 0))
-    {
-      state->theRemaining--;
+    state->theRemaining--;
 
-      STACK_PUSH(true, state);
-    }
+    STACK_PUSH(true, state);
   }
 
 done:
