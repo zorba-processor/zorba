@@ -2803,12 +2803,12 @@ void ProbeGeneralTreeIndexIterator::probeMap(
   if (targetMap == NULL)
     return;
 
-  // Several xs:decimal keys can equal one xs:float value.
-  std::pair<GeneralTreeIndex::EntryIterator, GeneralTreeIndex::EntryIterator>
-  range = targetMap->equal_range(key);
+  // Several xs:decimal keys can equal one xs:float value. Not equal_range,
+  // which may assume one match per key in a std::map (libc++ does).
+  GeneralTreeIndex::EntryIterator end = targetMap->upper_bound(key);
 
-  for (GeneralTreeIndex::EntryIterator ite = range.first;
-       ite != range.second;
+  for (GeneralTreeIndex::EntryIterator ite = targetMap->lower_bound(key);
+       ite != end;
        ++ite)
   {
     theResultSets.push_back((*ite).second);
