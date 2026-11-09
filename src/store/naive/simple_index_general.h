@@ -63,17 +63,22 @@ public:
 
 /**************************************************************************//**
   Stores all the domain nodes associated with a key K. For each such node N, a
-  boolean flag is also stored. The flag is true if  K was produced by 
+  boolean flag is also stored. The flag is true if  K was produced by
   casting an untypedAtomic key that was found in the result of the key expr
-  for node N.
+  for node N. A second field says whether K is the xs:double image of a typed
+  key of N that is also stored exactly in the xs:long map (LONG_IMAGE) or in
+  the xs:decimal map (DECIMAL_IMAGE).
 *******************************************************************************/
 class GeneralIndexValue
 {
 public:
+  enum ImageKind { NOT_IMAGE, LONG_IMAGE, DECIMAL_IMAGE };
+
   struct NodeInfo
   {
     store::Item_t theNode;
     bool          theUntyped;
+    ImageKind     theImage;
   };
 
   typedef std::vector<NodeInfo>::const_iterator const_iterator;
@@ -94,9 +99,11 @@ public:
 
   const_iterator end() const { return theNodes.end(); }
 
-  void addNode(store::Item_t& node, bool untyped);
+  void addNode(store::Item_t& node, bool untyped, ImageKind image);
 
-  bool removeNode(const store::Item_t& node);
+  bool removeNode(const store::Item_t& node, ImageKind image);
+
+  bool imagesOnly() const;
 };
 
 
@@ -167,13 +174,15 @@ protected:
       store::Item_t& key,
       store::Item_t& node,
       store::SchemaTypeCode targetMap,
-      bool untyped);
+      bool untyped,
+      GeneralIndexValue::ImageKind image = GeneralIndexValue::NOT_IMAGE);
 
   bool removeFromMap(
       const store::Item_t& key,
       const store::Item_t& node,
       store::SchemaTypeCode targetMap,
-      bool untyped);
+      bool untyped,
+      GeneralIndexValue::ImageKind image = GeneralIndexValue::NOT_IMAGE);
 
   bool probeMap(const store::Item* key, store::SchemaTypeCode targetMap);
 
@@ -240,6 +249,8 @@ class GeneralHashIndex : public GeneralIndex
 
   private:
     void setNextIter();
+
+    void skipImageKeys();
   };
 
   typedef rchandle<KeyIterator> KeyIterator_t;
@@ -253,12 +264,14 @@ protected:
       store::Item_t& key,
       store::Item_t& node,
       IndexMap*& targetMap,
-      bool untyped);
+      bool untyped,
+      GeneralIndexValue::ImageKind image);
 
   bool removeFromMap(
       const store::Item_t& key,
       const store::Item_t& node,
-      IndexMap* targetMap);
+      IndexMap* targetMap,
+      GeneralIndexValue::ImageKind image);
 
 public:
   GeneralHashIndex(
@@ -311,12 +324,14 @@ protected:
       store::Item_t& key,
       store::Item_t& node,
       IndexMap*& targetMap,
-      bool untyped);
+      bool untyped,
+      GeneralIndexValue::ImageKind image);
 
   bool removeFromMap(
       const store::Item_t& key,
       const store::Item_t& item,
-      IndexMap* targetMap);
+      IndexMap* targetMap,
+      GeneralIndexValue::ImageKind image);
 
 public:
   GeneralTreeIndex(
@@ -356,7 +371,21 @@ public:
   domain nodes that appear in the index with their associated "untyped" flag set
   to true must be skipped from the result because they will be just duplicates
   (they appear for sure in the STRING map). This is used for range probes only.
- 
+  Image entries are skipped too, because their exact keys are in the LONG or
+  DECIMAL map.
+
+  theIsExactProbe:
+  ----------------
+  Set to true if the search key is an xs:decimal (or a subtype). Such a key is
+  compared exactly with typed xs:decimal keys, which are probed in the LONG and
+  DECIMAL maps, so their xs:double images in the DOUBLE map are skipped.
+
+  theIsFloatProbe:
+  ----------------
+  Set to true if the search key is an xs:float. Compared with an xs:float, an
+  xs:decimal key is promoted to xs:float, not to xs:double, so typed xs:decimal
+  keys are probed in the DECIMAL map and their xs:double images are skipped.
+
   theResultSets:
   --------------
   The node sets associated with the keys that match the condition. This is used
@@ -419,6 +448,10 @@ protected:
 
   bool                                  theIsFullProbe;
 
+  bool                                  theIsExactProbe;
+
+  bool                                  theIsFloatProbe;
+
   ResultSets                            theResultSets;
 
   ResultSets::const_iterator            theResultSetsIte;
@@ -444,6 +477,8 @@ protected:
   void initBox();
 
   bool haveMap(store::SchemaTypeCode targetMap) const;
+
+  bool skipsImage(GeneralIndexValue::ImageKind image) const;
 
   void probeMap(store::SchemaTypeCode targetMap, const store::Item* key);
 

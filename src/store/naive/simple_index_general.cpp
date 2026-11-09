@@ -154,14 +154,14 @@ long GeneralIndexCompareFunction::compare(
 /******************************************************************************
 
 *******************************************************************************/
-bool GeneralIndexValue::removeNode(const store::Item_t& node)
+bool GeneralIndexValue::removeNode(const store::Item_t& node, ImageKind image)
 {
   GeneralIndexValue::iterator ite = theNodes.begin();
   GeneralIndexValue::iterator end = theNodes.end();
 
   for (; ite != end; ++ite)
   {
-    if ((*ite).theNode == node)
+    if ((*ite).theNode == node && (*ite).theImage == image)
     {
       theNodes.erase(ite);
       return true;
@@ -175,12 +175,31 @@ bool GeneralIndexValue::removeNode(const store::Item_t& node)
 /******************************************************************************
 
 *******************************************************************************/
-void GeneralIndexValue::addNode(store::Item_t& node, bool untyped)
+bool GeneralIndexValue::imagesOnly() const
+{
+  for (const_iterator ite = theNodes.begin(); ite != theNodes.end(); ++ite)
+  {
+    if ((*ite).theImage == NOT_IMAGE)
+      return false;
+  }
+
+  return true;
+}
+
+
+/******************************************************************************
+
+*******************************************************************************/
+void GeneralIndexValue::addNode(
+    store::Item_t& node,
+    bool untyped,
+    ImageKind image)
 {
   csize numNodes = theNodes.size();
   theNodes.resize(numNodes + 1);
   theNodes[numNodes].theNode.transfer(node);
   theNodes[numNodes].theUntyped = untyped;
+  theNodes[numNodes].theImage = image;
 }
 
 
@@ -375,17 +394,16 @@ bool GeneralIndex::insert(store::Item_t& key, store::Item_t& node)
       goto longmap;
     }
 
-    // Coerce to xs:double 
-    keyItem->coerceToDouble(castItem, true, lossy);
+    // The exact key serves xs:decimal and xs:float probes; its xs:double image
+    // serves xs:double probes.
+    GET_FACTORY().createDouble(castItem, xs_double(keyItem->getDecimalValue()));
 
-    found = insertInMap(key, node, store::XS_DOUBLE, false);
+    node2 = node;
+    found = insertInMap(key, node2, store::XS_DECIMAL, false);
 
-    if (lossy)
-    {
-      node2 = node;
-      if (insertInMap(castItem, node2, store::XS_DECIMAL, false))
-        found = true;
-    }
+    if (insertInMap(castItem, node, store::XS_DOUBLE, false,
+                    GeneralIndexValue::DECIMAL_IMAGE))
+      found = true;
 
     return found;
   }
@@ -420,7 +438,8 @@ longmap:
         node2 = node;
         found = insertInMap(key, node2, store::XS_LONG, false);
 
-        if (insertInMap(castItem, node, store::XS_DOUBLE, false))
+        if (insertInMap(castItem, node, store::XS_DOUBLE, false,
+                        GeneralIndexValue::LONG_IMAGE))
           found = true;
       }
       else
@@ -525,19 +544,14 @@ longmap:
       store::ItemHandle<DecimalItem> decimalItem = 
       static_cast<DecimalItem*>(castItem.getp());
 
-      decimalItem->coerceToDouble(castItem, true, lossy);
+      // Compared with a numeric key or probe, an untyped value is cast to
+      // xs:double, so only the xs:double image is stored.
+      GET_FACTORY().createDouble(castItem,
+                                 xs_double(decimalItem->getDecimalValue()));
 
       node2 = node;
       if (insertInMap(castItem, node2, store::XS_DOUBLE, true))
         found = true;
-
-      if (lossy)
-      {
-        castItem.transfer(decimalItem);
-        node2 = node;
-        if (insertInMap(castItem, node2, store::XS_DECIMAL, true))
-          found = true;
-      }
 
       // may also be hexBinary or base64Binary
       if (sorted)
@@ -666,7 +680,8 @@ bool GeneralIndex::insertInMap(
     store::Item_t& key,
     store::Item_t& node,
     store::SchemaTypeCode targetMap,
-    bool untyped)
+    bool untyped,
+    GeneralIndexValue::ImageKind image)
 {
   if (untyped)
     ++theNumUntypedEntries;
@@ -674,12 +689,12 @@ bool GeneralIndex::insertInMap(
   if (isSorted())
   {
     GeneralTreeIndex* idx = static_cast<GeneralTreeIndex*>(this);
-    return idx->insertInMap(key, node, idx->theMaps[targetMap], untyped);
+    return idx->insertInMap(key, node, idx->theMaps[targetMap], untyped, image);
   }
   else
   {
     GeneralHashIndex* idx = static_cast<GeneralHashIndex*>(this);
-    return idx->insertInMap(key, node, idx->theMaps[targetMap], untyped);
+    return idx->insertInMap(key, node, idx->theMaps[targetMap], untyped, image);
   }
 }
 
@@ -692,6 +707,7 @@ bool GeneralIndex::remove(const store::Item_t& key, const store::Item_t& node)
   bool lossy = false;
   bool found = false;
   store::Item_t castItem;
+  store::Item_t longItem;
 
   bool sorted = isSorted();
 
@@ -789,20 +805,19 @@ bool GeneralIndex::remove(const store::Item_t& key, const store::Item_t& node)
 
     if (castItem != NULL)
     {
-      keyItem = static_cast<AtomicItem*>(castItem.getp());
+      // Held apart from castItem, which the long map path reuses.
+      longItem.transfer(castItem);
+      keyItem = static_cast<AtomicItem*>(longItem.getp());
       goto longmap;
     }
 
-    // Coerce to xs:double 
-    keyItem->coerceToDouble(castItem, true, lossy);
+    GET_FACTORY().createDouble(castItem, xs_double(keyItem->getDecimalValue()));
 
-    found = removeFromMap(key, node, store::XS_DOUBLE, false);
+    found = removeFromMap(key, node, store::XS_DECIMAL, false);
 
-    if (lossy)
-    {
-      if (removeFromMap(castItem, node, store::XS_DECIMAL, false))
-        found = true;
-    }
+    if (removeFromMap(castItem, node, store::XS_DOUBLE, false,
+                      GeneralIndexValue::DECIMAL_IMAGE))
+      found = true;
 
     return found;
   }
@@ -838,7 +853,8 @@ longmap:
         */
         found = removeFromMap(keyItem, node, store::XS_LONG, false);
 
-        if (removeFromMap(castItem, node, store::XS_DOUBLE, false))
+        if (removeFromMap(castItem, node, store::XS_DOUBLE, false,
+                          GeneralIndexValue::LONG_IMAGE))
           found = true;
       }
       else
@@ -933,17 +949,11 @@ longmap:
       store::ItemHandle<DecimalItem> decimalItem = 
       static_cast<DecimalItem*>(castItem.getp());
 
-      decimalItem->coerceToDouble(castItem, true, lossy);
+      GET_FACTORY().createDouble(castItem,
+                                 xs_double(decimalItem->getDecimalValue()));
 
       if (removeFromMap(castItem, node, store::XS_DOUBLE, true))
         found = true;
-
-      if (lossy)
-      {
-        castItem.transfer(decimalItem);
-        if (removeFromMap(castItem, node, store::XS_DECIMAL, true))
-          found = true;
-      }
 
       // may also be hexBinary or base64Binary
       if (sorted)
@@ -1069,7 +1079,8 @@ bool GeneralIndex::removeFromMap(
     const store::Item_t& key,
     const store::Item_t& node,
     store::SchemaTypeCode targetMap,
-    bool untyped)
+    bool untyped,
+    GeneralIndexValue::ImageKind image)
 {
   if (untyped)
     --theNumUntypedEntries;
@@ -1077,12 +1088,12 @@ bool GeneralIndex::removeFromMap(
   if (isSorted())
   {
     GeneralTreeIndex* idx = static_cast<GeneralTreeIndex*>(this);
-    return idx->removeFromMap(key, node, idx->theMaps[targetMap]);
+    return idx->removeFromMap(key, node, idx->theMaps[targetMap], image);
   }
   else
   {
     GeneralHashIndex* idx = static_cast<GeneralHashIndex*>(this);
-    return idx->removeFromMap(key, node, idx->theMaps[targetMap]);
+    return idx->removeFromMap(key, node, idx->theMaps[targetMap], image);
   }
 }
 
@@ -1187,7 +1198,8 @@ bool GeneralHashIndex::insertInMap(
     store::Item_t& key,
     store::Item_t& node,
     IndexMap*& targetMap,
-    bool untyped)
+    bool untyped,
+    GeneralIndexValue::ImageKind image)
 {
   GeneralIndexValue* valueSet = NULL;
 
@@ -1201,14 +1213,14 @@ bool GeneralHashIndex::insertInMap(
       RAISE_ERROR_NO_LOC(zerr::ZDDY0024_INDEX_UNIQUE_VIOLATION,
       ERROR_PARAMS(theQname->getStringValue()));
     }
-    
-    valueSet->addNode(node, untyped);
+
+    valueSet->addNode(node, untyped, image);
 
     return true;
   }
 
   valueSet = new GeneralIndexValue();
-  valueSet->addNode(node, untyped);
+  valueSet->addNode(node, untyped, image);
   
   //std::cout << "Index Entry Insert [" << key << "," 
   //          << valueSet << "]" << std::endl;
@@ -1226,7 +1238,8 @@ bool GeneralHashIndex::insertInMap(
 bool GeneralHashIndex::removeFromMap(
     const store::Item_t& key,
     const store::Item_t& node,
-    IndexMap* targetMap)
+    IndexMap* targetMap,
+    GeneralIndexValue::ImageKind image)
 {
   assert(targetMap);
   assert(key != NULL);
@@ -1237,7 +1250,7 @@ bool GeneralHashIndex::removeFromMap(
   {
     GeneralIndexValue* valueSet = (*pos).second;
 
-    bool found = valueSet->removeNode(node);
+    bool found = valueSet->removeNode(node, image);
 
     if (valueSet->empty())
     {
@@ -1290,6 +1303,30 @@ void GeneralHashIndex::KeyIterator::setNextIter()
 }
 
 /******************************************************************************
+ * moves theIterator to the next key that is not only the xs:double image of
+ * keys listed from the xs:long or xs:decimal map
+*******************************************************************************/
+void GeneralHashIndex::KeyIterator::skipImageKeys()
+{
+  while (theCurType != store::XS_LAST)
+  {
+    if (theIterator == theMaps[theCurType]->end())
+    {
+      ++theCurType;
+      setNextIter();
+    }
+    else if ((*theIterator).second->imagesOnly())
+    {
+      ++theIterator;
+    }
+    else
+    {
+      return;
+    }
+  }
+}
+
+/******************************************************************************
 
 *******************************************************************************/
 void GeneralHashIndex::KeyIterator::open()
@@ -1299,6 +1336,7 @@ void GeneralHashIndex::KeyIterator::open()
   // Index doesn't contain keys from all atomic types -> we need to skip the
   // empty ones.
   setNextIter();
+  skipImageKeys();
 }
 
 
@@ -1319,14 +1357,7 @@ bool GeneralHashIndex::KeyIterator::next(store::IndexKey& aKey)
   aKey.push_back(const_cast<zorba::store::Item*>(lKeyItem));
 
   ++theIterator;
-
-  if (theIterator == theMaps[theCurType]->end())
-  {
-    // iteration of the keys of the current type is done.
-    // increase type and search for the next valid iterator.
-    ++theCurType;
-    setNextIter();
-  }
+  skipImageKeys();
 
   return true;
 }
@@ -1432,7 +1463,8 @@ bool GeneralTreeIndex::insertInMap(
     store::Item_t& key,
     store::Item_t& node,
     IndexMap*& targetMap,
-    bool untyped)
+    bool untyped,
+    GeneralIndexValue::ImageKind image)
 {
   GeneralIndexValue* valueSet = NULL;
 
@@ -1448,14 +1480,14 @@ bool GeneralTreeIndex::insertInMap(
       RAISE_ERROR_NO_LOC(zerr::ZDDY0024_INDEX_UNIQUE_VIOLATION,
       ERROR_PARAMS(theQname->getStringValue()));
     }
-    
-    pos->second->addNode(node, untyped);
+
+    pos->second->addNode(node, untyped, image);
 
     return true;
   }
 
   valueSet = new GeneralIndexValue();
-  valueSet->addNode(node, untyped);
+  valueSet->addNode(node, untyped, image);
   
   //std::cout << "Index Entry Insert [" << key << "," 
   //          << valueSet << "]" << std::endl;
@@ -1473,7 +1505,8 @@ bool GeneralTreeIndex::insertInMap(
 bool GeneralTreeIndex::removeFromMap(
     const store::Item_t& key,
     const store::Item_t& node,
-    IndexMap* targetMap)
+    IndexMap* targetMap,
+    GeneralIndexValue::ImageKind image)
 {
   assert(targetMap);
   assert(key != NULL);
@@ -1484,7 +1517,7 @@ bool GeneralTreeIndex::removeFromMap(
   {
     GeneralIndexValue* valueSet = (*pos).second;
 
-    bool found = valueSet->removeNode(node);
+    bool found = valueSet->removeNode(node, image);
 
     if (valueSet->empty())
     {
@@ -1560,7 +1593,9 @@ ProbeGeneralIndexIterator::ProbeGeneralIndexIterator(const store::Index_t& idx)
   :
   theIndex(static_cast<GeneralIndex*>(idx.getp())),
   theIsUntypedProbe(false),
-  theIsFullProbe(false)
+  theIsFullProbe(false),
+  theIsExactProbe(false),
+  theIsFloatProbe(false)
 {
 }
 
@@ -1671,6 +1706,8 @@ void ProbeGeneralIndexIterator::init(const store::IndexCondition_t& cond,
 {
   theProbeKind = cond->getKind();
   theCondition = static_cast<GeneralIndexCondition*>(cond.getp());
+  theIsExactProbe = false;
+  theIsFloatProbe = false;
 
   if (theProbeKind == store::IndexCondition::POINT_VALUE ||
       theProbeKind == store::IndexCondition::BOX_VALUE)
@@ -1805,6 +1842,12 @@ void ProbeGeneralIndexIterator::initPoint()
     {
       probeMap(store::XS_DOUBLE, key.getp());
 
+      if (keyType == store::XS_FLOAT)
+      {
+        theIsFloatProbe = true;
+        probeMap(store::XS_DECIMAL, key.getp());
+      }
+
       if (haveMap(store::XS_LONG) && key->castToLong(castItem))
         probeMap(store::XS_LONG, castItem.getp());
 
@@ -1819,10 +1862,11 @@ void ProbeGeneralIndexIterator::initPoint()
     case store::XS_POSITIVE_INTEGER:
     case store::XS_UNSIGNED_LONG:
     {
-      key->coerceToDouble(castItem, true, lossy);
+      theIsExactProbe = true;
 
-      if (lossy)
-        probeMap(store::XS_DECIMAL, key.getp());
+      GET_FACTORY().createDouble(castItem, xs_double(key->getDecimalValue()));
+
+      probeMap(store::XS_DECIMAL, key.getp());
 
       probeMap(store::XS_DOUBLE, castItem.getp());
 
@@ -1840,6 +1884,8 @@ void ProbeGeneralIndexIterator::initPoint()
     case store::XS_UNSIGNED_SHORT:
     case store::XS_UNSIGNED_BYTE:
     {
+      theIsExactProbe = true;
+
       probeMap(store::XS_LONG, key.getp());
 
       if (haveMap(store::XS_DOUBLE))
@@ -1920,7 +1966,8 @@ void ProbeGeneralIndexIterator::initPoint()
         store::ItemHandle<DecimalItem> decimalItem = 
         static_cast<DecimalItem*>(castItem.getp());
 
-        decimalItem->coerceToDouble(castItem, true, lossy);
+        GET_FACTORY().createDouble(castItem,
+                                   xs_double(decimalItem->getDecimalValue()));
 
         probeMap(store::XS_DOUBLE, castItem.getp());
 
@@ -1930,12 +1977,6 @@ void ProbeGeneralIndexIterator::initPoint()
             static_cast<AtomicItem*>(castItem.getp())->castToLong(longItem))
         {
           probeMap(store::XS_LONG, longItem.getp());
-        }
-
-        if (lossy && haveMap(store::XS_DECIMAL))
-        {
-          castItem.transfer(decimalItem);
-          probeMap(store::XS_DOUBLE, castItem.getp());
         }
 
         // may also be hexBinary or base64Binary
@@ -2181,6 +2222,13 @@ void ProbeGeneralIndexIterator::initBox()
     {
       probeMap(store::XS_DOUBLE, lowerKey, upperKey);
 
+      // Before the LONG map: doubleToLongProbe adjusts the bound flags.
+      if (keyType == store::XS_FLOAT)
+      {
+        theIsFloatProbe = true;
+        probeMap(store::XS_DECIMAL, lowerKey, upperKey);
+      }
+
       if (idx->theMaps[store::XS_LONG])
       {
         if (haveLower)
@@ -2211,6 +2259,8 @@ void ProbeGeneralIndexIterator::initBox()
     case store::XS_POSITIVE_INTEGER:
     case store::XS_UNSIGNED_LONG:
     {
+      theIsExactProbe = true;
+
       probeMap(store::XS_DECIMAL, lowerKey, upperKey);
 
       if (idx->theMaps[store::XS_LONG])
@@ -2246,6 +2296,8 @@ void ProbeGeneralIndexIterator::initBox()
     case store::XS_UNSIGNED_SHORT:
     case store::XS_UNSIGNED_BYTE:
     {
+      theIsExactProbe = true;
+
       probeMap(store::XS_LONG, lowerKey, upperKey);
 
       if (idx->theMaps[store::XS_DECIMAL])
@@ -2331,13 +2383,6 @@ void ProbeGeneralIndexIterator::initBox()
           GET_FACTORY().createDouble(altKey, doubleValue);
           probeMap(store::XS_DOUBLE, altKey, altKey);
         }
-
-        if (idx->theMaps[store::XS_DECIMAL])
-        {
-          xs_decimal const decimalValue( longItem->getLongValue() );
-          GET_FACTORY().createDecimal(altKey, decimalValue);
-          probeMap(store::XS_DECIMAL, altKey, altKey);
-        }
       }
 
       // try casting to xs:decimal
@@ -2348,11 +2393,6 @@ void ProbeGeneralIndexIterator::initBox()
       {
         store::ItemHandle<DecimalItem> decimalItem = 
         static_cast<DecimalItem*>(altKey.getp());
-
-        if (idx->theMaps[store::XS_DECIMAL])
-        {
-          probeMap(store::XS_DECIMAL, altKey, altKey);
-        }
 
         // Compared with a numeric key, an untyped value is cast to xs:double.
         xs_double const doubleValue( decimalItem->getDecimalValue() );
@@ -2565,6 +2605,22 @@ void ProbeGeneralIndexIterator::close()
 
 
 /******************************************************************************
+
+********************************************************************************/
+bool ProbeGeneralIndexIterator::skipsImage(
+    GeneralIndexValue::ImageKind image) const
+{
+  if (image == GeneralIndexValue::NOT_IMAGE)
+    return false;
+
+  if (theIsFullProbe || theIsExactProbe)
+    return true;
+
+  return theIsFloatProbe && image == GeneralIndexValue::DECIMAL_IMAGE;
+}
+
+
+/******************************************************************************
   TODO : need sync on result vector
 ********************************************************************************/
 bool ProbeGeneralIndexIterator::next(store::Item_t& result)
@@ -2580,6 +2636,12 @@ bool ProbeGeneralIndexIterator::next(store::Item_t& result)
         {
           assert(theProbeKind == store::IndexCondition::POINT_GENERAL);
 
+          ++theIte;
+          continue;
+        }
+
+        if (skipsImage((*theIte).theImage))
+        {
           ++theIte;
           continue;
         }
@@ -2608,6 +2670,12 @@ bool ProbeGeneralIndexIterator::next(store::Item_t& result)
         while (theIte != theEnd)
         {
           if ((theIsFullProbe || theIsUntypedProbe) && (*theIte).theUntyped)
+          {
+            ++theIte;
+            continue;
+          }
+
+          if (skipsImage((*theIte).theImage))
           {
             ++theIte;
             continue;
@@ -2735,13 +2803,15 @@ void ProbeGeneralTreeIndexIterator::probeMap(
   if (targetMap == NULL)
     return;
 
-  GeneralTreeIndex::EntryIterator ite = const_cast<GeneralTreeIndex::IndexMap*>
-  (targetMap)->find(const_cast<store::Item*>(key));
+  // Several xs:decimal keys can equal one xs:float value. Not equal_range,
+  // which may assume one match per key in a std::map (libc++ does).
+  GeneralTreeIndex::EntryIterator end = targetMap->upper_bound(key);
 
-  if (ite != targetMap->end())
+  for (GeneralTreeIndex::EntryIterator ite = targetMap->lower_bound(key);
+       ite != end;
+       ++ite)
   {
-    theResultSets.push_back(NULL);
-    theResultSets[theResultSets.size() - 1] = (*ite).second;
+    theResultSets.push_back((*ite).second);
   }
 }
 
