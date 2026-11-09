@@ -1272,9 +1272,11 @@ bool GeneralHashIndex::removeFromMap(
 
     if (valueSet->empty())
     {
-      const_cast<store::Item*>((*pos).first)->removeReference();
+      // Released after the erase, which hashes the key.
+      const store::Item* mapKey = (*pos).first;
       delete valueSet;
       targetMap->erase(pos);
+      const_cast<store::Item*>(mapKey)->removeReference();
     }
 
     return found;
@@ -1286,7 +1288,7 @@ bool GeneralHashIndex::removeFromMap(
 
 /////////////////////////////////////////////////////////////////////////////////
 //                                                                             //
-//  GeneralHashIndex::KeyIterator                                              //
+//  GeneralHashIndex::KeyIterator                                             //
 //                                                                             //
 /////////////////////////////////////////////////////////////////////////////////
 

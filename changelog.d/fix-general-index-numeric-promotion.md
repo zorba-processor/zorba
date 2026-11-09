@@ -10,3 +10,6 @@
   keys were compared the same wrong ways.
 - Fix general index probes with a NaN value or bound, which raised ZSTR0041
   instead of matching no number.
+- Fix a crash when the last node with a given key is deleted from a
+  collection with an automatic general equality index (the key was released
+  before its entry was removed).
