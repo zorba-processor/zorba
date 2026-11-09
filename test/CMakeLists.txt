@@ -63,3 +63,9 @@ ADD_SUBDIRECTORY(fuzz)
 INSTALL(DIRECTORY fots_driver
         DESTINATION share/zorba-${ZORBA_MAJOR_NUMBER}.${ZORBA_MINOR_NUMBER}.${ZORBA_PATCH_NUMBER})
 
+
+# TEMPORARY (t50): prints 300 KB, then a UBSan-format line, then fails.
+IF (UNIX)
+ADD_TEST (NAME test/tmp/t50_late_report
+  COMMAND sh -c "i=0; while [ $i -lt 6000 ]; do echo 'filler line to make the output of a failing test long, padding padding'; i=$((i+1)); done; echo '/src/src/t50/late.cpp:7:3: runtime error: late report after the output cap'; exit 1")
+ENDIF (UNIX)
