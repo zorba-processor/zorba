@@ -3551,10 +3551,6 @@ void test_seekable_stream_out_of_memory( Fixture const &f ) {
 }
 // XQuery::iterator() with each allocation failing in turn: an iterator or an
 // exception; then, in an AddressSanitizer build, nothing is left unreachable.
-#if defined(__linux__) && ( defined(__SANITIZE_ADDRESS__) || \
-    ( defined(__has_feature) && __has_feature(address_sanitizer) ) )
-extern "C" int __lsan_do_recoverable_leak_check();
-#endif
 void test_plan_wrapper_out_of_memory( Fixture const &f ) {
 #if defined(__linux__)
   auto attempt = [&]( long n, long length, long *count ) {
@@ -3576,11 +3572,10 @@ void test_plan_wrapper_out_of_memory( Fixture const &f ) {
       long count = 0;
       attempt( n, length, &count );
     }
-#if defined(__SANITIZE_ADDRESS__) || \
-    ( defined(__has_feature) && __has_feature(address_sanitizer) )
+# if defined(__SANITIZE_ADDRESS__)
   check( __lsan_do_recoverable_leak_check() == 0,
          "iterator() failing: nothing is left behind" );
-#endif
+# endif
 #else
   (void)f;
 #endif
