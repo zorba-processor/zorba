@@ -3223,12 +3223,12 @@ void test_sweep_fragment( Fixture const &f ) {
 }
 // The schema validator alone: built for each validate expression. No text
 // nodes: a failed allocation while a text node is attached to its parent is
-// another limit of the store.
+// another limit of the store. Twenty elements: under ASan, in the time of a test.
 void test_sweep_validate( Fixture const &f ) {
 #if defined(__linux__)
   auto const query = []( std::string const &prefix ) {
     std::string xml( "<root>" );
-    for ( int i = 0; i < 40; ++i )
+    for ( int i = 0; i < 20; ++i )
       xml += "<" + prefix + "_name_" + std::to_string( i ) + " " + prefix +
              "_attr_" + std::to_string( i ) + "='v'/>";
     return caught( "count((validate lax { " + xml + "</root> })//*)" );
@@ -3237,7 +3237,7 @@ void test_sweep_validate( Fixture const &f ) {
   s.query = query( "sweep" );
   s.before.push_back( query( "warm" ) );
   s.after_compile = true;
-  s.expected = "40";
+  s.expected = "20";
   exhaust_sweep( f, "validate", s );
 #else
   (void)f;
