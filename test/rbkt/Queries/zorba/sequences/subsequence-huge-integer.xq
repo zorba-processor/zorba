@@ -1,5 +1,7 @@
 (: fn:subsequence and positional predicates with integer arguments at the
    limits of xs:long. An error is reported as its code. :)
+declare namespace err = "http://www.w3.org/2005/xqt-errors";
+
 declare function local:t($label as xs:string, $f as function() as item()*)
   as xs:string
 {
