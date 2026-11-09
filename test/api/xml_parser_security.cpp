@@ -476,6 +476,28 @@ void test_dtd_entities(Zorba* z, const Files& f)
                  (std::string("[") + SECRET + "]").c_str()));
   CHECK(failed(parse_dtd_valid(z, open, lMissing), "FODC0006"));
   CHECK(failed(parse_dtd_valid(z, open, lUndeclared), "FODC0006"));
+
+  // An undeclared entity in a document whose declarations may be incomplete
+  // (a parameter entity reference, or an external subset that loads but does
+  // not declare it): libxml2 2.9 leaves an entity reference node in the tree
+  // with a non-fatal error, so the load must fail on that error.
+  // The SAX loader behind fn:parse-xml fails on the same documents.
+  std::string const lUndeclaredPERef =
+    "<?xml version=\"1.0\"?>\n"
+    "<!DOCTYPE r [<!ENTITY % p \"<!ELEMENT r (#PCDATA)>\"> %p;]>\n"
+    "<r>[&u;]</r>";
+  std::string const lUndeclaredInLoadedSubset =
+    "<?xml version=\"1.0\"?>\n"
+    "<!DOCTYPE r SYSTEM \"" +
+    f.write("declares-r-only.dtd", "<!ELEMENT r (#PCDATA)>\n") + "\">\n"
+    "<r>[&u;]</r>";
+
+  CHECK(failed(parse_dtd_valid(z, secure, lUndeclaredPERef), "FODC0006"));
+  CHECK(failed(parse_xml(z, secure, lUndeclaredPERef), "FODC0006"));
+  CHECK(failed(parse_dtd_valid(z, open, lUndeclaredPERef), "FODC0006"));
+  CHECK(failed(parse_dtd_valid(z, open, lUndeclaredInLoadedSubset),
+               "FODC0006"));
+  CHECK(failed(parse_xml(z, open, lUndeclaredInLoadedSubset), "FODC0006"));
 }
 #endif
 
