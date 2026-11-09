@@ -191,13 +191,6 @@ protected:
   T  * p;
 
 public:
-  union union_T
-  {
-    T** t;
-    void** v;
-  };
-
-public:
   rchandle(T* ptr = 0) : p(ptr)
   {
     init(); 
@@ -221,8 +214,6 @@ public:
 
   T* getp() const { return p; }
   T* get() const { return p; }          // synonym to match unique_ptr
-
-  union_T getp_ref() { union_T u_t; u_t.t = &p; return u_t;}
 
   // rchandle const-ness is unclear. The implicit operators are more
   // restrictive than the explicit cast() and getp() methods.
@@ -431,8 +422,6 @@ public:
   void setNull() { rchandle<T>::setNull();}
 
   const T* getp() const { return rchandle<T>::getp (); }
-
-  typename rchandle<T>::union_T getp_ref() { return rchandle<T>::getp_ref(); }
 
   operator const T* () const { return rchandle<T>::getp(); }
 
