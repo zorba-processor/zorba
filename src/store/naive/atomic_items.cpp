@@ -941,7 +941,7 @@ NotationItem::NotationItem(store::SchemaTypeCode t, store::Item* qname)
   :
   AtomicItem(t)
 {
-  theQName = qname;
+  theQName = static_cast<QNameItem*>(qname);
 }
 
 uint32_t NotationItem::hash(long timezone, const XQPCollator* aCollation) const

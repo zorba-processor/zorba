@@ -17,6 +17,7 @@
 #define ZORBA_STORE_ITEM_HANDLE_H
 
 #include <string>
+#include <type_traits>
 
 namespace zorba 
 {
@@ -91,12 +92,25 @@ public:
     return ItemHandle<otherT> (static_cast<otherT *>(p));
   }
 
-  template <class otherT> operator ItemHandle<otherT> () 
+  template <class otherT> ItemHandle<otherT> dyn_cast() const
+  {
+    return ItemHandle<otherT> (dynamic_cast<otherT *>(p));
+  }
+
+  // Implicit conversions only upcast (Derived -> Base); a downcast must name
+  // cast<D>() or dyn_cast<D>().
+  template <class otherT,
+            class = typename std::enable_if<
+                std::is_convertible<T*, otherT*>::value>::type>
+  operator ItemHandle<otherT> ()
   {
     return cast<otherT>();
   }
 
-  template <class otherT> operator const ItemHandle<otherT> () const 
+  template <class otherT,
+            class = typename std::enable_if<
+                std::is_convertible<T*, otherT*>::value>::type>
+  operator const ItemHandle<otherT> () const
   {
     return cast<otherT>();
   }
@@ -119,7 +133,10 @@ public:
 		return *this;
   }
 
-  template <class otherT> ItemHandle& operator=(const otherT* rhs)
+  template <class otherT,
+            class = typename std::enable_if<
+                std::is_convertible<const otherT*, const T*>::value>::type>
+  ItemHandle& operator=(const otherT* rhs)
   {
 		if (p != rhs)
     {
@@ -141,12 +158,18 @@ public:
     return assign(rhs);
   }
 
-	template <class otherT> ItemHandle& operator=(const ItemHandle<otherT>& rhs) 
+  template <class otherT,
+            class = typename std::enable_if<
+                std::is_convertible<otherT*, T*>::value>::type>
+  ItemHandle& operator=(const ItemHandle<otherT>& rhs)
   {
     return assign(rhs);
 	}
 
-  template <class otherT> ItemHandle& transfer(ItemHandle<otherT>& rhs)
+  template <class otherT,
+            class = typename std::enable_if<
+                std::is_convertible<otherT*, T*>::value>::type>
+  ItemHandle& transfer(ItemHandle<otherT>& rhs)
   {
 		if (p != rhs.getp())
     {
