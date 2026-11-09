@@ -42,4 +42,4 @@ range float INF lower: 10 12
 range double 2^63 lower: 1 3 4 10 12
 range value float 2^63 lower: 1 3 4 10 12
 range value double 2^53 both: 5 6 7
-range value decimal and float bounds: 8 9 13
+range value float bounds: 8 9 13

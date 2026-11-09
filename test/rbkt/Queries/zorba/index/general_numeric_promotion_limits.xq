@@ -43,5 +43,5 @@ fn:string-join((
   m:range-value("range value float 2^63 lower", xs:float("9.223372E18"), ()),
   m:range-value("range value double 2^53 both", 9.007199254740992E15,
                 9.007199254740994E15),
-  m:range-value("range value decimal and float bounds", -1, xs:float("0.5"))),
+  m:range-value("range value float bounds", xs:float("-1"), xs:float("0.5"))),
   "&#10;")

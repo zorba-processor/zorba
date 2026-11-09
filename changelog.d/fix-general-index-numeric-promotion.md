@@ -13,3 +13,10 @@
 - Fix a crash when the last node with a given key is deleted from a
   collection with an automatic general equality index (the key was released
   before its entry was removed).
+
+### Changed
+
+- `idml:keys` on a general equality index without a declared key type lists
+  an untyped key that is an integer with type `xs:double` (for example
+  `xs:double 1.0E11`; before, `xs:long`), and lists `xs:float` keys apart
+  from `xs:double` keys.

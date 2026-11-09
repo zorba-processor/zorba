@@ -298,6 +298,7 @@ declare function m:range-value($name as xs:string,
 declare %an:sequential function m:keys() as xs:string
 {
   ddl:create(xs:QName("m:k"));
+  iddl:create(xs:QName("m:Keys"));
   dml:insert(xs:QName("m:k"), (<e id="1" t="f" v="0.5"/>,
                                <e id="2" v="7"/>,
                                <e id="3" t="dec" v="0.25"/>,
