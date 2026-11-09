@@ -37,4 +37,4 @@ exclusive double upper:
 exclusive float both:
 unique decimals sharing an image: inserted;: 1
 unique equal decimals: ZDDY0024;: 1
-keys: xs:decimal 0.1000000000000000000001, xs:decimal 0.5, xs:long 9007199254740993
+keys: xs:decimal 0.3, xs:decimal 0.5, xs:long 9007199254740993

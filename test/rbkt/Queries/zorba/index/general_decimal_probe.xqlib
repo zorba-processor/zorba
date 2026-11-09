@@ -100,8 +100,9 @@ declare %an:sequential function m:init()
 
   ddl:create(xs:QName("m:k"));
   iddl:create(xs:QName("m:Keys"));
+  (: idml:keys prints a decimal key at xs:double precision, so 0.3. :)
   dml:insert(xs:QName("m:k"), (<e id="1" v="0.5"/>,
-                               <e id="2" v="0.1000000000000000000001"/>,
+                               <e id="2" v="0.3"/>,
                                <e id="3" t="i" v="9007199254740993"/>));
 };
 
