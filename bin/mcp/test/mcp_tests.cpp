@@ -86,9 +86,6 @@ using namespace zorba::mcp;
 #  define ZORBA_TEST_SANITIZER 1
 # endif
 #endif
-#if defined(__linux__) && defined(ZORBA_TEST_SANITIZER)
-# include <sanitizer/allocator_interface.h>
-#endif
 
 #if defined(__linux__)
 // The bytes of the QName pool's hash table (a test hook of the store). Its size
@@ -229,8 +226,12 @@ void budget_free( void *p ) noexcept {
 } // namespace
 
 # if defined(ZORBA_TEST_SANITIZER)
-// The sanitizer owns malloc: its hooks count the blocks.
+// The sanitizer owns malloc: its hooks count the blocks. Declared here, as in
+// <sanitizer/allocator_interface.h>, which not every compiler package installs.
 extern "C" {
+int __sanitizer_get_ownership( void const volatile *p );
+std::size_t __sanitizer_get_allocated_size( void const volatile *p );
+
 void __sanitizer_malloc_hook( void const volatile*, std::size_t n ) {
   heap_live.fetch_add( static_cast<long>( n ), std::memory_order_relaxed );
 }
