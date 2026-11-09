@@ -227,14 +227,17 @@ void budget_free( void *p ) noexcept {
 
 # if defined(ZORBA_TEST_SANITIZER)
 // The sanitizer owns malloc: its hooks count the blocks. Declared here, as in
-// <sanitizer/allocator_interface.h>, which not every compiler package installs.
+// <sanitizer/allocator_interface.h>, which not every compiler package installs;
+// visible to a shared sanitizer runtime despite -fvisibility=hidden.
 extern "C" {
 int __sanitizer_get_ownership( void const volatile *p );
 std::size_t __sanitizer_get_allocated_size( void const volatile *p );
 
+__attribute__(( visibility( "default" ) ))
 void __sanitizer_malloc_hook( void const volatile*, std::size_t n ) {
   heap_live.fetch_add( static_cast<long>( n ), std::memory_order_relaxed );
 }
+__attribute__(( visibility( "default" ) ))
 void __sanitizer_free_hook( void const volatile *p ) {
   if ( __sanitizer_get_ownership( p ) )
     heap_live.fetch_sub( static_cast<long>( __sanitizer_get_allocated_size( p ) ),
