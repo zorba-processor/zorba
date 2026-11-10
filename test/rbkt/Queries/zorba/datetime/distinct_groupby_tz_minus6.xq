@@ -11,7 +11,13 @@ let $values :=
         xs:date("2013-01-13"),
         xs:date("2013-01-13-06:00"),
         xs:time("06:01:53"),
-        xs:time("12:01:53Z"))
+        xs:time("12:01:53Z"),
+        xs:dateTime("2013-01-13T20:00:00"),
+        xs:dateTime("2013-01-14T02:00:00Z"),
+        xs:time("06:01:53.5"),
+        xs:time("12:01:53.5Z"),
+        xs:gYear("2013"),
+        xs:gYear("2013-06:00"))
   else ()
 return (
   count(distinct-values($values)),
