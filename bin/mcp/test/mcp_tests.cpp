@@ -3496,9 +3496,12 @@ void test_sweep_arithmetic( Fixture const &f ) {
   s.expected = "\"3 3 3.75 3.5\"";
   s.wrong = { "FOAR0001", "FOAR0002", "FOCA" };
   s.points = 100000;                // all of them
-  // As in test_sweep_compile.
-  s.known = { exact( "exit 2", 2 ), library_crash( "signal 6 in libstdc", true, 2 ),
-              exact( "terminate St9bad_alloc", 2, 8 ) };
+  // As in test_sweep_compile: the scanner calls exit(2), and std::bad_alloc
+  // leaves a noexcept function while the parser is set up (xquery_parser's
+  // constructor). Caps: about 1.5 times the most seen (exit 2: 3 alone,
+  // quick-check run 42784334470).
+  s.known = { exact( "exit 2", 5 ), library_crash( "signal 6 in libstdc", true, 2 ),
+              exact( "terminate St9bad_alloc", 2 ) };
   s.compiles = true;
   exhaust_sweep( f, "arithmetic", s );
 #else
