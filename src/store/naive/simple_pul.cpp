@@ -3057,7 +3057,7 @@ void CollectionPul::refreshGeneralIndex(csize idx)
     if (ite != end && (*ite).first.getp() == nodep)
     {
       index->remove((*ite).second, (*ite).first);
-      ++numDeletedApplied;
+      ++numBeforeApplied;
       ++ite;
 
       // Call removeMultiKey() after removing the 2nd key for the same node.
