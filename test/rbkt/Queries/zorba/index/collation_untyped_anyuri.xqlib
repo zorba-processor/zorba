@@ -14,28 +14,28 @@ import module namespace idml =
 
 declare namespace an = "http://zorba.io/annotations";
 
-declare default collation "http://zorba.io/collations/PRIMARY/en";
+declare default collation "http://zorba.io/collations/SECONDARY/en/EN";
 
 declare collection m:c as node()*;
 
 declare %an:value-equality %an:manual index m:UriHash
 on nodes dml:collection(xs:QName("m:c"))//e
-by xs:anyURI(./@v) as xs:anyURI collation "http://zorba.io/collations/PRIMARY/en";
+by xs:anyURI(./@v) as xs:anyURI collation "http://zorba.io/collations/SECONDARY/en/EN";
 
 declare %an:value-range %an:manual index m:UriTree
 on nodes dml:collection(xs:QName("m:c"))//e
-by xs:anyURI(./@v) as xs:anyURI collation "http://zorba.io/collations/PRIMARY/en";
+by xs:anyURI(./@v) as xs:anyURI collation "http://zorba.io/collations/SECONDARY/en/EN";
 
 (: Untyped keys for the elements with t="u", xs:anyURI keys for the others. :)
 declare %an:general-equality %an:manual index m:GeneralHash
 on nodes dml:collection(xs:QName("m:c"))//e
 by (if (./@t eq "u") then fn:data(./@v) else xs:anyURI(./@v))
-collation "http://zorba.io/collations/PRIMARY/en";
+collation "http://zorba.io/collations/SECONDARY/en/EN";
 
 declare %an:general-range %an:manual index m:GeneralTree
 on nodes dml:collection(xs:QName("m:c"))//e
 by (if (./@t eq "u") then fn:data(./@v) else xs:anyURI(./@v))
-collation "http://zorba.io/collations/PRIMARY/en";
+collation "http://zorba.io/collations/SECONDARY/en/EN";
 
 declare %an:sequential function m:init()
 {

@@ -1,7 +1,7 @@
 (: Under a default collation that ignores case, each join selects what its
    comparison selects without an index: xs:untypedAtomic and xs:anyURI values
    are compared as xs:string under the default collation. :)
-declare default collation "http://zorba.io/collations/PRIMARY/en";
+declare default collation "http://zorba.io/collations/SECONDARY/en/EN";
 
 let $doc := <d><a>x</a><b>X</b><b>y</b></d>
 return fn:string-join((

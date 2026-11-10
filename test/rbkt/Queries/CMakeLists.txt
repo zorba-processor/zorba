@@ -211,7 +211,7 @@ FOREACH(TESTFILE ${TESTFILES})
     # adjustments for the $place argument of fn:format-dateTime and the casing
     # properties for the final sigma in fn:lower-case come from ICU. With the
     # 'i' flag, a character range matches by full case closure only with ICU
-    # (regex-backref-casefold). Collation strengths such as PRIMARY come from
+    # (regex-backref-casefold). Collation strengths such as SECONDARY come from
     # ICU; without it every collation compares codepoints.
     FILE(READ "${CMAKE_CURRENT_SOURCE_DIR}/${TESTFILE}" _icu_query_text)
     IF (_icu_query_text MATCHES "ISO-8859-|CP1252|windows-125"
