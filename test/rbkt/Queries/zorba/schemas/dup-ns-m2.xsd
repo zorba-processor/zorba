@@ -1,0 +1,13 @@
+<xs:schema
+  xmlns:xs="http://www.w3.org/2001/XMLSchema"
+  targetNamespace="http://zorba.io/test/dup-ns/m"
+  elementFormDefault="qualified">
+
+  <!-- A second schema document for the namespace of dup-ns-m1.xsd. It and
+       dup-ns-h.xsd import each other. -->
+  <xs:import namespace="http://zorba.io/test/dup-ns/h" schemaLocation="dup-ns-h.xsd"/>
+
+  <xs:element name="head" type="xs:string"/>
+  <xs:element name="only-in-m2" type="xs:string"/>
+
+</xs:schema>

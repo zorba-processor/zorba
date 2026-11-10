@@ -1,0 +1,8 @@
+module namespace dm = "http://zorba.io/test/dup-ns/module";
+
+import schema namespace m = "http://zorba.io/test/dup-ns/m" at "dup-ns-m1.xsd";
+
+declare function dm:head()
+{
+  fn:data(validate { <m:head>a</m:head> })
+};
