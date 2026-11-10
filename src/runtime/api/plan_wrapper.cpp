@@ -131,8 +131,7 @@ void PlanWrapper::open()
   catch (...)
   {
     thePlanState->theCreatedStates = NULL;
-    for (auto state = created.rbegin(); state != created.rend(); ++state)
-      state->second(*thePlanState, state->first);
+    created.destroyAll(*thePlanState);
     throw;
   }
 

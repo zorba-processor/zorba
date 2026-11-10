@@ -19,7 +19,6 @@
 
 #include <chrono>
 #include <stack>
-#include <utility>
 #include <vector>
 
 #include "common/shared_types.h"
@@ -153,13 +152,58 @@ class QueryResources;
                     in theBlock, in order, with the function that destroys
                     each: if the open fails, close() cannot run (it would reach
                     iterators whose state was never created), so PlanWrapper
-                    destroys these. NULL at all other times.
+                    destroys these. NULL at all other times. The first
+                    INLINE_SIZE entries need no allocation, so that opening a
+                    plan of that many states allocates nothing more.
 ********************************************************************************/
 class PlanState
 {
 public:
-  typedef std::vector<std::pair<uint32_t, void (*)(PlanState&, uint32_t)> >
-  CreatedStates;
+  class CreatedStates
+  {
+  public:
+    typedef void (*Destroy)(PlanState&, uint32_t);
+
+    static constexpr std::size_t INLINE_SIZE = 128;
+
+    void push(uint32_t offset, Destroy destroy)
+    {
+      if (theSize < INLINE_SIZE)
+        theInline[theSize] = Entry{offset, destroy};
+      else
+        theMore.push_back(Entry{offset, destroy});
+      ++theSize;
+    }
+
+    void pop()
+    {
+      --theSize;
+      if (theSize >= INLINE_SIZE)
+        theMore.pop_back();
+    }
+
+    void destroyAll(PlanState& planState)
+    {
+      while (theSize > 0)
+      {
+        --theSize;
+        const Entry& e = (theSize < INLINE_SIZE ? theInline[theSize]
+                                                : theMore[theSize - INLINE_SIZE]);
+        e.destroy(planState, e.offset);
+      }
+    }
+
+  private:
+    struct Entry
+    {
+      uint32_t offset;
+      Destroy  destroy;
+    };
+
+    Entry              theInline[INLINE_SIZE];
+    std::size_t        theSize = 0;
+    std::vector<Entry> theMore;
+  };
 
   int8_t                  * theBlock;
 
@@ -464,14 +508,14 @@ public:
       return;
     }
 
-    planState.theCreatedStates->emplace_back(stateOffset, &destroyState);
+    planState.theCreatedStates->push(stateOffset, &destroyState);
     try
     {
       new (planState.theBlock + stateOffset)T();
     }
     catch (...)
     {
-      planState.theCreatedStates->pop_back();
+      planState.theCreatedStates->pop();
       throw;
     }
   }
