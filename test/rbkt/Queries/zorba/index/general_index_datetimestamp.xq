@@ -4,6 +4,8 @@ import module namespace m = "http://www.example.com/general-index-probe-gaps" at
 import module namespace idml =
   "http://zorba.io/modules/store/static/indexes/dml";
 
+declare namespace err = "http://www.w3.org/2005/xqt-errors";
+
 m:create(xs:QName("m:s"),
          (<e id="1" t="dt" v="2013-01-13T12:01:53+01:00"/>,
           <e id="2" t="dts" v="2013-01-13T12:01:53+01:00"/>,
