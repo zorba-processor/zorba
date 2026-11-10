@@ -20,6 +20,27 @@
           </ChildAxisIterator>
         </ChildAxisIterator>
       </LetVariable>
+      <LetVariable name="$$opt_temp_4" materialize="true">
+        <CreateInternalIndexIterator name="xs:QName(,,tempIndex0)">
+          <FLWORIterator>
+            <ForVariable name="$$opt_temp_2">
+              <LetVarIterator varname="ca"/>
+            </ForVariable>
+            <ReturnClause>
+              <GeneralIndexEntryBuilderIterator>
+                <ForVarIterator varname="$$opt_temp_2"/>
+                <FnDataIterator>
+                  <AttributeAxisIterator test-kind="match_name_test" qname="xs:QName(,,person)" typename="*" nill-allowed="false">
+                    <ChildAxisIterator test-kind="match_name_test" qname="xs:QName(,,buyer)" typename="*" nill-allowed="false">
+                      <ForVarIterator varname="$$opt_temp_2"/>
+                    </ChildAxisIterator>
+                  </AttributeAxisIterator>
+                </FnDataIterator>
+              </GeneralIndexEntryBuilderIterator>
+            </ReturnClause>
+          </FLWORIterator>
+        </CreateInternalIndexIterator>
+      </LetVariable>
       <LetVariable name="ei" materialize="true">
         <ChildAxisIterator test-kind="match_name_test" qname="xs:QName(,,item)" typename="*" nill-allowed="false">
           <ChildAxisIterator test-kind="match_name_test" qname="xs:QName(,,europe)" typename="*" nill-allowed="false">
@@ -31,18 +52,18 @@
           </ChildAxisIterator>
         </ChildAxisIterator>
       </LetVariable>
-      <LetVariable name="$$opt_temp_4" materialize="true">
-        <CreateInternalIndexIterator name="xs:QName(,,tempIndex0)">
+      <LetVariable name="$$opt_temp_7" materialize="true">
+        <CreateInternalIndexIterator name="xs:QName(,,tempIndex1)">
           <FLWORIterator>
-            <ForVariable name="$$opt_temp_2">
+            <ForVariable name="$$opt_temp_5">
               <LetVarIterator varname="ei"/>
             </ForVariable>
             <ReturnClause>
               <GeneralIndexEntryBuilderIterator>
-                <ForVarIterator varname="$$opt_temp_2"/>
+                <ForVarIterator varname="$$opt_temp_5"/>
                 <FnDataIterator>
                   <AttributeAxisIterator test-kind="match_name_test" qname="xs:QName(,,id)" typename="*" nill-allowed="false">
-                    <ForVarIterator varname="$$opt_temp_2"/>
+                    <ForVarIterator varname="$$opt_temp_5"/>
                   </AttributeAxisIterator>
                 </FnDataIterator>
               </GeneralIndexEntryBuilderIterator>
@@ -85,7 +106,17 @@
           <EnclosedIterator attr_cont="false">
             <FLWORIterator>
               <ForVariable name="t">
-                <LetVarIterator varname="ca"/>
+                <TryCatchIterator>
+                  <NodeSortIterator distinct="true" ascending="true">
+                    <ProbeIndexPointGeneralIterator>
+                      <SingletonIterator value="xs:QName(,,tempIndex0)"/>
+                      <UnhoistIterator>
+                        <LetVarIterator varname="$$opt_temp_0"/>
+                      </UnhoistIterator>
+                    </ProbeIndexPointGeneralIterator>
+                  </NodeSortIterator>
+                  <LetVarIterator varname="ca"/>
+                </TryCatchIterator>
               </ForVariable>
               <LetVariable name="$$opt_temp_1" materialize="true">
                 <HoistIterator>
@@ -123,7 +154,7 @@
                             <TryCatchIterator>
                               <NodeSortIterator distinct="true" ascending="true">
                                 <ProbeIndexPointGeneralIterator>
-                                  <SingletonIterator value="xs:QName(,,tempIndex0)"/>
+                                  <SingletonIterator value="xs:QName(,,tempIndex1)"/>
                                   <UnhoistIterator>
                                     <LetVarIterator varname="$$opt_temp_1"/>
                                   </UnhoistIterator>

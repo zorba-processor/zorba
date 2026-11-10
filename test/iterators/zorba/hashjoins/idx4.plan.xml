@@ -93,7 +93,7 @@
           <ConcatStrIterator>
             <SingletonIterator value="xs:string(xmlns:)"/>
             <ForVarIterator varname="prefixE"/>
-            <SingletonIterator value="xs:string(=&quot)"/>
+            <SingletonIterator value="xs:string(=&quot;)"/>
           </ConcatStrIterator>
         </HoistIterator>
       </ForVariable>
@@ -161,7 +161,7 @@
                     </UnhoistIterator>
                   </EnclosedIterator>
                 </ElementIterator>
-                <SingletonIterator value="xs:string(&quot)"/>
+                <SingletonIterator value="xs:string(&quot;)"/>
               </FnConcatIterator>
             </EnclosedIterator>
           </ElementIterator>
