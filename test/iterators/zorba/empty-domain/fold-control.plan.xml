@@ -1,3 +1,6 @@
+<iterator-tree description="const-folded expr">
+  <SingletonIterator value="xs:integer(10)"/>
+</iterator-tree>
 <iterator-tree description="main query">
   <FLWORIterator>
     <ForVariable name="$$context-item">

@@ -2,4 +2,4 @@
 declare variable $s external := "a";
 
 for $x in (1, 2)
-return if ($x eq 3) then $x else (if (xs:integer($s) eq 1) then () else ())
+return if ($x eq 3) then $x else (if (xs:integer($s) eq $x) then () else ())
