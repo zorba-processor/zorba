@@ -293,14 +293,19 @@ void UDFunctionCallIteratorState::reset(PlanState& planState)
   the caller starts another call, because the next call of the caller may well
   be this one again: running it after a reset is cheaper than opening it (a
   recursion that makes its calls from a loop, or one call per level). A dynamic
-  call has its iterator closed when it completes, so it does not wait.
+  call has its iterator closed when it completes, so it does not wait, and
+  neither does a sequential one: the caller may run its next statement before
+  it starts another call.
 ********************************************************************************/
-void UDFunctionCallIteratorState::bodyCompleted(PlanState& aCaller, bool isDynamic)
+void UDFunctionCallIteratorState::bodyCompleted(
+    PlanState& aCaller,
+    bool isDynamic,
+    bool isSequential)
 {
-  if (!thePlanOpen || !canReleaseBody(aCaller))
+  if (!thePlanOpen || !canReleaseBody(aCaller, isSequential))
     return;
 
-  if (isDynamic)
+  if (isDynamic || isSequential)
   {
     closeBody();
   }
@@ -336,6 +341,10 @@ void UDFunctionCallIteratorState::closeBody()
 {
   thePlanOpen = false;
   thePlan->close(*thePlanState);
+
+  // A closure dctx also holds the captured variables of its function item.
+  if (theIsLocalDCtxOwner)
+    theLocalDCtx->release_variables();
 }
 
 
@@ -703,7 +712,7 @@ bool UDFunctionCallIterator::nextImplCache(store::Item_t& aResult, PlanState& aP
 
     DEBUGGER_POP_FRAME;
 
-    lState->bodyCompleted(aPlanState, theIsDynamic);
+    lState->bodyCompleted(aPlanState, theIsDynamic, theUDF->isSequential());
   }
   else
   {
@@ -763,7 +772,7 @@ bool UDFunctionCallIterator::nextImplCache(store::Item_t& aResult, PlanState& aP
           aResult = lState->theNextResult;
         }
 
-        lState->bodyCompleted(aPlanState, theIsDynamic);
+        lState->bodyCompleted(aPlanState, theIsDynamic, theUDF->isSequential());
 
         if (!aResult.isNull())
         {
@@ -780,14 +789,14 @@ bool UDFunctionCallIterator::nextImplCache(store::Item_t& aResult, PlanState& aP
       {
         insertCacheEntry(aPlanState, lState, lState->theCachedResult);
 
-        lState->bodyCompleted(aPlanState, theIsDynamic);
+        lState->bodyCompleted(aPlanState, theIsDynamic, theUDF->isSequential());
       }
 
       DEBUGGER_POP_FRAME;
     }
     else // cache hit
     {
-      lState->bodyCompleted(aPlanState, theIsDynamic);
+      lState->bodyCompleted(aPlanState, theIsDynamic, theUDF->isSequential());
 
       lState->theCachedResultIterator = lState->theCachedResult.begin();
       while (lState->theCachedResultIterator != lState->theCachedResult.end())
@@ -836,7 +845,7 @@ bool UDFunctionCallIterator::nextImplNoCache(store::Item_t& aResult, PlanState& 
 
   DEBUGGER_PUSH_FRAME;
 
-  if (lState->canReleaseBody(aPlanState) &&
+  if (lState->canReleaseBody(aPlanState, theUDF->isSequential()) &&
       theUDF->getSignature().returnType()->max_card() <= 1)
   {
     // A consumer that knows from the signature that there is at most one item
@@ -854,7 +863,7 @@ bool UDFunctionCallIterator::nextImplNoCache(store::Item_t& aResult, PlanState& 
         aResult.transfer(lState->theNextResult);
       }
 
-      lState->bodyCompleted(aPlanState, theIsDynamic);
+      lState->bodyCompleted(aPlanState, theIsDynamic, theUDF->isSequential());
 
       DEBUGGER_POP_FRAME;
       STACK_PUSH(true, lState);
@@ -873,7 +882,7 @@ bool UDFunctionCallIterator::nextImplNoCache(store::Item_t& aResult, PlanState& 
 
   DEBUGGER_POP_FRAME;
 
-  lState->bodyCompleted(aPlanState, theIsDynamic);
+  lState->bodyCompleted(aPlanState, theIsDynamic, theUDF->isSequential());
 
   STACK_END(lState);
 }
