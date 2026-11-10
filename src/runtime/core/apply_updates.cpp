@@ -189,14 +189,14 @@ void apply_updates(
     zorbaIndexes[i] = indexDecl;
   }
 
-  numIndices = truncate_indexes.size();
-  for (csize i = 0; i < numIndices; ++i)
+  csize numTruncateIndices = truncate_indexes.size();
+  for (csize i = 0; i < numTruncateIndices; ++i)
   {
-    IndexDecl* indexDecl = sctx->lookup_index(indexes[i]->getName());
+    IndexDecl* indexDecl = sctx->lookup_index(truncate_indexes[i]->getName());
 
     if (indexDecl->getMaintenanceMode() == IndexDecl::DOC_MAP)
     {
-      pul->addIndexTruncator(indexDecl->getSourceName(0), indexes[i]);
+      pul->addIndexTruncator(indexDecl->getSourceName(0), truncate_indexes[i]);
     }
   }
 
