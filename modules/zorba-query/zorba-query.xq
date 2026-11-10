@@ -97,6 +97,14 @@ declare %an:sequential function zq:prepare-main-module($main-module-text as xs:s
  : <p>The URL resolver function's return type is not restricted, it could be a string, a sequence,
  : a node, etc. All the outputs types are to be serialized as a string.</p>
  : <p/>
+ : <p>The prepared query also calls the URL resolver function for fetch:content,
+ : fetch:content-binary and fn:doc, with the empty string as $entity. Both fetch
+ : functions are nondeterministic: every call of them in the query calls the URL
+ : resolver function, also two calls with the same URI and a call in a loop.
+ : fn:doc is stable: calls with the same URI return the same document, and the
+ : URL resolver function can be called once for all of them. The same holds for
+ : a query loaded with zq:load-from-query-plan#3.</p>
+ : <p/>
  : <p>The third parameter is a function item for a URI mapper.</p>
  : <ul>The URI mapper function, just like the URL resolver, receives 2 parameters:
  : <li>A $namespace as xs:string that will contain the URI to be mapped.</li>

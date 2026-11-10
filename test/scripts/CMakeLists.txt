@@ -41,3 +41,11 @@ ADD_TEST(NAME "scripts/index_decl_hoisting"
     -D "SRC_DIR=${CMAKE_SOURCE_DIR}"
     -P "${CMAKE_CURRENT_SOURCE_DIR}/index_decl_hoisting.cmake")
 SET_TESTS_PROPERTIES("scripts/index_decl_hoisting" PROPERTIES PASS_REGULAR_EXPRESSION "Passed!")
+
+# A user %an:nondeterministic annotation is not overwritten by inference from the body.
+ADD_TEST(NAME "scripts/udf_nondeterministic_annotation"
+  COMMAND "${CMAKE_COMMAND}"
+    -D "ZORBA_EXE=${ZORBA_EXE}"
+    -D "SRC_DIR=${CMAKE_SOURCE_DIR}"
+    -P "${CMAKE_CURRENT_SOURCE_DIR}/udf_nondeterministic_annotation.cmake")
+SET_TESTS_PROPERTIES("scripts/udf_nondeterministic_annotation" PROPERTIES PASS_REGULAR_EXPRESSION "Passed!")
