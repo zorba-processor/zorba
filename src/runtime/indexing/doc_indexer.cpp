@@ -100,17 +100,28 @@ void DocIndexer::createIndexEntries(
         {
           assert(domainNode->isNode());
 
+          bool haveKey = false;
+
           while ((more = thePlanWrapper->next(key)))
           {
             if (key->isNode())
-            {
-              domainNode.transfer(key);
               break;
-            }
 
             store::Item_t node = domainNode;
             delta.addGeneralPair(node, key);
+            haveKey = true;
           }
+
+          // A domain node whose key is the empty sequence has a NULL key.
+          if (!haveKey)
+          {
+            store::Item_t node = domainNode;
+            store::Item_t noKey;
+            delta.addGeneralPair(node, noKey);
+          }
+
+          if (more)
+            domainNode.transfer(key);
         }
       }
     }

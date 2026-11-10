@@ -1104,6 +1104,10 @@ void GeneralHashIndex::clear()
 
     theMaps[i]->clear();
   }
+
+  theEmptyKeyNodes.clear();
+  theNumUntypedEntries = 0;
+  theNumMultiKeyNodes = 0;
 }
 
 
@@ -1382,6 +1386,10 @@ void GeneralTreeIndex::clear()
 
     theMaps[i]->clear();
   }
+
+  theEmptyKeyNodes.clear();
+  theNumUntypedEntries = 0;
+  theNumMultiKeyNodes = 0;
 }
 
 
