@@ -24,6 +24,7 @@ import module namespace batch = "http://www.zorba-xquery.com/modules/xqdoc/batch
 declare namespace xqd = "http://www.xqdoc.org/1.0";
 declare namespace z   = "http://zorba.io/manifest";
 declare namespace xs  = "http://www.w3.org/2001/XMLSchema";
+declare namespace an  = "http://zorba.io/annotations";
 
 declare function xqdoc-html:id($label as xs:string)
 as xs:string
@@ -69,7 +70,7 @@ as element()*
   )
 };
 
-declare function xqdoc-html:modules($manifest) as element()
+declare %an:nondeterministic function xqdoc-html:modules($manifest) as element()
 {
 <modules>
   <section id="modules" label="XQuery Modules">
