@@ -1,4 +1,4 @@
-=, reversed domain: y x
-=, document order domain: x y
-eq, reversed domain: y x
-eq, document order domain: x y
+=, reversed domain: 2 1
+=, document order domain: 1 2
+=, reversed domain, two for clauses: 2 1
+eq, reversed domain: 2 1

@@ -660,6 +660,12 @@ bool IndexJoinRule::isIndexJoinPredicate(PredicateInfo& predInfo)
     if (innerDomainExpr->getProducesDistinctNodes() != ANNOTATION_TRUE &&
         innerDomainExpr->getProducesDistinctNodes() != ANNOTATION_TRUE_FIXED)
       return false;
+
+    // The probe returns its nodes in document order (see rewriteJoin()), so
+    // the domain must give them in document order too.
+    if (innerDomainExpr->getProducesSortedNodes() != ANNOTATION_TRUE &&
+        innerDomainExpr->getProducesSortedNodes() != ANNOTATION_TRUE_FIXED)
+      return false;
   }
 
   return true;
