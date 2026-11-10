@@ -1,5 +1,4 @@
-
-<root><iterator-tree description="main query">
+<iterator-tree description="main query">
   <FLWORIterator>
     <ForVariable name="d">
       <ElementIterator>
@@ -312,7 +311,7 @@
             </StringJoinIterator>
           </ConcatStrIterator>
         </FnConcatIterator>
-        <SingletonIterator value="xs:string(&#xA)"/>
+        <SingletonIterator value="xs:string(&#xA;)"/>
       </StringJoinIterator>
     </ReturnClause>
   </FLWORIterator>
