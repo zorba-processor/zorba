@@ -1,0 +1,8 @@
+<xs:schema
+  xmlns:xs="http://www.w3.org/2001/XMLSchema"
+  targetNamespace="http://zorba.io/test/dup-ns/m"
+  elementFormDefault="qualified">
+
+  <xs:element name="head" type="xs:string"/>
+
+</xs:schema>
