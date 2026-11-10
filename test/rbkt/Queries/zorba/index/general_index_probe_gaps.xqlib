@@ -139,6 +139,13 @@ by (switch (fn:string(./@t))
     case "n" return jn:null()
     default return xs:dateTime(./@v));
 
+(: Untyped keys in an index without a key type, probed by value with null. :)
+declare collection m:su as node()*;
+
+declare %an:general-range %an:manual index m:SURange
+on nodes dml:collection(xs:QName("m:su"))//e
+by ./@v;
+
 declare %an:sequential function m:create($coll as xs:QName,
                                          $rows as element(e)*,
                                          $indexes as xs:QName*)
