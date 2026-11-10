@@ -2,7 +2,7 @@
    xs:anyURI or untyped keys selects what the comparison selects without an
    index. :)
 import module namespace m = "http://www.example.com/collation-untyped-anyuri" at
-                             "collation_untyped_anyuri.xqlib";
+                             "probe_untyped_anyuri.xqlib";
 
 m:init();
 
