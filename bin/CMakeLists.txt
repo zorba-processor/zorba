@@ -91,6 +91,14 @@ ZORBA_SET_TEST_PROPERTY(bin/zorba_timeout PASS_REGULAR_EXPRESSION ".*ZXQP0068.*"
 ZORBA_ADD_TEST(bin/zorba_max_call_depth zorbacmd --max-udf-call-depth 10 -q "let $f := function($f, $n) { if ($n le 0) then 0 else $f($f, $n - 1) } return $f($f, 20)")
 ZORBA_SET_TEST_PROPERTY(bin/zorba_max_call_depth PASS_REGULAR_EXPRESSION ".*ZXQP0069.*")
 
+# --timezone sets the implicit timezone of every execution; the help says what
+# applies without it.
+ZORBA_ADD_TEST(bin/zorba_timezone zorbacmd --timezone 180 -r -q "fn:implicit-timezone()")
+ZORBA_SET_TEST_PROPERTY(bin/zorba_timezone PASS_REGULAR_EXPRESSION "^PT3H$")
+ZORBA_ADD_TEST(bin/zorba_timezone_help zorbacmd --help)
+ZORBA_SET_TEST_PROPERTY(bin/zorba_timezone_help PASS_REGULAR_EXPRESSION
+  "--timezone <minutes>\nSet the implicit timezone [(]in minutes[)] of every execution[.] Without this option, each execution uses the timezone of the host at its start[.]")
+
 # The option zorba-streaming-members, written as a literal in a parse that is
 # unboxed directly, reads the members one at a time; anything else goes through
 # the store as a whole.
