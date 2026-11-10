@@ -32,16 +32,19 @@ FUNCTION(main_tree query level result)
   SET(${result} "${tail}" PARENT_SCOPE)
 ENDFUNCTION()
 
+# The loop domain is hoisted in both queries; only a hoist of the call matters.
+SET(hoisted_call "hoist#[0-9]+ \\([^)]*\\) \\[[ \n\r]*local:g")
+
 FOREACH(level 1 2)
   main_tree(plain.xq ${level} plain)
-  STRING(FIND "${plain}" "hoist" pos)
-  IF(pos EQUAL -1)
+  STRING(REGEX MATCH "${hoisted_call}" found "${plain}")
+  IF(found STREQUAL "")
     MESSAGE(FATAL_ERROR "O${level}, deterministic function: call not hoisted:\n${plain}")
   ENDIF()
 
   main_tree(annotated.xq ${level} annotated)
-  STRING(FIND "${annotated}" "hoist" pos)
-  IF(NOT pos EQUAL -1)
+  STRING(REGEX MATCH "${hoisted_call}" found "${annotated}")
+  IF(NOT found STREQUAL "")
     MESSAGE(FATAL_ERROR "O${level}, %an:nondeterministic function: call hoisted:\n${annotated}")
   ENDIF()
 ENDFOREACH()
