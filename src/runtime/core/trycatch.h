@@ -26,6 +26,12 @@
 namespace zorba
 {
 
+class ZorbaException;
+
+// A timeout or running out of memory ends the query: no catch clause catches it.
+bool isCatchable(ZorbaException const& e);
+
+
 class TryCatchIteratorState : public  PlanIteratorState 
 {
 public:

@@ -680,6 +680,19 @@ TryCatchIterator::bindErrorVars(
 }
 
 
+bool isCatchable(ZorbaException const& e)
+{
+  // A timeout ends the query: a catch clause must not be able to resume it
+  // (for example inside an endless loop). So does running out of memory, which
+  // calls through the C++ API report as an internal error (fn:error() can raise
+  // that code too, and is a UserException).
+  return !(e.diagnostic() == zerr::ZXQP0068_QUERY_TIMEOUT ||
+           (!dynamic_cast<UserException const*>(&e) &&
+            e.diagnostic() == zerr::ZXQP0003_INTERNAL_ERROR &&
+            std::strstr(e.what(), "bad_alloc") != NULL));
+}
+
+
 bool
 TryCatchIterator::nextImpl(store::Item_t& result, PlanState& planState) const
 {
@@ -700,15 +713,7 @@ TryCatchIterator::nextImpl(store::Item_t& result, PlanState& planState) const
   }
   catch (ZorbaException const& e)
   {
-    // A timeout ends the query: a catch clause must not be able to resume it
-    // (for example inside an endless loop). So does running out of memory, which
-    // calls through the C++ API report as an internal error (fn:error() can raise
-    // that code too, and is a UserException).
-    if (e.diagnostic() == zerr::ZXQP0068_QUERY_TIMEOUT ||
-        (!dynamic_cast<UserException const*>(&e) &&
-         e.diagnostic() == zerr::ZXQP0003_INTERNAL_ERROR &&
-         std::strstr(e.what(), "bad_alloc") != NULL) ||
-        !matchedCatch(e, state, planState))
+    if (!isCatchable(e) || !matchedCatch(e, state, planState))
     {
       throw;
     }

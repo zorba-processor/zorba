@@ -16,6 +16,7 @@
 
 #include "runtime/visitors/planiter_visitor.h"
 #include "runtime/indexing/index_ddl.h"
+#include "runtime/core/trycatch.h"
 #include "runtime/api/plan_wrapper.h"
 #include "runtime/api/plan_iterator_wrapper.h"
 
@@ -228,6 +229,10 @@ bool CreateInternalIndexIterator::nextImpl(
   indexDecl = theSctx->lookup_index(theQName);
   ZORBA_ASSERT(indexDecl);
 
+  // The index of an earlier evaluation must not stay bound if this build fails.
+  if (planState.theLocalDynCtx->getIndex(indexDecl->getName()))
+    planState.theLocalDynCtx->unbindIndex(indexDecl->getName());
+
   planIteratorWrapper = new PlanIteratorWrapper(theChild, planState);
 
   createIndexSpec(indexDecl, planState.theLocalDynCtx->get_implicit_timezone(), spec);
@@ -236,17 +241,15 @@ bool CreateInternalIndexIterator::nextImpl(
   {
     storeIndex = GENV_STORE.createIndex(indexDecl->getName(), spec, planIteratorWrapper);
   }
-  catch(XQueryException& e)
+  catch (ZorbaException const& e)
   {
-    // Store raises error if index exists already
-    set_source( e, loc );
-    throw;
+    // Not the result yet: the probes find no index and fall back to the domain (IndexJoinRule::rewriteJoin()).
+    if (!isCatchable(e))
+      throw;
   }
 
-  if (planState.theLocalDynCtx->getIndex(indexDecl->getName()))
-    planState.theLocalDynCtx->unbindIndex(indexDecl->getName());
-
-  planState.theLocalDynCtx->bindIndex(indexDecl->getName(), storeIndex);
+  if (storeIndex != NULL)
+    planState.theLocalDynCtx->bindIndex(indexDecl->getName(), storeIndex);
 
   STACK_END(state);
 }
