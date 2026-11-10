@@ -3656,6 +3656,59 @@ void test_plan_wrapper_out_of_memory( Fixture const &f ) {
   (void)f;
 #endif
 }
+// Iterator::open() with each allocation failing in turn, over a FLWOR whose open
+// allocates (a let bound to a sequence, group by, order by): the answer or an
+// error; then, in an AddressSanitizer build, nothing is left unreachable.
+void test_plan_open_out_of_memory( Fixture const &f ) {
+#if defined(__linux__)
+  auto attempt = [&]( long n, long length, long *count ) -> std::string {
+    XQuery_t const query( f.zorba->compileQuery(
+      "for $i in 1 to 20\n"
+      "let $s := ($i, $i * 2)\n"
+      "group by $k := $i mod 3\n"
+      "order by $k descending\n"
+      "return sum($s)" ) );
+    Iterator_t const it( query->iterator() );
+    inject_arm( n, length );
+    bool opened = false;
+    try {
+      it->open();
+      opened = true;
+    }
+    catch ( std::exception const& ) {
+    }
+    *count = inject_disarm();
+    if ( !opened )
+      return "error";
+    std::string out;
+    Item item;
+    while ( it->next( item ) )
+      out += ( out.empty() ? "" : " " ) + item.getStringValue().str();
+    it->close();
+    return out;
+  };
+  long total = 0;
+  check( attempt( 0, 0, &total ) == "231 210 189", "the FLWOR: the answer" );
+  check( total > 0, "open() allocates", std::to_string( total ) );
+  long wrong = 0;
+  for ( long const length : { 1L, 8L } )
+    for ( long n = 1; n <= total; ++n ) {
+      long count = 0;
+      std::string const got( attempt( n, length, &count ) );
+      if ( got != "231 210 189" && got != "error" && ++wrong <= 3 )
+        std::cout << "at " << n << " of a run of " << length << ": " << got
+                  << std::endl;
+    }
+  check( wrong == 0, "open() failing: the answer or an error",
+         std::to_string( wrong ) + " points" );
+# if defined(__SANITIZE_ADDRESS__)
+  check( __lsan_do_recoverable_leak_check() == 0,
+         "open() failing: nothing is left behind" );
+# endif
+#else
+  (void)f;
+#endif
+}
 void test_base64_stream_out_of_memory( Fixture const &f ) {
 #if defined(__linux__)
   std::string encoded;
@@ -7708,6 +7761,7 @@ Test const tests[] = {
   { "exhaust_seekable_stream", test_seekable_stream_out_of_memory },
   { "exhaust_json_loader", test_json_loader_out_of_memory },
   { "exhaust_plan_wrapper", test_plan_wrapper_out_of_memory },
+  { "exhaust_plan_open", test_plan_open_out_of_memory },
   { "exhaust_sweep_matcher", test_sweep_matcher },
   { "exhaust_sweep_xml", test_sweep_xml },
   { "exhaust_sweep_xml_dtd", test_sweep_xml_dtd },
