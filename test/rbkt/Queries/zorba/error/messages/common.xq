@@ -33,4 +33,8 @@ local:eval('processing-instruction p { "?>" }', "XQDY0026",
 local:eval('replace("abc", "x*", "y")', "FORX0003",
   "^""x\*"": regular expression matches the empty string$"),
 local:eval('compare("a", "b", "http://example.com/no-such-collation")', "FOCH0002",
-  "^""http://example.com/no-such-collation"": unsupported collation")
+  "^""http://example.com/no-such-collation"": unsupported collation"),
+local:eval('declare default collation "http://example.com/no-such-collation"; 1', "XQST0038",
+  "^""http://example.com/no-such-collation"": not a known collation$"),
+local:eval('declare default collation "http://www.w3.org/2005/xpath-functions/collation/codepoint"; declare default collation "http://www.w3.org/2005/xpath-functions/collation/codepoint"; 1', "XQST0038",
+  "^multiple default collation declarations$")
