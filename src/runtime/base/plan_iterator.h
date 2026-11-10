@@ -455,19 +455,24 @@ public:
   {
     stateOffset = offset;
     offset += StateTraitsImpl<T>::getStateSize();
-    new (planState.theBlock + stateOffset)T();
 
-    if (planState.theCreatedStates != NULL)
+    // Listed before it is constructed, so that a failure to list it never
+    // destroys a state that init() has not set up yet.
+    if (planState.theCreatedStates == NULL)
     {
-      try
-      {
-        planState.theCreatedStates->emplace_back(stateOffset, &destroyState);
-      }
-      catch (...)
-      {
-        destroyState(planState, stateOffset);
-        throw;
-      }
+      new (planState.theBlock + stateOffset)T();
+      return;
+    }
+
+    planState.theCreatedStates->emplace_back(stateOffset, &destroyState);
+    try
+    {
+      new (planState.theBlock + stateOffset)T();
+    }
+    catch (...)
+    {
+      planState.theCreatedStates->pop_back();
+      throw;
     }
   }
 

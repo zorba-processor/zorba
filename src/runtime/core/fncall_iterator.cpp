@@ -1073,7 +1073,8 @@ ExtFunctionCallIteratorState::~ExtFunctionCallIteratorState()
 
   csize n = m_extArgs.size();
 
-  for (csize i = 0; i < n; ++i)
+  // NULL from the one whose allocation failed in openImpl().
+  for (csize i = 0; i < n && m_extArgs[i] != NULL; ++i)
   {
     m_extArgs[i]->removeReference();
   }

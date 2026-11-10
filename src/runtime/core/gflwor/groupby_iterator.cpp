@@ -64,6 +64,9 @@ GroupByState::GroupByState()
 ********************************************************************************/
 GroupByState::~GroupByState() 
 {
+  if (theGroupMap == NULL)  // init() did not run or failed
+    return;
+
   GroupHashMap::iterator iter = theGroupMap->begin();
   GroupHashMap::iterator end = theGroupMap->end();
   for (; iter != end; ++iter)
