@@ -297,6 +297,8 @@ expr* expr::clone(user_function* udf, substitution_t& subst) const
     trycatch_expr* cloneExpr = theCCB->theEM->
     create_trycatch_expr(theSctx, udf, theLoc, e->theTryExpr->clone(udf, subst));
 
+    cloneExpr->set_internal(e->is_internal());
+
     for (std::vector<expr*>::const_iterator ite = e->theCatchExprs.begin();
          ite != e->theCatchExprs.end();
          ++ite)

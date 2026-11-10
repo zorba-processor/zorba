@@ -64,11 +64,28 @@
       <FnCountIterator>
         <FLWORIterator>
           <ForVariable name="b">
-            <ProbeIndexPointValueIterator>
-              <SingletonIterator value="xs:QName(,,tempIndex0)"/>
-              <ForVarIterator varname="k"/>
-            </ProbeIndexPointValueIterator>
+            <TryCatchIterator>
+              <ProbeIndexPointValueIterator>
+                <SingletonIterator value="xs:QName(,,tempIndex0)"/>
+                <ForVarIterator varname="k"/>
+              </ProbeIndexPointValueIterator>
+              <UnhoistIterator>
+                <LetVarIterator varname="$$opt_temp_0"/>
+              </UnhoistIterator>
+            </TryCatchIterator>
           </ForVariable>
+          <WhereClause>
+            <FnBooleanIterator>
+              <TypedValueCompareIterator_INTEGER>
+                <CastIterator type="xs:integer">
+                  <FnDataIterator>
+                    <ForVarIterator varname="b"/>
+                  </FnDataIterator>
+                </CastIterator>
+                <ForVarIterator varname="k"/>
+              </TypedValueCompareIterator_INTEGER>
+            </FnBooleanIterator>
+          </WhereClause>
           <ReturnClause>
             <ForVarIterator varname="b"/>
           </ReturnClause>

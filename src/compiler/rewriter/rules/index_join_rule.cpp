@@ -26,6 +26,7 @@
 #include "functions/function.h"
 #include "functions/library.h"
 
+#include "types/node_test.h"
 #include "types/typeops.h"
 
 #include <zorba/properties.h>
@@ -143,18 +144,19 @@ public:
 
 
 /*******************************************************************************
-  Whether an expr is or contains a probe of a value index: see
-  createNormalizedProbe(), whose shape later rewrites may simplify.
+  Whether an expr is or contains a point probe of an index: see rewriteJoin(),
+  whose shape later rewrites may simplify.
 ********************************************************************************/
-static bool containsValueProbe(expr* e)
+static bool containsIndexProbe(expr* e)
 {
-  if (e->get_function_kind() == FunctionConsts::FN_ZORBA_XQDDF_PROBE_INDEX_POINT_VALUE_N)
+  if (e->get_function_kind() == FunctionConsts::FN_ZORBA_XQDDF_PROBE_INDEX_POINT_VALUE_N ||
+      e->get_function_kind() == FunctionConsts::FN_ZORBA_XQDDF_PROBE_INDEX_POINT_GENERAL_N)
     return true;
 
   ExprIterator iter(e);
   while (!iter.done())
   {
-    if (containsValueProbe(**iter))
+    if (containsIndexProbe(**iter))
       return true;
     iter.next();
   }
@@ -265,56 +267,22 @@ expr* IndexJoinRule::apply(RewriterContext& rCtx, expr* node, bool& modified)
       const where_clause* wc = static_cast<const where_clause *>(c);
       expr* whereExpr = wc->get_expr();
 
+      // Only the first conjunct: the earlier ones decide for which tuples a later one is evaluated.
       PredicateInfo predInfo;
       predInfo.theFlworExpr = flworExpr;
       predInfo.theWherePos = i;
-      predInfo.thePredicate = whereExpr;
+      predInfo.thePredicate =
+        (whereExpr->get_function_kind() == FunctionConsts::OP_AND_N ?
+         static_cast<fo_expr*>(whereExpr)->get_arg(0) :
+         whereExpr);
 
       if (isIndexJoinPredicate(predInfo))
       {
         rewriteJoin(predInfo);
         modified = true;
 
-        if (!predInfo.theNormalizeKeys)
-          predInfo.theFlworExpr->remove_clause(c, i);
-
         ZORBA_ASSERT(theVarDefExprs.back() == node);
         return node;
-      }
-      else if (whereExpr->get_function_kind() == FunctionConsts::OP_AND_N)
-      {
-        // TODO: consider multi-key indices
-        ExprIterator iter(whereExpr);
-        while (!iter.done())
-        {
-          PredicateInfo predInfo;
-          predInfo.theFlworExpr = flworExpr;
-          predInfo.theWherePos = i;
-          predInfo.thePredicate = (**iter);
-          
-          if (isIndexJoinPredicate(predInfo))
-          {
-            rewriteJoin(predInfo);
-            
-            modified = true;
-
-            // TODO: just remove the pred instead of replacing it with true.
-            if (!predInfo.theNormalizeKeys)
-            {
-              expr* trueExpr = rCtx.theEM->
-              create_const_expr(flworExpr->get_sctx(),
-                                flworExpr->get_udf(),
-                                flworExpr->get_loc(),
-                                true);
-              (**iter) = trueExpr;
-            }
-              
-            ZORBA_ASSERT(theVarDefExprs.back() == node);
-            return node;
-          }
-
-          iter.next();
-        }
       }
     }
   }
@@ -569,9 +537,9 @@ bool IndexJoinRule::isIndexJoinPredicate(PredicateInfo& predInfo)
   if (innerVarClause->get_pos_var() != NULL)
     return false;
 
-  // The inner var is already bound to an index probe (the predicate may have
-  // been kept in the WHERE clause after a rewrite with normalized keys).
-  if (containsValueProbe(innerVarClause->get_expr()))
+  // The inner var is already bound to an index probe (the predicate is kept in
+  // the WHERE clause after a rewrite).
+  if (containsIndexProbe(innerVarClause->get_expr()))
     return false;
 
   // The inner var must not be an outer FOR var
@@ -583,44 +551,27 @@ bool IndexJoinRule::isIndexJoinPredicate(PredicateInfo& predInfo)
   if (!predInfo.theFlworExpr->defines_var(predInfo.theInnerVar))
     return false;
 
-  // There should be no COUNT clause and no sequential clauses between the
-  // WHERE clause and the inner var clause.
-  for (csize i = predInfo.theWherePos; i > 0; --i)
+  // A clause between the inner var clause and the WHERE clause would see only
+  // the tuples of the probe, not every inner tuple. Only a LET of a hoisted
+  // expr may be there: op:hoist keeps an error until the value is used.
+  for (csize i = predInfo.theWherePos; ; --i)
   {
+    if (i == 0)
+      return false;
+
     flwor_clause* c = predInfo.theFlworExpr->get_clause(i-1);
 
-    switch (c->get_kind())
-    {
-    case flwor_clause::for_clause:
-    case flwor_clause::let_clause:
-    case flwor_clause::window_clause:
-    {
-      forletwin_clause* flwc = static_cast<forletwin_clause*>(c);
-      if (flwc->get_expr()->is_sequential())
-        return false;
-
-      break;
-    }
-    case flwor_clause::count_clause:
-    {
-      return false;
-    }
-    case flwor_clause::orderby_clause:
-    case flwor_clause::where_clause:
-    {
-      break;
-    }
-    case flwor_clause::groupby_clause:
-    case flwor_clause::materialize_clause:
-    default:
-    {
-      ZORBA_ASSERT(false);
-    }
-    }
-    
     if (c == innerVarClause)
       break;
+
+    if (c->get_kind() != flwor_clause::let_clause ||
+        static_cast<forlet_clause*>(c)->get_expr()->get_function_kind() !=
+        FunctionConsts::OP_HOIST_1)
+      return false;
   }
+
+  if (innerVarClause->get_expr()->is_sequential())
+    return false;
 
   // Let OV be the outer LOOP var and BV be the inner-most non-LET variable that
   // the index expression depends on. The index must be created somewhere between
@@ -1275,7 +1226,47 @@ expr* IndexJoinRule::createNormalizedProbe(
 
 
 /*******************************************************************************
+  "try { tryExpr } catch * { catchExpr }"
+********************************************************************************/
+static expr* createCatchAll(
+    ExprManager* em,
+    expr* tryExpr,
+    expr* catchExpr,
+    static_context* sctx,
+    user_function* udf,
+    const QueryLoc& loc)
+{
+  trycatch_expr* trycatch = em->create_trycatch_expr(sctx, udf, loc, tryExpr);
+  trycatch->set_internal(true);
 
+  catch_clause* clause = em->create_catch_clause();
+  clause->add_nametest_h(new NodeNameTest(zstring(), zstring()));
+
+  trycatch->add_clause(clause);
+  trycatch->add_catch_expr(catchExpr);
+
+  return trycatch;
+}
+
+
+/*******************************************************************************
+  The index evaluates the inner domain and the inner operand of the predicate
+  before the outer tuples, and the outer operand once per outer tuple, also
+  where the query without the index evaluates neither: for an empty domain,
+  under an empty outer domain, after fn:exists() has its first item. An error
+  they raise there is not a result, so:
+
+    let $dummy := create-index(...)
+    ...
+    for $innerVar in try { probe(index, outerOp) } catch * { domain }
+    where predicate
+
+  The predicate stays in the WHERE clause. A build that raises leaves the index
+  unbound (CreateInternalIndexIterator), so every probe raises; an outer operand
+  that raises fails one probe. A failed probe gives the whole domain, and the
+  predicate evaluates what the query without the index evaluates, errors
+  included. The domain and the operands are deterministic (see
+  isIndexJoinPredicate()), so evaluating them again changes nothing else.
 ********************************************************************************/
 void IndexJoinRule::rewriteJoin(PredicateInfo& predInfo)
 {
@@ -1294,7 +1285,7 @@ void IndexJoinRule::rewriteJoin(PredicateInfo& predInfo)
   expr* indexDomainExpr = innerClause->get_expr();
   expandVars(indexDomainExpr, predInfo.theOuterVarId, predInfo.theInnerVarId);
 
-  expr* scanExpr = predInfo.theNormalizeKeys ? indexDomainExpr->clone(udf) : NULL;
+  expr* scanExpr = indexDomainExpr->clone(udf);
 
   //
   // Create the index declaration
@@ -1322,30 +1313,25 @@ void IndexJoinRule::rewriteJoin(PredicateInfo& predInfo)
   std::vector<xqtref_t> columnTypes(1);
   std::vector<OrderModifier> modifiers(1);
 
-  // The probe key: with normalized keys the predicate stays in the WHERE
-  // clause, so its operands are cloned instead of moved.
-  expr* probeKeyExpr = const_cast<expr*>(predInfo.theOuterOp);
+  // The predicate stays in the WHERE clause, so its operands are cloned.
+  expr::substitution_t subst;
+  subst[predInfo.theInnerVar] = idx->getDomainVariable();
+  expr* indexKeyExpr = predInfo.theInnerOp->clone(udf, subst);
+
+  expr* probeKeyExpr = predInfo.theOuterOp->clone(udf);
 
   if (predInfo.theNormalizeKeys)
   {
-    expr::substitution_t subst;
-    subst[predInfo.theInnerVar] = idx->getDomainVariable();
-
-    columnExprs[0] = createNormalizedKey(predInfo.theInnerOp->clone(udf, subst),
-                                         sctx, udf, loc);
+    columnExprs[0] = createNormalizedKey(indexKeyExpr, sctx, udf, loc);
     columnTypes[0] = GENV_TYPESYSTEM.STRING_TYPE_QUESTION;
-
-    probeKeyExpr = predInfo.theOuterOp->clone(udf);
   }
   else
   {
-    columnExprs[0] = predInfo.theInnerOp;
+    columnExprs[0] = indexKeyExpr;
 
     columnTypes[0] = (predInfo.theIsGeneral ?
                       NULL :
                       predInfo.theInnerOp->get_return_type());
-
-    expr_tools::replace_var(columnExprs[0], predInfo.theInnerVar, idx->getDomainVariable());
   }
 
   modifiers[0].theAscending = true;
@@ -1434,7 +1420,7 @@ void IndexJoinRule::rewriteJoin(PredicateInfo& predInfo)
                    loc,
                    BUILTIN_FUNC(FN_ZORBA_XQDDF_PROBE_INDEX_POINT_GENERAL_N),
                    qnameExpr,
-                   const_cast<expr*>(predInfo.theOuterOp));
+                   probeKeyExpr);
     
     probeExpr = em->
     create_fo_expr(sctx,
@@ -1445,7 +1431,8 @@ void IndexJoinRule::rewriteJoin(PredicateInfo& predInfo)
   }
   else if (predInfo.theNormalizeKeys)
   {
-    probeExpr = createNormalizedProbe(qnameExpr, probeKeyExpr, scanExpr, sctx, udf, loc);
+    probeExpr = createNormalizedProbe(qnameExpr, probeKeyExpr, scanExpr->clone(udf),
+                                      sctx, udf, loc);
   }
   else
   {
@@ -1458,19 +1445,13 @@ void IndexJoinRule::rewriteJoin(PredicateInfo& predInfo)
                    probeKeyExpr);
   }
 
-  if (predInfo.theNormalizeKeys)
-  {
-    DynamicBitset keyVars;
-    expr_tools::build_expr_to_vars_map(probeExpr,
-                                       *theVarIdMap,
-                                       keyVars,
-                                       *theExprVarsMap);
-  }
-  else
-  {
-    DynamicBitset probeVars = (*theExprVarsMap)[predInfo.theOuterOp];
-    (*theExprVarsMap)[probeExpr] = probeVars;
-  }
+  probeExpr = createCatchAll(em, probeExpr, scanExpr, sctx, udf, loc);
+
+  DynamicBitset probeVars;
+  expr_tools::build_expr_to_vars_map(probeExpr,
+                                     *theVarIdMap,
+                                     probeVars,
+                                     *theExprVarsMap);
 
   innerClause->set_expr(probeExpr);
 

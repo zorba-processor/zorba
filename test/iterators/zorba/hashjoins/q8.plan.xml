@@ -79,13 +79,36 @@
           <FnCountIterator>
             <FLWORIterator>
               <ForVariable name="t">
-                <ProbeIndexPointValueIterator>
-                  <SingletonIterator value="xs:QName(,,tempIndex0)"/>
+                <TryCatchIterator>
+                  <ProbeIndexPointValueIterator>
+                    <SingletonIterator value="xs:QName(,,tempIndex0)"/>
+                    <UnhoistIterator>
+                      <LetVarIterator varname="$$opt_temp_1"/>
+                    </UnhoistIterator>
+                  </ProbeIndexPointValueIterator>
                   <UnhoistIterator>
-                    <LetVarIterator varname="$$opt_temp_1"/>
+                    <LetVarIterator varname="$$opt_temp_0"/>
                   </UnhoistIterator>
-                </ProbeIndexPointValueIterator>
+                </TryCatchIterator>
               </ForVariable>
+              <WhereClause>
+                <FnBooleanIterator>
+                  <TypedValueCompareIterator_STRING>
+                    <CastIterator type="xs:string">
+                      <FnDataIterator>
+                        <AttributeAxisIterator test-kind="match_name_test" qname="xs:QName(,,person)" typename="*" nill-allowed="false">
+                          <ChildAxisIterator test-kind="match_name_test" qname="xs:QName(,,buyer)" typename="*" nill-allowed="false">
+                            <ForVarIterator varname="t"/>
+                          </ChildAxisIterator>
+                        </AttributeAxisIterator>
+                      </FnDataIterator>
+                    </CastIterator>
+                    <UnhoistIterator>
+                      <LetVarIterator varname="$$opt_temp_1"/>
+                    </UnhoistIterator>
+                  </TypedValueCompareIterator_STRING>
+                </FnBooleanIterator>
+              </WhereClause>
               <ReturnClause>
                 <ForVarIterator varname="t"/>
               </ReturnClause>

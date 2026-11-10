@@ -109,10 +109,12 @@ TryCatchIterator::TryCatchIterator(
     static_context* sctx,
     const QueryLoc& loc,
     PlanIter_t& aBlock,
-    std::vector<CatchClause>& aCatchClauses)
+    std::vector<CatchClause>& aCatchClauses,
+    bool isInternal)
   :
   UnaryBaseIterator<TryCatchIterator, TryCatchIteratorState> (sctx, loc, aBlock),
-  theCatchClauses(aCatchClauses)
+  theCatchClauses(aCatchClauses),
+  theIsInternal(isInternal)
 {
 }
 
@@ -680,6 +682,27 @@ TryCatchIterator::bindErrorVars(
 }
 
 
+bool isCatchable(ZorbaException const& e)
+{
+  // A timeout ends the query: a catch clause must not be able to resume it
+  // (for example inside an endless loop). So does running out of memory, which
+  // calls through the C++ API report as an internal error (fn:error() can raise
+  // that code too, and is a UserException).
+  return !(e.diagnostic() == zerr::ZXQP0068_QUERY_TIMEOUT ||
+           (!dynamic_cast<UserException const*>(&e) &&
+            e.diagnostic() == zerr::ZXQP0003_INTERNAL_ERROR &&
+            std::strstr(e.what(), "bad_alloc") != NULL));
+}
+
+
+bool isEngineFault(ZorbaException const& e)
+{
+  return (!dynamic_cast<UserException const*>(&e) &&
+          (e.diagnostic() == zerr::ZXQP0002_ASSERT_FAILED ||
+           e.diagnostic() == zerr::ZXQP0003_INTERNAL_ERROR));
+}
+
+
 bool
 TryCatchIterator::nextImpl(store::Item_t& result, PlanState& planState) const
 {
@@ -700,14 +723,8 @@ TryCatchIterator::nextImpl(store::Item_t& result, PlanState& planState) const
   }
   catch (ZorbaException const& e)
   {
-    // A timeout ends the query: a catch clause must not be able to resume it
-    // (for example inside an endless loop). So does running out of memory, which
-    // calls through the C++ API report as an internal error (fn:error() can raise
-    // that code too, and is a UserException).
-    if (e.diagnostic() == zerr::ZXQP0068_QUERY_TIMEOUT ||
-        (!dynamic_cast<UserException const*>(&e) &&
-         e.diagnostic() == zerr::ZXQP0003_INTERNAL_ERROR &&
-         std::strstr(e.what(), "bad_alloc") != NULL) ||
+    if (!isCatchable(e) ||
+        (theIsInternal && isEngineFault(e)) ||
         !matchedCatch(e, state, planState))
     {
       throw;

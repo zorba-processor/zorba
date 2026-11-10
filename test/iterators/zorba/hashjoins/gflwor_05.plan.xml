@@ -59,49 +59,64 @@
     </LetVariable>
     <LetVariable name="y" materialize="true">
       <TupleStreamIterator>
-        <ForIterator>
-          <ForVariable name="w"/>
-          <GroupByIterator>
-            <ForIterator>
-              <ForVariable name="z"/>
-              <TupleSourceIterator/>
-              <FnConcatIterator>
-                <ElementIterator copyInputNodes="false">
-                  <SingletonIterator value="xs:QName(,,b)"/>
-                  <TextIterator>
-                    <SingletonIterator value="xs:string(1)"/>
-                  </TextIterator>
-                </ElementIterator>
-                <ElementIterator copyInputNodes="false">
-                  <SingletonIterator value="xs:QName(,,b)"/>
-                  <TextIterator>
-                    <SingletonIterator value="xs:string(2)"/>
-                  </TextIterator>
-                </ElementIterator>
-                <ElementIterator copyInputNodes="false">
-                  <SingletonIterator value="xs:QName(,,b)"/>
-                  <TextIterator>
-                    <SingletonIterator value="xs:string(2)"/>
-                  </TextIterator>
-                </ElementIterator>
-              </FnConcatIterator>
-            </ForIterator>
-            <Spec>
-              <TreatIterator quant="?">
-                <FnDataIterator>
-                  <ForVarIterator varname="z"/>
-                </FnDataIterator>
-              </TreatIterator>
-              <GroupVariable/>
-            </Spec>
-          </GroupByIterator>
-          <ProbeIndexPointValueIterator>
-            <SingletonIterator value="xs:QName(,,tempIndex0)"/>
-            <UnhoistIterator>
-              <LetVarIterator varname="$$opt_temp_1"/>
-            </UnhoistIterator>
-          </ProbeIndexPointValueIterator>
-        </ForIterator>
+        <WhereIterator>
+          <ForIterator>
+            <ForVariable name="w"/>
+            <GroupByIterator>
+              <ForIterator>
+                <ForVariable name="z"/>
+                <TupleSourceIterator/>
+                <FnConcatIterator>
+                  <ElementIterator copyInputNodes="false">
+                    <SingletonIterator value="xs:QName(,,b)"/>
+                    <TextIterator>
+                      <SingletonIterator value="xs:string(1)"/>
+                    </TextIterator>
+                  </ElementIterator>
+                  <ElementIterator copyInputNodes="false">
+                    <SingletonIterator value="xs:QName(,,b)"/>
+                    <TextIterator>
+                      <SingletonIterator value="xs:string(2)"/>
+                    </TextIterator>
+                  </ElementIterator>
+                  <ElementIterator copyInputNodes="false">
+                    <SingletonIterator value="xs:QName(,,b)"/>
+                    <TextIterator>
+                      <SingletonIterator value="xs:string(2)"/>
+                    </TextIterator>
+                  </ElementIterator>
+                </FnConcatIterator>
+              </ForIterator>
+              <Spec>
+                <TreatIterator quant="?">
+                  <FnDataIterator>
+                    <ForVarIterator varname="z"/>
+                  </FnDataIterator>
+                </TreatIterator>
+                <GroupVariable/>
+              </Spec>
+            </GroupByIterator>
+            <TryCatchIterator>
+              <ProbeIndexPointValueIterator>
+                <SingletonIterator value="xs:QName(,,tempIndex0)"/>
+                <UnhoistIterator>
+                  <LetVarIterator varname="$$opt_temp_1"/>
+                </UnhoistIterator>
+              </ProbeIndexPointValueIterator>
+              <UnhoistIterator>
+                <LetVarIterator varname="$$opt_temp_0"/>
+              </UnhoistIterator>
+            </TryCatchIterator>
+          </ForIterator>
+          <FnBooleanIterator>
+            <TypedValueCompareIterator_INTEGER>
+              <ForVarIterator varname="w"/>
+              <UnhoistIterator>
+                <LetVarIterator varname="$$opt_temp_1"/>
+              </UnhoistIterator>
+            </TypedValueCompareIterator_INTEGER>
+          </FnBooleanIterator>
+        </WhereIterator>
         <ForVarIterator varname="w"/>
       </TupleStreamIterator>
     </LetVariable>

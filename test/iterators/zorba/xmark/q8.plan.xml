@@ -81,15 +81,34 @@
             <FnCountIterator>
               <FLWORIterator>
                 <ForVariable name="t">
-                  <NodeSortIterator distinct="true" ascending="true">
-                    <ProbeIndexPointGeneralIterator>
-                      <SingletonIterator value="xs:QName(,,tempIndex0)"/>
-                      <UnhoistIterator>
-                        <LetVarIterator varname="$$opt_temp_1"/>
-                      </UnhoistIterator>
-                    </ProbeIndexPointGeneralIterator>
-                  </NodeSortIterator>
+                  <TryCatchIterator>
+                    <NodeSortIterator distinct="true" ascending="true">
+                      <ProbeIndexPointGeneralIterator>
+                        <SingletonIterator value="xs:QName(,,tempIndex0)"/>
+                        <UnhoistIterator>
+                          <LetVarIterator varname="$$opt_temp_1"/>
+                        </UnhoistIterator>
+                      </ProbeIndexPointGeneralIterator>
+                    </NodeSortIterator>
+                    <UnhoistIterator>
+                      <LetVarIterator varname="$$opt_temp_0"/>
+                    </UnhoistIterator>
+                  </TryCatchIterator>
                 </ForVariable>
+                <WhereClause>
+                  <CompareIterator>
+                    <FnDataIterator>
+                      <AttributeAxisIterator test-kind="match_name_test" qname="xs:QName(,,person)" typename="*" nill-allowed="false">
+                        <ChildAxisIterator test-kind="match_name_test" qname="xs:QName(,,buyer)" typename="*" nill-allowed="false">
+                          <ForVarIterator varname="t"/>
+                        </ChildAxisIterator>
+                      </AttributeAxisIterator>
+                    </FnDataIterator>
+                    <UnhoistIterator>
+                      <LetVarIterator varname="$$opt_temp_1"/>
+                    </UnhoistIterator>
+                  </CompareIterator>
+                </WhereClause>
                 <ReturnClause>
                   <ForVarIterator varname="t"/>
                 </ReturnClause>

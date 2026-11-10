@@ -50,11 +50,26 @@
             <EnclosedIterator attr_cont="false">
               <FLWORIterator>
                 <ForVariable name="book">
-                  <ProbeIndexPointValueIterator>
-                    <SingletonIterator value="xs:QName(,,tempIndex0)"/>
-                    <ForVarIterator varname="anzahl"/>
-                  </ProbeIndexPointValueIterator>
+                  <TryCatchIterator>
+                    <ProbeIndexPointValueIterator>
+                      <SingletonIterator value="xs:QName(,,tempIndex0)"/>
+                      <ForVarIterator varname="anzahl"/>
+                    </ProbeIndexPointValueIterator>
+                    <UnhoistIterator>
+                      <LetVarIterator varname="$$opt_temp_0"/>
+                    </UnhoistIterator>
+                  </TryCatchIterator>
                 </ForVariable>
+                <WhereClause>
+                  <TypedValueCompareIterator_INTEGER>
+                    <FnCountIterator>
+                      <ChildAxisIterator test-kind="match_name_test" qname="xs:QName(,,author)" typename="*" nill-allowed="false">
+                        <ForVarIterator varname="book"/>
+                      </ChildAxisIterator>
+                    </FnCountIterator>
+                    <ForVarIterator varname="anzahl"/>
+                  </TypedValueCompareIterator_INTEGER>
+                </WhereClause>
                 <ReturnClause>
                   <ForVarIterator varname="book"/>
                 </ReturnClause>

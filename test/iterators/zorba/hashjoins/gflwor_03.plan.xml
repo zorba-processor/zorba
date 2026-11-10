@@ -165,13 +165,30 @@
                 <AttributeAxisIterator test-kind="match_name_test" qname="xs:QName(,,city)" typename="*" nill-allowed="false">
                   <FLWORIterator>
                     <ForVariable name="$$context-item">
-                      <ProbeIndexPointValueIterator>
-                        <SingletonIterator value="xs:QName(,,tempIndex0)"/>
+                      <TryCatchIterator>
+                        <ProbeIndexPointValueIterator>
+                          <SingletonIterator value="xs:QName(,,tempIndex0)"/>
+                          <UnhoistIterator>
+                            <ForVarIterator varname="$$opt_temp_1"/>
+                          </UnhoistIterator>
+                        </ProbeIndexPointValueIterator>
+                        <UnhoistIterator>
+                          <LetVarIterator varname="$$opt_temp_0"/>
+                        </UnhoistIterator>
+                      </TryCatchIterator>
+                    </ForVariable>
+                    <WhereClause>
+                      <TypedValueCompareIterator_STRING>
+                        <FnStringIterator>
+                          <AttributeAxisIterator test-kind="match_name_test" qname="xs:QName(,,id)" typename="*" nill-allowed="false">
+                            <ForVarIterator varname="$$context-item"/>
+                          </AttributeAxisIterator>
+                        </FnStringIterator>
                         <UnhoistIterator>
                           <ForVarIterator varname="$$opt_temp_1"/>
                         </UnhoistIterator>
-                      </ProbeIndexPointValueIterator>
-                    </ForVariable>
+                      </TypedValueCompareIterator_STRING>
+                    </WhereClause>
                     <ReturnClause>
                       <ForVarIterator varname="$$context-item"/>
                     </ReturnClause>

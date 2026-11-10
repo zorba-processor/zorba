@@ -1,0 +1,377 @@
+<iterator-tree description="main query">
+  <FLWORIterator>
+    <ForVariable name="doc">
+      <ElementIterator copyInputNodes="false">
+        <SingletonIterator value="xs:QName(,,d)"/>
+        <FnConcatIterator>
+          <ElementIterator copyInputNodes="false">
+            <SingletonIterator value="xs:QName(,,k)"/>
+            <TextIterator>
+              <SingletonIterator value="xs:string(1)"/>
+            </TextIterator>
+          </ElementIterator>
+          <ElementIterator copyInputNodes="false">
+            <SingletonIterator value="xs:QName(,,k)"/>
+            <TextIterator>
+              <SingletonIterator value="xs:string(1)"/>
+            </TextIterator>
+          </ElementIterator>
+          <ElementIterator copyInputNodes="false">
+            <SingletonIterator value="xs:QName(,,x)"/>
+            <TextIterator>
+              <SingletonIterator value="xs:string(1)"/>
+            </TextIterator>
+          </ElementIterator>
+          <ElementIterator copyInputNodes="false">
+            <SingletonIterator value="xs:QName(,,x)"/>
+            <TextIterator>
+              <SingletonIterator value="xs:string(abc)"/>
+            </TextIterator>
+          </ElementIterator>
+        </FnConcatIterator>
+      </ElementIterator>
+    </ForVariable>
+    <LetVariable name="$$opt_temp_2" materialize="true">
+      <HoistIterator>
+        <ChildAxisIterator test-kind="match_name_test" qname="xs:QName(,,x)" typename="*" nill-allowed="false">
+          <ForVarIterator varname="doc"/>
+        </ChildAxisIterator>
+      </HoistIterator>
+    </LetVariable>
+    <LetVariable name="$$opt_temp_0" materialize="true">
+      <HoistIterator>
+        <ChildAxisIterator test-kind="match_name_test" qname="xs:QName(,,x)" typename="*" nill-allowed="false">
+          <ForVarIterator varname="doc"/>
+        </ChildAxisIterator>
+      </HoistIterator>
+    </LetVariable>
+    <ReturnClause>
+      <StringJoinIterator>
+        <FnConcatIterator>
+          <ConcatStrIterator>
+            <SingletonIterator value="xs:string(=: )"/>
+            <PromoteIterator type="xs:anyAtomicType">
+              <FnDataIterator>
+                <TryCatchIterator>
+                  <StringJoinIterator>
+                    <FLWORIterator>
+                      <LetVariable name="$$opt_temp_8" materialize="true">
+                        <CreateInternalIndexIterator name="xs:QName(,,tempIndex0)">
+                          <FLWORIterator>
+                            <ForVariable name="$$opt_temp_6">
+                              <UnhoistIterator>
+                                <LetVarIterator varname="$$opt_temp_0"/>
+                              </UnhoistIterator>
+                            </ForVariable>
+                            <ReturnClause>
+                              <GeneralIndexEntryBuilderIterator>
+                                <ForVarIterator varname="$$opt_temp_6"/>
+                                <CastIterator type="xs:integer">
+                                  <FnDataIterator>
+                                    <ForVarIterator varname="$$opt_temp_6"/>
+                                  </FnDataIterator>
+                                </CastIterator>
+                              </GeneralIndexEntryBuilderIterator>
+                            </ReturnClause>
+                          </FLWORIterator>
+                        </CreateInternalIndexIterator>
+                      </LetVariable>
+                      <ForVariable name="a">
+                        <ChildAxisIterator test-kind="match_name_test" qname="xs:QName(,,k)" typename="*" nill-allowed="false">
+                          <ForVarIterator varname="doc"/>
+                        </ChildAxisIterator>
+                      </ForVariable>
+                      <LetVariable name="$$opt_temp_1" materialize="true">
+                        <HoistIterator>
+                          <CastIterator type="xs:integer">
+                            <FnDataIterator>
+                              <ForVarIterator varname="a"/>
+                            </FnDataIterator>
+                          </CastIterator>
+                        </HoistIterator>
+                      </LetVariable>
+                      <ReturnClause>
+                        <FnStringIterator>
+                          <FnExistsIterator>
+                            <FLWORIterator>
+                              <ForVariable name="b">
+                                <TryCatchIterator>
+                                  <NodeSortIterator distinct="true" ascending="true">
+                                    <ProbeIndexPointGeneralIterator>
+                                      <SingletonIterator value="xs:QName(,,tempIndex0)"/>
+                                      <UnhoistIterator>
+                                        <LetVarIterator varname="$$opt_temp_1"/>
+                                      </UnhoistIterator>
+                                    </ProbeIndexPointGeneralIterator>
+                                  </NodeSortIterator>
+                                  <UnhoistIterator>
+                                    <LetVarIterator varname="$$opt_temp_0"/>
+                                  </UnhoistIterator>
+                                </TryCatchIterator>
+                              </ForVariable>
+                              <WhereClause>
+                                <CompareIterator>
+                                  <CastIterator type="xs:integer">
+                                    <FnDataIterator>
+                                      <ForVarIterator varname="b"/>
+                                    </FnDataIterator>
+                                  </CastIterator>
+                                  <UnhoistIterator>
+                                    <LetVarIterator varname="$$opt_temp_1"/>
+                                  </UnhoistIterator>
+                                </CompareIterator>
+                              </WhereClause>
+                              <ReturnClause>
+                                <SingletonIterator value="xs:boolean(true)"/>
+                              </ReturnClause>
+                            </FLWORIterator>
+                          </FnExistsIterator>
+                        </FnStringIterator>
+                      </ReturnClause>
+                    </FLWORIterator>
+                    <SingletonIterator value="xs:string( )"/>
+                  </StringJoinIterator>
+                  <LocalNameFromQNameIterator>
+                    <LetVarIterator varname="code"/>
+                  </LocalNameFromQNameIterator>
+                </TryCatchIterator>
+              </FnDataIterator>
+            </PromoteIterator>
+          </ConcatStrIterator>
+          <ConcatStrIterator>
+            <SingletonIterator value="xs:string(eq: )"/>
+            <PromoteIterator type="xs:anyAtomicType">
+              <FnDataIterator>
+                <TryCatchIterator>
+                  <StringJoinIterator>
+                    <FLWORIterator>
+                      <LetVariable name="$$opt_temp_11" materialize="true">
+                        <CreateInternalIndexIterator name="xs:QName(,,tempIndex1)">
+                          <FLWORIterator>
+                            <ForVariable name="$$opt_temp_9">
+                              <UnhoistIterator>
+                                <LetVarIterator varname="$$opt_temp_2"/>
+                              </UnhoistIterator>
+                            </ForVariable>
+                            <ReturnClause>
+                              <ValueIndexEntryBuilderIterator>
+                                <ForVarIterator varname="$$opt_temp_9"/>
+                                <CastIterator type="xs:integer">
+                                  <FnDataIterator>
+                                    <ForVarIterator varname="$$opt_temp_9"/>
+                                  </FnDataIterator>
+                                </CastIterator>
+                              </ValueIndexEntryBuilderIterator>
+                            </ReturnClause>
+                          </FLWORIterator>
+                        </CreateInternalIndexIterator>
+                      </LetVariable>
+                      <ForVariable name="a">
+                        <ChildAxisIterator test-kind="match_name_test" qname="xs:QName(,,k)" typename="*" nill-allowed="false">
+                          <ForVarIterator varname="doc"/>
+                        </ChildAxisIterator>
+                      </ForVariable>
+                      <LetVariable name="$$opt_temp_3" materialize="true">
+                        <HoistIterator>
+                          <CastIterator type="xs:integer">
+                            <FnDataIterator>
+                              <ForVarIterator varname="a"/>
+                            </FnDataIterator>
+                          </CastIterator>
+                        </HoistIterator>
+                      </LetVariable>
+                      <ReturnClause>
+                        <FnStringIterator>
+                          <FnExistsIterator>
+                            <FLWORIterator>
+                              <ForVariable name="b">
+                                <TryCatchIterator>
+                                  <ProbeIndexPointValueIterator>
+                                    <SingletonIterator value="xs:QName(,,tempIndex1)"/>
+                                    <UnhoistIterator>
+                                      <LetVarIterator varname="$$opt_temp_3"/>
+                                    </UnhoistIterator>
+                                  </ProbeIndexPointValueIterator>
+                                  <UnhoistIterator>
+                                    <LetVarIterator varname="$$opt_temp_2"/>
+                                  </UnhoistIterator>
+                                </TryCatchIterator>
+                              </ForVariable>
+                              <WhereClause>
+                                <FnBooleanIterator>
+                                  <TypedValueCompareIterator_INTEGER>
+                                    <CastIterator type="xs:integer">
+                                      <FnDataIterator>
+                                        <ForVarIterator varname="b"/>
+                                      </FnDataIterator>
+                                    </CastIterator>
+                                    <UnhoistIterator>
+                                      <LetVarIterator varname="$$opt_temp_3"/>
+                                    </UnhoistIterator>
+                                  </TypedValueCompareIterator_INTEGER>
+                                </FnBooleanIterator>
+                              </WhereClause>
+                              <ReturnClause>
+                                <SingletonIterator value="xs:boolean(true)"/>
+                              </ReturnClause>
+                            </FLWORIterator>
+                          </FnExistsIterator>
+                        </FnStringIterator>
+                      </ReturnClause>
+                    </FLWORIterator>
+                    <SingletonIterator value="xs:string( )"/>
+                  </StringJoinIterator>
+                  <LocalNameFromQNameIterator>
+                    <LetVarIterator varname="code"/>
+                  </LocalNameFromQNameIterator>
+                </TryCatchIterator>
+              </FnDataIterator>
+            </PromoteIterator>
+          </ConcatStrIterator>
+          <ConcatStrIterator>
+            <SingletonIterator value="xs:string(=, one join per document: )"/>
+            <PromoteIterator type="xs:anyAtomicType">
+              <FnDataIterator>
+                <TryCatchIterator>
+                  <StringJoinIterator>
+                    <FLWORIterator>
+                      <ForVariable name="d">
+                        <FnConcatIterator>
+                          <ElementIterator copyInputNodes="false">
+                            <SingletonIterator value="xs:QName(,,d)"/>
+                            <FnConcatIterator>
+                              <ElementIterator copyInputNodes="false">
+                                <SingletonIterator value="xs:QName(,,k)"/>
+                                <TextIterator>
+                                  <SingletonIterator value="xs:string(1)"/>
+                                </TextIterator>
+                              </ElementIterator>
+                              <ElementIterator copyInputNodes="false">
+                                <SingletonIterator value="xs:QName(,,x)"/>
+                                <TextIterator>
+                                  <SingletonIterator value="xs:string(1)"/>
+                                </TextIterator>
+                              </ElementIterator>
+                            </FnConcatIterator>
+                          </ElementIterator>
+                          <ElementIterator copyInputNodes="false">
+                            <SingletonIterator value="xs:QName(,,d)"/>
+                            <FnConcatIterator>
+                              <ElementIterator copyInputNodes="false">
+                                <SingletonIterator value="xs:QName(,,k)"/>
+                                <TextIterator>
+                                  <SingletonIterator value="xs:string(2)"/>
+                                </TextIterator>
+                              </ElementIterator>
+                              <ElementIterator copyInputNodes="false">
+                                <SingletonIterator value="xs:QName(,,x)"/>
+                                <TextIterator>
+                                  <SingletonIterator value="xs:string(2)"/>
+                                </TextIterator>
+                              </ElementIterator>
+                              <ElementIterator copyInputNodes="false">
+                                <SingletonIterator value="xs:QName(,,x)"/>
+                                <TextIterator>
+                                  <SingletonIterator value="xs:string(abc)"/>
+                                </TextIterator>
+                              </ElementIterator>
+                            </FnConcatIterator>
+                          </ElementIterator>
+                        </FnConcatIterator>
+                      </ForVariable>
+                      <LetVariable name="$$opt_temp_4" materialize="true">
+                        <HoistIterator>
+                          <ChildAxisIterator test-kind="match_name_test" qname="xs:QName(,,x)" typename="*" nill-allowed="false">
+                            <ForVarIterator varname="d"/>
+                          </ChildAxisIterator>
+                        </HoistIterator>
+                      </LetVariable>
+                      <LetVariable name="$$opt_temp_14" materialize="true">
+                        <CreateInternalIndexIterator name="xs:QName(,,tempIndex2)">
+                          <FLWORIterator>
+                            <ForVariable name="$$opt_temp_12">
+                              <UnhoistIterator>
+                                <LetVarIterator varname="$$opt_temp_4"/>
+                              </UnhoistIterator>
+                            </ForVariable>
+                            <ReturnClause>
+                              <GeneralIndexEntryBuilderIterator>
+                                <ForVarIterator varname="$$opt_temp_12"/>
+                                <CastIterator type="xs:integer">
+                                  <FnDataIterator>
+                                    <ForVarIterator varname="$$opt_temp_12"/>
+                                  </FnDataIterator>
+                                </CastIterator>
+                              </GeneralIndexEntryBuilderIterator>
+                            </ReturnClause>
+                          </FLWORIterator>
+                        </CreateInternalIndexIterator>
+                      </LetVariable>
+                      <ForVariable name="a">
+                        <ChildAxisIterator test-kind="match_name_test" qname="xs:QName(,,k)" typename="*" nill-allowed="false">
+                          <ForVarIterator varname="d"/>
+                        </ChildAxisIterator>
+                      </ForVariable>
+                      <LetVariable name="$$opt_temp_5" materialize="true">
+                        <HoistIterator>
+                          <CastIterator type="xs:integer">
+                            <FnDataIterator>
+                              <ForVarIterator varname="a"/>
+                            </FnDataIterator>
+                          </CastIterator>
+                        </HoistIterator>
+                      </LetVariable>
+                      <ReturnClause>
+                        <FnStringIterator>
+                          <FnExistsIterator>
+                            <FLWORIterator>
+                              <ForVariable name="b">
+                                <TryCatchIterator>
+                                  <NodeSortIterator distinct="true" ascending="true">
+                                    <ProbeIndexPointGeneralIterator>
+                                      <SingletonIterator value="xs:QName(,,tempIndex2)"/>
+                                      <UnhoistIterator>
+                                        <LetVarIterator varname="$$opt_temp_5"/>
+                                      </UnhoistIterator>
+                                    </ProbeIndexPointGeneralIterator>
+                                  </NodeSortIterator>
+                                  <UnhoistIterator>
+                                    <LetVarIterator varname="$$opt_temp_4"/>
+                                  </UnhoistIterator>
+                                </TryCatchIterator>
+                              </ForVariable>
+                              <WhereClause>
+                                <CompareIterator>
+                                  <CastIterator type="xs:integer">
+                                    <FnDataIterator>
+                                      <ForVarIterator varname="b"/>
+                                    </FnDataIterator>
+                                  </CastIterator>
+                                  <UnhoistIterator>
+                                    <LetVarIterator varname="$$opt_temp_5"/>
+                                  </UnhoistIterator>
+                                </CompareIterator>
+                              </WhereClause>
+                              <ReturnClause>
+                                <SingletonIterator value="xs:boolean(true)"/>
+                              </ReturnClause>
+                            </FLWORIterator>
+                          </FnExistsIterator>
+                        </FnStringIterator>
+                      </ReturnClause>
+                    </FLWORIterator>
+                    <SingletonIterator value="xs:string( )"/>
+                  </StringJoinIterator>
+                  <LocalNameFromQNameIterator>
+                    <LetVarIterator varname="code"/>
+                  </LocalNameFromQNameIterator>
+                </TryCatchIterator>
+              </FnDataIterator>
+            </PromoteIterator>
+          </ConcatStrIterator>
+        </FnConcatIterator>
+        <SingletonIterator value="xs:string(&#xA;)"/>
+      </StringJoinIterator>
+    </ReturnClause>
+  </FLWORIterator>
+</iterator-tree>
