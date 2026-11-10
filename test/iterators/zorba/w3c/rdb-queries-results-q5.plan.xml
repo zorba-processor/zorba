@@ -25,27 +25,6 @@
               </NodeSortIterator>
             </HoistIterator>
           </LetVariable>
-          <LetVariable name="$$opt_temp_14" materialize="true">
-            <CreateInternalIndexIterator name="xs:QName(,,tempIndex0)">
-              <FLWORIterator>
-                <ForVariable name="$$opt_temp_12">
-                  <UnhoistIterator>
-                    <LetVarIterator varname="$$opt_temp_2"/>
-                  </UnhoistIterator>
-                </ForVariable>
-                <ReturnClause>
-                  <GeneralIndexEntryBuilderIterator>
-                    <ForVarIterator varname="$$opt_temp_12"/>
-                    <FnDataIterator>
-                      <ChildAxisIterator test-kind="match_name_test" qname="xs:QName(,,itemno)" typename="*" nill-allowed="false">
-                        <ForVarIterator varname="$$opt_temp_12"/>
-                      </ChildAxisIterator>
-                    </FnDataIterator>
-                  </GeneralIndexEntryBuilderIterator>
-                </ReturnClause>
-              </FLWORIterator>
-            </CreateInternalIndexIterator>
-          </LetVariable>
           <LetVariable name="$$opt_temp_1" materialize="true">
             <HoistIterator>
               <NodeSortIterator distinct="true" ascending="true">
@@ -214,14 +193,9 @@
             </HoistIterator>
           </ForVariable>
           <ForVariable name="highbid">
-            <NodeSortIterator distinct="true" ascending="true">
-              <ProbeIndexPointGeneralIterator>
-                <SingletonIterator value="xs:QName(,,tempIndex0)"/>
-                <UnhoistIterator>
-                  <LetVarIterator varname="$$opt_temp_6"/>
-                </UnhoistIterator>
-              </ProbeIndexPointGeneralIterator>
-            </NodeSortIterator>
+            <UnhoistIterator>
+              <LetVarIterator varname="$$opt_temp_2"/>
+            </UnhoistIterator>
           </ForVariable>
           <WhereClause>
             <AndIterator>
@@ -234,7 +208,16 @@
               <UnhoistIterator>
                 <ForVarIterator varname="$$opt_temp_5"/>
               </UnhoistIterator>
-              <SingletonIterator value="xs:boolean(true)"/>
+              <CompareIterator>
+                <UnhoistIterator>
+                  <LetVarIterator varname="$$opt_temp_6"/>
+                </UnhoistIterator>
+                <FnDataIterator>
+                  <ChildAxisIterator test-kind="match_name_test" qname="xs:QName(,,itemno)" typename="*" nill-allowed="false">
+                    <ForVarIterator varname="highbid"/>
+                  </ChildAxisIterator>
+                </FnDataIterator>
+              </CompareIterator>
               <CompareIterator>
                 <FnDataIterator>
                   <ChildAxisIterator test-kind="match_name_test" qname="xs:QName(,,userid)" typename="*" nill-allowed="false">
