@@ -168,6 +168,7 @@ void SchemaValidatorFilter::reset()
 
   XMLString::release(&theProcessorStipulatedTypeName, fMemoryManager);
   theProcessorStipulatedTypeUriId = -1;
+  theHasTypeEntry.clear();
 }
 
 
@@ -354,6 +355,7 @@ void SchemaValidatorFilter::processStartElement()
       //validate element even if lax but has xsi:type
       fValidator->validateElement(elemDecl);
   }
+  theHasTypeEntry.push_back(fValidate || theXsiType);
 
 
   ComplexTypeInfo* typeinfo =
@@ -726,7 +728,10 @@ void SchemaValidatorFilter::endElementEvent(
   // We commandeer fCommentOrPISeen to keep _errorOccurred in
   theErrorOccurred = topElem->fCommentOrPISeen;
 
-  if(fValidate || theXsiType)
+  const bool hasTypeEntry = theHasTypeEntry.back();
+  theHasTypeEntry.pop_back();
+
+  if(hasTypeEntry)
   {
     DatatypeValidator *currentDV = 0;
     if(topElem->fThisElement->isDeclared())

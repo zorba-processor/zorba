@@ -122,6 +122,10 @@ private:
 
   const XMLCh                                 * theXsiType;
 
+  // for every open element, whether it took an entry of the type stack of
+  // theSchemaValidator, which checkContent pops at its end
+  std::vector<bool>                             theHasTypeEntry;
+
   unsigned int                                  theAttrCount;
 
   ValidationEventHandler                      * theEventBuffer;

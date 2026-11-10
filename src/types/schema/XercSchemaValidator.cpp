@@ -84,7 +84,7 @@ XercSchemaValidator::XercSchemaValidator( XMLErrorReporter* const errReporter
     , fMostRecentAttrValidator(0)
     , fErrorOccurred(false)
     , fElemIsSpecified(false)
-    , fStipulatedTypeIsSimple(false)
+    , fHasStipulatedType(false)
 {
     fTrailingSeenNonWhiteSpace.flags = 0;
     fTypeStack = new (fMemoryManager) ValueStackOf<ComplexTypeInfo*>(8, fMemoryManager);
@@ -128,13 +128,14 @@ bool XercSchemaValidator::checkContent (XMLElementDecl* const elemDecl
 
     ComplexTypeInfo* currType = fTypeStack->pop();
     //std::cout << "      xsv - : checkcontent   pop \n"; std::cout.flush();
-    // The root validated against a stipulated simple type has simple content,
-    // whatever the declaration of its name says.
-    const bool isStipulatedSimpleRoot = fStipulatedTypeIsSimple && fTypeStack->empty();
+    // The declaration of the name of a root validated against a stipulated type
+    // does not apply: a simple type gives simple content, and there is no default,
+    // fixed value or nillable.
+    const bool isStipulatedRoot = fHasStipulatedType && fTypeStack->empty();
 
     const SchemaElementDecl::ModelTypes modelType = (currType)
             ? (SchemaElementDecl::ModelTypes)(currType->getContentType())
-            : isStipulatedSimpleRoot ? SchemaElementDecl::Simple
+            : isStipulatedRoot ? SchemaElementDecl::Simple
             : ((SchemaElementDecl*)elemDecl)->getModelType();
 
     if (modelType == SchemaElementDecl::Empty  ||
@@ -200,7 +201,8 @@ bool XercSchemaValidator::checkContent (XMLElementDecl* const elemDecl
         else
         {
             XMLCh* value = fDatatypeBuffer.getRawBuffer();
-            XMLCh* elemDefaultValue = ((SchemaElementDecl*) elemDecl)->getDefaultValue();
+            XMLCh* elemDefaultValue = isStipulatedRoot ? 0 : ((SchemaElementDecl*) elemDecl)->getDefaultValue();
+            const int elemMiscFlags = isStipulatedRoot ? 0 : ((SchemaElementDecl*) elemDecl)->getMiscFlags();
 
             if (fCurrentDatatypeValidator)
             {
@@ -258,7 +260,7 @@ bool XercSchemaValidator::checkContent (XMLElementDecl* const elemDecl
                             // is neither the one in the element nor the one in the current
                             // complex type (if any)
                             if ((fCurrentDatatypeValidator != ((SchemaElementDecl*)elemDecl)->getDatatypeValidator())
-                                && (!fTypeStack->peek() || (fCurrentDatatypeValidator != fTypeStack->peek()->getDatatypeValidator()))) {
+                                && (!((SchemaElementDecl*)elemDecl)->getComplexTypeInfo() || (fCurrentDatatypeValidator != ((SchemaElementDecl*)elemDecl)->getComplexTypeInfo()->getDatatypeValidator()))) {
                                 value = elemDefaultValue;
                                 validateCanonical = true;
                             }
@@ -269,7 +271,7 @@ bool XercSchemaValidator::checkContent (XMLElementDecl* const elemDecl
                         {
                             // this element has specified some value
                             // if the flag is FIXED, then this value must be same as default value
-                            if ((((SchemaElementDecl*)elemDecl)->getMiscFlags() & SchemaSymbols::XSD_FIXED) != 0)
+                            if ((elemMiscFlags & SchemaSymbols::XSD_FIXED) != 0)
                             {
                                 if (fCurrentDatatypeValidator->compare(value, elemDefaultValue, fMemoryManager) != 0 )
                                 {
@@ -283,7 +285,7 @@ bool XercSchemaValidator::checkContent (XMLElementDecl* const elemDecl
                     {
                         // no default value, then check nillable
                         if (XMLString::equals(value, XMLUni::fgZeroLenString)
-                            && (((SchemaElementDecl*)elemDecl)->getMiscFlags() & SchemaSymbols::XSD_NILLABLE) != 0)
+                            && (elemMiscFlags & SchemaSymbols::XSD_NILLABLE) != 0)
                                 value = 0;
                     }
 
@@ -373,7 +375,7 @@ void XercSchemaValidator::reset()
     fTrailingSeenNonWhiteSpace.flags = 0;
     fSeenId = false;
     fTypeStack->removeAllElements();
-    fStipulatedTypeIsSimple = false;
+    fHasStipulatedType = false;
     //std::cout << "      xsv - : reset \n"; std::cout.flush();
 
     delete fXsiType;
@@ -906,7 +908,7 @@ void XercSchemaValidator::validateProcessorStipulatedTypeName(const   XMLElement
 
     // checkContent pops one entry for every element, a simple type included
     fTypeStack->push(stipulatedTypeInfo);
-    fStipulatedTypeIsSimple = !stipulatedTypeInfo;
+    fHasStipulatedType = true;
 
     fDatatypeBuffer.reset();
     fTrailingSeenNonWhiteSpace.flags = 0;
@@ -2295,7 +2297,7 @@ XercSchemaValidator::XercSchemaValidator( XMLErrorReporter* const errReporter
     , fMostRecentAttrValidator(0)
     , fErrorOccurred(false)
     , fElemIsSpecified(false)
-    , fStipulatedTypeIsSimple(false)
+    , fHasStipulatedType(false)
 {
     fTypeStack = new (fMemoryManager) ValueStackOf<ComplexTypeInfo*>(8, fMemoryManager);
 }
@@ -2336,13 +2338,14 @@ int XercSchemaValidator::checkContent (XMLElementDecl* const elemDecl
     }
 
     ComplexTypeInfo* currType = fTypeStack->pop();
-    // The root validated against a stipulated simple type has simple content,
-    // whatever the declaration of its name says.
-    const bool isStipulatedSimpleRoot = fStipulatedTypeIsSimple && fTypeStack->empty();
+    // The declaration of the name of a root validated against a stipulated type
+    // does not apply: a simple type gives simple content, and there is no default,
+    // fixed value or nillable.
+    const bool isStipulatedRoot = fHasStipulatedType && fTypeStack->empty();
 
     const SchemaElementDecl::ModelTypes modelType = (currType)
             ? (SchemaElementDecl::ModelTypes)(currType->getContentType())
-            : isStipulatedSimpleRoot ? SchemaElementDecl::Simple
+            : isStipulatedRoot ? SchemaElementDecl::Simple
             : ((SchemaElementDecl*)elemDecl)->getModelType();
 
     if (modelType == SchemaElementDecl::Empty)
@@ -2411,7 +2414,8 @@ int XercSchemaValidator::checkContent (XMLElementDecl* const elemDecl
         else
         {
             XMLCh* value = fDatatypeBuffer.getRawBuffer();
-            XMLCh* elemDefaultValue = ((SchemaElementDecl*) elemDecl)->getDefaultValue();
+            XMLCh* elemDefaultValue = isStipulatedRoot ? 0 : ((SchemaElementDecl*) elemDecl)->getDefaultValue();
+            const int elemMiscFlags = isStipulatedRoot ? 0 : ((SchemaElementDecl*) elemDecl)->getMiscFlags();
 
             if (fCurrentDatatypeValidator)
             {
@@ -2465,7 +2469,7 @@ int XercSchemaValidator::checkContent (XMLElementDecl* const elemDecl
                             // is neither the one in the element nor the one in the current
                             // complex type (if any)
                             if ((fCurrentDatatypeValidator != ((SchemaElementDecl*)elemDecl)->getDatatypeValidator())
-                                && (!fTypeStack->peek() || (fCurrentDatatypeValidator != fTypeStack->peek()->getDatatypeValidator()))) {
+                                && (!((SchemaElementDecl*)elemDecl)->getComplexTypeInfo() || (fCurrentDatatypeValidator != ((SchemaElementDecl*)elemDecl)->getComplexTypeInfo()->getDatatypeValidator()))) {
                                 value = elemDefaultValue;
                                 validateCanonical = true;
                             }
@@ -2476,7 +2480,7 @@ int XercSchemaValidator::checkContent (XMLElementDecl* const elemDecl
                         {
                             // this element has specified some value
                             // if the flag is FIXED, then this value must be same as default value
-                            if ((((SchemaElementDecl*)elemDecl)->getMiscFlags() & SchemaSymbols::XSD_FIXED) != 0)
+                            if ((elemMiscFlags & SchemaSymbols::XSD_FIXED) != 0)
                             {
                                 if (fCurrentDatatypeValidator->compare(value, elemDefaultValue, fMemoryManager) != 0 )
                                 {
@@ -2490,7 +2494,7 @@ int XercSchemaValidator::checkContent (XMLElementDecl* const elemDecl
                     {
                         // no default value, then check nillable
                         if (XMLString::equals(value, XMLUni::fgZeroLenString)
-                            && (((SchemaElementDecl*)elemDecl)->getMiscFlags() & SchemaSymbols::XSD_NILLABLE) != 0)
+                            && (elemMiscFlags & SchemaSymbols::XSD_NILLABLE) != 0)
                                 value = 0;
                     }
 
@@ -2580,7 +2584,7 @@ void XercSchemaValidator::reset()
     fTrailing = false;
     fSeenId = false;
     fTypeStack->removeAllElements();
-    fStipulatedTypeIsSimple = false;
+    fHasStipulatedType = false;
     delete fXsiType;
     fXsiType = 0;
     fCurrentDatatypeValidator = 0;
@@ -3123,7 +3127,7 @@ void XercSchemaValidator::validateProcessorStipulatedTypeName(const   XMLElement
 
     // checkContent pops one entry for every element, a simple type included
     fTypeStack->push(stipulatedTypeInfo);
-    fStipulatedTypeIsSimple = !stipulatedTypeInfo;
+    fHasStipulatedType = true;
 
     fDatatypeBuffer.reset();
     fTrailing = false;
