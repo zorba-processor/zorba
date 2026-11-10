@@ -256,10 +256,10 @@ FOREACH(TESTFILE ${TESTFILES})
 
     ZORBA_ADD_TEST("${TESTNAME}" testdriver ${TESTFILE})
     # The window, array member, dynamic function call, iteration-updates, copy
-    # modify target and empty for domain tests must give the same results at
-    # every optimization level (the testdriver reads ZORBA_OPTLEVEL; the default
-    # is O1).
-    IF (TESTNAME MATCHES "^test/rbkt/zorba/(jsoniq-windows|jsoniq-array-members|dynamic-calls|iteration-updates|updates/transform-targets|empty-domain)/")
+    # modify target, empty for domain and hash join key error tests must give
+    # the same results at every optimization level (the testdriver reads
+    # ZORBA_OPTLEVEL; the default is O1).
+    IF (TESTNAME MATCHES "^test/rbkt/zorba/(jsoniq-windows|jsoniq-array-members|dynamic-calls|iteration-updates|updates/transform-targets|empty-domain|hashjoin-key-errors)/")
       FOREACH (_optlevel O0 O2)
         ZORBA_ADD_TEST("${TESTNAME}-${_optlevel}" testdriver ${TESTFILE})
         SET_TESTS_PROPERTIES ("${TESTNAME}-${_optlevel}" PROPERTIES
