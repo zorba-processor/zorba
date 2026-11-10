@@ -817,7 +817,7 @@ void* thread_main(void* param)
 done:
     if (failure)
     {
-      zorba::AutoMutex(queries->theQueryLocks[queryNo]);
+      zorba::AutoMutex queryLock(queries->theQueryLocks[queryNo]);
       queries->theQueryStates[queryNo] = false;
     }
 

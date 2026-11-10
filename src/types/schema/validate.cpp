@@ -188,7 +188,7 @@ bool Validator::realValidationValue(
 
 #ifndef ZORBA_NO_XMLSCHEMA
 
-  SYNC_CODE(AutoMutex(GENV_TYPESYSTEM.getXercesMutex());)
+  // No Xerces lock here: the Schema calls below take it, and it is not recursive.
 
   EventSchemaValidator schemaValidator =
     EventSchemaValidator(typeManager,
