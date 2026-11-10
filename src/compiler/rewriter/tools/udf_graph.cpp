@@ -307,7 +307,12 @@ bool UDFGraph::inferDeterminism(UDFNode* node, ulong visit)
                   ERROR_PARAMS(node->theUDF->getName()->getStringValue()));
     }
 
-    node->theUDF->setDeterministic(deterministic);
+    // Inference only turns a function nondeterministic: a %an:nondeterministic
+    // annotation stays whatever the body does.
+    if (!deterministic)
+      node->theUDF->setDeterministic(false);
+
+    deterministic = node->theUDF->isDeterministic();
   }
 
   return deterministic;

@@ -306,6 +306,7 @@ declare %an:nondeterministic function random:random() as xs:integer external;
 
 If not specified otherwise, all functions are being treated as deterministic.
 If some function invokes a nondeterministic function, the invoking function itself must also be declared as nondeterministc, otherwise zerr::ZXQP0040 is raised.
+A function declared nondeterministic stays nondeterministic even if its body calls no nondeterministic function.
 
 
 \paragraph sequential_annotation Sequential Functions
