@@ -3479,6 +3479,32 @@ void test_sweep_casts( Fixture const &f ) {
   (void)f;
 #endif
 }
+// Additions of each numeric type, compiled and run: a failed allocation is out of
+// memory, never an arithmetic or cast error, and the compilation is held to that
+// too (not lenient).
+void test_sweep_arithmetic( Fixture const &f ) {
+#if defined(__linux__)
+  auto const query = []( int a, int b ) {
+    std::string const x( std::to_string( a ) ), y( std::to_string( b ) );
+    return "string-join((string(" + x + " + " + y + "), string(xs:integer(\"" +
+           x + "\") + " + y + "), string(" + x + ".5 + " + y + ".25), string(" +
+           x + ".5e0 + " + y + "e0)), ' ')";
+  };
+  Sweep s;
+  s.query = query( 1, 2 );
+  s.before.push_back( query( 5, 6 ) );
+  s.expected = "\"3 3 3.75 3.5\"";
+  s.wrong = { "FOAR0001", "FOAR0002", "FOCA" };
+  s.points = 100000;                // all of them
+  // As in test_sweep_compile.
+  s.known = { exact( "exit 2", 2 ), library_crash( "signal 6 in libstdc", true, 2 ),
+              exact( "terminate St9bad_alloc", 2, 8 ) };
+  s.compiles = true;
+  exhaust_sweep( f, "arithmetic", s );
+#else
+  (void)f;
+#endif
+}
 // While a query compiles: errors of the compiler are allowed, for now.
 void test_sweep_compile( Fixture const &f ) {
 #if defined(__linux__)
@@ -7690,6 +7716,7 @@ Test const tests[] = {
   { "exhaust_sweep_json", test_sweep_json },
   { "exhaust_sweep_csv", test_sweep_csv },
   { "exhaust_sweep_casts", test_sweep_casts },
+  { "exhaust_sweep_arithmetic", test_sweep_arithmetic },
   { "exhaust_sweep_decimal_thread", test_sweep_decimal_thread },
   { "exhaust_sweep_cache", test_sweep_cache },
   { "exhaust_sweep_kept_malloc", test_sweep_kept_malloc },
