@@ -2530,7 +2530,11 @@ bool DateTimeItem::equals(
 {
   try
   {
-    return 0 == theValue.compare(&aItem->getDateTimeValue(), timezone);
+    // eq does not compare different date/time types (xs:dateTimeStamp is an
+    // xs:dateTime), which share the normalized data of the same instant.
+    const DateTime& other = aItem->getDateTimeValue();
+    return theValue.getFacet() == other.getFacet() &&
+           0 == theValue.compare(&other, timezone);
   }
   catch (InvalidTimezoneException const &e)
   {
