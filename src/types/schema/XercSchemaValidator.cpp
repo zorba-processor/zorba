@@ -84,6 +84,7 @@ XercSchemaValidator::XercSchemaValidator( XMLErrorReporter* const errReporter
     , fMostRecentAttrValidator(0)
     , fErrorOccurred(false)
     , fElemIsSpecified(false)
+    , fStipulatedTypeIsSimple(false)
 {
     fTrailingSeenNonWhiteSpace.flags = 0;
     fTypeStack = new (fMemoryManager) ValueStackOf<ComplexTypeInfo*>(8, fMemoryManager);
@@ -127,9 +128,13 @@ bool XercSchemaValidator::checkContent (XMLElementDecl* const elemDecl
 
     ComplexTypeInfo* currType = fTypeStack->pop();
     //std::cout << "      xsv - : checkcontent   pop \n"; std::cout.flush();
+    // The root validated against a stipulated simple type has simple content,
+    // whatever the declaration of its name says.
+    const bool isStipulatedSimpleRoot = fStipulatedTypeIsSimple && fTypeStack->empty();
 
     const SchemaElementDecl::ModelTypes modelType = (currType)
             ? (SchemaElementDecl::ModelTypes)(currType->getContentType())
+            : isStipulatedSimpleRoot ? SchemaElementDecl::Simple
             : ((SchemaElementDecl*)elemDecl)->getModelType();
 
     if (modelType == SchemaElementDecl::Empty  ||
@@ -368,6 +373,7 @@ void XercSchemaValidator::reset()
     fTrailingSeenNonWhiteSpace.flags = 0;
     fSeenId = false;
     fTypeStack->removeAllElements();
+    fStipulatedTypeIsSimple = false;
     //std::cout << "      xsv - : reset \n"; std::cout.flush();
 
     delete fXsiType;
@@ -779,6 +785,7 @@ void XercSchemaValidator::validateElement(const   XMLElementDecl*  elemDef)
 void XercSchemaValidator::validateProcessorStipulatedTypeName(const   XMLElementDecl*  elemDef)
 {
     fErrorOccurred = false;
+    ComplexTypeInfo* stipulatedTypeInfo = 0;
 
     if (fXsiType)
     {
@@ -864,7 +871,7 @@ void XercSchemaValidator::validateProcessorStipulatedTypeName(const   XMLElement
 
                             if (!fErrorOccurred)
                             {
-                                fTypeStack->push(typeInfo);
+                                stipulatedTypeInfo = typeInfo;
                                 fCurrentDatatypeValidator = typeInfo->getDatatypeValidator();
                                 //std::cout << "  xsv - : valElem4 push " <<  (typeInfo ? StrX(typeInfo->getTypeLocalName()).localForm() : "_") << "\n"; std::cout.flush();
                             }
@@ -896,6 +903,10 @@ void XercSchemaValidator::validateProcessorStipulatedTypeName(const   XMLElement
     {
         ZORBA_ASSERT(false);
     }
+
+    // checkContent pops one entry for every element, a simple type included
+    fTypeStack->push(stipulatedTypeInfo);
+    fStipulatedTypeIsSimple = !stipulatedTypeInfo;
 
     fDatatypeBuffer.reset();
     fTrailingSeenNonWhiteSpace.flags = 0;
@@ -2284,6 +2295,7 @@ XercSchemaValidator::XercSchemaValidator( XMLErrorReporter* const errReporter
     , fMostRecentAttrValidator(0)
     , fErrorOccurred(false)
     , fElemIsSpecified(false)
+    , fStipulatedTypeIsSimple(false)
 {
     fTypeStack = new (fMemoryManager) ValueStackOf<ComplexTypeInfo*>(8, fMemoryManager);
 }
@@ -2324,9 +2336,13 @@ int XercSchemaValidator::checkContent (XMLElementDecl* const elemDecl
     }
 
     ComplexTypeInfo* currType = fTypeStack->pop();
+    // The root validated against a stipulated simple type has simple content,
+    // whatever the declaration of its name says.
+    const bool isStipulatedSimpleRoot = fStipulatedTypeIsSimple && fTypeStack->empty();
 
     const SchemaElementDecl::ModelTypes modelType = (currType)
             ? (SchemaElementDecl::ModelTypes)(currType->getContentType())
+            : isStipulatedSimpleRoot ? SchemaElementDecl::Simple
             : ((SchemaElementDecl*)elemDecl)->getModelType();
 
     if (modelType == SchemaElementDecl::Empty)
@@ -2564,6 +2580,7 @@ void XercSchemaValidator::reset()
     fTrailing = false;
     fSeenId = false;
     fTypeStack->removeAllElements();
+    fStipulatedTypeIsSimple = false;
     delete fXsiType;
     fXsiType = 0;
     fCurrentDatatypeValidator = 0;
@@ -2983,6 +3000,7 @@ void XercSchemaValidator::validateElement(const   XMLElementDecl*  elemDef)
 void XercSchemaValidator::validateProcessorStipulatedTypeName(const   XMLElementDecl*  elemDef)
 {
     fErrorOccurred = false;
+    ComplexTypeInfo* stipulatedTypeInfo = 0;
 
     if (fXsiType)
     {
@@ -3071,7 +3089,7 @@ void XercSchemaValidator::validateProcessorStipulatedTypeName(const   XMLElement
 
                             if (!fErrorOccurred)
                             {
-                                fTypeStack->push(typeInfo);
+                                stipulatedTypeInfo = typeInfo;
                                 fCurrentDatatypeValidator = typeInfo->getDatatypeValidator();
                             }
                         }
@@ -3102,6 +3120,10 @@ void XercSchemaValidator::validateProcessorStipulatedTypeName(const   XMLElement
     {
         ZORBA_ASSERT(false);
     }
+
+    // checkContent pops one entry for every element, a simple type included
+    fTypeStack->push(stipulatedTypeInfo);
+    fStipulatedTypeIsSimple = !stipulatedTypeInfo;
 
     fDatatypeBuffer.reset();
     fTrailing = false;
