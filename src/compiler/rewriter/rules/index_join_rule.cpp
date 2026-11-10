@@ -526,10 +526,24 @@ bool IndexJoinRule::isIndexJoinPredicate(PredicateInfo& predInfo)
   if (!predInfo.theFlworExpr->defines_var(predInfo.theInnerVar))
     return false;
 
-  // Directly: a clause in between would see only the tuples of the probe, not every inner tuple.
-  if (predInfo.theWherePos == 0 ||
-      predInfo.theFlworExpr->get_clause(predInfo.theWherePos - 1) != innerVarClause)
-    return false;
+  // A clause between the inner var clause and the WHERE clause would see only
+  // the tuples of the probe, not every inner tuple. Only a LET of a hoisted
+  // expr may be there: op:hoist keeps an error until the value is used.
+  for (csize i = predInfo.theWherePos; ; --i)
+  {
+    if (i == 0)
+      return false;
+
+    flwor_clause* c = predInfo.theFlworExpr->get_clause(i-1);
+
+    if (c == innerVarClause)
+      break;
+
+    if (c->get_kind() != flwor_clause::let_clause ||
+        static_cast<forlet_clause*>(c)->get_expr()->get_function_kind() !=
+        FunctionConsts::OP_HOIST_1)
+      return false;
+  }
 
   if (innerVarClause->get_expr()->is_sequential())
     return false;

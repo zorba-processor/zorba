@@ -49,13 +49,26 @@
       </HoistIterator>
     </ForVariable>
     <ForVariable name="er">
-      <ProbeIndexPointValueIterator>
-        <SingletonIterator value="xs:QName(,,tempIndex0)"/>
+      <TryCatchIterator>
+        <ProbeIndexPointValueIterator>
+          <SingletonIterator value="xs:QName(,,tempIndex0)"/>
+          <UnhoistIterator>
+            <ForVarIterator varname="$$opt_temp_1"/>
+          </UnhoistIterator>
+        </ProbeIndexPointValueIterator>
+        <UnhoistIterator>
+          <LetVarIterator varname="$$opt_temp_0"/>
+        </UnhoistIterator>
+      </TryCatchIterator>
+    </ForVariable>
+    <WhereClause>
+      <TypedValueCompareIterator_INTEGER>
         <UnhoistIterator>
           <ForVarIterator varname="$$opt_temp_1"/>
         </UnhoistIterator>
-      </ProbeIndexPointValueIterator>
-    </ForVariable>
+        <ForVarIterator varname="er"/>
+      </TypedValueCompareIterator_INTEGER>
+    </WhereClause>
     <ReturnClause>
       <ElementIterator>
         <SingletonIterator value="xs:QName(,,gruppe)"/>

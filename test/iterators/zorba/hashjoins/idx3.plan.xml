@@ -8,25 +8,21 @@
 <iterator-tree description="main query">
   <FunctionTraceIterator>
     <FLWORIterator>
+      <ForVariable name="repl">
+        <ElementIterator copyInputNodes="false">
+          <SingletonIterator value="xs:QName(,,b)"/>
+        </ElementIterator>
+      </ForVariable>
       <LetVariable name="$$opt_temp_3" materialize="true">
         <CreateInternalIndexIterator name="xs:QName(,,tempIndex0)">
-          <FLWORIterator>
-            <ForVariable name="$$opt_temp_1">
-              <ElementIterator copyInputNodes="false">
-                <SingletonIterator value="xs:QName(,,b)"/>
-              </ElementIterator>
-            </ForVariable>
-            <ReturnClause>
-              <ValueIndexEntryBuilderIterator>
-                <ForVarIterator varname="$$opt_temp_1"/>
-                <FnStringIterator>
-                  <NodeNameIterator>
-                    <ForVarIterator varname="$$opt_temp_1"/>
-                  </NodeNameIterator>
-                </FnStringIterator>
-              </ValueIndexEntryBuilderIterator>
-            </ReturnClause>
-          </FLWORIterator>
+          <ValueIndexEntryBuilderIterator>
+            <ForVarIterator varname="repl"/>
+            <FnStringIterator>
+              <NodeNameIterator>
+                <ForVarIterator varname="repl"/>
+              </NodeNameIterator>
+            </FnStringIterator>
+          </ValueIndexEntryBuilderIterator>
         </CreateInternalIndexIterator>
       </LetVariable>
       <ForVariable name="rec">
@@ -63,21 +59,46 @@
           </ChildAxisIterator>
         </NodeSortIterator>
       </ForVariable>
+      <ForVariable name="$$opt_temp_0">
+        <HoistIterator>
+          <FnStringIterator>
+            <NodeNameIterator>
+              <ForVarIterator varname="rec"/>
+            </NodeNameIterator>
+          </FnStringIterator>
+        </HoistIterator>
+      </ForVariable>
       <ReturnClause>
         <IfThenElseIterator>
           <FnBooleanIterator>
-            <ProbeIndexPointValueIterator>
-              <SingletonIterator value="xs:QName(,,tempIndex0)"/>
-              <UnhoistIterator>
-                <HoistIterator>
+            <FLWORIterator>
+              <ForVariable name="$$context-item">
+                <TryCatchIterator>
+                  <ProbeIndexPointValueIterator>
+                    <SingletonIterator value="xs:QName(,,tempIndex0)"/>
+                    <UnhoistIterator>
+                      <ForVarIterator varname="$$opt_temp_0"/>
+                    </UnhoistIterator>
+                  </ProbeIndexPointValueIterator>
+                  <ForVarIterator varname="repl"/>
+                </TryCatchIterator>
+              </ForVariable>
+              <WhereClause>
+                <TypedValueCompareIterator_STRING>
                   <FnStringIterator>
                     <NodeNameIterator>
-                      <ForVarIterator varname="rec"/>
+                      <ForVarIterator varname="$$context-item"/>
                     </NodeNameIterator>
                   </FnStringIterator>
-                </HoistIterator>
-              </UnhoistIterator>
-            </ProbeIndexPointValueIterator>
+                  <UnhoistIterator>
+                    <ForVarIterator varname="$$opt_temp_0"/>
+                  </UnhoistIterator>
+                </TypedValueCompareIterator_STRING>
+              </WhereClause>
+              <ReturnClause>
+                <ForVarIterator varname="$$context-item"/>
+              </ReturnClause>
+            </FLWORIterator>
           </FnBooleanIterator>
           <FnConcatIterator/>
           <ForVarIterator varname="rec"/>

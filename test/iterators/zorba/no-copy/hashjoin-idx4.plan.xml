@@ -45,18 +45,21 @@
           </TreatIterator>
         </HoistIterator>
       </ForVariable>
+      <LetVariable name="$$opt_temp_0" materialize="true">
+        <HoistIterator>
+          <InScopePrefixesIterator>
+            <TreatIterator quant="">
+              <LetVarIterator varname="parent"/>
+            </TreatIterator>
+          </InScopePrefixesIterator>
+        </HoistIterator>
+      </LetVariable>
       <LetVariable name="$$opt_temp_7" materialize="true">
         <CreateInternalIndexIterator name="xs:QName(,,tempIndex0)">
           <FLWORIterator>
             <ForVariable name="$$opt_temp_5">
               <UnhoistIterator>
-                <HoistIterator>
-                  <InScopePrefixesIterator>
-                    <TreatIterator quant="">
-                      <LetVarIterator varname="parent"/>
-                    </TreatIterator>
-                  </InScopePrefixesIterator>
-                </HoistIterator>
+                <LetVarIterator varname="$$opt_temp_0"/>
               </UnhoistIterator>
             </ForVariable>
             <ReturnClause>
@@ -90,7 +93,7 @@
           <ConcatStrIterator>
             <SingletonIterator value="xs:string(xmlns:)"/>
             <ForVarIterator varname="prefixE"/>
-            <SingletonIterator value="xs:string(=&quot;)"/>
+            <SingletonIterator value="xs:string(=&quot)"/>
           </ConcatStrIterator>
         </HoistIterator>
       </ForVariable>
@@ -105,13 +108,22 @@
         </HoistIterator>
       </LetVariable>
       <ForVariable name="prefixP">
-        <ProbeIndexPointValueIterator>
-          <SingletonIterator value="xs:QName(,,tempIndex0)"/>
-          <ForVarIterator varname="prefixE"/>
-        </ProbeIndexPointValueIterator>
+        <TryCatchIterator>
+          <ProbeIndexPointValueIterator>
+            <SingletonIterator value="xs:QName(,,tempIndex0)"/>
+            <ForVarIterator varname="prefixE"/>
+          </ProbeIndexPointValueIterator>
+          <UnhoistIterator>
+            <LetVarIterator varname="$$opt_temp_0"/>
+          </UnhoistIterator>
+        </TryCatchIterator>
       </ForVariable>
       <WhereClause>
-        <FnBooleanIterator>
+        <AndIterator>
+          <TypedValueCompareIterator_STRING>
+            <ForVarIterator varname="prefixE"/>
+            <ForVarIterator varname="prefixP"/>
+          </TypedValueCompareIterator_STRING>
           <CompareIterator>
             <UnhoistIterator>
               <LetVarIterator varname="$$opt_temp_1"/>
@@ -123,7 +135,7 @@
               </UnhoistIterator>
             </NamespaceUriForPrefixIterator>
           </CompareIterator>
-        </FnBooleanIterator>
+        </AndIterator>
       </WhereClause>
       <ReturnClause>
         <FnConcatIterator>
@@ -149,7 +161,7 @@
                     </UnhoistIterator>
                   </EnclosedIterator>
                 </ElementIterator>
-                <SingletonIterator value="xs:string(&quot;)"/>
+                <SingletonIterator value="xs:string(&quot)"/>
               </FnConcatIterator>
             </EnclosedIterator>
           </ElementIterator>

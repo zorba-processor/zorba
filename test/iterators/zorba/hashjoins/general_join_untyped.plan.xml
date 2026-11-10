@@ -79,15 +79,30 @@
       <FnCountIterator>
         <FLWORIterator>
           <ForVariable name="b">
-            <NodeSortIterator distinct="true" ascending="true">
-              <ProbeIndexPointGeneralIterator>
-                <SingletonIterator value="xs:QName(,,tempIndex0)"/>
-                <UnhoistIterator>
-                  <ForVarIterator varname="$$opt_temp_1"/>
-                </UnhoistIterator>
-              </ProbeIndexPointGeneralIterator>
-            </NodeSortIterator>
+            <TryCatchIterator>
+              <NodeSortIterator distinct="true" ascending="true">
+                <ProbeIndexPointGeneralIterator>
+                  <SingletonIterator value="xs:QName(,,tempIndex0)"/>
+                  <UnhoistIterator>
+                    <ForVarIterator varname="$$opt_temp_1"/>
+                  </UnhoistIterator>
+                </ProbeIndexPointGeneralIterator>
+              </NodeSortIterator>
+              <UnhoistIterator>
+                <LetVarIterator varname="$$opt_temp_0"/>
+              </UnhoistIterator>
+            </TryCatchIterator>
           </ForVariable>
+          <WhereClause>
+            <CompareIterator>
+              <FnDataIterator>
+                <ForVarIterator varname="b"/>
+              </FnDataIterator>
+              <UnhoistIterator>
+                <ForVarIterator varname="$$opt_temp_1"/>
+              </UnhoistIterator>
+            </CompareIterator>
+          </WhereClause>
           <ReturnClause>
             <ForVarIterator varname="b"/>
           </ReturnClause>

@@ -75,13 +75,28 @@
       </CountIterator>
       <FLWORIterator>
         <ForVariable name="z">
-          <ProbeIndexPointValueIterator>
-            <SingletonIterator value="xs:QName(,,tempIndex0)"/>
+          <TryCatchIterator>
+            <ProbeIndexPointValueIterator>
+              <SingletonIterator value="xs:QName(,,tempIndex0)"/>
+              <UnhoistIterator>
+                <LetVarIterator varname="$$opt_temp_1"/>
+              </UnhoistIterator>
+            </ProbeIndexPointValueIterator>
             <UnhoistIterator>
-              <LetVarIterator varname="$$opt_temp_1"/>
+              <LetVarIterator varname="$$opt_temp_0"/>
             </UnhoistIterator>
-          </ProbeIndexPointValueIterator>
+          </TryCatchIterator>
         </ForVariable>
+        <WhereClause>
+          <FnBooleanIterator>
+            <TypedValueCompareIterator_INTEGER>
+              <UnhoistIterator>
+                <LetVarIterator varname="$$opt_temp_1"/>
+              </UnhoistIterator>
+              <ForVarIterator varname="z"/>
+            </TypedValueCompareIterator_INTEGER>
+          </FnBooleanIterator>
+        </WhereClause>
         <ReturnClause>
           <ForVarIterator varname="z"/>
         </ReturnClause>
@@ -103,7 +118,7 @@
           </FnConcatIterator>
         </EnclosedIterator>
       </ElementIterator>
-      <SingletonIterator value="xs:string(&#xA;)"/>
+      <SingletonIterator value="xs:string(&#xA)"/>
     </FnConcatIterator>
   </TupleStreamIterator>
 </iterator-tree>

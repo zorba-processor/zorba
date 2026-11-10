@@ -46,11 +46,26 @@
               <EnclosedIterator attr_cont="true">
                 <FLWORIterator>
                   <ForVariable name="karte">
-                    <ProbeIndexPointValueIterator>
-                      <SingletonIterator value="xs:QName(,,tempIndex0)"/>
-                      <ForVarIterator varname="anzahl"/>
-                    </ProbeIndexPointValueIterator>
+                    <TryCatchIterator>
+                      <ProbeIndexPointValueIterator>
+                        <SingletonIterator value="xs:QName(,,tempIndex0)"/>
+                        <ForVarIterator varname="anzahl"/>
+                      </ProbeIndexPointValueIterator>
+                      <UnhoistIterator>
+                        <LetVarIterator varname="$$opt_temp_0"/>
+                      </UnhoistIterator>
+                    </TryCatchIterator>
                   </ForVariable>
+                  <WhereClause>
+                    <TypedValueCompareIterator_INTEGER>
+                      <ForVarIterator varname="anzahl"/>
+                      <FnCountIterator>
+                        <ChildAxisIterator test-kind="match_name_test" qname="xs:QName(,,author)" typename="*" nill-allowed="false">
+                          <ForVarIterator varname="karte"/>
+                        </ChildAxisIterator>
+                      </FnCountIterator>
+                    </TypedValueCompareIterator_INTEGER>
+                  </WhereClause>
                   <ReturnClause>
                     <ForVarIterator varname="anzahl"/>
                   </ReturnClause>

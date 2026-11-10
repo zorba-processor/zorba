@@ -79,13 +79,32 @@
               </ElementIterator>
               <FLWORIterator>
                 <ForVariable name="t">
-                  <NodeSortIterator distinct="true" ascending="true">
-                    <ProbeIndexPointGeneralIterator>
-                      <SingletonIterator value="xs:QName(,,tempIndex0)"/>
-                      <ForVarIterator varname="i"/>
-                    </ProbeIndexPointGeneralIterator>
-                  </NodeSortIterator>
+                  <TryCatchIterator>
+                    <NodeSortIterator distinct="true" ascending="true">
+                      <ProbeIndexPointGeneralIterator>
+                        <SingletonIterator value="xs:QName(,,tempIndex0)"/>
+                        <ForVarIterator varname="i"/>
+                      </ProbeIndexPointGeneralIterator>
+                    </NodeSortIterator>
+                    <UnhoistIterator>
+                      <LetVarIterator varname="$$opt_temp_0"/>
+                    </UnhoistIterator>
+                  </TryCatchIterator>
                 </ForVariable>
+                <WhereClause>
+                  <CompareIterator>
+                    <FnDataIterator>
+                      <AttributeAxisIterator test-kind="match_name_test" qname="xs:QName(,,category)" typename="*" nill-allowed="false">
+                        <ChildAxisIterator test-kind="match_name_test" qname="xs:QName(,,interest)" typename="*" nill-allowed="false">
+                          <ChildAxisIterator test-kind="match_name_test" qname="xs:QName(,,profile)" typename="*" nill-allowed="false">
+                            <ForVarIterator varname="t"/>
+                          </ChildAxisIterator>
+                        </ChildAxisIterator>
+                      </AttributeAxisIterator>
+                    </FnDataIterator>
+                    <ForVarIterator varname="i"/>
+                  </CompareIterator>
+                </WhereClause>
                 <ReturnClause>
                   <ElementIterator>
                     <SingletonIterator value="xs:QName(,,personne)"/>

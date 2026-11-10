@@ -84,11 +84,28 @@
         <SingletonIterator value="xs:string(:)"/>
         <FLWORIterator>
           <ForVariable name="$$context-item">
-            <ProbeIndexPointValueIterator>
-              <SingletonIterator value="xs:QName(,,tempIndex0)"/>
-              <ForVarIterator varname="furi"/>
-            </ProbeIndexPointValueIterator>
+            <TryCatchIterator>
+              <ProbeIndexPointValueIterator>
+                <SingletonIterator value="xs:QName(,,tempIndex0)"/>
+                <ForVarIterator varname="furi"/>
+              </ProbeIndexPointValueIterator>
+              <UnhoistIterator>
+                <LetVarIterator varname="$$opt_temp_2"/>
+              </UnhoistIterator>
+            </TryCatchIterator>
           </ForVariable>
+          <WhereClause>
+            <TypedValueCompareIterator_STRING>
+              <FnStringIterator>
+                <TreatIterator quant="?">
+                  <ChildAxisIterator test-kind="match_name_test" qname="xs:QName(http://www.xqdoc.org/1.0,xqdoc,uri)" typename="*" nill-allowed="false">
+                    <ForVarIterator varname="$$context-item"/>
+                  </ChildAxisIterator>
+                </TreatIterator>
+              </FnStringIterator>
+              <ForVarIterator varname="furi"/>
+            </TypedValueCompareIterator_STRING>
+          </WhereClause>
           <ReturnClause>
             <ForVarIterator varname="$$context-item"/>
           </ReturnClause>
