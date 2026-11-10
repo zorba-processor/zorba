@@ -1162,7 +1162,8 @@ RULE_REWRITE_POST(InlineFunctions)
           return bind_args_in_lets(rCtx, const_cast<fo_expr*>(fo));
       }
 
-      if (//!udf->isSequential() &&
+      // An inlined sequential body would leave its local variables bound in the caller.
+      if (!udf->isSequential() &&
           (
             !udf->getAnnotationList() ||
             (!udf->getAnnotationList()->contains(AnnotationInternal::zann_cache) &&
