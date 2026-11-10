@@ -85,6 +85,8 @@ protected:
 
   bool matchKeyExpr(expr* qexpr, expr* vexpr, expr::substitution_t& subst);
 
+  bool sameCollation(csize keyPos, const fo_expr* comparison) const;
+
   bool checkFreeVars(
       const expr* qexpr,
       const var_expr* domVar,

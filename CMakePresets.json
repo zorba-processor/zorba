@@ -280,7 +280,7 @@
       },
       "filter": {
         "include": {
-          "name": "bin/mcp/(scan_|exhaust_injected|exhaust_sweep)"
+          "name": "bin/(mcp/(scan_|exhaust_injected|exhaust_sweep)|db/scan_listing)"
         }
       },
       "environment": {

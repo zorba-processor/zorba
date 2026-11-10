@@ -121,6 +121,9 @@
                                                                       <ForVariable name="v">
                                                                         <FunctionTraceIterator prof-calls="2" prof-next-calls="8" prof-cpu="0.177297" prof-wall="0.172643" prof-name="FunctionTraceIterator">
                                                                           <FLWORIterator prof-calls="2" prof-next-calls="8" prof-cpu="0.160763" prof-wall="0.156131" prof-name="FLWORIterator">
+                                                                            <ForVariable name="i">
+                                                                              <ForVarIterator varname="i" prof-calls="2" prof-next-calls="4" prof-cpu="0" prof-wall="0" prof-name="ForVarIterator ($i)"/>
+                                                                            </ForVariable>
                                                                             <ForVariable name="$$opt_temp_0">
                                                                               <HoistIterator prof-calls="2" prof-next-calls="4" prof-cpu="0.02215" prof-wall="0.019376" prof-name="HoistIterator">
                                                                                 <TreatIterator type="[JSONXQType object]" quant="" prof-calls="2" prof-next-calls="4" prof-cpu="0.013717" prof-wall="0.0109" prof-name="TreatIterator">
@@ -171,6 +174,9 @@
                                                                                         <ForVariable name="v">
                                                                                           <FunctionTraceIterator prof-calls="2" prof-next-calls="6" prof-cpu="0.13382" prof-wall="0.130101" prof-name="FunctionTraceIterator">
                                                                                             <FLWORIterator prof-calls="2" prof-next-calls="6" prof-cpu="0.122073" prof-wall="0.118236" prof-name="FLWORIterator">
+                                                                                              <ForVariable name="i">
+                                                                                                <ForVarIterator varname="i" prof-calls="2" prof-next-calls="4" prof-cpu="0" prof-wall="0" prof-name="ForVarIterator ($i)"/>
+                                                                                              </ForVariable>
                                                                                               <ForVariable name="$$opt_temp_0">
                                                                                                 <HoistIterator prof-calls="2" prof-next-calls="4" prof-cpu="0.023214" prof-wall="0.020444" prof-name="HoistIterator">
                                                                                                   <TreatIterator type="[JSONXQType object]" quant="" prof-calls="2" prof-next-calls="4" prof-cpu="0.013336" prof-wall="0.010567" prof-name="TreatIterator">
@@ -382,6 +388,9 @@
                                                                             <ForVariable name="v">
                                                                               <FunctionTraceIterator prof-calls="2" prof-next-calls="8" prof-cpu="0.274014" prof-wall="0.269375" prof-name="FunctionTraceIterator">
                                                                                 <FLWORIterator prof-calls="2" prof-next-calls="8" prof-cpu="0.256867" prof-wall="0.252272" prof-name="FLWORIterator">
+                                                                                  <ForVariable name="i">
+                                                                                    <ForVarIterator varname="i" prof-calls="2" prof-next-calls="4" prof-cpu="0" prof-wall="0" prof-name="ForVarIterator ($i)"/>
+                                                                                  </ForVariable>
                                                                                   <ForVariable name="$$opt_temp_0">
                                                                                     <HoistIterator prof-calls="2" prof-next-calls="4" prof-cpu="0.020491" prof-wall="0.017708" prof-name="HoistIterator">
                                                                                       <TreatIterator type="[JSONXQType object]" quant="" prof-calls="2" prof-next-calls="4" prof-cpu="0.012556" prof-wall="0.00977" prof-name="TreatIterator">
@@ -432,6 +441,9 @@
                                                                                               <ForVariable name="v">
                                                                                                 <FunctionTraceIterator prof-calls="2" prof-next-calls="6" prof-cpu="0.137438" prof-wall="0.133688" prof-name="FunctionTraceIterator">
                                                                                                   <FLWORIterator prof-calls="2" prof-next-calls="6" prof-cpu="0.126618" prof-wall="0.122881" prof-name="FLWORIterator">
+                                                                                                    <ForVariable name="i">
+                                                                                                      <ForVarIterator varname="i" prof-calls="2" prof-next-calls="4" prof-cpu="0" prof-wall="0" prof-name="ForVarIterator ($i)"/>
+                                                                                                    </ForVariable>
                                                                                                     <ForVariable name="$$opt_temp_0">
                                                                                                       <HoistIterator prof-calls="2" prof-next-calls="4" prof-cpu="0.020397" prof-wall="0.017632" prof-name="HoistIterator">
                                                                                                         <TreatIterator type="[JSONXQType object]" quant="" prof-calls="2" prof-next-calls="4" prof-cpu="0.012259" prof-wall="0.009464" prof-name="TreatIterator">

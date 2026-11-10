@@ -784,7 +784,7 @@ inline bool operator==( FloatImpl<F> const &f, double d ) {
 
 template<typename F>
 inline bool operator==( double d, FloatImpl<F> const &f ) {
-  return d = f.getNumber();
+  return d == f.getNumber();
 }
 
 template<typename F>

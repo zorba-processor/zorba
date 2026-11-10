@@ -120,9 +120,22 @@ void PlanWrapper::open()
   if (!theHasParent)
     thePlanState->setDeadline(thePlanState->theTimeout);
 
-  uint32_t offset = 0;
-  theIterator->open(*thePlanState, offset);
+  PlanState::CreatedStates created;
+  thePlanState->theCreatedStates = &created;
 
+  uint32_t offset = 0;
+  try
+  {
+    theIterator->open(*thePlanState, offset);
+  }
+  catch (...)
+  {
+    thePlanState->theCreatedStates = NULL;
+    created.destroyAll(*thePlanState);
+    throw;
+  }
+
+  thePlanState->theCreatedStates = NULL;
   theIsOpen = true;
 }
 

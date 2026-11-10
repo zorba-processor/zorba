@@ -19,6 +19,7 @@
 
 #include <chrono>
 #include <stack>
+#include <vector>
 
 #include "common/shared_types.h"
 
@@ -146,10 +147,64 @@ class QueryResources;
 
   theCompletedCall: The call in this plan that completed last and has its body
                     still open (see UDFunctionCallIteratorState::bodyCompleted).
+
+  theCreatedStates: While PlanWrapper::open() runs, the states created so far
+                    in theBlock, in order, with the function that destroys
+                    each: if the open fails, close() cannot run (it would reach
+                    iterators whose state was never created), so PlanWrapper
+                    destroys these. NULL at all other times. The first
+                    INLINE_SIZE entries need no allocation, so that opening a
+                    plan of that many states allocates nothing more.
 ********************************************************************************/
 class PlanState
 {
 public:
+  class CreatedStates
+  {
+  public:
+    typedef void (*Destroy)(PlanState&, uint32_t);
+
+    static constexpr std::size_t INLINE_SIZE = 128;
+
+    void push(uint32_t offset, Destroy destroy)
+    {
+      if (theSize < INLINE_SIZE)
+        theInline[theSize] = Entry{offset, destroy};
+      else
+        theMore.push_back(Entry{offset, destroy});
+      ++theSize;
+    }
+
+    void pop()
+    {
+      --theSize;
+      if (theSize >= INLINE_SIZE)
+        theMore.pop_back();
+    }
+
+    void destroyAll(PlanState& planState)
+    {
+      while (theSize > 0)
+      {
+        --theSize;
+        const Entry& e = (theSize < INLINE_SIZE ? theInline[theSize]
+                                                : theMore[theSize - INLINE_SIZE]);
+        e.destroy(planState, e.offset);
+      }
+    }
+
+  private:
+    struct Entry
+    {
+      uint32_t offset;
+      Destroy  destroy;
+    };
+
+    Entry              theInline[INLINE_SIZE];
+    std::size_t        theSize = 0;
+    std::vector<Entry> theMore;
+  };
+
   int8_t                  * theBlock;
 
   uint32_t                  theBlockSize;
@@ -187,6 +242,8 @@ public:
   bool                      theHasUDFCalls;
 
   class UDFunctionCallIteratorState * theCompletedCall;
+
+  CreatedStates           * theCreatedStates;
 
 public:
   PlanState(
@@ -442,7 +499,25 @@ public:
   {
     stateOffset = offset;
     offset += StateTraitsImpl<T>::getStateSize();
-    new (planState.theBlock + stateOffset)T();
+
+    // Listed before it is constructed, so that a failure to list it never
+    // destroys a state that init() has not set up yet.
+    if (planState.theCreatedStates == NULL)
+    {
+      new (planState.theBlock + stateOffset)T();
+      return;
+    }
+
+    planState.theCreatedStates->push(stateOffset, &destroyState);
+    try
+    {
+      new (planState.theBlock + stateOffset)T();
+    }
+    catch (...)
+    {
+      planState.theCreatedStates->pop();
+      throw;
+    }
   }
 
   static void initState(PlanState& planState, uint32_t& stateOffset)

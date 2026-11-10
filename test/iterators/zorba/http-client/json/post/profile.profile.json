@@ -708,6 +708,21 @@
                                                                                                                                                       "iterators": [
                                                                                                                                                         {
                                                                                                                                                           "kind": "ForVariable",
+                                                                                                                                                          "name": "i",
+                                                                                                                                                          "iterators": [
+                                                                                                                                                            {
+                                                                                                                                                              "kind": "ForVarIterator",
+                                                                                                                                                              "varname": "i",
+                                                                                                                                                              "prof-calls": 2,
+                                                                                                                                                              "prof-next-calls": 4,
+                                                                                                                                                              "prof-cpu": 0,
+                                                                                                                                                              "prof-wall": 0,
+                                                                                                                                                              "prof-name": "ForVarIterator ($i)"
+                                                                                                                                                            }
+                                                                                                                                                          ]
+                                                                                                                                                        },
+                                                                                                                                                        {
+                                                                                                                                                          "kind": "ForVariable",
                                                                                                                                                           "name": "$$opt_temp_0",
                                                                                                                                                           "iterators": [
                                                                                                                                                             {
@@ -978,6 +993,21 @@
                                                                                                                                                                                           "prof-wall": 0.065702,
                                                                                                                                                                                           "prof-name": "FLWORIterator",
                                                                                                                                                                                           "iterators": [
+                                                                                                                                                                                            {
+                                                                                                                                                                                              "kind": "ForVariable",
+                                                                                                                                                                                              "name": "i",
+                                                                                                                                                                                              "iterators": [
+                                                                                                                                                                                                {
+                                                                                                                                                                                                  "kind": "ForVarIterator",
+                                                                                                                                                                                                  "varname": "i",
+                                                                                                                                                                                                  "prof-calls": 2,
+                                                                                                                                                                                                  "prof-next-calls": 4,
+                                                                                                                                                                                                  "prof-cpu": 0,
+                                                                                                                                                                                                  "prof-wall": 0,
+                                                                                                                                                                                                  "prof-name": "ForVarIterator ($i)"
+                                                                                                                                                                                                }
+                                                                                                                                                                                              ]
+                                                                                                                                                                                            },
                                                                                                                                                                                             {
                                                                                                                                                                                               "kind": "ForVariable",
                                                                                                                                                                                               "name": "$$opt_temp_0",
@@ -2058,6 +2088,21 @@
                                                                                                                                                                   "iterators": [
                                                                                                                                                                     {
                                                                                                                                                                       "kind": "ForVariable",
+                                                                                                                                                                      "name": "i",
+                                                                                                                                                                      "iterators": [
+                                                                                                                                                                        {
+                                                                                                                                                                          "kind": "ForVarIterator",
+                                                                                                                                                                          "varname": "i",
+                                                                                                                                                                          "prof-calls": 2,
+                                                                                                                                                                          "prof-next-calls": 4,
+                                                                                                                                                                          "prof-cpu": 0,
+                                                                                                                                                                          "prof-wall": 0,
+                                                                                                                                                                          "prof-name": "ForVarIterator ($i)"
+                                                                                                                                                                        }
+                                                                                                                                                                      ]
+                                                                                                                                                                    },
+                                                                                                                                                                    {
+                                                                                                                                                                      "kind": "ForVariable",
                                                                                                                                                                       "name": "$$opt_temp_0",
                                                                                                                                                                       "iterators": [
                                                                                                                                                                         {
@@ -2328,6 +2373,21 @@
                                                                                                                                                                                                       "prof-wall": 0.063563,
                                                                                                                                                                                                       "prof-name": "FLWORIterator",
                                                                                                                                                                                                       "iterators": [
+                                                                                                                                                                                                        {
+                                                                                                                                                                                                          "kind": "ForVariable",
+                                                                                                                                                                                                          "name": "i",
+                                                                                                                                                                                                          "iterators": [
+                                                                                                                                                                                                            {
+                                                                                                                                                                                                              "kind": "ForVarIterator",
+                                                                                                                                                                                                              "varname": "i",
+                                                                                                                                                                                                              "prof-calls": 2,
+                                                                                                                                                                                                              "prof-next-calls": 4,
+                                                                                                                                                                                                              "prof-cpu": 0,
+                                                                                                                                                                                                              "prof-wall": 0,
+                                                                                                                                                                                                              "prof-name": "ForVarIterator ($i)"
+                                                                                                                                                                                                            }
+                                                                                                                                                                                                          ]
+                                                                                                                                                                                                        },
                                                                                                                                                                                                         {
                                                                                                                                                                                                           "kind": "ForVariable",
                                                                                                                                                                                                           "name": "$$opt_temp_0",

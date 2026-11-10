@@ -3479,6 +3479,35 @@ void test_sweep_casts( Fixture const &f ) {
   (void)f;
 #endif
 }
+// Additions of each numeric type, compiled and run: a failed allocation is out of
+// memory, never an arithmetic or cast error, and the compilation is held to that
+// too (not lenient).
+void test_sweep_arithmetic( Fixture const &f ) {
+#if defined(__linux__)
+  auto const query = []( int a, int b ) {
+    std::string const x( std::to_string( a ) ), y( std::to_string( b ) );
+    return "string-join((string(" + x + " + " + y + "), string(xs:integer(\"" +
+           x + "\") + " + y + "), string(" + x + ".5 + " + y + ".25), string(" +
+           x + ".5e0 + " + y + "e0)), ' ')";
+  };
+  Sweep s;
+  s.query = query( 1, 2 );
+  s.before.push_back( query( 5, 6 ) );
+  s.expected = "\"3 3 3.75 3.5\"";
+  s.wrong = { "FOAR0001", "FOAR0002", "FOCA" };
+  s.points = 100000;                // all of them
+  // As in test_sweep_compile: the scanner calls exit(2), and std::bad_alloc
+  // leaves a noexcept function while the parser is set up (xquery_parser's
+  // constructor). Caps: about 1.5 times the most seen (exit 2: 3 alone,
+  // quick-check run 42784334470).
+  s.known = { exact( "exit 2", 5 ), library_crash( "signal 6 in libstdc", true, 2 ),
+              exact( "terminate St9bad_alloc", 2 ) };
+  s.compiles = true;
+  exhaust_sweep( f, "arithmetic", s );
+#else
+  (void)f;
+#endif
+}
 // While a query compiles: errors of the compiler are allowed, for now.
 void test_sweep_compile( Fixture const &f ) {
 #if defined(__linux__)
@@ -3622,6 +3651,59 @@ void test_plan_wrapper_out_of_memory( Fixture const &f ) {
 # if defined(__SANITIZE_ADDRESS__)
   check( __lsan_do_recoverable_leak_check() == 0,
          "iterator() failing: nothing is left behind" );
+# endif
+#else
+  (void)f;
+#endif
+}
+// Iterator::open() with each allocation failing in turn, over a FLWOR whose open
+// allocates (a let bound to a sequence, group by, order by): the answer or an
+// error; then, in an AddressSanitizer build, nothing is left unreachable.
+void test_plan_open_out_of_memory( Fixture const &f ) {
+#if defined(__linux__)
+  auto attempt = [&]( long n, long length, long *count ) -> std::string {
+    XQuery_t const query( f.zorba->compileQuery(
+      "for $i in 1 to 20\n"
+      "let $s := ($i, $i * 2)\n"
+      "group by $k := $i mod 3\n"
+      "order by $k descending\n"
+      "return sum($s)" ) );
+    Iterator_t const it( query->iterator() );
+    inject_arm( n, length );
+    bool opened = false;
+    try {
+      it->open();
+      opened = true;
+    }
+    catch ( std::exception const& ) {
+    }
+    *count = inject_disarm();
+    if ( !opened )
+      return "error";
+    std::string out;
+    Item item;
+    while ( it->next( item ) )
+      out += ( out.empty() ? "" : " " ) + item.getStringValue().str();
+    it->close();
+    return out;
+  };
+  long total = 0;
+  check( attempt( 0, 0, &total ) == "231 210 189", "the FLWOR: the answer" );
+  check( total > 0, "open() allocates", std::to_string( total ) );
+  long wrong = 0;
+  for ( long const length : { 1L, 8L } )
+    for ( long n = 1; n <= total; ++n ) {
+      long count = 0;
+      std::string const got( attempt( n, length, &count ) );
+      if ( got != "231 210 189" && got != "error" && ++wrong <= 3 )
+        std::cout << "at " << n << " of a run of " << length << ": " << got
+                  << std::endl;
+    }
+  check( wrong == 0, "open() failing: the answer or an error",
+         std::to_string( wrong ) + " points" );
+# if defined(__SANITIZE_ADDRESS__)
+  check( __lsan_do_recoverable_leak_check() == 0,
+         "open() failing: nothing is left behind" );
 # endif
 #else
   (void)f;
@@ -7679,6 +7761,7 @@ Test const tests[] = {
   { "exhaust_seekable_stream", test_seekable_stream_out_of_memory },
   { "exhaust_json_loader", test_json_loader_out_of_memory },
   { "exhaust_plan_wrapper", test_plan_wrapper_out_of_memory },
+  { "exhaust_plan_open", test_plan_open_out_of_memory },
   { "exhaust_sweep_matcher", test_sweep_matcher },
   { "exhaust_sweep_xml", test_sweep_xml },
   { "exhaust_sweep_xml_dtd", test_sweep_xml_dtd },
@@ -7690,6 +7773,7 @@ Test const tests[] = {
   { "exhaust_sweep_json", test_sweep_json },
   { "exhaust_sweep_csv", test_sweep_csv },
   { "exhaust_sweep_casts", test_sweep_casts },
+  { "exhaust_sweep_arithmetic", test_sweep_arithmetic },
   { "exhaust_sweep_decimal_thread", test_sweep_decimal_thread },
   { "exhaust_sweep_cache", test_sweep_cache },
   { "exhaust_sweep_kept_malloc", test_sweep_kept_malloc },

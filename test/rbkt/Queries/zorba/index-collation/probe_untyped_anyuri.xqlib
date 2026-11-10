@@ -1,0 +1,97 @@
+module namespace m = "http://www.example.com/collation-untyped-anyuri";
+
+import module namespace ddl =
+  "http://zorba.io/modules/store/static/collections/ddl";
+
+import module namespace dml =
+  "http://zorba.io/modules/store/static/collections/dml";
+
+import module namespace iddl =
+  "http://zorba.io/modules/store/static/indexes/ddl";
+
+import module namespace idml =
+  "http://zorba.io/modules/store/static/indexes/dml";
+
+declare namespace an = "http://zorba.io/annotations";
+
+declare default collation "http://zorba.io/collations/SECONDARY/en/EN";
+
+declare collection m:c as node()*;
+
+declare %an:value-equality %an:manual index m:UriHash
+on nodes dml:collection(xs:QName("m:c"))//e
+by xs:anyURI(./@v) as xs:anyURI collation "http://zorba.io/collations/SECONDARY/en/EN";
+
+declare %an:value-range %an:manual index m:UriTree
+on nodes dml:collection(xs:QName("m:c"))//e
+by xs:anyURI(./@v) as xs:anyURI collation "http://zorba.io/collations/SECONDARY/en/EN";
+
+(: Untyped keys for the elements with t="u", xs:anyURI keys for the others. :)
+declare %an:general-equality %an:manual index m:GeneralHash
+on nodes dml:collection(xs:QName("m:c"))//e
+by (if (./@t eq "u") then fn:data(./@v) else xs:anyURI(./@v))
+collation "http://zorba.io/collations/SECONDARY/en/EN";
+
+declare %an:general-range %an:manual index m:GeneralTree
+on nodes dml:collection(xs:QName("m:c"))//e
+by (if (./@t eq "u") then fn:data(./@v) else xs:anyURI(./@v))
+collation "http://zorba.io/collations/SECONDARY/en/EN";
+
+declare %an:sequential function m:init()
+{
+  ddl:create(xs:QName("m:c"));
+
+  dml:insert(xs:QName("m:c"),
+             <r>
+               <e id="1" t="a" v="x"/>
+               <e id="2" t="u" v="x"/>
+               <e id="3" t="a" v="y"/>
+             </r>);
+
+  iddl:create(xs:QName("m:UriHash"));
+  iddl:create(xs:QName("m:UriTree"));
+  iddl:create(xs:QName("m:GeneralHash"));
+  iddl:create(xs:QName("m:GeneralTree"));
+};
+
+declare function m:ids($nodes as node()*) as xs:string
+{
+  fn:string-join(
+    for $e in $nodes
+    order by xs:integer($e/@id)
+    return fn:string($e/@id),
+    " ")
+};
+
+(: The elements whose key is equal to $key under the default collation,
+   selected without an index. :)
+declare function m:value-unindexed($key as xs:anyURI) as xs:string
+{
+  m:ids(dml:collection(xs:QName("m:c"))//e[xs:anyURI(./@v) eq $key])
+};
+
+declare function m:general-unindexed($key as xs:anyAtomicType) as xs:string
+{
+  m:ids(dml:collection(xs:QName("m:c"))//e
+          [(if (./@t eq "u") then fn:data(./@v) else xs:anyURI(./@v)) = $key])
+};
+
+declare function m:value-point($name as xs:string, $key as xs:anyURI)
+  as xs:string
+{
+  m:ids(idml:probe-index-point-value(xs:QName($name), $key))
+};
+
+declare function m:value-range($key as xs:anyURI) as xs:string
+{
+  m:ids(idml:probe-index-range-value(xs:QName("m:UriTree"),
+                                     $key, $key,
+                                     fn:true(), fn:true(),
+                                     fn:true(), fn:true()))
+};
+
+declare function m:general-point($name as xs:string, $key as xs:anyAtomicType)
+  as xs:string
+{
+  m:ids(idml:probe-index-point-general(xs:QName($name), $key))
+};

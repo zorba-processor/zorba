@@ -207,7 +207,7 @@ void UDFunctionCallIteratorState::open(
 {
   thePlan = udf->getPlan(thePlanStateSize,
                          isDynamic && functionItem->getDctx() != NULL ?
-                           functionItem->getMaxInScopeVarId() : 1).getp();
+                           functionItem->getFirstLocalVarId() : 1).getp();
 
   thePlanStateSize = thePlan->getStateSizeOfSubtree();
 }
@@ -1082,7 +1082,8 @@ ExtFunctionCallIteratorState::~ExtFunctionCallIteratorState()
 
   csize n = m_extArgs.size();
 
-  for (csize i = 0; i < n; ++i)
+  // NULL from the one whose allocation failed in openImpl().
+  for (csize i = 0; i < n && m_extArgs[i] != NULL; ++i)
   {
     m_extArgs[i]->removeReference();
   }

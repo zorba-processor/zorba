@@ -784,7 +784,7 @@ bool IndexMatchingRule::matchKeyExprsForRangeIndex(
         else if (matchKeyExpr(qpredExpr->get_arg(1), keyExpr, subst))
           matched = 1;
 
-        if (matched < 0)
+        if (matched < 0 || !sameCollation(keyIte - theKeyClauses->begin(), qpredExpr))
           continue;
         
         if (compKind == CompareConsts::VALUE_EQUAL)
@@ -943,6 +943,9 @@ bool IndexMatchingRule::matchKeyExprsForEqIndex(
       else if (matchKeyExpr(qpredExpr->get_arg(1), keyExpr, subst))
         matched = 1;
 
+      if (matched >= 0 && !sameCollation(keyIte - theKeyClauses->begin(), qpredExpr))
+        matched = -1;
+
       if (matched >= 0)
       {
         // Read qpred before the erase: the erase invalidates the reference.
@@ -965,6 +968,21 @@ bool IndexMatchingRule::matchKeyExprsForEqIndex(
   }
 
   return true;
+}
+
+
+/*******************************************************************************
+  Whether the index compares its key at keyPos under the collation that the
+  value comparison uses: the default collation of the comparison. A key with no
+  collation is of a type that no collation applies to.
+********************************************************************************/
+bool IndexMatchingRule::sameCollation(csize keyPos, const fo_expr* comparison) const
+{
+  const std::string& indexCollation = theIndexDecl->getCollation(keyPos);
+
+  return (indexCollation.empty() ||
+          indexCollation ==
+          comparison->get_sctx()->get_default_collation(comparison->get_loc()));
 }
 
 

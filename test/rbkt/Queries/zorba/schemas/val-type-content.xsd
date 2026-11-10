@@ -1,0 +1,43 @@
+<xs:schema
+  xmlns:xs="http://www.w3.org/2001/XMLSchema"
+  targetNamespace="http://zorba.io/test/val-type-content"
+  xmlns="http://zorba.io/test/val-type-content"
+  elementFormDefault="qualified">
+
+  <xs:element name="i" type="IntT"/>
+  <xs:element name="d" type="xs:decimal" default="5"/>
+  <xs:element name="w" type="WithInt"/>
+  <xs:element name="r" type="LaxAny"/>
+
+  <xs:simpleType name="IntT">
+    <xs:restriction base="xs:integer"/>
+  </xs:simpleType>
+
+  <xs:complexType name="WithInt">
+    <xs:sequence>
+      <xs:element name="n" type="xs:integer"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="IntWithUnit">
+    <xs:simpleContent>
+      <xs:extension base="xs:integer">
+        <xs:attribute name="unit" type="xs:string"/>
+      </xs:extension>
+    </xs:simpleContent>
+  </xs:complexType>
+
+  <xs:complexType name="Nested">
+    <xs:sequence>
+      <xs:element name="p" type="WithInt"/>
+      <xs:element name="q" type="xs:integer"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="LaxAny">
+    <xs:sequence>
+      <xs:any processContents="lax"/>
+    </xs:sequence>
+  </xs:complexType>
+
+</xs:schema>
