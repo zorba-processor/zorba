@@ -1067,8 +1067,6 @@ uint32_t DateTime::hash(int implicit_timezone_seconds) const
   hval = hashfun::h32<int>(dt->data[SECONDS_DATA], hval);
   hval = hashfun::h32<int>(dt->data[FRACSECONDS_DATA], hval);
 
-  hval *= dt->the_time_zone.hash();
-
   return hval;
 }
 

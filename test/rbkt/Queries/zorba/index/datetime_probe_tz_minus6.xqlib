@@ -1,0 +1,95 @@
+module namespace m = "http://www.example.com/datetime-timezone-probe";
+
+import module namespace ddl =
+  "http://zorba.io/modules/store/static/collections/ddl";
+
+import module namespace dml =
+  "http://zorba.io/modules/store/static/collections/dml";
+
+import module namespace iddl =
+  "http://zorba.io/modules/store/static/indexes/ddl";
+
+import module namespace idml =
+  "http://zorba.io/modules/store/static/indexes/dml";
+
+declare namespace an = "http://zorba.io/annotations";
+
+declare collection m:c as node()*;
+
+(: Empty under any implicit timezone other than -06:00. :)
+declare variable $m:data :=
+  if (fn:implicit-timezone() eq xs:dayTimeDuration("-PT6H"))
+  then (<e id="1" dt="2013-01-13T06:01:53" d="2013-01-13" t="06:01:53"/>,
+        <e id="2" dt="2013-01-13T12:01:53Z" d="2013-01-13-06:00" t="12:01:53Z"/>,
+        <e id="3" dt="2013-01-13T06:01:54" d="2013-01-14" t="06:01:54"/>)
+  else ();
+
+declare %an:manual %an:value-equality index m:dt-value
+on nodes dml:collection(xs:QName("m:c"))
+by xs:dateTime(./@dt) as xs:dateTime;
+
+declare %an:manual %an:value-equality index m:d-value
+on nodes dml:collection(xs:QName("m:c"))
+by xs:date(./@d) as xs:date;
+
+declare %an:manual %an:value-equality index m:t-value
+on nodes dml:collection(xs:QName("m:c"))
+by xs:time(./@t) as xs:time;
+
+declare %an:manual %an:general-equality index m:dt-general
+on nodes dml:collection(xs:QName("m:c"))
+by xs:dateTime(./@dt);
+
+declare %an:manual %an:general-equality index m:d-general
+on nodes dml:collection(xs:QName("m:c"))
+by xs:date(./@d);
+
+declare %an:manual %an:general-equality index m:t-general
+on nodes dml:collection(xs:QName("m:c"))
+by xs:time(./@t);
+
+declare %an:sequential function m:init()
+{
+  ddl:create(xs:QName("m:c"));
+
+  dml:insert(xs:QName("m:c"), $m:data);
+
+  iddl:create(xs:QName("m:dt-value"));
+  iddl:create(xs:QName("m:d-value"));
+  iddl:create(xs:QName("m:t-value"));
+  iddl:create(xs:QName("m:dt-general"));
+  iddl:create(xs:QName("m:d-general"));
+  iddl:create(xs:QName("m:t-general"));
+};
+
+declare function m:ids($nodes as node()*) as xs:string
+{
+  fn:string-join(
+    for $e in $nodes
+    order by xs:integer($e/@id)
+    return fn:string($e/@id),
+    " ")
+};
+
+(: The ids that a probe of the value index and of the general index on the
+   attribute return, and the ids that eq returns on the unindexed copy. :)
+declare function m:probe(
+  $attr as xs:string,
+  $key as xs:anyAtomicType) as xs:string
+{
+  fn:concat(
+    $attr, " ", fn:string($key),
+    ": value ",
+    m:ids(idml:probe-index-point-value(
+            xs:QName(fn:concat("m:", $attr, "-value")), $key)),
+    "; general ",
+    m:ids(idml:probe-index-point-general(
+            xs:QName(fn:concat("m:", $attr, "-general")), $key)),
+    "; eq ",
+    m:ids(for $e in $m:data
+          where (switch ($attr)
+                 case "dt" return xs:dateTime($e/@dt)
+                 case "d" return xs:date($e/@d)
+                 default return xs:time($e/@t)) eq $key
+          return $e))
+};

@@ -210,6 +210,31 @@ static bool generalEqualityRaisesNoError(
 
 
 /*******************************************************************************
+  Whether "eq" between an item of prime type "type1" and one of prime type
+  "type2" cannot raise an error. "eq" compares an untyped value, an xs:string
+  and an xs:anyURI as strings, and raises XPTY0004 for an untyped value and an
+  item of another type; the pairs that "=" compares without an error compare
+  so with "eq" too. A value index never matches the pairs for which "eq"
+  raises an error, so it selects what "eq" selects only when there are none.
+********************************************************************************/
+static bool valueEqualityRaisesNoError(
+    const TypeManager* tm,
+    const XQType& type1,
+    const XQType& type2)
+{
+  RootTypeManager& rtm = GENV_TYPESYSTEM;
+
+  if ((isStringOrUntyped(tm, type1) ||
+       TypeOps::is_subtype(tm, type1, *rtm.ANY_URI_TYPE_ONE)) &&
+      (isStringOrUntyped(tm, type2) ||
+       TypeOps::is_subtype(tm, type2, *rtm.ANY_URI_TYPE_ONE)))
+    return true;
+
+  return generalEqualityRaisesNoError(tm, type1, type2);
+}
+
+
+/*******************************************************************************
   This rule analyzes the where clauses of flwor exprs to deterimne whether any
   predicate in a clause is a join predicate and whether the associated join
   can be converted into a hashjoin using an index that is built on-the-fly.
@@ -594,6 +619,9 @@ bool IndexJoinRule::isIndexJoinPredicate(PredicateInfo& predInfo)
 
     if (outerQuant != SequenceType::QUANT_ONE &&
         outerQuant != SequenceType::QUANT_QUESTION)
+      return false;
+
+    if (!valueEqualityRaisesNoError(tm, *primeInnerType, *primeOuterType))
       return false;
 
     // The index key type is the type of the inner operand, so it must not be
@@ -1067,8 +1095,9 @@ bool IndexJoinRule::findIndexPos(PredicateInfo& predInfo, csize boundVarId)
   compared as xs:string (the index uses the default collation, like "eq"). Items
   of other types share the key "o". The converse does not hold, so the join
   predicate must still be applied to the probe results. Pairs for which "eq"
-  would raise a type error get different keys and are never compared (permitted
-  by "Errors and Optimization").
+  would raise a type error get different keys and are never compared, so the
+  rule uses these keys only for operand types for which "eq" raises no error
+  (valueEqualityRaisesNoError).
 
   An xs:integer or xs:decimal compared with an xs:float is cast to xs:float
   (XPath 3.0 B.1): 16777217 eq xs:float(16777216). One key can not cover both a

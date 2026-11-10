@@ -168,6 +168,7 @@ void SchemaValidatorFilter::reset()
 
   XMLString::release(&theProcessorStipulatedTypeName, fMemoryManager);
   theProcessorStipulatedTypeUriId = -1;
+  theHasTypeEntry.clear();
 }
 
 
@@ -354,6 +355,7 @@ void SchemaValidatorFilter::processStartElement()
       //validate element even if lax but has xsi:type
       fValidator->validateElement(elemDecl);
   }
+  theHasTypeEntry.push_back(fValidate || theXsiType);
 
 
   ComplexTypeInfo* typeinfo =
@@ -726,7 +728,10 @@ void SchemaValidatorFilter::endElementEvent(
   // We commandeer fCommentOrPISeen to keep _errorOccurred in
   theErrorOccurred = topElem->fCommentOrPISeen;
 
-  if(fValidate || theXsiType)
+  const bool hasTypeEntry = theHasTypeEntry.back();
+  theHasTypeEntry.pop_back();
+
+  if(hasTypeEntry)
   {
     DatatypeValidator *currentDV = 0;
     if(topElem->fThisElement->isDeclared())
@@ -752,26 +757,18 @@ void SchemaValidatorFilter::endElementEvent(
       }
     }
 
-    int res;
-    if ( theProcessorStipulatedTypeName )
-    {
-      res = -1;
-    }
-    else
-    {
 #if _XERCES_VERSION >= 30000
-      XMLSize_t failingChildNo;
-      bool boolRes = fValidator->checkContent(topElem->fThisElement,
-                                              topElem->fChildren,
-                                              topElem->fChildCount,
-                                              &failingChildNo);
-      res = boolRes ? -1 /* means success */ : 0 /* means failure */;
+    XMLSize_t failingChildNo;
+    bool boolRes = fValidator->checkContent(topElem->fThisElement,
+                                            topElem->fChildren,
+                                            topElem->fChildCount,
+                                            &failingChildNo);
+    int res = boolRes ? -1 /* means success */ : 0 /* means failure */;
 #else
-      res = fValidator->checkContent(topElem->fThisElement,
-                                         topElem->fChildren,
-                                         topElem->fChildCount);
+    int res = fValidator->checkContent(topElem->fThisElement,
+                                       topElem->fChildren,
+                                       topElem->fChildCount);
 #endif // _XERCES_VERSION >= 30000
-    }
 
     if(res >= 0)
     {

@@ -21,7 +21,10 @@
 
 #ifndef ZORBA_NO_XMLSCHEMA
 #include <xercesc/sax/EntityResolver.hpp>
+#include <xercesc/sax2/SAX2XMLReader.hpp>
 #include <iostream>
+#include <memory>
+#include <vector>
 #include "types/schema/OwningMemoryManager.h"
 #endif // ZORBA_NO_XMLSCHEMA
 
@@ -72,6 +75,18 @@ private:
 #ifndef ZORBA_NO_XMLSCHEMA
   OwningMemoryManager                        theGrammarPoolMemoryManager;
   XERCES_CPP_NAMESPACE::XMLGrammarPool     * theGrammarPool;
+
+  // A parser of one schema import; the memory manager frees, after the parser,
+  // what its constructors keep when an allocation fails.
+  struct SchemaParser
+  {
+    OwningMemoryManager                                  theMemoryManager;
+    std::unique_ptr<XERCES_CPP_NAMESPACE::SAX2XMLReader> theParser;
+  };
+
+  // Parsers whose grammar the pool rejected, kept as long as the pool because
+  // grammars in the pool may point into the rejected grammar.
+  std::vector<std::unique_ptr<SchemaParser>> theRejectedGrammarParsers;
 
   UdTypesCache                             * theUdTypesCache;
 #endif // ZORBA_NO_XMLSCHEMA

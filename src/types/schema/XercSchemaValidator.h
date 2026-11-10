@@ -102,6 +102,9 @@ private:
   //
   //  fErrorOccurred
   //      whether an error occurred in the most recent operation
+  //
+  //  fHasStipulatedType
+  //      Whether validate type names the type of the root
   // -----------------------------------------------------------------------
   MemoryManager*                  fMemoryManager;
   SchemaGrammar*                  fSchemaGrammar;
@@ -130,6 +133,7 @@ private:
   DatatypeValidator *             fMostRecentAttrValidator;
   bool                            fErrorOccurred;
   bool                            fElemIsSpecified;
+  bool                            fHasStipulatedType;
 
 public:
   // -----------------------------------------------------------------------

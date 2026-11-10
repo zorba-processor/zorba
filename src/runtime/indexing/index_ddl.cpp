@@ -184,7 +184,7 @@ static void createIndexSpec(
       const XQType& t = *keyTypes[i];
       spec.theKeyTypes[i] = t.getQName();
     }
-    spec.theCollations.push_back(keyModifiers[i].theCollation);
+    spec.theCollations[i] = keyModifiers[i].theCollation;
   }
 
   spec.theIsGeneral = indexDecl->isGeneral();

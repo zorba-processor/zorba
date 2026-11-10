@@ -631,7 +631,7 @@ void IndexDelta::addValuePair(store::Item_t& node, store::IndexKey* key)
 ********************************************************************************/
 void IndexDelta::addGeneralPair(store::Item_t& node, store::Item_t& key)
 {
-  assert(node->isNode() && key->isAtomic());
+  assert(node->isNode() && (key == NULL || key->isAtomic()));
 
   theGeneralDelta.resize(theGeneralDelta.size() + 1);
   theGeneralDelta.back().first.transfer(node);

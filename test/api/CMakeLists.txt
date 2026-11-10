@@ -49,6 +49,7 @@ CREATE_TEST_SOURCELIST(APITests
   json_parse_members.cpp
   file_write_checks.cpp
   itemfactory_empty_items.cpp
+  host_date_time.cpp
   ${SchemaTests}
 )
 

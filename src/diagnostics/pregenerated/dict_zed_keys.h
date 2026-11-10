@@ -63,6 +63,8 @@
 #define ZED_XQST0036_NoRetTypeInModule_234 "~XQST0036_NoRetTypeInModule_234"
 #define ZED_XQST0036_NoParamTypeInMainModule_23 "~XQST0036_NoParamTypeInMainModule_23"
 #define ZED_XQST0036_NoParamTypeInModule_234 "~XQST0036_NoParamTypeInModule_234"
+#define ZED_XQST0038_MultipleDefaultCollations "~XQST0038_MultipleDefaultCollations"
+#define ZED_XQST0038_UnknownCollation_2 "~XQST0038_UnknownCollation_2"
 #define ZED_XQST0045_FUNCTION_23 "~XQST0045_FUNCTION_23"
 #define ZED_XQST0045_ANNOTATION_23 "~XQST0045_ANNOTATION_23"
 #define ZED_XQST0046_BadHexDigit_3 "~XQST0046_BadHexDigit_3"

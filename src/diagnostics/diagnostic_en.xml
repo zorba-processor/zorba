@@ -542,7 +542,15 @@
        declaration, or the value specified by a default collation declaration is
        not present in statically known collations.
       </comment>
-      <value>multiple default collation declarations</value>
+      <value>$1</value>
+
+      <entry key="MultipleDefaultCollations">
+        <value>multiple default collation declarations</value>
+      </entry>
+
+      <entry key="UnknownCollation_2">
+        <value>"$2": not a known collation</value>
+      </entry>
     </diagnostic>
 
     <diagnostic code="XQST0039">

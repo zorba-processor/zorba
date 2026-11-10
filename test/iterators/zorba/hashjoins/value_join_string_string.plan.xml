@@ -1,0 +1,77 @@
+<iterator-tree description="main query">
+  <FLWORIterator>
+    <ForVariable name="doc">
+      <ElementIterator copyInputNodes="false">
+        <SingletonIterator value="xs:QName(,,d)"/>
+        <FnConcatIterator>
+          <ElementIterator copyInputNodes="false">
+            <SingletonIterator value="xs:QName(,,b)"/>
+            <TextIterator>
+              <SingletonIterator value="xs:string(x)"/>
+            </TextIterator>
+          </ElementIterator>
+          <ElementIterator copyInputNodes="false">
+            <SingletonIterator value="xs:QName(,,b)"/>
+            <TextIterator>
+              <SingletonIterator value="xs:string(z)"/>
+            </TextIterator>
+          </ElementIterator>
+          <ElementIterator copyInputNodes="false">
+            <SingletonIterator value="xs:QName(,,b)"/>
+            <TextIterator>
+              <SingletonIterator value="xs:string(x)"/>
+            </TextIterator>
+          </ElementIterator>
+        </FnConcatIterator>
+      </ElementIterator>
+    </ForVariable>
+    <LetVariable name="$$opt_temp_0" materialize="true">
+      <HoistIterator>
+        <ChildAxisIterator test-kind="match_name_test" qname="xs:QName(,,b)" typename="*" nill-allowed="false">
+          <ForVarIterator varname="doc"/>
+        </ChildAxisIterator>
+      </HoistIterator>
+    </LetVariable>
+    <LetVariable name="$$opt_temp_3" materialize="true">
+      <CreateInternalIndexIterator name="xs:QName(,,tempIndex0)">
+        <FLWORIterator>
+          <ForVariable name="$$opt_temp_1">
+            <UnhoistIterator>
+              <LetVarIterator varname="$$opt_temp_0"/>
+            </UnhoistIterator>
+          </ForVariable>
+          <ReturnClause>
+            <ValueIndexEntryBuilderIterator>
+              <ForVarIterator varname="$$opt_temp_1"/>
+              <FnStringIterator>
+                <ForVarIterator varname="$$opt_temp_1"/>
+              </FnStringIterator>
+            </ValueIndexEntryBuilderIterator>
+          </ReturnClause>
+        </FLWORIterator>
+      </CreateInternalIndexIterator>
+    </LetVariable>
+    <ForVariable name="k">
+      <FnConcatIterator>
+        <SingletonIterator value="xs:string(x)"/>
+        <SingletonIterator value="xs:string(y)"/>
+        <SingletonIterator value="xs:string(z)"/>
+      </FnConcatIterator>
+    </ForVariable>
+    <ReturnClause>
+      <FnCountIterator>
+        <FLWORIterator>
+          <ForVariable name="b">
+            <ProbeIndexPointValueIterator>
+              <SingletonIterator value="xs:QName(,,tempIndex0)"/>
+              <ForVarIterator varname="k"/>
+            </ProbeIndexPointValueIterator>
+          </ForVariable>
+          <ReturnClause>
+            <ForVarIterator varname="b"/>
+          </ReturnClause>
+        </FLWORIterator>
+      </FnCountIterator>
+    </ReturnClause>
+  </FLWORIterator>
+</iterator-tree>

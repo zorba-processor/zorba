@@ -1,0 +1,52 @@
+module namespace m = "http://www.example.com/index-collation-match";
+
+import module namespace ddl =
+  "http://zorba.io/modules/store/static/collections/ddl";
+
+import module namespace dml =
+  "http://zorba.io/modules/store/static/collections/dml";
+
+import module namespace iddl =
+  "http://zorba.io/modules/store/static/indexes/ddl";
+
+declare namespace an = "http://zorba.io/annotations";
+
+declare default collation "http://zorba.io/collations/SECONDARY/en/EN";
+
+declare collection m:secondary as element(account)*;
+declare collection m:codepoint as element(account)*;
+declare collection m:uris as element(account)*;
+
+(: Takes the default collation of this module, which ignores case. :)
+declare %an:automatic %an:value-equality index m:by-email-secondary
+on nodes dml:collection(xs:QName("m:secondary"))
+by xs:string(@email) as xs:string;
+
+declare %an:automatic %an:value-equality index m:by-email-codepoint
+on nodes dml:collection(xs:QName("m:codepoint"))
+by xs:string(@email) as xs:string
+collation "http://www.w3.org/2005/xpath-functions/collation/codepoint";
+
+(: Takes the default collation of this module, as an xs:string key does. :)
+declare %an:automatic %an:value-equality index m:by-uri
+on nodes dml:collection(xs:QName("m:uris"))
+by xs:anyURI(@email) as xs:anyURI;
+
+declare %an:sequential function m:init()
+{
+  for $c in ("m:secondary", "m:codepoint", "m:uris")
+  return ddl:create(xs:QName($c));
+
+  for $i in ("m:by-email-secondary", "m:by-email-codepoint", "m:by-uri")
+  return iddl:create(xs:QName($i));
+
+  for $c in ("m:secondary", "m:codepoint", "m:uris")
+  return dml:insert(xs:QName($c),
+                    (<account name="John" email="john@yahoo.com"/>,
+                     <account name="George" email="george@gmail.com"/>));
+};
+
+declare function m:names($accounts as element(account)*) as xs:string
+{
+  fn:string-join(for $a in $accounts return fn:string($a/@name), " ")
+};

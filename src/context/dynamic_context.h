@@ -128,6 +128,10 @@ protected:
 
   long                         theTimezone;
 
+  // Set by the host: reset_current_date_time() keeps them.
+  bool                         theCurrentDateTimeSetByHost;
+  bool                         theTimezoneSetByHost;
+
   store::Item_t                theDefaultCollectionUri;
 
   std::vector<VarValue>        theVarValues;

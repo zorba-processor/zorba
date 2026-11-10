@@ -61,6 +61,7 @@ void initializeTestList()
   libunittests["mmap_file"] = test_mmap_file;
   libunittests["node_edit_iterator"] = test_node_edit_iterator;
   libunittests["node_packing"] = test_node_packing;
+  libunittests["float_equality"] = test_float_equality;
   libunittests["numeric_hash"] = test_numeric_hash;
   libunittests["ordpath"] = test_ordpath;
 
