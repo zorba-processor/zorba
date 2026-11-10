@@ -1020,10 +1020,7 @@ store::Item* AnyUriItem::getType() const
 
 uint32_t AnyUriItem::hash(long timezone, const XQPCollator* aCollation) const
 {
-  if (aCollation != NULL && !aCollation->doMemCmp())
-    return utf8::hash(theValue, aCollation);
-
-  return hashfun::h32(theValue.data(), (uint32_t)theValue.size());
+  return utf8::hash(theValue, aCollation);
 }
 
 
