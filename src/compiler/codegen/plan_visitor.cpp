@@ -2376,7 +2376,8 @@ void end_visit(trycatch_expr& v)
   std::vector<TryCatchIterator::CatchClause> ccs(rev_ccs.rbegin(), rev_ccs.rend());
   PlanIter_t lChild = pop_itstack();
 
-  push_itstack(new TryCatchIterator(sctx, qloc, lChild, ccs, v.is_internal()));
+  PlanIter_t tryCatch(new TryCatchIterator(sctx, qloc, lChild, ccs, v.is_internal()));
+  push_itstack(tryCatch.getp());
 }
 
 
