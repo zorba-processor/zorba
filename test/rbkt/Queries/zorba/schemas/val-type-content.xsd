@@ -5,6 +5,9 @@
   elementFormDefault="qualified">
 
   <xs:element name="i" type="IntT"/>
+  <xs:element name="d" type="xs:decimal" default="5"/>
+  <xs:element name="w" type="WithInt"/>
+  <xs:element name="r" type="LaxAny"/>
 
   <xs:simpleType name="IntT">
     <xs:restriction base="xs:integer"/>
@@ -22,6 +25,19 @@
         <xs:attribute name="unit" type="xs:string"/>
       </xs:extension>
     </xs:simpleContent>
+  </xs:complexType>
+
+  <xs:complexType name="Nested">
+    <xs:sequence>
+      <xs:element name="p" type="WithInt"/>
+      <xs:element name="q" type="xs:integer"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="LaxAny">
+    <xs:sequence>
+      <xs:any processContents="lax"/>
+    </xs:sequence>
   </xs:complexType>
 
 </xs:schema>
