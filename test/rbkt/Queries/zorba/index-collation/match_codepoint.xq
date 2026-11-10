@@ -28,7 +28,8 @@ fn:string-join((
   fn:concat("distinct string and anyURI: ",
     fn:count(fn:distinct-values(("x", xs:anyURI("x"))))),
   fn:concat("group by string and anyURI: ",
-    fn:string-join(for $k in ("x", xs:anyURI("x"))
+    fn:string-join(for $v in ("x", xs:anyURI("x"))
+                   let $k := $v
                    group by $k
-                   return fn:string(fn:count($k)), " "))),
+                   return fn:string(fn:count($v)), " "))),
   "&#10;")
