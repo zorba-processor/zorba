@@ -654,7 +654,7 @@ store::Item* UntypedAtomicItem::getType() const
 
 uint32_t UntypedAtomicItem::hash(long timezone, const XQPCollator* aCollation) const
 {
-  return utf8::hash(theValue);
+  return utf8::hash(theValue, aCollation);
 }
 
 
@@ -1020,7 +1020,28 @@ store::Item* AnyUriItem::getType() const
 
 uint32_t AnyUriItem::hash(long timezone, const XQPCollator* aCollation) const
 {
-  return hashfun::h32(theValue.data(), (uint32_t)theValue.size());
+  return utf8::hash(theValue, aCollation);
+}
+
+
+bool AnyUriItem::equals(
+    const store::Item* other,
+    long timezone,
+    const XQPCollator* aCollation) const
+{
+  if (aCollation == NULL || aCollation->doMemCmp())
+    return theValue == other->getString();
+
+  return (utf8::compare(theValue, other->getString(), aCollation) == 0);
+}
+
+
+long AnyUriItem::compare(
+    const Item* other,
+    long timezone,
+    const XQPCollator* aCollation) const
+{
+  return utf8::compare(theValue, other->getString(), aCollation);
 }
 
 

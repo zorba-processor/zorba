@@ -50,22 +50,7 @@ GeneralIndexCompareFunction::GeneralIndexCompareFunction(
   theTimezone(timezone)
 {
   if (!collation.empty())
-  {
-    theCollator = CollationFactory::createCollator(collation);
-  }
-  else
-  {
-    theCollator = NULL;
-  } 
-}
-
-
-/******************************************************************************
-
-********************************************************************************/
-GeneralIndexCompareFunction::~GeneralIndexCompareFunction()
-{
-  delete theCollator; 
+    theCollator.reset(CollationFactory::createCollator(collation));
 }
 
 
@@ -79,7 +64,7 @@ uint32_t GeneralIndexCompareFunction::hash(const store::Item* key) const
   if (key == NULL)
     return hval;
 
-  return hashfun::h32<uint32_t>(key->hash(theTimezone, theCollator), hval);
+  return hashfun::h32<uint32_t>(key->hash(theTimezone, theCollator.get()), hval);
 }
 
 
@@ -100,7 +85,7 @@ bool GeneralIndexCompareFunction::equal(
   if (key1->isNaN() || key2->isNaN())
     return key1->isNaN() && key2->isNaN();
 
-  if (! key1->equals(key2, theTimezone, theCollator))
+  if (! key1->equals(key2, theTimezone, theCollator.get()))
     return false;
   
   return true;
@@ -150,7 +135,7 @@ long GeneralIndexCompareFunction::compare(
 
     return (key2->isNaN() ? 0 : -1);
   }
-  else if ((result = key1->compare(key2, theTimezone, theCollator)))
+  else if ((result = key1->compare(key2, theTimezone, theCollator.get())))
   {
     return result;
   }
