@@ -1541,7 +1541,10 @@ void ProbeGeneralIndexIterator::checkStringKeyType(const AtomicItem* key) const
 
   store::SchemaTypeCode keyType = key->getTypeCode();
 
+  // A value comparison casts an untyped key to xs:string, which compares
+  // with null.
   if (keyType != store::XS_UNTYPED_ATOMIC &&
+      keyType != store::JS_NULL &&
       keyType != store::XS_ANY_URI &&
       keyType != store::XS_STRING &&
       keyType != store::XS_NORMALIZED_STRING &&
@@ -1892,7 +1895,13 @@ void ProbeGeneralIndexIterator::initBox()
     // key is selected by the bounds alone. An untyped bound is not compared
     // with a null key.
     GeneralIndexCondition::RangeFlags& flags = theCondition->theRangeFlags;
-    const GeneralIndexCondition::RangeFlags givenFlags = flags;
+
+    struct RangeFlagsRestorer
+    {
+      GeneralIndexCondition::RangeFlags& theFlags;
+      const GeneralIndexCondition::RangeFlags theGiven;
+      ~RangeFlagsRestorer() { theFlags = theGiven; }
+    } restorer{flags, flags};
 
     bool nullLower = (haveLower && lowerKey->getTypeCode() == store::JS_NULL);
     bool nullUpper = (haveUpper && upperKey->getTypeCode() == store::JS_NULL);
@@ -2109,8 +2118,6 @@ void ProbeGeneralIndexIterator::initBox()
       ERROR_PARAMS(theIndex->getName()->getStringValue()));
     }
     }
-
-    flags = givenFlags;
 
     if (selectsNullKeys && idx->theMaps[store::JS_NULL] != NULL)
     {

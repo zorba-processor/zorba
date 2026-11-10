@@ -8,5 +8,8 @@
   and raising `ZDTY0012` on a `jn:null()` key. A null key is selected by a
   null probe value, by a range with a typed upper bound and no lower bound,
   and by inclusive null bounds; a null lower bound selects every other key.
-  An untyped probe value or bound does not select null keys, where the
-  comparison without the index raises `XPTY0004`.
+  In a general probe, an untyped probe value or bound does not select null
+  keys, where the comparison without the index raises `XPTY0004`. A value
+  probe of an index with untyped keys accepts a null probe value or bound
+  instead of raising `XPTY0004`, as a value comparison casts the untyped key
+  to `xs:string`.
