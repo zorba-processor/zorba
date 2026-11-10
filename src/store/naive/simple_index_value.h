@@ -37,7 +37,7 @@ class ValueIndexCompareFunction
 private:
   csize                       theNumColumns;
   long                        theTimezone;
-  std::vector<XQPCollator*>   theCollators;
+  std::vector<std::shared_ptr<XQPCollator> > theCollators; // copies share them
   std::shared_ptr<NumericKeyHash> theNumericKeys;       // copies share it
 
 public:
@@ -46,9 +46,7 @@ public:
        long timezone,
        const std::vector<std::string>& collation);
 
-  ~ValueIndexCompareFunction();
-
-  const XQPCollator* getCollator(csize i) const { return theCollators[i]; }
+  const XQPCollator* getCollator(csize i) const { return theCollators[i].get(); }
 
   /**
    * For an index with a column of xs:anyAtomicType, where keys of different

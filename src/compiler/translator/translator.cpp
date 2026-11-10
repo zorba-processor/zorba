@@ -5736,9 +5736,13 @@ void end_visit(const IndexKeyList& v, void* /*visit_state*/)
       if (! theSctx->is_known_collation(collationUri))
         RAISE_ERROR(err::XQST0076, kloc, ERROR_PARAMS(collationUri));
     }
-    else if (ptype != NULL &&
-             TypeOps::is_subtype(tm, *ptype, *theRTM.STRING_TYPE_ONE, loc))
+    else if (ptype == NULL ||
+             TypeOps::is_subtype(tm, *ptype, *theRTM.STRING_TYPE_ONE, loc) ||
+             TypeOps::is_subtype(tm, *ptype, *theRTM.ANY_URI_TYPE_ONE, loc) ||
+             TypeOps::is_subtype(tm, *ptype, *theRTM.UNTYPED_ATOMIC_TYPE_ONE, loc))
     {
+      // Keys that a comparison compares as strings, as are the keys of a
+      // general index without a key type, take the default collation.
       collationUri = theSctx->get_default_collation(loc);
     }
 

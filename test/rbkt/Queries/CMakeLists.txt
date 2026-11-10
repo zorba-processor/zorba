@@ -211,10 +211,11 @@ FOREACH(TESTFILE ${TESTFILES})
     # adjustments for the $place argument of fn:format-dateTime and the casing
     # properties for the final sigma in fn:lower-case come from ICU. With the
     # 'i' flag, a character range matches by full case closure only with ICU
-    # (regex-backref-casefold).
+    # (regex-backref-casefold). Collation strengths such as SECONDARY come from
+    # ICU; without it every collation compares codepoints.
     FILE(READ "${CMAKE_CURRENT_SOURCE_DIR}/${TESTFILE}" _icu_query_text)
     IF (_icu_query_text MATCHES "ISO-8859-|CP1252|windows-125"
-        OR TESTNAME MATCHES "^test/rbkt/zorba/(bom/(utf16-mark|utf16-signature|utf16-first-char|read-twice-transcoded|lines-decode-error-fn|lines-decode-error-file)|file/(cp1252|invalid_encoding)|string/Regex/(regex_m5[45]|regex_err2[01]|regex_q10|regex-xsd-syntax|regex-backref-casefold)|string/ReplaceFunc/replace(17|19|20)|functx/functx-x-call|durationdatetime/FormatDateTimeFunc/format-timezone-table|string/LowerCaseFunc/lower-case-final-sigma)$")
+        OR TESTNAME MATCHES "^test/rbkt/zorba/(bom/(utf16-mark|utf16-signature|utf16-first-char|read-twice-transcoded|lines-decode-error-fn|lines-decode-error-file)|file/(cp1252|invalid_encoding)|string/Regex/(regex_m5[45]|regex_err2[01]|regex_q10|regex-xsd-syntax|regex-backref-casefold)|string/ReplaceFunc/replace(17|19|20)|functx/functx-x-call|durationdatetime/FormatDateTimeFunc/format-timezone-table|string/LowerCaseFunc/lower-case-final-sigma|index-collation/(join_untyped_anyuri|probe_untyped_anyuri|match_secondary))$")
       SET (SKIP_TEST 1)
     ENDIF ()
   ENDIF (ZORBA_NO_ICU)
@@ -256,10 +257,10 @@ FOREACH(TESTFILE ${TESTFILES})
 
     ZORBA_ADD_TEST("${TESTNAME}" testdriver ${TESTFILE})
     # The window, array member, dynamic function call, iteration-updates, copy
-    # modify target and empty for domain tests must give the same results at
-    # every optimization level (the testdriver reads ZORBA_OPTLEVEL; the default
-    # is O1).
-    IF (TESTNAME MATCHES "^test/rbkt/zorba/(jsoniq-windows|jsoniq-array-members|dynamic-calls|iteration-updates|updates/transform-targets|empty-domain)/")
+    # modify target, empty for domain and index collation tests must give the
+    # same results at every optimization level (the testdriver reads
+    # ZORBA_OPTLEVEL; the default is O1).
+    IF (TESTNAME MATCHES "^test/rbkt/zorba/(jsoniq-windows|jsoniq-array-members|dynamic-calls|iteration-updates|updates/transform-targets|empty-domain|index-collation)/")
       FOREACH (_optlevel O0 O2)
         ZORBA_ADD_TEST("${TESTNAME}-${_optlevel}" testdriver ${TESTFILE})
         SET_TESTS_PROPERTIES ("${TESTNAME}-${_optlevel}" PROPERTIES
@@ -287,6 +288,11 @@ FOREACH(TESTFILE ${TESTFILES})
       ZORBA_ADD_TEST("${TESTNAME}-O2" testdriver ${TESTFILE})
       SET_TESTS_PROPERTIES ("${TESTNAME}-O2" PROPERTIES
         ENVIRONMENT "ZORBA_OPTLEVEL=O2" TIMEOUT 120)
+    ENDIF ()
+    # The implicit timezone of a query is the host timezone (execute() replaces
+    # the one set by the .spec file), so these run with a fixed -06:00 offset.
+    IF (TESTNAME MATCHES "_tz_minus6$")
+      SET_TESTS_PROPERTIES ("${TESTNAME}" PROPERTIES ENVIRONMENT "TZ=UTC+6")
     ENDIF ()
     # Boundary-value tests: a regression (e.g. a range that never stops at
     # the largest xs:integer) loops forever, so fail fast.

@@ -1,0 +1,10 @@
+<xs:schema
+  xmlns:xs="http://www.w3.org/2001/XMLSchema"
+  targetNamespace="http://zorba.io/test/dup-ns/x"
+  elementFormDefault="qualified">
+
+  <xs:import namespace="http://zorba.io/test/dup-ns/m" schemaLocation="dup-ns-m1.xsd"/>
+
+  <xs:element name="e" type="xs:string"/>
+
+</xs:schema>

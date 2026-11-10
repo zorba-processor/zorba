@@ -207,7 +207,7 @@ void UDFunctionCallIteratorState::open(
 {
   thePlan = udf->getPlan(thePlanStateSize,
                          isDynamic && functionItem->getDctx() != NULL ?
-                           functionItem->getMaxInScopeVarId() : 1).getp();
+                           functionItem->getFirstLocalVarId() : 1).getp();
 
   thePlanStateSize = thePlan->getStateSizeOfSubtree();
 }

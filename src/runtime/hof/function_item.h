@@ -157,6 +157,10 @@ public:
   csize numInScopeVars() const { return theInScopeVars.size(); }
 
   void add_variable(expr* var, var_expr* substVar);
+
+  // The captured variables have the ids 1 to N in the closure dctx, which
+  // the local variables of the body share.
+  ulong firstLocalVarId() const { return theInScopeVarIds.size() + 1; }
 };
 
 
@@ -304,7 +308,10 @@ public:
 
   QueryResources* getGlobalResources() const { return theGlobalResources.getp(); }
 
-  ulong getMaxInScopeVarId() const;
+  ulong getFirstLocalVarId() const
+  {
+    return theFunctionItemInfo->firstLocalVarId();
+  }
 
   void setArgumentValue(csize pos, const store::TempSeq_t& value);
 

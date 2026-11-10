@@ -58,24 +58,8 @@ ValueIndexCompareFunction::ValueIndexCompareFunction(
   for (csize i = 0; i < theNumColumns; ++i)
   {
     if (!collations[i].empty())
-    {
-      theCollators[i] = CollationFactory::createCollator(collations[i]);
-    }
-    else
-    {
-      theCollators[i] = NULL;
-    }
+      theCollators[i].reset(CollationFactory::createCollator(collations[i]));
   }
-}
-
-
-/******************************************************************************
-
-********************************************************************************/
-ValueIndexCompareFunction::~ValueIndexCompareFunction()
-{
-  for (csize i = 0; i < theCollators.size(); ++i)
-    delete theCollators[i];
 }
 
 
@@ -92,8 +76,8 @@ uint32_t ValueIndexCompareFunction::hash(const store::IndexKey* key) const
       continue;
 
     uint32_t const h = theNumericKeys ?
-      theNumericKeys->hash((*key)[i].getp(), theTimezone, theCollators[i]) :
-      (*key)[i]->hash(theTimezone, theCollators[i]);
+      theNumericKeys->hash((*key)[i].getp(), theTimezone, theCollators[i].get()) :
+      (*key)[i]->hash(theTimezone, theCollators[i].get());
 
     hval = hashfun::h32<uint32_t>(h, hval);
   }
@@ -122,7 +106,7 @@ bool ValueIndexCompareFunction::equal(
 
     try
     {
-      if (! i1->equals(i2.getp(), theTimezone, theCollators[i]))
+      if (! i1->equals(i2.getp(), theTimezone, theCollators[i].get()))
         return false;
     }
     catch (ZorbaException const& e)
@@ -182,7 +166,7 @@ long ValueIndexCompareFunction::compare(
     {
       return -1;
     }
-    else if ((result = i1->compare(i2, theTimezone, theCollators[i])))
+    else if ((result = i1->compare(i2, theTimezone, theCollators[i].get())))
     {
       return result;
     }

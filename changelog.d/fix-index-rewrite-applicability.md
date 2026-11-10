@@ -6,6 +6,7 @@
   `xs:base64Binary`, a number or another type fails) or XPTY0004 (types that
   cannot be compared) was skipped instead of raising the error. Such a join
   now uses an index only if the static types of both operands are strings or
-  untyped, both numeric, or of one atomic type with no untyped value; joins
-  of operands of static type `xs:anyAtomicType`, such as attributes of nodes
-  in a collection or of an external variable, run without an index.
+  untyped, both numeric, or atomic with no untyped value and one a subtype
+  of the other; joins of operands of static type `xs:anyAtomicType`, such as
+  attributes of nodes in a collection or of an external variable, run
+  without an index.

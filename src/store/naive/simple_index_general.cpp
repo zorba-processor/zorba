@@ -50,22 +50,7 @@ GeneralIndexCompareFunction::GeneralIndexCompareFunction(
   theTimezone(timezone)
 {
   if (!collation.empty())
-  {
-    theCollator = CollationFactory::createCollator(collation);
-  }
-  else
-  {
-    theCollator = NULL;
-  } 
-}
-
-
-/******************************************************************************
-
-********************************************************************************/
-GeneralIndexCompareFunction::~GeneralIndexCompareFunction()
-{
-  delete theCollator; 
+    theCollator.reset(CollationFactory::createCollator(collation));
 }
 
 
@@ -79,7 +64,7 @@ uint32_t GeneralIndexCompareFunction::hash(const store::Item* key) const
   if (key == NULL)
     return hval;
 
-  return hashfun::h32<uint32_t>(key->hash(theTimezone, theCollator), hval);
+  return hashfun::h32<uint32_t>(key->hash(theTimezone, theCollator.get()), hval);
 }
 
 
@@ -100,7 +85,7 @@ bool GeneralIndexCompareFunction::equal(
   if (key1->isNaN() || key2->isNaN())
     return key1->isNaN() && key2->isNaN();
 
-  if (! key1->equals(key2, theTimezone, theCollator))
+  if (! key1->equals(key2, theTimezone, theCollator.get()))
     return false;
   
   return true;
@@ -150,7 +135,7 @@ long GeneralIndexCompareFunction::compare(
 
     return (key2->isNaN() ? 0 : -1);
   }
-  else if ((result = key1->compare(key2, theTimezone, theCollator)))
+  else if ((result = key1->compare(key2, theTimezone, theCollator.get())))
   {
     return result;
   }
@@ -427,8 +412,15 @@ bool GeneralIndex::insert(store::Item_t& key, store::Item_t& node)
   case store::XS_DATETIME:
   case store::XS_DATE:
   case store::XS_TIME:
+
+  case store::JS_NULL:
   {
     return insertInMap(key, node, keyType, false);
+  }
+
+  case store::XS_DATETIME_STAMP:
+  {
+    return insertInMap(key, node, store::XS_DATETIME, false);
   }
 
   case store::XS_DURATION:
@@ -811,8 +803,15 @@ bool GeneralIndex::remove(const store::Item_t& key, const store::Item_t& node)
   case store::XS_DATETIME:
   case store::XS_DATE:
   case store::XS_TIME:
+
+  case store::JS_NULL:
   {
     return removeFromMap(key, node, keyType, false);
+  }
+
+  case store::XS_DATETIME_STAMP:
+  {
+    return removeFromMap(key, node, store::XS_DATETIME, false);
   }
 
   case store::XS_DURATION:
@@ -1550,7 +1549,10 @@ void ProbeGeneralIndexIterator::checkStringKeyType(const AtomicItem* key) const
 
   store::SchemaTypeCode keyType = key->getTypeCode();
 
+  // A value comparison casts an untyped key to xs:string, which compares
+  // with null.
   if (keyType != store::XS_UNTYPED_ATOMIC &&
+      keyType != store::JS_NULL &&
       keyType != store::XS_ANY_URI &&
       keyType != store::XS_STRING &&
       keyType != store::XS_NORMALIZED_STRING &&
@@ -1659,9 +1661,15 @@ void ProbeGeneralIndexIterator::initPoint()
     case store::XS_DATETIME:
     case store::XS_DATE:
     case store::XS_TIME:
-
+    case store::JS_NULL:
     {
       probeMap(keyType, key.getp());
+      break;
+    }
+
+    case store::XS_DATETIME_STAMP:
+    {
+      probeMap(store::XS_DATETIME, key.getp());
       break;
     }
 
@@ -1860,7 +1868,8 @@ void ProbeGeneralIndexIterator::initPoint()
 
     default:
     {
-      ZORBA_ASSERT(false);
+      RAISE_ERROR_NO_LOC(zerr::ZDTY0012_INDEX_KEY_TYPE_ERROR,
+      ERROR_PARAMS(theIndex->getName()->getStringValue()));
     }
     }
   }
@@ -1897,6 +1906,46 @@ void ProbeGeneralIndexIterator::initBox()
   }
   else if (haveLower || haveUpper)
   {
+    // jn:null() is less than every other atomic value and equal to itself
+    // (JSONiq), so a null bound selects the other keys by itself, and a null
+    // key is selected by the bounds alone. An untyped bound is not compared
+    // with a null key.
+    GeneralIndexCondition::RangeFlags& flags = theCondition->theRangeFlags;
+
+    struct RangeFlagsRestorer
+    {
+      GeneralIndexCondition::RangeFlags& theFlags;
+      const GeneralIndexCondition::RangeFlags theGiven;
+      ~RangeFlagsRestorer() { theFlags = theGiven; }
+    } restorer{flags, flags};
+
+    bool nullLower = (haveLower && lowerKey->getTypeCode() == store::JS_NULL);
+    bool nullUpper = (haveUpper && upperKey->getTypeCode() == store::JS_NULL);
+
+    bool selectsNullKeys =
+      (!haveLower || (nullLower && flags.theLowerBoundIncl)) &&
+      (!haveUpper ||
+       (nullUpper ?
+        flags.theUpperBoundIncl :
+        upperKey->getTypeCode() != store::XS_UNTYPED_ATOMIC));
+
+    if (nullLower)
+      haveLower = flags.theHaveLowerBound = false;
+
+    if (!haveLower && !haveUpper)
+    {
+      theIsFullProbe = true;
+
+      for (csize i = 0; i < store::XS_LAST; ++i)
+      {
+        if (idx->theMaps[i] == NULL || i == store::JS_NULL)
+          continue;
+
+        theMapBegins.push_back(idx->theMaps[i]->begin());
+        theMapEnds.push_back(idx->theMaps[i]->end());
+      }
+    }
+
     store::Item_t castItem;
 
     store::SchemaTypeCode lowerKeyType = 
@@ -1906,7 +1955,8 @@ void ProbeGeneralIndexIterator::initBox()
     (haveUpper ? upperKey->getTypeCode() : store::XS_LAST);
 
     store::SchemaTypeCode keyType = 
-    (lowerKeyType < upperKeyType ? lowerKeyType : upperKeyType);
+    (nullUpper ? store::JS_NULL :
+     lowerKeyType < upperKeyType ? lowerKeyType : upperKeyType);
 
     switch (keyType)
     {
@@ -1916,6 +1966,20 @@ void ProbeGeneralIndexIterator::initBox()
     case store::XS_TIME:
     {
       probeMap(keyType, lowerKey, upperKey);
+      break;
+    }
+
+    case store::XS_DATETIME_STAMP:
+    {
+      probeMap(store::XS_DATETIME, lowerKey, upperKey);
+      break;
+    }
+
+    // No other key is at most null; without bounds left, the other keys were
+    // selected above.
+    case store::JS_NULL:
+    case store::XS_LAST:
+    {
       break;
     }
 
@@ -2071,7 +2135,16 @@ void ProbeGeneralIndexIterator::initBox()
     }
 
     default:
-      ZORBA_ASSERT(false);
+    {
+      RAISE_ERROR_NO_LOC(zerr::ZDTY0012_INDEX_KEY_TYPE_ERROR,
+      ERROR_PARAMS(theIndex->getName()->getStringValue()));
+    }
+    }
+
+    if (selectsNullKeys && idx->theMaps[store::JS_NULL] != NULL)
+    {
+      theMapBegins.push_back(idx->theMaps[store::JS_NULL]->begin());
+      theMapEnds.push_back(idx->theMaps[store::JS_NULL]->end());
     }
   }
   else

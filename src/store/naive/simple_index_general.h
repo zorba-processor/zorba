@@ -18,6 +18,7 @@
 
 #include <cassert>
 #include <map>
+#include <memory>
 
 #include "simple_index.h"
 #include "store_defs.h"
@@ -38,15 +39,13 @@ class AtomicItem;
 class GeneralIndexCompareFunction
 {
 private:
-  long               theTimezone;
-  const XQPCollator* theCollator;
+  long                         theTimezone;
+  std::shared_ptr<XQPCollator> theCollator;  // copies share it
 
 public:
   GeneralIndexCompareFunction(long timezone, const std::string& collation);
 
-  ~GeneralIndexCompareFunction();
-
-  const XQPCollator* getCollator() const { return theCollator; }
+  const XQPCollator* getCollator() const { return theCollator.get(); }
 
   uint32_t hash(const store::Item* key) const;
 

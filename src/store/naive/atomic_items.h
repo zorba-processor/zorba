@@ -648,10 +648,7 @@ public:
   bool equals(
         const store::Item* item,
         long timezone = 0,
-        const XQPCollator* aCollation = 0) const
-  {
-    return item->getString() == theValue;
-  }
+        const XQPCollator* aCollation = 0) const;
 
   size_t alloc_size() const;
   size_t dynamic_size() const;
@@ -659,10 +656,7 @@ public:
   long compare(
         const Item* other,
         long timezone = 0,
-        const XQPCollator* aCollation = 0) const
-  {
-    return theValue.compare(other->getString());
-  }
+        const XQPCollator* aCollation = 0) const;
 
   bool getEBV() const;
 
