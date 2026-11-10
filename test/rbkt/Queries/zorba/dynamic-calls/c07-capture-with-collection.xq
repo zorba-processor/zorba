@@ -7,7 +7,7 @@ ddl:create(xs:QName("local:c"));
 variable $prefix := "v";
 variable $h := %an:sequential function() as xs:string
 {
-  dml:insert(xs:QName("local:c"), <e v="1"/>);
+  dml:insert-last(xs:QName("local:c"), <e v="1"/>);
   variable $nodes := dml:collection(xs:QName("local:c"));
   concat($prefix, string($nodes[1]/@v))
 };
