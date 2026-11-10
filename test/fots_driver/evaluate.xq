@@ -482,7 +482,7 @@ declare %private %ann:sequential function eval:assert-permutation(
 (:
  : http://dev.w3.org/2011/QT3-test-suite/catalog-schema.html#elem_assert-xml
  :)
-declare %private function eval:assert-xml(
+declare %private %ann:nondeterministic function eval:assert-xml(
   $result    as item()*,
   $expResult as element(),
   $baseURI   as xs:anyURI
