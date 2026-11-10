@@ -5,6 +5,8 @@ main, for: 1 deleted
 main, declared variable, called in a loop: deleted
 main, assigned variable, called in a loop: deleted
 main, declared variable, function item: 1 deleted
+main, inline function item: 1 deleted
+main, inline function item with a captured variable: 11 deleted
 function, declared variable: 1 deleted
 function, assigned variable: 1 deleted
 function, let: 11 deleted

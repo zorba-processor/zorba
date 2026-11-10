@@ -6,7 +6,10 @@ import module namespace m = "http://www.example.com/delete-after-local-refs" at
 
 import module namespace ddl =
   "http://zorba.io/modules/store/static/collections/ddl";
+import module namespace dml =
+  "http://zorba.io/modules/store/static/collections/dml";
 
+declare namespace an = "http://zorba.io/annotations";
 declare namespace err = "http://www.w3.org/2005/xqt-errors";
 
 ddl:create(xs:QName("m:c"));
@@ -62,6 +65,31 @@ variable $dynamicOutcome :=
   try {{ ddl:delete(xs:QName("m:c")); "deleted" }}
   catch * {{ m:clear(); fn:local-name-from-QName($err:code) }};
 
+ddl:create(xs:QName("m:c"));
+variable $inline := %an:sequential function() as xs:string
+{
+  dml:insert(xs:QName("m:c"), <e v="1"/>);
+  variable $nodes := dml:collection(xs:QName("m:c"));
+  fn:string($nodes[1]/@v)
+};
+variable $inlined := $inline();
+variable $inlineOutcome :=
+  try {{ ddl:delete(xs:QName("m:c")); "deleted" }}
+  catch * {{ m:clear(); fn:local-name-from-QName($err:code) }};
+
+ddl:create(xs:QName("m:c"));
+variable $k := 1;
+variable $closure := %an:sequential function() as xs:string
+{
+  dml:insert(xs:QName("m:c"), <e v="1"/>);
+  variable $nodes := dml:collection(xs:QName("m:c"));
+  fn:concat(fn:string($nodes[1]/@v), $k)
+};
+variable $captured := $closure();
+variable $closureOutcome :=
+  try {{ ddl:delete(xs:QName("m:c")); "deleted" }}
+  catch * {{ m:clear(); fn:local-name-from-QName($err:code) }};
+
 variable $fromFunction := m:from-function();
 
 fn:string-join((
@@ -74,5 +102,8 @@ fn:string-join((
             $assignedLoopOutcome),
   fn:concat("main, declared variable, function item: ", $dynamic, " ",
             $dynamicOutcome),
+  fn:concat("main, inline function item: ", $inlined, " ", $inlineOutcome),
+  fn:concat("main, inline function item with a captured variable: ",
+            $captured, " ", $closureOutcome),
   $fromFunction),
   "&#10;")
