@@ -162,6 +162,51 @@ static bool containsValueProbe(expr* e)
 }
 
 
+static bool isStringOrUntyped(const TypeManager* tm, const XQType& type)
+{
+  RootTypeManager& rtm = GENV_TYPESYSTEM;
+
+  return (TypeOps::is_subtype(tm, type, *rtm.STRING_TYPE_ONE) ||
+          TypeOps::is_subtype(tm, type, *rtm.UNTYPED_ATOMIC_TYPE_ONE));
+}
+
+
+static bool isAtomicAndNeverUntyped(const TypeManager* tm, const XQType& type)
+{
+  RootTypeManager& rtm = GENV_TYPESYSTEM;
+
+  return (TypeOps::is_subtype(tm, type, *rtm.ANY_ATOMIC_TYPE_ONE) &&
+          !TypeOps::is_subtype(tm, *rtm.UNTYPED_ATOMIC_TYPE_ONE, type));
+}
+
+
+/*******************************************************************************
+  Whether "=" between an item of prime type "type1" and one of prime type
+  "type2" cannot raise an error. A general index skips the pairs for which the
+  comparison raises one (an untyped value whose cast to the type of the other
+  item fails, or items of types that cannot be compared), so it selects what
+  the comparison selects only when there are no such pairs.
+********************************************************************************/
+static bool generalEqualityRaisesNoError(
+    const TypeManager* tm,
+    const XQType& type1,
+    const XQType& type2)
+{
+  // Compared as strings.
+  if (isStringOrUntyped(tm, type1) && isStringOrUntyped(tm, type2))
+    return true;
+
+  if (TypeOps::is_numeric(tm, type1) && TypeOps::is_numeric(tm, type2))
+    return true;
+
+  // Compared as values of one type, with no untyped value to cast.
+  return (isAtomicAndNeverUntyped(tm, type1) &&
+          isAtomicAndNeverUntyped(tm, type2) &&
+          (TypeOps::is_subtype(tm, type1, type2) ||
+           TypeOps::is_subtype(tm, type2, type1)));
+}
+
+
 /*******************************************************************************
   This rule analyzes the where clauses of flwor exprs to deterimne whether any
   predicate in a clause is a join predicate and whether the associated join
@@ -621,6 +666,9 @@ bool IndexJoinRule::isIndexJoinPredicate(PredicateInfo& predInfo)
     bool const innerFloat = TypeOps::is_subtype(tm, *primeInnerType, *rtm.FLOAT_TYPE_ONE, innerLoc);
     bool const outerFloat = TypeOps::is_subtype(tm, *primeOuterType, *rtm.FLOAT_TYPE_ONE, outerLoc);
     if (innerFloat != outerFloat)
+      return false;
+
+    if (!generalEqualityRaisesNoError(tm, *primeInnerType, *primeOuterType))
       return false;
 
     // TODO: allow domain exprs that return atomic items?

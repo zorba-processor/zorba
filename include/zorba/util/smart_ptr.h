@@ -17,6 +17,8 @@
 #ifndef ZORBA_SMARTPTR_API_H
 #define ZORBA_SMARTPTR_API_H
 
+#include <type_traits>
+
 #include <zorba/config.h>
 
 namespace zorba {
@@ -103,7 +105,10 @@ public:
     return assign (rhs);
   }
 
-  template <class otherT> SmartPtr& operator=(SmartPtr<otherT> const& rhs) {
+  // Only upcasts convert; a downcast needs an explicit cast on the raw pointer.
+  template <class otherT,
+            class = std::enable_if_t<std::is_convertible_v<otherT*, T*>>>
+  SmartPtr& operator=(SmartPtr<otherT> const& rhs) {
     return assign (rhs);
   }
 
