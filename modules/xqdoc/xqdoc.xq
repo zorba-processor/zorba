@@ -120,7 +120,7 @@ declare %an:nondeterministic function xqd:xqdoc(
  :  module contain invalid XML
  : @deprecated please use the fetch:content#1 and xqd:xqdoc-content#2 function
  :)
-declare function xqd:xqdoc(
+declare %an:nondeterministic function xqd:xqdoc(
   $module-uri as xs:string,
   $options as element(opt:enable)
 ) as element()
