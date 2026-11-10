@@ -58,6 +58,8 @@
 # endif
 # include <xercesc/util/XercesDefs.hpp>
 # include <xercesc/util/BinInputStream.hpp>
+# include <xercesc/util/Janitor.hpp>
+# include <xercesc/framework/XMLSchemaDescription.hpp>
 # include <zorbatypes/xerces_xmlcharray.h>
 #endif /* ZORBA_NO_XMLSCHEMA */
 
@@ -547,6 +549,19 @@ void Schema::registerXSD(
 
   try
   {
+    // The location hint of an import of an already loaded namespace is
+    // disregarded: the pool would reject the second grammar, and grammars
+    // cached with it would point into it after the parser deletes it.
+    if (theGrammarPool != NULL)
+    {
+      XMLChArray xerces_ns(xsdURL);
+      XMLSchemaDescription* desc =
+      theGrammarPool->createSchemaDescription(xerces_ns.get());
+      Janitor<XMLSchemaDescription> descJanitor(desc);
+      if (theGrammarPool->retrieveGrammar(desc) != NULL)
+        return;
+    }
+
     // The implementation class (what XMLReaderFactory::createXMLReader()
     // returns) is used directly for setXMLEntityResolver(), which the
     // SAX2XMLReader interface does not have.
