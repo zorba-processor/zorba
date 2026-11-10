@@ -152,8 +152,8 @@ static bool clauses_before_cannot_raise_error(const flwor_expr* flwor, csize cla
 
 /******************************************************************************
   True if each clause after the clause at clausePos gives at least one tuple for
-  every tuple it receives, so that none of them can skip the evaluation of the
-  return clause for a tuple of the clause at clausePos.
+  every tuple it receives, so that none of them can skip the evaluation of a
+  later clause or of the return clause for a tuple of the clause at clausePos.
 *******************************************************************************/
 static bool clauses_after_keep_every_tuple(const flwor_expr* flwor, csize clausePos)
 {
@@ -193,7 +193,7 @@ static bool clauses_after_keep_every_tuple(const flwor_expr* flwor, csize clause
 
 ////////////////////////////////////////////////////////////////////////////////
 //                                                                            //
-//  SubstVars                                                                //
+//  SubstVars                                                                 //
 //                                                                            //
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -454,9 +454,11 @@ RULE_REWRITE_PRE(EliminateUnusedLetVars)
 
         // O0 evaluates this domain once for each tuple it receives; folded, it is
         // evaluated only where its variable is referenced.
+        // For a trivial domain, safe_to_fold_var gives numRefs = 2 without counting.
         if (safe_to_fold_var(i, numRefs) &&
             (cannot_raise_error(domExpr) ||
-             (numRefs != 0 && clauses_after_keep_every_tuple(theFlwor, i))))
+             (expr_tools::count_variable_uses(theFlwor, var, 1, NULL) != 0 &&
+              clauses_after_keep_every_tuple(theFlwor, i))))
         {
           if (numRefs != 0)
             subst_vars(rCtx, var, domExpr, numRefs);
