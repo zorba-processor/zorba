@@ -134,6 +134,7 @@ class UDFunctionCallIteratorState : public FunctionCallIteratorState
 public:
   dynamic_context* theLocalDCtx;
   bool theIsLocalDCtxOwner;
+  ulong theFirstLocalVarId;
 
   PlanIter_t thePlan;
   PlanState* thePlanState;
@@ -165,21 +166,23 @@ public:
 
   /**
    * True if the body plan should be closed when the call completes. Always for
-   * a sequential function: until its body is closed, its local variables and
-   * the states of its let and for clauses keep the nodes they were bound to
-   * referenced, and the statements after the call see them as referenced
-   * (ddl:delete raises ZDDY0015). Otherwise not for a call from the main plan,
-   * which holds one state tree per call site, and not for a body with no
-   * function call inside: its state does not grow, and running it again after
-   * a reset is cheaper than opening it again (a function called in a loop).
-   * Profiling reports the states when the query ends. Requires the body plan
-   * to be open.
+   * a sequential function, with profiling too: until its body is closed, its
+   * local variables and the states of its let and for clauses keep the nodes
+   * they were bound to referenced, and the statements after the call see them
+   * as referenced (ddl:delete raises ZDDY0015). The profile then has no body
+   * under the call. Otherwise not for a call from the main plan, which holds
+   * one state tree per call site, and not for a body with no function call
+   * inside: its state does not grow, and running it again after a reset is
+   * cheaper than opening it again (a function called in a loop). Nor with
+   * profiling, which reports the states when the query ends. Requires the body
+   * plan to be open.
    */
   bool canReleaseBody(const PlanState& aCaller, bool isSequential) const
   {
-    return !aCaller.theProfile &&
-           (isSequential ||
-            (aCaller.theStackDepth > 0 && thePlanState->theHasUDFCalls));
+    return isSequential ||
+           (aCaller.theStackDepth > 0 &&
+            thePlanState->theHasUDFCalls &&
+            !aCaller.theProfile);
   }
 
   void bodyCompleted(PlanState& aCaller, bool isDynamic, bool isSequential);

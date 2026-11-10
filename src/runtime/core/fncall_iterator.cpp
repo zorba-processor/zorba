@@ -170,6 +170,7 @@ FunctionCallIteratorState::FunctionCallIteratorState():
 UDFunctionCallIteratorState::UDFunctionCallIteratorState():
   theLocalDCtx(NULL),
   theIsLocalDCtxOwner(true),
+  theFirstLocalVarId(1),
   thePlan(NULL),
   thePlanState(NULL),
   thePlanOpen(false),
@@ -246,6 +247,8 @@ void UDFunctionCallIteratorState::createBodyState(
     theLocalDCtx = functionItem->getDctx();
 
     theIsLocalDCtxOwner = false;
+
+    theFirstLocalVarId = functionItem->getFirstLocalVarId();
   }
   else
   {
@@ -345,6 +348,8 @@ void UDFunctionCallIteratorState::closeBody()
   // A closure dctx also holds the captured variables of its function item.
   if (theIsLocalDCtxOwner)
     theLocalDCtx->release_variables();
+  else
+    theLocalDCtx->release_variables_from(theFirstLocalVarId);
 }
 
 
