@@ -1237,6 +1237,7 @@ static expr* createCatchAll(
     const QueryLoc& loc)
 {
   trycatch_expr* trycatch = em->create_trycatch_expr(sctx, udf, loc, tryExpr);
+  trycatch->set_internal(true);
 
   catch_clause* clause = em->create_catch_clause();
   clause->add_nametest_h(new NodeNameTest(zstring(), zstring()));

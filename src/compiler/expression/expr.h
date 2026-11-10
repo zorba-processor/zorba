@@ -1034,6 +1034,9 @@ protected:
   std::vector<expr*>         theCatchExprs;
   std::vector<catch_clause*> theCatchClauses;
 
+  // Written by a rewrite: an error of the engine itself is not caught.
+  bool                       theIsInternal;
+
 protected:
   trycatch_expr(
       CompilerCB* ccb,
@@ -1046,6 +1049,10 @@ public:
   expr* get_try_expr() const { return theTryExpr; }
 
   void set_try_expr(expr* e) { theTryExpr = e; }
+
+  bool is_internal() const { return theIsInternal; }
+
+  void set_internal(bool v) { theIsInternal = v; }
 
   expr* get_catch_expr(csize i) const { return theCatchExprs[i]; }
 

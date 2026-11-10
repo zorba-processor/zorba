@@ -109,10 +109,12 @@ TryCatchIterator::TryCatchIterator(
     static_context* sctx,
     const QueryLoc& loc,
     PlanIter_t& aBlock,
-    std::vector<CatchClause>& aCatchClauses)
+    std::vector<CatchClause>& aCatchClauses,
+    bool isInternal)
   :
   UnaryBaseIterator<TryCatchIterator, TryCatchIteratorState> (sctx, loc, aBlock),
-  theCatchClauses(aCatchClauses)
+  theCatchClauses(aCatchClauses),
+  theIsInternal(isInternal)
 {
 }
 
@@ -693,6 +695,14 @@ bool isCatchable(ZorbaException const& e)
 }
 
 
+bool isEngineFault(ZorbaException const& e)
+{
+  return (!dynamic_cast<UserException const*>(&e) &&
+          (e.diagnostic() == zerr::ZXQP0002_ASSERT_FAILED ||
+           e.diagnostic() == zerr::ZXQP0003_INTERNAL_ERROR));
+}
+
+
 bool
 TryCatchIterator::nextImpl(store::Item_t& result, PlanState& planState) const
 {
@@ -713,7 +723,9 @@ TryCatchIterator::nextImpl(store::Item_t& result, PlanState& planState) const
   }
   catch (ZorbaException const& e)
   {
-    if (!isCatchable(e) || !matchedCatch(e, state, planState))
+    if (!isCatchable(e) ||
+        (theIsInternal && isEngineFault(e)) ||
+        !matchedCatch(e, state, planState))
     {
       throw;
     }

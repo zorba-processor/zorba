@@ -245,7 +245,7 @@ bool CreateInternalIndexIterator::nextImpl(
   catch (ZorbaException const& e)
   {
     // Not the result yet: the probes find no index and fall back to the domain (IndexJoinRule::rewriteJoin()).
-    if (!isCatchable(e))
+    if (!isCatchable(e) || isEngineFault(e))
       throw;
   }
 
