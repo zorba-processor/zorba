@@ -617,28 +617,21 @@ void Schema::registerXSD(
       handler.resetErrors();
     }
 
-    if (grammar != NULL)
+    // The pool rejects the grammar of a document whose target namespace (not
+    // the imported one) is loaded; grammars cached with it may point into it.
+    if (grammar != NULL && theGrammarPool != NULL &&
+        theGrammarPool->retrieveGrammar(grammar->getGrammarDescription()) != grammar)
     {
-      // The pool rejects a grammar whose namespace it already has, and the
-      // parser deletes it, while grammars cached from the same load may point
-      // into it.
-      if (theGrammarPool != NULL &&
-          theGrammarPool->retrieveGrammar(grammar->getGrammarDescription()) != grammar)
-      {
-        parser->setErrorHandler(NULL);
-        reader->setXMLEntityResolver(NULL);
-        parser->setProperty(XMLUni::fgXercesSecurityManager, NULL);
-        theRejectedGrammarParsers.push_back(std::move(schemaParser));
-      }
+      parser->setErrorHandler(NULL);
+      reader->setXMLEntityResolver(NULL);
+      parser->setProperty(XMLUni::fgXercesSecurityManager, NULL);
+      theRejectedGrammarParsers.push_back(std::move(schemaParser));
 
-      if (!XMLString::equals(grammar->getTargetNamespace(), xerces_xsdURL.get()))
-      {
-        RAISE_ERROR(err::XQST0059, loc,
-        ERROR_PARAMS(ZED(XQST0059_UnknownSchema_23o), xsdURL,
-                     BUILD_STRING("the schema document has target namespace \"",
-                                  StrX(grammar->getTargetNamespace()).localForm(),
-                                  "\"")));
-      }
+      RAISE_ERROR(err::XQST0059, loc,
+      ERROR_PARAMS(ZED(XQST0059_UnknownSchema_23o), xsdURL,
+                   BUILD_STRING("the schema document has the target namespace \"",
+                                StrX(grammar->getTargetNamespace()).localForm(),
+                                "\", which is already loaded")));
     }
 
     theHasXSD = true;
