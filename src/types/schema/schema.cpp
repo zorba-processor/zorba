@@ -540,7 +540,7 @@ void Schema::registerXSD(
     internal::StreamResource* stream,
     const QueryLoc& loc)
 {
-  std::unique_ptr<SchemaParser> schemaParser(new SchemaParser);
+  std::unique_ptr<SchemaParser> schemaParser = std::make_unique<SchemaParser>();
   OwningMemoryManager& parserMemoryManager = schemaParser->theMemoryManager;
   std::unique_ptr<SAX2XMLReader>& parser = schemaParser->theParser;
 
