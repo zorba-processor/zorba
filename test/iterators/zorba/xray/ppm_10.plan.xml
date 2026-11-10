@@ -1349,8 +1349,8 @@
 <iterator-tree description="shapes:intersect-plane">
   <TupleStreamIterator>
     <WhereIterator>
-      <LetIterator>
-        <LetVariable name="$$temp3" materialize="true"/>
+      <ForIterator>
+        <ForVariable name="$$context-item"/>
         <WhereIterator>
           <ForIterator>
             <ForVariable name="denom"/>
@@ -1450,13 +1450,13 @@
             <ForVarIterator varname="denom"/>
           </SpecificNumArithIterator_DivideOperation_DOUBLE>
         </SpecificNumArithIterator_SubtractOperation_DOUBLE>
-      </LetIterator>
+      </ForIterator>
       <TypedValueCompareIterator_DOUBLE>
-        <LetVarIterator varname="$$temp3"/>
+        <ForVarIterator varname="$$context-item"/>
         <SingletonIterator value="xs:double(0)"/>
       </TypedValueCompareIterator_DOUBLE>
     </WhereIterator>
-    <LetVarIterator varname="$$temp3"/>
+    <ForVarIterator varname="$$context-item"/>
   </TupleStreamIterator>
 </iterator-tree>
 <iterator-tree description="shapes:intersect-sphere">

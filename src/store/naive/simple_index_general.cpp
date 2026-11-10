@@ -610,6 +610,13 @@ bool GeneralIndex::insert(store::Item_t& key, store::Item_t& node)
         found = true;
     }
 
+    if (untypedItem->castToBoolean(castItem))
+    {
+      node2 = node;
+      if (insertInMap(castItem, node2, store::XS_BOOLEAN, true))
+        found = true;
+    }
+
     return found;
   }
 
@@ -971,6 +978,12 @@ bool GeneralIndex::remove(const store::Item_t& key, const store::Item_t& node)
         found = true;
     }
 
+    if (untypedItem->castToBoolean(castItem))
+    {
+      if (removeFromMap(castItem, node, store::XS_BOOLEAN, true))
+        found = true;
+    }
+
     return found;
   }
 
@@ -1105,6 +1118,10 @@ void GeneralHashIndex::clear()
 
     theMaps[i]->clear();
   }
+
+  theEmptyKeyNodes.clear();
+  theNumUntypedEntries = 0;
+  theNumMultiKeyNodes = 0;
 }
 
 
@@ -1383,6 +1400,10 @@ void GeneralTreeIndex::clear()
 
     theMaps[i]->clear();
   }
+
+  theEmptyKeyNodes.clear();
+  theNumUntypedEntries = 0;
+  theNumMultiKeyNodes = 0;
 }
 
 
@@ -1526,6 +1547,8 @@ ProbeGeneralIndexIterator::ProbeGeneralIndexIterator(const store::Index_t& idx)
   theIndex(static_cast<GeneralIndex*>(idx.getp())),
   theIsUntypedProbe(false),
   theIsFullProbe(false),
+  theSelectsEmptyKeys(false),
+  theEmptyKeyPos(0),
   theNumberKind(NOT_NUMBER)
 {
 }
@@ -1575,6 +1598,7 @@ void ProbeGeneralIndexIterator::init(const store::IndexCondition_t& cond,
   // The runtime calls init once per search item on the same iterator.
   theIsUntypedProbe = false;
   theIsFullProbe = false;
+  theSelectsEmptyKeys = false;
   theNumberKind = NOT_NUMBER;
   theResultSets.clear();
   theMapBegins.clear();
@@ -1848,6 +1872,11 @@ void ProbeGeneralIndexIterator::initPoint()
       {
         probeMap(store::XS_BASE64BINARY, castItem.getp());
       }
+
+      if (haveMap(store::XS_BOOLEAN) && untypedItem->castToBoolean(castItem))
+      {
+        probeMap(store::XS_BOOLEAN, castItem.getp());
+      }
       
       break;
     }
@@ -1874,6 +1903,8 @@ void ProbeGeneralIndexIterator::initBox()
 
   assert(theProbeKind == store::IndexCondition::BOX_VALUE ||
          !(haveLower && haveUpper));
+
+  theSelectsEmptyKeys = (!haveLower && !haveUpper);
 
   AtomicItem_t& lowerKey = theCondition->theLowerBound;
   AtomicItem_t& upperKey = theCondition->theUpperBound;
@@ -2109,6 +2140,12 @@ void ProbeGeneralIndexIterator::initBox()
         probeMap(store::XS_DURATION, altKey, altKey);
       }
 
+      // This cast can succeed together with one of the casts above.
+      if (idx->theMaps[store::XS_BOOLEAN] && untypedItem->castToBoolean(altKey))
+      {
+        probeMap(store::XS_BOOLEAN, altKey, altKey);
+      }
+
       break;
     }
 
@@ -2313,6 +2350,7 @@ void ProbeGeneralIndexIterator::open()
   else
   {
     theCurrentMap = 0;
+    theEmptyKeyPos = 0;
 
     if (!theMapBegins.empty())
     {
@@ -2456,6 +2494,13 @@ bool ProbeGeneralIndexIterator::next(store::Item_t& result)
         theIte = resultSet->begin();
         theEnd = resultSet->end();
       }
+    }
+
+    if (theSelectsEmptyKeys &&
+        theEmptyKeyPos < theIndex->theEmptyKeyNodes.size())
+    {
+      result = theIndex->theEmptyKeyNodes[theEmptyKeyPos++];
+      return true;
     }
   }
 

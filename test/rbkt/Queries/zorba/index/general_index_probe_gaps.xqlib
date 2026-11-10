@@ -17,10 +17,11 @@ declare namespace err = "http://www.w3.org/2005/xqt-errors";
 
 (: Every collection holds e elements whose key is untyped unless @t names a
    type. :)
-declare function m:key($e as element(e)) as xs:anyAtomicType
+declare function m:key($e as element(e)) as xs:anyAtomicType?
 {
   switch (fn:string($e/@t))
   case "y" return xs:gYear($e/@v)
+  case "bool" return xs:boolean($e/@v)
   case "x" return xs:hexBinary($e/@v)
   case "b" return xs:base64Binary($e/@v)
   case "f" return xs:float($e/@v)
@@ -84,6 +85,35 @@ by fn:data(./@v);
 
 declare %an:general-range %an:manual index m:PRange
 on nodes dml:collection(xs:QName("m:p"))//e
+by fn:data(./@v);
+
+(: Untyped keys, each castable to xs:boolean, and xs:boolean keys. :)
+declare collection m:bo as node()*;
+
+declare %an:general-equality %an:manual index m:BoEquality
+on nodes dml:collection(xs:QName("m:bo"))//e
+by (if (./@t eq "bool") then xs:boolean(./@v) else fn:data(./@v));
+
+declare %an:general-range %an:manual index m:BoRange
+on nodes dml:collection(xs:QName("m:bo"))//e
+by (if (./@t eq "bool") then xs:boolean(./@v) else fn:data(./@v));
+
+(: Elements without @v have the empty sequence as their key. :)
+declare collection m:em as node()*;
+
+declare %an:general-range %an:manual index m:EmRange
+on nodes dml:collection(xs:QName("m:em"))//e
+by fn:data(./@v);
+
+declare %an:general-range %an:manual index m:EmTypedRange
+on nodes dml:collection(xs:QName("m:em"))//e
+by (for $v in ./@v return fn:string($v)) as xs:string*;
+
+(: The same keys, maintained by an automatic index. :)
+declare collection m:ea as node()*;
+
+declare %an:general-range %an:automatic index m:EaRange
+on nodes dml:collection(xs:QName("m:ea"))
 by fn:data(./@v);
 
 (: NaN keys, typed and untyped. :)
@@ -311,4 +341,18 @@ declare %an:sequential function m:unique($name as xs:string,
   iddl:delete($index);
 
   fn:concat($name, ": ", $outcome)
+};
+
+(: Bound-less general and value range probes, each compared with every
+   domain node, which is the selection both stand for. :)
+declare function m:no-bounds($name as xs:string,
+                             $coll as xs:QName,
+                             $index as xs:QName) as xs:string*
+{
+  m:range(fn:concat($name, ", general"), $coll, $index, (), (), fn:true()),
+  m:result(fn:concat($name, ", value"),
+           m:ids(idml:probe-index-range-value($index, (), (),
+                                              fn:false(), fn:false(),
+                                              fn:false(), fn:false())),
+           m:ids(m:elements($coll)))
 };

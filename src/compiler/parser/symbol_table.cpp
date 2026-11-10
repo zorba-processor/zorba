@@ -269,6 +269,9 @@ xs_double* symbol_table::doubleval(char const* text, size_t length)
   try {
     return new xs_double(text);
   }
+  catch ( std::bad_alloc const& ) {
+    throw;
+  }
   catch ( std::exception const& ) {
     return NULL;
   }
@@ -278,6 +281,9 @@ xs_integer* symbol_table::integerval(char const* text, size_t length)
 {
   try {
     return new xs_integer(text);
+  }
+  catch ( std::bad_alloc const& ) {
+    throw;
   }
   catch ( std::exception const& ) {
     return NULL;
