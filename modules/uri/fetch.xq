@@ -55,7 +55,7 @@ declare option ver:module-version "1.0";
  : @see <a href="http://zorba.io/documentation/latest/zorba/architecture/uriresolvers">URI Resolvers</a>.
  : @see <a href="http://zorba.io/documentation/latest/zorba/specifications/options_and_annotations">Documentation of Zorba's annotations</a>.
  :)
-declare %an:streamable function fetch:content($uri as xs:string) as xs:string
+declare %an:nondeterministic %an:streamable function fetch:content($uri as xs:string) as xs:string
 {
   fetch:content($uri, "SOME_CONTENT")
 };
@@ -78,7 +78,7 @@ declare %an:streamable function fetch:content($uri as xs:string) as xs:string
  : @see <a href="http://zorba.io/documentation/latest/zorba/architecture/uriresolvers">URI Resolvers</a>.
  : @see <a href="http://zorba.io/documentation/latest/zorba/specifications/options_and_annotations">Documentation of Zorba's annotations</a>.
  :)
-declare %an:streamable function fetch:content($uri as xs:string, $entity-kind as xs:string)
+declare %an:nondeterministic %an:streamable function fetch:content($uri as xs:string, $entity-kind as xs:string)
 as xs:string
 {
   fetch:content($uri, $entity-kind, "UTF-8")
@@ -102,7 +102,7 @@ as xs:string
  : @see <a href="http://zorba.io/documentation/latest/zorba/architecture/uriresolvers">URI Resolvers</a>.
  : @see <a href="http://zorba.io/documentation/latest/zorba/specifications/options_and_annotations">Documentation of Zorba's annotations</a>.
  :)
-declare %an:streamable function fetch:content(
+declare %an:nondeterministic %an:streamable function fetch:content(
   $uri as xs:string,
   $entity-kind as xs:string,
   $encoding as xs:string)
@@ -121,7 +121,7 @@ as xs:string external;
  : @error uri:URI_UNRESOLVED_OR_NOSTREAM if the URI could not be resolved
  :   or did not resolve to a <tt>StreamResource</tt>.
  :)
-declare %an:streamable function fetch:content-binary($uri as xs:string)
+declare %an:nondeterministic %an:streamable function fetch:content-binary($uri as xs:string)
 as xs:base64Binary
 {
   fetch:content-binary($uri, "SOME_CONTENT")
@@ -141,7 +141,7 @@ as xs:base64Binary
  : @error uri:URI_UNRESOLVED_OR_NOSTREAM if the URI could not be resolved
  :   or did not resolve to a <tt>StreamResource</tt>.
  :)
-declare %an:streamable function fetch:content-binary(
+declare %an:nondeterministic %an:streamable function fetch:content-binary(
   $uri as xs:string,
   $entity-kind as xs:string)
 as xs:base64Binary external;
