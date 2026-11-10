@@ -116,6 +116,12 @@ by (if (./@t eq "y") then xs:gYear(./@v)
     else if (./@t eq "d") then xs:double(./@v)
     else fn:data(./@v));
 
+declare collection m:un as node()*;
+
+declare %an:unique %an:general-equality %an:automatic index m:UNEquality
+on nodes dml:collection(xs:QName("m:un"))
+by (if (./@t eq "f") then xs:float(./@v) else xs:decimal(./@v));
+
 declare collection m:ut as node()*;
 
 declare %an:unique %an:general-range %an:automatic index m:UTRange
