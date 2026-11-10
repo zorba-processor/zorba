@@ -288,6 +288,11 @@ FOREACH(TESTFILE ${TESTFILES})
       SET_TESTS_PROPERTIES ("${TESTNAME}-O2" PROPERTIES
         ENVIRONMENT "ZORBA_OPTLEVEL=O2" TIMEOUT 120)
     ENDIF ()
+    # The implicit timezone of a query is the host timezone (execute() replaces
+    # the one set by the .spec file), so these run with a fixed -06:00 offset.
+    IF (TESTNAME MATCHES "_tz_minus6$")
+      SET_TESTS_PROPERTIES ("${TESTNAME}" PROPERTIES ENVIRONMENT "TZ=UTC+6")
+    ENDIF ()
     # Boundary-value tests: a regression (e.g. a range that never stops at
     # the largest xs:integer) loops forever, so fail fast.
     IF (TESTNAME MATCHES "^test/rbkt/zorba/numerics/integer-")

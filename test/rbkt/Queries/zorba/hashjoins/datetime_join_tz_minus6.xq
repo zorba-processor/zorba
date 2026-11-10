@@ -1,7 +1,7 @@
 (: Hash joins between date/time values with and without a timezone, under the
-   implicit timezone -06:00 set in the .spec file: each join finds the same
-   matches as eq without an index. The data is empty unless the implicit
-   timezone is -06:00, so the joins are evaluated at run time. :)
+   implicit timezone -06:00 (TZ=UTC+6, see test/rbkt/Queries/CMakeLists.txt):
+   each join finds the same matches as eq without an index. The data is empty
+   under any other implicit timezone. :)
 let $doc :=
   if (implicit-timezone() eq xs:dayTimeDuration("-PT6H"))
   then

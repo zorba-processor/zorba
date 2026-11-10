@@ -1,8 +1,8 @@
 (: fn:distinct-values and group by on date/time values with and without a
-   timezone, under the implicit timezone -06:00 set in the .spec file: values
-   that eq finds equal are one distinct value and one group. The values are
-   empty unless the implicit timezone is -06:00, so they are compared at run
-   time. :)
+   timezone, under the implicit timezone -06:00 (TZ=UTC+6, see
+   test/rbkt/Queries/CMakeLists.txt): values that eq finds equal are one
+   distinct value and one group. The values are empty under any other implicit
+   timezone. :)
 let $values :=
   if (implicit-timezone() eq xs:dayTimeDuration("-PT6H"))
   then (xs:dateTime("2013-01-13T06:01:53"),

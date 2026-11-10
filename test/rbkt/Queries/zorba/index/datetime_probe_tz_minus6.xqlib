@@ -16,8 +16,7 @@ declare namespace an = "http://zorba.io/annotations";
 
 declare collection m:c as node()*;
 
-(: Empty unless the implicit timezone is -06:00 (set in the .spec file), so the
-   comparisons on it are evaluated at run time, under that timezone. :)
+(: Empty under any implicit timezone other than -06:00. :)
 declare variable $m:data :=
   if (fn:implicit-timezone() eq xs:dayTimeDuration("-PT6H"))
   then (<e id="1" dt="2013-01-13T06:01:53" d="2013-01-13" t="06:01:53"/>,
