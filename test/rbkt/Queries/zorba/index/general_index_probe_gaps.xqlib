@@ -106,6 +106,13 @@ declare %an:general-range %an:manual index m:EmTypedRange
 on nodes dml:collection(xs:QName("m:em"))//e
 by (for $v in ./@v return fn:string($v)) as xs:string*;
 
+(: The same keys, maintained by an automatic index. :)
+declare collection m:ea as node()*;
+
+declare %an:general-range %an:automatic index m:EaRange
+on nodes dml:collection(xs:QName("m:ea"))
+by fn:data(./@v);
+
 (: NaN keys, typed and untyped. :)
 declare collection m:n as node()*;
 
@@ -307,4 +314,18 @@ declare %an:sequential function m:unique($name as xs:string,
   iddl:delete($index);
 
   fn:concat($name, ": ", $outcome)
+};
+
+(: Bound-less general and value range probes, each compared with every
+   domain node, which is the selection both stand for. :)
+declare function m:no-bounds($name as xs:string,
+                             $coll as xs:QName,
+                             $index as xs:QName) as xs:string*
+{
+  m:range(fn:concat($name, ", general"), $coll, $index, (), (), fn:true()),
+  m:result(fn:concat($name, ", value"),
+           m:ids(idml:probe-index-range-value($index, (), (),
+                                              fn:false(), fn:false(),
+                                              fn:false(), fn:false())),
+           m:ids(m:elements($coll)))
 };
