@@ -1,8 +1,3 @@
-<iterator-tree description="const-folded expr">
-  <FunctionTraceIterator>
-    <FnConcatIterator/>
-  </FunctionTraceIterator>
-</iterator-tree>
 <iterator-tree description="main query">
   <SequentialIterator>
     <CtxVarDeclareIterator varid="4" varname="coll">
@@ -46,7 +41,11 @@
         <ReturnClause>
           <SequentialIterator>
             <ApplyIterator>
-              <FnConcatIterator/>
+              <UDFunctionCallIterator function="local:test-sequential">
+                <UDFunctionArgs>
+                  <ForVarIterator varname="pos"/>
+                </UDFunctionArgs>
+              </UDFunctionCallIterator>
             </ApplyIterator>
             <ForVarIterator varname="w"/>
           </SequentialIterator>
@@ -54,4 +53,7 @@
       </FLWORIterator>
     </SequentialIterator>
   </SequentialIterator>
+</iterator-tree>
+<iterator-tree description="local:test-sequential">
+  <FnConcatIterator/>
 </iterator-tree>
