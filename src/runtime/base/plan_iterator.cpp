@@ -82,7 +82,8 @@ PlanState::PlanState(
   theProfile( Properties::instance().getCollectProfile() ),
   theBlockOwned(true),
   theHasUDFCalls(false),
-  theCompletedCall(NULL)
+  theCompletedCall(NULL),
+  theCreatedStates(NULL)
 {
   assert(globalDctx != NULL && localDctx != NULL);
   theBlock = new int8_t[theBlockSize];
@@ -107,7 +108,8 @@ PlanState::PlanState(PlanState& aPlanState):
       theProfile(aPlanState.theProfile),
       theBlockOwned(false),
       theHasUDFCalls(aPlanState.theHasUDFCalls),
-      theCompletedCall(NULL)
+      theCompletedCall(NULL),
+      theCreatedStates(NULL)
 {
 }
 

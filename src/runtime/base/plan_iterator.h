@@ -19,6 +19,8 @@
 
 #include <chrono>
 #include <stack>
+#include <utility>
+#include <vector>
 
 #include "common/shared_types.h"
 
@@ -146,10 +148,19 @@ class QueryResources;
 
   theCompletedCall: The call in this plan that completed last and has its body
                     still open (see UDFunctionCallIteratorState::bodyCompleted).
+
+  theCreatedStates: While PlanWrapper::open() runs, the states created so far
+                    in theBlock, in order, with the function that destroys
+                    each: if the open fails, close() cannot run (it would reach
+                    iterators whose state was never created), so PlanWrapper
+                    destroys these. NULL at all other times.
 ********************************************************************************/
 class PlanState
 {
 public:
+  typedef std::vector<std::pair<uint32_t, void (*)(PlanState&, uint32_t)> >
+  CreatedStates;
+
   int8_t                  * theBlock;
 
   uint32_t                  theBlockSize;
@@ -187,6 +198,8 @@ public:
   bool                      theHasUDFCalls;
 
   class UDFunctionCallIteratorState * theCompletedCall;
+
+  CreatedStates           * theCreatedStates;
 
 public:
   PlanState(
@@ -443,6 +456,19 @@ public:
     stateOffset = offset;
     offset += StateTraitsImpl<T>::getStateSize();
     new (planState.theBlock + stateOffset)T();
+
+    if (planState.theCreatedStates != NULL)
+    {
+      try
+      {
+        planState.theCreatedStates->emplace_back(stateOffset, &destroyState);
+      }
+      catch (...)
+      {
+        destroyState(planState, stateOffset);
+        throw;
+      }
+    }
   }
 
   static void initState(PlanState& planState, uint32_t& stateOffset)
