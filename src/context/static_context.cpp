@@ -3945,8 +3945,17 @@ void static_context::set_default_collation(
     const std::string& uri,
     const QueryLoc& loc)
 {
-  if (theDefaultCollation != NULL || !is_known_collation(uri))
-    throw XQUERY_EXCEPTION(err::XQST0038, ERROR_LOC(loc));
+  if (theDefaultCollation != NULL)
+    throw XQUERY_EXCEPTION(
+      err::XQST0038,
+      ERROR_PARAMS(ZED(XQST0038_MultipleDefaultCollations)),
+      ERROR_LOC(loc));
+
+  if (!is_known_collation(uri))
+    throw XQUERY_EXCEPTION(
+      err::XQST0038,
+      ERROR_PARAMS(ZED(XQST0038_UnknownCollation_2), uri),
+      ERROR_LOC(loc));
 
   zstring const resolvedUri( resolve_relative_uri(uri) );
 

@@ -384,7 +384,7 @@ char const* get_help_msg() {
       "Print a trailing newline after the result of the query.\n\n"
 
     HELP_OPT( "--timezone <minutes>" )
-      "Set implicit time zone (in minutes).\n\n"
+      "Set the implicit timezone (in minutes) of every execution. Without this option, each execution uses the timezone of the host at its start.\n\n"
 
     ////////// u //////////////////////////////////////////////////////////////
 
