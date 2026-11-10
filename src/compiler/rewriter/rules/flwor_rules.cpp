@@ -150,9 +150,50 @@ static bool clauses_before_cannot_raise_error(const flwor_expr* flwor, csize cla
 }
 
 
+/******************************************************************************
+  True if each clause after the clause at clausePos gives at least one tuple for
+  every tuple it receives, so that none of them can skip the evaluation of the
+  return clause for a tuple of the clause at clausePos.
+*******************************************************************************/
+static bool clauses_after_keep_every_tuple(const flwor_expr* flwor, csize clausePos)
+{
+  for (csize i = clausePos + 1; i < flwor->num_clauses(); ++i)
+  {
+    const flwor_clause* c = flwor->get_clause(i);
+
+    switch (c->get_kind())
+    {
+    case flwor_clause::for_clause:
+    {
+      const for_clause* fc = static_cast<const for_clause*>(c);
+      SequenceType::Quantifier q = fc->get_expr()->get_return_type()->get_quantifier();
+
+      if (!fc->is_allowing_empty() &&
+          q != SequenceType::QUANT_ONE &&
+          q != SequenceType::QUANT_PLUS)
+        return false;
+
+      break;
+    }
+    case flwor_clause::let_clause:
+    case flwor_clause::groupby_clause:
+    case flwor_clause::orderby_clause:
+    case flwor_clause::count_clause:
+    case flwor_clause::materialize_clause:
+      break;
+
+    default:
+      return false;
+    }
+  }
+
+  return true;
+}
+
+
 ////////////////////////////////////////////////////////////////////////////////
 //                                                                            //
-//  SubstVars                                                                 //
+//  SubstVars                                                                //
 //                                                                            //
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -411,7 +452,11 @@ RULE_REWRITE_PRE(EliminateUnusedLetVars)
           modified = true;
         }
 
-        if (safe_to_fold_var(i, numRefs))
+        // O0 evaluates this domain once for each tuple it receives; folded, it is
+        // evaluated only where its variable is referenced.
+        if (safe_to_fold_var(i, numRefs) &&
+            (cannot_raise_error(domExpr) ||
+             (numRefs != 0 && clauses_after_keep_every_tuple(theFlwor, i))))
         {
           if (numRefs != 0)
             subst_vars(rCtx, var, domExpr, numRefs);
@@ -1227,7 +1272,8 @@ RULE_REWRITE_PRE(RefactorPredFLWOR)
         !expr_tools::calls_unproven_function(flwor) &&
         (elseExpr->is_simple() || elseExpr->is_vacuous()) &&
         !elseExpr->isNonDiscardable() &&
-        elseExpr->get_return_type()->is_empty())
+        elseExpr->get_return_type()->is_empty() &&
+        cannot_raise_error(elseExpr))
     {
       flwor_clause* lastClause = flwor->get_clause(flwor->num_clauses() - 1);
 
