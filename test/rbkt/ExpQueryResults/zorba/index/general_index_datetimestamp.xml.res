@@ -18,7 +18,6 @@ lower null: 1 2 3 4 5
 upper null: 4
 lower null exclusive: 1 2 3 5
 upper null exclusive: none
-null to dateTimeStamp: 1 2 3 4
-exclusive null to dateTimeStamp: 1 2 3
-dateTime to null: none
+dateTime to dateTimeStamp: 1 2 3
 null to null: 4
+null to dateTimeStamp: ZDDY0034
