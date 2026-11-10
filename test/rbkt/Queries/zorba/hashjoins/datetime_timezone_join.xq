@@ -1,12 +1,16 @@
 (: Hash joins between date/time values with and without a timezone, under the
    implicit timezone -06:00 set in the .spec file: each join finds the same
-   matches as eq without an index. :)
+   matches as eq without an index. The data is empty unless the implicit
+   timezone is -06:00, so the joins are evaluated at run time. :)
 let $doc :=
-  <r>
-    <e dt="2013-01-13T06:01:53" d="2013-01-13" t="06:01:53"/>
-    <e dt="2013-01-13T12:01:53Z" d="2013-01-13-06:00" t="12:01:53Z"/>
-    <e dt="2013-01-13T06:01:54" d="2013-01-14" t="06:01:54"/>
-  </r>
+  if (implicit-timezone() eq xs:dayTimeDuration("-PT6H"))
+  then
+    <r>
+      <e dt="2013-01-13T06:01:53" d="2013-01-13" t="06:01:53"/>
+      <e dt="2013-01-13T12:01:53Z" d="2013-01-13-06:00" t="12:01:53Z"/>
+      <e dt="2013-01-13T06:01:54" d="2013-01-14" t="06:01:54"/>
+    </r>
+  else <r/>
 return (
   for $x in (xs:dateTimeStamp("2013-01-13T06:01:53-06:00"),
              xs:dateTime("2013-01-13T12:01:53Z"),

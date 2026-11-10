@@ -16,10 +16,14 @@ declare namespace an = "http://zorba.io/annotations";
 
 declare collection m:c as node()*;
 
+(: Empty unless the implicit timezone is -06:00 (set in the .spec file), so the
+   comparisons on it are evaluated at run time, under that timezone. :)
 declare variable $m:data :=
-  (<e id="1" dt="2013-01-13T06:01:53" d="2013-01-13" t="06:01:53"/>,
-   <e id="2" dt="2013-01-13T12:01:53Z" d="2013-01-13-06:00" t="12:01:53Z"/>,
-   <e id="3" dt="2013-01-13T06:01:54" d="2013-01-14" t="06:01:54"/>);
+  if (fn:implicit-timezone() eq xs:dayTimeDuration("-PT6H"))
+  then (<e id="1" dt="2013-01-13T06:01:53" d="2013-01-13" t="06:01:53"/>,
+        <e id="2" dt="2013-01-13T12:01:53Z" d="2013-01-13-06:00" t="12:01:53Z"/>,
+        <e id="3" dt="2013-01-13T06:01:54" d="2013-01-14" t="06:01:54"/>)
+  else ();
 
 declare %an:manual %an:value-equality index m:dt-value
 on nodes dml:collection(xs:QName("m:c"))
