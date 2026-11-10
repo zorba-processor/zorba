@@ -400,6 +400,16 @@ public:
   Image entries are skipped too, because their exact keys are in the LONG or
   DECIMAL map.
 
+  theSelectsEmptyKeys:
+  --------------------
+  Set to true if the condition is a range condition with no bounds, which
+  selects every domain node: after the maps, the nodes whose key is the empty
+  sequence are returned too.
+
+  theEmptyKeyPos:
+  ---------------
+  The position in theEmptyKeyNodes of the index of the next such node.
+
   theNumberKind:
   --------------
   Whether the search key is an xs:decimal (or a subtype), an xs:double (or an
@@ -469,6 +479,10 @@ protected:
   bool                                  theIsUntypedProbe;
 
   bool                                  theIsFullProbe;
+
+  bool                                  theSelectsEmptyKeys;
+
+  csize                                 theEmptyKeyPos;
 
   NumberKind                            theNumberKind;
 
