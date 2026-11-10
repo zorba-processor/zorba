@@ -22,7 +22,6 @@ declare function m:key($e as element(e)) as xs:anyAtomicType?
   switch (fn:string($e/@t))
   case "y" return xs:gYear($e/@v)
   case "bool" return xs:boolean($e/@v)
-  case "date" return xs:date($e/@v)
   case "x" return xs:hexBinary($e/@v)
   case "b" return xs:base64Binary($e/@v)
   case "f" return xs:float($e/@v)
@@ -106,29 +105,6 @@ by fn:data(./@v);
 declare %an:general-range %an:manual index m:EmTypedRange
 on nodes dml:collection(xs:QName("m:em"))//e
 by (for $v in ./@v return fn:string($v)) as xs:string*;
-
-(: Unique indexes whose keys are untyped unless @t names a type. :)
-declare collection m:uh as node()*;
-
-declare %an:unique %an:general-equality %an:automatic index m:UHEquality
-on nodes dml:collection(xs:QName("m:uh"))
-by (if (./@t eq "y") then xs:gYear(./@v)
-    else if (./@t eq "d") then xs:double(./@v)
-    else fn:data(./@v));
-
-declare collection m:un as node()*;
-
-declare %an:unique %an:general-equality %an:automatic index m:UNEquality
-on nodes dml:collection(xs:QName("m:un"))
-by (if (./@t eq "f") then xs:float(./@v) else xs:decimal(./@v));
-
-declare collection m:ut as node()*;
-
-declare %an:unique %an:general-range %an:automatic index m:UTRange
-on nodes dml:collection(xs:QName("m:ut"))
-by (if (./@t eq "date") then xs:date(./@v)
-    else if (./@t eq "d") then xs:double(./@v)
-    else fn:data(./@v));
 
 (: NaN keys, typed and untyped. :)
 declare collection m:n as node()*;
@@ -329,25 +305,6 @@ declare %an:sequential function m:unique($name as xs:string,
 
   dml:delete(dml:collection(xs:QName("m:u")));
   iddl:delete($index);
-
-  fn:concat($name, ": ", $outcome)
-};
-
-(: Inserts $rows into $coll in one update and reports whether it raised. :)
-declare %an:sequential function m:insert($name as xs:string,
-                                         $coll as xs:QName,
-                                         $rows as element(e)*) as xs:string
-{
-  variable $outcome :=
-    try
-    {{
-      dml:insert($coll, $rows);
-      "inserted"
-    }}
-    catch *
-    {
-      fn:local-name-from-QName($err:code)
-    };
 
   fn:concat($name, ": ", $outcome)
 };
