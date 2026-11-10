@@ -17,6 +17,7 @@
 #include "runtime/visitors/planiter_visitor.h"
 #include "runtime/indexing/index_ddl.h"
 #include "runtime/core/trycatch.h"
+#include "runtime/core/var_iterators.h"
 #include "runtime/api/plan_wrapper.h"
 #include "runtime/api/plan_iterator_wrapper.h"
 
