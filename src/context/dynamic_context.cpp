@@ -124,6 +124,8 @@ dynamic_context::VarValue::VarValue(const VarValue& other)
 dynamic_context::dynamic_context(dynamic_context* parent)
   :
   theParent(NULL),
+  theCurrentDateTimeSetByHost(false),
+  theTimezoneSetByHost(false),
   keymap(NULL),
   theAvailableIndices(NULL),
   theAvailableMaps(NULL),
@@ -240,6 +242,7 @@ void dynamic_context::set_implicit_timezone(long tzone_seconds)
     throw XQUERY_EXCEPTION(err::FODT0003, ERROR_PARAMS(tzone_seconds));
 
   theTimezone = tzone_seconds;
+  theTimezoneSetByHost = true;
 }
 
 
@@ -258,6 +261,7 @@ long dynamic_context::get_implicit_timezone() const
 void dynamic_context::set_current_date_time(const store::Item_t& aDateTimeItem)
 {
   this->theCurrentDateTimeStamp = aDateTimeItem;
+  theCurrentDateTimeSetByHost = true;
 }
 
 
@@ -272,7 +276,11 @@ void dynamic_context::reset_current_date_time()
   time::ztm tm;
   time::get_localtime( &tm, sec );
 
-  set_implicit_timezone( tm.ZTM_GMTOFF );
+  if (!theTimezoneSetByHost)
+    theTimezone = tm.ZTM_GMTOFF;
+
+  if (theCurrentDateTimeSetByHost)
+    return;
 
   GENV_ITEMFACTORY->createDateTimeStamp(
     theCurrentDateTimeStamp,
