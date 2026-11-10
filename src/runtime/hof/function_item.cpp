@@ -149,7 +149,8 @@ void FunctionItemInfo::serialize(::zorba::serialization::Archiver& ar)
   if (ar.is_serializing_out())
   {
     uint32_t planStateSize;
-    (void)static_cast<user_function*>(theFunction)->getPlan(planStateSize, 1);
+    (void)static_cast<user_function*>(theFunction)->getPlan(planStateSize,
+                                                            firstLocalVarId());
   }
 }
 
@@ -1042,16 +1043,6 @@ void FunctionItem::setArgumentValue(csize pos, const store::TempSeq_t& value)
   }
 
   assert(false);
-}
-
-
-/*******************************************************************************
-
-********************************************************************************/
-ulong FunctionItem::getMaxInScopeVarId() const
-{
-  return theFunctionItemInfo->
-         theInScopeVarIds[theFunctionItemInfo->theInScopeVarIds.size()-1];
 }
 
 
