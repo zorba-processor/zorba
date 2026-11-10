@@ -26,6 +26,15 @@
 namespace zorba
 {
 
+class ZorbaException;
+
+// A timeout or running out of memory ends the query: no catch clause catches it.
+bool isCatchable(ZorbaException const& e);
+
+// An assertion or internal error of the engine, not raised by fn:error().
+bool isEngineFault(ZorbaException const& e);
+
+
 class TryCatchIteratorState : public  PlanIteratorState 
 {
 public:
@@ -96,6 +105,9 @@ public:
 protected:
   std::vector<CatchClause> theCatchClauses;
 
+  // Written by a rewrite (see trycatch_expr::theIsInternal).
+  bool                     theIsInternal;
+
 public:
   SERIALIZABLE_CLASS(TryCatchIterator);
 
@@ -109,6 +121,7 @@ public:
     (UnaryBaseIterator<TryCatchIterator, TryCatchIteratorState>*)this);
 
     ar & theCatchClauses;
+    ar & theIsInternal;
   }
 
 
@@ -117,7 +130,8 @@ public:
         static_context* sctx,
         const QueryLoc& loc,
         PlanIter_t& aBlock,
-        std::vector<CatchClause>& aCatchClauses);
+        std::vector<CatchClause>& aCatchClauses,
+        bool isInternal = false);
 
   virtual ~TryCatchIterator();
   

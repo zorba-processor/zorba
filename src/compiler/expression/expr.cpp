@@ -1022,7 +1022,8 @@ trycatch_expr::trycatch_expr(
     expr* tryExpr)
   :
   expr(ccb, sctx, udf, loc, trycatch_expr_kind),
-  theTryExpr(tryExpr)
+  theTryExpr(tryExpr),
+  theIsInternal(false)
 {
   compute_scripting_kind();
 }

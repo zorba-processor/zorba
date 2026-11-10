@@ -45,13 +45,26 @@
           </HoistIterator>
         </ForVariable>
         <ForVariable name="anzahl">
-          <ProbeIndexPointValueIterator>
-            <SingletonIterator value="xs:QName(,,tempIndex0)"/>
+          <TryCatchIterator>
+            <ProbeIndexPointValueIterator>
+              <SingletonIterator value="xs:QName(,,tempIndex0)"/>
+              <UnhoistIterator>
+                <ForVarIterator varname="$$opt_temp_1"/>
+              </UnhoistIterator>
+            </ProbeIndexPointValueIterator>
+            <UnhoistIterator>
+              <LetVarIterator varname="$$opt_temp_0"/>
+            </UnhoistIterator>
+          </TryCatchIterator>
+        </ForVariable>
+        <WhereClause>
+          <TypedValueCompareIterator_INTEGER>
+            <ForVarIterator varname="anzahl"/>
             <UnhoistIterator>
               <ForVarIterator varname="$$opt_temp_1"/>
             </UnhoistIterator>
-          </ProbeIndexPointValueIterator>
-        </ForVariable>
+          </TypedValueCompareIterator_INTEGER>
+        </WhereClause>
         <ReturnClause>
           <ElementIterator copyInputNodes="false">
             <SingletonIterator value="xs:QName(,,gruppe)"/>
