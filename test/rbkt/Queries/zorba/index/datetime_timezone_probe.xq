@@ -7,7 +7,7 @@ import module namespace m = "http://www.example.com/datetime-timezone-probe" at
 m:init();
 
 fn:string-join((
-  m:probe("dt", xs:dateTimeStamp("2013-01-13T06:01:53-06:00")),
+  m:probe("dt", xs:dateTime("2013-01-13T06:01:53-06:00")),
   m:probe("dt", xs:dateTime("2013-01-13T12:01:53Z")),
   m:probe("dt", xs:dateTime("2013-01-13T06:01:53")),
   m:probe("d", xs:date("2013-01-13-06:00")),
