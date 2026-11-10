@@ -419,6 +419,7 @@ Schema::~Schema()
   {
     SYNC_CODE(AutoMutex(GENV_TYPESYSTEM.getXercesMutex());)
 
+    theRejectedGrammarParsers.clear();
     delete theGrammarPool;
   }
 
@@ -539,9 +540,9 @@ void Schema::registerXSD(
     internal::StreamResource* stream,
     const QueryLoc& loc)
 {
-  // Frees, after the parser, what its constructors keep when an allocation fails.
-  OwningMemoryManager parserMemoryManager;
-  std::unique_ptr<SAX2XMLReader> parser;
+  std::unique_ptr<SchemaParser> schemaParser(new SchemaParser);
+  OwningMemoryManager& parserMemoryManager = schemaParser->theMemoryManager;
+  std::unique_ptr<SAX2XMLReader>& parser = schemaParser->theParser;
 
   TRACE("url=" << xsdURL << " loc=" << loc);
 
@@ -608,11 +609,36 @@ void Schema::registerXSD(
     //parser->loadGrammar("file:///location/file.xsd",
     //                    Grammar::SchemaGrammarType, true);
 
+    Grammar* grammar =
     parser->loadGrammar(xsdURL, Grammar::SchemaGrammarType, true);
 
     if (handler.getSawErrors())
     {
       handler.resetErrors();
+    }
+
+    if (grammar != NULL)
+    {
+      // The pool rejects a grammar whose namespace it already has, and the
+      // parser deletes it, while grammars cached from the same load may point
+      // into it.
+      if (theGrammarPool != NULL &&
+          theGrammarPool->retrieveGrammar(grammar->getGrammarDescription()) != grammar)
+      {
+        parser->setErrorHandler(NULL);
+        reader->setXMLEntityResolver(NULL);
+        parser->setProperty(XMLUni::fgXercesSecurityManager, NULL);
+        theRejectedGrammarParsers.push_back(std::move(schemaParser));
+      }
+
+      if (!XMLString::equals(grammar->getTargetNamespace(), xerces_xsdURL.get()))
+      {
+        RAISE_ERROR(err::XQST0059, loc,
+        ERROR_PARAMS(ZED(XQST0059_UnknownSchema_23o), xsdURL,
+                     BUILD_STRING("the schema document has target namespace \"",
+                                  StrX(grammar->getTargetNamespace()).localForm(),
+                                  "\"")));
+      }
     }
 
     theHasXSD = true;
