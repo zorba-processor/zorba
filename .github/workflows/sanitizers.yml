@@ -62,6 +62,74 @@ jobs:
           key: ccache-v2-asan-${{ github.sha }}
           restore-keys: ccache-v2-asan-
 
+      # Xerces-C built with the asan preset's sanitizer flags, so ASan and UBSan
+      # also check the code inside it; it replaces the image's uninstrumented
+      # build in /usr/local of the test container. Same fork, tag and commit as
+      # the image (read from its Dockerfile). The key holds the image ID (Xerces
+      # links the image's ICU) and a hash of the flags.
+      - name: Xerces-C build parameters
+        id: xerces
+        run: |
+          df=docker/builder-latest/Dockerfile
+          arg() { sed -n "s/^ARG $1=//p" "$df"; }
+          python3 - >> "$GITHUB_OUTPUT" <<'EOF'
+          import hashlib, json
+          preset = next(p for p in json.load(open('CMakePresets.json'))['configurePresets']
+                        if p['name'] == 'asan')['cacheVariables']
+          print('cflags=' + preset['CMAKE_CXX_FLAGS_RELWITHDEBINFO'])
+          print('ldflags=' + preset['CMAKE_SHARED_LINKER_FLAGS'])
+          flags = preset['CMAKE_CXX_FLAGS_RELWITHDEBINFO'] + '|' + preset['CMAKE_SHARED_LINKER_FLAGS']
+          print('flags=' + hashlib.sha256(flags.encode()).hexdigest()[:16])
+          EOF
+          {
+            echo "repo=$(arg XERCES_REPO)"
+            echo "tag=$(arg XERCES_TAG)"
+            echo "commit=$(arg XERCES_COMMIT)"
+            echo "image=$(docker image inspect zorba-builder:ci --format '{{.Id}}' | sed 's/^sha256://' | cut -c1-16)"
+          } >> "$GITHUB_OUTPUT"
+          cat "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@v6
+        with:
+          path: .xerces-asan
+          key: xerces-asan-v1-${{ steps.xerces.outputs.commit }}-${{ steps.xerces.outputs.image }}-${{ steps.xerces.outputs.flags }}
+
+      - name: Build Xerces-C under sanitizers
+        env:
+          XERCES_REPO: ${{ steps.xerces.outputs.repo }}
+          XERCES_TAG: ${{ steps.xerces.outputs.tag }}
+          XERCES_COMMIT: ${{ steps.xerces.outputs.commit }}
+          SAN_CFLAGS: ${{ steps.xerces.outputs.cflags }}
+          SAN_LDFLAGS: ${{ steps.xerces.outputs.ldflags }}
+        run: |
+          docker run --rm \
+            -e XERCES_REPO -e XERCES_TAG -e XERCES_COMMIT -e SAN_CFLAGS -e SAN_LDFLAGS \
+            -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" \
+            -v "$PWD":/src -w /src zorba-builder:ci sh -c '
+              set -e
+              if [ ! -f .xerces-asan/lib/libxerces-c.so ]; then
+                git clone --depth 1 --branch "$XERCES_TAG" "$XERCES_REPO" /tmp/xerces
+                test "$(git -C /tmp/xerces rev-parse HEAD)" = "$XERCES_COMMIT"
+                cmake -S /tmp/xerces -B /tmp/xerces/build -G Ninja \
+                  -DCMAKE_C_COMPILER_LAUNCHER= -DCMAKE_CXX_COMPILER_LAUNCHER= \
+                  -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+                  -DCMAKE_C_FLAGS_RELWITHDEBINFO="$SAN_CFLAGS" \
+                  -DCMAKE_CXX_FLAGS_RELWITHDEBINFO="$SAN_CFLAGS" \
+                  -DCMAKE_SHARED_LINKER_FLAGS="$SAN_LDFLAGS" \
+                  -DCMAKE_EXE_LINKER_FLAGS="$SAN_LDFLAGS" \
+                  -DCMAKE_INSTALL_PREFIX=/src/.xerces-asan -DCMAKE_INSTALL_LIBDIR=lib \
+                  -Dtranscoder=icu -Dnetwork-accessor=curl
+                cmake --build /tmp/xerces/build
+                echo "A Xerces-C compile command:"
+                python3 -c "import json; print(json.load(open(\"/tmp/xerces/build/compile_commands.json\"))[0][\"command\"])"
+                cmake --install /tmp/xerces/build
+                chown -R "$HOST_UID:$HOST_GID" .xerces-asan
+              fi
+              lib=$(readlink -f .xerces-asan/lib/libxerces-c.so)
+              echo "$lib: $(nm -D "$lib" | grep -c " U __asan_report_") __asan_report_* references"
+              readelf -d "$lib" | grep NEEDED
+              test "$(nm -D "$lib" | grep -c " U __asan_report_")" -gt 0'
+
       # LeakSanitizer needs ptrace, which Docker's default seccomp profile blocks.
       - name: Build and test under sanitizers
         id: test
@@ -76,6 +144,10 @@ jobs:
             -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" \
             -v "$PWD":/src -w /src zorba-builder:ci sh -c '
               set -e
+              rm -rf /usr/local/include/xercesc /usr/local/lib/libxerces-c* \
+                /usr/local/lib/cmake/XercesC /usr/local/lib/pkgconfig/xerces-c.pc
+              cp -a .xerces-asan/include .xerces-asan/lib /usr/local/
+              ldconfig
               cmake --preset asan
               cmake --build --preset asan
               mkdir -p build/asan/sanitizer-logs
