@@ -113,7 +113,9 @@ SchemaValidatorFilter::SchemaValidatorFilter(
 
   // Create a fake XMLReader via the ReaderMgr if this XMLScanner. The only
   // reason we do this is because we need the XMLReader::isAllSpaces() method.
-  MemBufInputSource inputSrc(0, 0, XMLUni::fgZeroLenString, false,
+  // Xerces copies from the buffer even when it is empty: it must not be null.
+  static const XMLByte emptyBuffer[1] = { 0 };
+  MemBufInputSource inputSrc(emptyBuffer, 0, XMLUni::fgZeroLenString, false,
     fMemoryManager);
 
   XMLReader* newReader = fReaderMgr.createReader(inputSrc,
@@ -249,7 +251,7 @@ void SchemaValidatorFilter::processStartElement()
     isProcessorStipulatedTypeName = true;
 
     ((XercSchemaValidator*)fValidator)->
-                setXsiType(NULL,
+                setXsiType(XMLUni::fgZeroLenString,
                            theProcessorStipulatedTypeName,
                            theProcessorStipulatedTypeUriId);
   }
