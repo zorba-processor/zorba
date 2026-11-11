@@ -248,6 +248,31 @@ PlanIterator::~PlanIterator() {
   // out-of-line since it's virtual
 }
 
+
+/*******************************************************************************
+  Out of line: the list takes 2 KiB of stack only while the plan opens, not in
+  the frame of a call that opens its body and then runs the recursion.
+********************************************************************************/
+void PlanIterator::openPlan(PlanState& planState, uint32_t& offset)
+{
+  PlanState::CreatedStates* outer = planState.theCreatedStates;
+  PlanState::CreatedStates created;
+  planState.theCreatedStates = &created;
+
+  try
+  {
+    open(planState, offset);
+  }
+  catch (...)
+  {
+    planState.theCreatedStates = outer;
+    created.destroyAll(planState);
+    throw;
+  }
+
+  planState.theCreatedStates = outer;
+}
+
 SERIALIZE_INTERNAL_METHOD(PlanIterator)
 
 zstring PlanIterator::getNameAsString() const {

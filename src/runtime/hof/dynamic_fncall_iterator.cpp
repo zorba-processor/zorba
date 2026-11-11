@@ -237,7 +237,7 @@ bool SingleDynamicFnCallIterator::nextImpl(
       state->thePlan = fnItem->getImplementation(theChildren, planState.theCompilerCB);
       
       // must be opened after vars and params are set
-      state->thePlan->open(planState, state->theUDFStateOffset);
+      state->thePlan->openPlan(planState, state->theUDFStateOffset);
       state->theIsOpen = true;
 
       while (consumeNext(result, state->thePlan, planState))
@@ -545,7 +545,7 @@ bool MultiDynamicFnCallIterator::nextImpl(
       state->thePlan = fnItem->getImplementation(planState.theCompilerCB);
       
       // must be opened after vars and params are set
-      state->thePlan->open(planState, state->theUDFStateOffset);
+      state->thePlan->openPlan(planState, state->theUDFStateOffset);
       state->theIsOpen = true;
 
       while (consumeNext(result, state->thePlan, planState))
