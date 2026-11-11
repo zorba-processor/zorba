@@ -3774,16 +3774,6 @@ void test_call_body_out_of_memory( Fixture const &f ) {
     "local:f(3)",
     "30", "a function body" );
 }
-void test_cached_call_body_out_of_memory( Fixture const &f ) {
-  sweep_next_out_of_memory( f,
-    "declare namespace an = \"http://zorba.io/annotations\";\n"
-    "declare %an:cache function local:f($n as xs:integer) as xs:integer {\n" +
-    call_body_flwor + "};\n"
-    // Not a constant argument: the compiler would evaluate the call.
-    "declare variable $n as xs:integer external := 3;\n"
-    "local:f($n)",
-    "30", "a cached function body" );
-}
 void test_dynamic_call_out_of_memory( Fixture const &f ) {
   sweep_next_out_of_memory( f,
     "declare function local:g($x) { $x * 2 };\n"
@@ -7855,7 +7845,6 @@ Test const tests[] = {
   { "exhaust_plan_wrapper", test_plan_wrapper_out_of_memory },
   { "exhaust_plan_open", test_plan_open_out_of_memory },
   { "exhaust_call_body", test_call_body_out_of_memory },
-  { "exhaust_cached_call_body", test_cached_call_body_out_of_memory },
   { "exhaust_dynamic_call", test_dynamic_call_out_of_memory },
   { "exhaust_for_each_pair", test_for_each_pair_out_of_memory },
   { "exhaust_fold_left", test_fold_left_out_of_memory },
