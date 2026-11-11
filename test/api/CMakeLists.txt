@@ -50,6 +50,7 @@ CREATE_TEST_SOURCELIST(APITests
   file_write_checks.cpp
   itemfactory_empty_items.cpp
   host_date_time.cpp
+  sequential_profile.cpp
   ${SchemaTests}
 )
 

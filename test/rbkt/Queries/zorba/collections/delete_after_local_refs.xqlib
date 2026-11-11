@@ -1,0 +1,107 @@
+module namespace m = "http://www.example.com/delete-after-local-refs";
+
+import module namespace ddl =
+  "http://zorba.io/modules/store/static/collections/ddl";
+import module namespace dml =
+  "http://zorba.io/modules/store/static/collections/dml";
+
+declare namespace an = "http://zorba.io/annotations";
+declare namespace err = "http://www.w3.org/2005/xqt-errors";
+
+declare collection m:c as node()*;
+
+(: Each of these functions inserts a node into m:c, binds the nodes of m:c to
+   a local variable and returns the v attribute of the first one. :)
+declare %an:sequential function m:declared() as xs:string
+{
+  dml:insert(xs:QName("m:c"), <e v="1"/>);
+  variable $nodes := dml:collection(xs:QName("m:c"));
+  fn:string($nodes[1]/@v)
+};
+
+declare %an:sequential function m:assigned() as xs:string
+{
+  dml:insert(xs:QName("m:c"), <e v="1"/>);
+  variable $nodes;
+  $nodes := dml:collection(xs:QName("m:c"));
+  fn:string($nodes[1]/@v)
+};
+
+declare %an:sequential function m:let() as xs:string
+{
+  dml:insert(xs:QName("m:c"), <e v="1"/>);
+  let $nodes := dml:collection(xs:QName("m:c"))
+  return fn:concat(fn:count($nodes), fn:string($nodes[1]/@v))
+};
+
+declare %an:sequential function m:for() as xs:string
+{
+  dml:insert(xs:QName("m:c"), <e v="1"/>);
+  fn:string-join(for $node in dml:collection(xs:QName("m:c"))
+                 return fn:string($node/@v),
+                 "")
+};
+
+(: Empties and deletes m:c after a failed ddl:delete. :)
+declare %an:sequential function m:clear()
+{
+  dml:delete(dml:collection(xs:QName("m:c")));
+  ddl:delete(xs:QName("m:c"));
+};
+
+(: The same calls made from a function: ddl:delete runs in the function that
+   made the call. :)
+declare %an:sequential function m:from-function() as xs:string*
+{
+  ddl:create(xs:QName("m:c"));
+  variable $declared := m:declared();
+  variable $declaredOutcome :=
+    try {{ ddl:delete(xs:QName("m:c")); "deleted" }}
+    catch * {{ m:clear(); fn:local-name-from-QName($err:code) }};
+
+  ddl:create(xs:QName("m:c"));
+  variable $assigned := m:assigned();
+  variable $assignedOutcome :=
+    try {{ ddl:delete(xs:QName("m:c")); "deleted" }}
+    catch * {{ m:clear(); fn:local-name-from-QName($err:code) }};
+
+  ddl:create(xs:QName("m:c"));
+  variable $let := m:let();
+  variable $letOutcome :=
+    try {{ ddl:delete(xs:QName("m:c")); "deleted" }}
+    catch * {{ m:clear(); fn:local-name-from-QName($err:code) }};
+
+  ddl:create(xs:QName("m:c"));
+  variable $for := m:for();
+  variable $forOutcome :=
+    try {{ ddl:delete(xs:QName("m:c")); "deleted" }}
+    catch * {{ m:clear(); fn:local-name-from-QName($err:code) }};
+
+  ddl:create(xs:QName("m:c"));
+  variable $i := 0;
+  while ($i lt 2)
+  {
+    m:declared();
+    $i := $i + 1;
+  }
+  variable $loopOutcome :=
+    try {{ ddl:delete(xs:QName("m:c")); "deleted" }}
+    catch * {{ m:clear(); fn:local-name-from-QName($err:code) }};
+
+  ddl:create(xs:QName("m:c"));
+  variable $f := m:declared#0;
+  variable $dynamic := $f();
+  variable $dynamicOutcome :=
+    try {{ ddl:delete(xs:QName("m:c")); "deleted" }}
+    catch * {{ m:clear(); fn:local-name-from-QName($err:code) }};
+
+  (
+    fn:concat("function, declared variable: ", $declared, " ", $declaredOutcome),
+    fn:concat("function, assigned variable: ", $assigned, " ", $assignedOutcome),
+    fn:concat("function, let: ", $let, " ", $letOutcome),
+    fn:concat("function, for: ", $for, " ", $forOutcome),
+    fn:concat("function, declared variable, called in a loop: ", $loopOutcome),
+    fn:concat("function, declared variable, function item: ", $dynamic, " ",
+              $dynamicOutcome)
+  )
+};

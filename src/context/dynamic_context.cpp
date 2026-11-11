@@ -209,6 +209,22 @@ void dynamic_context::release_variables()
 }
 
 
+void dynamic_context::release_variables_from(ulong aFirstVarId)
+{
+  if (aFirstVarId >= theVarValues.size())
+    return;
+
+  // The values are released after the vector has shrunk: releasing one may
+  // destroy a function item, which may examine the variables of this dctx.
+  std::vector<VarValue> released(theVarValues.begin() + aFirstVarId,
+                                 theVarValues.end());
+  theVarValues.resize(aFirstVarId);
+
+  if (theTracksWrites)
+    QueryResources::graphChanged();
+}
+
+
 void dynamic_context::release_parameters()
 {
   destroy_keymap();
