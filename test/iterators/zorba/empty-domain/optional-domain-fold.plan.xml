@@ -1,3 +1,6 @@
+<iterator-tree description="const-folded expr">
+  <SingletonIterator value="xs:boolean(true)"/>
+</iterator-tree>
 <iterator-tree description="main query">
   <SequentialIterator>
     <CtxVarDeclareIterator varid="4" varname="opt">
