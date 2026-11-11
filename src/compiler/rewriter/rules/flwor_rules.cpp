@@ -98,12 +98,15 @@ static bool cannot_raise_error(const expr* e)
 
   case var_expr_kind:
   {
-    var_expr::var_kind k = static_cast<const var_expr*>(e)->get_kind();
+    const var_expr* ve = static_cast<const var_expr*>(e);
+    var_expr::var_kind k = ve->get_kind();
 
+    // A prolog variable without an initializer (an external variable without a
+    // default, or the context item) raises XPDY0002 when referenced unbound.
     return (k == var_expr::for_var ||
             k == var_expr::pos_var ||
             k == var_expr::count_var ||
-            k == var_expr::prolog_var);
+            (k == var_expr::prolog_var && ve->has_initializer()));
   }
 
   case fo_expr_kind:
