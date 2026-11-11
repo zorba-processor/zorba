@@ -3759,27 +3759,32 @@ void sweep_next_out_of_memory( Fixture const &f, std::string const &text,
   (void)what;
 #endif
 }
-// A FLWOR whose open allocates (as in test_plan_open_out_of_memory), in the
-// body of a recursive function, so that each call opens it.
-std::string const call_body_flwor(
-  "  if ($n le 0) then 0\n"
-  "  else sum(for $i in 1 to $n\n"
-  "           let $s := ($i, $i * 2)\n"
-  "           group by $k := $i mod 3\n"
-  "           order by $k descending\n"
-  "           return sum($s)) + local:f($n - 1)\n" );
+// A FLWOR whose open allocates (a let bound to a sequence, order by), in the
+// body of a recursive function, so that each call opens it. Not group by: a
+// failure while it groups leaves a group behind, which is not this test.
 void test_call_body_out_of_memory( Fixture const &f ) {
   sweep_next_out_of_memory( f,
-    "declare function local:f($n) {\n" + call_body_flwor + "};\n"
+    "declare function local:f($n) {\n"
+    "  if ($n le 0) then 0\n"
+    "  else sum(for $i in 1 to $n\n"
+    "           let $s := ($i, $i * 2)\n"
+    "           order by $i descending\n"
+    "           return sum($s) + count($s)) + local:f($n - 1)\n"
+    "};\n"
     "local:f(3)",
-    "30", "a function body" );
+    "42", "a function body" );
 }
+// The static call compiles the body of local:g when the query opens: a failure
+// while the body compiles leaves part of the optimizer behind, which is not
+// this test. Recursive, so that the call is not inlined.
 void test_dynamic_call_out_of_memory( Fixture const &f ) {
   sweep_next_out_of_memory( f,
-    "declare function local:g($x) { $x * 2 };\n"
+    "declare function local:g($x) {\n"
+    "  if ($x gt 100) then local:g($x - 1) else $x * 2\n"
+    "};\n"
     "let $fs := (local:g#1, local:g#1)\n"
-    "for $i in 1 to 2 return $fs[$i]($i)",
-    "2 4", "a dynamic function call" );
+    "return (local:g(0), for $i in 1 to 2 return $fs[$i]($i))",
+    "0 2 4", "a dynamic function call" );
 }
 void test_for_each_pair_out_of_memory( Fixture const &f ) {
   sweep_next_out_of_memory( f,
