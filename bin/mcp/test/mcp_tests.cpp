@@ -3709,6 +3709,96 @@ void test_plan_open_out_of_memory( Fixture const &f ) {
   (void)f;
 #endif
 }
+// The query opened, then read with each allocation failing in turn: the answer
+// or an error; then, in an AddressSanitizer build, nothing is left unreachable.
+// For the plans opened while a query runs: a function body, a function item.
+void sweep_next_out_of_memory( Fixture const &f, std::string const &text,
+                               std::string const &answer,
+                               std::string const &what ) {
+#if defined(__linux__)
+  auto attempt = [&]( long n, long length, long *count ) -> std::string {
+    XQuery_t const query( f.zorba->compileQuery( text ) );
+    Iterator_t const it( query->iterator() );
+    it->open();
+    inject_arm( n, length );
+    std::string out;
+    try {
+      Item item;
+      while ( it->next( item ) )
+        out += ( out.empty() ? "" : " " ) + item.getStringValue().str();
+    }
+    catch ( std::exception const& ) {
+      out = "error";
+    }
+    *count = inject_disarm();
+    it->close();
+    return out;
+  };
+  long total = 0;
+  check( attempt( 0, 0, &total ) == answer, what + ": the answer" );
+  check( total > 0, what + ": next() allocates", std::to_string( total ) );
+  long wrong = 0;
+  for ( long const length : { 1L, 8L } )
+    for ( long n = 1; n <= total; ++n ) {
+      long count = 0;
+      std::string const got( attempt( n, length, &count ) );
+      if ( got != answer && got != "error" && ++wrong <= 3 )
+        std::cout << "at " << n << " of a run of " << length << ": " << got
+                  << std::endl;
+    }
+  check( wrong == 0, what + " failing: the answer or an error",
+         std::to_string( wrong ) + " points" );
+# if defined(__SANITIZE_ADDRESS__)
+  check( __lsan_do_recoverable_leak_check() == 0,
+         what + " failing: nothing is left behind" );
+# endif
+#else
+  (void)f;
+  (void)text;
+  (void)answer;
+  (void)what;
+#endif
+}
+// A FLWOR whose open allocates (as in test_plan_open_out_of_memory), in the
+// body of a recursive function, so that each call opens it.
+std::string const call_body_flwor(
+  "  if ($n le 0) then 0\n"
+  "  else sum(for $i in 1 to $n\n"
+  "           let $s := ($i, $i * 2)\n"
+  "           group by $k := $i mod 3\n"
+  "           order by $k descending\n"
+  "           return sum($s)) + local:f($n - 1)\n" );
+void test_call_body_out_of_memory( Fixture const &f ) {
+  sweep_next_out_of_memory( f,
+    "declare function local:f($n) {\n" + call_body_flwor + "};\n"
+    "local:f(3)",
+    "30", "a function body" );
+}
+void test_cached_call_body_out_of_memory( Fixture const &f ) {
+  sweep_next_out_of_memory( f,
+    "declare namespace an = \"http://zorba.io/annotations\";\n"
+    "declare %an:cache function local:f($n as xs:integer) as xs:integer {\n" +
+    call_body_flwor + "};\n"
+    "local:f(3)",
+    "30", "a cached function body" );
+}
+void test_dynamic_call_out_of_memory( Fixture const &f ) {
+  sweep_next_out_of_memory( f,
+    "declare function local:g($x) { $x * 2 };\n"
+    "let $fs := (local:g#1, local:g#1)\n"
+    "for $i in 1 to 2 return $fs[$i]($i)",
+    "2 4", "a dynamic function call" );
+}
+void test_for_each_pair_out_of_memory( Fixture const &f ) {
+  sweep_next_out_of_memory( f,
+    "for-each-pair((1, 2), (3, 4), function($a, $b) { $a + $b })",
+    "4 6", "for-each-pair" );
+}
+void test_fold_left_out_of_memory( Fixture const &f ) {
+  sweep_next_out_of_memory( f,
+    "fold-left((1, 2, 3), 0, function($a, $b) { $a + $b })",
+    "6", "fold-left" );
+}
 void test_base64_stream_out_of_memory( Fixture const &f ) {
 #if defined(__linux__)
   std::string encoded;
@@ -7762,6 +7852,11 @@ Test const tests[] = {
   { "exhaust_json_loader", test_json_loader_out_of_memory },
   { "exhaust_plan_wrapper", test_plan_wrapper_out_of_memory },
   { "exhaust_plan_open", test_plan_open_out_of_memory },
+  { "exhaust_call_body", test_call_body_out_of_memory },
+  { "exhaust_cached_call_body", test_cached_call_body_out_of_memory },
+  { "exhaust_dynamic_call", test_dynamic_call_out_of_memory },
+  { "exhaust_for_each_pair", test_for_each_pair_out_of_memory },
+  { "exhaust_fold_left", test_fold_left_out_of_memory },
   { "exhaust_sweep_matcher", test_sweep_matcher },
   { "exhaust_sweep_xml", test_sweep_xml },
   { "exhaust_sweep_xml_dtd", test_sweep_xml_dtd },
