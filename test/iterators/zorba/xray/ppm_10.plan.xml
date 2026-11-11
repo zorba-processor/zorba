@@ -1293,6 +1293,16 @@
         <LetVarIterator varname="surface-reflectiveness"/>
       </SpecificNumArithIterator_MultiplyOperation_DOUBLE>
     </LetVariable>
+    <ForVariable name="$$opt_temp_0">
+      <HoistIterator>
+        <FnBooleanIterator>
+          <TypedValueCompareIterator_DOUBLE>
+            <LetVarIterator varname="contribution"/>
+            <SingletonIterator value="xs:double(0.01)"/>
+          </TypedValueCompareIterator_DOUBLE>
+        </FnBooleanIterator>
+      </HoistIterator>
+    </ForVariable>
     <ReturnClause>
       <UDFunctionCallIterator function="vector:sum">
         <UDFunctionArgs>
@@ -1309,32 +1319,28 @@
             </UDFunctionCallIterator>
             <FunctionTraceIterator>
               <FLWORIterator>
-                <ForVariable name="y">
-                  <IfThenElseIterator>
-                    <FnBooleanIterator>
-                      <TypedValueCompareIterator_DOUBLE>
+                <ForVariable name="$$context-item">
+                  <UDFunctionCallIterator function="raytracer:trace-ray">
+                    <UDFunctionArgs>
+                      <ForVarIterator varname="scene"/>
+                      <LetVarIterator varname="position"/>
+                      <LetVarIterator varname="reflected-direction"/>
+                      <ForVarIterator varname="shape"/>
+                      <PromoteIterator type="xs:double">
                         <LetVarIterator varname="contribution"/>
-                        <SingletonIterator value="xs:double(0.01)"/>
-                      </TypedValueCompareIterator_DOUBLE>
-                    </FnBooleanIterator>
-                    <UDFunctionCallIterator function="raytracer:trace-ray">
-                      <UDFunctionArgs>
-                        <ForVarIterator varname="scene"/>
-                        <LetVarIterator varname="position"/>
-                        <LetVarIterator varname="reflected-direction"/>
-                        <ForVarIterator varname="shape"/>
-                        <PromoteIterator type="xs:double">
-                          <LetVarIterator varname="contribution"/>
-                        </PromoteIterator>
-                      </UDFunctionArgs>
-                    </UDFunctionCallIterator>
-                    <FnConcatIterator/>
-                  </IfThenElseIterator>
+                      </PromoteIterator>
+                    </UDFunctionArgs>
+                  </UDFunctionCallIterator>
                 </ForVariable>
+                <WhereClause>
+                  <UnhoistIterator>
+                    <ForVarIterator varname="$$opt_temp_0"/>
+                  </UnhoistIterator>
+                </WhereClause>
                 <ReturnClause>
                   <SpecificNumArithIterator_MultiplyOperation_DOUBLE>
                     <LetVarIterator varname="surface-reflectiveness"/>
-                    <ForVarIterator varname="y"/>
+                    <ForVarIterator varname="$$context-item"/>
                   </SpecificNumArithIterator_MultiplyOperation_DOUBLE>
                 </ReturnClause>
               </FLWORIterator>
@@ -1719,7 +1725,7 @@
     <LetVariable name="surface-reflectiveness" materialize="true">
       <LetVarIterator varname="material" targetPos="4"/>
     </LetVariable>
-    <ForVariable name="$$opt_temp_0">
+    <ForVariable name="$$opt_temp_1">
       <HoistIterator>
         <PromoteIterator type="xs:anyAtomicType">
           <LetVarIterator varname="material" targetPos="5"/>
@@ -1851,6 +1857,14 @@
                 </FnSumDoubleIterator>
               </FunctionTraceIterator>
             </ForVariable>
+            <ForVariable name="$$opt_temp_0">
+              <HoistIterator>
+                <TypedValueCompareIterator_DOUBLE>
+                  <ForVarIterator varname="illumination"/>
+                  <SingletonIterator value="xs:double(0)"/>
+                </TypedValueCompareIterator_DOUBLE>
+              </HoistIterator>
+            </ForVariable>
             <ForVariable name="specular">
               <FunctionTraceIterator>
                 <FnSumDoubleIterator>
@@ -1869,6 +1883,14 @@
                   </FLWORIterator>
                 </FnSumDoubleIterator>
               </FunctionTraceIterator>
+            </ForVariable>
+            <ForVariable name="$$opt_temp_2">
+              <HoistIterator>
+                <TypedValueCompareIterator_DOUBLE>
+                  <ForVarIterator varname="specular"/>
+                  <SingletonIterator value="xs:double(0)"/>
+                </TypedValueCompareIterator_DOUBLE>
+              </HoistIterator>
             </ForVariable>
             <WhereClause>
               <FnBooleanIterator>
@@ -1917,71 +1939,81 @@
             </WhereClause>
             <ReturnClause>
               <FnConcatIterator>
-                <IfThenElseIterator>
-                  <TypedValueCompareIterator_DOUBLE>
-                    <ForVarIterator varname="illumination"/>
-                    <SingletonIterator value="xs:double(0)"/>
-                  </TypedValueCompareIterator_DOUBLE>
-                  <FunctionTraceIterator>
-                    <FLWORIterator>
-                      <ForVariable name="y">
-                        <FunctionTraceIterator>
-                          <FLWORIterator>
-                            <ForVariable name="x">
-                              <LetVarIterator varname="light-color"/>
-                            </ForVariable>
-                            <ReturnClause>
-                              <SpecificNumArithIterator_MultiplyOperation_DOUBLE>
-                                <ForVarIterator varname="x"/>
-                                <LetVarIterator varname="surface-color">
-                                  <ForVarIterator varname="p"/>
-                                </LetVarIterator>
-                              </SpecificNumArithIterator_MultiplyOperation_DOUBLE>
-                            </ReturnClause>
-                          </FLWORIterator>
-                        </FunctionTraceIterator>
-                      </ForVariable>
-                      <ReturnClause>
-                        <SpecificNumArithIterator_MultiplyOperation_DOUBLE>
-                          <ForVarIterator varname="illumination"/>
-                          <ForVarIterator varname="y"/>
-                        </SpecificNumArithIterator_MultiplyOperation_DOUBLE>
-                      </ReturnClause>
-                    </FLWORIterator>
-                  </FunctionTraceIterator>
-                  <FnConcatIterator/>
-                </IfThenElseIterator>
-                <IfThenElseIterator>
-                  <TypedValueCompareIterator_DOUBLE>
-                    <ForVarIterator varname="specular"/>
-                    <SingletonIterator value="xs:double(0)"/>
-                  </TypedValueCompareIterator_DOUBLE>
-                  <FunctionTraceIterator>
-                    <FLWORIterator>
-                      <LetVariable name="x" materialize="true">
-                        <SpecificNumArithIterator_MultiplyOperation_DOUBLE>
-                          <PowIterator>
-                            <ForVarIterator varname="specular"/>
-                            <UnhoistIterator>
-                              <ForVarIterator varname="$$opt_temp_0"/>
-                            </UnhoistIterator>
-                          </PowIterator>
-                          <LetVarIterator varname="surface-reflectiveness"/>
-                        </SpecificNumArithIterator_MultiplyOperation_DOUBLE>
-                      </LetVariable>
-                      <ForVariable name="y">
-                        <LetVarIterator varname="light-color"/>
-                      </ForVariable>
-                      <ReturnClause>
-                        <SpecificNumArithIterator_MultiplyOperation_DOUBLE>
-                          <LetVarIterator varname="x"/>
-                          <ForVarIterator varname="y"/>
-                        </SpecificNumArithIterator_MultiplyOperation_DOUBLE>
-                      </ReturnClause>
-                    </FLWORIterator>
-                  </FunctionTraceIterator>
-                  <FnConcatIterator/>
-                </IfThenElseIterator>
+                <FLWORIterator>
+                  <ForVariable name="$$context-item">
+                    <FunctionTraceIterator>
+                      <FLWORIterator>
+                        <ForVariable name="y">
+                          <FunctionTraceIterator>
+                            <FLWORIterator>
+                              <ForVariable name="x">
+                                <LetVarIterator varname="light-color"/>
+                              </ForVariable>
+                              <ReturnClause>
+                                <SpecificNumArithIterator_MultiplyOperation_DOUBLE>
+                                  <ForVarIterator varname="x"/>
+                                  <LetVarIterator varname="surface-color">
+                                    <ForVarIterator varname="p"/>
+                                  </LetVarIterator>
+                                </SpecificNumArithIterator_MultiplyOperation_DOUBLE>
+                              </ReturnClause>
+                            </FLWORIterator>
+                          </FunctionTraceIterator>
+                        </ForVariable>
+                        <ReturnClause>
+                          <SpecificNumArithIterator_MultiplyOperation_DOUBLE>
+                            <ForVarIterator varname="illumination"/>
+                            <ForVarIterator varname="y"/>
+                          </SpecificNumArithIterator_MultiplyOperation_DOUBLE>
+                        </ReturnClause>
+                      </FLWORIterator>
+                    </FunctionTraceIterator>
+                  </ForVariable>
+                  <WhereClause>
+                    <UnhoistIterator>
+                      <ForVarIterator varname="$$opt_temp_0"/>
+                    </UnhoistIterator>
+                  </WhereClause>
+                  <ReturnClause>
+                    <ForVarIterator varname="$$context-item"/>
+                  </ReturnClause>
+                </FLWORIterator>
+                <FLWORIterator>
+                  <ForVariable name="$$context-item">
+                    <FunctionTraceIterator>
+                      <FLWORIterator>
+                        <LetVariable name="x" materialize="true">
+                          <SpecificNumArithIterator_MultiplyOperation_DOUBLE>
+                            <PowIterator>
+                              <ForVarIterator varname="specular"/>
+                              <UnhoistIterator>
+                                <ForVarIterator varname="$$opt_temp_1"/>
+                              </UnhoistIterator>
+                            </PowIterator>
+                            <LetVarIterator varname="surface-reflectiveness"/>
+                          </SpecificNumArithIterator_MultiplyOperation_DOUBLE>
+                        </LetVariable>
+                        <ForVariable name="y">
+                          <LetVarIterator varname="light-color"/>
+                        </ForVariable>
+                        <ReturnClause>
+                          <SpecificNumArithIterator_MultiplyOperation_DOUBLE>
+                            <LetVarIterator varname="x"/>
+                            <ForVarIterator varname="y"/>
+                          </SpecificNumArithIterator_MultiplyOperation_DOUBLE>
+                        </ReturnClause>
+                      </FLWORIterator>
+                    </FunctionTraceIterator>
+                  </ForVariable>
+                  <WhereClause>
+                    <UnhoistIterator>
+                      <ForVarIterator varname="$$opt_temp_2"/>
+                    </UnhoistIterator>
+                  </WhereClause>
+                  <ReturnClause>
+                    <ForVarIterator varname="$$context-item"/>
+                  </ReturnClause>
+                </FLWORIterator>
               </FnConcatIterator>
             </ReturnClause>
           </FLWORIterator>
