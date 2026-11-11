@@ -148,10 +148,10 @@ class QueryResources;
   theCompletedCall: The call in this plan that completed last and has its body
                     still open (see UDFunctionCallIteratorState::bodyCompleted).
 
-  theCreatedStates: While PlanIterator::openPlan() runs, the states created so
-                    far in theBlock, in order, with the function that destroys
+  theCreatedStates: While PlanWrapper::open() runs, the states created so far
+                    in theBlock, in order, with the function that destroys
                     each: if the open fails, close() cannot run (it would reach
-                    iterators whose state was never created), so openPlan()
+                    iterators whose state was never created), so PlanWrapper
                     destroys these. NULL at all other times. The first
                     INLINE_SIZE entries need no allocation, so that opening a
                     plan of that many states allocates nothing more.
@@ -681,13 +681,6 @@ public:
     state->theIsOpened = true;
 #endif
   }
-
-  /**
-   * Opens this iterator as the root of a plan: a query plan, a function body,
-   * the call of a function item. If the open fails, destroys the states it
-   * created (see PlanState::theCreatedStates) and rethrows.
-   */
-  void openPlan(PlanState& planState, uint32_t& offset);
 
   virtual void openImpl(PlanState& planState, uint32_t& offset) = 0;
 

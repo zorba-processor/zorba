@@ -544,14 +544,9 @@ void UDFunctionCallIterator::openImpl(PlanState& planState, uint32_t& offset)
   }
   else
   {
-    // The caller reserved the space at offset and keeps offset unchanged: it
-    // opens the next call there.
-    uint32_t end = offset;
-    StateTraitsImpl<UDFunctionCallIteratorState>::
-    createState(planState, theStateOffset, end);
+    theStateOffset = offset;
 
-    state = StateTraitsImpl<UDFunctionCallIteratorState>::
-            getState(planState, theStateOffset);
+    state = new (planState.theBlock + offset) UDFunctionCallIteratorState();
 
     state->init(planState);
   }
@@ -688,7 +683,7 @@ bool UDFunctionCallIterator::nextImplCache(store::Item_t& aResult, PlanState& aP
       lState->createBodyState(aPlanState, theIsDynamic, const_cast<store::ItemHandle<FunctionItem>&>(theFunctionItem));
 
     uint32_t planOffset = 0;
-    lState->thePlan->openPlan(*lState->thePlanState, planOffset);
+    lState->thePlan->open(*lState->thePlanState, planOffset);
     lState->thePlanOpen = true;
   }
 
@@ -847,7 +842,7 @@ bool UDFunctionCallIterator::nextImplNoCache(store::Item_t& aResult, PlanState& 
       lState->createBodyState(aPlanState, theIsDynamic, const_cast<store::ItemHandle<FunctionItem>&>(theFunctionItem));
 
     uint32_t planOffset = 0;
-    lState->thePlan->openPlan(*lState->thePlanState, planOffset);
+    lState->thePlan->open(*lState->thePlanState, planOffset);
     lState->thePlanOpen = true;
   }
 
