@@ -6,19 +6,16 @@
     <TreatIterator type="xs:integer" quant="?">
       <CtxVarIterator varid="4" varname="opt" varkind="global"/>
     </TreatIterator>
-    <FLWORIterator>
-      <ForVariable name="c">
-        <FnConcatIterator>
-          <SingletonIterator value="xs:integer(1)"/>
-          <SingletonIterator value="xs:integer(2)"/>
-        </FnConcatIterator>
-      </ForVariable>
-      <ReturnClause>
-        <SpecificNumArithIterator_AddOperation_INTEGER>
-          <CtxVarIterator varid="4" varname="opt" varkind="global"/>
-          <ForVarIterator varname="c"/>
-        </SpecificNumArithIterator_AddOperation_INTEGER>
-      </ReturnClause>
-    </FLWORIterator>
+    <CtxVarDeclareIterator varid="5" varname="flag">
+      <SingletonIterator value="xs:boolean(true)"/>
+    </CtxVarDeclareIterator>
+    <TreatIterator type="xs:boolean" quant="">
+      <CtxVarIterator varid="5" varname="flag" varkind="global"/>
+    </TreatIterator>
+    <IfThenElseIterator>
+      <CtxVarIterator varid="5" varname="flag" varkind="global"/>
+      <CtxVarIterator varid="4" varname="opt" varkind="global"/>
+      <FnConcatIterator/>
+    </IfThenElseIterator>
   </SequentialIterator>
 </iterator-tree>

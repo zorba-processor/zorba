@@ -1,6 +1,7 @@
-(: A for clause over a domain of at most one item, before clauses that cannot raise: its variable is folded into the return clause. :)
+(: A for clause over a domain of at most one item, before a where clause that cannot raise: the for clause is folded and the where clause becomes an if. :)
 declare variable $opt as xs:integer? external := 5;
+declare variable $flag as xs:boolean external := true();
 
 for $a in $opt
-for $c in (1, 2)
+where $flag
 return $a
