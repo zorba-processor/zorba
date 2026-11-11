@@ -3,4 +3,4 @@ declare variable $opt as xs:integer? external := 5;
 
 for $a in $opt
 for $c in (1, 2)
-return $a + $c
+return $a
