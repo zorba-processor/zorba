@@ -132,20 +132,25 @@ static bool cannot_raise_error(const expr* e)
 
 
 /******************************************************************************
-  True if the clauses before the clause at clausePos are for or let clauses
-  whose domains cannot raise an error.
+  True if the clauses in [first, last) are for, let or where clauses whose
+  expressions cannot raise an error.
 *******************************************************************************/
-static bool clauses_before_cannot_raise_error(const flwor_expr* flwor, csize clausePos)
+static bool clauses_cannot_raise_error(const flwor_expr* flwor, csize first, csize last)
 {
-  for (csize i = 0; i < clausePos; ++i)
+  for (csize i = first; i < last; ++i)
   {
     const flwor_clause* c = flwor->get_clause(i);
+    const expr* e = NULL;
 
-    if (c->get_kind() != flwor_clause::for_clause &&
-        c->get_kind() != flwor_clause::let_clause)
+    if (c->get_kind() == flwor_clause::for_clause ||
+        c->get_kind() == flwor_clause::let_clause)
+      e = static_cast<const forlet_clause*>(c)->get_expr();
+    else if (c->get_kind() == flwor_clause::where_clause)
+      e = static_cast<const where_clause*>(c)->get_expr();
+    else
       return false;
 
-    if (!cannot_raise_error(static_cast<const forlet_clause*>(c)->get_expr()))
+    if (!cannot_raise_error(e))
       return false;
   }
 
@@ -417,7 +422,7 @@ RULE_REWRITE_PRE(EliminateUnusedLetVars)
         // evaluated at any level; this domain, and without allowing empty the
         // clauses before it, are evaluated at O0 and may raise an error.
         if (!cannot_raise_error(domExpr) ||
-            (!outerFor && !clauses_before_cannot_raise_error(theFlwor, i)))
+            (!outerFor && !clauses_cannot_raise_error(theFlwor, 0, i)))
           continue;
 
         if (! outerFor)
@@ -455,9 +460,12 @@ RULE_REWRITE_PRE(EliminateUnusedLetVars)
         }
 
         // O0 evaluates this domain once for each tuple it receives; folded, it is
-        // evaluated only where its variable is referenced.
+        // evaluated only where its variable is referenced. An empty domain gives
+        // no tuples at O0; folded, the clauses after it are evaluated.
         // For a trivial domain, safe_to_fold_var gives numRefs = 2 without counting.
         if (safe_to_fold_var(i, numRefs) &&
+            (outerFor || domQuant == SequenceType::QUANT_ONE ||
+             clauses_cannot_raise_error(theFlwor, i + 1, theFlwor->num_clauses())) &&
             (cannot_raise_error(domExpr) ||
              (expr_tools::count_variable_uses(theFlwor, var, 1, NULL) != 0 &&
               clauses_keep_every_tuple(theFlwor, i + 1, theFlwor->num_clauses()))))
