@@ -3779,7 +3779,9 @@ void test_cached_call_body_out_of_memory( Fixture const &f ) {
     "declare namespace an = \"http://zorba.io/annotations\";\n"
     "declare %an:cache function local:f($n as xs:integer) as xs:integer {\n" +
     call_body_flwor + "};\n"
-    "local:f(3)",
+    // Not a constant argument: the compiler would evaluate the call.
+    "declare variable $n as xs:integer external := 3;\n"
+    "local:f($n)",
     "30", "a cached function body" );
 }
 void test_dynamic_call_out_of_memory( Fixture const &f ) {
