@@ -223,6 +223,9 @@ public:
   // QueryResources).
   void release_variables();
 
+  // Drop the values of the variables with an id from aFirstVarId on.
+  void release_variables_from(ulong aFirstVarId);
+
   void release_parameters();
 
   // From now on, setting a variable changes the graph generation (see

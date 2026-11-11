@@ -34,28 +34,11 @@
         <ReturnClause>
           <SequentialIterator>
             <ApplyIterator>
-              <FunctionTraceIterator>
-                <IfThenElseIterator>
-                  <TypedValueCompareIterator_INTEGER>
-                    <ForVarIterator varname="pos"/>
-                    <SingletonIterator value="xs:integer(1)"/>
-                  </TypedValueCompareIterator_INTEGER>
-                  <ApplyIterator>
-                    <ZorbaInsertLastIterator is-dynamic="true" need-to-copy="true">
-                      <CtxVarIterator varid="4" varname="coll" varkind="global"/>
-                      <ElementIterator>
-                        <SingletonIterator value="xs:QName(,,d)"/>
-                        <EnclosedIterator attr_cont="false">
-                          <ForVarIterator varname="pos"/>
-                        </EnclosedIterator>
-                      </ElementIterator>
-                    </ZorbaInsertLastIterator>
-                  </ApplyIterator>
-                  <ApplyIterator>
-                    <FnConcatIterator/>
-                  </ApplyIterator>
-                </IfThenElseIterator>
-              </FunctionTraceIterator>
+              <UDFunctionCallIterator function="local:test-sequential">
+                <UDFunctionArgs>
+                  <ForVarIterator varname="pos"/>
+                </UDFunctionArgs>
+              </UDFunctionCallIterator>
             </ApplyIterator>
             <ForVarIterator varname="w"/>
           </SequentialIterator>
@@ -63,4 +46,42 @@
       </FLWORIterator>
     </SequentialIterator>
   </SequentialIterator>
+</iterator-tree>
+<iterator-tree description="local:test-sequential">
+  <FLWORIterator>
+    <LetVariable name="pos" materialize="true">
+      <LetVarIterator varname="pos"/>
+    </LetVariable>
+    <MaterializeClause>
+      <MaterializeLetVariable inputVar="pos"/>
+    </MaterializeClause>
+    <ReturnClause>
+      <IfThenElseIterator>
+        <FnBooleanIterator>
+          <CompareIterator>
+            <PromoteIterator type="xs:anyAtomicType">
+              <FnDataIterator>
+                <LetVarIterator varname="pos"/>
+              </FnDataIterator>
+            </PromoteIterator>
+            <SingletonIterator value="xs:integer(1)"/>
+          </CompareIterator>
+        </FnBooleanIterator>
+        <ApplyIterator>
+          <ZorbaInsertLastIterator is-dynamic="true" need-to-copy="true">
+            <CtxVarIterator varid="4" varname="coll" varkind="global"/>
+            <ElementIterator>
+              <SingletonIterator value="xs:QName(,,d)"/>
+              <EnclosedIterator attr_cont="false">
+                <LetVarIterator varname="pos"/>
+              </EnclosedIterator>
+            </ElementIterator>
+          </ZorbaInsertLastIterator>
+        </ApplyIterator>
+        <ApplyIterator>
+          <FnConcatIterator/>
+        </ApplyIterator>
+      </IfThenElseIterator>
+    </ReturnClause>
+  </FLWORIterator>
 </iterator-tree>
