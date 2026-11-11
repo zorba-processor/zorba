@@ -356,7 +356,7 @@ bool FnForEachPairIterator::nextImpl(
 
       state->thePlan = static_cast<FunctionItem*>(state->theFnItem.getp())->getImplementation(arguments, planState.theCompilerCB);
       // must be opened after vars and params are set
-      state->thePlan->open(planState, state->theUDFStateOffset);
+      state->thePlan->openPlan(planState, state->theUDFStateOffset);
       state->theIsOpen = true;
 
       while (consumeNext(result, state->thePlan, planState))
@@ -499,7 +499,7 @@ bool FnFoldLeftIterator::nextImpl(
           std::reverse(++arguments.begin(), arguments.end());
 
         state->thePlan = static_cast<FunctionItem*>(state->theFnItem.getp())->getImplementation(arguments, planState.theCompilerCB);
-        state->thePlan->open(planState, state->theUDFStateOffset);
+        state->thePlan->openPlan(planState, state->theUDFStateOffset);
         state->theIsOpen = true; 
       }
 
