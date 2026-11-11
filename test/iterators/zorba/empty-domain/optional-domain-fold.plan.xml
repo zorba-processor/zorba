@@ -1,0 +1,24 @@
+<iterator-tree description="const-folded expr">
+  <SingletonIterator value="xs:boolean(true)"/>
+</iterator-tree>
+<iterator-tree description="main query">
+  <SequentialIterator>
+    <CtxVarDeclareIterator varid="4" varname="opt">
+      <SingletonIterator value="xs:integer(5)"/>
+    </CtxVarDeclareIterator>
+    <TreatIterator type="xs:integer" quant="?">
+      <CtxVarIterator varid="4" varname="opt" varkind="global"/>
+    </TreatIterator>
+    <CtxVarDeclareIterator varid="5" varname="flag">
+      <SingletonIterator value="xs:boolean(true)"/>
+    </CtxVarDeclareIterator>
+    <TreatIterator type="xs:boolean" quant="">
+      <CtxVarIterator varid="5" varname="flag" varkind="global"/>
+    </TreatIterator>
+    <IfThenElseIterator>
+      <CtxVarIterator varid="5" varname="flag" varkind="global"/>
+      <CtxVarIterator varid="4" varname="opt" varkind="global"/>
+      <FnConcatIterator/>
+    </IfThenElseIterator>
+  </SequentialIterator>
+</iterator-tree>
