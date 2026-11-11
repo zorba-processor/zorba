@@ -216,10 +216,15 @@ struct RunPeak
 #endif
   }
 
-  // Growth of the peak; -1 where it cannot be measured per run.
+  // Growth of the peak; -1 where it cannot be measured per run. A run whose
+  // resident size never rises above its start grew by 0: the start, read
+  // after the reset, can be a few pages above the peak the reset recorded.
   long long growth() const
   {
-    return theOk ? status_kb("VmHWM:") * 1024 - theStart : -1;
+    if (!theOk)
+      return -1;
+    long long const grown = status_kb("VmHWM:") * 1024 - theStart;
+    return grown > 0 ? grown : 0;
   }
 };
 
