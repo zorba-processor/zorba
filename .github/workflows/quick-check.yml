@@ -6,7 +6,7 @@ name: Quick check
 # pull request still needs the full CI.
 #
 #   gh workflow run quick-check.yml --ref <branch> \
-#     -f tests='^test/rbkt/Queries/zorba/fn/' [-f asan=true] [-f preset=full-release]
+#     -f tests='^test/rbkt/zorba/fn/' [-f asan=true] [-f preset=full-release]
 #   gh run watch <run-id> --interval 60 --exit-status
 #
 # Allowed on a branch with an open pull request (a separate concurrency
