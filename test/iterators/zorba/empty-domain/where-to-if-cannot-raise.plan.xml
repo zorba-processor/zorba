@@ -1,1 +1,34 @@
-<iterator-tree description="main query"/>
+<iterator-tree description="const-folded expr">
+  <SingletonIterator value="xs:boolean(true)"/>
+</iterator-tree>
+<iterator-tree description="main query">
+  <SequentialIterator>
+    <CtxVarDeclareIterator varid="4" varname="s">
+      <FnConcatIterator/>
+    </CtxVarDeclareIterator>
+    <TreatIterator type="xs:integer" quant="*">
+      <CtxVarIterator varid="4" varname="s" varkind="global"/>
+    </TreatIterator>
+    <CtxVarDeclareIterator varid="5" varname="flag">
+      <SingletonIterator value="xs:boolean(true)"/>
+    </CtxVarDeclareIterator>
+    <TreatIterator type="xs:boolean" quant="">
+      <CtxVarIterator varid="5" varname="flag" varkind="global"/>
+    </TreatIterator>
+    <IfThenElseIterator>
+      <CtxVarIterator varid="5" varname="flag" varkind="global"/>
+      <FLWORIterator>
+        <ForVariable name="x">
+          <CtxVarIterator varid="4" varname="s" varkind="global"/>
+        </ForVariable>
+        <ReturnClause>
+          <SpecificNumArithIterator_AddOperation_INTEGER>
+            <ForVarIterator varname="x"/>
+            <SingletonIterator value="xs:integer(1)"/>
+          </SpecificNumArithIterator_AddOperation_INTEGER>
+        </ReturnClause>
+      </FLWORIterator>
+      <FnConcatIterator/>
+    </IfThenElseIterator>
+  </SequentialIterator>
+</iterator-tree>

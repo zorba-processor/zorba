@@ -151,13 +151,12 @@ static bool clauses_before_cannot_raise_error(const flwor_expr* flwor, csize cla
 
 
 /******************************************************************************
-  True if each clause after the clause at clausePos gives at least one tuple for
-  every tuple it receives, so that none of them can skip the evaluation of a
-  later clause or of the return clause for a tuple of the clause at clausePos.
+  True if each clause in [first, last) gives at least one tuple for every tuple
+  it receives, so that none of them can skip the evaluation of what follows it.
 *******************************************************************************/
-static bool clauses_after_keep_every_tuple(const flwor_expr* flwor, csize clausePos)
+static bool clauses_keep_every_tuple(const flwor_expr* flwor, csize first, csize last)
 {
-  for (csize i = clausePos + 1; i < flwor->num_clauses(); ++i)
+  for (csize i = first; i < last; ++i)
   {
     const flwor_clause* c = flwor->get_clause(i);
 
@@ -458,7 +457,7 @@ RULE_REWRITE_PRE(EliminateUnusedLetVars)
         if (safe_to_fold_var(i, numRefs) &&
             (cannot_raise_error(domExpr) ||
              (expr_tools::count_variable_uses(theFlwor, var, 1, NULL) != 0 &&
-              clauses_after_keep_every_tuple(theFlwor, i))))
+              clauses_keep_every_tuple(theFlwor, i + 1, theFlwor->num_clauses()))))
         {
           if (numRefs != 0)
             subst_vars(rCtx, var, domExpr, numRefs);
@@ -1446,7 +1445,9 @@ RULE_REWRITE_PRE(RefactorPredFLWOR)
           ++k;
         }
 
-        if (k == whereVars.size())
+        // O0 evaluates E only for the tuples that reach the where clause.
+        if (k == whereVars.size() &&
+            (cannot_raise_error(whereExpr) || clauses_keep_every_tuple(flwor, 0, i)))
         {
           flwor->remove_clause(i);
 
