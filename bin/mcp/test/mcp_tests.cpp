@@ -2465,7 +2465,7 @@ struct Sweep {
   // (bin/mcp/README.md). For runs of 8 only, kept memory is measured and
   // printed but does not fail the sweep; runs of 1 still do.
   bool kept_runs_of_8_reported = false;
-  bool kept_by_none = false;        // no measured point may keep memory
+  bool kept_by_none = false;        // every point is measured, none may keep memory
   bool compiles = false;            // the sweep includes the compilation
   std::vector<std::string> before;  // calls before all of them, with no failure
   // Calls after the failed one, with their answers: a failure leaves the server
@@ -3001,9 +3001,10 @@ void exhaust_sweep( Fixture const &f, std::string const &name, Sweep const &s ) 
   for ( long const length : { 1L, 8L } ) {
     long const step = length > 1 ? 4 * stride : stride;
     long const tried = ( total - 1 ) / step + 1;
-    // Every other point is measured (all of them when there are few); a point
-    // whose child ended before it could measure passes that to the next one.
-    long const every = tried < 2 * sweep_min_measured ? 1 : 2;
+    // Every other point is measured (all of them when there are few, or with
+    // kept_by_none); a point whose child ended before it could measure passes
+    // that to the next one.
+    long const every = s.kept_by_none || tried < 2 * sweep_min_measured ? 1 : 2;
     std::map<std::string, std::pair<long, long> > outcomes;
     std::map<std::string, long> last_of;
     std::map<std::string, Stacks> stacks_of;
