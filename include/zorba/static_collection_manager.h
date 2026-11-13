@@ -69,13 +69,13 @@ namespace zorba {
     createIndex(const Item& aQName) = 0;
 
     /**
-     * Create the index with the given name.
+     * Delete the index with the given name.
      *
-     * @param aQName The name of the index to create.
+     * @param aQName The name of the index to delete.
      *
      * @throw zerr:ZDDY0021 if a index with the given name is not declared.
      *
-     * @throw zerr:ZDDY0009 if a index with the given name does not exist
+     * @throw zerr:ZDDY0023 if a index with the given name does not exist.
      */
     virtual void
     deleteIndex(const Item& aQName) = 0;
