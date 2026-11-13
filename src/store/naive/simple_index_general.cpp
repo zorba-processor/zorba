@@ -401,8 +401,13 @@ bool GeneralIndex::insert(store::Item_t& key, store::Item_t& node)
   case store::XS_GDAY:
   case store::XS_GMONTH:
   {
-    assert(!sorted);
-    // falth through
+    // A range index needs an ordering among its keys.
+    if (sorted)
+    {
+      RAISE_ERROR_NO_LOC(zerr::ZDTY0012_INDEX_KEY_TYPE_ERROR,
+      ERROR_PARAMS(getName()->getStringValue()));
+    }
+    [[fallthrough]];
   }
 
   case store::XS_ANY_URI:
@@ -1534,7 +1539,8 @@ ProbeGeneralIndexIterator::ProbeGeneralIndexIterator(const store::Index_t& idx)
   theIsFullProbe(false),
   theSelectsEmptyKeys(false),
   theEmptyKeyPos(0),
-  theNumberKind(NOT_NUMBER)
+  theNumberKind(NOT_NUMBER),
+  theDropsDuplicates(false)
 {
 }
 
@@ -1579,6 +1585,7 @@ void ProbeGeneralIndexIterator::init(const store::IndexCondition_t& cond,
 {
   theProbeKind = cond->getKind();
   theCondition = static_cast<GeneralIndexCondition*>(cond.getp());
+  theSkip = aSkip;
 
   // The runtime calls init once per search item on the same iterator.
   theIsUntypedProbe = false;
@@ -1589,10 +1596,21 @@ void ProbeGeneralIndexIterator::init(const store::IndexCondition_t& cond,
   theMapBegins.clear();
   theMapEnds.clear();
 
+  // Without bounds, a value range probe makes no comparison with the keys.
+  bool comparesKeys =
+    (theProbeKind == store::IndexCondition::POINT_VALUE ||
+     (theProbeKind == store::IndexCondition::BOX_VALUE &&
+      (theCondition->theRangeFlags.theHaveLowerBound ||
+       theCondition->theRangeFlags.theHaveUpperBound)));
+
+  theDropsDuplicates = (theProbeKind == store::IndexCondition::BOX_VALUE &&
+                        !comparesKeys &&
+                        theIndex->theNumMultiKeyNodes > 0);
+
   if (theProbeKind == store::IndexCondition::POINT_VALUE ||
       theProbeKind == store::IndexCondition::BOX_VALUE)
   {
-    if (theIndex->theNumMultiKeyNodes > 0)
+    if (comparesKeys && theIndex->theNumMultiKeyNodes > 0)
     {
       RAISE_ERROR_NO_LOC(err::XPTY0004,
       ERROR_PARAMS(ZED(NoMultiKeyNodeValues_2), theIndex->getName()->getStringValue()));
@@ -2336,6 +2354,7 @@ void ProbeGeneralIndexIterator::open()
   {
     theCurrentMap = 0;
     theEmptyKeyPos = 0;
+    theReturnedNodes.clear();
 
     if (!theMapBegins.empty())
     {
@@ -2351,6 +2370,12 @@ void ProbeGeneralIndexIterator::open()
       }
     }
   }
+
+  xs_integer numSkipped(0);
+  store::Item_t skipped;
+
+  while (numSkipped < theSkip && next(skipped))
+    ++numSkipped;
 }
 
 
@@ -2446,7 +2471,9 @@ bool ProbeGeneralIndexIterator::next(store::Item_t& result)
             continue;
           }
 
-          if (skipsImage((*theIte).theImage))
+          if (skipsImage((*theIte).theImage) ||
+              (theDropsDuplicates &&
+               !theReturnedNodes.insert((*theIte).theNode.getp()).second))
           {
             ++theIte;
             continue;

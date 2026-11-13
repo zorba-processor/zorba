@@ -75,17 +75,16 @@ IndexJoinRule::IndexJoinRule(RewriterContext* rctx)
   :
   RewriteRule(RewriteRule::IndexJoin, "IndexJoin"),
   theRCtx(rctx),
-  theRootExpr(rctx->getRoot())
+  theRootExpr(rctx->getRoot()),
+  theVarIdMap(std::make_unique<expr_tools::VarIdMap>()),
+  theIdVarMap(std::make_unique<expr_tools::IdVarMap>()),
+  theExprVarsMap(std::make_unique<expr_tools::ExprVarsMap>())
 {
-  theVarIdMap = new expr_tools::VarIdMap;
-  theIdVarMap = new expr_tools::IdVarMap;
-  theExprVarsMap = new expr_tools::ExprVarsMap;
-
   theIdVarMap->reserve(32);
   theIdVarMap->push_back(0); // because varids are starting from 1
 
   csize numVars = 0;
-  expr_tools::index_flwor_vars(theRootExpr, numVars, *theVarIdMap, theIdVarMap);
+  expr_tools::index_flwor_vars(theRootExpr, numVars, *theVarIdMap, theIdVarMap.get());
 
   DynamicBitset freeset(numVars+1);
   expr_tools::build_expr_to_vars_map(theRootExpr,
@@ -102,10 +101,6 @@ IndexJoinRule::~IndexJoinRule()
 {
   assert(theVarDefExprs.empty());
   assert(theChildPositions.empty());
-
-  delete theVarIdMap;
-  delete theIdVarMap;
-  delete theExprVarsMap;
 }
 
 
