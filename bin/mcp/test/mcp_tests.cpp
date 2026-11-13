@@ -3337,13 +3337,14 @@ void test_sweep_fragment( Fixture const &f ) {
 }
 // The descendant axis over a parsed document 64 elements deep: its stack of
 // children iterators grows while the axis runs. A failure there keeps no
-// iterator that holds a node, and with it the whole document.
+// iterator that holds a node, and with it the whole document (a text of 200
+// characters in each element: more than the noise of the measure).
 void test_sweep_descendant( Fixture const &f ) {
 #if defined(__linux__)
   auto deep = []( std::string const &name ) {
     std::string open, close;
     for ( int i = 0; i < 64; ++i ) {
-      open += "<" + name + "_" + std::to_string( i ) + ">";
+      open += "<" + name + "_" + std::to_string( i ) + ">" + std::string( 200, 't' );
       close = "</" + name + "_" + std::to_string( i ) + ">" + close;
     }
     return open + close;
