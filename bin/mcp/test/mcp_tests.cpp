@@ -3537,6 +3537,24 @@ void test_sweep_query_text( Fixture const &f ) {
   (void)f;
 #endif
 }
+// A token longer than the scanner's input buffer (16 KB): the scanner grows the
+// buffer, and a failed growth is memory_limit like any other allocation.
+void test_sweep_long_token( Fixture const &f ) {
+#if defined(__linux__)
+  Sweep s;
+  s.query = "string-length(\"" + std::string( 20000, 'a' ) + "\")";
+  s.before.push_back( s.query );
+  s.expected = "20000";
+  s.points = 100000;                // all of them
+  // As in test_sweep_arithmetic and test_sweep_query_text.
+  s.known = { library_crash( "signal 6 in libstdc", true, 2 ),
+              starting( "terminate N11xercesc_", 2, 0, "OutOfMemoryExceptionE" ) };
+  s.compiles = true;
+  exhaust_sweep( f, "token longer than the scanner buffer", s );
+#else
+  (void)f;
+#endif
+}
 // A string read from a file, used twice (materialized): whole, or the call fails.
 void test_sweep_streamable_text( Fixture const &f ) {
 #if defined(__linux__)
@@ -7824,6 +7842,7 @@ Test const tests[] = {
   { "exhaust_sweep_compile", test_sweep_compile },
   { "exhaust_sweep_builtins", test_sweep_builtins },
   { "exhaust_sweep_query_text", test_sweep_query_text },
+  { "exhaust_sweep_long_token", test_sweep_long_token },
   { "exhaust_sweep_streamable_text", test_sweep_streamable_text },
   { "exhaust_base64_stream", test_base64_stream_out_of_memory },
   { "exhaust_seekable_stream", test_seekable_stream_out_of_memory },
