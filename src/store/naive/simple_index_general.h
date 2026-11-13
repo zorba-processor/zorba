@@ -16,6 +16,7 @@
 #ifndef ZORBA_SIMPLE_STORE_INDEX_HASH_GENERAL
 #define ZORBA_SIMPLE_STORE_INDEX_HASH_GENERAL
 
+#include <array>
 #include <cassert>
 #include <map>
 #include <memory>
@@ -126,12 +127,12 @@ public:
   A vector storing all domain nodes for which the key expr returns the empty
   sequence.
 
-  theNumUntypedEntries:
-  ---------------------
-  The number of [key, node] index entries where the key is the result of casting
-  an originally untyped key to a non-string atomic item. If > 0, then any value
-  probes with a key (or keys) whose type cannot be promoted to xs:string will
-  raise an error.
+  theNumTypedEntries:
+  -------------------
+  For each map, the number of its [key, node] entries where the key is not the
+  cast of an untyped key to a type other than xs:string. A value probe with a
+  search key that a value comparison cannot compare with the keys of a map
+  that has such entries raises an error, as the comparison does.
 
   theNumMultiKeyNodes:
   --------------------
@@ -170,7 +171,7 @@ protected:
 
   std::vector<store::Item_t>  theEmptyKeyNodes;
 
-  csize                       theNumUntypedEntries;
+  std::array<csize, store::XS_LAST> theNumTypedEntries;
 
   csize                       theNumMultiKeyNodes;
 
@@ -542,7 +543,7 @@ protected:
 
   void probeNumberRange(const store::Item* lowerKey, const store::Item* upperKey);
 
-  void checkStringKeyType(const AtomicItem* keyItem) const;
+  void checkComparableKeys(const AtomicItem* searchKey) const;
 
 public:
   void init(const store::IndexCondition_t& cond, const xs_integer& aSkip);

@@ -4383,6 +4383,10 @@
       <value>in data</value>
     </entry>
 
+    <entry key="IncomparableKeyNodeValue_23">
+      <value>"$2": search key can not be compared with a key value of a node in index "$3"</value>
+    </entry>
+
     <entry key="IncompleteKeyInIndexBuild">
       <value>incomplete key during index build</value>
     </entry>
@@ -4549,10 +4553,6 @@
 
     <entry key="NoURIScheme">
       <value>no URI scheme</value>
-    </entry>
-
-    <entry key="NoUntypedKeyNodeValue_2">
-      <value>node with untyped key value found during probe on index "$2"</value>
     </entry>
 
     <entry key="NodeIDNeedsBytes_2">

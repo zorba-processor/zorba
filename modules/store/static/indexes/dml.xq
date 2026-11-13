@@ -75,6 +75,8 @@ declare option ver:module-version "2.0";
  : the same as the number of keys declared for the index.
  : @error err:XPTY0004 if a non-empty seach key is given whose type does not
  : match the sequence type specified in the corresponding keyspec.
+ : @error err:XPTY0004 if the index is general and a value comparison can not
+ : compare a non-empty search key with a key of a domain node.
  :)
 declare %an:variadic function
 idml:probe-index-point-value( $name as xs:QName, $key_i as xs:anyAtomicType? )
@@ -95,6 +97,8 @@ idml:probe-index-point-value( $name as xs:QName, $key_i as xs:anyAtomicType? )
  : the same as the number of keys declared for the index.
  : @error err:XPTY0004 if a non-empty seach key is given whose type does not
  : match the sequence type specified in the corresponding keyspec.
+ : @error err:XPTY0004 if the index is general and a value comparison can not
+ : compare a non-empty search key with a key of a domain node.
  :)
 declare %an:variadic function
 idml:probe-index-point-value-skip( $name as xs:QName,
@@ -197,6 +201,8 @@ declare function idml:probe-index-point-general( $name as xs:QName,
  : <code>$haveUpperBound-i</code> is true and <code>$upperBound-i</code> is an
  : atomic item whose type does not match the sequence type specified by the
  : i<sup>th</sup> keyspec.
+ : @error err:XPTY0004 if the index is general and a value comparison can not
+ : compare a bound that is used with a key of a domain node.
  : @error zerr:ZDDY0034 if (a) the index is general (in which case there is
  : only one rangespac), (b) the index is untyped, (c) there is both a lower and
  : an upper bound, and (d) if T1 and T2 are the types of the lower and upper
@@ -246,6 +252,8 @@ idml:probe-index-range-value( $name                 as xs:QName,
  : <code>$haveUpperBound-i</code> is true and <code>$upperBound-i</code> is an
  : atomic item whose type does not match the sequence type specified by the
  : i<sup>th</sup> keyspec.
+ : @error err:XPTY0004 if the index is general and a value comparison can not
+ : compare a bound that is used with a key of a domain node.
  : @error zerr:ZDDY0034 if (a) the index is general (in which case there is
  : only one rangespac), (b) the index is untyped, (c) there is both a lower and
  : an upper bound, and (d) if T1 and T2 are the types of the lower and upper
