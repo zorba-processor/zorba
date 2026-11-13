@@ -129,10 +129,11 @@ public:
 
   theNumTypedEntries:
   -------------------
-  For each map, the number of its [key, node] entries where the key is not the
-  cast of an untyped key to a type other than xs:string. A value probe with a
-  search key that a value comparison cannot compare with the keys of a map
-  that has such entries raises an error, as the comparison does.
+  For each key type, the number of [key, node] entries with a key of that type
+  that is not the cast of an untyped key to a type other than xs:string. A
+  value probe with a search key that a value comparison cannot compare with
+  the keys of a type that has such entries raises an error, as the comparison
+  does.
 
   theNumMultiKeyNodes:
   --------------------
@@ -543,7 +544,8 @@ protected:
 
   void probeNumberRange(const store::Item* lowerKey, const store::Item* upperKey);
 
-  void checkComparableKeys(const AtomicItem* searchKey) const;
+  void checkComparableKeys(const AtomicItem* searchKey,
+                           bool isOrderComparison) const;
 
 public:
   void init(const store::IndexCondition_t& cond, const xs_integer& aSkip);
