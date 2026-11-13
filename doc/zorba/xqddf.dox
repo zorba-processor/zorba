@@ -1625,7 +1625,7 @@ If the index is a general index:
   </li>
 
   <li>
-  An error is raised [<a href="#ERRXDTY0012">zerr:XDTY0012</a>] if the index is 
+  An error is raised [<a href="#ERRZDTY0012">zerr:ZDTY0012</a>] if the index is 
   a range index and any of the key items has a type that is not xs:untypedAtomic 
   and for which no ordering relationship exists.
   </li>
