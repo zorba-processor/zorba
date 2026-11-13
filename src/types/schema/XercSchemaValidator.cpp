@@ -898,10 +898,12 @@ void XercSchemaValidator::validateProcessorStipulatedTypeName(const   XMLElement
     }
 
     // An xsi:type naming a type derived from the stipulated type governs the root (XSD 1.1 governing type definition)
-    if (fXsiType && !fErrorOccurred)
+    const Janitor<XERCES_CPP_NAMESPACE::QName> xsiType(fXsiType);
+    fXsiType = 0;
+    if (xsiType.get() && !fErrorOccurred)
     {
-        const unsigned int uri = fXsiType->getURI();
-        const XMLCh* localPart = fXsiType->getLocalPart();
+        const unsigned int uri = xsiType->getURI();
+        const XMLCh* localPart = xsiType->getLocalPart();
         ComplexTypeInfo* xsiTypeInfo = 0;
         DatatypeValidator* xsiTypeDV = 0;
 
@@ -941,15 +943,13 @@ void XercSchemaValidator::validateProcessorStipulatedTypeName(const   XMLElement
         {
             if (xsiTypeInfo && xsiTypeInfo->getAbstract())
             {
-                emitError(XMLValid::NoAbstractInXsiType, fXsiType->getRawName());
+                emitError(XMLValid::NoAbstractInXsiType, xsiType->getRawName());
                 fErrorOccurred = true;
             }
             governingTypeInfo = xsiTypeInfo;
             fCurrentDatatypeValidator = xsiTypeDV;
         }
     }
-    delete fXsiType;
-    fXsiType = 0;
 
     // Only an element declaration makes an element nilled, so xsi:nil is ignored
     fNil = false;
@@ -3165,10 +3165,12 @@ void XercSchemaValidator::validateProcessorStipulatedTypeName(const   XMLElement
     }
 
     // An xsi:type naming a type derived from the stipulated type governs the root (XSD 1.1 governing type definition)
-    if (fXsiType && !fErrorOccurred)
+    const Janitor<XERCES_CPP_NAMESPACE::QName> xsiType(fXsiType);
+    fXsiType = 0;
+    if (xsiType.get() && !fErrorOccurred)
     {
-        const unsigned int uri = fXsiType->getURI();
-        const XMLCh* localPart = fXsiType->getLocalPart();
+        const unsigned int uri = xsiType->getURI();
+        const XMLCh* localPart = xsiType->getLocalPart();
         ComplexTypeInfo* xsiTypeInfo = 0;
         DatatypeValidator* xsiTypeDV = 0;
 
@@ -3208,15 +3210,13 @@ void XercSchemaValidator::validateProcessorStipulatedTypeName(const   XMLElement
         {
             if (xsiTypeInfo && xsiTypeInfo->getAbstract())
             {
-                emitError(XMLValid::NoAbstractInXsiType, fXsiType->getRawName());
+                emitError(XMLValid::NoAbstractInXsiType, xsiType->getRawName());
                 fErrorOccurred = true;
             }
             governingTypeInfo = xsiTypeInfo;
             fCurrentDatatypeValidator = xsiTypeDV;
         }
     }
-    delete fXsiType;
-    fXsiType = 0;
 
     // Only an element declaration makes an element nilled, so xsi:nil is ignored
     fNil = false;
