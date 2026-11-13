@@ -6,3 +6,6 @@
 - Fix a memory leak when `group by` fails, for example when memory runs out,
   while it starts a new group: the sequences of the group's non-grouping
   variables are now freed.
+- Fix a memory leak when the optimization of a function body, done on its
+  first dynamic call, fails, for example when memory runs out, while the index
+  join rule starts.
