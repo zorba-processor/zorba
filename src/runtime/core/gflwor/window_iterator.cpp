@@ -16,6 +16,8 @@
 
 #include "system/globalenv.h"
 
+#include "compiler/api/compilercb.h"
+
 #include "runtime/core/gflwor/window_iterator.h"
 #include "runtime/core/gflwor/common.h"
 #include "runtime/core/var_iterators.h"
@@ -907,6 +909,24 @@ void WindowIterator::doGarbageCollection(WindowState* state) const
 
 
 /***************************************************************************//**
+  Whether the domain is read as it goes. For a sliding window, theLazyEval was
+  decided by the query that compiled it, which is not always the one that runs
+  it: the body of a function loaded with StaticContext::loadProlog(), or of a
+  function item made by another query, is compiled by that prolog or query. No
+  side effect may run in the query being run either.
+********************************************************************************/
+bool WindowIterator::readsDomainLazily(const PlanState& planState) const
+{
+  if (!theLazyEval || theWindowType == TUMBLING)
+    return theLazyEval;
+
+  const CompilerCB* ccb = planState.theCompilerCB;
+
+  return ccb != NULL && !ccb->theMayRunSideEffects;
+}
+
+
+/***************************************************************************//**
 
 ********************************************************************************/
 bool WindowIterator::nextImpl(store::Item_t& aResult, PlanState& planState) const
@@ -920,9 +940,9 @@ bool WindowIterator::nextImpl(store::Item_t& aResult, PlanState& planState) cons
   while (consumeNext(aResult, theTupleIter, planState))
   {
     // Create the temp sequence where to materialize the result of the domain
-    // expr (lazily if theLazyEval flag is true).
+    // expr (lazily if readsDomainLazily).
     iterator = new PlanIteratorWrapper(theInputIter, planState);
-    state->theDomainSeq = GENV_STORE.createTempSeq(iterator, theLazyEval);
+    state->theDomainSeq = GENV_STORE.createTempSeq(iterator, readsDomainLazily(planState));
 
     // Its clever to switch quite early to avoid a lot of if-else statements
     if (theWindowType == WindowIterator::SLIDING)
