@@ -1539,7 +1539,8 @@ ProbeGeneralIndexIterator::ProbeGeneralIndexIterator(const store::Index_t& idx)
   theIsFullProbe(false),
   theSelectsEmptyKeys(false),
   theEmptyKeyPos(0),
-  theNumberKind(NOT_NUMBER)
+  theNumberKind(NOT_NUMBER),
+  theDropsDuplicates(false)
 {
 }
 
@@ -1594,10 +1595,21 @@ void ProbeGeneralIndexIterator::init(const store::IndexCondition_t& cond,
   theMapBegins.clear();
   theMapEnds.clear();
 
+  // Without bounds, a value range probe makes no comparison with the keys.
+  bool comparesKeys =
+    (theProbeKind == store::IndexCondition::POINT_VALUE ||
+     (theProbeKind == store::IndexCondition::BOX_VALUE &&
+      (theCondition->theRangeFlags.theHaveLowerBound ||
+       theCondition->theRangeFlags.theHaveUpperBound)));
+
+  theDropsDuplicates = (theProbeKind == store::IndexCondition::BOX_VALUE &&
+                        !comparesKeys &&
+                        theIndex->theNumMultiKeyNodes > 0);
+
   if (theProbeKind == store::IndexCondition::POINT_VALUE ||
       theProbeKind == store::IndexCondition::BOX_VALUE)
   {
-    if (theIndex->theNumMultiKeyNodes > 0)
+    if (comparesKeys && theIndex->theNumMultiKeyNodes > 0)
     {
       RAISE_ERROR_NO_LOC(err::XPTY0004,
       ERROR_PARAMS(ZED(NoMultiKeyNodeValues_2), theIndex->getName()->getStringValue()));
@@ -2341,6 +2353,7 @@ void ProbeGeneralIndexIterator::open()
   {
     theCurrentMap = 0;
     theEmptyKeyPos = 0;
+    theReturnedNodes.clear();
 
     if (!theMapBegins.empty())
     {
@@ -2451,7 +2464,9 @@ bool ProbeGeneralIndexIterator::next(store::Item_t& result)
             continue;
           }
 
-          if (skipsImage((*theIte).theImage))
+          if (skipsImage((*theIte).theImage) ||
+              (theDropsDuplicates &&
+               !theReturnedNodes.insert((*theIte).theNode.getp()).second))
           {
             ++theIte;
             continue;

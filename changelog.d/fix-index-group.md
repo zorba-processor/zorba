@@ -10,3 +10,6 @@
   search keys and bounds compare as strings, so a range probe with two untyped
   bounds uses both instead of only the lower one, and a range index rejects a
   search key with no ordering with `err:XPTY0004`.
+- `probe-index-range-value` without bounds on a general index with domain
+  nodes that have several keys returns every domain node once, as documented,
+  instead of raising `err:XPTY0004`; with a bound it still raises it.
