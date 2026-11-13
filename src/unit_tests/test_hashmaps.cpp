@@ -6,6 +6,7 @@
 #include <utility>
 
 #include "zorbautils/hashmap.h"
+#include "zorbautils/hashset.h"
 #include "util/hashmap32.h"
 #include "util/hashmap.h"
 #include "util/unordered_map.h"
@@ -343,6 +344,78 @@ int test_hashmap_insert_rollback(int, char*[])
     // An empty bucket, then a collision entry in the same bucket.
     ok = insert_fails_cleanly(map, 1, pairOverload) && ok;
     ok = insert_fails_cleanly(map, 2, pairOverload) && ok;
+  }
+  return ok ? 0 : 1;
+}
+
+
+typedef HashSet<FailingKey, FailingKeyCompFunc> FailingKeySet;
+
+enum SetInsertOverload { SET_INSERT, SET_INSERT_OUT, SET_INSERT_CONST_OUT };
+
+
+// Insert key with a failing key copy through the given overload; the set
+// must be left as it was: no entry counted, the key insertable afterwards.
+static bool set_insert_fails_cleanly(
+    FailingKeySet& set,
+    int key,
+    SetInsertOverload overload)
+{
+  csize const sizeBefore = set.size();
+  FailingKey item(key);
+  FailingKey const constItem(key);
+  FailingKey outItem;
+  FailingKey::theFailNextCopy = true;
+  try
+  {
+    switch (overload)
+    {
+    case SET_INSERT:
+      (void)set.insert(item);
+      break;
+    case SET_INSERT_OUT:
+      (void)set.insert(item, outItem);
+      break;
+    case SET_INSERT_CONST_OUT:
+      (void)set.insert(constItem, outItem);
+      break;
+    }
+    std::cerr << "set insert of key " << key << " did not fail" << std::endl;
+    return false;
+  }
+  catch (std::bad_alloc const&)
+  {
+  }
+  FailingKey::theFailNextCopy = false;
+
+  if (set.size() != sizeBefore)
+  {
+    std::cerr << "failed set insert of key " << key << " left " << set.size()
+              << " entries instead of " << sizeBefore << std::endl;
+    return false;
+  }
+
+  if (!set.insert(item) || set.size() != sizeBefore + 1)
+  {
+    std::cerr << "key " << key << " not insertable in the set after a failed "
+              << "insert" << std::endl;
+    return false;
+  }
+  return true;
+}
+
+
+int test_hashset_insert_rollback(int, char*[])
+{
+  bool ok = true;
+  SetInsertOverload const overloads[] =
+    { SET_INSERT, SET_INSERT_OUT, SET_INSERT_CONST_OUT };
+  for (SetInsertOverload overload : overloads)
+  {
+    FailingKeySet set(8, false);
+    // An empty bucket, then a collision entry in the same bucket.
+    ok = set_insert_fails_cleanly(set, 1, overload) && ok;
+    ok = set_insert_fails_cleanly(set, 2, overload) && ok;
   }
   return ok ? 0 : 1;
 }
