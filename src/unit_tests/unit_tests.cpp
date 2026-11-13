@@ -49,6 +49,7 @@ void initializeTestList()
   libunittests["fs_util"] = test_fs_util;
   libunittests["hashmaps"] = test_hashmaps;
   libunittests["hashmap_insert_rollback"] = test_hashmap_insert_rollback;
+  libunittests["hashset_insert_rollback"] = test_hashset_insert_rollback;
   libunittests["hexbinary"] = test_hexbinary;
   libunittests["hexbinary_streambuf"] = test_hexbinary_streambuf;
 
