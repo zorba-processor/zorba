@@ -121,10 +121,8 @@ bool XercSchemaValidator::checkContent (XMLElementDecl* const elemDecl
     //  to do to validate it.
     //
     // the top of the type stack always knows best...
-    if ( fTypeStack->empty() )
-    {
-        emitError(XMLValid::DatatypeValidationFailure, elemDecl->getFullName());
-    }
+    // The filter calls checkContent only for an element that took a type stack entry
+    ZORBA_ASSERT(!fTypeStack->empty());
 
     ComplexTypeInfo* currType = fTypeStack->pop();
     //std::cout << "      xsv - : checkcontent   pop \n"; std::cout.flush();
@@ -2382,10 +2380,8 @@ int XercSchemaValidator::checkContent (XMLElementDecl* const elemDecl
     //  to do to validate it.
     //
     // the top of the type stack always knows best...
-    if ( fTypeStack->empty() )
-    {
-        emitError(XMLValid::DatatypeValidationFailure, elemDecl->getFullName());
-    }
+    // The filter calls checkContent only for an element that took a type stack entry
+    ZORBA_ASSERT(!fTypeStack->empty());
 
     ComplexTypeInfo* currType = fTypeStack->pop();
     // The declaration of the name of a root validated against a stipulated type
