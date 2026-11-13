@@ -1524,7 +1524,8 @@ void FLWORIterator::materializeGroupTuple(
   }
   else
   {
-    nongroupVarSequences = new std::vector<store::TempSeq_t>();
+    std::unique_ptr<std::vector<store::TempSeq_t>> newSequences =
+      std::make_unique<std::vector<store::TempSeq_t>>();
 
     for (csize i = 0; i < numNonGroupingSpecs; ++i)
     {
@@ -1533,13 +1534,16 @@ void FLWORIterator::materializeGroupTuple(
 
       store::TempSeq_t result = GENV_STORE.createTempSeq(iterWrapper, false);
 
-      nongroupVarSequences->push_back(result);
+      newSequences->push_back(result);
 
       nongroupingSpecs[i].reset(planState);
     }
 
+    nongroupVarSequences = newSequences.get();
     groupMap->insert(groupTuple.get(), nongroupVarSequences);
-    (void)groupTuple.release(); // owned by groupMap now
+    // owned by groupMap now
+    (void)groupTuple.release();
+    (void)newSequences.release();
   }
 }
 
