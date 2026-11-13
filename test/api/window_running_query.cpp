@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-// A sliding window reads its domain as it goes only when no side effect can run
-// in the query that runs it. The body of a function loaded with
+// A window reads its domain as it goes only when no side effect can run in the
+// query that runs it. The body of a function loaded with
 // StaticContext::loadProlog(), or of a function item made by another query, is
 // compiled by that prolog or query, not by the query that runs it.
 
@@ -99,16 +99,19 @@ Read read_with_change(const std::function<XQuery_t()>& aCompile,
 
 const int theWindows = 5;
 
+const char* const theKinds[] = { "sliding", "tumbling" };
+
 // One window per item of the domain, each item read from the file. The function
 // is recursive, so that the optimizer does not inline it into the calling query.
-std::string windows_function(const std::string& aPrefix)
+std::string windows_function(const std::string& aPrefix, const std::string& aKind)
 {
+  std::string const name = aPrefix + ":" + aKind;
   return
     "declare %an:nondeterministic\n"
-    "function " + aPrefix + ":windows($p as xs:string, $n as xs:integer) {\n"
-    "  if ($n gt 0) then " + aPrefix + ":windows($p, $n - 1)\n"
+    "function " + name + "($p as xs:string, $n as xs:integer) {\n"
+    "  if ($n gt 0) then " + name + "($p, $n - 1)\n"
     "  else\n"
-    "    for sliding window $w in\n"
+    "    for " + aKind + " window $w in\n"
     "      (for $i in 1 to " + std::to_string(theWindows) + "\n"
     "       return concat(file:read-text($p), string($i)))\n"
     "      start when true\n"
@@ -144,7 +147,8 @@ void check_prolog_function(Zorba* z, const std::string& aPath)
   Zorba_CompilerHints_t hints;
   sctx->loadProlog(std::string(theImports) +
                    "declare namespace p = \"urn:window-running-query\";\n" +
-                   windows_function("p"), hints);
+                   windows_function("p", "sliding") +
+                   windows_function("p", "tumbling"), hints);
 
   auto run = [&](const std::string& aBody) {
     return read_with_change(
@@ -156,14 +160,19 @@ void check_prolog_function(Zorba* z, const std::string& aPath)
       aPath);
   };
 
-  check("function of a loaded prolog, query without side effects",
-        run("p:windows(\"" + aPath + "\", 2)"), true);
-  check("function of a loaded prolog, query with a side effect",
-        run(never_writes(aPath) + "p:windows(\"" + aPath + "\", 2)"), false);
+  for (std::string const kind : theKinds)
+  {
+    std::string const call = "p:" + kind + "(\"" + aPath + "\", 2)";
+    check(kind + " function of a loaded prolog, query without side effects",
+          run(call), true);
+    check(kind + " function of a loaded prolog, query with a side effect",
+          run(never_writes(aPath) + call), false);
+  }
 }
 
 // The query that makes the function item cannot run a side effect.
-void check_foreign_function_item(Zorba* z, const std::string& aPath)
+void check_foreign_function_item(Zorba* z, const std::string& aPath,
+                                 const std::string& aKind)
 {
   StaticContext_t sctx = z->createStaticContext();
   sctx->setSecurityPolicy(SecurityPolicy::unrestricted());
@@ -171,8 +180,8 @@ void check_foreign_function_item(Zorba* z, const std::string& aPath)
   std::vector<Item> items;
   {
     XQuery_t q = z->compileQuery(std::string(theImports) +
-                                 windows_function("local") +
-                                 "local:windows#2", sctx);
+                                 windows_function("local", aKind) +
+                                 "local:" + aKind + "#2", sctx);
     Iterator_t it = q->iterator();
     it->open();
     Item item;
@@ -183,7 +192,7 @@ void check_foreign_function_item(Zorba* z, const std::string& aPath)
   }
   if (items.size() != 1)
   {
-    fail("function item: expected one item");
+    fail(aKind + " function item: expected one item");
     return;
   }
 
@@ -200,9 +209,9 @@ void check_foreign_function_item(Zorba* z, const std::string& aPath)
       aPath);
   };
 
-  check("function item of another query, query without side effects",
+  check(aKind + " function item of another query, query without side effects",
         run("$g(\"" + aPath + "\", 2)"), true);
-  check("function item of another query, query with a side effect",
+  check(aKind + " function item of another query, query with a side effect",
         run(never_writes(aPath) + "$g(\"" + aPath + "\", 2)"), false);
 }
 
@@ -225,7 +234,8 @@ window_running_query(int, char*[])
 #endif
              ".txt")).string();
     check_prolog_function(z, path);
-    check_foreign_function_item(z, path);
+    for (std::string const kind : theKinds)
+      check_foreign_function_item(z, path, kind);
   }
   catch (std::exception const& e)
   {
