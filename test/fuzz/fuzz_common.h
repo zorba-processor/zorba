@@ -52,24 +52,20 @@
 
 namespace zorba_fuzz {
 
-// fn:parse-xml and fn:parse-xml-fragment wrap any ZorbaException from the
-// store into FODC0006 and keep only its message text ("invalid content passed
-// to $1: $2"): neither the original code nor the exception survives, so the
-// text is the only link. It is the formatted message of ZXQP0003
-// ("internal error[: detail]") or ZXQP0002 ("\"cond\": assertion failed[ with
-// the message: m]"), found right after the wrapper's prefix.
+// The parse functions (fn:parse-xml, fn:parse-xml-fragment, x:parse,
+// x:parse-html) wrap a ZorbaException from the store into FODC0006 whose
+// message names the original code right after the wrapper's prefix
+// ("invalid content passed to $1: [code]: message").
 inline bool wraps_internal_error(zorba::ZorbaException const& e)
 {
   if (e.diagnostic() != zorba::err::FODC0006)
     return false;
-  const char* cause = std::strstr(e.what(), "): ");
+  const char* cause = std::strstr(e.what(), "): [");
   if (!cause)
     return false;
   cause += 3;
-  if (std::strncmp(cause, "internal error", 14) == 0 &&
-      (cause[14] == '\0' || cause[14] == ':'))
-    return true;
-  return cause[0] == '"' && std::strstr(cause, "\": assertion failed") != nullptr;
+  return std::strncmp(cause, "[zerr:ZXQP0002]: ", 17) == 0 ||
+         std::strncmp(cause, "[zerr:ZXQP0003]: ", 17) == 0;
 }
 
 inline bool is_internal_error(zorba::ZorbaException const& e)
