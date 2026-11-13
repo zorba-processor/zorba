@@ -538,6 +538,15 @@ bool Schema::isNamespaceLoaded(const char* ns) const
 {
   SYNC_CODE(AutoMutex(GENV_TYPESYSTEM.getXercesMutex());)
 
+  return isNamespaceInPool(ns);
+}
+
+
+/*******************************************************************************
+  isNamespaceLoaded() for a caller that holds the Xerces mutex
+*******************************************************************************/
+bool Schema::isNamespaceInPool(const char* ns) const
+{
   if (theGrammarPool == NULL)
     return false;
 
@@ -564,13 +573,14 @@ void Schema::registerXSD(
 
   TRACE("url=" << xsdURL << " loc=" << loc);
 
+  SYNC_CODE(AutoMutex(GENV_TYPESYSTEM.getXercesMutex());)
+
   // The location hint of an import of an already loaded namespace is
   // disregarded: the pool would reject the second grammar, and grammars
-  // cached with it would point into it after the parser deletes it.
-  if (isNamespaceLoaded(xsdURL))
+  // cached with it would point into it after the parser deletes it. Checked
+  // under the same hold of the mutex as the load.
+  if (isNamespaceInPool(xsdURL))
     return;
-
-  SYNC_CODE(AutoMutex(GENV_TYPESYSTEM.getXercesMutex());)
 
   try
   {

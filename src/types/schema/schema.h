@@ -189,6 +189,8 @@ public:
 private:
 
 #ifndef ZORBA_NO_XMLSCHEMA
+  bool isNamespaceInPool(const char* ns) const;
+
   XERCES_CPP_NAMESPACE::XSElementDeclaration* getDeclForElement(
       const store::Item* qname);
 
