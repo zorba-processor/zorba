@@ -1,0 +1,33 @@
+module namespace b = "http://zorba.io/bench/index-probe";
+
+import module namespace dml =
+  "http://zorba.io/modules/store/static/collections/dml";
+
+declare namespace an = "http://zorba.io/annotations";
+
+declare collection b:items;
+
+declare variable $b:items as xs:QName := xs:QName("b:items");
+
+declare %an:automatic %an:value-equality %an:unique index b:idx
+  on nodes dml:collection(xs:QName("b:items"))
+  by @k as xs:string;
+
+declare variable $b:idx as xs:QName := xs:QName("b:idx");
+
+declare %an:sequential function b:load($n as xs:integer) as empty-sequence()
+{
+  dml:insert($b:items, for $i in 1 to $n return <item k="{$i}"/>);
+};
+
+(: The shape of data:remove-document in test/rbkt/Queries/zorba/index/match_veq_06.xqlib :)
+declare %an:sequential function b:lookup($k as xs:string) as xs:string
+{
+  let $hit := for $i in dml:collection($b:items)
+              where $i/@k eq $k
+              return $i
+  return
+  {
+    string($hit/@k);
+  }
+};
