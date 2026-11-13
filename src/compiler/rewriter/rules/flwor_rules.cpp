@@ -567,7 +567,9 @@ RULE_REWRITE_PRE(EliminateUnusedLetVars)
         // O0 evaluates this domain once for each tuple it receives; folded, it is
         // evaluated only where its variable is referenced. An empty domain gives
         // no tuples at O0; folded, the clauses after it are evaluated.
-        if (safe_to_fold_var(i, numRefs) &&
+        // A positional variable left above is 0 or 1 by whether the domain is empty.
+        if (fc->get_pos_var() == NULL &&
+            safe_to_fold_var(i, numRefs) &&
             (outerFor || domQuant == SequenceType::QUANT_ONE ||
              clauses_cannot_raise_error(theFlwor, i + 1, theFlwor->num_clauses())) &&
             (cannot_raise_error(domExpr) ||
