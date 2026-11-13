@@ -3786,6 +3786,47 @@ void test_dynamic_call_out_of_memory( Fixture const &f ) {
     "return (local:g(0), for $i in 1 to 2 return $fs[$i]($i))",
     "0 2 4", "a dynamic function call" );
 }
+// The body of test_call_body_out_of_memory, cached: each call also looks up
+// and fills the function cache.
+void test_cached_call_body_out_of_memory( Fixture const &f ) {
+  sweep_next_out_of_memory( f,
+    "declare namespace an = \"http://zorba.io/annotations\";\n"
+    "declare %an:cache function local:f($n as xs:integer) as xs:integer {\n"
+    "  if ($n le 0) then 0\n"
+    "  else sum(for $i in 1 to $n\n"
+    "           let $s := ($i, $i * 2)\n"
+    "           order by $i descending\n"
+    "           return sum($s) + count($s)) + local:f($n - 1)\n"
+    "};\n"
+    // Not a constant argument: the compiler would evaluate the call.
+    "declare variable $n as xs:integer external := 3;\n"
+    "local:f($n)",
+    "42", "a cached function body" );
+}
+// A FLWOR that groups, in the body of a recursive function: a failure while
+// it groups.
+void test_group_by_out_of_memory( Fixture const &f ) {
+  sweep_next_out_of_memory( f,
+    "declare function local:f($n) {\n"
+    "  if ($n le 0) then 0\n"
+    "  else sum(for $i in 1 to $n\n"
+    "           let $s := ($i, $i * 2)\n"
+    "           group by $k := $i mod 3\n"
+    "           order by $k descending\n"
+    "           return sum($s)) + local:f($n - 1)\n"
+    "};\n"
+    "local:f(3)",
+    "30", "group by" );
+}
+// No static call of local:g: its body is optimized on the first dynamic call,
+// while the query runs.
+void test_first_dynamic_call_out_of_memory( Fixture const &f ) {
+  sweep_next_out_of_memory( f,
+    "declare function local:g($x) { $x * 2 };\n"
+    "let $fs := (local:g#1, local:g#1)\n"
+    "for $i in 1 to 2 return $fs[$i]($i)",
+    "2 4", "the first dynamic call of a function" );
+}
 void test_for_each_pair_out_of_memory( Fixture const &f ) {
   sweep_next_out_of_memory( f,
     "for-each-pair((1, 2), (3, 4), function($a, $b) { $a + $b })",
@@ -7851,6 +7892,9 @@ Test const tests[] = {
   { "exhaust_plan_open", test_plan_open_out_of_memory },
   { "exhaust_call_body", test_call_body_out_of_memory },
   { "exhaust_dynamic_call", test_dynamic_call_out_of_memory },
+  { "exhaust_cached_call_body", test_cached_call_body_out_of_memory },
+  { "exhaust_group_by", test_group_by_out_of_memory },
+  { "exhaust_first_dynamic_call", test_first_dynamic_call_out_of_memory },
   { "exhaust_for_each_pair", test_for_each_pair_out_of_memory },
   { "exhaust_fold_left", test_fold_left_out_of_memory },
   { "exhaust_sweep_matcher", test_sweep_matcher },
