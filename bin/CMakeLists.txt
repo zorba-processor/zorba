@@ -596,6 +596,7 @@ IF (ZORBA_WITH_FILE_ACCESS)
              exhaust_seekable_stream exhaust_json_loader exhaust_plan_wrapper
              exhaust_plan_open exhaust_call_body exhaust_dynamic_call
              exhaust_for_each_pair exhaust_fold_left exhaust_json_copy
+             exhaust_cached_call_body exhaust_group_by exhaust_first_dynamic_call
              exhaust_sweep_xml exhaust_sweep_xml_dtd exhaust_sweep_xml_dtd_nodes
              exhaust_sweep_fragment
              exhaust_sweep_html exhaust_sweep_json exhaust_sweep_csv
