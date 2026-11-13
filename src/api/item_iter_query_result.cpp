@@ -37,6 +37,8 @@
 
 namespace zorba {
 
+// After the query was closed, its diagnostic handler is gone: the error goes
+// to the caller.
 #define RESULT_ITER_CATCH                                           \
 catch (ZorbaException const &e)                                     \
 {                                                                   \
@@ -47,6 +49,8 @@ catch (ZorbaException const &e)                                     \
     theHaveLock = false;                                            \
   })                                                                \
                                                                     \
+  if (theQuery == NULL)                                             \
+    throw;                                                          \
   ZorbaImpl::notifyError(theQuery->theDiagnosticHandler, e);        \
 }                                                                   \
 catch (std::exception const& e)                                     \
@@ -58,6 +62,8 @@ catch (std::exception const& e)                                     \
     theHaveLock = false;                                            \
   })                                                                \
                                                                     \
+  if (theQuery == NULL)                                             \
+    throw;                                                          \
   ZorbaImpl::notifyError(theQuery->theDiagnosticHandler, e.what()); \
 }                                                                   \
 catch (...)                                                         \
@@ -69,6 +75,8 @@ catch (...)                                                         \
     theHaveLock = false;                                            \
   })                                                                \
                                                                     \
+  if (theQuery == NULL)                                             \
+    throw;                                                          \
   ZorbaImpl::notifyError(theQuery->theDiagnosticHandler);           \
 } 
 
