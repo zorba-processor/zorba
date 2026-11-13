@@ -575,15 +575,15 @@ void Schema::registerXSD(
 
   SYNC_CODE(AutoMutex(GENV_TYPESYSTEM.getXercesMutex());)
 
-  // The location hint of an import of an already loaded namespace is
-  // disregarded: the pool would reject the second grammar, and grammars
-  // cached with it would point into it after the parser deletes it. Checked
-  // under the same hold of the mutex as the load.
-  if (isNamespaceInPool(xsdURL))
-    return;
-
   try
   {
+    // The location hint of an import of an already loaded namespace is
+    // disregarded: the pool would reject the second grammar, and grammars
+    // cached with it would point into it after the parser deletes it. Checked
+    // under the same hold of the mutex as the load.
+    if (isNamespaceInPool(xsdURL))
+      return;
+
     // The implementation class (what XMLReaderFactory::createXMLReader()
     // returns) is used directly for setXMLEntityResolver(), which the
     // SAX2XMLReader interface does not have.
