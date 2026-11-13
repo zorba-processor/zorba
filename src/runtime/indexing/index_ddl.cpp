@@ -174,7 +174,10 @@ static void checkKeyType(
       return;
     }
 
-    if (TypeOps::is_subtype(tm, *indexKeyType, *rtm.DOUBLE_TYPE_ONE))
+    if (TypeOps::is_subtype(tm, *indexKeyType, *rtm.DOUBLE_TYPE_ONE) &&
+        (TypeOps::is_subtype(searchKeyTypeCode, store::XS_DECIMAL) ||
+         TypeOps::is_subtype(searchKeyTypeCode, store::XS_FLOAT) ||
+         searchKeyTypeCode == store::XS_UNTYPED_ATOMIC))
     {
       if (TypeOps::is_subtype(searchKeyTypeCode, store::XS_DECIMAL))
       {
