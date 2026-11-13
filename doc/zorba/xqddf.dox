@@ -744,7 +744,7 @@ sequence.</li>
   <li>If the update mode of a collection of any node is '%an:const', '%an:append-only', or '%an:queue', an
 error is raised [<a href="#ERRZDDY0004" title="zerr:ZDDY0004">zerr:ZDDY0004</a>],
 [<a href="#ERRZDDY0007" title="zerr:ZDDY0007">zerr:ZDDY0007</a>], or [<a
-href="#ERRZDDY009" title="zerr:ZDDY009">zerr:ZDDY009</a>], respectively.</li>
+href="#ERRZDDY0009" title="zerr:ZDDY0009">zerr:ZDDY0009</a>], respectively.</li>
   <li>The result of the function is an empty XDM instance and a pending update
 list that consists of a single update primitive:
 upd:deleteFromCollection($nodes).</li>
@@ -816,7 +816,7 @@ raised [<a href="#ERRZDDY0003" title="zerr:ZDDY0003">zerr:ZDDY0003</a>].</li>
   <li>If the update mode of the collection is const, append-only, or queue, an
 error is raised [<a href="#ERRZDDY0004" title="zerr:ZDDY0004">zerr:ZDDY0004</a>],
 [<a href="#ERRZDDY0007" title="zerr:ZDDY0007">zerr:ZDDY0007</a>], or [<a
-href="#ERRZDDY009" title="zerr:ZDDY009">zerr:ZDDY009</a>], respectively.</li>
+href="#ERRZDDY0008" title="zerr:ZDDY0008">zerr:ZDDY0008</a>], respectively.</li>
   <li>The expression that appears as the second argument to the function call is
 evaluated, producing a single positive integer. Let $number be that
 integer.</li>
@@ -2333,6 +2333,9 @@ index contains a non-simple expression.
 \n <a name="ERRZDST0034" id="ERRZDST0034"></a>zerr:ZDST0034, Index cannot be
 automatically maintained.
 
+\n <a name="ERRZDST0035" id="ERRZDST0035"></a>zerr:ZDST0035, A general index
+has more than one key expression.
+
 \n <a name="ERRZDST0036" id="ERRZDST0036"></a>zerr:ZDST0036, Index qname does not
 have the same namespace URI as the target namespace of the declaring module.
 
@@ -2370,6 +2373,9 @@ of index produces an item that is not a node.
 
 \n <a name="ERRXDTY0011" id="ERRXDTY0011"></a>zerr:XDTY0011, The result of some
 key expression of index does not match its declared type.
+
+\n <a name="ERRZDTY0012" id="ERRZDTY0012"></a>zerr:ZDTY0012, A key item of a
+general range index has a type for which no ordering relationship exists.
 </strong>
 
 <p>XQuery Data Definition Facility - Dynamic Errors:</p>
@@ -2445,6 +2451,12 @@ support range probes.
 
 <a name="ERRZDDY0027" id="ERRZDDY0027"></a>zerr:ZDDY0027, Cannot invoke the
 create function multiple times with the same QName in the same snapshot.
+
+\n <a name="ERRZDDY0028" id="ERRZDDY0028"></a>zerr:ZDDY0028, The domain expression
+of a general index produces duplicate nodes.
+
+\n <a name="ERRZDDY0029" id="ERRZDDY0029"></a>zerr:ZDDY0029, Index does not
+support general point probes.
 
 <a name="ERRZDDY0030" id="ERRZDDY0030"></a>zerr:ZDDY0030, Index does not
 support general range probes.
