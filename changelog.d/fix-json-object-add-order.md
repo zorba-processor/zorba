@@ -1,5 +1,6 @@
 ### Fixed
 
-- An insert into a JSON object that fails when memory runs out leaves the
-  object unchanged; before, the object could keep the member, or a later
-  lookup by name could return the value of another member.
+- When memory runs out while a member is added to a JSON object, a later
+  lookup by name no longer returns the value of another member, and the object
+  no longer keeps a member whose insert failed while it built its index of
+  names.
