@@ -401,8 +401,13 @@ bool GeneralIndex::insert(store::Item_t& key, store::Item_t& node)
   case store::XS_GDAY:
   case store::XS_GMONTH:
   {
-    assert(!sorted);
-    // falth through
+    // A range index needs an ordering among its keys.
+    if (sorted)
+    {
+      RAISE_ERROR_NO_LOC(zerr::ZDTY0012_INDEX_KEY_TYPE_ERROR,
+      ERROR_PARAMS(getName()->getStringValue()));
+    }
+    [[fallthrough]];
   }
 
   case store::XS_ANY_URI:
