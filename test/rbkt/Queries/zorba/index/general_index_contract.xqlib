@@ -66,6 +66,17 @@ declare %an:general-range %an:manual index m:URange
 on nodes dml:collection(xs:QName("m:u"))//e
 by fn:data(./@v) as xs:untypedAtomic*;
 
+(: Untyped and integer keys in indexes without a key type. :)
+declare collection m:x as node()*;
+
+declare %an:general-equality %an:manual index m:XEquality
+on nodes dml:collection(xs:QName("m:x"))//e
+by (if (./@t eq "i") then xs:integer(./@v) else fn:data(./@v));
+
+declare %an:general-range %an:manual index m:XRange
+on nodes dml:collection(xs:QName("m:x"))//e
+by (if (./@t eq "i") then xs:integer(./@v) else fn:data(./@v));
+
 (: Integer keys and untyped keys, several for some nodes, in an automatic
    range index. :)
 declare collection m:ta as node()*;
