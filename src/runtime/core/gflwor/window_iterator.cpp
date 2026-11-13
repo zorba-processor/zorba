@@ -909,16 +909,16 @@ void WindowIterator::doGarbageCollection(WindowState* state) const
 
 
 /***************************************************************************//**
-  Whether the domain is read as it goes. For a sliding window, theLazyEval was
-  decided by the query that compiled it, which is not always the one that runs
-  it: the body of a function loaded with StaticContext::loadProlog(), or of a
-  function item made by another query, is compiled by that prolog or query. No
-  side effect may run in the query being run either.
+  Whether the domain is read as it goes. theLazyEval was decided by the query
+  that compiled the clause, which is not always the one that runs it: the body
+  of a function loaded with StaticContext::loadProlog(), or of a function item
+  made by another query, is compiled by that prolog or query. No side effect may
+  run in the query being run either.
 ********************************************************************************/
 bool WindowIterator::readsDomainLazily(const PlanState& planState) const
 {
-  if (!theLazyEval || theWindowType == TUMBLING)
-    return theLazyEval;
+  if (!theLazyEval)
+    return false;
 
   const CompilerCB* ccb = planState.theCompilerCB;
 
