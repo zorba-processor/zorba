@@ -11,6 +11,8 @@ import module namespace iddl =
 
 declare namespace an = "http://zorba.io/annotations";
 
+declare namespace err = "http://www.w3.org/2005/xqt-errors";
+
 (: xs:double keys. :)
 declare collection m:d as node()*;
 
