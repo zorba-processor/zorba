@@ -650,6 +650,11 @@ IF (ZORBA_WITH_FILE_ACCESS)
       SET_TESTS_PROPERTIES (bin/mcp/exhaust_sweep_${_t} PROPERTIES
         RESOURCE_LOCK mcp_memory_exhaustion TIMEOUT 400)
     ENDFOREACH (_t)
+    # Under AddressSanitizer the builtins sweep takes up to 370 s, and 1.4 times longer on a loaded runner.
+    STRING (TOUPPER "${CMAKE_BUILD_TYPE}" _build_type)
+    IF ("${CMAKE_CXX_FLAGS} ${CMAKE_CXX_FLAGS_${_build_type}}" MATCHES "fsanitize=address")
+      SET_TESTS_PROPERTIES (bin/mcp/exhaust_sweep_builtins PROPERTIES TIMEOUT 600)
+    ENDIF ()
     FOREACH (_t generated json json_array csv xml strings numbers try)
       SET_TESTS_PROPERTIES (bin/mcp/exhaust_injected_${_t} PROPERTIES TIMEOUT 400)
     ENDFOREACH (_t)
