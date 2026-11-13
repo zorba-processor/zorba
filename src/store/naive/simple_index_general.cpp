@@ -1585,6 +1585,7 @@ void ProbeGeneralIndexIterator::init(const store::IndexCondition_t& cond,
 {
   theProbeKind = cond->getKind();
   theCondition = static_cast<GeneralIndexCondition*>(cond.getp());
+  theSkip = aSkip;
 
   // The runtime calls init once per search item on the same iterator.
   theIsUntypedProbe = false;
@@ -2369,6 +2370,12 @@ void ProbeGeneralIndexIterator::open()
       }
     }
   }
+
+  xs_integer numSkipped(0);
+  store::Item_t skipped;
+
+  while (numSkipped < theSkip && next(skipped))
+    ++numSkipped;
 }
 
 

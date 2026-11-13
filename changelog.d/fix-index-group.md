@@ -13,3 +13,5 @@
 - `probe-index-range-value` without bounds on a general index with domain
   nodes that have several keys returns every domain node once, as documented,
   instead of raising `err:XPTY0004`; with a bound it still raises it.
+- `probe-index-point-value-skip` and `probe-index-range-value-skip` skip the
+  given number of results also on a general index; they returned all of them.

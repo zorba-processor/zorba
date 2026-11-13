@@ -456,6 +456,10 @@ public:
   For marking the end of an iteration over the domain nodes associated with an
   index key that satisfies the search condition..
 
+  theSkip:
+  --------
+  The number of results that open() skips.
+
   theDropsDuplicates:
   -------------------
   Set to true for a value range probe without bounds in an index with domain
@@ -508,6 +512,8 @@ protected:
 
   GeneralIndexValue::const_iterator     theIte;
   GeneralIndexValue::const_iterator     theEnd;
+
+  xs_integer                            theSkip;
 
   bool                                  theDropsDuplicates;
 
