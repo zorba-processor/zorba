@@ -1,1 +1,110 @@
-<iterator-tree/>
+<iterator-tree description="const-folded expr">
+  <CastIterator type="xs:float">
+    <SingletonIterator value="xs:string(0.1)"/>
+  </CastIterator>
+</iterator-tree>
+<iterator-tree description="const-folded expr">
+  <CastIterator type="xs:float">
+    <SingletonIterator value="xs:string(0.5)"/>
+  </CastIterator>
+</iterator-tree>
+<iterator-tree description="main query">
+  <FLWORIterator>
+    <ForVariable name="doc">
+      <ElementIterator copyInputNodes="false">
+        <SingletonIterator value="xs:QName(,,d)"/>
+        <FnConcatIterator>
+          <ElementIterator copyInputNodes="false">
+            <SingletonIterator value="xs:QName(,,n)"/>
+            <TextIterator>
+              <SingletonIterator value="xs:string(0.1)"/>
+            </TextIterator>
+          </ElementIterator>
+          <ElementIterator copyInputNodes="false">
+            <SingletonIterator value="xs:QName(,,n)"/>
+            <TextIterator>
+              <SingletonIterator value="xs:string(0.5)"/>
+            </TextIterator>
+          </ElementIterator>
+        </FnConcatIterator>
+      </ElementIterator>
+    </ForVariable>
+    <LetVariable name="$$opt_temp_0" materialize="true">
+      <HoistIterator>
+        <ChildAxisIterator test-kind="match_name_test" qname="xs:QName(,,n)" typename="*" nill-allowed="false">
+          <ForVarIterator varname="doc"/>
+        </ChildAxisIterator>
+      </HoistIterator>
+    </LetVariable>
+    <LetVariable name="$$opt_temp_4" materialize="true">
+      <CreateInternalIndexIterator name="xs:QName(,,tempIndex0)">
+        <FLWORIterator>
+          <ForVariable name="$$opt_temp_2">
+            <UnhoistIterator>
+              <LetVarIterator varname="$$opt_temp_0"/>
+            </UnhoistIterator>
+          </ForVariable>
+          <ReturnClause>
+            <ValueIndexEntryBuilderIterator>
+              <ForVarIterator varname="$$opt_temp_2"/>
+              <CastIterator type="xs:double">
+                <FnDataIterator>
+                  <ForVarIterator varname="$$opt_temp_2"/>
+                </FnDataIterator>
+              </CastIterator>
+            </ValueIndexEntryBuilderIterator>
+          </ReturnClause>
+        </FLWORIterator>
+      </CreateInternalIndexIterator>
+    </LetVariable>
+    <ForVariable name="k">
+      <FnConcatIterator>
+        <SingletonIterator value="xs:float(0.1)"/>
+        <SingletonIterator value="xs:float(0.5)"/>
+      </FnConcatIterator>
+    </ForVariable>
+    <ForVariable name="$$opt_temp_1">
+      <HoistIterator>
+        <PromoteIterator type="xs:double">
+          <ForVarIterator varname="k"/>
+        </PromoteIterator>
+      </HoistIterator>
+    </ForVariable>
+    <ReturnClause>
+      <FnCountIterator>
+        <FLWORIterator>
+          <ForVariable name="n">
+            <TryCatchIterator>
+              <ProbeIndexPointValueIterator>
+                <SingletonIterator value="xs:QName(,,tempIndex0)"/>
+                <UnhoistIterator>
+                  <ForVarIterator varname="$$opt_temp_1"/>
+                </UnhoistIterator>
+              </ProbeIndexPointValueIterator>
+              <UnhoistIterator>
+                <LetVarIterator varname="$$opt_temp_0"/>
+              </UnhoistIterator>
+            </TryCatchIterator>
+          </ForVariable>
+          <WhereClause>
+            <FnBooleanIterator>
+              <TypedValueCompareIterator_DOUBLE>
+                <CastIterator type="xs:double">
+                  <FnDataIterator>
+                    <ForVarIterator varname="n"/>
+                  </FnDataIterator>
+                </CastIterator>
+                <UnhoistIterator>
+                  <ForVarIterator varname="$$opt_temp_1"/>
+                </UnhoistIterator>
+              </TypedValueCompareIterator_DOUBLE>
+            </FnBooleanIterator>
+          </WhereClause>
+          <ReturnClause>
+            <ForVarIterator varname="n"/>
+          </ReturnClause>
+        </FLWORIterator>
+      </FnCountIterator>
+    </ReturnClause>
+  </FLWORIterator>
+</iterator-tree>

@@ -1,1 +1,238 @@
-<iterator-tree/>
+<iterator-tree description="const-folded expr">
+  <CastIterator type="xs:anyURI">
+    <SingletonIterator value="xs:string(a)"/>
+  </CastIterator>
+</iterator-tree>
+<iterator-tree description="const-folded expr">
+  <CastIterator type="xs:anyURI">
+    <SingletonIterator value="xs:string(c)"/>
+  </CastIterator>
+</iterator-tree>
+<iterator-tree description="main query">
+  <FLWORIterator>
+    <ForVariable name="doc">
+      <ElementIterator>
+        <SingletonIterator value="xs:QName(,,d)"/>
+        <FnConcatIterator>
+          <ElementIterator>
+            <SingletonIterator value="xs:QName(,,u)"/>
+            <TextIterator>
+              <SingletonIterator value="xs:string(a)"/>
+            </TextIterator>
+          </ElementIterator>
+          <ElementIterator>
+            <SingletonIterator value="xs:QName(,,u)"/>
+            <TextIterator>
+              <SingletonIterator value="xs:string(b)"/>
+            </TextIterator>
+          </ElementIterator>
+          <ElementIterator>
+            <SingletonIterator value="xs:QName(,,u)"/>
+            <TextIterator>
+              <SingletonIterator value="xs:string(a)"/>
+            </TextIterator>
+          </ElementIterator>
+        </FnConcatIterator>
+      </ElementIterator>
+    </ForVariable>
+    <LetVariable name="$$opt_temp_0" materialize="true">
+      <HoistIterator>
+        <ChildAxisIterator test-kind="match_name_test" qname="xs:QName(,,u)" typename="*" nill-allowed="false">
+          <ForVarIterator varname="doc"/>
+        </ChildAxisIterator>
+      </HoistIterator>
+    </LetVariable>
+    <LetVariable name="$$opt_temp_4" materialize="true">
+      <CreateInternalIndexIterator name="xs:QName(,,tempIndex0)">
+        <FLWORIterator>
+          <ForVariable name="$$opt_temp_1">
+            <UnhoistIterator>
+              <LetVarIterator varname="$$opt_temp_0"/>
+            </UnhoistIterator>
+          </ForVariable>
+          <ReturnClause>
+            <ValueIndexEntryBuilderIterator>
+              <ForVarIterator varname="$$opt_temp_1"/>
+              <FLWORIterator>
+                <ForVariable name="$$opt_temp_3">
+                  <FnDataIterator>
+                    <ForVarIterator varname="$$opt_temp_1"/>
+                  </FnDataIterator>
+                </ForVariable>
+                <ReturnClause>
+                  <IfThenElseIterator>
+                    <FnEmptyIterator>
+                      <ForVarIterator varname="$$opt_temp_3"/>
+                    </FnEmptyIterator>
+                    <FnConcatIterator/>
+                    <IfThenElseIterator>
+                      <InstanceOfIterator>
+                        <ForVarIterator varname="$$opt_temp_3"/>
+                      </InstanceOfIterator>
+                      <SingletonIterator value="xs:string(f)"/>
+                      <IfThenElseIterator>
+                        <OrIterator>
+                          <InstanceOfIterator>
+                            <ForVarIterator varname="$$opt_temp_3"/>
+                          </InstanceOfIterator>
+                          <InstanceOfIterator>
+                            <ForVarIterator varname="$$opt_temp_3"/>
+                          </InstanceOfIterator>
+                        </OrIterator>
+                        <ConcatStrIterator>
+                          <SingletonIterator value="xs:string(n)"/>
+                          <FnStringIterator>
+                            <AbsIterator>
+                              <CastIterator type="xs:double">
+                                <ForVarIterator varname="$$opt_temp_3"/>
+                              </CastIterator>
+                            </AbsIterator>
+                          </FnStringIterator>
+                        </ConcatStrIterator>
+                        <IfThenElseIterator>
+                          <OrIterator>
+                            <InstanceOfIterator>
+                              <ForVarIterator varname="$$opt_temp_3"/>
+                            </InstanceOfIterator>
+                            <InstanceOfIterator>
+                              <ForVarIterator varname="$$opt_temp_3"/>
+                            </InstanceOfIterator>
+                            <InstanceOfIterator>
+                              <ForVarIterator varname="$$opt_temp_3"/>
+                            </InstanceOfIterator>
+                          </OrIterator>
+                          <ConcatStrIterator>
+                            <SingletonIterator value="xs:string(s)"/>
+                            <FnStringIterator>
+                              <ForVarIterator varname="$$opt_temp_3"/>
+                            </FnStringIterator>
+                          </ConcatStrIterator>
+                          <SingletonIterator value="xs:string(o)"/>
+                        </IfThenElseIterator>
+                      </IfThenElseIterator>
+                    </IfThenElseIterator>
+                  </IfThenElseIterator>
+                </ReturnClause>
+              </FLWORIterator>
+            </ValueIndexEntryBuilderIterator>
+          </ReturnClause>
+        </FLWORIterator>
+      </CreateInternalIndexIterator>
+    </LetVariable>
+    <ForVariable name="k">
+      <FnConcatIterator>
+        <SingletonIterator value="xs:anyURI(a)"/>
+        <SingletonIterator value="xs:anyURI(c)"/>
+      </FnConcatIterator>
+    </ForVariable>
+    <ReturnClause>
+      <FnCountIterator>
+        <FLWORIterator>
+          <ForVariable name="u">
+            <TryCatchIterator>
+              <FLWORIterator>
+                <ForVariable name="$$opt_temp_5">
+                  <ForVarIterator varname="k"/>
+                </ForVariable>
+                <ReturnClause>
+                  <IfThenElseIterator>
+                    <OrIterator>
+                      <InstanceOfIterator>
+                        <ForVarIterator varname="$$opt_temp_5"/>
+                      </InstanceOfIterator>
+                      <FnExistsIterator>
+                        <ProbeIndexPointValueIterator>
+                          <SingletonIterator value="xs:QName(,,tempIndex0)"/>
+                          <SingletonIterator value="xs:string(f)"/>
+                        </ProbeIndexPointValueIterator>
+                      </FnExistsIterator>
+                    </OrIterator>
+                    <UnhoistIterator>
+                      <LetVarIterator varname="$$opt_temp_0"/>
+                    </UnhoistIterator>
+                    <ProbeIndexPointValueIterator>
+                      <SingletonIterator value="xs:QName(,,tempIndex0)"/>
+                      <FLWORIterator>
+                        <ForVariable name="$$opt_temp_6">
+                          <ForVarIterator varname="$$opt_temp_5"/>
+                        </ForVariable>
+                        <ReturnClause>
+                          <IfThenElseIterator>
+                            <FnEmptyIterator>
+                              <ForVarIterator varname="$$opt_temp_6"/>
+                            </FnEmptyIterator>
+                            <FnConcatIterator/>
+                            <IfThenElseIterator>
+                              <InstanceOfIterator>
+                                <ForVarIterator varname="$$opt_temp_6"/>
+                              </InstanceOfIterator>
+                              <SingletonIterator value="xs:string(f)"/>
+                              <IfThenElseIterator>
+                                <OrIterator>
+                                  <InstanceOfIterator>
+                                    <ForVarIterator varname="$$opt_temp_6"/>
+                                  </InstanceOfIterator>
+                                  <InstanceOfIterator>
+                                    <ForVarIterator varname="$$opt_temp_6"/>
+                                  </InstanceOfIterator>
+                                </OrIterator>
+                                <ConcatStrIterator>
+                                  <SingletonIterator value="xs:string(n)"/>
+                                  <FnStringIterator>
+                                    <AbsIterator>
+                                      <CastIterator type="xs:double">
+                                        <ForVarIterator varname="$$opt_temp_6"/>
+                                      </CastIterator>
+                                    </AbsIterator>
+                                  </FnStringIterator>
+                                </ConcatStrIterator>
+                                <IfThenElseIterator>
+                                  <OrIterator>
+                                    <InstanceOfIterator>
+                                      <ForVarIterator varname="$$opt_temp_6"/>
+                                    </InstanceOfIterator>
+                                    <InstanceOfIterator>
+                                      <ForVarIterator varname="$$opt_temp_6"/>
+                                    </InstanceOfIterator>
+                                    <InstanceOfIterator>
+                                      <ForVarIterator varname="$$opt_temp_6"/>
+                                    </InstanceOfIterator>
+                                  </OrIterator>
+                                  <ConcatStrIterator>
+                                    <SingletonIterator value="xs:string(s)"/>
+                                    <FnStringIterator>
+                                      <ForVarIterator varname="$$opt_temp_6"/>
+                                    </FnStringIterator>
+                                  </ConcatStrIterator>
+                                  <SingletonIterator value="xs:string(o)"/>
+                                </IfThenElseIterator>
+                              </IfThenElseIterator>
+                            </IfThenElseIterator>
+                          </IfThenElseIterator>
+                        </ReturnClause>
+                      </FLWORIterator>
+                    </ProbeIndexPointValueIterator>
+                  </IfThenElseIterator>
+                </ReturnClause>
+              </FLWORIterator>
+              <UnhoistIterator>
+                <LetVarIterator varname="$$opt_temp_0"/>
+              </UnhoistIterator>
+            </TryCatchIterator>
+          </ForVariable>
+          <WhereClause>
+            <CompareIterator>
+              <FnDataIterator>
+                <ForVarIterator varname="u"/>
+              </FnDataIterator>
+              <ForVarIterator varname="k"/>
+            </CompareIterator>
+          </WhereClause>
+          <ReturnClause>
+            <ForVarIterator varname="u"/>
+          </ReturnClause>
+        </FLWORIterator>
+      </FnCountIterator>
+    </ReturnClause>
+  </FLWORIterator>
+</iterator-tree>
