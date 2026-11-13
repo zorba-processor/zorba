@@ -3796,6 +3796,74 @@ void test_fold_left_out_of_memory( Fixture const &f ) {
     "fold-left((1, 2, 3), 0, function($a, $b) { $a + $b })",
     "6", "fold-left" );
 }
+// The first dynamic call of local:g optimizes its body, with each allocation
+// failing in turn; when that optimization fails, the next run of the same
+// compiled query must optimize the body again (seen in the trees printed after
+// optimization) and give the answer.
+void test_optimize_after_failure( Fixture const &f ) {
+#if defined(__linux__)
+  std::ostringstream trees;
+  Properties &props = Properties::instance();
+  props.setPrintOptimized( true );
+  props.setDebugStream( trees );
+  std::string const optimized( "after optimization for local:g" );
+  auto run = [&]( XQuery_t const &query, long n ) -> std::string {
+    Iterator_t const it( query->iterator() );
+    it->open();
+    inject_arm( n, 1 );
+    std::string out;
+    try {
+      Item item;
+      while ( it->next( item ) )
+        out += ( out.empty() ? "" : " " ) + item.getStringValue().str();
+    }
+    catch ( std::exception const& ) {
+      out = "error";
+    }
+    inject_disarm();
+    it->close();
+    return out;
+  };
+  auto compile = [&]() {
+    XQuery_t query( f.zorba->compileQuery(
+      "declare function local:g($x) { $x * 2 };\n"
+      "let $fs := (local:g#1, local:g#1)\n"
+      "for $i in 1 to 2 return $fs[$i]($i)" ) );
+    trees.str( "" );
+    return query;
+  };
+  long total = 0;
+  {
+    XQuery_t const query( compile() );
+    check( run( query, 0 ) == "2 4", "the query: the answer" );
+    total = inject_count.load();
+    check( trees.str().find( optimized ) != std::string::npos,
+           "the first dynamic call optimizes local:g", trees.str() );
+  }
+  long failed = 0, wrong = 0;
+  for ( long n = 1; n <= total; ++n ) {
+    XQuery_t const query( compile() );
+    if ( run( query, n ) != "error" ||
+         trees.str().find( optimized ) != std::string::npos )
+      continue;
+    ++failed;
+    std::string const got( run( query, 0 ) );
+    if ( ( got != "2 4" || trees.str().find( optimized ) == std::string::npos )
+         && ++wrong <= 3 )
+      std::cout << "after a failure at " << n << ": " << got
+                << ( trees.str().find( optimized ) == std::string::npos
+                     ? ", local:g not optimized" : "" ) << std::endl;
+  }
+  props.setDebugStream( std::cout );
+  props.setPrintOptimized( false );
+  check( failed > 0, "runs that fail before local:g is optimized",
+         std::to_string( failed ) );
+  check( wrong == 0, "the run after a failure optimizes local:g",
+         std::to_string( wrong ) + " points" );
+#else
+  (void)f;
+#endif
+}
 void test_base64_stream_out_of_memory( Fixture const &f ) {
 #if defined(__linux__)
   std::string encoded;
@@ -7869,6 +7937,7 @@ Test const tests[] = {
   { "exhaust_sweep_cache", test_sweep_cache },
   { "exhaust_sweep_kept_malloc", test_sweep_kept_malloc },
   { "exhaust_cache_after_failure", test_cache_after_failed_admission },
+  { "exhaust_optimize_after_failure", test_optimize_after_failure },
   { "exhaust_user_error", test_user_error_named_like_memory },
   { "exhaust_notification", test_notification_out_of_memory },
   { "exhaust_request_id", test_request_id_out_of_memory },
