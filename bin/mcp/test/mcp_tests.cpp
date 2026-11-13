@@ -3787,14 +3787,15 @@ void test_dynamic_call_out_of_memory( Fixture const &f ) {
     "0 2 4", "a dynamic function call" );
 }
 // An array constructor appends more members than it reserved room for: a
-// failure while its members grow frees the member being appended.
+// failure while its members grow frees the member being appended. The
+// members are strings, so no copy is made.
 void test_json_array_growth_out_of_memory( Fixture const &f ) {
   sweep_next_out_of_memory( f,
     "jsoniq version \"1.0\";\n"
     "for $i in 1 to 2\n"
-    "let $a := [ for $j in 1 to 4 return [ $j, $i ] ]\n"
-    "return size($a) + $a[[4]][[2]]",
-    "5 6", "appending to an array" );
+    "let $a := [ for $j in 1 to 4 return concat(\"m\", $j, $i) ]\n"
+    "return $a[[size($a)]]",
+    "m41 m42", "appending to an array" );
 }
 // The body of test_call_body_out_of_memory, cached: each call also looks up
 // and fills the function cache.
