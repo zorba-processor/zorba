@@ -9,10 +9,9 @@ the `for` into an index probe. Before `fix-udf-identity-flwor` the FLWOR
 
 ## Results
 
-`bench.yml` with `suite=index-probe`, run 43501550670, 2026-11-13: base `20d5787a54`
-(master), head `d88b2b5de0`. Both builds ended the warm-up run with signal 11
-(`exit-11`), so there is no timing. The crash happens before and after the change; its
-cause is not known yet.
+Not measured yet: the first run (43501550670) stopped with a static error, because the
+sequential call was in a `where` clause (XSST0006). The query now counts the hits in a
+block.
 
 ## Compile time
 

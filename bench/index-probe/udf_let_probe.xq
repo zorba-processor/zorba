@@ -13,6 +13,13 @@ ddl:create($b:items);
 iddl:create($b:idx);
 b:load($n);
 
-count(for $j in 1 to $calls
-      where b:lookup(string(1 + $j mod $n)) ne ""
-      return $j)
+variable $found as xs:integer := 0;
+
+for $j in 1 to $calls
+return
+{
+  variable $k := b:lookup(string(1 + $j mod $n));
+  if ($k ne "") then $found := $found + 1; else ();
+}
+
+$found
