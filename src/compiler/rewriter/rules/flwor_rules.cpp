@@ -27,6 +27,7 @@
 #include "compiler/expression/script_exprs.h"
 #include "compiler/expression/expr_iter.h"
 #include "compiler/expression/expr.h"
+#include "compiler/expression/path_expr.h"
 
 #include "context/static_context.h"
 
@@ -203,9 +204,10 @@ static bool flwor_evaluates_var(const flwor_expr* flwor, csize first, const var_
 
 /******************************************************************************
   True if evaluating the first item of e evaluates var. A branch, a later
-  operand or argument, a predicate and a let binding may be skipped, and a
-  rewrite may drop an argument by its type (fn:count, fn:exists, a constant
-  operand of "or" or "and"), so a reference there does not count.
+  operand or argument, a predicate, a later path step and a let binding may be
+  skipped, and PartialEval may drop the argument of fn:count, fn:empty,
+  fn:exists and fn:boolean by its type and an operand of "or" or "and" for a
+  constant one, so a reference there does not count.
 *******************************************************************************/
 static bool evaluates_var(const expr* e, const var_expr* var)
 {
@@ -219,7 +221,11 @@ static bool evaluates_var(const expr* e, const var_expr* var)
 
   case treat_expr_kind:
   case promote_expr_kind:
+  case cast_expr_kind:
     return evaluates_var(static_cast<const cast_base_expr*>(e)->get_input(), var);
+
+  case relpath_expr_kind:
+    return evaluates_var((*static_cast<const relpath_expr*>(e))[0], var);
 
   case if_expr_kind:
   {
@@ -235,11 +241,22 @@ static bool evaluates_var(const expr* e, const var_expr* var)
     const fo_expr* fo = static_cast<const fo_expr*>(e);
     const function* f = fo->get_func();
 
-    return ((f->isArithmeticFunction() ||
-             f->isComparisonFunction() ||
-             f->getKind() == FunctionConsts::FN_DATA_1) &&
-            fo->num_args() > 0 &&
-            evaluates_var(fo->get_arg(0), var));
+    switch (f->getKind())
+    {
+    case FunctionConsts::FN_COUNT_1:
+    case FunctionConsts::FN_EMPTY_1:
+    case FunctionConsts::FN_EXISTS_1:
+    case FunctionConsts::FN_BOOLEAN_1:
+    case FunctionConsts::OP_OR_N:
+    case FunctionConsts::OP_AND_N:
+      return false;
+
+    default:
+      // A user-defined or external function may leave its argument unevaluated.
+      return (f->isBuiltin() &&
+              fo->num_args() > 0 &&
+              evaluates_var(fo->get_arg(0), var));
+    }
   }
 
   case flwor_expr_kind:
