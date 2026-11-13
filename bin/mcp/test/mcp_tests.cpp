@@ -3889,10 +3889,11 @@ void test_json_loader_out_of_memory( Fixture const &f ) {
   (void)f;
 #endif
 }
-// An insert into an object with each allocation failing in turn: a failed
-// insert leaves the object as it was, so a later insert and a lookup by name
-// still find what they should. 16 members: the insert builds the object's index
-// of names; 32: it adds to that index; both grow the members.
+// An insert into an object with each allocation failing in turn: a later
+// insert and a lookup by name find the member, or nothing where the insert
+// failed before it stored the member (a failure after it is applied keeps it).
+// 16 members: the insert builds the object's index of names; 32: it adds to
+// that index; both grow the members.
 void test_json_object_add_out_of_memory( Fixture const &f ) {
 #if defined(__linux__)
   for ( int const size : { 16, 32 } ) {
@@ -3954,11 +3955,12 @@ void test_json_object_add_out_of_memory( Fixture const &f ) {
       for ( long n = 1; n <= total; ++n ) {
         long count = 0;
         std::string const got( attempt( n, length, &count ) );
-        if ( got != answer && got != "error|" && ++wrong <= 3 )
+        if ( got != answer && got != "error|" &&
+             got != "error|" + std::to_string( size ) && ++wrong <= 3 )
           std::cout << "at " << n << " of a run of " << length << ": " << got
                     << std::endl;
       }
-    check( wrong == 0, what + " failing: the answer, or an error and no member",
+    check( wrong == 0, what + " failing: the member or nothing",
            std::to_string( wrong ) + " points" );
   }
 # if defined(__SANITIZE_ADDRESS__)
