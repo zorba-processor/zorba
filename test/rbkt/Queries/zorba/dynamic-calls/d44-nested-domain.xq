@@ -1,4 +1,4 @@
-(: Per tuple and interleaved: the domain is read as the loop goes (a direct call differs, see s05). :)
+(: The domain of a for in a flwor with such a call gives its whole binding sequence first, even without the call (as s05). :)
 declare namespace an = "http://zorba.io/annotations";
 declare %an:assignable variable $g := 0;
 declare %an:sequential function local:bump() { $g := $g + 1; $g };

@@ -965,7 +965,28 @@ bool begin_visit(flwor_expr& v)
   bool isGeneral = v.compute_is_general();
 
   v.set_general(isGeneral);
-    
+
+  // Without a materialize clause, the flwor iterator evaluates the return clause of
+  // each tuple before the tuples are sorted. A sequential return clause must run in
+  // the order of the order by clause. Note: a materialize clause may exist already
+  // in case plan serialization is on (see comment in materialize_clause::clone)
+  if (!isGeneral &&
+      v.get_order_clause() != NULL &&
+      v.get_return_expr()->is_sequential() &&
+      v.get_clause(numClauses-1)->get_kind() != flwor_clause::materialize_clause)
+  {
+    pragma* noMaterialization = NULL;
+    theCCB->lookup_pragma(&v, "no-materialization", noMaterialization);
+
+    if (noMaterialization == NULL)
+    {
+      materialize_clause* mat = theCCB->theEM->create_materialize_clause(v.get_sctx(),
+                                               v.get_return_expr()->get_loc());
+      v.add_clause(mat);
+      ++numClauses;
+    }
+  }
+
   for (csize i = 0; i < numClauses; ++i)
   {
     const flwor_clause* c = v.get_clause(i);

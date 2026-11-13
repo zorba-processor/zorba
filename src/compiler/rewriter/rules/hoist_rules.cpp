@@ -66,6 +66,9 @@ struct PathHolder
 };
 
 
+static bool is_in_sequential_flwor(const PathHolder*);
+
+
 /*******************************************************************************
 
 ********************************************************************************/
@@ -564,11 +567,14 @@ expr* HoistRule::hoistExpr(
 {
   // A call that can give a different result per call runs per tuple: an expr that
   // contains one stays. So does an expr that reads a state a call with a side effect
-  // can change. A query with such a call hoists nothing (see apply()).
+  // can change. A query with such a call hoists nothing (see apply()). Each iteration
+  // of a sequential flwor runs complete before the next, so an expr in it that reads
+  // a state stays too.
   if (non_hoistable(e) ||
       e->constructsNodes() ||
       (theHasUnprovenCalls && expr_tools::call_results_can_differ(e)) ||
-      expr_tools::depends_on_call_effects(e))
+      expr_tools::depends_on_call_effects(e) ||
+      (is_in_sequential_flwor(path) && expr_tools::reads_changeable_state(e)))
   {
     return NULL;
   }
@@ -906,6 +912,19 @@ static bool containsUnhoistableExpression(expr* e)
 /*******************************************************************************
 
 ********************************************************************************/
+static bool is_in_sequential_flwor(const PathHolder* path)
+{
+  for (; path->prev != NULL; path = path->prev)
+  {
+    if (path->theExpr->get_expr_kind() == flwor_expr_kind &&
+        path->theExpr->is_sequential())
+      return true;
+  }
+
+  return false;
+}
+
+
 static bool non_hoistable(expr* e)
 {
   expr_kind_t k = e->get_expr_kind();
