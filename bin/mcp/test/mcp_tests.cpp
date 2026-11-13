@@ -70,6 +70,7 @@
 
 #include <zorba/external_module.h>
 #include <zorba/function.h>
+#include <zorba/item_sequence.h>
 #include <zorba/store_manager.h>
 #include <zorba/zorba.h>
 
