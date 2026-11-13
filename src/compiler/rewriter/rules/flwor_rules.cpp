@@ -83,9 +83,10 @@ static void fix_if_annotations(if_expr* ifExpr)
 
 /******************************************************************************
   True for an expression whose evaluation cannot raise an error: a constant, a
-  sequence of such expressions, or a reference to a variable whose value is
-  already computed. A let or argument variable may be evaluated lazily, when it
-  is referenced, so a reference to it can raise the error of its binding.
+  function item that captures no variables, a sequence of such expressions, or
+  a reference to a variable whose value is already computed. A let or argument
+  variable may be evaluated lazily, when it is referenced, so a reference to it
+  can raise the error of its binding.
 *******************************************************************************/
 static bool cannot_raise_error(const expr* e)
 {
@@ -93,6 +94,9 @@ static bool cannot_raise_error(const expr* e)
   {
   case const_expr_kind:
     return true;
+
+  case function_item_expr_kind:
+    return static_cast<const function_item_expr*>(e)->get_in_scope_vars().empty();
 
   case wrapper_expr_kind:
     return cannot_raise_error(static_cast<const wrapper_expr*>(e)->get_input());
