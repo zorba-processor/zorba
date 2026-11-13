@@ -1,0 +1,19 @@
+<xs:schema
+  xmlns:xs="http://www.w3.org/2001/XMLSchema"
+  targetNamespace="http://zorba.io/test/nilled"
+  xmlns="http://zorba.io/test/nilled"
+  elementFormDefault="qualified">
+
+  <xs:element name="n" type="xs:string" nillable="true"/>
+  <xs:element name="s" type="xs:string"/>
+
+  <xs:element name="p">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="c" type="xs:integer" nillable="true"/>
+        <xs:element name="d" type="xs:integer" minOccurs="0"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+</xs:schema>
