@@ -388,8 +388,9 @@ void test_memory(Zorba* z)
 #endif
 #ifdef ZORBA_TEST_ASAN
   // The quarantine and the allocator's caches hide retained calls from the
-  // resident size: without the release of completed calls, it grew by as
-  // little as 80 MiB per run while the live heap grew by 170 MiB or more.
+  // resident size. Measured per run at n = 15: the live heap grew by under
+  // 1 MiB; without the release of completed calls, the resident size grew by
+  // as little as 115 MiB while the live heap grew by 170 to 284 MiB.
   long long const allowedLive = 32LL << 20;
   CHECK(LiveHeapPeak::install());
 #endif
