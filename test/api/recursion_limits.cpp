@@ -61,7 +61,13 @@ using std::chrono::steady_clock;
 #endif
 
 #ifdef ZORBA_TEST_ASAN
-# include <sanitizer/allocator_interface.h>
+// From <sanitizer/allocator_interface.h>, which not every toolchain installs.
+extern "C" {
+int __sanitizer_install_malloc_and_free_hooks(
+    void (*aMallocHook)(const volatile void*, size_t),
+    void (*aFreeHook)(const volatile void*));
+size_t __sanitizer_get_allocated_size(const volatile void* aPtr);
+}
 #endif
 
 namespace {
@@ -266,7 +272,7 @@ class LiveHeapPeak
   {
     if (aPtr != nullptr)
       theLive -= static_cast<long long>(
-          __sanitizer_get_allocated_size(const_cast<const void*>(aPtr)));
+          __sanitizer_get_allocated_size(aPtr));
   }
 
 public:
