@@ -98,6 +98,26 @@ static bool hasAnyKeyType(
 
 
 /*******************************************************************************
+  Whether the store keeps the keys of a general index as those of one without
+  a key type: the declaration gives no key type, xs:anyAtomicType or
+  xs:untypedAtomic.
+********************************************************************************/
+static bool hasUntypedStoreKeys(
+    TypeManager* tm,
+    const IndexDecl* indexDecl,
+    csize keyNo)
+{
+  if (hasAnyKeyType(tm, indexDecl, keyNo))
+    return true;
+
+  const xqtref_t& keyType = (indexDecl->getKeyTypes())[keyNo];
+
+  return (indexDecl->isGeneral() &&
+          TypeOps::is_equal(tm, *keyType, *GENV_TYPESYSTEM.UNTYPED_ATOMIC_TYPE_ONE));
+}
+
+
+/*******************************************************************************
   This function is called from the probe function to chaeck that the type of
   the probing key is consistent with the index declaration.
 ********************************************************************************/
@@ -832,7 +852,7 @@ store::IndexCondition_t ProbeIndexPointValueIterator::createCondition(
       checkKeyType(loc, tm, state->theIndexDecl, i - numNonKeyParams, keyItem);
     }
 
-    if (hasAnyKeyType(tm, state->theIndexDecl, i - numNonKeyParams))
+    if (hasUntypedStoreKeys(tm, state->theIndexDecl, i - numNonKeyParams))
     {
       store::SchemaTypeCode searchKeyType = keyItem->getTypeCode();
         
@@ -1317,7 +1337,7 @@ store::IndexCondition_t ProbeIndexRangeValueIterator::createCondition(
       checkKeyType(loc, tm, state->theIndexDecl, keyNo, tempRight);
     }
 
-    if (hasAnyKeyType(tm, state->theIndexDecl, keyNo))
+    if (hasUntypedStoreKeys(tm, state->theIndexDecl, keyNo))
     {
       store::SchemaTypeCode leftType = store::XS_LAST;
       store::SchemaTypeCode rightType = store::XS_LAST;
