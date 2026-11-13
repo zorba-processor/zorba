@@ -100,12 +100,9 @@ Rules this code depends on:
     (`on_terminate()`, `--help`).
   - Xerces-C throws from a destructor releasing a schema, at the end of a query that
     imports one, as the directory and xml modules do: abort.
-  - libxml2 and glibc abort if they cannot set up the first use by a thread. The main
-    thread and the scanner's do that at start.
-  - One allocation near the end of a `dir:open` query ended in SIGSEGV with no stack
-    to read (twice in 1990, not explained): the process ends.
-  - ICU crashes in `RegexPattern::zap()` (SIGSEGV) if an allocation fails while it
-    compiles a regular expression. The directory module uses some on each call.
+  - ICU crashes in `RegexPattern::zap()` or in `utext_openConstUnicodeString()`
+    (SIGSEGV) if an allocation fails while it compiles a regular expression. The
+    directory module uses some on each call.
   - The flex scanner calls `exit(2)` if it cannot allocate, while a query compiles.
   - Running out of memory while the message cannot be parsed (before its id is read,
     and again when it is read once more for its id): the error response has
