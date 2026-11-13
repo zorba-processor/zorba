@@ -1561,9 +1561,11 @@ RULE_REWRITE_PRE(RefactorPredFLWOR)
           ++k;
         }
 
-        // O0 evaluates E only for the tuples that reach the where clause.
+        // O0 evaluates E only for the tuples that reach the where clause, and
+        // evaluates the clauses before it even when E is false.
         if (k == whereVars.size() &&
-            (cannot_raise_error(whereExpr) || clauses_keep_every_tuple(flwor, 0, i)))
+            (cannot_raise_error(whereExpr) || clauses_keep_every_tuple(flwor, 0, i)) &&
+            clauses_cannot_raise_error(flwor, 0, i))
         {
           flwor->remove_clause(i);
 
