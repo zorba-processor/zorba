@@ -198,6 +198,86 @@ static bool clauses_keep_every_tuple(const flwor_expr* flwor, csize first, csize
 }
 
 
+static bool flwor_evaluates_var(const flwor_expr* flwor, csize first, const var_expr* var);
+
+
+/******************************************************************************
+  True if evaluating the first item of e evaluates var. A branch, a later
+  operand or argument, a predicate and a let binding may be skipped, and a
+  rewrite may drop an argument by its type (fn:count, fn:exists, a constant
+  operand of "or" or "and"), so a reference there does not count.
+*******************************************************************************/
+static bool evaluates_var(const expr* e, const var_expr* var)
+{
+  switch (e->get_expr_kind())
+  {
+  case var_expr_kind:
+    return e == var;
+
+  case wrapper_expr_kind:
+    return evaluates_var(static_cast<const wrapper_expr*>(e)->get_input(), var);
+
+  case treat_expr_kind:
+  case promote_expr_kind:
+    return evaluates_var(static_cast<const cast_base_expr*>(e)->get_input(), var);
+
+  case if_expr_kind:
+  {
+    const if_expr* ie = static_cast<const if_expr*>(e);
+
+    return (evaluates_var(ie->get_cond_expr(), var) ||
+            (evaluates_var(ie->get_then_expr(), var) &&
+             evaluates_var(ie->get_else_expr(), var)));
+  }
+
+  case fo_expr_kind:
+  {
+    const fo_expr* fo = static_cast<const fo_expr*>(e);
+    const function* f = fo->get_func();
+
+    return ((f->isArithmeticFunction() ||
+             f->isComparisonFunction() ||
+             f->getKind() == FunctionConsts::FN_DATA_1) &&
+            fo->num_args() > 0 &&
+            evaluates_var(fo->get_arg(0), var));
+  }
+
+  case flwor_expr_kind:
+    return flwor_evaluates_var(static_cast<const flwor_expr*>(e), 0, var);
+
+  default:
+    return false;
+  }
+}
+
+
+/******************************************************************************
+  True if every tuple that reaches the clause at position first evaluates var,
+  in the expr of a for, window or where clause or in the return clause.
+*******************************************************************************/
+static bool flwor_evaluates_var(const flwor_expr* flwor, csize first, const var_expr* var)
+{
+  for (csize i = first; i < flwor->num_clauses(); ++i)
+  {
+    const flwor_clause* c = flwor->get_clause(i);
+
+    if ((c->get_kind() == flwor_clause::for_clause ||
+         c->get_kind() == flwor_clause::window_clause) &&
+        evaluates_var(static_cast<const forletwin_clause*>(c)->get_expr(), var))
+      return true;
+
+    if (c->get_kind() == flwor_clause::where_clause &&
+        evaluates_var(static_cast<const where_clause*>(c)->get_expr(), var))
+      return true;
+
+    if (!clauses_keep_every_tuple(flwor, i, i + 1))
+      return false;
+  }
+
+  return evaluates_var(flwor->get_return_expr(), var);
+}
+
+
 ////////////////////////////////////////////////////////////////////////////////
 //                                                                            //
 //  SubstVars                                                                 //
@@ -462,13 +542,11 @@ RULE_REWRITE_PRE(EliminateUnusedLetVars)
         // O0 evaluates this domain once for each tuple it receives; folded, it is
         // evaluated only where its variable is referenced. An empty domain gives
         // no tuples at O0; folded, the clauses after it are evaluated.
-        // For a trivial domain, safe_to_fold_var gives numRefs = 2 without counting.
         if (safe_to_fold_var(i, numRefs) &&
             (outerFor || domQuant == SequenceType::QUANT_ONE ||
              clauses_cannot_raise_error(theFlwor, i + 1, theFlwor->num_clauses())) &&
             (cannot_raise_error(domExpr) ||
-             (expr_tools::count_variable_uses(theFlwor, var, 1, NULL) != 0 &&
-              clauses_keep_every_tuple(theFlwor, i + 1, theFlwor->num_clauses()))))
+             flwor_evaluates_var(theFlwor, i + 1, var)))
         {
           if (numRefs != 0)
             subst_vars(rCtx, var, domExpr, numRefs);
