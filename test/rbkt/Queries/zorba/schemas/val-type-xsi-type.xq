@@ -9,7 +9,7 @@ let $b := validate type xs:integer {
   <e xmlns:xs="http://www.w3.org/2001/XMLSchema" xsi:type="xs:string">5</e>
 }
 let $c := validate type t:WithInt {
-  <w xsi:type="t:WithIntExt"><t:n>1</t:n><t:m>2</t:m></w>
+  <w xmlns:t="http://zorba.io/test/val-type-content" xsi:type="t:WithIntExt"><t:n>1</t:n><t:m>2</t:m></w>
 }
 return (
   data($a) instance of xs:integer,
