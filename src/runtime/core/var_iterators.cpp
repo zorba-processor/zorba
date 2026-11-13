@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#include <limits>
+
 #include "diagnostics/assert.h"
 #include "diagnostics/util_macros.h"
 
@@ -857,10 +859,15 @@ void LetVarIterator::bind(const store::TempSeq_t& value, PlanState& planState)
       if (state->theTempSeqIter == NULL)
       {
         state->theTempSeqIter = 
-        GENV_STORE.getIteratorFactory()->createTempSeqIterator(false);
+        GENV_STORE.getIteratorFactory()->createTempSeqIterator(value->isLazy());
       }
 
-      state->theTempSeqIter->init(value);
+      // The iterator of a lazy sequence reads a range, materializing what it reaches.
+      if (value->isLazy())
+        state->theTempSeqIter->init(value, Integer(1), Integer(std::numeric_limits<xs_long>::max()));
+      else
+        state->theTempSeqIter->init(value);
+
       state->theTempSeqIter->open();
     }
   }

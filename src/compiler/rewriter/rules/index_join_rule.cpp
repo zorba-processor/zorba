@@ -1277,7 +1277,7 @@ static expr* createCatchAll(
   The LET of the build is lazy and the probe reads its var: the index is built
   at the first probe of a binding, not where no probe happens (an empty outer
   domain, say, over a domain that would take forever). A build placed in a
-  block (see below) is not lazy.
+  block of a sequential expr is not lazy.
 ********************************************************************************/
 void IndexJoinRule::rewriteJoin(PredicateInfo& predInfo)
 {
@@ -1388,31 +1388,13 @@ void IndexJoinRule::rewriteJoin(PredicateInfo& predInfo)
   else if (targetKind == flwor_expr_kind)
   {
     flwor_expr* flwor = static_cast<flwor_expr*>(targetExpr);
-    csize numClauses = flwor->num_clauses();
 
-    if (targetPos == numClauses)
-    {
-      std::vector<expr*> args(2);
-      args[0] = createExpr;
-      args[1] = flwor->get_return_expr();
+    buildVar = theRCtx->createTempVar(sctx, loc, var_expr::let_var);
 
-      block_expr* block = em->create_block_expr(sctx, udf, loc, false, args, NULL);
+    let_clause* createClause =
+    em->create_let_clause(sctx, loc, buildVar, createExpr, true);
 
-      DynamicBitset blockVars = indexVars;
-      blockVars.set_union((*theExprVarsMap)[flwor->get_return_expr()]);
-      (*theExprVarsMap)[block] = blockVars;
-
-      flwor->set_return_expr(block);
-    }
-    else
-    {
-      buildVar = theRCtx->createTempVar(sctx, loc, var_expr::let_var);
-
-      let_clause* createClause =
-      em->create_let_clause(sctx, loc, buildVar, createExpr, true);
-
-      flwor->add_clause(targetPos, createClause);
-    }
+    flwor->add_clause(targetPos, createClause);
   }
   else
   {
