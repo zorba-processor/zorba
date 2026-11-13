@@ -703,7 +703,8 @@ void PULImpl::addSetElementType(
     bool haveValue,
     bool haveEmptyValue,
     bool haveTypedValue,
-    bool isInSubstitutionGroup)
+    bool isInSubstitutionGroup,
+    bool isNilled)
 {
   UpdatePrimitive* upd = GET_PUL_FACTORY().
   createUpdSetElementType(this,
@@ -715,7 +716,8 @@ void PULImpl::addSetElementType(
                           haveEmptyValue,
                           haveTypedValue,
                           false,
-                          isInSubstitutionGroup);
+                          isInSubstitutionGroup,
+                          isNilled);
 
   theValidationList.push_back(upd);
 }
@@ -729,7 +731,8 @@ void PULImpl::addSetElementType(
     bool haveValue,
     bool haveEmptyValue,
     bool haveTypedValue,
-    bool isInSubstitutionGroup)
+    bool isInSubstitutionGroup,
+    bool isNilled)
 {
   store::Item_t typedValue = new ItemVector(valueV);
 
@@ -743,7 +746,8 @@ void PULImpl::addSetElementType(
                           haveEmptyValue,
                           haveTypedValue,
                           true,
-                          isInSubstitutionGroup);
+                          isInSubstitutionGroup,
+                          isNilled);
 
   theValidationList.push_back(upd);
 }

@@ -195,6 +195,8 @@ void SchemaValidatorImpl::processElement(
   //cout << " vup      - elemType new: " << typeQName->getLocalName()->c_str()
   //    << " @ " << typeQName->getNamespace()->c_str() << "\n"; cout.flush();
 
+  bool isNilled = schemaValidator.isNilled();
+
   bool isInSubstitutionElement = false;
   if (substitutedElemQName)
   {
@@ -281,7 +283,8 @@ void SchemaValidatorImpl::processElement(
                              tHasValue,
                              tHasEmptyValue,
                              tHasTypedValue,
-                             isInSubstitutionElement);
+                             isInSubstitutionElement,
+                             isNilled);
     else
       pul->addSetElementType(&loc,
                              elm,
@@ -290,7 +293,8 @@ void SchemaValidatorImpl::processElement(
                              tHasValue,
                              tHasEmptyValue,
                              tHasTypedValue,
-                             isInSubstitutionElement);
+                             isInSubstitutionElement,
+                             isNilled);
   }
 
   schemaValidator.endElem(nodeName);

@@ -65,6 +65,9 @@ static inline const XMLCh *nullToZero(const XMLCh *in)
   return in ? in : XMLUni::fgZeroLenString;
 }
 
+// "1", the other lexical form of the xs:boolean true
+static const XMLCh XSD_BOOLEAN_TRUE_DIGIT[] = { chDigit_1, chNull };
+
 
 const XMLCh SchemaValidatorFilter::DT_UNTYPED[] =
 {
@@ -97,7 +100,8 @@ SchemaValidatorFilter::SchemaValidatorFilter(
   theXsiType(0),
   theAttrCount(0),
   theEventBuffer(eventBuffer),
-  theErrorOccurred(false)
+  theErrorOccurred(false),
+  theIsNilled(false)
 {
   theSchemaGrammar = new (fMemoryManager) SchemaGrammar(fMemoryManager);
 
@@ -352,7 +356,14 @@ void SchemaValidatorFilter::processStartElement()
       //validate element even if lax but has xsi:type
       fValidator->validateElement(elemDecl);
   }
-  theHasTypeEntry.push_back(fValidate || theXsiType);
+  const bool isValidated = fValidate || theXsiType;
+  theHasTypeEntry.push_back(isValidated);
+
+  XercSchemaValidator* validator = (XercSchemaValidator*)fValidator;
+  // xsi:nil on an element that is not validated must not carry over to the next one
+  if (!isValidated)
+    validator->setNillable(false);
+  theIsNilled = validator->getIsNil();
 
 
   ComplexTypeInfo* typeinfo =
@@ -862,7 +873,8 @@ void SchemaValidatorFilter::attributeEvent(
       theXsiType = curAttr->getValue();
     }
     else if(XMLString::equals(localname, SchemaSymbols::fgATT_NILL) &&
-            XMLString::equals(value, SchemaSymbols::fgATTVAL_TRUE))
+            (XMLString::equals(value, SchemaSymbols::fgATTVAL_TRUE) ||
+             XMLString::equals(value, XSD_BOOLEAN_TRUE_DIGIT)))
     {
       ((XercSchemaValidator*)fValidator)->setNillable(true);
     }

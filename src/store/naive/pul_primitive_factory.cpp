@@ -215,11 +215,12 @@ PULPrimitiveFactory::createUpdSetElementType(
     bool           haveEmptyValue,
     bool           haveTypedValue,
     bool           haveListValue,
-    bool           isInSubstitutionGroup)
+    bool           isInSubstitutionGroup,
+    bool           isNilled)
 {
   return new UpdSetElementType(pul, aLoc, target, typeName, typedValue,
                                haveValue, haveEmptyValue, haveTypedValue, haveListValue,
-                               isInSubstitutionGroup);
+                               isInSubstitutionGroup, isNilled);
 }
     
 

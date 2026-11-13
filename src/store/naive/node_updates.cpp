@@ -628,6 +628,7 @@ void XmlNode::removeType(UpdatePrimitive& upd)
       n->setHaveTypedValue();
       n->resetHaveEmptyTypedValue();
       n->resetInSubstGroup();
+      n->resetNilled();
 
       revalidationNode = currNode;
     }
