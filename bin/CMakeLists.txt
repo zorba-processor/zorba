@@ -597,7 +597,7 @@ IF (ZORBA_WITH_FILE_ACCESS)
              exhaust_plan_open exhaust_call_body exhaust_dynamic_call
              exhaust_for_each_pair exhaust_fold_left
              exhaust_sweep_xml exhaust_sweep_xml_dtd exhaust_sweep_xml_dtd_nodes
-             exhaust_sweep_fragment
+             exhaust_sweep_fragment exhaust_sweep_descendant
              exhaust_sweep_html exhaust_sweep_json exhaust_sweep_csv
              exhaust_sweep_casts exhaust_sweep_arithmetic exhaust_sweep_decimal_thread
              exhaust_sweep_cache
@@ -643,7 +643,7 @@ IF (ZORBA_WITH_FILE_ACCESS)
     ENDFOREACH (_t)
     SET_TESTS_PROPERTIES (bin/mcp/exhaust_cache_after_failure PROPERTIES
       RESOURCE_LOCK mcp_memory_exhaustion TIMEOUT 400)
-    FOREACH (_t compile builtins query_text streamable_text xml fragment
+    FOREACH (_t compile builtins query_text streamable_text xml fragment descendant
                 ${_mcp_schema_sweeps} html json csv casts decimal_thread
                 cache kept_malloc)
       SET_TESTS_PROPERTIES (bin/mcp/exhaust_sweep_${_t} PROPERTIES
