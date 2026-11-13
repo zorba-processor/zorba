@@ -3558,8 +3558,6 @@ void test_sweep_arithmetic( Fixture const &f ) {
   s.expected = "\"3 3 3.75 3.5\"";
   s.wrong = { "FOAR0001", "FOAR0002", "FOCA" };
   s.points = 100000;                // all of them
-  // Until #291: std::bad_alloc leaves the noexcept xquery_parser constructor.
-  s.known = { exact( "terminate St9bad_alloc", 2 ) };
   s.compiles = true;
   exhaust_sweep( f, "arithmetic", s );
 #else
@@ -3594,8 +3592,6 @@ void test_sweep_query_text( Fixture const &f ) {
   s.expected = "true";
   s.lenient = true;                 // an error of the compilation is allowed
   s.points = 100000;                // all of them
-  // Until #291: std::bad_alloc leaves the noexcept xquery_parser constructor.
-  s.known = { exact( "terminate St9bad_alloc", 2 ) };
   s.compiles = true;
   exhaust_sweep( f, "text of the query", s );
 #else
@@ -3994,8 +3990,6 @@ void test_sweep_builtins( Fixture const &f ) {
   s.expected = "41";
   s.lenient = true;
   s.points = 100000;                // all of them
-  // Until #291: std::bad_alloc leaves the noexcept xquery_parser constructor.
-  s.known = { exact( "terminate St9bad_alloc", 2 ) };
   s.compiles = true;
   s.probes = {
     { "string-join((\"a\", \"b\"), \"-\")", "\"a-b\"" },
@@ -4070,8 +4064,6 @@ void test_sweep_decimal_thread( Fixture const &f ) {
   s.new_thread = true;
   s.points = 300;
   s.lenient = true;                 // the compilation is swept too
-  // Until #291: std::bad_alloc leaves the noexcept xquery_parser constructor.
-  s.known = { exact( "terminate St9bad_alloc", 2 ) };
   s.compiles = true;
   exhaust_sweep( f, "first decimal of a thread", s );
 #else
