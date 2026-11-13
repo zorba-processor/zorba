@@ -1069,7 +1069,7 @@ zorba::Item ItemFactoryImpl::createJSONObject(
   std::vector<store::Item_t> names;
   std::vector<store::Item_t> values;
   names.reserve(numPairs);
-  names.reserve(numPairs);
+  values.reserve(numPairs);
 
   std::vector<std::pair<Item, Item> >::iterator i = aPairs.begin();
   std::vector<std::pair<Item, Item> >::iterator end = aPairs.end();
@@ -1091,12 +1091,6 @@ zorba::Item ItemFactoryImpl::createJSONArray(std::vector<Item>& aItems)
   rejectEmptyItems(aItems, "aItems");
 
   csize numItems = aItems.size();
-
-  std::vector<store::CopyMode> copyModes(numItems);
-  for (csize i = 0; i < numItems; ++i)
-  {
-    copyModes[i].theDoCopy = false;
-  }
 
   // Convert vector of Items to vector of store::Item_ts
   std::vector<store::Item_t> items;
