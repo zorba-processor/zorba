@@ -49,6 +49,7 @@
 #if defined(__linux__)
 # include <malloc.h>
 #endif
+#include <sys/mman.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -198,6 +199,44 @@ void big_forget( void *p ) noexcept {
     }
 }
 
+// DIAG (temporary): every block of the malloc family allocated while all_track,
+// with its stack, while it lives.
+struct AllBlock { void *p; std::size_t n; int nf; void *frames[14]; };
+std::size_t const all_cap = std::size_t( 1 ) << 18;
+AllBlock *all_blocks = nullptr;
+bool all_track = false;
+bool all_forget_on = false;
+void * const all_tomb = reinterpret_cast<void*>( 1 );
+std::size_t all_slot( void *p ) {
+  return ( reinterpret_cast<std::uintptr_t>( p ) >> 4 ) * 11400714819323198485ull
+         >> ( 64 - 18 );
+}
+void all_note( void *p, std::size_t n ) noexcept {
+  if ( !all_track || !all_blocks )
+    return;
+  all_track = false;
+  for ( std::size_t i = all_slot( p ), k = 0; k < all_cap; ++k, i = ( i + 1 ) & ( all_cap - 1 ) )
+    if ( !all_blocks[i].p || all_blocks[i].p == all_tomb ) {
+      all_blocks[i].p = p;
+      all_blocks[i].n = n;
+      all_blocks[i].nf = backtrace( all_blocks[i].frames, 14 );
+      break;
+    }
+  all_track = true;
+}
+void all_forget( void *p ) noexcept {
+  if ( !all_forget_on || !all_blocks )
+    return;
+  for ( std::size_t i = all_slot( p ), k = 0; k < all_cap; ++k, i = ( i + 1 ) & ( all_cap - 1 ) ) {
+    if ( !all_blocks[i].p )
+      return;
+    if ( all_blocks[i].p == p ) {
+      all_blocks[i].p = all_tomb;
+      return;
+    }
+  }
+}
+
 void* budget_alloc( std::size_t n ) noexcept {
 # if defined(ZORBA_TEST_SANITIZER)
   if ( inject_fails() )
@@ -254,6 +293,7 @@ void* heap_add( void *p, std::size_t n ) noexcept {
     heap_live.fetch_add( static_cast<long>( malloc_usable_size( p ) ),
                          std::memory_order_relaxed );
     big_note( p, n );
+    all_note( p, malloc_usable_size( p ) );
   }
   return p;
 }
@@ -262,6 +302,7 @@ void* heap_add( void *p, std::size_t n ) noexcept {
 void heap_freed( void *p, std::size_t usable_size ) noexcept {
   if ( big_count )
     big_forget( p );
+  all_forget( p );
   heap_live.fetch_sub( static_cast<long>( usable_size ),
                        std::memory_order_relaxed );
 }
@@ -2840,13 +2881,13 @@ void exhaust_sweep( Fixture const &f, std::string const &name, Sweep const &s ) 
   long base_kept = 0;
 
   // The stacks a child sent with its outcome.
-  struct Stacks { std::string crash, alloc; std::vector<std::string> big; };
+  struct Stacks { std::string crash, alloc; std::vector<std::string> big, all; };
 
   // What one run in a child gives; first == 0 counts the allocations. With
   // measure, the same call runs again, and what the run left behind is measured.
   auto run_child = [&]( long first, long length, bool measure, long *total,
                         long *kept, Stacks *stacks,
-                        bool trace = false ) -> std::string {
+                        bool trace = false, bool trace_all = false ) -> std::string {
     int fd[2];
     if ( pipe( fd ) != 0 )
       return "pipe failed";
@@ -2876,6 +2917,16 @@ void exhaust_sweep( Fixture const &f, std::string const &name, Sweep const &s ) 
       long const live0 = heap_live.load();
       long const table0 = static_cast<long>( zorba_test_qname_table_bytes() );
       big_track = measure;
+#if !defined(ZORBA_TEST_SANITIZER)
+      if ( trace_all ) {
+        all_blocks = static_cast<AllBlock*>( mmap( nullptr, all_cap * sizeof( AllBlock ),
+          PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0 ) );
+        if ( all_blocks == MAP_FAILED )
+          all_blocks = nullptr;
+        all_forget_on = true;
+        all_track = true;
+      }
+#endif
       long count = 0;
       std::string out( sweep_call( server, call, s, first, length, &count ) );
       big_track = false;   // what the failed call itself allocated
@@ -2908,6 +2959,7 @@ void exhaust_sweep( Fixture const &f, std::string const &name, Sweep const &s ) 
         // The names cached for reuse depend on the order of insertions: dropped,
         // in this run and in the one with no failure alike.
         zorba_test_qname_pool_flush();
+        all_track = false;
         k = heap_live.load() - live0 -
           ( static_cast<long>( zorba_test_qname_table_bytes() ) - table0 );
       }
@@ -2926,6 +2978,29 @@ void exhaust_sweep( Fixture const &f, std::string const &name, Sweep const &s ) 
             if ( snprintf( tag, sizeof tag, "big %zu ", b.n ) > 0 )
               sweep_write_frames( tag, b.frames, b.num_frames );
           }
+      if ( trace_all && all_blocks ) {
+        all_track = false;
+        all_forget_on = false;
+        std::map<std::string, std::pair<long, long> > sites;
+        for ( std::size_t i = 0; i < all_cap; ++i ) {
+          AllBlock const &b = all_blocks[i];
+          if ( !b.p || b.p == all_tomb )
+            continue;
+          std::string key;
+          for ( int j = 2; j < b.nf; ++j ) {
+            char h[24];
+            snprintf( h, sizeof h, "%lx ", reinterpret_cast<unsigned long>( b.frames[j] ) );
+            key += h;
+          }
+          sites[key].first += static_cast<long>( b.n );
+          ++sites[key].second;
+        }
+        for ( auto const &e : sites ) {
+          std::string line( "\nall " + std::to_string( e.second.first ) + " " +
+                            std::to_string( e.second.second ) + " " + e.first );
+          sweep_write( line.data(), line.size() );
+        }
+      }
       _exit( 0 );
     }
     sweep_close( fd[1] );
@@ -2964,6 +3039,8 @@ void exhaust_sweep( Fixture const &f, std::string const &name, Sweep const &s ) 
         stacks->alloc = extra.substr( 6 );
       else if ( extra.rfind( "big ", 0 ) == 0 )
         stacks->big.push_back( extra.substr( 4 ) );
+      else if ( extra.rfind( "all ", 0 ) == 0 )
+        stacks->all.push_back( extra.substr( 4 ) );
     }
     if ( total )
       *total = c;
@@ -3040,6 +3117,43 @@ void exhaust_sweep( Fixture const &f, std::string const &name, Sweep const &s ) 
               std::string::size_type const sp = b.find( ' ' );
               sweep_show_frames( "  a block of " + b.substr( 0, sp ) + " bytes",
                                  b.substr( sp + 1 ), true );
+            }
+            // DIAG: live blocks by stack, this point against no failure.
+            {
+              Stacks a0, a1;
+              long k0 = 0, k1 = 0;
+              run_child( 0, 0, true, nullptr, &k0, &a0, false, true );
+              run_child( n, length, true, nullptr, &k1, &a1, false, true );
+              std::map<std::string, std::pair<long, long> > d;
+              auto add = [&]( std::vector<std::string> const &v, long sign ) {
+                for ( std::string const &l : v ) {
+                  std::istringstream ls( l );
+                  long b = 0, c = 0;
+                  ls >> b >> c;
+                  std::string rest;
+                  std::getline( ls, rest );
+                  d[rest].first += sign * b;
+                  d[rest].second += sign * c;
+                }
+              };
+              add( a1.all, 1 );
+              add( a0.all, -1 );
+              std::vector<std::pair<long, std::string> > top;
+              long sum = 0;
+              for ( auto const &e : d )
+                if ( e.second.first ) {
+                  top.push_back( { e.second.first, e.first } );
+                  sum += e.second.first;
+                }
+              std::sort( top.begin(), top.end(), []( auto const &x, auto const &y ) {
+                return std::labs( x.first ) > std::labs( y.first ); } );
+              std::cout << "DIAG " << name << " at " << n << ": kept " << k1 << " vs "
+                        << k0 << "; " << a1.all.size() << " / " << a0.all.size()
+                        << " sites; tracked difference " << sum << " bytes" << std::endl;
+              for ( std::size_t j = 0; j < top.size() && j < 12; ++j )
+                sweep_show_frames( "DIAG site " + std::to_string( top[j].first ) +
+                                   " bytes, " + std::to_string( d[top[j].second].second ) +
+                                   " blocks", top[j].second, true );
             }
             // Where the failing allocation was: the same point once more, traced.
             Stacks traced;
