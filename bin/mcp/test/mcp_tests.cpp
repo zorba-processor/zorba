@@ -25,6 +25,7 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <cerrno>
 #include <climits>
 #include <csignal>
 #include <cstdint>
@@ -48,6 +49,7 @@
 #include <fcntl.h>
 #if defined(__linux__)
 # include <malloc.h>
+# include <pthread.h>
 #endif
 #include <sys/resource.h>
 #include <sys/stat.h>
@@ -2326,6 +2328,57 @@ void test_exhaust_at_start( Fixture const &f ) {
 #endif
 }
 
+// A failed allocation sets errno to ENOMEM, as glibc's own does: glibc reads
+// errno after a failed calloc() in pthread_getattr_np(), which the stack limit
+// calls on a thread's first compilation.
+void test_exhaust_errno( Fixture const& ) {
+#if defined(__linux__) && !defined(ZORBA_TEST_SANITIZER)
+  // Volatile: the compiler may drop an unused allocation.
+  auto sets_enomem = []( char const *name, void *(*alloc)() ) {
+    errno = 0;
+    inject_arm( 1, 1 );
+    void *volatile p = alloc();
+    inject_disarm();
+    check( !p && errno == ENOMEM, std::string( name ) + " sets ENOMEM",
+           std::to_string( errno ) );
+    std::free( p );
+  };
+  sets_enomem( "malloc", [] { return std::malloc( 16 ); } );
+  sets_enomem( "calloc", [] { return std::calloc( 1, 16 ); } );
+  sets_enomem( "realloc", [] { return std::realloc( nullptr, 16 ); } );
+
+  // In a child: with errno 0, glibc dereferenced the null result.
+  pid_t const pid = fork();
+  if ( pid < 0 ) {
+    check( false, "fork" );
+    return;
+  }
+  if ( pid == 0 ) {
+    int failed = 0, other = 0;
+    std::thread( [&failed, &other] {
+      for ( long first = 1; first <= 4; ++first ) {
+        pthread_attr_t attr;
+        errno = 0;
+        inject_arm( first, 1 );
+        int const r = pthread_getattr_np( pthread_self(), &attr );
+        inject_disarm();
+        if ( r == 0 )
+          pthread_attr_destroy( &attr );
+        else if ( r == ENOMEM )
+          ++failed;
+        else
+          ++other;
+      }
+    } ).join();
+    _exit( failed > 0 && other == 0 ? 0 : 1 );
+  }
+  int status = 0;
+  check( waitpid( pid, &status, 0 ) == pid, "wait for the child" );
+  check( WIFEXITED( status ) && WEXITSTATUS( status ) == 0,
+         "pthread_getattr_np reports ENOMEM", std::to_string( status ) );
+#endif
+}
+
 void test_exhaust_generated( Fixture const &f ) {
   memory_exhaustion( f, exhaustion_queries[0] );
 }
@@ -3983,13 +4036,9 @@ void test_sweep_decimal_thread( Fixture const &f ) {
   // A new thread: glibc gives up if it cannot register the first thread_local
   // with a destructor of the thread.
   // Caps: about 1.5 times the most seen in CI (glibc: 1 alone, 53 in runs of 8).
-  // glibc also crashes in pthread_getattr_np() when calloc() fails in it, on
-  // the first compilation of a thread (the stack limit reads the thread's
-  // bounds): seen once alone, in the embedded profiles.
   // As in the other sweeps of compilation: std::bad_alloc leaving a noexcept
   // function while the parser is set up (xquery_parser's constructor), seen once.
   s.known = { exact( "exit 2", 2 ), exact( "terminate St9bad_alloc", 2 ),
-              library_crash( "signal 11 in libc.", true, 2 ),
               library_crash( "signal 6 in libstdc", true, 2, 1 ),
               library_crash( "signal 6 in libstdc", true, 80, 8 ),
               library_crash( "signal 6 in unknown", false, 2 ),
@@ -7840,6 +7889,7 @@ Test const tests[] = {
   { "windows", test_windows },
   { "memory_limit", test_memory_limit },
   { "exhaust_at_start", test_exhaust_at_start },
+  { "exhaust_errno", test_exhaust_errno },
   { "exhaust_sweep_compile", test_sweep_compile },
   { "exhaust_sweep_builtins", test_sweep_builtins },
   { "exhaust_sweep_query_text", test_sweep_query_text },
