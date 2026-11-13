@@ -87,17 +87,6 @@
             <CtxVarIterator varid="4" varname="x:auctions" varkind="global"/>
           </ZorbaCollectionIterator>
         </LetVariable>
-        <LetVariable name="$$opt_temp_0" materialize="true">
-          <HoistIterator>
-            <ChildAxisIterator test-kind="match_name_test" qname="xs:QName(,,closed_auction)" typename="*" nill-allowed="false">
-              <ChildAxisIterator test-kind="match_name_test" qname="xs:QName(,,closed_auctions)" typename="*" nill-allowed="false">
-                <ChildAxisIterator test-kind="match_name_test" qname="xs:QName(,,site)" typename="*" nill-allowed="false">
-                  <LetVarIterator varname="auctions"/>
-                </ChildAxisIterator>
-              </ChildAxisIterator>
-            </ChildAxisIterator>
-          </HoistIterator>
-        </LetVariable>
         <ForVariable name="p">
           <ChildAxisIterator test-kind="match_name_test" qname="xs:QName(,,person)" typename="*" nill-allowed="false">
             <ChildAxisIterator test-kind="match_name_test" qname="xs:QName(,,people)" typename="*" nill-allowed="false">
@@ -107,15 +96,6 @@
             </ChildAxisIterator>
           </ChildAxisIterator>
         </ForVariable>
-        <LetVariable name="$$opt_temp_1" materialize="true">
-          <HoistIterator>
-            <FnDataIterator>
-              <AttributeAxisIterator test-kind="match_name_test" qname="xs:QName(,,id)" typename="*" nill-allowed="false">
-                <ForVarIterator varname="p"/>
-              </AttributeAxisIterator>
-            </FnDataIterator>
-          </HoistIterator>
-        </LetVariable>
         <ReturnClause>
           <ElementIterator>
             <SingletonIterator value="xs:QName(,,item)"/>
@@ -132,19 +112,18 @@
             </AttributeIterator>
             <EnclosedIterator attr_cont="false">
               <FnCountIterator>
-                <FLWORIterator>
-                  <ForVariable name="t">
-                    <ProbeIndexPointValueIterator>
-                      <SingletonIterator value="xs:QName(www.xmark.com,x,idx)"/>
-                      <UnhoistIterator>
-                        <LetVarIterator varname="$$opt_temp_1"/>
-                      </UnhoistIterator>
-                    </ProbeIndexPointValueIterator>
-                  </ForVariable>
-                  <ReturnClause>
-                    <ForVarIterator varname="t"/>
-                  </ReturnClause>
-                </FLWORIterator>
+                <ProbeIndexPointValueIterator>
+                  <SingletonIterator value="xs:QName(www.xmark.com,x,idx)"/>
+                  <UnhoistIterator>
+                    <HoistIterator>
+                      <FnDataIterator>
+                        <AttributeAxisIterator test-kind="match_name_test" qname="xs:QName(,,id)" typename="*" nill-allowed="false">
+                          <ForVarIterator varname="p"/>
+                        </AttributeAxisIterator>
+                      </FnDataIterator>
+                    </HoistIterator>
+                  </UnhoistIterator>
+                </ProbeIndexPointValueIterator>
               </FnCountIterator>
             </EnclosedIterator>
           </ElementIterator>

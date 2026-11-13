@@ -97,26 +97,19 @@
         <SingletonIterator value="xs:string(answer_count)"/>
         <JSONBoxIterator>
           <MultiObjectLookupIterator>
-            <FLWORIterator>
-              <ForVariable name="$$context-item">
-                <ProbeIndexRangeValueIterator>
-                  <SingletonIterator value="xs:QName(http://zorba-tests.example.org/collections,db28,question-id-idx)"/>
-                  <UnhoistIterator>
-                    <LetVarIterator varname="$$opt_temp_0"/>
-                  </UnhoistIterator>
-                  <UnhoistIterator>
-                    <LetVarIterator varname="$$opt_temp_0"/>
-                  </UnhoistIterator>
-                  <SingletonIterator value="xs:boolean(true)"/>
-                  <SingletonIterator value="xs:boolean(true)"/>
-                  <SingletonIterator value="xs:boolean(true)"/>
-                  <SingletonIterator value="xs:boolean(true)"/>
-                </ProbeIndexRangeValueIterator>
-              </ForVariable>
-              <ReturnClause>
-                <ForVarIterator varname="$$context-item"/>
-              </ReturnClause>
-            </FLWORIterator>
+            <ProbeIndexRangeValueIterator>
+              <SingletonIterator value="xs:QName(http://zorba-tests.example.org/collections,db28,question-id-idx)"/>
+              <UnhoistIterator>
+                <LetVarIterator varname="$$opt_temp_0"/>
+              </UnhoistIterator>
+              <UnhoistIterator>
+                <LetVarIterator varname="$$opt_temp_0"/>
+              </UnhoistIterator>
+              <SingletonIterator value="xs:boolean(true)"/>
+              <SingletonIterator value="xs:boolean(true)"/>
+              <SingletonIterator value="xs:boolean(true)"/>
+              <SingletonIterator value="xs:boolean(true)"/>
+            </ProbeIndexRangeValueIterator>
             <SingletonIterator value="xs:string(title)"/>
           </MultiObjectLookupIterator>
         </JSONBoxIterator>
