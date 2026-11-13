@@ -591,7 +591,7 @@ IF (ZORBA_WITH_FILE_ACCESS)
              hints_nodes hints_names deep_json deep_json_binary
              entity_expansion case_paths html_edge_cases memory_limit
              exhaust_at_start exhaust_sweep_compile exhaust_sweep_builtins
-             exhaust_sweep_matcher exhaust_sweep_query_text
+             exhaust_sweep_matcher exhaust_sweep_query_text exhaust_sweep_long_token
              exhaust_sweep_streamable_text exhaust_base64_stream
              exhaust_seekable_stream exhaust_json_loader exhaust_plan_wrapper
              exhaust_plan_open exhaust_call_body exhaust_dynamic_call
