@@ -104,7 +104,8 @@ const int theWindows = 5;
 std::string windows_function(const std::string& aPrefix)
 {
   return
-    "declare function " + aPrefix + ":windows($p as xs:string, $n as xs:integer) {\n"
+    "declare %an:nondeterministic\n"
+    "function " + aPrefix + ":windows($p as xs:string, $n as xs:integer) {\n"
     "  if ($n gt 0) then " + aPrefix + ":windows($p, $n - 1)\n"
     "  else\n"
     "    for sliding window $w in\n"
@@ -125,7 +126,8 @@ std::string never_writes(const std::string& aPath)
 }
 
 const char* const theImports =
-  "import module namespace file = \"http://expath.org/ns/file\";\n";
+  "import module namespace file = \"http://expath.org/ns/file\";\n"
+  "declare namespace an = \"http://zorba.io/annotations\";\n";
 
 void check(const std::string& aWhat, const Read& r, bool aLazy)
 {
