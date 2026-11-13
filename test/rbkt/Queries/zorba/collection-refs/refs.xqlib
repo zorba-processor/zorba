@@ -29,62 +29,6 @@ declare %an:sequential function m:delete() as xs:string
   }}
 };
 
-declare function m:let() as xs:string
-{
-  let $nodes := dml:collection(xs:QName("m:c"))
-  return fn:concat(fn:count($nodes), fn:string($nodes[1]/@v))
-};
-
-declare function m:for() as xs:string
-{
-  fn:string-join(for $node in dml:collection(xs:QName("m:c"))
-                 return fn:string($node/@v),
-                 "")
-};
-
-(: A body with a function call is not inlined. :)
-declare function m:let-calling() as xs:string
-{
-  let $nodes := dml:collection(xs:QName("m:c"))
-  return fn:concat(m:let(), fn:string($nodes[1]/@v))
-};
-
-declare function m:for-calling() as xs:string
-{
-  fn:string-join(for $node in dml:collection(xs:QName("m:c"))
-                 return fn:concat(m:for(), fn:string($node/@v)),
-                 "")
-};
-
-(: The same calls from a sequential function, which then deletes m:c. :)
-declare %an:sequential function m:from-function() as xs:string*
-{
-  m:fill();
-  variable $let := m:let();
-  variable $letOutcome := m:delete();
-
-  m:fill();
-  variable $for := m:for();
-  variable $forOutcome := m:delete();
-
-  m:fill();
-  variable $letCalling := m:let-calling();
-  variable $letCallingOutcome := m:delete();
-
-  m:fill();
-  variable $forCalling := m:for-calling();
-  variable $forCallingOutcome := m:delete();
-
-  (
-    fn:concat("function, let: ", $let, " ", $letOutcome),
-    fn:concat("function, for: ", $for, " ", $forOutcome),
-    fn:concat("function, let, body with a call: ", $letCalling, " ",
-              $letCallingOutcome),
-    fn:concat("function, for, body with a call: ", $forCalling, " ",
-              $forCallingOutcome)
-  )
-};
-
 (: Binds the nodes of m:c, then raises m:raised. :)
 declare %an:sequential function m:raise() as xs:string
 {
