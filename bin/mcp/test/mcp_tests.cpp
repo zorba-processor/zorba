@@ -271,6 +271,15 @@ void heap_freed( void *p, std::size_t usable_size ) noexcept {
 template <class F> F libc_next( char const *name ) noexcept {
   return reinterpret_cast<F>( dlsym( RTLD_NEXT, name ) );
 }
+
+// Whether the allocation fails; then errno is ENOMEM, as glibc's malloc sets it
+// and glibc itself relies on.
+bool inject_fails_enomem() noexcept {
+  if ( !inject_fails() )
+    return false;
+  errno = ENOMEM;
+  return true;
+}
 } // namespace
 
 extern "C" {
@@ -280,13 +289,14 @@ void* __libc_realloc( void*, std::size_t );
 void __libc_free( void* );
 
 void* malloc( std::size_t n ) noexcept {
-  return inject_fails() ? nullptr : heap_add( __libc_malloc( n ), n );
+  return inject_fails_enomem() ? nullptr : heap_add( __libc_malloc( n ), n );
 }
 void* calloc( std::size_t n, std::size_t size ) noexcept {
-  return inject_fails() ? nullptr : heap_add( __libc_calloc( n, size ), n * size );
+  return inject_fails_enomem() ? nullptr
+                               : heap_add( __libc_calloc( n, size ), n * size );
 }
 void* realloc( void *p, std::size_t n ) noexcept {
-  if ( inject_fails() )
+  if ( inject_fails_enomem() )
     return nullptr;
   std::size_t const old = p ? malloc_usable_size( p ) : 0;
   void *const q = __libc_realloc( p, n );
