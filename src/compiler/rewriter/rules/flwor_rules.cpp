@@ -227,6 +227,10 @@ static bool evaluates_var(const expr* e, const var_expr* var)
   case relpath_expr_kind:
     return evaluates_var((*static_cast<const relpath_expr*>(e))[0], var);
 
+  case dynamic_function_invocation_expr_kind:
+    return evaluates_var(
+        static_cast<const dynamic_function_invocation_expr*>(e)->get_input(), var);
+
   case if_expr_kind:
   {
     const if_expr* ie = static_cast<const if_expr*>(e);
