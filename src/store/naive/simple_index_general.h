@@ -23,6 +23,7 @@
 
 #include "simple_index.h"
 #include "store_defs.h"
+#include "zorbatypes/integer.h"
 
 namespace zorba 
 { 
