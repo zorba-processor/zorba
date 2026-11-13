@@ -3,4 +3,4 @@ declare variable $zero as xs:integer external := 0;
 
 for $x in (1, $zero)
 for $a in 6 idiv $x
-return (1 to $x)[. eq $a]
+return $x[. ne 0][. eq $a]
