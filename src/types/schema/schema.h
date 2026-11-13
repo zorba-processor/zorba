@@ -112,6 +112,8 @@ public:
     return theGrammarPool;
   }
 
+  bool isNamespaceLoaded(const char* ns) const;
+
   void registerXSD(
       const char* xsdURL,
       static_context* sctx,

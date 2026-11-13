@@ -532,6 +532,24 @@ void Schema::printXSDInfo(bool excludeBuiltIn)
 
 
 /*******************************************************************************
+  Whether the grammar pool has the components of the namespace ns
+*******************************************************************************/
+bool Schema::isNamespaceLoaded(const char* ns) const
+{
+  SYNC_CODE(AutoMutex(GENV_TYPESYSTEM.getXercesMutex());)
+
+  if (theGrammarPool == NULL)
+    return false;
+
+  XMLChArray xerces_ns(ns);
+  XMLSchemaDescription* desc =
+  theGrammarPool->createSchemaDescription(xerces_ns.get());
+  Janitor<XMLSchemaDescription> descJanitor(desc);
+  return theGrammarPool->retrieveGrammar(desc) != NULL;
+}
+
+
+/*******************************************************************************
   Registers an imported schema into the curent grammar
 *******************************************************************************/
 void Schema::registerXSD(
@@ -546,23 +564,16 @@ void Schema::registerXSD(
 
   TRACE("url=" << xsdURL << " loc=" << loc);
 
+  // The location hint of an import of an already loaded namespace is
+  // disregarded: the pool would reject the second grammar, and grammars
+  // cached with it would point into it after the parser deletes it.
+  if (isNamespaceLoaded(xsdURL))
+    return;
+
   SYNC_CODE(AutoMutex(GENV_TYPESYSTEM.getXercesMutex());)
 
   try
   {
-    // The location hint of an import of an already loaded namespace is
-    // disregarded: the pool would reject the second grammar, and grammars
-    // cached with it would point into it after the parser deletes it.
-    if (theGrammarPool != NULL)
-    {
-      XMLChArray xerces_ns(xsdURL);
-      XMLSchemaDescription* desc =
-      theGrammarPool->createSchemaDescription(xerces_ns.get());
-      Janitor<XMLSchemaDescription> descJanitor(desc);
-      if (theGrammarPool->retrieveGrammar(desc) != NULL)
-        return;
-    }
-
     // The implementation class (what XMLReaderFactory::createXMLReader()
     // returns) is used directly for setXMLEntityResolver(), which the
     // SAX2XMLReader interface does not have.
