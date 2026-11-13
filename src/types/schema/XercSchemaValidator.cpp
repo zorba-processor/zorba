@@ -906,6 +906,9 @@ void XercSchemaValidator::validateProcessorStipulatedTypeName(const   XMLElement
         ZORBA_ASSERT(false);
     }
 
+    // Only an element declaration makes an element nilled, so xsi:nil is ignored
+    fNil = false;
+
     // checkContent pops one entry for every element, a simple type included
     fTypeStack->push(stipulatedTypeInfo);
     fHasStipulatedType = true;
