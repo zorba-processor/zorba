@@ -16,4 +16,24 @@
     </xs:complexType>
   </xs:element>
 
+  <!-- nillable, with element children: a nilled pn must have none -->
+  <xs:element name="pn" nillable="true">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="c" type="xs:integer" nillable="true" minOccurs="0"/>
+        <xs:element name="e" type="xs:integer" minOccurs="0"/>
+        <xs:element ref="pn" minOccurs="0"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <!-- nillable, mixed: a nilled m must have no text or element children -->
+  <xs:element name="m" nillable="true">
+    <xs:complexType mixed="true">
+      <xs:sequence>
+        <xs:element name="mc" type="xs:integer" nillable="true" minOccurs="0"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
 </xs:schema>
