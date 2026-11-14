@@ -166,11 +166,14 @@ probe 3:
 probe 4:
 <open_auction id="open_auction2"/><open_auction id="open_auction3"/>
 
+probe 4 with a number, which = cannot compare with the untyped dates:
+<exception>err:FORG0001 : "xs:decimal": search key can not be compared with a key value of a node in index "auctions:AuctionDates2"</exception>
+
 probe 5:
 <open_auction id="open_auction1"/><open_auction id="open_auction9"/>
 
-probe 6:
- 
+probe 6, with a number, which >= cannot compare with the untyped dates:
+<exception>err:FORG0001 : "xs:double": search key can not be compared with a key value of a node in index "auctions:AuctionDates2"</exception>
 
 probe 7:
 <open_auction id="open_auction1"/><open_auction id="open_auction9"/>

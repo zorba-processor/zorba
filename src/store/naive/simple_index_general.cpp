@@ -298,6 +298,7 @@ GeneralIndex::GeneralIndex(
   theKeyTypeCode(store::XS_LAST),
   theCompFunction(spec.theTimezone, spec.theCollations[0]),
   theNumTypedEntries(),
+  theNumNonNumberUntypedKeys(0),
   theNumMultiKeyNodes(0)
 {
   store::Item* typeName = spec.theKeyTypes[0].getp();
@@ -507,7 +508,12 @@ bool GeneralIndex::insert(store::Item_t& key, store::Item_t& node)
  
     // Compared with a numeric key or probe, an untyped value is cast to
     // xs:double.
-    if (untypedItem->castToDouble(castItem))
+    bool isNumber = untypedItem->castToDouble(castItem);
+
+    if (!isNumber)
+      ++theNumNonNumberUntypedKeys;
+
+    if (isNumber)
     {
       node2 = node;
       if (insertInMap(castItem, node2, store::XS_DOUBLE, true))
@@ -893,7 +899,12 @@ bool GeneralIndex::remove(const store::Item_t& key, const store::Item_t& node)
 
     found = removeFromMap(castItem, node, store::XS_STRING, false);
 
-    if (untypedItem->castToDouble(castItem))
+    bool isNumber = untypedItem->castToDouble(castItem);
+
+    if (found && !isNumber)
+      --theNumNonNumberUntypedKeys;
+
+    if (isNumber)
     {
       if (removeFromMap(castItem, node, store::XS_DOUBLE, true))
         found = true;
@@ -1116,6 +1127,7 @@ void GeneralHashIndex::clear()
 
   theEmptyKeyNodes.clear();
   theNumTypedEntries.fill(0);
+  theNumNonNumberUntypedKeys = 0;
   theNumMultiKeyNodes = 0;
 }
 
@@ -1398,6 +1410,7 @@ void GeneralTreeIndex::clear()
 
   theEmptyKeyNodes.clear();
   theNumTypedEntries.fill(0);
+  theNumNonNumberUntypedKeys = 0;
   theNumMultiKeyNodes = 0;
 }
 
@@ -1646,6 +1659,25 @@ void ProbeGeneralIndexIterator::checkComparableKeys(
 
 
 /*******************************************************************************
+  Raises the error that a general comparison of a numeric search key with an
+  untyped key of the index raises when it casts the key to xs:double.
+********************************************************************************/
+void ProbeGeneralIndexIterator::checkNumberUntypedKeys(
+    const AtomicItem* searchKey) const
+{
+  if (searchKey != NULL &&
+      theIndex->theNumNonNumberUntypedKeys > 0 &&
+      valueComparisonClass(searchKey->getTypeCode(), false) == store::XS_DOUBLE)
+  {
+    RAISE_ERROR_NO_LOC(err::FORG0001,
+    ERROR_PARAMS(ZED(IncomparableKeyNodeValue_23),
+                 searchKey->getType()->getStringValue(),
+                 theIndex->getName()->getStringValue()));
+  }
+}
+
+
+/*******************************************************************************
   
 ********************************************************************************/
 void ProbeGeneralIndexIterator::init(const store::IndexCondition_t& cond,
@@ -1684,12 +1716,17 @@ void ProbeGeneralIndexIterator::init(const store::IndexCondition_t& cond,
       ERROR_PARAMS(ZED(NoMultiKeyNodeValues_2), theIndex->getName()->getStringValue()));
     }
 
-    if (!theIndex->isTyped())
-    {
-      checkComparableKeys(theCondition->theKey.getp(), false);
-      checkComparableKeys(theCondition->theLowerBound.getp(), true);
-      checkComparableKeys(theCondition->theUpperBound.getp(), true);
-    }
+    // The key type of a typed index does not exclude keys of subtypes that
+    // an order comparison cannot compare, such as durations.
+    checkComparableKeys(theCondition->theKey.getp(), false);
+    checkComparableKeys(theCondition->theLowerBound.getp(), true);
+    checkComparableKeys(theCondition->theUpperBound.getp(), true);
+  }
+  else if (!theIndex->isTyped())
+  {
+    checkNumberUntypedKeys(theCondition->theKey.getp());
+    checkNumberUntypedKeys(theCondition->theLowerBound.getp());
+    checkNumberUntypedKeys(theCondition->theUpperBound.getp());
   }
 
   if (theProbeKind == store::IndexCondition::POINT_VALUE ||

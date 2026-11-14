@@ -135,6 +135,12 @@ public:
   the keys of a type that has such entries raises an error, as the comparison
   does.
 
+  theNumNonNumberUntypedKeys:
+  ---------------------------
+  The number of [key, node] entries with an untyped key that is not castable
+  to xs:double. A general probe with a numeric search key raises the error
+  that a general comparison raises when it casts such a key to xs:double.
+
   theNumMultiKeyNodes:
   --------------------
   The number of domain nodes for which the key expression returns more than one
@@ -173,6 +179,8 @@ protected:
   std::vector<store::Item_t>  theEmptyKeyNodes;
 
   std::array<csize, store::XS_LAST> theNumTypedEntries;
+
+  csize                       theNumNonNumberUntypedKeys;
 
   csize                       theNumMultiKeyNodes;
 
@@ -546,6 +554,8 @@ protected:
 
   void checkComparableKeys(const AtomicItem* searchKey,
                            bool isOrderComparison) const;
+
+  void checkNumberUntypedKeys(const AtomicItem* searchKey) const;
 
 public:
   void init(const store::IndexCondition_t& cond, const xs_integer& aSkip);

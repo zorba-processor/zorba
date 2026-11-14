@@ -119,14 +119,17 @@ static bool hasUntypedStoreKeys(
 
 /*******************************************************************************
   This function is called from the probe function to chaeck that the type of
-  the probing key is consistent with the index declaration.
+  the probing key is consistent with the index declaration. isGeneralProbe
+  says whether the probe stands for a general comparison rather than a value
+  comparison.
 ********************************************************************************/
 static void checkKeyType(
     const QueryLoc& loc,
     TypeManager* tm,
     const IndexDecl* indexDecl,
     csize keyNo,
-    store::Item_t& searchKey)
+    store::Item_t& searchKey,
+    bool isGeneralProbe)
 {
   RootTypeManager& rtm = GENV_TYPESYSTEM;
 
@@ -167,10 +170,12 @@ static void checkKeyType(
       return;
     }
 
+    // A value comparison casts an untyped value to xs:string, a general
+    // comparison with a number to xs:double.
     if (TypeOps::is_subtype(tm, *indexKeyType, *rtm.DOUBLE_TYPE_ONE) &&
         (TypeOps::is_subtype(searchKeyTypeCode, store::XS_DECIMAL) ||
          TypeOps::is_subtype(searchKeyTypeCode, store::XS_FLOAT) ||
-         searchKeyTypeCode == store::XS_UNTYPED_ATOMIC))
+         (isGeneralProbe && searchKeyTypeCode == store::XS_UNTYPED_ATOMIC)))
     {
       if (TypeOps::is_subtype(searchKeyTypeCode, store::XS_DECIMAL))
       {
@@ -182,7 +187,19 @@ static void checkKeyType(
         GENV_STORE.getItemFactory()->
         createDouble(searchKey, xs_double(searchKey->getFloatValue()));
       }
+      else
+      {
+        GenericCast::castToAtomic(searchKey, searchKey, &*rtm.DOUBLE_TYPE_ONE,
+                                  tm, NULL, loc);
+      }
 
+      return;
+    }
+
+    // A comparison promotes the xs:float keys to xs:double.
+    if (TypeOps::is_subtype(tm, *indexKeyType, *rtm.FLOAT_TYPE_ONE) &&
+        searchKeyTypeCode == store::XS_DOUBLE)
+    {
       return;
     }
 
@@ -845,7 +862,8 @@ store::IndexCondition_t ProbeIndexPointValueIterator::createCondition(
 
     if (theCheckKeyType)
     {
-      checkKeyType(loc, tm, state->theIndexDecl, i - numNonKeyParams, keyItem);
+      checkKeyType(loc, tm, state->theIndexDecl, i - numNonKeyParams, keyItem,
+                   false);
     }
 
     if (hasUntypedStoreKeys(tm, state->theIndexDecl, i - numNonKeyParams))
@@ -952,7 +970,8 @@ bool ProbeIndexPointGeneralIterator::nextImpl(
       
       if (theCheckKeyType)
       {
-        checkKeyType(loc, theSctx->get_typemanager(), state->theIndexDecl, 0, keyItem);
+        checkKeyType(loc, theSctx->get_typemanager(), state->theIndexDecl, 0,
+                     keyItem, true);
       }
 
       state->theCondition->clear();
@@ -1325,12 +1344,12 @@ store::IndexCondition_t ProbeIndexRangeValueIterator::createCondition(
       
     if (tempLeft != NULL && theCheckKeyType)
     {
-      checkKeyType(loc, tm, state->theIndexDecl, keyNo, tempLeft);
+      checkKeyType(loc, tm, state->theIndexDecl, keyNo, tempLeft, false);
     }
 
     if (tempRight != NULL && theCheckKeyType)
     {
-      checkKeyType(loc, tm, state->theIndexDecl, keyNo, tempRight);
+      checkKeyType(loc, tm, state->theIndexDecl, keyNo, tempRight, false);
     }
 
     if (hasAnyKeyType(tm, state->theIndexDecl, keyNo))
