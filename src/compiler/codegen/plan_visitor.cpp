@@ -2552,10 +2552,24 @@ void end_visit(fo_expr& v)
 
   if (v.is_sequential())
   {
+    FunctionConsts::FunctionKind const fkind = func->getKind();
+
+    // These need only a prefix of their first argument and may stop early over a
+    // loop, as they do over a call through a function item. A call of a sequential
+    // function still runs to its end.
+    bool const takesPrefix = (fkind == FunctionConsts::FN_HEAD_1 ||
+                              fkind == FunctionConsts::FN_EXISTS_1 ||
+                              fkind == FunctionConsts::FN_SUBSEQUENCE_2 ||
+                              fkind == FunctionConsts::FN_SUBSEQUENCE_3 ||
+                              fkind == FunctionConsts::OP_ZORBA_SEQUENCE_POINT_ACCESS_2 ||
+                              fkind == FunctionConsts::OP_ZORBA_SUBSEQUENCE_INT_2 ||
+                              fkind == FunctionConsts::OP_ZORBA_SUBSEQUENCE_INT_3) &&
+                             v.get_arg(0)->skip_wrappers()->get_expr_kind() == flwor_expr_kind;
+
     csize numArgs = v.num_args();
     for (csize i = 0; i < numArgs; ++i)
     {
-      if (v.get_arg(i)->is_sequential())
+      if (v.get_arg(i)->is_sequential() && !(takesPrefix && i == 0))
       {
         argv[i] = new MaterializeIterator(sctx, v.get_arg(i)->get_loc(), argv[i]);
       }
