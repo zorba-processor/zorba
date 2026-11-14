@@ -298,6 +298,7 @@ GeneralIndex::GeneralIndex(
   theKeyTypeCode(store::XS_LAST),
   theCompFunction(spec.theTimezone, spec.theCollations[0]),
   theNumTypedEntries(),
+  theNumUntypedKeys(0),
   theNumNonNumberUntypedKeys(0),
   theNumMultiKeyNodes(0)
 {
@@ -501,6 +502,7 @@ bool GeneralIndex::insert(store::Item_t& key, store::Item_t& node)
 
     node2 = node;
     found = insertInMap(castItem, node2, store::XS_STRING, false);
+    ++theNumUntypedKeys;
 
     // No reason to cast to xs:anyUri, because when we probe with xs:string or
     // with xs:anyUri, or with xs:untypedAtomic, we unconditionally probe both
@@ -899,6 +901,9 @@ bool GeneralIndex::remove(const store::Item_t& key, const store::Item_t& node)
 
     found = removeFromMap(castItem, node, store::XS_STRING, false);
 
+    if (found)
+      --theNumUntypedKeys;
+
     bool isNumber = untypedItem->castToDouble(castItem);
 
     if (found && !isNumber)
@@ -1127,6 +1132,7 @@ void GeneralHashIndex::clear()
 
   theEmptyKeyNodes.clear();
   theNumTypedEntries.fill(0);
+  theNumUntypedKeys = 0;
   theNumNonNumberUntypedKeys = 0;
   theNumMultiKeyNodes = 0;
 }
@@ -1410,6 +1416,7 @@ void GeneralTreeIndex::clear()
 
   theEmptyKeyNodes.clear();
   theNumTypedEntries.fill(0);
+  theNumUntypedKeys = 0;
   theNumNonNumberUntypedKeys = 0;
   theNumMultiKeyNodes = 0;
 }
@@ -1624,14 +1631,21 @@ static store::SchemaTypeCode valueComparisonClass(
 /*******************************************************************************
   Raises the error that a value comparison of the search key with a key of the
   index raises: the keys of each type other than null that has entries not
-  cast from an untyped key are compared with it.
+  cast from an untyped key are compared with it. A general comparison casts
+  an untyped operand to the type of the other one, so for it an untyped
+  search key and the untyped keys are left out.
 ********************************************************************************/
 void ProbeGeneralIndexIterator::checkComparableKeys(
     const AtomicItem* searchKey,
-    bool isOrderComparison) const
+    bool isOrderComparison,
+    bool isGeneralComparison) const
 {
   // null compares with every value.
   if (searchKey == NULL || searchKey->getTypeCode() == store::JS_NULL)
+    return;
+
+  if (isGeneralComparison &&
+      searchKey->getTypeCode() == store::XS_UNTYPED_ATOMIC)
     return;
 
   store::SchemaTypeCode searchClass =
@@ -1644,7 +1658,12 @@ void ProbeGeneralIndexIterator::checkComparableKeys(
   {
     store::SchemaTypeCode keyType = static_cast<store::SchemaTypeCode>(type);
 
-    if (theIndex->theNumTypedEntries[type] > 0 &&
+    csize numKeys = theIndex->theNumTypedEntries[type];
+
+    if (isGeneralComparison && keyType == store::XS_STRING)
+      numKeys -= theIndex->theNumUntypedKeys;
+
+    if (numKeys > 0 &&
         keyType != store::JS_NULL &&
         (isUnordered ||
          valueComparisonClass(keyType, isOrderComparison) != searchClass))
@@ -1718,15 +1737,22 @@ void ProbeGeneralIndexIterator::init(const store::IndexCondition_t& cond,
 
     // The key type of a typed index does not exclude keys of subtypes that
     // an order comparison cannot compare, such as durations.
-    checkComparableKeys(theCondition->theKey.getp(), false);
-    checkComparableKeys(theCondition->theLowerBound.getp(), true);
-    checkComparableKeys(theCondition->theUpperBound.getp(), true);
+    checkComparableKeys(theCondition->theKey.getp(), false, false);
+    checkComparableKeys(theCondition->theLowerBound.getp(), true, false);
+    checkComparableKeys(theCondition->theUpperBound.getp(), true, false);
   }
-  else if (!theIndex->isTyped())
+  else
   {
-    checkNumberUntypedKeys(theCondition->theKey.getp());
-    checkNumberUntypedKeys(theCondition->theLowerBound.getp());
-    checkNumberUntypedKeys(theCondition->theUpperBound.getp());
+    if (!theIndex->isTyped())
+    {
+      checkNumberUntypedKeys(theCondition->theKey.getp());
+      checkNumberUntypedKeys(theCondition->theLowerBound.getp());
+      checkNumberUntypedKeys(theCondition->theUpperBound.getp());
+    }
+
+    checkComparableKeys(theCondition->theKey.getp(), false, true);
+    checkComparableKeys(theCondition->theLowerBound.getp(), true, true);
+    checkComparableKeys(theCondition->theUpperBound.getp(), true, true);
   }
 
   if (theProbeKind == store::IndexCondition::POINT_VALUE ||
