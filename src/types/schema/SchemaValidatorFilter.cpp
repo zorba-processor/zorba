@@ -363,7 +363,9 @@ void SchemaValidatorFilter::processStartElement()
   }
   const bool isValidated = fValidate || theXsiType;
   theIsNilled = isValidated && ((XercSchemaValidator*)fValidator)->getIsNil();
-  theOpenElements.push_back({isValidated, theIsNilled});
+  theOpenElements.push_back(
+    {isValidated, theIsNilled,
+     ((XercSchemaValidator*)fValidator)->getCurrentDatatypeValidator()});
 
 
   ComplexTypeInfo* typeinfo =
@@ -742,6 +744,8 @@ void SchemaValidatorFilter::endElementEvent(
   if(element.hasTypeEntry)
   {
     ((XercSchemaValidator*)fValidator)->setNillable(element.isNilled);
+    ((XercSchemaValidator*)fValidator)->
+      setCurrentDatatypeValidator(element.datatypeValidator);
 
     DatatypeValidator *currentDV = 0;
     if(topElem->fThisElement->isDeclared())
