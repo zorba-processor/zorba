@@ -3917,6 +3917,89 @@ void test_json_loader_out_of_memory( Fixture const &f ) {
   (void)f;
 #endif
 }
+// An insert into an object with each allocation failing in turn: a failed
+// insert leaves the object as it was, so a later insert and a lookup by name
+// still find what they should. 16 members: the insert builds the object's index
+// of names; 32: it adds to that index; both grow the members.
+void test_json_object_add_out_of_memory( Fixture const &f ) {
+#if defined(__linux__)
+  for ( int const size : { 16, 32 } ) {
+    std::string const added( "k" + std::to_string( size ) );
+    auto attempt = [&]( long n, long length, long *count ) -> std::string {
+      Item object;
+      {
+        XQuery_t const make( f.zorba->compileQuery(
+          "jsoniq version \"1.0\";\n"
+          "{| for $i in 0 to " + std::to_string( size - 1 ) +
+          " return { \"k\" || $i : $i } |}" ) );
+        Iterator_t const it( make->iterator() );
+        it->open();
+        it->next( object );
+        it->close();
+      }
+      XQuery_t const insert( f.zorba->compileQuery(
+        "jsoniq version \"1.0\";\n"
+        "declare variable $o external;\n"
+        "insert json { \"" + added + "\" : " + std::to_string( size ) +
+        " } into $o;\n"
+        "1" ) );
+      insert->getDynamicContext()->setVariable( "o", object );
+      Iterator_t const it( insert->iterator() );
+      Item result;
+      bool failed = false;
+      inject_arm( n, length );
+      try {
+        it->open();
+        it->next( result );
+        it->close();
+      }
+      catch ( std::exception const& ) {
+        failed = true;
+      }
+      *count = inject_disarm();
+      // Made after the failures: they are for the insert, not the test.
+      std::string out( failed || result.isNull()
+                       ? "error" : result.getStringValue().str() );
+      XQuery_t const lookup( f.zorba->compileQuery(
+        "jsoniq version \"1.0\";\n"
+        "declare variable $o external;\n"
+        "insert json { \"next\" : -1 } into $o;\n"
+        "$o." + added ) );
+      lookup->getDynamicContext()->setVariable( "o", object );
+      Iterator_t const found( lookup->iterator() );
+      found->open();
+      Item item;
+      out += "|";
+      while ( found->next( item ) )
+        out += item.getStringValue().str();
+      found->close();
+      return out;
+    };
+    std::string const answer( "1|" + std::to_string( size ) );
+    std::string const what( "an insert into an object of " +
+                            std::to_string( size ) );
+    long total = 0;
+    check( attempt( 0, 0, &total ) == answer, what + ": the answer" );
+    long wrong = 0;
+    for ( long const length : { 1L, 8L } )
+      for ( long n = 1; n <= total; ++n ) {
+        long count = 0;
+        std::string const got( attempt( n, length, &count ) );
+        if ( got != answer && got != "error|" && ++wrong <= 3 )
+          std::cout << "at " << n << " of a run of " << length << ": " << got
+                    << std::endl;
+      }
+    check( wrong == 0, what + " failing: the answer, or an error and no member",
+           std::to_string( wrong ) + " points" );
+  }
+# if defined(__SANITIZE_ADDRESS__)
+  check( __lsan_do_recoverable_leak_check() == 0,
+         "an insert into an object failing: nothing is left behind" );
+# endif
+#else
+  (void)f;
+#endif
+}
 // Every allocation of a compilation fails in turn; after each, the same server
 // finds the built-in functions and the variables of a catch clause, as a fresh
 // one does.
@@ -7869,6 +7952,7 @@ Test const tests[] = {
   { "exhaust_base64_stream", test_base64_stream_out_of_memory },
   { "exhaust_seekable_stream", test_seekable_stream_out_of_memory },
   { "exhaust_json_loader", test_json_loader_out_of_memory },
+  { "exhaust_json_object_add", test_json_object_add_out_of_memory },
   { "exhaust_plan_wrapper", test_plan_wrapper_out_of_memory },
   { "exhaust_plan_open", test_plan_open_out_of_memory },
   { "exhaust_call_body", test_call_body_out_of_memory },
