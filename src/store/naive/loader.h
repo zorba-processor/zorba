@@ -82,6 +82,17 @@ class NsBindingsContext;
 ********************************************************************************/
 class XmlLoader
 {
+public:
+  // Element nesting limit: libxml2's without XML_PARSE_HUGE, which
+  // xml::ParserSecurity never sets. HtmlXmlLoader enforces it itself.
+  static constexpr csize MAX_DEPTH = 256;
+
+  /** MAX_DEPTH as the limit that reportLimit() names. */
+  static std::string depthLimit()
+  {
+    return "element nesting depth of " + std::to_string(MAX_DEPTH);
+  }
+
 protected:
   static const ulong INPUT_CHUNK_SIZE = 8192;
 
@@ -124,6 +135,14 @@ protected:
 
 protected:
   void applyLoadOptions(const store::LoadProperties& props, xmlParserCtxtPtr ctxt);
+
+  /**
+   * Reports err:XPDY0130 for an exceeded limit of the parser that is not
+   * memory; aLimit names it and its value. The data location is where in the
+   * input it was exceeded.
+   */
+  void reportLimit(char const* aUri, int aLine, int aColumn,
+                   std::string const& aLimit);
 
 
 public:
@@ -402,9 +421,6 @@ protected:
 ********************************************************************************/
 class HtmlXmlLoader : public FastXmlLoader
 {
-public:
-  static constexpr csize MAX_DEPTH = 256;
-
 protected:
   csize theDepth;
 #if LIBXML_VERSION < 21400

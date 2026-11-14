@@ -17,6 +17,7 @@
 #ifndef ZORBA_RUNTIME_PARSING_AND_SERIALIZING_INVALID_CONTENT_H
 #define ZORBA_RUNTIME_PARSING_AND_SERIALIZING_INVALID_CONTENT_H
 
+#include <memory>
 #include <sstream>
 
 #include "compiler/parser/query_loc.h"
@@ -28,13 +29,22 @@ namespace zorba
 /**
  * Throws err:FODC0006 for the error that parsing the argument of \a aFunction
  * raised: the message names that error's code and quotes its message, and the
- * data location (where in the parsed string) is that error's.
+ * data location (where in the parsed string) is that error's. An exceeded
+ * limit of the parser (err:XPDY0130) is not invalid content: it is thrown
+ * as it is, at \a aLoc.
  */
 [[noreturn]] inline void throw_invalid_content(
     char const* aFunction,
     ZorbaException const& aCause,
     QueryLoc const& aLoc)
 {
+  if (aCause.diagnostic() == err::XPDY0130)
+  {
+    std::unique_ptr<ZorbaException> const lLimit(clone(aCause));
+    set_source(*lLimit, aLoc);
+    lLimit->polymorphic_throw();
+  }
+
   std::ostringstream lCause;
   lCause << '[' << aCause.diagnostic().qname() << "]: " << aCause.what();
 
