@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#include <memory>
+
 #include "diagnostics/xquery_diagnostics.h"
 #include "diagnostics/assert.h"
 
@@ -1228,19 +1230,19 @@ void DescendantAxisState::reset(PlanState& planState)
 
 void DescendantAxisState::push(const store::Item* node)
 {
-  if (theTop < theCurrentPath.size())
+  if (theTop == theCurrentPath.size())
   {
-    theCurrentPath[theTop].first = node;
-    theCurrentPath[theTop].second->init(node);
-    theCurrentPath[theTop].second->open();
+    // Stored before it holds the node: if push_back() fails, the iterator
+    // does not keep the node, and with it the whole tree, alive.
+    std::unique_ptr<store::ChildrenIterator> ite(
+      GENV_ITERATOR_FACTORY->createChildrenIterator());
+    theCurrentPath.push_back(PathPair(NULL, NULL));
+    theCurrentPath.back().second = ite.release();
   }
-  else
-  {
-    store::ChildrenIterator* ite = GENV_ITERATOR_FACTORY->createChildrenIterator();
-    ite->init(node);
-    ite->open();
-    theCurrentPath.push_back(PathPair(node, ite));
-  }
+
+  theCurrentPath[theTop].first = node;
+  theCurrentPath[theTop].second->init(node);
+  theCurrentPath[theTop].second->open();
 
   ++theTop;
 }
