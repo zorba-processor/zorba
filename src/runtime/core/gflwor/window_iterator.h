@@ -328,7 +328,8 @@ public:
   theStartClause      : Object representing the start cond of this window clause
   theEndClause        : Object representing the end cond of this window clause
   theLazyEval         : Whether to use an eager or a lazy temp sequence to
-                        buffer the domain sequence.
+                        buffer the domain sequence, as decided by the query that
+                        compiled the clause (see readsDomainLazily).
   theEndCondSameForAllWindows :
                         The end condition has the same value at a given item for
                         every candidate window: see same_end_cond_for_all_windows
@@ -407,6 +408,8 @@ public:
   void closeImpl(PlanState& planState);
 
 private:
+  bool readsDomainLazily(const PlanState& planState) const;
+
   void bindVariable(
         PlanState& planState,
         store::TempSeq_t& aInputSeq,
