@@ -266,6 +266,10 @@ void SchemaValidatorImpl::processElement(
       }
     }
 
+    // A nilled element has no text child to hold a typed value
+    if (isNilled)
+      tHasTypedValue = false;
+
     //cout << " vup        - addSetElementType: " << elm->getNodeName()->
     //  getLocalName()->str() << "   " << newType->get_qname()->getLocalName() 
     //  << " @ " << newType->get_qname()->getNamespace() << "\n"; cout.flush();

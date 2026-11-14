@@ -9,3 +9,5 @@
   the property; revalidation after an update and `schema:validate-in-place`
   set it.
 - Validation treats `xsi:nil="1"` like `xsi:nil="true"`.
+- Revalidation after an update that makes a simple-typed element nil (deletes
+  its text and inserts `xsi:nil="true"`) no longer aborts the process.
