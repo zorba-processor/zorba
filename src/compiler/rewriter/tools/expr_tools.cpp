@@ -1869,6 +1869,46 @@ static bool is_sequential_flwor_with_binding_sequences(flwor_expr* flwor)
 
 
 /*******************************************************************************
+  Whether the call needs only a prefix of its first argument and that argument is
+  a loop: it may then stop early over a sequential loop, as over a loop with a call
+  through a function item. A call of a sequential function as the argument still
+  runs to its end.
+********************************************************************************/
+static bool stops_early_over_loop(const fo_expr* fo)
+{
+  switch (fo->get_func()->getKind())
+  {
+  case FunctionConsts::FN_HEAD_1:
+  case FunctionConsts::FN_EXISTS_1:
+  case FunctionConsts::FN_SUBSEQUENCE_2:
+  case FunctionConsts::FN_SUBSEQUENCE_3:
+  case FunctionConsts::OP_ZORBA_SEQUENCE_POINT_ACCESS_2:
+  case FunctionConsts::OP_ZORBA_SUBSEQUENCE_INT_2:
+  case FunctionConsts::OP_ZORBA_SUBSEQUENCE_INT_3:
+    break;
+  default:
+    return false;
+  }
+
+  const expr* arg = fo->get_arg(0);
+
+  while (true)
+  {
+    if (arg->get_expr_kind() == wrapper_expr_kind)
+      arg = static_cast<const wrapper_expr*>(arg)->get_input();
+    else if (arg->get_expr_kind() == treat_expr_kind)
+      arg = static_cast<const treat_expr*>(arg)->get_input();
+    else if (arg->get_expr_kind() == promote_expr_kind)
+      arg = static_cast<const promote_expr*>(arg)->get_input();
+    else
+      break;
+  }
+
+  return arg->get_expr_kind() == flwor_expr_kind;
+}
+
+
+/*******************************************************************************
   Marks, for every for clause reachable from the query, whether its domain has an
   unproven call or its flwor is sequential, on the tree before the optimizer runs.
   One walk, bottom up: the answer for an expr is whether it or one of its children
@@ -1950,10 +1990,11 @@ bool BindingSequenceWalk::walk(expr* e)
 
   case fo_expr_kind:
   {
-    const function* f = static_cast<const fo_expr*>(e)->get_func();
+    fo_expr* fo = static_cast<fo_expr*>(e);
     found = is_unproven_call(e);
     theFoundCall = theFoundCall || found;
-    walkFunction(f);
+    walkFunction(fo->get_func());
+    fo->set_stops_early(stops_early_over_loop(fo));
     break;
   }
   case function_item_expr_kind:

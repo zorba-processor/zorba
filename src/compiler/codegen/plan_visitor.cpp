@@ -987,6 +987,45 @@ bool begin_visit(flwor_expr& v)
     }
   }
 
+  // A window clause with a sequential domain keeps the order it had: the tuples
+  // before it, and then its own tuples, are all computed before the next clause.
+  if (isGeneral && v.is_sequential())
+  {
+    pragma* noMaterialization = NULL;
+    theCCB->lookup_pragma(&v, "no-materialization", noMaterialization);
+
+    for (csize i = 0; noMaterialization == NULL && i < numClauses; ++i)
+    {
+      const flwor_clause* c = v.get_clause(i);
+
+      if (c->get_kind() != flwor_clause::window_clause ||
+          !static_cast<const window_clause*>(c)->get_expr()->is_sequential())
+        continue;
+
+      std::vector<OrderModifier> modifiers;
+      std::vector<expr*> orderingExprs;
+
+      if (i > 0 &&
+          v.get_clause(i-1)->get_kind() != flwor_clause::orderby_clause &&
+          v.get_clause(i-1)->get_kind() != flwor_clause::groupby_clause)
+      {
+        v.add_clause(i, theCCB->theEM->create_orderby_clause(v.get_sctx(), c->get_loc(),
+                                                            true, modifiers, orderingExprs));
+        ++i;
+        ++numClauses;
+      }
+
+      if (i == numClauses - 1 ||
+          (v.get_clause(i+1)->get_kind() != flwor_clause::orderby_clause &&
+           v.get_clause(i+1)->get_kind() != flwor_clause::groupby_clause))
+      {
+        v.add_clause(i+1, theCCB->theEM->create_orderby_clause(v.get_sctx(), c->get_loc(),
+                                                              true, modifiers, orderingExprs));
+        ++numClauses;
+      }
+    }
+  }
+
   for (csize i = 0; i < numClauses; ++i)
   {
     const flwor_clause* c = v.get_clause(i);
@@ -2552,24 +2591,10 @@ void end_visit(fo_expr& v)
 
   if (v.is_sequential())
   {
-    FunctionConsts::FunctionKind const fkind = func->getKind();
-
-    // These need only a prefix of their first argument and may stop early over a
-    // loop, as they do over a call through a function item. A call of a sequential
-    // function still runs to its end.
-    bool const takesPrefix = (fkind == FunctionConsts::FN_HEAD_1 ||
-                              fkind == FunctionConsts::FN_EXISTS_1 ||
-                              fkind == FunctionConsts::FN_SUBSEQUENCE_2 ||
-                              fkind == FunctionConsts::FN_SUBSEQUENCE_3 ||
-                              fkind == FunctionConsts::OP_ZORBA_SEQUENCE_POINT_ACCESS_2 ||
-                              fkind == FunctionConsts::OP_ZORBA_SUBSEQUENCE_INT_2 ||
-                              fkind == FunctionConsts::OP_ZORBA_SUBSEQUENCE_INT_3) &&
-                             v.get_arg(0)->skip_wrappers()->get_expr_kind() == flwor_expr_kind;
-
     csize numArgs = v.num_args();
     for (csize i = 0; i < numArgs; ++i)
     {
-      if (v.get_arg(i)->is_sequential() && !(takesPrefix && i == 0))
+      if (v.get_arg(i)->is_sequential() && !(v.stops_early() && i == 0))
       {
         argv[i] = new MaterializeIterator(sctx, v.get_arg(i)->get_loc(), argv[i]);
       }
