@@ -186,6 +186,13 @@ static void checkKeyType(
       return;
     }
 
+    // A comparison promotes the xs:float keys to xs:double.
+    if (TypeOps::is_subtype(tm, *indexKeyType, *rtm.FLOAT_TYPE_ONE) &&
+        searchKeyTypeCode == store::XS_DOUBLE)
+    {
+      return;
+    }
+
     if (TypeOps::is_subtype(tm, *indexKeyType, *rtm.FLOAT_TYPE_ONE) &&
         TypeOps::is_subtype(searchKeyTypeCode, store::XS_DECIMAL))
     {
