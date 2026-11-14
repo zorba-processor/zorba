@@ -260,6 +260,7 @@ void SchemaValidatorFilter::processStartElement()
   bool parentValidation = fValidate;
   unsigned int currentScope = Grammar::TOP_LEVEL_SCOPE;
   bool laxThisOne = false;
+  bool isSkipped = !isRoot && theOpenElements.back().isSkipped;
 
   if(!isRoot)
   {
@@ -308,6 +309,8 @@ void SchemaValidatorFilter::processStartElement()
                                         cm->getContentLeafNameTypeVector(),
                                         cm,
                                         theElemDepth - 1);
+      // a skip wildcard turns validation off
+      isSkipped = isSkipped || (parentValidation && !fValidate);
     }
     else if(modelType == SchemaElementDecl::Any)
     {
@@ -320,6 +323,14 @@ void SchemaValidatorFilter::processStartElement()
                                                laxThisOne,
                                                isProcessorStipulatedTypeName);
   assert(elemDecl);
+
+  // A declared element below an element laxly assessed without a declaration
+  // is strictly assessed
+  if(!fValidate && laxThisOne && !isSkipped && elemDecl->isDeclared())
+  {
+    fValidate = true;
+    fElemStack.setValidationFlag(fValidate);
+  }
   fElemStack.setElement(elemDecl, fReaderMgr.getCurrentReaderNum());
 
   // save substituted element name
@@ -364,7 +375,7 @@ void SchemaValidatorFilter::processStartElement()
   const bool isValidated = fValidate || theXsiType;
   theIsNilled = isValidated && ((XercSchemaValidator*)fValidator)->getIsNil();
   theOpenElements.push_back(
-    {isValidated, theIsNilled,
+    {isValidated, isSkipped, theIsNilled,
      ((XercSchemaValidator*)fValidator)->getCurrentDatatypeValidator()});
 
 
