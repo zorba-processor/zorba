@@ -590,7 +590,8 @@ IF (ZORBA_WITH_FILE_ACCESS)
              error_cached_denial
              hints_nodes hints_names deep_json deep_json_binary
              entity_expansion case_paths html_edge_cases memory_limit
-             exhaust_at_start exhaust_errno exhaust_sweep_compile exhaust_sweep_builtins
+             exhaust_at_start exhaust_errno exhaust_bounds_retry
+             exhaust_sweep_compile exhaust_sweep_builtins
              exhaust_sweep_matcher exhaust_sweep_query_text
              exhaust_sweep_streamable_text exhaust_base64_stream
              exhaust_seekable_stream exhaust_json_loader exhaust_plan_wrapper

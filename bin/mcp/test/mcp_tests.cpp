@@ -341,6 +341,28 @@ void* pvalloc( std::size_t n ) noexcept {
   return heap_add( next( n ), n );
 }
 } // extern "C"
+
+// For test_exhaust_bounds_retry: with getattr_fail_next set, every allocation
+// in the next pthread_getattr_np() call fails; getattr_enomem counts the calls
+// that then returned ENOMEM.
+namespace {
+std::atomic<bool> getattr_fail_next{ false };
+std::atomic<int> getattr_enomem{ 0 };
+} // namespace
+
+extern "C" __attribute__(( visibility( "default" ) ))
+int pthread_getattr_np( pthread_t thread, pthread_attr_t *attr ) noexcept {
+  static auto const next = libc_next<int (*)( pthread_t, pthread_attr_t* )>(
+    "pthread_getattr_np" );
+  if ( !getattr_fail_next.exchange( false ) )
+    return next( thread, attr );
+  inject_arm( 1, 1L << 20 );
+  int const r = next( thread, attr );
+  inject_disarm();
+  if ( r == ENOMEM )
+    ++getattr_enomem;
+  return r;
+}
 # endif
 
 void* operator new( std::size_t n ) {
@@ -2387,6 +2409,64 @@ void test_exhaust_errno( Fixture const& ) {
   check( waitpid( pid, &status, 0 ) == pid, "wait for the child" );
   check( WIFEXITED( status ) && WEXITSTATUS( status ) == 0,
          "pthread_getattr_np reports ENOMEM", std::to_string( status ) );
+#endif
+}
+
+// When the stack limit cannot read the bounds of a thread's stack for lack of
+// memory, it reads them again on its next call: a later query on the thread
+// still stops a deep recursion at the stack limit. On a thread of 512 KiB, the
+// recursion runs out of stack before the call depth limit of 1024.
+void test_exhaust_bounds_retry( Fixture const &f ) {
+#if defined(__linux__) && !defined(ZORBA_TEST_SANITIZER)
+  // In a child: without the stack check, the recursion may overflow the stack.
+  pid_t const pid = fork();
+  if ( pid < 0 ) {
+    check( false, "fork" );
+    return;
+  }
+  if ( pid == 0 ) {
+    alarm( 60 );
+    ServerConfig config;
+    config.root = f.tree;
+    config.scan = false;
+    Server server( f.zorba, config, std::cerr );
+    auto on_thread = []( void *arg ) -> void* {
+      Server &s = *static_cast<Server*>( arg );
+      getattr_fail_next = true;
+      Json r = call_tool( s, "run_query",
+                          Json::object( { { "query", "1 + 1" } } ) );
+      if ( is_tool_error( r ) || result_text( r ) != "2" ||
+           getattr_enomem != 1 ) {
+        std::cerr << "first query: " << r.dump() << ", ENOMEM results: "
+                  << getattr_enomem << std::endl;
+        _exit( 2 );
+      }
+      r = call_tool( s, "run_query", Json::object( { { "query",
+        "declare function local:depth($n as xs:integer) as xs:integer\n"
+        "{ if ($n le 0) then 0 else 1 + local:depth($n - 1) };\n"
+        "local:depth(100000)" } } ) );
+      if ( !contains( r.dump(), "not enough stack space" ) ) {
+        std::cerr << "second query: " << r.dump().substr( 0, 500 ) << std::endl;
+        _exit( 3 );
+      }
+      _exit( 0 );
+    };
+    pthread_attr_t attr;
+    pthread_t thread;
+    if ( pthread_attr_init( &attr ) != 0 ||
+         pthread_attr_setstacksize( &attr, 512 * 1024 ) != 0 ||
+         pthread_create( &thread, &attr, on_thread, &server ) != 0 )
+      _exit( 127 );
+    pthread_join( thread, nullptr );
+    _exit( 127 );
+  }
+  int status = 0;
+  check( waitpid( pid, &status, 0 ) == pid, "wait for the child" );
+  check( WIFEXITED( status ) && WEXITSTATUS( status ) == 0,
+         "after ENOMEM, the next query on the thread checks the stack",
+         std::to_string( status ) );
+#else
+  (void)f;
 #endif
 }
 
@@ -7923,6 +8003,7 @@ Test const tests[] = {
   { "memory_limit", test_memory_limit },
   { "exhaust_at_start", test_exhaust_at_start },
   { "exhaust_errno", test_exhaust_errno },
+  { "exhaust_bounds_retry", test_exhaust_bounds_retry },
   { "exhaust_sweep_compile", test_sweep_compile },
   { "exhaust_sweep_builtins", test_sweep_builtins },
   { "exhaust_sweep_query_text", test_sweep_query_text },
