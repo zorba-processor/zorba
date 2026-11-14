@@ -348,17 +348,23 @@ return <open_auction>{$id}</open_auction>,
 
 "
 
-probe 6:
+probe 6, with a number, which >= cannot compare with the untyped dates:
 ",
 
-for $id in index_dml:probe-index-range-general($auctions:AuctionDates2, 
-                                               xs:double("2001"),
-                                               (),
-                                               fn:true(),
-                                               fn:false(),
-                                               fn:false(),
-                                               fn:true())/@id
-return <open_auction>{$id}</open_auction>,
+try
+{
+  index_dml:probe-index-range-general($auctions:AuctionDates2, 
+                                      xs:double("2001"),
+                                      (),
+                                      fn:true(),
+                                      fn:false(),
+                                      fn:false(),
+                                      fn:true())
+}
+catch * 
+{
+  <exception>{$err:code} : {$err:description}</exception>
+},
 
 "
 
