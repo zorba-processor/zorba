@@ -6,6 +6,7 @@
 
   <xs:element name="n" type="xs:string" nillable="true"/>
   <xs:element name="s" type="xs:string"/>
+  <xs:element name="a" nillable="true"/>
 
   <xs:element name="p">
     <xs:complexType>

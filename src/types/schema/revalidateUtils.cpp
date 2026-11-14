@@ -210,7 +210,7 @@ void SchemaValidatorImpl::processElement(
   xqtref_t newType;
   store::Item_t elm;
 
-  if ( !typeQName->equals(element->getType()) )
+  if ( !typeQName->equals(element->getType()) || isNilled != element->getNilled() )
   {
     isNewType = true;
     newType = typeManager->create_named_type(typeQName, SequenceType::QUANT_ONE, loc);
