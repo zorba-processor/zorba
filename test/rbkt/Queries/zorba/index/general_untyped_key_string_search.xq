@@ -6,7 +6,7 @@ import module namespace idml =
 
 m:create(xs:QName("m:u"),
          (<e id="1" v="a"/>, <e id="2" v="b"/>, <e id="3" v="c"/>),
-         (xs:QName("m:UEquality"), xs:QName("m:URange")));
+         xs:QName("m:UEquality"));
 
 (: An index whose key type is xs:untypedAtomic* is probed with xs:string and
    xs:anyURI search keys, which a comparison with an untyped value accepts. :)
@@ -19,10 +19,6 @@ fn:string-join((
   fn:concat("general string: ",
             m:ids(idml:probe-index-point-general(xs:QName("m:UEquality"),
                                                  ("a", "c")))),
-  fn:concat("range string: ",
-            m:ids(idml:probe-index-range-value(xs:QName("m:URange"), "a", "b",
-                                               fn:true(), fn:true(),
-                                               fn:true(), fn:true()))),
   fn:concat("unindexed: ",
             m:ids(for $e in m:elements(xs:QName("m:u"))
                   where fn:data($e/@v) eq "b"

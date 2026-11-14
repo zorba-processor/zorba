@@ -1337,7 +1337,7 @@ store::IndexCondition_t ProbeIndexRangeValueIterator::createCondition(
       checkKeyType(loc, tm, state->theIndexDecl, keyNo, tempRight);
     }
 
-    if (hasUntypedStoreKeys(tm, state->theIndexDecl, keyNo))
+    if (hasAnyKeyType(tm, state->theIndexDecl, keyNo))
     {
       store::SchemaTypeCode leftType = store::XS_LAST;
       store::SchemaTypeCode rightType = store::XS_LAST;

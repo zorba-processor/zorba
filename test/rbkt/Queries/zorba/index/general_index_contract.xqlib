@@ -55,14 +55,11 @@ declare %an:general-range %an:manual index m:ARange
 on nodes dml:collection(xs:QName("m:a"))//e
 by fn:data(./@v) as xs:anyAtomicType*;
 
-(: Untyped keys in indexes whose key type is xs:untypedAtomic*. :)
+(: Untyped keys in an index whose key type is xs:untypedAtomic*, which a range
+   index cannot have. :)
 declare collection m:u as node()*;
 
 declare %an:general-equality %an:manual index m:UEquality
-on nodes dml:collection(xs:QName("m:u"))//e
-by fn:data(./@v) as xs:untypedAtomic*;
-
-declare %an:general-range %an:manual index m:URange
 on nodes dml:collection(xs:QName("m:u"))//e
 by fn:data(./@v) as xs:untypedAtomic*;
 
