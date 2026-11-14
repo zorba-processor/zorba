@@ -1,0 +1,21 @@
+<xs:schema
+  xmlns:xs="http://www.w3.org/2001/XMLSchema"
+  targetNamespace="http://zorba.io/test/val-lax-declared"
+  xmlns="http://zorba.io/test/val-lax-declared"
+  elementFormDefault="qualified">
+
+  <xs:element name="n" type="xs:integer"/>
+
+  <!-- element-only content: an xsi:type naming a simple type does not derive from it -->
+  <xs:element name="k">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="e" type="xs:string" minOccurs="0"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <!-- no type: its content model is any -->
+  <xs:element name="u"/>
+
+</xs:schema>
