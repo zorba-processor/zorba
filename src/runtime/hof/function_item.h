@@ -158,6 +158,8 @@ public:
 
   void add_variable(expr* var, var_expr* substVar);
 
+  void remove_variable(csize pos);
+
   // The captured variables have the ids 1 to N in the closure dctx, which
   // the local variables of the body share.
   ulong firstLocalVarId() const { return theInScopeVarIds.size() + 1; }
