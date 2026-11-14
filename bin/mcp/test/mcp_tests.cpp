@@ -3305,6 +3305,7 @@ void test_sweep_xml_dtd( Fixture const &f ) {
   // allocation, Xerces-C releasing a schema. Caps: about 1.5 times the most seen
   // in the 8 test jobs of CI run 42450607400 (runs of 1 / of 8: 41 file; 2 / 69
   // Xerces-C).
+  // Xerces-C throws OutOfMemoryException from ~XMLGrammarPoolImpl (~SchemaGrammar).
   s.known = { starting( "\"caught err:FODC0002 \\\"/tmp/mcp-tree", 62, 1 ),
               starting( "terminate N11xercesc_", 4, 1, "OutOfMemoryExceptionE" ),
               starting( "terminate N11xercesc_", 105, 8, "OutOfMemoryExceptionE" ) };
@@ -3359,6 +3360,7 @@ void test_sweep_xml_dtd_nodes( Fixture const &f ) {
   // times the most seen in CI run 42487120094 (runs of 1 / of 8: 41 file; 2 / 143
   // Xerces-C; the 143 is from its bigint profile, which makes the most
   // allocations).
+  // Xerces-C throws OutOfMemoryException from ~XMLGrammarPoolImpl (~SchemaGrammar).
   s.known = { starting( "\"caught err:FODC0002 \\\"/tmp/mcp-tree", 62, 1 ),
               starting( "terminate N11xercesc_", 4, 1, "OutOfMemoryExceptionE" ),
               starting( "terminate N11xercesc_", 215, 8, "OutOfMemoryExceptionE" ) };
@@ -3450,10 +3452,12 @@ void test_sweep_schema_import( Fixture const &f ) {
   s.lenient = true;
   s.wrong = { "ZXQP0014", "ZXQP0035" };
   s.points = 200;
-  // As in test_sweep_compile, and Xerces-C releasing a schema. Caps: about 1.5
-  // times the most seen (1 alone, 17 in runs of 8, quick-check run 42693936525).
-  s.known = { library_crash( "signal 6 in libstdc", true, 2 ),
-              starting( "terminate N11xercesc_", 4, 1, "OutOfMemoryExceptionE" ),
+  // Xerces-C's OutOfMemoryException from ComplexTypeInfo::makeContentModel()
+  // ends the process (7 in runs of 8, quick-check run 43500984356); cap from
+  // quick-check run 42693936525. Alone, it throws OutOfMemoryException from
+  // ~XMLGrammarPoolImpl (~SchemaGrammar), as in the sweep of the HTML module
+  // (bigint, CI run 43530408382).
+  s.known = { starting( "terminate N11xercesc_", 4, 1, "OutOfMemoryExceptionE" ),
               starting( "terminate N11xercesc_", 26, 8, "OutOfMemoryExceptionE" ) };
   s.compiles = true;
   exhaust_sweep( f, "schema import", s );
@@ -3473,7 +3477,8 @@ void test_sweep_html( Fixture const &f ) {
   s.before.push_back( s.query );
   s.expected = "40";
   // Xerces-C releasing a schema. Caps: about 1.5 times the most seen in CI
-  // (2 alone, 167 in runs of 8).
+  // (2 alone, 167 in runs of 8): it throws OutOfMemoryException from
+  // ~XMLGrammarPoolImpl (~SchemaGrammar).
   s.known = { starting( "terminate N11xercesc_", 4, 1, "OutOfMemoryExceptionE" ),
               starting( "terminate N11xercesc_", 250, 8, "OutOfMemoryExceptionE" ) };
   s.needs_module = true;
@@ -3557,7 +3562,6 @@ void test_sweep_arithmetic( Fixture const &f ) {
   s.expected = "\"3 3 3.75 3.5\"";
   s.wrong = { "FOAR0001", "FOAR0002", "FOCA" };
   s.points = 100000;                // all of them
-  s.known = { library_crash( "signal 6 in libstdc", true, 2 ) };
   s.compiles = true;
   exhaust_sweep( f, "arithmetic", s );
 #else
@@ -3574,8 +3578,6 @@ void test_sweep_compile( Fixture const &f ) {
   s.expected = "41";
   s.lenient = true;
   s.points = 200;
-  s.known = { library_crash( "signal 6 in libstdc", true, 2 ),
-              starting( "terminate N11xercesc_", 2, 0, "OutOfMemoryExceptionE" ) };
   s.compiles = true;
   exhaust_sweep( f, "compilation", s );
 #else
@@ -3594,7 +3596,6 @@ void test_sweep_query_text( Fixture const &f ) {
   s.expected = "true";
   s.lenient = true;                 // an error of the compilation is allowed
   s.points = 100000;                // all of them
-  s.known = { starting( "terminate N11xercesc_", 2, 0, "OutOfMemoryExceptionE" ) };
   s.compiles = true;
   exhaust_sweep( f, "text of the query", s );
 #else
@@ -3618,10 +3619,10 @@ void test_sweep_streamable_text( Fixture const &f ) {
   s.after_compile = true;
   s.expected = std::to_string( 2 * text.size() );
   // The checks of a path, as in the sweep of the document cache.
+  // Xerces-C throws OutOfMemoryException from ~XMLGrammarPoolImpl (~SchemaGrammar).
   s.known = { starting( "error: file:FOFL9999: ", 6 ),
               starting( "terminate N11xercesc_", 4, 1, "OutOfMemoryExceptionE" ),
-              starting( "terminate N11xercesc_", 250, 8, "OutOfMemoryExceptionE" ),
-              library_crash( "signal 11 in libicu", true, 36 ) };
+              starting( "terminate N11xercesc_", 250, 8, "OutOfMemoryExceptionE" ) };
   exhaust_sweep( f, "string read from a file", s );
 #else
   (void)f;
@@ -3993,8 +3994,6 @@ void test_sweep_builtins( Fixture const &f ) {
   s.expected = "41";
   s.lenient = true;
   s.points = 100000;                // all of them
-  s.known = { library_crash( "signal 6 in libstdc", true, 2 ),
-              starting( "terminate N11xercesc_", 2, 0, "OutOfMemoryExceptionE" ) };
   s.compiles = true;
   s.probes = {
     { "string-join((\"a\", \"b\"), \"-\")", "\"a-b\"" },
@@ -4069,13 +4068,6 @@ void test_sweep_decimal_thread( Fixture const &f ) {
   s.new_thread = true;
   s.points = 300;
   s.lenient = true;                 // the compilation is swept too
-  // A new thread: glibc gives up if it cannot register the first thread_local
-  // with a destructor of the thread.
-  // Caps: about 1.5 times the most seen in CI (glibc: 1 alone, 53 in runs of 8).
-  s.known = { library_crash( "signal 6 in libstdc", true, 2, 1 ),
-              library_crash( "signal 6 in libstdc", true, 80, 8 ),
-              library_crash( "signal 6 in unknown", false, 2 ),
-              starting( "terminate N11xercesc_", 2, 0, "OutOfMemoryExceptionE" ) };
   s.compiles = true;
   exhaust_sweep( f, "first decimal of a thread", s );
 #else
@@ -4147,13 +4139,17 @@ void test_sweep_cache( Fixture const &f ) {
   // A query over dir:open: what is left of a failure in the checks of a path, and
   // in libraries. See the limits of --max-memory in bin/mcp/README.md.
   // Caps: about 1.5 times the most seen in CI (Xerces-C 2 alone and 608 in runs
-  // of 8 of 1990; ICU 24 alone and 23 in runs of 8; the others at most 5).
+  // of 8 of 1990; the others at most 5; ICU, quick-check run 43500984356: 12
+  // alone and 16 in runs of 8 in libicui18n, 12 and 2 in libicuuc).
   s.known = {
+    // Xerces-C throws OutOfMemoryException from ~XMLGrammarPoolImpl.
     starting( "terminate N11xercesc_", 4, 1, "OutOfMemoryExceptionE" ),
     starting( "terminate N11xercesc_", 900, 8, "OutOfMemoryExceptionE" ),
-    library_crash( "signal 11 in libicu", true, 36 ),
-    library_crash( "signal 11 in unknown", false, 3 ),
-    library_crash( "signal 11 in libstdc", true, 2 ),
+    // ICU RegexPattern::zap() after a failed allocation in RegexPattern::compile().
+    library_crash( "signal 11 in libicui18n", true, 24 ),
+    // ICU utext_openConstUnicodeString() after a failed allocation, from
+    // RegexCompile::compile().
+    library_crash( "signal 11 in libicuuc", true, 18 ),
     starting( "error: file:FOFL9999: ", 10 ),
     starting( "error: dir:INVALID_PATH: ", 6 ),
     starting( "error: err:FOCH0002: ", 3 ) };
