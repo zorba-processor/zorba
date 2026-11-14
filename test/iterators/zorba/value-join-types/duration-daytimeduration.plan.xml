@@ -1,0 +1,117 @@
+<iterator-tree description="const-folded expr">
+  <CastIterator type="xs:dayTimeDuration">
+    <SingletonIterator value="xs:string(PT1H)"/>
+  </CastIterator>
+</iterator-tree>
+<iterator-tree description="const-folded expr">
+  <CastIterator type="xs:dayTimeDuration">
+    <SingletonIterator value="xs:string(PT2H)"/>
+  </CastIterator>
+</iterator-tree>
+<iterator-tree description="const-folded expr">
+  <CastIterator type="xs:dayTimeDuration">
+    <SingletonIterator value="xs:string(PT0S)"/>
+  </CastIterator>
+</iterator-tree>
+<iterator-tree description="main query">
+  <FLWORIterator>
+    <ForVariable name="doc">
+      <ElementIterator copyInputNodes="false">
+        <SingletonIterator value="xs:QName(,,d)"/>
+        <FnConcatIterator>
+          <ElementIterator copyInputNodes="false">
+            <SingletonIterator value="xs:QName(,,t)"/>
+            <TextIterator>
+              <SingletonIterator value="xs:string(PT1H)"/>
+            </TextIterator>
+          </ElementIterator>
+          <ElementIterator copyInputNodes="false">
+            <SingletonIterator value="xs:QName(,,t)"/>
+            <TextIterator>
+              <SingletonIterator value="xs:string(P1M)"/>
+            </TextIterator>
+          </ElementIterator>
+          <ElementIterator copyInputNodes="false">
+            <SingletonIterator value="xs:QName(,,t)"/>
+            <TextIterator>
+              <SingletonIterator value="xs:string(PT60M)"/>
+            </TextIterator>
+          </ElementIterator>
+          <ElementIterator copyInputNodes="false">
+            <SingletonIterator value="xs:QName(,,t)"/>
+            <TextIterator>
+              <SingletonIterator value="xs:string(P0M)"/>
+            </TextIterator>
+          </ElementIterator>
+        </FnConcatIterator>
+      </ElementIterator>
+    </ForVariable>
+    <LetVariable name="$$opt_temp_0" materialize="true">
+      <HoistIterator>
+        <ChildAxisIterator test-kind="match_name_test" qname="xs:QName(,,t)" typename="*" nill-allowed="false">
+          <ForVarIterator varname="doc"/>
+        </ChildAxisIterator>
+      </HoistIterator>
+    </LetVariable>
+    <LetVariable name="$$opt_temp_3" materialize="true">
+      <CreateInternalIndexIterator name="xs:QName(,,tempIndex0)">
+        <FLWORIterator>
+          <ForVariable name="$$opt_temp_1">
+            <UnhoistIterator>
+              <LetVarIterator varname="$$opt_temp_0"/>
+            </UnhoistIterator>
+          </ForVariable>
+          <ReturnClause>
+            <ValueIndexEntryBuilderIterator>
+              <ForVarIterator varname="$$opt_temp_1"/>
+              <CastIterator type="xs:duration">
+                <FnDataIterator>
+                  <ForVarIterator varname="$$opt_temp_1"/>
+                </FnDataIterator>
+              </CastIterator>
+            </ValueIndexEntryBuilderIterator>
+          </ReturnClause>
+        </FLWORIterator>
+      </CreateInternalIndexIterator>
+    </LetVariable>
+    <ForVariable name="k">
+      <FnConcatIterator>
+        <SingletonIterator value="PT1H"/>
+        <SingletonIterator value="PT2H"/>
+        <SingletonIterator value="PT0S"/>
+      </FnConcatIterator>
+    </ForVariable>
+    <ReturnClause>
+      <FnCountIterator>
+        <FLWORIterator>
+          <ForVariable name="t">
+            <TryCatchIterator>
+              <ProbeIndexPointValueIterator>
+                <SingletonIterator value="xs:QName(,,tempIndex0)"/>
+                <ForVarIterator varname="k"/>
+              </ProbeIndexPointValueIterator>
+              <UnhoistIterator>
+                <LetVarIterator varname="$$opt_temp_0"/>
+              </UnhoistIterator>
+            </TryCatchIterator>
+          </ForVariable>
+          <WhereClause>
+            <FnBooleanIterator>
+              <CompareIterator>
+                <CastIterator type="xs:duration">
+                  <FnDataIterator>
+                    <ForVarIterator varname="t"/>
+                  </FnDataIterator>
+                </CastIterator>
+                <ForVarIterator varname="k"/>
+              </CompareIterator>
+            </FnBooleanIterator>
+          </WhereClause>
+          <ReturnClause>
+            <ForVarIterator varname="t"/>
+          </ReturnClause>
+        </FLWORIterator>
+      </FnCountIterator>
+    </ReturnClause>
+  </FLWORIterator>
+</iterator-tree>
