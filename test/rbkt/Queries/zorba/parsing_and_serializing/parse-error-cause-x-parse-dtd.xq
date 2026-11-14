@@ -1,6 +1,7 @@
 (: With DTD validation, FODC0006 names the error of the parser, its message
    and where in the string it is, as without: a well-formedness error and a
-   validity error. :)
+   validity error. The column of a validity error differs between libxml2
+   versions; only that there is one is checked. :)
 import module namespace x = "http://zorba.io/modules/xml";
 import schema namespace opt = "http://zorba.io/modules/xml-options";
 declare namespace zerr = "http://zorba.io/errors";
@@ -21,8 +22,8 @@ return
       string($err:code),
       substring-before(substring-after($err:description, "parse-xml:parse(): ["), "]"),
       string($zerr:data-line-number),
-      string($zerr:data-column-number),
-      string(contains($err:description, "tag mismatch") or
-             contains($err:description, "No declaration for element c"))
+      string($zerr:data-column-number gt 0),
+      string(contains($err:description, "closing tag mismatch") or
+             contains($err:description, '"c": undeclared element'))
     ), " ")
   }
