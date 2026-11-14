@@ -603,6 +603,7 @@ IF (ZORBA_WITH_FILE_ACCESS)
              exhaust_sweep_casts exhaust_sweep_arithmetic exhaust_sweep_decimal_thread
              exhaust_sweep_cache
              exhaust_sweep_kept_malloc exhaust_cache_after_failure exhaust_user_error exhaust_long_line
+             exhaust_optimize_after_failure
              exhaust_notification exhaust_request_id
              exhaust_stack_limit exhaust_generated exhaust_json exhaust_json_array exhaust_csv
              exhaust_xml exhaust_strings exhaust_numbers exhaust_try
