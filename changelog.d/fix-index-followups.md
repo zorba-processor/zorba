@@ -1,8 +1,8 @@
 ### Fixed
 
 - A general index whose key type is `xs:untypedAtomic*` accepts `xs:string`
-  and `xs:anyURI` search keys and bounds, and its value probes compare an
-  untyped search key or bound as a string, as a comparison with an untyped
+  and `xs:anyURI` search keys, and its value probes compare an untyped
+  search key as a string, as a comparison with an untyped
   value does. They raised `err:XPTY0004`, and an untyped search key in a value
   probe failed an internal assertion.
 - The value probes of a general index without a key type
