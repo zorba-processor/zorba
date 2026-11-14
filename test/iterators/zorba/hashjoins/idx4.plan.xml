@@ -19,32 +19,32 @@
           </ElementIterator>
         </ChildAxisIterator>
       </LetVariable>
-      <ForVariable name="$$opt_temp_1">
+      <LetVariable name="$$opt_temp_1" materialize="true">
         <HoistIterator>
           <TreatIterator quant="">
             <LetVarIterator varname="e"/>
           </TreatIterator>
         </HoistIterator>
-      </ForVariable>
-      <ForVariable name="$$opt_temp_0">
+      </LetVariable>
+      <LetVariable name="$$opt_temp_0" materialize="true">
         <HoistIterator>
           <TreatIterator quant="">
             <LetVarIterator varname="e"/>
           </TreatIterator>
         </HoistIterator>
-      </ForVariable>
+      </LetVariable>
       <LetVariable name="parent" materialize="true">
         <ParentAxisIterator test-kind="match_name_test" qname="*" typename="*" nill-allowed="false">
           <LetVarIterator varname="e"/>
         </ParentAxisIterator>
       </LetVariable>
-      <ForVariable name="$$opt_temp_2">
+      <LetVariable name="$$opt_temp_2" materialize="true">
         <HoistIterator>
           <TreatIterator quant="">
             <LetVarIterator varname="parent"/>
           </TreatIterator>
         </HoistIterator>
-      </ForVariable>
+      </LetVariable>
       <LetVariable name="$$opt_temp_0" materialize="true">
         <HoistIterator>
           <InScopePrefixesIterator>
@@ -83,12 +83,12 @@
           <NamespaceUriForPrefixIterator>
             <ForVarIterator varname="prefixE"/>
             <UnhoistIterator>
-              <ForVarIterator varname="$$opt_temp_0"/>
+              <LetVarIterator varname="$$opt_temp_0"/>
             </UnhoistIterator>
           </NamespaceUriForPrefixIterator>
         </HoistIterator>
       </LetVariable>
-      <ForVariable name="$$opt_temp_3">
+      <LetVariable name="$$opt_temp_3" materialize="true">
         <HoistIterator>
           <ConcatStrIterator>
             <SingletonIterator value="xs:string(xmlns:)"/>
@@ -96,13 +96,13 @@
             <SingletonIterator value="xs:string(=&quot;)"/>
           </ConcatStrIterator>
         </HoistIterator>
-      </ForVariable>
+      </LetVariable>
       <LetVariable name="$$opt_temp_1" materialize="true">
         <HoistIterator>
           <NamespaceUriForPrefixIterator>
             <ForVarIterator varname="prefixE"/>
             <UnhoistIterator>
-              <ForVarIterator varname="$$opt_temp_1"/>
+              <LetVarIterator varname="$$opt_temp_1"/>
             </UnhoistIterator>
           </NamespaceUriForPrefixIterator>
         </HoistIterator>
@@ -134,7 +134,7 @@
             <NamespaceUriForPrefixIterator>
               <ForVarIterator varname="prefixP"/>
               <UnhoistIterator>
-                <ForVarIterator varname="$$opt_temp_2"/>
+                <LetVarIterator varname="$$opt_temp_2"/>
               </UnhoistIterator>
             </NamespaceUriForPrefixIterator>
           </CompareIterator>
@@ -151,7 +151,7 @@
             <EnclosedIterator attr_cont="false">
               <FnConcatIterator>
                 <UnhoistIterator>
-                  <ForVarIterator varname="$$opt_temp_3"/>
+                  <LetVarIterator varname="$$opt_temp_3"/>
                 </UnhoistIterator>
                 <ElementIterator>
                   <SingletonIterator value="xs:QName(,,span)"/>

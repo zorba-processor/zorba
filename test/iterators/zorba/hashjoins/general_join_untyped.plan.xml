@@ -68,13 +68,13 @@
         <ForVarIterator varname="doc"/>
       </ChildAxisIterator>
     </ForVariable>
-    <ForVariable name="$$opt_temp_1">
+    <LetVariable name="$$opt_temp_1" materialize="true">
       <HoistIterator>
         <FnDataIterator>
           <ForVarIterator varname="a"/>
         </FnDataIterator>
       </HoistIterator>
-    </ForVariable>
+    </LetVariable>
     <ReturnClause>
       <FnCountIterator>
         <FLWORIterator>
@@ -86,7 +86,7 @@
                   <ProbeIndexPointGeneralIterator>
                     <SingletonIterator value="xs:QName(,,tempIndex0)"/>
                     <UnhoistIterator>
-                      <ForVarIterator varname="$$opt_temp_1"/>
+                      <LetVarIterator varname="$$opt_temp_1"/>
                     </UnhoistIterator>
                   </ProbeIndexPointGeneralIterator>
                 </NodeSortIterator>
@@ -102,7 +102,7 @@
                 <ForVarIterator varname="b"/>
               </FnDataIterator>
               <UnhoistIterator>
-                <ForVarIterator varname="$$opt_temp_1"/>
+                <LetVarIterator varname="$$opt_temp_1"/>
               </UnhoistIterator>
             </CompareIterator>
           </WhereClause>

@@ -95,8 +95,8 @@
       </ElementIterator>
     </CtxVarDeclareIterator>
     <TupleStreamIterator>
-      <ForIterator>
-        <ForVariable name="$$opt_temp_1"/>
+      <LetIterator>
+        <LetVariable name="$$opt_temp_1" materialize="true"/>
         <GroupByIterator>
           <ForIterator>
             <ForVariable name="s"/>
@@ -155,7 +155,7 @@
             <ForVarIterator varname="loc"/>
           </FnStringIterator>
         </HoistIterator>
-      </ForIterator>
+      </LetIterator>
       <ElementIterator>
         <SingletonIterator value="xs:QName(,,sale)"/>
         <FnConcatIterator>
@@ -171,7 +171,7 @@
                           <ProbeIndexPointValueIterator>
                             <SingletonIterator value="xs:QName(,,tempIndex0)"/>
                             <UnhoistIterator>
-                              <ForVarIterator varname="$$opt_temp_1"/>
+                              <LetVarIterator varname="$$opt_temp_1"/>
                             </UnhoistIterator>
                           </ProbeIndexPointValueIterator>
                         </FnConcatIterator>
@@ -188,7 +188,7 @@
                           </AttributeAxisIterator>
                         </FnStringIterator>
                         <UnhoistIterator>
-                          <ForVarIterator varname="$$opt_temp_1"/>
+                          <LetVarIterator varname="$$opt_temp_1"/>
                         </UnhoistIterator>
                       </TypedValueCompareIterator_STRING>
                     </WhereClause>

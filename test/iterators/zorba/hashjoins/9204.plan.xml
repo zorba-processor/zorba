@@ -32,7 +32,7 @@
         </FnDocIterator>
       </DescendantAxisIterator>
     </ForVariable>
-    <ForVariable name="$$opt_temp_1">
+    <LetVariable name="$$opt_temp_1" materialize="true">
       <HoistIterator>
         <FnCountIterator>
           <ChildAxisIterator test-kind="match_name_test" qname="xs:QName(,,author)" typename="*" nill-allowed="false">
@@ -40,7 +40,7 @@
           </ChildAxisIterator>
         </FnCountIterator>
       </HoistIterator>
-    </ForVariable>
+    </LetVariable>
     <ReturnClause>
       <ElementIterator>
         <SingletonIterator value="xs:QName(,,karteikasten)"/>
@@ -53,7 +53,7 @@
                   <ProbeIndexPointValueIterator>
                     <SingletonIterator value="xs:QName(,,tempIndex0)"/>
                     <UnhoistIterator>
-                      <ForVarIterator varname="$$opt_temp_1"/>
+                      <LetVarIterator varname="$$opt_temp_1"/>
                     </UnhoistIterator>
                   </ProbeIndexPointValueIterator>
                 </FnConcatIterator>
@@ -66,7 +66,7 @@
               <TypedValueCompareIterator_INTEGER>
                 <ForVarIterator varname="anzahl"/>
                 <UnhoistIterator>
-                  <ForVarIterator varname="$$opt_temp_1"/>
+                  <LetVarIterator varname="$$opt_temp_1"/>
                 </UnhoistIterator>
               </TypedValueCompareIterator_INTEGER>
             </WhereClause>
