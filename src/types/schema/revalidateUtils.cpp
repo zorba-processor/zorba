@@ -195,6 +195,8 @@ void SchemaValidatorImpl::processElement(
   //cout << " vup      - elemType new: " << typeQName->getLocalName()->c_str()
   //    << " @ " << typeQName->getNamespace()->c_str() << "\n"; cout.flush();
 
+  bool isNilled = schemaValidator.isNilled();
+
   bool isInSubstitutionElement = false;
   if (substitutedElemQName)
   {
@@ -208,7 +210,7 @@ void SchemaValidatorImpl::processElement(
   xqtref_t newType;
   store::Item_t elm;
 
-  if ( !typeQName->equals(element->getType()) )
+  if ( !typeQName->equals(element->getType()) || isNilled != element->getNilled() )
   {
     isNewType = true;
     newType = typeManager->create_named_type(typeQName, SequenceType::QUANT_ONE, loc);
@@ -264,6 +266,10 @@ void SchemaValidatorImpl::processElement(
       }
     }
 
+    // A nilled element has no text child to hold a typed value
+    if (isNilled)
+      tHasTypedValue = false;
+
     //cout << " vup        - addSetElementType: " << elm->getNodeName()->
     //  getLocalName()->str() << "   " << newType->get_qname()->getLocalName() 
     //  << " @ " << newType->get_qname()->getNamespace() << "\n"; cout.flush();
@@ -281,7 +287,8 @@ void SchemaValidatorImpl::processElement(
                              tHasValue,
                              tHasEmptyValue,
                              tHasTypedValue,
-                             isInSubstitutionElement);
+                             isInSubstitutionElement,
+                             isNilled);
     else
       pul->addSetElementType(&loc,
                              elm,
@@ -290,7 +297,8 @@ void SchemaValidatorImpl::processElement(
                              tHasValue,
                              tHasEmptyValue,
                              tHasTypedValue,
-                             isInSubstitutionElement);
+                             isInSubstitutionElement,
+                             isNilled);
   }
 
   schemaValidator.endElem(nodeName);

@@ -137,6 +137,10 @@ private:
   XMLCh*                                        theSubstitutedElemName;
   XMLCh*                                        theSubstitutedElemUri;
 
+  // After an element is processed, whether it is nilled: xsi:nil is true and
+  // the element declaration that governs it is nillable
+  bool                                          theIsNilled;
+
 public:
   SchemaValidatorFilter(
         bool strictValidation,
@@ -199,6 +203,8 @@ public:
 
   virtual const XMLCh* getSubstitutedElemUri()
   {   return theSubstitutedElemUri;  }
+
+  bool isNilled() const { return theIsNilled; }
 
 
 private:

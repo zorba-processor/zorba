@@ -656,6 +656,8 @@ public:
    *                       property of P.
    * @param baseUri        The base uri of N. It may be NULL, in which case, the
    *                       base-uri property of N is the same as that of P.
+   * @param isNilled       The nilled property of N: true only if validation
+   *                       found xsi:nil true and a nillable element declaration.
    * @return               Always true (if any errors occur, the method throws
    *                       exceptions)
    */
@@ -668,7 +670,8 @@ public:
         bool                haveEmptyValue,
         const NsBindings&   localBindings,
         zstring&            baseURI,
-        bool                isInSubstitutionGroup = false) = 0;
+        bool                isInSubstitutionGroup = false,
+        bool                isNilled = false) = 0;
 
   /**
    * Create a new attribute node N and place it as the last attribute of a given

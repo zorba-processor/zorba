@@ -188,7 +188,8 @@ public:
         bool           haveEmptyValue,
         bool           haveTypedValue,
         bool           haveListValue,
-        bool           isInSubstitutionGroup);
+        bool           isInSubstitutionGroup,
+        bool           isNilled);
   
   virtual UpdSetAttributeType*
   createUpdSetAttributeType(
