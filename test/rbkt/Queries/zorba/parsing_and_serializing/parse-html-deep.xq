@@ -1,7 +1,8 @@
 (: Element nesting is limited (256 levels, as for XML documents): a deeper
    HTML document exceeds an implementation limit (err:XPDY0130), whose message
    names the limit, with where in the string it was exceeded. One element per
-   line. :)
+   line; the html and body elements that the parser adds count, so the limit
+   is exceeded on line 255. :)
 import module namespace x = "http://zorba.io/modules/xml";
 declare namespace zerr = "http://zorba.io/errors";
 declare namespace err = "http://www.w3.org/2005/xqt-errors";

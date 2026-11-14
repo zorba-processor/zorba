@@ -188,6 +188,19 @@ static std::optional<std::string> parser_limit(
 }
 
 
+bool XmlLoader::reportParserLimit(ZORBA_XML_ERROR_PTR aError)
+{
+  if (aError == NULL)
+    return false;
+  std::optional<std::string> const lLimit =
+    parser_limit(aError, theParserSecurity.policy());
+  if (!lLimit)
+    return false;
+  reportLimit(aError->file, aError->line, aError->int2 /* column */, *lLimit);
+  return true;
+}
+
+
 void XmlLoader::reportUnreadableEntity()
 {
   if (!theParserSecurity.unreadableEntity() || theUnreadableEntityReported)
@@ -229,16 +242,8 @@ try
     return;
   }
 
-  {
-    XmlLoader *const loader = static_cast<XmlLoader*>( ctx );
-    if (std::optional<std::string> const lLimit =
-          parser_limit(error, loader->theParserSecurity.policy()))
-    {
-      loader->reportLimit(error->file, error->line, error->int2 /* column */,
-                          *lLimit);
-      return;
-    }
-  }
+  if ( static_cast<XmlLoader*>( ctx )->reportParserLimit( error ) )
+    return;
 
   ascii::itoa_buf_type itoa_buf;
 

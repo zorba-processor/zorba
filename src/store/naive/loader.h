@@ -144,6 +144,12 @@ protected:
   void reportLimit(char const* aUri, int aLine, int aColumn,
                    std::string const& aLimit);
 
+  /**
+   * If a libxml2 error is an exceeded limit of the parser that is not memory,
+   * reports it with reportLimit() and returns true.
+   */
+  bool reportParserLimit(ZORBA_XML_ERROR_PTR aError);
+
 
 public:
   bool outOfMemory() const { return theOutOfMemory; }
