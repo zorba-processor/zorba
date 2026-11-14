@@ -183,8 +183,9 @@ bool XercSchemaValidator::checkContent (XMLElementDecl* const elemDecl
 
             if(!result) {
                 fErrorOccurred = true;
-                return false;
             }
+
+            return result;
         }
     }
     else if (modelType == SchemaElementDecl::Simple || modelType == SchemaElementDecl::Any)
@@ -2442,8 +2443,9 @@ int XercSchemaValidator::checkContent (XMLElementDecl* const elemDecl
             if(result != -1)
             {
                 fErrorOccurred = true;
-                return result;
             }
+
+            return result;
         }
     }
     else if (modelType == SchemaElementDecl::Simple || modelType == SchemaElementDecl::Any)
