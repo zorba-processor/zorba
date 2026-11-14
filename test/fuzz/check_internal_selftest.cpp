@@ -59,27 +59,26 @@ int main()
          "top-level ZXQP0002");
 
   expect(flagged(err::FODC0006,
-                 "invalid content passed to fn:parse-xml(): internal error"),
-         true, "ZXQP0003 without detail wrapped in FODC0006");
-  expect(flagged(err::FODC0006,
-                 "invalid content passed to fn:parse-xml(): internal error: x"),
+                 "invalid content passed to fn:parse-xml(): "
+                 "[zerr:ZXQP0003]: internal error"),
          true, "ZXQP0003 wrapped in FODC0006");
   expect(flagged(err::FODC0006,
                  "invalid content passed to fn:parse-xml-fragment(): "
-                 "\"p != nullptr\": assertion failed"),
+                 "[zerr:ZXQP0002]: \"p != nullptr\": assertion failed"),
          true, "ZXQP0002 wrapped in FODC0006");
-  expect(flagged(err::FODC0006,
-                 "invalid content passed to fn:parse-xml(): \"p\": assertion "
-                 "failed with the message: m"),
-         true, "ZXQP0002 with message wrapped in FODC0006");
 
   expect(flagged(err::FODC0006,
-                 "invalid content passed to fn:parse-xml(): mismatched tag"),
+                 "invalid content passed to fn:parse-xml(): "
+                 "[zerr:ZSTR0021]: \"\":1,7: loader parsing error: mismatched tag"),
          false, "ordinary parse error in FODC0006");
   expect(flagged(err::FODC0006,
-                 "invalid content passed to fn:parse-xml(): an internal error "
-                 "in the input"),
-         false, "FODC0006 mentioning internal error in the middle");
+                 "invalid content passed to fn:parse-xml(): "
+                 "[zerr:ZSTR0021]: internal error"),
+         false, "FODC0006 of a parse error whose text reads internal error");
+  expect(flagged(err::FODC0006,
+                 "invalid content passed to fn:parse-xml(): "
+                 "[zerr:ZSTR0021]: an error [zerr:ZXQP0003]: in the input"),
+         false, "FODC0006 mentioning an internal code in the middle");
   expect(flagged(err::FODC0002, "internal error: x"), false,
          "internal error text under another code");
 

@@ -16,6 +16,7 @@
 
 #include <new>
 #include "runtime/parsing_and_serializing/parse_fragment.h"
+#include "runtime/parsing_and_serializing/invalid_content.h"
 
 #include <cstring>
 #include <iostream>
@@ -262,15 +263,7 @@ bool FnZorbaParseXmlFragmentIterator::nextImpl(
         {
           if ( !state->theProperties.getNoError() )
           {
-            XQueryException xe(
-              XQUERY_EXCEPTION(
-                err::FODC0006,
-                ERROR_PARAMS( "parse-xml:parse()", ERROR_TEXT( e.what() ) ),
-                ERROR_LOC( loc )
-              )
-            );
-            set_data( xe, e );
-            throw xe;
+            throw_invalid_content("parse-xml:parse()", e, loc);
           }
           result = nullptr;
         }
@@ -302,15 +295,7 @@ bool FnZorbaParseXmlFragmentIterator::nextImpl(
       {
         if ( !state->theProperties.getNoError() )
         {
-          XQueryException xe(
-            XQUERY_EXCEPTION(
-              err::FODC0006,
-              ERROR_PARAMS( "parse-xml:parse()", ERROR_TEXT( e.what() ) ),
-              ERROR_LOC( loc )
-            )
-          );
-          set_data( xe, e );
-          throw xe;
+          throw_invalid_content("parse-xml:parse()", e, loc);
         }
         result = nullptr;
       }
@@ -614,13 +599,7 @@ bool FnParseXmlFragmentIterator::nextImpl(
     {
       if ( !state->theProperties.getNoError() )
       {
-        XQueryException xe(
-          XQUERY_EXCEPTION(err::FODC0006,
-          ERROR_PARAMS( "fn:parse-xml-fragment()", ERROR_TEXT( e.what() ) ),
-          ERROR_LOC( loc )));
-
-        set_data( xe, e );
-        throw xe;
+        throw_invalid_content("fn:parse-xml-fragment()", e, loc);
       }
       result = nullptr;
     }
@@ -683,11 +662,7 @@ bool FnZorbaParseHtmlIterator::nextImpl(
       if (e.diagnostic() == zerr::ZXQP0002_ASSERT_FAILED)
         throw;
 
-      XQueryException xe(XQUERY_EXCEPTION(err::FODC0006,
-      ERROR_PARAMS("x:parse-html()", ERROR_TEXT( e.what() )), ERROR_LOC(loc)));
-
-      set_data(xe, e);
-      throw xe;
+      throw_invalid_content("x:parse-html()", e, loc);
     }
 
     STACK_PUSH(result != NULL, state);
