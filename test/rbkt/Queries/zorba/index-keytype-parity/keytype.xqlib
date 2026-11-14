@@ -1,0 +1,110 @@
+module namespace m = "http://www.example.com/index-keytype-parity";
+
+import module namespace ddl =
+  "http://zorba.io/modules/store/static/collections/ddl";
+
+import module namespace dml =
+  "http://zorba.io/modules/store/static/collections/dml";
+
+import module namespace iddl =
+  "http://zorba.io/modules/store/static/indexes/ddl";
+
+declare namespace an = "http://zorba.io/annotations";
+
+declare namespace err = "http://www.w3.org/2005/xqt-errors";
+
+(: xs:double keys. :)
+declare collection m:d as node()*;
+
+declare %an:general-equality %an:manual index m:DoubleHash
+on nodes dml:collection(xs:QName("m:d"))//e
+by xs:double(./@v) as xs:double*;
+
+declare %an:general-range %an:manual index m:DoubleTree
+on nodes dml:collection(xs:QName("m:d"))//e
+by xs:double(./@v) as xs:double*;
+
+declare %an:value-equality %an:manual index m:DoubleValue
+on nodes dml:collection(xs:QName("m:d"))//e
+by xs:double(./@v) as xs:double;
+
+(: xs:float keys. :)
+declare collection m:f as node()*;
+
+declare %an:general-equality %an:manual index m:FloatHash
+on nodes dml:collection(xs:QName("m:f"))//e
+by xs:float(./@v) as xs:float*;
+
+declare %an:general-range %an:manual index m:FloatTree
+on nodes dml:collection(xs:QName("m:f"))//e
+by xs:float(./@v) as xs:float*;
+
+declare %an:value-range %an:manual index m:FloatValue
+on nodes dml:collection(xs:QName("m:f"))//e
+by xs:float(./@v) as xs:float;
+
+(: Untyped keys. A range index cannot declare xs:untypedAtomic as its key
+   type. :)
+declare collection m:u as node()*;
+
+declare %an:general-equality %an:manual index m:UntypedHash
+on nodes dml:collection(xs:QName("m:u"))//e
+by fn:data(./@v) as xs:untypedAtomic*;
+
+(: The same values as xs:yearMonthDuration keys and as xs:duration keys, in
+   range indexes without a key type. :)
+declare collection m:ym as node()*;
+
+declare %an:general-range %an:manual index m:YearMonthTree
+on nodes dml:collection(xs:QName("m:ym"))//e
+by xs:yearMonthDuration(./@v);
+
+declare %an:general-range %an:manual index m:DurationTree
+on nodes dml:collection(xs:QName("m:ym"))//e
+by xs:duration(./@v);
+
+declare %an:sequential function m:create($collection as xs:QName,
+                                         $content as node()*,
+                                         $indexes as xs:QName*)
+{
+  ddl:create($collection);
+  dml:insert($collection, <r>{ $content }</r>);
+  for $index in $indexes
+  return iddl:create($index);
+};
+
+declare function m:elements($collection as xs:QName) as element(e)*
+{
+  dml:collection($collection)/descendant-or-self::e
+};
+
+declare function m:type($key as xs:anyAtomicType) as xs:string
+{
+  typeswitch ($key)
+  case xs:string return "string"
+  case xs:untypedAtomic return "untyped"
+  case xs:integer return "integer"
+  case xs:decimal return "decimal"
+  case xs:yearMonthDuration return "yearMonthDuration"
+  case xs:dayTimeDuration return "dayTimeDuration"
+  case xs:duration return "duration"
+  default return "other"
+};
+
+(: The ids of the selected nodes, "none", or the local name of the error. :)
+declare function m:line($label as xs:string,
+                        $select as function() as node()*) as xs:string
+{
+  fn:concat($label, ": ",
+    try
+    {
+      let $ids := for $e in $select()
+                  order by xs:integer($e/@id)
+                  return fn:string($e/@id)
+      return if (fn:empty($ids)) then "none" else fn:string-join($ids, " ")
+    }
+    catch *
+    {
+      fn:local-name-from-QName($err:code)
+    })
+};

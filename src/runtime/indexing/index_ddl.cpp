@@ -133,7 +133,8 @@ static void checkKeyType(
   xqtref_t searchKeyType = tm->create_value_type(searchKey);
   xqtref_t indexKeyType = (indexDecl->getKeyTypes())[keyNo];
 
-  if (hasAnyKeyType(tm, indexDecl, keyNo))
+  // The store raises the errors that comparisons with these keys raise.
+  if (hasUntypedStoreKeys(tm, indexDecl, keyNo))
   {
     ZORBA_ASSERT(indexDecl->isGeneral());
 
@@ -166,15 +167,10 @@ static void checkKeyType(
       return;
     }
 
-    // A comparison with an untyped value casts it to xs:string.
-    if (TypeOps::is_subtype(tm, *indexKeyType, *rtm.UNTYPED_ATOMIC_TYPE_ONE) &&
-        (TypeOps::is_subtype(searchKeyTypeCode, store::XS_STRING) ||
-         searchKeyTypeCode == store::XS_ANY_URI))
-    {
-      return;
-    }
-
-    if (TypeOps::is_subtype(tm, *indexKeyType, *rtm.DOUBLE_TYPE_ONE))
+    if (TypeOps::is_subtype(tm, *indexKeyType, *rtm.DOUBLE_TYPE_ONE) &&
+        (TypeOps::is_subtype(searchKeyTypeCode, store::XS_DECIMAL) ||
+         TypeOps::is_subtype(searchKeyTypeCode, store::XS_FLOAT) ||
+         searchKeyTypeCode == store::XS_UNTYPED_ATOMIC))
     {
       if (TypeOps::is_subtype(searchKeyTypeCode, store::XS_DECIMAL))
       {
