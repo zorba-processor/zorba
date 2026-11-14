@@ -1,0 +1,6 @@
+module namespace q = "http://example.org/queue-delete";
+
+declare namespace an = "http://zorba.io/annotations";
+
+declare variable $q:queue as xs:QName := xs:QName("q:queue");
+declare %an:ordered %an:queue collection q:queue as element(*)*;

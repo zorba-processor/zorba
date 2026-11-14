@@ -334,7 +334,10 @@ declare %an:sequential function cdml:apply-insert-after( $name as xs:QName,
  : deletes the items from their collections.
  : @error zerr:ZDDY0001 if the collection is not declared.
  : @error zerr:ZDDY0003 if the collection is not available.
- : @error zerr:ZDDY0006 if the collection is const, append-only, or queue.
+ : @error zerr:ZDDY0004 if the collection is const.
+ : @error zerr:ZDDY0007 if the collection is append-only.
+ : @error zerr:ZDDY0009 if the collection is a queue and the items are not
+ : all at its beginning.
  : @error zerr:ZDDY0011 if any item in <code>$items</code> is not a member of a
  : collection or not all items belong to the same collection.
  :)
