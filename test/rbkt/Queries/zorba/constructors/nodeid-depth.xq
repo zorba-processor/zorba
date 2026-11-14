@@ -6,9 +6,9 @@ declare namespace err = "http://www.w3.org/2005/xqt-errors";
 
 declare function local:nest($n as xs:integer)
 {
-  if ($n eq 0)
-  then "x"
-  else <a>{ local:nest($n - 1) }</a>
+  fold-left(1 to $n, "x", function($content, $i) {
+    <a>{ $content }</a>
+  })
 };
 
 <result>
