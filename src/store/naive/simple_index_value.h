@@ -16,6 +16,7 @@
 #ifndef ZORBA_SIMPLE_STORE_INDEX_HASH_VALUE
 #define ZORBA_SIMPLE_STORE_INDEX_HASH_VALUE
 
+#include <array>
 #include <memory>
 
 #include "zorbautils/numeric_key_hash.h"
@@ -256,6 +257,9 @@ class ValueTreeIndex : public ValueIndex
 private:
   IndexMap          theMap;
 
+  // For each column, the number of keys in theMap of each type.
+  std::vector<std::array<csize, store::XS_LAST> > theNumKeys;
+
   SYNC_CODE(Mutex   theMapMutex;)
 
 protected:
@@ -279,6 +283,9 @@ public:
   bool insert(store::IndexKey*& key, store::Item_t& item);
 
   bool remove(const store::IndexKey* key, const store::Item_t& item, bool all);
+
+private:
+  void countKey(const store::IndexKey* key, bool isInserted);
 };
 
 
@@ -309,6 +316,8 @@ protected:
   void initExact();
 
   void initBox();
+
+  void checkComparableKeys(csize column, const store::Item* bound) const;
 
 public:
   ProbeValueTreeIndexIterator(const store::Index_t& index)

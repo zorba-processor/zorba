@@ -603,6 +603,64 @@ std::string IndexBoxValueCondition::toString() const
 }
 
 
+/*******************************************************************************
+  The keys a value comparison compares with a key of the given type are those
+  of the same class: the numbers, the strings and xs:anyURI values (an untyped
+  value compares as an xs:string), the durations (for an order comparison, the
+  xs:yearMonthDuration values and the xs:dayTimeDuration values), the
+  xs:dateTime values, and otherwise the values of the same type.
+********************************************************************************/
+store::SchemaTypeCode valueComparisonClass(
+    store::SchemaTypeCode type,
+    bool isOrderComparison)
+{
+  switch (type)
+  {
+  case store::XS_DOUBLE:
+  case store::XS_FLOAT:
+  case store::XS_DECIMAL:
+  case store::XS_INTEGER:
+  case store::XS_NON_POSITIVE_INTEGER:
+  case store::XS_NEGATIVE_INTEGER:
+  case store::XS_NON_NEGATIVE_INTEGER:
+  case store::XS_POSITIVE_INTEGER:
+  case store::XS_UNSIGNED_LONG:
+  case store::XS_LONG:
+  case store::XS_INT:
+  case store::XS_SHORT:
+  case store::XS_BYTE:
+  case store::XS_UNSIGNED_INT:
+  case store::XS_UNSIGNED_SHORT:
+  case store::XS_UNSIGNED_BYTE:
+    return store::XS_DOUBLE;
+
+  case store::XS_UNTYPED_ATOMIC:
+  case store::XS_ANY_URI:
+  case store::XS_STRING:
+  case store::XS_NORMALIZED_STRING:
+  case store::XS_TOKEN:
+  case store::XS_NMTOKEN:
+  case store::XS_LANGUAGE:
+  case store::XS_NAME:
+  case store::XS_NCNAME:
+  case store::XS_ID:
+  case store::XS_IDREF:
+  case store::XS_ENTITY:
+    return store::XS_STRING;
+
+  case store::XS_YM_DURATION:
+  case store::XS_DT_DURATION:
+    return (isOrderComparison ? type : store::XS_DURATION);
+
+  case store::XS_DATETIME_STAMP:
+    return store::XS_DATETIME;
+
+  default:
+    return type;
+  }
+}
+
+
 } // namespace simplestore
 
 
