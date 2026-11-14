@@ -1716,12 +1716,11 @@ void ProbeGeneralIndexIterator::init(const store::IndexCondition_t& cond,
       ERROR_PARAMS(ZED(NoMultiKeyNodeValues_2), theIndex->getName()->getStringValue()));
     }
 
-    if (!theIndex->isTyped())
-    {
-      checkComparableKeys(theCondition->theKey.getp(), false);
-      checkComparableKeys(theCondition->theLowerBound.getp(), true);
-      checkComparableKeys(theCondition->theUpperBound.getp(), true);
-    }
+    // The key type of a typed index does not exclude keys of subtypes that
+    // an order comparison cannot compare, such as durations.
+    checkComparableKeys(theCondition->theKey.getp(), false);
+    checkComparableKeys(theCondition->theLowerBound.getp(), true);
+    checkComparableKeys(theCondition->theUpperBound.getp(), true);
   }
   else if (!theIndex->isTyped())
   {
