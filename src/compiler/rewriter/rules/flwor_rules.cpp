@@ -83,9 +83,9 @@ static void fix_if_annotations(if_expr* ifExpr)
 
 /******************************************************************************
   True for an expression whose evaluation cannot raise an error: a constant, a
-  function item (its captured variables are evaluated when it is called), a
-  sequence of such expressions, or a reference to a variable whose value is
-  already computed. A let or argument variable may be evaluated lazily, when it
+  function item whose captured values cannot raise (they are computed when it is
+  created), a sequence of such expressions, or a reference to a variable whose
+  value is already computed. A let or argument variable may be evaluated lazily, when it
   is referenced, so a reference to it can raise the error of its binding.
 *******************************************************************************/
 static bool cannot_raise_error(const expr* e)
@@ -93,8 +93,21 @@ static bool cannot_raise_error(const expr* e)
   switch (e->get_expr_kind())
   {
   case const_expr_kind:
-  case function_item_expr_kind:
     return true;
+
+  case function_item_expr_kind:
+  {
+    const std::vector<expr*>& values =
+    static_cast<const function_item_expr*>(e)->get_in_scope_var_values();
+
+    for (csize i = 0; i < values.size(); ++i)
+    {
+      if (values[i] != NULL && !cannot_raise_error(values[i]))
+        return false;
+    }
+
+    return true;
+  }
 
   case wrapper_expr_kind:
     return cannot_raise_error(static_cast<const wrapper_expr*>(e)->get_input());
@@ -205,11 +218,27 @@ static bool flwor_evaluates_var(const flwor_expr* flwor, csize first, const var_
 
 
 /******************************************************************************
+  True for a constant position of at least 1, at which a positional predicate
+  reads its sequence. Below 1 it gives the empty sequence without reading it.
+*******************************************************************************/
+static bool is_const_position(const expr* e)
+{
+  if (e->get_expr_kind() != const_expr_kind)
+    return false;
+
+  const store::Item* val = static_cast<const const_expr*>(e)->get_val();
+
+  return (TypeOps::is_subtype(val->getTypeCode(), store::XS_INTEGER) &&
+          val->getIntegerValue() >= 1);
+}
+
+
+/******************************************************************************
   True if evaluating the first item of e evaluates var. A branch, a later
   operand or argument, a predicate, a later path step and a let binding may be
-  skipped, and PartialEval may drop the argument of fn:count, fn:empty,
-  fn:exists and fn:boolean by its type and an operand of "or" or "and" for a
-  constant one, so a reference there does not count.
+  skipped, and so may the first argument of most functions (fn:subsequence at a
+  position below 1, fn:count dropped by PartialEval for its type), so only the
+  functions listed here count.
 *******************************************************************************/
 static bool evaluates_var(const expr* e, const var_expr* var)
 {
@@ -233,6 +262,21 @@ static bool evaluates_var(const expr* e, const var_expr* var)
     return evaluates_var(
         static_cast<const dynamic_function_invocation_expr*>(e)->get_input(), var);
 
+  case function_item_expr_kind:
+  {
+    // Creating a function item computes the values of its captured variables.
+    const std::vector<expr*>& values =
+    static_cast<const function_item_expr*>(e)->get_in_scope_var_values();
+
+    for (csize i = 0; i < values.size(); ++i)
+    {
+      if (values[i] != NULL && evaluates_var(values[i], var))
+        return true;
+    }
+
+    return false;
+  }
+
   case if_expr_kind:
   {
     const if_expr* ie = static_cast<const if_expr*>(e);
@@ -246,23 +290,28 @@ static bool evaluates_var(const expr* e, const var_expr* var)
   {
     const fo_expr* fo = static_cast<const fo_expr*>(e);
     const function* f = fo->get_func();
+    bool readsFirstArg;
 
     switch (f->getKind())
     {
-    case FunctionConsts::FN_COUNT_1:
-    case FunctionConsts::FN_EMPTY_1:
-    case FunctionConsts::FN_EXISTS_1:
-    case FunctionConsts::FN_BOOLEAN_1:
-    case FunctionConsts::OP_OR_N:
-    case FunctionConsts::OP_AND_N:
-      return false;
+    case FunctionConsts::FN_DATA_1:
+    case FunctionConsts::OP_VALUE_INDEX_ENTRY_BUILDER_N:
+    case FunctionConsts::OP_GENERAL_INDEX_ENTRY_BUILDER_N:
+      readsFirstArg = true;
+      break;
+
+    case FunctionConsts::OP_ZORBA_SEQUENCE_POINT_ACCESS_2:
+      readsFirstArg = is_const_position(fo->get_arg(1));
+      break;
 
     default:
-      // A user-defined or external function may leave its argument unevaluated.
-      return (f->isBuiltin() &&
-              fo->num_args() > 0 &&
-              evaluates_var(fo->get_arg(0), var));
+      readsFirstArg = (f->isArithmeticFunction() || f->isComparisonFunction());
+      break;
     }
+
+    return (readsFirstArg &&
+            fo->num_args() > 0 &&
+            evaluates_var(fo->get_arg(0), var));
   }
 
   case flwor_expr_kind:

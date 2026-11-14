@@ -160,6 +160,11 @@ public:
     return theFunctionItemInfo->theInScopeVars;
   }
 
+  const std::vector<expr*>& get_in_scope_var_values() const
+  {
+    return theFunctionItemInfo->theInScopeVarValues;
+  }
+
   const std::vector<store::Item_t>& get_in_scope_var_names() const
   {
     return theFunctionItemInfo->theInScopeVarNames;
