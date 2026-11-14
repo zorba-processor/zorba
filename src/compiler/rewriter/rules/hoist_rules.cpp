@@ -813,7 +813,8 @@ expr* HoistRule::hoistExpr(
 
   // Hoisting is possible ... Go ahead and hoist e: (a) we create an internal LET
   // var: $$temp := op:hoist(e) (b) we place the $$temp declaration right after
-  // variable V, and (c) we replace e with op:unhoist($$temp).
+  // variable V, and (c) we replace e with op:unhoist($$temp). The LET is lazy:
+  // e is evaluated where its value is first read, not where no loop reads it.
 
   var_expr* letvar = rCtx.createTempVar(sctx, loc, var_expr::let_var);
 
@@ -823,7 +824,7 @@ expr* HoistRule::hoistExpr(
   hoisted->setAnnotationFlags(e->getAnnotationFlags());
   //letvar->setFlags(e->getFlags());
 
-  let_clause* flref = rCtx.theEM->create_let_clause(sctx, loc, letvar, hoisted);
+  let_clause* flref = rCtx.theEM->create_let_clause(sctx, loc, letvar, hoisted, true);
 
   letvar->set_flwor_clause(flref);
 

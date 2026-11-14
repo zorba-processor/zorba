@@ -5,7 +5,7 @@
         <SingletonIterator value="xs:string(books.xml)"/>
       </FnDocIterator>
     </ForVariable>
-    <ForVariable name="$$opt_temp_0">
+    <LetVariable name="$$opt_temp_0" materialize="true">
       <HoistIterator>
         <FnCountIterator>
           <ChildAxisIterator test-kind="match_name_test" qname="xs:QName(,,author)" typename="*" nill-allowed="false">
@@ -17,7 +17,7 @@
           </ChildAxisIterator>
         </FnCountIterator>
       </HoistIterator>
-    </ForVariable>
+    </LetVariable>
     <ForVariable name="er">
       <OpToIterator>
         <SingletonIterator value="xs:integer(1)"/>
@@ -27,7 +27,7 @@
     <WhereClause>
       <TypedValueCompareIterator_INTEGER>
         <UnhoistIterator>
-          <ForVarIterator varname="$$opt_temp_0"/>
+          <LetVarIterator varname="$$opt_temp_0"/>
         </UnhoistIterator>
         <ForVarIterator varname="er"/>
       </TypedValueCompareIterator_INTEGER>

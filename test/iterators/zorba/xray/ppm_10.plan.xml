@@ -216,13 +216,13 @@
                 <SingletonIterator value="xs:decimal(0.5)"/>
               </SpecificNumArithIterator_AddOperation_DECIMAL>
             </ForVariable>
-            <ForVariable name="$$opt_temp_1">
+            <LetVariable name="$$opt_temp_1" materialize="true">
               <HoistIterator>
                 <PromoteIterator type="xs:double">
                   <ForVarIterator varname="y-recentered"/>
                 </PromoteIterator>
               </HoistIterator>
-            </ForVariable>
+            </LetVariable>
             <ForVariable name="x">
               <UnhoistIterator>
                 <LetVarIterator varname="$$opt_temp_0"/>
@@ -248,7 +248,7 @@
                           </SpecificNumArithIterator_MultiplyOperation_DECIMAL>
                         </PromoteIterator>
                         <UnhoistIterator>
-                          <ForVarIterator varname="$$opt_temp_1"/>
+                          <LetVarIterator varname="$$opt_temp_1"/>
                         </UnhoistIterator>
                       </UDFunctionArgs>
                     </UDFunctionCallIterator>
@@ -1293,7 +1293,7 @@
         <LetVarIterator varname="surface-reflectiveness"/>
       </SpecificNumArithIterator_MultiplyOperation_DOUBLE>
     </LetVariable>
-    <ForVariable name="$$opt_temp_0">
+    <LetVariable name="$$opt_temp_0" materialize="true">
       <HoistIterator>
         <FnBooleanIterator>
           <TypedValueCompareIterator_DOUBLE>
@@ -1302,7 +1302,7 @@
           </TypedValueCompareIterator_DOUBLE>
         </FnBooleanIterator>
       </HoistIterator>
-    </ForVariable>
+    </LetVariable>
     <ReturnClause>
       <UDFunctionCallIterator function="vector:sum">
         <UDFunctionArgs>
@@ -1334,7 +1334,7 @@
                 </ForVariable>
                 <WhereClause>
                   <UnhoistIterator>
-                    <ForVarIterator varname="$$opt_temp_0"/>
+                    <LetVarIterator varname="$$opt_temp_0"/>
                   </UnhoistIterator>
                 </WhereClause>
                 <ReturnClause>
@@ -1725,13 +1725,13 @@
     <LetVariable name="surface-reflectiveness" materialize="true">
       <LetVarIterator varname="material" targetPos="4"/>
     </LetVariable>
-    <ForVariable name="$$opt_temp_1">
+    <LetVariable name="$$opt_temp_1" materialize="true">
       <HoistIterator>
         <PromoteIterator type="xs:anyAtomicType">
           <LetVarIterator varname="material" targetPos="5"/>
         </PromoteIterator>
       </HoistIterator>
-    </ForVariable>
+    </LetVariable>
     <ReturnClause>
       <UDFunctionCallIterator function="vector:sum">
         <UDFunctionArgs>
@@ -1857,14 +1857,14 @@
                 </FnSumDoubleIterator>
               </FunctionTraceIterator>
             </ForVariable>
-            <ForVariable name="$$opt_temp_0">
+            <LetVariable name="$$opt_temp_0" materialize="true">
               <HoistIterator>
                 <TypedValueCompareIterator_DOUBLE>
                   <ForVarIterator varname="illumination"/>
                   <SingletonIterator value="xs:double(0)"/>
                 </TypedValueCompareIterator_DOUBLE>
               </HoistIterator>
-            </ForVariable>
+            </LetVariable>
             <ForVariable name="specular">
               <FunctionTraceIterator>
                 <FnSumDoubleIterator>
@@ -1884,14 +1884,14 @@
                 </FnSumDoubleIterator>
               </FunctionTraceIterator>
             </ForVariable>
-            <ForVariable name="$$opt_temp_2">
+            <LetVariable name="$$opt_temp_2" materialize="true">
               <HoistIterator>
                 <TypedValueCompareIterator_DOUBLE>
                   <ForVarIterator varname="specular"/>
                   <SingletonIterator value="xs:double(0)"/>
                 </TypedValueCompareIterator_DOUBLE>
               </HoistIterator>
-            </ForVariable>
+            </LetVariable>
             <WhereClause>
               <FnBooleanIterator>
                 <CompareIterator>
@@ -1971,7 +1971,7 @@
                   </ForVariable>
                   <WhereClause>
                     <UnhoistIterator>
-                      <ForVarIterator varname="$$opt_temp_0"/>
+                      <LetVarIterator varname="$$opt_temp_0"/>
                     </UnhoistIterator>
                   </WhereClause>
                   <ReturnClause>
@@ -1987,7 +1987,7 @@
                             <PowIterator>
                               <ForVarIterator varname="specular"/>
                               <UnhoistIterator>
-                                <ForVarIterator varname="$$opt_temp_1"/>
+                                <LetVarIterator varname="$$opt_temp_1"/>
                               </UnhoistIterator>
                             </PowIterator>
                             <LetVarIterator varname="surface-reflectiveness"/>
@@ -2007,7 +2007,7 @@
                   </ForVariable>
                   <WhereClause>
                     <UnhoistIterator>
-                      <ForVarIterator varname="$$opt_temp_2"/>
+                      <LetVarIterator varname="$$opt_temp_2"/>
                     </UnhoistIterator>
                   </WhereClause>
                   <ReturnClause>
