@@ -120,6 +120,9 @@ private:
 
   XERCES_CPP_NAMESPACE_QUALIFIER XMLBuffer      theContent;
 
+  // a copy: the next attribute of the element reuses the slot of xsi:type
+  XERCES_CPP_NAMESPACE_QUALIFIER XMLBuffer      theXsiTypeValue;
+
   const XMLCh                                 * theXsiType;
 
   struct OpenElement
