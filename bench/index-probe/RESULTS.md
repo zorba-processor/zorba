@@ -10,8 +10,10 @@ the `for` into an index probe. Before `fix-udf-identity-flwor` the FLWOR
 ## Results
 
 Not measured yet. Run 43501550670 stopped with XSST0006 (the sequential call was in a
-`where` clause); run 43523424503 stopped with ZDTY0001 (the constructed items were typed
-`xs:anyType`, the library now declares `construction strip`), in both builds.
+`where` clause), run 43523424503 with ZDTY0001 (the constructed items were typed
+`xs:anyType`; the library now declares `construction strip`), and run 43535397986 with
+XPTY0004 (the value of the last statement of a block is not the value of the block; the
+function now returns the `let` expression), in both builds.
 
 ## Compile time
 

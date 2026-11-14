@@ -22,14 +22,12 @@ declare %an:sequential function b:load($n as xs:integer) as empty-sequence()
   dml:insert($b:items, for $i in 1 to $n return <item k="{$i}"/>);
 };
 
-(: The shape of data:remove-document in test/rbkt/Queries/zorba/index/match_veq_06.xqlib :)
+(: The shape of data:remove-document in test/rbkt/Queries/zorba/index/match_veq_06.xqlib;
+   %an:sequential keeps it from being inlined. :)
 declare %an:sequential function b:lookup($k as xs:string) as xs:string
 {
   let $hit := for $i in dml:collection($b:items)
               where $i/@k eq $k
               return $i
-  return
-  {
-    string($hit/@k);
-  }
+  return string($hit/@k)
 };
