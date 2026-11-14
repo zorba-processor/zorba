@@ -1,0 +1,120 @@
+<iterator-tree description="main query">
+  <StringJoinIterator>
+    <TupleStreamIterator>
+      <WhereIterator>
+        <ForIterator>
+          <ForVariable name="i"/>
+          <ForIterator>
+            <ForVariable name="o"/>
+            <OrderByIterator>
+              <OrderByLetVariable inputVar="$$opt_temp_0"/>
+              <OrderByLetVariable inputVar="$$opt_temp_1"/>
+              <OrderBySpec>
+                <CastIterator type="xs:integer">
+                  <FnDataIterator>
+                    <AttributeAxisIterator test-kind="match_name_test" qname="xs:QName(,,n)" typename="*" nill-allowed="false">
+                      <ForVarIterator varname="d"/>
+                    </AttributeAxisIterator>
+                  </FnDataIterator>
+                </CastIterator>
+              </OrderBySpec>
+              <LetIterator>
+                <LetVariable name="$$opt_temp_1" materialize="true"/>
+                <ForIterator>
+                  <ForVariable name="d"/>
+                  <LetIterator>
+                    <LetVariable name="$$opt_temp_0" materialize="true"/>
+                    <TupleSourceIterator/>
+                    <HoistIterator>
+                      <FnConcatIterator>
+                        <SingletonIterator value="xs:string(x)"/>
+                        <SingletonIterator value="xs:string(y)"/>
+                      </FnConcatIterator>
+                    </HoistIterator>
+                  </LetIterator>
+                  <FnConcatIterator>
+                    <ElementIterator copyInputNodes="false">
+                      <SingletonIterator value="xs:QName(,,r)"/>
+                      <AttributeIterator qname="xs:QName(,,n)">
+                        <SingletonIterator value="xs:string(2)"/>
+                      </AttributeIterator>
+                      <FnConcatIterator>
+                        <ElementIterator copyInputNodes="false">
+                          <SingletonIterator value="xs:QName(,,b)"/>
+                          <AttributeIterator qname="xs:QName(,,id)">
+                            <SingletonIterator value="xs:string(2x)"/>
+                          </AttributeIterator>
+                          <TextIterator>
+                            <SingletonIterator value="xs:string(x)"/>
+                          </TextIterator>
+                        </ElementIterator>
+                        <ElementIterator copyInputNodes="false">
+                          <SingletonIterator value="xs:QName(,,b)"/>
+                          <AttributeIterator qname="xs:QName(,,id)">
+                            <SingletonIterator value="xs:string(2y)"/>
+                          </AttributeIterator>
+                          <TextIterator>
+                            <SingletonIterator value="xs:string(y)"/>
+                          </TextIterator>
+                        </ElementIterator>
+                      </FnConcatIterator>
+                    </ElementIterator>
+                    <ElementIterator copyInputNodes="false">
+                      <SingletonIterator value="xs:QName(,,r)"/>
+                      <AttributeIterator qname="xs:QName(,,n)">
+                        <SingletonIterator value="xs:string(1)"/>
+                      </AttributeIterator>
+                      <FnConcatIterator>
+                        <ElementIterator copyInputNodes="false">
+                          <SingletonIterator value="xs:QName(,,b)"/>
+                          <AttributeIterator qname="xs:QName(,,id)">
+                            <SingletonIterator value="xs:string(1x)"/>
+                          </AttributeIterator>
+                          <TextIterator>
+                            <SingletonIterator value="xs:string(x)"/>
+                          </TextIterator>
+                        </ElementIterator>
+                        <ElementIterator copyInputNodes="false">
+                          <SingletonIterator value="xs:QName(,,b)"/>
+                          <AttributeIterator qname="xs:QName(,,id)">
+                            <SingletonIterator value="xs:string(1y)"/>
+                          </AttributeIterator>
+                          <TextIterator>
+                            <SingletonIterator value="xs:string(y)"/>
+                          </TextIterator>
+                        </ElementIterator>
+                      </FnConcatIterator>
+                    </ElementIterator>
+                  </FnConcatIterator>
+                </ForIterator>
+                <HoistIterator>
+                  <ChildAxisIterator test-kind="match_name_test" qname="xs:QName(,,b)" typename="*" nill-allowed="false">
+                    <ForVarIterator varname="d"/>
+                  </ChildAxisIterator>
+                </HoistIterator>
+              </LetIterator>
+            </OrderByIterator>
+            <UnhoistIterator>
+              <LetVarIterator varname="$$opt_temp_0"/>
+            </UnhoistIterator>
+          </ForIterator>
+          <UnhoistIterator>
+            <LetVarIterator varname="$$opt_temp_1"/>
+          </UnhoistIterator>
+        </ForIterator>
+        <CompareIterator>
+          <FnDataIterator>
+            <ForVarIterator varname="i"/>
+          </FnDataIterator>
+          <ForVarIterator varname="o"/>
+        </CompareIterator>
+      </WhereIterator>
+      <FnStringIterator>
+        <AttributeAxisIterator test-kind="match_name_test" qname="xs:QName(,,id)" typename="*" nill-allowed="false">
+          <ForVarIterator varname="i"/>
+        </AttributeAxisIterator>
+      </FnStringIterator>
+    </TupleStreamIterator>
+    <SingletonIterator value="xs:string( )"/>
+  </StringJoinIterator>
+</iterator-tree>

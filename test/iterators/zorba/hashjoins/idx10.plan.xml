@@ -113,12 +113,15 @@
           </LetVariable>
           <ForVariable name="j">
             <TryCatchIterator>
-              <ProbeIndexPointValueIterator>
-                <SingletonIterator value="xs:QName(,,tempIndex0)"/>
-                <UnhoistIterator>
-                  <LetVarIterator varname="$$opt_temp_2"/>
-                </UnhoistIterator>
-              </ProbeIndexPointValueIterator>
+              <FnConcatIterator>
+                <LetVarIterator varname="$$opt_temp_5"/>
+                <ProbeIndexPointValueIterator>
+                  <SingletonIterator value="xs:QName(,,tempIndex0)"/>
+                  <UnhoistIterator>
+                    <LetVarIterator varname="$$opt_temp_2"/>
+                  </UnhoistIterator>
+                </ProbeIndexPointValueIterator>
+              </FnConcatIterator>
               <NodeSortIterator distinct="true" ascending="true">
                 <AttributeAxisIterator test-kind="match_name_test" qname="xs:QName(,,id)" typename="*" nill-allowed="false">
                   <FunctionTraceIterator>

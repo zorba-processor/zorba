@@ -72,12 +72,15 @@
     </LetVariable>
     <ForVariable name="a">
       <TryCatchIterator>
-        <ProbeIndexPointValueIterator>
-          <SingletonIterator value="xs:QName(,,tempIndex0)"/>
-          <UnhoistIterator>
-            <LetVarIterator varname="$$opt_temp_1"/>
-          </UnhoistIterator>
-        </ProbeIndexPointValueIterator>
+        <FnConcatIterator>
+          <LetVarIterator varname="$$opt_temp_5"/>
+          <ProbeIndexPointValueIterator>
+            <SingletonIterator value="xs:QName(,,tempIndex0)"/>
+            <UnhoistIterator>
+              <LetVarIterator varname="$$opt_temp_1"/>
+            </UnhoistIterator>
+          </ProbeIndexPointValueIterator>
+        </FnConcatIterator>
         <UnhoistIterator>
           <LetVarIterator varname="$$opt_temp_0"/>
         </UnhoistIterator>

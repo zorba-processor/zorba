@@ -1257,9 +1257,9 @@ static expr* createCatchAll(
   under an empty outer domain, after fn:exists() has its first item. An error
   they raise there is not a result, so:
 
-    let $dummy := create-index(...)
+    let $build := create-index(...)
     ...
-    for $innerVar in try { probe(index, outerOp) } catch * { domain }
+    for $innerVar in try { ($build, probe(index, outerOp)) } catch * { domain }
     where predicate
 
   The predicate stays in the WHERE clause. A build that raises leaves the index
@@ -1268,6 +1268,11 @@ static expr* createCatchAll(
   predicate evaluates what the query without the index evaluates, errors
   included. The domain and the operands are deterministic (see
   isIndexJoinPredicate()), so evaluating them again changes nothing else.
+
+  The LET of the build is lazy and the probe reads its var: the index is built
+  at the first probe of a binding, not where no probe happens (an empty outer
+  domain, say, over a domain that would take forever). A build placed in a
+  block of a sequential expr is not lazy.
 ********************************************************************************/
 void IndexJoinRule::rewriteJoin(PredicateInfo& predInfo)
 {
@@ -1367,6 +1372,7 @@ void IndexJoinRule::rewriteJoin(PredicateInfo& predInfo)
   expr* targetExpr = theVarDefExprs[predInfo.theStackPos];
   csize targetPos = predInfo.theChildPos;
   expr_kind_t targetKind = targetExpr->get_expr_kind();
+  var_expr* buildVar = NULL;
 
   if (targetKind == block_expr_kind)
   {
@@ -1377,31 +1383,13 @@ void IndexJoinRule::rewriteJoin(PredicateInfo& predInfo)
   else if (targetKind == flwor_expr_kind)
   {
     flwor_expr* flwor = static_cast<flwor_expr*>(targetExpr);
-    csize numClauses = flwor->num_clauses();
 
-    if (targetPos == numClauses)
-    {
-      std::vector<expr*> args(2);
-      args[0] = createExpr;
-      args[1] = flwor->get_return_expr();
+    buildVar = theRCtx->createTempVar(sctx, loc, var_expr::let_var);
 
-      block_expr* block = em->create_block_expr(sctx, udf, loc, false, args, NULL);
+    let_clause* createClause =
+    em->create_let_clause(sctx, loc, buildVar, createExpr, true);
 
-      DynamicBitset blockVars = indexVars;
-      blockVars.set_union((*theExprVarsMap)[flwor->get_return_expr()]);
-      (*theExprVarsMap)[block] = blockVars;
-
-      flwor->set_return_expr(block);
-    }
-    else
-    {
-      var_expr* dummyVar = theRCtx->createTempVar(sctx, loc, var_expr::let_var);
-
-      let_clause* createClause = 
-      em->create_let_clause(sctx, loc, dummyVar, createExpr, false);
-
-      flwor->add_clause(targetPos, createClause);
-    }
+    flwor->add_clause(targetPos, createClause);
   }
   else
   {
@@ -1444,6 +1432,17 @@ void IndexJoinRule::rewriteJoin(PredicateInfo& predInfo)
                    BUILTIN_FUNC(FN_ZORBA_XQDDF_PROBE_INDEX_POINT_VALUE_N),
                    qnameExpr,
                    probeKeyExpr);
+  }
+
+  if (buildVar != NULL)
+  {
+    probeExpr = em->
+    create_fo_expr(sctx,
+                   udf,
+                   loc,
+                   BUILTIN_FUNC(OP_CONCATENATE_N),
+                   em->create_wrapper_expr(sctx, udf, loc, buildVar),
+                   probeExpr);
   }
 
   probeExpr = createCatchAll(em, probeExpr, scanExpr, sctx, udf, loc);

@@ -47,10 +47,13 @@
                 <FLWORIterator>
                   <ForVariable name="karte">
                     <TryCatchIterator>
-                      <ProbeIndexPointValueIterator>
-                        <SingletonIterator value="xs:QName(,,tempIndex0)"/>
-                        <ForVarIterator varname="anzahl"/>
-                      </ProbeIndexPointValueIterator>
+                      <FnConcatIterator>
+                        <LetVarIterator varname="$$opt_temp_3"/>
+                        <ProbeIndexPointValueIterator>
+                          <SingletonIterator value="xs:QName(,,tempIndex0)"/>
+                          <ForVarIterator varname="anzahl"/>
+                        </ProbeIndexPointValueIterator>
+                      </FnConcatIterator>
                       <UnhoistIterator>
                         <LetVarIterator varname="$$opt_temp_0"/>
                       </UnhoistIterator>

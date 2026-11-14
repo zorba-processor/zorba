@@ -258,10 +258,10 @@ FOREACH(TESTFILE ${TESTFILES})
     ZORBA_ADD_TEST("${TESTNAME}" testdriver ${TESTFILE})
     # The window, array member, dynamic function call, iteration-updates, copy
     # modify target, empty for domain, index collation, hash join key error,
-    # hash join order and sequential call tests must give the same results at
+    # hash join order, hash join scope and sequential call tests must give the same results at
     # every optimization level (the testdriver reads ZORBA_OPTLEVEL; the default
     # is O1).
-    IF (TESTNAME MATCHES "^test/rbkt/zorba/(jsoniq-windows|jsoniq-array-members|dynamic-calls|iteration-updates|updates/transform-targets|empty-domain|index-collation|hashjoin-key-errors|hashjoin-order|sequential-calls)/")
+    IF (TESTNAME MATCHES "^test/rbkt/zorba/(jsoniq-windows|jsoniq-array-members|dynamic-calls|iteration-updates|updates/transform-targets|empty-domain|index-collation|hashjoin-key-errors|hashjoin-order|hashjoin-scope|sequential-calls)/")
       FOREACH (_optlevel O0 O2)
         ZORBA_ADD_TEST("${TESTNAME}-${_optlevel}" testdriver ${TESTFILE})
         SET_TESTS_PROPERTIES ("${TESTNAME}-${_optlevel}" PROPERTIES
@@ -294,6 +294,13 @@ FOREACH(TESTFILE ${TESTFILES})
     # the one set by the .spec file), so these run with a fixed -06:00 offset.
     IF (TESTNAME MATCHES "_tz_minus6$")
       SET_TESTS_PROPERTIES ("${TESTNAME}" PROPERTIES ENVIRONMENT "TZ=UTC+6")
+    ENDIF ()
+    # A join that evaluates a domain the query without the index does not
+    # evaluate does not end, so fail fast.
+    IF (TESTNAME MATCHES "^test/rbkt/zorba/hashjoin-scope/")
+      FOREACH (_name "${TESTNAME}" "${TESTNAME}-O0" "${TESTNAME}-O2")
+        SET_TESTS_PROPERTIES ("${_name}" PROPERTIES TIMEOUT 30)
+      ENDFOREACH ()
     ENDIF ()
     # Boundary-value tests: a regression (e.g. a range that never stops at
     # the largest xs:integer) loops forever, so fail fast.
