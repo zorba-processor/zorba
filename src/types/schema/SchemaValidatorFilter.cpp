@@ -363,7 +363,9 @@ void SchemaValidatorFilter::processStartElement()
   }
   const bool isValidated = fValidate || theXsiType;
   theIsNilled = isValidated && ((XercSchemaValidator*)fValidator)->getIsNil();
-  theOpenElements.push_back({isValidated, theIsNilled});
+  theOpenElements.push_back(
+    {isValidated, theIsNilled,
+     ((XercSchemaValidator*)fValidator)->getCurrentDatatypeValidator()});
 
 
   ComplexTypeInfo* typeinfo =
@@ -742,6 +744,8 @@ void SchemaValidatorFilter::endElementEvent(
   if(element.hasTypeEntry)
   {
     ((XercSchemaValidator*)fValidator)->setNillable(element.isNilled);
+    ((XercSchemaValidator*)fValidator)->
+      setCurrentDatatypeValidator(element.datatypeValidator);
 
     DatatypeValidator *currentDV = 0;
     if(topElem->fThisElement->isDeclared())
@@ -1574,8 +1578,16 @@ void SchemaValidatorFilter::error(
 #endif // _XERCES_VERSION >= 30000
     )
 {
-  // Skip some validation errors if validation isn't strict
+  // The element being processed; its declaration is not set yet while it is looked up
+  const ElemStack::StackElem* current =
+    fElemStack.isEmpty() ? 0 : fElemStack.topElement();
+  const bool isDeclared =
+    current && current->fThisElement && current->fThisElement->isDeclared();
+
+  // Lax validation skips some validation errors of an element without a
+  // declaration; an element with a declaration is assessed strictly
   if(!theStrictValidation &&
+     !isDeclared &&
      errDomain == XMLUni::fgValidityDomain &&
      errType != XMLErrorReporter::ErrType_Fatal &&
      !( errCode == XMLValid::AttNotDefined ||
