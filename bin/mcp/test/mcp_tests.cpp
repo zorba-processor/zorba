@@ -3824,6 +3824,17 @@ void test_fold_left_out_of_memory( Fixture const &f ) {
     "fold-left((1, 2, 3), 0, function($a, $b) { $a + $b })",
     "6", "fold-left" );
 }
+// An object constructor copies the array bound to $a, nested arrays and an
+// object included: a failure while a copy is made frees what it made.
+void test_json_copy_out_of_memory( Fixture const &f ) {
+  sweep_next_out_of_memory( f,
+    "jsoniq version \"1.0\";\n"
+    "for $i in 1 to 2\n"
+    "let $a := [ [ $i, 2 ], { \"b\" : [ $i ] } ]\n"
+    "let $o := { \"x\" : $a, \"y\" : $a }\n"
+    "return $o.x[[2]].b[[1]] + size($o.y[[1]])",
+    "3 4", "copying an array" );
+}
 void test_base64_stream_out_of_memory( Fixture const &f ) {
 #if defined(__linux__)
   std::string encoded;
@@ -7878,6 +7889,7 @@ Test const tests[] = {
   { "exhaust_first_dynamic_call", test_first_dynamic_call_out_of_memory },
   { "exhaust_for_each_pair", test_for_each_pair_out_of_memory },
   { "exhaust_fold_left", test_fold_left_out_of_memory },
+  { "exhaust_json_copy", test_json_copy_out_of_memory },
   { "exhaust_sweep_matcher", test_sweep_matcher },
   { "exhaust_sweep_xml", test_sweep_xml },
   { "exhaust_sweep_xml_dtd", test_sweep_xml_dtd },

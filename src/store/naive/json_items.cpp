@@ -1372,10 +1372,11 @@ store::Item* SimpleJSONArray::copy(
     json_nesting::check_stack();
 
     lNewArray = new SimpleJSONArray();
-    lNewArray->theContent.reserve(theContent.size());
 
     try
     {
+      lNewArray->theContent.reserve(theContent.size());
+
       for (Members::const_iterator lIter = theContent.begin();
            lIter != theContent.end();
            ++lIter)
