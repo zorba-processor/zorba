@@ -193,6 +193,8 @@ protected:
 
   void attach_transcoder(std::ostream& os);
 
+  void flush_output();
+
   ///////////////////////////////////////////////////////////
   //                                                       //
   //  class emitter                                        //

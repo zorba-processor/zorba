@@ -2618,6 +2618,18 @@ void serializer::attach_transcoder(std::ostream &os)
 }
 
 /*******************************************************************************
+  Raises ZOSE0004 if a write to the output stream failed without throwing.
+  Called before the transcoder is detached: detaching clears the stream's state.
+********************************************************************************/
+void serializer::flush_output()
+{
+  if (!tr->flush())
+    throw ZORBA_EXCEPTION(
+      zerr::ZOSE0004_IO_ERROR, ERROR_PARAMS( "", ZED( BadStreamState ) )
+    );
+}
+
+/*******************************************************************************
 
 ********************************************************************************/
 void serializer::serialize(
@@ -2686,6 +2698,7 @@ serializer::serialize(
     }
   //+  aObject->close();
     e->emit_end();
+    flush_output();
     transcode::detach( aOStream );
   }
   catch ( ... ) {
@@ -2739,6 +2752,7 @@ void serializer::serialize(
 
     //object->close();
     e->emit_end();
+    flush_output();
     transcode::detach( stream );
   }
   catch ( ... ) {
