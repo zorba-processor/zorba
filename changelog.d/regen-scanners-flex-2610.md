@@ -1,6 +1,6 @@
 ### Changed
 
 - The committed XQuery and JSONiq scanners and `FlexLexer.h` are generated
-  with flex 2.6.10. The scanner's default input buffer is now twice the C
-  library's `BUFSIZ` (16 KiB on glibc, as before; 2 KiB on macOS); it still
-  grows for longer tokens.
+  with flex 2.6.10. The scanner reads its input in 8 KiB chunks into a
+  16 KiB buffer on every platform, as before; it still grows for longer
+  tokens.
