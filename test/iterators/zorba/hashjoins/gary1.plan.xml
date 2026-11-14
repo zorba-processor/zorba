@@ -103,14 +103,17 @@
               <FLWORIterator>
                 <ForVariable name="$$context-item">
                   <TryCatchIterator>
-                    <NodeSortIterator distinct="true" ascending="true">
-                      <ProbeIndexPointGeneralIterator>
-                        <SingletonIterator value="xs:QName(,,tempIndex0)"/>
-                        <FnDataIterator>
-                          <LetVarIterator varname="unitid"/>
-                        </FnDataIterator>
-                      </ProbeIndexPointGeneralIterator>
-                    </NodeSortIterator>
+                    <FnConcatIterator>
+                      <LetVarIterator varname="$$opt_temp_4"/>
+                      <NodeSortIterator distinct="true" ascending="true">
+                        <ProbeIndexPointGeneralIterator>
+                          <SingletonIterator value="xs:QName(,,tempIndex0)"/>
+                          <FnDataIterator>
+                            <LetVarIterator varname="unitid"/>
+                          </FnDataIterator>
+                        </ProbeIndexPointGeneralIterator>
+                      </NodeSortIterator>
+                    </FnConcatIterator>
                     <LetVarIterator varname="y"/>
                   </TryCatchIterator>
                 </ForVariable>

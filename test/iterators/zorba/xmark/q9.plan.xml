@@ -107,14 +107,17 @@
             <FLWORIterator>
               <ForVariable name="t">
                 <TryCatchIterator>
-                  <NodeSortIterator distinct="true" ascending="true">
-                    <ProbeIndexPointGeneralIterator>
-                      <SingletonIterator value="xs:QName(,,tempIndex0)"/>
-                      <UnhoistIterator>
-                        <LetVarIterator varname="$$opt_temp_0"/>
-                      </UnhoistIterator>
-                    </ProbeIndexPointGeneralIterator>
-                  </NodeSortIterator>
+                  <FnConcatIterator>
+                    <LetVarIterator varname="$$opt_temp_4"/>
+                    <NodeSortIterator distinct="true" ascending="true">
+                      <ProbeIndexPointGeneralIterator>
+                        <SingletonIterator value="xs:QName(,,tempIndex0)"/>
+                        <UnhoistIterator>
+                          <LetVarIterator varname="$$opt_temp_0"/>
+                        </UnhoistIterator>
+                      </ProbeIndexPointGeneralIterator>
+                    </NodeSortIterator>
+                  </FnConcatIterator>
                   <LetVarIterator varname="ca"/>
                 </TryCatchIterator>
               </ForVariable>
@@ -152,14 +155,17 @@
                         <FLWORIterator>
                           <ForVariable name="t2">
                             <TryCatchIterator>
-                              <NodeSortIterator distinct="true" ascending="true">
-                                <ProbeIndexPointGeneralIterator>
-                                  <SingletonIterator value="xs:QName(,,tempIndex1)"/>
-                                  <UnhoistIterator>
-                                    <LetVarIterator varname="$$opt_temp_1"/>
-                                  </UnhoistIterator>
-                                </ProbeIndexPointGeneralIterator>
-                              </NodeSortIterator>
+                              <FnConcatIterator>
+                                <LetVarIterator varname="$$opt_temp_7"/>
+                                <NodeSortIterator distinct="true" ascending="true">
+                                  <ProbeIndexPointGeneralIterator>
+                                    <SingletonIterator value="xs:QName(,,tempIndex1)"/>
+                                    <UnhoistIterator>
+                                      <LetVarIterator varname="$$opt_temp_1"/>
+                                    </UnhoistIterator>
+                                  </ProbeIndexPointGeneralIterator>
+                                </NodeSortIterator>
+                              </FnConcatIterator>
                               <LetVarIterator varname="ei"/>
                             </TryCatchIterator>
                           </ForVariable>
