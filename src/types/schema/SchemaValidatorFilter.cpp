@@ -1581,6 +1581,7 @@ void SchemaValidatorFilter::error(
      !( errCode == XMLValid::AttNotDefined ||
         errCode == XMLValid::AttNotDefinedForElement ||
         errCode == XMLValid::SimpleTypeHasChild ||
+        errCode == XMLValid::NilAttrNotEmpty ||
         errCode == XMLValid::ElementNotValidForContent ||
         errCode == XMLValid::NotEnoughElemsForCM ||
         errCode == XMLValid::EmptyNotValidForContent ||
