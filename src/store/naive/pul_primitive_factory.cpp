@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#include <memory>
+
 #include "pul_primitive_factory.h"
 #include "pul_primitives.h"
 
@@ -218,9 +220,12 @@ PULPrimitiveFactory::createUpdSetElementType(
     bool           isInSubstitutionGroup,
     bool           isNilled)
 {
-  return new UpdSetElementType(pul, aLoc, target, typeName, typedValue,
-                               haveValue, haveEmptyValue, haveTypedValue, haveListValue,
-                               isInSubstitutionGroup, isNilled);
+  // The constructor is protected, so std::make_unique cannot build it; the PUL owns the result
+  std::unique_ptr<UpdSetElementType> upd(
+      new UpdSetElementType(pul, aLoc, target, typeName, typedValue,
+                            haveValue, haveEmptyValue, haveTypedValue, haveListValue,
+                            isInSubstitutionGroup, isNilled));
+  return upd.release();
 }
     
 
