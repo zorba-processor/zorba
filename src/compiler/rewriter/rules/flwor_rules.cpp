@@ -305,8 +305,20 @@ static bool evaluates_var(const expr* e, const var_expr* var)
       break;
 
     default:
-      readsFirstArg = (f->isArithmeticFunction() || f->isComparisonFunction());
+    {
+      // SpecializeOperations may swap the operands of a value comparison, which
+      // then reads the other one first and stops if it is empty.
+      SequenceType::Quantifier q =
+      (fo->num_args() > 1 ?
+       fo->get_arg(1)->get_return_type()->get_quantifier() :
+       SequenceType::QUANT_QUESTION);
+
+      readsFirstArg = (f->isArithmeticFunction() ||
+                       f->isGeneralComparisonFunction() ||
+                       (f->isValueComparisonFunction() &&
+                        (q == SequenceType::QUANT_ONE || q == SequenceType::QUANT_PLUS)));
       break;
+    }
     }
 
     return (readsFirstArg &&
