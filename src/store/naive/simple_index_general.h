@@ -19,9 +19,11 @@
 #include <cassert>
 #include <map>
 #include <memory>
+#include <unordered_set>
 
 #include "simple_index.h"
 #include "store_defs.h"
+#include "zorbatypes/integer.h"
 
 namespace zorba 
 { 
@@ -454,6 +456,16 @@ public:
   -------
   For marking the end of an iteration over the domain nodes associated with an
   index key that satisfies the search condition..
+
+  theSkip:
+  --------
+  The number of results that open() skips.
+
+  theDropsDuplicates:
+  -------------------
+  Set to true for a value range probe without bounds in an index with domain
+  nodes that have several keys. Such a node appears under each of its keys, but
+  is returned once: theReturnedNodes holds the nodes returned so far.
 ********************************************************************************/
 class ProbeGeneralIndexIterator : public store::IndexProbeIterator
 {
@@ -501,6 +513,12 @@ protected:
 
   GeneralIndexValue::const_iterator     theIte;
   GeneralIndexValue::const_iterator     theEnd;
+
+  xs_integer                            theSkip;
+
+  bool                                  theDropsDuplicates;
+
+  std::unordered_set<const store::Item*> theReturnedNodes;
 
 protected:
   ProbeGeneralIndexIterator(const store::Index_t& index);
