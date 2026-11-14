@@ -43,14 +43,11 @@ declare %an:value-range %an:manual index m:FloatValue
 on nodes dml:collection(xs:QName("m:f"))//e
 by xs:float(./@v) as xs:float;
 
-(: Untyped keys. :)
+(: Untyped keys. A range index cannot declare xs:untypedAtomic as its key
+   type. :)
 declare collection m:u as node()*;
 
 declare %an:general-equality %an:manual index m:UntypedHash
-on nodes dml:collection(xs:QName("m:u"))//e
-by fn:data(./@v) as xs:untypedAtomic*;
-
-declare %an:general-range %an:manual index m:UntypedTree
 on nodes dml:collection(xs:QName("m:u"))//e
 by fn:data(./@v) as xs:untypedAtomic*;
 
