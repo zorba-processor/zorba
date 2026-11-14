@@ -371,6 +371,13 @@ void SchemaValidatorFilter::processStartElement()
   {
       //validate element even if lax but has xsi:type
       fValidator->validateElement(elemDecl);
+
+      // A resolved complex xsi:type governs the children of the element
+      if(!isSkipped && ((XercSchemaValidator*)fValidator)->getCurrentTypeInfo())
+      {
+        fValidate = true;
+        fElemStack.setValidationFlag(fValidate);
+      }
   }
   const bool isValidated = fValidate || theXsiType;
   theIsNilled = isValidated && ((XercSchemaValidator*)fValidator)->getIsNil();
