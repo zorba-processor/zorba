@@ -101,6 +101,8 @@ SchemaValidatorFilter::SchemaValidatorFilter(
   theAttrCount(0),
   theEventBuffer(eventBuffer),
   theErrorOccurred(false),
+  theSubstitutedElemName(0),
+  theSubstitutedElemUri(0),
   theIsNilled(false)
 {
   theSchemaGrammar = new (fMemoryManager) SchemaGrammar(fMemoryManager);
