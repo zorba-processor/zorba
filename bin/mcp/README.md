@@ -103,7 +103,6 @@ Rules this code depends on:
   - ICU crashes in `RegexPattern::zap()` or in `utext_openConstUnicodeString()`
     (SIGSEGV) if an allocation fails while it compiles a regular expression. The
     directory module uses some on each call.
-  - The flex scanner calls `exit(2)` if it cannot allocate, while a query compiles.
   - Running out of memory while the message cannot be parsed (before its id is read,
     and again when it is read once more for its id): the error response has
     `"id": null`, as JSON-RPC 2.0 (section 5) requires when the id cannot be

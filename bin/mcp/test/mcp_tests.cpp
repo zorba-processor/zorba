@@ -2372,9 +2372,10 @@ void test_exhaust_errno( Fixture const& ) {
         inject_arm( first, 1 );
         int const r = pthread_getattr_np( pthread_self(), &attr );
         inject_disarm();
-        if ( r == 0 )
-          pthread_attr_destroy( &attr );
-        else if ( r == ENOMEM )
+        if ( r == 0 ) {
+          if ( pthread_attr_destroy( &attr ) != 0 )
+            ++other;
+        } else if ( r == ENOMEM )
           ++failed;
         else
           ++other;
@@ -3451,13 +3452,12 @@ void test_sweep_schema_import( Fixture const &f ) {
   s.lenient = true;
   s.wrong = { "ZXQP0014", "ZXQP0035" };
   s.points = 200;
-  // The scanner calls exit(2). Xerces-C's OutOfMemoryException from
-  // ComplexTypeInfo::makeContentModel() ends the process (7 in runs of 8,
-  // quick-check run 43500984356); cap from quick-check run 42693936525. Alone, it
-  // throws OutOfMemoryException from ~XMLGrammarPoolImpl (~SchemaGrammar), as in
-  // the sweep of the HTML module (bigint, CI run 43530408382).
-  s.known = { exact( "exit 2", 2 ),
-              starting( "terminate N11xercesc_", 4, 1, "OutOfMemoryExceptionE" ),
+  // Xerces-C's OutOfMemoryException from ComplexTypeInfo::makeContentModel()
+  // ends the process (7 in runs of 8, quick-check run 43500984356); cap from
+  // quick-check run 42693936525. Alone, it throws OutOfMemoryException from
+  // ~XMLGrammarPoolImpl (~SchemaGrammar), as in the sweep of the HTML module
+  // (bigint, CI run 43530408382).
+  s.known = { starting( "terminate N11xercesc_", 4, 1, "OutOfMemoryExceptionE" ),
               starting( "terminate N11xercesc_", 26, 8, "OutOfMemoryExceptionE" ) };
   s.compiles = true;
   exhaust_sweep( f, "schema import", s );
@@ -3539,8 +3539,6 @@ void test_sweep_casts( Fixture const &f ) {
   s.points = 400;
   s.expected = "\"true true true true true true true true true true 2000\"";
   s.lenient = true;                 // the compilation is swept too
-  // The scanner of the compiler.
-  s.known = { exact( "exit 2", 2 ) };
   s.compiles = true;
   exhaust_sweep( f, "casts", s );
 #else
@@ -3564,10 +3562,6 @@ void test_sweep_arithmetic( Fixture const &f ) {
   s.expected = "\"3 3 3.75 3.5\"";
   s.wrong = { "FOAR0001", "FOAR0002", "FOCA" };
   s.points = 100000;                // all of them
-  // The scanner calls exit(2). Caps: about 1.5 times the most seen (exit 2: 3
-  // alone, quick-check run 42784334470).
-  // Until #291: std::bad_alloc leaves the noexcept xquery_parser constructor.
-  s.known = { exact( "exit 2", 5 ), exact( "terminate St9bad_alloc", 2 ) };
   s.compiles = true;
   exhaust_sweep( f, "arithmetic", s );
 #else
@@ -3584,8 +3578,6 @@ void test_sweep_compile( Fixture const &f ) {
   s.expected = "41";
   s.lenient = true;
   s.points = 200;
-  // The scanner calls exit(2).
-  s.known = { exact( "exit 2", 2 ) };
   s.compiles = true;
   exhaust_sweep( f, "compilation", s );
 #else
@@ -3604,8 +3596,6 @@ void test_sweep_query_text( Fixture const &f ) {
   s.expected = "true";
   s.lenient = true;                 // an error of the compilation is allowed
   s.points = 100000;                // all of them
-  // Until #291: std::bad_alloc leaves the noexcept xquery_parser constructor.
-  s.known = { exact( "exit 2", 6 ), exact( "terminate St9bad_alloc", 2 ) };
   s.compiles = true;
   exhaust_sweep( f, "text of the query", s );
 #else
@@ -3848,6 +3838,47 @@ void test_dynamic_call_out_of_memory( Fixture const &f ) {
     "return (local:g(0), for $i in 1 to 2 return $fs[$i]($i))",
     "0 2 4", "a dynamic function call" );
 }
+// The body of test_call_body_out_of_memory, cached: each call also looks up
+// and fills the function cache.
+void test_cached_call_body_out_of_memory( Fixture const &f ) {
+  sweep_next_out_of_memory( f,
+    "declare namespace an = \"http://zorba.io/annotations\";\n"
+    "declare %an:cache function local:f($n as xs:integer) as xs:integer {\n"
+    "  if ($n le 0) then 0\n"
+    "  else sum(for $i in 1 to $n\n"
+    "           let $s := ($i, $i * 2)\n"
+    "           order by $i descending\n"
+    "           return sum($s) + count($s)) + local:f($n - 1)\n"
+    "};\n"
+    // Not a constant argument: the compiler would evaluate the call.
+    "declare variable $n as xs:integer external := 3;\n"
+    "local:f($n)",
+    "42", "a cached function body" );
+}
+// A FLWOR that groups, in the body of a recursive function: a failure while
+// it groups.
+void test_group_by_out_of_memory( Fixture const &f ) {
+  sweep_next_out_of_memory( f,
+    "declare function local:f($n) {\n"
+    "  if ($n le 0) then 0\n"
+    "  else sum(for $i in 1 to $n\n"
+    "           let $s := ($i, $i * 2)\n"
+    "           group by $k := $i mod 3\n"
+    "           order by $k descending\n"
+    "           return sum($s)) + local:f($n - 1)\n"
+    "};\n"
+    "local:f(3)",
+    "30", "group by" );
+}
+// No static call of local:g: its body is optimized on the first dynamic call,
+// while the query runs.
+void test_first_dynamic_call_out_of_memory( Fixture const &f ) {
+  sweep_next_out_of_memory( f,
+    "declare function local:g($x) { $x * 2 };\n"
+    "let $fs := (local:g#1, local:g#1)\n"
+    "for $i in 1 to 2 return $fs[$i]($i)",
+    "2 4", "the first dynamic call of a function" );
+}
 void test_for_each_pair_out_of_memory( Fixture const &f ) {
   sweep_next_out_of_memory( f,
     "for-each-pair((1, 2), (3, 4), function($a, $b) { $a + $b })",
@@ -3963,8 +3994,6 @@ void test_sweep_builtins( Fixture const &f ) {
   s.expected = "41";
   s.lenient = true;
   s.points = 100000;                // all of them
-  // Until #291: std::bad_alloc leaves the noexcept xquery_parser constructor.
-  s.known = { exact( "exit 2", 6 ), exact( "terminate St9bad_alloc", 2 ) };
   s.compiles = true;
   s.probes = {
     { "string-join((\"a\", \"b\"), \"-\")", "\"a-b\"" },
@@ -4039,8 +4068,6 @@ void test_sweep_decimal_thread( Fixture const &f ) {
   s.new_thread = true;
   s.points = 300;
   s.lenient = true;                 // the compilation is swept too
-  // Until #291: std::bad_alloc leaves the noexcept xquery_parser constructor.
-  s.known = { exact( "exit 2", 2 ), exact( "terminate St9bad_alloc", 2 ) };
   s.compiles = true;
   exhaust_sweep( f, "first decimal of a thread", s );
 #else
@@ -7903,6 +7930,9 @@ Test const tests[] = {
   { "exhaust_plan_open", test_plan_open_out_of_memory },
   { "exhaust_call_body", test_call_body_out_of_memory },
   { "exhaust_dynamic_call", test_dynamic_call_out_of_memory },
+  { "exhaust_cached_call_body", test_cached_call_body_out_of_memory },
+  { "exhaust_group_by", test_group_by_out_of_memory },
+  { "exhaust_first_dynamic_call", test_first_dynamic_call_out_of_memory },
   { "exhaust_for_each_pair", test_for_each_pair_out_of_memory },
   { "exhaust_fold_left", test_fold_left_out_of_memory },
   { "exhaust_sweep_matcher", test_sweep_matcher },
