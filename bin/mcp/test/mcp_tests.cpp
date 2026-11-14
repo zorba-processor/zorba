@@ -2457,8 +2457,8 @@ void test_exhaust_bounds_retry( Fixture const &f ) {
          pthread_attr_setstacksize( &attr, 512 * 1024 ) != 0 ||
          pthread_create( &thread, &attr, on_thread, &server ) != 0 )
       _exit( 127 );
-    pthread_join( thread, nullptr );
-    _exit( 127 );
+    // The thread ends the child: a return from pthread_join() is a failure.
+    _exit( pthread_join( thread, nullptr ) == 0 ? 126 : 127 );
   }
   int status = 0;
   check( waitpid( pid, &status, 0 ) == pid, "wait for the child" );
