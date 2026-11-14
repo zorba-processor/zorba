@@ -101,6 +101,8 @@ SchemaValidatorFilter::SchemaValidatorFilter(
   theAttrCount(0),
   theEventBuffer(eventBuffer),
   theErrorOccurred(false),
+  theSubstitutedElemName(0),
+  theSubstitutedElemUri(0),
   theIsNilled(false)
 {
   theSchemaGrammar = new (fMemoryManager) SchemaGrammar(fMemoryManager);
@@ -174,7 +176,7 @@ void SchemaValidatorFilter::reset()
 
   XMLString::release(&theProcessorStipulatedTypeName, fMemoryManager);
   theProcessorStipulatedTypeUriId = -1;
-  theHasTypeEntry.clear();
+  theOpenElements.clear();
 }
 
 
@@ -204,6 +206,9 @@ void SchemaValidatorFilter::startElementEvent(
   //cout << "    svf startElememntEvent: " << StrX(localname) << "  @ " << StrX(uri) << "\n";
   if(theElementToProcess)
     processStartElement();
+
+  // Only the attributes of this element may make it nil
+  ((XercSchemaValidator*)fValidator)->setNillable(false);
 
   thePrefix.set(prefix);
   theUri.set(uri);
@@ -357,13 +362,8 @@ void SchemaValidatorFilter::processStartElement()
       fValidator->validateElement(elemDecl);
   }
   const bool isValidated = fValidate || theXsiType;
-  theHasTypeEntry.push_back(isValidated);
-
-  XercSchemaValidator* validator = (XercSchemaValidator*)fValidator;
-  // xsi:nil on an element that is not validated must not carry over to the next one
-  if (!isValidated)
-    validator->setNillable(false);
-  theIsNilled = validator->getIsNil();
+  theIsNilled = isValidated && ((XercSchemaValidator*)fValidator)->getIsNil();
+  theOpenElements.push_back({isValidated, theIsNilled});
 
 
   ComplexTypeInfo* typeinfo =
@@ -736,11 +736,13 @@ void SchemaValidatorFilter::endElementEvent(
   // We commandeer fCommentOrPISeen to keep _errorOccurred in
   theErrorOccurred = topElem->fCommentOrPISeen;
 
-  const bool hasTypeEntry = theHasTypeEntry.back();
-  theHasTypeEntry.pop_back();
+  const OpenElement element = theOpenElements.back();
+  theOpenElements.pop_back();
 
-  if(hasTypeEntry)
+  if(element.hasTypeEntry)
   {
+    ((XercSchemaValidator*)fValidator)->setNillable(element.isNilled);
+
     DatatypeValidator *currentDV = 0;
     if(topElem->fThisElement->isDeclared())
     {
@@ -1586,6 +1588,7 @@ void SchemaValidatorFilter::error(
      !( errCode == XMLValid::AttNotDefined ||
         errCode == XMLValid::AttNotDefinedForElement ||
         errCode == XMLValid::SimpleTypeHasChild ||
+        errCode == XMLValid::NilAttrNotEmpty ||
         errCode == XMLValid::ElementNotValidForContent ||
         errCode == XMLValid::NotEnoughElemsForCM ||
         errCode == XMLValid::EmptyNotValidForContent ||
