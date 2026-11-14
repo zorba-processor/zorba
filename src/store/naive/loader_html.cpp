@@ -264,14 +264,10 @@ void HtmlXmlLoader::htmlStartElement(
 
   if (loader.theDepth >= MAX_DEPTH)
   {
-    std::ostringstream lMessage;
-    lMessage << "element nesting deeper than " << MAX_DEPTH << " levels";
-    loader.theXQueryDiagnostics->add_error(
-      NEW_ZORBA_EXCEPTION(zerr::ZSTR0021_LOADER_PARSING_ERROR,
-                          ERROR_PARAMS(loader.theDocUri,
-                                       xmlSAX2GetLineNumber(loader.ctxt),
-                                       xmlSAX2GetColumnNumber(loader.ctxt),
-                                       ERROR_TEXT( lMessage.str() ))));
+    loader.reportLimit(loader.theDocUri.c_str(),
+                       xmlSAX2GetLineNumber(loader.ctxt),
+                       xmlSAX2GetColumnNumber(loader.ctxt),
+                       depthLimit());
     xmlStopParser(loader.ctxt);
     return;
   }

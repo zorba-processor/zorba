@@ -1086,7 +1086,10 @@ store::Item_t DtdXmlLoader::loadXml(
     else if (parsed == -1)
     {
       // std::cout << "  xmlParseDocument: Error: Unable to create tree: " << xmlCtxtGetLastError(ctxt)->message << std::endl;
-      theXQueryDiagnostics->add_error(NEW_ZORBA_EXCEPTION(zerr::ZSTR0021_LOADER_PARSING_ERROR,ERROR_PARAMS( ZED( XMLParserNoCreateTree ) )));
+      // The parser's errors reach no handler of this loader; an exceeded
+      // limit is its last one, as the parser stops there.
+      if (!reportParserLimit(xmlCtxtGetLastError(ctxt)))
+        theXQueryDiagnostics->add_error(NEW_ZORBA_EXCEPTION(zerr::ZSTR0021_LOADER_PARSING_ERROR,ERROR_PARAMS( ZED( XMLParserNoCreateTree ) )));
       abortload();
       return NULL;
     }

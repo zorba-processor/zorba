@@ -261,6 +261,9 @@ XQueryErrorCode XPDY0002( "err:XPDY0002" );
 XQueryErrorCode XPDY0050( "err:XPDY0050" );
 
 
+XQueryErrorCode XPDY0130( "err:XPDY0130" );
+
+
 XQueryErrorCode XQDY0025( "err:XQDY0025" );
 
 

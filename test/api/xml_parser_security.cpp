@@ -550,7 +550,9 @@ void test_xqueryx(Zorba* z, const Files& f)
 #endif
 
 // Entity expansion must fail fast with an error under every policy; libxml2's
-// amplification checks are never disabled.
+// amplification checks are never disabled. When libxml2's message tells the
+// amplification limit apart from a real entity loop (from 2.11 on), the error
+// is the implementation limit err:XPDY0130, whose message names the factor.
 void test_billion_laughs(Zorba* z)
 {
   std::string const lDoc = billion_laughs();
@@ -566,7 +568,23 @@ void test_billion_laughs(Zorba* z)
     auto const secs = std::chrono::duration_cast<std::chrono::seconds>(
         std::chrono::steady_clock::now() - t0).count();
     CHECK(!o.ok);
-    CHECK(o.code == "FODC0006");
+#if LIBXML_VERSION >= 21100
+    CHECK(o.code == "XPDY0130");
+    CHECK(o.message.find("entity amplification factor") != std::string::npos);
+    if (p.getMaxEntityAmplification() != 0)
+      CHECK(o.message.find("entity amplification factor of 5")
+            != std::string::npos);
+#else
+    // libxml2 2.9 and 2.10 report the amplification limit as an entity
+    // reference loop, unless the distribution backported the message of 2.11.
+    bool const lExpected =
+      o.code == "FODC0006" ||
+      (o.code == "XPDY0130" &&
+       o.message.find("entity amplification factor") != std::string::npos);
+    CHECK(lExpected);
+    if (!lExpected)
+      std::cerr << "  billion laughs: " << o << std::endl;
+#endif
     CHECK(secs < 30);
     if (o.ok || secs >= 30)
       std::cerr << "  billion laughs: " << o << " after " << secs << " s"
