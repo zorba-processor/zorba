@@ -1285,8 +1285,8 @@ void visit_flwor_clause(const flwor_clause* c, bool general)
     clauseVarMap->theVarExprs.push_back(lc->get_var());
     clauseVarMap->theVarRebinds.push_back(varRebind);
 
-    // A single item is bound eagerly; a lazy LET (IndexJoinRule::rewriteJoin())
-    // is evaluated when its var is read.
+    // A single item is bound eagerly; a lazy LET (IndexJoinRule::rewriteJoin(),
+    // HoistRule::hoistExpr()) is evaluated when its var is read.
     if (!lc->lazyEval())
     {
       if (domType->get_quantifier() == SequenceType::QUANT_ONE)
