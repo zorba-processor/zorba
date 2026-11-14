@@ -97,8 +97,8 @@ bool call_results_can_differ(const expr* root);
 bool is_call_with_varying_result(const expr* call);
 
 // Whether the domain of the for clause gives its whole binding sequence before the
-// next clause runs (XQuery Scripting Extension 1.0, 6.7): its flwor has a call that can
-// have a side effect, or is sequential and has no no-materialization pragma. Decided
+// next clause runs (XQuery Scripting Extension 1.0, 6.7): it has a call that can have a
+// side effect, or its flwor is sequential and has no no-materialization pragma. Decided
 // by classify_calls() on the tree before the optimizer runs, so that every level
 // agrees; a rewrite must not remove such a for clause.
 bool is_binding_sequence(const for_clause* fc);

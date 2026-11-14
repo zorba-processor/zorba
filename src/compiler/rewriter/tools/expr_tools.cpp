@@ -1869,8 +1869,8 @@ static bool is_sequential_flwor_with_binding_sequences(flwor_expr* flwor)
 
 
 /*******************************************************************************
-  Marks, for every for clause reachable from the query, whether its flwor has an
-  unproven call or is sequential, on the tree before the optimizer runs.
+  Marks, for every for clause reachable from the query, whether its domain has an
+  unproven call or its flwor is sequential, on the tree before the optimizer runs.
   One walk, bottom up: the answer for an expr is whether it or one of its children
   is an unproven call, and the answer for a call of a user function covers its body
   (is_unproven_call()). The bodies of the functions that the query names are marked
@@ -1972,21 +1972,10 @@ bool BindingSequenceWalk::walk(expr* e)
   {
     flwor_expr* flwor = static_cast<flwor_expr*>(e);
 
-    ExprIterator iter(e);
-    while (!iter.done())
-    {
-      expr* child = **iter;
-
-      if (child != NULL && walk(child))
-        found = true;
-
-      iter.next();
-    }
-
-    // With such a call anywhere in the flwor, every for clause gives its binding
-    // sequence first, so that the call cannot change what a domain still has to read.
-    bool const bindingSequences =
-        found || is_sequential_flwor_with_binding_sequences(flwor);
+    // The domain of each for clause is walked on its own, for its answer. The rest
+    // of the flwor is walked below, with the domains of the for clauses skipped.
+    std::set<const expr*> domains;
+    bool const sequentialFlwor = is_sequential_flwor_with_binding_sequences(flwor);
 
     for (csize i = 0; i < flwor->num_clauses(); ++i)
     {
@@ -1996,12 +1985,27 @@ bool BindingSequenceWalk::walk(expr* e)
         continue;
 
       for_clause* fc = static_cast<for_clause*>(c);
+      bool const domainFound = walk(fc->get_expr());
 
       // Decided once: a clause already marked keeps its mark.
       if (fc->get_binding_sequence() == for_clause::BINDING_SEQUENCE_UNKNOWN)
-        fc->set_binding_sequence(bindingSequences ?
+        fc->set_binding_sequence(domainFound || sequentialFlwor ?
                                  for_clause::BINDING_SEQUENCE_YES :
                                  for_clause::BINDING_SEQUENCE_NO);
+
+      domains.insert(fc->get_expr());
+      found = found || domainFound;
+    }
+
+    ExprIterator iter(e);
+    while (!iter.done())
+    {
+      expr* child = **iter;
+
+      if (child != NULL && domains.find(child) == domains.end() && walk(child))
+        found = true;
+
+      iter.next();
     }
 
     return found;
@@ -2036,13 +2040,8 @@ bool is_binding_sequence(const for_clause* fc)
 
   // A clause that a rewrite created, or one in code that the walk of
   // classify_calls() did not reach.
-  flwor_expr* flwor = fc->get_flwor_expr();
-
-  if (flwor == NULL)
-    return calls_unproven_function(fc->get_expr());
-
-  return calls_unproven_function(flwor) ||
-         is_sequential_flwor_with_binding_sequences(flwor);
+  return calls_unproven_function(fc->get_expr()) ||
+         is_sequential_flwor_with_binding_sequences(fc->get_flwor_expr());
 }
 
 

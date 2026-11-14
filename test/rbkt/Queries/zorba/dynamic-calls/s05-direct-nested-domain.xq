@@ -1,4 +1,4 @@
-(: The tuples of a loop are computed before its return clause runs: the domain gives its whole binding sequence first (as d44). :)
+(: Control: the tuples of a loop are computed before its return clause runs. :)
 declare namespace an = "http://zorba.io/annotations";
 declare %an:assignable variable $g := 0;
 declare %an:sequential function local:bump() { $g := $g + 1; $g };
