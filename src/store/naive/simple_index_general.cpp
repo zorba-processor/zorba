@@ -297,7 +297,7 @@ GeneralIndex::GeneralIndex(
   IndexImpl(qname, spec),
   theKeyTypeCode(store::XS_LAST),
   theCompFunction(spec.theTimezone, spec.theCollations[0]),
-  theNumUntypedEntries(0),
+  theNumTypedEntries(),
   theNumMultiKeyNodes(0)
 {
   store::Item* typeName = spec.theKeyTypes[0].getp();
@@ -630,19 +630,23 @@ bool GeneralIndex::insertInMap(
     bool untyped,
     GeneralIndexValue::ImageKind image)
 {
-  if (untyped)
-    ++theNumUntypedEntries;
+  bool found;
 
   if (isSorted())
   {
     GeneralTreeIndex* idx = static_cast<GeneralTreeIndex*>(this);
-    return idx->insertInMap(key, node, idx->theMaps[targetMap], untyped, image);
+    found = idx->insertInMap(key, node, idx->theMaps[targetMap], untyped, image);
   }
   else
   {
     GeneralHashIndex* idx = static_cast<GeneralHashIndex*>(this);
-    return idx->insertInMap(key, node, idx->theMaps[targetMap], untyped, image);
+    found = idx->insertInMap(key, node, idx->theMaps[targetMap], untyped, image);
   }
+
+  if (!untyped)
+    ++theNumTypedEntries[targetMap];
+
+  return found;
 }
 
 
@@ -1020,8 +1024,8 @@ bool GeneralIndex::removeFromMap(
     found = idx->removeFromMap(key, node, idx->theMaps[targetMap], untyped, image);
   }
 
-  if (found && untyped)
-    --theNumUntypedEntries;
+  if (found && !untyped)
+    --theNumTypedEntries[targetMap];
 
   return found;
 }
@@ -1110,7 +1114,7 @@ void GeneralHashIndex::clear()
   }
 
   theEmptyKeyNodes.clear();
-  theNumUntypedEntries = 0;
+  theNumTypedEntries.fill(0);
   theNumMultiKeyNodes = 0;
 }
 
@@ -1392,7 +1396,7 @@ void GeneralTreeIndex::clear()
   }
 
   theEmptyKeyNodes.clear();
-  theNumUntypedEntries = 0;
+  theNumTypedEntries.fill(0);
   theNumMultiKeyNodes = 0;
 }
 
@@ -1546,33 +1550,87 @@ ProbeGeneralIndexIterator::ProbeGeneralIndexIterator(const store::Index_t& idx)
 
 
 /*******************************************************************************
-
+  The keys a value comparison compares with a key of the given type are those
+  of the same class: the numbers, the strings and xs:anyURI values (an untyped
+  value compares as an xs:string), the durations, the xs:dateTime values, and
+  otherwise the values of the same type.
 ********************************************************************************/
-void ProbeGeneralIndexIterator::checkStringKeyType(const AtomicItem* key) const
+static store::SchemaTypeCode valueComparisonClass(store::SchemaTypeCode type)
 {
-  if (key == NULL)
+  switch (type)
+  {
+  case store::XS_DOUBLE:
+  case store::XS_FLOAT:
+  case store::XS_DECIMAL:
+  case store::XS_INTEGER:
+  case store::XS_NON_POSITIVE_INTEGER:
+  case store::XS_NEGATIVE_INTEGER:
+  case store::XS_NON_NEGATIVE_INTEGER:
+  case store::XS_POSITIVE_INTEGER:
+  case store::XS_UNSIGNED_LONG:
+  case store::XS_LONG:
+  case store::XS_INT:
+  case store::XS_SHORT:
+  case store::XS_BYTE:
+  case store::XS_UNSIGNED_INT:
+  case store::XS_UNSIGNED_SHORT:
+  case store::XS_UNSIGNED_BYTE:
+    return store::XS_DOUBLE;
+
+  case store::XS_UNTYPED_ATOMIC:
+  case store::XS_ANY_URI:
+  case store::XS_STRING:
+  case store::XS_NORMALIZED_STRING:
+  case store::XS_TOKEN:
+  case store::XS_NMTOKEN:
+  case store::XS_LANGUAGE:
+  case store::XS_NAME:
+  case store::XS_NCNAME:
+  case store::XS_ID:
+  case store::XS_IDREF:
+  case store::XS_ENTITY:
+    return store::XS_STRING;
+
+  case store::XS_YM_DURATION:
+  case store::XS_DT_DURATION:
+    return store::XS_DURATION;
+
+  case store::XS_DATETIME_STAMP:
+    return store::XS_DATETIME;
+
+  default:
+    return type;
+  }
+}
+
+
+/*******************************************************************************
+  Raises the error that a value comparison of the search key with a key of the
+  index raises: the keys of a map other than the null map that has entries not
+  cast from an untyped key are compared with it.
+********************************************************************************/
+void ProbeGeneralIndexIterator::checkComparableKeys(const AtomicItem* searchKey) const
+{
+  // null compares with every value.
+  if (searchKey == NULL || searchKey->getTypeCode() == store::JS_NULL)
     return;
 
-  store::SchemaTypeCode keyType = key->getTypeCode();
+  store::SchemaTypeCode searchClass =
+    valueComparisonClass(searchKey->getTypeCode());
 
-  // A value comparison casts an untyped key to xs:string, which compares
-  // with null.
-  if (keyType != store::XS_UNTYPED_ATOMIC &&
-      keyType != store::JS_NULL &&
-      keyType != store::XS_ANY_URI &&
-      keyType != store::XS_STRING &&
-      keyType != store::XS_NORMALIZED_STRING &&
-      keyType != store::XS_TOKEN &&
-      keyType != store::XS_NMTOKEN &&
-      keyType != store::XS_LANGUAGE &&
-      keyType != store::XS_NAME &&
-      keyType != store::XS_NCNAME &&
-      keyType != store::XS_ID &&
-      keyType != store::XS_IDREF &&
-      keyType != store::XS_ENTITY)
+  for (csize map = 0; map < store::XS_LAST; ++map)
   {
-    RAISE_ERROR_NO_LOC(err::XPTY0004,
-    ERROR_PARAMS(ZED(NoUntypedKeyNodeValue_2), theIndex->getName()->getStringValue()));
+    store::SchemaTypeCode mapType = static_cast<store::SchemaTypeCode>(map);
+
+    if (theIndex->theNumTypedEntries[map] > 0 &&
+        mapType != store::JS_NULL &&
+        valueComparisonClass(mapType) != searchClass)
+    {
+      RAISE_ERROR_NO_LOC(err::XPTY0004,
+      ERROR_PARAMS(ZED(IncomparableKeyNodeValue_23),
+                   searchKey->getType()->getStringValue(),
+                   theIndex->getName()->getStringValue()));
+    }
   }
 }
 
@@ -1616,11 +1674,11 @@ void ProbeGeneralIndexIterator::init(const store::IndexCondition_t& cond,
       ERROR_PARAMS(ZED(NoMultiKeyNodeValues_2), theIndex->getName()->getStringValue()));
     }
 
-    if (theIndex->theNumUntypedEntries > 0)
+    if (!theIndex->isTyped())
     {
-      checkStringKeyType(theCondition->theKey.getp());
-      checkStringKeyType(theCondition->theLowerBound.getp());
-      checkStringKeyType(theCondition->theUpperBound.getp());
+      checkComparableKeys(theCondition->theKey.getp());
+      checkComparableKeys(theCondition->theLowerBound.getp());
+      checkComparableKeys(theCondition->theUpperBound.getp());
     }
   }
 

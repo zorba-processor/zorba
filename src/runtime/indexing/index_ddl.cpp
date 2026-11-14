@@ -98,6 +98,26 @@ static bool hasAnyKeyType(
 
 
 /*******************************************************************************
+  Whether the store keeps the keys of a general index as those of one without
+  a key type: the declaration gives no key type, xs:anyAtomicType or
+  xs:untypedAtomic.
+********************************************************************************/
+static bool hasUntypedStoreKeys(
+    TypeManager* tm,
+    const IndexDecl* indexDecl,
+    csize keyNo)
+{
+  if (hasAnyKeyType(tm, indexDecl, keyNo))
+    return true;
+
+  const xqtref_t& keyType = (indexDecl->getKeyTypes())[keyNo];
+
+  return (indexDecl->isGeneral() &&
+          TypeOps::is_equal(tm, *keyType, *GENV_TYPESYSTEM.UNTYPED_ATOMIC_TYPE_ONE));
+}
+
+
+/*******************************************************************************
   This function is called from the probe function to chaeck that the type of
   the probing key is consistent with the index declaration.
 ********************************************************************************/
@@ -141,6 +161,14 @@ static void checkKeyType(
 
     if (TypeOps::is_subtype(tm, *indexKeyType, *rtm.STRING_TYPE_ONE) &&
         (searchKeyTypeCode == store::XS_UNTYPED_ATOMIC ||
+         searchKeyTypeCode == store::XS_ANY_URI))
+    {
+      return;
+    }
+
+    // A comparison with an untyped value casts it to xs:string.
+    if (TypeOps::is_subtype(tm, *indexKeyType, *rtm.UNTYPED_ATOMIC_TYPE_ONE) &&
+        (TypeOps::is_subtype(searchKeyTypeCode, store::XS_STRING) ||
          searchKeyTypeCode == store::XS_ANY_URI))
     {
       return;
@@ -824,7 +852,7 @@ store::IndexCondition_t ProbeIndexPointValueIterator::createCondition(
       checkKeyType(loc, tm, state->theIndexDecl, i - numNonKeyParams, keyItem);
     }
 
-    if (hasAnyKeyType(tm, state->theIndexDecl, i - numNonKeyParams))
+    if (hasUntypedStoreKeys(tm, state->theIndexDecl, i - numNonKeyParams))
     {
       store::SchemaTypeCode searchKeyType = keyItem->getTypeCode();
         
