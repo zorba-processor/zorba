@@ -1,0 +1,30 @@
+<iterator-tree description="main query">
+  <SequentialIterator>
+    <CtxVarDeclareIterator varid="4" varname="two">
+      <SingletonIterator value="xs:integer(2)"/>
+    </CtxVarDeclareIterator>
+    <TreatIterator type="xs:integer" quant="">
+      <CtxVarIterator varid="4" varname="two" varkind="global"/>
+    </TreatIterator>
+    <FLWORIterator>
+      <ForVariable name="x">
+        <FnConcatIterator>
+          <SingletonIterator value="xs:integer(1)"/>
+          <CtxVarIterator varid="4" varname="two" varkind="global"/>
+        </FnConcatIterator>
+      </ForVariable>
+      <WhereClause>
+        <TypedValueCompareIterator_INTEGER>
+          <NumArithIterator_IntegerDivideOperation>
+            <SingletonIterator value="xs:integer(6)"/>
+            <ForVarIterator varname="x"/>
+          </NumArithIterator_IntegerDivideOperation>
+          <SingletonIterator value="xs:integer(6)"/>
+        </TypedValueCompareIterator_INTEGER>
+      </WhereClause>
+      <ReturnClause>
+        <ForVarIterator varname="x"/>
+      </ReturnClause>
+    </FLWORIterator>
+  </SequentialIterator>
+</iterator-tree>
