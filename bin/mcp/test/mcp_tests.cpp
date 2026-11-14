@@ -68,6 +68,9 @@
 
 #include <libxml/xmlversion.h>
 
+#include <zorba/external_module.h>
+#include <zorba/function.h>
+#include <zorba/item_sequence.h>
 #include <zorba/store_manager.h>
 #include <zorba/zorba.h>
 
@@ -3643,18 +3646,16 @@ void test_plan_wrapper_out_of_memory( Fixture const &f ) {
   (void)f;
 #endif
 }
-// Iterator::open() with each allocation failing in turn, over a FLWOR whose open
-// allocates (a let bound to a sequence, group by, order by): the answer or an
+// Iterator::open() with each allocation failing in turn: the answer or an
 // error; then, in an AddressSanitizer build, nothing is left unreachable.
-void test_plan_open_out_of_memory( Fixture const &f ) {
+void sweep_open_out_of_memory( Fixture const &f, StaticContext_t const &sctx,
+                               std::string const &text,
+                               std::string const &answer,
+                               std::string const &what ) {
 #if defined(__linux__)
   auto attempt = [&]( long n, long length, long *count ) -> std::string {
-    XQuery_t const query( f.zorba->compileQuery(
-      "for $i in 1 to 20\n"
-      "let $s := ($i, $i * 2)\n"
-      "group by $k := $i mod 3\n"
-      "order by $k descending\n"
-      "return sum($s)" ) );
+    XQuery_t const query( sctx ? f.zorba->compileQuery( text, sctx )
+                               : f.zorba->compileQuery( text ) );
     Iterator_t const it( query->iterator() );
     inject_arm( n, length );
     bool opened = false;
@@ -3675,26 +3676,79 @@ void test_plan_open_out_of_memory( Fixture const &f ) {
     return out;
   };
   long total = 0;
-  check( attempt( 0, 0, &total ) == "231 210 189", "the FLWOR: the answer" );
-  check( total > 0, "open() allocates", std::to_string( total ) );
+  check( attempt( 0, 0, &total ) == answer, what + ": the answer" );
+  check( total > 0, what + ": open() allocates", std::to_string( total ) );
   long wrong = 0;
   for ( long const length : { 1L, 8L } )
     for ( long n = 1; n <= total; ++n ) {
       long count = 0;
       std::string const got( attempt( n, length, &count ) );
-      if ( got != "231 210 189" && got != "error" && ++wrong <= 3 )
-        std::cout << "at " << n << " of a run of " << length << ": " << got
-                  << std::endl;
+      if ( got != answer && got != "error" && ++wrong <= 3 )
+        std::cout << what << " at " << n << " of a run of " << length << ": "
+                  << got << std::endl;
     }
-  check( wrong == 0, "open() failing: the answer or an error",
+  check( wrong == 0, what + ": open() failing: the answer or an error",
          std::to_string( wrong ) + " points" );
 # if defined(__SANITIZE_ADDRESS__)
   check( __lsan_do_recoverable_leak_check() == 0,
-         "open() failing: nothing is left behind" );
+         what + ": open() failing: nothing is left behind" );
 # endif
 #else
   (void)f;
+  (void)sctx;
+  (void)text;
+  (void)answer;
+  (void)what;
 #endif
+}
+
+// ex:echo($x) returns $x.
+class EchoFunction : public NonContextualExternalFunction {
+public:
+  String getURI() const override { return "urn:mcp-tests:ext"; }
+  String getLocalName() const override { return "echo"; }
+  ItemSequence_t evaluate( Arguments_t const &args ) const override {
+    return args[ 0 ];
+  }
+};
+
+class EchoModule : public ExternalModule {
+public:
+  String getURI() const override { return "urn:mcp-tests:ext"; }
+  ExternalFunction* getExternalFunction( String const& ) override {
+    return &echo_;
+  }
+private:
+  EchoFunction echo_;
+};
+
+// Opening a plan that fails partway destroys each state created so far,
+// including one whose init() failed or did not run: a simple FLWOR (a let bound
+// to a sequence, group by, order by), a general FLWOR (count after group by and
+// order by: GroupByState) and an external function call (ExtFunctionCallIteratorState).
+void test_plan_open_out_of_memory( Fixture const &f ) {
+  sweep_open_out_of_memory( f, StaticContext_t(),
+    "for $i in 1 to 20\n"
+    "let $s := ($i, $i * 2)\n"
+    "group by $k := $i mod 3\n"
+    "order by $k descending\n"
+    "return sum($s)",
+    "231 210 189", "the FLWOR" );
+  sweep_open_out_of_memory( f, StaticContext_t(),
+    "for $i in 1 to 20\n"
+    "group by $k := $i mod 3\n"
+    "order by $k descending\n"
+    "count $c\n"
+    "return $c * sum($i)",
+    "77 140 189", "the general FLWOR" );
+  EchoModule module;
+  StaticContext_t const sctx( f.zorba->createStaticContext() );
+  sctx->registerModule( &module );
+  sweep_open_out_of_memory( f, sctx,
+    "declare namespace ex = \"urn:mcp-tests:ext\";\n"
+    "declare function ex:echo($x) external;\n"
+    "for $i in 1 to 3 return ex:echo($i * 2)",
+    "2 4 6", "the external function call" );
 }
 // The query opened, then read with each allocation failing in turn: the answer
 // or an error; then, in an AddressSanitizer build, nothing is left unreachable.
