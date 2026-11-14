@@ -1,0 +1,80 @@
+module namespace m = "http://www.example.com/general-index-contract";
+
+import module namespace ddl =
+  "http://zorba.io/modules/store/static/collections/ddl";
+
+import module namespace dml =
+  "http://zorba.io/modules/store/static/collections/dml";
+
+import module namespace iddl =
+  "http://zorba.io/modules/store/static/indexes/ddl";
+
+declare namespace an = "http://zorba.io/annotations";
+
+(: gYear keys, which have no ordering, in range indexes without a key type
+   and with xs:anyAtomicType* as the key type. :)
+declare collection m:y as node()*;
+
+declare %an:general-range %an:manual index m:YRange
+on nodes dml:collection(xs:QName("m:y"))//e
+by xs:gYear(./@v);
+
+declare %an:general-range %an:manual index m:YAnyRange
+on nodes dml:collection(xs:QName("m:y"))//e
+by xs:gYear(./@v) as xs:anyAtomicType*;
+
+(: Integer keys and, once inserted, a gYear key in an automatic range index. :)
+declare collection m:ya as node()*;
+
+declare %an:general-range %an:automatic index m:YaRange
+on nodes dml:collection(xs:QName("m:ya"))
+by (if (./@t eq "y") then xs:gYear(./@v) else xs:integer(./@v));
+
+(: Elements with several, one or no k children. :)
+declare collection m:k as node()*;
+
+declare %an:general-range %an:manual index m:KRange
+on nodes dml:collection(xs:QName("m:k"))//e
+by fn:data(./k);
+
+(: Integer keys in indexes with a declared key type. :)
+declare collection m:i as node()*;
+
+declare %an:general-range %an:manual index m:IRange
+on nodes dml:collection(xs:QName("m:i"))//e
+by xs:integer(./@v) as xs:integer*;
+
+declare %an:general-equality %an:manual index m:IEquality
+on nodes dml:collection(xs:QName("m:i"))//e
+by xs:integer(./@v) as xs:integer*;
+
+(: Untyped keys in a range index whose key type is xs:anyAtomicType*. :)
+declare collection m:a as node()*;
+
+declare %an:general-range %an:manual index m:ARange
+on nodes dml:collection(xs:QName("m:a"))//e
+by fn:data(./@v) as xs:anyAtomicType*;
+
+declare %an:sequential function m:create($collection as xs:QName,
+                                         $content as node()*,
+                                         $indexes as xs:QName*)
+{
+  ddl:create($collection);
+  dml:insert($collection, <r>{ $content }</r>);
+  for $index in $indexes
+  return iddl:create($index);
+};
+
+declare function m:elements($collection as xs:QName) as element(e)*
+{
+  dml:collection($collection)/descendant-or-self::e
+};
+
+declare function m:ids($nodes as node()*) as xs:string
+{
+  fn:string-join(
+    for $e in $nodes
+    order by xs:integer($e/@id)
+    return fn:string($e/@id),
+    " ")
+};
