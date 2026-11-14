@@ -603,57 +603,6 @@ std::string IndexBoxValueCondition::toString() const
 }
 
 
-} // namespace simplestore
-
-
-namespace store 
-{
-
-/////////////////////////////////////////////////////////////////////////////////
-//                                                                             //
-//  IndexDelta                                                                 //
-//                                                                             //
-/////////////////////////////////////////////////////////////////////////////////
-
-/*******************************************************************************
-
-********************************************************************************/
-void IndexDelta::addValuePair(store::Item_t& node, store::IndexKey* key)
-{
-  theValueDelta.resize(theValueDelta.size() + 1);
-  theValueDelta.back().first.transfer(node);
-  theValueDelta.back().second = key;
-}
-
-
-/*******************************************************************************
-
-********************************************************************************/
-void IndexDelta::addGeneralPair(store::Item_t& node, store::Item_t& key)
-{
-  assert(node->isNode() && (key == NULL || key->isAtomic()));
-
-  theGeneralDelta.resize(theGeneralDelta.size() + 1);
-  theGeneralDelta.back().first.transfer(node);
-  theGeneralDelta.back().second.transfer(key);
-}
-
-
-/*******************************************************************************
-
-********************************************************************************/
-void IndexDelta::clear()
-{
-  for (csize i = 0; i < theValueDelta.size(); ++i)
-  {
-    delete theValueDelta[i].second;
-  }
-
-  theValueDelta.clear();
-  theGeneralDelta.clear();
-}
-
-
 /*******************************************************************************
   The keys a value comparison compares with a key of the given type are those
   of the same class: the numbers, the strings and xs:anyURI values (an untyped
@@ -709,6 +658,57 @@ store::SchemaTypeCode valueComparisonClass(
   default:
     return type;
   }
+}
+
+
+} // namespace simplestore
+
+
+namespace store 
+{
+
+/////////////////////////////////////////////////////////////////////////////////
+//                                                                             //
+//  IndexDelta                                                                 //
+//                                                                             //
+/////////////////////////////////////////////////////////////////////////////////
+
+/*******************************************************************************
+
+********************************************************************************/
+void IndexDelta::addValuePair(store::Item_t& node, store::IndexKey* key)
+{
+  theValueDelta.resize(theValueDelta.size() + 1);
+  theValueDelta.back().first.transfer(node);
+  theValueDelta.back().second = key;
+}
+
+
+/*******************************************************************************
+
+********************************************************************************/
+void IndexDelta::addGeneralPair(store::Item_t& node, store::Item_t& key)
+{
+  assert(node->isNode() && (key == NULL || key->isAtomic()));
+
+  theGeneralDelta.resize(theGeneralDelta.size() + 1);
+  theGeneralDelta.back().first.transfer(node);
+  theGeneralDelta.back().second.transfer(key);
+}
+
+
+/*******************************************************************************
+
+********************************************************************************/
+void IndexDelta::clear()
+{
+  for (csize i = 0; i < theValueDelta.size(); ++i)
+  {
+    delete theValueDelta[i].second;
+  }
+
+  theValueDelta.clear();
+  theGeneralDelta.clear();
 }
 
 
