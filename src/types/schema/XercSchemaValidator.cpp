@@ -191,8 +191,7 @@ bool XercSchemaValidator::checkContent (XMLElementDecl* const elemDecl
     {
         // Normally for SchemaElementDecl::Any, We pass no judgement on it and anything goes
         // but if there is a fXsiTypeValidator, we need to use it for validation
-        if (childCount > 0 &&
-            (modelType == SchemaElementDecl::Simple || fCurrentDatatypeValidator)) {
+        if (modelType == SchemaElementDecl::Simple && childCount > 0) {
             emitError(XMLValid::SimpleTypeHasChild, elemDecl->getFullName());
             fErrorOccurred = true;
         }
