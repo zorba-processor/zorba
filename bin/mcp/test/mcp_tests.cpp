@@ -3453,8 +3453,11 @@ void test_sweep_schema_import( Fixture const &f ) {
   s.points = 200;
   // The scanner calls exit(2). Xerces-C's OutOfMemoryException from
   // ComplexTypeInfo::makeContentModel() ends the process (7 in runs of 8,
-  // quick-check run 43500984356); cap from quick-check run 42693936525.
+  // quick-check run 43500984356); cap from quick-check run 42693936525. Alone, it
+  // throws OutOfMemoryException from ~XMLGrammarPoolImpl (~SchemaGrammar), as in
+  // the sweep of the HTML module (bigint, CI run 43530408382).
   s.known = { exact( "exit 2", 2 ),
+              starting( "terminate N11xercesc_", 4, 1, "OutOfMemoryExceptionE" ),
               starting( "terminate N11xercesc_", 26, 8, "OutOfMemoryExceptionE" ) };
   s.compiles = true;
   exhaust_sweep( f, "schema import", s );
