@@ -787,6 +787,18 @@ catch (std::bad_alloc const&)
 /*******************************************************************************
 
 ********************************************************************************/
+void DtdXmlLoader::parserError(void* ctx, ZORBA_XML_ERROR_PTR error)
+{
+  // A document without a DTD is accepted under DTD validation.
+  if (error->code == XML_ERR_NO_DTD)
+    return;
+  XmlLoader::error(static_cast<xmlParserCtxtPtr>(ctx)->_private, error);
+}
+
+
+/*******************************************************************************
+
+********************************************************************************/
 DtdXmlLoader::DtdXmlLoader(
     store::ItemFactory* factory,
     XQueryDiagnostics* xqueryDiagnostics,
@@ -1055,6 +1067,11 @@ store::Item_t DtdXmlLoader::loadXml(
       return NULL;
     }
 
+    // libxml2's tree builder needs the context as its SAX user data, so the
+    // errors reach this loader through _private.
+    ctxt->_private = this;
+    ctxt->sax->serror = &DtdXmlLoader::parserError;
+
     // Set the LibXml DTD validation options
     /*
     int options = XML_PARSE_COMPACT;
@@ -1086,9 +1103,8 @@ store::Item_t DtdXmlLoader::loadXml(
     else if (parsed == -1)
     {
       // std::cout << "  xmlParseDocument: Error: Unable to create tree: " << xmlCtxtGetLastError(ctxt)->message << std::endl;
-      // The parser's errors reach no handler of this loader; an exceeded
-      // limit is its last one, as the parser stops there.
-      if (!reportParserLimit(xmlCtxtGetLastError(ctxt)))
+      if (theXQueryDiagnostics->errors().empty() &&
+          !reportParserLimit(xmlCtxtGetLastError(ctxt)))
         theXQueryDiagnostics->add_error(NEW_ZORBA_EXCEPTION(zerr::ZSTR0021_LOADER_PARSING_ERROR,ERROR_PARAMS( ZED( XMLParserNoCreateTree ) )));
       abortload();
       return NULL;
