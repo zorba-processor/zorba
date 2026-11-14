@@ -4,7 +4,8 @@
    general range probes, eq for the value point probes, ge and le for the
    value range probes. Keys of one class compare only with search keys of the
    same class; = and >= cast an untyped search key to the type of the key, eq
-   and ge cast it to xs:string. :)
+   and ge cast it to xs:string. The general comparisons in which the cast of
+   an untyped operand to a type other than xs:double fails are left out. :)
 import module namespace m = "http://www.example.com/index-keytype-parity" at
                              "keytype.xqlib";
 
@@ -25,21 +26,29 @@ declare function local:lines($class as xs:string,
   for $search in $keys
   let $label := fn:concat($class, " keys, ", m:type($search), " search key, ")
   let $elements := function() { m:elements($collection) }
+  let $castFails :=
+    (m:type($search) eq "untyped" and
+     $class = ("date", "yearMonthDuration", "yearMonthDuration as duration")) or
+    ($class eq "untyped" and
+     m:type($search) = ("date", "yearMonthDuration", "boolean"))
   return (
-    m:line(fn:concat($label, "unindexed ="), function() {
-      $elements()[$key(.) = $search] }),
-    if (fn:exists($hash))
-    then m:line(fn:concat($label, "hash general"), function() {
-           idml:probe-index-point-general($hash, $search) })
-    else (),
-    m:line(fn:concat($label, "tree general"), function() {
-      idml:probe-index-point-general($tree, $search) }),
-    m:line(fn:concat($label, "unindexed >= <="), function() {
-      $elements()[$key(.) >= $search and $key(.) <= $search] }),
-    m:line(fn:concat($label, "tree general range"), function() {
-      idml:probe-index-range-general($tree, $search, $search,
-                                     fn:true(), fn:true(),
-                                     fn:true(), fn:true()) }),
+    if ($castFails)
+    then ()
+    else (
+      m:line(fn:concat($label, "unindexed ="), function() {
+        $elements()[$key(.) = $search] }),
+      if (fn:exists($hash))
+      then m:line(fn:concat($label, "hash general"), function() {
+             idml:probe-index-point-general($hash, $search) })
+      else (),
+      m:line(fn:concat($label, "tree general"), function() {
+        idml:probe-index-point-general($tree, $search) }),
+      m:line(fn:concat($label, "unindexed general range"), function() {
+        $elements()[$key(.) >= $search and $key(.) <= $search] }),
+      m:line(fn:concat($label, "tree general range"), function() {
+        idml:probe-index-range-general($tree, $search, $search,
+                                       fn:true(), fn:true(),
+                                       fn:true(), fn:true()) })),
     m:line(fn:concat($label, "unindexed eq"), function() {
       $elements()[$key(.) eq $search] }),
     if (fn:exists($hash))
