@@ -290,18 +290,11 @@
       </StringJoinIterator>
     </ForVariable>
     <LetVariable name="parent" materialize="true">
-      <FLWORIterator>
-        <ForVariable name="p">
-          <ProbeIndexPointValueIterator>
-            <SingletonIterator value="xs:QName(www.data.com,data,idx)"/>
-            <ForVarIterator varname="parent-uri"/>
-            <ForVarIterator varname="child-uri"/>
-          </ProbeIndexPointValueIterator>
-        </ForVariable>
-        <ReturnClause>
-          <ForVarIterator varname="p"/>
-        </ReturnClause>
-      </FLWORIterator>
+      <ProbeIndexPointValueIterator>
+        <SingletonIterator value="xs:QName(www.data.com,data,idx)"/>
+        <ForVarIterator varname="parent-uri"/>
+        <ForVarIterator varname="child-uri"/>
+      </ProbeIndexPointValueIterator>
     </LetVariable>
     <MaterializeClause>
       <MaterializeForVariable inputVar="parent-uri"/>
