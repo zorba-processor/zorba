@@ -122,9 +122,16 @@ private:
 
   const XMLCh                                 * theXsiType;
 
-  // for every open element, whether it took an entry of the type stack of
-  // theSchemaValidator, which checkContent pops at its end
-  std::vector<bool>                             theHasTypeEntry;
+  struct OpenElement
+  {
+    // whether it took an entry of the type stack of theSchemaValidator,
+    // which checkContent pops at its end
+    bool hasTypeEntry;
+    // restored before its checkContent: its children reuse the one nil flag of theSchemaValidator
+    bool isNilled;
+  };
+
+  std::vector<OpenElement>                      theOpenElements;
 
   unsigned int                                  theAttrCount;
 
