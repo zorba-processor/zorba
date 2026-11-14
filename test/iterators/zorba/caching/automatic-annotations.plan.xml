@@ -226,9 +226,6 @@
     <ForVariable name="x">
       <LetVarIterator varname="x"/>
     </ForVariable>
-    <MaterializeClause>
-      <MaterializeForVariable inputVar="x"/>
-    </MaterializeClause>
     <ReturnClause>
       <SequentialIterator>
         <ApplyIterator>

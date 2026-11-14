@@ -415,8 +415,9 @@ ftnode_visitor* get_ftnode_visitor()
 
 // XQSX 6.7: "The associated expression is evaluated first to produce the binding
 // sequence, then the next clause is evaluated once for each item in the binding
-// sequence." This applies to a domain with a call that can have a side effect, as
-// decided before the optimizer runs. Any other domain stays lazy.
+// sequence." This applies to a domain with a call that can have a side effect and to
+// every domain of a sequential flwor, as decided before the optimizer runs. Any other
+// domain stays lazy.
 PlanIter_t binding_sequence_iter(const for_clause* fc, PlanIter_t domainIter)
 {
   expr* domExpr = fc->get_expr();
@@ -964,161 +965,62 @@ bool begin_visit(flwor_expr& v)
   bool isGeneral = v.compute_is_general();
 
   v.set_general(isGeneral);
-    
-  if (v.is_sequential())
+
+  // Without a materialize clause, the flwor iterator evaluates the return clause of
+  // each tuple before the tuples are sorted. A sequential return clause must run in
+  // the order of the order by clause. Note: a materialize clause may exist already
+  // in case plan serialization is on (see comment in materialize_clause::clone)
+  if (!isGeneral &&
+      v.get_order_clause() != NULL &&
+      v.get_return_expr()->is_sequential() &&
+      v.get_clause(numClauses-1)->get_kind() != flwor_clause::materialize_clause)
   {
-    pragma* pr = 0;
-    theCCB->lookup_pragma(&v, "no-materialization", pr);
+    pragma* noMaterialization = NULL;
+    theCCB->lookup_pragma(&v, "no-materialization", noMaterialization);
 
-    if (!isGeneral)
+    if (noMaterialization == NULL)
     {
-      if (v.has_sequential_clauses())
-      {
-        csize numForClauses = 0;
+      materialize_clause* mat = theCCB->theEM->create_materialize_clause(v.get_sctx(),
+                                               v.get_return_expr()->get_loc());
+      v.add_clause(mat);
+      ++numClauses;
+    }
+  }
 
-        for (csize i = 0; i < numClauses; ++i)
-        {
-          const flwor_clause* c = v.get_clause(i);
+  // A window clause with a sequential domain keeps the order it had: the tuples
+  // before it, and then its own tuples, are all computed before the next clause.
+  if (isGeneral && v.is_sequential())
+  {
+    pragma* noMaterialization = NULL;
+    theCCB->lookup_pragma(&v, "no-materialization", noMaterialization);
 
-          if (c->get_kind() == flwor_clause::for_clause)
-          {
-            ++numForClauses;
-
-            const forlet_clause* fc = static_cast<const forlet_clause*>(c);
-
-            if (fc->get_expr()->is_sequential())
-            {
-              // TODO: do not convert to general flwor if the whole flwor consists
-              // of a single FOR followed by RETURN.
-              isGeneral = true;
-              v.set_general(true);
-              break;
-            }
-          }
-          else if (c->get_kind() == flwor_clause::let_clause)
-          {
-            const forlet_clause* lc = static_cast<const forlet_clause*>(c);
-
-            if (lc->get_expr()->is_sequential())
-            {
-              if (numForClauses > 0)
-              {
-                isGeneral = true;
-                v.set_general(true);
-                break;
-              }
-            }
-          }
-          else
-          {
-            break;
-          }
-        }
-      }
-
-      // Note: a materialize clause may exist already in case plan serialization
-      // is on (see comment in materialize_clause::clone)
-      if (!pr && !isGeneral &&
-          v.get_return_expr()->is_sequential() &&
-          v.get_clause(numClauses-1)->get_kind() != flwor_clause::materialize_clause &&
-          (v.get_order_clause() != NULL || v.get_group_clause() == NULL))
-      {
-        materialize_clause* mat = theCCB->theEM->create_materialize_clause(v.get_sctx(),
-                                                 v.get_return_expr()->get_loc());
-        v.add_clause(mat);
-        ++numClauses;
-      }
-    } // !isGeneral
-
-    if (isGeneral)
+    for (csize i = 0; noMaterialization == NULL && i < numClauses; ++i)
     {
-      static_context* sctx = v.get_sctx();
+      const flwor_clause* c = v.get_clause(i);
+
+      if (c->get_kind() != flwor_clause::window_clause ||
+          !static_cast<const window_clause*>(c)->get_expr()->is_sequential())
+        continue;
+
       std::vector<OrderModifier> modifiers;
       std::vector<expr*> orderingExprs;
 
-      csize numForClauses = 0;
-      csize i = 0;
-
-      while (i < numClauses)
+      if (i > 0 &&
+          v.get_clause(i-1)->get_kind() != flwor_clause::orderby_clause &&
+          v.get_clause(i-1)->get_kind() != flwor_clause::groupby_clause)
       {
-        const flwor_clause* c = v.get_clause(i);
-        flwor_clause::ClauseKind k = c->get_kind();
-
-        switch (k)
-        {
-        case flwor_clause::for_clause:
-        case flwor_clause::let_clause:
-        case flwor_clause::window_clause:
-        {
-          expr* domExpr = static_cast<const forletwin_clause*>(c)->get_expr();
-
-          if (k == flwor_clause::for_clause || k == flwor_clause::window_clause)
-          {
-            xqtref_t domainType = domExpr->get_return_type();
-
-            if (domainType->get_quantifier() != SequenceType::QUANT_ONE)
-              ++numForClauses;
-          }
-
-          if (!pr && domExpr->is_sequential() &&
-              (k == flwor_clause::for_clause ||
-               k == flwor_clause::window_clause ||
-               numForClauses > 0))
-          {
-            if (i > 0 &&
-                v.get_clause(i-1)->get_kind() != flwor_clause::orderby_clause &&
-                v.get_clause(i-1)->get_kind() != flwor_clause::groupby_clause)
-            {
-              orderby_clause* mat = theCCB->theEM->
-              create_orderby_clause(sctx, c->get_loc(), true, modifiers, orderingExprs);
-
-              v.add_clause(i, mat);
-              ++i;
-              ++numClauses;
-            }
-
-            if (i == numClauses -1 ||
-                (i < numClauses - 1 &&
-                 v.get_clause(i+1)->get_kind() != flwor_clause::groupby_clause))
-            {
-              orderby_clause* mat = theCCB->theEM->
-              create_orderby_clause(sctx, c->get_loc(), true, modifiers, orderingExprs);
-
-              v.add_clause(i+1, mat);
-              ++numClauses;
-            }
-          }
-
-          break;
-        }
-        case flwor_clause::where_clause:
-        case flwor_clause::groupby_clause:
-        case flwor_clause::orderby_clause:
-        case flwor_clause::count_clause:
-        {
-          break;
-        }
-        default:
-          ZORBA_ASSERT_WITH_MSG(false, "ClauseKind = " << k);
-        } // switch
-
+        v.add_clause(i, theCCB->theEM->create_orderby_clause(v.get_sctx(), c->get_loc(),
+                                                            true, modifiers, orderingExprs));
         ++i;
+        ++numClauses;
       }
 
-      const flwor_clause* lastClause = v.get_clause(v.num_clauses()-1);
-
-      if (v.get_return_expr()->is_sequential() &&
-          lastClause->get_kind() != flwor_clause::orderby_clause &&
-          lastClause->get_kind() != flwor_clause::groupby_clause)
+      if (i == numClauses - 1 ||
+          (v.get_clause(i+1)->get_kind() != flwor_clause::orderby_clause &&
+           v.get_clause(i+1)->get_kind() != flwor_clause::groupby_clause))
       {
-        orderby_clause* mat = theCCB->theEM->
-        create_orderby_clause(sctx,
-                              v.get_return_expr()->get_loc(),
-                              true,
-                              modifiers,
-                              orderingExprs);
-
-        v.add_clause(mat);
+        v.add_clause(i+1, theCCB->theEM->create_orderby_clause(v.get_sctx(), c->get_loc(),
+                                                              true, modifiers, orderingExprs));
         ++numClauses;
       }
     }
@@ -2692,7 +2594,7 @@ void end_visit(fo_expr& v)
     csize numArgs = v.num_args();
     for (csize i = 0; i < numArgs; ++i)
     {
-      if (v.get_arg(i)->is_sequential())
+      if (v.get_arg(i)->is_sequential() && !(v.stops_early() && i == 0))
       {
         argv[i] = new MaterializeIterator(sctx, v.get_arg(i)->get_loc(), argv[i]);
       }

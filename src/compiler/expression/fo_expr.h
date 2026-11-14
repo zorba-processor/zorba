@@ -42,6 +42,10 @@ protected:
   checked_vector<expr*>    theArgs;
   function               * theFunction;
 
+  // Whether the function may read only a prefix of its first argument, a loop,
+  // and stop early. Decided before the optimizer runs, so that every level agrees.
+  bool                     theStopsEarly = false;
+
 public:
 
 protected:
@@ -88,6 +92,10 @@ public:
   function* get_func() const { return theFunction; }
 
   void set_func(function* f) { theFunction = f; }
+
+  bool stops_early() const { return theStopsEarly; }
+
+  void set_stops_early(bool v) { theStopsEarly = v; }
 
   const signature& get_signature() const;
 

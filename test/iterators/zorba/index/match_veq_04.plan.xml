@@ -165,13 +165,12 @@
       </ApplyIterator>
       <FLWORIterator>
         <ForVariable name="s">
-          <ChildAxisIterator test-kind="match_name_test" qname="xs:QName(,,session)" typename="*" nill-allowed="false">
-            <CtxVarIterator varid="6" varname="doc" varkind="global"/>
-          </ChildAxisIterator>
+          <MaterializeIterator>
+            <ChildAxisIterator test-kind="match_name_test" qname="xs:QName(,,session)" typename="*" nill-allowed="false">
+              <CtxVarIterator varid="6" varname="doc" varkind="global"/>
+            </ChildAxisIterator>
+          </MaterializeIterator>
         </ForVariable>
-        <MaterializeClause>
-          <MaterializeForVariable inputVar="s"/>
-        </MaterializeClause>
         <ReturnClause>
           <ApplyIterator>
             <ZorbaInsertIterator need-to-copy="true">

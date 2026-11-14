@@ -110,10 +110,6 @@
     <ForVariable name="overwrite">
       <LetVarIterator varname="overwrite"/>
     </ForVariable>
-    <MaterializeClause>
-      <MaterializeForVariable inputVar="docURI"/>
-      <MaterializeForVariable inputVar="overwrite"/>
-    </MaterializeClause>
     <ReturnClause>
       <SequentialIterator>
         <CtxVarDeclareIterator varid="1" varname="doc-uri">
@@ -136,7 +132,9 @@
         </CtxVarDeclareIterator>
         <FLWORIterator>
           <ForVariable name="segment">
-            <CtxVarIterator varid="2" varname="segments" varkind="local"/>
+            <MaterializeIterator>
+              <CtxVarIterator varid="2" varname="segments" varkind="local"/>
+            </MaterializeIterator>
           </ForVariable>
           <ForVariable name="parent">
             <StringJoinIterator>
@@ -182,10 +180,6 @@
               </FnEmptyIterator>
             </AndIterator>
           </WhereClause>
-          <MaterializeClause>
-            <MaterializeForVariable inputVar="parent"/>
-            <MaterializeForVariable inputVar="child"/>
-          </MaterializeClause>
           <ReturnClause>
             <ApplyIterator>
               <ZorbaInsertIterator need-to-copy="true">
@@ -303,11 +297,6 @@
         </ReturnClause>
       </FLWORIterator>
     </LetVariable>
-    <MaterializeClause>
-      <MaterializeForVariable inputVar="parent-uri"/>
-      <MaterializeForVariable inputVar="child-uri"/>
-      <MaterializeLetVariable inputVar="parent"/>
-    </MaterializeClause>
     <ReturnClause>
       <SequentialIterator>
         <ApplyIterator>

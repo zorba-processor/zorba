@@ -1,4 +1,4 @@
-(: Control: fn:subsequence. The order of a direct sequential call is a known bug, fixed separately; the expected result records it. :)
+(: Per tuple and lazy at all levels: fn:subsequence stops after the item it needs (as e08d). :)
 declare namespace an = "http://zorba.io/annotations";
 declare %an:assignable variable $g := 0;
 declare %an:sequential function local:bump() { $g := $g + 1; $g };

@@ -1,4 +1,4 @@
-(: An order by key reads the state of its iteration (a direct call differs, see s16). :)
+(: An order by key reads the state of its iteration (a direct call does the same, see s16). :)
 declare namespace an = "http://zorba.io/annotations";
 declare %an:assignable variable $g := 0;
 declare %an:sequential function local:bump() { $g := $g + 1; $g };

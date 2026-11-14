@@ -323,10 +323,10 @@ Otherwise, unless the compiler can see the function and prove it deterministic a
 
 A call through a function item runs per tuple, interleaved with the clauses around it. The domain of a for clause with such a call is the exception: it gives its whole binding sequence first (Scripting Extension 6.7), and the next clauses then run per tuple. A domain without such a call stays lazy.
 
-A direct call of a sequential function does not follow these rules yet: each clause with the call runs for all the tuples before the next one (see \ref ZWST0004). This is a known bug, to be fixed separately; the second line below is the intended order.
+In a FLWOR expression with a direct call of a sequential function, each iteration of a for clause runs complete before the next: the clauses after it and the return clause run per tuple, interleaved, as with a call through a function item. The domain of every for clause of such an expression gives its whole binding sequence first, also a domain without the call (see \ref ZWST0004). A positional predicate, fn:head, fn:exists or fn:subsequence over such a loop stops after the items it needs, as over a loop with a call through a function item: <tt>((for $i in 1 to 3 return local:bump())[1], $g)</tt> gives <tt>1 1</tt>. A call of a sequential function written directly as their argument still runs to its end; the decision is taken on the query as written, before the optimizer. A window clause whose domain has a direct call of a sequential function keeps the order of earlier versions: the tuples before it, and then all its windows, are computed before the next clause runs.
 
 \code
-for $i in 1 to 3 let $a := local:bump()  let $b := local:bump()  return ($a, $b)   (: 1 4 2 5 3 6, known bug :)
+for $i in 1 to 3 let $a := local:bump()  let $b := local:bump()  return ($a, $b)   (: 1 2 3 4 5 6 :)
 for $i in 1 to 3 let $a := $f()          let $b := $f()          return ($a, $b)   (: 1 2 3 4 5 6 :)
 for $x in (for $j in 1 to 3 return $f()) return ($x, $g)                           (: 1 3 2 3 3 3 :)
 \endcode
@@ -354,10 +354,10 @@ XQuery is very powerful and expressive. As in C++, modularizing your programs in
 The compiler may report warnings to report scripting constructions which are not inherently erroneious but which are risky or suggest there may have been an error (also see \ref errors_warnings).
 
 \subsubsection ZWST0004 ZWST0004
-This is a warning to draw attention to the fact that when FOR clauses or LET clauses that are nested inside FOR clauses have a sequential domain expression, then one can think of two different evaluation semantics of the corresponding FLWOR expression.
-Both semantics are correct, but they are not equivalent.
-Zorba adopts one of these semantics (see <a href="/scripting-spec">Scripting Specification</a>).
-The warning is there to alert users who write such FLWOR expressions that what they may have in mind as the way these FLWORs will be evaluated may not be the same as the way Zorba actually evaluates them.
+This warning code is reserved for FLWOR expressions whose FOR clauses, or LET clauses nested inside FOR clauses, have a sequential domain expression: one can think of two different evaluation semantics for them, each clause for all the tuples before the next one, or each iteration complete before the next one.
+Zorba evaluates each iteration of a FOR clause complete before the next one, after the domain of the clause has given its whole binding sequence (see <a href="/scripting-spec">Scripting Specification</a>, 6.7): <tt>for $i in 1 to 3 let $a := local:bump() let $b := local:bump() return ($a, $b)</tt> gives <tt>1 2 3 4 5 6</tt>.
+Before Zorba 5.0, it evaluated each clause for all the tuples before the next one, which gave <tt>1 4 2 5 3 6</tt>.
+The compiler does not raise this warning.
 
 \subsection scripting_option Disabling Scripting Support 
 

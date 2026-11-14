@@ -12,37 +12,44 @@
         "name": "i",
         "iterators": [
           {
-            "kind": "OpToIterator",
+            "kind": "MaterializeIterator",
             "prof-calls": 1,
             "prof-next-calls": 3,
-            "prof-cpu": 0.031023,
-            "prof-wall": 0.029614,
-            "prof-name": "op:to",
+            "prof-cpu": 0.05,
+            "prof-wall": 0.05,
+            "prof-name": "MaterializeIterator",
             "iterators": [
               {
-                "kind": "SingletonIterator",
-                "value": "xs:integer(1)",
+                "kind": "OpToIterator",
                 "prof-calls": 1,
-                "prof-next-calls": 1,
-                "prof-cpu": 0.001367,
-                "prof-wall": 0.00077,
-                "prof-name": "SingletonIterator"
-              },
-              {
-                "kind": "SingletonIterator",
-                "value": "xs:integer(2)",
-                "prof-calls": 1,
-                "prof-next-calls": 1,
-                "prof-cpu": 0.000802,
-                "prof-wall": 0.000362,
-                "prof-name": "SingletonIterator"
+                "prof-next-calls": 3,
+                "prof-cpu": 0.031023,
+                "prof-wall": 0.029614,
+                "prof-name": "op:to",
+                "iterators": [
+                  {
+                    "kind": "SingletonIterator",
+                    "value": "xs:integer(1)",
+                    "prof-calls": 1,
+                    "prof-next-calls": 1,
+                    "prof-cpu": 0.001367,
+                    "prof-wall": 0.00077,
+                    "prof-name": "SingletonIterator"
+                  },
+                  {
+                    "kind": "SingletonIterator",
+                    "value": "xs:integer(2)",
+                    "prof-calls": 1,
+                    "prof-next-calls": 1,
+                    "prof-cpu": 0.000802,
+                    "prof-wall": 0.000362,
+                    "prof-name": "SingletonIterator"
+                  }
+                ]
               }
             ]
           }
         ]
-      },
-      {
-        "kind": "MaterializeClause"
       },
       {
         "kind": "ReturnClause",

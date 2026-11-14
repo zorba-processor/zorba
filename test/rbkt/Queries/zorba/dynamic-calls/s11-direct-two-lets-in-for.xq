@@ -1,4 +1,4 @@
-(: Control: each let runs for all the tuples before the next. The order of a direct sequential call is a known bug, fixed separately; the expected result records it. :)
+(: Each iteration of the for runs complete before the next: the two lets run per tuple, interleaved (as d46). :)
 declare namespace an = "http://zorba.io/annotations";
 declare %an:assignable variable $g := 0;
 declare %an:sequential function local:bump() { $g := $g + 1; $g };

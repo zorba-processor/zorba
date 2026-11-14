@@ -1,4 +1,4 @@
-(: Control: a predicate over a loop. The order of a direct sequential call is a known bug, fixed separately; the expected result records it. :)
+(: Per tuple and lazy at all levels: a predicate over a loop stops after the item it needs (as e08a). :)
 declare namespace an = "http://zorba.io/annotations";
 declare %an:assignable variable $g := 0;
 declare %an:sequential function local:bump() { $g := $g + 1; $g };

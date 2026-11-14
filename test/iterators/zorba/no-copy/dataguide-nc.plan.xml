@@ -84,11 +84,6 @@
     <ForVariable name="s">
       <LetVarIterator varname="s"/>
     </ForVariable>
-    <MaterializeClause>
-      <MaterializeForVariable inputVar="s"/>
-      <MaterializeForVariable inputVar="e"/>
-      <MaterializeLetVariable inputVar="x"/>
-    </MaterializeClause>
     <ReturnClause>
       <SequentialIterator>
         <CtxVarDeclareIterator varid="1" varname="label"/>
@@ -293,11 +288,6 @@
     <ForVariable name="s">
       <LetVarIterator varname="s"/>
     </ForVariable>
-    <MaterializeClause>
-      <MaterializeForVariable inputVar="e"/>
-      <MaterializeForVariable inputVar="s"/>
-      <MaterializeLetVariable inputVar="x"/>
-    </MaterializeClause>
     <ReturnClause>
       <IfThenElseIterator>
         <FnEmptyIterator>
@@ -306,7 +296,9 @@
         <FnConcatIterator/>
         <FLWORIterator>
           <ForVariable name="y">
-            <LetVarIterator varname="x"/>
+            <MaterializeIterator>
+              <LetVarIterator varname="x"/>
+            </MaterializeIterator>
           </ForVariable>
           <GroupByClause>
             <Spec>

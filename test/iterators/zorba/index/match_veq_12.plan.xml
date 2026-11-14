@@ -78,13 +78,12 @@
       </ApplyIterator>
       <FLWORIterator>
         <ForVariable name="item">
-          <ChildAxisIterator test-kind="match_name_test" qname="xs:QName(,,item)" typename="*" nill-allowed="false">
-            <CtxVarIterator varid="4" varname="doc" varkind="global"/>
-          </ChildAxisIterator>
+          <MaterializeIterator>
+            <ChildAxisIterator test-kind="match_name_test" qname="xs:QName(,,item)" typename="*" nill-allowed="false">
+              <CtxVarIterator varid="4" varname="doc" varkind="global"/>
+            </ChildAxisIterator>
+          </MaterializeIterator>
         </ForVariable>
-        <MaterializeClause>
-          <MaterializeForVariable inputVar="item"/>
-        </MaterializeClause>
         <ReturnClause>
           <ApplyIterator>
             <ZorbaInsertIterator need-to-copy="true">
