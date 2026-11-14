@@ -9,3 +9,7 @@
   `xsi:nil="true"` is validated against that type and is not nilled. Before,
   `validate strict` rejected it because no nillable declaration allowed
   `xsi:nil`.
+- An `xsi:type` followed by another attribute on the same element, such as
+  `xsi:nil`, is applied. Before, the value of the next attribute replaced the
+  `xsi:type` value, so validation reported a missing grammar or ignored the
+  type.

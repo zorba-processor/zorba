@@ -97,6 +97,7 @@ SchemaValidatorFilter::SchemaValidatorFilter(
   theElemDepth(0),
   theElementToProcess(false),
   theContent(1023, mm),
+  theXsiTypeValue(64, mm),
   theXsiType(0),
   theAttrCount(0),
   theEventBuffer(eventBuffer),
@@ -887,7 +888,8 @@ void SchemaValidatorFilter::attributeEvent(
     // Ignore schema location hints
     if(XMLString::equals(localname, SchemaSymbols::fgXSI_TYPE))
     {
-      theXsiType = curAttr->getValue();
+      theXsiTypeValue.set(value);
+      theXsiType = theXsiTypeValue.getRawBuffer();
     }
     else if(XMLString::equals(localname, SchemaSymbols::fgATT_NILL) &&
             (XMLString::equals(value, SchemaSymbols::fgATTVAL_TRUE) ||
