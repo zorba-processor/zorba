@@ -2372,9 +2372,10 @@ void test_exhaust_errno( Fixture const& ) {
         inject_arm( first, 1 );
         int const r = pthread_getattr_np( pthread_self(), &attr );
         inject_disarm();
-        if ( r == 0 )
-          pthread_attr_destroy( &attr );
-        else if ( r == ENOMEM )
+        if ( r == 0 ) {
+          if ( pthread_attr_destroy( &attr ) != 0 )
+            ++other;
+        } else if ( r == ENOMEM )
           ++failed;
         else
           ++other;
