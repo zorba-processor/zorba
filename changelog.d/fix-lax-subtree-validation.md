@@ -5,3 +5,7 @@
   annotation, and an invalid one raises XQDY0027. Before, the whole subtree
   of an element without a declaration was left untyped and unchecked. Below a
   `processContents="skip"` wildcard nothing is assessed, as before.
+- An element without a declaration that has an `xsi:type` and
+  `xsi:nil="true"` is validated against that type and is not nilled. Before,
+  `validate strict` rejected it because no nillable declaration allowed
+  `xsi:nil`.

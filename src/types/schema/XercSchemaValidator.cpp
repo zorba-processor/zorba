@@ -770,7 +770,11 @@ void XercSchemaValidator::validateElement(const   XMLElementDecl*  elemDef)
     //
     // Check whether this element allows Nillable
     //
-    if (fNil && (miscFlags & SchemaSymbols::XSD_NILLABLE) == 0 ) {
+    if (fNil && !elemDef->isDeclared()) {
+        // xsi:nil applies only to an element that has a declaration
+        fNil = false;
+    }
+    else if (fNil && (miscFlags & SchemaSymbols::XSD_NILLABLE) == 0 ) {
         fNil = false;
         emitError(XMLValid::NillNotAllowed, elemDef->getFullName());
         fErrorOccurred = true;
@@ -3033,7 +3037,12 @@ void XercSchemaValidator::validateElement(const   XMLElementDecl*  elemDef)
     //
     // Check whether this element allows Nillable
     //
-    if (fNil && (miscFlags & SchemaSymbols::XSD_NILLABLE) == 0 )
+    if (fNil && !elemDef->isDeclared())
+    {
+        // xsi:nil applies only to an element that has a declaration
+        fNil = false;
+    }
+    else if (fNil && (miscFlags & SchemaSymbols::XSD_NILLABLE) == 0 )
     {
         fNil = false;
         emitError(XMLValid::NillNotAllowed, elemDef->getFullName());
