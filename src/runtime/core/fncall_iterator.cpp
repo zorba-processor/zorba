@@ -647,6 +647,22 @@ bool UDFunctionCallIterator::nextImpl(store::Item_t& aResult, PlanState& aPlanSt
   }
   catch (ZorbaException& err)
   {
+    // A call that raised has no next item to give: its body is released as if
+    // it had completed, or a caller that catches the error would still see the
+    // values bound in it.
+    UDFunctionCallIteratorState* state =
+      StateTraitsImpl<UDFunctionCallIteratorState>::
+      getState(aPlanState, theStateOffset);
+
+    if (state->thePlanOpen &&
+        state->canReleaseBody(aPlanState, theUDF->isSequential()))
+    {
+      if (aPlanState.theCompletedCall == state)
+        aPlanState.theCompletedCall = NULL;
+
+      state->closeBody();
+    }
+
     recordStackTrace(theUDF->getLoc(),
                      loc,
                      theUDF->getName(),

@@ -1,0 +1,44 @@
+module namespace m = "http://www.example.com/collection-refs";
+
+import module namespace ddl =
+  "http://zorba.io/modules/store/static/collections/ddl";
+import module namespace dml =
+  "http://zorba.io/modules/store/static/collections/dml";
+
+declare namespace an = "http://zorba.io/annotations";
+declare namespace err = "http://www.w3.org/2005/xqt-errors";
+
+declare collection m:c as node()*;
+
+(: Creates m:c with one node. :)
+declare %an:sequential function m:fill()
+{
+  ddl:create(xs:QName("m:c"));
+  dml:insert(xs:QName("m:c"), <e v="1"/>);
+};
+
+(: Deletes m:c: "deleted", or the local name of the error, after which m:c is
+   emptied and deleted. :)
+declare %an:sequential function m:delete() as xs:string
+{
+  try {{ ddl:delete(xs:QName("m:c")); "deleted" }}
+  catch * {{
+    dml:delete(dml:collection(xs:QName("m:c")));
+    ddl:delete(xs:QName("m:c"));
+    fn:local-name-from-QName($err:code)
+  }}
+};
+
+(: Binds the nodes of m:c, then raises m:raised. :)
+declare %an:sequential function m:raise() as xs:string
+{
+  variable $nodes := dml:collection(xs:QName("m:c"));
+  fn:error(xs:QName("m:raised"), fn:string($nodes[1]/@v))
+};
+
+(: Binds the nodes of m:c and returns two items. :)
+declare %an:sequential function m:two() as xs:string*
+{
+  variable $nodes := dml:collection(xs:QName("m:c"));
+  (fn:string($nodes[1]/@v), "2")
+};
