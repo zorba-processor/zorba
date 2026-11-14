@@ -3337,6 +3337,13 @@ void test_sweep_descendant( Fixture const &f ) {
   s.after_compile = true;
   s.expected = "64";
   s.kept_by_none = true;
+  // libxml2 before 2.13 does not report every allocation of its own that failed
+  // (see test_sweep_xml_dtd_nodes): the document is then malformed. Cap: about
+  // 1.5 times the most seen (1, alone, linux-arm64 of CI run 43537747609).
+  int const version = libxml2_version();
+  if ( version && version < 21300 )
+    s.known = { starting( "\"caught err:FODC0006 invalid content passed to"
+                          " fn:parse-xml(): \\\"malformed XML document", 2 ) };
   exhaust_sweep( f, "descendant axis", s );
 #else
   (void)f;

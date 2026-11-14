@@ -1236,8 +1236,8 @@ void DescendantAxisState::push(const store::Item* node)
     // does not keep the node, and with it the whole tree, alive.
     std::unique_ptr<store::ChildrenIterator> ite(
       GENV_ITERATOR_FACTORY->createChildrenIterator());
-    theCurrentPath.push_back(PathPair(NULL, ite.get()));
-    ite.release();
+    theCurrentPath.push_back(PathPair(NULL, NULL));
+    theCurrentPath.back().second = ite.release();
   }
 
   theCurrentPath[theTop].first = node;
