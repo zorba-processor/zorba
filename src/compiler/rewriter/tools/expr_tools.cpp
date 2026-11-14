@@ -2035,13 +2035,10 @@ bool is_binding_sequence(const for_clause* fc)
   case for_clause::BINDING_SEQUENCE_NO:
     return false;
   default:
-    break;
+    // A clause that a rewrite created, or one in code that the walk of
+    // classify_calls() did not reach.
+    return calls_unproven_function(fc->get_expr());
   }
-
-  // A clause that a rewrite created, or one in code that the walk of
-  // classify_calls() did not reach.
-  return calls_unproven_function(fc->get_expr()) ||
-         is_sequential_flwor_with_binding_sequences(fc->get_flwor_expr());
 }
 
 
