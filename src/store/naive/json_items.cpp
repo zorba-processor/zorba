@@ -1030,8 +1030,8 @@ void SimpleJSONArray::push_back(const store::Item_t& aValue)
     lStructuredItem->setCollectionTreeInfo(theCollectionInfo);
   }
 
-  aValue->addReference();
   theContent.push_back(aValue.getp());
+  aValue->addReference();
 
   ASSERT_INVARIANT();
 }
@@ -1084,9 +1084,9 @@ void SimpleJSONArray::insert_before(
     lStructuredItem->setCollectionTreeInfo(theCollectionInfo);
   }
 
-  member->addReference();
   Members::size_type sPos = static_cast<Members::size_type>(cast(pos) - 1);
   theContent.insert(theContent.begin() + sPos, member.getp());
+  member->addReference();
 
   ASSERT_INVARIANT();
 }
@@ -1156,9 +1156,9 @@ void SimpleJSONArray::add(
       lStructuredItem->setCollectionTreeInfo(theCollectionInfo);
     }
 
-    lItem->addReference();
     Members::size_type sPos = static_cast<Members::size_type>(aTargetPos + i);
     theContent.insert(theContent.begin() + sPos, lItem);
+    lItem->addReference();
   }
 
   ASSERT_INVARIANT();
