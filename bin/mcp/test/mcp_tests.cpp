@@ -3246,15 +3246,22 @@ void test_sweep_xml_dtd( Fixture const &f ) {
               starting( "terminate N11xercesc_", 105, 8, "OutOfMemoryExceptionE" ) };
   // libxml2 before 2.13 does not report every allocation of its own that failed
   // (see test_sweep_xml_dtd_nodes): the load then fails as a document that
-  // libxml2 could not parse. Caps from the same run (189 / 35 tree creation;
-  // 55 / 13 malformed).
+  // libxml2 could not parse, or with the parse or validity error libxml2
+  // reports in its place, at its location (the file is unknown when its name
+  // could not be copied). Caps from the same run (189 / 35 tree creation;
+  // 55 / 13 malformed), and from the linux-arm64 job of CI run 43579489611
+  // (37 / 5 at a location in the file; 0 / 5 with no file).
   int const version = libxml2_version();
   if ( version && version < 21300 )
     s.known.insert( s.known.end(), {
       starting( "\"caught err:FODC0002 \\\"XML tree creation failed\\\"", 285, 1 ),
       starting( "\"caught err:FODC0002 \\\"XML tree creation failed\\\"", 53, 8 ),
       starting( "\"caught err:FODC0002 \\\"malformed XML document\\\"", 83, 1 ),
-      starting( "\"caught err:FODC0002 \\\"malformed XML document\\\"", 20, 8 ) } );
+      starting( "\"caught err:FODC0002 \\\"malformed XML document\\\"", 20, 8 ),
+      starting( "\"caught err:FODC0002 \\\"file:///tmp/mcp-tree", 56, 1 ),
+      starting( "\"caught err:FODC0002 \\\"file:///tmp/mcp-tree", 8, 8 ),
+      starting( "\"caught err:FODC0002 \\\"<null>\\\":", 4, 1 ),
+      starting( "\"caught err:FODC0002 \\\"<null>\\\":", 8, 8 ) } );
   s.kept_runs_of_8_reported = true;   // the known limit, see Sweep
   exhaust_sweep( f, "parse-xml with DTD validation", s );
 #else
