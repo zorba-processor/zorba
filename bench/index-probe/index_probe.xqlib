@@ -5,6 +5,8 @@ import module namespace dml =
 
 declare namespace an = "http://zorba.io/annotations";
 
+declare construction strip;
+
 declare collection b:items;
 
 declare variable $b:items as xs:QName := xs:QName("b:items");

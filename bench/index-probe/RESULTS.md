@@ -9,9 +9,9 @@ the `for` into an index probe. Before `fix-udf-identity-flwor` the FLWOR
 
 ## Results
 
-Not measured yet: the first run (43501550670) stopped with a static error, because the
-sequential call was in a `where` clause (XSST0006). The query now counts the hits in a
-block.
+Not measured yet. Run 43501550670 stopped with XSST0006 (the sequential call was in a
+`where` clause); run 43523424503 stopped with ZDTY0001 (the constructed items were typed
+`xs:anyType`, the library now declares `construction strip`), in both builds.
 
 ## Compile time
 
