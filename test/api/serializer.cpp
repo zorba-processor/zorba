@@ -22,6 +22,7 @@
 #include <string>
 #include <string.h>
 
+#include <zorba/config.h>
 #include <zorba/zorba.h>
 #include <zorba/store_manager.h>
 #include <zorba/serializer.h>
@@ -133,6 +134,7 @@ test_failed_stream(Zorba* aZorba)
     Serializer::createSerializer(lOptions)->serialize(lQuery->iterator(), os);
   });
 
+#ifndef ZORBA_NO_ICU
   // The transcoder resets the stream's state when it is detached.
   lOk &= expect_write_failure("ISO-8859-1", [&](std::ostream& os) {
     XQuery_t lQuery = aZorba->compileQuery(theLongQuery);
@@ -140,6 +142,7 @@ test_failed_stream(Zorba* aZorba)
     lOptions.set("encoding", "ISO-8859-1");
     lQuery->execute(os, &lOptions);
   });
+#endif /* ZORBA_NO_ICU */
 
   // A stream that takes the whole text gets it, and no error.
   limited_streambuf lBuf(std::numeric_limits<std::string::size_type>::max());
