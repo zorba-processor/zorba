@@ -2460,11 +2460,6 @@ struct Sweep {
   std::vector<Known> known;         // other allowed outcomes: limits
   bool empty_answer = false;        // an empty answer is allowed too, a limit
   bool needs_module = false;        // of a module that some builds leave out
-  // Known limit: after several consecutive failed allocations, the XML, fragment
-  // and HTML parsers can keep 8 to 18 KB per failed call, cause not established
-  // (bin/mcp/README.md). For runs of 8 only, kept memory is measured and
-  // printed but does not fail the sweep; runs of 1 still do.
-  bool kept_runs_of_8_reported = false;
   bool kept_by_none = false;        // every point is measured, none may keep memory
   bool compiles = false;            // the sweep includes the compilation
   std::vector<std::string> before;  // calls before all of them, with no failure
@@ -3071,21 +3066,12 @@ void exhaust_sweep( Fixture const &f, std::string const &name, Sweep const &s ) 
            name + ": enough points measured",
            std::to_string( sampled ) + " of " + std::to_string( completed ) +
            " that could, every " + std::to_string( every ) );
-    if ( s.kept_runs_of_8_reported && length == 8 ) {
-      // The known limit of Sweep::kept_runs_of_8_reported: reported, not failed.
-      std::cout << name << ", " << length << " failing: kept memory reported, not"
-                << " checked (known limit): " << keeping << " of " << sampled
-                << " keep memory, at most " << max_kept << " bytes; would fail: "
-                << ( keeping > std::max( 2L, sampled / 10 ) ||
-                     max_kept > sweep_kept_max ? "yes" : "no" ) << std::endl;
-    } else {
-      check( keeping <= ( s.kept_by_none ? 0 : std::max( 2L, sampled / 10 ) ),
-             name + ": failed calls give their memory back",
-             std::to_string( keeping ) + " of " + std::to_string( sampled ) );
-      check( max_kept <= sweep_kept_max,
-             name + ": no failed call keeps more than the bound",
-             std::to_string( max_kept ) + " bytes" );
-    }
+    check( keeping <= ( s.kept_by_none ? 0 : std::max( 2L, sampled / 10 ) ),
+           name + ": failed calls give their memory back",
+           std::to_string( keeping ) + " of " + std::to_string( sampled ) );
+    check( max_kept <= sweep_kept_max,
+           name + ": no failed call keeps more than the bound",
+           std::to_string( max_kept ) + " bytes" );
     // An answer with "id": null (JSON-RPC 2.0, section 5) only where the id
     // could not be read: a failure while the message itself is parsed.
     for ( auto const &l : last_of )
@@ -3257,7 +3243,6 @@ void test_sweep_xml_dtd( Fixture const &f ) {
       starting( "\"caught err:FODC0002 \\\"XML tree creation failed\\\"", 53, 8 ),
       starting( "\"caught err:FODC0002 \\\"malformed XML document\\\"", 83, 1 ),
       starting( "\"caught err:FODC0002 \\\"malformed XML document\\\"", 20, 8 ) } );
-  s.kept_runs_of_8_reported = true;   // the known limit, see Sweep
   exhaust_sweep( f, "parse-xml with DTD validation", s );
 #else
   (void)f;
@@ -3300,7 +3285,6 @@ void test_sweep_xml_dtd_nodes( Fixture const &f ) {
   s.known = { starting( "\"caught err:FODC0002 \\\"/tmp/mcp-tree", 62, 1 ),
               starting( "terminate N11xercesc_", 4, 1, "OutOfMemoryExceptionE" ),
               starting( "terminate N11xercesc_", 215, 8, "OutOfMemoryExceptionE" ) };
-  s.kept_runs_of_8_reported = true;   // the known limit, see Sweep
   exhaust_sweep( f, "parse-xml with DTD validation, every kind of node", s );
 #else
   (void)f;
@@ -3314,7 +3298,6 @@ void test_sweep_xml( Fixture const &f ) {
                               "\")//*)" ) );
   s.after_compile = true;
   s.expected = "41";
-  s.kept_runs_of_8_reported = true;   // the known limit, see Sweep
   exhaust_sweep( f, "parse-xml", s );
 #else
   (void)f;
@@ -3329,7 +3312,6 @@ void test_sweep_fragment( Fixture const &f ) {
                               sweep_names_xml( "warm" ) + "\")//*)" ) );
   s.after_compile = true;
   s.expected = "41";
-  s.kept_runs_of_8_reported = true;   // the known limit, see Sweep
   exhaust_sweep( f, "parse-xml-fragment", s );
 #else
   (void)f;
@@ -3441,7 +3423,6 @@ void test_sweep_html( Fixture const &f ) {
   s.known = { starting( "terminate N11xercesc_", 4, 1, "OutOfMemoryExceptionE" ),
               starting( "terminate N11xercesc_", 250, 8, "OutOfMemoryExceptionE" ) };
   s.needs_module = true;
-  s.kept_runs_of_8_reported = true;   // the known limit, see Sweep
   exhaust_sweep( f, "x:parse-html", s );
 #else
   (void)f;
