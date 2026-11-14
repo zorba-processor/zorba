@@ -22,6 +22,7 @@
 #include <iostream>
 
 #include <libxml/xmlmemory.h>
+#include <libxml/SAX2.h>
 
 #include <zorba/store_consts.h>
 
@@ -751,7 +752,7 @@ void FastXmlLoader::startDocument(void * ctx)
   }
   catch (ZorbaException const& e)
   {
-    loader.theXQueryDiagnostics->add_error( e );
+    loader.addBuildError( e );
   }
   catch (std::bad_alloc const&)
   {
@@ -762,6 +763,24 @@ void FastXmlLoader::startDocument(void * ctx)
     loader.theXQueryDiagnostics->
     add_error(NEW_ZORBA_EXCEPTION(zerr::ZXQP0003_INTERNAL_ERROR));
   }
+}
+
+
+void FastXmlLoader::addBuildError(ZorbaException const& e)
+{
+  if (e.diagnostic() != err::XPDY0130)
+  {
+    theXQueryDiagnostics->add_error(e);
+    return;
+  }
+
+  // The first component of the node id is the document node's.
+  reportLimit(theDocUri.c_str(),
+              xmlSAX2GetLineNumber(ctxt),
+              xmlSAX2GetColumnNumber(ctxt),
+              "element nesting depth of " +
+              std::to_string(theOrdPath.getNumComps() - 1) +
+              " exceeds the node id limit");
 }
 
 
@@ -840,7 +859,7 @@ void FastXmlLoader::endDocument(void * ctx)
   }
   catch (ZorbaException const& e)
   {
-    loader.theXQueryDiagnostics->add_error( e );
+    loader.addBuildError( e );
   }
   catch (std::bad_alloc const&)
   {
@@ -1100,7 +1119,7 @@ void FastXmlLoader::startElement(
   {
     if (elemNode != NULL && !owned)
       discardElement(elemNode);
-    loader.theXQueryDiagnostics->add_error( e );
+    loader.addBuildError( e );
   }
   catch (std::bad_alloc const&)
   {
@@ -1252,7 +1271,7 @@ void  FastXmlLoader::endElement(
   }
   catch (ZorbaException const& e)
   {
-    loader.theXQueryDiagnostics->add_error( e );
+    loader.addBuildError( e );
   }
   catch (std::bad_alloc const&)
   {
@@ -1307,7 +1326,7 @@ void FastXmlLoader::characters(void * ctx, const xmlChar * ch, int len)
   }
   catch (ZorbaException const& e)
   {
-    loader.theXQueryDiagnostics->add_error( e );
+    loader.addBuildError( e );
   }
   catch (std::bad_alloc const&)
   {
@@ -1364,7 +1383,7 @@ void FastXmlLoader::cdataBlock(void * ctx, const xmlChar * ch, int len)
   }
   catch (ZorbaException const& e)
   {
-    loader.theXQueryDiagnostics->add_error( e );
+    loader.addBuildError( e );
   }
   catch (std::bad_alloc const&)
   {
@@ -1418,7 +1437,7 @@ void FastXmlLoader::processingInstruction(
   }
   catch (ZorbaException const& e)
   {
-    loader.theXQueryDiagnostics->add_error( e );
+    loader.addBuildError( e );
   }
   catch (std::bad_alloc const&)
   {
@@ -1467,7 +1486,7 @@ void FastXmlLoader::comment(void * ctx, const xmlChar * ch)
   }
   catch (ZorbaException const& e)
   {
-    loader.theXQueryDiagnostics->add_error( e );
+    loader.addBuildError( e );
   }
   catch (std::bad_alloc const&)
   {
