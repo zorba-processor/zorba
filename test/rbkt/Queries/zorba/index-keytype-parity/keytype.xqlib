@@ -145,6 +145,16 @@ declare %an:general-range %an:manual index m:YearMonthKeysTypedTree
 on nodes dml:collection(xs:QName("m:ky"))//e
 by xs:yearMonthDuration(./@v) as xs:duration*;
 
+(: Value range indexes whose key type is xs:duration, with xs:duration keys
+   and with xs:yearMonthDuration keys. :)
+declare %an:value-range %an:manual index m:DurationValueTree
+on nodes dml:collection(xs:QName("m:ym"))//e
+by xs:duration(./@v) as xs:duration;
+
+declare %an:value-range %an:manual index m:YearMonthValueTree
+on nodes dml:collection(xs:QName("m:ym"))//e
+by xs:yearMonthDuration(./@v) as xs:duration;
+
 declare %an:sequential function m:create($collection as xs:QName,
                                          $content as node()*,
                                          $indexes as xs:QName*)
