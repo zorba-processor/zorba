@@ -111,6 +111,7 @@ serializer::emitter::emitter(
   theIsFirstElementNode(true),
   theEmitAttributes(aEmitAttributes)
 {
+  theChildIters.reserve(8);
   for (ulong i = 0; i < 8; i++)
     theChildIters.push_back(std::unique_ptr<store::ChildrenIterator>(
       GENV_ITERATOR_FACTORY->createChildrenIterator()));

@@ -3941,6 +3941,8 @@ void test_serializer_out_of_memory( Fixture const &f ) {
   options.omit_xml_declaration = ZORBA_OMIT_XML_DECLARATION_YES;
   auto attempt = [&]( long n, long length, long *count ) -> std::string {
     std::ostringstream out;
+    // As the server's stream: a write that cannot grow the text throws.
+    out.exceptions( std::ios::badbit );
     inject_arm( n, length );
     try {
       Serializer::createSerializer( options )->serialize( sequence.get(), out );
