@@ -25,6 +25,7 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <cerrno>
 #include <climits>
 #include <csignal>
 #include <cstdint>
@@ -48,6 +49,7 @@
 #include <fcntl.h>
 #if defined(__linux__)
 # include <malloc.h>
+# include <pthread.h>
 #endif
 #include <sys/resource.h>
 #include <sys/stat.h>
@@ -269,6 +271,15 @@ void heap_freed( void *p, std::size_t usable_size ) noexcept {
 template <class F> F libc_next( char const *name ) noexcept {
   return reinterpret_cast<F>( dlsym( RTLD_NEXT, name ) );
 }
+
+// Whether the allocation fails; then errno is ENOMEM, as glibc's malloc sets it
+// and glibc itself relies on.
+bool inject_fails_enomem() noexcept {
+  if ( !inject_fails() )
+    return false;
+  errno = ENOMEM;
+  return true;
+}
 } // namespace
 
 extern "C" {
@@ -278,13 +289,14 @@ void* __libc_realloc( void*, std::size_t );
 void __libc_free( void* );
 
 void* malloc( std::size_t n ) noexcept {
-  return inject_fails() ? nullptr : heap_add( __libc_malloc( n ), n );
+  return inject_fails_enomem() ? nullptr : heap_add( __libc_malloc( n ), n );
 }
 void* calloc( std::size_t n, std::size_t size ) noexcept {
-  return inject_fails() ? nullptr : heap_add( __libc_calloc( n, size ), n * size );
+  return inject_fails_enomem() ? nullptr
+                               : heap_add( __libc_calloc( n, size ), n * size );
 }
 void* realloc( void *p, std::size_t n ) noexcept {
-  if ( inject_fails() )
+  if ( inject_fails_enomem() )
     return nullptr;
   std::size_t const old = p ? malloc_usable_size( p ) : 0;
   void *const q = __libc_realloc( p, n );
@@ -2326,6 +2338,58 @@ void test_exhaust_at_start( Fixture const &f ) {
 #endif
 }
 
+// A failed allocation sets errno to ENOMEM, as glibc's own does: glibc reads
+// errno after a failed calloc() in pthread_getattr_np(), which the stack limit
+// calls on a thread's first compilation.
+void test_exhaust_errno( Fixture const& ) {
+#if defined(__linux__) && !defined(ZORBA_TEST_SANITIZER)
+  // Volatile: the compiler may drop an unused allocation.
+  auto sets_enomem = []( char const *name, void *(*alloc)() ) {
+    errno = 0;
+    inject_arm( 1, 1 );
+    void *volatile p = alloc();
+    inject_disarm();
+    check( !p && errno == ENOMEM, std::string( name ) + " sets ENOMEM",
+           std::to_string( errno ) );
+    std::free( p );
+  };
+  sets_enomem( "malloc", [] { return std::malloc( 16 ); } );
+  sets_enomem( "calloc", [] { return std::calloc( 1, 16 ); } );
+  sets_enomem( "realloc", [] { return std::realloc( nullptr, 16 ); } );
+
+  // In a child: with errno 0, glibc dereferenced the null result.
+  pid_t const pid = fork();
+  if ( pid < 0 ) {
+    check( false, "fork" );
+    return;
+  }
+  if ( pid == 0 ) {
+    int failed = 0, other = 0;
+    std::thread( [&failed, &other] {
+      for ( long first = 1; first <= 4; ++first ) {
+        pthread_attr_t attr;
+        errno = 0;
+        inject_arm( first, 1 );
+        int const r = pthread_getattr_np( pthread_self(), &attr );
+        inject_disarm();
+        if ( r == 0 ) {
+          if ( pthread_attr_destroy( &attr ) != 0 )
+            ++other;
+        } else if ( r == ENOMEM )
+          ++failed;
+        else
+          ++other;
+      }
+    } ).join();
+    _exit( failed > 0 && other == 0 ? 0 : 1 );
+  }
+  int status = 0;
+  check( waitpid( pid, &status, 0 ) == pid, "wait for the child" );
+  check( WIFEXITED( status ) && WEXITSTATUS( status ) == 0,
+         "pthread_getattr_np reports ENOMEM", std::to_string( status ) );
+#endif
+}
+
 void test_exhaust_generated( Fixture const &f ) {
   memory_exhaustion( f, exhaustion_queries[0] );
 }
@@ -2460,11 +2524,7 @@ struct Sweep {
   std::vector<Known> known;         // other allowed outcomes: limits
   bool empty_answer = false;        // an empty answer is allowed too, a limit
   bool needs_module = false;        // of a module that some builds leave out
-  // Known limit: after several consecutive failed allocations, the XML, fragment
-  // and HTML parsers can keep 8 to 18 KB per failed call, cause not established
-  // (bin/mcp/README.md). For runs of 8 only, kept memory is measured and
-  // printed but does not fail the sweep; runs of 1 still do.
-  bool kept_runs_of_8_reported = false;
+  bool kept_by_none = false;        // every point is measured, none may keep memory
   bool compiles = false;            // the sweep includes the compilation
   std::vector<std::string> before;  // calls before all of them, with no failure
   // Calls after the failed one, with their answers: a failure leaves the server
@@ -3000,9 +3060,10 @@ void exhaust_sweep( Fixture const &f, std::string const &name, Sweep const &s ) 
   for ( long const length : { 1L, 8L } ) {
     long const step = length > 1 ? 4 * stride : stride;
     long const tried = ( total - 1 ) / step + 1;
-    // Every other point is measured (all of them when there are few); a point
-    // whose child ended before it could measure passes that to the next one.
-    long const every = tried < 2 * sweep_min_measured ? 1 : 2;
+    // Every other point is measured (all of them when there are few, or with
+    // kept_by_none); a point whose child ended before it could measure passes
+    // that to the next one.
+    long const every = s.kept_by_none || tried < 2 * sweep_min_measured ? 1 : 2;
     std::map<std::string, std::pair<long, long> > outcomes;
     std::map<std::string, long> last_of;
     std::map<std::string, Stacks> stacks_of;
@@ -3069,21 +3130,12 @@ void exhaust_sweep( Fixture const &f, std::string const &name, Sweep const &s ) 
            name + ": enough points measured",
            std::to_string( sampled ) + " of " + std::to_string( completed ) +
            " that could, every " + std::to_string( every ) );
-    if ( s.kept_runs_of_8_reported && length == 8 ) {
-      // The known limit of Sweep::kept_runs_of_8_reported: reported, not failed.
-      std::cout << name << ", " << length << " failing: kept memory reported, not"
-                << " checked (known limit): " << keeping << " of " << sampled
-                << " keep memory, at most " << max_kept << " bytes; would fail: "
-                << ( keeping > std::max( 2L, sampled / 10 ) ||
-                     max_kept > sweep_kept_max ? "yes" : "no" ) << std::endl;
-    } else {
-      check( keeping <= std::max( 2L, sampled / 10 ),
-             name + ": failed calls give their memory back",
-             std::to_string( keeping ) + " of " + std::to_string( sampled ) );
-      check( max_kept <= sweep_kept_max,
-             name + ": no failed call keeps more than the bound",
-             std::to_string( max_kept ) + " bytes" );
-    }
+    check( keeping <= ( s.kept_by_none ? 0 : std::max( 2L, sampled / 10 ) ),
+           name + ": failed calls give their memory back",
+           std::to_string( keeping ) + " of " + std::to_string( sampled ) );
+    check( max_kept <= sweep_kept_max,
+           name + ": no failed call keeps more than the bound",
+           std::to_string( max_kept ) + " bytes" );
     // An answer with "id": null (JSON-RPC 2.0, section 5) only where the id
     // could not be read: a failure while the message itself is parsed.
     for ( auto const &l : last_of )
@@ -3255,7 +3307,6 @@ void test_sweep_xml_dtd( Fixture const &f ) {
       starting( "\"caught err:FODC0002 \\\"XML tree creation failed\\\"", 53, 8 ),
       starting( "\"caught err:FODC0002 \\\"malformed XML document\\\"", 83, 1 ),
       starting( "\"caught err:FODC0002 \\\"malformed XML document\\\"", 20, 8 ) } );
-  s.kept_runs_of_8_reported = true;   // the known limit, see Sweep
   exhaust_sweep( f, "parse-xml with DTD validation", s );
 #else
   (void)f;
@@ -3298,7 +3349,6 @@ void test_sweep_xml_dtd_nodes( Fixture const &f ) {
   s.known = { starting( "\"caught err:FODC0002 \\\"/tmp/mcp-tree", 62, 1 ),
               starting( "terminate N11xercesc_", 4, 1, "OutOfMemoryExceptionE" ),
               starting( "terminate N11xercesc_", 215, 8, "OutOfMemoryExceptionE" ) };
-  s.kept_runs_of_8_reported = true;   // the known limit, see Sweep
   exhaust_sweep( f, "parse-xml with DTD validation, every kind of node", s );
 #else
   (void)f;
@@ -3312,7 +3362,6 @@ void test_sweep_xml( Fixture const &f ) {
                               "\")//*)" ) );
   s.after_compile = true;
   s.expected = "41";
-  s.kept_runs_of_8_reported = true;   // the known limit, see Sweep
   exhaust_sweep( f, "parse-xml", s );
 #else
   (void)f;
@@ -3327,8 +3376,39 @@ void test_sweep_fragment( Fixture const &f ) {
                               sweep_names_xml( "warm" ) + "\")//*)" ) );
   s.after_compile = true;
   s.expected = "41";
-  s.kept_runs_of_8_reported = true;   // the known limit, see Sweep
   exhaust_sweep( f, "parse-xml-fragment", s );
+#else
+  (void)f;
+#endif
+}
+// The descendant axis over a parsed document 64 elements deep: its stack of
+// children iterators grows while the axis runs. A failure there keeps no
+// iterator that holds a node, and with it the whole document (a text of 200
+// characters in each element: more than the noise of the measure).
+void test_sweep_descendant( Fixture const &f ) {
+#if defined(__linux__)
+  auto deep = []( std::string const &name ) {
+    std::string open, close;
+    for ( int i = 0; i < 64; ++i ) {
+      open += "<" + name + "_" + std::to_string( i ) + ">" + std::string( 200, 't' );
+      close = "</" + name + "_" + std::to_string( i ) + ">" + close;
+    }
+    return open + close;
+  };
+  Sweep s;
+  s.query = caught( "count(parse-xml(\"" + deep( "sweep" ) + "\")//*)" );
+  s.before.push_back( caught( "count(parse-xml(\"" + deep( "warm" ) + "\")//*)" ) );
+  s.after_compile = true;
+  s.expected = "64";
+  s.kept_by_none = true;
+  // libxml2 before 2.13 does not report every allocation of its own that failed
+  // (see test_sweep_xml_dtd_nodes): the document is then malformed. Cap: about
+  // 1.5 times the most seen (1, alone, linux-arm64 of CI run 43537747609).
+  int const version = libxml2_version();
+  if ( version && version < 21300 )
+    s.known = { starting( "\"caught err:FODC0006 invalid content passed to"
+                          " fn:parse-xml(): \\\"malformed XML document", 2 ) };
+  exhaust_sweep( f, "descendant axis", s );
 #else
   (void)f;
 #endif
@@ -3413,7 +3493,6 @@ void test_sweep_html( Fixture const &f ) {
   s.known = { starting( "terminate N11xercesc_", 4, 1, "OutOfMemoryExceptionE" ),
               starting( "terminate N11xercesc_", 250, 8, "OutOfMemoryExceptionE" ) };
   s.needs_module = true;
-  s.kept_runs_of_8_reported = true;   // the known limit, see Sweep
   exhaust_sweep( f, "x:parse-html", s );
 #else
   (void)f;
@@ -4008,11 +4087,7 @@ void test_sweep_decimal_thread( Fixture const &f ) {
   // A new thread: glibc gives up if it cannot register the first thread_local
   // with a destructor of the thread.
   // Caps: about 1.5 times the most seen in CI (glibc: 1 alone, 53 in runs of 8).
-  // glibc also crashes in pthread_getattr_np() when calloc() fails in it, on
-  // the first compilation of a thread (the stack limit reads the thread's
-  // bounds): seen once alone, in the embedded profiles.
-  s.known = { library_crash( "signal 11 in libc.", true, 2 ),
-              library_crash( "signal 6 in libstdc", true, 2, 1 ),
+  s.known = { library_crash( "signal 6 in libstdc", true, 2, 1 ),
               library_crash( "signal 6 in libstdc", true, 80, 8 ),
               library_crash( "signal 6 in unknown", false, 2 ),
               starting( "terminate N11xercesc_", 2, 0, "OutOfMemoryExceptionE" ) };
@@ -7862,6 +7937,7 @@ Test const tests[] = {
   { "windows", test_windows },
   { "memory_limit", test_memory_limit },
   { "exhaust_at_start", test_exhaust_at_start },
+  { "exhaust_errno", test_exhaust_errno },
   { "exhaust_sweep_compile", test_sweep_compile },
   { "exhaust_sweep_builtins", test_sweep_builtins },
   { "exhaust_sweep_query_text", test_sweep_query_text },
@@ -7883,6 +7959,7 @@ Test const tests[] = {
   { "exhaust_sweep_xml_dtd", test_sweep_xml_dtd },
   { "exhaust_sweep_xml_dtd_nodes", test_sweep_xml_dtd_nodes },
   { "exhaust_sweep_fragment", test_sweep_fragment },
+  { "exhaust_sweep_descendant", test_sweep_descendant },
   { "exhaust_sweep_validate", test_sweep_validate },
   { "exhaust_sweep_schema_import", test_sweep_schema_import },
   { "exhaust_sweep_html", test_sweep_html },
