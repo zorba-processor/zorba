@@ -3635,8 +3635,7 @@ void test_sweep_streamable_text( Fixture const &f ) {
   // The checks of a path, as in the sweep of the document cache.
   s.known = { starting( "error: file:FOFL9999: ", 6 ),
               starting( "terminate N11xercesc_", 4, 1, "OutOfMemoryExceptionE" ),
-              starting( "terminate N11xercesc_", 250, 8, "OutOfMemoryExceptionE" ),
-              library_crash( "signal 11 in libicu", true, 36 ) };
+              starting( "terminate N11xercesc_", 250, 8, "OutOfMemoryExceptionE" ) };
   exhaust_sweep( f, "string read from a file", s );
 #else
   (void)f;
@@ -4162,11 +4161,10 @@ void test_sweep_cache( Fixture const &f ) {
   // A query over dir:open: what is left of a failure in the checks of a path, and
   // in libraries. See the limits of --max-memory in bin/mcp/README.md.
   // Caps: about 1.5 times the most seen in CI (Xerces-C 2 alone and 608 in runs
-  // of 8 of 1990; ICU 24 alone and 23 in runs of 8; the others at most 5).
+  // of 8 of 1990; the others at most 5).
   s.known = {
     starting( "terminate N11xercesc_", 4, 1, "OutOfMemoryExceptionE" ),
     starting( "terminate N11xercesc_", 900, 8, "OutOfMemoryExceptionE" ),
-    library_crash( "signal 11 in libicu", true, 36 ),
     library_crash( "signal 11 in unknown", false, 3 ),
     library_crash( "signal 11 in libstdc", true, 2 ),
     starting( "error: file:FOFL9999: ", 10 ),

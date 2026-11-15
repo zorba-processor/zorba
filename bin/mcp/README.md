@@ -104,8 +104,11 @@ Rules this code depends on:
     thread and the scanner's do that at start.
   - One allocation near the end of a `dir:open` query ended in SIGSEGV with no stack
     to read (twice in 1990, not explained): the process ends.
-  - ICU crashes in `RegexPattern::zap()` (SIGSEGV) if an allocation fails while it
-    compiles a regular expression. The directory module uses some on each call.
+  - A stock ICU crashes in `RegexPattern::zap()` or `utext_openConstUnicodeString()`
+    (SIGSEGV) if an allocation fails while it compiles a regular expression. The
+    directory module uses some on each call. The Docker images carry the patched
+    ICU of the zorba-processor fork, which reports the failure instead; the sweeps
+    allow no ICU crash.
   - Running out of memory while the message cannot be parsed (before its id is read,
     and again when it is read once more for its id): the error response has
     `"id": null`, as JSON-RPC 2.0 (section 5) requires when the id cannot be
