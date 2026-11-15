@@ -27,6 +27,7 @@
 #include "compiler/expression/script_exprs.h"
 #include "compiler/expression/expr_iter.h"
 #include "compiler/expression/expr.h"
+#include "compiler/expression/path_expr.h"
 
 #include "context/static_context.h"
 
@@ -82,8 +83,9 @@ static void fix_if_annotations(if_expr* ifExpr)
 
 /******************************************************************************
   True for an expression whose evaluation cannot raise an error: a constant, a
-  sequence of such expressions, or a reference to a variable whose value is
-  already computed. A let or argument variable may be evaluated lazily, when it
+  function item whose captured values cannot raise (they are computed when it is
+  created), a sequence of such expressions, or a reference to a variable whose
+  value is already computed. A let or argument variable may be evaluated lazily, when it
   is referenced, so a reference to it can raise the error of its binding.
 *******************************************************************************/
 static bool cannot_raise_error(const expr* e)
@@ -92,6 +94,20 @@ static bool cannot_raise_error(const expr* e)
   {
   case const_expr_kind:
     return true;
+
+  case function_item_expr_kind:
+  {
+    const std::vector<expr*>& values =
+    static_cast<const function_item_expr*>(e)->get_in_scope_var_values();
+
+    for (csize i = 0; i < values.size(); ++i)
+    {
+      if (values[i] != NULL && !cannot_raise_error(values[i]))
+        return false;
+    }
+
+    return true;
+  }
 
   case wrapper_expr_kind:
     return cannot_raise_error(static_cast<const wrapper_expr*>(e)->get_input());
@@ -195,6 +211,154 @@ static bool clauses_keep_every_tuple(const flwor_expr* flwor, csize first, csize
   }
 
   return true;
+}
+
+
+static bool flwor_evaluates_var(const flwor_expr* flwor, csize first, const var_expr* var);
+
+
+/******************************************************************************
+  True for a constant position of at least 1, at which a positional predicate
+  reads its sequence. Below 1 it gives the empty sequence without reading it.
+*******************************************************************************/
+static bool is_const_position(const expr* e)
+{
+  if (e->get_expr_kind() != const_expr_kind)
+    return false;
+
+  const store::Item* val = static_cast<const const_expr*>(e)->get_val();
+
+  return (TypeOps::is_subtype(val->getTypeCode(), store::XS_INTEGER) &&
+          val->getIntegerValue() >= 1);
+}
+
+
+/******************************************************************************
+  True if evaluating the first item of e evaluates var. A branch, a later
+  operand or argument, a predicate, a later path step and a let binding may be
+  skipped, and so may the first argument of most functions (fn:subsequence at a
+  position below 1, fn:count dropped by PartialEval for its type), so only the
+  functions listed here count.
+*******************************************************************************/
+static bool evaluates_var(const expr* e, const var_expr* var)
+{
+  switch (e->get_expr_kind())
+  {
+  case var_expr_kind:
+    return e == var;
+
+  case wrapper_expr_kind:
+    return evaluates_var(static_cast<const wrapper_expr*>(e)->get_input(), var);
+
+  case treat_expr_kind:
+  case promote_expr_kind:
+  case cast_expr_kind:
+    return evaluates_var(static_cast<const cast_base_expr*>(e)->get_input(), var);
+
+  case relpath_expr_kind:
+    return evaluates_var((*static_cast<const relpath_expr*>(e))[0], var);
+
+  case dynamic_function_invocation_expr_kind:
+    return evaluates_var(
+        static_cast<const dynamic_function_invocation_expr*>(e)->get_input(), var);
+
+  case function_item_expr_kind:
+  {
+    // Creating a function item computes the values of its captured variables.
+    const std::vector<expr*>& values =
+    static_cast<const function_item_expr*>(e)->get_in_scope_var_values();
+
+    for (csize i = 0; i < values.size(); ++i)
+    {
+      if (values[i] != NULL && evaluates_var(values[i], var))
+        return true;
+    }
+
+    return false;
+  }
+
+  case if_expr_kind:
+  {
+    const if_expr* ie = static_cast<const if_expr*>(e);
+
+    return (evaluates_var(ie->get_cond_expr(), var) ||
+            (evaluates_var(ie->get_then_expr(), var) &&
+             evaluates_var(ie->get_else_expr(), var)));
+  }
+
+  case fo_expr_kind:
+  {
+    const fo_expr* fo = static_cast<const fo_expr*>(e);
+    const function* f = fo->get_func();
+    bool readsFirstArg;
+
+    switch (f->getKind())
+    {
+    case FunctionConsts::FN_DATA_1:
+    case FunctionConsts::OP_VALUE_INDEX_ENTRY_BUILDER_N:
+    case FunctionConsts::OP_GENERAL_INDEX_ENTRY_BUILDER_N:
+      readsFirstArg = true;
+      break;
+
+    case FunctionConsts::OP_ZORBA_SEQUENCE_POINT_ACCESS_2:
+      readsFirstArg = is_const_position(fo->get_arg(1));
+      break;
+
+    default:
+    {
+      // SpecializeOperations may swap the operands of a value comparison, which
+      // then reads the other one first and stops if it is empty.
+      SequenceType::Quantifier q =
+      (fo->num_args() > 1 ?
+       fo->get_arg(1)->get_return_type()->get_quantifier() :
+       SequenceType::QUANT_QUESTION);
+
+      readsFirstArg = (f->isArithmeticFunction() ||
+                       f->isGeneralComparisonFunction() ||
+                       (f->isValueComparisonFunction() &&
+                        (q == SequenceType::QUANT_ONE || q == SequenceType::QUANT_PLUS)));
+      break;
+    }
+    }
+
+    return (readsFirstArg &&
+            fo->num_args() > 0 &&
+            evaluates_var(fo->get_arg(0), var));
+  }
+
+  case flwor_expr_kind:
+    return flwor_evaluates_var(static_cast<const flwor_expr*>(e), 0, var);
+
+  default:
+    return false;
+  }
+}
+
+
+/******************************************************************************
+  True if every tuple that reaches the clause at position first evaluates var,
+  in the expr of a for, window or where clause or in the return clause.
+*******************************************************************************/
+static bool flwor_evaluates_var(const flwor_expr* flwor, csize first, const var_expr* var)
+{
+  for (csize i = first; i < flwor->num_clauses(); ++i)
+  {
+    const flwor_clause* c = flwor->get_clause(i);
+
+    if ((c->get_kind() == flwor_clause::for_clause ||
+         c->get_kind() == flwor_clause::window_clause) &&
+        evaluates_var(static_cast<const forletwin_clause*>(c)->get_expr(), var))
+      return true;
+
+    if (c->get_kind() == flwor_clause::where_clause &&
+        evaluates_var(static_cast<const where_clause*>(c)->get_expr(), var))
+      return true;
+
+    if (!clauses_keep_every_tuple(flwor, i, i + 1))
+      return false;
+  }
+
+  return evaluates_var(flwor->get_return_expr(), var);
 }
 
 
@@ -462,13 +626,13 @@ RULE_REWRITE_PRE(EliminateUnusedLetVars)
         // O0 evaluates this domain once for each tuple it receives; folded, it is
         // evaluated only where its variable is referenced. An empty domain gives
         // no tuples at O0; folded, the clauses after it are evaluated.
-        // For a trivial domain, safe_to_fold_var gives numRefs = 2 without counting.
-        if (safe_to_fold_var(i, numRefs) &&
+        // A positional variable left above is 0 or 1 by whether the domain is empty.
+        if (fc->get_pos_var() == NULL &&
+            safe_to_fold_var(i, numRefs) &&
             (outerFor || domQuant == SequenceType::QUANT_ONE ||
              clauses_cannot_raise_error(theFlwor, i + 1, theFlwor->num_clauses())) &&
             (cannot_raise_error(domExpr) ||
-             (expr_tools::count_variable_uses(theFlwor, var, 1, NULL) != 0 &&
-              clauses_keep_every_tuple(theFlwor, i + 1, theFlwor->num_clauses()))))
+             flwor_evaluates_var(theFlwor, i + 1, var)))
         {
           if (numRefs != 0)
             subst_vars(rCtx, var, domExpr, numRefs);
