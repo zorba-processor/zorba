@@ -824,6 +824,18 @@ DtdXmlLoader::DtdXmlLoader(
 ********************************************************************************/
 DtdXmlLoader::~DtdXmlLoader()
 {
+  // A load that an exception left (std::bad_alloc while an error was reported,
+  // for one): its tree, nodes and parser context go with the loader.
+  if (theTree != NULL || ctxt != NULL || !theNodeStack.empty())
+  {
+    try
+    {
+      abortload();
+    }
+    catch (...)
+    {
+    }
+  }
 }
 
 
