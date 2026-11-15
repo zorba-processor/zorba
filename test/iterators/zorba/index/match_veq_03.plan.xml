@@ -123,31 +123,21 @@
           <LetVariable name="id" materialize="true">
             <CtxVarIterator varid="5" varname="external_id" varkind="global"/>
           </LetVariable>
-          <LetVariable name="$$opt_temp_0" materialize="true">
-            <HoistIterator>
-              <PromoteIterator type="xs:anyAtomicType">
-                <FnDataIterator>
-                  <LetVarIterator varname="id"/>
-                </FnDataIterator>
-              </PromoteIterator>
-            </HoistIterator>
-          </LetVariable>
           <LetVariable name="session" materialize="true">
-            <FLWORIterator>
-              <ForVariable name="session">
-                <NodeSortIterator distinct="false" ascending="true">
-                  <ProbeIndexPointValueIterator>
-                    <SingletonIterator value="xs:QName(www.sessions.com,sessions,session-index)"/>
-                    <UnhoistIterator>
-                      <LetVarIterator varname="$$opt_temp_0"/>
-                    </UnhoistIterator>
-                  </ProbeIndexPointValueIterator>
-                </NodeSortIterator>
-              </ForVariable>
-              <ReturnClause>
-                <ForVarIterator varname="session"/>
-              </ReturnClause>
-            </FLWORIterator>
+            <NodeSortIterator distinct="false" ascending="true">
+              <ProbeIndexPointValueIterator>
+                <SingletonIterator value="xs:QName(www.sessions.com,sessions,session-index)"/>
+                <UnhoistIterator>
+                  <HoistIterator>
+                    <PromoteIterator type="xs:anyAtomicType">
+                      <FnDataIterator>
+                        <LetVarIterator varname="id"/>
+                      </FnDataIterator>
+                    </PromoteIterator>
+                  </HoistIterator>
+                </UnhoistIterator>
+              </ProbeIndexPointValueIterator>
+            </NodeSortIterator>
           </LetVariable>
           <ReturnClause>
             <IfThenElseIterator>

@@ -32,21 +32,14 @@
         <SingletonIterator value="xs:QName(http://zorba-tests.example.org/collections,db28,foo__id_)"/>
       </CreateIndexIterator>
     </ApplyIterator>
-    <FLWORIterator>
-      <ForVariable name="i">
-        <ProbeIndexRangeValueIterator>
-          <SingletonIterator value="xs:QName(http://zorba-tests.example.org/collections,db28,foo__id_)"/>
-          <SingletonIterator value="xs:string(3)"/>
-          <SingletonIterator value="xs:string(3)"/>
-          <SingletonIterator value="xs:boolean(true)"/>
-          <SingletonIterator value="xs:boolean(true)"/>
-          <SingletonIterator value="xs:boolean(true)"/>
-          <SingletonIterator value="xs:boolean(true)"/>
-        </ProbeIndexRangeValueIterator>
-      </ForVariable>
-      <ReturnClause>
-        <ForVarIterator varname="i"/>
-      </ReturnClause>
-    </FLWORIterator>
+    <ProbeIndexRangeValueIterator>
+      <SingletonIterator value="xs:QName(http://zorba-tests.example.org/collections,db28,foo__id_)"/>
+      <SingletonIterator value="xs:string(3)"/>
+      <SingletonIterator value="xs:string(3)"/>
+      <SingletonIterator value="xs:boolean(true)"/>
+      <SingletonIterator value="xs:boolean(true)"/>
+      <SingletonIterator value="xs:boolean(true)"/>
+      <SingletonIterator value="xs:boolean(true)"/>
+    </ProbeIndexRangeValueIterator>
   </SequentialIterator>
 </iterator-tree>
