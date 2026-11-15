@@ -414,7 +414,8 @@ void GroupByIterator::matVarsAndGroupBy(
   }
   else
   {
-    nonGroupTuple = new std::vector<store::TempSeq_t>();
+    std::unique_ptr<std::vector<store::TempSeq_t>> newSequences =
+      std::make_unique<std::vector<store::TempSeq_t>>();
 
     for (csize i = 0; i < numVars; ++i)
     {
@@ -424,13 +425,16 @@ void GroupByIterator::matVarsAndGroupBy(
       // FIXME are those settings (no-copy and no-lazy) right? 
       store::TempSeq_t tempSeq = GENV_STORE.createTempSeq(iterWrapper, false); 
 
-      nonGroupTuple->push_back(tempSeq);
+      newSequences->push_back(tempSeq);
 
       theNonGroupingSpecs[i].theInput->reset(aPlanState);
     }
 
+    nonGroupTuple = newSequences.get();
     groupMap->insert(groupTuple.get(), nonGroupTuple);
-    (void)groupTuple.release(); // owned by groupMap now
+    // owned by groupMap now
+    (void)groupTuple.release();
+    (void)newSequences.release();
   }
 }
 
