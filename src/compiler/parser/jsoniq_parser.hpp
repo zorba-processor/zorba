@@ -1382,7 +1382,7 @@ namespace zorba {
       }
 
       /// The user-facing name of this symbol.
-      std::string name () const YY_NOEXCEPT
+      std::string name () const
       {
         return jsoniq_parser::symbol_name (this->kind ());
       }
@@ -1697,7 +1697,7 @@ namespace zorba {
       typedef typename S::size_type size_type;
       typedef typename std::ptrdiff_t index_type;
 
-      stack (size_type n = 200) YY_NOEXCEPT
+      stack (size_type n = 200)
         : seq_ (n)
       {}
 

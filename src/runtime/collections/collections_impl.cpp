@@ -1474,6 +1474,7 @@ bool ZorbaDeleteIterator::nextImpl(
     PlanState& planState) const
 {
   store::Collection_t              collection;
+  const StaticallyKnownCollection* collectionDecl;
   store::Item_t                    name;
   store::Item_t                    node;
   std::vector<store::Item_t>       nodes;
@@ -1510,7 +1511,38 @@ bool ZorbaDeleteIterator::nextImpl(
   {
     name = collection->getName();
 
-    (void)getCollection(name, collection);
+    collectionDecl = getCollection(name, collection);
+
+    if (!theIsDynamic &&
+        collectionDecl->getUpdateProperty() == StaticContextConsts::decl_queue)
+    {
+      // The nodes may come in any order and more than once.
+      std::vector<xs_integer> positions;
+      positions.reserve(nodes.size());
+
+      for (const store::Item_t& deleted : nodes)
+      {
+        xs_integer position;
+        bool const found = collection->findNode(deleted.getp(), position);
+        ZORBA_ASSERT(found);
+        positions.push_back(position);
+      }
+
+      std::sort(positions.begin(), positions.end());
+      positions.erase(std::unique(positions.begin(), positions.end()),
+                      positions.end());
+
+      xs_integer expected(0);
+      for (const xs_integer& position : positions)
+      {
+        if (position != expected)
+        {
+          RAISE_ERROR(zerr::ZDDY0009_COLLECTION_QUEUE_BAD_DELETE, loc,
+          ERROR_PARAMS(name->getStringValue()));
+        }
+        ++expected;
+      }
+    }
 
     // create the pul and add the primitive
     pul.reset(GENV_ITEMFACTORY->createPendingUpdateList());
@@ -1553,11 +1585,8 @@ ZorbaDeleteIterator::getCollection(
         ERROR_PARAMS(name->getStringValue()));
 
       case StaticContextConsts::decl_queue:
-        RAISE_ERROR(zerr::ZDDY0009_COLLECTION_QUEUE_BAD_DELETE, loc,
-        ERROR_PARAMS(name->getStringValue()));
-
+        // nextImpl checks that the nodes are at the beginning of the queue
       case StaticContextConsts::decl_mutable:
-        // good to go
         break;
 
       default:
