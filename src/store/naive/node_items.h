@@ -429,6 +429,8 @@ protected:
 
   void attach(InternalNode* parent, csize pos);
 
+  void setRecursiveForSharedSubtree(InternalNode* parent) const;
+
   void detach();
 
   void destroy(bool removeType);
