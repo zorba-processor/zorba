@@ -10,7 +10,7 @@
   from O0. Inserting is not checked. Declarations that relied on the indicator
   being ignored need `*`.
 
-### Documentation
+### Fixed
 
 - XQDDF: the queue rule of `delete-nodes`, `iddl:delete` raising `ZDDY0023`,
   and the errors of `cdml:delete-first` and `cdml:delete-last` (`ZDDY0004`,
