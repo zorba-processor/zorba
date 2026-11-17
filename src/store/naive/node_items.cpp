@@ -14,9 +14,12 @@
  * limitations under the License.
  */
 
+#include <algorithm>
 #include <cstring>
 #include <sstream>
 #include <stack>
+#include <utility>
+#include <vector>
 
 #include <zorba/config.h>
 #include <zorba/item.h>
@@ -1006,10 +1009,31 @@ ConnectorNode::ConnectorNode(
     const XmlNode* child)
   :
   XmlNode(tree, parent, child->getNodeKind()),
-  theNode(const_cast<XmlNode*>(child))
+  theNode(const_cast<XmlNode*>(child)),
+  theDescendantIdBits(0)
 {
   ZORBA_ASSERT(parent != NULL && child != NULL);
   theFlags |= IsConnectorNode;
+
+  store::StoreConsts::NodeKind kind = child->getNodeKind();
+
+#ifndef TEXT_ORDPATH
+  if (kind != store::StoreConsts::textNode)
+#endif
+  {
+    OrdPathNode::computeOrdPath(parent, false, parent->numChildren(), kind,
+                                theOrdPath);
+
+    if (kind == store::StoreConsts::elementNode && theOrdPath.isValid())
+    {
+      const InternalNode* elem = static_cast<const InternalNode*>(child);
+
+      theDescendantIdBits = descendantIdBits(elem);
+
+      if (theOrdPath.getBitLength() + theDescendantIdBits > OrdPath::MAX_BIT_LEN)
+        raiseIdLimit(elem, theOrdPath);
+    }
+  }
 
   if (child->getNodeKind() == store::StoreConsts::attributeNode)
   {
@@ -1027,12 +1051,182 @@ ConnectorNode::ConnectorNode(
 ********************************************************************************/
 size_t ConnectorNode::alloc_size() const
 {
-  return XmlNode::alloc_size() + ztd::alloc_sizeof( theNode );
+  return XmlNode::alloc_size() + ztd::alloc_sizeof( theNode ) +
+         ztd::alloc_sizeof( theOrdPath );
 }
 
 size_t ConnectorNode::dynamic_size() const
 {
   return sizeof( *this );
+}
+
+
+/*******************************************************************************
+  The number of attributes a copy of elem, below the root of its tree, has: the
+  hidden base uri attribute is dropped, unless an explicit xml:base attribute
+  makes the copy insert it again before the others (insertsBaseUri).
+********************************************************************************/
+csize ConnectorNode::copyNumAttrs(const InternalNode* elem, bool& insertsBaseUri)
+{
+  bool hiddenBaseUri = false;
+  bool explicitBaseUri = false;
+
+  InternalNode::const_iterator ite = elem->attrsBegin();
+  InternalNode::const_iterator end = elem->attrsEnd();
+
+  for (; ite != end; ++ite)
+  {
+    const AttributeNode* attr = static_cast<const AttributeNode*>(*ite);
+
+    if (attr->isBaseUri())
+    {
+      if (attr->isHidden())
+        hiddenBaseUri = true;
+      else
+        explicitBaseUri = true;
+    }
+  }
+
+  insertsBaseUri = (hiddenBaseUri && explicitBaseUri);
+
+  return elem->numAttrs() - (hiddenBaseUri && !explicitBaseUri ? 1 : 0);
+}
+
+
+/*******************************************************************************
+  The most bits that the node ids of a copy of the attributes and descendants
+  of root add to the id of the copy of root. A copy numbers the attributes (see
+  copyNumAttrs) and children of each element by position; a connector below
+  root adds the bits its own copy adds.
+********************************************************************************/
+ulong ConnectorNode::descendantIdBits(const InternalNode* root)
+{
+  ulong maxBits = 0;
+
+  std::vector<std::pair<const InternalNode*, ulong> > elems;
+  elems.push_back(std::make_pair(root, ulong(0)));
+
+  while (!elems.empty())
+  {
+    const InternalNode* elem = elems.back().first;
+    ulong elemBits = elems.back().second;
+    elems.pop_back();
+
+    bool insertsBaseUri;
+    csize numAttrs = copyNumAttrs(elem, insertsBaseUri);
+
+    csize numAppended = (insertsBaseUri ? numAttrs - 1 : numAttrs);
+
+    if (numAppended > 0)
+      maxBits = std::max(maxBits, elemBits +
+                         OrdPath::compBitLength(int32_t(2 * numAppended - 1)));
+
+    // The inserted attribute goes before the first one: component -1.
+    if (insertsBaseUri)
+      maxBits = std::max(maxBits, elemBits + OrdPath::compBitLength(-1));
+
+    csize pos = numAttrs;
+    InternalNode::const_iterator ite = elem->childrenBegin();
+    InternalNode::const_iterator end = elem->childrenEnd();
+
+    for (; ite != end; ++ite, ++pos)
+    {
+      const XmlNode* child = (*ite);
+      store::StoreConsts::NodeKind kind = child->getNodeKind();
+
+#ifndef TEXT_ORDPATH
+      if (kind == store::StoreConsts::textNode)
+        continue;
+#endif
+
+      ulong childBits = elemBits + OrdPath::compBitLength(int32_t(2 * pos + 1));
+      maxBits = std::max(maxBits, childBits);
+
+      if (child->isConnectorNode())
+      {
+        maxBits = std::max(maxBits, childBits +
+          static_cast<const ConnectorNode*>(child)->theDescendantIdBits);
+      }
+      else if (kind == store::StoreConsts::elementNode)
+      {
+        elems.push_back(std::make_pair(static_cast<const InternalNode*>(child),
+                                       childBits));
+      }
+    }
+  }
+
+  return maxBits;
+}
+
+
+/*******************************************************************************
+  Compute, in the order a copy creates them, the node ids of a copy of the
+  attributes and descendants of root whose own copy gets rootId: the first id
+  that exceeds the node id limit raises the error a copy raises.
+********************************************************************************/
+void ConnectorNode::raiseIdLimit(const InternalNode* root, const OrdPath& rootId)
+{
+  // A node with the id of its parent and the component to append; root has
+  // its id already (no component).
+  struct Pending
+  {
+    const XmlNode* theNode;
+    OrdPath        theParentId;
+    int32_t        theComp;
+  };
+
+  std::vector<Pending> pending;
+  pending.push_back(Pending{root, rootId, 0});
+
+  while (!pending.empty())
+  {
+    Pending next = pending.back();
+    pending.pop_back();
+
+    OrdPath id(next.theParentId);
+    if (next.theComp != 0)
+      id.appendComp(next.theComp);
+
+    if (next.theNode->getNodeKind() != store::StoreConsts::elementNode)
+      continue;
+
+    const InternalNode* elem = static_cast<const InternalNode*>(next.theNode);
+    bool insertsBaseUri;
+    csize numAttrs = copyNumAttrs(elem, insertsBaseUri);
+    csize numAppended = (insertsBaseUri ? numAttrs - 1 : numAttrs);
+    OrdPath firstAttrId;
+
+    for (csize i = 0; i < numAppended; ++i)
+    {
+      OrdPath attrId(id);
+      attrId.appendComp(int32_t(2 * i + 1));
+
+      if (i == 0)
+        firstAttrId = attrId;
+    }
+
+    if (insertsBaseUri)
+    {
+      OrdPath baseUriId;
+      OrdPath::insertBefore(id, firstAttrId, baseUriId);
+    }
+
+    // Pushed in reverse, so that the children are visited in order.
+    for (csize i = elem->numChildren(); i-- > 0; )
+    {
+      const XmlNode* child = elem->getChild(i);
+
+      if (child->isConnectorNode())
+        child = static_cast<const ConnectorNode*>(child)->getNode();
+
+#ifndef TEXT_ORDPATH
+      if (child->getNodeKind() == store::StoreConsts::textNode)
+        continue;
+#endif
+
+      pending.push_back(Pending{child, id, int32_t(2 * (numAttrs + i) + 1)});
+    }
+  }
 }
 
 
@@ -1146,9 +1340,24 @@ void OrdPathNode::setOrdPath(
     csize pos,
     store::StoreConsts::NodeKind nodeKind)
 {
+  computeOrdPath(parent, append, pos, nodeKind, theOrdPath);
+}
+
+
+/*******************************************************************************
+  Compute into result the node id that setOrdPath() gives a node of the given
+  kind placed under parent; result is left as it is if parent has no id.
+********************************************************************************/
+void OrdPathNode::computeOrdPath(
+    InternalNode* parent,
+    bool append,
+    csize pos,
+    store::StoreConsts::NodeKind nodeKind,
+    OrdPath& result)
+{
   if (parent == NULL)
   {
-    theOrdPath.setAsRoot();
+    result.setAsRoot();
     return;
   }
 
@@ -1169,8 +1378,8 @@ void OrdPathNode::setOrdPath(
   {
     if (append)
     {
-      theOrdPath = parent->getOrdPath();
-      theOrdPath.appendComp(2 * numAttrs + 1);
+      result = parent->getOrdPath();
+      result.appendComp(2 * numAttrs + 1);
     }
     // Parent has some existing attributes.
     else if (numAttrs > 0)
@@ -1179,7 +1388,7 @@ void OrdPathNode::setOrdPath(
       {
         OrdPath::insertBefore(parent->theOrdPath,
                               elemParent->getAttr(0)->getOrdPath(),
-                              theOrdPath);
+                              result);
       }
       else if (pos >= numAttrs)
       {
@@ -1190,13 +1399,13 @@ void OrdPathNode::setOrdPath(
           OrdPath::insertInto(parent->theOrdPath,
                               elemParent->getAttr(numAttrs-1)->theOrdPath,
                               *upperOrdPath,
-                              theOrdPath);
+                              result);
         }
         else
         {
           OrdPath::insertAfter(parent->theOrdPath,
                                elemParent->getAttr(numAttrs-1)->getOrdPath(),
-                               theOrdPath);
+                               result);
         }
       }
       else
@@ -1204,7 +1413,7 @@ void OrdPathNode::setOrdPath(
         OrdPath::insertInto(parent->theOrdPath,
                             elemParent->getAttr(pos-1)->getOrdPath(),
                             elemParent->getAttr(pos)->getOrdPath(),
-                            theOrdPath);
+                            result);
       }
     }
     // Parent has no existing attributes.
@@ -1214,12 +1423,12 @@ void OrdPathNode::setOrdPath(
 
       if (upperOrdPath != NULL)
       {
-        OrdPath::insertBefore(parent->theOrdPath, *upperOrdPath, theOrdPath);
+        OrdPath::insertBefore(parent->theOrdPath, *upperOrdPath, result);
       }
       else
       {
-        theOrdPath = parent->theOrdPath;
-        theOrdPath.appendComp(1);
+        result = parent->theOrdPath;
+        result.appendComp(1);
       }
     }
   }
@@ -1228,8 +1437,8 @@ void OrdPathNode::setOrdPath(
   {
     if (append)
     {
-      theOrdPath = parent->getOrdPath();
-      theOrdPath.appendComp(2 * (numAttrs + numChildren) + 1);
+      result = parent->getOrdPath();
+      result.appendComp(2 * (numAttrs + numChildren) + 1);
     }
 
     // Parent has some other children
@@ -1259,20 +1468,20 @@ void OrdPathNode::setOrdPath(
         OrdPath::insertInto(parent->theOrdPath,
                             *lowerOrdPath,
                             *upperOrdPath,
-                            theOrdPath);
+                            result);
       }
       else if (upperOrdPath == NULL && lowerOrdPath != NULL)
       {
-        OrdPath::insertAfter(parent->theOrdPath, *lowerOrdPath, theOrdPath);
+        OrdPath::insertAfter(parent->theOrdPath, *lowerOrdPath, result);
       }
       else if (upperOrdPath != NULL && lowerOrdPath == NULL)
       {
-        OrdPath::insertBefore(parent->theOrdPath, *upperOrdPath, theOrdPath);
+        OrdPath::insertBefore(parent->theOrdPath, *upperOrdPath, result);
       }
       else
       {
-        theOrdPath = parent->theOrdPath;
-        theOrdPath.appendComp(1);
+        result = parent->theOrdPath;
+        result.appendComp(1);
       }
     }
 
@@ -1281,14 +1490,14 @@ void OrdPathNode::setOrdPath(
     {
       OrdPath::insertAfter(parent->getOrdPath(),
                            elemParent->getAttr(numAttrs-1)->getOrdPath(),
-                           theOrdPath);
+                           result);
     }
 
     // Parent has no children and no attributes
     else
     {
-      theOrdPath = parent->theOrdPath;
-      theOrdPath.appendComp(1);
+      result = parent->theOrdPath;
+      result.appendComp(1);
     }
   }
 }
@@ -1625,16 +1834,18 @@ const OrdPath* InternalNode::getFirstChildOrdPathAfter(csize pos) const
 #ifndef TEXT_ORDPATH
   for (; ite != end; ++ite)
   {
-    assert(!(*ite)->isConnectorNode());
-
     if ((*ite)->getNodeKind() != store::StoreConsts::textNode)
       break;
   }
 #endif
 
-  return (ite == end ?
-          NULL :
-          &static_cast<const OrdPathNode*>((*ite))->getOrdPath());
+  if (ite == end)
+    return NULL;
+
+  if ((*ite)->isConnectorNode())
+    return &static_cast<const ConnectorNode*>(*ite)->getOrdPath();
+
+  return &static_cast<const OrdPathNode*>(*ite)->getOrdPath();
 }
 
 
@@ -1653,16 +1864,18 @@ const OrdPath* InternalNode::getFirstChildOrdPathBefore(csize pos) const
 #ifndef TEXT_ORDPATH
   for (; ite != end; ++ite)
   {
-    assert(!(*ite)->isConnectorNode());
-
     if ((*ite)->getNodeKind() != store::StoreConsts::textNode)
       break;
   }
 #endif
 
-  return (ite == end ?
-          NULL :
-          &static_cast<const OrdPathNode*>((*ite))->getOrdPath());
+  if (ite == end)
+    return NULL;
+
+  if ((*ite)->isConnectorNode())
+    return &static_cast<const ConnectorNode*>(*ite)->getOrdPath();
+
+  return &static_cast<const OrdPathNode*>(*ite)->getOrdPath();
 }
 
 

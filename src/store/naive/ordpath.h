@@ -210,6 +210,22 @@ public:
 
   ulong getLevel() const;
 
+  ulong getBitLength() const
+  {
+    ulong byteLen;
+    return getBitLength(byteLen);
+  }
+
+  // The number of bits appendComp(value) adds.
+  static ulong compBitLength(int32_t value)
+  {
+    ulong bits;
+    uint32_t eval;
+    uint64_t eval2;
+    bitsNeeded(value, bits, eval, eval2);
+    return bits;
+  }
+
   void compress(const DeweyID& dewey);
 
   void appendComp(int32_t value);

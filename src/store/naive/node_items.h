@@ -619,17 +619,31 @@ class ConnectorNode : public XmlNode
 protected:
   XmlNode_t  theNode;
 
+  // The node id that a copy of theNode would get in place of this connector,
+  // and the most bits the ids of the copy's attributes and descendants add to
+  // it: the ids of a copy must fit in the node id limit, so must these.
+  OrdPath    theOrdPath;
+  ulong      theDescendantIdBits;
+
 protected:
   ConnectorNode(
       XmlTree* tree,
       InternalNode* parent,
       const XmlNode* child);
 
+  static csize copyNumAttrs(const InternalNode* elem, bool& insertsBaseUri);
+
+  static ulong descendantIdBits(const InternalNode* root);
+
+  static void raiseIdLimit(const InternalNode* root, const OrdPath& rootId);
+
 public:
   size_t alloc_size() const;
   size_t dynamic_size() const;
 
   XmlNode* getNode() const { return theNode.getp(); }
+
+  const OrdPath& getOrdPath() const { return theOrdPath; }
 
   store::Item* getNodeName() const { return theNode->getNodeName(); }
 
@@ -705,6 +719,13 @@ public:
         bool append,
         csize pos,
         store::StoreConsts::NodeKind nodeKind);
+
+  static void computeOrdPath(
+        InternalNode* parent,
+        bool append,
+        csize pos,
+        store::StoreConsts::NodeKind nodeKind,
+        OrdPath& result);
 
   // Looks for a descendant node with the ordpath aOrdPath and puts it into the
   // aResult variable. aAttribute specifies whether to look for an attribute or
