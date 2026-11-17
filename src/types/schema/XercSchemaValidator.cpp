@@ -121,10 +121,8 @@ bool XercSchemaValidator::checkContent (XMLElementDecl* const elemDecl
     //  to do to validate it.
     //
     // the top of the type stack always knows best...
-    if ( fTypeStack->empty() )
-    {
-        emitError(XMLValid::DatatypeValidationFailure, elemDecl->getFullName());
-    }
+    // The filter calls checkContent only for an element that took a type stack entry
+    ZORBA_ASSERT(!fTypeStack->empty());
 
     ComplexTypeInfo* currType = fTypeStack->pop();
     //std::cout << "      xsv - : checkcontent   pop \n"; std::cout.flush();
@@ -784,17 +782,16 @@ void XercSchemaValidator::validateElement(const   XMLElementDecl*  elemDef)
 }
 
 // modeled after validateElement
-void XercSchemaValidator::validateProcessorStipulatedTypeName(const   XMLElementDecl*  elemDef)
+void XercSchemaValidator::validateProcessorStipulatedTypeName(const   XMLElementDecl*  elemDef,
+                                                              const XERCES_CPP_NAMESPACE::QName& stipulatedType)
 {
     fErrorOccurred = false;
-    ComplexTypeInfo* stipulatedTypeInfo = 0;
+    ComplexTypeInfo* governingTypeInfo = 0;
 
-    if (fXsiType)
     {
-        // handle "xsi:type" right here
         DatatypeValidator *xsiTypeDV = 0;
-        unsigned int uri = fXsiType->getURI();
-        const XMLCh* localPart = fXsiType->getLocalPart();
+        unsigned int uri = stipulatedType.getURI();
+        const XMLCh* localPart = stipulatedType.getLocalPart();
 
         if (uri != XMLElementDecl::fgInvalidElemId &&
             uri != XMLElementDecl::fgPCDataElemId &&
@@ -815,7 +812,7 @@ void XercSchemaValidator::validateProcessorStipulatedTypeName(const   XMLElement
 
                     if (!xsiTypeDV)
                     {
-                        emitError(XMLValid::BadXsiType, fXsiType->getRawName());
+                        emitError(XMLValid::BadXsiType, stipulatedType.getRawName());
                         fErrorOccurred = true;
                     }
                     else
@@ -841,7 +838,7 @@ void XercSchemaValidator::validateProcessorStipulatedTypeName(const   XMLElement
                 RefHashTableOf<ComplexTypeInfo>* complexTypeRegistry = sGrammar->getComplexTypeRegistry();
                 if (!complexTypeRegistry)
                 {
-                    emitError(XMLValid::BadXsiType, fXsiType->getRawName());
+                    emitError(XMLValid::BadXsiType, stipulatedType.getRawName());
                     fErrorOccurred = true;
                 }
                 else
@@ -866,14 +863,14 @@ void XercSchemaValidator::validateProcessorStipulatedTypeName(const   XMLElement
                                 // if the original type is a simple type, check derivation ok.
                                 if (fCurrentDatatypeValidator && !fCurrentDatatypeValidator->isSubstitutableBy(typeInfo->getDatatypeValidator())) {
                                     // the type is not derived from ancestor
-                                    emitError(XMLValid::NonDerivedXsiType, fXsiType->getRawName(), elemDef->getFullName());
+                                    emitError(XMLValid::NonDerivedXsiType, stipulatedType.getRawName(), elemDef->getFullName());
                                     fErrorOccurred = true;
                                 }
                             }
 
                             if (!fErrorOccurred)
                             {
-                                stipulatedTypeInfo = typeInfo;
+                                governingTypeInfo = typeInfo;
                                 fCurrentDatatypeValidator = typeInfo->getDatatypeValidator();
                                 //std::cout << "  xsv - : valElem4 push " <<  (typeInfo ? StrX(typeInfo->getTypeLocalName()).localForm() : "_") << "\n"; std::cout.flush();
                             }
@@ -886,7 +883,7 @@ void XercSchemaValidator::validateProcessorStipulatedTypeName(const   XMLElement
 
                         if (!xsiTypeDV)
                         {
-                            emitError(XMLValid::BadXsiType, fXsiType->getRawName());
+                            emitError(XMLValid::BadXsiType, stipulatedType.getRawName());
                             fErrorOccurred = true;
                         }
                         else
@@ -898,16 +895,67 @@ void XercSchemaValidator::validateProcessorStipulatedTypeName(const   XMLElement
             }
         }
 
-        delete fXsiType;
-        fXsiType = 0;
-    }
-    else
-    {
-        ZORBA_ASSERT(false);
     }
 
+    // An xsi:type naming a type derived from the stipulated type governs the root (XSD 1.1 governing type definition)
+    const Janitor<XERCES_CPP_NAMESPACE::QName> xsiType(fXsiType);
+    fXsiType = 0;
+    if (xsiType.get() && !fErrorOccurred)
+    {
+        const unsigned int uri = xsiType->getURI();
+        const XMLCh* localPart = xsiType->getLocalPart();
+        ComplexTypeInfo* xsiTypeInfo = 0;
+        DatatypeValidator* xsiTypeDV = 0;
+
+        if (uri != XMLElementDecl::fgInvalidElemId &&
+            uri != XMLElementDecl::fgPCDataElemId &&
+            uri != XMLContentModel::gEpsilonFakeId &&
+            uri != XMLContentModel::gEOCFakeId)
+        {
+            const XMLCh* uriStr = getScanner()->getURIText(uri);
+            SchemaGrammar* sGrammar = (SchemaGrammar*) fGrammarResolver->getGrammar(uriStr);
+            if (sGrammar && sGrammar->getGrammarType() == Grammar::SchemaGrammarType
+                && sGrammar->getComplexTypeRegistry())
+            {
+                XMLBuffer aBuffer(1023, fMemoryManager);
+                aBuffer.set(uriStr);
+                aBuffer.append(chComma);
+                aBuffer.append(localPart);
+                xsiTypeInfo = sGrammar->getComplexTypeRegistry()->get(aBuffer.getRawBuffer());
+            }
+            xsiTypeDV = xsiTypeInfo
+                ? xsiTypeInfo->getDatatypeValidator()
+                : fGrammarResolver->getDatatypeValidator(uriStr, localPart);
+        }
+
+        bool isDerived = false;
+        if (governingTypeInfo)
+        {
+            for (ComplexTypeInfo* base = xsiTypeInfo; base && !isDerived; base = base->getBaseComplexTypeInfo())
+                isDerived = (base == governingTypeInfo);
+        }
+        else if (fCurrentDatatypeValidator && xsiTypeDV)
+        {
+            isDerived = fCurrentDatatypeValidator->isSubstitutableBy(xsiTypeDV);
+        }
+
+        if (isDerived)
+        {
+            if (xsiTypeInfo && xsiTypeInfo->getAbstract())
+            {
+                emitError(XMLValid::NoAbstractInXsiType, xsiType->getRawName());
+                fErrorOccurred = true;
+            }
+            governingTypeInfo = xsiTypeInfo;
+            fCurrentDatatypeValidator = xsiTypeDV;
+        }
+    }
+
+    // Only an element declaration makes an element nilled, so xsi:nil is ignored
+    fNil = false;
+
     // checkContent pops one entry for every element, a simple type included
-    fTypeStack->push(stipulatedTypeInfo);
+    fTypeStack->push(governingTypeInfo);
     fHasStipulatedType = true;
 
     fDatatypeBuffer.reset();
@@ -2332,10 +2380,8 @@ int XercSchemaValidator::checkContent (XMLElementDecl* const elemDecl
     //  to do to validate it.
     //
     // the top of the type stack always knows best...
-    if ( fTypeStack->empty() )
-    {
-        emitError(XMLValid::DatatypeValidationFailure, elemDecl->getFullName());
-    }
+    // The filter calls checkContent only for an element that took a type stack entry
+    ZORBA_ASSERT(!fTypeStack->empty());
 
     ComplexTypeInfo* currType = fTypeStack->pop();
     // The declaration of the name of a root validated against a stipulated type
@@ -3001,17 +3047,16 @@ void XercSchemaValidator::validateElement(const   XMLElementDecl*  elemDef)
 }
 
 // modeled after validateElement
-void XercSchemaValidator::validateProcessorStipulatedTypeName(const   XMLElementDecl*  elemDef)
+void XercSchemaValidator::validateProcessorStipulatedTypeName(const   XMLElementDecl*  elemDef,
+                                                              const XERCES_CPP_NAMESPACE::QName& stipulatedType)
 {
     fErrorOccurred = false;
-    ComplexTypeInfo* stipulatedTypeInfo = 0;
+    ComplexTypeInfo* governingTypeInfo = 0;
 
-    if (fXsiType)
     {
-        // handle "xsi:type" right here
         DatatypeValidator *xsiTypeDV = 0;
-        unsigned int uri = fXsiType->getURI();
-        const XMLCh* localPart = fXsiType->getLocalPart();
+        unsigned int uri = stipulatedType.getURI();
+        const XMLCh* localPart = stipulatedType.getLocalPart();
 
         if (uri != XMLElementDecl::fgInvalidElemId &&
             uri != XMLElementDecl::fgPCDataElemId &&
@@ -3032,7 +3077,7 @@ void XercSchemaValidator::validateProcessorStipulatedTypeName(const   XMLElement
 
                     if (!xsiTypeDV)
                     {
-                        emitError(XMLValid::BadXsiType, fXsiType->getRawName());
+                        emitError(XMLValid::BadXsiType, stipulatedType.getRawName());
                         fErrorOccurred = true;
                     }
                     else
@@ -3058,7 +3103,7 @@ void XercSchemaValidator::validateProcessorStipulatedTypeName(const   XMLElement
                 RefHashTableOf<ComplexTypeInfo>* complexTypeRegistry = sGrammar->getComplexTypeRegistry();
                 if (!complexTypeRegistry)
                 {
-                    emitError(XMLValid::BadXsiType, fXsiType->getRawName());
+                    emitError(XMLValid::BadXsiType, stipulatedType.getRawName());
                     fErrorOccurred = true;
                 }
                 else
@@ -3086,14 +3131,14 @@ void XercSchemaValidator::validateProcessorStipulatedTypeName(const   XMLElement
                                 if (fCurrentDatatypeValidator && !fCurrentDatatypeValidator->isSubstitutableBy(typeInfo->getDatatypeValidator()))
                                 {
                                     // the type is not derived from ancestor
-                                    emitError(XMLValid::NonDerivedXsiType, fXsiType->getRawName(), elemDef->getFullName());
+                                    emitError(XMLValid::NonDerivedXsiType, stipulatedType.getRawName(), elemDef->getFullName());
                                     fErrorOccurred = true;
                                 }
                             }
 
                             if (!fErrorOccurred)
                             {
-                                stipulatedTypeInfo = typeInfo;
+                                governingTypeInfo = typeInfo;
                                 fCurrentDatatypeValidator = typeInfo->getDatatypeValidator();
                             }
                         }
@@ -3105,7 +3150,7 @@ void XercSchemaValidator::validateProcessorStipulatedTypeName(const   XMLElement
 
                         if (!xsiTypeDV)
                         {
-                            emitError(XMLValid::BadXsiType, fXsiType->getRawName());
+                            emitError(XMLValid::BadXsiType, stipulatedType.getRawName());
                             fErrorOccurred = true;
                         }
                         else
@@ -3117,16 +3162,67 @@ void XercSchemaValidator::validateProcessorStipulatedTypeName(const   XMLElement
             }
         }
 
-        delete fXsiType;
-        fXsiType = 0;
-    }
-    else
-    {
-        ZORBA_ASSERT(false);
     }
 
+    // An xsi:type naming a type derived from the stipulated type governs the root (XSD 1.1 governing type definition)
+    const Janitor<XERCES_CPP_NAMESPACE::QName> xsiType(fXsiType);
+    fXsiType = 0;
+    if (xsiType.get() && !fErrorOccurred)
+    {
+        const unsigned int uri = xsiType->getURI();
+        const XMLCh* localPart = xsiType->getLocalPart();
+        ComplexTypeInfo* xsiTypeInfo = 0;
+        DatatypeValidator* xsiTypeDV = 0;
+
+        if (uri != XMLElementDecl::fgInvalidElemId &&
+            uri != XMLElementDecl::fgPCDataElemId &&
+            uri != XMLContentModel::gEpsilonFakeId &&
+            uri != XMLContentModel::gEOCFakeId)
+        {
+            const XMLCh* uriStr = getScanner()->getURIText(uri);
+            SchemaGrammar* sGrammar = (SchemaGrammar*) fGrammarResolver->getGrammar(uriStr);
+            if (sGrammar && sGrammar->getGrammarType() == Grammar::SchemaGrammarType
+                && sGrammar->getComplexTypeRegistry())
+            {
+                XMLBuffer aBuffer(1023, fMemoryManager);
+                aBuffer.set(uriStr);
+                aBuffer.append(chComma);
+                aBuffer.append(localPart);
+                xsiTypeInfo = sGrammar->getComplexTypeRegistry()->get(aBuffer.getRawBuffer());
+            }
+            xsiTypeDV = xsiTypeInfo
+                ? xsiTypeInfo->getDatatypeValidator()
+                : fGrammarResolver->getDatatypeValidator(uriStr, localPart);
+        }
+
+        bool isDerived = false;
+        if (governingTypeInfo)
+        {
+            for (ComplexTypeInfo* base = xsiTypeInfo; base && !isDerived; base = base->getBaseComplexTypeInfo())
+                isDerived = (base == governingTypeInfo);
+        }
+        else if (fCurrentDatatypeValidator && xsiTypeDV)
+        {
+            isDerived = fCurrentDatatypeValidator->isSubstitutableBy(xsiTypeDV);
+        }
+
+        if (isDerived)
+        {
+            if (xsiTypeInfo && xsiTypeInfo->getAbstract())
+            {
+                emitError(XMLValid::NoAbstractInXsiType, xsiType->getRawName());
+                fErrorOccurred = true;
+            }
+            governingTypeInfo = xsiTypeInfo;
+            fCurrentDatatypeValidator = xsiTypeDV;
+        }
+    }
+
+    // Only an element declaration makes an element nilled, so xsi:nil is ignored
+    fNil = false;
+
     // checkContent pops one entry for every element, a simple type included
-    fTypeStack->push(stipulatedTypeInfo);
+    fTypeStack->push(governingTypeInfo);
     fHasStipulatedType = true;
 
     fDatatypeBuffer.reset();

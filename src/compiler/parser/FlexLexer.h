@@ -139,6 +139,7 @@ public:
   void yypush_buffer_state( yy_buffer_state* new_buffer );
   void yypop_buffer_state();
 
+  virtual int yyread(char *buf, size_t);
   virtual int yylex();
   virtual void switch_streams( std::istream& new_in, std::ostream& new_out );
   virtual void switch_streams( std::istream* new_in = 0, std::ostream* new_out = 0 );
@@ -148,8 +149,8 @@ protected:
   virtual int LexerInput( char* buf, int max_size );
   virtual void LexerOutput( const char* buf, int size );
   virtual void LexerError( const char* msg );
-
-  void yyunput( int c, char* buf_ptr );
+			
+  void yyunput_r( int c, char* buf_ptr );
   int yyinput();
 
   void yy_load_buffer_state();
@@ -201,6 +202,7 @@ protected:
 
   yy_state_type* yy_state_buf;
   yy_state_type* yy_state_ptr;
+  size_t yy_state_buf_max;
 
   char* yy_full_match;
   int* yy_full_state;
