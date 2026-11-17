@@ -1,4 +1,4 @@
-### Bug fixes
+### Fixed
 
 - A document that loads can be validated: `validate` gave every element of
   the validated copy its own base URI, held in an attribute that lengthened
