@@ -257,11 +257,11 @@ FOREACH(TESTFILE ${TESTFILES})
 
     ZORBA_ADD_TEST("${TESTNAME}" testdriver ${TESTFILE})
     # The window, array member, dynamic function call, iteration-updates, copy
-    # modify target, empty for domain, index collation, index key type, hash
-    # join key error, hash join order, sequential call and queue delete tests
-    # must give the same results at every optimization level (the testdriver
-    # reads ZORBA_OPTLEVEL; the default is O1).
-    IF (TESTNAME MATCHES "^test/rbkt/zorba/(jsoniq-windows|jsoniq-array-members|dynamic-calls|iteration-updates|updates/transform-targets|empty-domain|index-collation|index-keytype-parity|hashjoin-key-errors|hashjoin-order|sequential-calls)/|^test/rbkt/zorba/collections/queue-delete-")
+    # modify target, no-copy shared subtree, empty for domain, index collation,
+    # index key type, hash join key error, hash join order, sequential call and
+    # queue delete tests must give the same results at every optimization level
+    # (the testdriver reads ZORBA_OPTLEVEL; the default is O1).
+    IF (TESTNAME MATCHES "^test/rbkt/zorba/(jsoniq-windows|jsoniq-array-members|dynamic-calls|iteration-updates|updates/transform-targets|no-copy/shared|empty-domain|index-collation|index-keytype-parity|hashjoin-key-errors|hashjoin-order|sequential-calls)/|^test/rbkt/zorba/collections/queue-delete-")
       FOREACH (_optlevel O0 O2)
         ZORBA_ADD_TEST("${TESTNAME}-${_optlevel}" testdriver ${TESTFILE})
         SET_TESTS_PROPERTIES ("${TESTNAME}-${_optlevel}" PROPERTIES
