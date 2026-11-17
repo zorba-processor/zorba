@@ -184,7 +184,7 @@ Probing the untyped PersonIncome2 sorted general 1-1 index
 
 probe 1:
 
-<exception>err:XPTY0004 : node with untyped key value found during probe on index "auctions:PersonIncome2"</exception>
+<exception>err:XPTY0004 : "xs:integer": search key can not be compared with a key value of a node in index "auctions:PersonIncome2"</exception>
 
 probe 2:
 
