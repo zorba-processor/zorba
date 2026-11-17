@@ -553,42 +553,66 @@ void test_xqueryx(Zorba* z, const Files& f)
 // amplification checks are never disabled. When libxml2's message tells the
 // amplification limit apart from a real entity loop (from 2.11 on), the error
 // is the implementation limit err:XPDY0130, whose message names the factor.
-void test_billion_laughs(Zorba* z)
+// aOtherCode is what the parse raises for an entity loop before 2.11.
+void check_laughs(const Outcome& o, const SecurityPolicy& p, long long aSecs,
+                  const char* aOtherCode, const char* aWhat)
+{
+  CHECK(!o.ok);
+#if LIBXML_VERSION >= 21100
+  (void)aOtherCode;
+  CHECK(o.code == "XPDY0130");
+  CHECK(o.message.find("entity amplification factor") != std::string::npos);
+  if (p.getMaxEntityAmplification() != 0)
+    CHECK(o.message.find("entity amplification factor of 5")
+          != std::string::npos);
+#else
+  // libxml2 2.9 and 2.10 report the amplification limit as an entity
+  // reference loop, unless the distribution backported the message of 2.11.
+  bool const lExpected =
+    o.code == aOtherCode ||
+    (o.code == "XPDY0130" &&
+     o.message.find("entity amplification factor") != std::string::npos);
+  CHECK(lExpected);
+  if (!lExpected)
+    std::cerr << "  billion laughs, " << aWhat << ": " << o << std::endl;
+#endif
+  CHECK(aSecs < 30);
+  if (o.ok || aSecs >= 30)
+    std::cerr << "  billion laughs, " << aWhat << ": " << o << " after "
+              << aSecs << " s" << std::endl;
+}
+
+// fn:parse-xml under every policy; fn:doc of a file under the policies that
+// let it read files, with the file as the data location of the error.
+void test_billion_laughs(Zorba* z, const Files& f)
 {
   std::string const lDoc = billion_laughs();
-  const SecurityPolicy lPolicies[] = {
-    SecurityPolicy::secure(),
-    SecurityPolicy::unrestricted(),
-    SecurityPolicy::secure().setMaxEntityAmplification(5)
+  std::string const lDocURI = f.write("laughs.xml", lDoc);
+  struct Case { SecurityPolicy policy; bool readsFiles; };
+  const Case lCases[] = {
+    { SecurityPolicy::secure(), false },
+    { SecurityPolicy::unrestricted(), true },
+    { SecurityPolicy::secure().setMaxEntityAmplification(5), false },
+    { SecurityPolicy::unrestricted().setMaxEntityAmplification(5), true }
   };
-  for (const SecurityPolicy& p : lPolicies)
+  for (const Case& c : lCases)
   {
-    auto const t0 = std::chrono::steady_clock::now();
-    Outcome o = parse_xml(z, context(z, p), lDoc);
-    auto const secs = std::chrono::duration_cast<std::chrono::seconds>(
-        std::chrono::steady_clock::now() - t0).count();
-    CHECK(!o.ok);
-#if LIBXML_VERSION >= 21100
-    CHECK(o.code == "XPDY0130");
-    CHECK(o.message.find("entity amplification factor") != std::string::npos);
-    if (p.getMaxEntityAmplification() != 0)
-      CHECK(o.message.find("entity amplification factor of 5")
-            != std::string::npos);
-#else
-    // libxml2 2.9 and 2.10 report the amplification limit as an entity
-    // reference loop, unless the distribution backported the message of 2.11.
-    bool const lExpected =
-      o.code == "FODC0006" ||
-      (o.code == "XPDY0130" &&
-       o.message.find("entity amplification factor") != std::string::npos);
-    CHECK(lExpected);
-    if (!lExpected)
-      std::cerr << "  billion laughs: " << o << std::endl;
-#endif
-    CHECK(secs < 30);
-    if (o.ok || secs >= 30)
-      std::cerr << "  billion laughs: " << o << " after " << secs << " s"
-                << std::endl;
+    auto t0 = std::chrono::steady_clock::now();
+    auto lSeconds = [&t0] {
+      return static_cast<long long>(
+        std::chrono::duration_cast<std::chrono::seconds>(
+          std::chrono::steady_clock::now() - t0).count());
+    };
+    check_laughs(parse_xml(z, context(z, c.policy), lDoc), c.policy,
+                 lSeconds(), "FODC0006", "fn:parse-xml");
+    if (!c.readsFiles)
+      continue;
+
+    t0 = std::chrono::steady_clock::now();
+    Outcome const d = doc(z, context(z, c.policy), lDocURI);
+    check_laughs(d, c.policy, lSeconds(), "FODC0002", "fn:doc");
+    if (d.code == "XPDY0130")
+      CHECK(d.message.find("laughs.xml") != std::string::npos);
   }
 }
 
@@ -644,7 +668,7 @@ xml_parser_security(int argc, char* argv[])
 #ifdef ZORBA_XQUERYX
     test_xqueryx(lZorba, lFiles);
 #endif
-    test_billion_laughs(lZorba);
+    test_billion_laughs(lZorba, lFiles);
 #ifndef ZORBA_NO_XMLSCHEMA
     test_embedder_error_handler(lZorba);
 #endif
