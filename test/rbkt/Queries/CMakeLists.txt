@@ -261,7 +261,7 @@ FOREACH(TESTFILE ${TESTFILES})
     # hash join order, sequential call and node id depth tests must give the
     # same results at every optimization level (the testdriver reads
     # ZORBA_OPTLEVEL; the default is O1).
-    IF (TESTNAME MATCHES "^test/rbkt/zorba/((jsoniq-windows|jsoniq-array-members|dynamic-calls|iteration-updates|updates/transform-targets|empty-domain|index-collation|hashjoin-key-errors|hashjoin-order|sequential-calls)/|parsing_and_serializing/parse-nodeid-depth$)")
+    IF (TESTNAME MATCHES "^test/rbkt/zorba/((jsoniq-windows|jsoniq-array-members|dynamic-calls|iteration-updates|updates/transform-targets|empty-domain|index-collation|hashjoin-key-errors|hashjoin-order|sequential-calls)/|parsing_and_serializing/parse-nodeid-depth$|schemas/validate-nodeid-depth$)")
       FOREACH (_optlevel O0 O2)
         ZORBA_ADD_TEST("${TESTNAME}-${_optlevel}" testdriver ${TESTFILE})
         SET_TESTS_PROPERTIES ("${TESTNAME}-${_optlevel}" PROPERTIES
