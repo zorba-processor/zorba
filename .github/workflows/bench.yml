@@ -282,6 +282,11 @@ jobs:
             -e "head:=$(git -C src-head rev-parse HEAD) ($HEAD_REF)" > out/table.md
           cat out/table.md >> "$GITHUB_STEP_SUMMARY"
           awk -F'\t' '$6 != "ok" { print "::warning title=" $1 " (" $2 ")::" $6 " in run " $3 }' out/raw.tsv
+          # exit-N is an exit status (a signal shows as 128+N); the query's stderr says why.
+          for f in out/errors/*.txt; do
+            test -s "$f" || continue
+            { echo; echo "\`$(basename "$f" .txt)\`:"; echo '```'; head -c 2000 "$f"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          done
 
       - uses: actions/upload-artifact@v7
         if: always()
