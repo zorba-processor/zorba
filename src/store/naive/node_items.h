@@ -18,7 +18,9 @@
 #define ZORBA_SIMPLE_STORE_NODE_ITEMS
 
 #include <cassert>
+#include <deque>
 #include <stack>
+#include <utility>
 #include <vector>
 
 #include <store/api/item.h>
@@ -83,6 +85,7 @@ class ElementNode;
 class GuideNode;
 class InternalNode;
 class NsBindingsContext;
+class OrdPathNode;
 class PiNode;
 class TextNode;
 
@@ -428,6 +431,10 @@ protected:
   virtual void getBaseURIInternal(zstring& uri, bool& local) const;
 
   void attach(InternalNode* parent, csize pos);
+
+  void computeSubtreeOrdPaths(
+      std::deque<OrdPath>& ordPaths,
+      std::vector<std::pair<OrdPathNode*, OrdPath*> >& ordPathOf) const;
 
   void detach();
 

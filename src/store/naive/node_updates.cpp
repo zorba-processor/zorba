@@ -14,7 +14,10 @@
  * limitations under the License.
  */
 
+#include <deque>
 #include <stack>
+#include <utility>
+#include <vector>
 #include <zorba/internal/unique_ptr.h>
 
 #include "system/globalenv.h"
@@ -131,6 +134,41 @@ void XmlNode::attach(InternalNode* parent, csize pos)
   ZORBA_ASSERT(theParent == NULL);
   ZORBA_ASSERT(parent != NULL);
 
+  store::StoreConsts::NodeKind nodeKind = getNodeKind();
+
+  // A node id can exceed its size limit, so every new id is computed before
+  // the subtree changes: if one throws, the subtree is left as it was.
+  std::deque<OrdPath> newOrdPaths;
+  std::vector<std::pair<OrdPathNode*, OrdPath*> > newOrdPathOf;
+
+#ifndef TEXT_ORDPATH
+  bool hasOrdPath = (nodeKind != store::StoreConsts::textNode);
+#else
+  bool hasOrdPath = true;
+#endif
+
+  if (hasOrdPath)
+  {
+    OrdPathNode* self = static_cast<OrdPathNode*>(this);
+    OrdPath oldOrdPath(self->theOrdPath);
+
+    try
+    {
+      self->setOrdPath(parent, false, pos, nodeKind);
+
+      if (nodeKind == store::StoreConsts::elementNode)
+        computeSubtreeOrdPaths(newOrdPaths, newOrdPathOf);
+    }
+    catch (...)
+    {
+      oldOrdPath.swap(self->theOrdPath);
+      throw;
+    }
+  }
+
+  for (csize i = 0; i < newOrdPathOf.size(); ++i)
+    newOrdPathOf[i].first->theOrdPath.swap(*newOrdPathOf[i].second);
+
   XmlTree* newTree = parent->getTree();
   XmlTree* oldTree = getTree();
 
@@ -140,57 +178,24 @@ void XmlNode::attach(InternalNode* parent, csize pos)
 
   theParent = parent;
 
-  store::StoreConsts::NodeKind nodeKind = getNodeKind();
-
   switch (nodeKind)
   {
   case store::StoreConsts::attributeNode:
   {
-    ElementNode* elemParent = reinterpret_cast<ElementNode*>(parent);
-
-    static_cast<AttributeNode*>(this)->
-    setOrdPath(parent, false, pos, store::StoreConsts::attributeNode);
-
-    elemParent->insertAttr(this, pos);
-
+    reinterpret_cast<ElementNode*>(parent)->insertAttr(this, pos);
     break;
   }
   case store::StoreConsts::commentNode:
-  {
-    static_cast<CommentNode*>(this)->
-    setOrdPath(parent, false, pos, getNodeKind());
-    
-    parent->insertChild(this, pos);
-
-    break;
-  }
   case store::StoreConsts::piNode:
-  {
-    static_cast<PiNode*>(this)->
-    setOrdPath(parent, false, pos, getNodeKind());
-    
-    parent->insertChild(this, pos);
-
-    break;
-  }
   case store::StoreConsts::textNode:
   {
-#ifdef TEXT_ORDPATH
-    static_cast<TextNode*>(this)->
-    setOrdPath(parent, false, pos, getNodeKind());
-#endif
-
     parent->insertChild(this, pos);
-
     break;
   }
   case store::StoreConsts::elementNode:
   {
     ElementNode* elemRoot = reinterpret_cast<ElementNode*>(this);
 
-    static_cast<ElementNode*>(this)->
-    setOrdPath(parent, false, pos, getNodeKind());
-    
     parent->insertChild(this, pos);
 
     std::stack<XmlNode*> nodes;
@@ -225,18 +230,15 @@ void XmlNode::attach(InternalNode* parent, csize pos)
       // Attach the attributes of this node to the new tree.
       AttributeNode* baseUriAttr = NULL;
       AttributeNode* hiddenBaseUriAttr = NULL;
-      csize numAttrs = elem->numAttrs();
 
       InternalNode::iterator ite = elem->attrsBegin();
       InternalNode::iterator end = elem->attrsEnd();
 
-      for (csize i = 0; ite != end; ++i, ++ite)
+      for (; ite != end; ++ite)
       {
         AttributeNode* attr = static_cast<AttributeNode*>(*ite);
 
         attr->setTree(newTree);
-        attr->theOrdPath = elem->theOrdPath;
-        attr->theOrdPath.appendComp(2 * i + 1);
 
         if (attr->isBaseUri())
         {
@@ -279,25 +281,10 @@ void XmlNode::attach(InternalNode* parent, csize pos)
       ite = elem->childrenBegin();
       end = elem->childrenEnd();
 
-      for (ulong i = 0; ite != end; ++i, ++ite)
+      for (; ite != end; ++ite)
       {
         XmlNode* child = (*ite);
-
         child->setTree(newTree);
-
-#ifndef TEXT_ORDPATH
-        if (child->getNodeKind() != store::StoreConsts::textNode)
-        {
-          OrdPathNode* child2 = static_cast<OrdPathNode*>(child);
-          
-          child2->theOrdPath = elem->theOrdPath;
-          child2->theOrdPath.appendComp(2 * (numAttrs + i) + 1);
-        }
-#else
-        static_cast<OrdPathNode*>(child)->theOrdPath = elem->theOrdPath;
-        static_cast<OrdPathNode*>(child)->theOrdPath.appendComp(2 * (numAttrs + i) + 1);
-#endif
-
         nodes.push(child);
       }
     } // done traversing tree
@@ -317,6 +304,63 @@ void XmlNode::attach(InternalNode* parent, csize pos)
   SYNC_CODE(newTree->getRCLock()->acquire());
   newTree->getRefCount() += refcount;
   SYNC_CODE(newTree->getRCLock()->release());
+}
+
+
+/*******************************************************************************
+  For the subtree rooted at "this" element, whose own new node id is already
+  set, compute the new id of each descendant and attribute (as attach() sets
+  them) into ordPaths, and pair each node with its id in ordPathOf.
+********************************************************************************/
+void XmlNode::computeSubtreeOrdPaths(
+    std::deque<OrdPath>& ordPaths,
+    std::vector<std::pair<OrdPathNode*, OrdPath*> >& ordPathOf) const
+{
+  std::stack<std::pair<const ElementNode*, const OrdPath*> > elems;
+  elems.push(std::make_pair(reinterpret_cast<const ElementNode*>(this),
+                            &static_cast<const OrdPathNode*>(this)->theOrdPath));
+
+  while (!elems.empty())
+  {
+    const ElementNode* elem = elems.top().first;
+    const OrdPath* elemOrdPath = elems.top().second;
+    elems.pop();
+
+    csize numAttrs = elem->numAttrs();
+
+    InternalNode::const_iterator ite = elem->attrsBegin();
+    InternalNode::const_iterator end = elem->attrsEnd();
+
+    for (csize i = 0; ite != end; ++i, ++ite)
+    {
+      ordPaths.push_back(*elemOrdPath);
+      ordPaths.back().appendComp(2 * i + 1);
+      ordPathOf.push_back(std::make_pair(static_cast<OrdPathNode*>(*ite),
+                                         &ordPaths.back()));
+    }
+
+    ite = elem->childrenBegin();
+    end = elem->childrenEnd();
+
+    for (csize i = 0; ite != end; ++i, ++ite)
+    {
+      XmlNode* child = (*ite);
+
+#ifndef TEXT_ORDPATH
+      if (child->getNodeKind() == store::StoreConsts::textNode)
+        continue;
+#endif
+
+      ordPaths.push_back(*elemOrdPath);
+      ordPaths.back().appendComp(2 * (numAttrs + i) + 1);
+      ordPathOf.push_back(std::make_pair(static_cast<OrdPathNode*>(child),
+                                         &ordPaths.back()));
+
+      if (child->getNodeKind() == store::StoreConsts::elementNode)
+        elems.push(std::make_pair(reinterpret_cast<const ElementNode*>(child),
+                                  &ordPaths.back()));
+    }
+  }
 }
 
 

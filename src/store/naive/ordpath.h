@@ -18,6 +18,7 @@
 #define ZORBA_STORE_ORDPATH_H
 
 #include <cassert>
+#include <utility>
 #include <vector>
 
 #include <zorba/config.h>
@@ -199,6 +200,8 @@ public:
 
   OrdPath& operator=(const OrdPath& other);
   OrdPath& operator=(const OrdPathStack& ops);
+
+  void swap(OrdPath& other) noexcept { std::swap(theBuffer, other.theBuffer); }
 
   bool operator==(const OrdPath& other) const;
   int operator<(const OrdPath& other) const;
