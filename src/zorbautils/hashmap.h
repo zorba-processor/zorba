@@ -788,7 +788,19 @@ bool insert(const K& item, V& value)
   if (!found)
   {
     entry->key() = item;
-    entry->value() = value;
+
+    // A copy of the value that fails leaves no entry, not a key without it.
+    try
+    {
+      entry->value() = value;
+    }
+    catch (...)
+    {
+      // hashInsert() put the new entry first in its bucket or right after it.
+      HashEntry<K, V>* headEntry = bucket(hval);
+      eraseEntry(entry, entry == headEntry ? NULL : headEntry);
+      throw;
+    }
   }
   else
   {

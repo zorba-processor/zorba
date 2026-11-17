@@ -106,7 +106,6 @@ Rules this code depends on:
     to read (twice in 1990, not explained): the process ends.
   - ICU crashes in `RegexPattern::zap()` (SIGSEGV) if an allocation fails while it
     compiles a regular expression. The directory module uses some on each call.
-  - The flex scanner calls `exit(2)` if it cannot allocate, while a query compiles.
   - Running out of memory while the message cannot be parsed (before its id is read,
     and again when it is read once more for its id): the error response has
     `"id": null`, as JSON-RPC 2.0 (section 5) requires when the id cannot be
@@ -119,10 +118,6 @@ Rules this code depends on:
 
   The sweeps measure what a failed call keeps over the `malloc` family, which
   libxml2, ICU, Xerces-C and MAPM allocate with and `operator new` uses too.
-  After several consecutive failed allocations (runs of 8 in the sweeps), the XML,
-  fragment and HTML parsers can keep 8 to 18 KB per failed call. The cause is not
-  established. `exhaust_sweep_xml`, `_fragment` and `_html` report it for runs of 8
-  but do not fail on it; for single failures the check still fails.
 
 Tests hold the threads at known points with `ServerConfig::scan_hook`. Tests
 under ThreadSanitizer: the `tsan-mcp` job of `sanitizers.yml`.
