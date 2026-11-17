@@ -1648,7 +1648,9 @@ void load_document_from_uri(
   }
   catch (ZorbaException& e)
   {
-    e.set_diagnostic(err::FODC0002);
+    // A parser limit is not a document that is unavailable.
+    if (e.diagnostic() != err::XPDY0130)
+      e.set_diagnostic(err::FODC0002);
     set_source(e, loc);
     throw;
   }

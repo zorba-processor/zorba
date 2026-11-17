@@ -41,6 +41,7 @@
 #include <zorba/static_context.h>
 #include <zorba/store_manager.h>
 #include <zorba/xmldatamanager.h>
+#include <zorba/xquery_exception.h>
 #include <zorba/xquery.h>
 #include <zorba/zorba.h>
 #include <zorba/zorba_exception.h>
@@ -147,6 +148,7 @@ struct Outcome
   std::string value;     // string value of the result, if ok
   std::string code;      // local name of the error code, if not ok
   std::string message;   // error message, if not ok
+  std::string dataURI;   // document of the error's data location, if any
 };
 
 std::ostream& operator<<(std::ostream& os, const Outcome& o)
@@ -177,6 +179,9 @@ Outcome run(Zorba* z, StaticContext_t sctx, const char* aQuery,
   {
     o.code = e.diagnostic().qname().localname();
     o.message = e.what();
+    if (auto const* xe = dynamic_cast<XQueryException const*>(&e))
+      if (xe->has_data())
+        o.dataURI = xe->data_uri();
   }
   return o;
 }
@@ -612,7 +617,7 @@ void test_billion_laughs(Zorba* z, const Files& f)
     Outcome const d = doc(z, context(z, c.policy), lDocURI);
     check_laughs(d, c.policy, lSeconds(), "FODC0002", "fn:doc");
     if (d.code == "XPDY0130")
-      CHECK(d.message.find("laughs.xml") != std::string::npos);
+      CHECK(d.dataURI.ends_with("/laughs.xml"));
   }
 }
 
