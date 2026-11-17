@@ -311,12 +311,12 @@ void test_default_limit(Zorba* z)
     }
 
     // Element nesting is also limited by the store (node ids of at most 255
-    // bytes, zerr:ZSTR0030), a clean error.
+    // bytes, err:XPDY0130), a clean error.
     Outcome const ok = run(z, p, s.make(lo));
     if (!ok.ok)
       std::cout << "  " << s.name << " at " << lo << " levels: " << ok
                 << std::endl;
-    CHECK(ok.ok || ok.code == "ZSTR0030");
+    CHECK(ok.ok || ok.code == "XPDY0130");
     CHECK(is_default_limit_error(run(z, p, s.make(lo + 1))));
 
     std::cout << "  " << s.name << ": " << lo << " levels";

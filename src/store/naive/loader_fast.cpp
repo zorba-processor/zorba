@@ -774,13 +774,20 @@ void FastXmlLoader::addBuildError(ZorbaException const& e)
     return;
   }
 
+  int lLine, lColumn;
+  dataPosition(lLine, lColumn);
   // The first component of the node id is the document node's.
-  reportLimit(theDocUri.c_str(),
-              xmlSAX2GetLineNumber(ctxt),
-              xmlSAX2GetColumnNumber(ctxt),
-              "element nesting depth of " +
+  reportLimit(theDocUri.c_str(), lLine, lColumn,
+              "node nesting depth of " +
               std::to_string(theOrdPath.getNumComps() - 1) +
               " exceeds the node id limit");
+}
+
+
+void FastXmlLoader::dataPosition(int& aLine, int& aColumn)
+{
+  aLine = xmlSAX2GetLineNumber(ctxt);
+  aColumn = xmlSAX2GetColumnNumber(ctxt);
 }
 
 
