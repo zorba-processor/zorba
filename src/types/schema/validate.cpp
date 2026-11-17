@@ -341,6 +341,15 @@ store::Item_t Validator::processElement(
   store::Item_t nodeName = element->getNodeName();
   zstring baseUri;
   element->getBaseURI(baseUri);
+  // An element given a base URI gets an attribute holding it, which lengthens
+  // the node ids of its children: give it only where it is not inherited.
+  if (parent != NULL)
+  {
+    zstring parentBaseUri;
+    parent->getBaseURI(parentBaseUri);
+    if (parentBaseUri == baseUri)
+      baseUri.clear();
+  }
 
   schemaValidator.startElem(nodeName);
 
