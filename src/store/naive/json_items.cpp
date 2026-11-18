@@ -419,14 +419,23 @@ bool SimpleJSONObject::add(
       lStructuredItem->setCollectionTreeInfo(theCollectionInfo);
     }
     
-    if (theKeys)
-      theKeys->insert( std::make_pair( lName, thePairs.size() ) );
+    // The index of names records only stored pairs: a failure leaves the
+    // object as it was.
     thePairs.push_back(std::make_pair(aName.getp(), lValue));
+    try
+    {
+      if (theKeys)
+        theKeys->insert( std::make_pair( lName, thePairs.size() - 1 ) );
+      else if (thePairs.size() > KEY_INDEX_THRESHOLD)
+        buildKeyIndex();
+    }
+    catch (...)
+    {
+      thePairs.pop_back();
+      throw;
+    }
     aName->addReference();
     lValue->addReference();
-
-    if (!theKeys && thePairs.size() > KEY_INDEX_THRESHOLD)
-      buildKeyIndex();
 
     ASSERT_INVARIANT();
     return true;
