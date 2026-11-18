@@ -61,7 +61,6 @@ struct FragmentEvent
   std::vector<bool> ns_has_prefix;
   std::vector<attribute> attributes;
   int nb_defaulted = 0;
-  int line = 0, column = 0;             // where in the input it was read
 };
 
 class FragmentIStream : public std::istream
@@ -97,8 +96,6 @@ public:
   bool parser_started;
   bool parser_done;
   int parse_depth;                  // element depth as seen by libxml2, wrapper included
-  int wrapper_line;                 // the input line the wrapper start tag is put on
-  int wrapper_shift;                // columns added on that line before the content
   void* current_loader;             // the FragmentXmlLoader replaying events
   std::vector<std::vector<std::pair<std::string,std::string> > > ns_scopes;
 
@@ -125,8 +122,6 @@ public:
     parser_started(false),
     parser_done(false),
     parse_depth(0),
-    wrapper_line(0),
-    wrapper_shift(0),
     current_loader(NULL),
     only_one_doc_node(false)
   {
@@ -182,8 +177,6 @@ public:
     parser_started = false;
     parser_done = false;
     parse_depth = 0;
-    wrapper_line = 0;
-    wrapper_shift = 0;
     current_loader = NULL;
     ns_scopes.clear();
     only_one_doc_node = false;
