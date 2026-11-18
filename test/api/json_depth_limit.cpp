@@ -478,8 +478,8 @@ void test_collection()
   }
 }
 
-// XML conversions: the XML has limits of its own (err:XPDY0130), a clean
-// error like any other here.
+// XML conversions: a value at the limit converts, however deep its XML (node
+// ids have no depth limit); a deeper one is refused.
 void test_json_xml()
 {
   std::string const lImport =
@@ -513,10 +513,12 @@ void test_json_xml()
     return repeat("{\"tagName\":\"a\",\"childNodes\":[", n) + "\"t\"" +
       repeat("]}", n);
   };
-  report("JsonML-array at the limit",
-         lConvert(lJsonMLArray(LIMIT), "JsonML-array"));
-  report("JsonML-object at the limit",
-         lConvert(lJsonMLObject(LIMIT / 2), "JsonML-object"));
+  Outcome const lArray = lConvert(lJsonMLArray(LIMIT), "JsonML-array");
+  report("JsonML-array at the limit", lArray);
+  CHECK(worked(lArray));
+  Outcome const lObject = lConvert(lJsonMLObject(LIMIT / 2), "JsonML-object");
+  report("JsonML-object at the limit", lObject);
+  CHECK(worked(lObject));
   CHECK(refused(lConvert(lJsonMLArray(DEEP), "JsonML-array")));
   CHECK(refused(lConvert(lJsonMLObject(DEEP), "JsonML-object")));
 }
