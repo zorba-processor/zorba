@@ -82,6 +82,17 @@ class NsBindingsContext;
 ********************************************************************************/
 class XmlLoader
 {
+public:
+  // Element nesting limit: libxml2's without XML_PARSE_HUGE, which
+  // xml::ParserSecurity never sets. HtmlXmlLoader enforces it itself.
+  static constexpr csize MAX_DEPTH = 256;
+
+  /** MAX_DEPTH as the limit that reportLimit() names. */
+  static std::string depthLimit()
+  {
+    return "element nesting depth of " + std::to_string(MAX_DEPTH);
+  }
+
 protected:
   static const ulong INPUT_CHUNK_SIZE = 8192;
 
@@ -124,6 +135,20 @@ protected:
 
 protected:
   void applyLoadOptions(const store::LoadProperties& props, xmlParserCtxtPtr ctxt);
+
+  /**
+   * Reports err:XPDY0130 for an exceeded limit of the parser that is not
+   * memory; aLimit names it and its value. The data location is where in the
+   * input it was exceeded.
+   */
+  void reportLimit(char const* aUri, int aLine, int aColumn,
+                   std::string const& aLimit);
+
+  /**
+   * If a libxml2 error is an exceeded limit of the parser that is not memory,
+   * reports it with reportLimit() and returns true.
+   */
+  bool reportParserLimit(ZORBA_XML_ERROR_PTR aError);
 
 
 public:
@@ -247,6 +272,14 @@ protected:
 
   void* getElementNode();
 
+  // Adds an error raised while building the tree. A node id over its byte
+  // limit (err:XPDY0130) is reported with reportLimit(), naming the node
+  // nesting depth reached, with where in the input it was reached.
+  void addBuildError(ZorbaException const& e);
+
+  // The line and column in the input of the node being built.
+  virtual void dataPosition(int& aLine, int& aColumn);
+
 public:
   // startElement() failed before the element reached the node stack: nothing
   // else will destroy it. Its attributes not made yet are dropped first. Also
@@ -341,6 +374,8 @@ protected:
 
   void replay(FragmentEvent const &ev);
 
+  void dataPosition(int& aLine, int& aColumn) override;
+
   static FragmentIStream* streamOf(void* ctx);
 
   static void recordOutOfMemory(void* ctx) noexcept;
@@ -391,6 +426,8 @@ protected:
 
 protected:
   FragmentIStream* theFragmentStream;
+  int theEventLine = 0;
+  int theEventColumn = 0;
 };
 
 /*******************************************************************************
@@ -402,9 +439,6 @@ protected:
 ********************************************************************************/
 class HtmlXmlLoader : public FastXmlLoader
 {
-public:
-  static constexpr csize MAX_DEPTH = 256;
-
 protected:
   csize theDepth;
 #if LIBXML_VERSION < 21400

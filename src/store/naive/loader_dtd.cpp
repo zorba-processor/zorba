@@ -23,6 +23,7 @@
 #include <libxml/parserInternals.h>
 #include <libxml/uri.h>
 #include <libxml/SAX2.h>
+#include <algorithm>
 #include <cstring>
 #include <memory>
 #include <utility>
@@ -337,11 +338,17 @@ void FragmentXmlLoader::startParser()
   std::string::size_type const prolog_end = doctype_end ? doctype_end : decl_end;
   std::string prolog(head, 0, prolog_end);
   // A text declaration may omit the version; an XML declaration may not.
+  std::string::size_type const prolog_length = prolog.size();
   if (has_decl && prolog.find("version", 0) >= decl_end)
   {
     std::string::size_type const pos = prolog.find("<?xml");
     prolog.insert(pos + 5, " version=\"1.0\"");
   }
+  fs.wrapper_line =
+    1 + static_cast<int>(std::count(prolog.begin(), prolog.end(), '\n'));
+  fs.wrapper_shift = static_cast<int>(sizeof(FRAGMENT_WRAPPER_START) - 1);
+  if (fs.wrapper_line == 1)
+    fs.wrapper_shift += static_cast<int>(prolog.size() - prolog_length);
   prolog += FRAGMENT_WRAPPER_START;
   prolog.append(head, prolog_end, std::string::npos);
 
@@ -390,6 +397,8 @@ void FragmentXmlLoader::replay(FragmentEvent const &ev)
 {
   FragmentIStream &fs = *theFragmentStream;
   int const skip = fs.root_elements_to_skip;
+  theEventLine = ev.line;
+  theEventColumn = ev.column;
 
   switch (ev.kind)
   {
@@ -477,6 +486,13 @@ void FragmentXmlLoader::replay(FragmentEvent const &ev)
                                            xml_str(ev.text));
     break;
   }
+}
+
+
+void FragmentXmlLoader::dataPosition(int& aLine, int& aColumn)
+{
+  aLine = theEventLine;
+  aColumn = theEventColumn;
 }
 
 
@@ -602,6 +618,16 @@ FragmentIStream* FragmentXmlLoader::streamOf(void *ctx)
 }
 
 
+// Where in the input the parser is, without what the wrapper added.
+static void stamp(void *ctx, FragmentIStream const &fs, FragmentEvent &ev)
+{
+  ev.line = xmlSAX2GetLineNumber(ctx);
+  ev.column = xmlSAX2GetColumnNumber(ctx);
+  if (ev.line == fs.wrapper_line && ev.column > fs.wrapper_shift)
+    ev.column -= fs.wrapper_shift;
+}
+
+
 // Nothing may leave these callbacks: libxml2 is C code.
 void FragmentXmlLoader::recordOutOfMemory(void *ctx) noexcept
 {
@@ -653,6 +679,7 @@ try
     ev.attributes.push_back(attr);
   }
   ev.nb_defaulted = nb_defaulted;
+  stamp(ctx, fs, ev);
   fs.events.push_back(std::move(ev));
 }
 catch (std::bad_alloc const&)
@@ -679,6 +706,7 @@ try
   ev.prefix = to_string(prefix);
   ev.has_uri = URI != NULL;
   ev.uri = to_string(URI);
+  stamp(ctx, fs, ev);
   fs.events.push_back(std::move(ev));
 }
 catch (std::bad_alloc const&)
@@ -707,6 +735,7 @@ try
   FragmentEvent ev;
   ev.kind = kind;
   ev.text.assign(reinterpret_cast<char const*>(text), len);
+  stamp(ctx, fs, ev);
   fs.events.push_back(std::move(ev));
 }
 catch (std::bad_alloc const&)
@@ -743,7 +772,9 @@ try
   FragmentEvent ev;
   ev.kind = FragmentEvent::COMMENT;
   ev.text = to_string(value);
-  streamOf(ctx)->events.push_back(std::move(ev));
+  FragmentIStream &fs = *streamOf(ctx);
+  stamp(ctx, fs, ev);
+  fs.events.push_back(std::move(ev));
 }
 catch (std::bad_alloc const&)
 {
@@ -763,7 +794,9 @@ try
   ev.kind = FragmentEvent::PI;
   ev.name = to_string(target);
   ev.text = to_string(data);
-  streamOf(ctx)->events.push_back(std::move(ev));
+  FragmentIStream &fs = *streamOf(ctx);
+  stamp(ctx, fs, ev);
+  fs.events.push_back(std::move(ev));
 }
 catch (std::bad_alloc const&)
 {
@@ -1098,7 +1131,10 @@ store::Item_t DtdXmlLoader::loadXml(
     else if (parsed == -1)
     {
       // std::cout << "  xmlParseDocument: Error: Unable to create tree: " << xmlCtxtGetLastError(ctxt)->message << std::endl;
-      theXQueryDiagnostics->add_error(NEW_ZORBA_EXCEPTION(zerr::ZSTR0021_LOADER_PARSING_ERROR,ERROR_PARAMS( ZED( XMLParserNoCreateTree ) )));
+      // The parser's errors reach no handler of this loader; an exceeded
+      // limit is its last one, as the parser stops there.
+      if (!reportParserLimit(xmlCtxtGetLastError(ctxt)))
+        theXQueryDiagnostics->add_error(NEW_ZORBA_EXCEPTION(zerr::ZSTR0021_LOADER_PARSING_ERROR,ERROR_PARAMS( ZED( XMLParserNoCreateTree ) )));
       abortload();
       return NULL;
     }

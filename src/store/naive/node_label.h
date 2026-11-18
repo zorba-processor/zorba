@@ -167,6 +167,8 @@ public:
   void nextChild() { theStack.nextChild(); }
 
   void popChild() { theStack.popChild(); }
+
+  ulong getNumComps() const { return theStack.getNumComps(); }
 };
 
 
