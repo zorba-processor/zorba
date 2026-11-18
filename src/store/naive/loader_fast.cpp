@@ -311,7 +311,7 @@ FastXmlLoader::FastXmlLoader(
   theNodeStack(2048)
 {
   theBuffer = new char[INPUT_CHUNK_SIZE];
-  theOrdPath.init();
+  theLabelBuilder.init();
 
   theTraceLevel = GET_STORE().getTraceLevel();
 
@@ -372,7 +372,7 @@ void FastXmlLoader::abortload()
   zstring().swap(theBaseUri);
   zstring().swap(theDocUri);
 
-  theOrdPath.init();
+  theLabelBuilder.init();
   theRootNode = NULL;
 
   while(!theNodeStack.empty())
@@ -426,7 +426,7 @@ void FastXmlLoader::reset()
   zstring().swap(theDocUri);
 
   theTree = NULL;
-  theOrdPath.init();
+  theLabelBuilder.init();
   theRootNode = NULL;
 
   if (!theNodeStack.empty())
@@ -673,8 +673,8 @@ void FastXmlLoader::startDocument(void * ctx)
 
     docNode->setBaseUri(loader.theBaseUri);
     docNode->setDocUri(loader.theDocUri);
-    docNode->setId(loader.theTree, &loader.theOrdPath);
-    loader.theOrdPath.pushChild();
+    docNode->setId(loader.theTree, &loader.theLabelBuilder);
+    loader.theLabelBuilder.pushChild();
 
     LOADER_TRACE1("Start Doc Node = " << docNode);
   }
@@ -906,13 +906,13 @@ void FastXmlLoader::startElement(
     }
 
     // Assign the current node id to this node, and compute the next node id.
-    elemNode->setId(loader.theTree, &loader.theOrdPath);
-    loader.theOrdPath.pushChild();
+    elemNode->setId(loader.theTree, &loader.theLabelBuilder);
+    loader.theLabelBuilder.pushChild();
 
     LOADER_TRACE1("Start Element: node = " << elemNode << " name = ["
                   << (prefix != NULL ? prefix : (xmlChar*)"") << ":" << lname
                   << " (" << (uri != NULL ? uri : (xmlChar*)"NULL") << ")]"
-                  << std::endl << " ordpath = " << elemNode->getOrdPath().show()
+                  << std::endl << " ordpath = " << elemNode->getLabel().show()
                   << std::endl);
     
     // Process namespace bindings
@@ -971,7 +971,7 @@ void FastXmlLoader::startElement(
         AttributeNode* attrNode = nfactory.createAttributeNode(qname);
         attrNodes[i] = attrNode;   // first: the element destroys it
         attrNode->theParent = elemNode;
-        attrNode->setId(loader.theTree, &loader.theOrdPath);
+        attrNode->setId(loader.theTree, &loader.theLabelBuilder);
         attrNode->theTypedValue.transfer(typedValue);
 
         if (attrNode->isBaseUri())
@@ -999,14 +999,14 @@ void FastXmlLoader::startElement(
           }
         }
 
-        loader.theOrdPath.nextChild();
+        loader.theLabelBuilder.nextChild();
 
         LOADER_TRACE2("Attribute: node = " << attrNode << " name ["
                       << (prefix != NULL ? prefix : "") << ":" << lname << " ("
                       << (uri != NULL ? uri : "NULL") << ")]" << " value = "
                       << attrNode->theTypedValue->getStringValue()
                       << std::endl << " ordpath = "
-                      << attrNode->getOrdPath().show() << std::endl);
+                      << attrNode->getLabel().show() << std::endl);
       }
     }
     
@@ -1168,7 +1168,7 @@ void  FastXmlLoader::endElement(
     }
 
     // Adjust the dewey id
-    loader.theOrdPath.popChild();
+    loader.theLabelBuilder.popChild();
 
 #ifdef DATAGUIDE
     if (loader.theBuildDataGuide)
@@ -1220,15 +1220,15 @@ void FastXmlLoader::characters(void * ctx, const xmlChar * ch, int len)
 
     loader.theNodeStack.push(textNode);
 
-    textNode->setId(loader.theTree, &loader.theOrdPath);
-    loader.theOrdPath.nextChild();
+    textNode->setId(loader.theTree, &loader.theLabelBuilder);
+    loader.theLabelBuilder.nextChild();
 
 #ifndef NDEBUG
     std::stringstream lSs;
     lSs << "Text Node = " << textNode << " content = "
         << std::string(charp, len) << std::endl
 #ifdef TEXT_ORDPATH
-        << " ordpath = " << textNode->getOrdPath().show()
+        << " ordpath = " << textNode->getLabel().show()
 #endif
         << std::endl;
     LOADER_TRACE2(lSs.str());
@@ -1277,15 +1277,15 @@ void FastXmlLoader::cdataBlock(void * ctx, const xmlChar * ch, int len)
 
     loader.theNodeStack.push(cdataNode);
 
-    cdataNode->setId(loader.theTree, &loader.theOrdPath);
-    loader.theOrdPath.nextChild();
+    cdataNode->setId(loader.theTree, &loader.theLabelBuilder);
+    loader.theLabelBuilder.nextChild();
 
 #ifndef NDEBUG
     std::stringstream lSs;
     lSs << "CDATA Node = " << cdataNode << " content = "
         << std::string(charp, len) << std::endl
 #ifdef TEXT_ORDPATH
-        << " ordpath = " << cdataNode->getOrdPath().show()
+        << " ordpath = " << cdataNode->getLabel().show()
 #endif
         << std::endl;
     LOADER_TRACE2(lSs.str());
@@ -1338,12 +1338,12 @@ void FastXmlLoader::processingInstruction(
 
     loader.theNodeStack.push(piNode);
 
-    piNode->setId(loader.theTree, &loader.theOrdPath);
-    loader.theOrdPath.nextChild();
+    piNode->setId(loader.theTree, &loader.theLabelBuilder);
+    loader.theLabelBuilder.nextChild();
 
     LOADER_TRACE2("Pi Node = " << piNode << " target = "
                   << targetp << std::endl << " ordpath = "
-                  << piNode->getOrdPath().show() << std::endl);
+                  << piNode->getLabel().show() << std::endl);
   }
   catch (ZorbaException const& e)
   {
@@ -1387,12 +1387,12 @@ void FastXmlLoader::comment(void * ctx, const xmlChar * ch)
 
     loader.theNodeStack.push(commentNode);
 
-    commentNode->setId(loader.theTree, &loader.theOrdPath);
-    loader.theOrdPath.nextChild();
+    commentNode->setId(loader.theTree, &loader.theLabelBuilder);
+    loader.theLabelBuilder.nextChild();
 
     LOADER_TRACE2("Comment Node = " << commentNode << " content = "
                   << charp << std::endl << " ordpath = "
-                  << commentNode->getOrdPath().show() << std::endl);
+                  << commentNode->getLabel().show() << std::endl);
   }
   catch (ZorbaException const& e)
   {

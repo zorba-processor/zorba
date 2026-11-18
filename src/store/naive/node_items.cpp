@@ -326,8 +326,8 @@ long XmlNode::compareInSameTree(const XmlNode* n1, const XmlNode* n2)
   if (kind1 != store::StoreConsts::textNode &&
       kind2 != store::StoreConsts::textNode)
   {
-    if (static_cast<const OrdPathNode*>(n1)->getOrdPath() <
-        static_cast<const OrdPathNode*>(n2)->getOrdPath())
+    if (static_cast<const LabeledNode*>(n1)->getLabel() <
+        static_cast<const LabeledNode*>(n2)->getLabel())
       return -1;
     else
       return 1;
@@ -343,20 +343,20 @@ long XmlNode::compareInSameTree(const XmlNode* n1, const XmlNode* n2)
     if (p2 == NULL)
       return 1;
 
-    const OrdPath& op1 = p1->getOrdPath();
-    const OrdPath& op2 = p2->getOrdPath();
+    const NodeLabel& op1 = p1->getLabel();
+    const NodeLabel& op2 = p2->getLabel();
 
-    OrdPath::RelativePosition relPos = op1.getRelativePosition(op2);
+    NodeLabel::RelativePosition relPos = op1.getRelativePosition(op2);
 
-    if (relPos == OrdPath::FOLLOWING)
+    if (relPos == NodeLabel::FOLLOWING)
     {
       return -1;
     }
-    else if (relPos == OrdPath::PRECEDING)
+    else if (relPos == NodeLabel::PRECEDING)
     {
       return 1;
     }
-    else if (relPos == OrdPath::DESCENDANT)
+    else if (relPos == NodeLabel::DESCENDANT)
     {
       // p2 is a descendant of p1
       InternalNode::const_iterator ite = p1->childrenBegin();
@@ -375,16 +375,16 @@ long XmlNode::compareInSameTree(const XmlNode* n1, const XmlNode* n2)
         if (elem == p2)
           return 1;
 
-        OrdPath::RelativePosition relPos2 =
-        elem->getOrdPath().getRelativePosition(op2);
+        NodeLabel::RelativePosition relPos2 =
+        elem->getLabel().getRelativePosition(op2);
 
-        if (relPos2 == OrdPath::DESCENDANT)
+        if (relPos2 == NodeLabel::DESCENDANT)
           return 1;
       }
 
       assert(ite != end);
     }
-    else if (relPos == OrdPath::ANCESTOR)
+    else if (relPos == NodeLabel::ANCESTOR)
     {
       // p1 is a descendant of p2
       InternalNode::const_iterator ite = p2->childrenBegin();
@@ -403,15 +403,15 @@ long XmlNode::compareInSameTree(const XmlNode* n1, const XmlNode* n2)
         if (elem == p1)
           return -1;
 
-        OrdPath::RelativePosition relPos2 =
-        elem->getOrdPath().getRelativePosition(op1);
+        NodeLabel::RelativePosition relPos2 =
+        elem->getLabel().getRelativePosition(op1);
 
-        if (relPos2 == OrdPath::DESCENDANT)
+        if (relPos2 == NodeLabel::DESCENDANT)
           return -1;
       }
 
       assert(ite != end);
-    } else if (relPos == OrdPath::SELF)
+    } else if (relPos == NodeLabel::SELF)
     {
       return 1;
     }
@@ -597,7 +597,7 @@ void XmlNode::setTree(const XmlTree* aNewTree)
 /*******************************************************************************
   Method called only from the loader and PutUpd::apply()
 ********************************************************************************/
-void XmlNode::setId(XmlTree* tree, const OrdPathStack* op)
+void XmlNode::setId(XmlTree* tree, const NodeLabelBuilder* builder)
 {
   assert(!isConnectorNode());
   ZORBA_ASSERT(getTree() == NULL);
@@ -608,10 +608,10 @@ void XmlNode::setId(XmlTree* tree, const OrdPathStack* op)
   if (getNodeKind() != store::StoreConsts::textNode)
   {
 #endif
-    if (op != NULL)
-      static_cast<OrdPathNode*>(this)->getOrdPath() = *op;
+    if (builder != NULL)
+      static_cast<LabeledNode*>(this)->getLabel() = *builder;
     else
-      static_cast<OrdPathNode*>(this)->getOrdPath().setAsRoot();
+      static_cast<LabeledNode*>(this)->getLabel().setAsRoot();
 #ifndef TEXT_ORDPATH
   }
 #endif
@@ -1078,7 +1078,7 @@ void ConnectorNode::swap(Item* anotherItem)
 
 /////////////////////////////////////////////////////////////////////////////////
 //                                                                             //
-//  class OrdPathNode                                                          //
+//  class LabeledNode                                                          //
 //                                                                             //
 /////////////////////////////////////////////////////////////////////////////////
 
@@ -1103,7 +1103,7 @@ void ConnectorNode::swap(Item* anotherItem)
   evaluation of a node-constructor expression, or during the copying of a
   subtree S, if the node to be created is not the copy of the root of S.
 ********************************************************************************/
-OrdPathNode::OrdPathNode(
+LabeledNode::LabeledNode(
     XmlTree* tree,
     InternalNode* parent,
     bool append,
@@ -1114,11 +1114,11 @@ OrdPathNode::OrdPathNode(
 {
   if (parent == NULL)
   {
-    theOrdPath.setAsRoot();
+    theLabel.setAsRoot();
   }
   else
   {
-    setOrdPath(parent, append, pos, nodeKind);
+    setLabel(parent, append, pos, nodeKind);
   }
 }
 
@@ -1126,12 +1126,12 @@ OrdPathNode::OrdPathNode(
 /*******************************************************************************
 
 ********************************************************************************/
-size_t OrdPathNode::alloc_size() const
+size_t LabeledNode::alloc_size() const
 {
-  return XmlNode::alloc_size() + ztd::alloc_sizeof( theOrdPath );
+  return XmlNode::alloc_size() + ztd::alloc_sizeof( theLabel );
 }
 
-size_t OrdPathNode::dynamic_size() const
+size_t LabeledNode::dynamic_size() const
 {
   return sizeof( *this );
 }
@@ -1140,7 +1140,7 @@ size_t OrdPathNode::dynamic_size() const
 /*******************************************************************************
 
 ********************************************************************************/
-void OrdPathNode::setOrdPath(
+void LabeledNode::setLabel(
     InternalNode* parent,
     bool append,
     csize pos,
@@ -1148,11 +1148,11 @@ void OrdPathNode::setOrdPath(
 {
   if (parent == NULL)
   {
-    theOrdPath.setAsRoot();
+    theLabel.setAsRoot();
     return;
   }
 
-  if (!parent->theOrdPath.isValid())
+  if (!parent->theLabel.isValid())
     return;
 
   csize numChildren = parent->numChildren();
@@ -1169,57 +1169,51 @@ void OrdPathNode::setOrdPath(
   {
     if (append)
     {
-      theOrdPath = parent->getOrdPath();
-      theOrdPath.appendComp(2 * numAttrs + 1);
+      theLabel.setAsChild(parent->getLabel(), numAttrs);
     }
     // Parent has some existing attributes.
     else if (numAttrs > 0)
     {
       if (pos == 0)
       {
-        OrdPath::insertBefore(parent->theOrdPath,
-                              elemParent->getAttr(0)->getOrdPath(),
-                              theOrdPath);
+        theLabel.setBefore(parent->theLabel,
+                           elemParent->getAttr(0)->getLabel());
       }
       else if (pos >= numAttrs)
       {
-        const OrdPath* upperOrdPath = parent->getFirstChildOrdPathAfter(0);
+        const NodeLabel* upperLabel = parent->getFirstChildLabelAfter(0);
 
-        if (upperOrdPath != NULL)
+        if (upperLabel != NULL)
         {
-          OrdPath::insertInto(parent->theOrdPath,
-                              elemParent->getAttr(numAttrs-1)->theOrdPath,
-                              *upperOrdPath,
-                              theOrdPath);
+          theLabel.setBetween(parent->theLabel,
+                              elemParent->getAttr(numAttrs-1)->theLabel,
+                              *upperLabel);
         }
         else
         {
-          OrdPath::insertAfter(parent->theOrdPath,
-                               elemParent->getAttr(numAttrs-1)->getOrdPath(),
-                               theOrdPath);
+          theLabel.setAfter(parent->theLabel,
+                            elemParent->getAttr(numAttrs-1)->getLabel());
         }
       }
       else
       {
-        OrdPath::insertInto(parent->theOrdPath,
-                            elemParent->getAttr(pos-1)->getOrdPath(),
-                            elemParent->getAttr(pos)->getOrdPath(),
-                            theOrdPath);
+        theLabel.setBetween(parent->theLabel,
+                            elemParent->getAttr(pos-1)->getLabel(),
+                            elemParent->getAttr(pos)->getLabel());
       }
     }
     // Parent has no existing attributes.
     else
     {
-      const OrdPath* upperOrdPath = parent->getFirstChildOrdPathAfter(0);
+      const NodeLabel* upperLabel = parent->getFirstChildLabelAfter(0);
 
-      if (upperOrdPath != NULL)
+      if (upperLabel != NULL)
       {
-        OrdPath::insertBefore(parent->theOrdPath, *upperOrdPath, theOrdPath);
+        theLabel.setBefore(parent->theLabel, *upperLabel);
       }
       else
       {
-        theOrdPath = parent->theOrdPath;
-        theOrdPath.appendComp(1);
+        theLabel.setAsChild(parent->theLabel, 0);
       }
     }
   }
@@ -1228,67 +1222,60 @@ void OrdPathNode::setOrdPath(
   {
     if (append)
     {
-      theOrdPath = parent->getOrdPath();
-      theOrdPath.appendComp(2 * (numAttrs + numChildren) + 1);
+      theLabel.setAsChild(parent->getLabel(), numAttrs + numChildren);
     }
 
     // Parent has some other children
     else if (numChildren > 0)
     {
-      const OrdPath* upperOrdPath = NULL;
-      const OrdPath* lowerOrdPath = NULL;
+      const NodeLabel* upperLabel = NULL;
+      const NodeLabel* lowerLabel = NULL;
 
       if (pos < numChildren)
-        upperOrdPath = parent->getFirstChildOrdPathAfter(pos);
+        upperLabel = parent->getFirstChildLabelAfter(pos);
 
       if (pos == 0)
       {
         if (numAttrs > 0)
-          lowerOrdPath = &elemParent->getAttr(numAttrs-1)->theOrdPath;
+          lowerLabel = &elemParent->getAttr(numAttrs-1)->theLabel;
       }
       else
       {
-        lowerOrdPath = parent->getFirstChildOrdPathBefore(pos-1);
+        lowerLabel = parent->getFirstChildLabelBefore(pos-1);
 
-        if (lowerOrdPath == NULL && numAttrs > 0)
-          lowerOrdPath = &elemParent->getAttr(numAttrs-1)->theOrdPath;
+        if (lowerLabel == NULL && numAttrs > 0)
+          lowerLabel = &elemParent->getAttr(numAttrs-1)->theLabel;
       }
 
-      if (upperOrdPath != NULL && lowerOrdPath != NULL)
+      if (upperLabel != NULL && lowerLabel != NULL)
       {
-        OrdPath::insertInto(parent->theOrdPath,
-                            *lowerOrdPath,
-                            *upperOrdPath,
-                            theOrdPath);
+        theLabel.setBetween(parent->theLabel, *lowerLabel, *upperLabel);
       }
-      else if (upperOrdPath == NULL && lowerOrdPath != NULL)
+      else if (upperLabel == NULL && lowerLabel != NULL)
       {
-        OrdPath::insertAfter(parent->theOrdPath, *lowerOrdPath, theOrdPath);
+        theLabel.setAfter(parent->theLabel, *lowerLabel);
       }
-      else if (upperOrdPath != NULL && lowerOrdPath == NULL)
+      else if (upperLabel != NULL && lowerLabel == NULL)
       {
-        OrdPath::insertBefore(parent->theOrdPath, *upperOrdPath, theOrdPath);
+        theLabel.setBefore(parent->theLabel, *upperLabel);
       }
       else
       {
-        theOrdPath = parent->theOrdPath;
-        theOrdPath.appendComp(1);
+        theLabel.setAsChild(parent->theLabel, 0);
       }
     }
 
     // Parent has no children, but some attributes
     else if (numAttrs > 0)
     {
-      OrdPath::insertAfter(parent->getOrdPath(),
-                           elemParent->getAttr(numAttrs-1)->getOrdPath(),
-                           theOrdPath);
+      theLabel.setAfter(parent->getLabel(),
+                        elemParent->getAttr(numAttrs-1)->getLabel());
     }
 
     // Parent has no children and no attributes
     else
     {
-      theOrdPath = parent->theOrdPath;
-      theOrdPath.appendComp(1);
+      theLabel.setAsChild(parent->theLabel, 0);
     }
   }
 }
@@ -1297,13 +1284,13 @@ void OrdPathNode::setOrdPath(
 /*******************************************************************************
 
 ********************************************************************************/
-bool OrdPathNode::getDescendantNodeByOrdPath(
-    const OrdPath& aOrdPath,
+bool LabeledNode::getDescendantNodeByLabel(
+    const NodeLabel& aLabel,
     store::Item_t& aResult,
     bool aAttribute) const
 {
 #ifdef TEXT_ORDPATH
-  if (getOrdPath() == aOrdPath)
+  if (getLabel() == aLabel)
   {
     aResult = this;
     return true;
@@ -1314,7 +1301,7 @@ bool OrdPathNode::getDescendantNodeByOrdPath(
     aResult = NULL;
     return false;
   }
-  else if (getOrdPath() == aOrdPath)
+  else if (getLabel() == aLabel)
   {
     aResult = this;
     return true;
@@ -1342,14 +1329,14 @@ bool OrdPathNode::getDescendantNodeByOrdPath(
       {
         AttributeNode* child = elemParent->getAttr(i);
 
-        OrdPath::RelativePosition pos =  child->getOrdPath().getRelativePosition(aOrdPath);
+        NodeLabel::RelativePosition pos =  child->getLabel().getRelativePosition(aLabel);
 
-        if (pos == OrdPath::SELF)
+        if (pos == NodeLabel::SELF)
         {
           aResult = child;
           return true;
         }
-        else if (pos != OrdPath::FOLLOWING) // Includes DESCENDANT case
+        else if (pos != NodeLabel::FOLLOWING) // Includes DESCENDANT case
         {
           aResult = NULL;
           return false;
@@ -1363,29 +1350,29 @@ bool OrdPathNode::getDescendantNodeByOrdPath(
     for (i = 0; i < numChildren; ++i)
     {
 #ifdef TEXT_ORDPATH
-      OrdPathNode* child = static_cast<OrdPathNode*>(this2->getChild(i));
+      LabeledNode* child = static_cast<LabeledNode*>(this2->getChild(i));
 #else
       XmlNode* c = this2->getChild(i);
 
       if (c->getNodeKind() == store::StoreConsts::textNode)
         continue;
 
-      OrdPathNode* child = static_cast<OrdPathNode*>(c);
+      LabeledNode* child = static_cast<LabeledNode*>(c);
 #endif
 
-      OrdPath::RelativePosition pos =  child->getOrdPath().getRelativePosition(aOrdPath);
+      NodeLabel::RelativePosition pos =  child->getLabel().getRelativePosition(aLabel);
 
-      if (pos == OrdPath::SELF)
+      if (pos == NodeLabel::SELF)
       {
         aResult = child;
         return true;
       }
-      else if (pos == OrdPath::DESCENDANT)
+      else if (pos == NodeLabel::DESCENDANT)
       {
         parent = child;
         break;
       }
-      else if (pos != OrdPath::FOLLOWING)
+      else if (pos != NodeLabel::FOLLOWING)
       {
         aResult = NULL;
         return false;
@@ -1404,25 +1391,25 @@ bool OrdPathNode::getDescendantNodeByOrdPath(
 /*******************************************************************************
   Return true if "aOther" is an ancestore of "this".
 ********************************************************************************/
-bool OrdPathNode::isAncestor(const store::Item_t& aOther) const
+bool LabeledNode::isAncestor(const store::Item_t& aOther) const
 {
   assert(dynamic_cast<XmlNode*>(aOther.getp()));
   assert(!static_cast<XmlNode*>(aOther.getp())->isConnectorNode());
 
-  const OrdPathNode* lThisNode = static_cast<const OrdPathNode*>(this);
-  const OrdPathNode* lOtherNode = static_cast<const OrdPathNode*>(aOther.getp());
-  const OrdPath& lOtherOrdPath = lOtherNode->getOrdPath();
-  const OrdPath& lThisOrdPath = lThisNode->getOrdPath();
+  const LabeledNode* lThisNode = static_cast<const LabeledNode*>(this);
+  const LabeledNode* lOtherNode = static_cast<const LabeledNode*>(aOther.getp());
+  const NodeLabel& lOtherLabel = lOtherNode->getLabel();
+  const NodeLabel& lThisLabel = lThisNode->getLabel();
 
   return (lThisNode->getTree() == lOtherNode->getTree() &&
-          (lThisOrdPath.getRelativePosition(lOtherOrdPath) == OrdPath::ANCESTOR));
+          (lThisLabel.getRelativePosition(lOtherLabel) == NodeLabel::ANCESTOR));
 }
 
 
 /*******************************************************************************
 
 ********************************************************************************/
-bool OrdPathNode::isFollowingSibling(const store::Item_t& aOther) const
+bool LabeledNode::isFollowingSibling(const store::Item_t& aOther) const
 { 
   return isFollowing(aOther) && getParent() == aOther->getParent();
 }
@@ -1431,43 +1418,43 @@ bool OrdPathNode::isFollowingSibling(const store::Item_t& aOther) const
 /*******************************************************************************
 
 ********************************************************************************/
-bool OrdPathNode::isFollowing(const store::Item_t& aOther) const
+bool LabeledNode::isFollowing(const store::Item_t& aOther) const
 { 
   assert(dynamic_cast<XmlNode*>(aOther.getp()));
   assert(!static_cast<XmlNode*>(aOther.getp())->isConnectorNode());
 
-  const OrdPathNode* lThisNode = static_cast<const OrdPathNode*>(this);
-  const OrdPathNode* lOtherNode = static_cast<const OrdPathNode*>(aOther.getp());
-  const OrdPath& lOtherOrdPath = lOtherNode->getOrdPath();
-  const OrdPath& lThisOrdPath = lThisNode->getOrdPath();
+  const LabeledNode* lThisNode = static_cast<const LabeledNode*>(this);
+  const LabeledNode* lOtherNode = static_cast<const LabeledNode*>(aOther.getp());
+  const NodeLabel& lOtherLabel = lOtherNode->getLabel();
+  const NodeLabel& lThisLabel = lThisNode->getLabel();
 
   return (lThisNode->getTree() == lOtherNode->getTree() &&
-          (lThisOrdPath.getRelativePosition(lOtherOrdPath) == OrdPath::FOLLOWING));
+          (lThisLabel.getRelativePosition(lOtherLabel) == NodeLabel::FOLLOWING));
 }
 
 
 /*******************************************************************************
 
 ********************************************************************************/
-bool OrdPathNode::isDescendant(const store::Item_t& aOther) const
+bool LabeledNode::isDescendant(const store::Item_t& aOther) const
 { 
   assert(dynamic_cast<XmlNode*>(aOther.getp()));
   assert(!static_cast<XmlNode*>(aOther.getp())->isConnectorNode());
 
-  const OrdPathNode* lThisNode = static_cast<const OrdPathNode*>(this);
-  const OrdPathNode* lOtherNode = static_cast<const OrdPathNode*>(aOther.getp());
-  const OrdPath& lOtherOrdPath = lOtherNode->getOrdPath();
-  const OrdPath& lThisOrdPath = lThisNode->getOrdPath();
+  const LabeledNode* lThisNode = static_cast<const LabeledNode*>(this);
+  const LabeledNode* lOtherNode = static_cast<const LabeledNode*>(aOther.getp());
+  const NodeLabel& lOtherLabel = lOtherNode->getLabel();
+  const NodeLabel& lThisLabel = lThisNode->getLabel();
 
   return (lThisNode->getTree() == lOtherNode->getTree() &&
-          (lThisOrdPath.getRelativePosition(lOtherOrdPath) == OrdPath::DESCENDANT));
+          (lThisLabel.getRelativePosition(lOtherLabel) == NodeLabel::DESCENDANT));
 }
 
 
 /*******************************************************************************
 
 ********************************************************************************/
-bool OrdPathNode::isPrecedingSibling(const store::Item_t& aOther) const
+bool LabeledNode::isPrecedingSibling(const store::Item_t& aOther) const
 {
   assert(dynamic_cast<XmlNode*>(aOther.getp()));
   assert(!static_cast<XmlNode*>(aOther.getp())->isConnectorNode());
@@ -1479,25 +1466,25 @@ bool OrdPathNode::isPrecedingSibling(const store::Item_t& aOther) const
 /*******************************************************************************
 
 ********************************************************************************/
-bool OrdPathNode::isPreceding(const store::Item_t& aOther) const
+bool LabeledNode::isPreceding(const store::Item_t& aOther) const
 {
   assert(dynamic_cast<XmlNode*>(aOther.getp()));
   assert(!static_cast<XmlNode*>(aOther.getp())->isConnectorNode());
  
-  const OrdPathNode* lThisNode = static_cast<const OrdPathNode*>(this);
-  const OrdPathNode* lOtherNode = static_cast<const OrdPathNode*>(aOther.getp());
-  const OrdPath& lOtherOrdPath = lOtherNode->getOrdPath();
-  const OrdPath& lThisOrdPath = lThisNode->getOrdPath();
+  const LabeledNode* lThisNode = static_cast<const LabeledNode*>(this);
+  const LabeledNode* lOtherNode = static_cast<const LabeledNode*>(aOther.getp());
+  const NodeLabel& lOtherLabel = lOtherNode->getLabel();
+  const NodeLabel& lThisLabel = lThisNode->getLabel();
 
   return (lThisNode->getTree() == lOtherNode->getTree() &&
-          (lThisOrdPath.getRelativePosition(lOtherOrdPath) == OrdPath::PRECEDING));
+          (lThisLabel.getRelativePosition(lOtherLabel) == NodeLabel::PRECEDING));
 }
 
 
 /*******************************************************************************
 
 ********************************************************************************/
-bool OrdPathNode::isChild(const store::Item_t& aOther) const
+bool LabeledNode::isChild(const store::Item_t& aOther) const
 {
   assert(dynamic_cast<XmlNode*>(aOther.getp()));
   assert(!static_cast<XmlNode*>(aOther.getp())->isConnectorNode());
@@ -1509,7 +1496,7 @@ bool OrdPathNode::isChild(const store::Item_t& aOther) const
 /*******************************************************************************
 
 ********************************************************************************/
-bool OrdPathNode::isParent(const store::Item_t& aOther) const
+bool LabeledNode::isParent(const store::Item_t& aOther) const
 {
   assert(dynamic_cast<XmlNode*>(aOther.getp()));
   assert(!static_cast<XmlNode*>(aOther.getp())->isConnectorNode());
@@ -1521,7 +1508,7 @@ bool OrdPathNode::isParent(const store::Item_t& aOther) const
 /*******************************************************************************
 
 ********************************************************************************/
-store::Item_t OrdPathNode::getLevel() const
+store::Item_t LabeledNode::getLevel() const
 { 
   ulong lNumLevels = 1;
   store::Item_t lCurrent = this->getParent();
@@ -1539,13 +1526,13 @@ store::Item_t OrdPathNode::getLevel() const
 /*******************************************************************************
 
 ********************************************************************************/
-store::Item_t OrdPathNode::leastCommonAncestor(const store::Item_t& aOther) const
+store::Item_t LabeledNode::leastCommonAncestor(const store::Item_t& aOther) const
 {
   assert(dynamic_cast<XmlNode*>(aOther.getp()));
   assert(!static_cast<XmlNode*>(aOther.getp())->isConnectorNode());
 
-  const OrdPathNode* lThisNode = static_cast<const OrdPathNode*>(this);
-  const OrdPathNode* lOtherNode = static_cast<const OrdPathNode*>(aOther.getp());
+  const LabeledNode* lThisNode = static_cast<const LabeledNode*>(this);
+  const LabeledNode* lOtherNode = static_cast<const LabeledNode*>(aOther.getp());
 
   if (lThisNode->getTree() != lOtherNode->getTree())
   {
@@ -1554,7 +1541,7 @@ store::Item_t OrdPathNode::leastCommonAncestor(const store::Item_t& aOther) cons
 
   if (this == aOther.getp() || isDescendant(aOther))
   {
-    return const_cast<OrdPathNode*>(this);
+    return const_cast<LabeledNode*>(this);
   }
 
   if (isAncestor(aOther))
@@ -1569,12 +1556,12 @@ store::Item_t OrdPathNode::leastCommonAncestor(const store::Item_t& aOther) cons
   {
     if (!lThisCurr)
     {
-      return const_cast<OrdPathNode*>(lThisNode);
+      return const_cast<LabeledNode*>(lThisNode);
     }
 
     if (!lOtherCurr)
     {
-      return const_cast<OrdPathNode*>(lOtherNode);
+      return const_cast<LabeledNode*>(lOtherNode);
     }
 
     lThisCurr = lThisCurr->getParent();
@@ -1584,11 +1571,11 @@ store::Item_t OrdPathNode::leastCommonAncestor(const store::Item_t& aOther) cons
 }
 
 
-void OrdPathNode::swap(Item* anotherItem)
+void LabeledNode::swap(Item* anotherItem)
 {
   XmlNode::swap(anotherItem);
-  OrdPathNode* lOtherItem = dynamic_cast<OrdPathNode*>(anotherItem);
-  std::swap(theOrdPath, lOtherItem->theOrdPath);
+  LabeledNode* lOtherItem = dynamic_cast<LabeledNode*>(anotherItem);
+  std::swap(theLabel, lOtherItem->theLabel);
 }
 
 
@@ -1604,7 +1591,7 @@ void OrdPathNode::swap(Item* anotherItem)
 ********************************************************************************/
 size_t InternalNode::alloc_size() const
 {
-  size_t size = OrdPathNode::alloc_size() + theNodes.heap_size();
+  size_t size = LabeledNode::alloc_size() + theNodes.heap_size();
   for (const_iterator ite = theNodes.begin(); ite != theNodes.end(); ++ite)
     size += ztd::mem_sizeof(**ite);
   return size;
@@ -1613,7 +1600,7 @@ size_t InternalNode::alloc_size() const
 /*******************************************************************************
 
 ********************************************************************************/
-const OrdPath* InternalNode::getFirstChildOrdPathAfter(csize pos) const
+const NodeLabel* InternalNode::getFirstChildLabelAfter(csize pos) const
 {
   assert((pos == 0 && numChildren() == 0) || pos < numChildren());
 
@@ -1634,14 +1621,14 @@ const OrdPath* InternalNode::getFirstChildOrdPathAfter(csize pos) const
 
   return (ite == end ?
           NULL :
-          &static_cast<const OrdPathNode*>((*ite))->getOrdPath());
+          &static_cast<const LabeledNode*>((*ite))->getLabel());
 }
 
 
 /*******************************************************************************
 
 ********************************************************************************/
-const OrdPath* InternalNode::getFirstChildOrdPathBefore(csize pos) const
+const NodeLabel* InternalNode::getFirstChildLabelBefore(csize pos) const
 {
   assert(pos < numChildren());
 
@@ -1662,7 +1649,7 @@ const OrdPath* InternalNode::getFirstChildOrdPathBefore(csize pos) const
 
   return (ite == end ?
           NULL :
-          &static_cast<const OrdPathNode*>((*ite))->getOrdPath());
+          &static_cast<const LabeledNode*>((*ite))->getLabel());
 }
 
 
@@ -1907,7 +1894,7 @@ void InternalNode::unregisterReferencesToDeletedSubtree()
 
 void InternalNode::swap(Item* anotherItem)
 {
-  OrdPathNode::swap(anotherItem);
+  LabeledNode::swap(anotherItem);
   InternalNode* lOtherItem = dynamic_cast<InternalNode*>(anotherItem);
   theNodes.swap(lOtherItem->theNodes);
   for (iterator lIterator = theNodes.begin();
@@ -2349,7 +2336,7 @@ ElementNode::ElementNode(
   STORE_TRACE1("Constructed element node " << this << " parent = "
               << std::hex << (parent ? (ulong)parent : 0) << " pos = " << pos
               << " tree = " << getTreeId() << ":" << getTree()
-              << " ordpath = " << theOrdPath.show()
+              << " ordpath = " << theLabel.show()
               << " name = " << theName->getStringValue()
               << " type = " << getType()->getStringValue());
 }
@@ -3779,7 +3766,7 @@ zstring ElementNode::show() const
 
   str <<  "<" << theName->getStringValue() << "-elem";
 
-  str << " nid=\"" << theOrdPath.show() << "\"";
+  str << " nid=\"" << theLabel.show() << "\"";
 
   store::NsBindings nsBindings;
   getNamespaceBindings(nsBindings);
@@ -3835,7 +3822,7 @@ void ElementNode::swap(Item* anotherItem)
 ********************************************************************************/
 AttributeNode::AttributeNode(store::Item_t& attrName)
   :
-  OrdPathNode(store::StoreConsts::attributeNode)
+  LabeledNode(store::StoreConsts::attributeNode)
 {
   theName.transfer(attrName);
 
@@ -3868,7 +3855,7 @@ AttributeNode::AttributeNode(
     bool isListValue,
     bool hidden)
   :
-  OrdPathNode(tree, parent, append, pos, store::StoreConsts::attributeNode)
+  LabeledNode(tree, parent, append, pos, store::StoreConsts::attributeNode)
 {
   // Normally, no exceptions are expected by the rest of the code here, but
   // just to be safe, we use a try-catch.
@@ -3970,7 +3957,7 @@ AttributeNode::AttributeNode(
   STORE_TRACE1("Constructed attribute node " << this << " parent = "
               << std::hex << (parent ? (ulong)parent : 0) << " pos = " << pos
               << " tree = " << getTreeId() << ":" << getTree()
-              << " ordpath = " << theOrdPath.show()
+              << " ordpath = " << theLabel.show()
               << " name = " << theName->getStringValue()
               << " value = " << getStringValue());
 }
@@ -3981,7 +3968,7 @@ AttributeNode::AttributeNode(
 ********************************************************************************/
 size_t AttributeNode::alloc_size() const
 {
-  return  OrdPathNode::alloc_size()
+  return  LabeledNode::alloc_size()
         + ztd::alloc_sizeof( theName )
 #ifdef EMBEDED_TYPE
         + ztd::alloc_sizeof( theTypeName )
@@ -4374,7 +4361,7 @@ store::Iterator_t AttributeNode::getChildren() const
 
 void AttributeNode::swap(Item* anotherItem)
 {
-  OrdPathNode::swap(anotherItem);
+  LabeledNode::swap(anotherItem);
   AttributeNode* lOtherItem = dynamic_cast<AttributeNode*>(anotherItem);
   std::swap(theName, lOtherItem->theName);
 #ifdef EMBEDED_TYPE
@@ -4397,7 +4384,7 @@ void AttributeNode::swap(Item* anotherItem)
 TextNode::TextNode(zstring& content)
   :
 #ifdef TEXT_ORDPATH
-  OrdPathNode(store::StoreConsts::textNode)
+  LabeledNode(store::StoreConsts::textNode)
 #else
   XmlNode(store::StoreConsts::textNode)
 #endif
@@ -4425,7 +4412,7 @@ TextNode::TextNode(
     zstring& content)
   :
 #ifdef TEXT_ORDPATH
-  OrdPathNode(tree, parent, append, pos, store::StoreConsts::textNode)
+  LabeledNode(tree, parent, append, pos, store::StoreConsts::textNode)
 #else
   XmlNode(tree, parent, store::StoreConsts::textNode)
 #endif
@@ -4454,7 +4441,7 @@ TextNode::TextNode(
   STORE_TRACE1("Constructed text node " << this << " parent = "
               << std::hex << (parent ? (ulong)parent : 0) << " pos = " << pos
               << " tree = " << getTree()->getId() << ":" << getTree()
-              << " ordpath = " << theOrdPath.show()
+              << " ordpath = " << theLabel.show()
               << " content = " << getText());
 #else
   STORE_TRACE1("Constructed text node " << this << " parent = "
@@ -4474,7 +4461,7 @@ TextNode::TextNode(
     bool isListValue)
   :
 #ifdef TEXT_ORDPATH
-  OrdPathNode(NULL, parent, append, pos, store::StoreConsts::textNode)
+  LabeledNode(NULL, parent, append, pos, store::StoreConsts::textNode)
 #else
   XmlNode(NULL, parent, store::StoreConsts::textNode)
 #endif
@@ -4515,7 +4502,7 @@ TextNode::TextNode(
 #ifdef TEXT_ORDPATH
   STORE_TRACE1("Constructed text node " << this << " parent = "
               << std::hex << (parent ? (ulong)parent : 0)
-              << " ordpath = " << theOrdPath.show()
+              << " ordpath = " << theLabel.show()
               << " content = " << getValue()->getStringValue());
 #else
   STORE_TRACE1("Constructed text node " << this << " parent = "
@@ -4660,18 +4647,18 @@ XmlNode* TextNode::copyInternal(
 /*******************************************************************************
 
 ********************************************************************************/
-void TextNode::getOrdPath(OrdPath& ordPath) const
+void TextNode::getLabel(NodeLabel& label) const
 {
   InternalNode* parent = static_cast<InternalNode*>(getParent());
 
   if (parent == NULL)
   {
     // The text node is the root
-    ordPath.setAsRoot();
+    label.setAsRoot();
     return;
   }
 
-  ZORBA_FATAL(parent->theOrdPath.isValid(),"Parent ordpath is invalid.");
+  ZORBA_FATAL(parent->theLabel.isValid(),"Parent ordpath is invalid.");
 
   csize pos = parent->findChild(this);
   csize numChildren = parent->numChildren();
@@ -4680,47 +4667,46 @@ void TextNode::getOrdPath(OrdPath& ordPath) const
   if (numChildren == 1 && numAttrs == 0)
   {
     // Parent has no other children and no attributes
-    ordPath = parent->theOrdPath;
-    ordPath.appendComp(1);
+    label.setAsChild(parent->theLabel, 0);
   }
   else 
   {
     // Parent has either children or attributes
     
     // The smallest Ordpath at the same level of the textNode which must
-    // be greater than the OrdPath of the textNode
-    const OrdPath* upperOrdPath = NULL;
+    // be greater than the label of the textNode
+    const NodeLabel* upperLabel = NULL;
     
     // The biggest Ordpath at the same level of the textNode which must 
-    // be smaller than the OrdPath of the textNode
-    const OrdPath* lowerOrdPath = NULL; 
+    // be smaller than the label of the textNode
+    const NodeLabel* lowerLabel = NULL; 
     
     if (pos < numChildren-1) 
     {
-      //There could be an upperOrdPath
-      upperOrdPath = parent->getFirstChildOrdPathAfter(pos);
+      //There could be an upperLabel
+      upperLabel = parent->getFirstChildLabelAfter(pos);
     }
     
     if (pos > 0)
     {
-      //There could be a lowerOrdPath in the children
-      lowerOrdPath = parent->getFirstChildOrdPathBefore(pos-1);
+      //There could be a lowerLabel in the children
+      lowerLabel = parent->getFirstChildLabelBefore(pos-1);
     }
     
-    if (lowerOrdPath == NULL && numAttrs > 0) 
+    if (lowerLabel == NULL && numAttrs > 0) 
     {
-      //There is a lowerOrdPath in the attributes
-      lowerOrdPath = &parent->getAttr(numAttrs-1)->theOrdPath;
+      //There is a lowerLabel in the attributes
+      lowerLabel = &parent->getAttr(numAttrs-1)->theLabel;
     }
     
-    if (upperOrdPath != NULL && lowerOrdPath != NULL)
-      OrdPath::insertInto(parent->theOrdPath, *lowerOrdPath, *upperOrdPath, ordPath);
+    if (upperLabel != NULL && lowerLabel != NULL)
+      label.setBetween(parent->theLabel, *lowerLabel, *upperLabel);
 
-    else if (upperOrdPath == NULL && lowerOrdPath != NULL)
-      OrdPath::insertAfter(parent->theOrdPath, *lowerOrdPath, ordPath);
+    else if (upperLabel == NULL && lowerLabel != NULL)
+      label.setAfter(parent->theLabel, *lowerLabel);
 
-    else if (upperOrdPath != NULL && lowerOrdPath == NULL)
-      OrdPath::insertBefore(parent->theOrdPath, *upperOrdPath, ordPath);
+    else if (upperLabel != NULL && lowerLabel == NULL)
+      label.setBefore(parent->theLabel, *upperLabel);
 
     else
       ZORBA_FATAL(0,"Adjacent text nodes.");
@@ -4918,7 +4904,7 @@ void TextNode::appendStringValue(zstring& buf) const
 zstring TextNode::show() const
 {
 #ifdef TEXT_ORDPATH
-  return "<text nid=\"" + theOrdPath.show() + "\">"
+  return "<text nid=\"" + theLabel.show() + "\">"
     + getStringValue() + "</text>";
 #else
   return "<text>" + getStringValue() + "</text>";
@@ -5139,7 +5125,7 @@ void TextNode::swap(Item* anotherItem)
 ********************************************************************************/
 PiNode::PiNode(zstring& target, zstring& content)
   :
-  OrdPathNode(store::StoreConsts::piNode)
+  LabeledNode(store::StoreConsts::piNode)
 {
   QNamePool& qnpool = GET_STORE().getQNamePool();
 
@@ -5164,7 +5150,7 @@ PiNode::PiNode(
     zstring& target,
     zstring& content)
   :
-  OrdPathNode(tree, parent, append, pos, store::StoreConsts::piNode)
+  LabeledNode(tree, parent, append, pos, store::StoreConsts::piNode)
 {
   QNamePool& qnpool = GET_STORE().getQNamePool();
 
@@ -5184,7 +5170,7 @@ PiNode::PiNode(
   STORE_TRACE1("Constructed pi node " << this << " parent = "
               << std::hex << (parent ? (ulong)parent : 0) << " pos = " << pos
               << " tree = " << getTreeId() << ":" << getTree()
-              << " ordpath = " << theOrdPath.show() << " target = " << theTarget);
+              << " ordpath = " << theLabel.show() << " target = " << theTarget);
 }
 
 
@@ -5194,7 +5180,7 @@ PiNode::PiNode(
 
 size_t PiNode::alloc_size() const
 {
-  return  OrdPathNode::alloc_size()
+  return  LabeledNode::alloc_size()
         + ztd::alloc_sizeof( theTarget )
         + ztd::alloc_sizeof( theContent )
         + ztd::alloc_sizeof( theName );
@@ -5291,7 +5277,7 @@ store::Iterator_t PiNode::getChildren() const
 
 void PiNode::swap(Item* anotherItem)
 {
-  OrdPathNode::swap(anotherItem);
+  LabeledNode::swap(anotherItem);
   PiNode* lOtherItem = dynamic_cast<PiNode*>(anotherItem);
   std::swap(theTarget, lOtherItem->theTarget);
   std::swap(theContent, lOtherItem->theContent);
@@ -5311,7 +5297,7 @@ void PiNode::swap(Item* anotherItem)
 ********************************************************************************/
 CommentNode::CommentNode(zstring& content)
   :
-  OrdPathNode(store::StoreConsts::commentNode)
+  LabeledNode(store::StoreConsts::commentNode)
 {
   theContent.take(content);
 
@@ -5329,7 +5315,7 @@ CommentNode::CommentNode(
     csize         pos,
     zstring&      content)
   :
-  OrdPathNode(tree, parent, append, pos, store::StoreConsts::commentNode)
+  LabeledNode(tree, parent, append, pos, store::StoreConsts::commentNode)
 {
   theContent.take(content);
 
@@ -5344,7 +5330,7 @@ CommentNode::CommentNode(
   STORE_TRACE1("Constructed comment node " << this << " parent = "
               << std::hex << (parent ? (ulong)parent : 0) << " pos = " << pos
               << " tree = " << getTreeId() << ":" << getTree()
-              << " ordpath = " << theOrdPath.show() << " content = "
+              << " ordpath = " << theLabel.show() << " content = "
               << theContent);
 }
 
@@ -5354,7 +5340,7 @@ CommentNode::CommentNode(
 ********************************************************************************/
 size_t CommentNode::alloc_size() const
 {
-  return  OrdPathNode::alloc_size() + ztd::alloc_sizeof( theContent );
+  return  LabeledNode::alloc_size() + ztd::alloc_sizeof( theContent );
 }
 
 
@@ -5451,7 +5437,7 @@ store::Iterator_t CommentNode::getChildren() const
 
 void CommentNode::swap(Item* anotherItem)
 {
-  OrdPathNode::swap(anotherItem);
+  LabeledNode::swap(anotherItem);
   CommentNode* lOtherItem = dynamic_cast<CommentNode*>(anotherItem);
   std::swap(theContent, lOtherItem->theContent);
 }

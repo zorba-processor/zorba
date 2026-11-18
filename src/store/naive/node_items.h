@@ -39,7 +39,7 @@
 #endif /* ZORBA_NO_FULL_TEXT */
 #include "item_vector.h"
 #include "nsbindings.h" // TODO remove by introducing explicit destructors
-#include "ordpath.h"
+#include "node_label.h"
 #include "ptr_vector.h"
 #include "shared_types.h"
 #include "store.h"
@@ -308,7 +308,7 @@ public:
 
   Node identification: A node is uniquely and globally identified by a
   composite key consisting of: the id of the containing collection, the id of
-  the containing tree, and the ordpath of the node within its containing tree.
+  the containing tree, and the label of the node within its containing tree.
 
  ******************************************************************************/
 
@@ -541,7 +541,7 @@ public:
     return getTree()->getCollectionId(); 
   }
 
-  void setId(XmlTree* tree, const OrdPathStack* op);
+  void setId(XmlTree* tree, const NodeLabelBuilder* builder);
 
   void setParent(InternalNode* p) { theParent = p; }
 
@@ -657,7 +657,7 @@ public:
 /******************************************************************************
 
 *******************************************************************************/
-class OrdPathNode : public XmlNode
+class LabeledNode : public XmlNode
 {
   friend class XmlTree;
   friend class NodeFactory;
@@ -672,46 +672,46 @@ class OrdPathNode : public XmlNode
   friend class CommentNode;
 
 protected:
-  OrdPath           theOrdPath;
+  NodeLabel         theLabel;
 
 protected:
-  OrdPathNode() : XmlNode()
+  LabeledNode() : XmlNode()
   {
   }
 
-  OrdPathNode(store::StoreConsts::NodeKind k) : XmlNode(k)
+  LabeledNode(store::StoreConsts::NodeKind k) : XmlNode(k)
   {
   }
 
-  OrdPathNode(
+  LabeledNode(
       XmlTree* tree,
       InternalNode* parent,
       bool append,
       csize pos,
       store::StoreConsts::NodeKind nodeKind);
 
-  virtual ~OrdPathNode() {}
+  virtual ~LabeledNode() {}
 
 public:
   size_t alloc_size() const;
   size_t dynamic_size() const;
 
-  const OrdPath& getOrdPath() const { return theOrdPath; }
+  const NodeLabel& getLabel() const { return theLabel; }
 
-  OrdPath& getOrdPath() { return theOrdPath; }
+  NodeLabel& getLabel() { return theLabel; }
 
-  void setOrdPath(
+  void setLabel(
         InternalNode* parent,
         bool append,
         csize pos,
         store::StoreConsts::NodeKind nodeKind);
 
-  // Looks for a descendant node with the ordpath aOrdPath and puts it into the
+  // Looks for a descendant node with the label aLabel and puts it into the
   // aResult variable. aAttribute specifies whether to look for an attribute or
   // not.
   bool
-  getDescendantNodeByOrdPath(
-      const OrdPath& aOrdPath,
+  getDescendantNodeByLabel(
+      const NodeLabel& aLabel,
       store::Item_t& aResult,
       bool aAttribute = false) const;
 
@@ -752,10 +752,10 @@ public:
 /*******************************************************************************
   Base class for element and document nodes
 ********************************************************************************/
-class InternalNode : public OrdPathNode
+class InternalNode : public LabeledNode
 {
   friend class XmlNode;
-  friend class OrdPathNode;
+  friend class LabeledNode;
   friend class ElementNode;
   friend class AttributeNode;
   friend class TextNode;
@@ -786,7 +786,7 @@ protected:
 
   InternalNode(store::StoreConsts::NodeKind nodeKind)
     :
-    OrdPathNode(nodeKind)
+    LabeledNode(nodeKind)
   {
   }
 
@@ -797,7 +797,7 @@ protected:
       csize pos,
       store::StoreConsts::NodeKind nodeKind)
     :
-    OrdPathNode(tree, parent, append, pos, nodeKind)
+    LabeledNode(tree, parent, append, pos, nodeKind)
   {
   }
 
@@ -924,9 +924,9 @@ protected:
 
   csize removeAttr(XmlNode* attr);
 
-  const OrdPath* getFirstChildOrdPathAfter(csize pos) const;
+  const NodeLabel* getFirstChildLabelAfter(csize pos) const;
 
-  const OrdPath* getFirstChildOrdPathBefore(csize pos) const;
+  const NodeLabel* getFirstChildLabelBefore(csize pos) const;
 
   virtual void swap(Item* anotherItem);
 };
@@ -1208,7 +1208,7 @@ private:
 /*******************************************************************************
 
 ********************************************************************************/
-class AttributeNode : public OrdPathNode
+class AttributeNode : public LabeledNode
 {
   friend class XmlNode;
   friend class ElementNode;
@@ -1342,8 +1342,8 @@ protected:
 
 ********************************************************************************/
 #ifdef TEXT_ORDPATH
-class TextNode : public OrdPathNode {
-  typedef OrdPathNode base_type;
+class TextNode : public LabeledNode {
+  typedef LabeledNode base_type;
 #else
 class TextNode : public XmlNode {
   typedef XmlNode base_type;
@@ -1426,7 +1426,7 @@ public:
         const store::CopyMode& copymode) const;
 
 #ifndef TEXT_ORDPATH
-  void getOrdPath(OrdPath& ordPath) const;
+  void getLabel(NodeLabel& label) const;
 #endif
 
   bool isTyped() const;
@@ -1503,7 +1503,7 @@ protected:
 /*******************************************************************************
 
 ********************************************************************************/
-class PiNode : public OrdPathNode
+class PiNode : public LabeledNode
 {
   friend class XmlNode;
   friend class FastXmlLoader;
@@ -1574,7 +1574,7 @@ public:
 /*******************************************************************************
 
 ********************************************************************************/
-class CommentNode : public OrdPathNode
+class CommentNode : public LabeledNode
 {
   friend class XmlNode;
   friend class FastXmlLoader;
@@ -1702,10 +1702,10 @@ inline long XmlNode::compare2(const XmlNode* other) const
       if (tree1 < tree2)
         return -1;
 
-      const OrdPathNode* ordThis = static_cast<const OrdPathNode*>(this);
-      const OrdPathNode* ordOther = static_cast<const OrdPathNode*>(other);
+      const LabeledNode* ordThis = static_cast<const LabeledNode*>(this);
+      const LabeledNode* ordOther = static_cast<const LabeledNode*>(other);
 
-      if (tree1 == tree2 && ordThis->getOrdPath() < ordOther->getOrdPath())
+      if (tree1 == tree2 && ordThis->getLabel() < ordOther->getLabel())
         return -1;
     }
     else
@@ -1716,10 +1716,10 @@ inline long XmlNode::compare2(const XmlNode* other) const
       if (pos1 < pos2)
         return -1;
 
-      const OrdPathNode* ordThis = static_cast<const OrdPathNode*>(this);
-      const OrdPathNode* ordOther = static_cast<const OrdPathNode*>(other);
+      const LabeledNode* ordThis = static_cast<const LabeledNode*>(this);
+      const LabeledNode* ordOther = static_cast<const LabeledNode*>(other);
 
-      if (pos1 == pos2 && ordThis->getOrdPath() < ordOther->getOrdPath())
+      if (pos1 == pos2 && ordThis->getLabel() < ordOther->getLabel())
         return -1;
     }
   }

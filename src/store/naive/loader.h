@@ -34,7 +34,7 @@
 #include "store/api/load_properties.h"
 #include "util/xml_parser_security.h"
 
-#include "ordpath.h"
+#include "node_label.h"
 
 #include "zorbautils/stack.h"
 #include "runtime/parsing_and_serializing/fragment_istream.h"
@@ -213,7 +213,7 @@ protected:
 protected:
   char                           * theBuffer;
   XmlTree                        * theTree;
-  OrdPathStack                     theOrdPath;
+  NodeLabelBuilder                 theLabelBuilder;
 
   XmlNode                        * theRootNode;
   zorba::Stack<XmlNode*>           theNodeStack;
@@ -468,7 +468,7 @@ class DtdXmlLoader : public XmlLoader
 protected:
   std::vector<char>                theBuffer;
   XmlTree                        * theTree;
-  OrdPathStack                     theOrdPath;
+  NodeLabelBuilder                 theLabelBuilder;
 
   XmlNode                        * theRootNode;
   zorba::Stack<XmlNode*>           theNodeStack;

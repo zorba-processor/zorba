@@ -136,12 +136,12 @@ bool BasicItemFactory::createStructuralAnyURI(
     ulong collectionId,
     const TreeId& treeId,
     store::StoreConsts::NodeKind nodeKind,
-    const OrdPath& ordPath)
+    const NodeLabel& label)
 {
   ZORBA_FATAL(nodeKind,"Unexpected node kind");
 
   result = new StructuralAnyUriItem(store::XS_ANY_URI,
-                                    collectionId, treeId, nodeKind, ordPath);
+                                    collectionId, treeId, nodeKind, label);
   return true;
 }
 
