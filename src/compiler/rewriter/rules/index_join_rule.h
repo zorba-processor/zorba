@@ -21,6 +21,8 @@
 #include "compiler/rewriter/rules/rule_base.h"
 #include "compiler/rewriter/tools/expr_tools.h"
 
+#include <memory>
+
 namespace zorba
 {
 
@@ -66,9 +68,9 @@ protected:
   std::vector<expr*>         theVarDefExprs;
   std::vector<csize>         theChildPositions;
 
-  expr_tools::VarIdMap     * theVarIdMap;
-  expr_tools::IdVarMap     * theIdVarMap;
-  expr_tools::ExprVarsMap  * theExprVarsMap;
+  std::unique_ptr<expr_tools::VarIdMap>     theVarIdMap;
+  std::unique_ptr<expr_tools::IdVarMap>     theIdVarMap;
+  std::unique_ptr<expr_tools::ExprVarsMap>  theExprVarsMap;
 
 public:
   IndexJoinRule(RewriterContext* rctx);

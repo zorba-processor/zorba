@@ -515,6 +515,9 @@ store::Item_t FastXmlLoader::loadXml(
 
   xml::ParserSecurity::Scope lSecurityScope(theParserSecurity);
 
+  // See the check of xmlGetLastError() after parsing.
+  xmlResetLastError();
+
   try
   {
     std::streamsize numChars = readPacket(stream, theBuffer, INPUT_CHUNK_SIZE);
@@ -600,6 +603,13 @@ store::Item_t FastXmlLoader::loadXml(
     abortload();
     return NULL;
   }
+
+  // Older libxml2 versions (2.9 on Ubuntu 24.04) report a failure to grow an
+  // input buffer only through the thread's last error, not to the error
+  // handler, and the parse then ends as if the document were malformed.
+  const xmlError* lLastError = xmlGetLastError();
+  if (lLastError != NULL && lLastError->code == XML_ERR_NO_MEMORY)
+    setOutOfMemory();
 
   if (theOutOfMemory)
   {

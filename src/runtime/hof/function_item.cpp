@@ -167,6 +167,15 @@ void FunctionItemInfo::add_variable(expr* var, var_expr* substVar)
 }
 
 
+void FunctionItemInfo::remove_variable(csize pos)
+{
+  theInScopeVarValues.erase(theInScopeVarValues.begin() + pos);
+  theInScopeVars.erase(theInScopeVars.begin() + pos);
+  theInScopeVarNames.erase(theInScopeVarNames.begin() + pos);
+  theInScopeVarIds.erase(theInScopeVarIds.begin() + pos);
+}
+
+
 ////////////////////////////////////////////////////////////////////////////////
 //                                                                            //
 //  FunctionItem                                                              //
