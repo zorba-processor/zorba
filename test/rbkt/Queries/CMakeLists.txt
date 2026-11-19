@@ -261,7 +261,7 @@ FOREACH(TESTFILE ${TESTFILES})
     # join key error, hash join order, collection reference, sequential call and
     # queue delete tests must give the same results at every optimization level
     # (the testdriver reads ZORBA_OPTLEVEL; the default is O1).
-    IF (TESTNAME MATCHES "^test/rbkt/zorba/(jsoniq-windows|jsoniq-array-members|dynamic-calls|iteration-updates|updates/transform-targets|empty-domain|index-collation|index-keytype-parity|hashjoin-key-errors|hashjoin-order|collection-refs|sequential-calls)/|^test/rbkt/zorba/collections/queue-delete-")
+    IF (TESTNAME MATCHES "^test/rbkt/zorba/(jsoniq-windows|jsoniq-array-members|dynamic-calls|iteration-updates|updates/transform-targets|empty-domain|index-collation|index-keytype-parity|hashjoin-key-errors|hashjoin-order|collection-refs|sequential-calls)/|^test/rbkt/zorba/collections/queue-delete-|^test/rbkt/zorba/constructors/copy-xml-base$")
       FOREACH (_optlevel O0 O2)
         ZORBA_ADD_TEST("${TESTNAME}-${_optlevel}" testdriver ${TESTFILE})
         SET_TESTS_PROPERTIES ("${TESTNAME}-${_optlevel}" PROPERTIES
