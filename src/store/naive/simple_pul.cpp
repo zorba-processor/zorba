@@ -3633,6 +3633,8 @@ void CollectionPul::applyUpdates()
 
     // Compute the after-delta for each incrementally maintained index.
     computeIndexAfterDeltas();
+
+    prepareFinalize();
   }
   catch (...)
   {
@@ -3693,6 +3695,7 @@ void CollectionPul::undoUpdates()
         merge.theMergedNodes[j]->connect(merge.theParent, merge.thePos + j);
     }
     theMergeList.clear();
+    theMergeDetachRecords.clear();
 
     undoList(theJSONObjectInsertList);
     undoList(theJSONObjectRenameList);
@@ -3738,6 +3741,88 @@ void CollectionPul::undoUpdates()
 
 
 /*******************************************************************************
+  What finalizeUpdates() needs to detach the removed nodes without allocating,
+  made where a failure still undoes the updates. Each removed node gets its
+  former parent back while all the records are made, as finalizeUpdates() gives
+  it, so that it sees the namespaces and base URI that detaching it then keeps.
+********************************************************************************/
+void CollectionPul::prepareFinalize()
+{
+  std::vector<std::pair<XmlNode*, InternalNode*> > parents;
+
+  auto prepare = [&](XmlNode* node, InternalNode* parent,
+                     std::vector<DetachRecord>& records, csize i)
+  {
+    parents.push_back(std::make_pair(node, node->theParent));
+    node->theParent = parent;
+    node->prepareDetach(records[i]);
+  };
+
+  try
+  {
+    for (csize i = 0; i < theReplaceNodeList.size(); ++i)
+    {
+      UpdatePrimitive* upd = theReplaceNodeList[i];
+
+      if (!upd->theIsApplied)
+        continue;
+
+      XmlNode* node =
+        upd->getKind() == store::UpdateConsts::UP_REPLACE_CHILD ?
+        BASE_NODE(static_cast<UpdReplaceChild*>(upd)->theChild) :
+        BASE_NODE(static_cast<UpdReplaceAttribute*>(upd)->theAttr);
+
+      upd->theDetachRecords.resize(1);
+      prepare(node, INTERNAL_NODE(upd->theTarget), upd->theDetachRecords, 0);
+    }
+
+    for (csize i = 0; i < theReplaceContentList.size(); ++i)
+    {
+      UpdReplaceElemContent* upd =
+        static_cast<UpdReplaceElemContent*>(theReplaceContentList[i]);
+
+      csize numChildren = upd->theOldChildren.size();
+      upd->theDetachRecords.resize(numChildren);
+      for (csize j = 0; j < numChildren; ++j)
+        prepare(upd->theOldChildren[j], INTERNAL_NODE(upd->theTarget),
+                upd->theDetachRecords, j);
+    }
+
+    for (csize i = 0; i < theDeleteList.size(); ++i)
+    {
+      UpdDelete* upd = static_cast<UpdDelete*>(theDeleteList[i]);
+
+      if (!upd->theIsApplied)
+        continue;
+
+      upd->theDetachRecords.resize(1);
+      prepare(BASE_NODE(upd->theTarget), upd->theParent,
+              upd->theDetachRecords, 0);
+    }
+
+    theMergeDetachRecords.resize(theMergeList.size());
+    for (csize i = 0; i < theMergeList.size(); ++i)
+    {
+      csize numMerged = theMergeList[i].theMergedNodes.size();
+      theMergeDetachRecords[i].resize(numMerged);
+      for (csize j = 0; j < numMerged; ++j)
+        prepare(theMergeList[i].theMergedNodes[j].getp(),
+                theMergeList[i].theParent, theMergeDetachRecords[i], j);
+    }
+  }
+  catch (...)
+  {
+    for (csize i = parents.size(); i-- > 0; )
+      parents[i].first->theParent = parents[i].second;
+    throw;
+  }
+
+  for (csize i = parents.size(); i-- > 0; )
+    parents[i].first->theParent = parents[i].second;
+}
+
+
+/*******************************************************************************
   Actions performed in this method are not expected to raise any error, and
   the method itself is called after all other actions that may raise errors
   have been executed already. This separation of actions into ones that may 
@@ -3774,19 +3859,19 @@ void CollectionPul::finalizeUpdates()
 
         XmlNode* node = BASE_NODE(upd2->theChild);
 
-        // To make the detach() method work properly, we must set the node's
+        // To make finishDetach() work properly, we must set the node's
         // parent back to what it used to be.
         node->theParent = INTERNAL_NODE(upd->theTarget);
-        node->detach();
+        node->finishDetach(upd->theDetachRecords[0]);
       }
       else
       {
         XmlNode* node = BASE_NODE(static_cast<UpdReplaceAttribute*>(upd)->theAttr);
 
-        // To make the detach() method work properly, we must set the node's
+        // To make finishDetach() work properly, we must set the node's
         // parent back to what it used to be.
         node->theParent = INTERNAL_NODE(upd->theTarget);
-        node->detach();
+        node->finishDetach(upd->theDetachRecords[0]);
       }
     }
 
@@ -3801,7 +3886,7 @@ void CollectionPul::finalizeUpdates()
       {
         XmlNode* node = upd->theOldChildren[j];
         node->theParent = INTERNAL_NODE(upd->theTarget);
-        node->detach();
+        node->finishDetach(upd->theDetachRecords[j]);
       }
     }
 
@@ -3814,7 +3899,7 @@ void CollectionPul::finalizeUpdates()
       {
         XmlNode* target = BASE_NODE(upd->theTarget);
         target->theParent = upd->theParent;
-        target->detach();
+        target->finishDetach(upd->theDetachRecords[0]);
       }
     }
 
@@ -3824,7 +3909,8 @@ void CollectionPul::finalizeUpdates()
       for (csize j = 0; j < theMergeList[i].theMergedNodes.size(); ++j)
       {
         theMergeList[i].theMergedNodes[j]->theParent= theMergeList[i].theParent;
-        theMergeList[i].theMergedNodes[j]->detach();
+        theMergeList[i].theMergedNodes[j]->finishDetach(
+          theMergeDetachRecords[i][j]);
       }
     }
   }
