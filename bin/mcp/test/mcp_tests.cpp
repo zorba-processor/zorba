@@ -3527,13 +3527,18 @@ void test_sweep_insert( Fixture const &f ) {
 void test_sweep_delete( Fixture const &f ) {
 #if defined(__linux__)
   auto query = []( std::string const &name ) {
-    return caught(
-      "variable $x := <" + name + " xmlns:p=\"urn:p\" xml:base=\"http://e/\">"
+    std::string const call = caught( "local:run()" );
+    std::size_t const prolog = call.find( '\n' ) + 1;
+    return call.substr( 0, prolog ) +
+      "declare namespace an = \"http://zorba.io/annotations\";\n"
+      "declare %an:sequential function local:run() {\n"
+      "  variable $x := <" + name + " xmlns:p=\"urn:p\" xml:base=\"http://e/\">"
       "t<b p:k=\"1\"><p:c/></b>u</" + name + ">;\n"
-      "variable $b := $x/b;\n"
-      "delete node $b;\n"
-      "concat(string($x), \" \", count($x/text()), \" \",\n"
-      "       namespace-uri-for-prefix(\"p\", $b), \" \", base-uri($b))" );
+      "  variable $b := $x/b;\n"
+      "  delete node $b;\n"
+      "  concat(string($x), \" \", count($x/text()), \" \",\n"
+      "         namespace-uri-for-prefix(\"p\", $b), \" \", base-uri($b))\n"
+      "};\n" + call.substr( prolog );
   };
   Sweep s;
   s.query = query( "sweep" );
