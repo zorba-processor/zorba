@@ -85,6 +85,49 @@ const StaticallyKnownCollection* getCollection(
 
 
 /*******************************************************************************
+  Raises err:XPTY0004 if the number of nodes in a collection does not match the
+  occurrence indicator of its declared type.
+********************************************************************************/
+void checkDeclaredOccurrence(
+    const StaticallyKnownCollection* collectionDecl,
+    const store::Item_t& name,
+    const store::Collection_t& coll,
+    const QueryLoc& loc)
+{
+  if (collectionDecl == NULL)
+    return;
+
+  const XQType* type = collectionDecl->getCollectionType();
+  xs_integer const size = coll->size();
+  bool matches;
+
+  switch (type->get_quantifier())
+  {
+  case SequenceType::QUANT_ONE:
+    matches = size == 1;
+    break;
+  case SequenceType::QUANT_QUESTION:
+    matches = size <= 1;
+    break;
+  case SequenceType::QUANT_PLUS:
+    matches = size >= 1;
+    break;
+  default:
+    matches = true;
+    break;
+  }
+
+  if (!matches)
+  {
+    RAISE_ERROR(err::XPTY0004, loc,
+    ERROR_PARAMS("collection " + name->getStringValue().str() + " has " +
+                 size.toString().str() + " nodes, which does not match its "
+                 "declared type " + type->toSchemaString()));
+  }
+}
+
+
+/*******************************************************************************
   fn:collection() as node()*
   fn:collection($uri as xs:string?) as node()*
 ********************************************************************************/
@@ -287,7 +330,10 @@ void ZorbaCollectionIterator::initCollection(PlanState& planState, int64_t skipC
 
   consumeNext(name, theChildren[0].getp(), planState);
 
-  (void)getCollection(theSctx, name, loc, theIsDynamic, collection);
+  const StaticallyKnownCollection* collectionDecl =
+    getCollection(theSctx, name, loc, theIsDynamic, collection);
+  if (!theIsDynamic)
+    checkDeclaredOccurrence(collectionDecl, name, collection, loc);
 
   if (theChildren.size() == 1)
   {
@@ -414,7 +460,12 @@ bool ZorbaCollectionIterator::countImpl(store::Item_t& result, PlanState& planSt
 
   consumeNext(name, theChildren[0].getp(), planState);
 
-  (void)getCollection(theSctx, name, loc, theIsDynamic, collection);
+  {
+    const StaticallyKnownCollection* collectionDecl =
+      getCollection(theSctx, name, loc, theIsDynamic, collection);
+    if (!theIsDynamic)
+      checkDeclaredOccurrence(collectionDecl, name, collection, loc);
+  }
 
   count = collection->size();
 
@@ -1474,6 +1525,7 @@ bool ZorbaDeleteIterator::nextImpl(
     PlanState& planState) const
 {
   store::Collection_t              collection;
+  const StaticallyKnownCollection* collectionDecl;
   store::Item_t                    name;
   store::Item_t                    node;
   std::vector<store::Item_t>       nodes;
@@ -1510,7 +1562,38 @@ bool ZorbaDeleteIterator::nextImpl(
   {
     name = collection->getName();
 
-    (void)getCollection(name, collection);
+    collectionDecl = getCollection(name, collection);
+
+    if (!theIsDynamic &&
+        collectionDecl->getUpdateProperty() == StaticContextConsts::decl_queue)
+    {
+      // The nodes may come in any order and more than once.
+      std::vector<xs_integer> positions;
+      positions.reserve(nodes.size());
+
+      for (const store::Item_t& deleted : nodes)
+      {
+        xs_integer position;
+        bool const found = collection->findNode(deleted.getp(), position);
+        ZORBA_ASSERT(found);
+        positions.push_back(position);
+      }
+
+      std::sort(positions.begin(), positions.end());
+      positions.erase(std::unique(positions.begin(), positions.end()),
+                      positions.end());
+
+      xs_integer expected(0);
+      for (const xs_integer& position : positions)
+      {
+        if (position != expected)
+        {
+          RAISE_ERROR(zerr::ZDDY0009_COLLECTION_QUEUE_BAD_DELETE, loc,
+          ERROR_PARAMS(name->getStringValue()));
+        }
+        ++expected;
+      }
+    }
 
     // create the pul and add the primitive
     pul.reset(GENV_ITEMFACTORY->createPendingUpdateList());
@@ -1553,11 +1636,8 @@ ZorbaDeleteIterator::getCollection(
         ERROR_PARAMS(name->getStringValue()));
 
       case StaticContextConsts::decl_queue:
-        RAISE_ERROR(zerr::ZDDY0009_COLLECTION_QUEUE_BAD_DELETE, loc,
-        ERROR_PARAMS(name->getStringValue()));
-
+        // nextImpl checks that the nodes are at the beginning of the queue
       case StaticContextConsts::decl_mutable:
-        // good to go
         break;
 
       default:

@@ -723,6 +723,7 @@ extern entry const dict_en[] = {
   { "~INVALID_OPTION_MustBeTrueFalse", "must be sub-object with \"true\" and \"false\" keys" },
   { "~INVALID_OPTION_jse_MustBeBoolean", "must be boolean" },
   { "~InData", "in data" },
+  { "~IncomparableKeyNodeValue_23", "\"$2\": search key can not be compared with a key value of a node in index \"$3\"" },
   { "~IncompleteKeyInIndexBuild", "incomplete key during index build" },
   { "~IncompleteKeyInIndexRefresh", "incomplete key during index refresh" },
   { "~JNDY0021_IllegalCharacter_2", "'$2': illegal JSON character" },
@@ -781,7 +782,6 @@ extern entry const dict_en[] = {
   { "~NoURIAuthority", "no authority" },
   { "~NoURIInStore", "URI for document not found in store" },
   { "~NoURIScheme", "no URI scheme" },
-  { "~NoUntypedKeyNodeValue_2", "node with untyped key value found during probe on index \"$2\"" },
   { "~NodeIDNeedsBytes_2", "nodeid requires more than $2 bytes" },
   { "~NodeIDTooBig", "nodeid component too big for encoding" },
 #if !defined(ZORBA_NO_ICU)

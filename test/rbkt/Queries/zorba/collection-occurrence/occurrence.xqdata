@@ -1,0 +1,8 @@
+module namespace o = "http://example.org/occurrence";
+
+declare namespace an = "http://zorba.io/annotations";
+
+declare %an:ordered collection o:one as element(*);
+declare %an:ordered collection o:optional as element(*)?;
+declare %an:ordered collection o:some as element(*)+;
+declare %an:ordered collection o:any as element(*)*;

@@ -500,8 +500,8 @@ public:
     stateOffset = offset;
     offset += StateTraitsImpl<T>::getStateSize();
 
-    // Listed before it is constructed, so that a failure to list it never
-    // destroys a state that init() has not set up yet.
+    // Listed before it is constructed, so that a failure to list it leaves no
+    // constructed state that destroyAll() would miss.
     if (planState.theCreatedStates == NULL)
     {
       new (planState.theBlock + stateOffset)T();
