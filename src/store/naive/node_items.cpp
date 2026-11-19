@@ -2335,6 +2335,11 @@ ElementNode::ElementNode(
     setType(null);
     theNsContext = NULL;
 
+    // XmlNode's constructor made "this" the root of its tree; a caller that
+    // frees the tree (ElementNode::copyInternal) must not find it there.
+    if (theParent == NULL && getTree()->getRoot() == this)
+      getTree()->setRoot(NULL);
+
     if (numAttrs() != 0)
     {
       ulong pos = 0;
