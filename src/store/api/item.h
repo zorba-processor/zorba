@@ -632,6 +632,13 @@ public:
   virtual void
   getBaseURI(zstring& uri) const;
 
+  /**
+   * Gives the base URI that this node sets itself and returns true, or
+   * returns false if it takes its base URI from its parent.
+   */
+  virtual bool
+  getLocalBaseURI(zstring& uri) const;
+
   /** Accessor for element node
    *  @return  attribute*
    */

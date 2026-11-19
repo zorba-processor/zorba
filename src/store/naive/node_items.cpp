@@ -147,7 +147,26 @@ void XmlTree::destroy() throw()
 ********************************************************************************/
 void XmlTree::free()
 {
-  destroy();
+  // A tree holds the trees its connector nodes refer to, and destroying it
+  // frees them: they wait in a list and are destroyed one after the other,
+  // not by recursion, which would go as deep as the trees are nested.
+  thread_local XmlTree* tPending = NULL;
+  thread_local bool tFreeing = false;
+
+  theNextToFree = tPending;
+  tPending = this;
+
+  if (tFreeing)
+    return;
+
+  tFreeing = true;
+  while (tPending != NULL)
+  {
+    XmlTree* tree = tPending;
+    tPending = tree->theNextToFree;
+    tree->destroy();
+  }
+  tFreeing = false;
 }
 
 

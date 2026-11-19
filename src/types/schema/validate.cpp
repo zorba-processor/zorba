@@ -247,6 +247,7 @@ bool Validator::realValidationValue(
                     schemaValidator,
                     newDoc,
                     sourceNode->getChildren(),
+                    docBaseUri,
                     loc);
     
     if ( validationMode == ParseConstants::val_typename )
@@ -297,6 +298,7 @@ bool Validator::realValidationValue(
                                            schemaValidator,
                                            NULL,
                                            sourceNode,
+                                           NULL,
                                            loc);
     
     if ( validationMode == ParseConstants::val_typename )
@@ -333,6 +335,7 @@ store::Item_t Validator::processElement(
     EventSchemaValidator& schemaValidator,
     store::Item* parent,
     const store::Item_t& element,
+    const zstring* aParentBaseUri,
     const QueryLoc& loc)
 {
   ZORBA_ASSERT(element->isNode());
@@ -341,8 +344,13 @@ store::Item_t Validator::processElement(
   tree_depth::check_stack(element.getp(), "validate", loc);
 
   store::Item_t nodeName = element->getNodeName();
+  // From the parent's when the element does not set its own: reading it from
+  // the tree walks up to the root, for every element.
   zstring baseUri;
-  element->getBaseURI(baseUri);
+  if (aParentBaseUri == NULL)
+    element->getBaseURI(baseUri);
+  else if (!element->getLocalBaseURI(baseUri))
+    baseUri = *aParentBaseUri;
 
   schemaValidator.startElem(nodeName);
 
@@ -402,6 +410,7 @@ store::Item_t Validator::processElement(
                   schemaValidator,
                   (store::Item *)newElem,
                   element->getChildren(),
+                  baseUri,
                   loc);
 
   schemaValidator.endElem(nodeName);
@@ -503,6 +512,7 @@ void Validator::processChildren(
     EventSchemaValidator& schemaValidator,
     store::Item* parent,
     store::Iterator_t children,
+    const zstring& aParentBaseUri,
     const QueryLoc& loc)
 {
   store::Item_t child;
@@ -531,7 +541,8 @@ void Validator::processChildren(
           inTextContent = false;
           textContent.clear();
         }
-        processElement(sctx, typeManager, schemaValidator, parent, child, loc);
+        processElement(sctx, typeManager, schemaValidator, parent, child,
+                       &aParentBaseUri, loc);
         break;
 
       case store::StoreConsts::attributeNode:

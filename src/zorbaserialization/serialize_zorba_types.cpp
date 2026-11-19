@@ -53,6 +53,7 @@
 #include "diagnostics/assert.h"
 #include "util/string_util.h"
 #include "runtime/json/nesting.h"
+#include "runtime/util/tree_depth.h"
 
 #include <zorba/store_consts.h>
 
@@ -1186,6 +1187,7 @@ void serialize_node_tree(Archiver& ar, store::Item*& obj, bool all_tree)
       SERIALIZE_FIELD2(zstring, baseUri, getBaseURI);
       SERIALIZE_FIELD2(zstring, docUri, getDocumentURI);
       FINALIZE_SERIALIZE(createDocumentNode, (result, baseUri, docUri));
+      tree_depth::check_stack(obj, ar.is_serializing_out() ? "save" : "load");
       serialize_my_children(ar, obj->getChildren());
       break;
     }
@@ -1223,6 +1225,7 @@ void serialize_node_tree(Archiver& ar, store::Item*& obj, bool all_tree)
 
       serialize_my_children2(ar, obj->getAttributes());
 
+      tree_depth::check_stack(obj, ar.is_serializing_out() ? "save" : "load");
       serialize_my_children(ar, obj->getChildren());
 
       break;

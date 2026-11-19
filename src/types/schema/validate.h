@@ -111,12 +111,14 @@ private:
         const static_context* sctx,
         const QueryLoc& loc);
 
+  // aParentBaseUri: the base URI of the children's parent.
   static void processChildren(
         const static_context* sctx,
         TypeManager* typeManager,
         EventSchemaValidator& schemaValidator,
         store::Item* parent,
         store::Iterator_t children,
+        const zstring& aParentBaseUri,
         const QueryLoc& loc);
 
   static void processTextContent(
@@ -137,12 +139,15 @@ private:
         zstring& textNodeValue,
         const QueryLoc& loc);
 
+  // aParentBaseUri: the base URI of element's parent, or NULL to read the
+  // element's own from the tree.
   static store::Item_t processElement(
         const static_context* sctx,
         TypeManager* typeManager, 
         EventSchemaValidator& schemaValidator,
         store::Item* parent,
         const store::Item_t& element,
+        const zstring* aParentBaseUri,
         const QueryLoc& loc);
   
   static void validateAttributes(
