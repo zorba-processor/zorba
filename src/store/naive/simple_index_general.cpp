@@ -631,6 +631,7 @@ bool GeneralIndex::insertInMap(
     GeneralIndexValue::ImageKind image)
 {
   bool found;
+  store::SchemaTypeCode keyType = key->getTypeCode();
 
   if (isSorted())
   {
@@ -644,7 +645,7 @@ bool GeneralIndex::insertInMap(
   }
 
   if (!untyped)
-    ++theNumTypedEntries[targetMap];
+    ++theNumTypedEntries[keyType];
 
   return found;
 }
@@ -1025,7 +1026,7 @@ bool GeneralIndex::removeFromMap(
   }
 
   if (found && !untyped)
-    --theNumTypedEntries[targetMap];
+    --theNumTypedEntries[key->getTypeCode()];
 
   return found;
 }
@@ -1552,10 +1553,13 @@ ProbeGeneralIndexIterator::ProbeGeneralIndexIterator(const store::Index_t& idx)
 /*******************************************************************************
   The keys a value comparison compares with a key of the given type are those
   of the same class: the numbers, the strings and xs:anyURI values (an untyped
-  value compares as an xs:string), the durations, the xs:dateTime values, and
-  otherwise the values of the same type.
+  value compares as an xs:string), the durations (for an order comparison, the
+  xs:yearMonthDuration values and the xs:dayTimeDuration values), the
+  xs:dateTime values, and otherwise the values of the same type.
 ********************************************************************************/
-static store::SchemaTypeCode valueComparisonClass(store::SchemaTypeCode type)
+static store::SchemaTypeCode valueComparisonClass(
+    store::SchemaTypeCode type,
+    bool isOrderComparison)
 {
   switch (type)
   {
@@ -1593,7 +1597,7 @@ static store::SchemaTypeCode valueComparisonClass(store::SchemaTypeCode type)
 
   case store::XS_YM_DURATION:
   case store::XS_DT_DURATION:
-    return store::XS_DURATION;
+    return (isOrderComparison ? type : store::XS_DURATION);
 
   case store::XS_DATETIME_STAMP:
     return store::XS_DATETIME;
@@ -1606,25 +1610,31 @@ static store::SchemaTypeCode valueComparisonClass(store::SchemaTypeCode type)
 
 /*******************************************************************************
   Raises the error that a value comparison of the search key with a key of the
-  index raises: the keys of a map other than the null map that has entries not
+  index raises: the keys of each type other than null that has entries not
   cast from an untyped key are compared with it.
 ********************************************************************************/
-void ProbeGeneralIndexIterator::checkComparableKeys(const AtomicItem* searchKey) const
+void ProbeGeneralIndexIterator::checkComparableKeys(
+    const AtomicItem* searchKey,
+    bool isOrderComparison) const
 {
   // null compares with every value.
   if (searchKey == NULL || searchKey->getTypeCode() == store::JS_NULL)
     return;
 
   store::SchemaTypeCode searchClass =
-    valueComparisonClass(searchKey->getTypeCode());
+    valueComparisonClass(searchKey->getTypeCode(), isOrderComparison);
 
-  for (csize map = 0; map < store::XS_LAST; ++map)
+  // xs:duration values have no order.
+  bool isUnordered = (isOrderComparison && searchClass == store::XS_DURATION);
+
+  for (csize type = 0; type < store::XS_LAST; ++type)
   {
-    store::SchemaTypeCode mapType = static_cast<store::SchemaTypeCode>(map);
+    store::SchemaTypeCode keyType = static_cast<store::SchemaTypeCode>(type);
 
-    if (theIndex->theNumTypedEntries[map] > 0 &&
-        mapType != store::JS_NULL &&
-        valueComparisonClass(mapType) != searchClass)
+    if (theIndex->theNumTypedEntries[type] > 0 &&
+        keyType != store::JS_NULL &&
+        (isUnordered ||
+         valueComparisonClass(keyType, isOrderComparison) != searchClass))
     {
       RAISE_ERROR_NO_LOC(err::XPTY0004,
       ERROR_PARAMS(ZED(IncomparableKeyNodeValue_23),
@@ -1676,9 +1686,9 @@ void ProbeGeneralIndexIterator::init(const store::IndexCondition_t& cond,
 
     if (!theIndex->isTyped())
     {
-      checkComparableKeys(theCondition->theKey.getp());
-      checkComparableKeys(theCondition->theLowerBound.getp());
-      checkComparableKeys(theCondition->theUpperBound.getp());
+      checkComparableKeys(theCondition->theKey.getp(), false);
+      checkComparableKeys(theCondition->theLowerBound.getp(), true);
+      checkComparableKeys(theCondition->theUpperBound.getp(), true);
     }
   }
 
