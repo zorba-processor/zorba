@@ -180,7 +180,10 @@ void XmlNode::attach(InternalNode* parent, csize pos, AttachRecord& record)
 
     collectMoved(parent, moved, baseUris);
 
-    parent->theNodes.reserve(parent->theNodes.size() + 1);
+    // Room for one more node, growing geometrically: a statement inserting many
+    // nodes into one parent reserves once per insert.
+    if (parent->theNodes.size() == parent->theNodes.capacity())
+      parent->theNodes.reserve(2 * parent->theNodes.size() + 1);
 
     for (; numTyped < moved.size(); ++numTyped)
     {
