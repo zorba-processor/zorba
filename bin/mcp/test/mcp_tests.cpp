@@ -3520,6 +3520,31 @@ void test_sweep_insert( Fixture const &f ) {
   (void)f;
 #endif
 }
+// Deleting a node, which makes the text around it adjacent: after the updates
+// are committed, the deleted node becomes a tree of its own (with the
+// namespaces and the base URI it had) and the two text nodes merge. A failed
+// allocation gives the answer or the memory error, and keeps nothing.
+void test_sweep_delete( Fixture const &f ) {
+#if defined(__linux__)
+  auto query = []( std::string const &name ) {
+    return caught(
+      "variable $x := <" + name + " xmlns:p=\"urn:p\" xml:base=\"http://e/\">"
+      "t<b p:k=\"1\"><p:c/></b>u</" + name + ">;\n"
+      "variable $b := $x/b;\n"
+      "delete node $b;\n"
+      "concat(string($x), \" \", count($x/text()), \" \",\n"
+      "       namespace-uri-for-prefix(\"p\", $b), \" \", base-uri($b))" );
+  };
+  Sweep s;
+  s.query = query( "sweep" );
+  s.before.push_back( query( "warm" ) );
+  s.after_compile = true;
+  s.expected = "\"tu 1 urn:p http://e/\"";
+  exhaust_sweep( f, "delete", s );
+#else
+  (void)f;
+#endif
+}
 // The schema validator alone: built for each validate expression, with a text
 // node under each element, attached to its parent when the element is made and
 // when it is validated. Twenty elements: under ASan, in the time of a test.
@@ -8063,6 +8088,7 @@ Test const tests[] = {
   { "exhaust_sweep_fragment", test_sweep_fragment },
   { "exhaust_sweep_descendant", test_sweep_descendant },
   { "exhaust_sweep_insert", test_sweep_insert },
+  { "exhaust_sweep_delete", test_sweep_delete },
   { "exhaust_sweep_validate", test_sweep_validate },
   { "exhaust_sweep_schema_import", test_sweep_schema_import },
   { "exhaust_sweep_html", test_sweep_html },

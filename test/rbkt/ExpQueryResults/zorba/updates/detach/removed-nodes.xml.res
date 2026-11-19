@@ -1,0 +1,2 @@
+<?xml version="1.0" encoding="UTF-8"?>
+&lt;a xmlns:p="urn:p" xml:base="http://e/" m="2"&gt;tu&lt;e&gt;w&lt;/e&gt;&lt;h/&gt;&lt;/a&gt; 1 urn:p http://e/ 1 true http://e/ urn:p true 1 true http://e/ true http://e/
