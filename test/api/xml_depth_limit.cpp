@@ -147,8 +147,9 @@ std::string number(uint64_t n) { return std::to_string(n); }
 
 const std::vector<Operation> theOperations = {
   { "load", "count($d//a)", number },
-  { "construct", "count(<w>{ $d/a }</w>//a)", number },
-  { "copy", "count(document { $d }//a)", number },
+  // except compares node identities, so the copies cannot be left out.
+  { "construct", "count(<w>{ $d/a }</w>//a except $d//a)", number },
+  { "copy", "count(document { $d }//a except $d//a)", number },
   { "update",
     "count((copy $c := $d\n"
     "       modify insert node <b/> into ($c//a)[last()]\n"
@@ -192,11 +193,19 @@ const Zorba_opt_level_t theLevels[] = {
   ZORBA_OPT_LEVEL_O0, ZORBA_OPT_LEVEL_O1, ZORBA_OPT_LEVEL_O2
 };
 
+// A build without XML Schema support cannot validate.
+bool not_in_build(const Outcome& o)
+{
+  return !o.ok && o.code == "XQST0009";
+}
+
 // What a deep tree may do: give the right value, or run out of stack with
 // the stack error, which says how deep the node was and, for an expression
 // of the query, where that expression is.
 bool expected_outcome(const Operation& op, uint64_t n, const Outcome& o)
 {
+  if (not_in_build(o))
+    return true;
   if (o.ok)
   {
     std::string lValue = o.value;
@@ -236,7 +245,7 @@ void check_operation(const Operation& op, uint64_t n)
   for (Zorba_opt_level_t lLevel : theLevels)
   {
     Outcome const o = run(operation_query(op, n), lLevel);
-    std::cout << "  " << n << " levels, O" << lLevel << ", " << op.name
+    std::cout << "  " << n << " levels, O" << static_cast<int>(lLevel) << ", " << op.name
               << ": " << o << std::endl;
     CHECK(expected_outcome(op, n, o));
     if (lFirst)
@@ -258,9 +267,9 @@ void test_levels()
     for (Zorba_opt_level_t lLevel : theLevels)
     {
       Outcome const o = run(operation_query(op, LEVELS), lLevel);
-      std::cout << "  " << LEVELS << " levels, O" << lLevel << ", "
+      std::cout << "  " << LEVELS << " levels, O" << static_cast<int>(lLevel) << ", "
                 << op.name << ": " << o << std::endl;
-      CHECK(o.ok);
+      CHECK(o.ok || not_in_build(o));
       CHECK(expected_outcome(op, LEVELS, o));
     }
   }
@@ -321,7 +330,7 @@ void test_doc_uri()
   for (Zorba_opt_level_t lLevel : theLevels)
   {
     Outcome o = run("count(doc('" + lUri + "')//a)", lLevel);
-    std::cout << "  O" << lLevel << ", load: " << o << std::endl;
+    std::cout << "  O" << static_cast<int>(lLevel) << ", load: " << o << std::endl;
     CHECK(o.ok);
     o = Outcome();
     try
@@ -334,7 +343,7 @@ void test_doc_uri()
     {
       caught(e, o);
     }
-    std::cout << "  O" << lLevel << ", serialize: " << o << std::endl;
+    std::cout << "  O" << static_cast<int>(lLevel) << ", serialize: " << o << std::endl;
     CHECK(o.code == STACK_CODE);
     CHECK(o.line == 1);
     CHECK(o.message.find(lPath) != std::string::npos);
@@ -393,7 +402,7 @@ void test_namespaces()
     {
       caught(e, o);
     }
-    std::cout << "  O" << lLevel << ": " << o << std::endl;
+    std::cout << "  O" << static_cast<int>(lLevel) << ": " << o << std::endl;
     CHECK(o.ok);
   }
 }
@@ -458,7 +467,7 @@ void test_measure()
               << (lLargeUsed > lSmallUsed
                   ? (lLargeUsed - lSmallUsed) / (LEVELS - lSmall) : 0)
               << " bytes per level" << std::endl;
-    CHECK(lLargeOutcome.ok);
+    CHECK(lLargeOutcome.ok || not_in_build(lLargeOutcome));
   }
 }
 #else

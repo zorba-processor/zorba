@@ -345,7 +345,7 @@ void OrdPath::initFromString(const unsigned char* str, ulong strLen)
   catch (...)
   {
     if (!isLocal)
-      delete [] getRemoteBuffer();
+      delete [] getRemoteBuffer(); // NOLINT(zorba-owning-memory) the remote buffer shares a union with the inline bytes
 
     memset(theBuffer.local, 0, MAX_EMBEDDED_BYTE_LEN);
     markLocal();
@@ -376,7 +376,7 @@ unsigned char* OrdPath::newRemoteBuffer(ulong byteLen)
   if (byteLen > std::numeric_limits<uint32_t>::max())
     throw std::bad_alloc();
 
-  unsigned char* buf = new unsigned char[REMOTE_HEADER_LEN + byteLen]();
+  unsigned char* buf = new unsigned char[REMOTE_HEADER_LEN + byteLen](); // NOLINT(zorba-owning-memory) the remote buffer shares a union with the inline bytes
   uint32_t const len = static_cast<uint32_t>(byteLen);
   memcpy(buf, &len, sizeof len);
   return buf;
@@ -843,30 +843,18 @@ void OrdPath::compressRemote(const DeweyID& dewey)
   // A component takes at most 42 bits.
   ulong maxByteLen = (numComps * 42 + 7) / 8;
 
-  unsigned char* databuf = new unsigned char[maxByteLen];
+  std::unique_ptr<unsigned char[]> databuf(new unsigned char[maxByteLen]());
 
-  try
+  for (ulong i = 0; i < numComps; ++i)
   {
-    memset(databuf, 0, maxByteLen);
-
-    for (ulong i = 0; i < numComps; ++i)
-    {
-      bool success = pushComp(databuf, maxByteLen * 8, dewey[i], bitLen);
-      ZORBA_ASSERT(success);
-    }
-
-    ulong byteLen = (bitLen + 7) / 8;
-
-    initRemote(byteLen);
-    memcpy(getRemoteData(), databuf, byteLen);
-  }
-  catch (...)
-  {
-    delete [] databuf;
-    throw;
+    bool success = pushComp(databuf.get(), maxByteLen * 8, dewey[i], bitLen);
+    ZORBA_ASSERT(success);
   }
 
-  delete [] databuf;
+  ulong byteLen = (bitLen + 7) / 8;
+
+  initRemote(byteLen);
+  memcpy(getRemoteData(), databuf.get(), byteLen);
 }
 
 

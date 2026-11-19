@@ -889,35 +889,41 @@ void XmlNode::destroy(bool removeType)
 ********************************************************************************/
 void XmlNode::destroyInternal(bool removeType)
 {
-  // A loop over the nodes still to delete, not recursion: a tree may be
-  // deeper than the stack, and a destructor cannot raise an error.
-  std::vector<XmlNode*> lPending(1, this);
+  // A loop, not recursion, since a tree may be deeper than the stack; and
+  // without allocating, since a destructor cannot raise an error. Each node
+  // gives up its last child or attribute until it has none and is deleted;
+  // theParent leads back up.
+  XmlNode* node = this;
 
-  while (!lPending.empty())
+  while (node != NULL)
   {
-    XmlNode* node = lPending.back();
-    lPending.pop_back();
-
     store::StoreConsts::NodeKind kind = node->getNodeKind();
 
     if (kind == store::StoreConsts::elementNode ||
         kind == store::StoreConsts::documentNode)
     {
       InternalNode* parent = static_cast<InternalNode*>(node);
+      InternalNode::NodeVector& nodes = parent->theNodes;
 
-      InternalNode::iterator ite = parent->childrenBegin();
-      InternalNode::iterator end = parent->childrenEnd();
-
-      for (; ite != end; ++ite)
+      if (!nodes.empty())
       {
-        if ((*ite)->isConnectorNode())
-          delete (*ite);
-        else
-          lPending.push_back(*ite);
-      }
+        XmlNode* child = nodes.back();
+        nodes.resize(nodes.size() - 1);
 
-      lPending.insert(lPending.end(), parent->attrsBegin(), parent->attrsEnd());
+        if (child->isConnectorNode())
+        {
+          delete child; // NOLINT(zorba-owning-memory) a tree owns its nodes through raw child pointers
+        }
+        else
+        {
+          child->theParent = parent;
+          node = child;
+        }
+        continue;
+      }
     }
+
+    XmlNode* up = (node == this ? NULL : node->theParent);
 
 #ifndef EMBEDED_TYPE
     if (removeType)
@@ -940,7 +946,8 @@ void XmlNode::destroyInternal(bool removeType)
     if (node->haveReference())
       GET_STORE().unregisterReferenceToUnusedNode(node);
 
-    delete node;
+    delete node; // NOLINT(zorba-owning-memory) a tree owns its nodes through raw child pointers
+    node = up;
   }
 }
 
