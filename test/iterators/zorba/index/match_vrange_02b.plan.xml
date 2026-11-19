@@ -185,28 +185,53 @@
         </CreateIndexIterator>
       </ApplyIterator>
       <FnConcatIterator>
-        <FLWORIterator>
-          <ForVariable name="d">
-            <ProbeIndexRangeValueIterator>
-              <SingletonIterator value="xs:QName(www.data.com,data,idx)"/>
-              <SingletonIterator value="xs:string(folder1)"/>
-              <FnConcatIterator/>
-              <SingletonIterator value="xs:boolean(true)"/>
-              <SingletonIterator value="xs:boolean(false)"/>
-              <SingletonIterator value="xs:boolean(false)"/>
-              <SingletonIterator value="xs:boolean(false)"/>
-              <FnConcatIterator/>
-              <FnConcatIterator/>
-              <SingletonIterator value="xs:boolean(false)"/>
-              <SingletonIterator value="xs:boolean(false)"/>
-              <SingletonIterator value="xs:boolean(false)"/>
-              <SingletonIterator value="xs:boolean(false)"/>
-            </ProbeIndexRangeValueIterator>
-          </ForVariable>
-          <ReturnClause>
-            <ForVarIterator varname="d"/>
-          </ReturnClause>
-        </FLWORIterator>
+        <ProbeIndexRangeValueIterator>
+          <SingletonIterator value="xs:QName(www.data.com,data,idx)"/>
+          <SingletonIterator value="xs:string(folder1)"/>
+          <FnConcatIterator/>
+          <SingletonIterator value="xs:boolean(true)"/>
+          <SingletonIterator value="xs:boolean(false)"/>
+          <SingletonIterator value="xs:boolean(false)"/>
+          <SingletonIterator value="xs:boolean(false)"/>
+          <FnConcatIterator/>
+          <FnConcatIterator/>
+          <SingletonIterator value="xs:boolean(false)"/>
+          <SingletonIterator value="xs:boolean(false)"/>
+          <SingletonIterator value="xs:boolean(false)"/>
+          <SingletonIterator value="xs:boolean(false)"/>
+        </ProbeIndexRangeValueIterator>
+        <SingletonIterator value="xs:string(&#xA;)"/>
+        <ProbeIndexRangeValueIterator>
+          <SingletonIterator value="xs:QName(www.data.com,data,idx)"/>
+          <SingletonIterator value="xs:string(folder1)"/>
+          <SingletonIterator value="xs:string(folder3)"/>
+          <SingletonIterator value="xs:boolean(true)"/>
+          <SingletonIterator value="xs:boolean(true)"/>
+          <SingletonIterator value="xs:boolean(true)"/>
+          <SingletonIterator value="xs:boolean(false)"/>
+          <SingletonIterator value="xs:string(2012-12-30)"/>
+          <FnConcatIterator/>
+          <SingletonIterator value="xs:boolean(true)"/>
+          <SingletonIterator value="xs:boolean(false)"/>
+          <SingletonIterator value="xs:boolean(false)"/>
+          <SingletonIterator value="xs:boolean(false)"/>
+        </ProbeIndexRangeValueIterator>
+        <SingletonIterator value="xs:string(&#xA;)"/>
+        <ProbeIndexRangeValueIterator>
+          <SingletonIterator value="xs:QName(www.data.com,data,idx)"/>
+          <SingletonIterator value="xs:string(folder1)"/>
+          <SingletonIterator value="xs:string(folder3)"/>
+          <SingletonIterator value="xs:boolean(true)"/>
+          <SingletonIterator value="xs:boolean(true)"/>
+          <SingletonIterator value="xs:boolean(true)"/>
+          <SingletonIterator value="xs:boolean(false)"/>
+          <SingletonIterator value="xs:string(2012-12-30)"/>
+          <FnConcatIterator/>
+          <SingletonIterator value="xs:boolean(true)"/>
+          <SingletonIterator value="xs:boolean(false)"/>
+          <SingletonIterator value="xs:boolean(false)"/>
+          <SingletonIterator value="xs:boolean(false)"/>
+        </ProbeIndexRangeValueIterator>
         <SingletonIterator value="xs:string(&#xA;)"/>
         <FLWORIterator>
           <ForVariable name="d">
@@ -226,53 +251,7 @@
               <SingletonIterator value="xs:boolean(false)"/>
             </ProbeIndexRangeValueIterator>
           </ForVariable>
-          <ReturnClause>
-            <ForVarIterator varname="d"/>
-          </ReturnClause>
-        </FLWORIterator>
-        <SingletonIterator value="xs:string(&#xA;)"/>
-        <FLWORIterator>
-          <ForVariable name="d">
-            <ProbeIndexRangeValueIterator>
-              <SingletonIterator value="xs:QName(www.data.com,data,idx)"/>
-              <SingletonIterator value="xs:string(folder1)"/>
-              <SingletonIterator value="xs:string(folder3)"/>
-              <SingletonIterator value="xs:boolean(true)"/>
-              <SingletonIterator value="xs:boolean(true)"/>
-              <SingletonIterator value="xs:boolean(true)"/>
-              <SingletonIterator value="xs:boolean(false)"/>
-              <SingletonIterator value="xs:string(2012-12-30)"/>
-              <FnConcatIterator/>
-              <SingletonIterator value="xs:boolean(true)"/>
-              <SingletonIterator value="xs:boolean(false)"/>
-              <SingletonIterator value="xs:boolean(false)"/>
-              <SingletonIterator value="xs:boolean(false)"/>
-            </ProbeIndexRangeValueIterator>
-          </ForVariable>
-          <ReturnClause>
-            <ForVarIterator varname="d"/>
-          </ReturnClause>
-        </FLWORIterator>
-        <SingletonIterator value="xs:string(&#xA;)"/>
-        <FLWORIterator>
-          <ForVariable name="d">
-            <ProbeIndexRangeValueIterator>
-              <SingletonIterator value="xs:QName(www.data.com,data,idx)"/>
-              <SingletonIterator value="xs:string(folder1)"/>
-              <SingletonIterator value="xs:string(folder3)"/>
-              <SingletonIterator value="xs:boolean(true)"/>
-              <SingletonIterator value="xs:boolean(true)"/>
-              <SingletonIterator value="xs:boolean(true)"/>
-              <SingletonIterator value="xs:boolean(false)"/>
-              <SingletonIterator value="xs:string(2012-12-30)"/>
-              <FnConcatIterator/>
-              <SingletonIterator value="xs:boolean(true)"/>
-              <SingletonIterator value="xs:boolean(false)"/>
-              <SingletonIterator value="xs:boolean(false)"/>
-              <SingletonIterator value="xs:boolean(false)"/>
-            </ProbeIndexRangeValueIterator>
-          </ForVariable>
-          <ForVariable name="key2">
+          <OrderBySpec>
             <FnStringIterator>
               <TreatIterator quant="?">
                 <AttributeAxisIterator test-kind="match_name_test" qname="xs:QName(,,date-time)" typename="*" nill-allowed="false">
@@ -284,9 +263,6 @@
                 </AttributeAxisIterator>
               </TreatIterator>
             </FnStringIterator>
-          </ForVariable>
-          <OrderBySpec>
-            <ForVarIterator varname="key2"/>
           </OrderBySpec>
           <ReturnClause>
             <ForVarIterator varname="d"/>
