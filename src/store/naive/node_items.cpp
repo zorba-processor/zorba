@@ -49,6 +49,10 @@
 #include "dataguide.h"
 #include "node_factory.h"
 
+#include "system/globalenv.h"
+#include "types/casting.h"
+#include "types/root_typemanager.h"
+
 #ifndef ZORBA_NO_FULL_TEXT
 using namespace zorba::locale;
 #endif /* ZORBA_NO_FULL_TEXT */
@@ -223,6 +227,40 @@ void XmlTree::removeType(const XmlNode* n)
   {
     assert(false);
   }
+}
+
+
+/*******************************************************************************
+
+********************************************************************************/
+store::Item* XmlTree::getEmptyContentValue(const XmlNode* n) const
+{
+  if (!theEmptyContentValues)
+    return NULL;
+
+  NodePointerHashMap<store::Item_t>::iterator ite = theEmptyContentValues->find(n);
+  return ite == theEmptyContentValues->end() ? NULL : (*ite).second.getp();
+}
+
+
+void XmlTree::setEmptyContentValue(const XmlNode* n, store::Item_t& value)
+{
+  if (!theEmptyContentValues)
+    theEmptyContentValues =
+      std::make_unique<NodePointerHashMap<store::Item_t>>(32, false);
+
+  NodePointerHashMap<store::Item_t>::iterator ite = theEmptyContentValues->find(n);
+  if (ite == theEmptyContentValues->end())
+    theEmptyContentValues->insert(n, value);
+  else
+    ite.setValue(value);
+}
+
+
+void XmlTree::removeEmptyContentValue(const XmlNode* n)
+{
+  if (theEmptyContentValues)
+    theEmptyContentValues->erase(n);
 }
 
 
@@ -574,12 +612,23 @@ void XmlNode::setTree(const XmlTree* aNewTree)
     getTree()->removeType(this);
   }
 
+  store::Item_t emptyContentValue;
+  if (getNodeKind() == store::StoreConsts::elementNode &&
+      static_cast<ElementNode*>(this)->haveEmptyContentValue())
+  {
+    emptyContentValue = getTree()->getEmptyContentValue(this);
+    getTree()->removeEmptyContentValue(this);
+  }
+
   setTreeInternal(aNewTree);
 
   if (lAdjustTypes)
   {
     getTree()->addType(this, type);
   }
+
+  if (emptyContentValue != NULL)
+    getTree()->setEmptyContentValue(this, emptyContentValue);
   
 #ifndef NDEBUG
   if (getNodeKind() == store::StoreConsts::elementNode)
@@ -908,6 +957,8 @@ void XmlNode::destroyInternal(bool removeType)
       ElementNode* elem = static_cast<ElementNode*>(this);
       if (elem->haveType())
         getTree()->removeType(this);
+      if (elem->haveEmptyContentValue())
+        getTree()->removeEmptyContentValue(this);
     }
     else if (kind == store::StoreConsts::attributeNode)
     {
@@ -2439,6 +2490,13 @@ XmlNode* ElementNode::copyInternal(
     if (copymode.theTypePreserve && getNilled())
       copyNode->setNilled();
 
+    if (copymode.theTypePreserve && haveEmptyContentValue())
+    {
+      store::Item_t value = getTree()->getEmptyContentValue(this);
+      if (value != NULL)
+        static_cast<ElementNode*>(copyNode)->setEmptyContentTypedValue(value);
+    }
+
     if (rootCopy == NULL)
       rootCopy = copyNode;
 
@@ -2984,6 +3042,12 @@ void ElementNode::getTypedValue(store::Item_t& val, store::Iterator_t& iter) con
           iter = NULL;
           return;
         }
+
+        if (getEmptyContentTypedValue(val))
+        {
+          iter = NULL;
+          return;
+        }
       }
 
       GET_FACTORY().createUntypedAtomic(val, rch);
@@ -2994,6 +3058,49 @@ void ElementNode::getTypedValue(store::Item_t& val, store::Iterator_t& iter) con
     throw XQUERY_EXCEPTION(err::FOTY0012,
     ERROR_PARAMS(theName->getStringValue(), getType()->getStringValue()));
   }
+}
+
+
+/*******************************************************************************
+  The typed value of the empty content of an element of an atomic type: kept
+  by validation for a user-defined type, made from the type for a built-in
+  one. Returns false for other elements.
+********************************************************************************/
+bool ElementNode::getEmptyContentTypedValue(store::Item_t& val) const
+{
+  if (!haveType())
+    return false;
+
+  store::Item* type = getType();
+
+  if (haveEmptyContentValue())
+  {
+    // The value is of the type it was set for; an update may have changed the
+    // type since.
+    store::Item* value = getTree()->getEmptyContentValue(this);
+    if (value != NULL && value->getType()->equals(type))
+    {
+      val = value;
+      return true;
+    }
+  }
+
+  xqtref_t builtin = GENV_TYPESYSTEM.create_named_atomic_type(
+    type, SequenceType::QUANT_ONE, QueryLoc::null, false);
+  if (builtin == NULL)
+    return false;
+
+  zstring empty;
+  return GenericCast::castStringToAtomic(val, empty, builtin.getp(),
+                                         &GENV_TYPESYSTEM, NULL,
+                                         QueryLoc::null, false);
+}
+
+
+void ElementNode::setEmptyContentTypedValue(store::Item_t& value)
+{
+  getTree()->setEmptyContentValue(this, value);
+  theFlags |= HaveEmptyContentValue;
 }
 
 
