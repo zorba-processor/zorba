@@ -145,6 +145,10 @@ class CollectionPul
     InternalNode         * theParent;
     ulong                  thePos;
     std::vector<XmlNode_t> theMergedNodes;
+    // An empty tree, made when the merge is done, for its undo, which cannot
+    // allocate (see CollectionPul::undoUpdates()); freed with the PUL if
+    // unused.
+    XmlTree              * theUndoTree = NULL;
 
     TextNodeMerge(InternalNode* aParent, ulong aPos)
       :

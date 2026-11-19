@@ -307,6 +307,44 @@ public:
 };
 
 
+/*******************************************************************************
+  What XmlNode::attach() changed, kept so that XmlNode::undoAttach() can put it
+  back without allocating: undoing an update cannot fail.
+
+  theOldTree           : The tree the node came from, kept empty for undo, with
+                         the type entries of the moved nodes; freed with the
+                         record if the attach is not undone.
+  theMoved             : The nodes that moved, the attached node first.
+  theBaseUris          : The hidden base-uri attributes that attach() re-resolved,
+                         with their old values (null for the next one).
+  theRemovedBaseUri    : The old root's hidden base-uri attribute, which attach()
+                         took off; destroyed with the record if not undone.
+  theRemovedBaseUriPos : Its position among the attributes.
+  theOldNsContext      : The attached element's namespace context before an
+                         insert made it inherit its new parent's.
+********************************************************************************/
+class AttachRecord
+{
+public:
+  XmlTree                                                * theOldTree = NULL;
+  std::vector<XmlNode*>                                    theMoved;
+  std::vector<std::pair<AttributeNode*, store::Item_t> >   theBaseUris;
+  AttributeNode                                          * theRemovedBaseUri = NULL;
+  csize                                                    theRemovedBaseUriPos = 0;
+  rchandle<NsBindingsContext>                              theOldNsContext;
+
+  AttachRecord() = default;
+
+  AttachRecord(const AttachRecord&) = delete;
+
+  AttachRecord& operator=(const AttachRecord&) = delete;
+
+  AttachRecord(AttachRecord&& other) noexcept;
+
+  ~AttachRecord();
+};
+
+
 /******************************************************************************
 
   Node identification: A node is uniquely and globally identified by a
@@ -317,6 +355,7 @@ public:
 
 class XmlNode : public StructuredItem
 {
+  friend class AttachRecord;
   friend class XmlTree;
   friend class NodeFactory;
   friend class InternalNode;
@@ -430,7 +469,11 @@ protected:
 
   virtual void getBaseURIInternal(zstring& uri, bool& local) const;
 
-  void attach(InternalNode* parent, csize pos);
+  void attach(InternalNode* parent, csize pos, AttachRecord& record);
+
+  void undoAttach(AttachRecord& record);
+
+  void detachText(XmlTree* tree);
 
   void collectMoved(
         const InternalNode* parent,
@@ -926,7 +969,7 @@ protected:
 
   csize removeChild(XmlNode* child);
 
-  void removeChildren(csize pos, csize numChildren);
+  void undoAttaches(UpdatePrimitive& upd, csize numApplied);
 
   void removeConnector(csize pos);
 
@@ -1181,7 +1224,6 @@ public:
       const XmlNode* rootCopy,
       const store::CopyMode& copymode) const;
 
-  void removeAttributes(csize pos, csize numAttributes);
 
   void insertAttributes(UpdInsertAttributes& upd);
 

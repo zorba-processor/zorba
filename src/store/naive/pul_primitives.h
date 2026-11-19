@@ -40,6 +40,7 @@ class PULImpl;
 class CollectionPul;
 class XmlNode;
 class InternalNode;
+class AttachRecord;
 
 
 /*******************************************************************************
@@ -100,6 +101,8 @@ typedef std::vector<NodeTypeInfo> TypeUndoList;
                      ancestors, if upd:removeType has been applied to these nodes.
                      Used to undo the effects of upd:removeType() in case of
                      errors.
+  theAttachRecords : For inserts and replacements, what the attach() of each new
+                     node changed, so that undo() allocates nothing.
 ********************************************************************************/
 class UpdatePrimitive
 {
@@ -118,6 +121,7 @@ protected:
   bool             theIsApplied;
   bool             theRemoveType;
   TypeUndoList     theTypeUndoList;
+  std::vector<AttachRecord> theAttachRecords;
 
 protected:
   UpdatePrimitive(PULImpl* pul, const QueryLoc*, store::Item_t& target);
