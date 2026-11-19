@@ -52,6 +52,7 @@
 #include "store/api/item_factory.h"
 #include "store/api/copymode.h"
 #include "runtime/json/nesting.h"
+#include "runtime/util/tree_depth.h"
 
 namespace zorba {
 
@@ -533,6 +534,28 @@ void serializer::emitter::emit_node(const store::Item* item, int depth)
 
     break;
   }
+  default:
+  {
+    emit_leaf_node(item);
+    break;
+  }
+  }
+}
+
+
+/*******************************************************************************
+  Not inlined into emit_node(), whose frame is taken once for each level of
+  a tree: these cases need much more stack than the element case.
+********************************************************************************/
+#if defined(__GNUC__) || defined(__clang__)
+__attribute__((noinline))
+#elif defined(_MSC_VER)
+__declspec(noinline)
+#endif
+void serializer::emitter::emit_leaf_node(const store::Item* item)
+{
+  switch (item->getNodeKind())
+  {
   case store::StoreConsts::attributeNode:
   {
     store::Item* qnameItem = item->getNodeName();
@@ -661,6 +684,9 @@ int serializer::emitter::emit_node_children(
   int depth,
   bool perform_escaping)
 {
+  // An exception ends this emitter's use.
+  tree_depth::check_stack(item, "serialize");
+
   store::Item* child;
   store::Item* attr;
   int closed_parent_tag = 0;
@@ -1515,6 +1541,32 @@ void serializer::html_emitter::emit_node(
 
     break;
   }
+  default:
+  {
+    emit_leaf_node(item);
+    break;
+  }
+  }
+}
+
+
+/*******************************************************************************
+  Not inlined into emit_node(), whose frame is taken once for each level of
+  a tree: these cases need much more stack than the element case.
+********************************************************************************/
+#if defined(__GNUC__) || defined(__clang__)
+__attribute__((noinline))
+#elif defined(_MSC_VER)
+__declspec(noinline)
+#endif
+void serializer::html_emitter::emit_leaf_node(const store::Item* item)
+{
+  const store::Item* element_parent = item->getParent();
+
+  store::NodeKind kind = item->getNodeKind();
+
+  switch (kind)
+  {
   case store::StoreConsts::attributeNode:
   {
     // The HTML output method MUST output boolean attributes (that is attributes
@@ -1791,6 +1843,8 @@ int serializer::sax2_emitter::emit_node_children(
 ********************************************************************************/
 void serializer::sax2_emitter::emit_node_children( const store::Item* item )
 {
+  tree_depth::check_stack(item, "serialize");
+
   store::Iterator_t it;
   store::Item_t child;
   // output all the other nodes
@@ -2148,6 +2202,8 @@ int serializer::text_emitter::emit_node_children(
   int depth,
   bool perform_escaping)
 {
+  tree_depth::check_stack(node, "serialize");
+
   store::Item* child;
 
   // output all the other nodes

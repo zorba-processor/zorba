@@ -37,6 +37,7 @@
 #include "zorbautils/store_util.h"
 
 #include "snelson.h"
+#include "runtime/util/tree_depth.h"
 
 #define SNELSON_NS "http://john.snelson.org.uk/parsing-json-into-xquery"
 
@@ -372,6 +373,7 @@ static json::type get_json_type( store::Item_t const &element,
 
 static void x2j_array( store::Item_t const &parent, store::Item_t *array ) {
   ZORBA_ASSERT( array );
+  tree_depth::check_stack( parent.getp(), "convert" );
   vector<store::Item_t> elements;
   store::Iterator_t i( parent->getChildren() );
   i->open();
@@ -599,6 +601,7 @@ static void x2j_number( store::Item_t const &parent, store::Item_t *number ) {
 
 static void x2j_object( store::Item_t const &parent, store::Item_t *object ) {
   ZORBA_ASSERT( object );
+  tree_depth::check_stack( parent.getp(), "convert" );
   vector<store::Item_t> keys, values;
   store::Item_t child, key, value;
 

@@ -38,6 +38,7 @@
 #include "system/globalenv.h"
 
 #include "types/schema/schema.h"
+#include "runtime/util/tree_depth.h"
 #include "types/schema/validate.h"
 #include "util/stream_util.h"
 
@@ -294,7 +295,15 @@ FnSerializeIterator::nextImpl(store::Item_t& aResult, PlanState& aPlanState) con
     {
       // and now serialize
       std::unique_ptr<std::stringstream> lResultStream = std::make_unique<std::stringstream>();
-      lSerializer.serialize(lIterWrapper, *lResultStream.get());
+      try
+      {
+        lSerializer.serialize(lIterWrapper, *lResultStream.get());
+      }
+      catch (ZorbaException& e)
+      {
+        tree_depth::locate(e, loc);
+        throw;
+      }
       GENV_ITEMFACTORY->createStreamableString(aResult, *lResultStream.get(), FnSerializeIterator::streamReleaser, true);
       (void)lResultStream.release(); // owned by the streamable item now
     }

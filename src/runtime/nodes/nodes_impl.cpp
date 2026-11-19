@@ -32,6 +32,7 @@
 #include "zorbautils/string_util.h"
 
 #include "diagnostics/util_macros.h"
+#include "runtime/util/tree_depth.h"
 
 
 using namespace std;
@@ -739,7 +740,7 @@ NodeCopyIterator::nextImpl(store::Item_t& result, PlanState& planState) const
 
   while (consumeNext(item, theChildren[0].getp(), planState))
   {
-    result = item->copy(0, copyMode);
+    result = tree_depth::located(loc, [&] { return item->copy(0, copyMode); });
     STACK_PUSH(true, state);
   }
 

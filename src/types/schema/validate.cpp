@@ -56,6 +56,7 @@
 #include "context/namespace_context.h"
 
 #include "diagnostics/assert.h"
+#include "runtime/util/tree_depth.h"
 #include "zorba/store_consts.h"
 
 namespace zorba
@@ -337,6 +338,7 @@ store::Item_t Validator::processElement(
   ZORBA_ASSERT(element->isNode());
   ZORBA_ASSERT(element->getNodeKind() == store::StoreConsts::elementNode);
 
+  tree_depth::check_stack(element.getp(), "validate", loc);
 
   store::Item_t nodeName = element->getNodeName();
   zstring baseUri;

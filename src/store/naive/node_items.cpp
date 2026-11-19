@@ -49,6 +49,8 @@
 #include "dataguide.h"
 #include "node_factory.h"
 
+#include "runtime/util/tree_depth.h"
+
 #ifndef ZORBA_NO_FULL_TEXT
 using namespace zorba::locale;
 #endif /* ZORBA_NO_FULL_TEXT */
@@ -629,16 +631,34 @@ bool XmlNode::getEBV() const
 
 
 /*******************************************************************************
-  Document and element methods redefine this method.
+
+********************************************************************************/
+void XmlNode::getBaseURI(zstring& uri) const
+{
+  assert(!isConnectorNode());
+
+  // A loop up the ancestors, not recursion: a tree may be deeper than the
+  // stack.
+  bool local = false;
+  for (const XmlNode* node = this; node != NULL; node = node->theParent)
+  {
+    node->getBaseURIInternal(uri, local);
+    if (local)
+      return;
+  }
+}
+
+
+/*******************************************************************************
+  Gives the base URI that this node sets itself, with local = true, or sets
+  local = false if it inherits it. Document and element methods redefine this
+  method.
 ********************************************************************************/
 void XmlNode::getBaseURIInternal(zstring& uri, bool& local) const
 {
   assert(!isConnectorNode());
 
   local = false;
-
-  if (theParent)
-    theParent->getBaseURI(uri);
 }
 
 
@@ -869,59 +889,59 @@ void XmlNode::destroy(bool removeType)
 ********************************************************************************/
 void XmlNode::destroyInternal(bool removeType)
 {
-  store::StoreConsts::NodeKind kind = getNodeKind();
+  // A loop over the nodes still to delete, not recursion: a tree may be
+  // deeper than the stack, and a destructor cannot raise an error.
+  std::vector<XmlNode*> lPending(1, this);
 
-  if (kind == store::StoreConsts::elementNode ||
-      kind == store::StoreConsts::documentNode)
+  while (!lPending.empty())
   {
-    InternalNode* node = static_cast<InternalNode*>(this);
+    XmlNode* node = lPending.back();
+    lPending.pop_back();
 
-    InternalNode::iterator ite = node->childrenBegin();
-    InternalNode::iterator end = node->childrenEnd();
+    store::StoreConsts::NodeKind kind = node->getNodeKind();
 
-    for (; ite != end; ++ite)
+    if (kind == store::StoreConsts::elementNode ||
+        kind == store::StoreConsts::documentNode)
     {
-      if ((*ite)->isConnectorNode())
-      {
-        delete (*ite);
-      }
-      else
-      {
-        (*ite)->destroyInternal(removeType);
-      }
-    }
+      InternalNode* parent = static_cast<InternalNode*>(node);
 
-    ite = node->attrsBegin();
-    end = node->attrsEnd();
+      InternalNode::iterator ite = parent->childrenBegin();
+      InternalNode::iterator end = parent->childrenEnd();
 
-    for (; ite != end; ++ite)
-    {
-      (*ite)->destroyInternal(removeType);
+      for (; ite != end; ++ite)
+      {
+        if ((*ite)->isConnectorNode())
+          delete (*ite);
+        else
+          lPending.push_back(*ite);
+      }
+
+      lPending.insert(lPending.end(), parent->attrsBegin(), parent->attrsEnd());
     }
-  }
 
 #ifndef EMBEDED_TYPE
-  if (removeType)
-  {
-    if (kind == store::StoreConsts::elementNode)
+    if (removeType)
     {
-      ElementNode* elem = static_cast<ElementNode*>(this);
-      if (elem->haveType())
-        getTree()->removeType(this);
+      if (kind == store::StoreConsts::elementNode)
+      {
+        ElementNode* elem = static_cast<ElementNode*>(node);
+        if (elem->haveType())
+          node->getTree()->removeType(node);
+      }
+      else if (kind == store::StoreConsts::attributeNode)
+      {
+        AttributeNode* attr = static_cast<AttributeNode*>(node);
+        if (attr->haveType())
+          node->getTree()->removeType(node);
+      }
     }
-    else if (kind == store::StoreConsts::attributeNode)
-    {
-      AttributeNode* attr = static_cast<AttributeNode*>(this);
-      if (attr->haveType())
-        getTree()->removeType(this);
-    }
-  }
 #endif
 
-  if (haveReference())
-    GET_STORE().unregisterReferenceToUnusedNode(this);
+    if (node->haveReference())
+      GET_STORE().unregisterReferenceToUnusedNode(node);
 
-  delete this;
+    delete node;
+  }
 }
 
 
@@ -1880,15 +1900,29 @@ void InternalNode::finalizeNode()
 ********************************************************************************/
 void InternalNode::unregisterReferencesToDeletedSubtree()
 {
-  std::for_each(
-      childrenBegin(), childrenEnd(),
-      std::mem_fn(&XmlNode::unregisterReferencesToDeletedSubtree));
+  // A loop, not recursion: a tree may be deeper than the stack, and this runs
+  // while updates are applied.
+  std::vector<XmlNode*> lPending(1, this);
 
-  std::for_each(
-      attrsBegin(), attrsEnd(),
-      std::mem_fn(&XmlNode::unregisterReferencesToDeletedSubtree));
+  while (!lPending.empty())
+  {
+    XmlNode* node = lPending.back();
+    lPending.pop_back();
 
-  XmlNode::unregisterReferencesToDeletedSubtree();
+    node->XmlNode::unregisterReferencesToDeletedSubtree();
+
+    store::StoreConsts::NodeKind kind = node->getNodeKind();
+
+    if (!node->isConnectorNode() &&
+        (kind == store::StoreConsts::elementNode ||
+         kind == store::StoreConsts::documentNode))
+    {
+      InternalNode* parent = static_cast<InternalNode*>(node);
+      lPending.insert(lPending.end(), parent->childrenBegin(),
+                      parent->childrenEnd());
+      lPending.insert(lPending.end(), parent->attrsBegin(), parent->attrsEnd());
+    }
+  }
 }
 
 
@@ -2000,6 +2034,8 @@ XmlNode* DocumentNode::copyInternal(
 
     copyNode = NodeFactory::instance().createDocumentNode(tree, theBaseUri, docUri);
 
+    tree_depth::check_stack(this, "copy");
+
     const_iterator ite = childrenBegin();
     const_iterator end = childrenEnd();
 
@@ -2091,6 +2127,8 @@ zstring DocumentNode::getStringValue() const
 
 void DocumentNode::getStringValue2(zstring& val) const
 {
+  tree_depth::check_stack(this, "atomize");
+
   store::StoreConsts::NodeKind kind;
 
   if (numChildren() == 1)
@@ -2124,6 +2162,8 @@ void DocumentNode::getStringValue2(zstring& val) const
 
 void DocumentNode::appendStringValue(zstring& buf) const
 {
+  tree_depth::check_stack(this, "atomize");
+
   const_iterator ite = childrenBegin();
   const_iterator end = childrenEnd();
 
@@ -2657,6 +2697,8 @@ XmlNode* ElementNode::copyInternal(
       }
     }
 
+    tree_depth::check_stack(this, "copy");
+
     // Copy the children of this node
     ite = childrenBegin();
     end = childrenEnd();
@@ -2997,6 +3039,8 @@ zstring ElementNode::getStringValue() const
 ********************************************************************************/
 void ElementNode::getStringValue2(zstring& val) const
 {
+  tree_depth::check_stack(this, "atomize");
+
   store::StoreConsts::NodeKind kind;
 
   if (numChildren() == 1)
@@ -3033,6 +3077,8 @@ void ElementNode::getStringValue2(zstring& val) const
 ********************************************************************************/
 void ElementNode::appendStringValue(zstring& buf) const
 {
+  tree_depth::check_stack(this, "atomize");
+
   const_iterator ite = childrenBegin();
   const_iterator end = childrenEnd();
 
@@ -3517,26 +3563,37 @@ void ElementNode::uninheritBinding(
     NsBindingsContext* rootNSCtx,
     const zstring& prefix)
 {
-  if (theNsContext.getp() == rootNSCtx || theNsContext->getParent() == rootNSCtx)
+  // A loop, not recursion: a tree may be deeper than the stack, and this runs
+  // while updates are applied.
+  std::vector<ElementNode*> lPending(1, this);
+
+  while (!lPending.empty())
   {
-    if (theNsContext.getp() == rootNSCtx)
+    ElementNode* elem = lPending.back();
+    lPending.pop_back();
+
+    if (elem->theNsContext.getp() == rootNSCtx ||
+        elem->theNsContext->getParent() == rootNSCtx)
     {
-      theNsContext = new NsBindingsContext(rootNSCtx);
+      if (elem->theNsContext.getp() == rootNSCtx)
+      {
+        elem->theNsContext = new NsBindingsContext(rootNSCtx);
+      }
+
+      zstring emptyStr;
+
+      elem->theNsContext->addBinding(prefix, emptyStr, true);
     }
 
-    zstring emptyStr;
+    const_iterator ite = elem->childrenBegin();
+    const_iterator end = elem->childrenEnd();
 
-    theNsContext->addBinding(prefix, emptyStr, true);
-  }
-
-  const_iterator ite = childrenBegin();
-  const_iterator end = childrenEnd();
-
-  for (; ite != end; ++ite)
-  {
-    if ((*ite)->getNodeKind() == store::StoreConsts::elementNode)
+    for (; ite != end; ++ite)
     {
-      static_cast<ElementNode*>(getChild(ite))->uninheritBinding(rootNSCtx, prefix);
+      if ((*ite)->getNodeKind() == store::StoreConsts::elementNode)
+      {
+        lPending.push_back(static_cast<ElementNode*>(elem->getChild(ite)));
+      }
     }
   }
 }
@@ -3751,9 +3808,6 @@ void ElementNode::getBaseURIInternal(zstring& uri, bool& local) const
   }
 
   local = false;
-
-  if (theParent)
-    theParent->getBaseURI(uri);
 }
 
 

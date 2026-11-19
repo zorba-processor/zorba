@@ -286,7 +286,23 @@ void test_deep_string() { check_operation(operation("string"), DEEP); }
 void test_deep_result() { check_operation(operation("result"), DEEP); }
 
 #ifdef ZORBA_TEST_THREADS
-// A document loaded with fn:doc: the stack error names it.
+void* thread_main(void* aFn);
+
+// Runs a compiled query on a thread with a stack of aSize bytes.
+void execute_on_thread(const XQuery_t& q, Outcome& o, size_t aSize)
+{
+  std::function<void()> lFn = [&] { execute(q, o); };
+  pthread_attr_t lAttr;
+  pthread_attr_init(&lAttr);
+  pthread_attr_setstacksize(&lAttr, aSize);
+  pthread_t lThread;
+  CHECK(pthread_create(&lThread, &lAttr, thread_main, &lFn) == 0);
+  pthread_join(lThread, nullptr);
+  pthread_attr_destroy(&lAttr);
+}
+
+// A document loaded with fn:doc: the stack error names it. Serializing runs
+// on a 1 MiB stack, so that it surely runs out.
 void test_doc_uri()
 {
   char lPath[] = "/tmp/xml_depth_limit_XXXXXX";
@@ -307,7 +323,17 @@ void test_doc_uri()
     Outcome o = run("count(doc('" + lUri + "')//a)", lLevel);
     std::cout << "  O" << lLevel << ", load: " << o << std::endl;
     CHECK(o.ok);
-    o = run("string-length(serialize(doc('" + lUri + "')))", lLevel);
+    o = Outcome();
+    try
+    {
+      execute_on_thread(
+        compile("string-length(serialize(doc('" + lUri + "')))", lLevel),
+        o, 1024 * 1024);
+    }
+    catch (ZorbaException const& e)
+    {
+      caught(e, o);
+    }
     std::cout << "  O" << lLevel << ", serialize: " << o << std::endl;
     CHECK(o.code == STACK_CODE);
     CHECK(o.line == 1);
@@ -333,15 +359,8 @@ void test_second_thread()
       Outcome o;
       try
       {
-        XQuery_t q = compile(operation_query(op, LEVELS), ZORBA_OPT_LEVEL_O1);
-        std::function<void()> lFn = [&] { execute(q, o); };
-        pthread_attr_t lAttr;
-        pthread_attr_init(&lAttr);
-        pthread_attr_setstacksize(&lAttr, lSize);
-        pthread_t lThread;
-        CHECK(pthread_create(&lThread, &lAttr, thread_main, &lFn) == 0);
-        pthread_join(lThread, nullptr);
-        pthread_attr_destroy(&lAttr);
+        execute_on_thread(
+          compile(operation_query(op, LEVELS), ZORBA_OPT_LEVEL_O1), o, lSize);
       }
       catch (ZorbaException const& e)
       {
@@ -351,6 +370,32 @@ void test_second_thread()
                 << std::endl;
       CHECK(expected_outcome(op, LEVELS, o));
     }
+}
+
+// Each level declares a namespace: freeing the tree releases a chain of
+// namespace contexts as long as the tree is deep, here on a 512 KiB stack.
+void test_namespaces()
+{
+  std::string const lQuery =
+    "declare variable $n as xs:integer external := " + number(LEVELS) + ";\n"
+    "let $d := parse-xml(string-join((\n"
+    "  for $i in 1 to $n return concat('<a xmlns:p', $i, '=\"u\">'),\n"
+    "  for $i in 1 to $n return '</a>')))\n"
+    "return count($d//a)";
+  for (Zorba_opt_level_t lLevel : theLevels)
+  {
+    Outcome o;
+    try
+    {
+      execute_on_thread(compile(lQuery, lLevel), o, 512 * 1024);
+    }
+    catch (ZorbaException const& e)
+    {
+      caught(e, o);
+    }
+    std::cout << "  O" << lLevel << ": " << o << std::endl;
+    CHECK(o.ok);
+  }
 }
 
 const unsigned char PAINT = 0xA5;
@@ -419,6 +464,7 @@ void test_measure()
 #else
 void test_doc_uri() { }
 void test_second_thread() { }
+void test_namespaces() { }
 void test_measure() { }
 #endif
 
@@ -441,6 +487,7 @@ const Case theCases[] = {
   { "deep_result", test_deep_result },
   { "doc_uri", test_doc_uri },
   { "second_thread", test_second_thread },
+  { "namespaces", test_namespaces },
   { "measure", test_measure },
 };
 

@@ -283,6 +283,11 @@ protected:
     virtual void emit_node(const store::Item* item, int depth);
 
     /**
+     *  Serializes an attribute, text, comment or processing instruction node.
+     */
+    void emit_leaf_node(const store::Item* item);
+
+    /**
      *  Serializes a given text node. Also performs the processing of
      *  cdata-section-elements parameter, if set.
      */
@@ -481,6 +486,11 @@ protected:
   protected:
     virtual void emit_doctype(const zstring& elementName);
     virtual void emit_node(const store::Item* item, int depth);
+
+    /**
+     *  Serializes an attribute, text, comment or processing instruction node.
+     */
+    void emit_leaf_node(const store::Item* item);
   };
 
 

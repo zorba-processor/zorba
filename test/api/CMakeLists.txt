@@ -80,7 +80,7 @@ ENDFOREACH (_c)
 LIST (FILTER TestsToRun EXCLUDE REGEX "(^|/)xml_depth_limit\\.cpp$")
 FOREACH (_c levels deep_load deep_construct deep_copy deep_update deep_validate
          deep_equal deep_serialize deep_string deep_result doc_uri second_thread
-         measure)
+         namespaces measure)
   ZORBA_ADD_TEST("test/api/xml_depth_limit/${_c}" APITests xml_depth_limit
     ${_c})
 ENDFOREACH (_c)
