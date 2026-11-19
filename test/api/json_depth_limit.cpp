@@ -696,11 +696,13 @@ void test_chain_walkers()
     "declare %an:strictlydeterministic function local:f($x) { count($x) };\n";
   not_crashed("hash", run(std::string(IMPORT_JN) + lFunction +
                           update_chain(CHAIN) + "local:f($root)"));
+  // An XML tree as deep as the value: its node ids take memory that grows with
+  // the square of its depth (about 15 GiB for CHAIN), so a tenth of it.
   for (char const* lFormat : { "Snelson", "JsonML-array", "JsonML-object" })
   {
     o = run(
       "import module namespace jx = \"http://zorba.io/modules/json-xml\";\n" +
-      with_jn(update_chain(CHAIN) +
+      with_jn(update_chain(CHAIN / 10) +
               "count(jx:json-to-xml($root, { \"json-format\" : \"" +
               lFormat + "\" }))"));
     report(lFormat, o);
