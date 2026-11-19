@@ -299,13 +299,18 @@ void test_decode_table() {
       grand.pop_back();
     OrdPath parent;
     parent.compress( grand );
-    OrdPath after, before;
+    OrdPath after;
     OrdPath::insertAfter( parent, p, after );
-    OrdPath::insertBefore( parent, p, before );
     check_less( p, after, ( string( "decode table: insertAfter " ) + *s ).c_str() );
-    check_less( before, p, ( string( "decode table: insertBefore " ) + *s ).c_str() );
     check_valid_child( parent, after, "decode table: insertAfter" );
-    check_valid_child( parent, before, "decode table: insertBefore" );
+    // Nothing fits before the smallest component.
+    if ( d.back() > -2147483647 ) {
+      OrdPath before;
+      OrdPath::insertBefore( parent, p, before );
+      check_less( before, p,
+                  ( string( "decode table: insertBefore " ) + *s ).c_str() );
+      check_valid_child( parent, before, "decode table: insertBefore" );
+    }
     check( parent.getRelativePosition2( p ) == OrdPath::CHILD,
            "decode table: child", *s );
   }
@@ -384,15 +389,18 @@ void test_inline_boundary() {
           expected_position( ids[i], ids[j] );
         bool const less = pos == OrdPath::DESCENDANT ||
                           pos == OrdPath::FOLLOWING;
+        bool const ok_less = ( paths[i] < paths[j] ) == less;
+        bool const ok_greater = ( paths[j] > paths[i] ) == less;
+        bool const ok_equal = ( paths[i] == paths[j] ) == ( pos == OrdPath::SELF );
+        bool const ok_position = paths[i].getRelativePosition( paths[j] ) == pos;
+        if ( ok_less && ok_greater && ok_equal && ok_position )
+          continue;
         string const what = join( ids[i] ) + " vs " + join( ids[j] );
-        int const before = failures;
-        check( ( paths[i] < paths[j] ) == less, "inline boundary: <", what );
-        check( ( paths[j] > paths[i] ) == less, "inline boundary: >", what );
-        check( ( paths[i] == paths[j] ) == ( pos == OrdPath::SELF ),
-               "inline boundary: ==", what );
-        check( paths[i].getRelativePosition( paths[j] ) == pos,
-               "inline boundary: relative position", what );
-        if ( failures != before && ++reported >= 20 ) {
+        check( ok_less, "inline boundary: <", what );
+        check( ok_greater, "inline boundary: >", what );
+        check( ok_equal, "inline boundary: ==", what );
+        check( ok_position, "inline boundary: relative position", what );
+        if ( ++reported >= 20 ) {
           cerr << "  (more inline boundary failures not shown)" << endl;
           return;
         }

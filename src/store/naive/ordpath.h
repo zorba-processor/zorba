@@ -278,6 +278,23 @@ protected:
   }
 
 
+  /**
+   * The data bytes and their number, for comparing labels: a local label
+   * that uses all of its bytes keeps its flag in the lowest bit of its last
+   * byte, which is not data, so its bytes are copied to aCopy without it.
+   */
+  const unsigned char* getComparableData(
+      ulong& len,
+      unsigned char (&aCopy)[MAX_EMBEDDED_BYTE_LEN]) const
+  {
+    unsigned char* data = getDataAndLength(len);
+    if (!isLocal() || len != MAX_EMBEDDED_BYTE_LEN)
+      return data;
+    memcpy(aCopy, data, MAX_EMBEDDED_BYTE_LEN);
+    aCopy[MAX_EMBEDDED_BYTE] &= 0xFE;
+    return aCopy;
+  }
+
   unsigned char* getData() const
   {
     return (isLocal() ? getLocalData() : getRemoteData()); 
