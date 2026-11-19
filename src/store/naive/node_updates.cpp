@@ -136,10 +136,26 @@ void XmlNode::attach(InternalNode* parent, csize pos)
 
   store::StoreConsts::NodeKind nodeKind = getNodeKind();
 
-  // A node id can exceed its size limit, so every new id is computed before
-  // the subtree changes: if one throws, the subtree is left as it was.
+  XmlTree* newTree = parent->getTree();
+  XmlTree* oldTree = getTree();
+
+  // All-or-nothing: everything that can fail (a node id over its size limit,
+  // an allocation) happens before the subtree changes, and if something
+  // throws, the subtree is left as it was. Nothing after the ids are swapped
+  // in can fail.
   std::deque<OrdPath> newOrdPaths;
   std::vector<std::pair<OrdPathNode*, OrdPath*> > newOrdPathOf;
+
+  // The nodes that move to the new tree: "this", then its attributes and
+  // descendants.
+  std::vector<XmlNode*> moved;
+
+  // The hidden base-uri attributes to re-resolve (with their new value) or to
+  // remove (with no value).
+  std::vector<std::pair<AttributeNode*, store::Item_t> > baseUris;
+
+  // The moved nodes whose types newTree already has.
+  csize numTyped = 0;
 
 #ifndef TEXT_ORDPATH
   bool hasOrdPath = (nodeKind != store::StoreConsts::textNode);
@@ -147,154 +163,104 @@ void XmlNode::attach(InternalNode* parent, csize pos)
   bool hasOrdPath = true;
 #endif
 
-  if (hasOrdPath)
-  {
-    OrdPathNode* self = static_cast<OrdPathNode*>(this);
-    OrdPath oldOrdPath(self->theOrdPath);
+  std::unique_ptr<OrdPath> oldOrdPath;
 
-    try
+  try
+  {
+    if (hasOrdPath)
     {
+      OrdPathNode* self = static_cast<OrdPathNode*>(this);
+      oldOrdPath = std::make_unique<OrdPath>(self->theOrdPath);
+
       self->setOrdPath(parent, false, pos, nodeKind);
 
       if (nodeKind == store::StoreConsts::elementNode)
         computeSubtreeOrdPaths(newOrdPaths, newOrdPathOf);
     }
-    catch (...)
+
+    collectMoved(parent, moved, baseUris);
+
+    parent->theNodes.reserve(parent->theNodes.size() + 1);
+
+    for (; numTyped < moved.size(); ++numTyped)
     {
-      oldOrdPath.swap(self->theOrdPath);
-      throw;
+      store::Item_t type = moved[numTyped]->typeToMove();
+      if (type != NULL)
+        newTree->addType(moved[numTyped], type);
     }
+  }
+  catch (...)
+  {
+    for (csize i = 0; i < numTyped; ++i)
+    {
+      if (moved[i]->typeToMove() != NULL)
+        newTree->removeType(moved[i]);
+    }
+
+    if (oldOrdPath)
+      oldOrdPath->swap(static_cast<OrdPathNode*>(this)->theOrdPath);
+    throw;
   }
 
   for (csize i = 0; i < newOrdPathOf.size(); ++i)
     newOrdPathOf[i].first->theOrdPath.swap(*newOrdPathOf[i].second);
 
-  XmlTree* newTree = parent->getTree();
-  XmlTree* oldTree = getTree();
-
   oldTree->setRoot(NULL);
 
-  setTree(newTree);
+  for (csize i = 0; i < moved.size(); ++i)
+  {
+    if (moved[i]->typeToMove() != NULL)
+      oldTree->removeType(moved[i]);
+    moved[i]->setTreeInternal(newTree);
+  }
 
   theParent = parent;
 
-  switch (nodeKind)
-  {
-  case store::StoreConsts::attributeNode:
-  {
+  if (nodeKind == store::StoreConsts::attributeNode)
     reinterpret_cast<ElementNode*>(parent)->insertAttr(this, pos);
-    break;
-  }
-  case store::StoreConsts::commentNode:
-  case store::StoreConsts::piNode:
-  case store::StoreConsts::textNode:
-  {
-    parent->insertChild(this, pos);
-    break;
-  }
-  case store::StoreConsts::elementNode:
-  {
-    ElementNode* elemRoot = reinterpret_cast<ElementNode*>(this);
-
+  else
     parent->insertChild(this, pos);
 
-    std::stack<XmlNode*> nodes;
-    nodes.push(this);
+  for (csize i = 0; i < moved.size(); ++i)
+  {
+    if (moved[i]->getNodeKind() != store::StoreConsts::elementNode)
+      continue;
 
-    while (!nodes.empty())
+    ElementNode* elem = reinterpret_cast<ElementNode*>(moved[i]);
+
+    // Maintain recursiveness info: check if the current node is a descendant
+    // of another node with the same name.
+    XmlNode* ancestor = parent;
+    while (ancestor != NULL &&
+           ancestor->getNodeKind() == store::StoreConsts::elementNode)
     {
-      XmlNode* node = nodes.top();
-      nodes.pop();
-
-      if (node->getNodeKind() != store::StoreConsts::elementNode)
-        continue;
-
-      ElementNode* elem = reinterpret_cast<ElementNode*>(node);
-
-      // Maintain recursiveness info: check if the current node is a descendant
-      // of another node with the same name.
-      XmlNode* ancestor = parent;
-      while (ancestor != NULL &&
-             ancestor->getNodeKind() == store::StoreConsts::elementNode)
+      ElementNode* elemAncestor = reinterpret_cast<ElementNode*>(ancestor);
+      if (elemAncestor->theName->equals(elem->theName))
       {
-        ElementNode* elemAncestor = reinterpret_cast<ElementNode*>(ancestor);
-        if (elemAncestor->theName->equals(elem->theName))
-        {
-          elemAncestor->setRecursive();
-          break;
-        }
-
-        ancestor = ancestor->theParent;
+        elemAncestor->setRecursive();
+        break;
       }
 
-      // Attach the attributes of this node to the new tree.
-      AttributeNode* baseUriAttr = NULL;
-      AttributeNode* hiddenBaseUriAttr = NULL;
-
-      InternalNode::iterator ite = elem->attrsBegin();
-      InternalNode::iterator end = elem->attrsEnd();
-
-      for (; ite != end; ++ite)
-      {
-        AttributeNode* attr = static_cast<AttributeNode*>(*ite);
-
-        attr->setTree(newTree);
-
-        if (attr->isBaseUri())
-        {
-          if (attr->isHidden())
-            hiddenBaseUriAttr = attr;
-          else
-            baseUriAttr = attr;
-        }
-      }
-
-      // If the current node N has a local base uri property.
-      if (hiddenBaseUriAttr)
-      {
-        // If N's local base uri is due to an explicit base uri attribute, then
-        // it must be re-resolved based on the (potentially new) base uri of the
-        // parent node.
-        if (baseUriAttr)
-        {
-          zstring absuri;
-          zstring reluri;
-          parent->getBaseURI(absuri);
-          baseUriAttr->getBaseURI(reluri);
-
-          elem->adjustBaseUriProperty(hiddenBaseUriAttr, absuri, reluri);
-        }
-        // else if N does not have an explicit base uri attribute, then N was the
-        // root of the old tree, and since N is no longer a root in the new tree,
-        // its local base uri must be removed.
-        else
-        {
-          ZORBA_ASSERT(elem == elemRoot);
-          csize pos;
-          hiddenBaseUriAttr->disconnect(pos);
-          hiddenBaseUriAttr->destroy(true);
-          elem->resetHaveBaseUri();
-        }
-      }
-
-      // Attach the children of this node to the new tree.
-      ite = elem->childrenBegin();
-      end = elem->childrenEnd();
-
-      for (; ite != end; ++ite)
-      {
-        XmlNode* child = (*ite);
-        child->setTree(newTree);
-        nodes.push(child);
-      }
-    } // done traversing tree
-
-    break;
+      ancestor = ancestor->theParent;
+    }
   }
-  default:
+
+  for (csize i = 0; i < baseUris.size(); ++i)
   {
-    ZORBA_ASSERT(false);
-  }
+    AttributeNode* attr = baseUris[i].first;
+
+    if (baseUris[i].second != NULL)
+    {
+      attr->setTypedValue(baseUris[i].second);
+    }
+    else
+    {
+      ElementNode* elem = reinterpret_cast<ElementNode*>(attr->theParent);
+      csize attrPos;
+      attr->disconnect(attrPos);
+      attr->destroy(true);
+      elem->resetHaveBaseUri();
+    }
   }
 
   ulong refcount = oldTree->getRefCount();
@@ -304,6 +270,93 @@ void XmlNode::attach(InternalNode* parent, csize pos)
   SYNC_CODE(newTree->getRCLock()->acquire());
   newTree->getRefCount() += refcount;
   SYNC_CODE(newTree->getRCLock()->release());
+}
+
+
+/*******************************************************************************
+  For attach(): the nodes of the subtree rooted at "this" ("this" first) and
+  the changes to the hidden base-uri attributes of its elements once it is
+  under parent: one with an explicit xml:base is re-resolved against parent's
+  base URI; one without (only the old root has such) is removed.
+********************************************************************************/
+void XmlNode::collectMoved(
+    const InternalNode* parent,
+    std::vector<XmlNode*>& moved,
+    std::vector<std::pair<AttributeNode*, store::Item_t> >& baseUris)
+{
+  moved.push_back(this);
+
+  for (csize next = 0; next < moved.size(); ++next)
+  {
+    if (moved[next]->getNodeKind() != store::StoreConsts::elementNode)
+      continue;
+
+    ElementNode* elem = reinterpret_cast<ElementNode*>(moved[next]);
+
+    AttributeNode* baseUriAttr = NULL;
+    AttributeNode* hiddenBaseUriAttr = NULL;
+
+    InternalNode::iterator ite = elem->attrsBegin();
+    InternalNode::iterator end = elem->attrsEnd();
+
+    for (; ite != end; ++ite)
+    {
+      AttributeNode* attr = static_cast<AttributeNode*>(*ite);
+
+      moved.push_back(attr);
+
+      if (attr->isBaseUri())
+      {
+        if (attr->isHidden())
+          hiddenBaseUriAttr = attr;
+        else
+          baseUriAttr = attr;
+      }
+    }
+
+    if (hiddenBaseUriAttr)
+    {
+      store::Item_t value;
+
+      if (baseUriAttr)
+      {
+        zstring absuri;
+        zstring reluri;
+        parent->getBaseURI(absuri);
+        baseUriAttr->getBaseURI(reluri);
+        ElementNode::resolveBaseUri(absuri, reluri, value);
+      }
+      else
+      {
+        ZORBA_ASSERT(elem == this);
+      }
+
+      baseUris.push_back(std::make_pair(hiddenBaseUriAttr, value));
+    }
+
+    ite = elem->childrenBegin();
+    end = elem->childrenEnd();
+
+    for (; ite != end; ++ite)
+      moved.push_back(*ite);
+  }
+}
+
+
+/*******************************************************************************
+  For attach(): the type that must move with "this" to another tree, or NULL.
+********************************************************************************/
+store::Item_t XmlNode::typeToMove() const
+{
+  store::StoreConsts::NodeKind kind = getNodeKind();
+
+  if ((kind == store::StoreConsts::elementNode &&
+       static_cast<const ElementNode*>(this)->haveType()) ||
+      (kind == store::StoreConsts::attributeNode &&
+       static_cast<const AttributeNode*>(this)->haveType()))
+    return getType();
+
+  return NULL;
 }
 
 

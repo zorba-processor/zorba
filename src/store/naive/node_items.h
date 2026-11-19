@@ -432,6 +432,13 @@ protected:
 
   void attach(InternalNode* parent, csize pos);
 
+  void collectMoved(
+        const InternalNode* parent,
+        std::vector<XmlNode*>& moved,
+        std::vector<std::pair<AttributeNode*, store::Item_t> >& baseUris);
+
+  store::Item_t typeToMove() const;
+
   void computeSubtreeOrdPaths(
       std::deque<OrdPath>& ordPaths,
       std::vector<std::pair<OrdPathNode*, OrdPath*> >& ordPathOf) const;
@@ -1205,6 +1212,11 @@ protected:
         AttributeNode* attr,
         zstring& absUri,
         zstring& relUri);
+
+  static void resolveBaseUri(
+        zstring& absUri,
+        zstring& relUri,
+        store::Item_t& typedValue);
 
 private:
   //disable default copy constructor

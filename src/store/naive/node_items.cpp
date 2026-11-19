@@ -3714,9 +3714,22 @@ void ElementNode::adjustBaseUriProperty(
     zstring& absUri,
     zstring& relUri)
 {
+  store::Item_t typedValue;
+  resolveBaseUri(absUri, relUri, typedValue);
+  attr->setTypedValue(typedValue);
+}
+
+
+/*******************************************************************************
+  The value of a hidden base-uri attribute: relUri resolved against absUri.
+********************************************************************************/
+void ElementNode::resolveBaseUri(
+    zstring& absUri,
+    zstring& relUri,
+    store::Item_t& typedValue)
+{
   ZORBA_FATAL(!absUri.empty(), "");
 
-  store::Item_t typedValue;
   if (relUri.empty())
   {
     GET_FACTORY().createAnyURI(typedValue, absUri);
@@ -3738,8 +3751,6 @@ void ElementNode::adjustBaseUriProperty(
 
     GET_FACTORY().createAnyURI(typedValue, resolvedUriString);
   }
-
-  attr->setTypedValue(typedValue);
 }
 
 
