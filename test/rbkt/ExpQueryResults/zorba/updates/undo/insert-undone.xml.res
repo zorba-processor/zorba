@@ -1,0 +1,2 @@
+<?xml version="1.0" encoding="UTF-8"?>
+XUDY0021 &lt;a xml:base="http://example.com/x/" k="0"&gt;&lt;b/&gt;t&lt;/a&gt; 2 http://example.com/x/ &lt;c xml:base="s/" k="1"&gt;&lt;d&gt;e&lt;/d&gt;&lt;/c&gt; true
