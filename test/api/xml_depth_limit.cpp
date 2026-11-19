@@ -236,6 +236,31 @@ bool expected_outcome(const Operation& op, uint64_t n, const Outcome& o)
   return true;
 }
 
+#ifdef ZORBA_TEST_THREADS
+void execute_on_thread(const XQuery_t& q, Outcome& o, size_t aSize);
+#endif
+
+// Runs a query on a stack of the size of a usual main thread (8 MiB): ctest
+// raises the main thread's limit on macOS (to 64 MiB), where a walk would go
+// on for much longer before it runs out.
+Outcome run_on_usual_stack(const std::string& aQuery, Zorba_opt_level_t aLevel)
+{
+#ifdef ZORBA_TEST_THREADS
+  Outcome o;
+  try
+  {
+    execute_on_thread(compile(aQuery, aLevel), o, 8u * 1024 * 1024);
+  }
+  catch (ZorbaException const& e)
+  {
+    caught(e, o);
+  }
+  return o;
+#else
+  return run(aQuery, aLevel);
+#endif
+}
+
 // Each operation, at each optimization level: the expected outcome, and the
 // same one (value or error) at every level.
 void check_operation(const Operation& op, uint64_t n)
@@ -244,7 +269,7 @@ void check_operation(const Operation& op, uint64_t n)
   bool lFirstOk = false;
   for (Zorba_opt_level_t lLevel : theLevels)
   {
-    Outcome const o = run(operation_query(op, n), lLevel);
+    Outcome const o = run_on_usual_stack(operation_query(op, n), lLevel);
     std::cout << "  " << n << " levels, O" << static_cast<int>(lLevel) << ", " << op.name
               << ": " << o << std::endl;
     CHECK(expected_outcome(op, n, o));
@@ -454,10 +479,19 @@ void test_measure()
   for (Operation const& op : theOperations)
   {
     Outcome lSmallOutcome, lLargeOutcome;
-    XQuery_t const lSmallQuery =
-      compile(operation_query(op, lSmall), ZORBA_OPT_LEVEL_O1);
-    XQuery_t const lLargeQuery =
-      compile(operation_query(op, LEVELS), ZORBA_OPT_LEVEL_O1);
+    XQuery_t lSmallQuery, lLargeQuery;
+    try
+    {
+      lSmallQuery = compile(operation_query(op, lSmall), ZORBA_OPT_LEVEL_O1);
+      lLargeQuery = compile(operation_query(op, LEVELS), ZORBA_OPT_LEVEL_O1);
+    }
+    catch (ZorbaException const& e)
+    {
+      caught(e, lLargeOutcome);
+      std::cout << "  stack: " << op.name << ": " << lLargeOutcome << std::endl;
+      CHECK(not_in_build(lLargeOutcome));
+      continue;
+    }
     size_t const lSmallUsed = measure_stack([&] {
       execute(lSmallQuery, lSmallOutcome); });
     size_t const lLargeUsed = measure_stack([&] {

@@ -928,18 +928,12 @@ void XmlNode::destroyInternal(bool removeType)
 #ifndef EMBEDED_TYPE
     if (removeType)
     {
-      if (kind == store::StoreConsts::elementNode)
-      {
-        ElementNode* elem = static_cast<ElementNode*>(node);
-        if (elem->haveType())
-          node->getTree()->removeType(node);
-      }
-      else if (kind == store::StoreConsts::attributeNode)
-      {
-        AttributeNode* attr = static_cast<AttributeNode*>(node);
-        if (attr->haveType())
-          node->getTree()->removeType(node);
-      }
+      // The flag that ElementNode::haveType() and AttributeNode::haveType()
+      // read.
+      if ((kind == store::StoreConsts::elementNode ||
+           kind == store::StoreConsts::attributeNode) &&
+          (node->theFlags & HaveType) != 0)
+        node->getTree()->removeType(node);
     }
 #endif
 
