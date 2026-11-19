@@ -1,4 +1,4 @@
-(: As v03, with the counting query two evals deep: each eval query inherits that the query running it hoists nothing, so the innermost count reads the nodes per tuple. :)
+(: As v03, with the counting query two evals deep: the window reads the eval's result before the first window, so every count is taken before the inserts. :)
 import module namespace r = "http://zorba.io/modules/reflection";
 declare namespace an = "http://zorba.io/annotations";
 declare variable $d := <a/>;

@@ -209,8 +209,10 @@ void check_foreign_function_item(Zorba* z, const std::string& aPath,
       aPath);
   };
 
-  check(aKind + " function item of another query, query without side effects",
-        run("$g(\"" + aPath + "\", 2)"), true);
+  // A call through a variable can run a side effect (the function item could be
+  // sequential), so the query that makes it runs one too: no lazy read.
+  check(aKind + " function item of another query, query with only the call",
+        run("$g(\"" + aPath + "\", 2)"), false);
   check(aKind + " function item of another query, query with a side effect",
         run(never_writes(aPath) + "$g(\"" + aPath + "\", 2)"), false);
 }

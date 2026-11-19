@@ -1,4 +1,4 @@
-(: The query compiled by eval has no call that can have a side effect, but the query that runs it inserts nodes through a function item while a window clause consumes the result lazily: the eval query hoists nothing either, and its count reads the nodes per tuple. :)
+(: The query compiled by eval has no call that can have a side effect, but the query that runs it inserts nodes through a function item: the window reads the eval's result before the first window, since the query running it can run a side effect, so every count is taken before the inserts. :)
 import module namespace r = "http://zorba.io/modules/reflection";
 declare namespace an = "http://zorba.io/annotations";
 declare variable $d := <a/>;
