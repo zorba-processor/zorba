@@ -1,0 +1,2 @@
+# Results must not depend on the optimization level.
+nodeid-inline-boundary$

@@ -18,8 +18,10 @@
 #define ZORBA_SIMPLE_STORE_NODE_ITEMS
 
 #include <cassert>
+#include <deque>
 #include <memory>
 #include <stack>
+#include <utility>
 #include <vector>
 
 #include <store/api/item.h>
@@ -83,6 +85,7 @@ class DocumentNode;
 class ElementNode;
 class GuideNode;
 class InternalNode;
+class LabeledNode;
 class NsBindingsContext;
 class PiNode;
 class TextNode;
@@ -453,6 +456,10 @@ protected:
   virtual void getBaseURIInternal(zstring& uri, bool& local) const;
 
   void attach(InternalNode* parent, csize pos);
+
+  void computeSubtreeLabels(
+      std::deque<NodeLabel>& labels,
+      std::vector<std::pair<LabeledNode*, NodeLabel*> >& labelOf) const;
 
   void setRecursiveForSharedSubtree(InternalNode* parent) const;
 

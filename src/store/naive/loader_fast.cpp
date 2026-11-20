@@ -196,7 +196,23 @@ bool XmlLoader::reportParserLimit(ZORBA_XML_ERROR_PTR aError)
     parser_limit(aError, theParserSecurity.policy());
   if (!lLimit)
     return false;
-  reportLimit(aError->file, aError->line, aError->int2 /* column */, *lLimit);
+  char const* lUri = aError->file;
+  int lLine = aError->line;
+  int lColumn = aError->int2;
+  // Inside an entity, the position is in its replacement text: report where
+  // the document is.
+  xmlParserCtxtPtr const lCtxt = static_cast<xmlParserCtxtPtr>(aError->ctxt);
+  if (lCtxt != NULL && lCtxt->inputNr > 1)
+  {
+    xmlParserInputPtr const lDocInput = lCtxt->inputTab[0];
+    lUri = theDocUri.empty() ? lDocInput->filename : theDocUri.c_str();
+    lLine = lDocInput->line;
+    lColumn = lDocInput->col;
+  }
+  if (lUri == NULL || *lUri == '\0')
+    lUri = theDocUri.c_str();
+
+  reportLimit(lUri, lLine, lColumn, *lLimit);
   return true;
 }
 

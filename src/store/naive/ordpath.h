@@ -19,6 +19,7 @@
 
 #include <cassert>
 #include <cstring>
+#include <utility>
 #include <vector>
 
 #include <zorba/config.h>
@@ -196,6 +197,8 @@ public:
   OrdPath& operator=(const OrdPath& other);
   OrdPath& operator=(const OrdPathStack& ops);
 
+  void swap(OrdPath& other) noexcept { std::swap(theBuffer, other.theBuffer); }
+
   bool operator==(const OrdPath& other) const;
   int operator<(const OrdPath& other) const;
   int operator>(const OrdPath& other) const;
@@ -274,6 +277,23 @@ protected:
     }
   }
 
+
+  /**
+   * The data bytes and their number, for comparing labels: a local label
+   * that uses all of its bytes keeps its flag in the lowest bit of its last
+   * byte, which is not data, so its bytes are copied to aCopy without it.
+   */
+  const unsigned char* getComparableData(
+      ulong& len,
+      unsigned char (&aCopy)[MAX_EMBEDDED_BYTE_LEN]) const
+  {
+    unsigned char* data = getDataAndLength(len);
+    if (!isLocal() || len != MAX_EMBEDDED_BYTE_LEN)
+      return data;
+    memcpy(aCopy, data, MAX_EMBEDDED_BYTE_LEN);
+    aCopy[MAX_EMBEDDED_BYTE] &= 0xFE;
+    return aCopy;
+  }
 
   unsigned char* getData() const
   {
