@@ -6322,15 +6322,22 @@ int yyFlexLexer::yy_get_next_buffer()
 			if ( b->yy_is_our_buffer ) {
 				int new_size = b->yy_buf_size * 2;
 
+				int yy_old_buf_size = b->yy_buf_size;
+				char *yy_new_ch_buf;
 				if ( new_size <= 0 ) {
 					b->yy_buf_size += b->yy_buf_size / 8;
 				} else {
 					b->yy_buf_size *= 2;
 				}
-				b->yy_ch_buf = (char *)
+				yy_new_ch_buf = (char *)
 					/* Include room in for 2 EOB chars. */
 					yyrealloc( (void *) b->yy_ch_buf,
 							 (yy_size_t) (b->yy_buf_size + 2)  );
+				if ( ! yy_new_ch_buf ) {
+					b->yy_buf_size = yy_old_buf_size;
+					YY_FATAL_ERROR( "out of dynamic memory in yy_get_next_buffer()" );
+				}
+				b->yy_ch_buf = yy_new_ch_buf;
 			} else {
 				/* Can't grow it, we don't own it. */
 				b->yy_ch_buf = NULL;
@@ -6371,11 +6378,12 @@ int yyFlexLexer::yy_get_next_buffer()
 	if (((yy_n_chars) + number_to_move) > YY_CURRENT_BUFFER_LVALUE->yy_buf_size) {
 		/* Extend the array by 50%, plus the number we really need. */
 		int new_size = (yy_n_chars) + number_to_move + ((yy_n_chars) >> 1) + 2;
-		YY_CURRENT_BUFFER_LVALUE->yy_ch_buf = (char *) yyrealloc(
+		char *yy_new_ch_buf = (char *) yyrealloc(
 			(void *) YY_CURRENT_BUFFER_LVALUE->yy_ch_buf, (yy_size_t) new_size  );
-		if ( ! YY_CURRENT_BUFFER_LVALUE->yy_ch_buf ) {
+		if ( ! yy_new_ch_buf ) {
 			YY_FATAL_ERROR( "out of dynamic memory in yy_get_next_buffer()" );
 		}
+		YY_CURRENT_BUFFER_LVALUE->yy_ch_buf = yy_new_ch_buf;
 		/* "- 2" to take care of EOB's */
 		YY_CURRENT_BUFFER_LVALUE->yy_buf_size = (int) (new_size - 2);
 	}
@@ -6728,6 +6736,7 @@ yybuffer yyFlexLexer::yy_create_buffer( std::istream& file, int size )
 	 */
 	b->yy_ch_buf = (char *) yyalloc( (yy_size_t) (b->yy_buf_size + 2)  );
 	if ( b->yy_ch_buf == NULL ) {
+		yyfree( (void *) b );
 		YY_FATAL_ERROR( "out of dynamic memory in yy_create_buffer()" );
 	}
 	b->yy_is_our_buffer = 1;
@@ -6935,14 +6944,16 @@ void yyFlexLexer::yyensure_buffer_stack(void)
 		/* Increase the buffer to prepare for a possible push. */
 		yy_size_t grow_size = 8 /* arbitrary grow size */;
 
+		struct yy_buffer_state** yy_new_buffer_stack;
 		num_to_alloc = (yy_buffer_stack_max) + grow_size;
-		(yy_buffer_stack) = (struct yy_buffer_state**)yyrealloc
+		yy_new_buffer_stack = (struct yy_buffer_state**)yyrealloc
 								((yy_buffer_stack),
 								num_to_alloc * sizeof(struct yy_buffer_state*)
 								);
-		if ((yy_buffer_stack) == NULL) {
+		if (yy_new_buffer_stack == NULL) {
 			YY_FATAL_ERROR( "out of dynamic memory in yyensure_buffer_stack()" );
 		}
+		(yy_buffer_stack) = yy_new_buffer_stack;
 		/* zero only the new slots.*/
 		memset((yy_buffer_stack) + (yy_buffer_stack_max), 0, grow_size * sizeof(struct yy_buffer_state*));
 		(yy_buffer_stack_max) = num_to_alloc;
@@ -6954,20 +6965,22 @@ void yyFlexLexer::yy_push_state( int _new_state )
 {
 		if ( (yy_start_stack_ptr) >= (yy_start_stack_depth) ) {
 		yy_size_t new_size;
+		int *yy_new_start_stack;
 
-		(yy_start_stack_depth) += YY_START_STACK_INCR;
-		new_size = (yy_size_t) (yy_start_stack_depth) * sizeof( int );
+		new_size = (yy_size_t) ((yy_start_stack_depth) + YY_START_STACK_INCR) * sizeof( int );
 
 		if ( ! (yy_start_stack) ) {
-			(yy_start_stack) = (int *) yyalloc( new_size  );
+			yy_new_start_stack = (int *) yyalloc( new_size  );
 
 		} else {
-			(yy_start_stack) = (int *) yyrealloc(
+			yy_new_start_stack = (int *) yyrealloc(
 					(void *) (yy_start_stack), new_size  );
 		}
-		if ( ! (yy_start_stack) ) {
+		if ( ! yy_new_start_stack ) {
 			YY_FATAL_ERROR( "out of memory expanding start-condition stack" );
 		}
+		(yy_start_stack) = yy_new_start_stack;
+		(yy_start_stack_depth) += YY_START_STACK_INCR;
 	}
 	(yy_start_stack)[(yy_start_stack_ptr)++] = YY_START;
 
