@@ -245,16 +245,7 @@ void SchemaValidatorFilter::processStartElement()
                                                    atUriId);
   }
 
-  bool isProcessorStipulatedTypeName = false;
-  if( theProcessorStipulatedTypeName && isRoot )
-  {
-    isProcessorStipulatedTypeName = true;
-
-    ((XercSchemaValidator*)fValidator)->
-                setXsiType(XMLUni::fgZeroLenString,
-                           theProcessorStipulatedTypeName,
-                           theProcessorStipulatedTypeUriId);
-  }
+  const bool isProcessorStipulatedTypeName = theProcessorStipulatedTypeName && isRoot;
 
   //if schema, check if we should lax or skip the validation of this element
   bool parentValidation = fValidate;
@@ -344,8 +335,12 @@ void SchemaValidatorFilter::processStartElement()
   {
     if (isProcessorStipulatedTypeName)
     {
+      const XERCES_CPP_NAMESPACE::QName stipulatedType(XMLUni::fgZeroLenString,
+                                                       theProcessorStipulatedTypeName,
+                                                       theProcessorStipulatedTypeUriId,
+                                                       fMemoryManager);
       ((XercSchemaValidator*)fValidator)->
-      validateProcessorStipulatedTypeName(elemDecl);
+      validateProcessorStipulatedTypeName(elemDecl, stipulatedType);
     }
     else
     {
@@ -1021,7 +1016,15 @@ const XMLCh* SchemaValidatorFilter::getTypeUri()
   {
     if (theProcessorStipulatedTypeName && theParentStack == 0)
     {
-      typeURI = fURIStringPool->getValueForId(theProcessorStipulatedTypeUriId);
+      // the root has no declaration: its type is the governing type of validate type
+      ComplexTypeInfo* rootTypeInfo = ((XercSchemaValidator*)fValidator)->getCurrentTypeInfo();
+      DatatypeValidator* rootDV = ((XercSchemaValidator*)fValidator)->getCurrentDatatypeValidator();
+      if (rootTypeInfo)
+        typeURI = rootTypeInfo->getTypeUri();
+      else if (rootDV)
+        typeURI = rootDV->getTypeUri();
+      else
+        typeURI = fURIStringPool->getValueForId(theProcessorStipulatedTypeUriId);
     }
     else
     {
@@ -1064,7 +1067,15 @@ const XMLCh* SchemaValidatorFilter::getTypeName()
     //cout << "  - getTypeQName: theElemDepth:" << theElemDepth << "\n";
     if (theProcessorStipulatedTypeName && theElemDepth == 0 )
     {
-      typeName = theProcessorStipulatedTypeName;
+      // the root has no declaration: its type is the governing type of validate type
+      ComplexTypeInfo* rootTypeInfo = ((XercSchemaValidator*)fValidator)->getCurrentTypeInfo();
+      DatatypeValidator* rootDV = ((XercSchemaValidator*)fValidator)->getCurrentDatatypeValidator();
+      if (rootTypeInfo)
+        typeName = rootTypeInfo->getTypeLocalName();
+      else if (rootDV)
+        typeName = rootDV->getTypeLocalName();
+      else
+        typeName = theProcessorStipulatedTypeName;
     }
     else
     {

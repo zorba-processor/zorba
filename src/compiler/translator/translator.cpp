@@ -2387,6 +2387,12 @@ void* import_schema(
     return no_state;
   }
 
+  // The location hints of an already loaded namespace are disregarded, so
+  // they are not resolved either.
+  Schema* loadedSchema = theSctx->get_typemanager()->getSchema();
+  if (loadedSchema != NULL && loadedSchema->isNamespaceLoaded(targetNS.c_str()))
+    return no_state;
+
   store::Item_t targetNSItem = NULL;
   zstring tmp = targetNS;
   ITEM_FACTORY->createAnyURI(targetNSItem, tmp);
@@ -13510,6 +13516,19 @@ void generate_inline_function(
   function_item_expr* fiExpr = dynamic_cast<function_item_expr*>(theNodeStack.top());
   assert(fiExpr != NULL);
   fiExpr->set_function(udf.get(), udf->numArgs());
+
+  // A captured variable is evaluated when the function item is created, so
+  // only the variables the body reads or assigns are captured.
+  FunctionItemInfo* fiInfo = fiExpr->get_fi_info();
+
+  for (csize i = fiInfo->numInScopeVars(); i-- > 0; )
+  {
+    var_expr* substVar = fiInfo->theInScopeVars[i];
+
+    if (substVar->get_num_refs() == 0 &&
+        expr_tools::count_variable_uses(body, substVar, 1, NULL) == 0)
+      fiInfo->remove_variable(i);
+  }
 
   if (theCCB->theConfig.translate_cb != NULL)
     theCCB->theConfig.translate_cb(udf->getBody(),
