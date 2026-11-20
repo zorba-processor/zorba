@@ -272,6 +272,14 @@ protected:
 
   void* getElementNode();
 
+  // Adds an error raised while building the tree. A node id over its byte
+  // limit (err:XPDY0130) is reported with reportLimit(), naming the node
+  // nesting depth reached, with where in the input it was reached.
+  void addBuildError(ZorbaException const& e);
+
+  // The line and column in the input of the node being built.
+  virtual void dataPosition(int& aLine, int& aColumn);
+
 public:
   // startElement() failed before the element reached the node stack: nothing
   // else will destroy it. Its attributes not made yet are dropped first. Also
@@ -366,6 +374,8 @@ protected:
 
   void replay(FragmentEvent const &ev);
 
+  void dataPosition(int& aLine, int& aColumn) override;
+
   static FragmentIStream* streamOf(void* ctx);
 
   static void recordOutOfMemory(void* ctx) noexcept;
@@ -416,6 +426,8 @@ protected:
 
 protected:
   FragmentIStream* theFragmentStream;
+  int theEventLine = 0;
+  int theEventColumn = 0;
 };
 
 /*******************************************************************************

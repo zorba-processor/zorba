@@ -478,7 +478,7 @@ void test_collection()
   }
 }
 
-// XML conversions: the XML has limits of its own (zerr:ZSTR0030), a clean
+// XML conversions: the XML has limits of its own (err:XPDY0130), a clean
 // error like any other here.
 void test_json_xml()
 {

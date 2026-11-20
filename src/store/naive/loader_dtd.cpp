@@ -23,6 +23,7 @@
 #include <libxml/parserInternals.h>
 #include <libxml/uri.h>
 #include <libxml/SAX2.h>
+#include <algorithm>
 #include <cstring>
 #include <memory>
 #include <utility>
@@ -257,6 +258,18 @@ inline void remove_insertion(int &column, int at, int length) {
 }
 
 /**
+ * Moves \a column, on line \a line, to its column in the input.
+ */
+void remove_insertions(FragmentInsertions const &ins, int line, int &column) {
+  if (line == ins.wrapper_line)
+    remove_insertion(column, ins.wrapper_column,
+                     static_cast<int>(sizeof(FRAGMENT_WRAPPER_START) - 1));
+  if (line == 1 && ins.version)
+    remove_insertion(column, static_cast<int>(sizeof(XML_DECL_START)),
+                     static_cast<int>(sizeof(VERSION_INFO) - 1));
+}
+
+/**
  * Whether libxml2 locates the current error in the input rather than in an
  * external entity; it locates an internal entity's error at its reference.
  */
@@ -287,12 +300,7 @@ void locate_in_input(FragmentIStream const &fs, xmlError &e,
     e.line = ins.end_line;
     e.int2 = ins.end_column;
   }
-  if (e.line == ins.wrapper_line)
-    remove_insertion(e.int2, ins.wrapper_column,
-                     static_cast<int>(sizeof(FRAGMENT_WRAPPER_START) - 1));
-  if (e.line == 1 && ins.version)
-    remove_insertion(e.int2, static_cast<int>(sizeof(XML_DECL_START)),
-                     static_cast<int>(sizeof(VERSION_INFO) - 1));
+  remove_insertions(ins, e.line, e.int2);
 
   if (e.code != XML_ERR_TAG_NAME_MISMATCH)
     return;
@@ -496,6 +504,8 @@ void FragmentXmlLoader::replay(FragmentEvent const &ev)
 {
   FragmentIStream &fs = *theFragmentStream;
   int const skip = fs.root_elements_to_skip;
+  theEventLine = ev.line;
+  theEventColumn = ev.column;
 
   switch (ev.kind)
   {
@@ -583,6 +593,13 @@ void FragmentXmlLoader::replay(FragmentEvent const &ev)
                                            xml_str(ev.text));
     break;
   }
+}
+
+
+void FragmentXmlLoader::dataPosition(int& aLine, int& aColumn)
+{
+  aLine = theEventLine;
+  aColumn = theEventColumn;
 }
 
 
@@ -708,6 +725,15 @@ FragmentIStream* FragmentXmlLoader::streamOf(void *ctx)
 }
 
 
+// Where in the input the parser is, without what the wrapper added.
+static void stamp(void *ctx, FragmentIStream const &fs, FragmentEvent &ev)
+{
+  ev.line = xmlSAX2GetLineNumber(ctx);
+  ev.column = xmlSAX2GetColumnNumber(ctx);
+  remove_insertions(fs.insertions, ev.line, ev.column);
+}
+
+
 // Nothing may leave these callbacks: libxml2 is C code.
 void FragmentXmlLoader::recordOutOfMemory(void *ctx) noexcept
 {
@@ -759,6 +785,7 @@ try
     ev.attributes.push_back(attr);
   }
   ev.nb_defaulted = nb_defaulted;
+  stamp(ctx, fs, ev);
   fs.events.push_back(std::move(ev));
 }
 catch (std::bad_alloc const&)
@@ -785,6 +812,7 @@ try
   ev.prefix = to_string(prefix);
   ev.has_uri = URI != NULL;
   ev.uri = to_string(URI);
+  stamp(ctx, fs, ev);
   fs.events.push_back(std::move(ev));
 }
 catch (std::bad_alloc const&)
@@ -813,6 +841,7 @@ try
   FragmentEvent ev;
   ev.kind = kind;
   ev.text.assign(reinterpret_cast<char const*>(text), len);
+  stamp(ctx, fs, ev);
   fs.events.push_back(std::move(ev));
 }
 catch (std::bad_alloc const&)
@@ -849,7 +878,9 @@ try
   FragmentEvent ev;
   ev.kind = FragmentEvent::COMMENT;
   ev.text = to_string(value);
-  streamOf(ctx)->events.push_back(std::move(ev));
+  FragmentIStream &fs = *streamOf(ctx);
+  stamp(ctx, fs, ev);
+  fs.events.push_back(std::move(ev));
 }
 catch (std::bad_alloc const&)
 {
@@ -869,7 +900,9 @@ try
   ev.kind = FragmentEvent::PI;
   ev.name = to_string(target);
   ev.text = to_string(data);
-  streamOf(ctx)->events.push_back(std::move(ev));
+  FragmentIStream &fs = *streamOf(ctx);
+  stamp(ctx, fs, ev);
+  fs.events.push_back(std::move(ev));
 }
 catch (std::bad_alloc const&)
 {
