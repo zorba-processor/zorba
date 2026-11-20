@@ -285,7 +285,9 @@ bool InsertIterator::nextImpl(store::Item_t& result, PlanState& aPlanState) cons
       for (ulong i = 0; i < numAttrs; ++i)
         attrs[i] = attrs[i]->copy(NULL, lCopyMode);
 
-      pul->addInsertAttributes(&loc, target, attrs);
+      // The PUL takes the target it is given; the other nodes need it too.
+      store::Item_t attrTarget(target);
+      pul->addInsertAttributes(&loc, attrTarget, attrs);
     }
 
     if (numNodes > 0)
