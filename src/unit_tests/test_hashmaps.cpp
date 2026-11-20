@@ -2,6 +2,8 @@
 #include <cstdlib>
 #include <stdio.h>
 #include <iostream>
+#include <new>
+#include <utility>
 
 #include "zorbautils/hashmap.h"
 #include "util/hashmap32.h"
@@ -245,6 +247,104 @@ int test_hashmaps(int argc, char* argv[])
   delete [] str_buf;
 
   return 0;
+}
+
+
+// A key whose next copy assignment fails, as a zstring copy can when it
+// allocates.
+struct FailingKey
+{
+  static bool theFailNextCopy;
+
+  int theId;
+
+  FailingKey() : theId(0) {}
+  explicit FailingKey(int id) : theId(id) {}
+  FailingKey(const FailingKey&) = default;
+
+  FailingKey& operator=(const FailingKey& other)
+  {
+    if (theFailNextCopy)
+    {
+      theFailNextCopy = false;
+      throw std::bad_alloc();
+    }
+    theId = other.theId;
+    return *this;
+  }
+};
+
+bool FailingKey::theFailNextCopy = false;
+
+
+// One bucket for all keys: the second key inserted is a collision entry.
+class FailingKeyCompFunc
+{
+public:
+  static bool equal(const FailingKey& k1, const FailingKey& k2)
+  {
+    return k1.theId == k2.theId;
+  }
+
+  static uint32_t hash(const FailingKey&)
+  {
+    return 0;
+  }
+};
+
+
+typedef HashMap<FailingKey, int, FailingKeyCompFunc> FailingKeyMap;
+
+
+// Insert key with a failing key copy through the given overload; the map
+// must be left as it was: no entry counted, the key insertable afterwards.
+static bool insert_fails_cleanly(FailingKeyMap& map, int key, bool pairOverload)
+{
+  csize const sizeBefore = map.size();
+  int value = key;
+  FailingKey::theFailNextCopy = true;
+  try
+  {
+    if (pairOverload)
+      (void)map.insert(std::pair<const FailingKey, int>(FailingKey(key), value));
+    else
+      (void)map.insert(FailingKey(key), value);
+    std::cerr << "insert of key " << key << " did not fail" << std::endl;
+    return false;
+  }
+  catch (std::bad_alloc const&)
+  {
+  }
+  FailingKey::theFailNextCopy = false;
+
+  if (map.size() != sizeBefore)
+  {
+    std::cerr << "failed insert of key " << key << " left " << map.size()
+              << " entries instead of " << sizeBefore << std::endl;
+    return false;
+  }
+
+  if (!map.insert(FailingKey(key), value) || map.size() != sizeBefore + 1)
+  {
+    std::cerr << "key " << key << " not insertable after a failed insert"
+              << std::endl;
+    return false;
+  }
+  return true;
+}
+
+
+int test_hashmap_insert_rollback(int, char*[])
+{
+  bool ok = true;
+  for (int pairOverload = 0; pairOverload < 2; ++pairOverload)
+  {
+    FailingKeyMap map(8, false);
+    // An empty bucket, then a collision entry in the same bucket.
+    ok = insert_fails_cleanly(map, 1, pairOverload) && ok;
+    ok = insert_fails_cleanly(map, 2, pairOverload) && ok;
+  }
+  return ok ? 0 : 1;
 }
 
 
