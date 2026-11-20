@@ -1,4 +1,4 @@
-(: Control: a read in an earlier let of a loop with a direct call. The order of a direct sequential call is a known bug, fixed separately; the expected result records it. :)
+(: A read in an earlier let of a loop with a direct call: each tuple reads the state of its iteration (as d41). :)
 declare namespace an = "http://zorba.io/annotations";
 declare %an:assignable variable $g := 0;
 declare %an:sequential function local:bump() { $g := $g + 1; $g };
