@@ -711,6 +711,7 @@ store::Item* XmlNode::copy(
       }
 
       new ConnectorNode(parent->getTree(), parent, this);
+      setRecursiveForSharedSubtree(parent);
       return const_cast<XmlNode*>(this);
     }
 
@@ -733,6 +734,60 @@ store::Item* XmlNode::copy(
   else
   {
     return const_cast<XmlNode*>(this);
+  }
+}
+
+
+/*******************************************************************************
+  "this" was just placed, without a copy, under the given parent. Mark as
+  recursive (having a descendant of the same name) each element ancestor of
+  the parent that a copy would have made recursive. Only the names of "this"
+  and of its own children are known here, so when "this" has element
+  children, every element ancestor is marked: a recursive flag that is not
+  needed costs only a fuller descendant scan.
+********************************************************************************/
+void XmlNode::setRecursiveForSharedSubtree(InternalNode* parent) const
+{
+  if (getNodeKind() != store::StoreConsts::elementNode)
+    return;
+
+  const ElementNode* elem = static_cast<const ElementNode*>(this);
+
+  if (elem->getTree()->isRecursive())
+    parent->getTree()->setRecursive();
+
+  bool haveElementChildren = false;
+
+  InternalNode::const_iterator ite = elem->childrenBegin();
+  InternalNode::const_iterator end = elem->childrenEnd();
+
+  for (; ite != end; ++ite)
+  {
+    if ((*ite)->getNodeKind() == store::StoreConsts::elementNode)
+    {
+      haveElementChildren = true;
+      break;
+    }
+  }
+
+  XmlNode* ancestor = parent;
+
+  while (ancestor != NULL &&
+         ancestor->getNodeKind() == store::StoreConsts::elementNode)
+  {
+    ElementNode* elemAncestor = static_cast<ElementNode*>(ancestor);
+
+    if (haveElementChildren)
+    {
+      elemAncestor->setRecursive();
+    }
+    else if (elemAncestor->getNodeName()->equals(elem->getNodeName()))
+    {
+      elemAncestor->setRecursive();
+      break;
+    }
+
+    ancestor = ancestor->theParent;
   }
 }
 
