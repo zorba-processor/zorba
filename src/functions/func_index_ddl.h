@@ -175,8 +175,8 @@ public:
       ....
       $keyN as xs:anyAtomicItem?) as node()*
 
-  Note: the translator wraps calls to this function with an OP_NODE_SORT_ASC
-  function.
+  Note: the result is a set of distinct domain nodes in no particular order;
+  the translator does not sort it.
 ********************************************************************************/
 class fn_zorba_ddl_probe_index_point_value : public function
 {
@@ -206,8 +206,8 @@ public:
       ....
       $keyN as xs:anyAtomicItem?) as node()*
 
-  Note: the translator wraps calls to this function with an OP_NODE_SORT_ASC
-  function.
+  Note: the result is a set of distinct domain nodes in no particular order;
+  the translator does not sort it.
 ********************************************************************************/
 class fn_zorba_ddl_probe_index_point_value_skip : public function
 {
@@ -234,8 +234,8 @@ public:
       $indexName as xs:QName,
       $keys      as xs:anyAtomicItem*) as node()*
 
-  Note: the translator wraps calls to this function with an OP_NODE_SORT_DISTINCT_ASC
-  function.
+  Note: the translator wraps calls to this function with an
+  OP_SORT_DISTINCT_NODES_ASC_1 function.
 ********************************************************************************/
 class fn_zorba_ddl_probe_index_point_general : public function
 {
@@ -263,8 +263,8 @@ public:
       $upperBoundIncluded1 as xs:boolean,
       ....) as node()*
 
-  Note: the translator wraps calls to this function with an OP_NODE_SORT_ASC
-  function.
+  Note: the result is a set of distinct domain nodes in no particular order;
+  the translator does not sort it.
 ********************************************************************************/
 class fn_zorba_ddl_probe_index_range_value : public function
 {
@@ -292,8 +292,8 @@ public:
       $skip as xs:integer,
       ....) as node()*
 
-  Note: the translator wraps calls to this function with an OP_NODE_SORT_ASC
-  function.
+  Note: the result is a set of distinct domain nodes in no particular order;
+  the translator does not sort it.
 ********************************************************************************/
 class fn_zorba_ddl_probe_index_range_value_skip : public function
 {
@@ -325,8 +325,8 @@ public:
       $lowerBoundIncluded  as xs:boolean,
       $upperBoundIncluded  as xs:boolean) as node()*
 
-  Note: the translator wraps calls to this function with an OP_NODE_SORT_DISTINCT_ASC
-  function.
+  Note: the translator wraps calls to this function with an
+  OP_SORT_DISTINCT_NODES_ASC_1 function.
 ********************************************************************************/
 class fn_zorba_ddl_probe_index_range_general : public function
 {
