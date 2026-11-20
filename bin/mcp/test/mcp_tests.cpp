@@ -70,6 +70,8 @@
 
 #include <libxml/xmlversion.h>
 
+#include <zorba/serializer.h>
+#include <zorba/singleton_item_sequence.h>
 #include <zorba/external_module.h>
 #include <zorba/function.h>
 #include <zorba/item_sequence.h>
@@ -3682,6 +3684,21 @@ void test_sweep_compile( Fixture const &f ) {
   (void)f;
 #endif
 }
+// A token longer than the scanner's input buffer (16 KB): the scanner grows the
+// buffer, and a failed growth is memory_limit like any other allocation.
+void test_sweep_long_token( Fixture const &f ) {
+#if defined(__linux__)
+  Sweep s;
+  s.query = "string-length(\"" + std::string( 20000, 'a' ) + "\")";
+  s.before.push_back( s.query );
+  s.expected = "20000";
+  s.points = 100000;                // all of them
+  s.compiles = true;
+  exhaust_sweep( f, "token longer than the scanner buffer", s );
+#else
+  (void)f;
+#endif
+}
 // The text of a query is read whole, or the call fails: a cut text is not
 // compiled. Every prefix of this query is a valid query with another answer
 // ("1.000…" is 1, without " eq 1" it is not true), so a cut where the copy of the
@@ -4216,6 +4233,63 @@ void test_json_loader_out_of_memory( Fixture const &f ) {
 # if defined(__SANITIZE_ADDRESS__)
   check( __lsan_do_recoverable_leak_check() == 0,
          "jn:parse-json: a failed parse leaks nothing" );
+# endif
+#else
+  (void)f;
+#endif
+}
+// The serializer with each allocation failing in turn, over an element 12 deep:
+// past the 8 children iterators the emitter makes first, so its pool of them
+// grows. The whole text or an error; then, in an AddressSanitizer build,
+// nothing is left unreachable.
+void test_serializer_out_of_memory( Fixture const &f ) {
+#if defined(__linux__)
+  std::string open, close;
+  for ( int i = 0; i < 12; ++i ) {
+    open += "<e" + std::to_string( i ) + ">t";
+    close = "</e" + std::to_string( i ) + ">" + close;
+  }
+  XQuery_t const query( f.zorba->compileQuery( open + close ) );
+  Iterator_t const it( query->iterator() );
+  Item element;
+  it->open();
+  check( it->next( element ), "the element" );
+  it->close();
+  ItemSequence_t const sequence( new SingletonItemSequence( element ) );
+  Zorba_SerializerOptions_t options;
+  options.omit_xml_declaration = ZORBA_OMIT_XML_DECLARATION_YES;
+  auto attempt = [&]( long n, long length, long *count ) -> std::string {
+    std::ostringstream out;
+    // As the server's stream: a write that cannot grow the text throws.
+    out.exceptions( std::ios::badbit );
+    inject_arm( n, length );
+    try {
+      Serializer::createSerializer( options )->serialize( sequence.get(), out );
+    }
+    catch ( std::exception const& ) {
+      *count = inject_disarm();
+      return "error";
+    }
+    *count = inject_disarm();
+    return out.str();
+  };
+  long total = 0;
+  std::string const whole( attempt( 0, 0, &total ) );
+  check( whole == open + close, "the serializer: the whole text", whole );
+  long wrong = 0;
+  for ( long const length : { 1L, 8L } )
+    for ( long n = 1; n <= total; ++n ) {
+      long count = 0;
+      std::string const got( attempt( n, length, &count ) );
+      if ( got != whole && got != "error" && ++wrong <= 3 )
+        std::cout << "at " << n << " of a run of " << length << ": " << got
+                  << std::endl;
+    }
+  check( wrong == 0, "the serializer: the whole text or an error",
+         std::to_string( wrong ) + " points" );
+# if defined(__SANITIZE_ADDRESS__)
+  check( __lsan_do_recoverable_leak_check() == 0,
+         "the serializer failing: nothing is left behind" );
 # endif
 #else
   (void)f;
@@ -8245,10 +8319,12 @@ Test const tests[] = {
   { "exhaust_sweep_compile", test_sweep_compile },
   { "exhaust_sweep_builtins", test_sweep_builtins },
   { "exhaust_sweep_query_text", test_sweep_query_text },
+  { "exhaust_sweep_long_token", test_sweep_long_token },
   { "exhaust_sweep_streamable_text", test_sweep_streamable_text },
   { "exhaust_base64_stream", test_base64_stream_out_of_memory },
   { "exhaust_seekable_stream", test_seekable_stream_out_of_memory },
   { "exhaust_json_loader", test_json_loader_out_of_memory },
+  { "exhaust_serializer", test_serializer_out_of_memory },
   { "exhaust_json_object_add", test_json_object_add_out_of_memory },
   { "exhaust_plan_wrapper", test_plan_wrapper_out_of_memory },
   { "exhaust_plan_open", test_plan_open_out_of_memory },

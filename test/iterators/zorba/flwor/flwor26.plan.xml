@@ -52,9 +52,6 @@
     <LetVariable name="pos" materialize="true">
       <LetVarIterator varname="pos"/>
     </LetVariable>
-    <MaterializeClause>
-      <MaterializeLetVariable inputVar="pos"/>
-    </MaterializeClause>
     <ReturnClause>
       <IfThenElseIterator>
         <FnBooleanIterator>

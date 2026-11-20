@@ -588,6 +588,7 @@ expr* HoistRule::hoistExpr(
 
   bool inloop = false;
   int clauseNo = 0;
+  int readsState = -1;
 
   // step->prev == NULL means that expr e is not inside any flwor expr, and as a
   // result, there is nothing to hoist.
@@ -622,6 +623,26 @@ expr* HoistRule::hoistExpr(
       assert(step->theExpr->get_expr_kind() == flwor_expr_kind);
 
       flwor_expr* flwor = static_cast<flwor_expr*>(step->theExpr);
+
+      // Each iteration of a sequential flwor runs complete before the next, so an
+      // expr that reads a state does not leave it: it goes at most to the start of
+      // the inner flwor it was hoisted out of.
+      if (flwor->is_sequential())
+      {
+        if (readsState < 0)
+          readsState = expr_tools::reads_changeable_state(e) ? 1 : 0;
+
+        if (readsState == 1)
+        {
+          if (nextstep == NULL ||
+              nextstep->theExpr->get_expr_kind() != flwor_expr_kind)
+            return NULL;
+
+          step = nextstep;
+          clauseNo = -1;
+          break;
+        }
+      }
 
       bool foundReferencedFLWORVar = false;
       bool foundSequentialClause = false;

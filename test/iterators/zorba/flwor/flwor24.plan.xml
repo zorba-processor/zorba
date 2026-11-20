@@ -15,28 +15,27 @@
       </CtxVarDeclareIterator>
       <FLWORIterator>
         <ForVariable name="w">
-          <FnZorbaParseXmlFragmentIterator>
-            <PromoteIterator type="xs:string">
-              <FnDataIterator>
-                <CtxVarIterator varid="5" varname="xmlcontents" varkind="local"/>
-              </FnDataIterator>
-            </PromoteIterator>
-            <TreatIterator type="[NodeXQType elementNode nametest=[uri: http://zorba.io/modules/xml-options, local: options] content=[XQType ANY_TYPE_KIND*]]" quant="?">
-              <ElementIterator>
-                <SingletonIterator value="xs:QName(http://zorba.io/modules/xml-options,opt,options)"/>
+          <MaterializeIterator>
+            <FnZorbaParseXmlFragmentIterator>
+              <PromoteIterator type="xs:string">
+                <FnDataIterator>
+                  <CtxVarIterator varid="5" varname="xmlcontents" varkind="local"/>
+                </FnDataIterator>
+              </PromoteIterator>
+              <TreatIterator type="[NodeXQType elementNode nametest=[uri: http://zorba.io/modules/xml-options, local: options] content=[XQType ANY_TYPE_KIND*]]" quant="?">
                 <ElementIterator>
-                  <SingletonIterator value="xs:QName(http://zorba.io/modules/xml-options,opt,parse-external-parsed-entity)"/>
-                  <AttributeIterator qname="xs:QName(http://zorba.io/modules/xml-options,opt,skip-root-nodes)">
-                    <SingletonIterator value="xs:string(1)"/>
-                  </AttributeIterator>
+                  <SingletonIterator value="xs:QName(http://zorba.io/modules/xml-options,opt,options)"/>
+                  <ElementIterator>
+                    <SingletonIterator value="xs:QName(http://zorba.io/modules/xml-options,opt,parse-external-parsed-entity)"/>
+                    <AttributeIterator qname="xs:QName(http://zorba.io/modules/xml-options,opt,skip-root-nodes)">
+                      <SingletonIterator value="xs:string(1)"/>
+                    </AttributeIterator>
+                  </ElementIterator>
                 </ElementIterator>
-              </ElementIterator>
-            </TreatIterator>
-          </FnZorbaParseXmlFragmentIterator>
+              </TreatIterator>
+            </FnZorbaParseXmlFragmentIterator>
+          </MaterializeIterator>
         </ForVariable>
-        <MaterializeClause>
-          <MaterializeForVariable inputVar="w"/>
-        </MaterializeClause>
         <ReturnClause>
           <SequentialIterator>
             <ApplyIterator>
