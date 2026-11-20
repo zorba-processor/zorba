@@ -158,7 +158,7 @@
                     <ForVarIterator varname="j"/>
                   </AttributeAxisIterator>
                 </LetVariable>
-                <ForVariable name="$$opt_temp_0">
+                <LetVariable name="$$opt_temp_0" materialize="true">
                   <HoistIterator>
                     <CompareIterator>
                       <FnDataIterator>
@@ -167,7 +167,7 @@
                       <SingletonIterator value="xs:integer(1980)"/>
                     </CompareIterator>
                   </HoistIterator>
-                </ForVariable>
+                </LetVariable>
                 <ReturnClause>
                   <ElementIterator copyInputNodes="false">
                     <SingletonIterator value="xs:QName(,,year)"/>
@@ -204,7 +204,7 @@
                               <IfThenElseIterator>
                                 <AndIterator>
                                   <UnhoistIterator>
-                                    <ForVarIterator varname="$$opt_temp_0"/>
+                                    <LetVarIterator varname="$$opt_temp_0"/>
                                   </UnhoistIterator>
                                   <CompareIterator>
                                     <FnDataIterator>
