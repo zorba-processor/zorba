@@ -2706,6 +2706,23 @@ XmlNode* ElementNode::copyInternal(
 
     if (hiddenBaseUriAttr)
     {
+      // The copy of an explicit xml:base attribute has already given the copy
+      // a hidden base-uri attribute; the one added here replaces it.
+      if (baseUriAttr)
+      {
+        const_iterator ite = copyNode->attrsBegin();
+        const_iterator end = copyNode->attrsEnd();
+        for (; ite != end; ++ite)
+        {
+          AttributeNode* attr = copyNode->getAttr(ite);
+          if (attr->isBaseUri() && attr->isHidden())
+          {
+            attr->destroy(true);
+            break;
+          }
+        }
+      }
+
       if (parent == 0)
       {
         zstring absuri;
