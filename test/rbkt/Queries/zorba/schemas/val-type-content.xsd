@@ -19,6 +19,16 @@
     </xs:sequence>
   </xs:complexType>
 
+  <xs:complexType name="WithIntExt">
+    <xs:complexContent>
+      <xs:extension base="WithInt">
+        <xs:sequence>
+          <xs:element name="m" type="xs:integer"/>
+        </xs:sequence>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
   <xs:complexType name="IntWithUnit">
     <xs:simpleContent>
       <xs:extension base="xs:integer">
