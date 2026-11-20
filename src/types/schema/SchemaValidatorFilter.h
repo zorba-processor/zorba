@@ -129,6 +129,8 @@ private:
     bool hasTypeEntry;
     // restored before its checkContent: its children reuse the one nil flag of theSchemaValidator
     bool isNilled;
+    // restored before its checkContent: the check of a child resets it
+    XERCES_CPP_NAMESPACE::DatatypeValidator* datatypeValidator;
   };
 
   std::vector<OpenElement>                      theOpenElements;
