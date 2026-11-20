@@ -166,6 +166,28 @@ static bool test_large_write() {
   return oss.str() == expected_ext_str;
 }
 
+/**
+ * A streambuf whose every write fails, as on a full disk.
+ */
+struct failing_streambuf : std::streambuf {
+  int_type overflow( int_type ) override {
+    return traits_type::eof();
+  }
+};
+
+/**
+ * A put() whose converted bytes the original streambuf does not take must
+ * fail the stream.
+ */
+static bool test_failed_put( test const *t ) {
+  failing_streambuf failing;
+  ostream os( &failing );
+  icu_streambuf xbuf( t->ext_charset, &failing );
+  os.rdbuf( &xbuf );
+  os.put( 'a' );
+  return os.bad();
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 
 namespace zorba {
@@ -179,6 +201,7 @@ int test_icu_streambuf( int, char*[] ) {
     ASSERT_TRUE_AND_NO_EXCEPTION( test_no, test_insertion( t ) );
     ASSERT_TRUE_AND_NO_EXCEPTION( test_no, test_put( t ) );
     ASSERT_TRUE_AND_NO_EXCEPTION( test_no, test_attach( t ) );
+    ASSERT_TRUE_AND_NO_EXCEPTION( test_no, test_failed_put( t ) );
   }
   ASSERT_TRUE_AND_NO_EXCEPTION( test_no, test_large_write() );
   cout << failures << " test(s) failed\n";
