@@ -2436,6 +2436,9 @@ XmlNode* ElementNode::copyInternal(
                  NULL, // local bindings
                  baseUri);
 
+    if (copymode.theTypePreserve && getNilled())
+      copyNode->setNilled();
+
     if (rootCopy == NULL)
       rootCopy = copyNode;
 
@@ -3065,47 +3068,7 @@ void ElementNode::appendStringValue(zstring& buf) const
 ********************************************************************************/
 bool ElementNode::getNilled() const
 {
-  store::Item_t val;
-
-  if (getType()->equals(GET_STORE().XS_UNTYPED_QNAME))
-    return false;
-
-  if (!isValidated())
-    return false;
-
-  const_iterator ite = childrenBegin();
-  const_iterator end = childrenEnd();
-
-  for (; ite != end; ++ite)
-  {
-    if ((*ite)->getNodeKind() == store::StoreConsts::elementNode ||
-        (*ite)->getNodeKind() == store::StoreConsts::textNode)
-    {
-      return false;
-    }
-  }
-
-  ite = attrsBegin();
-  end = attrsEnd();
-
-  for (; ite != end; ++ite)
-  {
-    XmlNode* attr = *ite;
-
-    zstring strval;
-    attr->getStringValue2(strval);
-
-    if (ZSTREQ(attr->getNodeName()->getNamespace(),
-               "http://www.w3.org/2001/XMLSchema-instance") &&
-        ZSTREQ(attr->getNodeName()->getLocalName(), "nil") &&
-        (ZSTREQ(strval, "true") || ZSTREQ(strval, "1") ))
-    {
-      return true;
-      break;
-    }
-  }
-
-  return false;
+  return (theFlags & IsNilled) != 0;
 }
 
 
