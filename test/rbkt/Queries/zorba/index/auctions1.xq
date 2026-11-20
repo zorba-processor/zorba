@@ -313,10 +313,23 @@ probe 4:
 for $id in index_dml:probe-index-point-general($auctions:AuctionDates2, 
                                                ("2000-12-04",
                                                 "2000-01-03",
-                                                10.23,
                                                 xs:date("2000-01-03"),
                                                 "1998-08-18"))/@id
 return <open_auction>{$id}</open_auction>,
+
+"
+
+probe 4 with a number, which = cannot compare with the untyped dates:
+",
+
+try
+{
+  index_dml:probe-index-point-general($auctions:AuctionDates2, 10.23)
+}
+catch * 
+{
+  <exception>{$err:code} : {$err:description}</exception>
+},
 
 "
 
@@ -335,17 +348,23 @@ return <open_auction>{$id}</open_auction>,
 
 "
 
-probe 6:
+probe 6, with a number, which >= cannot compare with the untyped dates:
 ",
 
-for $id in index_dml:probe-index-range-general($auctions:AuctionDates2, 
-                                               xs:double("2001"),
-                                               (),
-                                               fn:true(),
-                                               fn:false(),
-                                               fn:false(),
-                                               fn:true())/@id
-return <open_auction>{$id}</open_auction>,
+try
+{
+  index_dml:probe-index-range-general($auctions:AuctionDates2, 
+                                      xs:double("2001"),
+                                      (),
+                                      fn:true(),
+                                      fn:false(),
+                                      fn:false(),
+                                      fn:true())
+}
+catch * 
+{
+  <exception>{$err:code} : {$err:description}</exception>
+},
 
 "
 

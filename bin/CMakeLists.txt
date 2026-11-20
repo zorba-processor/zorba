@@ -593,9 +593,10 @@ IF (ZORBA_WITH_FILE_ACCESS)
              exhaust_at_start exhaust_errno exhaust_bounds_retry
              exhaust_sweep_compile exhaust_sweep_builtins
              exhaust_json_object_add
-             exhaust_sweep_matcher exhaust_sweep_query_text
+             exhaust_sweep_matcher exhaust_sweep_query_text exhaust_sweep_long_token
              exhaust_sweep_streamable_text exhaust_base64_stream
-             exhaust_seekable_stream exhaust_json_loader exhaust_plan_wrapper
+             exhaust_seekable_stream exhaust_json_loader exhaust_serializer
+             exhaust_plan_wrapper
              exhaust_plan_open exhaust_call_body exhaust_dynamic_call
              exhaust_for_each_pair exhaust_fold_left exhaust_json_copy
              exhaust_cached_call_body exhaust_group_by exhaust_first_dynamic_call

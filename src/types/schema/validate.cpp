@@ -386,7 +386,8 @@ store::Item_t Validator::processElement(
   store::Item_t elemName = element->getNodeName();
   GENV_ITEMFACTORY->createElementNode(newElem, parent, elemName,
                                       typeName, haveTypedValue, haveEmptyValue,
-                                      bindings, baseUri, isSubstitutionGroup);
+                                      bindings, baseUri, isSubstitutionGroup,
+                                      schemaValidator.isNilled());
 
   processAttributes(sctx,
                     typeManager,
