@@ -170,8 +170,9 @@ icu_streambuf::int_type icu_streambuf::overflow( int_type c ) {
   assert( ok );
 #endif /* NDEBUG */
   if ( streamsize const n = to - ebuf ) {
-    original()->sputn( ebuf, n );
     p_.reset();
+    if ( original()->sputn( ebuf, n ) != n )
+      return traits_type::eof();
   }
 
   return c;

@@ -11,8 +11,8 @@
       <WhereIterator>
         <ForIterator>
           <ForVariable name="$$context-item"/>
-          <ForIterator>
-            <ForVariable name="$$opt_temp_2"/>
+          <LetIterator>
+            <LetVariable name="$$opt_temp_2" materialize="true"/>
             <LetIterator>
               <LetVariable name="y" materialize="true"/>
               <ForIterator>
@@ -53,7 +53,7 @@
                 <LetVarIterator varname="y"/>
               </FnCountIterator>
             </HoistIterator>
-          </ForIterator>
+          </LetIterator>
           <UnhoistIterator>
             <LetVarIterator varname="$$opt_temp_1"/>
           </UnhoistIterator>
@@ -61,7 +61,7 @@
         <TypedValueCompareIterator_INTEGER>
           <ForVarIterator varname="$$context-item"/>
           <UnhoistIterator>
-            <ForVarIterator varname="$$opt_temp_2"/>
+            <LetVarIterator varname="$$opt_temp_2"/>
           </UnhoistIterator>
         </TypedValueCompareIterator_INTEGER>
       </WhereIterator>

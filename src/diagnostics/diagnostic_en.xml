@@ -1093,6 +1093,13 @@
       <value>$1 cannot be treated as type $2</value>
     </diagnostic>
 
+    <diagnostic code="XPDY0130">
+      <comment>
+       An implementation-dependent limit has been exceeded.
+      </comment>
+      <value>implementation limit exceeded: $1</value>
+    </diagnostic>
+
     <diagnostic code="XQDY0025">
       <comment>
        It is a dynamic error if any attribute of a constructed element does not
