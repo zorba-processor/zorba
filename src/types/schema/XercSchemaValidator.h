@@ -185,7 +185,8 @@ public:
         const XMLElementDecl* elemDef);
 
   virtual void validateProcessorStipulatedTypeName(
-        const   XMLElementDecl* elemDef);
+        const   XMLElementDecl* elemDef,
+        const XERCES_CPP_NAMESPACE::QName& stipulatedType);
 
   virtual Grammar* getGrammar() const;
 
