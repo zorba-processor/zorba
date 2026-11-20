@@ -170,6 +170,14 @@ static void checkKeyType(
       return;
     }
 
+    // A comparison with an untyped value casts it to xs:string.
+    if (TypeOps::is_subtype(tm, *indexKeyType, *rtm.UNTYPED_ATOMIC_TYPE_ONE) &&
+        (TypeOps::is_subtype(searchKeyTypeCode, store::XS_STRING) ||
+         searchKeyTypeCode == store::XS_ANY_URI))
+    {
+      return;
+    }
+
     // A value comparison casts an untyped value to xs:string, a general
     // comparison with a number to xs:double.
     if (TypeOps::is_subtype(tm, *indexKeyType, *rtm.DOUBLE_TYPE_ONE) &&
