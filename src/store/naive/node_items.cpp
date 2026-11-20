@@ -2075,7 +2075,6 @@ XmlNode* DocumentNode::copyInternal(
     {
       if ((*ite)->isConnectorNode())
       {
-        ZORBA_ASSERT(copymode.theNsPreserve == false);
         static_cast<ConnectorNode*>(*ite)->getNode()->
         copyInternal(rootParent, copyNode, 0, NULL, copymode);
       }
@@ -2505,10 +2504,12 @@ XmlNode* ElementNode::copyInternal(
       if (parent && parent->getNodeKind() == store::StoreConsts::elementNode)
         copyParentNsContext = static_cast<ElementNode*>(parent)->getNsContext();
 
-      // If we are copying the root of an xml subtree, or a node that does
-      // not inherit ns bindings directly from its parent (but may inherit
-      // from another ancestor).
+      // If we are copying the root of an xml subtree, a node that does not
+      // inherit ns bindings directly from its parent (but may inherit from
+      // another ancestor), or a node placed without a copy (reached through a
+      // connector, it inherits nothing from the tree that references it).
       if (parent == rootParent ||
+          theParent == NULL ||
           (haveLocalBindings() && theNsContext->getParent() != myParentNsContext) ||
           (!haveLocalBindings() && theNsContext != myParentNsContext))
       {
@@ -2743,7 +2744,6 @@ XmlNode* ElementNode::copyInternal(
 
       if (child->isConnectorNode())
       {
-        ZORBA_ASSERT(copymode.theNsPreserve == false);
         static_cast<ConnectorNode*>(child)->getNode()->
         copyInternal(rootParent, copyNode, 0, rootCopy, copymode);
       }
