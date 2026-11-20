@@ -109,10 +109,13 @@
       </LetVariable>
       <ForVariable name="prefixP">
         <TryCatchIterator>
-          <ProbeIndexPointValueIterator>
-            <SingletonIterator value="xs:QName(,,tempIndex0)"/>
-            <ForVarIterator varname="prefixE"/>
-          </ProbeIndexPointValueIterator>
+          <FnConcatIterator>
+            <LetVarIterator varname="$$opt_temp_7"/>
+            <ProbeIndexPointValueIterator>
+              <SingletonIterator value="xs:QName(,,tempIndex0)"/>
+              <ForVarIterator varname="prefixE"/>
+            </ProbeIndexPointValueIterator>
+          </FnConcatIterator>
           <UnhoistIterator>
             <LetVarIterator varname="$$opt_temp_0"/>
           </UnhoistIterator>

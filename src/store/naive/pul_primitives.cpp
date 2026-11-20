@@ -520,6 +520,7 @@ void UpdSetElementType::apply()
     theOldHaveEmptyTypedValue = target->haveEmptyTypedValue();
 
   theOldIsInSubstitutionGroup = target->isInSubstitutionGroup();
+  theOldIsNilled = target->getNilled();
 
   target->setType(theTypeName);
 
@@ -567,6 +568,11 @@ void UpdSetElementType::apply()
     target->setInSubstGroup();
   else
     target->resetInSubstGroup();
+
+  if (theIsNilled)
+    target->setNilled();
+  else
+    target->resetNilled();
 
   theIsApplied = true;
 }
@@ -616,6 +622,11 @@ void UpdSetElementType::undo()
       target->setInSubstGroup();
     else
       target->resetInSubstGroup();
+
+    if (theOldIsNilled)
+      target->setNilled();
+    else
+      target->resetNilled();
 
     theIsApplied = false;
   }

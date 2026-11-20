@@ -1,12 +1,13 @@
 <iterator-tree>
   <FLWORIterator prof-calls="1" prof-next-calls="1" prof-cpu="17.2851" prof-wall="889.549" prof-name="FLWORIterator">
     <ForVariable name="i">
-      <OpToIterator prof-calls="1" prof-next-calls="3" prof-cpu="0.034156" prof-wall="0.03264" prof-name="op:to">
-        <SingletonIterator value="xs:integer(1)" prof-calls="1" prof-next-calls="1" prof-cpu="0.001623" prof-wall="0.001007" prof-name="SingletonIterator"/>
-        <SingletonIterator value="xs:integer(2)" prof-calls="1" prof-next-calls="1" prof-cpu="0.000728" prof-wall="0.000308" prof-name="SingletonIterator"/>
-      </OpToIterator>
+      <MaterializeIterator prof-calls="1" prof-next-calls="3" prof-cpu="0.05" prof-wall="0.05" prof-name="MaterializeIterator">
+        <OpToIterator prof-calls="1" prof-next-calls="3" prof-cpu="0.034156" prof-wall="0.03264" prof-name="op:to">
+          <SingletonIterator value="xs:integer(1)" prof-calls="1" prof-next-calls="1" prof-cpu="0.001623" prof-wall="0.001007" prof-name="SingletonIterator"/>
+          <SingletonIterator value="xs:integer(2)" prof-calls="1" prof-next-calls="1" prof-cpu="0.000728" prof-wall="0.000308" prof-name="SingletonIterator"/>
+        </OpToIterator>
+      </MaterializeIterator>
     </ForVariable>
-    <MaterializeClause/>
     <ReturnClause>
       <ApplyIterator prof-calls="2" prof-next-calls="2" prof-cpu="17.0915" prof-wall="889.354" prof-name="ApplyIterator">
         <UDFunctionCallIterator function="http:post" prof-calls="2" prof-next-calls="4" prof-cpu="17.0595" prof-wall="889.32" prof-name="http:post">
