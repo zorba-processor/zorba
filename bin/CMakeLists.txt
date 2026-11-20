@@ -592,18 +592,20 @@ IF (ZORBA_WITH_FILE_ACCESS)
              entity_expansion case_paths html_edge_cases memory_limit
              exhaust_at_start exhaust_errno exhaust_bounds_retry
              exhaust_sweep_compile exhaust_sweep_builtins
+             exhaust_json_object_add
              exhaust_sweep_matcher exhaust_sweep_query_text
              exhaust_sweep_streamable_text exhaust_base64_stream
              exhaust_seekable_stream exhaust_json_loader exhaust_plan_wrapper
              exhaust_plan_open exhaust_call_body exhaust_dynamic_call
-             exhaust_for_each_pair exhaust_fold_left
+             exhaust_for_each_pair exhaust_fold_left exhaust_json_copy
              exhaust_cached_call_body exhaust_group_by exhaust_first_dynamic_call
              exhaust_sweep_xml exhaust_sweep_xml_dtd exhaust_sweep_xml_dtd_nodes
              exhaust_sweep_fragment exhaust_sweep_descendant
              exhaust_sweep_html exhaust_sweep_json exhaust_sweep_csv
              exhaust_sweep_casts exhaust_sweep_arithmetic exhaust_sweep_decimal_thread
-             exhaust_sweep_cache
+             exhaust_sweep_cache exhaust_json_array_growth
              exhaust_sweep_kept_malloc exhaust_cache_after_failure exhaust_user_error exhaust_long_line
+             exhaust_optimize_after_failure
              exhaust_notification exhaust_request_id
              exhaust_stack_limit exhaust_generated exhaust_json exhaust_json_array exhaust_csv
              exhaust_xml exhaust_strings exhaust_numbers exhaust_try
@@ -651,6 +653,11 @@ IF (ZORBA_WITH_FILE_ACCESS)
       SET_TESTS_PROPERTIES (bin/mcp/exhaust_sweep_${_t} PROPERTIES
         RESOURCE_LOCK mcp_memory_exhaustion TIMEOUT 400)
     ENDFOREACH (_t)
+    # Under AddressSanitizer the builtins sweep takes up to 370 s, and 1.4 times longer on a loaded runner.
+    STRING (TOUPPER "${CMAKE_BUILD_TYPE}" _build_type)
+    IF ("${CMAKE_CXX_FLAGS} ${CMAKE_CXX_FLAGS_${_build_type}}" MATCHES "fsanitize=address")
+      SET_TESTS_PROPERTIES (bin/mcp/exhaust_sweep_builtins PROPERTIES TIMEOUT 600)
+    ENDIF ()
     FOREACH (_t generated json json_array csv xml strings numbers try)
       SET_TESTS_PROPERTIES (bin/mcp/exhaust_injected_${_t} PROPERTIES TIMEOUT 400)
     ENDFOREACH (_t)

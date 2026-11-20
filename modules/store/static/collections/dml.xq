@@ -57,6 +57,8 @@ declare option ver:module-version "2.0";
  : @return The seqnence of items from the collection.
  : @error zerr:ZDDY0001 if the collection is not declared.
  : @error zerr:ZDDY0003 if the collection is not available.
+ : @error err:XPTY0004 if the number of items in the collection does not
+ : match the occurrence indicator of its declared type.
  :)
 declare function cdml:collection( $name as xs:QName )
   as item()* external;
@@ -70,6 +72,8 @@ declare function cdml:collection( $name as xs:QName )
  :
  : @error zerr:ZDDY0001 if the collection is not declared.
  : @error zerr:ZDDY0003 if the collection is not available.
+ : @error err:XPTY0004 if the number of items in the collection does not
+ : match the occurrence indicator of its declared type.
  :)
 declare function cdml:collection( $name as xs:QName, $skip as xs:integer )
   as item()* external;
@@ -92,6 +96,8 @@ declare function cdml:collection( $name as xs:QName, $skip as xs:integer )
  : @error zerr:ZDDY0003 if the collection is not available.
  : @error zerr:ZSTR0066 if <code>$start</code> does not reference a node from
  : the collection.
+ : @error err:XPTY0004 if the number of items in the collection does not
+ : match the occurrence indicator of its declared type.
  :)
 declare function cdml:collection( $name as xs:QName, 
                                   $start as xs:anyURI,
@@ -352,7 +358,8 @@ declare updating function cdml:delete( $items as item()* )
  : deletes the first item from the collection.
  : @error zerr:ZDDY0001 if the collection is not declared.
  : @error zerr:ZDDY0003 if the collection is not available.
- : @error zerr:ZDDY0006 if the collection is const or append-only.
+ : @error zerr:ZDDY0004 if the collection is const.
+ : @error zerr:ZDDY0007 if the collection is append-only.
  : @error zerr:ZDDY0012 if the collection is unordered.
  : @error zerr:ZDDY0011 if the collection is empty.
  :)
@@ -368,7 +375,8 @@ declare updating function cdml:delete-first( $name as xs:QName )
  : deletes the items from the collection.
  : @error zerr:ZDDY0001 if the collection is not declared.
  : @error zerr:ZDDY0003 if the collection is not available.
- : @error zerr:ZDDY0006 if the collection is const or append-only.
+ : @error zerr:ZDDY0004 if the collection is const.
+ : @error zerr:ZDDY0007 if the collection is append-only.
  : @error zerr:ZDDY0012 if the collection is unordered.
  : @error zerr:ZDDY0011 if the collection contains less than
  : <code>$number</code> items.
@@ -385,7 +393,9 @@ declare updating function cdml:delete-first( $name as xs:QName,
  : deletes the last item from the collection.
  : @error zerr:ZDDY0001 if the collection is not declared.
  : @error zerr:ZDDY0003 if the collection is not available.
- : @error zerr:ZDDY0006 if the collection is const, append-only, or queue.
+ : @error zerr:ZDDY0004 if the collection is const.
+ : @error zerr:ZDDY0007 if the collection is append-only.
+ : @error zerr:ZDDY0008 if the collection is a queue.
  : @error zerr:ZDDY0012 if the collection is unordered.
  : @error zerr:ZDDY0011 if the collection is empty.
  :)
@@ -401,6 +411,9 @@ declare updating function cdml:delete-last( $name as xs:QName )
  : deletes the items.
  : @error zerr:ZDDY0001 if the collection is not declared.
  : @error zerr:ZDDY0003 if the collection is not available.
+ : @error zerr:ZDDY0004 if the collection is const.
+ : @error zerr:ZDDY0007 if the collection is append-only.
+ : @error zerr:ZDDY0008 if the collection is a queue.
  : @error zerr:ZDDY0012 if the collection is unordered.
  : @error zerr:ZDDY0011 if the collection contains less than
  : <code>$number</code> items.
