@@ -1,0 +1,16 @@
+<xs:schema
+  xmlns:xs="http://www.w3.org/2001/XMLSchema"
+  targetNamespace="http://zorba.io/test/revalidation-empty"
+  xmlns="http://zorba.io/test/revalidation-empty"
+  elementFormDefault="qualified">
+
+  <xs:simpleType name="integers">
+    <xs:list itemType="xs:integer"/>
+  </xs:simpleType>
+
+  <xs:element name="h" type="xs:hexBinary"/>
+  <xs:element name="b" type="xs:base64Binary"/>
+  <xs:element name="l" type="integers"/>
+  <xs:element name="s" type="xs:string"/>
+
+</xs:schema>
