@@ -165,8 +165,9 @@ public:
   void reset(PlanState& planState);
 
   /**
-   * True if the body plan should be closed when the call completes. Always for
-   * a sequential function, with profiling too: until its body is closed, its
+   * True if the body plan should be closed when the call completes or raises an
+   * error (see UDFunctionCallIterator::nextImpl). Always for a sequential
+   * function, with profiling too: until its body is closed, its
    * local variables and the states of its let and for clauses keep the nodes
    * they were bound to referenced, and the statements after the call see them
    * as referenced (ddl:delete raises ZDDY0015). The profile then has no body
