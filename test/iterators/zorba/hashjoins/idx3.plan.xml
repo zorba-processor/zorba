@@ -59,7 +59,7 @@
           </ChildAxisIterator>
         </NodeSortIterator>
       </ForVariable>
-      <ForVariable name="$$opt_temp_0">
+      <LetVariable name="$$opt_temp_0" materialize="true">
         <HoistIterator>
           <FnStringIterator>
             <NodeNameIterator>
@@ -67,7 +67,7 @@
             </NodeNameIterator>
           </FnStringIterator>
         </HoistIterator>
-      </ForVariable>
+      </LetVariable>
       <ReturnClause>
         <IfThenElseIterator>
           <FnBooleanIterator>
@@ -79,7 +79,7 @@
                     <ProbeIndexPointValueIterator>
                       <SingletonIterator value="xs:QName(,,tempIndex0)"/>
                       <UnhoistIterator>
-                        <ForVarIterator varname="$$opt_temp_0"/>
+                        <LetVarIterator varname="$$opt_temp_0"/>
                       </UnhoistIterator>
                     </ProbeIndexPointValueIterator>
                   </FnConcatIterator>
@@ -94,7 +94,7 @@
                     </NodeNameIterator>
                   </FnStringIterator>
                   <UnhoistIterator>
-                    <ForVarIterator varname="$$opt_temp_0"/>
+                    <LetVarIterator varname="$$opt_temp_0"/>
                   </UnhoistIterator>
                 </TypedValueCompareIterator_STRING>
               </WhereClause>
