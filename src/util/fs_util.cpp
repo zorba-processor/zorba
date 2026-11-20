@@ -14,9 +14,11 @@
  * limitations under the License.
  */
 
+#include <cerrno>
 #include <cstdlib>                     /* for getenv(3), _dupenv_s() */
 #include <climits>                     /* for PATH_MAX */
 #include <cstdio>
+#include <new>
 #include <fcntl.h>                     /* for creat(2) */
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -194,6 +196,8 @@ string curdir() {
 #endif /* ZORBA_FOR_ONE_THREAD_ONLY */
 
   while ( !::getcwd( dir_buf.get(), dir_buf_len ) ) {
+    if ( errno == ENOMEM )
+      throw bad_alloc();
     if ( errno != ERANGE )
       throw ZORBA_IO_EXCEPTION( "getcwd()", "" );
     dir_buf.reset( new char[ dir_buf_len *= 2 ] );

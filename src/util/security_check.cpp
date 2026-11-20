@@ -714,6 +714,8 @@ std::string canonical_path(const std::string& aPathOrFileURI)
   std::error_code ec;
   std::filesystem::path const lCanonical =
     std::filesystem::weakly_canonical(std::filesystem::path(lPath), ec);
+  if (ec == std::errc::not_enough_memory)
+    throw std::bad_alloc();
   if (ec)
     throw std::invalid_argument(ec.message());
   std::string lResult = lCanonical.string();
