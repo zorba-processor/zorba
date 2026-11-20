@@ -14,7 +14,9 @@
  * limitations under the License.
  */
 
+#include <cstring>
 #include <fstream>
+#include <new>
 
 #include <zorba/properties.h>
 #include "compiler/parser/xquery_driver.h"
@@ -52,6 +54,30 @@
 
 namespace zorba
 {
+
+namespace
+{
+
+// Every message of flex about a failed allocation says "memory".
+[[noreturn]] void throw_scanner_failure(const char* msg)
+{
+  if (std::strstr(msg, "memory"))
+    throw std::bad_alloc();
+  throw ZORBA_EXCEPTION(zerr::ZXQP0003_INTERNAL_ERROR,
+                        ERROR_PARAMS(ERROR_TEXT(msg)));
+}
+
+}
+
+void xquery_scanner::LexerError(const char* msg)
+{
+  throw_scanner_failure(msg);
+}
+
+void jsoniq_scanner::LexerError(const char* msg)
+{
+  throw_scanner_failure(msg);
+}
 
 xquery_driver::xquery_driver(CompilerCB* aCompilerCB, GRAMMAR_TYPE a_grammar_type, uint32_t initial_heapsize)
   :
