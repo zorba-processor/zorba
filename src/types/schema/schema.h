@@ -112,6 +112,8 @@ public:
     return theGrammarPool;
   }
 
+  bool isNamespaceLoaded(const char* ns) const;
+
   void registerXSD(
       const char* xsdURL,
       static_context* sctx,
@@ -187,6 +189,8 @@ public:
 private:
 
 #ifndef ZORBA_NO_XMLSCHEMA
+  bool isNamespaceInPool(const char* ns) const;
+
   XERCES_CPP_NAMESPACE::XSElementDeclaration* getDeclForElement(
       const store::Item* qname);
 
