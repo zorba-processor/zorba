@@ -167,6 +167,9 @@ public:
   void nextChild() { theStack.nextChild(); }
 
   void popChild() { theStack.popChild(); }
+
+  // The level of the next node; the root is at level 1.
+  ulong getLevel() const { return theStack.getNumComps(); }
 };
 
 
