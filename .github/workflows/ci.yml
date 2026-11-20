@@ -265,6 +265,15 @@ jobs:
         if: needs.changes.outputs.code == 'true'
         run: scripts/check-hardening.sh build/full-release
 
+      # zorba and the test executables load one copy each of ICU and libxml2:
+      # the builds from the zorba-processor forks (see docker/*/Dockerfile).
+      - name: Verify the patched ICU and libxml2
+        if: needs.changes.outputs.code == 'true'
+        run: |
+          docker run --rm -v "$PWD":/src -w /src zorba-builder:ci sh -ec '
+            scripts/check-patched-libs.sh $(find build/full-release -type f -perm -u+x \
+              \( -name zorba -o -name zorba-mcp -o -name testdriver -o -name mcp_tests \))'
+
       # The checked-in parsers/scanners must be what this image's bison and
       # flex generate from parser.y/scanner.l (see
       # src/compiler/parser/CMakeLists.txt). The regenerated files are
