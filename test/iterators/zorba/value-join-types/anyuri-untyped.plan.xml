@@ -127,13 +127,13 @@
         </ElementIterator>
       </FnConcatIterator>
     </ForVariable>
-    <ForVariable name="$$opt_temp_1">
+    <LetVariable name="$$opt_temp_1" materialize="true">
       <HoistIterator>
         <FnDataIterator>
           <ForVarIterator varname="k"/>
         </FnDataIterator>
       </HoistIterator>
-    </ForVariable>
+    </LetVariable>
     <ReturnClause>
       <FnCountIterator>
         <FLWORIterator>
@@ -144,7 +144,7 @@
                 <FLWORIterator>
                   <ForVariable name="$$opt_temp_6">
                     <UnhoistIterator>
-                      <ForVarIterator varname="$$opt_temp_1"/>
+                      <LetVarIterator varname="$$opt_temp_1"/>
                     </UnhoistIterator>
                   </ForVariable>
                   <ReturnClause>
@@ -242,7 +242,7 @@
                 </FnDataIterator>
               </CastIterator>
               <UnhoistIterator>
-                <ForVarIterator varname="$$opt_temp_1"/>
+                <LetVarIterator varname="$$opt_temp_1"/>
               </UnhoistIterator>
             </CompareIterator>
           </WhereClause>
