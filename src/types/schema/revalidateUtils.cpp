@@ -226,13 +226,13 @@ void SchemaValidatorImpl::processElement(
                     element->getAttributes(), loc);
 
   std::vector<store::Item_t> typedValues;
-  int noOfChildren = processChildren(pul,
-                                     nsCtx,
-                                     typeManager, 
-                                     schemaValidator,
-                                     element->getChildren(),
-                                     typedValues,
-                                     loc);
+  int noOfTextChildren = processChildren(pul,
+                                         nsCtx,
+                                         typeManager,
+                                         schemaValidator,
+                                         element->getChildren(),
+                                         typedValues,
+                                         loc);
 
   if ( isNewType )
   {
@@ -240,29 +240,20 @@ void SchemaValidatorImpl::processElement(
     bool tHasTypedValue = Validator::typeHasTypedValue(typeManager, newType, loc);
     bool tHasEmptyValue = Validator::typeHasEmptyValue(newType);
 
-    if ( noOfChildren==0 )
+    // The typed value is stored in the text child; without one the element
+    // keeps the untyped value of its string value, as validation gives it
+    if ( noOfTextChildren==0 )
     {
-      // workaround for elem of type xsd:string with no text child
-      if ( newType->is_builtin() && 
-          newType->getQName()->equals(GENV_TYPESYSTEM.STRING_TYPE_ONE->getQName()) )
+      tHasTypedValue = false;
+
+      store::Item_t emptyValue;
+      if (!isNilled && element->getStringValue().empty())
       {
-        /*store::Item_t result;
-         zstring emptyStr = "";
-         GENV_ITEMFACTORY->createString( result, emptyStr);
-         typedValues.push_back(result);*/
-        tHasEmptyValue = true;
-        tHasTypedValue = false;
-        tHasValue = false;
-      }
-      else if ( newType->type_kind()==XQType::USER_DEFINED_KIND )
-      {
-        const UserDefinedXQType udXQType = static_cast<const UserDefinedXQType&>(*newType);
-        if ( udXQType.isSubTypeOf(typeManager, *GENV_TYPESYSTEM.STRING_TYPE_ONE) )
-        {
+        if (Validator::emptyContentTypedValue(theSctx, typeManager, newType,
+                                              bindings, emptyValue, loc))
           tHasEmptyValue = true;
-          tHasTypedValue = false;
-          tHasValue = false;
-        }
+        else if (emptyValue != NULL)
+          typedValues.assign(1, emptyValue);
       }
     }
 
@@ -419,11 +410,9 @@ int SchemaValidatorImpl::processChildren(
 
   store::Item_t typeName;
 
-  int noOfChildren = 0;
+  int noOfTextChildren = 0;
   while ( children->next(child) )
   {
-    noOfChildren++;
-
     if ( child->isNode() )
     {
       //cout << " vup  - processChildren: " << child->getType()->getLocalName()
@@ -445,6 +434,8 @@ int SchemaValidatorImpl::processChildren(
 
       case store::StoreConsts::textNode:
       {
+        noOfTextChildren++;
+
         //cout << " vup        - pC text: '" << child->getStringValue()->
         //  normalizeSpace()->str() << "'\n"; cout.flush();
 
@@ -486,7 +477,7 @@ int SchemaValidatorImpl::processChildren(
       }
     }
   }
-  return noOfChildren;
+  return noOfTextChildren;
 }
 
 

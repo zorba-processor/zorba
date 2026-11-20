@@ -808,6 +808,14 @@ declare variable $err:XPDY0050 as xs:QName := fn:QName($err:NS, "err:XPDY0050");
 
 (:~
  :
+ : An implementation-dependent limit has been exceeded.
+ : 
+ : @see http://www.w3.org/2005/xqt-errors
+:)
+declare variable $err:XPDY0130 as xs:QName := fn:QName($err:NS, "err:XPDY0130");
+
+(:~
+ :
  : It is a dynamic error if any attribute of a constructed element does not
  : have a name that is distinct from the names of all other attributes of
  : the constructed element.

@@ -17,6 +17,7 @@
 #include <cassert>
 #include <limits>
 #include <sstream>
+#include <string>
 
 #include "zorbautils/hashfun.h"
 #include "diagnostics/xquery_diagnostics.h"
@@ -27,6 +28,18 @@
 
 
 namespace zorba { namespace simplestore {
+
+
+/*******************************************************************************
+  Raises err:XPDY0130 for a node that cannot get an id of at most MAX_BYTE_LEN
+  bytes; aLevel is its depth in its tree, the root being 1.
+********************************************************************************/
+[[noreturn]] static void raiseDepthLimit(ulong aLevel)
+{
+  throw XQUERY_EXCEPTION(err::XPDY0130, ERROR_PARAMS(ERROR_TEXT(
+    "node nesting depth of " + std::to_string(aLevel) +
+    " exceeds the node id limit")));
+}
 
 
 
@@ -1268,12 +1281,7 @@ void OrdPath::appendComp(int32_t value)
 
   ulong bytesNeeded = byteIndex + (bitsNeeded + 15 - bitsAvailable) / 8;
   if (bytesNeeded > MAX_BYTE_LEN)
-  {
-    throw ZORBA_EXCEPTION(
-      zerr::ZSTR0030_NODEID_ERROR,
-      ERROR_PARAMS( ZED( NodeIDNeedsBytes_2 ), int( MAX_BYTE_LEN ) )
-    );
-  }
+    raiseDepthLimit(getLevel() + 1); // every caller appends a child (odd) comp
 
   if (bitLen + bitsNeeded <= MAX_EMBEDDED_BIT_LEN)
   {
@@ -4204,14 +4212,10 @@ ulong OrdPathStack::getByteLength() const
 ********************************************************************************/
 void OrdPathStack::pushChild()
 {
+  // Every component of the stack is a child (odd) one: one per level.
   if (theByteIndex == OrdPath::MAX_BYTE_LEN ||
       (theByteIndex == OrdPath::MAX_BYTE_LEN - 1 && theBitsAvailable < 2))
-  {
-    throw ZORBA_EXCEPTION(
-      zerr::ZSTR0030_NODEID_ERROR,
-      ERROR_PARAMS( ZED( NodeIDNeedsBytes_2 ), int(OrdPath::MAX_BYTE_LEN) )
-    );
-  }
+    raiseDepthLimit(theNumComps + 1);
 
   theDeweyId[theNumComps] = 1;
   theCompLens[theNumComps] = 2;
@@ -4378,12 +4382,7 @@ void OrdPathStack::compressComp(ulong comp, int32_t value)
                       (bitsNeeded + 15 - theBitsAvailable) / 8;
 
   if (bytesNeeded > OrdPath::MAX_BYTE_LEN)
-  {
-    throw ZORBA_EXCEPTION(
-      zerr::ZSTR0030_NODEID_ERROR,
-      ERROR_PARAMS( ZED( NodeIDNeedsBytes_2 ), int(OrdPath::MAX_BYTE_LEN) )
-    );
-  }
+    raiseDepthLimit(comp + 1);
 
   // theBitsAvailable == 0 means the previous component ended exactly on a
   // byte boundary. Start the new component in the next byte: the code below

@@ -70,6 +70,8 @@
 
 #include <libxml/xmlversion.h>
 
+#include <zorba/serializer.h>
+#include <zorba/singleton_item_sequence.h>
 #include <zorba/external_module.h>
 #include <zorba/function.h>
 #include <zorba/item_sequence.h>
@@ -3382,15 +3384,22 @@ void test_sweep_xml_dtd( Fixture const &f ) {
               starting( "terminate N11xercesc_", 105, 8, "OutOfMemoryExceptionE" ) };
   // libxml2 before 2.13 does not report every allocation of its own that failed
   // (see test_sweep_xml_dtd_nodes): the load then fails as a document that
-  // libxml2 could not parse. Caps from the same run (189 / 35 tree creation;
-  // 55 / 13 malformed).
+  // libxml2 could not parse, or with the parse or validity error libxml2
+  // reports in its place, at its location (the file is unknown when its name
+  // could not be copied). Caps from the same run (189 / 35 tree creation;
+  // 55 / 13 malformed), and from the linux-arm64 job of CI run 43579489611
+  // (37 / 5 at a location in the file; 0 / 5 with no file).
   int const version = libxml2_version();
   if ( version && version < 21300 )
     s.known.insert( s.known.end(), {
       starting( "\"caught err:FODC0002 \\\"XML tree creation failed\\\"", 285, 1 ),
       starting( "\"caught err:FODC0002 \\\"XML tree creation failed\\\"", 53, 8 ),
       starting( "\"caught err:FODC0002 \\\"malformed XML document\\\"", 83, 1 ),
-      starting( "\"caught err:FODC0002 \\\"malformed XML document\\\"", 20, 8 ) } );
+      starting( "\"caught err:FODC0002 \\\"malformed XML document\\\"", 20, 8 ),
+      starting( "\"caught err:FODC0002 \\\"file:///tmp/mcp-tree", 56, 1 ),
+      starting( "\"caught err:FODC0002 \\\"file:///tmp/mcp-tree", 8, 8 ),
+      starting( "\"caught err:FODC0002 \\\"<null>\\\":", 4, 1 ),
+      starting( "\"caught err:FODC0002 \\\"<null>\\\":", 8, 8 ) } );
   exhaust_sweep( f, "parse-xml with DTD validation", s );
 #else
   (void)f;
@@ -4236,6 +4245,63 @@ void test_json_loader_out_of_memory( Fixture const &f ) {
   (void)f;
 #endif
 }
+// The serializer with each allocation failing in turn, over an element 12 deep:
+// past the 8 children iterators the emitter makes first, so its pool of them
+// grows. The whole text or an error; then, in an AddressSanitizer build,
+// nothing is left unreachable.
+void test_serializer_out_of_memory( Fixture const &f ) {
+#if defined(__linux__)
+  std::string open, close;
+  for ( int i = 0; i < 12; ++i ) {
+    open += "<e" + std::to_string( i ) + ">t";
+    close = "</e" + std::to_string( i ) + ">" + close;
+  }
+  XQuery_t const query( f.zorba->compileQuery( open + close ) );
+  Iterator_t const it( query->iterator() );
+  Item element;
+  it->open();
+  check( it->next( element ), "the element" );
+  it->close();
+  ItemSequence_t const sequence( new SingletonItemSequence( element ) );
+  Zorba_SerializerOptions_t options;
+  options.omit_xml_declaration = ZORBA_OMIT_XML_DECLARATION_YES;
+  auto attempt = [&]( long n, long length, long *count ) -> std::string {
+    std::ostringstream out;
+    // As the server's stream: a write that cannot grow the text throws.
+    out.exceptions( std::ios::badbit );
+    inject_arm( n, length );
+    try {
+      Serializer::createSerializer( options )->serialize( sequence.get(), out );
+    }
+    catch ( std::exception const& ) {
+      *count = inject_disarm();
+      return "error";
+    }
+    *count = inject_disarm();
+    return out.str();
+  };
+  long total = 0;
+  std::string const whole( attempt( 0, 0, &total ) );
+  check( whole == open + close, "the serializer: the whole text", whole );
+  long wrong = 0;
+  for ( long const length : { 1L, 8L } )
+    for ( long n = 1; n <= total; ++n ) {
+      long count = 0;
+      std::string const got( attempt( n, length, &count ) );
+      if ( got != whole && got != "error" && ++wrong <= 3 )
+        std::cout << "at " << n << " of a run of " << length << ": " << got
+                  << std::endl;
+    }
+  check( wrong == 0, "the serializer: the whole text or an error",
+         std::to_string( wrong ) + " points" );
+# if defined(__SANITIZE_ADDRESS__)
+  check( __lsan_do_recoverable_leak_check() == 0,
+         "the serializer failing: nothing is left behind" );
+# endif
+#else
+  (void)f;
+#endif
+}
 // An insert into an object with each allocation failing in turn: a failed
 // insert leaves the object as it was, so a later insert and a lookup by name
 // still find what they should. 16 members: the insert builds the object's index
@@ -4476,17 +4542,11 @@ void test_sweep_cache( Fixture const &f ) {
   // A query over dir:open: what is left of a failure in the checks of a path, and
   // in libraries. See the limits of --max-memory in bin/mcp/README.md.
   // Caps: about 1.5 times the most seen in CI (Xerces-C 2 alone and 608 in runs
-  // of 8 of 1990; the others at most 5; ICU, quick-check run 43500984356: 12
-  // alone and 16 in runs of 8 in libicui18n, 12 and 2 in libicuuc).
+  // of 8 of 1990; the others at most 5).
   s.known = {
     // Xerces-C throws OutOfMemoryException from ~XMLGrammarPoolImpl.
     starting( "terminate N11xercesc_", 4, 1, "OutOfMemoryExceptionE" ),
     starting( "terminate N11xercesc_", 900, 8, "OutOfMemoryExceptionE" ),
-    // ICU RegexPattern::zap() after a failed allocation in RegexPattern::compile().
-    library_crash( "signal 11 in libicui18n", true, 24 ),
-    // ICU utext_openConstUnicodeString() after a failed allocation, from
-    // RegexCompile::compile().
-    library_crash( "signal 11 in libicuuc", true, 18 ),
     starting( "error: file:FOFL9999: ", 10 ),
     starting( "error: dir:INVALID_PATH: ", 6 ),
     starting( "error: err:FOCH0002: ", 3 ) };
@@ -8265,6 +8325,7 @@ Test const tests[] = {
   { "exhaust_base64_stream", test_base64_stream_out_of_memory },
   { "exhaust_seekable_stream", test_seekable_stream_out_of_memory },
   { "exhaust_json_loader", test_json_loader_out_of_memory },
+  { "exhaust_serializer", test_serializer_out_of_memory },
   { "exhaust_json_object_add", test_json_object_add_out_of_memory },
   { "exhaust_plan_wrapper", test_plan_wrapper_out_of_memory },
   { "exhaust_plan_open", test_plan_open_out_of_memory },

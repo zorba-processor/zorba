@@ -1,4 +1,4 @@
-(: Per tuple and interleaved (a direct call differs, see s11). :)
+(: Per tuple and interleaved (a direct call does the same, see s11). :)
 declare namespace an = "http://zorba.io/annotations";
 declare %an:assignable variable $g := 0;
 declare %an:sequential function local:bump() { $g := $g + 1; $g };

@@ -1592,6 +1592,12 @@ bool depends_on_call_effects(const expr* root)
   if (call_effects(root) != CompilerCB::CALLS_HAVE_EFFECTS)
     return false;
 
+  return reads_changeable_state(root);
+}
+
+
+bool reads_changeable_state(const expr* root)
+{
   ImpurityWalk w(root);
 
   bool const answer = w.walk(root, true);
@@ -1846,11 +1852,69 @@ void ClosedWorldWalk::walk(const expr* e)
 
 
 /*******************************************************************************
+  Whether every for clause of the flwor gives its binding sequence first: the flwor
+  is sequential, so that each of its iterations runs complete before the next, unless
+  the no-materialization pragma keeps its domains lazy.
+********************************************************************************/
+static bool is_sequential_flwor_with_binding_sequences(flwor_expr* flwor)
+{
+  if (flwor == NULL || !flwor->is_sequential())
+    return false;
+
+  pragma* noMaterialization = NULL;
+  flwor->get_ccb()->lookup_pragma(flwor, "no-materialization", noMaterialization);
+
+  return noMaterialization == NULL;
+}
+
+
+/*******************************************************************************
+  Whether the call needs only a prefix of its first argument and that argument is
+  a loop: it may then stop early over a sequential loop, as over a loop with a call
+  through a function item. A call of a sequential function as the argument still
+  runs to its end.
+********************************************************************************/
+static bool stops_early_over_loop(const fo_expr* fo)
+{
+  switch (fo->get_func()->getKind())
+  {
+  case FunctionConsts::FN_HEAD_1:
+  case FunctionConsts::FN_EXISTS_1:
+  case FunctionConsts::FN_SUBSEQUENCE_2:
+  case FunctionConsts::FN_SUBSEQUENCE_3:
+  case FunctionConsts::OP_ZORBA_SEQUENCE_POINT_ACCESS_2:
+  case FunctionConsts::OP_ZORBA_SUBSEQUENCE_INT_2:
+  case FunctionConsts::OP_ZORBA_SUBSEQUENCE_INT_3:
+    break;
+  default:
+    return false;
+  }
+
+  const expr* arg = fo->get_arg(0);
+
+  while (true)
+  {
+    if (arg->get_expr_kind() == wrapper_expr_kind)
+      arg = static_cast<const wrapper_expr*>(arg)->get_input();
+    else if (arg->get_expr_kind() == treat_expr_kind)
+      arg = static_cast<const treat_expr*>(arg)->get_input();
+    else if (arg->get_expr_kind() == promote_expr_kind)
+      arg = static_cast<const promote_expr*>(arg)->get_input();
+    else
+      break;
+  }
+
+  return arg->get_expr_kind() == flwor_expr_kind;
+}
+
+
+/*******************************************************************************
   Marks, for every for clause reachable from the query, whether its domain has an
-  unproven call, on the tree before the optimizer runs. One walk, bottom up: the
-  answer for an expr is whether it or one of its children is an unproven call, and
-  the answer for a call of a user function covers its body (is_unproven_call()). The
-  bodies of the functions that the query names are marked as well, once.
+  unproven call or its flwor is sequential, on the tree before the optimizer runs.
+  One walk, bottom up: the answer for an expr is whether it or one of its children
+  is an unproven call, and the answer for a call of a user function covers its body
+  (is_unproven_call()). The bodies of the functions that the query names are marked
+  as well, once.
 ********************************************************************************/
 class BindingSequenceWalk
 {
@@ -1926,10 +1990,11 @@ bool BindingSequenceWalk::walk(expr* e)
 
   case fo_expr_kind:
   {
-    const function* f = static_cast<const fo_expr*>(e)->get_func();
+    fo_expr* fo = static_cast<fo_expr*>(e);
     found = is_unproven_call(e);
     theFoundCall = theFoundCall || found;
-    walkFunction(f);
+    walkFunction(fo->get_func());
+    fo->set_stops_early(stops_early_over_loop(fo));
     break;
   }
   case function_item_expr_kind:
@@ -1951,6 +2016,7 @@ bool BindingSequenceWalk::walk(expr* e)
     // The domain of each for clause is walked on its own, for its answer. The rest
     // of the flwor is walked below, with the domains of the for clauses skipped.
     std::set<const expr*> domains;
+    bool const sequentialFlwor = is_sequential_flwor_with_binding_sequences(flwor);
 
     for (csize i = 0; i < flwor->num_clauses(); ++i)
     {
@@ -1964,7 +2030,7 @@ bool BindingSequenceWalk::walk(expr* e)
 
       // Decided once: a clause already marked keeps its mark.
       if (fc->get_binding_sequence() == for_clause::BINDING_SEQUENCE_UNKNOWN)
-        fc->set_binding_sequence(domainFound ?
+        fc->set_binding_sequence(domainFound || sequentialFlwor ?
                                  for_clause::BINDING_SEQUENCE_YES :
                                  for_clause::BINDING_SEQUENCE_NO);
 
@@ -2020,6 +2086,7 @@ bool is_binding_sequence(const for_clause* fc)
 void classify_calls(expr* root)
 {
   CompilerCB* ccb = root->get_ccb();
+  bool hasEffects = true;
 
   // What an eval query can see comes from the query that runs it.
   if (ccb->theIsEval)
@@ -2032,6 +2099,8 @@ void classify_calls(expr* root)
 
     w.walk(root);
 
+    hasEffects = w.theHasEffects;
+
     if (!w.theHasCalls)
       ccb->theCallEffects = CompilerCB::CALLS_ARE_PURE;
     else if (w.theHasEffects)
@@ -2042,7 +2111,10 @@ void classify_calls(expr* root)
       ccb->theCallEffects = CompilerCB::CALLS_ARE_PURE;
   }
 
-  if (ccb->theCallEffects == CompilerCB::CALLS_HAVE_EFFECTS)
+  bool const callsHaveEffects = (ccb->theCallEffects == CompilerCB::CALLS_HAVE_EFFECTS);
+
+  // Only a query with a side effect can have a sequential flwor.
+  if (callsHaveEffects || hasEffects)
   {
     BindingSequenceWalk w(ccb);
     w.walk(root);
@@ -2070,7 +2142,7 @@ void classify_calls(expr* root)
     for (csize j = 0; j < functions.size(); ++j)
       w.walkFunction(functions[j]);
 
-    ccb->theNoHoisting = w.theFoundCall || ccb->theOuterNoHoisting;
+    ccb->theNoHoisting = callsHaveEffects && (w.theFoundCall || ccb->theOuterNoHoisting);
   }
   else
   {

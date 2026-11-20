@@ -18,6 +18,7 @@
 #define ZORBA_SIMPLE_STORE_NODE_ITEMS
 
 #include <cassert>
+#include <memory>
 #include <stack>
 #include <vector>
 
@@ -39,7 +40,7 @@
 #endif /* ZORBA_NO_FULL_TEXT */
 #include "item_vector.h"
 #include "nsbindings.h" // TODO remove by introducing explicit destructors
-#include "ordpath.h"
+#include "node_label.h"
 #include "ptr_vector.h"
 #include "shared_types.h"
 #include "store.h"
@@ -172,6 +173,13 @@ class XmlNodeTokenizerCallback;
   (specified as a qname). Nodes whose type is xs:untyped are not included in this
   map.
 
+  theEmptyContentValues:
+  ----------------------
+  For each element node of a user-defined atomic type whose content is empty
+  and that has the HaveEmptyContentValue flag, the typed value of its empty
+  content, set by validation and revalidation (the store has no schema to
+  compute it). NULL until the first such node.
+
   theTokens:
   ----------
 ********************************************************************************/
@@ -210,6 +218,8 @@ protected:
 #ifndef EMBEDED_TYPE
   NodeTypeMap             * theTypesMap;
 #endif
+
+  std::unique_ptr<NodePointerHashMap<store::Item_t>> theEmptyContentValues;
 
 #ifndef ZORBA_NO_FULL_TEXT
   FTTokenStore              theTokens;
@@ -298,6 +308,12 @@ public:
   void copyTypesMap(const XmlTree* source);
 #endif
 
+  store::Item* getEmptyContentValue(const XmlNode* n) const;
+
+  void setEmptyContentValue(const XmlNode* n, store::Item_t& value);
+
+  void removeEmptyContentValue(const XmlNode* n);
+
 #ifndef ZORBA_NO_FULL_TEXT
   FTTokenStore& getTokenStore() { return theTokens; }
 #endif
@@ -308,7 +324,7 @@ public:
 
   Node identification: A node is uniquely and globally identified by a
   composite key consisting of: the id of the containing collection, the id of
-  the containing tree, and the ordpath of the node within its containing tree.
+  the containing tree, and the label of the node within its containing tree.
 
  ******************************************************************************/
 
@@ -394,6 +410,11 @@ public:
     HaveType              = 0x8000,
 #endif
 
+    // For element nodes only. Set by validation for an element of a
+    // user-defined atomic type with empty content: its tree keeps the typed
+    // value (see XmlTree::theEmptyContentValues).
+    HaveEmptyContentValue = 0x400,
+
     // For any kind of node. Set if an identifier has been generated for the node
     // (see SimpleStore::getNodeReference() method).
     HaveReference         = 0x10000,
@@ -432,6 +453,8 @@ protected:
   virtual void getBaseURIInternal(zstring& uri, bool& local) const;
 
   void attach(InternalNode* parent, csize pos);
+
+  void setRecursiveForSharedSubtree(InternalNode* parent) const;
 
   void detach();
 
@@ -545,7 +568,7 @@ public:
     return getTree()->getCollectionId(); 
   }
 
-  void setId(XmlTree* tree, const OrdPathStack* op);
+  void setId(XmlTree* tree, const NodeLabelBuilder* builder);
 
   void setParent(InternalNode* p) { theParent = p; }
 
@@ -661,7 +684,7 @@ public:
 /******************************************************************************
 
 *******************************************************************************/
-class OrdPathNode : public XmlNode
+class LabeledNode : public XmlNode
 {
   friend class XmlTree;
   friend class NodeFactory;
@@ -676,46 +699,46 @@ class OrdPathNode : public XmlNode
   friend class CommentNode;
 
 protected:
-  OrdPath           theOrdPath;
+  NodeLabel         theLabel;
 
 protected:
-  OrdPathNode() : XmlNode()
+  LabeledNode() : XmlNode()
   {
   }
 
-  OrdPathNode(store::StoreConsts::NodeKind k) : XmlNode(k)
+  LabeledNode(store::StoreConsts::NodeKind k) : XmlNode(k)
   {
   }
 
-  OrdPathNode(
+  LabeledNode(
       XmlTree* tree,
       InternalNode* parent,
       bool append,
       csize pos,
       store::StoreConsts::NodeKind nodeKind);
 
-  virtual ~OrdPathNode() {}
+  virtual ~LabeledNode() {}
 
 public:
   size_t alloc_size() const;
   size_t dynamic_size() const;
 
-  const OrdPath& getOrdPath() const { return theOrdPath; }
+  const NodeLabel& getLabel() const { return theLabel; }
 
-  OrdPath& getOrdPath() { return theOrdPath; }
+  NodeLabel& getLabel() { return theLabel; }
 
-  void setOrdPath(
+  void setLabel(
         InternalNode* parent,
         bool append,
         csize pos,
         store::StoreConsts::NodeKind nodeKind);
 
-  // Looks for a descendant node with the ordpath aOrdPath and puts it into the
+  // Looks for a descendant node with the label aLabel and puts it into the
   // aResult variable. aAttribute specifies whether to look for an attribute or
   // not.
   bool
-  getDescendantNodeByOrdPath(
-      const OrdPath& aOrdPath,
+  getDescendantNodeByLabel(
+      const NodeLabel& aLabel,
       store::Item_t& aResult,
       bool aAttribute = false) const;
 
@@ -756,10 +779,10 @@ public:
 /*******************************************************************************
   Base class for element and document nodes
 ********************************************************************************/
-class InternalNode : public OrdPathNode
+class InternalNode : public LabeledNode
 {
   friend class XmlNode;
-  friend class OrdPathNode;
+  friend class LabeledNode;
   friend class ElementNode;
   friend class AttributeNode;
   friend class TextNode;
@@ -790,7 +813,7 @@ protected:
 
   InternalNode(store::StoreConsts::NodeKind nodeKind)
     :
-    OrdPathNode(nodeKind)
+    LabeledNode(nodeKind)
   {
   }
 
@@ -801,7 +824,7 @@ protected:
       csize pos,
       store::StoreConsts::NodeKind nodeKind)
     :
-    OrdPathNode(tree, parent, append, pos, nodeKind)
+    LabeledNode(tree, parent, append, pos, nodeKind)
   {
   }
 
@@ -928,9 +951,9 @@ protected:
 
   csize removeAttr(XmlNode* attr);
 
-  const OrdPath* getFirstChildOrdPathAfter(csize pos) const;
+  const NodeLabel* getFirstChildLabelAfter(csize pos) const;
 
-  const OrdPath* getFirstChildOrdPathBefore(csize pos) const;
+  const NodeLabel* getFirstChildLabelBefore(csize pos) const;
 
   virtual void swap(Item* anotherItem);
 };
@@ -1110,6 +1133,12 @@ public:
   void resetHaveEmptyTypedValue()    { theFlags &= ~HaveEmptyTypedValue; }
   bool haveEmptyTypedValue() const   { return (theFlags & HaveEmptyTypedValue) != 0; }
 
+  bool haveEmptyContentValue() const { return (theFlags & HaveEmptyContentValue) != 0; }
+
+  void setEmptyContentTypedValue(store::Item_t& value);
+
+  bool getEmptyContentTypedValue(store::Item_t& val) const;
+
   bool haveTypedTypedValue(TextNode*&) const;
 
   TextNode* getUniqueTextChild() const;
@@ -1216,7 +1245,7 @@ private:
 /*******************************************************************************
 
 ********************************************************************************/
-class AttributeNode : public OrdPathNode
+class AttributeNode : public LabeledNode
 {
   friend class XmlNode;
   friend class ElementNode;
@@ -1350,8 +1379,8 @@ protected:
 
 ********************************************************************************/
 #ifdef TEXT_ORDPATH
-class TextNode : public OrdPathNode {
-  typedef OrdPathNode base_type;
+class TextNode : public LabeledNode {
+  typedef LabeledNode base_type;
 #else
 class TextNode : public XmlNode {
   typedef XmlNode base_type;
@@ -1434,7 +1463,7 @@ public:
         const store::CopyMode& copymode) const;
 
 #ifndef TEXT_ORDPATH
-  void getOrdPath(OrdPath& ordPath) const;
+  void getLabel(NodeLabel& label) const;
 #endif
 
   bool isTyped() const;
@@ -1511,7 +1540,7 @@ protected:
 /*******************************************************************************
 
 ********************************************************************************/
-class PiNode : public OrdPathNode
+class PiNode : public LabeledNode
 {
   friend class XmlNode;
   friend class FastXmlLoader;
@@ -1582,7 +1611,7 @@ public:
 /*******************************************************************************
 
 ********************************************************************************/
-class CommentNode : public OrdPathNode
+class CommentNode : public LabeledNode
 {
   friend class XmlNode;
   friend class FastXmlLoader;
@@ -1710,10 +1739,10 @@ inline long XmlNode::compare2(const XmlNode* other) const
       if (tree1 < tree2)
         return -1;
 
-      const OrdPathNode* ordThis = static_cast<const OrdPathNode*>(this);
-      const OrdPathNode* ordOther = static_cast<const OrdPathNode*>(other);
+      const LabeledNode* ordThis = static_cast<const LabeledNode*>(this);
+      const LabeledNode* ordOther = static_cast<const LabeledNode*>(other);
 
-      if (tree1 == tree2 && ordThis->getOrdPath() < ordOther->getOrdPath())
+      if (tree1 == tree2 && ordThis->getLabel() < ordOther->getLabel())
         return -1;
     }
     else
@@ -1724,10 +1753,10 @@ inline long XmlNode::compare2(const XmlNode* other) const
       if (pos1 < pos2)
         return -1;
 
-      const OrdPathNode* ordThis = static_cast<const OrdPathNode*>(this);
-      const OrdPathNode* ordOther = static_cast<const OrdPathNode*>(other);
+      const LabeledNode* ordThis = static_cast<const LabeledNode*>(this);
+      const LabeledNode* ordOther = static_cast<const LabeledNode*>(other);
 
-      if (pos1 == pos2 && ordThis->getOrdPath() < ordOther->getOrdPath())
+      if (pos1 == pos2 && ordThis->getLabel() < ordOther->getLabel())
         return -1;
     }
   }
