@@ -128,6 +128,26 @@ ELSE (TARGET testdriver_mt)
   SET (_testdriver_mt_available 0)
 ENDIF (TARGET testdriver_mt)
 
+# Tests under a directory holding an all-optlevels.txt file also run at O0 and
+# O2 (the testdriver reads ZORBA_OPTLEVEL; the default is O1): their results
+# must not depend on the optimization level. Non-comment lines in the file
+# narrow it to the test names in that directory they match as regex prefixes.
+FILE(GLOB_RECURSE _optlevel_markers FOLLOW_SYMLINKS
+  RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" "all-optlevels.txt")
+SET(_all_optlevels_alts)
+FOREACH(_marker ${_optlevel_markers})
+  GET_FILENAME_COMPONENT(_marker_dir "${_marker}" DIRECTORY)
+  FILE(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/${_marker}" _marker_names REGEX "^[^#]")
+  IF (_marker_names)
+    FOREACH(_marker_name ${_marker_names})
+      LIST(APPEND _all_optlevels_alts "^test/rbkt/${_marker_dir}/${_marker_name}")
+    ENDFOREACH()
+  ELSE()
+    LIST(APPEND _all_optlevels_alts "^test/rbkt/${_marker_dir}/")
+  ENDIF()
+ENDFOREACH()
+STRING(REPLACE ";" "|" _all_optlevels_re "${_all_optlevels_alts}")
+
 FOREACH(TESTFILE ${TESTFILES})
   # All testfile paths end in .xq or .xqx. Strip that part off to form
   # the test name.
@@ -256,13 +276,7 @@ FOREACH(TESTFILE ${TESTFILES})
   IF(NOT SKIP_TEST)
 
     ZORBA_ADD_TEST("${TESTNAME}" testdriver ${TESTFILE})
-    # The window, array member, dynamic function call, iteration-updates, copy
-    # modify target, empty for domain, index collation, index key type, hash
-    # join key error, hash join order, hash join scope, collection reference,
-    # sequential call and queue delete tests must give the same results at every
-    # optimization level (the testdriver reads ZORBA_OPTLEVEL; the default is
-    # O1).
-    IF (TESTNAME MATCHES "^test/rbkt/zorba/(jsoniq-windows|jsoniq-array-members|dynamic-calls|iteration-updates|updates/transform-targets|empty-domain|index-collation|index-keytype-parity|hashjoin-key-errors|hashjoin-order|hashjoin-scope|collection-refs|sequential-calls)/|^test/rbkt/zorba/collections/queue-delete-")
+    IF (_all_optlevels_re AND TESTNAME MATCHES "${_all_optlevels_re}")
       FOREACH (_optlevel O0 O2)
         ZORBA_ADD_TEST("${TESTNAME}-${_optlevel}" testdriver ${TESTFILE})
         SET_TESTS_PROPERTIES ("${TESTNAME}-${_optlevel}" PROPERTIES

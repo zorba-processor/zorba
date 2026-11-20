@@ -70,6 +70,9 @@
 
 #include <libxml/xmlversion.h>
 
+#include <zorba/external_module.h>
+#include <zorba/function.h>
+#include <zorba/item_sequence.h>
 #include <zorba/store_manager.h>
 #include <zorba/zorba.h>
 
@@ -3679,6 +3682,21 @@ void test_sweep_compile( Fixture const &f ) {
   (void)f;
 #endif
 }
+// A token longer than the scanner's input buffer (16 KB): the scanner grows the
+// buffer, and a failed growth is memory_limit like any other allocation.
+void test_sweep_long_token( Fixture const &f ) {
+#if defined(__linux__)
+  Sweep s;
+  s.query = "string-length(\"" + std::string( 20000, 'a' ) + "\")";
+  s.before.push_back( s.query );
+  s.expected = "20000";
+  s.points = 100000;                // all of them
+  s.compiles = true;
+  exhaust_sweep( f, "token longer than the scanner buffer", s );
+#else
+  (void)f;
+#endif
+}
 // The text of a query is read whole, or the call fails: a cut text is not
 // compiled. Every prefix of this query is a valid query with another answer
 // ("1.000…" is 1, without " eq 1" it is not true), so a cut where the copy of the
@@ -3803,18 +3821,16 @@ void test_plan_wrapper_out_of_memory( Fixture const &f ) {
   (void)f;
 #endif
 }
-// Iterator::open() with each allocation failing in turn, over a FLWOR whose open
-// allocates (a let bound to a sequence, group by, order by): the answer or an
+// Iterator::open() with each allocation failing in turn: the answer or an
 // error; then, in an AddressSanitizer build, nothing is left unreachable.
-void test_plan_open_out_of_memory( Fixture const &f ) {
+void sweep_open_out_of_memory( Fixture const &f, StaticContext_t const &sctx,
+                               std::string const &text,
+                               std::string const &answer,
+                               std::string const &what ) {
 #if defined(__linux__)
   auto attempt = [&]( long n, long length, long *count ) -> std::string {
-    XQuery_t const query( f.zorba->compileQuery(
-      "for $i in 1 to 20\n"
-      "let $s := ($i, $i * 2)\n"
-      "group by $k := $i mod 3\n"
-      "order by $k descending\n"
-      "return sum($s)" ) );
+    XQuery_t const query( sctx ? f.zorba->compileQuery( text, sctx )
+                               : f.zorba->compileQuery( text ) );
     Iterator_t const it( query->iterator() );
     inject_arm( n, length );
     bool opened = false;
@@ -3835,26 +3851,79 @@ void test_plan_open_out_of_memory( Fixture const &f ) {
     return out;
   };
   long total = 0;
-  check( attempt( 0, 0, &total ) == "231 210 189", "the FLWOR: the answer" );
-  check( total > 0, "open() allocates", std::to_string( total ) );
+  check( attempt( 0, 0, &total ) == answer, what + ": the answer" );
+  check( total > 0, what + ": open() allocates", std::to_string( total ) );
   long wrong = 0;
   for ( long const length : { 1L, 8L } )
     for ( long n = 1; n <= total; ++n ) {
       long count = 0;
       std::string const got( attempt( n, length, &count ) );
-      if ( got != "231 210 189" && got != "error" && ++wrong <= 3 )
-        std::cout << "at " << n << " of a run of " << length << ": " << got
-                  << std::endl;
+      if ( got != answer && got != "error" && ++wrong <= 3 )
+        std::cout << what << " at " << n << " of a run of " << length << ": "
+                  << got << std::endl;
     }
-  check( wrong == 0, "open() failing: the answer or an error",
+  check( wrong == 0, what + ": open() failing: the answer or an error",
          std::to_string( wrong ) + " points" );
 # if defined(__SANITIZE_ADDRESS__)
   check( __lsan_do_recoverable_leak_check() == 0,
-         "open() failing: nothing is left behind" );
+         what + ": open() failing: nothing is left behind" );
 # endif
 #else
   (void)f;
+  (void)sctx;
+  (void)text;
+  (void)answer;
+  (void)what;
 #endif
+}
+
+// ex:echo($x) returns $x.
+class EchoFunction : public NonContextualExternalFunction {
+public:
+  String getURI() const override { return "urn:mcp-tests:ext"; }
+  String getLocalName() const override { return "echo"; }
+  ItemSequence_t evaluate( Arguments_t const &args ) const override {
+    return args[ 0 ];
+  }
+};
+
+class EchoModule : public ExternalModule {
+public:
+  String getURI() const override { return "urn:mcp-tests:ext"; }
+  ExternalFunction* getExternalFunction( String const& ) override {
+    return &echo_;
+  }
+private:
+  EchoFunction echo_;
+};
+
+// Opening a plan that fails partway destroys each state created so far,
+// including one whose init() failed or did not run: a simple FLWOR (a let bound
+// to a sequence, group by, order by), a general FLWOR (count after group by and
+// order by: GroupByState) and an external function call (ExtFunctionCallIteratorState).
+void test_plan_open_out_of_memory( Fixture const &f ) {
+  sweep_open_out_of_memory( f, StaticContext_t(),
+    "for $i in 1 to 20\n"
+    "let $s := ($i, $i * 2)\n"
+    "group by $k := $i mod 3\n"
+    "order by $k descending\n"
+    "return sum($s)",
+    "231 210 189", "the FLWOR" );
+  sweep_open_out_of_memory( f, StaticContext_t(),
+    "for $i in 1 to 20\n"
+    "group by $k := $i mod 3\n"
+    "order by $k descending\n"
+    "count $c\n"
+    "return $c * sum($i)",
+    "77 140 189", "the general FLWOR" );
+  EchoModule module;
+  StaticContext_t const sctx( f.zorba->createStaticContext() );
+  sctx->registerModule( &module );
+  sweep_open_out_of_memory( f, sctx,
+    "declare namespace ex = \"urn:mcp-tests:ext\";\n"
+    "declare function ex:echo($x) external;\n"
+    "for $i in 1 to 3 return ex:echo($i * 2)",
+    "2 4 6", "the external function call" );
 }
 // The query opened, then read with each allocation failing in turn: the answer
 // or an error; then, in an AddressSanitizer build, nothing is left unreachable.
@@ -3933,6 +4002,17 @@ void test_dynamic_call_out_of_memory( Fixture const &f ) {
     "return (local:g(0), for $i in 1 to 2 return $fs[$i]($i))",
     "0 2 4", "a dynamic function call" );
 }
+// An array constructor appends more members than it reserved room for: a
+// failure while its members grow frees the member being appended. The
+// members are strings, so no copy is made.
+void test_json_array_growth_out_of_memory( Fixture const &f ) {
+  sweep_next_out_of_memory( f,
+    "jsoniq version \"1.0\";\n"
+    "for $i in 1 to 2\n"
+    "let $a := [ for $j in 1 to 4 return concat(\"m\", $j, $i) ]\n"
+    "return $a[[size($a)]]",
+    "m41 m42", "appending to an array" );
+}
 // The body of test_call_body_out_of_memory, cached: each call also looks up
 // and fills the function cache.
 void test_cached_call_body_out_of_memory( Fixture const &f ) {
@@ -3983,6 +4063,85 @@ void test_fold_left_out_of_memory( Fixture const &f ) {
   sweep_next_out_of_memory( f,
     "fold-left((1, 2, 3), 0, function($a, $b) { $a + $b })",
     "6", "fold-left" );
+}
+// The first dynamic call of local:g optimizes its body, with each allocation
+// failing in turn; when that optimization fails, the next run of the same
+// compiled query must optimize the body again (seen in the trees printed after
+// optimization) and give the answer.
+void test_optimize_after_failure( Fixture const &f ) {
+#if defined(__linux__)
+  std::ostringstream trees;
+  Properties &props = Properties::instance();
+  props.setPrintOptimized( true );
+  props.setDebugStream( trees );
+  std::string const optimized( "after optimization for local:g" );
+  auto run = [&]( XQuery_t const &query, long n ) -> std::string {
+    Iterator_t const it( query->iterator() );
+    it->open();
+    inject_arm( n, 1 );
+    std::string out;
+    try {
+      Item item;
+      while ( it->next( item ) )
+        out += ( out.empty() ? "" : " " ) + item.getStringValue().str();
+    }
+    catch ( std::exception const& ) {
+      out = "error";
+    }
+    inject_disarm();
+    it->close();
+    return out;
+  };
+  auto compile = [&]() {
+    XQuery_t query( f.zorba->compileQuery(
+      "declare function local:g($x) { $x * 2 };\n"
+      "let $fs := (local:g#1, local:g#1)\n"
+      "for $i in 1 to 2 return $fs[$i]($i)" ) );
+    trees.str( "" );
+    return query;
+  };
+  long total = 0;
+  {
+    XQuery_t const query( compile() );
+    check( run( query, 0 ) == "2 4", "the query: the answer" );
+    total = inject_count.load();
+    check( trees.str().find( optimized ) != std::string::npos,
+           "the first dynamic call optimizes local:g", trees.str() );
+  }
+  long failed = 0, wrong = 0;
+  for ( long n = 1; n <= total; ++n ) {
+    XQuery_t const query( compile() );
+    if ( run( query, n ) != "error" ||
+         trees.str().find( optimized ) != std::string::npos )
+      continue;
+    ++failed;
+    std::string const got( run( query, 0 ) );
+    if ( ( got != "2 4" || trees.str().find( optimized ) == std::string::npos )
+         && ++wrong <= 3 )
+      std::cout << "after a failure at " << n << ": " << got
+                << ( trees.str().find( optimized ) == std::string::npos
+                     ? ", local:g not optimized" : "" ) << std::endl;
+  }
+  props.setDebugStream( std::cout );
+  props.setPrintOptimized( false );
+  check( failed > 0, "runs that fail before local:g is optimized",
+         std::to_string( failed ) );
+  check( wrong == 0, "the run after a failure optimizes local:g",
+         std::to_string( wrong ) + " points" );
+#else
+  (void)f;
+#endif
+}
+// An object constructor copies the array bound to $a, nested arrays and an
+// object included: a failure while a copy is made frees what it made.
+void test_json_copy_out_of_memory( Fixture const &f ) {
+  sweep_next_out_of_memory( f,
+    "jsoniq version \"1.0\";\n"
+    "for $i in 1 to 2\n"
+    "let $a := [ [ $i, 2 ], { \"b\" : [ $i ] } ]\n"
+    "let $o := { \"x\" : $a, \"y\" : $a }\n"
+    "return $o.x[[2]].b[[1]] + size($o.y[[1]])",
+    "3 4", "copying an array" );
 }
 void test_base64_stream_out_of_memory( Fixture const &f ) {
 #if defined(__linux__)
@@ -8101,6 +8260,7 @@ Test const tests[] = {
   { "exhaust_sweep_compile", test_sweep_compile },
   { "exhaust_sweep_builtins", test_sweep_builtins },
   { "exhaust_sweep_query_text", test_sweep_query_text },
+  { "exhaust_sweep_long_token", test_sweep_long_token },
   { "exhaust_sweep_streamable_text", test_sweep_streamable_text },
   { "exhaust_base64_stream", test_base64_stream_out_of_memory },
   { "exhaust_seekable_stream", test_seekable_stream_out_of_memory },
@@ -8115,6 +8275,7 @@ Test const tests[] = {
   { "exhaust_first_dynamic_call", test_first_dynamic_call_out_of_memory },
   { "exhaust_for_each_pair", test_for_each_pair_out_of_memory },
   { "exhaust_fold_left", test_fold_left_out_of_memory },
+  { "exhaust_json_copy", test_json_copy_out_of_memory },
   { "exhaust_sweep_matcher", test_sweep_matcher },
   { "exhaust_sweep_xml", test_sweep_xml },
   { "exhaust_sweep_xml_dtd", test_sweep_xml_dtd },
@@ -8130,8 +8291,10 @@ Test const tests[] = {
   { "exhaust_sweep_arithmetic", test_sweep_arithmetic },
   { "exhaust_sweep_decimal_thread", test_sweep_decimal_thread },
   { "exhaust_sweep_cache", test_sweep_cache },
+  { "exhaust_json_array_growth", test_json_array_growth_out_of_memory },
   { "exhaust_sweep_kept_malloc", test_sweep_kept_malloc },
   { "exhaust_cache_after_failure", test_cache_after_failed_admission },
+  { "exhaust_optimize_after_failure", test_optimize_after_failure },
   { "exhaust_user_error", test_user_error_named_like_memory },
   { "exhaust_notification", test_notification_out_of_memory },
   { "exhaust_request_id", test_request_id_out_of_memory },
