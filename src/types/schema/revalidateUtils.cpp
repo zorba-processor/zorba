@@ -250,10 +250,11 @@ void SchemaValidatorImpl::processElement(
       tHasTypedValue = false;
 
       store::Item_t emptyValue;
-      if (!isNilled && element->getStringValue().empty())
+      if (!isNilled)
       {
         if (Validator::emptyContentTypedValue(theSctx, typeManager, newType,
-                                              bindings, emptyValue, loc))
+                                              element.getp(), bindings,
+                                              emptyValue, loc))
           tHasEmptyValue = true;
         else if (emptyValue != NULL)
           typedValues.assign(1, emptyValue);
