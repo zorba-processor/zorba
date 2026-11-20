@@ -100,9 +100,11 @@ Rules this code depends on:
     (`on_terminate()`, `--help`).
   - Xerces-C throws from a destructor releasing a schema, at the end of a query that
     imports one, as the directory and xml modules do: abort.
-  - ICU crashes in `RegexPattern::zap()` or in `utext_openConstUnicodeString()`
+  - A stock ICU crashes in `RegexPattern::zap()` or `utext_openConstUnicodeString()`
     (SIGSEGV) if an allocation fails while it compiles a regular expression. The
-    directory module uses some on each call.
+    directory module uses some on each call. The Docker images carry the patched
+    ICU of the zorba-processor fork, which reports the failure instead; the sweeps
+    allow no ICU crash.
   - Running out of memory while the message cannot be parsed (before its id is read,
     and again when it is read once more for its id): the error response has
     `"id": null`, as JSON-RPC 2.0 (section 5) requires when the id cannot be

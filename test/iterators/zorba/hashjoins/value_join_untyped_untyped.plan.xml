@@ -68,24 +68,27 @@
         <ForVarIterator varname="doc"/>
       </ChildAxisIterator>
     </ForVariable>
-    <ForVariable name="$$opt_temp_1">
+    <LetVariable name="$$opt_temp_1" materialize="true">
       <HoistIterator>
         <FnDataIterator>
           <ForVarIterator varname="a"/>
         </FnDataIterator>
       </HoistIterator>
-    </ForVariable>
+    </LetVariable>
     <ReturnClause>
       <FnCountIterator>
         <FLWORIterator>
           <ForVariable name="b">
             <TryCatchIterator>
-              <ProbeIndexPointValueIterator>
-                <SingletonIterator value="xs:QName(,,tempIndex0)"/>
-                <UnhoistIterator>
-                  <ForVarIterator varname="$$opt_temp_1"/>
-                </UnhoistIterator>
-              </ProbeIndexPointValueIterator>
+              <FnConcatIterator>
+                <LetVarIterator varname="$$opt_temp_4"/>
+                <ProbeIndexPointValueIterator>
+                  <SingletonIterator value="xs:QName(,,tempIndex0)"/>
+                  <UnhoistIterator>
+                    <LetVarIterator varname="$$opt_temp_1"/>
+                  </UnhoistIterator>
+                </ProbeIndexPointValueIterator>
+              </FnConcatIterator>
               <UnhoistIterator>
                 <LetVarIterator varname="$$opt_temp_0"/>
               </UnhoistIterator>
@@ -97,7 +100,7 @@
                 <ForVarIterator varname="b"/>
               </FnDataIterator>
               <UnhoistIterator>
-                <ForVarIterator varname="$$opt_temp_1"/>
+                <LetVarIterator varname="$$opt_temp_1"/>
               </UnhoistIterator>
             </TypedValueCompareIterator_STRING>
           </WhereClause>

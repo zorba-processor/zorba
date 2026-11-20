@@ -369,6 +369,7 @@ store::Item_t Validator::processElement(
 
   bool haveTypedValue = true;
   bool haveEmptyValue = false;
+  store::Item_t emptyContentValue;
 
   if ( typeName!=NULL && typeManager!=NULL )
   {
@@ -380,13 +381,23 @@ store::Item_t Validator::processElement(
     {
       haveTypedValue = typeHasValue(schemaType);
       haveEmptyValue = typeHasEmptyValue(schemaType);
+
+      if (haveTypedValue && !haveEmptyValue && !schemaValidator.isNilled() &&
+          element->getStringValue().empty() &&
+          emptyContentTypedValue(sctx, typeManager, schemaType, bindings,
+                                 emptyContentValue, loc))
+        haveEmptyValue = true;
     }
   }
 
   store::Item_t elemName = element->getNodeName();
   GENV_ITEMFACTORY->createElementNode(newElem, parent, elemName,
                                       typeName, haveTypedValue, haveEmptyValue,
-                                      bindings, baseUri, isSubstitutionGroup);
+                                      bindings, baseUri, isSubstitutionGroup,
+                                      schemaValidator.isNilled());
+
+  if (emptyContentValue != NULL)
+    newElem->setEmptyContentTypedValue(emptyContentValue);
 
   processAttributes(sctx,
                     typeManager,
@@ -788,6 +799,36 @@ void Validator::processNamespaces (
   {
     schemaValidator.ns(bindings[i].first, bindings[i].second);
   }
+}
+
+
+bool Validator::emptyContentTypedValue(
+    const static_context* sctx,
+    TypeManager* typeManager,
+    const xqtref_t& aType,
+    store::NsBindings& bindings,
+    store::Item_t& aValue,
+    const QueryLoc& loc)
+{
+  if (aType->type_kind() != XQType::USER_DEFINED_KIND)
+    return false;
+
+  const UserDefinedXQType& udt = static_cast<const UserDefinedXQType&>(*aType);
+
+  if (udt.isList())
+    return true;
+
+  if (udt.isAtomicAny())
+  {
+    namespace_context nsCtx(sctx, bindings);
+    zstring empty;
+    if (!typeManager->getSchema()->parseUserAtomicTypes(empty, aType.getp(),
+                                                        aValue, &nsCtx, loc,
+                                                        false))
+      aValue = NULL;
+  }
+
+  return false;
 }
 
 

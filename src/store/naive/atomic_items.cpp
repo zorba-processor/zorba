@@ -47,7 +47,7 @@
 #include "store_defs.h"
 #include "item_iterator.h"
 #include "node_items.h"
-#include "ordpath.h"
+#include "node_label.h"
 #include "tree_id.h"
 
 #include "util/ascii_util.h"
@@ -1288,13 +1288,13 @@ StructuralAnyUriItem::StructuralAnyUriItem(
     ulong collectionId,
     const TreeId& treeId, 
     store::StoreConsts::NodeKind nodeKind,
-    const OrdPath& ordPath)
+    const NodeLabel& label)
   :
   AtomicItem(t),
   theCollectionId(collectionId),
   theTreeId(treeId),
   theNodeKind(nodeKind),
-  theOrdPath(ordPath),
+  theLabel(label),
   theEncodedValue("")
 {
 }
@@ -1380,7 +1380,7 @@ StructuralAnyUriItem::StructuralAnyUriItem(store::SchemaTypeCode t, zstring& val
 
   try 
   {
-    theOrdPath.deserialize(prefix);
+    theLabel.deserialize(prefix);
   }
   catch(...) 
   {
@@ -1409,7 +1409,7 @@ void StructuralAnyUriItem::encode() const
            << theCollectionId << "."
            << theTreeId << "."
            << static_cast<int>(theNodeKind) << "."
-           << theOrdPath.serialize();
+           << theLabel.serialize();
   zorba::zstring lValue = stream.str();
   theEncodedValue.take(lValue);
 }
@@ -1443,7 +1443,7 @@ bool StructuralAnyUriItem::equals(
   return (lOther->theCollectionId == theCollectionId &&
           lOther->theTreeId == theTreeId &&
           lOther->theNodeKind == theNodeKind &&
-          lOther->theOrdPath == theOrdPath);
+          lOther->theLabel == theLabel);
 }
  
 
@@ -1487,11 +1487,11 @@ long StructuralAnyUriItem::compare(
   {
     return 1;
   }
-  if (theOrdPath < lOther->theOrdPath)
+  if (theLabel < lOther->theLabel)
   {
     return -1;
   }
-  if (theOrdPath > lOther->theOrdPath)
+  if (theLabel > lOther->theLabel)
   {
     return 1;
   }
@@ -1539,7 +1539,7 @@ bool StructuralAnyUriItem::isAncestor(const store::Item_t& aOther) const
     return 
     (other->theCollectionId == theCollectionId &&
      other->theTreeId == theTreeId &&
-     theOrdPath.getRelativePosition(other->theOrdPath) == OrdPath::ANCESTOR);
+     theLabel.getRelativePosition(other->theLabel) == NodeLabel::ANCESTOR);
   }
 }
 
@@ -1568,7 +1568,7 @@ bool StructuralAnyUriItem::isFollowingSibling(const store::Item_t& aOther) const
      other->theTreeId == theTreeId &&
      other->theNodeKind != store::StoreConsts::attributeNode &&
      theNodeKind != store::StoreConsts::attributeNode &&
-     theOrdPath.getRelativePosition2(other->theOrdPath) == OrdPath::FOLLOWING_SIBLING);
+     theLabel.getAdjacentPosition(other->theLabel) == NodeLabel::FOLLOWING_SIBLING);
   }
 }
 
@@ -1595,7 +1595,7 @@ bool StructuralAnyUriItem::isFollowing(const store::Item_t& aOther) const
     return 
     (other->theCollectionId == theCollectionId &&
      other->theTreeId == theTreeId &&
-     theOrdPath.getRelativePosition(other->theOrdPath) == OrdPath::FOLLOWING);
+     theLabel.getRelativePosition(other->theLabel) == NodeLabel::FOLLOWING);
   }
 }
 
@@ -1622,7 +1622,7 @@ bool StructuralAnyUriItem::isDescendant(const store::Item_t& aOther) const
     (other->theCollectionId == theCollectionId &&
      other->theTreeId == theTreeId &&
      other->theNodeKind != store::StoreConsts::attributeNode &&
-     theOrdPath.getRelativePosition(other->theOrdPath) == OrdPath::DESCENDANT);
+     theLabel.getRelativePosition(other->theLabel) == NodeLabel::DESCENDANT);
   }
 }
 
@@ -1648,7 +1648,7 @@ bool StructuralAnyUriItem::isInSubtreeOf(const store::Item_t& aOther) const
     return 
     (other->theCollectionId == theCollectionId &&
      other->theTreeId == theTreeId &&
-     theOrdPath.getRelativePosition(other->theOrdPath) == OrdPath::DESCENDANT);
+     theLabel.getRelativePosition(other->theLabel) == NodeLabel::DESCENDANT);
   }
 }
 
@@ -1676,7 +1676,7 @@ bool StructuralAnyUriItem::isPrecedingSibling(const store::Item_t& aOther) const
      other->theTreeId == theTreeId &&
      other->theNodeKind != store::StoreConsts::attributeNode &&
      theNodeKind != store::StoreConsts::attributeNode &&
-     theOrdPath.getRelativePosition2(other->theOrdPath) == OrdPath::PRECEDING_SIBLING);
+     theLabel.getAdjacentPosition(other->theLabel) == NodeLabel::PRECEDING_SIBLING);
   }
 }
 
@@ -1702,7 +1702,7 @@ bool StructuralAnyUriItem::isPreceding(const store::Item_t& aOther) const
     return 
     (other->theCollectionId == theCollectionId &&
      other->theTreeId == theTreeId &&
-     theOrdPath.getRelativePosition(other->theOrdPath) == OrdPath::PRECEDING);
+     theLabel.getRelativePosition(other->theLabel) == NodeLabel::PRECEDING);
   }
 }
 
@@ -1729,7 +1729,7 @@ bool StructuralAnyUriItem::isChild(const store::Item_t& aOther) const
     (other->theCollectionId == theCollectionId &&
      other->theTreeId == theTreeId &&
      other->theNodeKind != store::StoreConsts::attributeNode &&
-     theOrdPath.getRelativePosition2(other->theOrdPath) == OrdPath::CHILD);
+     theLabel.getAdjacentPosition(other->theLabel) == NodeLabel::CHILD);
   }
 }
 
@@ -1756,7 +1756,7 @@ bool StructuralAnyUriItem::isAttribute(const store::Item_t& aOther) const
     (other->theCollectionId == theCollectionId &&
      other->theTreeId == theTreeId &&
      other->theNodeKind == store::StoreConsts::attributeNode &&
-     theOrdPath.getRelativePosition2(other->theOrdPath) == OrdPath::CHILD);
+     theLabel.getAdjacentPosition(other->theLabel) == NodeLabel::CHILD);
   }
 }
 
@@ -1782,7 +1782,7 @@ bool StructuralAnyUriItem::isParent(const store::Item_t& aOther) const
     return 
     (other->theCollectionId == theCollectionId &&
      other->theTreeId == theTreeId &&
-     theOrdPath.getRelativePosition2(other->theOrdPath) == OrdPath::PARENT);
+     theLabel.getAdjacentPosition(other->theLabel) == NodeLabel::PARENT);
   }
 }
 
@@ -1809,7 +1809,7 @@ bool StructuralAnyUriItem::isPrecedingInDocumentOrder(const store::Item_t& aOthe
         other->theTreeId < theTreeId) ||
     (theCollectionId == other->theCollectionId &&
         other->theTreeId == theTreeId &&
-        theOrdPath > other->theOrdPath));
+        theLabel > other->theLabel));
   }
 }
 
@@ -1836,7 +1836,7 @@ bool StructuralAnyUriItem::isFollowingInDocumentOrder(const store::Item_t& aOthe
         theTreeId < other->theTreeId) ||
     (theCollectionId == other->theCollectionId &&
         other->theTreeId == theTreeId &&
-        theOrdPath < other->theOrdPath));
+        theLabel < other->theLabel));
   }
 }
 
@@ -1844,7 +1844,7 @@ bool StructuralAnyUriItem::isFollowingInDocumentOrder(const store::Item_t& aOthe
 store::Item_t StructuralAnyUriItem::getLevel() const
 {
   store::Item_t lResult;
-  GET_FACTORY().createInteger(lResult, xs_integer(theOrdPath.getLevel()));
+  GET_FACTORY().createInteger(lResult, xs_integer(theLabel.getLevel()));
   return lResult;
 }
 
@@ -1907,11 +1907,11 @@ bool StructuralAnyUriItem::isSibling(const store::Item_t& aOther) const
         other->theNodeKind != store::StoreConsts::attributeNode &&
         theNodeKind != store::StoreConsts::attributeNode)
     {
-      OrdPath::RelativePosition pos = 
-      theOrdPath.getRelativePosition2(other->theOrdPath);
+      NodeLabel::RelativePosition pos = 
+      theLabel.getAdjacentPosition(other->theLabel);
 
-      return (pos == OrdPath::FOLLOWING_SIBLING ||
-              pos==OrdPath::PRECEDING_SIBLING);
+      return (pos == NodeLabel::FOLLOWING_SIBLING ||
+              pos==NodeLabel::PRECEDING_SIBLING);
     }
     else
     {
@@ -1976,7 +1976,7 @@ bool StructuralAnyUriItem::inSameCollection(const store::Item_t& aOther) const
 size_t StructuralAnyUriItem::alloc_size() const
 {
   return  AtomicItem::alloc_size()
-        + ztd::alloc_sizeof( theOrdPath )
+        + ztd::alloc_sizeof( theLabel )
         + ztd::alloc_sizeof( theEncodedValue );
 }
 

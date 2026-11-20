@@ -338,6 +338,7 @@ expr* expr::clone(user_function* udf, substitution_t& subst) const
       cloneExpr->theArgs.push_back(e->theArgs[i]->clone(udf, subst));
 
     cloneExpr->theScriptingKind  = e->theScriptingKind;
+    cloneExpr->theStopsEarly = e->theStopsEarly;
 
     newExpr = cloneExpr;
     break;

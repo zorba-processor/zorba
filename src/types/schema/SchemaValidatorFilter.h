@@ -122,9 +122,18 @@ private:
 
   const XMLCh                                 * theXsiType;
 
-  // for every open element, whether it took an entry of the type stack of
-  // theSchemaValidator, which checkContent pops at its end
-  std::vector<bool>                             theHasTypeEntry;
+  struct OpenElement
+  {
+    // whether it took an entry of the type stack of theSchemaValidator,
+    // which checkContent pops at its end
+    bool hasTypeEntry;
+    // restored before its checkContent: its children reuse the one nil flag of theSchemaValidator
+    bool isNilled;
+    // restored before its checkContent: the check of a child resets it
+    XERCES_CPP_NAMESPACE::DatatypeValidator* datatypeValidator;
+  };
+
+  std::vector<OpenElement>                      theOpenElements;
 
   unsigned int                                  theAttrCount;
 
@@ -136,6 +145,10 @@ private:
   // if current is a substitution element, otherwise NULL
   XMLCh*                                        theSubstitutedElemName;
   XMLCh*                                        theSubstitutedElemUri;
+
+  // After an element is processed, whether it is nilled: xsi:nil is true and
+  // the element declaration that governs it is nillable
+  bool                                          theIsNilled;
 
 public:
   SchemaValidatorFilter(
@@ -199,6 +212,8 @@ public:
 
   virtual const XMLCh* getSubstitutedElemUri()
   {   return theSubstitutedElemUri;  }
+
+  bool isNilled() const { return theIsNilled; }
 
 
 private:

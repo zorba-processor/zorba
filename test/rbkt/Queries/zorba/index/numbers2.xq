@@ -84,7 +84,15 @@ TEST 3:
   idml:probe-index-point-general($num:idx-g-h-untyped, xs:int(2)),
 "
 ",
-  idml:probe-index-point-general($num:idx-g-h-untyped, "2")
+  (: = raises err:XPTY0004 for the string and the typed numeric keys. :)
+  try
+  {
+    idml:probe-index-point-general($num:idx-g-h-untyped, "2")
+  }
+  catch *
+  {
+    <exception>{$err:code} : {$err:description}</exception>
+  }
 }
 ,
 "

@@ -66,6 +66,31 @@ that restrict a union type (see `doc/KNOWN_ISSUES.txt`). The runtime image ships
 only `libxerces-c-3.3.so`. The macOS CI job (Homebrew) and the CodeQL workflow
 (Ubuntu packages) use stock Xerces-C.
 
+The three images also build ICU and libxml2 from the
+[zorba-processor/icu](https://github.com/zorba-processor/icu) and
+[zorba-processor/libxml2](https://github.com/zorba-processor/libxml2) forks
+(branch `zorba-patches`, tags `release-78.3-zorba.1` and `v2.15.4-zorba.1`,
+pinned to commits in each Dockerfile; keep the three in sync): stock ICU
+crashes and stock libxml2's canonicalization drops content when an allocation
+fails (see `doc/KNOWN_ISSUES.txt`). Each process loads one copy of each
+library:
+
+- `builder-latest/` builds them at exactly the versions of Arch's `icu` and
+  `libxml2` packages and installs them over the packages' files in `/usr`, so
+  Arch's libxslt and the Xerces-C fork load the patched copy too. The build
+  stops when Arch moves to another version; move the forks first.
+- `builder/` and `runtime/` install them in `/usr/local` instead of Ubuntu's
+  ICU 74 and libxml2 2.9, which have other sonames; Ubuntu's development
+  packages are not installed. `builder/` also builds libxslt 1.1.45 against
+  them. The runtime image ships the libraries without Ubuntu's.
+
+Each image records the checksums of the patched libraries in
+`/usr/local/share/zorba-patched-libs.sha256`. `scripts/check-patched-libs.sh`
+(run by `ci.yml` in the builder images and by `images.yml` in the runtime
+image) fails when an executable loads more than one copy of ICU or libxml2 or
+a copy that is not the recorded one. The macOS CI job, the CodeQL workflow and
+ClusterFuzzLite use stock ICU and libxml2.
+
 ## Attestations and SBOMs
 
 Release images carry:

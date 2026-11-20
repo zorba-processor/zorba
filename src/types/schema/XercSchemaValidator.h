@@ -222,6 +222,8 @@ public:
 
   void setNillable(bool isNil);
 
+  void setCurrentDatatypeValidator(DatatypeValidator* validator);
+
   void setErrorReporter(XMLErrorReporter* const errorReporter);
 
   void setExitOnFirstFatal(const bool newValue);
@@ -242,6 +244,8 @@ public:
   bool getErrorOccurred() const;
 
   bool getIsElemSpecified() const;
+
+  bool getIsNil() const;
 
   const XMLCh* getNormalizedValue() const;
 
@@ -425,6 +429,12 @@ inline void XercSchemaValidator::setNillable(bool isNil)
 }
 
 
+inline void XercSchemaValidator::setCurrentDatatypeValidator(DatatypeValidator* validator)
+{
+  fCurrentDatatypeValidator = validator;
+}
+
+
 inline void XercSchemaValidator::setExitOnFirstFatal(const bool newValue)
 {
   fSchemaErrorReporter.setExitOnFirstFatal(newValue);
@@ -535,6 +545,12 @@ inline bool XercSchemaValidator::getErrorOccurred() const
 inline bool XercSchemaValidator::getIsElemSpecified() const
 {
   return fElemIsSpecified;
+}
+
+
+inline bool XercSchemaValidator::getIsNil() const
+{
+  return fNil;
 }
 
 
