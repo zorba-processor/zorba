@@ -540,6 +540,8 @@ protected:
   void loadNode(xmlNode *node);
 
 public:
+  static void parserError(void* ctx, ZORBA_XML_ERROR_PTR error);
+
   static void	startDocument(void * ctx);
 
   static void endDocument(void * ctx);
