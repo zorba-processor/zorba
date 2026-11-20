@@ -481,12 +481,17 @@ uint32_t OrdPath::hash() const
 ********************************************************************************/
 bool OrdPath::operator==(const OrdPath& other) const
 {
-  ulong len = getByteLength();
+  unsigned char copy1[MAX_EMBEDDED_BYTE_LEN];
+  unsigned char copy2[MAX_EMBEDDED_BYTE_LEN];
+  ulong len1;
+  ulong len2;
+  const unsigned char* p1 = getComparableData(len1, copy1);
+  const unsigned char* p2 = other.getComparableData(len2, copy2);
 
-  if (len != other.getByteLength())
+  if (len1 != len2)
     return false;
 
-  return !memcmp(getData(), other.getData(), len);
+  return !memcmp(p1, p2, len1);
 }
 
 
@@ -495,14 +500,16 @@ bool OrdPath::operator==(const OrdPath& other) const
 ********************************************************************************/
 int OrdPath::operator<(const OrdPath& other) const
 {
+  unsigned char copy1[MAX_EMBEDDED_BYTE_LEN];
+  unsigned char copy2[MAX_EMBEDDED_BYTE_LEN];
   ulong len1;
   ulong len2;
-  unsigned char* p1 = getDataAndLength(len1);
-  unsigned char* p2 = other.getDataAndLength(len2);
+  const unsigned char* p1 = getComparableData(len1, copy1);
+  const unsigned char* p2 = other.getComparableData(len2, copy2);
 
   if (len1 < len2)
   {
-    unsigned char* end = p1 + len1;
+    const unsigned char* end = p1 + len1;
 
     while (p1 != end)
     {
@@ -519,7 +526,7 @@ int OrdPath::operator<(const OrdPath& other) const
   }
   else
   {
-    unsigned char* end = p2 + len2;
+    const unsigned char* end = p2 + len2;
 
     while (p2 != end)
     {
@@ -542,14 +549,16 @@ int OrdPath::operator<(const OrdPath& other) const
 ********************************************************************************/
 int OrdPath::operator>(const OrdPath& other) const
 {
+  unsigned char copy1[MAX_EMBEDDED_BYTE_LEN];
+  unsigned char copy2[MAX_EMBEDDED_BYTE_LEN];
   ulong len1;
   ulong len2;
-  unsigned char* p1 = getDataAndLength(len1);
-  unsigned char* p2 = other.getDataAndLength(len2);
+  const unsigned char* p1 = getComparableData(len1, copy1);
+  const unsigned char* p2 = other.getComparableData(len2, copy2);
 
   if (len1 <= len2)
   {
-    unsigned char* end = p1 + len1;
+    const unsigned char* end = p1 + len1;
 
     while (p1 != end)
     {
@@ -566,7 +575,7 @@ int OrdPath::operator>(const OrdPath& other) const
   }
   else
   {
-    unsigned char* end = p2 + len2;
+    const unsigned char* end = p2 + len2;
 
     while (p2 != end)
     {
@@ -590,13 +599,15 @@ int OrdPath::operator>(const OrdPath& other) const
 ********************************************************************************/
 OrdPath::RelativePosition OrdPath::getRelativePosition(const OrdPath& other) const
 {
+  unsigned char copy1[MAX_EMBEDDED_BYTE_LEN];
+  unsigned char copy2[MAX_EMBEDDED_BYTE_LEN];
   ulong len1;
   ulong len2;
-  unsigned char* data1 = getDataAndLength(len1);
-  unsigned char* data2 = other.getDataAndLength(len2);
+  const unsigned char* data1 = getComparableData(len1, copy1);
+  const unsigned char* data2 = other.getComparableData(len2, copy2);
 
-  unsigned char* end1 = data1 + len1;
-  unsigned char* end2 = data2 + len2;
+  const unsigned char* end1 = data1 + len1;
+  const unsigned char* end2 = data2 + len2;
 
   if (len1 < len2)
   {
@@ -725,13 +736,13 @@ OrdPath::RelativePosition OrdPath::getRelativePosition2(const OrdPath& other) co
 
   for (ulong i = curr; i < numComps1; ++i)
   {
-    if (dewey1[i] % 2 == 1)
+    if (dewey1[i] % 2 != 0)
       ++extraLevels1;
   }
 
   for (ulong i = curr; i < numComps2; ++i)
   {
-    if (dewey2[i] % 2 == 1)
+    if (dewey2[i] % 2 != 0)
       ++extraLevels2;
   }
 
@@ -1459,17 +1470,16 @@ void OrdPath::bitsNeeded(
       eval >>= 9;
       eval |= 0x00800000;
     }
-    // value in [-INT32_MAX, -1118485] --> 9 bits for code + 20 bits for data
+    // value in [-INT32_MAX, -1118485] --> 10 bits for code + 32 bits for data
     else
     {
-      // 10 bits for code + 32 bits for data
       bitsNeeded = 42;
 
-      value = std::numeric_limits<int32_t>::max() + value;
-
+      // Offset from INT32_MIN, an even base, so that an odd value, which can
+      // end an ordpath, ends with a 1 bit like in every other range.
       eval2 = 0x00400000;
       eval2 <<= 32;
-      eval2 |= value;
+      eval2 |= static_cast<uint32_t>(value) - 0x80000000u;
     }
   }
 
@@ -1643,7 +1653,7 @@ ulong OrdPath::getLevel() const
 
   for (ulong i = 0; i < numComps; ++i)
   {
-    if (dewey[i] % 2 == 1)
+    if (dewey[i] % 2 != 0)
       ++level;
   }
 
@@ -1746,23 +1756,24 @@ void OrdPath::decodeByte(
 
   switch (byte)
   {
-  case 0:    // 0000 0000   00000000 ...            (29/9,20 or 42/10,32)
+  case 0:    // 0000 0000   000000001,... or 0000000001,... (29/9,20 or 42/10,32)
   {
-    ADVANCE(bitLen, byteIndex, bitIndex, 9);
+    ADVANCE(bitLen, byteIndex, bitIndex, 8);
 
-    if (data[byteIndex] >> (7 - bitIndex) == 0)
+    if (((data[byteIndex] >> (7 - bitIndex)) & 0x1) == 0)
     {
-      ADVANCE(bitLen, byteIndex, bitIndex, 1);
+      ADVANCE(bitLen, byteIndex, bitIndex, 2);
       extractValue(data,
                    bitLen,
                    byteIndex,
                    bitIndex,
                    32,
-                   -std::numeric_limits<int32_t>::max(),
+                   std::numeric_limits<int32_t>::min(),
                    deweyid[numComps]);
     }
     else
     {
+      ADVANCE(bitLen, byteIndex, bitIndex, 1);
       extractValue(data, bitLen, byteIndex, bitIndex, 20, -1118484, deweyid[numComps]);
     }
     ++numComps;
@@ -1998,7 +2009,7 @@ void OrdPath::decodeByte(
   }
   case 31:   // 0001 1111   0001,11 + 11 ...        (6/4,2)
   {
-    deweyid[numComps] = -2;
+    deweyid[numComps] = -1;
     ADVANCE(bitLen, byteIndex, bitIndex, 6);
     numComps += 1;
     break;
@@ -2532,7 +2543,7 @@ void OrdPath::decodeByte(
     deweyid[numComps + 2] = 1;
     deweyid[numComps + 3] = 1;
     numComps += 4;
-    byteIndex++;
+    ADVANCE(bitLen, byteIndex, bitIndex, 8);
     break;
   }
   case 86:   // 0101 0110   01 + 01 + 01 + 10, ... (2/2,0 + 2/2,0 + 2/2,0 + 3/2,1)
@@ -2542,9 +2553,10 @@ void OrdPath::decodeByte(
     deweyid[numComps] = 1;
     deweyid[numComps + 1] = 1;
     deweyid[numComps + 2] = 1;
+    compOffsets[numComps+3] = bitLen + 6;
     ADVANCE(bitLen, byteIndex, bitIndex, 8);
     extractValue(data, bitLen, byteIndex, bitIndex, 1, 2, deweyid[numComps + 3]);
-    numComps += 3;
+    numComps += 4;
     break;
   }
   case 87:   // 0101 0111   01 + 01 + 01 + 11 ... (2/2,0 + 2/2,0 + 2/2,0)
@@ -3323,7 +3335,7 @@ void OrdPath::decodeByte(
     compOffsets[numComps+1] = bitLen + 3;
     deweyid[numComps] = 3;
     deweyid[numComps + 1] = 0;
-    ADVANCE(bitLen, byteIndex, bitIndex, 5);
+    ADVANCE(bitLen, byteIndex, bitIndex, 6);
     numComps += 2;
     break;
   }
@@ -3354,7 +3366,7 @@ void OrdPath::decodeByte(
     compOffsets[numComps+1] = bitLen + 3;
     deweyid[numComps] = 3;
     deweyid[numComps + 1] = 0;
-    ADVANCE(bitLen, byteIndex, bitIndex, 5);
+    ADVANCE(bitLen, byteIndex, bitIndex, 6);
     numComps += 2;
     break;
   }
