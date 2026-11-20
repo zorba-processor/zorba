@@ -898,11 +898,18 @@ void SchemaValidatorFilter::attributeEvent(
       theXsiTypeValue.set(value);
       theXsiType = theXsiTypeValue.getRawBuffer();
     }
-    else if(XMLString::equals(localname, SchemaSymbols::fgATT_NILL) &&
-            (XMLString::equals(value, SchemaSymbols::fgATTVAL_TRUE) ||
-             XMLString::equals(value, XSD_BOOLEAN_TRUE_DIGIT)))
+    else if(XMLString::equals(localname, SchemaSymbols::fgATT_NILL))
     {
-      ((XercSchemaValidator*)fValidator)->setNillable(true);
+      // xsi:nil is an xs:boolean, whose value is whitespace collapsed
+      XMLBuffer nilValue(16, fMemoryManager);
+      nilValue.set(value);
+      XMLString::collapseWS(nilValue.getRawBuffer(), fMemoryManager);
+
+      if(XMLString::equals(nilValue.getRawBuffer(), SchemaSymbols::fgATTVAL_TRUE) ||
+         XMLString::equals(nilValue.getRawBuffer(), XSD_BOOLEAN_TRUE_DIGIT))
+      {
+        ((XercSchemaValidator*)fValidator)->setNillable(true);
+      }
     }
     --theAttrCount;  // remove att from the list but still needs to be reported
 
@@ -1613,6 +1620,7 @@ void SchemaValidatorFilter::error(
      !( errCode == XMLValid::AttNotDefined ||
         errCode == XMLValid::AttNotDefinedForElement ||
         errCode == XMLValid::SimpleTypeHasChild ||
+        errCode == XMLValid::NilAttrNotEmpty ||
         errCode == XMLValid::ElementNotValidForContent ||
         errCode == XMLValid::NotEnoughElemsForCM ||
         errCode == XMLValid::EmptyNotValidForContent ||
