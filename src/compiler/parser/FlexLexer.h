@@ -48,6 +48,13 @@
 // Never included before - need to define base class.
 #define __FLEX_LEXER_H
 
+// The version of flex this file comes from.  A scanner flex generates
+// checks it, so that a copy of this file from another flex stops the
+// build with one clear message.
+#define YY_FLEXLEXER_MAJOR_VERSION 2
+#define YY_FLEXLEXER_MINOR_VERSION 7
+#define YY_FLEXLEXER_SUBMINOR_VERSION 1
+
 #include <iostream>
 
 extern "C++" {
@@ -172,8 +179,10 @@ protected:
   std::istream yyin;  // input source for default LexerInput
   std::ostream yyout; // output sink for default LexerOutput
 
-  // yy_hold_char holds the character lost when yytext is formed.
+  // yy_hold_char holds the character lost when yytext is formed, and
+  // yy_hold_ptr is where it was lost.
   char yy_hold_char;
+  char* yy_hold_ptr;
 
   // Number of characters read into yy_ch_buf.
   int yy_n_chars;
