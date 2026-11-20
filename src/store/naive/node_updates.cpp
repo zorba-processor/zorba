@@ -149,7 +149,7 @@ void XmlNode::attach(InternalNode* parent, csize pos)
     ElementNode* elemParent = reinterpret_cast<ElementNode*>(parent);
 
     static_cast<AttributeNode*>(this)->
-    setOrdPath(parent, false, pos, store::StoreConsts::attributeNode);
+    setLabel(parent, false, pos, store::StoreConsts::attributeNode);
 
     elemParent->insertAttr(this, pos);
 
@@ -158,7 +158,7 @@ void XmlNode::attach(InternalNode* parent, csize pos)
   case store::StoreConsts::commentNode:
   {
     static_cast<CommentNode*>(this)->
-    setOrdPath(parent, false, pos, getNodeKind());
+    setLabel(parent, false, pos, getNodeKind());
     
     parent->insertChild(this, pos);
 
@@ -167,7 +167,7 @@ void XmlNode::attach(InternalNode* parent, csize pos)
   case store::StoreConsts::piNode:
   {
     static_cast<PiNode*>(this)->
-    setOrdPath(parent, false, pos, getNodeKind());
+    setLabel(parent, false, pos, getNodeKind());
     
     parent->insertChild(this, pos);
 
@@ -177,7 +177,7 @@ void XmlNode::attach(InternalNode* parent, csize pos)
   {
 #ifdef TEXT_ORDPATH
     static_cast<TextNode*>(this)->
-    setOrdPath(parent, false, pos, getNodeKind());
+    setLabel(parent, false, pos, getNodeKind());
 #endif
 
     parent->insertChild(this, pos);
@@ -189,7 +189,7 @@ void XmlNode::attach(InternalNode* parent, csize pos)
     ElementNode* elemRoot = reinterpret_cast<ElementNode*>(this);
 
     static_cast<ElementNode*>(this)->
-    setOrdPath(parent, false, pos, getNodeKind());
+    setLabel(parent, false, pos, getNodeKind());
     
     parent->insertChild(this, pos);
 
@@ -235,8 +235,7 @@ void XmlNode::attach(InternalNode* parent, csize pos)
         AttributeNode* attr = static_cast<AttributeNode*>(*ite);
 
         attr->setTree(newTree);
-        attr->theOrdPath = elem->theOrdPath;
-        attr->theOrdPath.appendComp(2 * i + 1);
+        attr->theLabel.setAsChild(elem->theLabel, i);
 
         if (attr->isBaseUri())
         {
@@ -288,14 +287,13 @@ void XmlNode::attach(InternalNode* parent, csize pos)
 #ifndef TEXT_ORDPATH
         if (child->getNodeKind() != store::StoreConsts::textNode)
         {
-          OrdPathNode* child2 = static_cast<OrdPathNode*>(child);
+          LabeledNode* child2 = static_cast<LabeledNode*>(child);
           
-          child2->theOrdPath = elem->theOrdPath;
-          child2->theOrdPath.appendComp(2 * (numAttrs + i) + 1);
+          child2->theLabel.setAsChild(elem->theLabel, numAttrs + i);
         }
 #else
-        static_cast<OrdPathNode*>(child)->theOrdPath = elem->theOrdPath;
-        static_cast<OrdPathNode*>(child)->theOrdPath.appendComp(2 * (numAttrs + i) + 1);
+        static_cast<LabeledNode*>(child)->theLabel.setAsChild(elem->theLabel,
+                                                             numAttrs + i);
 #endif
 
         nodes.push(child);
@@ -1261,7 +1259,7 @@ void ElementNode::replaceContent(UpdReplaceElemContent& upd)
     
     newChild->setTree(newTree);
 #ifdef TEXT_ORDPATH
-    newChild->setOrdPath(this, true, 0, store::StoreConsts::textNode);
+    newChild->setLabel(this, true, 0, store::StoreConsts::textNode);
 #endif
     newChild->connect(this, 0);
     

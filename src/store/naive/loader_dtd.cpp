@@ -23,6 +23,7 @@
 #include <libxml/parserInternals.h>
 #include <libxml/uri.h>
 #include <libxml/SAX2.h>
+#include <algorithm>
 #include <cstring>
 #include <memory>
 #include <utility>
@@ -257,6 +258,18 @@ inline void remove_insertion(int &column, int at, int length) {
 }
 
 /**
+ * Moves \a column, on line \a line, to its column in the input.
+ */
+void remove_insertions(FragmentInsertions const &ins, int line, int &column) {
+  if (line == ins.wrapper_line)
+    remove_insertion(column, ins.wrapper_column,
+                     static_cast<int>(sizeof(FRAGMENT_WRAPPER_START) - 1));
+  if (line == 1 && ins.version)
+    remove_insertion(column, static_cast<int>(sizeof(XML_DECL_START)),
+                     static_cast<int>(sizeof(VERSION_INFO) - 1));
+}
+
+/**
  * Whether libxml2 locates the current error in the input rather than in an
  * external entity; it locates an internal entity's error at its reference.
  */
@@ -287,12 +300,7 @@ void locate_in_input(FragmentIStream const &fs, xmlError &e,
     e.line = ins.end_line;
     e.int2 = ins.end_column;
   }
-  if (e.line == ins.wrapper_line)
-    remove_insertion(e.int2, ins.wrapper_column,
-                     static_cast<int>(sizeof(FRAGMENT_WRAPPER_START) - 1));
-  if (e.line == 1 && ins.version)
-    remove_insertion(e.int2, static_cast<int>(sizeof(XML_DECL_START)),
-                     static_cast<int>(sizeof(VERSION_INFO) - 1));
+  remove_insertions(ins, e.line, e.int2);
 
   if (e.code != XML_ERR_TAG_NAME_MISMATCH)
     return;
@@ -326,7 +334,7 @@ FragmentXmlLoader::FragmentXmlLoader(
   FastXmlLoader(factory, xqueryDiagnostics, loadProperties, dataguide),
   theFragmentStream(NULL)
 {
-  theOrdPath.init();
+  theLabelBuilder.init();
 
   theTraceLevel = GET_STORE().getTraceLevel();
 
@@ -496,6 +504,8 @@ void FragmentXmlLoader::replay(FragmentEvent const &ev)
 {
   FragmentIStream &fs = *theFragmentStream;
   int const skip = fs.root_elements_to_skip;
+  theEventLine = ev.line;
+  theEventColumn = ev.column;
 
   switch (ev.kind)
   {
@@ -583,6 +593,13 @@ void FragmentXmlLoader::replay(FragmentEvent const &ev)
                                            xml_str(ev.text));
     break;
   }
+}
+
+
+void FragmentXmlLoader::dataPosition(int& aLine, int& aColumn)
+{
+  aLine = theEventLine;
+  aColumn = theEventColumn;
 }
 
 
@@ -708,6 +725,15 @@ FragmentIStream* FragmentXmlLoader::streamOf(void *ctx)
 }
 
 
+// Where in the input the parser is, without what the wrapper added.
+static void stamp(void *ctx, FragmentIStream const &fs, FragmentEvent &ev)
+{
+  ev.line = xmlSAX2GetLineNumber(ctx);
+  ev.column = xmlSAX2GetColumnNumber(ctx);
+  remove_insertions(fs.insertions, ev.line, ev.column);
+}
+
+
 // Nothing may leave these callbacks: libxml2 is C code.
 void FragmentXmlLoader::recordOutOfMemory(void *ctx) noexcept
 {
@@ -759,6 +785,7 @@ try
     ev.attributes.push_back(attr);
   }
   ev.nb_defaulted = nb_defaulted;
+  stamp(ctx, fs, ev);
   fs.events.push_back(std::move(ev));
 }
 catch (std::bad_alloc const&)
@@ -785,6 +812,7 @@ try
   ev.prefix = to_string(prefix);
   ev.has_uri = URI != NULL;
   ev.uri = to_string(URI);
+  stamp(ctx, fs, ev);
   fs.events.push_back(std::move(ev));
 }
 catch (std::bad_alloc const&)
@@ -813,6 +841,7 @@ try
   FragmentEvent ev;
   ev.kind = kind;
   ev.text.assign(reinterpret_cast<char const*>(text), len);
+  stamp(ctx, fs, ev);
   fs.events.push_back(std::move(ev));
 }
 catch (std::bad_alloc const&)
@@ -849,7 +878,9 @@ try
   FragmentEvent ev;
   ev.kind = FragmentEvent::COMMENT;
   ev.text = to_string(value);
-  streamOf(ctx)->events.push_back(std::move(ev));
+  FragmentIStream &fs = *streamOf(ctx);
+  stamp(ctx, fs, ev);
+  fs.events.push_back(std::move(ev));
 }
 catch (std::bad_alloc const&)
 {
@@ -869,7 +900,9 @@ try
   ev.kind = FragmentEvent::PI;
   ev.name = to_string(target);
   ev.text = to_string(data);
-  streamOf(ctx)->events.push_back(std::move(ev));
+  FragmentIStream &fs = *streamOf(ctx);
+  stamp(ctx, fs, ev);
+  fs.events.push_back(std::move(ev));
 }
 catch (std::bad_alloc const&)
 {
@@ -898,6 +931,18 @@ catch (std::bad_alloc const&)
 /*******************************************************************************
 
 ********************************************************************************/
+void DtdXmlLoader::parserError(void* ctx, ZORBA_XML_ERROR_PTR error)
+{
+  // A document without a DTD is accepted under DTD validation.
+  if (error->code == XML_ERR_NO_DTD)
+    return;
+  XmlLoader::error(static_cast<xmlParserCtxtPtr>(ctx)->_private, error);
+}
+
+
+/*******************************************************************************
+
+********************************************************************************/
 DtdXmlLoader::DtdXmlLoader(
     store::ItemFactory* factory,
     XQueryDiagnostics* xqueryDiagnostics,
@@ -909,7 +954,7 @@ DtdXmlLoader::DtdXmlLoader(
   theRootNode(NULL),
   theNodeStack(2048)
 {
-  theOrdPath.init();
+  theLabelBuilder.init();
 
   theTraceLevel = GET_STORE().getTraceLevel();
 
@@ -994,7 +1039,7 @@ void DtdXmlLoader::abortload()
     theTree = NULL;
   }
 
-  theOrdPath.init();
+  theLabelBuilder.init();
   theRootNode = NULL;
 
   thePathStack.clear();
@@ -1038,7 +1083,7 @@ void DtdXmlLoader::reset()
   zstring().swap(theDocUri);
 
   theTree = NULL;
-  theOrdPath.init();
+  theLabelBuilder.init();
   theRootNode = NULL;
 
   if ( !theNodeStack.empty() )
@@ -1178,6 +1223,11 @@ store::Item_t DtdXmlLoader::loadXml(
       return NULL;
     }
 
+    // libxml2's tree builder needs the context as its SAX user data, so the
+    // errors reach this loader through _private.
+    ctxt->_private = this;
+    ctxt->sax->serror = &DtdXmlLoader::parserError;
+
     // Set the LibXml DTD validation options
     /*
     int options = XML_PARSE_COMPACT;
@@ -1209,9 +1259,8 @@ store::Item_t DtdXmlLoader::loadXml(
     else if (parsed == -1)
     {
       // std::cout << "  xmlParseDocument: Error: Unable to create tree: " << xmlCtxtGetLastError(ctxt)->message << std::endl;
-      // The parser's errors reach no handler of this loader; an exceeded
-      // limit is its last one, as the parser stops there.
-      if (!reportParserLimit(xmlCtxtGetLastError(ctxt)))
+      if (theXQueryDiagnostics->errors().empty() &&
+          !reportParserLimit(xmlCtxtGetLastError(ctxt)))
         theXQueryDiagnostics->add_error(NEW_ZORBA_EXCEPTION(zerr::ZSTR0021_LOADER_PARSING_ERROR,ERROR_PARAMS( ZED( XMLParserNoCreateTree ) )));
       abortload();
       return NULL;
@@ -1490,8 +1539,8 @@ void DtdXmlLoader::startDocument(void * ctx)
 
     docNode->setBaseUri(loader.theBaseUri);
     docNode->setDocUri(loader.theDocUri);
-    docNode->setId(loader.theTree, &loader.theOrdPath);
-    loader.theOrdPath.pushChild();
+    docNode->setId(loader.theTree, &loader.theLabelBuilder);
+    loader.theLabelBuilder.pushChild();
 
     LOADER_TRACE1("Start Doc Node = " << docNode);
   }
@@ -1727,13 +1776,13 @@ void DtdXmlLoader::startElement(
     }
 
     // Assign the current node id to this node, and compute the next node id.
-    elemNode->setId(loader.theTree, &loader.theOrdPath);
-    loader.theOrdPath.pushChild();
+    elemNode->setId(loader.theTree, &loader.theLabelBuilder);
+    loader.theLabelBuilder.pushChild();
 
     LOADER_TRACE1("Start Element: node = " << elemNode << " name = ["
                   << (prefix != NULL ? prefix : (xmlChar*)"") << ":" << lname
                   << " (" << (uri != NULL ? uri : (xmlChar*)"NULL") << ")]"
-                  << std::endl << " ordpath = " << elemNode->getOrdPath().show()
+                  << std::endl << " ordpath = " << elemNode->getLabel().show()
                   << std::endl);
 
     // Process namespace bindings
@@ -1854,7 +1903,7 @@ void DtdXmlLoader::startElement(
       }
 
       attrNode->theParent = elemNode;
-      attrNode->setId(loader.theTree, &loader.theOrdPath);
+      attrNode->setId(loader.theTree, &loader.theLabelBuilder);
       attrNode->theTypedValue.transfer(typedValue);
       attrNode->setType(typeName);
 
@@ -1882,14 +1931,14 @@ void DtdXmlLoader::startElement(
         }
       }
 
-      loader.theOrdPath.nextChild();
+      loader.theLabelBuilder.nextChild();
 
       LOADER_TRACE2("Attribute: node = " << attrNode << " name ["
                     << (prefix != NULL ? prefix : "") << ":" << lname << " ("
                     << (uri != NULL ? uri : "NULL") << ")]" << " value = "
                     << attrNode->theTypedValue->getStringValue()
                     << std::endl << " ordpath = "
-                    << attrNode->getOrdPath().show() << std::endl);
+                    << attrNode->getLabel().show() << std::endl);
 
 
       i++;
@@ -2031,7 +2080,7 @@ void  DtdXmlLoader::endElement(
     }
 
     // Adjust the dewey id
-    loader.theOrdPath.popChild();
+    loader.theLabelBuilder.popChild();
 
 #ifdef DATAGUIDE
     if (loader.theBuildDataGuide)
@@ -2083,15 +2132,15 @@ void DtdXmlLoader::characters(void * ctx, const xmlChar * ch, int len)
 
     loader.theNodeStack.push(textNode);
 
-    textNode->setId(loader.theTree, &loader.theOrdPath);
-    loader.theOrdPath.nextChild();
+    textNode->setId(loader.theTree, &loader.theLabelBuilder);
+    loader.theLabelBuilder.nextChild();
 
 #ifndef NDEBUG
     std::stringstream lSs;
     lSs << "Text Node = " << textNode << " content = "
         << std::string(charp, len) << std::endl
 #ifdef TEXT_ORDPATH
-        << " ordpath = " << textNode->getOrdPath().show()
+        << " ordpath = " << textNode->getLabel().show()
 #endif
         << std::endl;
     LOADER_TRACE2(lSs.str());
@@ -2140,15 +2189,15 @@ void DtdXmlLoader::cdataBlock(void * ctx, const xmlChar * ch, int len)
 
     loader.theNodeStack.push(cdataNode);
 
-    cdataNode->setId(loader.theTree, &loader.theOrdPath);
-    loader.theOrdPath.nextChild();
+    cdataNode->setId(loader.theTree, &loader.theLabelBuilder);
+    loader.theLabelBuilder.nextChild();
 
 #ifndef NDEBUG
     std::stringstream lSs;
     lSs << "CDATA Node = " << cdataNode << " content = "
         << std::string(charp, len) << std::endl
 #ifdef TEXT_ORDPATH
-        << " ordpath = " << cdataNode->getOrdPath().show()
+        << " ordpath = " << cdataNode->getLabel().show()
 #endif
         << std::endl;
   LOADER_TRACE2(lSs.str());
@@ -2201,12 +2250,12 @@ void DtdXmlLoader::processingInstruction(
 
     loader.theNodeStack.push(piNode);
 
-    piNode->setId(loader.theTree, &loader.theOrdPath);
-    loader.theOrdPath.nextChild();
+    piNode->setId(loader.theTree, &loader.theLabelBuilder);
+    loader.theLabelBuilder.nextChild();
 
     LOADER_TRACE2("Pi Node = " << piNode << " target = "
                   << targetp << std::endl << " ordpath = "
-                  << piNode->getOrdPath().show() << std::endl);
+                  << piNode->getLabel().show() << std::endl);
   }
   catch (ZorbaException const& e)
   {
@@ -2248,12 +2297,12 @@ void DtdXmlLoader::comment(void * ctx, const xmlChar * ch)
 
     loader.theNodeStack.push(commentNode);
 
-    commentNode->setId(loader.theTree, &loader.theOrdPath);
-    loader.theOrdPath.nextChild();
+    commentNode->setId(loader.theTree, &loader.theLabelBuilder);
+    loader.theLabelBuilder.nextChild();
 
     LOADER_TRACE2("Comment Node = " << commentNode << " content = "
                   << charp << std::endl << " ordpath = "
-                  << commentNode->getOrdPath().show() << std::endl);
+                  << commentNode->getLabel().show() << std::endl);
   }
   catch (ZorbaException const& e)
   {

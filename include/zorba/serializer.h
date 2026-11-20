@@ -29,6 +29,12 @@ namespace zorba {
 
       virtual ~Serializer() {}
 
+      /**
+       * Writes \c object to \c stream, then flushes \c stream.
+       *
+       * @throw ZorbaException with zerr::ZOSE0004_IO_ERROR if a write to
+       *        \c stream fails and the stream does not throw on \c badbit.
+       */
       virtual void
       serialize(
         ItemSequence  *object,
@@ -43,6 +49,12 @@ namespace zorba {
       static Serializer_t
       createSerializer(ItemSequence* options);
 
+      /**
+       * Writes \c object to \c stream, then flushes \c stream.
+       *
+       * @throw ZorbaException with zerr::ZOSE0004_IO_ERROR if a write to
+       *        \c stream fails and the stream does not throw on \c badbit.
+       */
       virtual void
       serialize(
         Iterator_t object,

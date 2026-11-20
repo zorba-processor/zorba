@@ -558,6 +558,13 @@ void UpdSetElementType::apply()
       else
         textChild->resetHaveListValue();
     }
+    // Without a text child, a single value is the typed value of the empty
+    // content (user-defined atomic types). Undo leaves it: it is used only
+    // while the element has the value's type.
+    else if (theTypedValue != NULL && !theHaveListTypedValue)
+    {
+      target->setEmptyContentTypedValue(theTypedValue);
+    }
   }
   else
   {

@@ -101,6 +101,21 @@ class Validator
     return t->contentKind() == XQType::EMPTY_CONTENT_KIND;
   }
 
+  /**
+   * The typed value of the empty content (no text child) of an element of
+   * type aType: returns true for a list type, whose typed value is then the
+   * empty sequence; sets aValue to the value of "" for a user-defined atomic
+   * type that allows it (the store, which has no schema, keeps it). A
+   * built-in atomic type's the store makes itself.
+   */
+  static bool emptyContentTypedValue(
+        const static_context* sctx,
+        TypeManager* typeManager,
+        const xqtref_t& aType,
+        store::NsBindings& bindings,
+        store::Item_t& aValue,
+        const QueryLoc& loc);
+
 private:
   static bool realValidationValue(
         store::Item_t& result,
