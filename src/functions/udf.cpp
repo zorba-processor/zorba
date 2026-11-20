@@ -482,58 +482,67 @@ void user_function::optimize()
       theCCB->theConfig.opt_level > CompilerCB::config::O0)
   {
     // Set the Optimized flag in advance to prevent an infinte loop (for
-    // recursive functions, an optimization could be attempted again)
+    // recursive functions, an optimization could be attempted again). A failed
+    // optimization clears it, so that the next getPlan() optimizes again.
     theIsOptimized = true;
 
-    csize numParams = theArgVars.size();
-
-    expr* body = getBody();
-
-    RewriterContext rctx(theCCB,
-                         body,
-                         this,
-                         zstring(),
-                         body->get_sctx()->is_in_ordered_mode());
-
-    GENV_COMPILERSUBSYS.getDefaultOptimizingRewriter()->rewrite(rctx);
-    body = rctx.getRoot();
-
-    setBody(body);
-
-    if (theBodyExpr->dereferencesNodes())
-      setFlag(FunctionConsts::DereferencesNodes);
-
-    if (theBodyExpr->constructsNodes())
-      setFlag(FunctionConsts::ConstructsNodes);
-
-    if (theBodyExpr->isUnfoldable())
-      setFlag(FunctionConsts::AccessesDynCtx);
-
-    numParams = theArgVars.size();
-
-    theIgnoresSortedNodes.resize(numParams);
-    theIgnoresDuplicateNodes.resize(numParams);
-    theMustCopyInputNodes.resize(numParams);
-    thePropagatesInputNodes.resize(numParams);
-
-    for (csize i = 0; i < numParams; ++i)
+    try
     {
-      theIgnoresSortedNodes[i] = theArgVars[i]->getIgnoresSortedNodes();
-      theIgnoresDuplicateNodes[i] = theArgVars[i]->getIgnoresDuplicateNodes();
-      theMustCopyInputNodes[i] = 1;
-      thePropagatesInputNodes[i] = 1;
+      csize numParams = theArgVars.size();
+
+      expr* body = getBody();
+
+      RewriterContext rctx(theCCB,
+                           body,
+                           this,
+                           zstring(),
+                           body->get_sctx()->is_in_ordered_mode());
+
+      GENV_COMPILERSUBSYS.getDefaultOptimizingRewriter()->rewrite(rctx);
+      body = rctx.getRoot();
+
+      setBody(body);
+
+      if (theBodyExpr->dereferencesNodes())
+        setFlag(FunctionConsts::DereferencesNodes);
+
+      if (theBodyExpr->constructsNodes())
+        setFlag(FunctionConsts::ConstructsNodes);
+
+      if (theBodyExpr->isUnfoldable())
+        setFlag(FunctionConsts::AccessesDynCtx);
+
+      numParams = theArgVars.size();
+
+      theIgnoresSortedNodes.resize(numParams);
+      theIgnoresDuplicateNodes.resize(numParams);
+      theMustCopyInputNodes.resize(numParams);
+      thePropagatesInputNodes.resize(numParams);
+
+      for (csize i = 0; i < numParams; ++i)
+      {
+        theIgnoresSortedNodes[i] = theArgVars[i]->getIgnoresSortedNodes();
+        theIgnoresDuplicateNodes[i] = theArgVars[i]->getIgnoresDuplicateNodes();
+        theMustCopyInputNodes[i] = 1;
+        thePropagatesInputNodes[i] = 1;
+      }
+
+      if (theCCB->theConfig.optimize_cb != NULL)
+      {
+        if (getName())
+        {
+          theCCB->theConfig.optimize_cb(body, getName()->getStringValue().c_str());
+        }
+        else
+        {
+          theCCB->theConfig.optimize_cb(body, "inline function");
+        }
+      }
     }
-
-    if (theCCB->theConfig.optimize_cb != NULL)
+    catch (...)
     {
-      if (getName())
-      {
-        theCCB->theConfig.optimize_cb(body, getName()->getStringValue().c_str());
-      }
-      else
-      {
-        theCCB->theConfig.optimize_cb(body, "inline function");
-      }
+      theIsOptimized = false;
+      throw;
     }
   }
 }

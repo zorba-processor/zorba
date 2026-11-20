@@ -16,6 +16,7 @@
 
 #include "runtime/util/stack_limit.h"
 
+#include <cerrno>
 #include <cstdint>
 
 #if defined(__EMSCRIPTEN__)
@@ -39,6 +40,7 @@ struct Bounds
   uintptr_t low = 0;   // lowest usable address (the stack grows down)
   uintptr_t high = 0;  // highest address; 0 = unknown
   size_t reserve = 0;
+  bool settled = true; // false: query again on the next call
 };
 
 Bounds query_bounds()
@@ -56,7 +58,10 @@ Bounds query_bounds()
   b.high = top;
 #elif defined(__unix__)
   pthread_attr_t attr;
-  if (pthread_getattr_np(pthread_self(), &attr) == 0)
+  int const lError = pthread_getattr_np(pthread_self(), &attr);
+  // Out of memory now, not for the thread's life.
+  b.settled = lError != ENOMEM;
+  if (lError == 0)
   {
     void* addr = nullptr;
     size_t size = 0;
@@ -99,8 +104,11 @@ Bounds query_bounds()
 
 const Bounds& bounds()
 {
-  // A thread's stack does not move; query it once per thread.
-  thread_local Bounds const theBounds = query_bounds();
+  // A thread's stack does not move; query it once per thread, again only
+  // after a failure for lack of memory.
+  thread_local Bounds theBounds{0, 0, 0, false};
+  if (!theBounds.settled)
+    theBounds = query_bounds();
   return theBounds;
 }
 
