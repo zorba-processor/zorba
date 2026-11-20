@@ -11,7 +11,7 @@ declare namespace d = "http://test.example.com/d/";
 declare namespace ann = "http://zorba.io/annotations";
 
 
-declare collection n:foo as node();
+declare collection n:foo as node()*;
 
 
 declare %ann:automatic %ann:nonunique %ann:value-equality index n:index

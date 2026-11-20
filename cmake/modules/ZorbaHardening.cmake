@@ -29,8 +29,9 @@ OPTION(ZORBA_HARDENING
   ${_zorba_hardening_default})
 
 IF (ZORBA_HARDENING)
+  STRING(TOUPPER "${CMAKE_BUILD_TYPE}" _zorba_build_type)
   IF (CMAKE_CXX_FLAGS MATCHES "fsanitize=address" OR
-      CMAKE_CXX_FLAGS_${CMAKE_BUILD_TYPE} MATCHES "fsanitize=address")
+      CMAKE_CXX_FLAGS_${_zorba_build_type} MATCHES "fsanitize=address")
     MESSAGE(STATUS "Hardening: disabled, AddressSanitizer detected")
   ELSE()
     MESSAGE(STATUS "Hardening: enabled")

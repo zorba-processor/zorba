@@ -18,7 +18,9 @@
 // must stop them, the memory of a completed call must be released, and
 // releasing it must not change results.
 
+#include <atomic>
 #include <chrono>
+#include <cstddef>
 #include <cstdint>
 #include <exception>
 #include <fstream>
@@ -48,6 +50,24 @@ using std::chrono::steady_clock;
 # if __has_feature(address_sanitizer) || __has_feature(thread_sanitizer)
 #  define ZORBA_TEST_SANITIZER 1
 # endif
+#endif
+
+#if defined(__SANITIZE_ADDRESS__)
+# define ZORBA_TEST_ASAN 1
+#elif defined(__has_feature)
+# if __has_feature(address_sanitizer)
+#  define ZORBA_TEST_ASAN 1
+# endif
+#endif
+
+#ifdef ZORBA_TEST_ASAN
+// From <sanitizer/allocator_interface.h>, which not every toolchain installs.
+extern "C" {
+int __sanitizer_install_malloc_and_free_hooks(
+    void (*aMallocHook)(const volatile void*, size_t),
+    void (*aFreeHook)(const volatile void*));
+size_t __sanitizer_get_allocated_size(const volatile void* aPtr);
+}
 #endif
 
 namespace {
@@ -228,6 +248,54 @@ struct RunPeak
   }
 };
 
+#ifdef ZORBA_TEST_ASAN
+// The peak of the live heap during one run, from the allocator hooks of
+// AddressSanitizer. Unlike the resident size, it leaves out the freed blocks
+// in quarantine, so memory that a run keeps until it ends shows at its size.
+class LiveHeapPeak
+{
+  static std::atomic<long long> theLive;
+  static std::atomic<long long> thePeak;
+
+  long long theStart;
+
+  static void on_malloc(const volatile void*, size_t aSize)
+  {
+    long long const live = theLive += static_cast<long long>(aSize);
+    long long peak = thePeak.load(std::memory_order_relaxed);
+    while (live > peak && !thePeak.compare_exchange_weak(peak, live))
+    {
+    }
+  }
+
+  static void on_free(const volatile void* aPtr)
+  {
+    if (aPtr != nullptr)
+      theLive -= static_cast<long long>(
+          __sanitizer_get_allocated_size(aPtr));
+  }
+
+public:
+  // False if the hooks could not be installed.
+  static bool install()
+  {
+    static bool const installed =
+      __sanitizer_install_malloc_and_free_hooks(on_malloc, on_free) != 0;
+    return installed;
+  }
+
+  LiveHeapPeak() : theStart(theLive.load())
+  {
+    thePeak.store(theStart);
+  }
+
+  long long growth() const { return thePeak.load() - theStart; }
+};
+
+std::atomic<long long> LiveHeapPeak::theLive{0};
+std::atomic<long long> LiveHeapPeak::thePeak{0};
+#endif
+
 // %N% is replaced by the argument of the outermost call.
 const char UNDECLARED[] =
   "declare function local:f($n)\n"
@@ -318,6 +386,14 @@ void test_memory(Zorba* z)
   int const n = 17;
   long long const allowed = 128LL << 20;
 #endif
+#ifdef ZORBA_TEST_ASAN
+  // The quarantine and the allocator's caches hide retained calls from the
+  // resident size. Measured per run at n = 15: the live heap grew by under
+  // 1 MiB; without the release of completed calls, the resident size grew by
+  // as little as 115 MiB while the live heap grew by 170 to 284 MiB.
+  long long const allowedLive = 32LL << 20;
+  CHECK(LiveHeapPeak::install());
+#endif
   SecurityPolicy const p = SecurityPolicy::unrestricted();
   AddressSpaceLimit const limit(ADDRESS_SPACE);
 
@@ -350,12 +426,22 @@ void test_memory(Zorba* z)
     for (int const m : { n - 2, n - 1 })
     {
       RunPeak const rp;
+# ifdef ZORBA_TEST_ASAN
+      LiveHeapPeak const lp;
+# endif
       Outcome const o = run(z, p, with_n(shape, m));
       std::cout << "  n=" << m << ": peak RSS grew by " << (rp.growth() >> 20)
-                << " MiB; " << o << std::endl;
+                << " MiB"
+# ifdef ZORBA_TEST_ASAN
+                << ", live heap by " << (lp.growth() >> 20) << " MiB"
+# endif
+                << "; " << o << std::endl;
       CHECK(o.ok && o.value == std::to_string(1 << m));
     }
     RunPeak const rp;
+#endif
+#ifdef ZORBA_TEST_ASAN
+    LiveHeapPeak const lp;
 #endif
     Outcome const o = run(z, p, with_n(shape, n));
 #ifdef ZORBA_TEST_SANITIZER
@@ -364,8 +450,15 @@ void test_memory(Zorba* z)
 #else
     long long const grown = peak_rss() - base;
 #endif
+#ifdef ZORBA_TEST_ASAN
+    long long const live = lp.growth();
+#endif
     std::cout << "  n=" << n << ": peak RSS grew by " << (grown >> 20)
-              << " MiB; " << o << std::endl;
+              << " MiB"
+#ifdef ZORBA_TEST_ASAN
+              << ", live heap by " << (live >> 20) << " MiB"
+#endif
+              << "; " << o << std::endl;
     CHECK(o.ok && o.value == std::to_string(1 << n));
     if (grown >= allowed)
     {
@@ -373,6 +466,14 @@ void test_memory(Zorba* z)
                 << (allowed >> 20) << " MiB:\n" << shape << std::endl;
       ++theFailures;
     }
+#ifdef ZORBA_TEST_ASAN
+    if (live >= allowedLive)
+    {
+      std::cerr << "live heap grew by " << (live >> 20) << " MiB, allowed "
+                << (allowedLive >> 20) << " MiB:\n" << shape << std::endl;
+      ++theFailures;
+    }
+#endif
   }
 
 }
