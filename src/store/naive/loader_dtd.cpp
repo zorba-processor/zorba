@@ -257,6 +257,18 @@ inline void remove_insertion(int &column, int at, int length) {
 }
 
 /**
+ * Moves \a column, on line \a line, to its column in the input.
+ */
+void remove_insertions(FragmentInsertions const &ins, int line, int &column) {
+  if (line == ins.wrapper_line)
+    remove_insertion(column, ins.wrapper_column,
+                     static_cast<int>(sizeof(FRAGMENT_WRAPPER_START) - 1));
+  if (line == 1 && ins.version)
+    remove_insertion(column, static_cast<int>(sizeof(XML_DECL_START)),
+                     static_cast<int>(sizeof(VERSION_INFO) - 1));
+}
+
+/**
  * Whether libxml2 locates the current error in the input rather than in an
  * external entity; it locates an internal entity's error at its reference.
  */
@@ -287,12 +299,7 @@ void locate_in_input(FragmentIStream const &fs, xmlError &e,
     e.line = ins.end_line;
     e.int2 = ins.end_column;
   }
-  if (e.line == ins.wrapper_line)
-    remove_insertion(e.int2, ins.wrapper_column,
-                     static_cast<int>(sizeof(FRAGMENT_WRAPPER_START) - 1));
-  if (e.line == 1 && ins.version)
-    remove_insertion(e.int2, static_cast<int>(sizeof(XML_DECL_START)),
-                     static_cast<int>(sizeof(VERSION_INFO) - 1));
+  remove_insertions(ins, e.line, e.int2);
 
   if (e.code != XML_ERR_TAG_NAME_MISMATCH)
     return;
