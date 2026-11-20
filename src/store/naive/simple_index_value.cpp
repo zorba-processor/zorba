@@ -681,6 +681,29 @@ void ValueTreeIndex::clear()
   }
 
   theMap.clear();
+  theNumKeys.clear();
+}
+
+
+/******************************************************************************
+  Counts the type of each column of a key inserted in or erased from theMap.
+********************************************************************************/
+void ValueTreeIndex::countKey(const store::IndexKey* key, bool isInserted)
+{
+  theNumKeys.resize(key->size());
+
+  for (csize i = 0; i < key->size(); ++i)
+  {
+    if ((*key)[i] == NULL)
+      continue;
+
+    csize& numKeys = theNumKeys[i][(*key)[i]->getTypeCode()];
+
+    if (isInserted)
+      ++numKeys;
+    else
+      --numKeys;
+  }
 }
 
 
@@ -751,6 +774,7 @@ bool ValueTreeIndex::insert(store::IndexKey*& key, store::Item_t& value)
 
   // Note: ownership of the key obj passes to the index.
   theMap.insert(IndexMapPair(key, valueSet));
+  countKey(key, true);
 
   return false;
 }
@@ -788,6 +812,7 @@ bool ValueTreeIndex::remove(
 
       if (valueSet->empty())
       {
+        countKey(keyp, false);
         theMap.erase(pos);
         delete keyp;
         delete valueSet;
@@ -865,6 +890,44 @@ void ProbeValueTreeIndexIterator::initExact()
 
 
 /******************************************************************************
+  Raises the error that ge and le raise for a bound and a key of the column
+  they cannot compare: the keys of each type other than null in the column
+  are compared with it.
+********************************************************************************/
+void ProbeValueTreeIndexIterator::checkComparableKeys(
+    csize column,
+    const store::Item* bound) const
+{
+  // null compares with every value.
+  if (bound == NULL ||
+      bound->getTypeCode() == store::JS_NULL ||
+      column >= theIndex->theNumKeys.size())
+    return;
+
+  store::SchemaTypeCode boundClass =
+    valueComparisonClass(bound->getTypeCode(), true);
+
+  // xs:duration values have no order.
+  bool isUnordered = (boundClass == store::XS_DURATION);
+
+  for (csize type = 0; type < store::XS_LAST; ++type)
+  {
+    store::SchemaTypeCode keyType = static_cast<store::SchemaTypeCode>(type);
+
+    if (theIndex->theNumKeys[column][type] > 0 &&
+        keyType != store::JS_NULL &&
+        (isUnordered || valueComparisonClass(keyType, true) != boundClass))
+    {
+      RAISE_ERROR_NO_LOC(err::XPTY0004,
+      ERROR_PARAMS(ZED(IncomparableKeyNodeValue_23),
+                   bound->getType()->getStringValue(),
+                   theIndex->getName()->getStringValue()));
+    }
+  }
+}
+
+
+/******************************************************************************
 
 ********************************************************************************/
 void ProbeValueTreeIndexIterator::initBox()
@@ -887,6 +950,15 @@ void ProbeValueTreeIndexIterator::initBox()
 
   const std::vector<IndexConditionImpl::RangeFlags>& flags = 
     theBoxCond->theRangeFlags;
+
+  for (csize i = 0; i < numRanges; ++i)
+  {
+    if (flags[i].theHaveLowerBound)
+      checkComparableKeys(i, lowerBounds[i].getp());
+
+    if (flags[i].theHaveUpperBound)
+      checkComparableKeys(i, upperBounds[i].getp());
+  }
 
   //
   // Check if there is going to be a lower/upper bound
