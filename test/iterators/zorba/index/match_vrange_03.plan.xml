@@ -84,6 +84,15 @@
     <SingletonIterator value="xs:boolean(false)"/>
   </OrIterator>
 </iterator-tree>
+<iterator-tree description="const-folded expr">
+  <SingletonIterator value="xs:string(folder2)"/>
+</iterator-tree>
+<iterator-tree description="const-folded expr">
+  <SingletonIterator value="xs:string(folder2)"/>
+</iterator-tree>
+<iterator-tree description="const-folded expr">
+  <SingletonIterator value="xs:string(2012-12-31)"/>
+</iterator-tree>
 <iterator-tree description="main query">
   <SequentialIterator>
     <CtxVarDeclareIterator varid="4" varname="data:documents">

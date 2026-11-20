@@ -98,6 +98,9 @@ public:
 
 protected:
   int yy_get_start_stack_ptr(void) const;
+
+  // Flex reports a failure here; its own version exits the process.
+  [[noreturn]] void LexerError(const char* msg) override;
 };
 
 }

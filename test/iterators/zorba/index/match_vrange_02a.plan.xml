@@ -230,29 +230,31 @@
                 <ForIterator>
                   <ForVariable name="group"/>
                   <TupleSourceIterator/>
-                  <ChildAxisIterator test-kind="match_name_test" qname="xs:QName(,,sports-content)" typename="*" nill-allowed="false">
-                    <ChildAxisIterator test-kind="match_name_test" qname="xs:QName(,,doc)" typename="*" nill-allowed="false">
-                      <SubsequenceIntIterator>
-                        <ProbeIndexRangeValueIterator>
-                          <SingletonIterator value="xs:QName(www.data.com,data,idx)"/>
-                          <SingletonIterator value="xs:string(folder1)"/>
-                          <SingletonIterator value="xs:string(folder3)"/>
-                          <SingletonIterator value="xs:boolean(true)"/>
-                          <SingletonIterator value="xs:boolean(true)"/>
-                          <SingletonIterator value="xs:boolean(true)"/>
-                          <SingletonIterator value="xs:boolean(true)"/>
-                          <FnConcatIterator/>
-                          <FnConcatIterator/>
-                          <SingletonIterator value="xs:boolean(false)"/>
-                          <SingletonIterator value="xs:boolean(false)"/>
-                          <SingletonIterator value="xs:boolean(false)"/>
-                          <SingletonIterator value="xs:boolean(false)"/>
-                        </ProbeIndexRangeValueIterator>
-                        <SingletonIterator value="xs:integer(1)"/>
-                        <SingletonIterator value="xs:integer(3)"/>
-                      </SubsequenceIntIterator>
+                  <NodeDistinctIterator allow-atomics="false" check-only="false">
+                    <ChildAxisIterator test-kind="match_name_test" qname="xs:QName(,,sports-content)" typename="*" nill-allowed="false">
+                      <ChildAxisIterator test-kind="match_name_test" qname="xs:QName(,,doc)" typename="*" nill-allowed="false">
+                        <SubsequenceIntIterator>
+                          <ProbeIndexRangeValueIterator>
+                            <SingletonIterator value="xs:QName(www.data.com,data,idx)"/>
+                            <SingletonIterator value="xs:string(folder1)"/>
+                            <SingletonIterator value="xs:string(folder3)"/>
+                            <SingletonIterator value="xs:boolean(true)"/>
+                            <SingletonIterator value="xs:boolean(true)"/>
+                            <SingletonIterator value="xs:boolean(true)"/>
+                            <SingletonIterator value="xs:boolean(true)"/>
+                            <FnConcatIterator/>
+                            <FnConcatIterator/>
+                            <SingletonIterator value="xs:boolean(false)"/>
+                            <SingletonIterator value="xs:boolean(false)"/>
+                            <SingletonIterator value="xs:boolean(false)"/>
+                            <SingletonIterator value="xs:boolean(false)"/>
+                          </ProbeIndexRangeValueIterator>
+                          <SingletonIterator value="xs:integer(1)"/>
+                          <SingletonIterator value="xs:integer(3)"/>
+                        </SubsequenceIntIterator>
+                      </ChildAxisIterator>
                     </ChildAxisIterator>
-                  </ChildAxisIterator>
+                  </NodeDistinctIterator>
                 </ForIterator>
                 <Spec>
                   <TreatIterator quant="?">
