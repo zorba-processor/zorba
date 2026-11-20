@@ -310,6 +310,14 @@ FOREACH(TESTFILE ${TESTFILES})
     IF (TESTNAME MATCHES "_tz_minus6$")
       SET_TESTS_PROPERTIES ("${TESTNAME}" PROPERTIES ENVIRONMENT "TZ=UTC+6")
     ENDIF ()
+    # A join that evaluates a domain the query without the index does not
+    # evaluate, or a hoisted expr evaluated under an empty domain, does not
+    # end, so fail fast.
+    IF (TESTNAME MATCHES "^test/rbkt/zorba/(hashjoin-scope/|empty-domain/unbounded-)")
+      FOREACH (_name "${TESTNAME}" "${TESTNAME}-O0" "${TESTNAME}-O2")
+        SET_TESTS_PROPERTIES ("${_name}" PROPERTIES TIMEOUT 30)
+      ENDFOREACH ()
+    ENDIF ()
     # Boundary-value tests: a regression (e.g. a range that never stops at
     # the largest xs:integer) loops forever, so fail fast.
     IF (TESTNAME MATCHES "^test/rbkt/zorba/numerics/integer-")

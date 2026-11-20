@@ -56,7 +56,7 @@
               </DescendantAxisIterator>
             </NodeSortIterator>
           </ForVariable>
-          <ForVariable name="$$opt_temp_3">
+          <LetVariable name="$$opt_temp_3" materialize="true">
             <HoistIterator>
               <CompareIterator>
                 <FnDataIterator>
@@ -67,7 +67,7 @@
                 <SingletonIterator value="xs:string(Tom Jones)"/>
               </CompareIterator>
             </HoistIterator>
-          </ForVariable>
+          </LetVariable>
           <ForVariable name="buyer">
             <UnhoistIterator>
               <LetVarIterator varname="$$opt_temp_0"/>
@@ -160,7 +160,7 @@
               </FnDataIterator>
             </HoistIterator>
           </LetVariable>
-          <ForVariable name="$$opt_temp_5">
+          <LetVariable name="$$opt_temp_5" materialize="true">
             <HoistIterator>
               <ContainsIterator>
                 <PromoteIterator type="xs:string">
@@ -175,8 +175,8 @@
                 <SingletonIterator value="xs:string(Bicycle)"/>
               </ContainsIterator>
             </HoistIterator>
-          </ForVariable>
-          <ForVariable name="$$opt_temp_4">
+          </LetVariable>
+          <LetVariable name="$$opt_temp_4" materialize="true">
             <HoistIterator>
               <CompareIterator>
                 <FnDataIterator>
@@ -191,7 +191,7 @@
                 </FnDataIterator>
               </CompareIterator>
             </HoistIterator>
-          </ForVariable>
+          </LetVariable>
           <ForVariable name="highbid">
             <UnhoistIterator>
               <LetVarIterator varname="$$opt_temp_2"/>
@@ -200,13 +200,13 @@
           <WhereClause>
             <AndIterator>
               <UnhoistIterator>
-                <ForVarIterator varname="$$opt_temp_3"/>
+                <LetVarIterator varname="$$opt_temp_3"/>
               </UnhoistIterator>
               <UnhoistIterator>
-                <ForVarIterator varname="$$opt_temp_4"/>
+                <LetVarIterator varname="$$opt_temp_4"/>
               </UnhoistIterator>
               <UnhoistIterator>
-                <ForVarIterator varname="$$opt_temp_5"/>
+                <LetVarIterator varname="$$opt_temp_5"/>
               </UnhoistIterator>
               <CompareIterator>
                 <UnhoistIterator>
