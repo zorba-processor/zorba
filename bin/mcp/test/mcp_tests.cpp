@@ -4535,17 +4535,11 @@ void test_sweep_cache( Fixture const &f ) {
   // A query over dir:open: what is left of a failure in the checks of a path, and
   // in libraries. See the limits of --max-memory in bin/mcp/README.md.
   // Caps: about 1.5 times the most seen in CI (Xerces-C 2 alone and 608 in runs
-  // of 8 of 1990; the others at most 5; ICU, quick-check run 43500984356: 12
-  // alone and 16 in runs of 8 in libicui18n, 12 and 2 in libicuuc).
+  // of 8 of 1990; the others at most 5).
   s.known = {
     // Xerces-C throws OutOfMemoryException from ~XMLGrammarPoolImpl.
     starting( "terminate N11xercesc_", 4, 1, "OutOfMemoryExceptionE" ),
     starting( "terminate N11xercesc_", 900, 8, "OutOfMemoryExceptionE" ),
-    // ICU RegexPattern::zap() after a failed allocation in RegexPattern::compile().
-    library_crash( "signal 11 in libicui18n", true, 24 ),
-    // ICU utext_openConstUnicodeString() after a failed allocation, from
-    // RegexCompile::compile().
-    library_crash( "signal 11 in libicuuc", true, 18 ),
     starting( "error: file:FOFL9999: ", 10 ),
     starting( "error: dir:INVALID_PATH: ", 6 ),
     starting( "error: err:FOCH0002: ", 3 ) };

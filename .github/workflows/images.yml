@@ -135,6 +135,10 @@ jobs:
         run: docker/runtime/smoke-test.sh zorba-smoke:test
       - name: Smoke test the zorba entrypoint
         run: test "$(docker run --rm zorba-smoke:test -r -q '1 + 1')" = "2"
+      - name: Verify the patched ICU and libxml2
+        run: |
+          docker run --rm -i --entrypoint sh zorba-smoke:test -s \
+            /opt/zorba/bin/zorba /opt/zorba/bin/zorba-mcp < scripts/check-patched-libs.sh
       - id: build
         if: github.ref == 'refs/heads/master'
         uses: docker/build-push-action@v7
