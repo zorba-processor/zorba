@@ -15,6 +15,7 @@
  */
 
 #include "runtime/parsing_and_serializing/parsing_and_serializing.h"
+#include "runtime/parsing_and_serializing/invalid_content.h"
 
 #include <iostream>
 #include <set>
@@ -93,11 +94,7 @@ bool FnParseXmlIterator::nextImpl(store::Item_t& result, PlanState& planState) c
     }
     catch (const ZorbaException& e)
     {
-      XQueryException xe(XQUERY_EXCEPTION(err::FODC0006,
-      ERROR_PARAMS("fn:parse-xml()", ERROR_TEXT( e.what() )), ERROR_LOC(loc)));
-
-      set_data(xe, e);
-      throw xe;
+      throw_invalid_content("fn:parse-xml()", e, loc);
     }
 
     STACK_PUSH(true, state);

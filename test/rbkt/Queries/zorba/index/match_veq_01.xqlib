@@ -12,7 +12,7 @@ import module namespace iddl =
 declare namespace an = "http://zorba.io/annotations";
 
 
-declare %an:ordered collection accounts:accounts as element(account);
+declare %an:ordered collection accounts:accounts as element(account)*;
 
 
 declare %an:automatic %an:unique %an:value-equality index accounts:accounts-index
