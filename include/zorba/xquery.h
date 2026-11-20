@@ -108,6 +108,9 @@ class ZORBA_DLL_PUBLIC XQuery : public SmartObject
    * @param aSerOptions an optional set of serialization options.
    * @throw ZorbaException if an error occurs (e.g. the query is closed or
    *        has not been compiled)
+   * @throw ZorbaException with zerr::ZOSE0004_IO_ERROR if a write to
+   *        \c aOutStream fails and the stream does not throw on \c badbit;
+   *        the stream is flushed at the end of the result.
    */
   virtual void
   execute(std::ostream& aOutStream,
@@ -124,6 +127,9 @@ class ZORBA_DLL_PUBLIC XQuery : public SmartObject
    * @param aSerOptions Serializer options.
    * @throw ZorbaException if an error occurs (e.g. the query is closed or
    *        has not been compiled)
+   * @throw ZorbaException with zerr::ZOSE0004_IO_ERROR if a write to
+   *        \c aOutStream fails and the stream does not throw on \c badbit;
+   *        the stream is flushed at the end of the result.
    */
   virtual void
   execute(std::ostream& aOutStream,

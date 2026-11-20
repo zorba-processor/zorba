@@ -136,38 +136,38 @@ void XmlNode::attach(InternalNode* parent, csize pos)
 
   store::StoreConsts::NodeKind nodeKind = getNodeKind();
 
-  // A node id can exceed its size limit, so every new id is computed before
-  // the subtree changes: if one throws, the subtree is left as it was.
-  std::deque<OrdPath> newOrdPaths;
-  std::vector<std::pair<OrdPathNode*, OrdPath*> > newOrdPathOf;
+  // A node label can exceed its size limit, so every new label is computed
+  // before the subtree changes: if one throws, the subtree is left as it was.
+  std::deque<NodeLabel> newLabels;
+  std::vector<std::pair<LabeledNode*, NodeLabel*> > newLabelOf;
 
 #ifndef TEXT_ORDPATH
-  bool hasOrdPath = (nodeKind != store::StoreConsts::textNode);
+  bool hasLabel = (nodeKind != store::StoreConsts::textNode);
 #else
-  bool hasOrdPath = true;
+  bool hasLabel = true;
 #endif
 
-  if (hasOrdPath)
+  if (hasLabel)
   {
-    OrdPathNode* self = static_cast<OrdPathNode*>(this);
-    OrdPath oldOrdPath(self->theOrdPath);
+    LabeledNode* self = static_cast<LabeledNode*>(this);
+    NodeLabel oldLabel(self->theLabel);
 
     try
     {
-      self->setOrdPath(parent, false, pos, nodeKind);
+      self->setLabel(parent, false, pos, nodeKind);
 
       if (nodeKind == store::StoreConsts::elementNode)
-        computeSubtreeOrdPaths(newOrdPaths, newOrdPathOf);
+        computeSubtreeLabels(newLabels, newLabelOf);
     }
     catch (...)
     {
-      oldOrdPath.swap(self->theOrdPath);
+      oldLabel.swap(self->theLabel);
       throw;
     }
   }
 
-  for (csize i = 0; i < newOrdPathOf.size(); ++i)
-    newOrdPathOf[i].first->theOrdPath.swap(*newOrdPathOf[i].second);
+  for (csize i = 0; i < newLabelOf.size(); ++i)
+    newLabelOf[i].first->theLabel.swap(*newLabelOf[i].second);
 
   XmlTree* newTree = parent->getTree();
   XmlTree* oldTree = getTree();
@@ -308,22 +308,22 @@ void XmlNode::attach(InternalNode* parent, csize pos)
 
 
 /*******************************************************************************
-  For the subtree rooted at "this" element, whose own new node id is already
-  set, compute the new id of each descendant and attribute (as attach() sets
-  them) into ordPaths, and pair each node with its id in ordPathOf.
+  For the subtree rooted at "this" element, whose own new label is already
+  set, compute the new label of each descendant and attribute (as attach()
+  sets them) into labels, and pair each node with its label in labelOf.
 ********************************************************************************/
-void XmlNode::computeSubtreeOrdPaths(
-    std::deque<OrdPath>& ordPaths,
-    std::vector<std::pair<OrdPathNode*, OrdPath*> >& ordPathOf) const
+void XmlNode::computeSubtreeLabels(
+    std::deque<NodeLabel>& labels,
+    std::vector<std::pair<LabeledNode*, NodeLabel*> >& labelOf) const
 {
-  std::stack<std::pair<const ElementNode*, const OrdPath*> > elems;
+  std::stack<std::pair<const ElementNode*, const NodeLabel*> > elems;
   elems.push(std::make_pair(reinterpret_cast<const ElementNode*>(this),
-                            &static_cast<const OrdPathNode*>(this)->theOrdPath));
+                            &static_cast<const LabeledNode*>(this)->theLabel));
 
   while (!elems.empty())
   {
     const ElementNode* elem = elems.top().first;
-    const OrdPath* elemOrdPath = elems.top().second;
+    const NodeLabel* elemLabel = elems.top().second;
     elems.pop();
 
     csize numAttrs = elem->numAttrs();
@@ -333,10 +333,10 @@ void XmlNode::computeSubtreeOrdPaths(
 
     for (csize i = 0; ite != end; ++i, ++ite)
     {
-      ordPaths.push_back(*elemOrdPath);
-      ordPaths.back().appendComp(2 * i + 1);
-      ordPathOf.push_back(std::make_pair(static_cast<OrdPathNode*>(*ite),
-                                         &ordPaths.back()));
+      labels.push_back(NodeLabel());
+      labels.back().setAsChild(*elemLabel, i);
+      labelOf.push_back(std::make_pair(static_cast<LabeledNode*>(*ite),
+                                       &labels.back()));
     }
 
     ite = elem->childrenBegin();
@@ -351,14 +351,14 @@ void XmlNode::computeSubtreeOrdPaths(
         continue;
 #endif
 
-      ordPaths.push_back(*elemOrdPath);
-      ordPaths.back().appendComp(2 * (numAttrs + i) + 1);
-      ordPathOf.push_back(std::make_pair(static_cast<OrdPathNode*>(child),
-                                         &ordPaths.back()));
+      labels.push_back(NodeLabel());
+      labels.back().setAsChild(*elemLabel, numAttrs + i);
+      labelOf.push_back(std::make_pair(static_cast<LabeledNode*>(child),
+                                       &labels.back()));
 
       if (child->getNodeKind() == store::StoreConsts::elementNode)
         elems.push(std::make_pair(reinterpret_cast<const ElementNode*>(child),
-                                  &ordPaths.back()));
+                                  &labels.back()));
     }
   }
 }
@@ -1305,7 +1305,7 @@ void ElementNode::replaceContent(UpdReplaceElemContent& upd)
     
     newChild->setTree(newTree);
 #ifdef TEXT_ORDPATH
-    newChild->setOrdPath(this, true, 0, store::StoreConsts::textNode);
+    newChild->setLabel(this, true, 0, store::StoreConsts::textNode);
 #endif
     newChild->connect(this, 0);
     

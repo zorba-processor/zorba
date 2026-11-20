@@ -131,9 +131,16 @@ public:
   -------------------
   For each key type, the number of [key, node] entries with a key of that type
   that is not the cast of an untyped key to a type other than xs:string. A
-  value probe with a search key that a value comparison cannot compare with
-  the keys of a type that has such entries raises an error, as the comparison
-  does.
+  probe with a search key that the comparison it stands for cannot compare
+  with the keys of a type that has such entries raises an error, as the
+  comparison does.
+
+  theNumUntypedKeys:
+  ------------------
+  The number of [key, node] entries with an untyped key. Their xs:string
+  images are among the theNumTypedEntries of xs:string: a value comparison
+  casts an untyped key to xs:string, a general comparison to the type of the
+  search key.
 
   theNumNonNumberUntypedKeys:
   ---------------------------
@@ -179,6 +186,8 @@ protected:
   std::vector<store::Item_t>  theEmptyKeyNodes;
 
   std::array<csize, store::XS_LAST> theNumTypedEntries;
+
+  csize                       theNumUntypedKeys;
 
   csize                       theNumNonNumberUntypedKeys;
 
@@ -553,7 +562,8 @@ protected:
   void probeNumberRange(const store::Item* lowerKey, const store::Item* upperKey);
 
   void checkComparableKeys(const AtomicItem* searchKey,
-                           bool isOrderComparison) const;
+                           bool isOrderComparison,
+                           bool isGeneralComparison) const;
 
   void checkNumberUntypedKeys(const AtomicItem* searchKey) const;
 

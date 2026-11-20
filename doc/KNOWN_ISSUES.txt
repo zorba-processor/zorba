@@ -52,6 +52,24 @@ Zorba Version 2.0
   (macOS CI) the rbkt tests zorba/schemas/choice-empty-sequence and
   zorba/schemas/union-whitespace are expected to fail.
 
+* When an allocation fails while it compiles a regular expression, stock ICU
+  (78.3, 79.1 and its main branch) crashes with SIGSEGV:
+  RegexPattern::zap() reads the null set vector that RegexPattern::init()
+  failed to allocate, and RegexCompile::compile() passes the null pattern
+  string it failed to allocate to utext_openConstUnicodeString().
+  When an allocation fails during canonicalization, stock libxml2 (2.15.4
+  and its master branch, and 2.9.14) leaves a namespace declaration, an
+  attribute or an attribute's value out of the canonical form and reports
+  success, so x:canonicalize() returns a wrong canonical form.
+  Zorba's Linux CI, builder and runtime images (docker/builder,
+  docker/builder-latest, docker/runtime) build both libraries from patched
+  forks, https://github.com/zorba-processor/icu (tag release-78.3-zorba.1)
+  and https://github.com/zorba-processor/libxml2 (tag v2.15.4-zorba.1),
+  which report these failures as errors; the allocation-failure sweeps of
+  bin/mcp/test/mcp_tests.cpp allow no ICU crash. Builds against stock
+  libraries (Homebrew on macOS, distribution packages) keep the bugs until
+  they are fixed upstream.
+
 * HTML parsed with libxml2 before 2.14 differs from libxml2 2.14 and later at
   two points that belong to the parser. Text or elements after </html> are
   dropped; from 2.14 they are a second root html element. A run of 1000 or more

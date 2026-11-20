@@ -3384,15 +3384,22 @@ void test_sweep_xml_dtd( Fixture const &f ) {
               starting( "terminate N11xercesc_", 105, 8, "OutOfMemoryExceptionE" ) };
   // libxml2 before 2.13 does not report every allocation of its own that failed
   // (see test_sweep_xml_dtd_nodes): the load then fails as a document that
-  // libxml2 could not parse. Caps from the same run (189 / 35 tree creation;
-  // 55 / 13 malformed).
+  // libxml2 could not parse, or with the parse or validity error libxml2
+  // reports in its place, at its location (the file is unknown when its name
+  // could not be copied). Caps from the same run (189 / 35 tree creation;
+  // 55 / 13 malformed), and from the linux-arm64 job of CI run 43579489611
+  // (37 / 5 at a location in the file; 0 / 5 with no file).
   int const version = libxml2_version();
   if ( version && version < 21300 )
     s.known.insert( s.known.end(), {
       starting( "\"caught err:FODC0002 \\\"XML tree creation failed\\\"", 285, 1 ),
       starting( "\"caught err:FODC0002 \\\"XML tree creation failed\\\"", 53, 8 ),
       starting( "\"caught err:FODC0002 \\\"malformed XML document\\\"", 83, 1 ),
-      starting( "\"caught err:FODC0002 \\\"malformed XML document\\\"", 20, 8 ) } );
+      starting( "\"caught err:FODC0002 \\\"malformed XML document\\\"", 20, 8 ),
+      starting( "\"caught err:FODC0002 \\\"file:///tmp/mcp-tree", 56, 1 ),
+      starting( "\"caught err:FODC0002 \\\"file:///tmp/mcp-tree", 8, 8 ),
+      starting( "\"caught err:FODC0002 \\\"<null>\\\":", 4, 1 ),
+      starting( "\"caught err:FODC0002 \\\"<null>\\\":", 8, 8 ) } );
   exhaust_sweep( f, "parse-xml with DTD validation", s );
 #else
   (void)f;
@@ -4535,17 +4542,11 @@ void test_sweep_cache( Fixture const &f ) {
   // A query over dir:open: what is left of a failure in the checks of a path, and
   // in libraries. See the limits of --max-memory in bin/mcp/README.md.
   // Caps: about 1.5 times the most seen in CI (Xerces-C 2 alone and 608 in runs
-  // of 8 of 1990; the others at most 5; ICU, quick-check run 43500984356: 12
-  // alone and 16 in runs of 8 in libicui18n, 12 and 2 in libicuuc).
+  // of 8 of 1990; the others at most 5).
   s.known = {
     // Xerces-C throws OutOfMemoryException from ~XMLGrammarPoolImpl.
     starting( "terminate N11xercesc_", 4, 1, "OutOfMemoryExceptionE" ),
     starting( "terminate N11xercesc_", 900, 8, "OutOfMemoryExceptionE" ),
-    // ICU RegexPattern::zap() after a failed allocation in RegexPattern::compile().
-    library_crash( "signal 11 in libicui18n", true, 24 ),
-    // ICU utext_openConstUnicodeString() after a failed allocation, from
-    // RegexCompile::compile().
-    library_crash( "signal 11 in libicuuc", true, 18 ),
     starting( "error: file:FOFL9999: ", 10 ),
     starting( "error: dir:INVALID_PATH: ", 6 ),
     starting( "error: err:FOCH0002: ", 3 ) };

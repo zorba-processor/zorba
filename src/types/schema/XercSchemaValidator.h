@@ -222,6 +222,8 @@ public:
 
   void setNillable(bool isNil);
 
+  void setCurrentDatatypeValidator(DatatypeValidator* validator);
+
   void setErrorReporter(XMLErrorReporter* const errorReporter);
 
   void setExitOnFirstFatal(const bool newValue);
@@ -424,6 +426,12 @@ inline void XercSchemaValidator::setXsiType(
 inline void XercSchemaValidator::setNillable(bool isNil)
 {
   fNil = isNil;
+}
+
+
+inline void XercSchemaValidator::setCurrentDatatypeValidator(DatatypeValidator* validator)
+{
+  fCurrentDatatypeValidator = validator;
 }
 
 

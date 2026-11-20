@@ -34,7 +34,7 @@
 #include "store/api/load_properties.h"
 #include "util/xml_parser_security.h"
 
-#include "ordpath.h"
+#include "node_label.h"
 
 #include "zorbautils/stack.h"
 #include "runtime/parsing_and_serializing/fragment_istream.h"
@@ -238,7 +238,7 @@ protected:
 protected:
   char                           * theBuffer;
   XmlTree                        * theTree;
-  OrdPathStack                     theOrdPath;
+  NodeLabelBuilder                 theLabelBuilder;
 
   XmlNode                        * theRootNode;
   zorba::Stack<XmlNode*>           theNodeStack;
@@ -271,6 +271,14 @@ protected:
   void setRoot(XmlNode* root);
 
   void* getElementNode();
+
+  // Adds an error raised while building the tree. A node id over its byte
+  // limit (err:XPDY0130) is reported with reportLimit(), naming the node
+  // nesting depth reached, with where in the input it was reached.
+  void addBuildError(ZorbaException const& e);
+
+  // The line and column in the input of the node being built.
+  virtual void dataPosition(int& aLine, int& aColumn);
 
 public:
   // startElement() failed before the element reached the node stack: nothing
@@ -366,6 +374,8 @@ protected:
 
   void replay(FragmentEvent const &ev);
 
+  void dataPosition(int& aLine, int& aColumn) override;
+
   static FragmentIStream* streamOf(void* ctx);
 
   static void recordOutOfMemory(void* ctx) noexcept;
@@ -416,6 +426,8 @@ protected:
 
 protected:
   FragmentIStream* theFragmentStream;
+  int theEventLine = 0;
+  int theEventColumn = 0;
 };
 
 /*******************************************************************************
@@ -490,7 +502,7 @@ class DtdXmlLoader : public XmlLoader
 protected:
   std::vector<char>                theBuffer;
   XmlTree                        * theTree;
-  OrdPathStack                     theOrdPath;
+  NodeLabelBuilder                 theLabelBuilder;
 
   XmlNode                        * theRootNode;
   zorba::Stack<XmlNode*>           theNodeStack;
@@ -528,6 +540,8 @@ protected:
   void loadNode(xmlNode *node);
 
 public:
+  static void parserError(void* ctx, ZORBA_XML_ERROR_PTR error);
+
   static void	startDocument(void * ctx);
 
   static void endDocument(void * ctx);
