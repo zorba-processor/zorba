@@ -16,7 +16,9 @@
 
 #include <cstdio>
 #include <memory.h>
+#include <optional>
 #include <string>
+#include <string_view>
 #include <iostream>
 
 #include <libxml/xmlmemory.h>
@@ -133,6 +135,72 @@ bool XmlLoader::reportDeniedResource()
 }
 
 
+void XmlLoader::reportLimit(
+    char const* aUri,
+    int aLine,
+    int aColumn,
+    std::string const& aLimit)
+{
+  XQueryException *const xe =
+    NEW_XQUERY_EXCEPTION(err::XPDY0130, ERROR_PARAMS(ERROR_TEXT( aLimit )));
+  xe->set_data(aUri, aLine, aColumn);
+  theXQueryDiagnostics->add_error(xe);
+}
+
+
+/*******************************************************************************
+  If a libxml2 error is an exceeded limit of the parser that is not memory, the
+  limit, named with its value. From libxml2 2.13 on, these errors are
+  XML_ERR_RESOURCE_LIMIT. Before, the nesting depth was an XML_ERR_INTERNAL_ERROR
+  and, from 2.11, the entity amplification an XML_ERR_ENTITY_LOOP, which only
+  their messages tell apart from real errors; before 2.11 the amplification
+  limit shares its code and message with an entity reference loop.
+********************************************************************************/
+static std::optional<std::string> parser_limit(
+    ZORBA_XML_ERROR_PTR aError,
+    SecurityPolicy const& aPolicy)
+{
+  std::string_view const lMessage(aError->message ? aError->message : "");
+  bool const lDepth = lMessage.starts_with("Excessive depth in document");
+  bool const lAmplification =
+    lMessage.find("amplification") != std::string_view::npos;
+
+#if LIBXML_VERSION >= 21300
+  if (aError->code != XML_ERR_RESOURCE_LIMIT)
+    return std::nullopt;
+#else
+  if (!(lDepth && aError->code == XML_ERR_INTERNAL_ERROR) &&
+      !(lAmplification && aError->code == XML_ERR_ENTITY_LOOP))
+    return std::nullopt;
+#endif
+
+  if (lDepth)
+    return XmlLoader::depthLimit();
+  if (lAmplification)
+  {
+    if (uint32_t const lMax = aPolicy.getMaxEntityAmplification())
+      return "entity amplification factor of " + std::to_string(lMax);
+    return std::string("entity amplification factor of libxml2's default");
+  }
+  std::string lLimit(lMessage);
+  ascii::trim_end_space(lLimit);
+  return lLimit;
+}
+
+
+bool XmlLoader::reportParserLimit(ZORBA_XML_ERROR_PTR aError)
+{
+  if (aError == NULL)
+    return false;
+  std::optional<std::string> const lLimit =
+    parser_limit(aError, theParserSecurity.policy());
+  if (!lLimit)
+    return false;
+  reportLimit(aError->file, aError->line, aError->int2 /* column */, *lLimit);
+  return true;
+}
+
+
 void XmlLoader::reportUnreadableEntity()
 {
   if (!theParserSecurity.unreadableEntity() || theUnreadableEntityReported)
@@ -173,6 +241,9 @@ try
     static_cast<XmlLoader*>( ctx )->setOutOfMemory();
     return;
   }
+
+  if ( static_cast<XmlLoader*>( ctx )->reportParserLimit( error ) )
+    return;
 
   ascii::itoa_buf_type itoa_buf;
 
