@@ -95,12 +95,13 @@ bool insert(T& item)
 
   //assert(item != 0);
 
-  HashEntry<T, DummyHashValue>* entry;
-  entry = this->hashInsert(item, this->hash(item), found);
+  ulong hval = this->hash(item);
+  HashEntry<T, DummyHashValue>* entry = this->hashInsert(item, hval, found);
 
   if (!found)
   {
-    entry->key() = item;
+    DummyHashValue value;
+    this->setNewEntry(entry, hval, item, value);
   }
 
   return !found;
@@ -120,11 +121,12 @@ bool insert(T& item, T& outItem)
 
   //assert(item != 0);
 
-  HashEntry<T, DummyHashValue>* entry;
-  entry = this->hashInsert(item, this->hash(item), found);
+  ulong hval = this->hash(item);
+  HashEntry<T, DummyHashValue>* entry = this->hashInsert(item, hval, found);
   if (!found)
   {
-    entry->key() = item;
+    DummyHashValue value;
+    this->setNewEntry(entry, hval, item, value);
     outItem = entry->key();
     return true;
   }
@@ -149,11 +151,12 @@ bool insert(const T& item, T& outItem)
 
   //assert(item != 0);
 
-  HashEntry<T, DummyHashValue>* entry;
-  entry = this->hashInsert(item, this->hash(item), found);
+  ulong hval = this->hash(item);
+  HashEntry<T, DummyHashValue>* entry = this->hashInsert(item, hval, found);
   if (!found)
   {
-    entry->key() = item;
+    DummyHashValue value;
+    this->setNewEntry(entry, hval, item, value);
     outItem = entry->key();
     return true;
   }
