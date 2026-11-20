@@ -1,10 +1,10 @@
 <iterator-tree description="main query">
   <FLWORIterator>
-    <ForVariable name="$$opt_temp_0">
+    <LetVariable name="$$opt_temp_0" materialize="true">
       <HoistIterator>
         <ErrorIterator/>
       </HoistIterator>
-    </ForVariable>
+    </LetVariable>
     <LetVariable name="$$opt_temp_1" materialize="true">
       <HoistIterator>
         <OpToIterator>
@@ -24,13 +24,13 @@
                     <AttributeAxisIterator test-kind="match_name_test" qname="xs:QName(,,id)" typename="*" nill-allowed="false">
                       <FunctionTraceIterator>
                         <FLWORIterator>
-                          <ForVariable name="$$opt_temp_0">
+                          <LetVariable name="$$opt_temp_0" materialize="true">
                             <HoistIterator>
                               <UnhoistIterator>
-                                <ForVarIterator varname="$$opt_temp_0"/>
+                                <LetVarIterator varname="$$opt_temp_0"/>
                               </UnhoistIterator>
                             </HoistIterator>
-                          </ForVariable>
+                          </LetVariable>
                           <ForVariable name="i">
                             <UnhoistIterator>
                               <LetVarIterator varname="$$opt_temp_1"/>
@@ -54,7 +54,7 @@
                                 </AttributeIterator>
                               </ElementIterator>
                               <UnhoistIterator>
-                                <ForVarIterator varname="$$opt_temp_0"/>
+                                <LetVarIterator varname="$$opt_temp_0"/>
                               </UnhoistIterator>
                             </IfThenElseIterator>
                           </ReturnClause>
@@ -126,13 +126,13 @@
                 <AttributeAxisIterator test-kind="match_name_test" qname="xs:QName(,,id)" typename="*" nill-allowed="false">
                   <FunctionTraceIterator>
                     <FLWORIterator>
-                      <ForVariable name="$$opt_temp_0">
+                      <LetVariable name="$$opt_temp_0" materialize="true">
                         <HoistIterator>
                           <UnhoistIterator>
-                            <ForVarIterator varname="$$opt_temp_0"/>
+                            <LetVarIterator varname="$$opt_temp_0"/>
                           </UnhoistIterator>
                         </HoistIterator>
-                      </ForVariable>
+                      </LetVariable>
                       <ForVariable name="i">
                         <UnhoistIterator>
                           <LetVarIterator varname="$$opt_temp_1"/>
@@ -156,7 +156,7 @@
                             </AttributeIterator>
                           </ElementIterator>
                           <UnhoistIterator>
-                            <ForVarIterator varname="$$opt_temp_0"/>
+                            <LetVarIterator varname="$$opt_temp_0"/>
                           </UnhoistIterator>
                         </IfThenElseIterator>
                       </ReturnClause>
