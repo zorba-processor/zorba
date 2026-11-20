@@ -1,4 +1,4 @@
-# flex's C++ skeleton (2.6.4, 2.6.15) loses memory when an allocation fails:
+# flex's C++ skeleton (2.6.4, 2.6.15, 2.7.1) loses memory when an allocation fails:
 # yy_create_buffer() keeps the buffer struct when its character buffer cannot
 # be allocated, and yy_get_next_buffer(), yyensure_buffer_stack() and
 # yy_push_state() assign the result of realloc() over the only pointer to the
