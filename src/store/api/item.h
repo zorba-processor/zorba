@@ -632,6 +632,14 @@ public:
   virtual void
   getBaseURI(zstring& uri) const;
 
+  /**
+   * For an element node of a user-defined atomic type with empty content: sets
+   * the typed value of that content, which the store cannot compute without
+   * the schema.
+   */
+  virtual void
+  setEmptyContentTypedValue(Item_t& value);
+
   /** Accessor for element node
    *  @return  attribute*
    */

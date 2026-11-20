@@ -42,7 +42,7 @@ namespace simplestore
 class StringPool;
 typedef StringPool UriPool;
 class QNamePool;
-class OrdPath;
+class NodeLabel;
 
 
 class BasicItemFactory : public store::ItemFactory
@@ -115,7 +115,7 @@ public:
       ulong collectionId,
       const TreeId& treeId,
       store::StoreConsts::NodeKind nodeKind,
-      const OrdPath& ordPath);
+      const NodeLabel& label);
 
   bool createUntypedAtomic(store::Item_t& result, zstring& value);
 

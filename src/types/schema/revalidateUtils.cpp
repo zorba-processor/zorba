@@ -243,7 +243,19 @@ void SchemaValidatorImpl::processElement(
     // The typed value is stored in the text child; without one the element
     // keeps the untyped value of its string value, as validation gives it
     if ( noOfTextChildren==0 )
+    {
       tHasTypedValue = false;
+
+      store::Item_t emptyValue;
+      if (!isNilled && element->getStringValue().empty())
+      {
+        if (Validator::emptyContentTypedValue(theSctx, typeManager, newType,
+                                              bindings, emptyValue, loc))
+          tHasEmptyValue = true;
+        else if (emptyValue != NULL)
+          typedValues.assign(1, emptyValue);
+      }
+    }
 
     // A nilled element has no text child to hold a typed value
     if (isNilled)
