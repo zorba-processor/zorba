@@ -34,7 +34,7 @@
 #define FLEX_SCANNER
 #define YY_FLEX_MAJOR_VERSION 2
 #define YY_FLEX_MINOR_VERSION 6
-#define YY_FLEX_SUBMINOR_VERSION 10
+#define YY_FLEX_SUBMINOR_VERSION 15
 #if YY_FLEX_SUBMINOR_VERSION > 0
 #define FLEX_BETA
 #endif
@@ -169,15 +169,11 @@ typedef unsigned long int flex_uint32_t;
  * but we do it the disgusting crufty way forced on us by the ()-less
  * definition of BEGIN.
  */
-#define yybegin(s) (yy_start) = 1 + 2 * (s)
-/* Legacy interface */
 #define BEGIN (yy_start) = 1 + 2 *
 /* Translate the current start state into a value that can be later handed
  * to BEGIN to return to the state.  The YYSTATE alias is for lex
  * compatibility.
  */
-#define yystart() (((yy_start) - 1) / 2)
-/* Legacy interfaces */
 #define YY_START (((yy_start) - 1) / 2)
 #define YYSTATE YY_START
 /* Action number for EOF rule of a given start state. */
@@ -231,11 +227,13 @@ extern int yyleng;
 		YY_RESTORE_YY_MORE_OFFSET \
 		(yy_c_buf_p) = yy_cp = yy_bp + yyless_macro_arg - YY_MORE_ADJ; \
 		YY_DO_BEFORE_ACTION; /* set up yytext again */ \
+		YY_CURRENT_BUFFER_LVALUE->yy_at_bol = ( yyleng > 0 ) ? \
+			(yytext[yyleng - 1] == '\n') : \
+			YY_CURRENT_BUFFER_LVALUE->yy_at_bol_before_match; \
 		} \
 	while ( 0 )
-#define yyunput(c) yyunput_r( c, (yytext_ptr)  )
-/* Legacy interface */
-#define unput(c) yyunput_r( c, (yytext_ptr)  )
+/* Push a character back onto the input. In an action, flex also reads yyunput(c) as this. */
+#define unput(c) yyunput( c, (yytext_ptr)  )
 
 #ifndef YY_STRUCT_YY_BUFFER_STATE
 #define YY_STRUCT_YY_BUFFER_STATE
@@ -275,6 +273,11 @@ struct yy_buffer_state
 	 * not.
 	 */
 	int yy_at_bol;
+
+	/* The value of yy_at_bol when the current match began, so that
+	 * yyless(0) can give the text back and restore it.
+	 */
+	int yy_at_bol_before_match;
 
 	int yy_bs_lineno; /**< The line count. */
 	int yy_bs_column; /**< The column count. */
@@ -332,17 +335,6 @@ void yyfree ( void *  );
 	} \
 	YY_CURRENT_BUFFER_LVALUE->yy_is_interactive = is_interactive; \
 }
-#define yysetbol(at_bol) \
-	{ \
-	if ( yy_current_buffer() == NULL ) { \
-		yyensure_buffer_stack ();	\
-		YY_CURRENT_BUFFER_LVALUE =    \
-            yy_create_buffer( yyin, YY_BUF_SIZE ); \
-	} \
-	YY_CURRENT_BUFFER_LVALUE->yy_at_bol = at_bol; \
-}
-#define yyatbol() (YY_CURRENT_BUFFER_LVALUE->yy_at_bol)
-/* Legacy interface */
 #define YY_AT_BOL() (YY_CURRENT_BUFFER_LVALUE->yy_at_bol)
 #define yy_set_bol(at_bol) \
 	{ \
@@ -367,6 +359,31 @@ typedef flex_uint8_t YY_CHAR;
 #include "compiler/parser/FlexLexer.h"
 
 int yyFlexLexer::yywrap() { return 1;}
+
+/* These come before the user's first section, as in flex 2.6.4, so that a
+ * program can use them there. */
+/*
+ * Amount of stuff to slurp up with each read.
+ * We assume the stdio library has already
+ * chosen a fit size foe whatever platform
+ * we're running on.  Some freestanding environments
+ * have no BUFSIZ, so fall back to a fixed size there.
+ */
+#ifndef YY_READ_BUF_SIZE
+#ifdef BUFSIZ
+#define YY_READ_BUF_SIZE BUFSIZ
+#else
+#define YY_READ_BUF_SIZE 8192
+#endif
+#endif
+
+/* Size of default input buffer. We want to be able to fit two
+ * OS-level reads, but efficiency gains as the buffer size
+ * increases fall off after that
+ */
+#ifndef YY_BUF_SIZE
+#define YY_BUF_SIZE	(2 * YY_READ_BUF_SIZE)
+#endif
 
 /* %% [1.5] DFA */
 /* %% [1.5] DFA */
@@ -404,6 +421,7 @@ struct yy_trans_info
  */
 #define YY_DO_BEFORE_ACTION \
 	do { \
+	 \
 	(yytext_ptr) = yy_bp; \
 	 \
 	yyleng = (int) (yy_cp - yy_bp); \
@@ -3397,7 +3415,6 @@ static const flex_int16_t yy_rule_linenum[355] = { 0,
 /* The intent behind this definition is that it'll catch
  * any uses of yyreject() which flex missed.
  */
-#define yyreject() reject_used_but_not_detected
 #define REJECT reject_used_but_not_detected
 
 #define yymore() yymore_used_but_not_detected
@@ -3737,43 +3754,11 @@ static int yy_flex_strlen ( const char * );
 
 #endif
 
-/*
- * Amount of stuff to slurp up with each read.
- * We assume the stdio library has already
- * chosen a fit size foe whatever platform
- * we're running on.  Some freestanding environments
- * have no BUFSIZ, so fall back to a fixed size there.
- */
-#ifndef YY_READ_BUF_SIZE
-#ifdef BUFSIZ
-#define YY_READ_BUF_SIZE BUFSIZ
-#else
-#define YY_READ_BUF_SIZE 8192
-#endif
-#endif
-
-/* Size of default input buffer. We want to be able to fit two
- * OS-level reads, but efficiency gains as the buffer size
- * increases fall off after that
- */
-#ifndef YY_BUF_SIZE
-#define YY_BUF_SIZE	(2 * YY_READ_BUF_SIZE)
-#endif
-
 /* Copy whatever the last rule matched to the standard output. */
-#ifndef yyecho
-#ifdef ECHO
-/* Legacy interface: a user-defined ECHO replaces the default action. */
-#define yyecho() ECHO
-#else
-
-#define yyecho() LexerOutput( yytext, yyleng )
-
-#endif
-#endif
-/* Legacy interface */
 #ifndef ECHO
-#define ECHO yyecho()
+
+#define ECHO LexerOutput( yytext, yyleng )
+
 #endif
 
 #ifndef YY_EXIT_FAILURE
@@ -3843,6 +3828,12 @@ int yyFlexLexer::yyread(char *buf, size_t max_size) {
  */
 #ifndef YY_USER_ACTION
 #define YY_USER_ACTION
+#endif
+
+/* Code executed at the end of each rule. A program can define it, as with
+ * flex 2.6.4. The post-action option replaces it. */
+#ifndef YY_BREAK
+#define YY_BREAK /*LINTED*/break;
 #endif
 
 #define YY_RULE_SETUP \
@@ -3991,7 +3982,7 @@ YY_DECL {
 
 				} else {
 
-					std::cerr << "--EOF (start condition " << yystart() << ")\n";
+					std::cerr << "--EOF (start condition " << YY_START << ")\n";
 
 				}
 			}
@@ -4017,119 +4008,119 @@ YY_DECL {
 YY_RULE_SETUP
 
 { return token::SHEBANG; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 2:
 /* rule 2 can match eol */
 YY_RULE_SETUP
 
 { BEGIN INITIAL; yyless(0); }
-	/*LINTED*/break;
+	YY_BREAK
 
 	case 3:
 YY_RULE_SETUP
 
 { return token::LPAR; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 4:
 YY_RULE_SETUP
 
 { return token::SEMI; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 5:
 YY_RULE_SETUP
 
 { return token::COMMA; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 6:
 YY_RULE_SETUP
 
 { return token::MINUS; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 7:
 YY_RULE_SETUP
 
 { return token::PLUS; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 8:
 YY_RULE_SETUP
 
 { return token::SLASH; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 9:
 YY_RULE_SETUP
 
 { return token::SLASH_SLASH; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 10:
 YY_RULE_SETUP
 
 { return token::BANG; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 11:
 YY_RULE_SETUP
 
 { return token::AT_SIGN; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 12:
 YY_RULE_SETUP
 
 { return token::RPAR; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 13:
 YY_RULE_SETUP
 
 { return token::STAR; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 14:
 YY_RULE_SETUP
 
 { return token::DOT_DOT; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 15:
 YY_RULE_SETUP
 
 { return token::DOT; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 16:
 YY_RULE_SETUP
 
 { return token::HOOK; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 17:
 YY_RULE_SETUP
 
 { return token::DOLLAR; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 18:
 YY_RULE_SETUP
 
 { return token::HASH; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 19:
 YY_RULE_SETUP
 
 { return token::COLON; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 20:
 YY_RULE_SETUP
 
 { return token::DOUBLE_COLON; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 21:
 YY_RULE_SETUP
 
 { return token::PERCENTAGE; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 22:
 YY_RULE_SETUP
 
 { return token::CONCAT; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 23:
 YY_RULE_SETUP
 
 { return token::DOLLAR_DOLLAR; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 24:
 YY_RULE_SETUP
 
@@ -4139,7 +4130,7 @@ YY_RULE_SETUP
   theDriver->theDocComment.str("");
   return token::DECLARE;
 }
-	/*LINTED*/break;
+	YY_BREAK
 	case 25:
 YY_RULE_SETUP
 
@@ -4149,567 +4140,567 @@ YY_RULE_SETUP
   theDriver->theDocComment.str("");
   return token::MODULE;
 }
-	/*LINTED*/break;
+	YY_BREAK
 	case 26:
 YY_RULE_SETUP
 
 { PUSH_STATE(MODE_ELEM_COMP_CONSTR); }
-	/*LINTED*/break;
+	YY_BREAK
 	case 27:
 YY_RULE_SETUP
 
 { PUSH_STATE(MODE_ATTR_COMP_CONSTR); }
-	/*LINTED*/break;
+	YY_BREAK
 	case 28:
 YY_RULE_SETUP
 
 { PUSH_STATE(MODE_PI_COMP_CONSTR); }
-	/*LINTED*/break;
+	YY_BREAK
 	case 29:
 YY_RULE_SETUP
 
 { PUSH_STATE(MODE_NS_COMP_CONSTR); }
-	/*LINTED*/break;
+	YY_BREAK
 	case 30:
 YY_RULE_SETUP
 
 { return token::IF; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 31:
 YY_RULE_SETUP
 
 { return token::RETURNING; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 32:
 YY_RULE_SETUP
 
 { return token::EXIT; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 33:
 YY_RULE_SETUP
 
 { return token::WITH; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 34:
 YY_RULE_SETUP
 
 { return token::BREAK; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 35:
 YY_RULE_SETUP
 
 { return token::LOOP; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 36:
 YY_RULE_SETUP
 
 { return token::CONTINUE; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 37:
 YY_RULE_SETUP
 
 { return token::WHILE; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 38:
 YY_RULE_SETUP
 
 { return token::SET; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 39:
 YY_RULE_SETUP
 
 { return token::VALIDATE; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 40:
 YY_RULE_SETUP
 
 { return token::TYPE; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 41:
 YY_RULE_SETUP
 
 { return token::SWITCH; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 42:
 YY_RULE_SETUP
 
 { return token::TYPESWITCH; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 43:
 YY_RULE_SETUP
 
 { return token::DOCUMENT; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 44:
 YY_RULE_SETUP
 
 { return token::TEXT; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 45:
 YY_RULE_SETUP
 
 { return token::COMMENT; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 46:
 YY_RULE_SETUP
 
 { return token::FUNCTION; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 47:
 YY_RULE_SETUP
 
 { return token::SIMPLE; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 48:
 YY_RULE_SETUP
 
 { return token::UPDATING; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 49:
 YY_RULE_SETUP
 
 { return token::SEQUENTIAL; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 50:
 YY_RULE_SETUP
 
 { return token::ORDERED;}
-	/*LINTED*/break;
+	YY_BREAK
 	case 51:
 YY_RULE_SETUP
 
 { return token::UNORDERED; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 52:
 YY_RULE_SETUP
 
 { return token::SCHEMA_ELEMENT; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 53:
 YY_RULE_SETUP
 
 { return token::SCHEMA_ATTRIBUTE; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 54:
 YY_RULE_SETUP
 
 { return token::NODE; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 55:
 YY_RULE_SETUP
 
 { return token::DOCUMENT_NODE; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 56:
 YY_RULE_SETUP
 
 { return token::NS_NODE; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 57:
 YY_RULE_SETUP
 
 { return token::CONSTRUCTION; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 58:
 YY_RULE_SETUP
 
 { return token::DEFAULT; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 59:
 YY_RULE_SETUP
 
 { return token::ORDER; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 60:
 YY_RULE_SETUP
 
 { return token::COLLATION; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 61:
 YY_RULE_SETUP
 
 { return token::BASE_URI; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 62:
 YY_RULE_SETUP
 
 { return token::IMPORT; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 63:
 YY_RULE_SETUP
 
 { return token::SCHEMA; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 64:
 YY_RULE_SETUP
 
 { return token::COPY_NAMESPACES; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 65:
 YY_RULE_SETUP
 
 { return token::FOR; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 66:
 YY_RULE_SETUP
 
 { return token::LET; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 67:
 YY_RULE_SETUP
 
 { return token::ALLOWING; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 68:
 YY_RULE_SETUP
 
 { return token::SLIDING; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 69:
 YY_RULE_SETUP
 
 { return token::TUMBLING; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 70:
 YY_RULE_SETUP
 
 { return token::PREVIOUS; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 71:
 YY_RULE_SETUP
 
 { return token::NEXT; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 72:
 YY_RULE_SETUP
 
 { return token::ONLY; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 73:
 YY_RULE_SETUP
 
 { return token::WHEN; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 74:
 YY_RULE_SETUP
 
 { return token::COUNT; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 75:
 YY_RULE_SETUP
 
 { return token::USING; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 76:
 YY_RULE_SETUP
 
 { return token::SOME; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 77:
 YY_RULE_SETUP
 
 { return token::EVERY; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 78:
 YY_RULE_SETUP
 
 { return token::CONTEXT; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 79:
 YY_RULE_SETUP
 
 { return token::VARIABLE; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 80:
 YY_RULE_SETUP
 
 { return token::BOUNDARY_SPACE; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 81:
 YY_RULE_SETUP
 
 { return token::ORDERING; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 82:
 YY_RULE_SETUP
 
 { return token::XQUERY; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 83:
 YY_RULE_SETUP
 
 { return token::VERSION; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 84:
 YY_RULE_SETUP
 
 { return token::OPTION; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 85:
 YY_RULE_SETUP
 
 { return token::AT; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 86:
 YY_RULE_SETUP
 
 { return token::REVALIDATION; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 87:
 YY_RULE_SETUP
 
 { return token::AS; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 88:
 YY_RULE_SETUP
 
 { return token::TRY; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 89:
 YY_RULE_SETUP
 
 { return token::JSONIQ; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 90:
 YY_RULE_SETUP
 
 { return token::ANCESTOR_OR_SELF; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 91:
 YY_RULE_SETUP
 
 { return token::ANCESTOR; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 92:
 YY_RULE_SETUP
 
 { return token::CHILD; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 93:
 YY_RULE_SETUP
 
 { return token::DESCENDANT_OR_SELF; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 94:
 YY_RULE_SETUP
 
 { return token::DESCENDANT; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 95:
 YY_RULE_SETUP
 
 { return token::FOLLOWING_SIBLING; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 96:
 YY_RULE_SETUP
 
 { return token::FOLLOWING; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 97:
 YY_RULE_SETUP
 
 { return token::PARENT; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 98:
 YY_RULE_SETUP
 
 { return token::PRECEDING_SIBLING; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 99:
 YY_RULE_SETUP
 
 { return token::PRECEDING; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 100:
 YY_RULE_SETUP
 
 { return token::SELF;}
-	/*LINTED*/break;
+	YY_BREAK
 	case 101:
 YY_RULE_SETUP
 
 { return token::DECIMAL_FORMAT; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 102:
 YY_RULE_SETUP
 
 { return token::DECIMAL_SEPARATOR; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 103:
 YY_RULE_SETUP
 
 { return token::GROUPING_SEPARATOR; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 104:
 YY_RULE_SETUP
 
 { return token::INFINITY_VALUE; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 105:
 YY_RULE_SETUP
 
 { return token::MINUS_SIGN; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 106:
 YY_RULE_SETUP
 
 { return token::NaN; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 107:
 YY_RULE_SETUP
 
 { return token::PERCENT; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 108:
 YY_RULE_SETUP
 
 { return token::PER_MILLE; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 109:
 YY_RULE_SETUP
 
 { return token::ZERO_DIGIT; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 110:
 YY_RULE_SETUP
 
 { return token::DIGIT; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 111:
 YY_RULE_SETUP
 
 { return token::PATTERN_SEPARATOR; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 112:
 YY_RULE_SETUP
 
 { return token::COLLECTION; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 113:
 YY_RULE_SETUP
 
 { return token::CONSTOPT; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 114:
 YY_RULE_SETUP
 
 { return token::APPEND_ONLY; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 115:
 YY_RULE_SETUP
 
 { return token::QUEUE; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 116:
 YY_RULE_SETUP
 
 { return token::MUTABLE; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 117:
 YY_RULE_SETUP
 
 { return token::READ_ONLY; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 118:
 YY_RULE_SETUP
 
 { return token::INDEX; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 119:
 YY_RULE_SETUP
 
 { return token::UNIQUE; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 120:
 YY_RULE_SETUP
 
 { return token::NON; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 121:
 YY_RULE_SETUP
 
 { return token::MANUALLY; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 122:
 YY_RULE_SETUP
 
 { return token::AUTOMATICALLY; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 123:
 YY_RULE_SETUP
 
 { return token::MAINTAINED; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 124:
 YY_RULE_SETUP
 
 { return token::RANGE; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 125:
 YY_RULE_SETUP
 
 { return token::EQUALITY; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 126:
 YY_RULE_SETUP
 
 { return token::ON; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 127:
 YY_RULE_SETUP
 
 { return token::GENERAL; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 128:
 YY_RULE_SETUP
 
 { return token::INTEGRITY; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 129:
 YY_RULE_SETUP
 
 { return token::CONSTRAINT; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 130:
 YY_RULE_SETUP
 
 { return token::CHECK; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 131:
 YY_RULE_SETUP
 
 { return token::KEY; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 132:
 YY_RULE_SETUP
 
 { return token::FOREACH; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 133:
 YY_RULE_SETUP
 
 { return token::FOREIGN; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 134:
 YY_RULE_SETUP
 
 { return token::KEYS; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 135:
 YY_RULE_SETUP
 
 { PUSH_STATE(INITIAL); return token::LBRACK; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 136:
 YY_RULE_SETUP
 
 { POP_STATE(); return token::RBRACK; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 137:
 YY_RULE_SETUP
 
 { PUSH_STATE(INITIAL_ACCUMULATOR); return token::L_ACCUMULATOR_OBJ_UNION; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 138:
 YY_RULE_SETUP
 
@@ -4726,647 +4717,647 @@ YY_RULE_SETUP
           return token::RBRACK;
         }
       }
-	/*LINTED*/break;
+	YY_BREAK
 	case 139:
 YY_RULE_SETUP
 
 { return token::L_SIMPLE_OBJ_UNION; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 140:
 YY_RULE_SETUP
 
 { return token::R_SIMPLE_OBJ_UNION; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 141:
 YY_RULE_SETUP
 
 { return token::JSON; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 142:
 YY_RULE_SETUP
 
 { return token::APPEND; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 143:
 YY_RULE_SETUP
 
 { return token::POSITION; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 144:
 YY_RULE_SETUP
 
 { return token::JSON_ITEM; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 145:
 YY_RULE_SETUP
 
 { return token::STRUCTURED_ITEM; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 146:
 YY_RULE_SETUP
 
 { return token::ARRAY; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 147:
 YY_RULE_SETUP
 
 { return token::OBJECT; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 148:
 YY_RULE_SETUP
 
 { return token::CONTAINS; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 149:
 YY_RULE_SETUP
 
 { return token::FTAND; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 150:
 YY_RULE_SETUP
 
 { return token::FTOR; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 151:
 YY_RULE_SETUP
 
 { return token::FTNOT; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 152:
 YY_RULE_SETUP
 
 { return token::NOT; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 153:
 YY_RULE_SETUP
 
 { return token::_IN; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 154:
 YY_RULE_SETUP
 
 { return token::ALL; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 155:
 YY_RULE_SETUP
 
 { return token::WORDS; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 156:
 YY_RULE_SETUP
 
 { return token::ANY; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 157:
 YY_RULE_SETUP
 
 { return token::WORD; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 158:
 YY_RULE_SETUP
 
 { return token::END; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 159:
 YY_RULE_SETUP
 
 { return token::LEAST; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 160:
 YY_RULE_SETUP
 
 { return token::MOST; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 161:
 YY_RULE_SETUP
 
 { return token::START; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 162:
 YY_RULE_SETUP
 
 { return token::CASE; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 163:
 YY_RULE_SETUP
 
 { return token::INSENSITIVE; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 164:
 YY_RULE_SETUP
 
 { return token::SENSITIVE; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 165:
 YY_RULE_SETUP
 
 { return token::FT_OPTION; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 166:
 YY_RULE_SETUP
 
 { return token::DIACRITICS; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 167:
 YY_RULE_SETUP
 
 { return token::DIFFERENT; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 168:
 YY_RULE_SETUP
 
 { return token::DISTANCE; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 169:
 YY_RULE_SETUP
 
 { return token::ENTIRE; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 170:
 YY_RULE_SETUP
 
 { return token::CONTENT; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 171:
 YY_RULE_SETUP
 
 { return token::EXACTLY; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 172:
 YY_RULE_SETUP
 
 { return token::FROM; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 173:
 YY_RULE_SETUP
 
 { return token::LANGUAGE; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 174:
 YY_RULE_SETUP
 
 { return token::LEVELS; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 175:
 YY_RULE_SETUP
 
 { return token::LOWERCASE; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 176:
 YY_RULE_SETUP
 
 { return token::NO; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 177:
 YY_RULE_SETUP
 
 { return token::OCCURS; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 178:
 YY_RULE_SETUP
 
 { return token::PARAGRAPH; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 179:
 YY_RULE_SETUP
 
 { return token::PARAGRAPHS; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 180:
 YY_RULE_SETUP
 
 { return token::PHRASE; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 181:
 YY_RULE_SETUP
 
 { return token::RELATIONSHIP; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 182:
 YY_RULE_SETUP
 
 { return token::SAME; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 183:
 YY_RULE_SETUP
 
 { return token::SCORE; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 184:
 YY_RULE_SETUP
 
 { return token::SENTENCE; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 185:
 YY_RULE_SETUP
 
 { return token::SENTENCES; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 186:
 YY_RULE_SETUP
 
 { return token::TIMES; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 187:
 YY_RULE_SETUP
 
 { return token::UPPERCASE; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 188:
 YY_RULE_SETUP
 
 { return token::WEIGHT; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 189:
 YY_RULE_SETUP
 
 { return token::WINDOW; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 190:
 YY_RULE_SETUP
 
 { return token::WITHOUT; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 191:
 YY_RULE_SETUP
 
 { return token::STEMMING; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 192:
 YY_RULE_SETUP
 
 { return token::STOP; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 193:
 YY_RULE_SETUP
 
 { return token::THESAURUS; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 194:
 YY_RULE_SETUP
 
 { return token::WILDCARDS; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 195:
 YY_RULE_SETUP
 
 { return token::GETS; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 196:
 YY_RULE_SETUP
 
 { return token::DIV; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 197:
 YY_RULE_SETUP
 
 { return token::EQUALS; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 198:
 YY_RULE_SETUP
 
 { return token::EXCEPT; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 199:
 YY_RULE_SETUP
 
 { return token::VAL_EQ; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 200:
 YY_RULE_SETUP
 
 { return token::VAL_GE; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 201:
 YY_RULE_SETUP
 
 { return token::VAL_GT; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 202:
 YY_RULE_SETUP
 
 { return token::VAL_LE; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 203:
 YY_RULE_SETUP
 
 { return token::VAL_LT; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 204:
 YY_RULE_SETUP
 
 { return token::VAL_NE; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 205:
 YY_RULE_SETUP
 
 { return token::GE; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 206:
 YY_RULE_SETUP
 
 { return token::FOLLOWS; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 207:
 YY_RULE_SETUP
 
 { return token::GT; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 208:
 YY_RULE_SETUP
 
 { return token::IDIV; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 209:
 YY_RULE_SETUP
 
 { return token::INTERSECT; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 210:
 YY_RULE_SETUP
 
 { return token::IS; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 211:
 YY_RULE_SETUP
 
 { return token::LE; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 212:
 YY_RULE_SETUP
 
 { return token::PRECEDES; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 213:
 YY_RULE_SETUP
 
 { return token::MOD; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 214:
 YY_RULE_SETUP
 
 { return token::NE; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 215:
 YY_RULE_SETUP
 
 { return token::GROUP; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 216:
 YY_RULE_SETUP
 
 { return token::BY; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 217:
 YY_RULE_SETUP
 
 { return token::STABLE; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 218:
 YY_RULE_SETUP
 
 { return token::OR; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 219:
 YY_RULE_SETUP
 
 { return token::RETURN; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 220:
 YY_RULE_SETUP
 
 { return token::SELECT; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 221:
 YY_RULE_SETUP
 
 { return token::SATISFIES; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 222:
 YY_RULE_SETUP
 
 { return token::TO; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 223:
 YY_RULE_SETUP
 
 { return token::UNION; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 224:
 YY_RULE_SETUP
 
 { return token::VBAR; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 225:
 YY_RULE_SETUP
 
 { return token::WHERE; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 226:
 YY_RULE_SETUP
 
 { return token::PRESERVE; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 227:
 YY_RULE_SETUP
 
 { return token::STRIP; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 228:
 YY_RULE_SETUP
 
 { return token::INSERT; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 229:
 YY_RULE_SETUP
 
 { return token::_DELETE; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 230:
 YY_RULE_SETUP
 
 { return token::REPLACE; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 231:
 YY_RULE_SETUP
 
 { return token::VALUE; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 232:
 YY_RULE_SETUP
 
 { return token::OF; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 233:
 YY_RULE_SETUP
 
 { return token::RENAME; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 234:
 YY_RULE_SETUP
 
 { return token::COPY; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 235:
 YY_RULE_SETUP
 
 { return token::NODES; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 236:
 YY_RULE_SETUP
 
 { return token::INTO; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 237:
 YY_RULE_SETUP
 
 { return token::AFTER; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 238:
 YY_RULE_SETUP
 
 { return token::BEFORE; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 239:
 YY_RULE_SETUP
 
 { return token::MODIFY; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 240:
 YY_RULE_SETUP
 
 { return token::_STRICT; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 241:
 YY_RULE_SETUP
 
 { return token::LAX; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 242:
 YY_RULE_SETUP
 
 { return token::SKIP; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 243:
 YY_RULE_SETUP
 
 { return token::THEN; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 244:
 YY_RULE_SETUP
 
 { return token::ELSE; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 245:
 YY_RULE_SETUP
 
 { return token::EXTERNAL; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 246:
 YY_RULE_SETUP
 
 { return token::AND; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 247:
 YY_RULE_SETUP
 
 { return token::INHERIT; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 248:
 YY_RULE_SETUP
 
 { return token::NO_INHERIT; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 249:
 YY_RULE_SETUP
 
 { return token::NO_PRESERVE; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 250:
 YY_RULE_SETUP
 
 { return token::EMPTY_SEQUENCE; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 251:
 YY_RULE_SETUP
 
 { return token::ITEM; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 252:
 YY_RULE_SETUP
 
 { return token::CAST; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 253:
 YY_RULE_SETUP
 
 { return token::CASTABLE; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 254:
 YY_RULE_SETUP
 
 { return token::INSTANCE;}
-	/*LINTED*/break;
+	YY_BREAK
 	case 255:
 YY_RULE_SETUP
 
 { return token::TREAT; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 256:
 YY_RULE_SETUP
 
 { return token::FIRST; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 257:
 YY_RULE_SETUP
 
 { return token::LAST; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 258:
 YY_RULE_SETUP
 
 { return token::CATCH; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 259:
 YY_RULE_SETUP
 
 { return token::_EMPTY; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 260:
 YY_RULE_SETUP
 
 { return token::GREATEST; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 261:
 YY_RULE_SETUP
 
 { return token::ASCENDING; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 262:
 YY_RULE_SETUP
 
 { return token::DESCENDING; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 263:
 YY_RULE_SETUP
 
 { return token::ENCODING; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 264:
 YY_RULE_SETUP
 
 { return token::NULL_TOKEN; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 265:
 YY_RULE_SETUP
 
 { return token::TRUE_TOKEN; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 266:
 YY_RULE_SETUP
 
 { return token::FALSE_TOKEN; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 267:
 YY_RULE_SETUP
 
@@ -5380,7 +5371,7 @@ YY_RULE_SETUP
   else
     return token::INTEGER_LITERAL;
 }
-	/*LINTED*/break;
+	YY_BREAK
 	case 268:
 YY_RULE_SETUP
 
@@ -5388,7 +5379,7 @@ YY_RULE_SETUP
   yylval->decval = getDriver()->symtab.decimalval(yytext, yyleng);
   return token::DECIMAL_LITERAL;
 }
-	/*LINTED*/break;
+	YY_BREAK
 	case 269:
 YY_RULE_SETUP
 
@@ -5402,7 +5393,7 @@ YY_RULE_SETUP
   else
     return token::DOUBLE_LITERAL;
 }
-	/*LINTED*/break;
+	YY_BREAK
 	case 270:
 YY_RULE_SETUP
 
@@ -5410,45 +5401,45 @@ YY_RULE_SETUP
   yylval->err = getDriver()->parserErr(std::string("syntax error, unexpected \"") + yytext + "\", separator needed after numeric literal", *yylloc);
   return token::UNRECOGNIZED;
 }
-	/*LINTED*/break;
+	YY_BREAK
 	case 271:
 YY_RULE_SETUP
 
 { TRY_SVAL_TOKEN(ELEM_WILDCARD, put_ncname(yytext, yyleng-2), yytext); }
-	/*LINTED*/break;
+	YY_BREAK
 	case 272:
 /* rule 272 can match eol */
 YY_RULE_SETUP
 
 { TRY_SVAL_TOKEN(ELEM_EQNAME_WILDCARD, put_ncname(yytext+2, yyleng-4), yytext+2); }
-	/*LINTED*/break;
+	YY_BREAK
 	case 273:
 YY_RULE_SETUP
 
 { TRY_SVAL_TOKEN(QNAME_SVAL, put_qname(yytext, yyleng), yytext); }
-	/*LINTED*/break;
+	YY_BREAK
 	case 274:
 /* rule 274 can match eol */
 YY_RULE_SETUP
 
 { TRY_SVAL_TOKEN(EQNAME_SVAL, put_qname(yytext, yyleng, false, false, true), yytext); }
-	/*LINTED*/break;
+	YY_BREAK
 	case 275:
 YY_RULE_SETUP
 
 { TRY_SVAL_TOKEN(ANNOTATION_QNAME_SVAL, put_qname(yytext+1, yyleng-1), yytext+1); }
-	/*LINTED*/break;
+	YY_BREAK
 	case 276:
 /* rule 276 can match eol */
 YY_RULE_SETUP
 
 { TRY_SVAL_TOKEN(ANNOTATION_EQNAME_SVAL, put_qname(yytext+1, yyleng-1, false, false, true), yytext+1); }
-	/*LINTED*/break;
+	YY_BREAK
 	case 277:
 YY_RULE_SETUP
 
 { TRY_SVAL_TOKEN (PREFIX_WILDCARD, put_ncname(yytext+2, yyleng-2), yytext); }
-	/*LINTED*/break;
+	YY_BREAK
 	case 278:
 /* rule 278 can match eol */
 YY_RULE_SETUP
@@ -5456,65 +5447,65 @@ YY_RULE_SETUP
 {
   TRY_STRING_LITERAL(STRING_LITERAL, yytext, yyleng);
 }
-	/*LINTED*/break;
+	YY_BREAK
 	case 279:
 /* rule 279 can match eol */
 YY_RULE_SETUP
 
 { yylval->err = getDriver()->parserErr(std::string("syntax error, unterminated string literal \"") + yytext + "\"", *yylloc); return token::UNRECOGNIZED; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 280:
 YY_RULE_SETUP
 
 { PUSH_STATE(MODE_XML_COMMENT); return token::XML_COMMENT_BEGIN; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 281:
 YY_RULE_SETUP
 
 { PUSH_STATE(MODE_PROCESSING_INSTRUCTION);return token::PI_BEGIN; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 282:
 YY_RULE_SETUP
 
 { return token::CDATA_BEGIN; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 283:
 YY_RULE_SETUP
 
 { PUSH_STATE(MODE_START_TAG); return token::LT_OR_START_TAG; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 284:
 YY_RULE_SETUP
 
 { PUSH_STATE(MODE_EXPR_DOC_COMMENT); }
-	/*LINTED*/break;
+	YY_BREAK
 	case 285:
 YY_RULE_SETUP
 
 { PUSH_STATE(MODE_EXPR_COMMENT); }
-	/*LINTED*/break;
+	YY_BREAK
 	case 286:
 YY_RULE_SETUP
 
 { BEGIN MODE_PRAGMA; return token::PRAGMA_BEGIN;}
-	/*LINTED*/break;
+	YY_BREAK
 	case 287:
 YY_RULE_SETUP
 
 { PUSH_STATE(INITIAL); return token::LBRACE; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 288:
 YY_RULE_SETUP
 
 { POP_STATE(); return token::RBRACE; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 289:
 /* rule 289 can match eol */
 YY_RULE_SETUP
 
 {
 }
-	/*LINTED*/break;
+	YY_BREAK
 
 	case 290:
 YY_RULE_SETUP
@@ -5525,7 +5516,7 @@ YY_RULE_SETUP
   else
     COMP_CONSTR_ROLLBACK(true);
 }
-	/*LINTED*/break;
+	YY_BREAK
 	case 291:
 /* rule 291 can match eol */
 YY_RULE_SETUP
@@ -5536,7 +5527,7 @@ YY_RULE_SETUP
   else
     COMP_CONSTR_ROLLBACK(true);
 }
-	/*LINTED*/break;
+	YY_BREAK
 	case 292:
 YY_RULE_SETUP
 
@@ -5546,7 +5537,7 @@ YY_RULE_SETUP
   else
     COMP_CONSTR_ROLLBACK(true);
 }
-	/*LINTED*/break;
+	YY_BREAK
 	case 293:
 YY_RULE_SETUP
 
@@ -5574,252 +5565,252 @@ YY_RULE_SETUP
       TRY_SVAL_TOKEN(COMP_NS_NCNAME_LBRACE, put_ncname(temp.c_str(), temp.size()), temp.c_str());
   }
 }
-	/*LINTED*/break;
+	YY_BREAK
 	case 294:
 YY_RULE_SETUP
 
 { PUSH_STATE(MODE_EXPR_COMMENT); }
-	/*LINTED*/break;
+	YY_BREAK
 	case 295:
 /* rule 295 can match eol */
 YY_RULE_SETUP
 
 { }
-	/*LINTED*/break;
+	YY_BREAK
 	case YY_STATE_EOF(MODE_ELEM_COMP_CONSTR):
 	case YY_STATE_EOF(MODE_ATTR_COMP_CONSTR):
 	case YY_STATE_EOF(MODE_PI_COMP_CONSTR):
 	case YY_STATE_EOF(MODE_NS_COMP_CONSTR):
 { COMP_CONSTR_ROLLBACK(false); }
-	/*LINTED*/break;
+	YY_BREAK
 	case 296:
 YY_RULE_SETUP
 
 { COMP_CONSTR_ROLLBACK(true); }
-	/*LINTED*/break;
+	YY_BREAK
 	case 297:
 /* rule 297 can match eol */
 YY_RULE_SETUP
 
 { BEGIN MODE_PRAGMACONTENTS; TRY_SVAL_TOKEN(QNAME_SVAL, put_qname(yytext, yyleng, true, true), yytext); }
-	/*LINTED*/break;
+	YY_BREAK
 	case 298:
 /* rule 298 can match eol */
 YY_RULE_SETUP
 
 { BEGIN MODE_PRAGMACONTENTS; TRY_SVAL_TOKEN(EQNAME_SVAL, put_qname(yytext, yyleng, true, true), yytext); }
-	/*LINTED*/break;
+	YY_BREAK
 	case 299:
 YY_RULE_SETUP
 
 { BEGIN INITIAL; TRY_SVAL_TOKEN(QNAME_SVAL_AND_END_PRAGMA, put_qname(yytext, yyleng-2), yytext); }
-	/*LINTED*/break;
+	YY_BREAK
 	case 300:
 /* rule 300 can match eol */
 YY_RULE_SETUP
 
 { BEGIN INITIAL; TRY_SVAL_TOKEN(EQNAME_SVAL_AND_END_PRAGMA, put_qname(yytext, yyleng-2), yytext); }
-	/*LINTED*/break;
+	YY_BREAK
 	case 301:
 /* rule 301 can match eol */
 YY_RULE_SETUP
 
 { }
-	/*LINTED*/break;
+	YY_BREAK
 	case 302:
 /* rule 302 can match eol */
 YY_RULE_SETUP
 
 { BEGIN INITIAL; TRY_SVAL_TOKEN(PRAGMA_LITERAL_AND_END_PRAGMA, put(yytext, yyleng-2), yytext); }
-	/*LINTED*/break;
+	YY_BREAK
 	case 303:
 YY_RULE_SETUP
 
 { BEGIN MODE_ELEMENT_CONTENT; return token::TAG_END; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 304:
 YY_RULE_SETUP
 
 { BEGIN MODE_QUOTE_ATTRIBUTE_CONTENT; return token::QUOTE; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 305:
 YY_RULE_SETUP
 
 { BEGIN MODE_APOS_ATTRIBUTE_CONTENT; return token::APOS; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 306:
 YY_RULE_SETUP
 
 { return token::EQUALS; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 307:
 /* rule 307 can match eol */
 YY_RULE_SETUP
 
 { return token::BLANK; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 308:
 YY_RULE_SETUP
 
 { POP_STATE(); return token::EMPTY_TAG_END; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 309:
 YY_RULE_SETUP
 
 { TRY_SVAL_TOKEN (QNAME_SVAL, put_qname(yytext, yyleng), yytext); }
-	/*LINTED*/break;
+	YY_BREAK
 	case 310:
 YY_RULE_SETUP
 
 { yylval->err = getDriver()->unrecognizedCharErr(yytext, *yylloc); return token::UNRECOGNIZED; }
-	/*LINTED*/break;
+	YY_BREAK
 	case YY_STATE_EOF(MODE_START_TAG):
 { yylval->err = getDriver()->unterminatedElementConstructor(*yylloc); EOF_ERROR_END(); return token::UNRECOGNIZED; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 311:
 YY_RULE_SETUP
 
 { BEGIN MODE_END_TAG; return token::START_TAG_END; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 312:
 YY_RULE_SETUP
 
 { PUSH_STATE(INITIAL); return token::LBRACE; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 313:
 YY_RULE_SETUP
 
 { PUSH_STATE(MODE_XML_COMMENT); return token::XML_COMMENT_BEGIN; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 314:
 YY_RULE_SETUP
 
 { PUSH_STATE(MODE_PROCESSING_INSTRUCTION); return token::PI_BEGIN; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 315:
 YY_RULE_SETUP
 
 { PUSH_STATE(MODE_CDATA_SECTION); return token::CDATA_BEGIN; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 316:
 YY_RULE_SETUP
 
 { PUSH_STATE(MODE_START_TAG); return token::LT_OR_START_TAG; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 317:
 /* rule 317 can match eol */
 YY_RULE_SETUP
 
 { TRY_SVAL_TOKEN(ELEMENT_CONTENT, put(yytext, yyleng, 1), yytext); }
-	/*LINTED*/break;
+	YY_BREAK
 	case 318:
 YY_RULE_SETUP
 
 { TRY_SVAL_TOKEN(ELEMENT_CONTENT, put_entityref(yytext, yyleng), yytext); }
-	/*LINTED*/break;
+	YY_BREAK
 	case 319:
 YY_RULE_SETUP
 
 { TRY_CHARREF_LITERAL(CHAR_REF_LITERAL, put_charref, yytext, yyleng); }
-	/*LINTED*/break;
+	YY_BREAK
 	case 320:
 YY_RULE_SETUP
 
 { return token::DOUBLE_LBRACE; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 321:
 YY_RULE_SETUP
 
 { return token::DOUBLE_RBRACE; }
-	/*LINTED*/break;
+	YY_BREAK
 	case YY_STATE_EOF(MODE_ELEMENT_CONTENT):
 { yylval->err = getDriver()->noClosingTagForElementConstructor(*yylloc); EOF_ERROR_END(); return token::UNRECOGNIZED; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 322:
 YY_RULE_SETUP
 
 { POP_STATE(); return token::TAG_END; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 323:
 /* rule 323 can match eol */
 YY_RULE_SETUP
 
 { TRY_SVAL_TOKEN (QNAME_SVAL, put_qname(yytext, yyleng, false, true), yytext); }
-	/*LINTED*/break;
+	YY_BREAK
 	case YY_STATE_EOF(MODE_END_TAG):
 { yylval->err = getDriver()->noClosingTagForElementConstructor(*yylloc); EOF_ERROR_END(); return token::UNRECOGNIZED; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 324:
 YY_RULE_SETUP
 
 { POP_STATE(); return token::XML_COMMENT_END; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 325:
 /* rule 325 can match eol */
 YY_RULE_SETUP
 
 { TRY_SVAL_TOKEN (XML_COMMENT_LITERAL, put(yytext, yyleng, 1), yytext); }
-	/*LINTED*/break;
+	YY_BREAK
 	case 326:
 YY_RULE_SETUP
 
 { POP_STATE(); }
-	/*LINTED*/break;
+	YY_BREAK
 	case 327:
 YY_RULE_SETUP
 
 { PUSH_STATE(MODE_EXPR_COMMENT); }
-	/*LINTED*/break;
+	YY_BREAK
 	case 328:
 /* rule 328 can match eol */
 YY_RULE_SETUP
 
 { }
-	/*LINTED*/break;
+	YY_BREAK
 	case 329:
 YY_RULE_SETUP
 
 { }
-	/*LINTED*/break;
+	YY_BREAK
 	case YY_STATE_EOF(MODE_EXPR_COMMENT):
 { yylval->err = getDriver()->unterminatedCommentErr(*yylloc); EOF_ERROR_END(); return token::UNRECOGNIZED; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 330:
 /* rule 330 can match eol */
 YY_RULE_SETUP
 
 { getDriver()->theDocComment << yytext; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 331:
 /* rule 331 can match eol */
 YY_RULE_SETUP
 
 { getDriver()->theDocComment << yytext; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 332:
 YY_RULE_SETUP
 
 { POP_STATE(); }
-	/*LINTED*/break;
+	YY_BREAK
 	case YY_STATE_EOF(MODE_EXPR_DOC_COMMENT):
 { yylval->err = getDriver()->unterminatedCommentErr(*yylloc); EOF_ERROR_END(); return token::UNRECOGNIZED; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 333:
 /* rule 333 can match eol */
 YY_RULE_SETUP
 
 { BEGIN MODE_PROCESSING_INSTRUCTION_CONTENT; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 334:
 YY_RULE_SETUP
 
 { POP_STATE(); return token::PI_END; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 335:
 YY_RULE_SETUP
 
 { TRY_SVAL_TOKEN (NCNAME_SVAL, put(yytext, yyleng), yytext); }
-	/*LINTED*/break;
+	YY_BREAK
 	case 336:
 /* rule 336 can match eol */
 YY_RULE_SETUP
@@ -5828,95 +5819,95 @@ YY_RULE_SETUP
   POP_STATE();
   TRY_SVAL_TOKEN (CHAR_LITERAL_AND_PI_END, put(yytext, yyleng-2), yytext);
 }
-	/*LINTED*/break;
+	YY_BREAK
 	case 337:
 /* rule 337 can match eol */
 YY_RULE_SETUP
 
 { POP_STATE(); TRY_SVAL_TOKEN (CHAR_LITERAL_AND_CDATA_END, put(yytext, yyleng-3, 1), yytext); }
-	/*LINTED*/break;
+	YY_BREAK
 	case 338:
 YY_RULE_SETUP
 
 { BEGIN MODE_START_TAG; return token::QUOTE; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 339:
 YY_RULE_SETUP
 
 { PUSH_STATE(INITIAL); return token::LBRACE; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 340:
 YY_RULE_SETUP
 
 { return token::ESCAPE_QUOTE; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 341:
 /* rule 341 can match eol */
 YY_RULE_SETUP
 
 { TRY_SVAL_TOKEN(QUOTE_ATTR_CONTENT, put(yytext, yyleng, 2), yytext); }
-	/*LINTED*/break;
+	YY_BREAK
 	case 342:
 YY_RULE_SETUP
 
 { TRY_SVAL_TOKEN(QUOTE_ATTR_CONTENT, put_entityref(yytext, yyleng), yytext); }
-	/*LINTED*/break;
+	YY_BREAK
 	case 343:
 YY_RULE_SETUP
 
 { TRY_CHARREF_LITERAL(CHAR_REF_LITERAL, put_charref, yytext, yyleng); }
-	/*LINTED*/break;
+	YY_BREAK
 	case 344:
 YY_RULE_SETUP
 
 { return token::DOUBLE_LBRACE; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 345:
 YY_RULE_SETUP
 
 { return token::DOUBLE_RBRACE; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 346:
 YY_RULE_SETUP
 
 { BEGIN MODE_START_TAG; return token::APOS; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 347:
 YY_RULE_SETUP
 
 { PUSH_AND_BEGIN (INITIAL, MODE_APOS_ATTRIBUTE_CONTENT); return token::LBRACE; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 348:
 YY_RULE_SETUP
 
 { return token::ESCAPE_APOS; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 349:
 /* rule 349 can match eol */
 YY_RULE_SETUP
 
 { TRY_SVAL_TOKEN(APOS_ATTR_CONTENT, put(yytext, yyleng, 2), yytext); }
-	/*LINTED*/break;
+	YY_BREAK
 	case 350:
 YY_RULE_SETUP
 
 { TRY_SVAL_TOKEN(APOS_ATTR_CONTENT, put_entityref(yytext, yyleng), yytext); }
-	/*LINTED*/break;
+	YY_BREAK
 	case 351:
 YY_RULE_SETUP
 
 { TRY_CHARREF_LITERAL(CHAR_REF_LITERAL, put_charref, yytext, yyleng); }
-	/*LINTED*/break;
+	YY_BREAK
 	case 352:
 YY_RULE_SETUP
 
 { return token::DOUBLE_LBRACE; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 353:
 YY_RULE_SETUP
 
 { return token::DOUBLE_RBRACE; }
-	/*LINTED*/break;
+	YY_BREAK
 	case 354:
 YY_RULE_SETUP
 
@@ -5924,13 +5915,13 @@ YY_RULE_SETUP
     yylval->err = getDriver()->unrecognizedCharErr(yytext, *yylloc);
     return token::UNRECOGNIZED;
 }
-	/*LINTED*/break;
+	YY_BREAK
 	case 355:
 /* rule 355 can match eol */
 YY_RULE_SETUP
 
-yyecho();
-	/*LINTED*/break;
+ECHO;
+	YY_BREAK
 	case YY_STATE_EOF(INITIAL):
 
 	;
@@ -6200,7 +6191,7 @@ yyecho();
 							 */
 							(yy_c_buf_p) = (yytext_ptr) + YY_MORE_ADJ;
 
-							yy_act = YY_STATE_EOF(yystart());
+							yy_act = YY_STATE_EOF(YY_START);
 							goto do_action;
 						} else {
 							if ( ! (yy_did_buffer_switch_on_eof) ) {
@@ -6295,7 +6286,17 @@ void yyFlexLexer::ctor_common() {
 yyFlexLexer::~yyFlexLexer() {
 	yyfree( yy_state_buf  );
 	yyfree( yy_start_stack  );
-	yy_delete_buffer( yy_current_buffer() );
+	/* Delete the whole buffer stack, like yylex_destroy() does for the C
+	 * scanners, so buffers pushed with yypush_buffer_state() are freed.
+	 * The scanner is going away, so there is no need to load the state
+	 * of each buffer that becomes the top.
+	 */
+	while ( yy_current_buffer() != NULL ) {
+		yy_delete_buffer( yy_current_buffer() );
+		if ( yy_buffer_stack_top > 0 ) {
+			--yy_buffer_stack_top;
+		}
+	}
 	yyfree( yy_buffer_stack  );
 }
 
@@ -6602,7 +6603,7 @@ yy_is_jam = (yy_current_state == YY_JAMSTATE);
 		return yy_is_jam ? 0 : yy_current_state;
 }
 
-void yyFlexLexer::yyunput_r( int c, char* yy_bp)
+void yyFlexLexer::yyunput( int c, char* yy_bp)
 
 {
 	char *yy_cp;
@@ -6698,6 +6699,7 @@ int yyFlexLexer::yyinput()
 				if ( ! (yy_did_buffer_switch_on_eof) ) {
 					YY_NEW_FILE;
 				}
+
 				return yyinput();
 
 			case EOB_ACT_CONTINUE_SCAN:
@@ -6710,8 +6712,8 @@ int yyFlexLexer::yyinput()
 	}
 
 	c = *(unsigned char *) (yy_c_buf_p);	/* cast for 8-bit char's */
-	*(yy_c_buf_p) = '\0';	/* preserve yytext */
 	(yy_hold_char) = *++(yy_c_buf_p);
+	*(yy_c_buf_p) = '\0';	/* preserve yytext */
 
 	return c;
 }
@@ -6935,6 +6937,7 @@ void yyFlexLexer::yy_flush_buffer( yybuffer b )
 	b->yy_buf_pos = &b->yy_ch_buf[0];
 
 	b->yy_at_bol = 1;
+	b->yy_at_bol_before_match = 1;
 	b->yy_buffer_status = YY_BUFFER_NEW;
 
 	if ( b == yy_current_buffer() ) {
@@ -7067,9 +7070,9 @@ void yyFlexLexer::yy_push_state( int _new_state )
 			YY_FATAL_ERROR( "out of memory expanding start-condition stack" );
 		}
 	}
-	(yy_start_stack)[(yy_start_stack_ptr)++] = yystart();
+	(yy_start_stack)[(yy_start_stack_ptr)++] = YY_START;
 
-	yybegin(_new_state);
+	BEGIN(_new_state);
 }
 
 void yyFlexLexer::yy_pop_state()
@@ -7078,13 +7081,13 @@ void yyFlexLexer::yy_pop_state()
 		if ( --(yy_start_stack_ptr) < 0 ) {
 		YY_FATAL_ERROR( "start-condition stack underflow" );
 	}
-	yybegin((yy_start_stack)[(yy_start_stack_ptr)]);
+	BEGIN((yy_start_stack)[(yy_start_stack_ptr)]);
 }
 
 int yyFlexLexer::yy_top_state()
 
 {
-		return (yy_start_stack_ptr) > 0 ? (yy_start_stack)[(yy_start_stack_ptr) - 1] : yystart();
+		return (yy_start_stack_ptr) > 0 ? (yy_start_stack)[(yy_start_stack_ptr) - 1] : YY_START;
 }
 
 /* Redefine yyless() so it works in section 3 code. */
@@ -7102,6 +7105,9 @@ int yyFlexLexer::yy_top_state()
 			(yy_hold_char) = *(yy_c_buf_p); \
 			*(yy_c_buf_p) = '\0'; \
 			yyleng = yyless_macro_arg; \
+			YY_CURRENT_BUFFER_LVALUE->yy_at_bol = ( yyleng > 0 ) ? \
+				(yytext[yyleng - 1] == '\n') : \
+				YY_CURRENT_BUFFER_LVALUE->yy_at_bol_before_match; \
 	} while ( 0 )
 
 /* Accessor  methods (get/set functions) to struct members. */
