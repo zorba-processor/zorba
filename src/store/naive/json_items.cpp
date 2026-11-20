@@ -419,14 +419,23 @@ bool SimpleJSONObject::add(
       lStructuredItem->setCollectionTreeInfo(theCollectionInfo);
     }
     
-    if (theKeys)
-      theKeys->insert( std::make_pair( lName, thePairs.size() ) );
+    // The index of names records only stored pairs: a failure leaves the
+    // object as it was.
     thePairs.push_back(std::make_pair(aName.getp(), lValue));
+    try
+    {
+      if (theKeys)
+        theKeys->insert( std::make_pair( lName, thePairs.size() - 1 ) );
+      else if (thePairs.size() > KEY_INDEX_THRESHOLD)
+        buildKeyIndex();
+    }
+    catch (...)
+    {
+      thePairs.pop_back();
+      throw;
+    }
     aName->addReference();
     lValue->addReference();
-
-    if (!theKeys && thePairs.size() > KEY_INDEX_THRESHOLD)
-      buildKeyIndex();
 
     ASSERT_INVARIANT();
     return true;
@@ -1030,8 +1039,8 @@ void SimpleJSONArray::push_back(const store::Item_t& aValue)
     lStructuredItem->setCollectionTreeInfo(theCollectionInfo);
   }
 
-  aValue->addReference();
   theContent.push_back(aValue.getp());
+  aValue->addReference();
 
   ASSERT_INVARIANT();
 }
@@ -1084,9 +1093,9 @@ void SimpleJSONArray::insert_before(
     lStructuredItem->setCollectionTreeInfo(theCollectionInfo);
   }
 
-  member->addReference();
   Members::size_type sPos = static_cast<Members::size_type>(cast(pos) - 1);
   theContent.insert(theContent.begin() + sPos, member.getp());
+  member->addReference();
 
   ASSERT_INVARIANT();
 }
@@ -1156,9 +1165,9 @@ void SimpleJSONArray::add(
       lStructuredItem->setCollectionTreeInfo(theCollectionInfo);
     }
 
-    lItem->addReference();
     Members::size_type sPos = static_cast<Members::size_type>(aTargetPos + i);
     theContent.insert(theContent.begin() + sPos, lItem);
+    lItem->addReference();
   }
 
   ASSERT_INVARIANT();
@@ -1372,10 +1381,11 @@ store::Item* SimpleJSONArray::copy(
     json_nesting::check_stack();
 
     lNewArray = new SimpleJSONArray();
-    lNewArray->theContent.reserve(theContent.size());
 
     try
     {
+      lNewArray->theContent.reserve(theContent.size());
+
       for (Members::const_iterator lIter = theContent.begin();
            lIter != theContent.end();
            ++lIter)
