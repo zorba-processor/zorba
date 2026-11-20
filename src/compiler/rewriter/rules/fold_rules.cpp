@@ -186,6 +186,15 @@ expr* MarkExprs::apply(RewriterContext& rCtx, expr* node, bool& modified)
       {
         curDereferencesNodes = ANNOTATION_TRUE;
       }
+      // Reading a static collection checks the occurrence of its declared
+      // type: a rewrite must not drop the read for its type.
+      else if ((fkind == FunctionConsts::ZORBA_STORE_STATIC_COLLECTIONS_DML_COLLECTION_1 ||
+                fkind == FunctionConsts::ZORBA_STORE_STATIC_COLLECTIONS_DML_COLLECTION_2 ||
+                fkind == FunctionConsts::ZORBA_STORE_STATIC_COLLECTIONS_DML_COLLECTION_3) &&
+               fo->get_return_type()->get_quantifier() != SequenceType::QUANT_STAR)
+      {
+        curNonDiscardable = ANNOTATION_TRUE_FIXED;
+      }
 
       // Do not fold functions that always require access to the dynamic context,
       // or may need to access the implicit timezone (which is also in the dynamic
