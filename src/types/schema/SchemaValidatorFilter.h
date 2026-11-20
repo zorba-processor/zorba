@@ -120,6 +120,9 @@ private:
 
   XERCES_CPP_NAMESPACE_QUALIFIER XMLBuffer      theContent;
 
+  // a copy: the next attribute of the element reuses the slot of xsi:type
+  XERCES_CPP_NAMESPACE_QUALIFIER XMLBuffer      theXsiTypeValue;
+
   const XMLCh                                 * theXsiType;
 
   struct OpenElement
@@ -127,6 +130,8 @@ private:
     // whether it took an entry of the type stack of theSchemaValidator,
     // which checkContent pops at its end
     bool hasTypeEntry;
+    // whether a skip wildcard matched it or one of its ancestors
+    bool isSkipped;
     // restored before its checkContent: its children reuse the one nil flag of theSchemaValidator
     bool isNilled;
     // restored before its checkContent: the check of a child resets it
