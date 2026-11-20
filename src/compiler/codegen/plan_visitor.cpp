@@ -1285,10 +1285,15 @@ void visit_flwor_clause(const flwor_clause* c, bool general)
     clauseVarMap->theVarExprs.push_back(lc->get_var());
     clauseVarMap->theVarRebinds.push_back(varRebind);
 
-    if (domType->get_quantifier() == SequenceType::QUANT_ONE)
-      varRebind->theIsFakeLetVar = true;
-    else if (domType->get_quantifier() == SequenceType::QUANT_QUESTION)
-      varRebind->theIsSingleItemLetVar = true;
+    // A single item is bound eagerly; a lazy LET (IndexJoinRule::rewriteJoin())
+    // is evaluated when its var is read.
+    if (!lc->lazyEval())
+    {
+      if (domType->get_quantifier() == SequenceType::QUANT_ONE)
+        varRebind->theIsFakeLetVar = true;
+      else if (domType->get_quantifier() == SequenceType::QUANT_QUESTION)
+        varRebind->theIsSingleItemLetVar = true;
+    }
 
     break;
   }
