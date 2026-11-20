@@ -87,7 +87,7 @@ declare function iddl:declared-indexes()
  : @param $name The name of the index to delete.
  : @return An empty XDM instance and a pending update list that, once applied,
  : deletes the index with the given name.
- : @error zerr:ZDDY0009 if the index does not exist.
+ : @error zerr:ZDDY0023 if the index does not exist.
  :)
 declare updating function iddl:delete( $name as xs:QName )
   external;

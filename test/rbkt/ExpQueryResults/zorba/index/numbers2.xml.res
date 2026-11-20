@@ -3,7 +3,7 @@ xs:long
 
 TEST 1:
 
-<exception>err:XPTY0004 : node with untyped key value found during probe on index "num:idx-g-h-untyped"</exception>
+<exception>err:XPTY0004 : "xs:integer": search key can not be compared with a key value of a node in index "num:idx-g-h-untyped"</exception>
 
 TEST 2:
 
