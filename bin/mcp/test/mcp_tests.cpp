@@ -4625,8 +4625,15 @@ void test_cache_after_failed_admission( Fixture const &f ) {
           call( open_of( 0 ) );
         std::size_t const before = server.cache_stats().hits;
         call( open_of( 0 ) );
-        if ( server.cache_stats().hits <= before )
-          out = "the file is not cached any more";
+        if ( server.cache_stats().hits <= before ) {
+          auto const &st = server.cache_stats();
+          out = "the file is not cached any more (failing allocation " +
+                std::to_string( n ) + " of " + std::to_string( total ) +
+                "; admissions " + std::to_string( st.admissions ) +
+                ", refused " + std::to_string( st.refused ) +
+                ", entries " + std::to_string( st.entries ) +
+                ", evictions " + std::to_string( st.evictions ) + ")";
+        }
       }
       ssize_t const w = write( fd[1], out.data(), out.size() );
       _exit( w == static_cast<ssize_t>( out.size() ) ? 0 : 1 );
