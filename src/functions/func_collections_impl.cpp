@@ -22,6 +22,7 @@
 #include "compiler/expression/fo_expr.h"
 
 #include "compiler/expression/pragma.h"
+#include "types/typemanager.h"
 #include "compiler/api/compilercb.h"
 
 #include "zorbamisc/ns_consts.h"
@@ -85,6 +86,11 @@ xqtref_t zorba_store_static_collections_dml_collection::getReturnType(const fo_e
 
     if (collection != NULL)
     {
+      // A skip leaves fewer nodes than the collection has.
+      if (caller->num_args() > 1)
+        return sctx->get_typemanager()->create_type_x_quant(
+          *collection->getCollectionType(), SequenceType::QUANT_QUESTION);
+
       return collection->getCollectionType();
     }
     else

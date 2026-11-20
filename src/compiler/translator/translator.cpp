@@ -2387,6 +2387,12 @@ void* import_schema(
     return no_state;
   }
 
+  // The location hints of an already loaded namespace are disregarded, so
+  // they are not resolved either.
+  Schema* loadedSchema = theSctx->get_typemanager()->getSchema();
+  if (loadedSchema != NULL && loadedSchema->isNamespaceLoaded(targetNS.c_str()))
+    return no_state;
+
   store::Item_t targetNSItem = NULL;
   zstring tmp = targetNS;
   ITEM_FACTORY->createAnyURI(targetNSItem, tmp);
