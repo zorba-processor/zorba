@@ -802,10 +802,10 @@ void FastXmlLoader::addBuildError(ZorbaException const& e)
 
   int lLine, lColumn;
   dataPosition(lLine, lColumn);
-  // The first component of the node id is the document node's.
+  // The document node is at level 1.
   reportLimit(theDocUri.c_str(), lLine, lColumn,
               "node nesting depth of " +
-              std::to_string(theOrdPath.getNumComps() - 1) +
+              std::to_string(theLabelBuilder.getLevel() - 1) +
               " exceeds the node id limit");
 }
 
