@@ -74,12 +74,15 @@
             <FLWORIterator>
               <ForVariable name="$$context-item">
                 <TryCatchIterator>
-                  <ProbeIndexPointValueIterator>
-                    <SingletonIterator value="xs:QName(,,tempIndex0)"/>
-                    <UnhoistIterator>
-                      <ForVarIterator varname="$$opt_temp_0"/>
-                    </UnhoistIterator>
-                  </ProbeIndexPointValueIterator>
+                  <FnConcatIterator>
+                    <LetVarIterator varname="$$opt_temp_3"/>
+                    <ProbeIndexPointValueIterator>
+                      <SingletonIterator value="xs:QName(,,tempIndex0)"/>
+                      <UnhoistIterator>
+                        <ForVarIterator varname="$$opt_temp_0"/>
+                      </UnhoistIterator>
+                    </ProbeIndexPointValueIterator>
+                  </FnConcatIterator>
                   <ForVarIterator varname="repl"/>
                 </TryCatchIterator>
               </ForVariable>

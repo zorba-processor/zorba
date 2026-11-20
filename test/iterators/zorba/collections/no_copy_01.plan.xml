@@ -13,9 +13,6 @@
               <SingletonIterator value="xs:QName(,,a)"/>
             </ElementIterator>
           </ForVariable>
-          <MaterializeClause>
-            <MaterializeForVariable inputVar="n"/>
-          </MaterializeClause>
           <ReturnClause>
             <IsSameNodeIterator>
               <ForVarIterator varname="n"/>
@@ -38,9 +35,6 @@
               <SingletonIterator value="xs:QName(,,a)"/>
             </ElementIterator>
           </ForVariable>
-          <MaterializeClause>
-            <MaterializeForVariable inputVar="n"/>
-          </MaterializeClause>
           <ReturnClause>
             <IsSameNodeIterator>
               <ForVarIterator varname="n"/>

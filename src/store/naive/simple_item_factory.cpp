@@ -1423,7 +1423,8 @@ bool BasicItemFactory::createElementNode(
     bool                        haveEmptyValue,
     const store::NsBindings&    localBindings,
     zstring&                    baseUri,
-    bool                        isInSubstitutionGroup)
+    bool                        isInSubstitutionGroup,
+    bool                        isNilled)
 {
   XmlTree* xmlTree = NULL;
   ElementNode* n = NULL;
@@ -1457,6 +1458,9 @@ bool BasicItemFactory::createElementNode(
                         isInSubstitutionGroup,
                         &localBindings,
                         baseUri);
+
+    if (isNilled)
+      n->setNilled();
   }
   catch (...)
   {

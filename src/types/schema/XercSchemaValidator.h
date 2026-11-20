@@ -243,6 +243,8 @@ public:
 
   bool getIsElemSpecified() const;
 
+  bool getIsNil() const;
+
   const XMLCh* getNormalizedValue() const;
 
 private:
@@ -535,6 +537,12 @@ inline bool XercSchemaValidator::getErrorOccurred() const
 inline bool XercSchemaValidator::getIsElemSpecified() const
 {
   return fElemIsSpecified;
+}
+
+
+inline bool XercSchemaValidator::getIsNil() const
+{
+  return fNil;
 }
 
 
