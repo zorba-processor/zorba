@@ -1198,38 +1198,38 @@ bool Store::getStructuralInformation(
     const store::Item* node)
 {
 #ifdef TEXT_ORDPATH
-  const OrdPathNode* n = static_cast<const OrdPathNode*>(node);
+  const LabeledNode* n = static_cast<const LabeledNode*>(node);
 
   return theItemFactory->createStructuralAnyURI(
       result,
       n->getCollectionId(),
       n->getTree()->getTreeId(),
       n->getNodeKind(),
-      n->getOrdPath());
+      n->getLabel());
 #else
   if (node->getNodeKind() == store::StoreConsts::textNode)
   {
-    OrdPath ordPath;
+    NodeLabel label;
     const TextNode* n = static_cast<const TextNode*>(node);
-    n->getOrdPath(ordPath);
+    n->getLabel(label);
 
     return GET_FACTORY().createStructuralAnyURI(
         result,
         n->getCollectionId(),
         n->getTree()->getTreeId(),
         store::StoreConsts::textNode,
-        ordPath);
+        label);
   }
   else
   {
-    const OrdPathNode* n = static_cast<const OrdPathNode*>(node);
+    const LabeledNode* n = static_cast<const LabeledNode*>(node);
 
     return GET_FACTORY().createStructuralAnyURI(
         result,
         n->getCollectionId(),
         n->getTree()->getTreeId(),
         n->getNodeKind(),
-        n->getOrdPath());
+        n->getLabel());
   }
 #endif
 }

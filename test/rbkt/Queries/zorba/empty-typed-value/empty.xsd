@@ -1,0 +1,22 @@
+<xs:schema
+  xmlns:xs="http://www.w3.org/2001/XMLSchema"
+  targetNamespace="http://zorba.io/test/empty-typed-value"
+  xmlns="http://zorba.io/test/empty-typed-value"
+  elementFormDefault="qualified">
+
+  <xs:simpleType name="integers">
+    <xs:list itemType="xs:integer"/>
+  </xs:simpleType>
+
+  <xs:simpleType name="code">
+    <xs:restriction base="xs:string">
+      <xs:maxLength value="3"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:element name="h" type="xs:hexBinary"/>
+  <xs:element name="s" type="xs:string"/>
+  <xs:element name="l" type="integers"/>
+  <xs:element name="c" type="code"/>
+
+</xs:schema>
