@@ -100,8 +100,11 @@ void XmlLoader::applyLoadOptions(const store::LoadProperties& props, xmlParserCt
 ********************************************************************************/
 namespace {
 
+char const FRAGMENT_WRAPPER_NAME[] = "zorba-fragment-wrapper";
 char const FRAGMENT_WRAPPER_START[] = "<zorba-fragment-wrapper>";
 char const FRAGMENT_WRAPPER_END[] = "</zorba-fragment-wrapper>";
+char const XML_DECL_START[] = "<?xml";
+char const VERSION_INFO[] = " version=\"1.0\"";
 
 // Stop looking for a DOCTYPE after this many bytes of prolog.
 std::string::size_type const MAX_PROLOG_SCAN = 1024 * 1024;
@@ -222,6 +225,95 @@ inline std::string to_string(xmlChar const *s) {
   return s ? std::string(reinterpret_cast<char const*>(s)) : std::string();
 }
 
+/**
+ * Advances the end position of \a ins past \a n bytes fed to libxml2, which
+ * counts a CR LF pair as one line break and a UTF-8 sequence as one column.
+ */
+void advance(FragmentInsertions &ins, char const *p, std::size_t n) {
+  for (char const *const end = p + n; p < end; ++p) {
+    char const c = *p;
+    bool const lf_after_cr = c == '\n' && ins.after_cr;
+    ins.after_cr = c == '\r';
+    if (lf_after_cr)
+      continue;
+    if (c == '\n' || c == '\r') {
+      ++ins.end_line;
+      ins.end_column = 1;
+    } else if ((static_cast<unsigned char>(c) & 0xC0) != 0x80) {
+      ++ins.end_column;
+    }
+  }
+}
+
+/**
+ * Moves \a column, on a line where \a length characters were inserted at
+ * column \a at, to its column without them.
+ */
+inline void remove_insertion(int &column, int at, int length) {
+  if (column >= at + length)
+    column -= length;
+  else if (column > at)
+    column = at;
+}
+
+/**
+ * Whether libxml2 locates the current error in the input rather than in an
+ * external entity; it locates an internal entity's error at its reference.
+ */
+bool locates_in_input(xmlParserCtxtPtr ctxt) {
+  xmlParserInputPtr input = ctxt->input;
+  if (input == NULL)
+    return false;
+  if (input->filename == NULL && ctxt->inputNr > 1)
+    input = ctxt->inputTab[ctxt->inputNr - 2];
+  return input == ctxt->inputTab[0];
+}
+
+inline bool is_wrapper(char const *name) {
+  return name && std::strcmp(name, FRAGMENT_WRAPPER_NAME) == 0;
+}
+
+/**
+ * Moves error \a e of the input from libxml2's position to the position in
+ * the input, and reports an error that names the wrapper as libxml2 reports it
+ * for a document or a well-balanced chunk; \a message holds a new message.
+ */
+void locate_in_input(FragmentIStream const &fs, xmlError &e,
+                     std::string &message) {
+  FragmentInsertions const &ins = fs.insertions;
+  bool const in_end_tag = ins.ended &&
+    (e.line > ins.end_line || (e.line == ins.end_line && e.int2 > ins.end_column));
+  if (in_end_tag) {
+    e.line = ins.end_line;
+    e.int2 = ins.end_column;
+  }
+  if (e.line == ins.wrapper_line)
+    remove_insertion(e.int2, ins.wrapper_column,
+                     static_cast<int>(sizeof(FRAGMENT_WRAPPER_START) - 1));
+  if (e.line == 1 && ins.version)
+    remove_insertion(e.int2, static_cast<int>(sizeof(XML_DECL_START)),
+                     static_cast<int>(sizeof(VERSION_INFO) - 1));
+
+  if (e.code != XML_ERR_TAG_NAME_MISMATCH)
+    return;
+  if (in_end_tag && is_wrapper(e.str2)) {
+    // An element the input leaves open.
+    message = "Premature end of data in tag ";
+    message += e.str1 ? e.str1 : "";
+    message += " line " + std::to_string(e.int1) + "\n";
+    e.code = XML_ERR_TAG_NOT_FINISHED;
+    e.str2 = NULL;
+    e.message = message.data();
+  } else if (fs.parse_depth == 1 && is_wrapper(e.str1)) {
+    // An end tag without a start tag.
+    message = "chunk is not well balanced\n";
+    e.code = XML_ERR_NOT_WELL_BALANCED;
+    e.str1 = e.str2 = NULL;
+    e.int1 = 0;
+    e.message = message.data();
+  }
+}
+
 } // anonymous namespace
 
 
@@ -337,13 +429,23 @@ void FragmentXmlLoader::startParser()
   std::string::size_type const prolog_end = doctype_end ? doctype_end : decl_end;
   std::string prolog(head, 0, prolog_end);
   // A text declaration may omit the version; an XML declaration may not.
+  FragmentInsertions &ins = fs.insertions;
   if (has_decl && prolog.find("version", 0) >= decl_end)
   {
-    std::string::size_type const pos = prolog.find("<?xml");
-    prolog.insert(pos + 5, " version=\"1.0\"");
+    std::string::size_type const pos = prolog.find(XML_DECL_START);
+    prolog.insert(pos + sizeof(XML_DECL_START) - 1, VERSION_INFO);
+    ins.version = true;
   }
+  std::string::size_type const wrapper_pos = prolog.size();
   prolog += FRAGMENT_WRAPPER_START;
   prolog.append(head, prolog_end, std::string::npos);
+
+  // libxml2 skips a byte order mark without counting it.
+  std::string::size_type const bom = starts_with(prolog, 0, "\xEF\xBB\xBF") ? 3 : 0;
+  advance(ins, prolog.data() + bom, wrapper_pos - bom);
+  ins.wrapper_line = ins.end_line;
+  ins.wrapper_column = ins.end_column;
+  advance(ins, prolog.data() + wrapper_pos, prolog.size() - wrapper_pos);
 
   xmlParseChunk(fs.ctxt, prolog.data(), static_cast<int>(prolog.size()), 0);
   if (eof)
@@ -357,6 +459,7 @@ void FragmentXmlLoader::startParser()
 void FragmentXmlLoader::finishParser()
 {
   FragmentIStream &fs = *theFragmentStream;
+  fs.insertions.ended = true;
   xmlParseChunk(fs.ctxt, FRAGMENT_WRAPPER_END,
                 static_cast<int>(sizeof(FRAGMENT_WRAPPER_END) - 1), 1);
   fs.parser_done = true;
@@ -377,7 +480,10 @@ void FragmentXmlLoader::feedParser()
     throw 0;
   }
   if (n > 0)
+  {
+    advance(fs.insertions, &buf[0], static_cast<std::size_t>(n));
     xmlParseChunk(fs.ctxt, &buf[0], static_cast<int>(n), 0);
+  }
   if (fs.theStream->eof() || n == 0)
     finishParser();
 }
@@ -775,8 +881,13 @@ void FragmentXmlLoader::recordError(void* ctx, ZORBA_XML_ERROR_PTR error)
 try
 {
   FragmentIStream *const fs = streamOf(ctx);
-  if (fs && fs->current_loader)
-    XmlLoader::error(fs->current_loader, error);
+  if (!fs || !fs->current_loader)
+    return;
+  xmlError located = *error;
+  std::string message;
+  if (locates_in_input(static_cast<xmlParserCtxtPtr>(ctx)))
+    locate_in_input(*fs, located, message);
+  XmlLoader::error(fs->current_loader, &located);
 }
 catch (std::bad_alloc const&)
 {

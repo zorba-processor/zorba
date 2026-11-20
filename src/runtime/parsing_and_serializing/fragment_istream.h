@@ -63,6 +63,22 @@ struct FragmentEvent
   int nb_defaulted = 0;
 };
 
+/**
+ * Where the fragment parser feeds libxml2 text the input does not have, in
+ * libxml2's line and column numbers, so that an error is reported at its
+ * position in the input.
+ */
+struct FragmentInsertions
+{
+  bool version = false;     // " version=\"1.0\"" after "<?xml" on line 1
+  int wrapper_line = 0;     // the wrapper start tag
+  int wrapper_column = 0;
+  int end_line = 1;         // just past the text fed so far
+  int end_column = 1;
+  bool after_cr = false;    // the last byte fed is a carriage return
+  bool ended = false;       // the wrapper end tag follows end_line, end_column
+};
+
 class FragmentIStream : public std::istream
 {
 public:
@@ -98,6 +114,7 @@ public:
   int parse_depth;                  // element depth as seen by libxml2, wrapper included
   void* current_loader;             // the FragmentXmlLoader replaying events
   std::vector<std::vector<std::pair<std::string,std::string> > > ns_scopes;
+  FragmentInsertions insertions;
 
   bool only_one_doc_node;           // If set to true, all parsed fragments will be added to one
                                     // single document node, instead of having one for each fragment.
@@ -179,6 +196,7 @@ public:
     parse_depth = 0;
     current_loader = NULL;
     ns_scopes.clear();
+    insertions = FragmentInsertions();
     only_one_doc_node = false;
   }
   

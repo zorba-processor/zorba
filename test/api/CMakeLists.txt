@@ -47,6 +47,8 @@ CREATE_TEST_SOURCELIST(APITests
   invoke_module_globals.cpp
   function_item_lifetime.cpp
   json_parse_members.cpp
+  window_running_query.cpp
+  iterator_after_close.cpp
   file_write_checks.cpp
   itemfactory_empty_items.cpp
   host_date_time.cpp
