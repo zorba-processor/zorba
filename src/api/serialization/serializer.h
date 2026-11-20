@@ -17,6 +17,7 @@
 #ifndef ZORBA_SERIALIZER_H
 #define ZORBA_SERIALIZER_H
 
+#include <memory>
 #include <vector>
 
 #include <zorba/sax2.h>
@@ -212,9 +213,9 @@ protected:
       PREVIOUS_ITEM_WAS_NODE
     }                                     thePreviousItemKind;
 
-    std::vector<store::ChildrenIterator*> theChildIters;
+    std::vector<std::unique_ptr<store::ChildrenIterator> > theChildIters;
     ulong                                 theFirstFreeChildIter;
-    store::AttributesIterator           * theAttrIter;
+    std::unique_ptr<store::AttributesIterator> theAttrIter;
 
     bool                                  theIsFirstElementNode;
     bool                                  theEmitAttributes;
