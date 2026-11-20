@@ -14,7 +14,9 @@
  * limitations under the License.
  */
 
+#include <cstring>
 #include <fstream>
+#include <new>
 
 #include <zorba/properties.h>
 #include "compiler/parser/xquery_driver.h"
@@ -52,6 +54,39 @@
 
 namespace zorba
 {
+
+namespace
+{
+
+// The messages of flex raised only after an allocation returned null; the
+// buffer is always the scanner's own, so it overflows only when growing it fails.
+[[noreturn]] void throw_scanner_failure(const char* msg)
+{
+  static const char* const allocation_failures[] = {
+    "out of dynamic memory in yy_create_buffer()",
+    "out of dynamic memory in yy_get_next_buffer()",
+    "out of dynamic memory in yyensure_buffer_stack()",
+    "out of memory expanding start-condition stack",
+    "fatal error - scanner input buffer overflow"
+  };
+  for (const char* failure : allocation_failures)
+    if (std::strcmp(msg, failure) == 0)
+      throw std::bad_alloc();
+  throw ZORBA_EXCEPTION(zerr::ZXQP0003_INTERNAL_ERROR,
+                        ERROR_PARAMS(ERROR_TEXT(msg)));
+}
+
+}
+
+void xquery_scanner::LexerError(const char* msg)
+{
+  throw_scanner_failure(msg);
+}
+
+void jsoniq_scanner::LexerError(const char* msg)
+{
+  throw_scanner_failure(msg);
+}
 
 xquery_driver::xquery_driver(CompilerCB* aCompilerCB, GRAMMAR_TYPE a_grammar_type, uint32_t initial_heapsize)
   :

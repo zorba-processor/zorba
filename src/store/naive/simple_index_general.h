@@ -16,12 +16,15 @@
 #ifndef ZORBA_SIMPLE_STORE_INDEX_HASH_GENERAL
 #define ZORBA_SIMPLE_STORE_INDEX_HASH_GENERAL
 
+#include <array>
 #include <cassert>
 #include <map>
 #include <memory>
+#include <unordered_set>
 
 #include "simple_index.h"
 #include "store_defs.h"
+#include "zorbatypes/integer.h"
 
 namespace zorba 
 { 
@@ -124,12 +127,13 @@ public:
   A vector storing all domain nodes for which the key expr returns the empty
   sequence.
 
-  theNumUntypedEntries:
-  ---------------------
-  The number of [key, node] index entries where the key is the result of casting
-  an originally untyped key to a non-string atomic item. If > 0, then any value
-  probes with a key (or keys) whose type cannot be promoted to xs:string will
-  raise an error.
+  theNumTypedEntries:
+  -------------------
+  For each key type, the number of [key, node] entries with a key of that type
+  that is not the cast of an untyped key to a type other than xs:string. A
+  value probe with a search key that a value comparison cannot compare with
+  the keys of a type that has such entries raises an error, as the comparison
+  does.
 
   theNumMultiKeyNodes:
   --------------------
@@ -168,7 +172,7 @@ protected:
 
   std::vector<store::Item_t>  theEmptyKeyNodes;
 
-  csize                       theNumUntypedEntries;
+  std::array<csize, store::XS_LAST> theNumTypedEntries;
 
   csize                       theNumMultiKeyNodes;
 
@@ -454,6 +458,16 @@ public:
   -------
   For marking the end of an iteration over the domain nodes associated with an
   index key that satisfies the search condition..
+
+  theSkip:
+  --------
+  The number of results that open() skips.
+
+  theDropsDuplicates:
+  -------------------
+  Set to true for a value range probe without bounds in an index with domain
+  nodes that have several keys. Such a node appears under each of its keys, but
+  is returned once: theReturnedNodes holds the nodes returned so far.
 ********************************************************************************/
 class ProbeGeneralIndexIterator : public store::IndexProbeIterator
 {
@@ -502,6 +516,12 @@ protected:
   GeneralIndexValue::const_iterator     theIte;
   GeneralIndexValue::const_iterator     theEnd;
 
+  xs_integer                            theSkip;
+
+  bool                                  theDropsDuplicates;
+
+  std::unordered_set<const store::Item*> theReturnedNodes;
+
 protected:
   ProbeGeneralIndexIterator(const store::Index_t& index);
 
@@ -524,7 +544,8 @@ protected:
 
   void probeNumberRange(const store::Item* lowerKey, const store::Item* upperKey);
 
-  void checkStringKeyType(const AtomicItem* keyItem) const;
+  void checkComparableKeys(const AtomicItem* searchKey,
+                           bool isOrderComparison) const;
 
 public:
   void init(const store::IndexCondition_t& cond, const xs_integer& aSkip);
