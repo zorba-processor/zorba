@@ -33,6 +33,7 @@ namespace UnitTests {
   int test_base64_streambuf( int, char*[] );
   int test_fs_util( int, char*[] );
   int test_hashmaps( int argc, char* argv[] );
+  int test_hashmap_insert_rollback( int, char*[] );
   int test_hexbinary( int argc, char* argv[] );
   int test_hexbinary_streambuf( int argc, char* argv[] );
 

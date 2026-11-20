@@ -103,14 +103,17 @@
               <FLWORIterator>
                 <ForVariable name="$$context-item">
                   <TryCatchIterator>
-                    <NodeSortIterator distinct="true" ascending="true">
-                      <ProbeIndexPointGeneralIterator>
-                        <SingletonIterator value="xs:QName(,,tempIndex0)"/>
-                        <FnDataIterator>
-                          <LetVarIterator varname="unitid"/>
-                        </FnDataIterator>
-                      </ProbeIndexPointGeneralIterator>
-                    </NodeSortIterator>
+                    <FnConcatIterator>
+                      <LetVarIterator varname="$$opt_temp_4"/>
+                      <NodeSortIterator distinct="true" ascending="true">
+                        <ProbeIndexPointGeneralIterator>
+                          <SingletonIterator value="xs:QName(,,tempIndex0)"/>
+                          <FnDataIterator>
+                            <LetVarIterator varname="unitid"/>
+                          </FnDataIterator>
+                        </ProbeIndexPointGeneralIterator>
+                      </NodeSortIterator>
+                    </FnConcatIterator>
                     <LetVarIterator varname="y"/>
                   </TryCatchIterator>
                 </ForVariable>
@@ -155,7 +158,7 @@
                     <ForVarIterator varname="j"/>
                   </AttributeAxisIterator>
                 </LetVariable>
-                <ForVariable name="$$opt_temp_0">
+                <LetVariable name="$$opt_temp_0" materialize="true">
                   <HoistIterator>
                     <CompareIterator>
                       <FnDataIterator>
@@ -164,7 +167,7 @@
                       <SingletonIterator value="xs:integer(1980)"/>
                     </CompareIterator>
                   </HoistIterator>
-                </ForVariable>
+                </LetVariable>
                 <ReturnClause>
                   <ElementIterator>
                     <SingletonIterator value="xs:QName(,,year)"/>
@@ -201,7 +204,7 @@
                               <IfThenElseIterator>
                                 <AndIterator>
                                   <UnhoistIterator>
-                                    <ForVarIterator varname="$$opt_temp_0"/>
+                                    <LetVarIterator varname="$$opt_temp_0"/>
                                   </UnhoistIterator>
                                   <CompareIterator>
                                     <FnDataIterator>

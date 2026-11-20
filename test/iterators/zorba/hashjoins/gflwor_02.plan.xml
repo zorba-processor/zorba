@@ -103,8 +103,8 @@
         <ForIterator>
           <ForVariable name="s"/>
           <WhereIterator>
-            <ForIterator>
-              <ForVariable name="$$opt_temp_1"/>
+            <LetIterator>
+              <LetVariable name="$$opt_temp_1" materialize="true"/>
               <LetIterator>
                 <LetVariable name="$$opt_temp_2" materialize="true"/>
                 <LetIterator>
@@ -171,7 +171,7 @@
                   </AttributeAxisIterator>
                 </FnStringIterator>
               </HoistIterator>
-            </ForIterator>
+            </LetIterator>
             <CompareIterator>
               <CastIterator type="xs:integer">
                 <FnDataIterator>
@@ -184,12 +184,15 @@
             </CompareIterator>
           </WhereIterator>
           <TryCatchIterator>
-            <ProbeIndexPointValueIterator>
-              <SingletonIterator value="xs:QName(,,tempIndex0)"/>
-              <UnhoistIterator>
-                <ForVarIterator varname="$$opt_temp_1"/>
-              </UnhoistIterator>
-            </ProbeIndexPointValueIterator>
+            <FnConcatIterator>
+              <LetVarIterator varname="$$opt_temp_6"/>
+              <ProbeIndexPointValueIterator>
+                <SingletonIterator value="xs:QName(,,tempIndex0)"/>
+                <UnhoistIterator>
+                  <LetVarIterator varname="$$opt_temp_1"/>
+                </UnhoistIterator>
+              </ProbeIndexPointValueIterator>
+            </FnConcatIterator>
             <UnhoistIterator>
               <LetVarIterator varname="$$opt_temp_0"/>
             </UnhoistIterator>
@@ -197,7 +200,7 @@
         </ForIterator>
         <TypedValueCompareIterator_STRING>
           <UnhoistIterator>
-            <ForVarIterator varname="$$opt_temp_1"/>
+            <LetVarIterator varname="$$opt_temp_1"/>
           </UnhoistIterator>
           <FnStringIterator>
             <AttributeAxisIterator test-kind="match_name_test" qname="xs:QName(,,pid)" typename="*" nill-allowed="false">
