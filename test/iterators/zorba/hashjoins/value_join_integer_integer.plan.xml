@@ -65,10 +65,13 @@
         <FLWORIterator>
           <ForVariable name="b">
             <TryCatchIterator>
-              <ProbeIndexPointValueIterator>
-                <SingletonIterator value="xs:QName(,,tempIndex0)"/>
-                <ForVarIterator varname="k"/>
-              </ProbeIndexPointValueIterator>
+              <FnConcatIterator>
+                <LetVarIterator varname="$$opt_temp_3"/>
+                <ProbeIndexPointValueIterator>
+                  <SingletonIterator value="xs:QName(,,tempIndex0)"/>
+                  <ForVarIterator varname="k"/>
+                </ProbeIndexPointValueIterator>
+              </FnConcatIterator>
               <UnhoistIterator>
                 <LetVarIterator varname="$$opt_temp_0"/>
               </UnhoistIterator>
