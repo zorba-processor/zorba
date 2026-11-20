@@ -190,6 +190,7 @@ bool DefaultOptimizer::rewrite(RewriterContext& rCtx)
       freeVarsRule.apply(rCtx, rCtx.theRoot, modified);
     }
 
+    bool indexMatched = false;
     std::vector<IndexDecl*>::const_iterator ite = indexDecls.begin();
     std::vector<IndexDecl*>::const_iterator end = indexDecls.end();
     for (; ite != end; ++ite)
@@ -218,7 +219,16 @@ bool DefaultOptimizer::rewrite(RewriterContext& rCtx)
         }
 
         modified = true;
+        indexMatched = true;
       }
+    }
+
+    // A match can leave "for $x in probe return $x" after the fold rules ran.
+    if (indexMatched)
+    {
+      RuleOnceDriver<MarkExprs> driverMarkExpr;
+      driverMarkExpr.rewrite(rCtx);
+      driverEliminateVars.rewrite(rCtx);
     }
   }
 

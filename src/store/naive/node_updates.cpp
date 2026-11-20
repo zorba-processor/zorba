@@ -594,6 +594,16 @@ void XmlNode::removeType(UpdatePrimitive& upd)
 
       if (n->getType()->equals(GET_STORE().XS_ANY_QNAME))
       {
+        // The type stays, but the nilled property is removed with it
+        if (n->getNilled())
+        {
+          tinfo.theTypeName = n->getType();
+          tinfo.theFlags = n->theFlags;
+          undoList.resize(++undoSize);
+          undoList[undoSize - 1].transfer(tinfo);
+          n->resetNilled();
+        }
+
         revalidationNode = currNode;
         break;
       }
