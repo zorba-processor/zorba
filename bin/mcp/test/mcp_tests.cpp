@@ -3682,6 +3682,21 @@ void test_sweep_compile( Fixture const &f ) {
   (void)f;
 #endif
 }
+// A token longer than the scanner's input buffer (16 KB): the scanner grows the
+// buffer, and a failed growth is memory_limit like any other allocation.
+void test_sweep_long_token( Fixture const &f ) {
+#if defined(__linux__)
+  Sweep s;
+  s.query = "string-length(\"" + std::string( 20000, 'a' ) + "\")";
+  s.before.push_back( s.query );
+  s.expected = "20000";
+  s.points = 100000;                // all of them
+  s.compiles = true;
+  exhaust_sweep( f, "token longer than the scanner buffer", s );
+#else
+  (void)f;
+#endif
+}
 // The text of a query is read whole, or the call fails: a cut text is not
 // compiled. Every prefix of this query is a valid query with another answer
 // ("1.000…" is 1, without " eq 1" it is not true), so a cut where the copy of the
@@ -8245,6 +8260,7 @@ Test const tests[] = {
   { "exhaust_sweep_compile", test_sweep_compile },
   { "exhaust_sweep_builtins", test_sweep_builtins },
   { "exhaust_sweep_query_text", test_sweep_query_text },
+  { "exhaust_sweep_long_token", test_sweep_long_token },
   { "exhaust_sweep_streamable_text", test_sweep_streamable_text },
   { "exhaust_base64_stream", test_base64_stream_out_of_memory },
   { "exhaust_seekable_stream", test_seekable_stream_out_of_memory },
