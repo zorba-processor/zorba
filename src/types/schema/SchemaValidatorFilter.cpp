@@ -65,6 +65,9 @@ static inline const XMLCh *nullToZero(const XMLCh *in)
   return in ? in : XMLUni::fgZeroLenString;
 }
 
+// "1", the other lexical form of the xs:boolean true
+static const XMLCh XSD_BOOLEAN_TRUE_DIGIT[] = { chDigit_1, chNull };
+
 
 const XMLCh SchemaValidatorFilter::DT_UNTYPED[] =
 {
@@ -97,7 +100,10 @@ SchemaValidatorFilter::SchemaValidatorFilter(
   theXsiType(0),
   theAttrCount(0),
   theEventBuffer(eventBuffer),
-  theErrorOccurred(false)
+  theErrorOccurred(false),
+  theSubstitutedElemName(0),
+  theSubstitutedElemUri(0),
+  theIsNilled(false)
 {
   theSchemaGrammar = new (fMemoryManager) SchemaGrammar(fMemoryManager);
 
@@ -170,7 +176,7 @@ void SchemaValidatorFilter::reset()
 
   XMLString::release(&theProcessorStipulatedTypeName, fMemoryManager);
   theProcessorStipulatedTypeUriId = -1;
-  theHasTypeEntry.clear();
+  theOpenElements.clear();
 }
 
 
@@ -200,6 +206,9 @@ void SchemaValidatorFilter::startElementEvent(
   //cout << "    svf startElememntEvent: " << StrX(localname) << "  @ " << StrX(uri) << "\n";
   if(theElementToProcess)
     processStartElement();
+
+  // Only the attributes of this element may make it nil
+  ((XercSchemaValidator*)fValidator)->setNillable(false);
 
   thePrefix.set(prefix);
   theUri.set(uri);
@@ -352,7 +361,9 @@ void SchemaValidatorFilter::processStartElement()
       //validate element even if lax but has xsi:type
       fValidator->validateElement(elemDecl);
   }
-  theHasTypeEntry.push_back(fValidate || theXsiType);
+  const bool isValidated = fValidate || theXsiType;
+  theIsNilled = isValidated && ((XercSchemaValidator*)fValidator)->getIsNil();
+  theOpenElements.push_back({isValidated, theIsNilled});
 
 
   ComplexTypeInfo* typeinfo =
@@ -725,11 +736,13 @@ void SchemaValidatorFilter::endElementEvent(
   // We commandeer fCommentOrPISeen to keep _errorOccurred in
   theErrorOccurred = topElem->fCommentOrPISeen;
 
-  const bool hasTypeEntry = theHasTypeEntry.back();
-  theHasTypeEntry.pop_back();
+  const OpenElement element = theOpenElements.back();
+  theOpenElements.pop_back();
 
-  if(hasTypeEntry)
+  if(element.hasTypeEntry)
   {
+    ((XercSchemaValidator*)fValidator)->setNillable(element.isNilled);
+
     DatatypeValidator *currentDV = 0;
     if(topElem->fThisElement->isDeclared())
     {
@@ -861,10 +874,18 @@ void SchemaValidatorFilter::attributeEvent(
     {
       theXsiType = curAttr->getValue();
     }
-    else if(XMLString::equals(localname, SchemaSymbols::fgATT_NILL) &&
-            XMLString::equals(value, SchemaSymbols::fgATTVAL_TRUE))
+    else if(XMLString::equals(localname, SchemaSymbols::fgATT_NILL))
     {
-      ((XercSchemaValidator*)fValidator)->setNillable(true);
+      // xsi:nil is an xs:boolean, whose value is whitespace collapsed
+      XMLBuffer nilValue(16, fMemoryManager);
+      nilValue.set(value);
+      XMLString::collapseWS(nilValue.getRawBuffer(), fMemoryManager);
+
+      if(XMLString::equals(nilValue.getRawBuffer(), SchemaSymbols::fgATTVAL_TRUE) ||
+         XMLString::equals(nilValue.getRawBuffer(), XSD_BOOLEAN_TRUE_DIGIT))
+      {
+        ((XercSchemaValidator*)fValidator)->setNillable(true);
+      }
     }
     --theAttrCount;  // remove att from the list but still needs to be reported
 
@@ -1567,6 +1588,7 @@ void SchemaValidatorFilter::error(
      !( errCode == XMLValid::AttNotDefined ||
         errCode == XMLValid::AttNotDefinedForElement ||
         errCode == XMLValid::SimpleTypeHasChild ||
+        errCode == XMLValid::NilAttrNotEmpty ||
         errCode == XMLValid::ElementNotValidForContent ||
         errCode == XMLValid::NotEnoughElemsForCM ||
         errCode == XMLValid::EmptyNotValidForContent ||

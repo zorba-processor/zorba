@@ -192,6 +192,12 @@ xqtref_t EventSchemaValidator::getType()
 }
 
 
+bool EventSchemaValidator::isNilled() const
+{
+  return theSchemaValidatorFilter->isNilled();
+}
+
+
 store::Item_t EventSchemaValidator::getSubstitutedElemQName()
 {
   if (theSchemaValidatorFilter->getSubstitutedElemName())

@@ -371,6 +371,10 @@ public:
     // node is actually a sequence of atomic items.
     HaveListValue         = 0x100,
 
+    // For element nodes only. Set by validation if xsi:nil is true and the
+    // element declaration that governs the node is nillable.
+    IsNilled              = 0x200,
+
     // For attribute nodes only.
     IsBaseUri             = 0x800,
 
@@ -428,6 +432,8 @@ protected:
   virtual void getBaseURIInternal(zstring& uri, bool& local) const;
 
   void attach(InternalNode* parent, csize pos);
+
+  void setRecursiveForSharedSubtree(InternalNode* parent) const;
 
   void detach();
 
@@ -1108,6 +1114,10 @@ public:
   void setInSubstGroup() { theFlags |= IsInSubstGroup; }
 
   void resetInSubstGroup() { theFlags &= ~IsInSubstGroup; }
+
+  void setNilled() { theFlags |= IsNilled; }
+
+  void resetNilled() { theFlags &= ~IsNilled; }
 
 #ifndef EMBEDED_TYPE
   void assertInvariants() const;

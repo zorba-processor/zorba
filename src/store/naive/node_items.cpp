@@ -731,6 +731,7 @@ store::Item* XmlNode::copy(
       }
 
       new ConnectorNode(parent->getTree(), parent, this);
+      setRecursiveForSharedSubtree(parent);
       return const_cast<XmlNode*>(this);
     }
 
@@ -753,6 +754,60 @@ store::Item* XmlNode::copy(
   else
   {
     return const_cast<XmlNode*>(this);
+  }
+}
+
+
+/*******************************************************************************
+  "this" was just placed, without a copy, under the given parent. Mark as
+  recursive (having a descendant of the same name) each element ancestor of
+  the parent that a copy would have made recursive. Only the names of "this"
+  and of its own children are known here, so when "this" has element
+  children, every element ancestor is marked: a recursive flag that is not
+  needed costs only a fuller descendant scan.
+********************************************************************************/
+void XmlNode::setRecursiveForSharedSubtree(InternalNode* parent) const
+{
+  if (getNodeKind() != store::StoreConsts::elementNode)
+    return;
+
+  const ElementNode* elem = static_cast<const ElementNode*>(this);
+
+  if (elem->getTree()->isRecursive())
+    parent->getTree()->setRecursive();
+
+  bool haveElementChildren = false;
+
+  InternalNode::const_iterator ite = elem->childrenBegin();
+  InternalNode::const_iterator end = elem->childrenEnd();
+
+  for (; ite != end; ++ite)
+  {
+    if ((*ite)->getNodeKind() == store::StoreConsts::elementNode)
+    {
+      haveElementChildren = true;
+      break;
+    }
+  }
+
+  XmlNode* ancestor = parent;
+
+  while (ancestor != NULL &&
+         ancestor->getNodeKind() == store::StoreConsts::elementNode)
+  {
+    ElementNode* elemAncestor = static_cast<ElementNode*>(ancestor);
+
+    if (haveElementChildren)
+    {
+      elemAncestor->setRecursive();
+    }
+    else if (elemAncestor->getNodeName()->equals(elem->getNodeName()))
+    {
+      elemAncestor->setRecursive();
+      break;
+    }
+
+    ancestor = ancestor->theParent;
   }
 }
 
@@ -2044,7 +2099,6 @@ XmlNode* DocumentNode::copyInternal(
     {
       if ((*ite)->isConnectorNode())
       {
-        ZORBA_ASSERT(copymode.theNsPreserve == false);
         static_cast<ConnectorNode*>(*ite)->getNode()->
         copyInternal(rootParent, copyNode, 0, NULL, copymode);
       }
@@ -2464,6 +2518,9 @@ XmlNode* ElementNode::copyInternal(
                  NULL, // local bindings
                  baseUri);
 
+    if (copymode.theTypePreserve && getNilled())
+      copyNode->setNilled();
+
     if (rootCopy == NULL)
       rootCopy = copyNode;
 
@@ -2475,10 +2532,12 @@ XmlNode* ElementNode::copyInternal(
       if (parent && parent->getNodeKind() == store::StoreConsts::elementNode)
         copyParentNsContext = static_cast<ElementNode*>(parent)->getNsContext();
 
-      // If we are copying the root of an xml subtree, or a node that does
-      // not inherit ns bindings directly from its parent (but may inherit
-      // from another ancestor).
+      // If we are copying the root of an xml subtree, a node that does not
+      // inherit ns bindings directly from its parent (but may inherit from
+      // another ancestor), or a node placed without a copy (reached through a
+      // connector, it inherits nothing from the tree that references it).
       if (parent == rootParent ||
+          theParent == NULL ||
           (haveLocalBindings() && theNsContext->getParent() != myParentNsContext) ||
           (!haveLocalBindings() && theNsContext != myParentNsContext))
       {
@@ -2675,6 +2734,23 @@ XmlNode* ElementNode::copyInternal(
 
     if (hiddenBaseUriAttr)
     {
+      // The copy of an explicit xml:base attribute has already given the copy
+      // a hidden base-uri attribute; the one added here replaces it.
+      if (baseUriAttr)
+      {
+        const_iterator ite = copyNode->attrsBegin();
+        const_iterator end = copyNode->attrsEnd();
+        for (; ite != end; ++ite)
+        {
+          AttributeNode* attr = copyNode->getAttr(ite);
+          if (attr->isBaseUri() && attr->isHidden())
+          {
+            attr->destroy(true);
+            break;
+          }
+        }
+      }
+
       if (parent == 0)
       {
         zstring absuri;
@@ -2715,7 +2791,6 @@ XmlNode* ElementNode::copyInternal(
 
       if (child->isConnectorNode())
       {
-        ZORBA_ASSERT(copymode.theNsPreserve == false);
         static_cast<ConnectorNode*>(child)->getNode()->
         copyInternal(rootParent, copyNode, 0, rootCopy, copymode);
       }
@@ -3099,47 +3174,7 @@ void ElementNode::appendStringValue(zstring& buf) const
 ********************************************************************************/
 bool ElementNode::getNilled() const
 {
-  store::Item_t val;
-
-  if (getType()->equals(GET_STORE().XS_UNTYPED_QNAME))
-    return false;
-
-  if (!isValidated())
-    return false;
-
-  const_iterator ite = childrenBegin();
-  const_iterator end = childrenEnd();
-
-  for (; ite != end; ++ite)
-  {
-    if ((*ite)->getNodeKind() == store::StoreConsts::elementNode ||
-        (*ite)->getNodeKind() == store::StoreConsts::textNode)
-    {
-      return false;
-    }
-  }
-
-  ite = attrsBegin();
-  end = attrsEnd();
-
-  for (; ite != end; ++ite)
-  {
-    XmlNode* attr = *ite;
-
-    zstring strval;
-    attr->getStringValue2(strval);
-
-    if (ZSTREQ(attr->getNodeName()->getNamespace(),
-               "http://www.w3.org/2001/XMLSchema-instance") &&
-        ZSTREQ(attr->getNodeName()->getLocalName(), "nil") &&
-        (ZSTREQ(strval, "true") || ZSTREQ(strval, "1") ))
-    {
-      return true;
-      break;
-    }
-  }
-
-  return false;
+  return (theFlags & IsNilled) != 0;
 }
 
 
