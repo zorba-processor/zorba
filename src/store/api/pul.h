@@ -117,7 +117,8 @@ public:
         bool haveValue,
         bool haveEmptyValue,
         bool haveTypedValue,
-        bool isInSubstitutionGroup) = 0;
+        bool isInSubstitutionGroup,
+        bool isNilled) = 0;
 
   virtual void addSetElementType(
         const QueryLoc* aQueryLoc,
@@ -127,7 +128,8 @@ public:
         bool haveValue,
         bool haveEmptyValue,
         bool haveTypedValue,
-        bool isInSubstitutionGroup) = 0;
+        bool isInSubstitutionGroup,
+        bool isNilled) = 0;
 
   virtual void addSetAttributeType(
         const QueryLoc* aQueryLoc,
