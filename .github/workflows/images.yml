@@ -33,6 +33,11 @@ on:
       - '.github/workflows/images.yml'
   workflow_dispatch:
 
+# One run per ref at a time, so an older run never publishes after a newer one; never cancel mid-publish.
+concurrency:
+  group: images-${{ github.ref }}
+  cancel-in-progress: false
+
 permissions:
   contents: read
   packages: write
