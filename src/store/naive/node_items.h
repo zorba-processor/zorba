@@ -18,6 +18,7 @@
 #define ZORBA_SIMPLE_STORE_NODE_ITEMS
 
 #include <cassert>
+#include <memory>
 #include <stack>
 #include <vector>
 
@@ -172,6 +173,13 @@ class XmlNodeTokenizerCallback;
   (specified as a qname). Nodes whose type is xs:untyped are not included in this
   map.
 
+  theEmptyContentValues:
+  ----------------------
+  For each element node of a user-defined atomic type whose content is empty
+  and that has the HaveEmptyContentValue flag, the typed value of its empty
+  content, set by validation and revalidation (the store has no schema to
+  compute it). NULL until the first such node.
+
   theTokens:
   ----------
 ********************************************************************************/
@@ -210,6 +218,8 @@ protected:
 #ifndef EMBEDED_TYPE
   NodeTypeMap             * theTypesMap;
 #endif
+
+  std::unique_ptr<NodePointerHashMap<store::Item_t>> theEmptyContentValues;
 
 #ifndef ZORBA_NO_FULL_TEXT
   FTTokenStore              theTokens;
@@ -297,6 +307,12 @@ public:
 
   void copyTypesMap(const XmlTree* source);
 #endif
+
+  store::Item* getEmptyContentValue(const XmlNode* n) const;
+
+  void setEmptyContentValue(const XmlNode* n, store::Item_t& value);
+
+  void removeEmptyContentValue(const XmlNode* n);
 
 #ifndef ZORBA_NO_FULL_TEXT
   FTTokenStore& getTokenStore() { return theTokens; }
@@ -393,6 +409,11 @@ public:
     // a type other than untyped (for elements) or untypedAtomic (for attributes)
     HaveType              = 0x8000,
 #endif
+
+    // For element nodes only. Set by validation for an element of a
+    // user-defined atomic type with empty content: its tree keeps the typed
+    // value (see XmlTree::theEmptyContentValues).
+    HaveEmptyContentValue = 0x400,
 
     // For any kind of node. Set if an identifier has been generated for the node
     // (see SimpleStore::getNodeReference() method).
@@ -1106,6 +1127,12 @@ public:
   void setHaveEmptyTypedValue()      { theFlags |= HaveEmptyTypedValue; }
   void resetHaveEmptyTypedValue()    { theFlags &= ~HaveEmptyTypedValue; }
   bool haveEmptyTypedValue() const   { return (theFlags & HaveEmptyTypedValue) != 0; }
+
+  bool haveEmptyContentValue() const { return (theFlags & HaveEmptyContentValue) != 0; }
+
+  void setEmptyContentTypedValue(store::Item_t& value);
+
+  bool getEmptyContentTypedValue(store::Item_t& val) const;
 
   bool haveTypedTypedValue(TextNode*&) const;
 
