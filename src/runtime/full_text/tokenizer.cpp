@@ -28,6 +28,7 @@
 #include "zorbamisc/ns_consts.h"
 
 #include "ft_util.h"
+#include "runtime/util/tree_depth.h"
 
 using namespace zorba::locale;
 
@@ -74,6 +75,8 @@ void Tokenizer::tokenize_node_impl( Item const &item, iso639_1::type lang,
         [[fallthrough]];
 
       case store::StoreConsts::documentNode:
+        tree_depth::check_stack( Unmarshaller::getInternalItem( item ),
+                                 "tokenize" );
         i = item.getChildren();
         i->open();
         for ( Item child; i->next( child ); )

@@ -267,6 +267,14 @@ declare variable $zerr:ZXQP0071 as xs:QName := fn:QName($zerr:NS, "zerr:ZXQP0071
 
 (:~
  :
+ : An XML tree is too deep to process with the machine stack that is
+ : left.
+ : 
+:)
+declare variable $zerr:ZXQP0072 as xs:QName := fn:QName($zerr:NS, "zerr:ZXQP0072");
+
+(:~
+ :
  : The version of the thesaurus is not the expected version.
  : 
 :)

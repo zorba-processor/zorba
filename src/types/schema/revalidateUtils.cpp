@@ -40,6 +40,7 @@
 #ifndef ZORBA_NO_XMLSCHEMA
 #include <new>
 #include <xercesc/util/OutOfMemoryException.hpp>
+#include "runtime/util/tree_depth.h"
 #endif
 
 
@@ -168,6 +169,8 @@ void SchemaValidatorImpl::processElement(
   ZORBA_ASSERT(element->isNode());
   ZORBA_ASSERT(element->getNodeKind() == store::StoreConsts::elementNode);
 
+  tree_depth::check_stack(element.getp(), "revalidate", loc);
+
   store::Item_t nodeName = element->getNodeName();
   zstring baseUri;
   element->getBaseURI(baseUri);
@@ -247,10 +250,11 @@ void SchemaValidatorImpl::processElement(
       tHasTypedValue = false;
 
       store::Item_t emptyValue;
-      if (!isNilled && element->getStringValue().empty())
+      if (!isNilled)
       {
         if (Validator::emptyContentTypedValue(theSctx, typeManager, newType,
-                                              bindings, emptyValue, loc))
+                                              element.getp(), bindings,
+                                              emptyValue, loc))
           tHasEmptyValue = true;
         else if (emptyValue != NULL)
           typedValues.assign(1, emptyValue);

@@ -23,7 +23,6 @@
 #include <libxml/parserInternals.h>
 #include <libxml/uri.h>
 #include <libxml/SAX2.h>
-#include <algorithm>
 #include <cstring>
 #include <memory>
 #include <utility>
@@ -504,8 +503,6 @@ void FragmentXmlLoader::replay(FragmentEvent const &ev)
 {
   FragmentIStream &fs = *theFragmentStream;
   int const skip = fs.root_elements_to_skip;
-  theEventLine = ev.line;
-  theEventColumn = ev.column;
 
   switch (ev.kind)
   {
@@ -593,13 +590,6 @@ void FragmentXmlLoader::replay(FragmentEvent const &ev)
                                            xml_str(ev.text));
     break;
   }
-}
-
-
-void FragmentXmlLoader::dataPosition(int& aLine, int& aColumn)
-{
-  aLine = theEventLine;
-  aColumn = theEventColumn;
 }
 
 
@@ -725,15 +715,6 @@ FragmentIStream* FragmentXmlLoader::streamOf(void *ctx)
 }
 
 
-// Where in the input the parser is, without what the wrapper added.
-static void stamp(void *ctx, FragmentIStream const &fs, FragmentEvent &ev)
-{
-  ev.line = xmlSAX2GetLineNumber(ctx);
-  ev.column = xmlSAX2GetColumnNumber(ctx);
-  remove_insertions(fs.insertions, ev.line, ev.column);
-}
-
-
 // Nothing may leave these callbacks: libxml2 is C code.
 void FragmentXmlLoader::recordOutOfMemory(void *ctx) noexcept
 {
@@ -785,7 +766,6 @@ try
     ev.attributes.push_back(attr);
   }
   ev.nb_defaulted = nb_defaulted;
-  stamp(ctx, fs, ev);
   fs.events.push_back(std::move(ev));
 }
 catch (std::bad_alloc const&)
@@ -812,7 +792,6 @@ try
   ev.prefix = to_string(prefix);
   ev.has_uri = URI != NULL;
   ev.uri = to_string(URI);
-  stamp(ctx, fs, ev);
   fs.events.push_back(std::move(ev));
 }
 catch (std::bad_alloc const&)
@@ -841,7 +820,6 @@ try
   FragmentEvent ev;
   ev.kind = kind;
   ev.text.assign(reinterpret_cast<char const*>(text), len);
-  stamp(ctx, fs, ev);
   fs.events.push_back(std::move(ev));
 }
 catch (std::bad_alloc const&)
@@ -878,9 +856,7 @@ try
   FragmentEvent ev;
   ev.kind = FragmentEvent::COMMENT;
   ev.text = to_string(value);
-  FragmentIStream &fs = *streamOf(ctx);
-  stamp(ctx, fs, ev);
-  fs.events.push_back(std::move(ev));
+  streamOf(ctx)->events.push_back(std::move(ev));
 }
 catch (std::bad_alloc const&)
 {
@@ -900,9 +876,7 @@ try
   ev.kind = FragmentEvent::PI;
   ev.name = to_string(target);
   ev.text = to_string(data);
-  FragmentIStream &fs = *streamOf(ctx);
-  stamp(ctx, fs, ev);
-  fs.events.push_back(std::move(ev));
+  streamOf(ctx)->events.push_back(std::move(ev));
 }
 catch (std::bad_alloc const&)
 {

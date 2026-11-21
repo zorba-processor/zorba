@@ -1,2 +1,2 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<result><shallow>1000 7001 x true 1000</shallow><deep>err:XPDY0130 | implementation limit exceeded: node nesting depth of 1019 exceeds the node id limit | 1020</deep><fragment>err:XPDY0130 | implementation limit exceeded: node nesting depth of 1019 exceeds the node id limit | 1020</fragment></result>
+<result><xml levels="1100">1100 1099 1100 true true true 7701 true 1100 1100 1100 1 c true</xml><fragment levels="1100">1100 1099 1100 true true true 7701 true 1100 1100 1100 1 c true</fragment><xml levels="10000">10000 9999 10000 true true true 70001 true 10000 10000 10000 1 c true</xml><fragment levels="10000">10000 9999 10000 true true true 70001 true 10000 10000 10000 1 c true</fragment></result>

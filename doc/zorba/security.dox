@@ -32,6 +32,11 @@ or walking over a value with too little stack left on the thread. In
 the directory module, the record around a file's content counts as one level,
 and a file that does not fit gets an error record like any malformed file.
 
+An XML tree has no fixed depth limit. What walks over a tree recursively
+(serializing, validating, copying, comparing, converting it to JSON) raises
+<tt>zerr:ZXQP0072</tt> when the thread has too little stack left for the next
+level, naming the depth of the node and the document it came from.
+
 Zorba 4.x and earlier ran every query with all of these capabilities.
 
 \section security_allow Allowing capabilities

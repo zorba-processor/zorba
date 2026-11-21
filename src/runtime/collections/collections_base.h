@@ -32,6 +32,7 @@
 
 #include "diagnostics/util_macros.h"
 #include "zorbatypes/integer.h"
+#include "runtime/util/tree_depth.h"
 
 
 namespace zorba {
@@ -118,7 +119,8 @@ protected:
                     this->loc,
                     theIsDynamic);
 
-      copyNode = node->copy(NULL, lCopyMode);
+      copyNode = tree_depth::located(this->loc, [&] {
+        return node->copy(NULL, lCopyMode); });
       nodes.push_back(copyNode);
     }
   }

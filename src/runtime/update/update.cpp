@@ -44,6 +44,7 @@
 #include "zorbautils/fatal.h"
 
 #include <zorba/internal/unique_ptr.h>
+#include "runtime/util/tree_depth.h"
 
 namespace zorba 
 {
@@ -218,7 +219,8 @@ bool InsertIterator::nextImpl(store::Item_t& result, PlanState& aPlanState) cons
       nodes.resize(numNodes);
 
       for (ulong i = 0; i < numNodes; ++i)
-        nodes[i] = nodes[i]->copy(NULL, lCopyMode);
+        nodes[i] = tree_depth::located(loc, [&] {
+          return nodes[i]->copy(NULL, lCopyMode); });
 
       if (theType == store::UpdateConsts::BEFORE)
         pul->addInsertBefore(&loc, target, nodes);
@@ -295,7 +297,8 @@ bool InsertIterator::nextImpl(store::Item_t& result, PlanState& aPlanState) cons
       nodes.resize(numNodes);
 
       for (ulong i = 0; i < numNodes; ++i)
-        nodes[i] = nodes[i]->copy(NULL, lCopyMode);
+        nodes[i] = tree_depth::located(loc, [&] {
+          return nodes[i]->copy(NULL, lCopyMode); });
 
       if (theType == store::UpdateConsts::INTO)
         pul->addInsertInto(&loc, target, nodes);
@@ -454,7 +457,8 @@ ReplaceIterator::nextImpl(store::Item_t& result, PlanState& aPlanState) const
           throw XQUERY_EXCEPTION(err::XUTY0011, ERROR_LOC(loc));
         }
 
-        lWith = lWith->copy(NULL, lCopyMode);
+        lWith = tree_depth::located(loc, [&] {
+          return lWith->copy(NULL, lCopyMode); });
 
         lNodes[lNumNodes++].transfer(lWith);
 
@@ -479,7 +483,8 @@ ReplaceIterator::nextImpl(store::Item_t& result, PlanState& aPlanState) const
           throw XQUERY_EXCEPTION(err::XUTY0010, ERROR_LOC(loc));
         }
 
-        lWith = lWith->copy(NULL, lCopyMode);
+        lWith = tree_depth::located(loc, [&] {
+          return lWith->copy(NULL, lCopyMode); });
 
         lNodes[lNumNodes++].transfer(lWith);
 
@@ -874,7 +879,8 @@ TransformIterator::nextImpl(store::Item_t& result, PlanState& aPlanState) const
 
       if (!copyClause.theCopyVars.empty())
       {
-        copyNodes.push_back(copyNode->copy(NULL, copymode));
+        copyNodes.push_back(tree_depth::located(loc, [&] {
+          return copyNode->copy(NULL, copymode); }));
 
         varRefIte = copyClause.theCopyVars.begin();
         varRefEnd = copyClause.theCopyVars.end();

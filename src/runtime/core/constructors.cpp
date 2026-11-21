@@ -43,6 +43,7 @@
 #include "util/string_util.h"
 #include "util/utf8_util.h"
 #include "util/xml_util.h"
+#include "runtime/util/tree_depth.h"
 
 using namespace std;
 
@@ -161,7 +162,7 @@ bool DocumentIterator::nextImpl(store::Item_t& result, PlanState& planState) con
           continue;
         }
 
-        child->copy(result, copymode);
+        tree_depth::located(loc, [&] { return child->copy(result, copymode); });
       }
     }
 
