@@ -129,6 +129,7 @@ extern entry const dict_en[] = {
   { "err:SESU0013", "\"$1\": unsupported $2 version; supported versions are: $3" },
   { "err:XPDY0002", "$1" },
   { "err:XPDY0050", "$1 cannot be treated as type $2" },
+  { "err:XPDY0130", "implementation limit exceeded: $1" },
   { "err:XPST0001", "${\"1\": }undefined value${: 2}" },
   { "err:XPST0003", "invalid expression${: 1}" },
   { "err:XPST0005", "static type must not be empty-sequence()" },
@@ -532,6 +533,7 @@ extern entry const dict_en[] = {
   { "zerr:ZXQP0069", "$1" },
   { "zerr:ZXQP0070", "$1" },
   { "zerr:ZXQP0071", "$1" },
+  { "zerr:ZXQP0072", "not enough stack space left to $1 a node nested $2 levels deep${ in document \"3\"}: the tree is too deep for the available stack" },
 #if !defined(ZORBA_NO_FULL_TEXT)
   { "zerr:ZXQP8401", "\"$1\": wrong WordNet file version; should be \"$2\"" },
 #endif

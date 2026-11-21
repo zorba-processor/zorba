@@ -56,6 +56,7 @@
 #include "context/namespace_context.h"
 
 #include "diagnostics/assert.h"
+#include "runtime/util/tree_depth.h"
 #include "zorba/store_consts.h"
 
 namespace zorba
@@ -337,10 +338,20 @@ store::Item_t Validator::processElement(
   ZORBA_ASSERT(element->isNode());
   ZORBA_ASSERT(element->getNodeKind() == store::StoreConsts::elementNode);
 
+  tree_depth::check_stack(element.getp(), "validate", loc);
 
   store::Item_t nodeName = element->getNodeName();
   zstring baseUri;
   element->getBaseURI(baseUri);
+  // An element given a base URI gets an attribute holding it, which lengthens
+  // the node ids of its children: give it only where it is not inherited.
+  if (parent != NULL)
+  {
+    zstring parentBaseUri;
+    parent->getBaseURI(parentBaseUri);
+    if (parentBaseUri == baseUri)
+      baseUri.clear();
+  }
 
   schemaValidator.startElem(nodeName);
 
@@ -369,6 +380,7 @@ store::Item_t Validator::processElement(
 
   bool haveTypedValue = true;
   bool haveEmptyValue = false;
+  store::Item_t emptyContentValue;
 
   if ( typeName!=NULL && typeManager!=NULL )
   {
@@ -380,13 +392,22 @@ store::Item_t Validator::processElement(
     {
       haveTypedValue = typeHasValue(schemaType);
       haveEmptyValue = typeHasEmptyValue(schemaType);
+
+      if (haveTypedValue && !haveEmptyValue && !schemaValidator.isNilled() &&
+          emptyContentTypedValue(sctx, typeManager, schemaType, element.getp(),
+                                 bindings, emptyContentValue, loc))
+        haveEmptyValue = true;
     }
   }
 
   store::Item_t elemName = element->getNodeName();
   GENV_ITEMFACTORY->createElementNode(newElem, parent, elemName,
                                       typeName, haveTypedValue, haveEmptyValue,
-                                      bindings, baseUri, isSubstitutionGroup);
+                                      bindings, baseUri, isSubstitutionGroup,
+                                      schemaValidator.isNilled());
+
+  if (emptyContentValue != NULL)
+    newElem->setEmptyContentTypedValue(emptyContentValue);
 
   processAttributes(sctx,
                     typeManager,
@@ -788,6 +809,43 @@ void Validator::processNamespaces (
   {
     schemaValidator.ns(bindings[i].first, bindings[i].second);
   }
+}
+
+
+bool Validator::emptyContentTypedValue(
+    const static_context* sctx,
+    TypeManager* typeManager,
+    const xqtref_t& aType,
+    store::Item* aElement,
+    store::NsBindings& bindings,
+    store::Item_t& aValue,
+    const QueryLoc& loc)
+{
+  if (aType->type_kind() != XQType::USER_DEFINED_KIND)
+    return false;
+
+  const UserDefinedXQType& udt = static_cast<const UserDefinedXQType&>(*aType);
+
+  // Tested after the type: the string value of an element with element
+  // children walks its whole subtree, which made validation quadratic in depth
+  if (!(udt.isList() || udt.isAtomicAny()) ||
+      !aElement->getStringValue().empty())
+    return false;
+
+  if (udt.isList())
+    return true;
+
+  if (udt.isAtomicAny())
+  {
+    namespace_context nsCtx(sctx, bindings);
+    zstring empty;
+    if (!typeManager->getSchema()->parseUserAtomicTypes(empty, aType.getp(),
+                                                        aValue, &nsCtx, loc,
+                                                        false))
+      aValue = NULL;
+  }
+
+  return false;
 }
 
 

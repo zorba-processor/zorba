@@ -19,6 +19,7 @@
 #include "store/api/shared_types.h"
 #include "store/api/index.h"
 #include "store/api/iterator.h"
+#include <zorba/store_consts.h>
 
 #include "shared_types.h"
 
@@ -344,6 +345,15 @@ public:
 
   GeneralDelta& getGeneralDelta() { return theGeneralDelta; }
 };
+
+
+/*******************************************************************************
+  The class of the keys a value comparison compares with a key of the given
+  type; isOrderComparison says whether it is an order comparison.
+********************************************************************************/
+store::SchemaTypeCode valueComparisonClass(
+    store::SchemaTypeCode type,
+    bool isOrderComparison);
 
 
 }

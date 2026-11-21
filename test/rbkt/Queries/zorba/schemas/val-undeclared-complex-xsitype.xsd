@@ -1,0 +1,17 @@
+<xs:schema
+  xmlns:xs="http://www.w3.org/2001/XMLSchema"
+  targetNamespace="http://zorba.io/test/val-undeclared-complex-xsitype"
+  xmlns="http://zorba.io/test/val-undeclared-complex-xsitype"
+  elementFormDefault="qualified">
+
+  <xs:complexType name="pair">
+    <xs:sequence>
+      <xs:element name="a" type="xs:integer"/>
+      <xs:element name="b" type="xs:date"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- no type: its content is a lax wildcard -->
+  <xs:element name="any"/>
+
+</xs:schema>

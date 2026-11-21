@@ -89,6 +89,15 @@ NsBindingsContext::~NsBindingsContext()
   std::cout << "Removing binding context " << this << "; num bindings = "
             << theBindings.size() << std::endl;
 #endif
+
+  // Parents that only this context holds are released in a loop, not by
+  // recursion: the chain is as long as the tree is deep.
+  while (theParent != NULL && theParent->getRefCount() == 1)
+  {
+    NsBindingsContext* lParent = theParent.release();
+    theParent.transfer(lParent->theParent);
+    lParent->removeReference();
+  }
 }
 
 

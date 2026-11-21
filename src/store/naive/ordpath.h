@@ -18,6 +18,7 @@
 #define ZORBA_STORE_ORDPATH_H
 
 #include <cassert>
+#include <cstring>
 #include <utility>
 #include <vector>
 
@@ -61,12 +62,6 @@ public:
   typedef std::vector<int32_t> DeweyID;
 
 public:
-  enum 
-  {
-    MAX_BYTE_LEN = 255,
-    MAX_BIT_LEN = MAX_BYTE_LEN * 8
-  };
-
   size_t alloc_size() const;
 
 protected:
@@ -75,7 +70,8 @@ protected:
 
   static const ulong MAX_EMBEDDED_BYTE = MAX_EMBEDDED_BYTE_LEN - 1;
 
-  static const ulong MAX_NUM_COMPS = MAX_BYTE_LEN * 4;
+  // A remote buffer starts with the byte length of the id, a uint32_t.
+  static const ulong REMOTE_HEADER_LEN = sizeof(uint32_t);
 
   // decompression
   static const unsigned char theByteMasks[8][2];
@@ -253,16 +249,17 @@ protected:
   }
 
 
+  static unsigned char* newRemoteBuffer(ulong byteLen);
+
   void initRemote(ulong byteLen)
   {
+    unsigned char* buf = newRemoteBuffer(byteLen);
+
     if (!isLocal())
       delete [] getRemoteBuffer();
 
     memset(theBuffer.local, 0, MAX_EMBEDDED_BYTE_LEN);
-
-    setRemoteBuffer(new unsigned char[byteLen + 1]);
-    memset(getRemoteBuffer(), 0, byteLen+1);
-    getRemoteBuffer()[0] = (unsigned char)byteLen;
+    setRemoteBuffer(buf);
   }
 
 
@@ -281,6 +278,23 @@ protected:
   }
 
 
+  /**
+   * The data bytes and their number, for comparing labels: a local label
+   * that uses all of its bytes keeps its flag in the lowest bit of its last
+   * byte, which is not data, so its bytes are copied to aCopy without it.
+   */
+  const unsigned char* getComparableData(
+      ulong& len,
+      unsigned char (&aCopy)[MAX_EMBEDDED_BYTE_LEN]) const
+  {
+    unsigned char* data = getDataAndLength(len);
+    if (!isLocal() || len != MAX_EMBEDDED_BYTE_LEN)
+      return data;
+    memcpy(aCopy, data, MAX_EMBEDDED_BYTE_LEN);
+    aCopy[MAX_EMBEDDED_BYTE] &= 0xFE;
+    return aCopy;
+  }
+
   unsigned char* getData() const
   {
     return (isLocal() ? getLocalData() : getRemoteData()); 
@@ -296,7 +310,7 @@ protected:
   unsigned char* getRemoteData() const
   {
     assert(!isLocal());
-    return &getRemoteBuffer()[1]; 
+    return getRemoteBuffer() + REMOTE_HEADER_LEN;
   }
 
 
@@ -323,7 +337,9 @@ protected:
 
   ulong getRemoteByteLength() const
   {
-    return getRemoteBuffer()[0];
+    uint32_t len;
+    memcpy(&len, getRemoteBuffer(), sizeof len);
+    return len;
   }
 
 
@@ -355,7 +371,8 @@ protected:
   theDeweyId       : Array containing the current, uncompressed dewey id.
   theCompLens      : Array containing the bit-length of each component.
 
-  theBuffer        : Buffer containing the current, compressed ordpath.
+  theBuffer        : Buffer containing the current, compressed ordpath. The
+                     bytes after theByteIndex are zero.
   theByteIndex     : Position of the last byte of the ordpath within theBuffer.
   theBitsAvailable : The number of unsed bits in the last byte of the compressed
                      ordpath. Can range between 0 and 7.
@@ -365,15 +382,15 @@ class OrdPathStack
   friend class OrdPath;
 
 protected:
-  ulong         theNumComps;
+  ulong                      theNumComps;
 
-  int32_t       theDeweyId[OrdPath::MAX_NUM_COMPS];
+  std::vector<int32_t>       theDeweyId;
 
-  unsigned char theCompLens[OrdPath::MAX_NUM_COMPS];
+  std::vector<unsigned char> theCompLens;
 
-  unsigned char theBuffer[OrdPath::MAX_BYTE_LEN];
-  ulong         theByteIndex;
-  ulong         theBitsAvailable;
+  std::vector<unsigned char> theBuffer;
+  ulong                      theByteIndex;
+  ulong                      theBitsAvailable;
 
 public:
   OrdPathStack();
@@ -397,6 +414,8 @@ private:
   OrdPathStack& operator=(const OrdPathStack& other);
 
   void compressComp(ulong comp, int32_t value);
+
+  void reserveBytes(ulong byteLen);
 };
 
 

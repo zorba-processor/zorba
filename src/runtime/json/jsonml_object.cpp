@@ -31,6 +31,7 @@
 #include "common.h"
 #include "jsonml_common.h"
 #include "jsonml_object.h"
+#include "runtime/util/tree_depth.h"
 
 // JsonML ("object form") grammar.
 //
@@ -239,6 +240,7 @@ static void x2j_children( store::Item_t const &parent,
 static void x2j_element( store::Item_t const &element,
                          store::Item_t *json_item ) {
   ZORBA_ASSERT( json_item );
+  tree_depth::check_stack( element.getp(), "convert" );
   vector<store::Item_t> keys, values, children;
 
   push_back( &keys, "tagName" );

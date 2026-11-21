@@ -43,10 +43,13 @@ CREATE_TEST_SOURCELIST(APITests
   timeout_bounds.cpp
   expr_depth_limit.cpp
   json_depth_limit.cpp
+  xml_depth_limit.cpp
   module_security.cpp
   invoke_module_globals.cpp
   function_item_lifetime.cpp
   json_parse_members.cpp
+  window_running_query.cpp
+  iterator_after_close.cpp
   file_write_checks.cpp
   itemfactory_empty_items.cpp
   host_date_time.cpp
@@ -72,6 +75,15 @@ FOREACH (_c parse_arrays parse_objects parse_mixed parse_truncated
          chain_serialize chain_copy chain_deep_equal chain_destroy
          chain_walkers chain_collection measure second_thread)
   ZORBA_ADD_TEST("test/api/json_depth_limit/${_c}" APITests json_depth_limit
+    ${_c})
+ENDFOREACH (_c)
+
+# xml_depth_limit runs case by case, so that each case reports its own result
+LIST (FILTER TestsToRun EXCLUDE REGEX "(^|/)xml_depth_limit\\.cpp$")
+FOREACH (_c levels deep_load deep_construct deep_copy deep_update deep_validate
+         deep_equal deep_serialize deep_string deep_result doc_uri second_thread
+         namespaces measure)
+  ZORBA_ADD_TEST("test/api/xml_depth_limit/${_c}" APITests xml_depth_limit
     ${_c})
 ENDFOREACH (_c)
 

@@ -49,6 +49,7 @@
 #include "store/api/shared_types.h"
 #include "types/typeops.h"
 #include "types/root_typemanager.h"
+#include "runtime/util/tree_depth.h"
 
 
 namespace zorba {
@@ -605,7 +606,8 @@ bool ZorbaCreateCollectionIterator::nextImpl(
     {
       checkNodeType(theSctx, node, collectionDecl, loc, theIsDynamic);
 
-      copyNode = node->copy(NULL, copymode);
+      copyNode = tree_depth::located(loc, [&] {
+        return node->copy(NULL, copymode); });
 
       nodes.resize(numNodes+1);
       nodes[numNodes++].transfer(copyNode);
@@ -1900,7 +1902,8 @@ bool ZorbaEditIterator::nextImpl(
                 collectionDecl,
                 this->loc,
                 theIsDynamic);
-  content = content->copy(NULL, lCopyMode);
+  content = tree_depth::located(loc, [&] {
+    return content->copy(NULL, lCopyMode); });
 
   // create the pul and add the primitive
   pul.reset(GENV_ITEMFACTORY->createPendingUpdateList());

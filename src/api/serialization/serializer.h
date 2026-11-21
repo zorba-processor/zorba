@@ -17,6 +17,7 @@
 #ifndef ZORBA_SERIALIZER_H
 #define ZORBA_SERIALIZER_H
 
+#include <memory>
 #include <vector>
 
 #include <zorba/sax2.h>
@@ -192,6 +193,8 @@ protected:
 
   void attach_transcoder(std::ostream& os);
 
+  void flush_output();
+
   ///////////////////////////////////////////////////////////
   //                                                       //
   //  class emitter                                        //
@@ -212,9 +215,9 @@ protected:
       PREVIOUS_ITEM_WAS_NODE
     }                                     thePreviousItemKind;
 
-    std::vector<store::ChildrenIterator*> theChildIters;
+    std::vector<std::unique_ptr<store::ChildrenIterator> > theChildIters;
     ulong                                 theFirstFreeChildIter;
-    store::AttributesIterator           * theAttrIter;
+    std::unique_ptr<store::AttributesIterator> theAttrIter;
 
     bool                                  theIsFirstElementNode;
     bool                                  theEmitAttributes;
@@ -281,6 +284,11 @@ protected:
      *  of a normalized sequence.
      */
     virtual void emit_node(const store::Item* item, int depth);
+
+    /**
+     *  Serializes an attribute, text, comment or processing instruction node.
+     */
+    void emit_leaf_node(const store::Item* item);
 
     /**
      *  Serializes a given text node. Also performs the processing of
@@ -481,6 +489,11 @@ protected:
   protected:
     virtual void emit_doctype(const zstring& elementName);
     virtual void emit_node(const store::Item* item, int depth);
+
+    /**
+     *  Serializes an attribute, text, comment or processing instruction node.
+     */
+    void emit_leaf_node(const store::Item* item);
   };
 
 

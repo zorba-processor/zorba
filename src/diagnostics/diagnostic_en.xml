@@ -1093,6 +1093,13 @@
       <value>$1 cannot be treated as type $2</value>
     </diagnostic>
 
+    <diagnostic code="XPDY0130">
+      <comment>
+       An implementation-dependent limit has been exceeded.
+      </comment>
+      <value>implementation limit exceeded: $1</value>
+    </diagnostic>
+
     <diagnostic code="XQDY0025">
       <comment>
        It is a dynamic error if any attribute of a constructed element does not
@@ -2611,6 +2618,14 @@
       <entry key="Stack">
         <value>not enough stack space left for a JSON value nested this deep: flatten the value or split it into smaller values</value>
       </entry>
+    </diagnostic>
+
+    <diagnostic code="ZXQP0072" name="XML_NESTING_EXCEEDED">
+      <comment>
+        An XML tree is too deep to process with the machine stack that is
+        left.
+      </comment>
+      <value>not enough stack space left to $1 a node nested $2 levels deep${ in document "3"}: the tree is too deep for the available stack</value>
     </diagnostic>
       
     <diagnostic code="ZXQP8401" name="THESAURUS_VERSION_MISMATCH"

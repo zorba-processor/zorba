@@ -14,8 +14,11 @@
  * limitations under the License.
  */
 
+#include <algorithm>
 #include <cassert>
 #include <limits>
+#include <memory>
+#include <new>
 #include <sstream>
 
 #include "zorbautils/hashfun.h"
@@ -27,6 +30,52 @@
 
 
 namespace zorba { namespace simplestore {
+
+
+// Every component takes at least 2 bits.
+static const ulong MAX_COMPS_PER_BYTE = 4;
+
+// Ids of up to this many bytes are decompressed without allocating.
+static const ulong INLINE_BYTE_LEN = 255;
+
+
+/*******************************************************************************
+  Room for the components (and their bit offsets) decompressed from an id of a
+  given byte length: on the stack up to INLINE_BYTE_LEN bytes, on the heap
+  beyond.
+********************************************************************************/
+class DeweyBuffer
+{
+  static const ulong INLINE_COMPS = INLINE_BYTE_LEN * MAX_COMPS_PER_BYTE;
+
+  int32_t                    theInlineComps[INLINE_COMPS];
+  ulong                      theInlineOffsets[INLINE_COMPS];
+  std::unique_ptr<int32_t[]> theHeapComps;
+  std::unique_ptr<ulong[]>   theHeapOffsets;
+
+public:
+  int32_t* const comps;
+  ulong* const   offsets;
+
+  explicit DeweyBuffer(ulong byteLen)
+    :
+    theHeapComps(heapSize(byteLen) ? new int32_t[heapSize(byteLen)] : NULL),
+    theHeapOffsets(heapSize(byteLen) ? new ulong[heapSize(byteLen)] : NULL),
+    comps(theHeapComps ? theHeapComps.get() : theInlineComps),
+    offsets(theHeapOffsets ? theHeapOffsets.get() : theInlineOffsets)
+  {
+  }
+
+private:
+  static ulong heapSize(ulong byteLen)
+  {
+    ulong const numComps = byteLen * MAX_COMPS_PER_BYTE;
+    return numComps > INLINE_COMPS ? numComps : 0;
+  }
+
+  DeweyBuffer(const DeweyBuffer&);
+  DeweyBuffer& operator=(const DeweyBuffer&);
+};
 
 
 
@@ -240,12 +289,6 @@ void OrdPath::initFromString(const unsigned char* str, ulong strLen)
 
   ulong byteLen = strLen / 2;
 
-  if (byteLen > MAX_BYTE_LEN)
-  {
-    throw ZORBA_EXCEPTION(zerr::ZSTR0030_NODEID_ERROR,
-    ERROR_PARAMS(ZED(NodeIDNeedsBytes_2), int(MAX_BYTE_LEN)));
-  }
-
   memset(theBuffer.local, 0, MAX_EMBEDDED_BYTE_LEN);
 
   if ((byteLen < MAX_EMBEDDED_BYTE_LEN) ||
@@ -256,10 +299,8 @@ void OrdPath::initFromString(const unsigned char* str, ulong strLen)
   }
   else
   {
-    setRemoteBuffer(new unsigned char[byteLen + 1]);
-    memset(getRemoteBuffer(), 0, byteLen+1);
-    getRemoteBuffer()[0] = (unsigned char)byteLen;
-    buf = &getRemoteBuffer()[1];
+    setRemoteBuffer(newRemoteBuffer(byteLen));
+    buf = getRemoteData();
     isLocal = false;
   }
 
@@ -303,8 +344,8 @@ void OrdPath::initFromString(const unsigned char* str, ulong strLen)
   }
   catch (...)
   {
-    if (!isLocal && buf != NULL)
-      delete [] buf;
+    if (!isLocal)
+      delete [] getRemoteBuffer(); // NOLINT(zorba-owning-memory) the remote buffer shares a union with the inline bytes
 
     memset(theBuffer.local, 0, MAX_EMBEDDED_BYTE_LEN);
     markLocal();
@@ -329,6 +370,18 @@ void OrdPath::setAsRoot()
 /*******************************************************************************
 
 ********************************************************************************/
+
+unsigned char* OrdPath::newRemoteBuffer(ulong byteLen)
+{
+  if (byteLen > std::numeric_limits<uint32_t>::max())
+    throw std::bad_alloc();
+
+  unsigned char* buf = new unsigned char[REMOTE_HEADER_LEN + byteLen](); // NOLINT(zorba-owning-memory) the remote buffer shares a union with the inline bytes
+  uint32_t const len = static_cast<uint32_t>(byteLen);
+  memcpy(buf, &len, sizeof len);
+  return buf;
+}
+
 
 size_t OrdPath::alloc_size() const
 {
@@ -377,7 +430,7 @@ OrdPath& OrdPath::operator=(const OrdPathStack& ops)
       (len == MAX_EMBEDDED_BYTE_LEN && ops.theBitsAvailable == 0))
   {
     initRemote(len);
-    memcpy(getRemoteData(), ops.theBuffer, len);
+    memcpy(getRemoteData(), ops.theBuffer.data(), len);
 
     ZORBA_ASSERT(!isLocal());
   }
@@ -468,12 +521,17 @@ uint32_t OrdPath::hash() const
 ********************************************************************************/
 bool OrdPath::operator==(const OrdPath& other) const
 {
-  ulong len = getByteLength();
+  unsigned char copy1[MAX_EMBEDDED_BYTE_LEN];
+  unsigned char copy2[MAX_EMBEDDED_BYTE_LEN];
+  ulong len1;
+  ulong len2;
+  const unsigned char* p1 = getComparableData(len1, copy1);
+  const unsigned char* p2 = other.getComparableData(len2, copy2);
 
-  if (len != other.getByteLength())
+  if (len1 != len2)
     return false;
 
-  return !memcmp(getData(), other.getData(), len);
+  return !memcmp(p1, p2, len1);
 }
 
 
@@ -482,14 +540,16 @@ bool OrdPath::operator==(const OrdPath& other) const
 ********************************************************************************/
 int OrdPath::operator<(const OrdPath& other) const
 {
+  unsigned char copy1[MAX_EMBEDDED_BYTE_LEN];
+  unsigned char copy2[MAX_EMBEDDED_BYTE_LEN];
   ulong len1;
   ulong len2;
-  unsigned char* p1 = getDataAndLength(len1);
-  unsigned char* p2 = other.getDataAndLength(len2);
+  const unsigned char* p1 = getComparableData(len1, copy1);
+  const unsigned char* p2 = other.getComparableData(len2, copy2);
 
   if (len1 < len2)
   {
-    unsigned char* end = p1 + len1;
+    const unsigned char* end = p1 + len1;
 
     while (p1 != end)
     {
@@ -506,7 +566,7 @@ int OrdPath::operator<(const OrdPath& other) const
   }
   else
   {
-    unsigned char* end = p2 + len2;
+    const unsigned char* end = p2 + len2;
 
     while (p2 != end)
     {
@@ -529,14 +589,16 @@ int OrdPath::operator<(const OrdPath& other) const
 ********************************************************************************/
 int OrdPath::operator>(const OrdPath& other) const
 {
+  unsigned char copy1[MAX_EMBEDDED_BYTE_LEN];
+  unsigned char copy2[MAX_EMBEDDED_BYTE_LEN];
   ulong len1;
   ulong len2;
-  unsigned char* p1 = getDataAndLength(len1);
-  unsigned char* p2 = other.getDataAndLength(len2);
+  const unsigned char* p1 = getComparableData(len1, copy1);
+  const unsigned char* p2 = other.getComparableData(len2, copy2);
 
   if (len1 <= len2)
   {
-    unsigned char* end = p1 + len1;
+    const unsigned char* end = p1 + len1;
 
     while (p1 != end)
     {
@@ -553,7 +615,7 @@ int OrdPath::operator>(const OrdPath& other) const
   }
   else
   {
-    unsigned char* end = p2 + len2;
+    const unsigned char* end = p2 + len2;
 
     while (p2 != end)
     {
@@ -577,13 +639,15 @@ int OrdPath::operator>(const OrdPath& other) const
 ********************************************************************************/
 OrdPath::RelativePosition OrdPath::getRelativePosition(const OrdPath& other) const
 {
+  unsigned char copy1[MAX_EMBEDDED_BYTE_LEN];
+  unsigned char copy2[MAX_EMBEDDED_BYTE_LEN];
   ulong len1;
   ulong len2;
-  unsigned char* data1 = getDataAndLength(len1);
-  unsigned char* data2 = other.getDataAndLength(len2);
+  const unsigned char* data1 = getComparableData(len1, copy1);
+  const unsigned char* data2 = other.getComparableData(len2, copy2);
 
-  unsigned char* end1 = data1 + len1;
-  unsigned char* end2 = data2 + len2;
+  const unsigned char* end1 = data1 + len1;
+  const unsigned char* end2 = data2 + len2;
 
   if (len1 < len2)
   {
@@ -677,14 +741,15 @@ OrdPath::RelativePosition OrdPath::getRelativePosition(const OrdPath& other) con
 ********************************************************************************/
 OrdPath::RelativePosition OrdPath::getRelativePosition2(const OrdPath& other) const
 {
-  int32_t dewey1[MAX_NUM_COMPS], dewey2[MAX_NUM_COMPS];
-  ulong offsets1[MAX_NUM_COMPS], offsets2[MAX_NUM_COMPS];
+  DeweyBuffer buf1(getByteLength()), buf2(other.getByteLength());
+  int32_t* dewey1 = buf1.comps;
+  int32_t* dewey2 = buf2.comps;
   ulong numComps1 = 0, numComps2 = 0;
   ulong bitLen1 = 0, bitLen2 = 0;
   bool thisFirst;
 
-  decompress(0, dewey1, offsets1, numComps1, bitLen1);
-  other.decompress(0, dewey2, offsets2, numComps2, bitLen2);
+  decompress(0, dewey1, buf1.offsets, numComps1, bitLen1);
+  other.decompress(0, dewey2, buf2.offsets, numComps2, bitLen2);
 
   // curr will be the first non-shared component
   ulong curr = 0;
@@ -712,13 +777,13 @@ OrdPath::RelativePosition OrdPath::getRelativePosition2(const OrdPath& other) co
 
   for (ulong i = curr; i < numComps1; ++i)
   {
-    if (dewey1[i] % 2 == 1)
+    if (dewey1[i] % 2 != 0)
       ++extraLevels1;
   }
 
   for (ulong i = curr; i < numComps2; ++i)
   {
-    if (dewey2[i] % 2 == 1)
+    if (dewey2[i] % 2 != 0)
       ++extraLevels2;
   }
 
@@ -784,31 +849,23 @@ void OrdPath::compressRemote(const DeweyID& dewey)
 
   ulong bitLen = 0;
 
-  unsigned char* databuf = new unsigned char[MAX_BYTE_LEN];
+  ulong numComps = (ulong)dewey.size();
 
-  try
+  // A component takes at most 42 bits.
+  ulong maxByteLen = (numComps * 42 + 7) / 8;
+
+  std::unique_ptr<unsigned char[]> databuf(new unsigned char[maxByteLen]());
+
+  for (ulong i = 0; i < numComps; ++i)
   {
-    memset(databuf, 0, MAX_BYTE_LEN);
-
-    ulong numComps = (ulong)dewey.size();
-    for (ulong i = 0; i < numComps; ++i)
-    {
-      bool success = pushComp(databuf, MAX_BIT_LEN, dewey[i], bitLen);
-      ZORBA_ASSERT(success);
-    }
-
-    ulong byteLen = (bitLen + 7) / 8;
-
-    initRemote(byteLen);
-    memcpy(getRemoteData(), databuf, byteLen);
-  }
-  catch (...)
-  {
-    delete [] databuf;
-    throw;
+    bool success = pushComp(databuf.get(), maxByteLen * 8, dewey[i], bitLen);
+    ZORBA_ASSERT(success);
   }
 
-  delete [] databuf;
+  ulong byteLen = (bitLen + 7) / 8;
+
+  initRemote(byteLen);
+  memcpy(getRemoteData(), databuf.get(), byteLen);
 }
 
 
@@ -860,8 +917,6 @@ void OrdPath::insertBeforeOrAfter(
     OrdPath&       result)
 {
   ulong numComps = 0;
-  int32_t dewey[MAX_NUM_COMPS];
-  ulong offsets[MAX_NUM_COMPS];
   ulong bitLen;
   ulong byteLen;
   unsigned char* data;
@@ -870,6 +925,9 @@ void OrdPath::insertBeforeOrAfter(
   ulong parentBitLen = parent.getBitLength(parentByteLen);
 
   // Decompress the last level-component of sibling.
+  DeweyBuffer buf(sibling.getByteLength() - parentBitLen / 8);
+  int32_t* dewey = buf.comps;
+  ulong* offsets = buf.offsets;
   sibling.decompress(parentBitLen, dewey, offsets, numComps, bitLen);
 
   int32_t newcomp = dewey[numComps-1];
@@ -954,13 +1012,15 @@ void OrdPath::insertInto(
 
   ulong numComps1 = 0;
   ulong bitLen1 = 0;
-  int32_t dewey1[MAX_NUM_COMPS];
-  ulong offsets1[MAX_NUM_COMPS];
+  DeweyBuffer buf1(sib1.getByteLength() - parentBitLen / 8);
+  int32_t* dewey1 = buf1.comps;
+  ulong* offsets1 = buf1.offsets;
 
   ulong numComps2 = 0;
   ulong bitLen2 = 0;
-  int32_t dewey2[MAX_BYTE_LEN];
-  ulong offsets2[MAX_BYTE_LEN];
+  DeweyBuffer buf2(sib2.getByteLength() - parentBitLen / 8);
+  int32_t* dewey2 = buf2.comps;
+  ulong* offsets2 = buf2.offsets;
 
   // decompress the last level-comp of sib1
   sib1.decompress(parentBitLen, dewey1, offsets1, numComps1, bitLen1);
@@ -1185,15 +1245,6 @@ bool OrdPath::pushComp(
   ulong byteIndex = bitLen / 8;
   ulong bitsAvailable = 8 - bitLen % 8; // # bits available in the "current" byte.
 
-  ulong bytesNeeded = byteIndex + (bitsNeeded + 15 - bitsAvailable) / 8;
-  if (bytesNeeded > MAX_BYTE_LEN)
-  {
-    throw ZORBA_EXCEPTION(
-      zerr::ZSTR0030_NODEID_ERROR,
-      ERROR_PARAMS( ZED( NodeIDNeedsBytes_2 ), int(MAX_BYTE_LEN) )
-    );
-  }
-
   if (bitLen + bitsNeeded > maxBitLen)
     return false;
 
@@ -1267,13 +1318,6 @@ void OrdPath::appendComp(int32_t value)
   OrdPath::bitsNeeded(value, bitsNeeded, eval, eval2);
 
   ulong bytesNeeded = byteIndex + (bitsNeeded + 15 - bitsAvailable) / 8;
-  if (bytesNeeded > MAX_BYTE_LEN)
-  {
-    throw ZORBA_EXCEPTION(
-      zerr::ZSTR0030_NODEID_ERROR,
-      ERROR_PARAMS( ZED( NodeIDNeedsBytes_2 ), int( MAX_BYTE_LEN ) )
-    );
-  }
 
   if (bitLen + bitsNeeded <= MAX_EMBEDDED_BIT_LEN)
   {
@@ -1285,19 +1329,17 @@ void OrdPath::appendComp(int32_t value)
     // The ordpath is local but will become remote after the append, or
     // the ordpath is remote already but is buffer must be extended to
     // acommodate the append.
-    unsigned char* newbuf = new unsigned char[bytesNeeded + 1];
-    memset(newbuf, 0, bytesNeeded+1);
-    newbuf[0] = (unsigned char)(bytesNeeded);
+    unsigned char* newbuf = newRemoteBuffer(bytesNeeded);
 
     if (isLocal)
     {
       markRemote();
-      memcpy(&newbuf[1], getLocalData(), byteLen);
+      memcpy(newbuf + REMOTE_HEADER_LEN, getLocalData(), byteLen);
       setRemoteBuffer(newbuf);
     }
     else
     {
-      memcpy(&newbuf[1], getRemoteData(), byteLen);
+      memcpy(newbuf + REMOTE_HEADER_LEN, getRemoteData(), byteLen);
       delete [] getRemoteBuffer();
       setRemoteBuffer(newbuf);
     }
@@ -1451,17 +1493,16 @@ void OrdPath::bitsNeeded(
       eval >>= 9;
       eval |= 0x00800000;
     }
-    // value in [-INT32_MAX, -1118485] --> 9 bits for code + 20 bits for data
+    // value in [-INT32_MAX, -1118485] --> 10 bits for code + 32 bits for data
     else
     {
-      // 10 bits for code + 32 bits for data
       bitsNeeded = 42;
 
-      value = std::numeric_limits<int32_t>::max() + value;
-
+      // Offset from INT32_MIN, an even base, so that an odd value, which can
+      // end an ordpath, ends with a 1 bit like in every other range.
       eval2 = 0x00400000;
       eval2 <<= 32;
-      eval2 |= value;
+      eval2 |= static_cast<uint32_t>(value) - 0x80000000u;
     }
   }
 
@@ -1603,10 +1644,10 @@ zstring OrdPath::show() const
 
   ulong numComps = 0;
   ulong bitSize = 0;
-  int32_t deweyid[MAX_NUM_COMPS];
-  ulong offsets[MAX_NUM_COMPS];
+  DeweyBuffer dewey(len);
+  int32_t* deweyid = dewey.comps;
 
-  decompress(0, deweyid, offsets, numComps, bitSize);
+  decompress(0, deweyid, dewey.offsets, numComps, bitSize);
 
   for (ulong i = 0; i < numComps; ++i)
   {
@@ -1624,18 +1665,18 @@ zstring OrdPath::show() const
 ********************************************************************************/
 ulong OrdPath::getLevel() const
 {
-  int32_t dewey[MAX_NUM_COMPS];
-  ulong offsets[MAX_NUM_COMPS];
+  DeweyBuffer buf(getByteLength());
+  int32_t* dewey = buf.comps;
   ulong numComps = 0;
   ulong bitLen = 0;
 
-  decompress(0, dewey, offsets, numComps, bitLen);
+  decompress(0, dewey, buf.offsets, numComps, bitLen);
 
   ulong level = 0;
 
   for (ulong i = 0; i < numComps; ++i)
   {
-    if (dewey[i] % 2 == 1)
+    if (dewey[i] % 2 != 0)
       ++level;
   }
 
@@ -1738,23 +1779,24 @@ void OrdPath::decodeByte(
 
   switch (byte)
   {
-  case 0:    // 0000 0000   00000000 ...            (29/9,20 or 42/10,32)
+  case 0:    // 0000 0000   000000001,... or 0000000001,... (29/9,20 or 42/10,32)
   {
-    ADVANCE(bitLen, byteIndex, bitIndex, 9);
+    ADVANCE(bitLen, byteIndex, bitIndex, 8);
 
-    if (data[byteIndex] >> (7 - bitIndex) == 0)
+    if (((data[byteIndex] >> (7 - bitIndex)) & 0x1) == 0)
     {
-      ADVANCE(bitLen, byteIndex, bitIndex, 1);
+      ADVANCE(bitLen, byteIndex, bitIndex, 2);
       extractValue(data,
                    bitLen,
                    byteIndex,
                    bitIndex,
                    32,
-                   -std::numeric_limits<int32_t>::max(),
+                   std::numeric_limits<int32_t>::min(),
                    deweyid[numComps]);
     }
     else
     {
+      ADVANCE(bitLen, byteIndex, bitIndex, 1);
       extractValue(data, bitLen, byteIndex, bitIndex, 20, -1118484, deweyid[numComps]);
     }
     ++numComps;
@@ -1990,7 +2032,7 @@ void OrdPath::decodeByte(
   }
   case 31:   // 0001 1111   0001,11 + 11 ...        (6/4,2)
   {
-    deweyid[numComps] = -2;
+    deweyid[numComps] = -1;
     ADVANCE(bitLen, byteIndex, bitIndex, 6);
     numComps += 1;
     break;
@@ -2524,7 +2566,7 @@ void OrdPath::decodeByte(
     deweyid[numComps + 2] = 1;
     deweyid[numComps + 3] = 1;
     numComps += 4;
-    byteIndex++;
+    ADVANCE(bitLen, byteIndex, bitIndex, 8);
     break;
   }
   case 86:   // 0101 0110   01 + 01 + 01 + 10, ... (2/2,0 + 2/2,0 + 2/2,0 + 3/2,1)
@@ -2534,9 +2576,10 @@ void OrdPath::decodeByte(
     deweyid[numComps] = 1;
     deweyid[numComps + 1] = 1;
     deweyid[numComps + 2] = 1;
+    compOffsets[numComps+3] = bitLen + 6;
     ADVANCE(bitLen, byteIndex, bitIndex, 8);
     extractValue(data, bitLen, byteIndex, bitIndex, 1, 2, deweyid[numComps + 3]);
-    numComps += 3;
+    numComps += 4;
     break;
   }
   case 87:   // 0101 0111   01 + 01 + 01 + 11 ... (2/2,0 + 2/2,0 + 2/2,0)
@@ -3315,7 +3358,7 @@ void OrdPath::decodeByte(
     compOffsets[numComps+1] = bitLen + 3;
     deweyid[numComps] = 3;
     deweyid[numComps + 1] = 0;
-    ADVANCE(bitLen, byteIndex, bitIndex, 5);
+    ADVANCE(bitLen, byteIndex, bitIndex, 6);
     numComps += 2;
     break;
   }
@@ -3346,7 +3389,7 @@ void OrdPath::decodeByte(
     compOffsets[numComps+1] = bitLen + 3;
     deweyid[numComps] = 3;
     deweyid[numComps + 1] = 0;
-    ADVANCE(bitLen, byteIndex, bitIndex, 5);
+    ADVANCE(bitLen, byteIndex, bitIndex, 6);
     numComps += 2;
     break;
   }
@@ -4167,10 +4210,22 @@ void OrdPath::extractValue(
 OrdPathStack::OrdPathStack()
   :
   theNumComps(0),
+  theDeweyId(INLINE_BYTE_LEN * MAX_COMPS_PER_BYTE),
+  theCompLens(INLINE_BYTE_LEN * MAX_COMPS_PER_BYTE),
+  theBuffer(INLINE_BYTE_LEN),
   theByteIndex(0),
   theBitsAvailable(0)
 {
-  memset(theBuffer, 0, OrdPath::MAX_BYTE_LEN);
+}
+
+
+/*******************************************************************************
+  Makes theBuffer at least byteLen bytes long.
+********************************************************************************/
+void OrdPathStack::reserveBytes(ulong byteLen)
+{
+  if (byteLen > theBuffer.size())
+    theBuffer.resize(std::max<ulong>(byteLen, 2 * theBuffer.size()));
 }
 
 
@@ -4204,13 +4259,12 @@ ulong OrdPathStack::getByteLength() const
 ********************************************************************************/
 void OrdPathStack::pushChild()
 {
-  if (theByteIndex == OrdPath::MAX_BYTE_LEN ||
-      (theByteIndex == OrdPath::MAX_BYTE_LEN - 1 && theBitsAvailable < 2))
+  reserveBytes(theByteIndex + 2);
+
+  if (theNumComps == theDeweyId.size())
   {
-    throw ZORBA_EXCEPTION(
-      zerr::ZSTR0030_NODEID_ERROR,
-      ERROR_PARAMS( ZED( NodeIDNeedsBytes_2 ), int(OrdPath::MAX_BYTE_LEN) )
-    );
+    theDeweyId.resize(2 * theNumComps);
+    theCompLens.resize(2 * theNumComps);
   }
 
   theDeweyId[theNumComps] = 1;
@@ -4377,13 +4431,7 @@ void OrdPathStack::compressComp(ulong comp, int32_t value)
   ulong bytesNeeded = theByteIndex +
                       (bitsNeeded + 15 - theBitsAvailable) / 8;
 
-  if (bytesNeeded > OrdPath::MAX_BYTE_LEN)
-  {
-    throw ZORBA_EXCEPTION(
-      zerr::ZSTR0030_NODEID_ERROR,
-      ERROR_PARAMS( ZED( NodeIDNeedsBytes_2 ), int(OrdPath::MAX_BYTE_LEN) )
-    );
-  }
+  reserveBytes(bytesNeeded);
 
   // theBitsAvailable == 0 means the previous component ended exactly on a
   // byte boundary. Start the new component in the next byte: the code below

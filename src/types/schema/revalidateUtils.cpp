@@ -40,6 +40,7 @@
 #ifndef ZORBA_NO_XMLSCHEMA
 #include <new>
 #include <xercesc/util/OutOfMemoryException.hpp>
+#include "runtime/util/tree_depth.h"
 #endif
 
 
@@ -168,6 +169,8 @@ void SchemaValidatorImpl::processElement(
   ZORBA_ASSERT(element->isNode());
   ZORBA_ASSERT(element->getNodeKind() == store::StoreConsts::elementNode);
 
+  tree_depth::check_stack(element.getp(), "revalidate", loc);
+
   store::Item_t nodeName = element->getNodeName();
   zstring baseUri;
   element->getBaseURI(baseUri);
@@ -195,6 +198,8 @@ void SchemaValidatorImpl::processElement(
   //cout << " vup      - elemType new: " << typeQName->getLocalName()->c_str()
   //    << " @ " << typeQName->getNamespace()->c_str() << "\n"; cout.flush();
 
+  bool isNilled = schemaValidator.isNilled();
+
   bool isInSubstitutionElement = false;
   if (substitutedElemQName)
   {
@@ -208,7 +213,7 @@ void SchemaValidatorImpl::processElement(
   xqtref_t newType;
   store::Item_t elm;
 
-  if ( !typeQName->equals(element->getType()) )
+  if ( !typeQName->equals(element->getType()) || isNilled != element->getNilled() )
   {
     isNewType = true;
     newType = typeManager->create_named_type(typeQName, SequenceType::QUANT_ONE, loc);
@@ -224,13 +229,13 @@ void SchemaValidatorImpl::processElement(
                     element->getAttributes(), loc);
 
   std::vector<store::Item_t> typedValues;
-  int noOfChildren = processChildren(pul,
-                                     nsCtx,
-                                     typeManager, 
-                                     schemaValidator,
-                                     element->getChildren(),
-                                     typedValues,
-                                     loc);
+  int noOfTextChildren = processChildren(pul,
+                                         nsCtx,
+                                         typeManager,
+                                         schemaValidator,
+                                         element->getChildren(),
+                                         typedValues,
+                                         loc);
 
   if ( isNewType )
   {
@@ -238,31 +243,27 @@ void SchemaValidatorImpl::processElement(
     bool tHasTypedValue = Validator::typeHasTypedValue(typeManager, newType, loc);
     bool tHasEmptyValue = Validator::typeHasEmptyValue(newType);
 
-    if ( noOfChildren==0 )
+    // The typed value is stored in the text child; without one the element
+    // keeps the untyped value of its string value, as validation gives it
+    if ( noOfTextChildren==0 )
     {
-      // workaround for elem of type xsd:string with no text child
-      if ( newType->is_builtin() && 
-          newType->getQName()->equals(GENV_TYPESYSTEM.STRING_TYPE_ONE->getQName()) )
+      tHasTypedValue = false;
+
+      store::Item_t emptyValue;
+      if (!isNilled)
       {
-        /*store::Item_t result;
-         zstring emptyStr = "";
-         GENV_ITEMFACTORY->createString( result, emptyStr);
-         typedValues.push_back(result);*/
-        tHasEmptyValue = true;
-        tHasTypedValue = false;
-        tHasValue = false;
-      }
-      else if ( newType->type_kind()==XQType::USER_DEFINED_KIND )
-      {
-        const UserDefinedXQType udXQType = static_cast<const UserDefinedXQType&>(*newType);
-        if ( udXQType.isSubTypeOf(typeManager, *GENV_TYPESYSTEM.STRING_TYPE_ONE) )
-        {
+        if (Validator::emptyContentTypedValue(theSctx, typeManager, newType,
+                                              element.getp(), bindings,
+                                              emptyValue, loc))
           tHasEmptyValue = true;
-          tHasTypedValue = false;
-          tHasValue = false;
-        }
+        else if (emptyValue != NULL)
+          typedValues.assign(1, emptyValue);
       }
     }
+
+    // A nilled element has no text child to hold a typed value
+    if (isNilled)
+      tHasTypedValue = false;
 
     //cout << " vup        - addSetElementType: " << elm->getNodeName()->
     //  getLocalName()->str() << "   " << newType->get_qname()->getLocalName() 
@@ -281,7 +282,8 @@ void SchemaValidatorImpl::processElement(
                              tHasValue,
                              tHasEmptyValue,
                              tHasTypedValue,
-                             isInSubstitutionElement);
+                             isInSubstitutionElement,
+                             isNilled);
     else
       pul->addSetElementType(&loc,
                              elm,
@@ -290,7 +292,8 @@ void SchemaValidatorImpl::processElement(
                              tHasValue,
                              tHasEmptyValue,
                              tHasTypedValue,
-                             isInSubstitutionElement);
+                             isInSubstitutionElement,
+                             isNilled);
   }
 
   schemaValidator.endElem(nodeName);
@@ -411,11 +414,9 @@ int SchemaValidatorImpl::processChildren(
 
   store::Item_t typeName;
 
-  int noOfChildren = 0;
+  int noOfTextChildren = 0;
   while ( children->next(child) )
   {
-    noOfChildren++;
-
     if ( child->isNode() )
     {
       //cout << " vup  - processChildren: " << child->getType()->getLocalName()
@@ -437,6 +438,8 @@ int SchemaValidatorImpl::processChildren(
 
       case store::StoreConsts::textNode:
       {
+        noOfTextChildren++;
+
         //cout << " vup        - pC text: '" << child->getStringValue()->
         //  normalizeSpace()->str() << "'\n"; cout.flush();
 
@@ -478,7 +481,7 @@ int SchemaValidatorImpl::processChildren(
       }
     }
   }
-  return noOfChildren;
+  return noOfTextChildren;
 }
 
 

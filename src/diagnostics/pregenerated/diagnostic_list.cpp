@@ -261,6 +261,9 @@ XQueryErrorCode XPDY0002( "err:XPDY0002" );
 XQueryErrorCode XPDY0050( "err:XPDY0050" );
 
 
+XQueryErrorCode XPDY0130( "err:XPDY0130" );
+
+
 XQueryErrorCode XQDY0025( "err:XQDY0025" );
 
 
@@ -766,6 +769,9 @@ ZorbaErrorCode ZXQP0070_EXPR_DEPTH_EXCEEDED( "zerr:ZXQP0070" );
 
 
 ZorbaErrorCode ZXQP0071_JSON_NESTING_EXCEEDED( "zerr:ZXQP0071" );
+
+
+ZorbaErrorCode ZXQP0072_XML_NESTING_EXCEEDED( "zerr:ZXQP0072" );
 
 
 #if !defined(ZORBA_NO_FULL_TEXT)
