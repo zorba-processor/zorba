@@ -191,7 +191,7 @@ CollectionPul* PULImpl::getCollectionPul(const store::Item* target)
   }
   else
   {
-    std::unique_ptr<CollectionPul> pul(new CollectionPul(this, NULL));
+    auto pul = std::make_unique<CollectionPul>(this, nullptr);
     theCollectionPuls.push_back(pul.get());
     theNoCollectionPul = pul.release();
     theCollectionPulsMap[NULL] = theCollectionPuls.size() - 1;
@@ -223,13 +223,11 @@ CollectionPul* PULImpl::getCollectionPulByName(
     Collection* collection = static_cast<Collection*>
     (GET_STORE().getCollection(collName, isDynamic).getp());
 
-    std::unique_ptr<CollectionPul> pul(new CollectionPul(this, collection));
+    auto pul = std::make_unique<CollectionPul>(this, collection);
     theCollectionPuls.push_back(pul.get());
-    pul.release();
+    theLastPul = pul.release();
 
     theCollectionPulsMap[collName] = theCollectionPuls.size() - 1;
-
-    theLastPul = theCollectionPuls.back();
   }
 
   theLastCollection = collName;
@@ -1224,8 +1222,8 @@ void PULImpl::addJSONObjectInsert(
       pul->theJSONObjectInsertList.pop_back();
       throw;
     }
-    newUpdates.release();
-    upd.release();
+    (void)newUpdates.release(); // owned by theNodeToUpdatesMap now
+    (void)upd.release(); // owned by theJSONObjectInsertList now
   }
 }
 
