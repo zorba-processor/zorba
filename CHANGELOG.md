@@ -18,7 +18,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 | Compiler warnings | 1,897 to 5,949 per platform | Dozens or fewer |
 | Build options tested | Full build only; other options had rotted | `embedded`, `embedded-noicu`, `full-nopch`, debugger in CI; XQueryX and big-integer profiles |
 | Test timeouts | Never enforced (`NORMAL_TIMEOUT_VALUE` macro bug) | Enforced |
-| W3C conformance | QT3 harness present but inactive | Weekly QT3 run in CI: 26,729 of 27,053 applicable test cases pass (98.8%) |
+| W3C conformance | QT3 harness present but inactive | Weekly QT3 run in CI: 26,730 of 27,053 applicable test cases pass (98.8%) |
 | Performance | Not measured | XMark and JSONiq benchmarks with A/B comparison; cold build 795 s → 376 s; hash join example 22 s → 0.5 s |
 | Toolchain | `auto_ptr`, TR1, CMake 2.8-era checks, Flex 2.5.35 | C++23, CMake 3.28, Bison 3.8, Flex 2.6.4, ICU 78, libxml2 2.15, Xerces-C 3.3 |
 
