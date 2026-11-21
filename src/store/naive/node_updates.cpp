@@ -158,6 +158,8 @@ void XmlNode::attach(InternalNode* parent, csize pos, AttachRecord& record)
   // The moved nodes whose types newTree already has.
   csize numTyped = 0;
 
+  AttributeNode* removedBaseUri = NULL;
+
 #ifndef TEXT_ORDPATH
   bool hasLabel = (nodeKind != store::StoreConsts::textNode);
 #else
@@ -186,8 +188,18 @@ void XmlNode::attach(InternalNode* parent, csize pos, AttachRecord& record)
     if (parent->theNodes.size() == parent->theNodes.capacity())
       parent->theNodes.reserve(2 * parent->theNodes.size() + 1);
 
+    // The hidden base-uri attribute that is taken off is freed without
+    // removing its type (see ~AttachRecord()), so newTree must not have it.
+    for (csize i = 0; i < baseUris.size(); ++i)
+    {
+      if (baseUris[i].second == NULL)
+        removedBaseUri = baseUris[i].first;
+    }
+
     for (; numTyped < moved.size(); ++numTyped)
     {
+      if (moved[numTyped] == removedBaseUri)
+        continue;
       store::Item_t type = moved[numTyped]->typeToMove();
       if (type != NULL)
         newTree->addType(moved[numTyped], type);
@@ -197,7 +209,7 @@ void XmlNode::attach(InternalNode* parent, csize pos, AttachRecord& record)
   {
     for (csize i = 0; i < numTyped; ++i)
     {
-      if (moved[i]->typeToMove() != NULL)
+      if (moved[i] != removedBaseUri && moved[i]->typeToMove() != NULL)
         newTree->removeType(moved[i]);
     }
 
@@ -300,7 +312,7 @@ void XmlNode::undoAttach(AttachRecord& record)
   {
     XmlNode* node = record.theMoved[i];
     refcount += node->theRefCount;
-    if (node->typeToMove() != NULL)
+    if (node != record.theRemovedBaseUri && node->typeToMove() != NULL)
       newTree->removeType(node);
     node->setTreeInternal(oldTree);
   }
