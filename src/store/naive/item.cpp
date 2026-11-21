@@ -972,6 +972,13 @@ void Item::getBaseURI(zstring& uri) const
 }
 
 
+bool Item::getLocalBaseURI(zstring& uri) const
+{
+  getBaseURI(uri);
+  return true;
+}
+
+
 store::Iterator_t Item::getAttributes() const
 {
   throw ZORBA_EXCEPTION(

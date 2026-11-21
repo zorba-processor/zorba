@@ -633,6 +633,13 @@ public:
   getBaseURI(zstring& uri) const;
 
   /**
+   * Gives the base URI that this node sets itself and returns true, or
+   * returns false if it takes its base URI from its parent.
+   */
+  virtual bool
+  getLocalBaseURI(zstring& uri) const;
+
+  /**
    * For an element node of a user-defined atomic type with empty content: sets
    * the typed value of that content, which the store cannot compute without
    * the schema.
