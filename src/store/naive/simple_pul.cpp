@@ -2693,6 +2693,12 @@ CollectionPul::CollectionPul(PULImpl* pul, Collection* collection)
 ********************************************************************************/
 CollectionPul::~CollectionPul()
 {
+  for (csize i = 0; i < theMergeList.size(); ++i)
+  {
+    if (theMergeList[i].theUndoTree != NULL)
+      theMergeList[i].theUndoTree->free();
+  }
+
   cleanList(theDoFirstList);
   cleanList(theInsertList);
   cleanList(theReplaceNodeList);
@@ -3557,31 +3563,44 @@ void CollectionPul::applyUpdates()
         if (node->getChild(i)->getNodeKind() == store::StoreConsts::textNode &&
             node->getChild(i+1)->getNodeKind() == store::StoreConsts::textNode)
         {
-          TextNode* mergedNode = reinterpret_cast<TextNode*>(node->getChild(i));
-
-          TextNodeMerge mergeInfo(node, i);
-          mergeInfo.theMergedNodes.push_back(mergedNode);
-          node->removeChild(i);
-
-          zstring newContent = mergedNode->getText();
+          // What can fail comes first: the text, the merge's record, its
+          // undo tree and the new text node after the merged ones.
+          zstring newContent;
           csize j = i;
 
           while (j < node->numChildren() &&
                  node->getChild(j)->getNodeKind() == store::StoreConsts::textNode)
           {
-            TextNode* mergedNode = reinterpret_cast<TextNode*>(node->getChild(j));
-            newContent += mergedNode->getText();
-            node->removeChild(j);
-            mergeInfo.theMergedNodes.push_back(mergedNode);
+            newContent += reinterpret_cast<TextNode*>(node->getChild(j))->getText();
+            ++j;
           }
 
-          theMergeList.push_back(mergeInfo);
+          theMergeList.push_back(TextNodeMerge(node, i));
+          TextNodeMerge& mergeInfo = theMergeList.back();
 
-          (void)GET_NODE_FACTORY().createTextNode(node->getTree(),
-                                                  node,
-                                                  false,
-                                                  i,
-                                                  newContent);
+          try
+          {
+            mergeInfo.theMergedNodes.reserve(j - i);
+            mergeInfo.theUndoTree = GET_NODE_FACTORY().createXmlTree();
+            (void)GET_NODE_FACTORY().createTextNode(node->getTree(),
+                                                    node,
+                                                    false,
+                                                    j,
+                                                    newContent);
+          }
+          catch (...)
+          {
+            if (mergeInfo.theUndoTree != NULL)
+              mergeInfo.theUndoTree->free();
+            theMergeList.pop_back();
+            throw;
+          }
+
+          for (csize k = i; k < j; ++k)
+          {
+            mergeInfo.theMergedNodes.push_back(node->getChild(i));
+            node->removeChild(i);
+          }
         }
       }
     }
@@ -3667,11 +3686,12 @@ void CollectionPul::undoUpdates()
     std::vector<TextNodeMerge>::reverse_iterator rend = theMergeList.rend();
     for (; rit != rend; ++rit)
     {
-      TextNodeMerge merge = (*rit);
+      TextNodeMerge& merge = (*rit);
       XmlNode* newTextNode = merge.theParent->getChild(merge.thePos);
       ZORBA_ASSERT(newTextNode->getNodeKind()== store::StoreConsts::textNode);
 
-      newTextNode->detach();
+      newTextNode->detachText(merge.theUndoTree);
+      merge.theUndoTree = NULL;
 
       for (csize j = 0; j < merge.theMergedNodes.size(); ++j)
         merge.theMergedNodes[j]->connect(merge.theParent, merge.thePos + j);

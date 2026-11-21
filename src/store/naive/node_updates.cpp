@@ -129,7 +129,7 @@ void NodeTypeInfo::transfer(NodeTypeInfo& other)
   Make the tree rooted at "this" node a subtree of the given parent node at the
   given position among the children of the parent node.
 ********************************************************************************/
-void XmlNode::attach(InternalNode* parent, csize pos) 
+void XmlNode::attach(InternalNode* parent, csize pos, AttachRecord& record)
 {
   ZORBA_ASSERT(theParent == NULL);
   ZORBA_ASSERT(parent != NULL);
@@ -210,12 +210,9 @@ void XmlNode::attach(InternalNode* parent, csize pos)
 
   oldTree->setRoot(NULL);
 
+  // The old tree keeps its type entries, for undoAttach().
   for (csize i = 0; i < moved.size(); ++i)
-  {
-    if (moved[i]->typeToMove() != NULL)
-      oldTree->removeType(moved[i]);
     moved[i]->setTreeInternal(newTree);
-  }
 
   theParent = parent;
 
@@ -248,31 +245,97 @@ void XmlNode::attach(InternalNode* parent, csize pos)
     }
   }
 
+  // baseUris keeps the old values, for undoAttach().
   for (csize i = 0; i < baseUris.size(); ++i)
   {
     AttributeNode* attr = baseUris[i].first;
 
     if (baseUris[i].second != NULL)
     {
-      attr->setTypedValue(baseUris[i].second);
+      store::Item_t value;
+      value.transfer(baseUris[i].second);
+      baseUris[i].second = attr->theTypedValue;
+      attr->setTypedValue(value);
     }
     else
     {
       ElementNode* elem = reinterpret_cast<ElementNode*>(attr->theParent);
-      csize attrPos;
-      attr->disconnect(attrPos);
-      attr->destroy(true);
+      attr->disconnect(record.theRemovedBaseUriPos);
+      record.theRemovedBaseUri = attr;
       elem->resetHaveBaseUri();
     }
   }
 
   ulong refcount = oldTree->getRefCount();
   oldTree->getRefCount() = 0;
-  oldTree->free();
+  record.theOldTree = oldTree;
+  record.theMoved.swap(moved);
+  record.theBaseUris.swap(baseUris);
 
   SYNC_CODE(newTree->getRCLock()->acquire());
   newTree->getRefCount() += refcount;
   SYNC_CODE(newTree->getRCLock()->release());
+}
+
+
+/*******************************************************************************
+  Undo attach(), from what it recorded and without allocating: undoing an
+  update cannot fail. The node goes back to its old tree, with its old types,
+  base URIs and namespace context. Node ids stay as attach() made them, as
+  they did with detach().
+********************************************************************************/
+void XmlNode::undoAttach(AttachRecord& record)
+{
+  ZORBA_ASSERT(theParent != NULL && record.theOldTree != NULL);
+
+  XmlTree* newTree = getTree();
+  XmlTree* oldTree = record.theOldTree;
+
+  SYNC_CODE(oldTree->getRCLock()->acquire());
+  SYNC_CODE(newTree->getRCLock()->acquire());
+
+  long refcount = 0;
+
+  for (csize i = 0; i < record.theMoved.size(); ++i)
+  {
+    XmlNode* node = record.theMoved[i];
+    refcount += node->theRefCount;
+    if (node->typeToMove() != NULL)
+      newTree->removeType(node);
+    node->setTreeInternal(oldTree);
+  }
+
+  for (csize i = 0; i < record.theBaseUris.size(); ++i)
+  {
+    if (record.theBaseUris[i].second != NULL)
+      record.theBaseUris[i].first->setTypedValue(record.theBaseUris[i].second);
+  }
+
+  if (record.theRemovedBaseUri != NULL)
+  {
+    record.theRemovedBaseUri->connect(static_cast<InternalNode*>(this),
+                                      record.theRemovedBaseUriPos);
+    static_cast<ElementNode*>(this)->setHaveBaseUri();
+    record.theRemovedBaseUri = NULL;
+  }
+
+  if (record.theOldNsContext != NULL)
+    static_cast<ElementNode*>(this)->theNsContext.transfer(
+      record.theOldNsContext);
+
+  if (getNodeKind() == store::StoreConsts::attributeNode)
+    theParent->removeAttr(this);
+  else
+    theParent->removeChild(this);
+  theParent = NULL;
+
+  oldTree->setRoot(this);
+  record.theOldTree = NULL;
+
+  newTree->getRefCount() -= refcount;
+  oldTree->getRefCount() += refcount;
+  SYNC_CODE(newTree->getRCLock()->release());
+  SYNC_CODE(oldTree->getRCLock()->release());
 }
 
 
@@ -630,32 +693,69 @@ void XmlNode::detach()
 
 
 /*******************************************************************************
-  This method is used by the undo of UpdInsertChildren and UpdReplaceChild.
+  Undo the first numApplied attaches of upd, last first.
 ********************************************************************************/
-void InternalNode::removeChildren(csize pos, csize numChildren)
+void InternalNode::undoAttaches(UpdatePrimitive& upd, csize numApplied)
 {
-  ZORBA_FATAL(pos + numChildren <= this->numChildren(), "");
-
-  for (csize i = 0; i < numChildren; ++i)
+  for (csize i = numApplied; i-- > 0; )
   {
-    XmlNode* child = getChild(pos);
-    child->detach();
+    AttachRecord& record = upd.theAttachRecords[i];
+    record.theMoved[0]->undoAttach(record);
   }
 }
 
 
 /*******************************************************************************
-  This method is used by the undo of UpdInsertAttributes, and UpdReplaceAttribute.
+  Detach a text node into tree, an empty tree made beforehand: no allocation.
 ********************************************************************************/
-void ElementNode::removeAttributes(csize pos, csize numAttrs)
+void XmlNode::detachText(XmlTree* tree)
 {
-  ZORBA_FATAL(pos + numAttrs <= this->numAttrs(), "");
+  ZORBA_ASSERT(getNodeKind() == store::StoreConsts::textNode &&
+               !static_cast<TextNode*>(this)->isTyped());
 
-  for (csize i = 0; i < numAttrs; ++i)
-  {
-    XmlNode* attr = getAttr(pos);
-    attr->detach();
-  }
+  XmlTree* oldTree = getTree();
+
+  SYNC_CODE(oldTree->getRCLock()->acquire());
+
+  setTreeInternal(tree);
+  tree->setRoot(this);
+
+  theParent->removeChild(this);
+  theParent = NULL;
+
+  oldTree->getRefCount() -= theRefCount;
+  SYNC_CODE(oldTree->getRCLock()->release());
+
+  tree->getRefCount() += theRefCount;
+  if (tree->getRefCount() == 0)
+    tree->free();
+}
+
+
+/*******************************************************************************
+
+********************************************************************************/
+AttachRecord::AttachRecord(AttachRecord&& other) noexcept
+  :
+  theOldTree(other.theOldTree),
+  theRemovedBaseUri(other.theRemovedBaseUri),
+  theRemovedBaseUriPos(other.theRemovedBaseUriPos)
+{
+  theMoved.swap(other.theMoved);
+  theBaseUris.swap(other.theBaseUris);
+  theOldNsContext.transfer(other.theOldNsContext);
+  other.theOldTree = NULL;
+  other.theRemovedBaseUri = NULL;
+}
+
+
+AttachRecord::~AttachRecord()
+{
+  if (theOldTree != NULL)
+    theOldTree->free();
+
+  if (theRemovedBaseUri != NULL)
+    theRemovedBaseUri->destroy(false);
 }
 
 
@@ -952,19 +1052,22 @@ void InternalNode::insertChildren(UpdInsertChildren& upd, csize pos)
   if (upd.theRemoveType)
     removeType(upd);
 
+  upd.theAttachRecords.resize(numNewChildren);
+
   // Insert the new children without merging text nodes
   for (ulong i = 0; i < numNewChildren; ++i)
   {
     XmlNode* child = BASE_NODE(upd.theNewChildren[i]);
 
-    child->attach(this, pos + i);
+    child->attach(this, pos + i, upd.theAttachRecords[i]);
     
     if (getNodeKind() == store::StoreConsts::elementNode &&
         child->getNodeKind() == store::StoreConsts::elementNode &&
         upd.thePul->inheritNSBindings())
     {
-      static_cast<ElementNode*>(child)->
-      setNsContext(static_cast<ElementNode*>(this)->getNsContext());
+      ElementNode* elem = static_cast<ElementNode*>(child);
+      upd.theAttachRecords[i].theOldNsContext = elem->theNsContext;
+      elem->setNsContext(static_cast<ElementNode*>(this)->getNsContext());
     }
 
     upd.theNumApplied++;
@@ -1030,7 +1133,7 @@ void InternalNode::undoInsertChildren(UpdInsertChildren& upd)
 
   ZORBA_FATAL(pos < numChildren(), "");
 
-  removeChildren(pos, upd.theNumApplied);
+  undoAttaches(upd, upd.theNumApplied);
 
   restoreType(upd.theTypeUndoList);
 }
@@ -1045,6 +1148,8 @@ void ElementNode::insertAttributes(UpdInsertAttributes& upd)
   csize numNewAttrs = upd.theNewAttrs.size();
 
   removeType(upd);
+
+  upd.theAttachRecords.resize(numNewAttrs);
 
   for (csize i = 0; i < numNewAttrs; i++)
   {
@@ -1067,7 +1172,7 @@ void ElementNode::insertAttributes(UpdInsertAttributes& upd)
       upd.theNewBindings.push_back(attr->theName);
     }
 
-    attr->attach(this, numAttrs + i);
+    attr->attach(this, numAttrs + i, upd.theAttachRecords[i]);
 
     if (!upd.thePul->inheritNSBindings())
     {
@@ -1097,7 +1202,7 @@ void ElementNode::undoInsertAttributes(UpdInsertAttributes& upd)
 
   ZORBA_FATAL(pos < numAttrs(), "");
 
-  removeAttributes(pos, upd.theNumApplied);
+  undoAttaches(upd, upd.theNumApplied);
 
   csize numBindings = upd.theNewBindings.size();
   for (csize i = 0; i < numBindings; ++i)
@@ -1126,6 +1231,8 @@ void ElementNode::replaceAttribute(UpdReplaceAttribute& upd)
 
   csize numNewAttrs = upd.theNewAttrs.size();
 
+  upd.theAttachRecords.resize(numNewAttrs);
+
   for (csize i = 0; i < numNewAttrs; ++i)
   {
     AttributeNode* attr = static_cast<AttributeNode*>(upd.theNewAttrs[i].getp());
@@ -1146,7 +1253,7 @@ void ElementNode::replaceAttribute(UpdReplaceAttribute& upd)
     if (newBinding)
       upd.theNewBindings.push_back(attr->theName);
   
-    attr->attach(this, pos + i);
+    attr->attach(this, pos + i, upd.theAttachRecords[i]);
 
     if (newBinding && !upd.thePul->inheritNSBindings())
     {
@@ -1188,7 +1295,7 @@ void ElementNode::restoreAttribute(UpdReplaceAttribute& upd)
 
   ZORBA_FATAL(pos < numAttrs(), "");
 
-  removeAttributes(pos, upd.theNumApplied);
+  undoAttaches(upd, upd.theNumApplied);
 
   csize numBindings = upd.theNewBindings.size();
   for (csize i = 0; i < numBindings; ++i)
@@ -1251,19 +1358,22 @@ void InternalNode::replaceChild(UpdReplaceChild& upd)
     XmlNode* rsib = (pos < numChildren() - 1 ? getChild(pos+1) : NULL);
     XmlNode* lsib = (pos > 0 ? getChild(pos-1) : NULL);
 
+    upd.theAttachRecords.resize(numNewChildren);
+
     // Insert the new children without merging text nodes
     for (csize i = 0; i < numNewChildren; ++i)
     {
       XmlNode* child = BASE_NODE(upd.theNewChildren[i]);
 
-      child->attach(this, pos + i);
+      child->attach(this, pos + i, upd.theAttachRecords[i]);
 
       if (getNodeKind() == store::StoreConsts::elementNode &&
           child->getNodeKind() == store::StoreConsts::elementNode &&
           upd.thePul->inheritNSBindings())
       {
-        static_cast<ElementNode*>(child)->
-          setNsContext(static_cast<ElementNode*>(this)->getNsContext());
+        ElementNode* elem = static_cast<ElementNode*>(child);
+        upd.theAttachRecords[i].theOldNsContext = elem->theNsContext;
+        elem->setNsContext(static_cast<ElementNode*>(this)->getNsContext());
       }
       
       upd.theNumApplied++;
@@ -1313,7 +1423,7 @@ void InternalNode::restoreChild(UpdReplaceChild& upd)
 
     ZORBA_ASSERT(getChild(pos) == upd.theNewChildren[0].getp());
 
-    removeChildren(pos, upd.theNumApplied);
+    undoAttaches(upd, upd.theNumApplied);
 
     child->connect(this, pos);
   }
