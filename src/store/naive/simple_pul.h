@@ -430,7 +430,8 @@ public:
         bool haveValue,
         bool haveEmptyValue,
         bool haveTypedValue,
-        bool isInSubstitutionGroup);
+        bool isInSubstitutionGroup,
+        bool isNilled);
 
   void addSetElementType(
         const QueryLoc* aQueryLoc,
@@ -440,7 +441,8 @@ public:
         bool                         haveValue,
         bool                         haveEmptyValue,
         bool                         haveTypedValue,
-        bool                         isInSubstitutionGroup);
+        bool                         isInSubstitutionGroup,
+        bool                         isNilled);
 
   void addSetAttributeType(
         const QueryLoc* aQueryLoc,

@@ -136,12 +136,12 @@ bool BasicItemFactory::createStructuralAnyURI(
     ulong collectionId,
     const TreeId& treeId,
     store::StoreConsts::NodeKind nodeKind,
-    const OrdPath& ordPath)
+    const NodeLabel& label)
 {
   ZORBA_FATAL(nodeKind,"Unexpected node kind");
 
   result = new StructuralAnyUriItem(store::XS_ANY_URI,
-                                    collectionId, treeId, nodeKind, ordPath);
+                                    collectionId, treeId, nodeKind, label);
   return true;
 }
 
@@ -1423,7 +1423,8 @@ bool BasicItemFactory::createElementNode(
     bool                        haveEmptyValue,
     const store::NsBindings&    localBindings,
     zstring&                    baseUri,
-    bool                        isInSubstitutionGroup)
+    bool                        isInSubstitutionGroup,
+    bool                        isNilled)
 {
   XmlTree* xmlTree = NULL;
   ElementNode* n = NULL;
@@ -1457,6 +1458,9 @@ bool BasicItemFactory::createElementNode(
                         isInSubstitutionGroup,
                         &localBindings,
                         baseUri);
+
+    if (isNilled)
+      n->setNilled();
   }
   catch (...)
   {

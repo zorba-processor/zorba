@@ -47,7 +47,7 @@
 #include "zorbatypes/schema_types.h"
 
 #include "diagnostics/xquery_diagnostics.h"
-#include "ordpath.h"
+#include "node_label.h"
 
 
 namespace zorba
@@ -750,7 +750,7 @@ protected:
   ulong                        theCollectionId;
   TreeId                       theTreeId;
   store::StoreConsts::NodeKind theNodeKind;
-  OrdPath                      theOrdPath;
+  NodeLabel                    theLabel;
    
   // The value is computed lazily when needed.
   // The empty string is used if it has not been computed yet.
@@ -876,7 +876,7 @@ protected:
       ulong collectionId,
       const TreeId& treeId,
       store::StoreConsts::NodeKind nodeKind,
-      const OrdPath& ordPath);
+      const NodeLabel& label);
 
   StructuralAnyUriItem() 
     :

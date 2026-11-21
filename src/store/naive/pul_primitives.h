@@ -712,6 +712,10 @@ public:
 
   theIsInSubstitutionGroup:
   -------------------------
+
+  theIsNilled:
+  ------------
+  True if validation found xsi:nil true and a nillable element declaration.
 ********************************************************************************/
 class UpdSetElementType : public UpdatePrimitive
 {
@@ -727,6 +731,7 @@ protected:
   bool                     theHaveTypedTypedValue;
   bool                     theHaveListTypedValue;
   bool                     theIsInSubstitutionGroup;
+  bool                     theIsNilled;
 
   store::Item_t            theOldTypeName;
   store::Item_t            theOldTypedValue;
@@ -736,6 +741,7 @@ protected:
   bool                     theOldHaveTypedTypedValue;
   bool                     theOldHaveListTypedValue;
   bool                     theOldIsInSubstitutionGroup;
+  bool                     theOldIsNilled;
 
 
   UpdSetElementType(
@@ -748,14 +754,16 @@ protected:
         bool            haveEmptyTypedValue,
         bool            haveTypedTypedValue,
         bool            haveListTypedValue,
-        bool            isInSubstitutionGroup)
+        bool            isInSubstitutionGroup,
+        bool            isNilled)
     :
     UpdatePrimitive(pul, aLoc, target),
     theHaveTypedValue(haveTypedValue),
     theHaveEmptyTypedValue(haveEmptyTypedValue),
     theHaveTypedTypedValue(haveTypedTypedValue),
     theHaveListTypedValue(haveListTypedValue),
-    theIsInSubstitutionGroup(isInSubstitutionGroup)
+    theIsInSubstitutionGroup(isInSubstitutionGroup),
+    theIsNilled(isNilled)
   {
     theTypeName.transfer(typeName);
     theTypedValue.transfer(typedValue);

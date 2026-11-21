@@ -51,6 +51,21 @@ declare %an:general-equality %an:manual index m:UntypedHash
 on nodes dml:collection(xs:QName("m:u"))//e
 by fn:data(./@v) as xs:untypedAtomic*;
 
+(: Untyped keys, one of them not castable to xs:double. :)
+declare collection m:ua as node()*;
+
+declare %an:general-equality %an:manual index m:AnyHash
+on nodes dml:collection(xs:QName("m:ua"))//e
+by fn:data(./@v);
+
+declare %an:general-range %an:manual index m:AnyTree
+on nodes dml:collection(xs:QName("m:ua"))//e
+by fn:data(./@v);
+
+declare %an:general-equality %an:manual index m:UntypedKeysHash
+on nodes dml:collection(xs:QName("m:ua"))//e
+by fn:data(./@v) as xs:untypedAtomic*;
+
 (: The same values as xs:yearMonthDuration keys and as xs:duration keys, in
    range indexes without a key type. :)
 declare collection m:ym as node()*;
@@ -62,6 +77,83 @@ by xs:yearMonthDuration(./@v);
 declare %an:general-range %an:manual index m:DurationTree
 on nodes dml:collection(xs:QName("m:ym"))//e
 by xs:duration(./@v);
+
+(: The same values in range indexes whose key type is xs:duration, as
+   xs:duration keys and as xs:yearMonthDuration keys. :)
+declare %an:general-range %an:manual index m:DurationTypedTree
+on nodes dml:collection(xs:QName("m:ym"))//e
+by xs:duration(./@v) as xs:duration*;
+
+declare %an:general-range %an:manual index m:YearMonthTypedTree
+on nodes dml:collection(xs:QName("m:ym"))//e
+by xs:yearMonthDuration(./@v) as xs:duration*;
+
+(: One key class per collection, in indexes without a key type. :)
+declare collection m:ks as node()*;
+
+declare %an:general-equality %an:manual index m:StringKeysHash
+on nodes dml:collection(xs:QName("m:ks"))//e
+by fn:string(./@v);
+
+declare %an:general-range %an:manual index m:StringKeysTree
+on nodes dml:collection(xs:QName("m:ks"))//e
+by fn:string(./@v);
+
+declare collection m:kn as node()*;
+
+declare %an:general-equality %an:manual index m:NumberKeysHash
+on nodes dml:collection(xs:QName("m:kn"))//e
+by xs:integer(./@v);
+
+declare %an:general-range %an:manual index m:NumberKeysTree
+on nodes dml:collection(xs:QName("m:kn"))//e
+by xs:integer(./@v);
+
+declare collection m:kb as node()*;
+
+declare %an:general-equality %an:manual index m:BooleanKeysHash
+on nodes dml:collection(xs:QName("m:kb"))//e
+by xs:boolean(./@v);
+
+declare %an:general-range %an:manual index m:BooleanKeysTree
+on nodes dml:collection(xs:QName("m:kb"))//e
+by xs:boolean(./@v);
+
+declare collection m:kd as node()*;
+
+declare %an:general-equality %an:manual index m:DateKeysHash
+on nodes dml:collection(xs:QName("m:kd"))//e
+by xs:date(./@v);
+
+declare %an:general-range %an:manual index m:DateKeysTree
+on nodes dml:collection(xs:QName("m:kd"))//e
+by xs:date(./@v);
+
+declare collection m:ky as node()*;
+
+declare %an:general-equality %an:manual index m:YearMonthKeysHash
+on nodes dml:collection(xs:QName("m:ky"))//e
+by xs:yearMonthDuration(./@v);
+
+declare %an:general-range %an:manual index m:YearMonthKeysTree
+on nodes dml:collection(xs:QName("m:ky"))//e
+by xs:yearMonthDuration(./@v);
+
+(: xs:yearMonthDuration keys in a range index whose key type is
+   xs:duration. :)
+declare %an:general-range %an:manual index m:YearMonthKeysTypedTree
+on nodes dml:collection(xs:QName("m:ky"))//e
+by xs:yearMonthDuration(./@v) as xs:duration*;
+
+(: Value range indexes whose key type is xs:duration, with xs:duration keys
+   and with xs:yearMonthDuration keys. :)
+declare %an:value-range %an:manual index m:DurationValueTree
+on nodes dml:collection(xs:QName("m:ym"))//e
+by xs:duration(./@v) as xs:duration;
+
+declare %an:value-range %an:manual index m:YearMonthValueTree
+on nodes dml:collection(xs:QName("m:ym"))//e
+by xs:yearMonthDuration(./@v) as xs:duration;
 
 declare %an:sequential function m:create($collection as xs:QName,
                                          $content as node()*,
@@ -83,11 +175,15 @@ declare function m:type($key as xs:anyAtomicType) as xs:string
   typeswitch ($key)
   case xs:string return "string"
   case xs:untypedAtomic return "untyped"
+  case xs:double return "double"
+  case xs:float return "float"
   case xs:integer return "integer"
   case xs:decimal return "decimal"
   case xs:yearMonthDuration return "yearMonthDuration"
   case xs:dayTimeDuration return "dayTimeDuration"
   case xs:duration return "duration"
+  case xs:date return "date"
+  case xs:boolean return "boolean"
   default return "other"
 };
 

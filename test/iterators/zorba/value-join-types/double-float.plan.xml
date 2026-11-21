@@ -63,24 +63,27 @@
         <SingletonIterator value="xs:float(0.5)"/>
       </FnConcatIterator>
     </ForVariable>
-    <ForVariable name="$$opt_temp_1">
+    <LetVariable name="$$opt_temp_1" materialize="true">
       <HoistIterator>
         <PromoteIterator type="xs:double">
           <ForVarIterator varname="k"/>
         </PromoteIterator>
       </HoistIterator>
-    </ForVariable>
+    </LetVariable>
     <ReturnClause>
       <FnCountIterator>
         <FLWORIterator>
           <ForVariable name="n">
             <TryCatchIterator>
-              <ProbeIndexPointValueIterator>
-                <SingletonIterator value="xs:QName(,,tempIndex0)"/>
-                <UnhoistIterator>
-                  <ForVarIterator varname="$$opt_temp_1"/>
-                </UnhoistIterator>
-              </ProbeIndexPointValueIterator>
+              <FnConcatIterator>
+                <LetVarIterator varname="$$opt_temp_4"/>
+                <ProbeIndexPointValueIterator>
+                  <SingletonIterator value="xs:QName(,,tempIndex0)"/>
+                  <UnhoistIterator>
+                    <LetVarIterator varname="$$opt_temp_1"/>
+                  </UnhoistIterator>
+                </ProbeIndexPointValueIterator>
+              </FnConcatIterator>
               <UnhoistIterator>
                 <LetVarIterator varname="$$opt_temp_0"/>
               </UnhoistIterator>
@@ -95,7 +98,7 @@
                   </FnDataIterator>
                 </CastIterator>
                 <UnhoistIterator>
-                  <ForVarIterator varname="$$opt_temp_1"/>
+                  <LetVarIterator varname="$$opt_temp_1"/>
                 </UnhoistIterator>
               </TypedValueCompareIterator_DOUBLE>
             </FnBooleanIterator>
