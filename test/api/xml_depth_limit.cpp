@@ -283,6 +283,36 @@ void check_operation(const Operation& op, uint64_t n)
 
 ///////////////////////////////////////////////////////////////////////////////
 
+#if defined(__SANITIZE_ADDRESS__)
+# define ZORBA_TEST_ASAN 1
+#elif defined(__has_feature)
+# if __has_feature(address_sanitizer)
+#  define ZORBA_TEST_ASAN 1
+# endif
+#endif
+
+// Runs a query on the main thread, or under AddressSanitizer on a 64 MiB
+// thread (the main thread's stack under ctest on macOS): its frames take
+// three to five times the stack, so the 8 MiB of a Linux main thread do not
+// hold ten thousand levels of a copy or a validation.
+Outcome run_on_main_stack(const std::string& aQuery, Zorba_opt_level_t aLevel)
+{
+#if defined(ZORBA_TEST_ASAN) && defined(ZORBA_TEST_THREADS)
+  Outcome o;
+  try
+  {
+    execute_on_thread(compile(aQuery, aLevel), o, 64u * 1024 * 1024);
+  }
+  catch (ZorbaException const& e)
+  {
+    caught(e, o);
+  }
+  return o;
+#else
+  return run(aQuery, aLevel);
+#endif
+}
+
 // Ten thousand levels: within the stack of every supported platform for
 // every operation.
 void test_levels()
@@ -291,7 +321,7 @@ void test_levels()
   {
     for (Zorba_opt_level_t lLevel : theLevels)
     {
-      Outcome const o = run(operation_query(op, LEVELS), lLevel);
+      Outcome const o = run_on_main_stack(operation_query(op, LEVELS), lLevel);
       std::cout << "  " << LEVELS << " levels, O" << static_cast<int>(lLevel) << ", "
                 << op.name << ": " << o << std::endl;
       CHECK(o.ok || not_in_build(o));

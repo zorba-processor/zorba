@@ -15,6 +15,7 @@
  */
 
 #include <algorithm>
+#include <memory>
 
 #include "diagnostics/xquery_diagnostics.h"
 #include "diagnostics/util_macros.h"
@@ -190,8 +191,9 @@ CollectionPul* PULImpl::getCollectionPul(const store::Item* target)
   }
   else
   {
-    theNoCollectionPul = new CollectionPul(this, NULL);
-    theCollectionPuls.push_back(theNoCollectionPul);
+    auto pul = std::make_unique<CollectionPul>(this, nullptr);
+    theCollectionPuls.push_back(pul.get());
+    theNoCollectionPul = pul.release();
     theCollectionPulsMap[NULL] = theCollectionPuls.size() - 1;
     return theNoCollectionPul;
   }
@@ -212,8 +214,6 @@ CollectionPul* PULImpl::getCollectionPulByName(
 
   CollectionPulMap::iterator ite = theCollectionPulsMap.find(collName);
 
-  theLastCollection = collName;
-
   if (ite != theCollectionPulsMap.end())
   {
     theLastPul = theCollectionPuls[ite->second];
@@ -223,12 +223,14 @@ CollectionPul* PULImpl::getCollectionPulByName(
     Collection* collection = static_cast<Collection*>
     (GET_STORE().getCollection(collName, isDynamic).getp());
 
-    theLastPul = new CollectionPul(this, collection);
-
-    theCollectionPuls.push_back(theLastPul);
+    auto pul = std::make_unique<CollectionPul>(this, collection);
+    theCollectionPuls.push_back(pul.get());
+    theLastPul = pul.release();
 
     theCollectionPulsMap[collName] = theCollectionPuls.size() - 1;
   }
+
+  theLastCollection = collName;
 
   return theLastPul;
 }
@@ -1196,23 +1198,32 @@ void PULImpl::addJSONObjectInsert(
       return;
     }
 
-    UpdatePrimitive* upd =  GET_PUL_FACTORY().
-    createUpdJSONObjectInsert(pul, loc, target, names, values);
+    std::unique_ptr<UpdatePrimitive> upd(GET_PUL_FACTORY().
+      createUpdJSONObjectInsert(pul, loc, target, names, values));
 
-    pul->theJSONObjectInsertList.push_back(upd);
-
-    updates->push_back(upd);
+    updates->reserve(updates->size() + 1);
+    pul->theJSONObjectInsertList.push_back(upd.get());
+    updates->push_back(upd.release());
   }
   else
   {
-    UpdatePrimitive* upd =  GET_PUL_FACTORY().
-    createUpdJSONObjectInsert(pul, loc, target, names, values);
+    std::unique_ptr<UpdatePrimitive> upd(GET_PUL_FACTORY().
+      createUpdJSONObjectInsert(pul, loc, target, names, values));
 
-    pul->theJSONObjectInsertList.push_back(upd);
+    std::unique_ptr<NodeUpdates> newUpdates(new NodeUpdates(1, upd.get()));
 
-    updates = new NodeUpdates(1);
-    (*updates)[0] = upd;
-    pul->theNodeToUpdatesMap.insert(obj, updates);
+    pul->theJSONObjectInsertList.push_back(upd.get());
+    try
+    {
+      pul->theNodeToUpdatesMap.insert(obj, newUpdates.get());
+    }
+    catch (...)
+    {
+      pul->theJSONObjectInsertList.pop_back();
+      throw;
+    }
+    (void)newUpdates.release(); // owned by theNodeToUpdatesMap now
+    (void)upd.release(); // owned by theJSONObjectInsertList now
   }
 }
 
