@@ -210,6 +210,9 @@ protected:
 
   XmlNode                 * theRootNode;
 
+  // The next tree that free() has still to destroy on this thread.
+  XmlTree                 * theNextToFree = NULL;
+
 #ifdef DATAGUIDE
   GuideNode               * theDataGuideRootNode;
 #endif
@@ -531,6 +534,13 @@ public:
   uint32_t hash(long timezone = 0, const XQPCollator* aCollation = 0) const;
 
   void getBaseURI(zstring& uri) const;
+
+  bool getLocalBaseURI(zstring& uri) const
+  {
+    bool local = false;
+    getBaseURIInternal(uri, local);
+    return local;
+  }
 
   bool getEBV() const;
 
