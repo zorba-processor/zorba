@@ -18,7 +18,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 | Compiler warnings | 1,897 to 5,949 per platform | Dozens or fewer |
 | Build options tested | Full build only; other options had rotted | `embedded`, `embedded-noicu`, `full-nopch`, debugger in CI; XQueryX and big-integer profiles |
 | Test timeouts | Never enforced (`NORMAL_TIMEOUT_VALUE` macro bug) | Enforced |
-| W3C conformance | QT3 harness present but inactive | Weekly QT3 run in CI: 26,729 of 27,053 applicable test cases pass (98.8%) |
+| W3C conformance | QT3 harness present but inactive | Weekly QT3 run in CI: 26,730 of 27,053 applicable test cases pass (98.8%) |
 | Performance | Not measured | XMark and JSONiq benchmarks with A/B comparison; cold build 795 s → 376 s; hash join example 22 s → 0.5 s |
 | Toolchain | `auto_ptr`, TR1, CMake 2.8-era checks, Flex 2.5.35 | C++23, CMake 3.28, Bison 3.8, Flex 2.6.4, ICU 78, libxml2 2.15, Xerces-C 3.3 |
 
@@ -53,6 +53,44 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - The private member `add_param` of `zorba::internal::diagnostic::parameters`,
   which the inline templates of `<zorba/internal/diagnostic.h>` call, takes a
   second argument: a module built against the older header must be rebuilt. ([#180](https://github.com/zorba-processor/zorba/pull/180))
+- `fetch:content` and `fetch:content-binary` are now declared
+  nondeterministic. A user function that calls one of them must be declared
+  `%an:nondeterministic`; otherwise compiling a query that calls the user
+  function raises `zerr:ZXQP0040`. ([#253](https://github.com/zorba-processor/zorba/pull/253))
+- Restrict `zorba::SmartPtr<T>::operator=(SmartPtr<otherT> const&)` to types where `otherT*` converts implicitly to `T*`. Assigning a `SmartPtr` of a base or unrelated type to a `SmartPtr<T>` no longer compiles; it used to apply an unchecked `static_cast`. Embedders that downcast this way must cast the raw pointer explicitly, for example `derived = static_cast<Derived*>(base.get());`. ([#254](https://github.com/zorba-processor/zorba/pull/254))
+- A function that calls a function declared `%an:nondeterministic` must now
+  itself be declared `%an:nondeterministic`, otherwise compilation fails with
+  ZXQP0040. Before, the annotation was overwritten by inference when the body
+  of the annotated function called no nondeterministic function, and the caller
+  compiled. ([#258](https://github.com/zorba-processor/zorba/pull/258))
+- A FLWOR expression with a direct call of a sequential function runs each iteration of a `for` clause complete before the next, as a call through a function item does: `for $i in 1 to 3 let $a := local:bump() let $b := local:bump() return ($a, $b)` gives `1 2 3 4 5 6` instead of `1 4 2 5 3 6`, at every optimization level. The later clauses and the return clause run per tuple, so a `let`, `where` or `order by` reads the state left by the earlier clauses of its own iteration. The domain of every `for` clause of such an expression gives its whole binding sequence first (XQuery Scripting Extension 1.0, 6.7), per tuple of the clauses before it; the `no-materialization` pragma keeps the domains lazy, as before. ([#305](https://github.com/zorba-processor/zorba/pull/305))
+- A positional predicate, `fn:head`, `fn:exists` or `fn:subsequence` over a loop with a direct sequential call stops after the items it needs, as over a loop with a call through a function item: `((for $i in 1 to 3 return local:bump())[1], $g)` gives `1 1` instead of `1 3`. A call of a sequential function written directly as their argument still runs to its end; the decision is taken on the query as written, before the optimizer. ([#305](https://github.com/zorba-processor/zorba/pull/305))
+- `fn:parse-xml`, `fn:parse-xml-fragment`, `x:parse` and `x:parse-html` raise
+  `err:XPDY0130` (XQuery 3.1, implementation-dependent limit exceeded) instead
+  of `FODC0006` when the input exceeds a limit of the parser that is not
+  memory: element nesting deeper than 256 levels (`x:parse-html`, and `x:parse`
+  with DTD validation), the entity amplification factor (libxml2 2.11 and
+  later), and libxml2's other resource limits (libxml2 2.13 and later). The
+  message names the limit and its value, e.g. `implementation limit exceeded:
+  element nesting depth of 256`; the line and column in the parsed string are
+  the error's data location. Well-formedness errors and running out of memory
+  are reported as before. The error record of `dir:` functions for such a file
+  carries `XPDY0130`. ([#337](https://github.com/zorba-processor/zorba/pull/337))
+- The occurrence indicator of a static collection's declared type is checked
+  when the collection is read: `dml:collection` raises `err:XPTY0004` when
+  the number of items in the collection does not match it (for example two
+  elements in a collection declared `as element(*)`), with a message naming
+  the collection, its size and its declared type, at every optimization
+  level. Before, the indicator was not checked, and O1/O2 rewrote queries on
+  it (a `count` folded to 1, a `let` turned into a `for`), so results differed
+  from O0. Inserting is not checked. Declarations that relied on the indicator
+  being ignored need `*`. ([#346](https://github.com/zorba-processor/zorba/pull/346))
+- `fn:doc` on a document that exceeds a parser limit (element nesting depth
+  of 256 with DTD validation, entity amplification) raises
+  `err:XPDY0130` (implementation limit exceeded), as `fn:parse-xml` and
+  `x:parse` do, instead of `FODC0002`. The message names the limit; the data
+  location is the document URI, line and column. `FODC0002` stays for
+  documents that are missing, unreadable or not well-formed. ([#348](https://github.com/zorba-processor/zorba/pull/348))
 
 ### Security
 
@@ -345,6 +383,45 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
   it with passed tests removed and each line cut to 1000 characters. ([#182](https://github.com/zorba-processor/zorba/pull/182))
 - The sanitizer workflow now fails when UBSan reports undefined behavior at
   one or more sites. Before, those reports only appeared in the summary. ([#182](https://github.com/zorba-processor/zorba/pull/182))
+- The release notes of a prerelease list only the changes since the previous prerelease of the same version, with a link to the full `CHANGELOG.md`; the first prerelease and the final release list the whole section, and notes over 120,000 characters link to `CHANGELOG.md` instead. ([#194](https://github.com/zorba-processor/zorba/pull/194))
+- `idml:keys` on a general equality index without a declared key type lists
+  an untyped key that is an integer with type `xs:double` (for example
+  `xs:double 1.0E11`; before, `xs:long`), and lists `xs:float` keys apart
+  from `xs:double` keys. ([#241](https://github.com/zorba-processor/zorba/pull/241))
+- A `%an:unique` index whose `xs:string`, `xs:anyURI` or untyped key has a
+  collation other than the codepoint collation, from its `collation` clause
+  or from the default collation of its module, now rejects keys that the
+  collation makes equal, such as `"x"` and `"X"` under a collation that ignores
+  case; before, every index compared keys by codepoint and accepted them. ([#269](https://github.com/zorba-processor/zorba/pull/269))
+- The keys of an index declared `as xs:anyURI` or `as xs:untypedAtomic`, and of
+  a general index without a key type, take the default collation of the module
+  that declares the index, as `xs:string` keys do. ([#269](https://github.com/zorba-processor/zorba/pull/269))
+- The location hint of an `import schema` whose namespace is already loaded
+  (by an earlier import or a schema it imported) is disregarded; the namespace
+  keeps the components loaded first, and schema documents named only by that
+  hint are not read. ([#273](https://github.com/zorba-processor/zorba/pull/273))
+- When an index probe replaces a `for` clause and leaves a FLWOR that only
+  returns the probed items, the optimizer now drops that FLWOR, in function
+  bodies and in the main module alike. ([#296](https://github.com/zorba-processor/zorba/pull/296))
+- At O1 and O2, an expression that reads an assignable variable, a nondeterministic function, `fn:doc`, `fn:collection` or a store function is no longer moved out of a sequential FLWOR expression. ([#305](https://github.com/zorba-processor/zorba/pull/305))
+- `zorba-mcp --help` and `bin/mcp/README.md` list as the ways a library ends the
+  server when memory runs out only Xerces-C releasing a schema (abort) and ICU
+  compiling a regular expression (SIGSEGV). The allocation-failure sweeps of the
+  MCP server tests allow only those crashes. ([#313](https://github.com/zorba-processor/zorba/pull/313))
+- The `FODC0006` error of `fn:parse-xml`, `fn:parse-xml-fragment`, `x:parse`
+  and `x:parse-html` names the code of the parser error it reports, before that
+  error's message: `invalid content passed to fn:parse-xml(): [zerr:ZSTR0021]:
+  ...`. The line and column in the parsed string stay in the error's data
+  location. ([#315](https://github.com/zorba-processor/zorba/pull/315))
+- The `zorba` image and the Ubuntu 24.04 builder image use ICU 78.3 and
+  libxml2 2.15.4, in `/usr/local`, instead of Ubuntu's ICU 74 and libxml2
+  2.9.14. ([#344](https://github.com/zorba-processor/zorba/pull/344))
+- The committed XQuery and JSONiq scanners and `FlexLexer.h` are generated
+  with flex 2.7.1. The scanner reads its input in 8 KiB chunks into a
+  16 KiB buffer on every platform, as before; it still grows for longer
+  tokens. flex 2.7.1 keeps the position of the character it replaces to end
+  `yytext`, so input read after a token is restored in place, and a scanner
+  stops the build if its `FlexLexer.h` comes from another flex version. ([#353](https://github.com/zorba-processor/zorba/pull/353))
 
 ### Fixed
 
@@ -724,6 +801,759 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
   item: the iteration read storage the update had freed or moved, and
   returned wrong items or crashed. It now returns the contents the item had
   when the iteration started, the same result as at optimization level O0. ([#189](https://github.com/zorba-processor/zorba/pull/189))
+- Fix an invalid read in the optimizer after it rewrites a `group by`
+  clause that sees at most one tuple into `let` clauses: the domain of a
+  grouping or non-grouping variable was then read as if its clause were
+  still a `group by` clause. ([#192](https://github.com/zorba-processor/zorba/pull/192))
+- Fix `fn:parse-xml` and `fn:parse-xml-fragment` reporting an internal
+  assertion when the input does not convert from its declared encoding and
+  libxml2 (2.9) stops the parser without an error: the parse is now reported
+  as a malformed document (`err:FODC0006`). ([#193](https://github.com/zorba-processor/zorba/pull/193))
+- Fix the automatic index rewrite reading a predicate after removing it from
+  its working list: the rule took the position of the last matched `where`
+  clause from the next predicate, so an index that applies was not used when
+  a later `where` clause followed a `count` or `group by` clause. Query
+  results do not change. ([#197](https://github.com/zorba-processor/zorba/pull/197))
+- Fix JSONiq array updates on one array in one pending update list: an insert
+  and a replace (or delete) at the same position now both refer to the
+  original member at that position, as the JSONiq update facility requires;
+  before, the replace could hit the newly inserted member. The order in which
+  array updates are applied is also now a well-defined ordering instead of an
+  invalid sort comparator. ([#199](https://github.com/zorba-processor/zorba/pull/199))
+- Fix wrong results at O1 and O2 when `reflection:eval` or an invoke function
+  runs code with a side effect: an expression beside it in a loop was moved out
+  of the loop, and a `let` holding it was removed when its variable was unused.
+  An eval now counts as a call that can have a side effect: the query that
+  contains it and the query it compiles move nothing out of loops, and a `for`
+  domain with an eval gives its whole binding sequence first, at every level. ([#200](https://github.com/zorba-processor/zorba/pull/200))
+- Fix wrong results of `ref:reference` and `ref:has-reference` called directly at
+  optimization levels O1 and O2: the optimizer treated both as pure and could
+  hoist or merge a call of `ref:has-reference` across the `ref:reference` call
+  that changes its result. Both functions are now declared nondeterministic. ([#201](https://github.com/zorba-processor/zorba/pull/201))
+- A URI port is now read only when it is all digits and at most 65535. Before, it was read with `atoi`, so a port beyond the `int` range could wrap to another value (`http://h:4294967376/` was read as port 80) and trailing text was ignored (`http://h:80abc/` was read as port 80). Such authorities are now kept as written, the same as ports from 65536 up already were. ([#202](https://github.com/zorba-processor/zorba/pull/202))
+- Fix `file:write-text`, `file:write-text-lines`, `file:write-binary` and the
+  `file:append-*` functions returning success with a truncated file when the
+  content is a streamable item and its stream cannot be read, or when the file
+  cannot be written (disk full, I/O error). Both now raise `file:FOFL9999`
+  naming the path. An empty streamable content still writes an empty file
+  (and, for the `-lines` functions, the line break). ([#204](https://github.com/zorba-processor/zorba/pull/204))
+- Fix the modify clause of a copy/modify expression accepting
+  `schema:validate-in-place` on a node that the copy clause did not create
+  when it followed another update of the same modify clause; it now raises
+  `err:XUDY0014` in either order. ([#205](https://github.com/zorba-processor/zorba/pull/205))
+- Fix the release of a parse node twice when memory runs out while a query
+  is parsed: a handle a grammar rule had taken on a node of the parser's
+  stack could free it before the parser released it again. ([#208](https://github.com/zorba-processor/zorba/pull/208))
+- Fix the loss of a parsed XML document (`fn:parse-xml`, `doc()`) when memory
+  runs out as the loader finishes it: the document stayed allocated after the
+  query ended. ([#208](https://github.com/zorba-processor/zorba/pull/208))
+- Fix JSONiq array updates with a delete and a replace at the same position of
+  one array in one pending update list: the member is now deleted and the
+  replace is omitted, as the JSONiq update facility's merging rules require;
+  before, the replace was applied and the delete dropped. Two replaces at that
+  position still raise `jerr:JNUP0009`. ([#210](https://github.com/zorba-processor/zorba/pull/210))
+- Fix wrong results of `zq:evaluate` in a loop at optimization levels O1 and
+  O2 when the prepared query has a side effect through a function item: the
+  optimizer treated the call as pure and could run it once for all iterations,
+  or move an expression beside it out of the loop. A call of `zq:evaluate` is
+  now treated like a call of `fn:invoke` or `r:eval`, whose code the compiler
+  cannot see. ([#211](https://github.com/zorba-processor/zorba/pull/211))
+- Restore hoisting and index joins in the expressions of index declarations
+  (`declare index`: the domain and every key). They were optimized as if the
+  query contained a call that can have a side effect, and no expression was moved
+  out of a loop or joined through a temporary index in any query. They are
+  optimized with hoisting now, unless one of them makes a call through a function
+  item or an eval. The rule of the query that imports the declaration does not
+  change. ([#212](https://github.com/zorba-processor/zorba/pull/212))
+- Fix a document read with the `dtd` feature when memory runs out as the loader
+  walks the tree libxml2 built: a text, CDATA or processing instruction node
+  whose content could not be allocated was loaded as an empty node, with no
+  error. The load now fails as it does for any other allocation failure, and
+  so does a comment whose content could not be allocated. ([#214](https://github.com/zorba-processor/zorba/pull/214))
+- Fix a leak of an attribute value when memory runs out while the same loader
+  builds an attribute node. ([#214](https://github.com/zorba-processor/zorba/pull/214))
+- Fix `err:XUDY0014` in a copy modify expression reporting, when several
+  update targets are outside the copy, a location that depended on the order
+  of the store's internal table; it now reports the first one in the query
+  text. ([#215](https://github.com/zorba-processor/zorba/pull/215))
+- Fix the message of `err:XUDY0014` saying "node" for an update whose target is
+  a collection, an index, an integrity constraint or a document; it now says
+  what the target is. ([#215](https://github.com/zorba-processor/zorba/pull/215))
+- The modify clause of a copy modify expression also raises `XUDY0014` for
+  `icddl:deactivate`, which the earlier entry on collection, document, index
+  and integrity-constraint updates (activation only) did not list. ([#215](https://github.com/zorba-processor/zorba/pull/215))
+- Fix several invalid pointer casts found by the UBSan `vptr` check, now
+  enabled in the sanitizer builds: in the `sctx` functions that list in-scope
+  schema components, in the full-text `window` and `without content` parse
+  nodes, in `StructuralAnyUriItem` node-relationship tests, in
+  `CollectionPul::truncateIndexes`, and in the JSound `$minLength` and
+  `$maxLength` checks on array types. ([#216](https://github.com/zorba-processor/zorba/pull/216))
+- Fix a general index range probe (`probe-index-range-general`) with an
+  `xs:untypedAtomic` bound on an index that has a string or `xs:anyURI` key map
+  and no numeric key map: it skipped the `xs:dateTime`, `xs:date` and later cast
+  attempts. Point probes were not affected. ([#216](https://github.com/zorba-processor/zorba/pull/216))
+- Fix wrong results at optimization levels O1 and O2 when a call of a
+  nondeterministic function was dropped because its static type decided the
+  result: for example `fn:exists(ref:reference($n))` became `true()` without
+  calling `ref:reference`, so a later `ref:has-reference($n)` returned false.
+  A rewrite no longer drops an expression that contains such a call (`fn:exists`,
+  `fn:empty`, `fn:count`, `fn:boolean`, `instance of`, `castable as`, `and`/`or`
+  with a constant operand, unused `for` and `let` variables, a `for` over an
+  empty sequence type, and an empty object value), and `count(E) = 0`, `= 1` or
+  `= n` no longer reads only part of such an E. ([#218](https://github.com/zorba-processor/zorba/pull/218))
+- Fix wrong results of `jsd:validate`, `jsd:annotate` and
+  `icdml:check-integrity-constraint` in a loop at optimization levels O1 and
+  O2 when the code they run has a side effect: a constraint of the JSound
+  schema (a query from a string) or the body of the integrity constraint. The
+  optimizer treated the call as pure and could run it once for all
+  iterations. These calls are now treated like a call of `zq:evaluate`, whose
+  code the compiler cannot see. ([#219](https://github.com/zorba-processor/zorba/pull/219))
+- Fix general range index probes with an `xs:double` or `xs:float` bound,
+  which returned no entry whose key was an integer. ([#223](https://github.com/zorba-processor/zorba/pull/223))
+- Fix general index probes with an `xs:untypedAtomic` value in decimal
+  notation, which compared it with integer keys as an `xs:decimal` instead of
+  casting it to `xs:double`, and so missed keys equal to the cast value (for
+  example key 2 for the value `"2.00000000000000000001"`). ([#223](https://github.com/zorba-processor/zorba/pull/223))
+- Fix DTD-validated parsing (`x:parse` with `DTD-validate`, `fn:doc` with the
+  `dtd` feature): attributes that share a local name in different namespaces,
+  such as `a:x` and `b:x`, all got the value of the first one. ([#224](https://github.com/zorba-processor/zorba/pull/224))
+- Fix `ref:reference` declaring `xs:string` as its result type while it
+  returns an `xs:anyURI`, as its documentation says. At O1 and O2 an
+  expression such as `ref:reference($n) instance of xs:string` was folded to
+  `true` from the declared type, while O0 gave `false`. The declared result
+  type is now `xs:anyURI`, so every optimization level gives the same result.
+  An `xs:anyURI` still converts to the `xs:string` parameter of
+  `ref:dereference` and `ref:assign-reference`. ([#225](https://github.com/zorba-processor/zorba/pull/225))
+- Fix `icdml:check-integrity-constraint` returning an empty sequence. It now
+  returns `true` when the integrity constraint holds and `false` when it does
+  not, as its signature `xs:boolean` documents. ([#226](https://github.com/zorba-processor/zorba/pull/226))
+- Fix general index probes with an `xs:decimal` or `xs:integer` value, which
+  compared it with `xs:decimal` keys through their `xs:double` images instead
+  of exactly, and so returned keys that differ from the value only beyond
+  `xs:double` precision (for example key `0.1000000000000000000001` for the
+  value `0.1`); a probe could also crash on a key of that kind, and an integer
+  key above 99999999999 could be returned twice. ([#228](https://github.com/zorba-processor/zorba/pull/228))
+- Fix a crash when a node whose general index key is an `xs:integer` above
+  99999999999 is deleted from a collection with an automatic general index. ([#228](https://github.com/zorba-processor/zorba/pull/228))
+- Fix a document read with the `dtd` feature when libxml2 runs out of memory
+  while it parses: the load failed with `err:FODC0002` ("XML tree creation
+  failed" or "malformed XML document"), an error a catch clause could catch.
+  It now fails as running out of memory does elsewhere in the engine. With
+  libxml2 before 2.13, which does not report every allocation of its own that
+  fails, some of these failures still give `err:FODC0002`. ([#230](https://github.com/zorba-processor/zorba/pull/230))
+- `x:canonicalize` now reports memory exhaustion as memory exhaustion instead
+  of `FOCZ0001`, and no longer crashes when libxml2 cannot produce the
+  canonical form. An input whose canonical form cannot be built, such as one
+  with a relative namespace URI, raises `FOCZ0001` with the reason libxml2
+  gives. `FOCZ0001` is otherwise kept for input that is not well formed. ([#231](https://github.com/zorba-processor/zorba/pull/231))
+- Fix `fn:subsequence` with huge or non-finite start and length arguments such
+  as `1e300`, `-INF` or `NaN`, and with integer arguments at the limits of
+  `xs:long`. Positions are now compared as the specification defines, so
+  `subsequence((1,2,3), 1e300)` is empty and `subsequence((1,2,3), -1e300)`
+  returns all items on every platform. ([#233](https://github.com/zorba-processor/zorba/pull/233))
+- Fix general index probes with several search keys, which carried state from
+  one key to the next: after an untyped key, later typed keys skipped untyped
+  index entries, and the matches of an earlier key were returned again under
+  the rules of a later key, which could add `xs:decimal` entries that only
+  share its `xs:double` image. ([#237](https://github.com/zorba-processor/zorba/pull/237))
+- Fix a crash of `idml:probe-index-range-general` with several bounds when the
+  first bound has matches, and a crash when the same range probe runs again,
+  for example once per iteration of a `for` clause. ([#237](https://github.com/zorba-processor/zorba/pull/237))
+- Fix schema validation (`validate`, and the option checks of functions such as
+  `x:canonicalize`) when an allocation fails: the validator kept up to about
+  170 KB per failed call, and the failure was reported as the internal error
+  `ZXQP0003` instead of running out of memory. ([#238](https://github.com/zorba-processor/zorba/pull/238))
+- Fix a crash in the C++ API `ItemFactory::createUserTypedAtomicItem` when the
+  base item or the type name is an empty item; it now raises `ZAPI0014`. ([#239](https://github.com/zorba-processor/zorba/pull/239))
+- Fix general index probes that compare numbers of different types, which did
+  not promote them as a general comparison does: an `xs:decimal` value missed
+  an equal `xs:float` key (`0.1` and `xs:float("0.1")`), an `xs:float` value
+  missed `xs:integer` keys that round to it (`16777217` for
+  `xs:float(16777216)`) and on an equality index all but one `xs:decimal` key
+  equal to it, an `xs:decimal` value missed an untyped key equal to it as
+  `xs:double` (`3.00000000000000000001` and `"3"`), and range bounds on such
+  keys were compared the same wrong ways. ([#241](https://github.com/zorba-processor/zorba/pull/241))
+- Fix general index probes with a NaN value or bound, which raised ZSTR0041
+  instead of matching no number. ([#241](https://github.com/zorba-processor/zorba/pull/241))
+- Fix a crash when the last node with a given key is deleted from a
+  collection with an automatic general equality index (the key was released
+  before its entry was removed). ([#241](https://github.com/zorba-processor/zorba/pull/241))
+- Fix a memory leak in `jn:parse-json` (and JSONiq `parse-json`) when memory
+  runs out while an object member is added: the member's key was not freed. ([#242](https://github.com/zorba-processor/zorba/pull/242))
+- Fix crashes in the C++ API `ItemFactory` when an empty item is passed as the
+  node name of `createElementNode` or `createAttributeNode`, as the element or
+  the typed value of `assignElementTypedValue`, as the typed value of
+  `createAttributeNode`, or inside the arguments of `createJSONObject` and
+  `createJSONArray`; they now raise `ZAPI0014`. An empty parent of the node
+  constructors stays allowed. ([#243](https://github.com/zorba-processor/zorba/pull/243))
+- Fix a memory leak when creating the plan of a query for execution fails
+  part-way, for example when memory runs out. ([#245](https://github.com/zorba-processor/zorba/pull/245))
+- Fix general equality index probes that missed keys an untyped value is
+  equal to: an untyped value missed `xs:gYear` keys unless the index also had
+  numeric keys (`"2001"`) or the value was not an integer (`"1998Z"`), and an
+  untyped value that is also of another type missed `xs:base64Binary` keys, or
+  `xs:hexBinary` and `xs:base64Binary` keys if it was not an integer
+  (`"1E10"`, `"P10Y"`, `"12345678901234567890"`), in both directions. ([#247](https://github.com/zorba-processor/zorba/pull/247))
+- Fix general index probes on untyped keys with more than 18 fractional
+  digits, which were cast to `xs:double` from an `xs:decimal` rounded to 18
+  digits instead of from the string: `"0.00000000000000000001"` missed
+  `1e-20` and matched `0e0`. ([#247](https://github.com/zorba-processor/zorba/pull/247))
+- Fix general range index value probes whose two bounds are out of order as
+  given but equal once promoted to the type of the keys, which selected
+  nothing: bounds `0.1000000000000000001` and `0.1` select the key `0.1e0`. ([#247](https://github.com/zorba-processor/zorba/pull/247))
+- Fix NaN keys in a general range index, which raised ZSTR0041 when a second
+  key was inserted; a probe without bounds selects them and no other probe
+  does. NaN keys deleted from a general equality index are now removed (they
+  stayed listed by `idml:keys`), and two NaN keys in a unique general range
+  index no longer raise ZSTR0041. ([#247](https://github.com/zorba-processor/zorba/pull/247))
+- Fix `ddl:delete` raising ZDDY0015 for a collection that had an automatic
+  index while nodes were inserted, after the index was deleted: index
+  maintenance kept the last indexed node referenced, which `ddl:delete` took
+  for a variable that references a node of the collection. ([#248](https://github.com/zorba-processor/zorba/pull/248))
+- Fix a schema import when an allocation fails while the schema loads: it was
+  reported as the error `ZXQP0014` or `ZXQP0035` of that schema instead of
+  running out of memory, and the schema parser kept up to about 160 KB per
+  failed import. ([#249](https://github.com/zorba-processor/zorba/pull/249))
+- Fix `validate type` when validation raises an error: the copy of the type
+  name was not freed. ([#249](https://github.com/zorba-processor/zorba/pull/249))
+- Fix building a text node under a parent when an allocation fails while the
+  node is attached: debug and sanitizer builds stopped on an assertion, and
+  release builds did not free the text of the node. ([#250](https://github.com/zorba-processor/zorba/pull/250))
+- Fix joins on a general comparison (`=`) that the optimizer ran through an
+  index although the comparison can raise an error: a pair whose comparison
+  raises FORG0001 (an untyped value whose cast to `xs:gYear`, `xs:hexBinary`,
+  `xs:base64Binary`, a number or another type fails) or XPTY0004 (types that
+  cannot be compared) was skipped instead of raising the error. Such a join
+  now uses an index only if the static types of both operands are strings or
+  untyped, both numeric, or atomic with no untyped value and one a subtype
+  of the other; joins of operands of static type `xs:anyAtomicType`, such as
+  attributes of nodes in a collection or of an external variable, run
+  without an index. ([#251](https://github.com/zorba-processor/zorba/pull/251))
+- At O1 and O2, a `for` clause whose domain has the empty sequence type no
+  longer drops the domain, or without `allowing empty` the clauses before it,
+  when their evaluation can raise an error: the query raises the error that it
+  raises at O0. Before, such a FLWOR was replaced by the empty sequence (with
+  `allowing empty`, its variable by the empty sequence) and the error was lost. ([#252](https://github.com/zorba-processor/zorba/pull/252))
+- Fix `fetch:content` and `fetch:content-binary` calling the URL resolver
+  function item of a query prepared with `zq:prepare-main-module#3` or loaded
+  with `zq:load-from-query-plan#3` fewer times than written: the optimizer
+  treated both functions as deterministic and moved a call out of a loop.
+  Every call now calls the resolver. `fn:doc` stays stable: calls with the
+  same URI return the same document. ([#253](https://github.com/zorba-processor/zorba/pull/253))
+- Fix the index maintenance of an update that truncates a collection while it
+  also modifies another collection that has an automatic index: the index of
+  the other collection was cleared and the index of the truncated collection
+  kept its entries. ([#255](https://github.com/zorba-processor/zorba/pull/255))
+- Fix general indexes, including the temporary index of a hash join, aborting
+  on an `xs:dateTimeStamp` probe value and raising `ZDTY0012` on an
+  `xs:dateTimeStamp` key; such values now compare with `xs:dateTime` keys and
+  probe values as `xs:dateTime` values. ([#256](https://github.com/zorba-processor/zorba/pull/256))
+- Fix general indexes aborting on a `jn:null()` probe value or range bound
+  and raising `ZDTY0012` on a `jn:null()` key. A null key is selected by a
+  null probe value, by a range with a typed upper bound and no lower bound,
+  and by inclusive null bounds; a null lower bound selects every other key.
+  In a general probe, an untyped probe value or bound does not select null
+  keys, where the comparison without the index raises `XPTY0004`. A value
+  probe of an index with untyped keys accepts a null probe value or bound
+  instead of raising `XPTY0004`, as a value comparison casts the untyped key
+  to `xs:string`. ([#256](https://github.com/zorba-processor/zorba/pull/256))
+- A function annotated `%an:nondeterministic` stays nondeterministic when its
+  body calls no nondeterministic function. The optimizer no longer moves a call
+  of it out of a loop or evaluates it once for several iterations. ([#258](https://github.com/zorba-processor/zorba/pull/258))
+- Fix general index probes that missed keys an untyped value is equal to as an
+  `xs:boolean`: an untyped key such as `"1"` or `"true"` is now cast to
+  `xs:boolean`, so it meets `xs:boolean` probes, and an untyped probe meets
+  `xs:boolean` keys, in point and range probes. ([#259](https://github.com/zorba-processor/zorba/pull/259))
+- Fix general range index probes without bounds, which did not select the
+  domain nodes whose key is the empty sequence. ([#259](https://github.com/zorba-processor/zorba/pull/259))
+- Fix `validate type`: the content of the element was not checked against the
+  named type, so an invalid value of a built-in atomic type (in the element,
+  in a child element or in simple content) and missing or unexpected child
+  elements raised no `XQDY0027`. The declaration of the element name no
+  longer applies to the validated element: no default or fixed value and no
+  nillable. ([#260](https://github.com/zorba-processor/zorba/pull/260))
+- Fix validation of an element that is not validated (laxly assessed) and has
+  a child with `xsi:type`: it raised `XQDY0027` for valid content. ([#260](https://github.com/zorba-processor/zorba/pull/260))
+- Fix joins on a value comparison (`eq`) that the optimizer ran through an
+  index although the comparison can raise XPTY0004: a pair of types that `eq`
+  cannot compare, such as an untyped value and an `xs:integer`, an `xs:gYear`
+  and an `xs:string`, or a JSON string and a JSON number, was skipped instead
+  of raising the error. Such a join now uses an index only if the static types
+  of both operands are strings, untyped or `xs:anyURI`, both numeric, or
+  atomic with no untyped value and one a subtype of the other; joins of
+  operands of static type `xs:anyAtomicType`, such as attributes of nodes
+  from `fn:doc` or JSON values, run without an index. ([#261](https://github.com/zorba-processor/zorba/pull/261))
+- Fix the undo of a general index refresh when an update fails after removing
+  a node with more than one key from the index: the undo counted the node's
+  second key against the wrong delta, so it restored too few keys and could
+  crash. ([#264](https://github.com/zorba-processor/zorba/pull/264))
+- At O1 and O2, a `for` variable whose domain has at most one item is no
+  longer folded into the rest of the FLWOR when its domain can raise an error
+  and the variable is not referenced, or a later clause can leave the tuple
+  without a result (for example a later `for` clause with an empty domain or
+  a `where` clause). Before, the domain was dropped or never evaluated and
+  the error that the query raises at O0 was lost. A folded domain whose
+  reference is in a position evaluated lazily can still go unevaluated. ([#266](https://github.com/zorba-processor/zorba/pull/266))
+- At O1 and O2, `return if (C) then T else E` with an `E` of the empty sequence
+  type is turned into `where C return T` only when `E` cannot raise an error.
+  Before, the error of `E` was lost for the tuples where `C` is false. ([#266](https://github.com/zorba-processor/zorba/pull/266))
+- Fix hash joins raising an error that the query without the join index does
+  not raise: the outer key was evaluated over an empty inner domain, the inner
+  keys under an empty outer domain, after `fn:exists()` had its first item, and
+  for nodes that an earlier conjunct of the `where` clause rejects. An index
+  build or outer key that raises now makes the join evaluate its comparison as
+  without the index, and a join comparison is hash-joined only when it is the
+  first conjunct of its `where` clause and only `let` clauses of hoisted
+  expressions (which keep an error until the value is used) lie between the
+  inner `for` clause and the `where` clause. An assertion or internal error of
+  the engine raised by the index or its probe is not caught. ([#267](https://github.com/zorba-processor/zorba/pull/267))
+- Fix hash indexes, hash joins, `fn:distinct-values` and `group by` on date
+  and time values, which gave every value the same hash code, so each lookup
+  compared the key with every date/time entry of the table. Values are now
+  hashed under the implicit timezone that the comparison uses, so a value
+  without a timezone still matches an equal value with a timezone. ([#268](https://github.com/zorba-processor/zorba/pull/268))
+- Fix unordered maps and value indexes with `xs:anyAtomicType` keys, which
+  treated date/time keys of different types that denote the same instant (for
+  example `xs:date("2013-01-13Z")` and `xs:dateTime("2013-01-13T00:00:00Z")`)
+  as one key; `eq` does not compare them, so they are now different keys. ([#268](https://github.com/zorba-processor/zorba/pull/268))
+- Fix indexes ignoring their collation: every value and general index,
+  declared or built for a join, compared its keys by codepoint, whatever the
+  `collation` of its key or the default collation of the join, so under a
+  collation other than the codepoint collation probes and joins missed keys
+  that the collation makes equal, such as `"x"` and `"X"` under a collation
+  that ignores case. ([#269](https://github.com/zorba-processor/zorba/pull/269))
+- Do not answer a value comparison with an automatic index whose key has a
+  collation other than the default collation of the comparison. ([#269](https://github.com/zorba-processor/zorba/pull/269))
+- Compare `xs:anyURI` values under the collation of the comparison, as
+  `xs:string` values: under a collation other than the codepoint collation,
+  `eq`, `=`, `lt` and the other comparisons, `fn:distinct-values` and index
+  keys compared `xs:anyURI` values by codepoint. ([#269](https://github.com/zorba-processor/zorba/pull/269))
+- Hash an `xs:anyURI` value as the equal `xs:string` value:
+  `fn:distinct-values(("x", xs:anyURI("x")))` returned both, `group by` put
+  them in separate groups, and a probe of an `xs:string` index with an
+  `xs:anyURI` key missed the equal key. ([#269](https://github.com/zorba-processor/zorba/pull/269))
+- Fix a join on two `xs:untypedAtomic` operands under a collation other than
+  the codepoint collation: it missed pairs that the collation makes equal but
+  that differ by codepoint. ([#269](https://github.com/zorba-processor/zorba/pull/269))
+- Fix the implicit timezone and the current dateTime that a host sets on the
+  dynamic context (`DynamicContext::setImplicitTimezone`,
+  `DynamicContext::setCurrentDateTime`, `zorba --timezone`) being replaced by
+  the timezone and clock of the host at each execution of the query. A value
+  the host sets now applies to every execution; a value it does not set is
+  still taken from the host at the start of each execution. The API
+  documentation now states that the timezone is in minutes. ([#270](https://github.com/zorba-processor/zorba/pull/270))
+- A failed allocation while the parser reads an xs:integer or xs:double
+  literal is reported as out of memory instead of err:FOAR0002 (numeric
+  overflow). ([#271](https://github.com/zorba-processor/zorba/pull/271))
+- Fix the message of XQST0038 for an unknown collation in `declare default collation`: it now names the collation and says it is not a known collation instead of reporting multiple declarations. ([#272](https://github.com/zorba-processor/zorba/pull/272))
+- Fix a crash after `import schema` named a schema document whose target
+  namespace was already loaded, when that document imports, directly or
+  transitively, a namespace not yet loaded whose components refer to it. An
+  import whose location hint names a schema document with another target
+  namespace that is already loaded now raises `XQST0059`. ([#273](https://github.com/zorba-processor/zorba/pull/273))
+- Fix `ddl:delete` raising ZDDY0015 for a collection after a sequential
+  function that bound a node of the collection to a local variable (a
+  `variable` declaration, a `let` or a `for`) had returned: the local
+  variables kept their values after the function returned. A sequential
+  function is no longer inlined into its caller, and its call releases its
+  local variables when the function returns its last item, with or without
+  profiling. They stay referenced when the function raises an error that the
+  caller catches, and when the caller stops reading the result before its
+  last item. ([#274](https://github.com/zorba-processor/zorba/pull/274))
+- Fix a memory leak when opening a query plan fails partway, for example when
+  memory runs out while a FLWOR expression with `group by` or `order by` sets
+  up its state: the iterator states created before the failure are now
+  destroyed. ([#275](https://github.com/zorba-processor/zorba/pull/275))
+- Fix a sequential inline function item that declares local variables reading
+  the value of one of them for the last variable it captures: the first local
+  variable of its body had the same dynamic-context id as that captured
+  variable. ([#276](https://github.com/zorba-processor/zorba/pull/276))
+- Fix a general comparison join (`=`) over an inner domain of nodes that are
+  not in document order, for example `fn:reverse($d/b)`: at the default and
+  higher optimization levels the join returned the matching nodes in document
+  order instead of the order of the domain. Such a join is now evaluated
+  without an index. ([#278](https://github.com/zorba-processor/zorba/pull/278))
+- Fix a where clause that does not use the variables of its FLWOR raising an
+  error at O1 and O2 when no tuple reaches it: its condition was evaluated
+  before the FLWOR, and is now moved there only if it cannot raise an error or
+  the clauses before it produce at least one tuple. ([#279](https://github.com/zorba-processor/zorba/pull/279))
+- At O1 and O2, a FLWOR with an empty `for` domain after a `for` clause over an
+  external variable without a default value, or over the context item, raises
+  XPDY0002 when that variable or the context item is not bound, as it does at
+  O0. Before, the FLWOR was replaced by the empty sequence and the error was
+  lost. ([#281](https://github.com/zorba-processor/zorba/pull/281))
+- Fix a memory leak when opening the body of a function call, a dynamic
+  function call, or the function passed to `fn:for-each-pair`, `fn:fold-left`
+  or `fn:fold-right` fails partway, for example when memory runs out: the
+  iterator states created before the failure are now destroyed. ([#282](https://github.com/zorba-processor/zorba/pull/282))
+- At O1 and O2, a `for` clause whose domain has at most one item is no longer
+  folded into the rest of the FLWOR when a later clause can raise an error.
+  When the domain was empty, the later clauses were evaluated after the fold
+  and could raise an error that O0, which has no tuples to evaluate them for,
+  does not raise. ([#286](https://github.com/zorba-processor/zorba/pull/286))
+- A general range index without a key type, or with `xs:anyAtomicType*` as
+  its key type, now raises `zerr:ZDTY0012` when a key is a QName, NOTATION,
+  binary or `xs:gYear`-like value, as documented, both when the index is
+  built and when it is maintained. Release builds used to accept such keys. ([#287](https://github.com/zorba-processor/zorba/pull/287))
+- The value probes (`probe-index-point-value`, `probe-index-range-value` and
+  their `-skip` forms) and `probe-index-point-general` treat a general index
+  whose key type is `xs:anyAtomicType*` as one without a key type: untyped
+  search keys and bounds compare as strings, so a range probe with two untyped
+  bounds uses both instead of only the lower one, and a range index rejects a
+  search key with no ordering with `err:XPTY0004`. ([#287](https://github.com/zorba-processor/zorba/pull/287))
+- `probe-index-range-value` without bounds on a general index with domain
+  nodes that have several keys returns every domain node once, as documented,
+  instead of raising `err:XPTY0004`; with a bound it still raises it. ([#287](https://github.com/zorba-processor/zorba/pull/287))
+- `probe-index-point-value-skip` and `probe-index-range-value-skip` skip the
+  given number of results also on a general index; they returned all of them. ([#287](https://github.com/zorba-processor/zorba/pull/287))
+- `validate type` no longer treats `xsi:nil="true"` on the validated element as
+  making it nilled: without an element declaration the attribute is ignored and
+  the content is validated against the type, so
+  `validate type xs:integer { <e xsi:nil="true"/> }` raises `XQDY0027`. ([#288](https://github.com/zorba-processor/zorba/pull/288))
+- `validate type` uses an `xsi:type` on the validated element when it names a
+  type derived from the named type: the content is validated against it and
+  the element is annotated with it. Before, the attribute was ignored. An
+  `xsi:type` that names a type not derived from the named type is still
+  ignored. ([#288](https://github.com/zorba-processor/zorba/pull/288))
+- At O1 and O2, a `for` variable whose domain has at most one item and can
+  raise an error is folded only into a position that is evaluated for every
+  tuple: the expression of a later `for`, `window` or `where` clause or the
+  return clause, reached through the condition of an `if`, the first operand
+  of an arithmetic operator, a general comparison or a value comparison whose
+  other operand is never empty, `fn:data`, a cast, the first step
+  of a path, a positional predicate at a constant position of at least 1, the
+  function of a dynamic call, a value captured by a function item, or the
+  clauses of a nested FLWOR that keep every tuple. Before, it was also folded
+  into an `if` branch, a `let` binding, the second operand of `or` or `and`, a
+  predicate or the return clause of a nested FLWOR that can have no tuples,
+  where it could go unevaluated and the error that the query raises at O0 was
+  lost. ([#289](https://github.com/zorba-processor/zorba/pull/289))
+- An `import schema` of a namespace that is already loaded no longer resolves
+  its location hints: a hint that cannot be resolved no longer raises
+  `XQST0059`, and a hint that would be disregarded is not fetched. ([#290](https://github.com/zorba-processor/zorba/pull/290))
+- A failed allocation while the query text is scanned no longer exits the
+  process with status 2: the compilation fails with `std::bad_alloc`, as other
+  failed allocations do. Another failure of the scanner raises `ZXQP0003`. ([#291](https://github.com/zorba-processor/zorba/pull/291))
+- A failed allocation while the parser is set up no longer terminates the
+  process: `std::bad_alloc` reaches the caller. ([#291](https://github.com/zorba-processor/zorba/pull/291))
+- Fix creating an inline function item raising XPDY0002 when a block variable
+  without a value is in scope: an inline function item now captures only the
+  variables its body uses. ([#292](https://github.com/zorba-processor/zorba/pull/292))
+- A failed allocation while a cached function stores a result no longer leaves
+  a function cache entry without its value, which the cache later released as
+  if it owned a reference to the key. ([#293](https://github.com/zorba-processor/zorba/pull/293))
+- Fix a memory leak when `group by` fails, for example when memory runs out,
+  while it starts a new group: the sequences of the group's non-grouping
+  variables are now freed. ([#293](https://github.com/zorba-processor/zorba/pull/293))
+- Fix a memory leak when the optimization of a function body, done on its
+  first dynamic call, fails, for example when memory runs out, while the index
+  join rule starts. ([#293](https://github.com/zorba-processor/zorba/pull/293))
+- Copying a JSON array no longer leaks the new array when memory runs out
+  before its members are copied. ([#294](https://github.com/zorba-processor/zorba/pull/294))
+- Appending or inserting a member into a JSON array no longer leaks the
+  member when memory runs out while the array grows. ([#295](https://github.com/zorba-processor/zorba/pull/295))
+- A sliding window in the body of a function loaded with
+  `StaticContext::loadProlog()`, or of a function item made by another query,
+  read its input as it went when the query that runs it can run a side effect:
+  the side effect could change the input between two windows. Such a window now
+  reads its input before the first window, as in a query of its own that can run
+  a side effect. ([#299](https://github.com/zorba-processor/zorba/pull/299))
+- A tumbling window read its input as it went even when the query that runs it
+  can run a side effect. It now reads its input before the first window then,
+  like a sliding window. ([#299](https://github.com/zorba-processor/zorba/pull/299))
+- Calling `next()`, `open()` or `close()` on the result iterator of a closed
+  query crashed; it raises ZAPI0042. ([#299](https://github.com/zorba-processor/zorba/pull/299))
+- A sequential function that raised an error after binding a node of a
+  collection to a local variable kept that node referenced when the caller
+  caught the error: a later `ddl:delete` of the collection raised ZDDY0015.
+  The body of a call that raises is now released as if the call had completed. ([#301](https://github.com/zorba-processor/zorba/pull/301))
+- The data definition facility documentation names the error raised for a
+  range index key item without an ordering relationship as `zerr:ZDTY0012`
+  (it said `zerr:XDTY0012`, which does not exist). ([#302](https://github.com/zorba-processor/zorba/pull/302))
+- When memory runs out while a member is added to a JSON object, a later
+  lookup by name no longer returns the value of another member, and the object
+  no longer keeps a member whose insert failed while it built its index of
+  names. ([#304](https://github.com/zorba-processor/zorba/pull/304))
+- The data definition facility documentation names the errors raised when
+  deleting from a queue collection as `zerr:ZDDY0009` (delete-nodes) and
+  `zerr:ZDDY0008` (delete-nodes-last); it said `zerr:ZDDY009`, which does not
+  exist. Its error appendix now lists `zerr:ZDST0035`, `zerr:ZDTY0012`,
+  `zerr:ZDDY0028` and `zerr:ZDDY0029`, so every error link in the page resolves. ([#306](https://github.com/zorba-processor/zorba/pull/306))
+- At O1 and O2, a `where` clause whose condition does not use the variables of
+  its FLWOR is moved in front of the FLWOR (`if E then flwor else ()`) only
+  when the clauses before it cannot raise an error. Before, a false condition
+  skipped those clauses, and the error that O0 raises while evaluating them,
+  such as a `for` domain that divides by zero, was lost. ([#308](https://github.com/zorba-processor/zorba/pull/308))
+- The allocation-failure sweeps of the MCP server tests no longer allow a crash
+  in glibc's `pthread_getattr_np()`: the test allocator now sets `errno` to
+  `ENOMEM` when it makes an allocation fail, as glibc's `malloc` does and glibc
+  itself relies on. ([#309](https://github.com/zorba-processor/zorba/pull/309))
+- When the optimization of a function body fails, for example when memory runs
+  out during its first dynamic call, the next run of the same compiled query
+  optimizes the body again instead of running it as the failed optimization
+  left it. ([#310](https://github.com/zorba-processor/zorba/pull/310))
+- Build the index of a hash join at its first probe: a join under an empty
+  outer domain, or one whose outer tuples never reach it, no longer evaluates
+  its inner keys, which the query without the index does not evaluate either
+  and which may not end. A join whose index is built inside a block of a
+  sequential expression still builds it in advance. ([#311](https://github.com/zorba-processor/zorba/pull/311))
+- An internal hash map insert whose key copy fails, for example when memory
+  runs out, no longer leaves an entry with an empty key counted in the map. ([#312](https://github.com/zorba-processor/zorba/pull/312))
+- A general index whose key type is `xs:untypedAtomic*` accepts `xs:string`
+  and `xs:anyURI` search keys, and its value probes compare an untyped
+  search key as a string, as a comparison with an untyped
+  value does. They raised `err:XPTY0004`, and an untyped search key in a value
+  probe failed an internal assertion. ([#314](https://github.com/zorba-processor/zorba/pull/314))
+- The value probes of a general index without a key type
+  (`probe-index-point-value`, `probe-index-range-value` and their `-skip`
+  forms) raise `err:XPTY0004` when the index holds a key that a value
+  comparison cannot compare with the search key or a bound, as the value
+  comparison the probe stands for does. They returned the nodes whose keys
+  could be compared and skipped the others, unless those keys were untyped
+  values castable to a type other than `xs:string`. ([#314](https://github.com/zorba-processor/zorba/pull/314))
+- An internal hash set insert whose key copy fails, for example when memory
+  runs out, no longer leaves an entry with an empty key counted in the set. ([#316](https://github.com/zorba-processor/zorba/pull/316))
+- `delete` of the static collections DML module on a queue collection now
+  deletes the given items when they are all at the beginning of the queue, in
+  any order and with repetitions. It raised `zerr:ZDDY0009` for every queue
+  delete; it still raises it when an item is not at the beginning. The module
+  documentation of `delete` now lists `zerr:ZDDY0004`, `zerr:ZDDY0007` and
+  `zerr:ZDDY0009` instead of `zerr:ZDDY0006`. ([#318](https://github.com/zorba-processor/zorba/pull/318))
+- The hardening option detects AddressSanitizer flags given for a build type in mixed case (for example `RelWithDebInfo`), so it no longer combines hardening with ASan in that case. ([#320](https://github.com/zorba-processor/zorba/pull/320))
+- A failed allocation while the scanner grows its input buffer for a token
+  longer than the buffer raises `std::bad_alloc` (the MCP server's
+  `memory_limit`) instead of `ZXQP0003`. ([#322](https://github.com/zorba-processor/zorba/pull/322))
+- A descendant path step (`//`) whose stack of children iterators could not grow for lack of memory kept the node it was about to enter, and with it the whole document, allocated for the rest of the process. ([#324](https://github.com/zorba-processor/zorba/pull/324))
+- Loading a document with DTD validation kept libxml2's parser context and the partial document allocated when running out of memory while an error of the document was reported (seen with libxml2 before 2.13). ([#324](https://github.com/zorba-processor/zorba/pull/324))
+- `fn:nilled` and the `nilled` property follow XDM: an element is nilled only
+  if validation found `xsi:nil` true and the element declaration that governs
+  it is nillable. Before, any validated element with `xsi:nil="true"` and no
+  element or text children was nilled, including the result of
+  `validate type xs:string { <e xsi:nil="true"/> }` and elements validated
+  laxly without a declaration. Copies that preserve the type annotation keep
+  the property; an update that removes the type annotation clears it, also
+  on an element of type `xs:anyType`; revalidation after an update and
+  `schema:validate-in-place` set it. ([#325](https://github.com/zorba-processor/zorba/pull/325))
+- Validation treats `xsi:nil="1"` like `xsi:nil="true"` and collapses
+  whitespace in the `xsi:nil` value (`xsi:nil=" true "`). ([#325](https://github.com/zorba-processor/zorba/pull/325))
+- Revalidation after an update that makes a simple-typed element nil (deletes
+  its text and inserts `xsi:nil="true"`) no longer aborts the process. ([#325](https://github.com/zorba-processor/zorba/pull/325))
+- A serialization that ran out of memory while its emitter made its children
+  iterators, or added one for an element nested deeper than 8 levels, left
+  those iterators allocated. ([#326](https://github.com/zorba-processor/zorba/pull/326))
+- Validation rejects with `XQDY0027` an element with `xsi:nil="true"` that
+  has element children, as XML Schema requires (a nilled element has no
+  character or element children), in strict and in lax mode. Before, the
+  element was accepted when its children were nillable, nilled themselves,
+  or followed text in mixed content, and lax validation accepted a nilled
+  element with any content. ([#327](https://github.com/zorba-processor/zorba/pull/327))
+- The probes of an index whose key type is `xs:double` raise `err:XPTY0004`
+  for a search key that is not a number or an untyped value, as the
+  comparison without an index does. They accepted any search key. ([#328](https://github.com/zorba-processor/zorba/pull/328))
+- `probe-index-point-general` on a general index whose key type is
+  `xs:untypedAtomic*` accepts a numeric or other search key and compares the
+  untyped keys as `=` does. It raised `err:XPTY0004` for any search key other
+  than `xs:string`, `xs:anyURI` or an untyped value. ([#328](https://github.com/zorba-processor/zorba/pull/328))
+- The value range probes of a general index without a key type raise
+  `err:XPTY0004` for a duration bound that has no order with a key, as `ge`
+  and `le` do: an `xs:yearMonthDuration` with an `xs:dayTimeDuration`, and an
+  `xs:duration` with any duration. ([#328](https://github.com/zorba-processor/zorba/pull/328))
+- A general probe with a numeric search key on an index without a key type,
+  or with `xs:untypedAtomic*`, raises `err:FORG0001` when an untyped key is
+  not castable to `xs:double`, as `=` does. It returned the other matches. ([#329](https://github.com/zorba-processor/zorba/pull/329))
+- An index whose key type is `xs:float` accepts an `xs:double` search key and
+  compares the keys promoted to `xs:double`, as the comparison does. It raised
+  `err:XPTY0004`. ([#329](https://github.com/zorba-processor/zorba/pull/329))
+- In an index whose key type is `xs:double`, an untyped search key raises
+  `err:XPTY0004` in value probes, as `eq` does, and is cast to `xs:double` in
+  general probes, as `=` does. It matched nothing. ([#329](https://github.com/zorba-processor/zorba/pull/329))
+- The value range probes of a general index whose key type is `xs:duration`
+  raise `err:XPTY0004` for duration bounds that have no order with a key, as
+  `ge` and `le` do. They returned the keys in range. ([#329](https://github.com/zorba-processor/zorba/pull/329))
+- General probes of an index holding keys of one class (strings, numbers,
+  booleans, dates, durations, ...) raise `err:XPTY0004` for a search key of
+  another class, as `=`, `>=` and `<=` do. They returned no match. Untyped
+  keys are cast to the type of the search key, as before. ([#331](https://github.com/zorba-processor/zorba/pull/331))
+- Range probes of a value range index raise `err:XPTY0004` for a bound that
+  `ge` and `le` cannot compare with a key, such as any duration bound in an
+  index whose key type is `xs:duration`. They returned the keys in range. ([#331](https://github.com/zorba-processor/zorba/pull/331))
+- Known limit: general probes do not raise the `err:FORG0001` that `=`, `>=`
+  and `<=` raise when the cast of an untyped operand to a type other than
+  `xs:double` fails, that is, an untyped search key against date or duration
+  keys, or a date, duration or boolean search key against untyped keys that
+  are not castable to it. These probes keep their current results. ([#331](https://github.com/zorba-processor/zorba/pull/331))
+- When reading the bounds of a thread's stack fails for lack of memory, the
+  stack limit reads them again on its next call instead of leaving the thread
+  without a stack check for its life; other failures are still remembered. ([#332](https://github.com/zorba-processor/zorba/pull/332))
+- `validate lax` raises XQDY0027 for an invalid element that has a
+  declaration: an `xsi:type` that does not derive from the declared type, an
+  abstract element, `xsi:nil` on a non-nillable declaration, a nilled element
+  with content, or an identity constraint violation. Before, lax validation
+  accepted these; it still skips elements without a declaration. ([#334](https://github.com/zorba-processor/zorba/pull/334))
+- An element declared without a type whose `xsi:type` names a simple type
+  is invalid with element children, in strict and lax validation. Before, it
+  was accepted and annotated `xs:anyType`, because the check of a child reset
+  the simple type of its parent. ([#334](https://github.com/zorba-processor/zorba/pull/334))
+- A declared element below an element without a declaration is strictly
+  assessed in `validate lax` and `validate strict`: it gets its type
+  annotation, and an invalid one raises XQDY0027. Before, the whole subtree
+  of an element without a declaration was left untyped and unchecked. Below a
+  `processContents="skip"` wildcard nothing is assessed, as before. ([#335](https://github.com/zorba-processor/zorba/pull/335))
+- An element without a declaration that has an `xsi:type` and
+  `xsi:nil="true"` is validated against that type and is not nilled. Before,
+  `validate strict` rejected it because no nillable declaration allowed
+  `xsi:nil`. ([#335](https://github.com/zorba-processor/zorba/pull/335))
+- An `xsi:type` followed by another attribute on the same element, such as
+  `xsi:nil`, is applied. Before, the value of the next attribute replaced the
+  `xsi:type` value, so validation reported a missing grammar or ignored the
+  type. ([#335](https://github.com/zorba-processor/zorba/pull/335))
+- The children of an element without a declaration whose `xsi:type` names a
+  complex type are validated against the content model of that type in
+  `validate lax` and `validate strict`: they get their declared types, and a
+  child the content model does not allow or a missing required child raises
+  XQDY0027. Before, the content model was checked as if the element had no
+  children, so valid content raised XQDY0027. ([#336](https://github.com/zorba-processor/zorba/pull/336))
+- At O1 and O2 an expression the optimizer moves out of a for loop is evaluated
+  where its value is first read, still once per binding of the variables it
+  depends on: under an empty for domain it is no longer evaluated, as at O0, so
+  one that does not end no longer keeps the query from ending. ([#338](https://github.com/zorba-processor/zorba/pull/338))
+- A parser error of `fn:parse-xml-fragment` and of `x:parse` with
+  `parse-external-parsed-entity` is reported at its line and column in the
+  parsed string: the column on the first line no longer counts the text the
+  parser adds before the fragment. An element the string leaves open is
+  reported as for a document (`premature end of content for tag starting on
+  line N`, at the end of the string), and an end tag without a start tag as
+  `XML chunk is not well-balanced`; neither message names an element the string
+  does not have. ([#339](https://github.com/zorba-processor/zorba/pull/339))
+- Serializing to a C++ output stream whose writes fail without throwing (for
+  example a full disk, with `badbit` not in the stream's exceptions mask) now
+  raises `zerr:ZOSE0004` instead of returning normally with the text cut off.
+  The serializer flushes the stream at the end of each serialization; streams
+  that throw on `badbit` keep throwing their own exception. ([#340](https://github.com/zorba-processor/zorba/pull/340))
+- A single-character write through the transcoder for a non-UTF-8 encoding
+  reported success when the underlying stream did not take the converted
+  bytes; it now fails the stream. ([#340](https://github.com/zorba-processor/zorba/pull/340))
+- `x:parse` with `<opt:DTD-validate/>` reports a well-formedness or validity
+  error with libxml2's message and its line and column in the parsed string,
+  as `x:parse` without DTD validation does, instead of a generic
+  `zerr:ZSTR0021` with no location. ([#341](https://github.com/zorba-processor/zorba/pull/341))
+- Revalidation after an update that leaves a simple-typed element without a
+  text child (for example deleting the text of an `xs:hexBinary`,
+  `xs:base64Binary` or list-typed element) no longer aborts the process. The
+  element gets the typed value validation gives the same element; for
+  `xs:string` elements `fn:data` returns it instead of raising FOTY0012. ([#342](https://github.com/zorba-processor/zorba/pull/342))
+- The `zorba` image and the builder images build ICU and libxml2 from patched
+  forks (zorba-processor/icu `release-78.3-zorba.1`, zorba-processor/libxml2
+  `v2.15.4-zorba.1`). With them, a failed allocation while ICU compiles a
+  regular expression is reported as an out-of-memory error instead of
+  crashing, and `x:canonicalize()` reports a failed allocation instead of
+  returning a canonical form that lacks a namespace declaration, an attribute
+  or an attribute's value. Each process loads one copy of each library. ([#344](https://github.com/zorba-processor/zorba/pull/344))
+- A document that loads can be validated: `validate` gave every element of
+  the validated copy its own base URI, held in an attribute that lengthened
+  the node ids of its children, so a document over about 680 levels deep
+  failed validation with `ZSTR0030`. An element now gets a base URI only
+  where it differs from its parent's. ([#345](https://github.com/zorba-processor/zorba/pull/345))
+- XQDDF: the queue rule of `delete-nodes`, `iddl:delete` raising `ZDDY0023`,
+  and the errors of `cdml:delete-first` and `cdml:delete-last` (`ZDDY0004`,
+  `ZDDY0007`, `ZDDY0008`) now match the implementation. ([#346](https://github.com/zorba-processor/zorba/pull/346))
+- The data location of an entity amplification error is where the document
+  references the entity, with the document's URI; it was a position in the
+  entity's replacement text, without the document. ([#348](https://github.com/zorba-processor/zorba/pull/348))
+- At O1 and O2, a descendant step with a name test (`//a`,
+  `descendant-or-self::a`) missed elements nested in an element of the same
+  name when the inner element came from an expression whose result a
+  constructor did not copy (the no-copy optimization), e.g. a recursive
+  function `<a>{ local:nest($n - 1) }</a>`: `count(local:nest(3)//a)` gave 1
+  instead of 2. Placing a subtree without copying it now marks the elements
+  above it that a copy would mark as containing an element of their own name. ([#350](https://github.com/zorba-processor/zorba/pull/350))
+- At O1 and O2, with `declare copy-namespaces preserve, no-inherit`, copying a
+  tree in which a constructor had placed content without a copy (the no-copy
+  optimization), e.g. `copy $c := local:nest(3) modify () return $c`, raised
+  the internal error `zerr:ZXQP0002` (`copymode.theNsPreserve == false`). Such
+  a copy now works, and each copied element gets the in-scope namespaces it
+  gets at O0: an element placed without a copy does not inherit the bindings
+  of the tree that references it. ([#351](https://github.com/zorba-processor/zorba/pull/351))
+- Trees may be as deep as memory and the XML parser allow. Node ids had at
+  most 255 bytes, about a thousand levels for a chain of single children
+  (fewer when elements have preceding siblings or attributes): a deeper
+  document failed to load (`FODC0006`, "nodeid requires more than 255 bytes")
+  and constructing, copying, validating or updating such a tree raised
+  `ZSTR0030`. They now work, at the cost of node ids that grow with depth
+  (memory grows with the number of nodes times their depth). ([#355](https://github.com/zorba-processor/zorba/pull/355))
+- What walks over a tree recursively no longer crashes on a tree too deep
+  for the machine stack (serializing crashed between 10 000 and 20 000
+  levels, freeing a loaded tree between 80 000 and 90 000): serializing,
+  validating and revalidating, copying (constructors, `copy modify`, inserts
+  and replacements, collections), `fn:deep-equal` and the deep-equal hash of
+  cached functions, atomizing, `jx:xml-to-json` and full-text tokenization
+  raise `zerr:ZXQP0072` with the depth of the node, the document it came from
+  and the location of the expression. Freeing a tree, deleting nodes,
+  inheriting namespaces after an update, releasing namespace contexts and
+  computing base URIs no longer recurse. The serializer and `fn:deep-equal`
+  take less stack per level (208 and about 270 bytes instead of 720 and 448). ([#355](https://github.com/zorba-processor/zorba/pull/355))
+- Fix document order around 31 levels of nesting: a node id that used all
+  8 bytes kept inline compared its inline flag bit as data, so `<<`, `>>`,
+  `is`, duplicate removal and ancestor tests could be wrong between such a
+  node and its deeper descendants. ([#356](https://github.com/zorba-processor/zorba/pull/356))
+- Fix the decoding of node ids at six bytes of the encoding (0000 0000,
+  0001 1111, 0101 0101, 0101 0110, 1010 0100, 1010 0111): ids such as
+  1.1.1.3 decoded as 1.1.1, with effects on node levels, sibling and parent
+  tests and on the ids given to inserted nodes. Ids with components below
+  -1 118 484 did not decode at all; an odd one at the end of an id crashed. ([#356](https://github.com/zorba-processor/zorba/pull/356))
+- Fix node levels and parent and sibling tests for ids with negative odd
+  components (made by inserting before the first child), which did not
+  count as levels. ([#356](https://github.com/zorba-processor/zorba/pull/356))
+- `validate` no longer takes time proportional to the square of a tree's
+  depth: each element took its base URI from the tree, walking up to the root
+  (10 000 levels: 0.38 s, now 0.18 s). ([#357](https://github.com/zorba-processor/zorba/pull/357))
+- Saving or loading a compiled plan with a tree too deep for the stack
+  raises `zerr:ZXQP0072` instead of crashing. ([#357](https://github.com/zorba-processor/zorba/pull/357))
+- Freeing trees that hold each other through the nodes that constructors
+  share without copying no longer recurses. ([#357](https://github.com/zorba-processor/zorba/pull/357))
+- A failed allocation while libxml2 grows its input buffer is a memory error,
+  not a malformed document, with libxml2 versions that report it only as the
+  thread's last error (2.9). ([#357](https://github.com/zorba-processor/zorba/pull/357))
+- An element of a simple type with no text child (empty content) has the
+  typed value of "" for its type, after validation and after revalidation:
+  `xs:hexBinary("")`, `xs:string("")`, the user-defined atomic type's value of
+  "", and the empty sequence for a list type. It was `xs:untypedAtomic("")`. ([#358](https://github.com/zorba-processor/zorba/pull/358))
+- A copy of an element with an explicit `xml:base` attribute got two hidden
+  base-uri attributes: the copy of `xml:base` added one and the copy added
+  another. The extra attribute took node id space, so nested copies of such
+  elements reached the node id limit at about 257 levels instead of about
+  409. The copy now has one; base URIs are unchanged. ([#359](https://github.com/zorba-processor/zorba/pull/359))
+- Inserting a node (`insert node`, `replace node`) no longer leaves the
+  inserted subtree half moved into its new tree when an allocation fails
+  after its node ids are computed: moving types, making room in the parent,
+  re-resolving `xml:base` and collecting the subtree now happen before the
+  subtree changes, and nothing after that can fail. ([#360](https://github.com/zorba-processor/zorba/pull/360))
+- Copying an element no longer crashes when an allocation fails while the
+  copy's root element is created. ([#360](https://github.com/zorba-processor/zorba/pull/360))
+- The XQuery and JSONiq scanners no longer lose memory when an allocation
+  fails while they create or grow a buffer or their start-condition stack
+  (flex's skeleton dropped the old block or the buffer struct). The fix is a
+  patch applied to the generated scanners, so it survives regeneration. ([#361](https://github.com/zorba-processor/zorba/pull/361))
+- Undoing applied updates (inserts and replacements of nodes, and the merge
+  of adjacent text nodes) no longer aborts the process when no memory is
+  left: what the undo needs is kept while the update is applied, and the
+  undo allocates nothing. ([#363](https://github.com/zorba-processor/zorba/pull/363))
+- `insert nodes ... into`, `as first into` and `as last into` with both
+  attributes and other nodes crashed the process: the attributes' update
+  took the target, and the other nodes' update got none. ([#364](https://github.com/zorba-processor/zorba/pull/364))
+- Detaching the nodes that updates removed (deleted, replaced, and text
+  nodes merged together), done after the updates are committed, no longer
+  aborts the process when no memory is left: what it needs is made while the
+  updates are applied, where a failure still undoes them. ([#365](https://github.com/zorba-processor/zorba/pull/365))
+- Running out of memory while the security policy resolves a file path is a
+  memory error, not an access denied for a malformed path (`FOFL9999`), so the
+  document cache no longer refuses that file for good. ([#365](https://github.com/zorba-processor/zorba/pull/365))
+- Inserting an element no longer leaves the type of its hidden base-uri
+  attribute in the target tree after that attribute is freed: a node later
+  allocated at the same address and added to the tree's types failed an
+  assertion, or in a release build kept the stale entry.
+- Adding a member to a JSON object no longer leaks the collection's update list
+  or the insert primitive when an allocation fails while they are registered.
 
 ### Removed
 
