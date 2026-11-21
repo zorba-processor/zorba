@@ -3507,6 +3507,36 @@ void test_sweep_descendant( Fixture const &f ) {
   (void)f;
 #endif
 }
+// Inserting a subtree into a copy: XmlNode::attach moves the inserted copy,
+// with its attributes, an explicit xml:base re-resolved under the target and a
+// typed attribute, into the target tree. A failed allocation there leaves both
+// trees whole: the query gives the answer or the memory error, and nothing is
+// kept.
+void test_sweep_insert( Fixture const &f ) {
+#if defined(__linux__)
+  auto query = []( std::string const &name ) {
+    return caught(
+      "count(copy $c := <a xml:base=\"http://example.com/\"><b/></a>\n"
+      "      modify insert node <" + name + " xml:base=\"sub/\" k=\"1\">"
+      "{ attribute id { xs:ID(\"i1\") } }<z>t</z></" + name + ">\n"
+      "             into $c/b\n"
+      "      return $c//*)" );
+  };
+  Sweep s;
+  s.query = query( "sweep" );
+  s.before.push_back( query( "warm" ) );
+  s.after_compile = true;
+  s.expected = "3";
+  // Not attach itself: when allocations keep failing after the insert was
+  // applied, undoing it detaches the node again, which allocates (a new tree,
+  // its type map) and cannot fail, so it aborts (CI run 44533934853, point 257
+  // of the runs of 8). Cap: once, as seen.
+  s.known = { starting( "signal 6 in libzorba_simplestore", 1, 8 ) };
+  exhaust_sweep( f, "insert", s );
+#else
+  (void)f;
+#endif
+}
 // The schema validator alone: built for each validate expression, with a text
 // node under each element, attached to its parent when the element is made and
 // when it is validated. Twenty elements: under ASan, in the time of a test.
@@ -8343,6 +8373,7 @@ Test const tests[] = {
   { "exhaust_sweep_xml_dtd_nodes", test_sweep_xml_dtd_nodes },
   { "exhaust_sweep_fragment", test_sweep_fragment },
   { "exhaust_sweep_descendant", test_sweep_descendant },
+  { "exhaust_sweep_insert", test_sweep_insert },
   { "exhaust_sweep_validate", test_sweep_validate },
   { "exhaust_sweep_schema_import", test_sweep_schema_import },
   { "exhaust_sweep_html", test_sweep_html },
