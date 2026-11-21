@@ -40,6 +40,7 @@
 #include <compiler/api/compilercb.h>
 
 #include "runtime/json/nesting.h"
+#include "runtime/util/tree_depth.h"
 
 #include <runtime/sequences/sequences.h>
 #include <runtime/core/arithmetic_impl.h>
@@ -99,7 +100,9 @@ bool deepEqualChildren(
       return true;
     else if (!c1Valid || !c2Valid)
       return false;
-    else if (!deepEqual(loc, sctx, child1, child2, collator, timezone, raiseError))
+    // Children are nodes: deepEqual() would only add a frame per level.
+    else if (!deepEqualNodes(loc, sctx, child1, child2, collator, timezone,
+                             raiseError))
       return false;
   }
 
@@ -164,6 +167,8 @@ bool deepEqualNodes(
 {
   if (item1->getNodeKind() != item2->getNodeKind())
     return false;
+
+  tree_depth::check_stack(item1, "compare", loc);
 
   switch (item1->getNodeKind())
   {
@@ -571,6 +576,8 @@ uint32_t deHashNode(
     XQPCollator* collator,
     int timezone)
 {
+  tree_depth::check_stack(item, "hash", loc);
+
   uint32_t lHash = FNV_32_INIT;
   uint32_t lInnerHash;
 

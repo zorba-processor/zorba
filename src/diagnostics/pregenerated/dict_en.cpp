@@ -533,6 +533,7 @@ extern entry const dict_en[] = {
   { "zerr:ZXQP0069", "$1" },
   { "zerr:ZXQP0070", "$1" },
   { "zerr:ZXQP0071", "$1" },
+  { "zerr:ZXQP0072", "not enough stack space left to $1 a node nested $2 levels deep${ in document \"3\"}: the tree is too deep for the available stack" },
 #if !defined(ZORBA_NO_FULL_TEXT)
   { "zerr:ZXQP8401", "\"$1\": wrong WordNet file version; should be \"$2\"" },
 #endif

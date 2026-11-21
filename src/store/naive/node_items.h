@@ -523,12 +523,7 @@ public:
 
   uint32_t hash(long timezone = 0, const XQPCollator* aCollation = 0) const;
 
-  void getBaseURI(zstring& uri) const
-  {
-    assert(!isConnectorNode());
-    bool local = false;
-    getBaseURIInternal(uri, local);
-  }
+  void getBaseURI(zstring& uri) const;
 
   bool getEBV() const;
 

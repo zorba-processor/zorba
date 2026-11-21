@@ -21,6 +21,8 @@
 // - insertBefore/insertAfter/insertInto produce ids strictly between the
 //   neighbours, also when applied repeatedly;
 // - getRelativePosition() classifies ancestor/descendant/preceding/following;
+// - ids have no fixed length: thousands of levels, built by appending, by the
+//   loaders' OrdPathStack and by insertions, keep all of the above;
 // - every bit pattern of the encoding decodes, at every bit offset;
 // - ids that just fit inline order and compare like the longer ones.
 
@@ -33,6 +35,7 @@
 
 using namespace std;
 using zorba::simplestore::OrdPath;
+using zorba::simplestore::OrdPathStack;
 
 namespace {
 
@@ -246,6 +249,81 @@ void test_relative_position() {
   }
 }
 
+// Ids far longer than 255 bytes: a chain of first children whose every tenth
+// component takes 41 bits.
+void test_long_ids() {
+  int const levels = 3000;
+  string chain = "1";
+  OrdPath appended;
+  appended.setAsRoot();
+  for ( int i = 1; i <= levels; ++i ) {
+    int const comp = i % 10 ? 1 : 2000001;
+    chain += "." + to_string( comp );
+    appended.appendComp( comp );
+  }
+  OrdPath const deep = make( chain );
+  check( dewey( deep ) == chain, "long id: round trip", "dewey" );
+  check( appended == deep, "long id: appendComp", "vs compress" );
+  check( deep.getLevel() == unsigned( levels + 1 ), "long id: level",
+         to_string( deep.getLevel() ) );
+
+  string const s = deep.serialize();
+  check( s.size() > 2 * 255, "long id: longer than 255 bytes",
+         to_string( s.size() / 2 ) );
+  OrdPath back;
+  back.deserialize( s );
+  check( back == deep, "long id: serialize, deserialize", "" );
+
+  OrdPath copy( deep );
+  check( copy == deep, "long id: copy", "" );
+
+  // The loaders' stack gives the same id for a chain of first children.
+  string ones = "1";
+  OrdPath ones_appended;
+  ones_appended.setAsRoot();
+  OrdPathStack ones_stack;
+  ones_stack.init();
+  for ( int i = 1; i <= levels; ++i ) {
+    ones += ".1";
+    ones_appended.appendComp( 1 );
+    ones_stack.pushChild();
+  }
+  OrdPath from_stack;
+  from_stack = ones_stack;
+  check( from_stack == ones_appended, "long id: OrdPathStack", "vs appendComp" );
+  check( from_stack == make( ones ), "long id: OrdPathStack", "vs compress" );
+  ones_stack.popChild();
+  OrdPath popped;
+  popped = ones_stack;
+  check( popped == make( ones.substr( 0, ones.size() - 4 ) + ".3" ),
+         "long id: OrdPathStack popChild", "" );
+
+  // Children of a long id: order, position, insertions between them.
+  OrdPath const c1 = make( chain + ".1" ), c3 = make( chain + ".3" );
+  check_less( deep, c1, "long id: parent before child" );
+  check_less( c1, c3, "long id: siblings" );
+  check( deep.getRelativePosition( c3 ) == OrdPath::DESCENDANT,
+         "long id: relative position", "descendant" );
+  check( c3.getRelativePosition( c1 ) == OrdPath::PRECEDING,
+         "long id: relative position", "preceding" );
+  check( deep.getRelativePosition2( c1 ) == OrdPath::CHILD,
+         "long id: adjacent position", "child" );
+  check( c1.getRelativePosition2( c3 ) == OrdPath::FOLLOWING_SIBLING,
+         "long id: adjacent position", "following sibling" );
+
+  OrdPath between, before, after;
+  OrdPath::insertInto( deep, c1, c3, between );
+  check_less( c1, between, "long id: insertInto" );
+  check_less( between, c3, "long id: insertInto" );
+  check_valid_child( deep, between, "long id: insertInto" );
+  OrdPath::insertBefore( deep, c1, before );
+  check_less( before, c1, "long id: insertBefore" );
+  check_valid_child( deep, before, "long id: insertBefore" );
+  OrdPath::insertAfter( deep, c3, after );
+  check_less( c3, after, "long id: insertAfter" );
+  check_valid_child( deep, after, "long id: insertAfter" );
+}
+
 // Component values at the edges of every encoding class, so that sequences
 // of them put every bit pattern the decoder handles at every bit offset.
 int const edge_values[] = {
@@ -419,6 +497,7 @@ int test_ordpath( int, char*[] ) {
   test_ordering();
   test_insert();
   test_relative_position();
+  test_long_ids();
   test_decode_table();
   test_decode_all_patterns();
   test_inline_boundary();

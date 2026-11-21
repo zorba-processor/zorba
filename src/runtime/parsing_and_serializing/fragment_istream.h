@@ -61,7 +61,6 @@ struct FragmentEvent
   std::vector<bool> ns_has_prefix;
   std::vector<attribute> attributes;
   int nb_defaulted = 0;
-  int line = 0, column = 0;             // where in the input it was read
 };
 
 /**

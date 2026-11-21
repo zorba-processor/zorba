@@ -56,6 +56,7 @@
 #include "context/namespace_context.h"
 
 #include "diagnostics/assert.h"
+#include "runtime/util/tree_depth.h"
 #include "zorba/store_consts.h"
 
 namespace zorba
@@ -337,6 +338,7 @@ store::Item_t Validator::processElement(
   ZORBA_ASSERT(element->isNode());
   ZORBA_ASSERT(element->getNodeKind() == store::StoreConsts::elementNode);
 
+  tree_depth::check_stack(element.getp(), "validate", loc);
 
   store::Item_t nodeName = element->getNodeName();
   zstring baseUri;
@@ -392,9 +394,8 @@ store::Item_t Validator::processElement(
       haveEmptyValue = typeHasEmptyValue(schemaType);
 
       if (haveTypedValue && !haveEmptyValue && !schemaValidator.isNilled() &&
-          element->getStringValue().empty() &&
-          emptyContentTypedValue(sctx, typeManager, schemaType, bindings,
-                                 emptyContentValue, loc))
+          emptyContentTypedValue(sctx, typeManager, schemaType, element.getp(),
+                                 bindings, emptyContentValue, loc))
         haveEmptyValue = true;
     }
   }
@@ -815,6 +816,7 @@ bool Validator::emptyContentTypedValue(
     const static_context* sctx,
     TypeManager* typeManager,
     const xqtref_t& aType,
+    store::Item* aElement,
     store::NsBindings& bindings,
     store::Item_t& aValue,
     const QueryLoc& loc)
@@ -823,6 +825,12 @@ bool Validator::emptyContentTypedValue(
     return false;
 
   const UserDefinedXQType& udt = static_cast<const UserDefinedXQType&>(*aType);
+
+  // Tested after the type: the string value of an element with element
+  // children walks its whole subtree, which made validation quadratic in depth
+  if (!(udt.isList() || udt.isAtomicAny()) ||
+      !aElement->getStringValue().empty())
+    return false;
 
   if (udt.isList())
     return true;

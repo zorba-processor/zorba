@@ -438,6 +438,8 @@ void XmlNode::detach()
       bool localBaseUri;
       zstring baseUri;
       getBaseURIInternal(baseUri, localBaseUri);
+      if (!localBaseUri)
+        theParent->getBaseURI(baseUri);
       if (!localBaseUri && !baseUri.empty())
       {
         zstring dummyUri;
