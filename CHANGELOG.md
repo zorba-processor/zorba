@@ -1548,6 +1548,12 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 - Running out of memory while the security policy resolves a file path is a
   memory error, not an access denied for a malformed path (`FOFL9999`), so the
   document cache no longer refuses that file for good. ([#365](https://github.com/zorba-processor/zorba/pull/365))
+- Inserting an element no longer leaves the type of its hidden base-uri
+  attribute in the target tree after that attribute is freed: a node later
+  allocated at the same address and added to the tree's types failed an
+  assertion, or in a release build kept the stale entry.
+- Adding a member to a JSON object no longer leaks the collection's update list
+  or the insert primitive when an allocation fails while they are registered.
 
 ### Removed
 
