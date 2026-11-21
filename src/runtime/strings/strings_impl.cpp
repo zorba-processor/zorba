@@ -341,7 +341,6 @@ bool ConcatStrIterator::nextImpl(
     PlanState& planState) const
 {
   store::Item_t lItem;
-  std::stringstream lResStream;
   zstring tmp;
 
   checked_vector<PlanIter_t>::const_iterator iter = theChildren.begin();
@@ -354,8 +353,9 @@ bool ConcatStrIterator::nextImpl(
   {
     if (consumeNext(lItem, *iter, planState))
     {
-      lResStream << lItem->getStringValue();
-      planState.chargeBytes(lItem->getStringValue().size(), loc);
+      zstring::size_type const lBefore = tmp.size();
+      lItem->appendStringValue(tmp);
+      planState.chargeBytes(tmp.size() - lBefore, loc);
 
       if (consumeNext(lItem, *iter, planState))
       {
@@ -364,7 +364,6 @@ bool ConcatStrIterator::nextImpl(
     }
   }
 
-  tmp = lResStream.str();
   STACK_PUSH(GENV_ITEMFACTORY->createString(result, tmp), state);
 
   STACK_END(state);

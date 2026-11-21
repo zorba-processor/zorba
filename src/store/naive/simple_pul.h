@@ -39,6 +39,7 @@ namespace store
 namespace simplestore 
 {
 
+class DetachRecord;
 class UpdatePrimitive;
 class IndexKey;
 class PULImpl;
@@ -158,6 +159,10 @@ class CollectionPul
     }
   };
 
+  // For each merge of theMergeList, what detaching each merged node after the
+  // commit needs (see XmlNode::prepareDetach()).
+  std::vector<std::vector<DetachRecord> > theMergeDetachRecords;
+
 protected:
   // Bookeeping
   Collection                       * theCollection;
@@ -244,6 +249,8 @@ public:
   void applyUpdates();
 
   void undoUpdates();
+
+  void prepareFinalize();
 
   void finalizeUpdates();
 

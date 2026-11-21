@@ -327,6 +327,46 @@ public:
 
 
 /*******************************************************************************
+  What XmlNode::finishDetach() needs, made by XmlNode::prepareDetach() while the
+  update that removes the node is applied, so that detaching it after the
+  updates are committed allocates nothing.
+
+  theNewTree     : The node's tree once detached; freed with the record if not
+                   used (with theBaseUriAttr, its root until then).
+  theMoved       : The nodes that move, the node first; the new tree already has
+                   their types.
+  theOwnContexts : The elements that get a namespace context of their own, with
+                   it.
+  theInheriting  : The elements that take their parent's namespace context.
+  theBaseUriAttr : The hidden base-uri attribute that keeps the base URI the
+                   node inherited, or NULL.
+  theText        : For a typed text node, its text.
+********************************************************************************/
+class DetachRecord
+{
+public:
+  XmlTree                                               * theNewTree = NULL;
+  std::vector<XmlNode*>                                   theMoved;
+  std::vector<std::pair<ElementNode*, rchandle<NsBindingsContext> > >
+                                                          theOwnContexts;
+  std::vector<ElementNode*>                               theInheriting;
+  AttributeNode                                         * theBaseUriAttr = NULL;
+  zstring                                                 theText;
+  bool                                                    theRevertText = false;
+
+  DetachRecord() = default;
+
+  DetachRecord(const DetachRecord&) = delete;
+
+  DetachRecord& operator=(const DetachRecord&) = delete;
+
+  DetachRecord(DetachRecord&& other) noexcept;
+
+  ~DetachRecord();
+};
+
+
+/*******************************************************************************
   What XmlNode::attach() changed, kept so that XmlNode::undoAttach() can put it
   back without allocating: undoing an update cannot fail.
 
@@ -375,6 +415,7 @@ public:
 class XmlNode : public StructuredItem
 {
   friend class AttachRecord;
+  friend class DetachRecord;
   friend class XmlTree;
   friend class NodeFactory;
   friend class InternalNode;
@@ -503,6 +544,10 @@ protected:
 
   void detachText(XmlTree* tree);
 
+  void prepareDetach(DetachRecord& record);
+
+  void finishDetach(DetachRecord& record);
+
   void collectMoved(
         const InternalNode* parent,
         std::vector<XmlNode*>& moved,
@@ -516,7 +561,6 @@ protected:
 
   void setRecursiveForSharedSubtree(InternalNode* parent) const;
 
-  void detach();
 
   void destroy(bool removeType);
 

@@ -41,6 +41,7 @@
 #include "node_factory.h"
 
 #include "store/api/validator.h"
+#include "qname_pool.h"
 
 
 namespace zorba { namespace simplestore {
@@ -281,8 +282,7 @@ void XmlNode::attach(InternalNode* parent, csize pos, AttachRecord& record)
 /*******************************************************************************
   Undo attach(), from what it recorded and without allocating: undoing an
   update cannot fail. The node goes back to its old tree, with its old types,
-  base URIs and namespace context. Node ids stay as attach() made them, as
-  they did with detach().
+  base URIs and namespace context. Node ids stay as attach() made them.
 ********************************************************************************/
 void XmlNode::undoAttach(AttachRecord& record)
 {
@@ -484,215 +484,6 @@ void XmlNode::computeSubtreeLabels(
 
 
 /*******************************************************************************
-  Let N be "this" node. Disconnect N and its subtree NT from its containing xml
-  tree T and make NT a new standalone xml tree. The method guarantees that the
-  new tree will be XDM consistent. On the other hand, T may become inconsistent
-  (eg, text nodes may become adjacent, but are not merged).
-********************************************************************************/
-void XmlNode::detach()
-{
-  try
-  {
-    ZORBA_ASSERT(theParent != NULL);
-
-    ulong refcount = 0;
-
-    XmlTree* oldTree = getTree();
-    XmlTree* newTree = GET_STORE().getNodeFactory().createXmlTree();
-    newTree->setRoot(this);
-
-    if (oldTree->getRoot() == this)
-      oldTree->setRoot(NULL);
-
-    store::StoreConsts::NodeKind nodeKind = getNodeKind();
-
-    // ???? What we do here is not really thread-safe. For example, consider the
-    // following scenario: Let T1 be "this" thread and T2 be another thread that
-    // has an rchandle, rc2, on N. Right after T1 acquires the rclock on the old
-    // tree, T2 tries to make a copy of rc2; as a result, T2 will block on the
-    // old tree rclock. When T1 releases the old rclock, the old tree may be
-    // destroyed already, so T2 will be trying to acquire a deallocated lock. 
-    // Even if the old tree is there, T2 will increment the ref counter of the
-    // new tree while holding the lock of the old tree. In fact, the setTree()
-    // method istself is not safe (if T2 tries to copy rc2 after T1 has returned
-    // from setTree(), then things are ok).
-    SYNC_CODE(oldTree->getRCLock()->acquire());
-    SYNC_CODE(newTree->getRCLock()->acquire());
-
-    refcount += theRefCount;
-
-    switch (nodeKind)
-    {
-    case store::StoreConsts::attributeNode:
-    {
-      setTree(newTree);
-      theParent->removeAttr(this);
-      theParent = NULL;
-      break;
-    }
-    case store::StoreConsts::piNode:
-    case store::StoreConsts::commentNode:
-    {
-      setTree(newTree);
-      theParent->removeChild(this);
-      theParent = NULL;
-      break;
-    }
-    case store::StoreConsts::textNode:
-    {
-      setTree(newTree);
-
-      reinterpret_cast<TextNode*>(this)->revertToTextContent();
-
-      theParent->removeChild(this);
-      theParent = NULL;
-      break;
-    }
-    case store::StoreConsts::elementNode:
-    {
-      ElementNode* rootNode = reinterpret_cast<ElementNode*>(this);
-
-      // If the baseUri property of N is inherited from its ancestors, make a
-      // local copy of it, before disconnecting N from its parent.
-      bool localBaseUri;
-      zstring baseUri;
-      getBaseURIInternal(baseUri, localBaseUri);
-      if (!localBaseUri)
-        theParent->getBaseURI(baseUri);
-      if (!localBaseUri && !baseUri.empty())
-      {
-        zstring dummyUri;
-        rootNode->addBaseUriProperty(baseUri, dummyUri);
-      }
-
-      // For each node in the nodes stack, we must save the nsCtx of its
-      // parent node in the parentNsCtxs stack, because the nsCtx of the
-      // parent may change during the while loop below.
-      std::stack<XmlNode*> nodes;
-      std::stack<NsBindingsContext*> parentNsCtxs;
-
-      nodes.push(this);
-      parentNsCtxs.push(rootNode->theParent->getNsContext());
-
-      while (!nodes.empty())
-      {
-        XmlNode* node = nodes.top();
-        nodes.pop();
-
-        if (node->getNodeKind() == store::StoreConsts::elementNode)
-        {
-          ElementNode* elemNode = reinterpret_cast<ElementNode*>(node);
-
-          node->setTree(newTree);
-
-          // Preserve the namespace bindings of the current node
-          NsBindingsContext* nsContext = elemNode->getNsContext();
-          NsBindingsContext* parentNsContext = parentNsCtxs.top();
-          parentNsCtxs.pop();
-
-          // If the current node is N, or a node in NT that does not inherit ns
-          // bindings directly from its parent (but may inherit from some other
-          // ancestor).
-          if (elemNode == rootNode ||
-              nsContext == NULL ||
-              (elemNode->haveLocalBindings() &&
-               nsContext->getParent() != parentNsContext) ||
-              nsContext != parentNsContext)
-          {
-            if (nsContext != NULL)
-            {
-              std::unique_ptr<NsBindingsContext> ctx = std::make_unique<NsBindingsContext>();
-              elemNode->getNamespaceBindings(ctx->getBindings());
-            
-              if (!ctx->empty())
-              {
-                elemNode->theNsContext = ctx.release();
-                elemNode->theFlags |= HaveLocalBindings;
-              }
-            }
-          }
-
-          // Else the current node is not N and it inherits ns bindings directly
-          // from its parent.
-          else
-          {
-            elemNode->setNsContext(elemNode->theParent->getNsContext());
-          }
-
-          // Detach the attributes of the current node
-          InternalNode::iterator ite = elemNode->attrsBegin();
-          InternalNode::iterator end = elemNode->attrsEnd();
-          
-          for (; ite != end; ++ite)
-          {
-            AttributeNode* attrNode = static_cast<AttributeNode*>(*ite);
-            refcount += attrNode->theRefCount;
-            attrNode->setTree(newTree);
-          }
-
-          // Detach the children of the current node
-          ite = elemNode->childrenBegin();
-          end = elemNode->childrenEnd();
-
-          for (; ite != end; ++ite)
-          {
-            XmlNode* child = (*ite);
-            refcount += child->theRefCount;
-
-            nodes.push(child);
-
-            if (child->getNodeKind() == store::StoreConsts::elementNode)
-              parentNsCtxs.push(nsContext);
-          }
-        }
-        else
-        {
-          node->setTree(newTree);
-        }
-      } // done traversing tree
-
-      theParent->removeChild(this);
-      theParent = NULL;
-
-      break;
-    }
-    default:
-    {
-      ZORBA_ASSERT(false);
-    }
-    }
-
-    newTree->getRefCount() += refcount;
-    if (newTree->getRefCount() == 0)
-    {
-      SYNC_CODE(newTree->getRCLock()->release());
-      newTree->free();
-    }
-    else
-    {
-      SYNC_CODE(newTree->getRCLock()->release());
-    }
-
-    oldTree->getRefCount() -= refcount;
-    if (oldTree->getRefCount() == 0)
-    {
-      SYNC_CODE(oldTree->getRCLock()->release());
-      oldTree->free();
-    }
-    else
-    {
-      SYNC_CODE(oldTree->getRCLock()->release());
-    }
-  }
-  catch(...)
-  {
-    ZORBA_FATAL(0, "Unexpected exception");
-  }
-}
-
-
-
-/*******************************************************************************
   Undo the first numApplied attaches of upd, last first.
 ********************************************************************************/
 void InternalNode::undoAttaches(UpdatePrimitive& upd, csize numApplied)
@@ -729,6 +520,248 @@ void XmlNode::detachText(XmlTree* tree)
   tree->getRefCount() += theRefCount;
   if (tree->getRefCount() == 0)
     tree->free();
+}
+
+
+/*******************************************************************************
+  Make what finishDetach() needs, while "this" has its former parent: the new
+  tree with the moved nodes' types, the namespace contexts that keep the
+  in-scope bindings, the hidden base-uri attribute that keeps an inherited
+  base URI, and a typed text node's text. This is where detaching can fail.
+********************************************************************************/
+void XmlNode::prepareDetach(DetachRecord& record)
+{
+  record.theNewTree = GET_STORE().getNodeFactory().createXmlTree();
+
+  store::StoreConsts::NodeKind nodeKind = getNodeKind();
+
+  if (nodeKind == store::StoreConsts::textNode)
+  {
+    record.theMoved.push_back(this);
+    TextNode* text = static_cast<TextNode*>(this);
+    if (text->isTyped())
+    {
+      text->getStringValue2(record.theText);
+      record.theRevertText = true;
+    }
+  }
+  else if (nodeKind != store::StoreConsts::elementNode)
+  {
+    record.theMoved.push_back(this);
+  }
+  else
+  {
+    ElementNode* root = static_cast<ElementNode*>(this);
+
+    bool localBaseUri;
+    zstring baseUri;
+    getBaseURIInternal(baseUri, localBaseUri);
+    if (!localBaseUri)
+      theParent->getBaseURI(baseUri);
+    if (!localBaseUri && !baseUri.empty())
+    {
+      const Store& store = GET_STORE();
+      store::Item_t qname;
+      store.getQNamePool().insert(qname, store.XML_URI, "xml", "base");
+      store::Item_t typeName = store.theSchemaTypeNames[store::XS_ANY_URI];
+      store::Item_t typedValue;
+      GET_FACTORY().createAnyURI(typedValue, baseUri);
+
+      // The root of the new tree until finishDetach() uses it.
+      record.theBaseUriAttr = GET_NODE_FACTORY().createAttributeNode(
+        record.theNewTree, NULL, false, 0, qname, typeName, typedValue,
+        false, true);
+
+      if (root->theNodes.size() == root->theNodes.capacity())
+        root->theNodes.reserve(2 * root->theNodes.size() + 1);
+    }
+
+    // Which elements get a context of their own, which take their parent's.
+    std::vector<std::pair<XmlNode*, NsBindingsContext*> > pending;
+    pending.push_back(std::make_pair(this, theParent->getNsContext()));
+
+    while (!pending.empty())
+    {
+      XmlNode* node = pending.back().first;
+      NsBindingsContext* parentNsContext = pending.back().second;
+      pending.pop_back();
+
+      record.theMoved.push_back(node);
+
+      if (node->getNodeKind() != store::StoreConsts::elementNode)
+        continue;
+
+      ElementNode* elem = static_cast<ElementNode*>(node);
+      NsBindingsContext* nsContext = elem->getNsContext();
+
+      if (elem == root ||
+          nsContext == NULL ||
+          (elem->haveLocalBindings() && nsContext->getParent() != parentNsContext) ||
+          nsContext != parentNsContext)
+      {
+        if (nsContext != NULL)
+        {
+          rchandle<NsBindingsContext> ctx = new NsBindingsContext();
+          elem->getNamespaceBindings(ctx->getBindings());
+
+          if (!ctx->empty())
+            record.theOwnContexts.push_back(std::make_pair(elem, ctx));
+        }
+      }
+      else
+      {
+        record.theInheriting.push_back(elem);
+      }
+
+      InternalNode::iterator ite = elem->attrsBegin();
+      InternalNode::iterator end = elem->attrsEnd();
+      for (; ite != end; ++ite)
+        record.theMoved.push_back(*ite);
+
+      ite = elem->childrenBegin();
+      end = elem->childrenEnd();
+      for (; ite != end; ++ite)
+        pending.push_back(std::make_pair(*ite, nsContext));
+    }
+  }
+
+  for (csize i = 0; i < record.theMoved.size(); ++i)
+  {
+    store::Item_t type = record.theMoved[i]->typeToMove();
+    if (type != NULL)
+      record.theNewTree->addType(record.theMoved[i], type);
+  }
+}
+
+
+/*******************************************************************************
+  Detach "this" with what prepareDetach() made, without allocating: it runs after
+  the updates are committed, and cannot fail. "this" has its former parent
+  set again (see CollectionPul::finalizeUpdates()).
+********************************************************************************/
+void XmlNode::finishDetach(DetachRecord& record)
+{
+  ZORBA_ASSERT(theParent != NULL && record.theNewTree != NULL);
+
+  XmlTree* oldTree = getTree();
+  XmlTree* newTree = record.theNewTree;
+  record.theNewTree = NULL;
+
+  SYNC_CODE(oldTree->getRCLock()->acquire());
+  SYNC_CODE(newTree->getRCLock()->acquire());
+
+  newTree->setRoot(this);
+  if (oldTree->getRoot() == this)
+    oldTree->setRoot(NULL);
+
+  long refcount = 0;
+
+  // A node that a later update removed from the subtree stays where it is.
+  // theMoved has parents before their children and attributes.
+  for (csize i = 0; i < record.theMoved.size(); ++i)
+  {
+    XmlNode* node = record.theMoved[i];
+    bool const stays = node != this &&
+      (node->theParent == NULL || node->theParent->getTree() != newTree);
+
+    if (stays)
+    {
+      if (node->typeToMove() != NULL)
+        newTree->removeType(node);
+      continue;
+    }
+
+    refcount += node->theRefCount;
+    if (node->typeToMove() != NULL)
+      node->getTree()->removeType(node);
+    node->setTreeInternal(newTree);
+  }
+
+  if (record.theRevertText)
+  {
+    TextNode* text = static_cast<TextNode*>(this);
+    text->setValue(NULL);
+    text->setText(record.theText);
+    text->theFlags &= ~IsTyped;
+  }
+
+  if (record.theBaseUriAttr != NULL)
+  {
+    record.theBaseUriAttr->connect(static_cast<InternalNode*>(this), 0);
+    static_cast<ElementNode*>(this)->setHaveBaseUri();
+    record.theBaseUriAttr = NULL;
+  }
+
+  for (csize i = 0; i < record.theOwnContexts.size(); ++i)
+  {
+    ElementNode* elem = record.theOwnContexts[i].first;
+    if (elem->getTree() != newTree)
+      continue;
+    elem->theNsContext.transfer(record.theOwnContexts[i].second);
+    elem->theFlags |= HaveLocalBindings;
+  }
+
+  for (csize i = 0; i < record.theInheriting.size(); ++i)
+  {
+    ElementNode* elem = record.theInheriting[i];
+    if (elem->getTree() != newTree)
+      continue;
+    elem->setNsContext(elem->theParent->getNsContext());
+  }
+
+  if (getNodeKind() == store::StoreConsts::attributeNode)
+    theParent->removeAttr(this);
+  else
+    theParent->removeChild(this);
+  theParent = NULL;
+
+  newTree->getRefCount() += refcount;
+  if (newTree->getRefCount() == 0)
+  {
+    SYNC_CODE(newTree->getRCLock()->release());
+    newTree->free();
+  }
+  else
+  {
+    SYNC_CODE(newTree->getRCLock()->release());
+  }
+
+  oldTree->getRefCount() -= refcount;
+  if (oldTree->getRefCount() == 0)
+  {
+    SYNC_CODE(oldTree->getRCLock()->release());
+    oldTree->free();
+  }
+  else
+  {
+    SYNC_CODE(oldTree->getRCLock()->release());
+  }
+}
+
+
+/*******************************************************************************
+
+********************************************************************************/
+DetachRecord::DetachRecord(DetachRecord&& other) noexcept
+  :
+  theNewTree(other.theNewTree),
+  theBaseUriAttr(other.theBaseUriAttr),
+  theRevertText(other.theRevertText)
+{
+  theMoved.swap(other.theMoved);
+  theOwnContexts.swap(other.theOwnContexts);
+  theInheriting.swap(other.theInheriting);
+  theText.swap(other.theText);
+  other.theNewTree = NULL;
+  other.theBaseUriAttr = NULL;
+}
+
+
+DetachRecord::~DetachRecord()
+{
+  // The base-uri attribute, if any, is the root of the unused tree.
+  if (theNewTree != NULL)
+    theNewTree->free();
 }
 
 

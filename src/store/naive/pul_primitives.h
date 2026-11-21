@@ -41,6 +41,7 @@ class CollectionPul;
 class XmlNode;
 class InternalNode;
 class AttachRecord;
+class DetachRecord;
 
 
 /*******************************************************************************
@@ -103,6 +104,8 @@ typedef std::vector<NodeTypeInfo> TypeUndoList;
                      errors.
   theAttachRecords : For inserts and replacements, what the attach() of each new
                      node changed, so that undo() allocates nothing.
+  theDetachRecords : For deletes and replacements, what detaching each removed
+                     node after the commit needs (see XmlNode::prepareDetach).
 ********************************************************************************/
 class UpdatePrimitive
 {
@@ -122,6 +125,7 @@ protected:
   bool             theRemoveType;
   TypeUndoList     theTypeUndoList;
   std::vector<AttachRecord> theAttachRecords;
+  std::vector<DetachRecord> theDetachRecords;
 
 protected:
   UpdatePrimitive(PULImpl* pul, const QueryLoc*, store::Item_t& target);

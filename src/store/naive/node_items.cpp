@@ -4183,6 +4183,10 @@ AttributeNode::AttributeNode(
     store::Item_t null;
     setType(null);
 
+    // The tree outlives this node, which is freed when its constructor throws.
+    if (parent == NULL)
+      tree->setRoot(NULL);
+
     throw;
   }
 

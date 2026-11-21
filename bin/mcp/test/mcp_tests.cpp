@@ -3532,6 +3532,36 @@ void test_sweep_insert( Fixture const &f ) {
   (void)f;
 #endif
 }
+// Deleting a node, which makes the text around it adjacent: after the updates
+// are committed, the deleted node becomes a tree of its own (with the
+// namespaces and the base URI it had) and the two text nodes merge. A failed
+// allocation gives the answer or the memory error, and keeps nothing.
+void test_sweep_delete( Fixture const &f ) {
+#if defined(__linux__)
+  auto query = []( std::string const &name ) {
+    std::string const call = caught( "local:run()" );
+    std::size_t const prolog = call.find( '\n' ) + 1;
+    return call.substr( 0, prolog ) +
+      "declare namespace an = \"http://zorba.io/annotations\";\n"
+      "declare %an:sequential function local:run() {\n"
+      "  variable $x := <" + name + " xmlns:p=\"urn:p\" xml:base=\"http://e/\">"
+      "t<b p:k=\"1\"><p:c/></b>u</" + name + ">;\n"
+      "  variable $b := $x/b;\n"
+      "  delete node $b;\n"
+      "  concat(string($x), \" \", count($x/text()), \" \",\n"
+      "         namespace-uri-for-prefix(\"p\", $b), \" \", base-uri($b))\n"
+      "};\n" + call.substr( prolog );
+  };
+  Sweep s;
+  s.query = query( "sweep" );
+  s.before.push_back( query( "warm" ) );
+  s.after_compile = true;
+  s.expected = "\"tu 1 urn:p http://e/\"";
+  exhaust_sweep( f, "delete", s );
+#else
+  (void)f;
+#endif
+}
 // The schema validator alone: built for each validate expression, with a text
 // node under each element, attached to its parent when the element is made and
 // when it is validated. Twenty elements: under ASan, in the time of a test.
@@ -4670,8 +4700,15 @@ void test_cache_after_failed_admission( Fixture const &f ) {
           call( open_of( 0 ) );
         std::size_t const before = server.cache_stats().hits;
         call( open_of( 0 ) );
-        if ( server.cache_stats().hits <= before )
-          out = "the file is not cached any more";
+        if ( server.cache_stats().hits <= before ) {
+          auto const &st = server.cache_stats();
+          out = "the file is not cached any more (failing allocation " +
+                std::to_string( n ) + " of " + std::to_string( total ) +
+                "; admissions " + std::to_string( st.admissions ) +
+                ", refused " + std::to_string( st.refused ) +
+                ", entries " + std::to_string( st.entries ) +
+                ", evictions " + std::to_string( st.evictions ) + ")";
+        }
       }
       ssize_t const w = write( fd[1], out.data(), out.size() );
       _exit( w == static_cast<ssize_t>( out.size() ) ? 0 : 1 );
@@ -8369,6 +8406,7 @@ Test const tests[] = {
   { "exhaust_sweep_fragment", test_sweep_fragment },
   { "exhaust_sweep_descendant", test_sweep_descendant },
   { "exhaust_sweep_insert", test_sweep_insert },
+  { "exhaust_sweep_delete", test_sweep_delete },
   { "exhaust_sweep_validate", test_sweep_validate },
   { "exhaust_sweep_schema_import", test_sweep_schema_import },
   { "exhaust_sweep_html", test_sweep_html },
