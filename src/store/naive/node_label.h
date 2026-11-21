@@ -57,6 +57,8 @@ public:
 
   void setAsRoot() { theOrdPath.setAsRoot(); }
 
+  void swap(NodeLabel& other) { theOrdPath.swap(other.theOrdPath); }
+
   // The label of the child at a position among the children (attributes
   // first) of a parent that never lost a child.
   void setAsChild(const NodeLabel& parent, csize position)

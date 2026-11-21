@@ -588,6 +588,7 @@ expr* HoistRule::hoistExpr(
 
   bool inloop = false;
   int clauseNo = 0;
+  int readsState = -1;
 
   // step->prev == NULL means that expr e is not inside any flwor expr, and as a
   // result, there is nothing to hoist.
@@ -622,6 +623,26 @@ expr* HoistRule::hoistExpr(
       assert(step->theExpr->get_expr_kind() == flwor_expr_kind);
 
       flwor_expr* flwor = static_cast<flwor_expr*>(step->theExpr);
+
+      // Each iteration of a sequential flwor runs complete before the next, so an
+      // expr that reads a state does not leave it: it goes at most to the start of
+      // the inner flwor it was hoisted out of.
+      if (flwor->is_sequential())
+      {
+        if (readsState < 0)
+          readsState = expr_tools::reads_changeable_state(e) ? 1 : 0;
+
+        if (readsState == 1)
+        {
+          if (nextstep == NULL ||
+              nextstep->theExpr->get_expr_kind() != flwor_expr_kind)
+            return NULL;
+
+          step = nextstep;
+          clauseNo = -1;
+          break;
+        }
+      }
 
       bool foundReferencedFLWORVar = false;
       bool foundSequentialClause = false;
@@ -813,7 +834,8 @@ expr* HoistRule::hoistExpr(
 
   // Hoisting is possible ... Go ahead and hoist e: (a) we create an internal LET
   // var: $$temp := op:hoist(e) (b) we place the $$temp declaration right after
-  // variable V, and (c) we replace e with op:unhoist($$temp).
+  // variable V, and (c) we replace e with op:unhoist($$temp). The LET is lazy:
+  // e is evaluated where its value is first read, not where no loop reads it.
 
   var_expr* letvar = rCtx.createTempVar(sctx, loc, var_expr::let_var);
 
@@ -823,7 +845,7 @@ expr* HoistRule::hoistExpr(
   hoisted->setAnnotationFlags(e->getAnnotationFlags());
   //letvar->setFlags(e->getFlags());
 
-  let_clause* flref = rCtx.theEM->create_let_clause(sctx, loc, letvar, hoisted);
+  let_clause* flref = rCtx.theEM->create_let_clause(sctx, loc, letvar, hoisted, true);
 
   letvar->set_flwor_clause(flref);
 

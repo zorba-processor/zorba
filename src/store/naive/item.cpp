@@ -954,6 +954,15 @@ void Item::getDocumentURI(zstring& uri) const
 }
 
 
+void Item::setEmptyContentTypedValue(Item_t&)
+{
+  throw ZORBA_EXCEPTION(
+    zerr::ZSTR0050_FUNCTION_NOT_IMPLEMENTED_FOR_ITEMTYPE,
+    ERROR_PARAMS( __FUNCTION__, getType()->getStringValue() )
+  );
+}
+
+
 void Item::getBaseURI(zstring& uri) const
 {
   throw ZORBA_EXCEPTION(

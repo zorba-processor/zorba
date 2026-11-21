@@ -329,7 +329,8 @@ public:
         bool                        haveEmptyValue,
         const store::NsBindings&    localBindings,
         zstring&                    baseURI,
-        bool                        isInSubstitutionGroup = false);
+        bool                        isInSubstitutionGroup = false,
+        bool                        isNilled = false);
 
   bool createAttributeNode(
         store::Item_t&              result,

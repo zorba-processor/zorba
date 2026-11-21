@@ -70,6 +70,11 @@
 
 #include <libxml/xmlversion.h>
 
+#include <zorba/serializer.h>
+#include <zorba/singleton_item_sequence.h>
+#include <zorba/external_module.h>
+#include <zorba/function.h>
+#include <zorba/item_sequence.h>
 #include <zorba/store_manager.h>
 #include <zorba/zorba.h>
 
@@ -3379,15 +3384,22 @@ void test_sweep_xml_dtd( Fixture const &f ) {
               starting( "terminate N11xercesc_", 105, 8, "OutOfMemoryExceptionE" ) };
   // libxml2 before 2.13 does not report every allocation of its own that failed
   // (see test_sweep_xml_dtd_nodes): the load then fails as a document that
-  // libxml2 could not parse. Caps from the same run (189 / 35 tree creation;
-  // 55 / 13 malformed).
+  // libxml2 could not parse, or with the parse or validity error libxml2
+  // reports in its place, at its location (the file is unknown when its name
+  // could not be copied). Caps from the same run (189 / 35 tree creation;
+  // 55 / 13 malformed), and from the linux-arm64 job of CI run 43579489611
+  // (37 / 5 at a location in the file; 0 / 5 with no file).
   int const version = libxml2_version();
   if ( version && version < 21300 )
     s.known.insert( s.known.end(), {
       starting( "\"caught err:FODC0002 \\\"XML tree creation failed\\\"", 285, 1 ),
       starting( "\"caught err:FODC0002 \\\"XML tree creation failed\\\"", 53, 8 ),
       starting( "\"caught err:FODC0002 \\\"malformed XML document\\\"", 83, 1 ),
-      starting( "\"caught err:FODC0002 \\\"malformed XML document\\\"", 20, 8 ) } );
+      starting( "\"caught err:FODC0002 \\\"malformed XML document\\\"", 20, 8 ),
+      starting( "\"caught err:FODC0002 \\\"file:///tmp/mcp-tree", 56, 1 ),
+      starting( "\"caught err:FODC0002 \\\"file:///tmp/mcp-tree", 8, 8 ),
+      starting( "\"caught err:FODC0002 \\\"<null>\\\":", 4, 1 ),
+      starting( "\"caught err:FODC0002 \\\"<null>\\\":", 8, 8 ) } );
   exhaust_sweep( f, "parse-xml with DTD validation", s );
 #else
   (void)f;
@@ -3679,6 +3691,21 @@ void test_sweep_compile( Fixture const &f ) {
   (void)f;
 #endif
 }
+// A token longer than the scanner's input buffer (16 KB): the scanner grows the
+// buffer, and a failed growth is memory_limit like any other allocation.
+void test_sweep_long_token( Fixture const &f ) {
+#if defined(__linux__)
+  Sweep s;
+  s.query = "string-length(\"" + std::string( 20000, 'a' ) + "\")";
+  s.before.push_back( s.query );
+  s.expected = "20000";
+  s.points = 100000;                // all of them
+  s.compiles = true;
+  exhaust_sweep( f, "token longer than the scanner buffer", s );
+#else
+  (void)f;
+#endif
+}
 // The text of a query is read whole, or the call fails: a cut text is not
 // compiled. Every prefix of this query is a valid query with another answer
 // ("1.000…" is 1, without " eq 1" it is not true), so a cut where the copy of the
@@ -3803,18 +3830,16 @@ void test_plan_wrapper_out_of_memory( Fixture const &f ) {
   (void)f;
 #endif
 }
-// Iterator::open() with each allocation failing in turn, over a FLWOR whose open
-// allocates (a let bound to a sequence, group by, order by): the answer or an
+// Iterator::open() with each allocation failing in turn: the answer or an
 // error; then, in an AddressSanitizer build, nothing is left unreachable.
-void test_plan_open_out_of_memory( Fixture const &f ) {
+void sweep_open_out_of_memory( Fixture const &f, StaticContext_t const &sctx,
+                               std::string const &text,
+                               std::string const &answer,
+                               std::string const &what ) {
 #if defined(__linux__)
   auto attempt = [&]( long n, long length, long *count ) -> std::string {
-    XQuery_t const query( f.zorba->compileQuery(
-      "for $i in 1 to 20\n"
-      "let $s := ($i, $i * 2)\n"
-      "group by $k := $i mod 3\n"
-      "order by $k descending\n"
-      "return sum($s)" ) );
+    XQuery_t const query( sctx ? f.zorba->compileQuery( text, sctx )
+                               : f.zorba->compileQuery( text ) );
     Iterator_t const it( query->iterator() );
     inject_arm( n, length );
     bool opened = false;
@@ -3835,26 +3860,79 @@ void test_plan_open_out_of_memory( Fixture const &f ) {
     return out;
   };
   long total = 0;
-  check( attempt( 0, 0, &total ) == "231 210 189", "the FLWOR: the answer" );
-  check( total > 0, "open() allocates", std::to_string( total ) );
+  check( attempt( 0, 0, &total ) == answer, what + ": the answer" );
+  check( total > 0, what + ": open() allocates", std::to_string( total ) );
   long wrong = 0;
   for ( long const length : { 1L, 8L } )
     for ( long n = 1; n <= total; ++n ) {
       long count = 0;
       std::string const got( attempt( n, length, &count ) );
-      if ( got != "231 210 189" && got != "error" && ++wrong <= 3 )
-        std::cout << "at " << n << " of a run of " << length << ": " << got
-                  << std::endl;
+      if ( got != answer && got != "error" && ++wrong <= 3 )
+        std::cout << what << " at " << n << " of a run of " << length << ": "
+                  << got << std::endl;
     }
-  check( wrong == 0, "open() failing: the answer or an error",
+  check( wrong == 0, what + ": open() failing: the answer or an error",
          std::to_string( wrong ) + " points" );
 # if defined(__SANITIZE_ADDRESS__)
   check( __lsan_do_recoverable_leak_check() == 0,
-         "open() failing: nothing is left behind" );
+         what + ": open() failing: nothing is left behind" );
 # endif
 #else
   (void)f;
+  (void)sctx;
+  (void)text;
+  (void)answer;
+  (void)what;
 #endif
+}
+
+// ex:echo($x) returns $x.
+class EchoFunction : public NonContextualExternalFunction {
+public:
+  String getURI() const override { return "urn:mcp-tests:ext"; }
+  String getLocalName() const override { return "echo"; }
+  ItemSequence_t evaluate( Arguments_t const &args ) const override {
+    return args[ 0 ];
+  }
+};
+
+class EchoModule : public ExternalModule {
+public:
+  String getURI() const override { return "urn:mcp-tests:ext"; }
+  ExternalFunction* getExternalFunction( String const& ) override {
+    return &echo_;
+  }
+private:
+  EchoFunction echo_;
+};
+
+// Opening a plan that fails partway destroys each state created so far,
+// including one whose init() failed or did not run: a simple FLWOR (a let bound
+// to a sequence, group by, order by), a general FLWOR (count after group by and
+// order by: GroupByState) and an external function call (ExtFunctionCallIteratorState).
+void test_plan_open_out_of_memory( Fixture const &f ) {
+  sweep_open_out_of_memory( f, StaticContext_t(),
+    "for $i in 1 to 20\n"
+    "let $s := ($i, $i * 2)\n"
+    "group by $k := $i mod 3\n"
+    "order by $k descending\n"
+    "return sum($s)",
+    "231 210 189", "the FLWOR" );
+  sweep_open_out_of_memory( f, StaticContext_t(),
+    "for $i in 1 to 20\n"
+    "group by $k := $i mod 3\n"
+    "order by $k descending\n"
+    "count $c\n"
+    "return $c * sum($i)",
+    "77 140 189", "the general FLWOR" );
+  EchoModule module;
+  StaticContext_t const sctx( f.zorba->createStaticContext() );
+  sctx->registerModule( &module );
+  sweep_open_out_of_memory( f, sctx,
+    "declare namespace ex = \"urn:mcp-tests:ext\";\n"
+    "declare function ex:echo($x) external;\n"
+    "for $i in 1 to 3 return ex:echo($i * 2)",
+    "2 4 6", "the external function call" );
 }
 // The query opened, then read with each allocation failing in turn: the answer
 // or an error; then, in an AddressSanitizer build, nothing is left unreachable.
@@ -3933,6 +4011,17 @@ void test_dynamic_call_out_of_memory( Fixture const &f ) {
     "return (local:g(0), for $i in 1 to 2 return $fs[$i]($i))",
     "0 2 4", "a dynamic function call" );
 }
+// An array constructor appends more members than it reserved room for: a
+// failure while its members grow frees the member being appended. The
+// members are strings, so no copy is made.
+void test_json_array_growth_out_of_memory( Fixture const &f ) {
+  sweep_next_out_of_memory( f,
+    "jsoniq version \"1.0\";\n"
+    "for $i in 1 to 2\n"
+    "let $a := [ for $j in 1 to 4 return concat(\"m\", $j, $i) ]\n"
+    "return $a[[size($a)]]",
+    "m41 m42", "appending to an array" );
+}
 // The body of test_call_body_out_of_memory, cached: each call also looks up
 // and fills the function cache.
 void test_cached_call_body_out_of_memory( Fixture const &f ) {
@@ -3983,6 +4072,85 @@ void test_fold_left_out_of_memory( Fixture const &f ) {
   sweep_next_out_of_memory( f,
     "fold-left((1, 2, 3), 0, function($a, $b) { $a + $b })",
     "6", "fold-left" );
+}
+// The first dynamic call of local:g optimizes its body, with each allocation
+// failing in turn; when that optimization fails, the next run of the same
+// compiled query must optimize the body again (seen in the trees printed after
+// optimization) and give the answer.
+void test_optimize_after_failure( Fixture const &f ) {
+#if defined(__linux__)
+  std::ostringstream trees;
+  Properties &props = Properties::instance();
+  props.setPrintOptimized( true );
+  props.setDebugStream( trees );
+  std::string const optimized( "after optimization for local:g" );
+  auto run = [&]( XQuery_t const &query, long n ) -> std::string {
+    Iterator_t const it( query->iterator() );
+    it->open();
+    inject_arm( n, 1 );
+    std::string out;
+    try {
+      Item item;
+      while ( it->next( item ) )
+        out += ( out.empty() ? "" : " " ) + item.getStringValue().str();
+    }
+    catch ( std::exception const& ) {
+      out = "error";
+    }
+    inject_disarm();
+    it->close();
+    return out;
+  };
+  auto compile = [&]() {
+    XQuery_t query( f.zorba->compileQuery(
+      "declare function local:g($x) { $x * 2 };\n"
+      "let $fs := (local:g#1, local:g#1)\n"
+      "for $i in 1 to 2 return $fs[$i]($i)" ) );
+    trees.str( "" );
+    return query;
+  };
+  long total = 0;
+  {
+    XQuery_t const query( compile() );
+    check( run( query, 0 ) == "2 4", "the query: the answer" );
+    total = inject_count.load();
+    check( trees.str().find( optimized ) != std::string::npos,
+           "the first dynamic call optimizes local:g", trees.str() );
+  }
+  long failed = 0, wrong = 0;
+  for ( long n = 1; n <= total; ++n ) {
+    XQuery_t const query( compile() );
+    if ( run( query, n ) != "error" ||
+         trees.str().find( optimized ) != std::string::npos )
+      continue;
+    ++failed;
+    std::string const got( run( query, 0 ) );
+    if ( ( got != "2 4" || trees.str().find( optimized ) == std::string::npos )
+         && ++wrong <= 3 )
+      std::cout << "after a failure at " << n << ": " << got
+                << ( trees.str().find( optimized ) == std::string::npos
+                     ? ", local:g not optimized" : "" ) << std::endl;
+  }
+  props.setDebugStream( std::cout );
+  props.setPrintOptimized( false );
+  check( failed > 0, "runs that fail before local:g is optimized",
+         std::to_string( failed ) );
+  check( wrong == 0, "the run after a failure optimizes local:g",
+         std::to_string( wrong ) + " points" );
+#else
+  (void)f;
+#endif
+}
+// An object constructor copies the array bound to $a, nested arrays and an
+// object included: a failure while a copy is made frees what it made.
+void test_json_copy_out_of_memory( Fixture const &f ) {
+  sweep_next_out_of_memory( f,
+    "jsoniq version \"1.0\";\n"
+    "for $i in 1 to 2\n"
+    "let $a := [ [ $i, 2 ], { \"b\" : [ $i ] } ]\n"
+    "let $o := { \"x\" : $a, \"y\" : $a }\n"
+    "return $o.x[[2]].b[[1]] + size($o.y[[1]])",
+    "3 4", "copying an array" );
 }
 void test_base64_stream_out_of_memory( Fixture const &f ) {
 #if defined(__linux__)
@@ -4072,6 +4240,146 @@ void test_json_loader_out_of_memory( Fixture const &f ) {
 # if defined(__SANITIZE_ADDRESS__)
   check( __lsan_do_recoverable_leak_check() == 0,
          "jn:parse-json: a failed parse leaks nothing" );
+# endif
+#else
+  (void)f;
+#endif
+}
+// The serializer with each allocation failing in turn, over an element 12 deep:
+// past the 8 children iterators the emitter makes first, so its pool of them
+// grows. The whole text or an error; then, in an AddressSanitizer build,
+// nothing is left unreachable.
+void test_serializer_out_of_memory( Fixture const &f ) {
+#if defined(__linux__)
+  std::string open, close;
+  for ( int i = 0; i < 12; ++i ) {
+    open += "<e" + std::to_string( i ) + ">t";
+    close = "</e" + std::to_string( i ) + ">" + close;
+  }
+  XQuery_t const query( f.zorba->compileQuery( open + close ) );
+  Iterator_t const it( query->iterator() );
+  Item element;
+  it->open();
+  check( it->next( element ), "the element" );
+  it->close();
+  ItemSequence_t const sequence( new SingletonItemSequence( element ) );
+  Zorba_SerializerOptions_t options;
+  options.omit_xml_declaration = ZORBA_OMIT_XML_DECLARATION_YES;
+  auto attempt = [&]( long n, long length, long *count ) -> std::string {
+    std::ostringstream out;
+    // As the server's stream: a write that cannot grow the text throws.
+    out.exceptions( std::ios::badbit );
+    inject_arm( n, length );
+    try {
+      Serializer::createSerializer( options )->serialize( sequence.get(), out );
+    }
+    catch ( std::exception const& ) {
+      *count = inject_disarm();
+      return "error";
+    }
+    *count = inject_disarm();
+    return out.str();
+  };
+  long total = 0;
+  std::string const whole( attempt( 0, 0, &total ) );
+  check( whole == open + close, "the serializer: the whole text", whole );
+  long wrong = 0;
+  for ( long const length : { 1L, 8L } )
+    for ( long n = 1; n <= total; ++n ) {
+      long count = 0;
+      std::string const got( attempt( n, length, &count ) );
+      if ( got != whole && got != "error" && ++wrong <= 3 )
+        std::cout << "at " << n << " of a run of " << length << ": " << got
+                  << std::endl;
+    }
+  check( wrong == 0, "the serializer: the whole text or an error",
+         std::to_string( wrong ) + " points" );
+# if defined(__SANITIZE_ADDRESS__)
+  check( __lsan_do_recoverable_leak_check() == 0,
+         "the serializer failing: nothing is left behind" );
+# endif
+#else
+  (void)f;
+#endif
+}
+// An insert into an object with each allocation failing in turn: a failed
+// insert leaves the object as it was, so a later insert and a lookup by name
+// still find what they should. 16 members: the insert builds the object's index
+// of names; 32: it adds to that index; both grow the members.
+void test_json_object_add_out_of_memory( Fixture const &f ) {
+#if defined(__linux__)
+  for ( int const size : { 16, 32 } ) {
+    std::string const added( "k" + std::to_string( size ) );
+    auto attempt = [&]( long n, long length, long *count ) -> std::string {
+      Item object;
+      {
+        XQuery_t const make( f.zorba->compileQuery(
+          "jsoniq version \"1.0\";\n"
+          "{| for $i in 0 to " + std::to_string( size - 1 ) +
+          " return { \"k\" || $i : $i } |}" ) );
+        Iterator_t const it( make->iterator() );
+        it->open();
+        it->next( object );
+        it->close();
+      }
+      XQuery_t const insert( f.zorba->compileQuery(
+        "jsoniq version \"1.0\";\n"
+        "declare variable $o external;\n"
+        "insert json { \"" + added + "\" : " + std::to_string( size ) +
+        " } into $o;\n"
+        "1" ) );
+      insert->getDynamicContext()->setVariable( "o", object );
+      Iterator_t const it( insert->iterator() );
+      Item result;
+      bool failed = false;
+      inject_arm( n, length );
+      try {
+        it->open();
+        it->next( result );
+        it->close();
+      }
+      catch ( std::exception const& ) {
+        failed = true;
+      }
+      *count = inject_disarm();
+      // Made after the failures: they are for the insert, not the test.
+      std::string out( failed || result.isNull()
+                       ? "error" : result.getStringValue().str() );
+      XQuery_t const lookup( f.zorba->compileQuery(
+        "jsoniq version \"1.0\";\n"
+        "declare variable $o external;\n"
+        "insert json { \"next\" : -1 } into $o;\n"
+        "$o." + added ) );
+      lookup->getDynamicContext()->setVariable( "o", object );
+      Iterator_t const found( lookup->iterator() );
+      found->open();
+      Item item;
+      out += "|";
+      while ( found->next( item ) )
+        out += item.getStringValue().str();
+      found->close();
+      return out;
+    };
+    std::string const answer( "1|" + std::to_string( size ) );
+    std::string const what( "an insert into an object of " +
+                            std::to_string( size ) );
+    long total = 0;
+    check( attempt( 0, 0, &total ) == answer, what + ": the answer" );
+    long wrong = 0;
+    for ( long const length : { 1L, 8L } )
+      for ( long n = 1; n <= total; ++n ) {
+        long count = 0;
+        std::string const got( attempt( n, length, &count ) );
+        if ( got != answer && got != "error|" && ++wrong <= 3 )
+          std::cout << "at " << n << " of a run of " << length << ": " << got
+                    << std::endl;
+      }
+    check( wrong == 0, what + " failing: the answer, or an error and no member",
+           std::to_string( wrong ) + " points" );
+  }
+# if defined(__SANITIZE_ADDRESS__)
+  check( __lsan_do_recoverable_leak_check() == 0,
+         "an insert into an object failing: nothing is left behind" );
 # endif
 #else
   (void)f;
@@ -4234,17 +4542,11 @@ void test_sweep_cache( Fixture const &f ) {
   // A query over dir:open: what is left of a failure in the checks of a path, and
   // in libraries. See the limits of --max-memory in bin/mcp/README.md.
   // Caps: about 1.5 times the most seen in CI (Xerces-C 2 alone and 608 in runs
-  // of 8 of 1990; the others at most 5; ICU, quick-check run 43500984356: 12
-  // alone and 16 in runs of 8 in libicui18n, 12 and 2 in libicuuc).
+  // of 8 of 1990; the others at most 5).
   s.known = {
     // Xerces-C throws OutOfMemoryException from ~XMLGrammarPoolImpl.
     starting( "terminate N11xercesc_", 4, 1, "OutOfMemoryExceptionE" ),
     starting( "terminate N11xercesc_", 900, 8, "OutOfMemoryExceptionE" ),
-    // ICU RegexPattern::zap() after a failed allocation in RegexPattern::compile().
-    library_crash( "signal 11 in libicui18n", true, 24 ),
-    // ICU utext_openConstUnicodeString() after a failed allocation, from
-    // RegexCompile::compile().
-    library_crash( "signal 11 in libicuuc", true, 18 ),
     starting( "error: file:FOFL9999: ", 10 ),
     starting( "error: dir:INVALID_PATH: ", 6 ),
     starting( "error: err:FOCH0002: ", 3 ) };
@@ -8018,10 +8320,13 @@ Test const tests[] = {
   { "exhaust_sweep_compile", test_sweep_compile },
   { "exhaust_sweep_builtins", test_sweep_builtins },
   { "exhaust_sweep_query_text", test_sweep_query_text },
+  { "exhaust_sweep_long_token", test_sweep_long_token },
   { "exhaust_sweep_streamable_text", test_sweep_streamable_text },
   { "exhaust_base64_stream", test_base64_stream_out_of_memory },
   { "exhaust_seekable_stream", test_seekable_stream_out_of_memory },
   { "exhaust_json_loader", test_json_loader_out_of_memory },
+  { "exhaust_serializer", test_serializer_out_of_memory },
+  { "exhaust_json_object_add", test_json_object_add_out_of_memory },
   { "exhaust_plan_wrapper", test_plan_wrapper_out_of_memory },
   { "exhaust_plan_open", test_plan_open_out_of_memory },
   { "exhaust_call_body", test_call_body_out_of_memory },
@@ -8031,6 +8336,7 @@ Test const tests[] = {
   { "exhaust_first_dynamic_call", test_first_dynamic_call_out_of_memory },
   { "exhaust_for_each_pair", test_for_each_pair_out_of_memory },
   { "exhaust_fold_left", test_fold_left_out_of_memory },
+  { "exhaust_json_copy", test_json_copy_out_of_memory },
   { "exhaust_sweep_matcher", test_sweep_matcher },
   { "exhaust_sweep_xml", test_sweep_xml },
   { "exhaust_sweep_xml_dtd", test_sweep_xml_dtd },
@@ -8046,8 +8352,10 @@ Test const tests[] = {
   { "exhaust_sweep_arithmetic", test_sweep_arithmetic },
   { "exhaust_sweep_decimal_thread", test_sweep_decimal_thread },
   { "exhaust_sweep_cache", test_sweep_cache },
+  { "exhaust_json_array_growth", test_json_array_growth_out_of_memory },
   { "exhaust_sweep_kept_malloc", test_sweep_kept_malloc },
   { "exhaust_cache_after_failure", test_cache_after_failed_admission },
+  { "exhaust_optimize_after_failure", test_optimize_after_failure },
   { "exhaust_user_error", test_user_error_named_like_memory },
   { "exhaust_notification", test_notification_out_of_memory },
   { "exhaust_request_id", test_request_id_out_of_memory },

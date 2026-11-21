@@ -14,7 +14,10 @@
  * limitations under the License.
  */
 
+#include <deque>
 #include <stack>
+#include <utility>
+#include <vector>
 #include <zorba/internal/unique_ptr.h>
 
 #include "system/globalenv.h"
@@ -131,6 +134,41 @@ void XmlNode::attach(InternalNode* parent, csize pos)
   ZORBA_ASSERT(theParent == NULL);
   ZORBA_ASSERT(parent != NULL);
 
+  store::StoreConsts::NodeKind nodeKind = getNodeKind();
+
+  // A node label can exceed its size limit, so every new label is computed
+  // before the subtree changes: if one throws, the subtree is left as it was.
+  std::deque<NodeLabel> newLabels;
+  std::vector<std::pair<LabeledNode*, NodeLabel*> > newLabelOf;
+
+#ifndef TEXT_ORDPATH
+  bool hasLabel = (nodeKind != store::StoreConsts::textNode);
+#else
+  bool hasLabel = true;
+#endif
+
+  if (hasLabel)
+  {
+    LabeledNode* self = static_cast<LabeledNode*>(this);
+    NodeLabel oldLabel(self->theLabel);
+
+    try
+    {
+      self->setLabel(parent, false, pos, nodeKind);
+
+      if (nodeKind == store::StoreConsts::elementNode)
+        computeSubtreeLabels(newLabels, newLabelOf);
+    }
+    catch (...)
+    {
+      oldLabel.swap(self->theLabel);
+      throw;
+    }
+  }
+
+  for (csize i = 0; i < newLabelOf.size(); ++i)
+    newLabelOf[i].first->theLabel.swap(*newLabelOf[i].second);
+
   XmlTree* newTree = parent->getTree();
   XmlTree* oldTree = getTree();
 
@@ -140,57 +178,24 @@ void XmlNode::attach(InternalNode* parent, csize pos)
 
   theParent = parent;
 
-  store::StoreConsts::NodeKind nodeKind = getNodeKind();
-
   switch (nodeKind)
   {
   case store::StoreConsts::attributeNode:
   {
-    ElementNode* elemParent = reinterpret_cast<ElementNode*>(parent);
-
-    static_cast<AttributeNode*>(this)->
-    setLabel(parent, false, pos, store::StoreConsts::attributeNode);
-
-    elemParent->insertAttr(this, pos);
-
+    reinterpret_cast<ElementNode*>(parent)->insertAttr(this, pos);
     break;
   }
   case store::StoreConsts::commentNode:
-  {
-    static_cast<CommentNode*>(this)->
-    setLabel(parent, false, pos, getNodeKind());
-    
-    parent->insertChild(this, pos);
-
-    break;
-  }
   case store::StoreConsts::piNode:
-  {
-    static_cast<PiNode*>(this)->
-    setLabel(parent, false, pos, getNodeKind());
-    
-    parent->insertChild(this, pos);
-
-    break;
-  }
   case store::StoreConsts::textNode:
   {
-#ifdef TEXT_ORDPATH
-    static_cast<TextNode*>(this)->
-    setLabel(parent, false, pos, getNodeKind());
-#endif
-
     parent->insertChild(this, pos);
-
     break;
   }
   case store::StoreConsts::elementNode:
   {
     ElementNode* elemRoot = reinterpret_cast<ElementNode*>(this);
 
-    static_cast<ElementNode*>(this)->
-    setLabel(parent, false, pos, getNodeKind());
-    
     parent->insertChild(this, pos);
 
     std::stack<XmlNode*> nodes;
@@ -225,17 +230,15 @@ void XmlNode::attach(InternalNode* parent, csize pos)
       // Attach the attributes of this node to the new tree.
       AttributeNode* baseUriAttr = NULL;
       AttributeNode* hiddenBaseUriAttr = NULL;
-      csize numAttrs = elem->numAttrs();
 
       InternalNode::iterator ite = elem->attrsBegin();
       InternalNode::iterator end = elem->attrsEnd();
 
-      for (csize i = 0; ite != end; ++i, ++ite)
+      for (; ite != end; ++ite)
       {
         AttributeNode* attr = static_cast<AttributeNode*>(*ite);
 
         attr->setTree(newTree);
-        attr->theLabel.setAsChild(elem->theLabel, i);
 
         if (attr->isBaseUri())
         {
@@ -278,24 +281,10 @@ void XmlNode::attach(InternalNode* parent, csize pos)
       ite = elem->childrenBegin();
       end = elem->childrenEnd();
 
-      for (ulong i = 0; ite != end; ++i, ++ite)
+      for (; ite != end; ++ite)
       {
         XmlNode* child = (*ite);
-
         child->setTree(newTree);
-
-#ifndef TEXT_ORDPATH
-        if (child->getNodeKind() != store::StoreConsts::textNode)
-        {
-          LabeledNode* child2 = static_cast<LabeledNode*>(child);
-          
-          child2->theLabel.setAsChild(elem->theLabel, numAttrs + i);
-        }
-#else
-        static_cast<LabeledNode*>(child)->theLabel.setAsChild(elem->theLabel,
-                                                             numAttrs + i);
-#endif
-
         nodes.push(child);
       }
     } // done traversing tree
@@ -315,6 +304,63 @@ void XmlNode::attach(InternalNode* parent, csize pos)
   SYNC_CODE(newTree->getRCLock()->acquire());
   newTree->getRefCount() += refcount;
   SYNC_CODE(newTree->getRCLock()->release());
+}
+
+
+/*******************************************************************************
+  For the subtree rooted at "this" element, whose own new label is already
+  set, compute the new label of each descendant and attribute (as attach()
+  sets them) into labels, and pair each node with its label in labelOf.
+********************************************************************************/
+void XmlNode::computeSubtreeLabels(
+    std::deque<NodeLabel>& labels,
+    std::vector<std::pair<LabeledNode*, NodeLabel*> >& labelOf) const
+{
+  std::stack<std::pair<const ElementNode*, const NodeLabel*> > elems;
+  elems.push(std::make_pair(reinterpret_cast<const ElementNode*>(this),
+                            &static_cast<const LabeledNode*>(this)->theLabel));
+
+  while (!elems.empty())
+  {
+    const ElementNode* elem = elems.top().first;
+    const NodeLabel* elemLabel = elems.top().second;
+    elems.pop();
+
+    csize numAttrs = elem->numAttrs();
+
+    InternalNode::const_iterator ite = elem->attrsBegin();
+    InternalNode::const_iterator end = elem->attrsEnd();
+
+    for (csize i = 0; ite != end; ++i, ++ite)
+    {
+      labels.push_back(NodeLabel());
+      labels.back().setAsChild(*elemLabel, i);
+      labelOf.push_back(std::make_pair(static_cast<LabeledNode*>(*ite),
+                                       &labels.back()));
+    }
+
+    ite = elem->childrenBegin();
+    end = elem->childrenEnd();
+
+    for (csize i = 0; ite != end; ++i, ++ite)
+    {
+      XmlNode* child = (*ite);
+
+#ifndef TEXT_ORDPATH
+      if (child->getNodeKind() == store::StoreConsts::textNode)
+        continue;
+#endif
+
+      labels.push_back(NodeLabel());
+      labels.back().setAsChild(*elemLabel, numAttrs + i);
+      labelOf.push_back(std::make_pair(static_cast<LabeledNode*>(child),
+                                       &labels.back()));
+
+      if (child->getNodeKind() == store::StoreConsts::elementNode)
+        elems.push(std::make_pair(reinterpret_cast<const ElementNode*>(child),
+                                  &labels.back()));
+    }
+  }
 }
 
 
@@ -594,6 +640,16 @@ void XmlNode::removeType(UpdatePrimitive& upd)
 
       if (n->getType()->equals(GET_STORE().XS_ANY_QNAME))
       {
+        // The type stays, but the nilled property is removed with it
+        if (n->getNilled())
+        {
+          tinfo.theTypeName = n->getType();
+          tinfo.theFlags = n->theFlags;
+          undoList.resize(++undoSize);
+          undoList[undoSize - 1].transfer(tinfo);
+          n->resetNilled();
+        }
+
         revalidationNode = currNode;
         break;
       }
@@ -628,6 +684,7 @@ void XmlNode::removeType(UpdatePrimitive& upd)
       n->setHaveTypedValue();
       n->resetHaveEmptyTypedValue();
       n->resetInSubstGroup();
+      n->resetNilled();
 
       revalidationNode = currNode;
     }

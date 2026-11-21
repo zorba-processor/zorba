@@ -108,15 +108,16 @@ serializer::emitter::emitter(
   ser(the_serializer),
   tr(the_stream),
   thePreviousItemKind(INVALID_ITEM),
-  theChildIters(8),
   theFirstFreeChildIter(0),
   theIsFirstElementNode(true),
   theEmitAttributes(aEmitAttributes)
 {
+  theChildIters.reserve(8);
   for (ulong i = 0; i < 8; i++)
-    theChildIters[i] = GENV_ITERATOR_FACTORY->createChildrenIterator();
+    theChildIters.push_back(std::unique_ptr<store::ChildrenIterator>(
+      GENV_ITERATOR_FACTORY->createChildrenIterator()));
 
-  theAttrIter = GENV_ITERATOR_FACTORY->createAttributesIterator();
+  theAttrIter.reset(GENV_ITERATOR_FACTORY->createAttributesIterator());
 }
 
 
@@ -125,11 +126,6 @@ serializer::emitter::emitter(
 ********************************************************************************/
 serializer::emitter::~emitter()
 {
-  ulong numIters = (ulong)theChildIters.size();
-  for (ulong i = 0; i < numIters; i++)
-    delete theChildIters[i];
-
-  delete theAttrIter;
 }
 
 
@@ -140,12 +136,14 @@ store::ChildrenIterator* serializer::emitter::getChildIter()
 {
   if (theFirstFreeChildIter == theChildIters.size())
   {
-    theChildIters.push_back(GENV_ITERATOR_FACTORY->createChildrenIterator());
+    // Owned before push_back() allocates: if that fails, the iterator is freed.
+    theChildIters.push_back(std::unique_ptr<store::ChildrenIterator>(
+      GENV_ITERATOR_FACTORY->createChildrenIterator()));
   }
 
   theFirstFreeChildIter++;
 
-  return theChildIters[theFirstFreeChildIter-1];
+  return theChildIters[theFirstFreeChildIter-1].get();
 }
 
 
@@ -155,7 +153,7 @@ store::ChildrenIterator* serializer::emitter::getChildIter()
 void serializer::emitter::releaseChildIter(store::ChildrenIterator* iter)
 {
   theFirstFreeChildIter--;
-  assert(iter == theChildIters[theFirstFreeChildIter]);
+  assert(iter == theChildIters[theFirstFreeChildIter].get());
 }
 
 /*******************************************************************************
@@ -694,7 +692,7 @@ int serializer::emitter::emit_node_children(
   if (item->getNodeKind() == store::StoreConsts::elementNode)
   {
     // emit attributes
-    store::AttributesIterator* iter = theAttrIter;
+    store::AttributesIterator* iter = theAttrIter.get();
 
     iter->init(item);
     iter->open();
@@ -2676,6 +2674,18 @@ void serializer::attach_transcoder(std::ostream &os)
 }
 
 /*******************************************************************************
+  Raises ZOSE0004 if a write to the output stream failed without throwing.
+  Called before the transcoder is detached: detaching clears the stream's state.
+********************************************************************************/
+void serializer::flush_output()
+{
+  if (!tr->flush())
+    throw ZORBA_EXCEPTION(
+      zerr::ZOSE0004_IO_ERROR, ERROR_PARAMS( "", ZED( BadStreamState ) )
+    );
+}
+
+/*******************************************************************************
 
 ********************************************************************************/
 void serializer::serialize(
@@ -2744,6 +2754,7 @@ serializer::serialize(
     }
   //+  aObject->close();
     e->emit_end();
+    flush_output();
     transcode::detach( aOStream );
   }
   catch ( ... ) {
@@ -2797,6 +2808,7 @@ void serializer::serialize(
 
     //object->close();
     e->emit_end();
+    flush_output();
     transcode::detach( stream );
   }
   catch ( ... ) {

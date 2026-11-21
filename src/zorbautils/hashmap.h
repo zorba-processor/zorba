@@ -762,8 +762,7 @@ bool insert(const std::pair<const K, V>& pair)
 
   if (!found)
   {
-    entry->key() = pair.first;
-    entry->value() = pair.second;
+    setNewEntry(entry, hval, pair.first, pair.second);
   }
 
   return !found;
@@ -787,20 +786,7 @@ bool insert(const K& item, V& value)
 
   if (!found)
   {
-    entry->key() = item;
-
-    // A copy of the value that fails leaves no entry, not a key without it.
-    try
-    {
-      entry->value() = value;
-    }
-    catch (...)
-    {
-      // hashInsert() put the new entry first in its bucket or right after it.
-      HashEntry<K, V>* headEntry = bucket(hval);
-      eraseEntry(entry, entry == headEntry ? NULL : headEntry);
-      throw;
-    }
+    setNewEntry(entry, hval, item, value);
   }
   else
   {
@@ -1029,6 +1015,28 @@ void eraseEntry(HashEntry<K, V>* entry, HashEntry<K, V>* preventry)
     --theNumEntries;
 
     shrinkHashTab();
+  }
+}
+
+
+/*******************************************************************************
+  Copy the key and the value into the entry that hashInsert() just made for a
+  key that hashes to hval. A copy that fails leaves no entry, not a partial one.
+********************************************************************************/
+template <class Value>
+void setNewEntry(HashEntry<K, V>* entry, ulong hval, const K& key, Value& value)
+{
+  try
+  {
+    entry->key() = key;
+    entry->value() = value;
+  }
+  catch (...)
+  {
+    // hashInsert() put the new entry first in its bucket or right after it.
+    HashEntry<K, V>* headEntry = bucket(hval);
+    eraseEntry(entry, entry == headEntry ? NULL : headEntry);
+    throw;
   }
 }
 

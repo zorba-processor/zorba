@@ -192,7 +192,8 @@ bool XercSchemaValidator::checkContent (XMLElementDecl* const elemDecl
     {
         // Normally for SchemaElementDecl::Any, We pass no judgement on it and anything goes
         // but if there is a fXsiTypeValidator, we need to use it for validation
-        if (modelType == SchemaElementDecl::Simple && childCount > 0) {
+        if (childCount > 0 &&
+            (modelType == SchemaElementDecl::Simple || fCurrentDatatypeValidator)) {
             emitError(XMLValid::SimpleTypeHasChild, elemDecl->getFullName());
             fErrorOccurred = true;
         }
@@ -770,7 +771,11 @@ void XercSchemaValidator::validateElement(const   XMLElementDecl*  elemDef)
     //
     // Check whether this element allows Nillable
     //
-    if (fNil && (miscFlags & SchemaSymbols::XSD_NILLABLE) == 0 ) {
+    if (fNil && !elemDef->isDeclared()) {
+        // xsi:nil applies only to an element that has a declaration
+        fNil = false;
+    }
+    else if (fNil && (miscFlags & SchemaSymbols::XSD_NILLABLE) == 0 ) {
         fNil = false;
         emitError(XMLValid::NillNotAllowed, elemDef->getFullName());
         fErrorOccurred = true;
@@ -3034,7 +3039,12 @@ void XercSchemaValidator::validateElement(const   XMLElementDecl*  elemDef)
     //
     // Check whether this element allows Nillable
     //
-    if (fNil && (miscFlags & SchemaSymbols::XSD_NILLABLE) == 0 )
+    if (fNil && !elemDef->isDeclared())
+    {
+        // xsi:nil applies only to an element that has a declaration
+        fNil = false;
+    }
+    else if (fNil && (miscFlags & SchemaSymbols::XSD_NILLABLE) == 0 )
     {
         fNil = false;
         emitError(XMLValid::NillNotAllowed, elemDef->getFullName());

@@ -50,6 +50,9 @@
 #include "node_factory.h"
 
 #include "runtime/util/tree_depth.h"
+#include "system/globalenv.h"
+#include "types/casting.h"
+#include "types/root_typemanager.h"
 
 #ifndef ZORBA_NO_FULL_TEXT
 using namespace zorba::locale;
@@ -244,6 +247,40 @@ void XmlTree::removeType(const XmlNode* n)
   {
     assert(false);
   }
+}
+
+
+/*******************************************************************************
+
+********************************************************************************/
+store::Item* XmlTree::getEmptyContentValue(const XmlNode* n) const
+{
+  if (!theEmptyContentValues)
+    return NULL;
+
+  NodePointerHashMap<store::Item_t>::iterator ite = theEmptyContentValues->find(n);
+  return ite == theEmptyContentValues->end() ? NULL : (*ite).second.getp();
+}
+
+
+void XmlTree::setEmptyContentValue(const XmlNode* n, store::Item_t& value)
+{
+  if (!theEmptyContentValues)
+    theEmptyContentValues =
+      std::make_unique<NodePointerHashMap<store::Item_t>>(32, false);
+
+  NodePointerHashMap<store::Item_t>::iterator ite = theEmptyContentValues->find(n);
+  if (ite == theEmptyContentValues->end())
+    theEmptyContentValues->insert(n, value);
+  else
+    ite.setValue(value);
+}
+
+
+void XmlTree::removeEmptyContentValue(const XmlNode* n)
+{
+  if (theEmptyContentValues)
+    theEmptyContentValues->erase(n);
 }
 
 
@@ -595,12 +632,23 @@ void XmlNode::setTree(const XmlTree* aNewTree)
     getTree()->removeType(this);
   }
 
+  store::Item_t emptyContentValue;
+  if (getNodeKind() == store::StoreConsts::elementNode &&
+      static_cast<ElementNode*>(this)->haveEmptyContentValue())
+  {
+    emptyContentValue = getTree()->getEmptyContentValue(this);
+    getTree()->removeEmptyContentValue(this);
+  }
+
   setTreeInternal(aNewTree);
 
   if (lAdjustTypes)
   {
     getTree()->addType(this, type);
   }
+
+  if (emptyContentValue != NULL)
+    getTree()->setEmptyContentValue(this, emptyContentValue);
   
 #ifndef NDEBUG
   if (getNodeKind() == store::StoreConsts::elementNode)
@@ -750,6 +798,7 @@ store::Item* XmlNode::copy(
       }
 
       new ConnectorNode(parent->getTree(), parent, this);
+      setRecursiveForSharedSubtree(parent);
       return const_cast<XmlNode*>(this);
     }
 
@@ -772,6 +821,60 @@ store::Item* XmlNode::copy(
   else
   {
     return const_cast<XmlNode*>(this);
+  }
+}
+
+
+/*******************************************************************************
+  "this" was just placed, without a copy, under the given parent. Mark as
+  recursive (having a descendant of the same name) each element ancestor of
+  the parent that a copy would have made recursive. Only the names of "this"
+  and of its own children are known here, so when "this" has element
+  children, every element ancestor is marked: a recursive flag that is not
+  needed costs only a fuller descendant scan.
+********************************************************************************/
+void XmlNode::setRecursiveForSharedSubtree(InternalNode* parent) const
+{
+  if (getNodeKind() != store::StoreConsts::elementNode)
+    return;
+
+  const ElementNode* elem = static_cast<const ElementNode*>(this);
+
+  if (elem->getTree()->isRecursive())
+    parent->getTree()->setRecursive();
+
+  bool haveElementChildren = false;
+
+  InternalNode::const_iterator ite = elem->childrenBegin();
+  InternalNode::const_iterator end = elem->childrenEnd();
+
+  for (; ite != end; ++ite)
+  {
+    if ((*ite)->getNodeKind() == store::StoreConsts::elementNode)
+    {
+      haveElementChildren = true;
+      break;
+    }
+  }
+
+  XmlNode* ancestor = parent;
+
+  while (ancestor != NULL &&
+         ancestor->getNodeKind() == store::StoreConsts::elementNode)
+  {
+    ElementNode* elemAncestor = static_cast<ElementNode*>(ancestor);
+
+    if (haveElementChildren)
+    {
+      elemAncestor->setRecursive();
+    }
+    else if (elemAncestor->getNodeName()->equals(elem->getNodeName()))
+    {
+      elemAncestor->setRecursive();
+      break;
+    }
+
+    ancestor = ancestor->theParent;
   }
 }
 
@@ -953,6 +1056,9 @@ void XmlNode::destroyInternal(bool removeType)
            kind == store::StoreConsts::attributeNode) &&
           (node->theFlags & HaveType) != 0)
         node->getTree()->removeType(node);
+      if (kind == store::StoreConsts::elementNode &&
+          static_cast<ElementNode*>(node)->haveEmptyContentValue())
+        node->getTree()->removeEmptyContentValue(node);
     }
 #endif
 
@@ -2063,7 +2169,6 @@ XmlNode* DocumentNode::copyInternal(
     {
       if ((*ite)->isConnectorNode())
       {
-        ZORBA_ASSERT(copymode.theNsPreserve == false);
         static_cast<ConnectorNode*>(*ite)->getNode()->
         copyInternal(rootParent, copyNode, 0, NULL, copymode);
       }
@@ -2483,6 +2588,16 @@ XmlNode* ElementNode::copyInternal(
                  NULL, // local bindings
                  baseUri);
 
+    if (copymode.theTypePreserve && getNilled())
+      copyNode->setNilled();
+
+    if (copymode.theTypePreserve && haveEmptyContentValue())
+    {
+      store::Item_t value = getTree()->getEmptyContentValue(this);
+      if (value != NULL)
+        static_cast<ElementNode*>(copyNode)->setEmptyContentTypedValue(value);
+    }
+
     if (rootCopy == NULL)
       rootCopy = copyNode;
 
@@ -2494,10 +2609,12 @@ XmlNode* ElementNode::copyInternal(
       if (parent && parent->getNodeKind() == store::StoreConsts::elementNode)
         copyParentNsContext = static_cast<ElementNode*>(parent)->getNsContext();
 
-      // If we are copying the root of an xml subtree, or a node that does
-      // not inherit ns bindings directly from its parent (but may inherit
-      // from another ancestor).
+      // If we are copying the root of an xml subtree, a node that does not
+      // inherit ns bindings directly from its parent (but may inherit from
+      // another ancestor), or a node placed without a copy (reached through a
+      // connector, it inherits nothing from the tree that references it).
       if (parent == rootParent ||
+          theParent == NULL ||
           (haveLocalBindings() && theNsContext->getParent() != myParentNsContext) ||
           (!haveLocalBindings() && theNsContext != myParentNsContext))
       {
@@ -2694,6 +2811,23 @@ XmlNode* ElementNode::copyInternal(
 
     if (hiddenBaseUriAttr)
     {
+      // The copy of an explicit xml:base attribute has already given the copy
+      // a hidden base-uri attribute; the one added here replaces it.
+      if (baseUriAttr)
+      {
+        const_iterator ite = copyNode->attrsBegin();
+        const_iterator end = copyNode->attrsEnd();
+        for (; ite != end; ++ite)
+        {
+          AttributeNode* attr = copyNode->getAttr(ite);
+          if (attr->isBaseUri() && attr->isHidden())
+          {
+            attr->destroy(true);
+            break;
+          }
+        }
+      }
+
       if (parent == 0)
       {
         zstring absuri;
@@ -2734,7 +2868,6 @@ XmlNode* ElementNode::copyInternal(
 
       if (child->isConnectorNode())
       {
-        ZORBA_ASSERT(copymode.theNsPreserve == false);
         static_cast<ConnectorNode*>(child)->getNode()->
         copyInternal(rootParent, copyNode, 0, rootCopy, copymode);
       }
@@ -3030,6 +3163,12 @@ void ElementNode::getTypedValue(store::Item_t& val, store::Iterator_t& iter) con
           iter = NULL;
           return;
         }
+
+        if (getEmptyContentTypedValue(val))
+        {
+          iter = NULL;
+          return;
+        }
       }
 
       GET_FACTORY().createUntypedAtomic(val, rch);
@@ -3040,6 +3179,49 @@ void ElementNode::getTypedValue(store::Item_t& val, store::Iterator_t& iter) con
     throw XQUERY_EXCEPTION(err::FOTY0012,
     ERROR_PARAMS(theName->getStringValue(), getType()->getStringValue()));
   }
+}
+
+
+/*******************************************************************************
+  The typed value of the empty content of an element of an atomic type: kept
+  by validation for a user-defined type, made from the type for a built-in
+  one. Returns false for other elements.
+********************************************************************************/
+bool ElementNode::getEmptyContentTypedValue(store::Item_t& val) const
+{
+  if (!haveType())
+    return false;
+
+  store::Item* type = getType();
+
+  if (haveEmptyContentValue())
+  {
+    // The value is of the type it was set for; an update may have changed the
+    // type since.
+    store::Item* value = getTree()->getEmptyContentValue(this);
+    if (value != NULL && value->getType()->equals(type))
+    {
+      val = value;
+      return true;
+    }
+  }
+
+  xqtref_t builtin = GENV_TYPESYSTEM.create_named_atomic_type(
+    type, SequenceType::QUANT_ONE, QueryLoc::null, false);
+  if (builtin == NULL)
+    return false;
+
+  zstring empty;
+  return GenericCast::castStringToAtomic(val, empty, builtin.getp(),
+                                         &GENV_TYPESYSTEM, NULL,
+                                         QueryLoc::null, false);
+}
+
+
+void ElementNode::setEmptyContentTypedValue(store::Item_t& value)
+{
+  getTree()->setEmptyContentValue(this, value);
+  theFlags |= HaveEmptyContentValue;
 }
 
 
@@ -3118,47 +3300,7 @@ void ElementNode::appendStringValue(zstring& buf) const
 ********************************************************************************/
 bool ElementNode::getNilled() const
 {
-  store::Item_t val;
-
-  if (getType()->equals(GET_STORE().XS_UNTYPED_QNAME))
-    return false;
-
-  if (!isValidated())
-    return false;
-
-  const_iterator ite = childrenBegin();
-  const_iterator end = childrenEnd();
-
-  for (; ite != end; ++ite)
-  {
-    if ((*ite)->getNodeKind() == store::StoreConsts::elementNode ||
-        (*ite)->getNodeKind() == store::StoreConsts::textNode)
-    {
-      return false;
-    }
-  }
-
-  ite = attrsBegin();
-  end = attrsEnd();
-
-  for (; ite != end; ++ite)
-  {
-    XmlNode* attr = *ite;
-
-    zstring strval;
-    attr->getStringValue2(strval);
-
-    if (ZSTREQ(attr->getNodeName()->getNamespace(),
-               "http://www.w3.org/2001/XMLSchema-instance") &&
-        ZSTREQ(attr->getNodeName()->getLocalName(), "nil") &&
-        (ZSTREQ(strval, "true") || ZSTREQ(strval, "1") ))
-    {
-      return true;
-      break;
-    }
-  }
-
-  return false;
+  return (theFlags & IsNilled) != 0;
 }
 
 

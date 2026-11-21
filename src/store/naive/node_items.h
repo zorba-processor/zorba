@@ -18,7 +18,10 @@
 #define ZORBA_SIMPLE_STORE_NODE_ITEMS
 
 #include <cassert>
+#include <deque>
+#include <memory>
 #include <stack>
+#include <utility>
 #include <vector>
 
 #include <store/api/item.h>
@@ -82,6 +85,7 @@ class DocumentNode;
 class ElementNode;
 class GuideNode;
 class InternalNode;
+class LabeledNode;
 class NsBindingsContext;
 class PiNode;
 class TextNode;
@@ -172,6 +176,13 @@ class XmlNodeTokenizerCallback;
   (specified as a qname). Nodes whose type is xs:untyped are not included in this
   map.
 
+  theEmptyContentValues:
+  ----------------------
+  For each element node of a user-defined atomic type whose content is empty
+  and that has the HaveEmptyContentValue flag, the typed value of its empty
+  content, set by validation and revalidation (the store has no schema to
+  compute it). NULL until the first such node.
+
   theTokens:
   ----------
 ********************************************************************************/
@@ -213,6 +224,8 @@ protected:
 #ifndef EMBEDED_TYPE
   NodeTypeMap             * theTypesMap;
 #endif
+
+  std::unique_ptr<NodePointerHashMap<store::Item_t>> theEmptyContentValues;
 
 #ifndef ZORBA_NO_FULL_TEXT
   FTTokenStore              theTokens;
@@ -301,6 +314,12 @@ public:
   void copyTypesMap(const XmlTree* source);
 #endif
 
+  store::Item* getEmptyContentValue(const XmlNode* n) const;
+
+  void setEmptyContentValue(const XmlNode* n, store::Item_t& value);
+
+  void removeEmptyContentValue(const XmlNode* n);
+
 #ifndef ZORBA_NO_FULL_TEXT
   FTTokenStore& getTokenStore() { return theTokens; }
 #endif
@@ -374,6 +393,10 @@ public:
     // node is actually a sequence of atomic items.
     HaveListValue         = 0x100,
 
+    // For element nodes only. Set by validation if xsi:nil is true and the
+    // element declaration that governs the node is nillable.
+    IsNilled              = 0x200,
+
     // For attribute nodes only.
     IsBaseUri             = 0x800,
 
@@ -392,6 +415,11 @@ public:
     // a type other than untyped (for elements) or untypedAtomic (for attributes)
     HaveType              = 0x8000,
 #endif
+
+    // For element nodes only. Set by validation for an element of a
+    // user-defined atomic type with empty content: its tree keeps the typed
+    // value (see XmlTree::theEmptyContentValues).
+    HaveEmptyContentValue = 0x400,
 
     // For any kind of node. Set if an identifier has been generated for the node
     // (see SimpleStore::getNodeReference() method).
@@ -431,6 +459,12 @@ protected:
   virtual void getBaseURIInternal(zstring& uri, bool& local) const;
 
   void attach(InternalNode* parent, csize pos);
+
+  void computeSubtreeLabels(
+      std::deque<NodeLabel>& labels,
+      std::vector<std::pair<LabeledNode*, NodeLabel*> >& labelOf) const;
+
+  void setRecursiveForSharedSubtree(InternalNode* parent) const;
 
   void detach();
 
@@ -1111,6 +1145,12 @@ public:
   void resetHaveEmptyTypedValue()    { theFlags &= ~HaveEmptyTypedValue; }
   bool haveEmptyTypedValue() const   { return (theFlags & HaveEmptyTypedValue) != 0; }
 
+  bool haveEmptyContentValue() const { return (theFlags & HaveEmptyContentValue) != 0; }
+
+  void setEmptyContentTypedValue(store::Item_t& value);
+
+  bool getEmptyContentTypedValue(store::Item_t& val) const;
+
   bool haveTypedTypedValue(TextNode*&) const;
 
   TextNode* getUniqueTextChild() const;
@@ -1118,6 +1158,10 @@ public:
   void setInSubstGroup() { theFlags |= IsInSubstGroup; }
 
   void resetInSubstGroup() { theFlags &= ~IsInSubstGroup; }
+
+  void setNilled() { theFlags |= IsNilled; }
+
+  void resetNilled() { theFlags &= ~IsNilled; }
 
 #ifndef EMBEDED_TYPE
   void assertInvariants() const;
