@@ -16,6 +16,7 @@
 
 #include <zorba/config.h>
 
+#include <algorithm>
 #include <stdexcept>
 #include <unordered_set>
 
@@ -93,7 +94,8 @@ loader::loader( istream &is, bool allow_multiple, bool strip_top_level_array,
   in_top_level_array_( false ),
   check_only_( false ),
   last_value_was_array_( false ),
-  depth_( 0 )
+  depth_( 0 ),
+  prev_key_pos_( 0 )
 {
   // F&O 3.1 fn:parse-json: "If the input starts with a byte order mark, this
   // function ignores it."  Not in json::lexer, which also checks single values.
@@ -168,6 +170,9 @@ void loader::clear() {
   parser_.clear();
   clear_stack();
   keys_.clear();
+  prev_keys_.clear();
+  cur_keys_.clear();
+  prev_key_pos_ = 0;
   stripped_top_level_array_ = false;
   in_top_level_array_ = false;
   depth_ = 0;
@@ -184,15 +189,36 @@ void loader::check_depth( json::token const &t ) {
 }
 
 void loader::make_key( zstring const &s, store::Item_t *result ) {
-  keys_type::const_iterator const i( keys_.find( s ) );
-  if ( i != keys_.end() ) {
-    *result = i->second;
-    return;
+  size_t const end = min( prev_keys_.size(), prev_key_pos_ + key_lookahead );
+  for ( size_t i = prev_key_pos_; i < end; ++i ) {
+    if ( prev_keys_[i]->getString() == s ) {
+      *result = prev_keys_[i];
+      prev_key_pos_ = i + 1;
+      record_key( *result );
+      return;
+    }
   }
-  zstring copy( s );
-  GENV_ITEMFACTORY->createString( *result, copy );
-  if ( keys_.size() < max_shared_keys && s.size() <= max_shared_key_length )
-    keys_.insert( keys_type::value_type( (*result)->getString(), *result ) );
+  keys_type::const_iterator const i( keys_.find( s ) );
+  if ( i != keys_.end() )
+    *result = i->second;
+  else {
+    zstring copy( s );
+    GENV_ITEMFACTORY->createString( *result, copy );
+    if ( keys_.size() < max_shared_keys && s.size() <= max_shared_key_length )
+      keys_.insert( keys_type::value_type( (*result)->getString(), *result ) );
+  }
+  record_key( *result );
+}
+
+void loader::record_key( store::Item_t const &key ) {
+  if ( cur_keys_.size() < max_shared_keys )
+    cur_keys_.push_back( key );
+}
+
+void loader::end_top_level_value() {
+  prev_keys_.swap( cur_keys_ );
+  cur_keys_.clear();
+  prev_key_pos_ = 0;
 }
 
 void loader::clear_stack() {
@@ -343,6 +369,7 @@ bool loader::next( store::Item_t *result ) {
       } // switch
 
       if ( stack_.empty() ) {
+        end_top_level_value();
         if ( check_only_ )
           last_value_was_array_ = false;
         *result = item;

@@ -305,6 +305,8 @@ public:
 
   virtual ~SimpleJSONObject();
 
+  void reserve(size_type aPairs) { thePairs.reserve(aPairs); }
+
   // store API
 
   size_t alloc_size() const;

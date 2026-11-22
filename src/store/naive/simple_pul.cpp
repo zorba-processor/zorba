@@ -2612,6 +2612,9 @@ void PULImpl::applyUpdates(bool inheritNSBindings)
       CollectionPul* pul = *collIte;
       pul->refreshIndexes();
     }
+
+    // Apply validation primitives, if this is a revalidation pul.
+    applyList(theValidationList);
   }
   catch (...)
   {
@@ -2624,16 +2627,6 @@ void PULImpl::applyUpdates(bool inheritNSBindings)
   {
     CollectionPul* pul = *collIte;
     pul->finalizeUpdates();
-  }
-
-  // Apply validation primitives, if this is a revalidation pul.
-  try
-  {
-    applyList(theValidationList);
-  }
-  catch (...)
-  {
-    ZORBA_FATAL(0, "Unexpected error during application of revalidation PUL");
   }
 
   try
@@ -3630,7 +3623,9 @@ void CollectionPul::applyUpdates()
       }
       catch (...)
       {
-        ZORBA_FATAL(0, "Error during the application of the validation PUL");
+        // It undid itself: undoUpdates() must not undo it again.
+        theValidationPul = NULL;
+        throw;
       }
     }
 
@@ -3687,10 +3682,11 @@ void CollectionPul::undoUpdates()
     // Undo validate-in-place validation
     undoList(theRevalidateList);
 
-    // Undo apply-updates caused validation
+    // Undo apply-updates caused validation, with the default attributes it
+    // inserted
     if (theValidationPul)
     {
-      undoList(static_cast<PULImpl *>(theValidationPul.getp())->theValidationList);
+      static_cast<PULImpl *>(theValidationPul.getp())->undoUpdates();
     }
 #endif
 
