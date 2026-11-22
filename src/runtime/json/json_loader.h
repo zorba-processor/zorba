@@ -37,6 +37,49 @@ namespace json {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+/**
+ * What a query reads of a parsed value: all of it, or some keys of an object,
+ * each with what is read of its value.  Of an array where keys are read, no
+ * member is read: looking up a key in an array gives nothing.
+ */
+struct projection {
+  bool all;
+  std::vector<zstring> keys;
+  std::vector<projection> values;       // what is read of each key's value
+
+  projection() : all( false ) { }
+
+  /**
+   * Notes that a query reads all of the value at the end of a path of keys.
+   *
+   * @param path The keys from this value.
+   */
+  void add( std::vector<zstring> const &path );
+
+  /**
+   * Gets what is read of a key's value.
+   *
+   * @param key The key.
+   * @return Returns said projection or \c nullptr if nothing is read of it.
+   */
+  projection const* find( std::string_view key ) const;
+
+  /**
+   * Gets this %projection as text that parse() reads back.
+   */
+  zstring str() const;
+
+  /**
+   * Reads a %projection from the text that str() gives.
+   *
+   * @param text The text.
+   * @return Returns \c false if \a text is not such text.
+   */
+  bool parse( std::string_view *text );
+};
+
+///////////////////////////////////////////////////////////////////////////////
+
 class loader {
 public:
   typedef parser::line_type line_type;
@@ -96,6 +139,17 @@ public:
   }
 
   /**
+   * Makes next() build only what a query reads of each top-level value (see
+   * projection): the rest is checked as check_only() does, so it raises what
+   * building it raises, in the same order, and a value keeps its kind.
+   *
+   * @param p What is read.  It must outlive this %loader.
+   */
+  void project( projection const *p ) {
+    projection_ = p;
+  }
+
+  /**
    * Gets whether the top-level value that check_only() parsing has just ended
    * was an array.
    */
@@ -151,6 +205,8 @@ private:
       json_object_type *object_;
       store::Item *key_;
     };
+    bool skipped_;                      // nothing of it is read
+    projection const *read_;            // what is read of it; null: all
 
     stack_element( type = no_type );
     void destroy();
@@ -172,6 +228,9 @@ private:
   static char const* number_of( token const&, char (&)[64] );
   void record_key( store::Item_t const& );
   void end_top_level_value();
+  void read_of_value( bool *skipped, projection const **read ) const;
+  bool building_value() const;
+  void keep_read_pairs( json_object_type* ) const;
 
   stack_element& push( stack_element::type t ) {
     //
@@ -189,6 +248,7 @@ private:
   bool in_top_level_array_;
   bool check_only_;
   bool last_value_was_array_;
+  projection const *projection_;
   uint32_t depth_;                      // arrays and objects on stack_
 
   //

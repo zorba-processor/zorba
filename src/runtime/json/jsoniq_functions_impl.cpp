@@ -781,6 +781,7 @@ void JSONParseIteratorState::init(PlanState& aState)
   theInputStream = nullptr;
   theGotOne = false;
   loader_ = nullptr;
+  theReadParts.reset();
 }
 
 
@@ -795,6 +796,7 @@ void JSONParseIteratorState::reset(PlanState& aState)
   theGotOne = false;
   delete loader_;
   loader_ = nullptr;
+  theReadParts.reset();
 }
 
 
@@ -804,6 +806,12 @@ JSONParseIteratorState::~JSONParseIteratorState()
     delete theInputStream;
 
   delete loader_;
+}
+
+
+void JSONParseIterator::setProjection(const zstring& projection)
+{
+  theProjection = projection;
 }
 
 
@@ -885,6 +893,18 @@ bool JSONParseIterator::nextImpl(
     state->loader_ = new json::loader(
       *state->theInputStream, true, lStripTopLevelArray
     );
+
+    if (!theProjection.empty())
+    {
+      if (!state->theReadParts)
+      {
+        state->theReadParts = std::make_unique<json::projection>();
+        std::string_view lText(theProjection.data(), theProjection.size());
+        bool const lRead = state->theReadParts->parse(&lText);
+        ZORBA_ASSERT(lRead && lText.empty());
+      }
+      state->loader_->project(state->theReadParts.get());
+    }
 
     if ( state->theInput == NULL && theRelativeLocation )
     {

@@ -31,6 +31,8 @@
 #include "diagnostics/xquery_diagnostics.h"
 #include "store/api/item_factory.h"
 #include "system/globalenv.h"
+#include "util/ascii_util.h"
+#include "util/string_util.h"
 #include "zorbatypes/decimal.h"
 #include "zorbatypes/float.h"
 #include "zorbatypes/integer.h"
@@ -48,7 +50,9 @@ namespace json {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-loader::stack_element::stack_element( type t ) : type_( t ) {
+loader::stack_element::stack_element( type t ) :
+  type_( t ), skipped_( false ), read_( nullptr )
+{
   switch ( type_ ) {
     case array_type:
       array_ = new json_array_type;
@@ -95,6 +99,7 @@ loader::loader( istream &is, bool allow_multiple, bool strip_top_level_array,
   in_top_level_array_( false ),
   check_only_( false ),
   last_value_was_array_( false ),
+  projection_( nullptr ),
   depth_( 0 ),
   prev_key_pos_( 0 )
 {
@@ -112,17 +117,30 @@ void loader::add_value( store::Item_t const &value ) {
   stack_element top( stack_.top() );
   switch ( top.type_ ) {
     case stack_element::array_type:
-      if ( !check_only_ )
+      if ( !check_only_ && !top.skipped_ && !top.read_ )
         top.array_->push_back( value );
       break;
-    case stack_element::object_type:
+    case stack_element::object_type: {
       //
       // value must be a string that's the name of the object's next key/value
       // pair.
       //
-      push( stack_element::key_type ).key_ = value.getp();
+      bool skipped = top.skipped_;
+      projection const *read = nullptr;
+      if ( !skipped && top.read_ ) {
+        zstring const &name = value->getString();
+        read = top.read_->find( std::string_view( name.data(), name.size() ) );
+        skipped = !read;
+        if ( read && read->all )
+          read = nullptr;
+      }
+      stack_element &key = push( stack_element::key_type );
+      key.key_ = value.getp();
       value->addReference();
+      key.skipped_ = skipped;
+      key.read_ = read;
       break;
+    }
     case stack_element::key_type: {
       //
       // Otherwise, the top of the stack must be a string which means that the
@@ -136,8 +154,9 @@ void loader::add_value( store::Item_t const &value ) {
       stack_element &top2 = stack_.top();
       assert( top2.type_ == stack_element::object_type );
       top2.object_->keys_.push_back( top.key_ );
-      if ( !check_only_ )
-        top2.object_->values_.push_back( value );
+      // A value that is not read holds its key's place, for the duplicate check.
+      if ( !check_only_ && !top2.skipped_ )
+        top2.object_->values_.push_back( top.skipped_ ? nullptr : value );
       break;
     }
     default:
@@ -233,6 +252,135 @@ char const* loader::number_of( token const &t, char (&buf)[64] ) {
   return buf;
 }
 
+/**
+ * Gets whether nothing is read of the value that starts now, and what is read
+ * of it (null: all).
+ */
+void loader::read_of_value( bool *skipped, projection const **read ) const {
+  if ( stack_.empty() ) {
+    *skipped = false;
+    *read = projection_;
+    return;
+  }
+  stack_element const &top = stack_.top();
+  if ( top.type_ == stack_element::array_type ) {
+    *skipped = top.skipped_ || top.read_;
+    *read = nullptr;
+  } else {
+    assert( top.type_ == stack_element::key_type );
+    *skipped = top.skipped_;
+    *read = top.read_;
+  }
+}
+
+bool loader::building_value() const {
+  if ( check_only_ )
+    return false;
+  bool skipped;
+  projection const *read;
+  read_of_value( &skipped, &read );
+  return !skipped;
+}
+
+/**
+ * Removes the pairs whose value is not read, once the keys of all of them are
+ * checked for duplicates as createJSONObject() checks them.
+ */
+void loader::keep_read_pairs( json_object_type *o ) const {
+  check_duplicate_keys( o->keys_ );
+  size_t n = 0;
+  for ( size_t i = 0; i < o->values_.size(); ++i ) {
+    if ( o->values_[i] ) {
+      if ( n != i ) {
+        o->keys_[n] = o->keys_[i];
+        o->values_[n] = o->values_[i];
+      }
+      ++n;
+    }
+  }
+  o->keys_.resize( n );
+  o->values_.resize( n );
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void projection::add( std::vector<zstring> const &path ) {
+  projection *p = this;
+  for ( zstring const &key : path ) {
+    if ( p->all )
+      return;
+    size_t i = 0;
+    while ( i < p->keys.size() && p->keys[i] != key )
+      ++i;
+    if ( i == p->keys.size() ) {
+      p->keys.push_back( key );
+      p->values.push_back( projection() );
+    }
+    p = &p->values[i];
+  }
+  p->all = true;
+  p->keys.clear();
+  p->values.clear();
+}
+
+projection const* projection::find( std::string_view key ) const {
+  for ( size_t i = 0; i < keys.size(); ++i )
+    if ( std::string_view( keys[i].data(), keys[i].size() ) == key )
+      return &values[i];
+  return nullptr;
+}
+
+// "*" for all, else '{', then for each key its length, ':', the key and what is read of its value, then '}'.
+zstring projection::str() const {
+  if ( all )
+    return "*";
+  zstring result( "{" );
+  for ( size_t i = 0; i < keys.size(); ++i ) {
+    result += ztd::to_string( keys[i].size() );
+    result += ':';
+    result += keys[i];
+    result += values[i].str();
+  }
+  result += '}';
+  return result;
+}
+
+bool projection::parse( std::string_view *text ) {
+  all = false;
+  keys.clear();
+  values.clear();
+  if ( text->empty() )
+    return false;
+  char const c = text->front();
+  text->remove_prefix( 1 );
+  if ( c == '*' ) {
+    all = true;
+    return true;
+  }
+  if ( c != '{' )
+    return false;
+  while ( !text->empty() && text->front() != '}' ) {
+    size_t len = 0;
+    while ( !text->empty() && ascii::is_digit( text->front() ) ) {
+      len = len * 10 + static_cast<size_t>( text->front() - '0' );
+      text->remove_prefix( 1 );
+    }
+    if ( text->empty() || text->front() != ':' || text->size() < len + 1 )
+      return false;
+    keys.push_back( zstring( text->data() + 1, len ) );
+    text->remove_prefix( len + 1 );
+    values.push_back( projection() );
+    if ( !values.back().parse( text ) )
+      return false;
+  }
+  if ( text->empty() )
+    return false;
+  text->remove_prefix( 1 );
+  return true;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 void loader::clear_stack() {
   while ( !stack_.empty() ) {
     stack_.top().destroy();
@@ -244,6 +392,7 @@ bool loader::next( store::Item_t *result ) {
   store::Item_t item;
   zstring s;
   json::token t;
+  bool build;
 
   try {
     while ( parser_.next( &t ) ) {
@@ -259,13 +408,24 @@ bool loader::next( store::Item_t *result ) {
             stripped_top_level_array_ = true;
           else {
             check_depth( t );
-            push( stack_element::array_type );
+            bool skipped;
+            projection const *read;
+            read_of_value( &skipped, &read );
+            stack_element &e = push( stack_element::array_type );
+            e.skipped_ = skipped;
+            e.read_ = read;
           }
           continue;
-        case '{':
+        case '{': {
           check_depth( t );
-          push( stack_element::object_type );
+          bool skipped;
+          projection const *read;
+          read_of_value( &skipped, &read );
+          stack_element &e = push( stack_element::object_type );
+          e.skipped_ = skipped;
+          e.read_ = read;
           continue;
+        }
         case ']':
           if ( unbox_top_level_arrays_ && stack_.empty() ) {
             --depth_;
@@ -288,16 +448,19 @@ bool loader::next( store::Item_t *result ) {
           destroyer const destroy_top{ top };
           switch ( top.type_ ) {
             case stack_element::array_type:
-              if ( !check_only_ )
+              if ( !check_only_ && !top.skipped_ )
                 GENV_ITEMFACTORY->createJSONArray( item, *top.array_ );
               break;
             case stack_element::object_type:
-              if ( check_only_ )
+              if ( check_only_ || top.skipped_ )
                 check_duplicate_keys( top.object_->keys_ );
-              else
+              else {
+                if ( top.read_ )
+                  keep_read_pairs( top.object_ );
                 GENV_ITEMFACTORY->createJSONObject(
                   item, top.object_->keys_, top.object_->values_
                 );
+              }
               break;
             default:
               assert( false );
@@ -308,6 +471,7 @@ bool loader::next( store::Item_t *result ) {
         case ',':
           continue;
         case token::number:
+          build = building_value();
           try {
             char buf[64];
             char const *const n = number_of( t, buf );
@@ -315,7 +479,7 @@ bool loader::next( store::Item_t *result ) {
               case token::integer:
                 try {
                   xs_integer const value( n );
-                  if ( !check_only_ )
+                  if ( build )
                     GENV_ITEMFACTORY->createInteger( item, value );
                 }
                 catch ( std::range_error const& ) {
@@ -323,19 +487,19 @@ bool loader::next( store::Item_t *result ) {
                   // integer (e.g. an ID) exactly as an xs:decimal rather than
                   // failing to parse the document.
                   xs_decimal const value( n );
-                  if ( !check_only_ )
+                  if ( build )
                     GENV_ITEMFACTORY->createDecimal( item, value );
                 }
                 break;
               case token::decimal: {
                 xs_decimal const value( n );
-                if ( !check_only_ )
+                if ( build )
                   GENV_ITEMFACTORY->createDecimal( item, value );
                 break;
               }
               case token::floating_point: {
                 xs_double const value( n );
-                if ( !check_only_ )
+                if ( build )
                   GENV_ITEMFACTORY->createDouble( item, value );
                 break;
               }
@@ -363,18 +527,18 @@ bool loader::next( store::Item_t *result ) {
           if ( !stack_.empty() &&
                stack_.top().type_ == stack_element::object_type ) {
             make_key( t.text(), &item );  // the string is an object's key
-          } else if ( !check_only_ ) {
+          } else if ( building_value() ) {
             t.get_value( &s );
             GENV_ITEMFACTORY->createString( item, s );
           }
           break;
         case 'F':
         case 'T':
-          if ( !check_only_ )
+          if ( building_value() )
             GENV_ITEMFACTORY->createBoolean( item, t.get_type() == 'T' );
           break;
         case token::json_null:
-          if ( !check_only_ )
+          if ( building_value() )
             GENV_ITEMFACTORY->createJSONNull( item );
           break;
         default:

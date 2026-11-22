@@ -21,12 +21,15 @@
 
 #include "runtime/json/json_constructors.h"
 #include "runtime/json/jsoniq_functions.h"
+#include "runtime/json/json_loader.h"
 #include "runtime/core/item_iterator.h"
 
 #include "compiler/parser/query_loc.h"
 #include "compiler/expression/expr_consts.h"
 #include "compiler/api/compilercb.h"
 #include "compiler/expression/expr.h"
+#include "compiler/expression/expr_iter.h"
+#include "compiler/expression/flwor_expr.h"
 #include "compiler/expression/fo_expr.h"
 #include "compiler/expression/json_exprs.h"
 #include "compiler/expression/var_expr.h"
@@ -57,6 +60,112 @@ PlanIter_t fn_jsoniq_parse_json::codegen(
     QueryLoc lArgLoc = QueryLoc::null;
     return new JSONParseIterator(sctx, loc, argv, lArgLoc);
   }
+}
+
+
+/*******************************************************************************
+  Parse-time projection: a parse whose values the query reads only through
+  lookups of literal keys builds only what is read (see json::projection).
+  At -O0 every value is built, so that the optimized levels have a reference.
+********************************************************************************/
+static bool is_parse_json(const expr* e)
+{
+  if (e->get_expr_kind() != fo_expr_kind)
+    return false;
+  FunctionConsts::FunctionKind const kind =
+    static_cast<const fo_expr*>(e)->get_func()->getKind();
+  return kind == FunctionConsts::FN_JSONIQ_PARSE_JSON_1 ||
+         kind == FunctionConsts::FN_JSONIQ_PARSE_JSON_2;
+}
+
+
+/**
+ * Gets the keys of e if it is $var.k1.k2... with literal string keys.
+ */
+static bool lookup_path(const expr* e, const var_expr* var,
+                        std::vector<zstring>* path)
+{
+  if (e->get_expr_kind() == wrapper_expr_kind)
+    return static_cast<const wrapper_expr*>(e)->get_input() == var;
+
+  if (e->get_expr_kind() != fo_expr_kind)
+    return false;
+
+  const fo_expr* lookup = static_cast<const fo_expr*>(e);
+  FunctionConsts::FunctionKind const kind = lookup->get_func()->getKind();
+  if (kind != FunctionConsts::OP_ZORBA_SINGLE_OBJECT_LOOKUP_2 &&
+      kind != FunctionConsts::OP_ZORBA_MULTI_OBJECT_LOOKUP_2)
+    return false;
+
+  const expr* name = lookup->get_arg(1);
+  if (name->get_expr_kind() != const_expr_kind)
+    return false;
+  const store::Item* key = static_cast<const const_expr*>(name)->get_val();
+  if (!key->isAtomic() || key->getTypeCode() != store::XS_STRING)
+    return false;
+
+  if (!lookup_path(lookup->get_arg(0), var, path))
+    return false;
+  path->push_back(key->getStringValue());
+  return true;
+}
+
+
+/**
+ * Adds to p what e reads of the values of var.
+ *
+ * @return false if e uses var other than through lookups of literal keys.
+ */
+static bool read_parts(expr* e, const var_expr* var, json::projection* p)
+{
+  if (e == var)
+    return false;
+
+  std::vector<zstring> path;
+  if (e->get_expr_kind() == fo_expr_kind && lookup_path(e, var, &path))
+  {
+    p->add(path);
+    return true;
+  }
+
+  for (ExprIterator i(e); !i.done(); i.next())
+  {
+    if (!read_parts(**i, var, p))
+      return false;
+  }
+  return true;
+}
+
+
+void project_parse_json(
+    CompilerCB* ccb,
+    const for_clause* fc,
+    const PlanIter_t& domainIter)
+{
+  if (ccb->theConfig.opt_level == CompilerCB::config::O0 ||
+      !is_parse_json(fc->get_expr()))
+    return;
+
+  JSONParseIterator* parse = dynamic_cast<JSONParseIterator*>(domainIter.getp());
+  if (!parse)
+    return;
+
+  json::projection read;
+  if (read_parts(fc->get_flwor_expr(), fc->get_var(), &read) && !read.all)
+    parse->setProjection(read.str());
+}
+
+
+void project_counted_parse_json(
+    CompilerCB* ccb,
+    const expr* arg,
+    const PlanIter_t& argIter)
+{
+  if (ccb->theConfig.opt_level == CompilerCB::config::O0 || !is_parse_json(arg))
+    return;
+
+  if (JSONParseIterator* parse = dynamic_cast<JSONParseIterator*>(argIter.getp()))
+    parse->setProjection(json::projection().str());
 }
 
 
