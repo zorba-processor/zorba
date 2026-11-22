@@ -499,10 +499,22 @@ template<typename N1,typename N2> inline
 typename std::enable_if<(ZORBA_TR1_NS::is_signed<N1>::value ||
                          ZORBA_TR1_NS::is_floating_point<N1>::value)
                      && (ZORBA_TR1_NS::is_signed<N2>::value ||
-                         ZORBA_TR1_NS::is_floating_point<N2>::value),
+                         ZORBA_TR1_NS::is_floating_point<N2>::value)
+                     && !(ZORBA_TR1_NS::is_floating_point<N1>::value &&
+                          ZORBA_TR1_NS::is_integral<N2>::value),
                         bool>::type
 le_max( N1 n1, N2 ) {
   return n1 <= std::numeric_limits<N2>::max();
+}
+
+// max() + 1 is a power of two, exact in N1; max() itself may round up to it.
+template<typename N1,typename N2> inline
+typename std::enable_if<ZORBA_TR1_NS::is_floating_point<N1>::value
+                     && ZORBA_TR1_NS::is_signed<N2>::value
+                     && ZORBA_TR1_NS::is_integral<N2>::value,
+                        bool>::type
+le_max( N1 n1, N2 ) {
+  return n1 < static_cast<N1>( std::numeric_limits<N2>::max() / 2 + 1 ) * 2;
 }
 
 template<typename N1,typename N2> inline
