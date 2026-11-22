@@ -286,19 +286,32 @@ inline bool is_wrapper(char const *name) {
 }
 
 /**
+ * How many characters of the wrapper end tag that follows the input libxml2
+ * has read, or 0. The tag is the last bytes libxml2 has, in ASCII whatever
+ * the encoding of the input, so its position does not depend on how many
+ * characters that encoding makes of the input.
+ */
+int read_of_end_tag(FragmentInsertions const &ins, xmlParserCtxtPtr ctxt) {
+  if (!ins.ended)
+    return 0;
+  int const length = static_cast<int>(sizeof(FRAGMENT_WRAPPER_END) - 1);
+  xmlParserInputPtr const input = ctxt->inputTab[0];
+  std::ptrdiff_t const left = input->end - input->cur;
+  return left < length ? length - static_cast<int>(left) : 0;
+}
+
+/**
  * Moves error \a e of the input from libxml2's position to the position in
  * the input, and reports an error that names the wrapper as libxml2 reports it
  * for a document or a well-balanced chunk; \a message holds a new message.
  */
-void locate_in_input(FragmentIStream const &fs, xmlError &e,
-                     std::string &message) {
+void locate_in_input(FragmentIStream const &fs, xmlParserCtxtPtr ctxt,
+                     xmlError &e, std::string &message) {
   FragmentInsertions const &ins = fs.insertions;
-  bool const in_end_tag = ins.ended &&
-    (e.line > ins.end_line || (e.line == ins.end_line && e.int2 > ins.end_column));
-  if (in_end_tag) {
-    e.line = ins.end_line;
-    e.int2 = ins.end_column;
-  }
+  int const read = read_of_end_tag(ins, ctxt);
+  bool const in_end_tag = read > 0;
+  if (in_end_tag)
+    e.int2 -= read;                     // the end of the input, on that line
   remove_insertions(ins, e.line, e.int2);
 
   if (e.code != XML_ERR_TAG_NAME_MISMATCH)
@@ -452,7 +465,6 @@ void FragmentXmlLoader::startParser()
   advance(ins, prolog.data() + bom, wrapper_pos - bom);
   ins.wrapper_line = ins.end_line;
   ins.wrapper_column = ins.end_column;
-  advance(ins, prolog.data() + wrapper_pos, prolog.size() - wrapper_pos);
 
   xmlParseChunk(fs.ctxt, prolog.data(), static_cast<int>(prolog.size()), 0);
   if (eof)
@@ -487,10 +499,7 @@ void FragmentXmlLoader::feedParser()
     throw 0;
   }
   if (n > 0)
-  {
-    advance(fs.insertions, &buf[0], static_cast<std::size_t>(n));
     xmlParseChunk(fs.ctxt, &buf[0], static_cast<int>(n), 0);
-  }
   if (fs.theStream->eof() || n == 0)
     finishParser();
 }
@@ -783,7 +792,25 @@ try
 {
   FragmentIStream &fs = *streamOf(ctx);
   if (fs.parse_depth-- == 1)
-    return;                             // the wrapper element
+  {
+    // The wrapper element ends, at the end tag that follows the input or at
+    // one in the input: an end tag without a start tag.
+    xmlParserCtxtPtr const ctxt = static_cast<xmlParserCtxtPtr>(ctx);
+    if (read_of_end_tag(fs.insertions, ctxt) == 0)
+    {
+      xmlError e = xmlError();
+      e.domain = XML_FROM_PARSER;
+      e.code = XML_ERR_NOT_WELL_BALANCED;
+      e.message = const_cast<char*>("chunk is not well balanced\n");
+      e.level = XML_ERR_FATAL;
+      e.file = const_cast<char*>(ctxt->input->filename);
+      e.line = ctxt->input->line;
+      e.int2 = ctxt->input->col;
+      recordError(ctx, &e);
+      xmlStopParser(ctxt);
+    }
+    return;
+  }
 
   FragmentEvent ev;
   ev.kind = FragmentEvent::END_ELEMENT;
@@ -893,7 +920,7 @@ try
   xmlError located = *error;
   std::string message;
   if (locates_in_input(static_cast<xmlParserCtxtPtr>(ctx)))
-    locate_in_input(*fs, located, message);
+    locate_in_input(*fs, static_cast<xmlParserCtxtPtr>(ctx), located, message);
   XmlLoader::error(fs->current_loader, &located);
 }
 catch (std::bad_alloc const&)
