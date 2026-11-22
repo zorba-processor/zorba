@@ -3588,6 +3588,54 @@ void test_sweep_validate( Fixture const &f ) {
   (void)f;
 #endif
 }
+// Revalidation after an insert into a validated document, and validation in
+// place: each applies a PUL of its own (types, and the default attribute of
+// the new element) once the updates are applied. A failed allocation there
+// undoes everything and gives the memory error.
+void test_sweep_revalidate( Fixture const &f ) {
+#if defined(__linux__)
+  auto const schema = []( std::string const &name ) {
+    return "<xs:schema xmlns:xs='http://www.w3.org/2001/XMLSchema'"
+           " targetNamespace='urn:" + name + "' xmlns='urn:" + name + "'"
+           " elementFormDefault='qualified'>"
+           "<xs:complexType name='A'><xs:simpleContent>"
+           "<xs:extension base='xs:integer'>"
+           "<xs:attribute name='d' type='xs:integer' default='5'/>"
+           "</xs:extension></xs:simpleContent></xs:complexType>"
+           "<xs:element name='r'><xs:complexType><xs:sequence>"
+           "<xs:element name='a' type='A' maxOccurs='unbounded'/>"
+           "</xs:sequence></xs:complexType></xs:element></xs:schema>";
+  };
+  auto const query = []( std::string const &name ) {
+    std::string const call = caught( "local:run()" );
+    std::size_t const prolog = call.find( '\n' ) + 1;
+    return call.substr( 0, prolog ) +
+      "import schema namespace s = 'urn:" + name + "' at '" + name + ".xsd';\n"
+      "import module namespace schema = 'http://zorba.io/modules/schema';\n"
+      "declare revalidation strict;\n"
+      "declare namespace an = 'http://zorba.io/annotations';\n"
+      "declare %an:sequential function local:run() {\n"
+      "  variable $d := validate { document { <s:r><s:a>1</s:a></s:r> } };\n"
+      "  insert node <s:a>2</s:a> into $d/s:r;\n"
+      "  variable $e := document { <s:r><s:a>3</s:a></s:r> };\n"
+      "  schema:validate-in-place($e);\n"
+      "  string-join((string(sum(data(($d, $e)/s:r/s:a/@d))),\n"
+      "               for $a in ($d, $e)/s:r/s:a\n"
+      "               return string($a instance of element(*, s:A))), ' ')\n"
+      "};\n" + call.substr( prolog );
+  };
+  Sweep s;
+  s.files = { { "sweep.xsd", schema( "sweep" ) },
+              { "warm.xsd", schema( "warm" ) } };
+  s.query = query( "sweep" );
+  s.before.push_back( query( "warm" ) );
+  s.after_compile = true;
+  s.expected = "\"15 true true true\"";
+  exhaust_sweep( f, "revalidate", s );
+#else
+  (void)f;
+#endif
+}
 std::string sweep_schema( std::string const &ns ) {
   return "<xs:schema xmlns:xs='http://www.w3.org/2001/XMLSchema'"
          " targetNamespace='" + ns + "' xmlns='" + ns + "'"
@@ -8405,6 +8453,7 @@ Test const tests[] = {
   { "exhaust_sweep_insert", test_sweep_insert },
   { "exhaust_sweep_delete", test_sweep_delete },
   { "exhaust_sweep_validate", test_sweep_validate },
+  { "exhaust_sweep_revalidate", test_sweep_revalidate },
   { "exhaust_sweep_schema_import", test_sweep_schema_import },
   { "exhaust_sweep_html", test_sweep_html },
   { "exhaust_sweep_json", test_sweep_json },
