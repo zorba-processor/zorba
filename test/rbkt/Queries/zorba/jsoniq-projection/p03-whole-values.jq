@@ -10,7 +10,6 @@ declare function local:f($o) { keys($o) };
   [ for $v in parse-json($log, $options) let $w := $v return $w.a ],
   [ for $v in parse-json($log, $options) return local:f($v.a) ],
   [ for $v in parse-json($log, $options) return local:f($v) ],
-  [ for $v in parse-json($log, $options) group by $b := $v.a.b return count($v) ],
   [ for $v in parse-json($log, $options) return size($v.n) ],
   [ for $v in parse-json($log, $options) return $v.n[] ],
   [ for $v in parse-json($log, $options) return $v.a.c ],

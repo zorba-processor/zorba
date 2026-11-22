@@ -29,8 +29,9 @@ void populate_context_jsoniq_functions_impl(static_context* sctx);
 
 /**
  * Makes a parse that is the domain of fc build of each value only what the
- * FLWOR reads of it, when the FLWOR reads its variable only through lookups of
- * literal keys.  Not at -O0.
+ * FLWOR reads of it, when the FLWOR reads its variable, and the group by
+ * variables that collect its values, only through lookups of literal keys,
+ * counting, and predicates that do so.  Not at -O0.
  */
 void project_parse_json(
     CompilerCB* ccb,
