@@ -17,6 +17,7 @@
 #include <zorba/config.h>
 
 #include <algorithm>
+#include <cstring>
 #include <stdexcept>
 #include <unordered_set>
 
@@ -188,21 +189,22 @@ void loader::check_depth( json::token const &t ) {
   ++depth_;
 }
 
-void loader::make_key( zstring const &s, store::Item_t *result ) {
+void loader::make_key( std::string_view s, store::Item_t *result ) {
   size_t const end = min( prev_keys_.size(), prev_key_pos_ + key_lookahead );
   for ( size_t i = prev_key_pos_; i < end; ++i ) {
-    if ( prev_keys_[i]->getString() == s ) {
+    zstring const &key = prev_keys_[i]->getString();
+    if ( std::string_view( key.data(), key.size() ) == s ) {
       *result = prev_keys_[i];
       prev_key_pos_ = i + 1;
       record_key( *result );
       return;
     }
   }
-  keys_type::const_iterator const i( keys_.find( s ) );
+  zstring copy( s.data(), s.size() );
+  keys_type::const_iterator const i( keys_.find( copy ) );
   if ( i != keys_.end() )
     *result = i->second;
   else {
-    zstring copy( s );
     GENV_ITEMFACTORY->createString( *result, copy );
     if ( keys_.size() < max_shared_keys && s.size() <= max_shared_key_length )
       keys_.insert( keys_type::value_type( (*result)->getString(), *result ) );
@@ -219,6 +221,16 @@ void loader::end_top_level_value() {
   prev_keys_.swap( cur_keys_ );
   cur_keys_.clear();
   prev_key_pos_ = 0;
+}
+
+// Numbers are short: parse them from a terminated copy on the stack, not from an allocated value.
+char const* loader::number_of( token const &t, char (&buf)[64] ) {
+  std::string_view const text( t.text() );
+  if ( text.size() >= sizeof buf )
+    return t.get_value().c_str();
+  std::memcpy( buf, text.data(), text.size() );
+  buf[ text.size() ] = '\0';
+  return buf;
 }
 
 void loader::clear_stack() {
@@ -297,10 +309,12 @@ bool loader::next( store::Item_t *result ) {
           continue;
         case token::number:
           try {
+            char buf[64];
+            char const *const n = number_of( t, buf );
             switch ( t.get_numeric_type() ) {
               case token::integer:
                 try {
-                  xs_integer const value( t.get_value() );
+                  xs_integer const value( n );
                   if ( !check_only_ )
                     GENV_ITEMFACTORY->createInteger( item, value );
                 }
@@ -308,19 +322,19 @@ bool loader::next( store::Item_t *result ) {
                   // Without big integers, xs:integer is 64-bit: keep a larger
                   // integer (e.g. an ID) exactly as an xs:decimal rather than
                   // failing to parse the document.
-                  xs_decimal const value( t.get_value() );
+                  xs_decimal const value( n );
                   if ( !check_only_ )
                     GENV_ITEMFACTORY->createDecimal( item, value );
                 }
                 break;
               case token::decimal: {
-                xs_decimal const value( t.get_value() );
+                xs_decimal const value( n );
                 if ( !check_only_ )
                   GENV_ITEMFACTORY->createDecimal( item, value );
                 break;
               }
               case token::floating_point: {
-                xs_double const value( t.get_value() );
+                xs_double const value( n );
                 if ( !check_only_ )
                   GENV_ITEMFACTORY->createDouble( item, value );
                 break;
@@ -348,10 +362,9 @@ bool loader::next( store::Item_t *result ) {
         case token::string:
           if ( !stack_.empty() &&
                stack_.top().type_ == stack_element::object_type ) {
-            s = t.get_value();
-            make_key( s, &item );       // the string is an object's key
+            make_key( t.text(), &item );  // the string is an object's key
           } else if ( !check_only_ ) {
-            s = t.get_value();
+            t.get_value( &s );
             GENV_ITEMFACTORY->createString( item, s );
           }
           break;

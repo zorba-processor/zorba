@@ -154,7 +154,45 @@ unterminated_string::~unterminated_string() throw() {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-token::token() : type_( none ), numeric_type_( non_numeric ) {
+token::token() :
+  file_( nullptr ), line_( 0 ), line_end_( 0 ), column_( 0 ), column_end_( 0 ),
+  type_( none ), numeric_type_( non_numeric ), view_( nullptr ), view_size_( 0 )
+{
+}
+
+token::token( token const &that ) :
+  file_( that.file_ ), line_( that.line_ ), line_end_( that.line_end_ ),
+  column_( that.column_ ), column_end_( that.column_end_ ),
+  type_( that.type_ ), numeric_type_( that.numeric_type_ ),
+  value_( that.get_value() ), view_( nullptr ), view_size_( 0 )
+{
+}
+
+token& token::operator=( token const &that ) {
+  if ( &that != this ) {
+    set_loc(
+      that.file_, that.line_, that.column_, that.line_end_, that.column_end_
+    );
+    type_ = that.type_;
+    numeric_type_ = that.numeric_type_;
+    value_ = that.get_value();
+    view_ = nullptr;
+    view_size_ = 0;
+  }
+  return *this;
+}
+
+// As *this = *that; that->clear(), without copying the value.
+void token::take( token *that ) {
+  set_loc(
+    that->file_, that->line_, that->column_, that->line_end_, that->column_end_
+  );
+  type_ = that->type_;
+  numeric_type_ = that->numeric_type_;
+  value_.swap( that->value_ );
+  view_ = that->view_;
+  view_size_ = that->view_size_;
+  that->clear();
 }
 
 ostream& operator<<( ostream &o, token::type tt ) {
@@ -191,26 +229,18 @@ ostream& operator<<( ostream &o, token const &t ) {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-// As istream::get() (bump) or istream::peek(), stream state included, without a sentry per character.
-inline int lexer::read_char( bool bump ) {
-  typedef istream::traits_type traits;
-  if ( !in_->good() ) {
-    in_->setstate( ios::failbit );
-    return traits::eof();
-  }
-  int i;
-  try {
-    i = bump ? in_->rdbuf()->sbumpc() : in_->rdbuf()->sgetc();
-  }
-  catch ( ... ) {
-    set_badbit_and_rethrow_if_masked();
-    if ( bump )
-      in_->setstate( ios::failbit );
-    return traits::eof();
-  }
-  if ( traits::eq_int_type( i, traits::eof() ) )
-    in_->setstate( bump ? ios::eofbit | ios::failbit : ios::eofbit );
-  return i;
+lexer::lexer( istream &in ) :
+  in_( &in ),
+  buf_( small_buf_ ),
+  buf_size_( small_buf_size ),
+  cur_( small_buf_ ),
+  end_( small_buf_ ),
+  buf_offset_( 0 ),
+  line_( 1 ),
+  line_start_( 0 ),
+  prev_line_start_( 0 ),
+  capture_( nullptr )
+{
 }
 
 // As istream does when its buffer throws: rethrow only if badbit is in the exception mask.
@@ -231,13 +261,111 @@ void lexer::set_badbit_and_rethrow_if_masked() {
   throw;
 }
 
+/**
+ * Once the buffer is all lexed, reads into it what the stream's buffer holds,
+ * at most max_buf_size bytes.  At the end of the stream, or when its buffer
+ * throws, it sets the stream state as istream::get() (if \a bump) or
+ * istream::peek() would.
+ */
+bool lexer::fill( bool bump ) {
+  typedef istream::traits_type traits;
+  if ( capture_ )
+    value_.append( capture_, static_cast<size_t>( end_ - capture_ ) );
+  buf_offset_ += end_ - buf_;
+  cur_ = end_ = buf_;
+  if ( capture_ )
+    capture_ = buf_;
+
+  if ( !in_->good() ) {
+    in_->setstate( ios::failbit );
+    return false;
+  }
+  std::streambuf *const sb = in_->rdbuf();
+  streamsize avail;
+  try {
+    if ( traits::eq_int_type( sb->sgetc(), traits::eof() ) ) {
+      in_->setstate( bump ? ios::eofbit | ios::failbit : ios::eofbit );
+      return false;
+    }
+    // after sgetc(), what the stream's buffer holds: reading that cannot fail
+    avail = sb->in_avail();
+  }
+  catch ( ... ) {
+    set_badbit_and_rethrow_if_masked();
+    if ( bump )
+      in_->setstate( ios::failbit );
+    return false;
+  }
+
+  size_t const want = avail < 1 ? 1 :
+    static_cast<size_t>( std::min<streamsize>( avail, max_buf_size ) );
+  if ( want > buf_size_ ) {
+    size_t const size =
+      std::min( max_buf_size, std::max( want, 2 * buf_size_ ) );
+    big_buf_ = std::make_unique_for_overwrite<char[]>( size );
+    buf_ = big_buf_.get();
+    buf_size_ = size;
+    cur_ = end_ = buf_;
+    if ( capture_ )
+      capture_ = buf_;
+  }
+
+  streamsize got;
+  try {
+    got = sb->sgetn( buf_, static_cast<streamsize>( want ) );
+  }
+  catch ( ... ) {
+    set_badbit_and_rethrow_if_masked();
+    if ( bump )
+      in_->setstate( ios::failbit );
+    return false;
+  }
+  if ( got < 1 ) {
+    // sgetc() saw a character that sgetn() does not give: the end after all
+    in_->setstate( bump ? ios::eofbit | ios::failbit : ios::eofbit );
+    return false;
+  }
+  end_ = buf_ + got;
+  return true;
+}
+
+inline void lexer::newline() {
+  prev_line_start_ = line_start_;
+  line_start_ = pos();
+  ++line_;
+}
+
+inline bool lexer::get_char( char *c ) {
+  if ( cur_ == end_ && !fill( true ) )
+    return false;
+  char const temp = *cur_++;
+  if ( temp == '\n' )
+    newline();
+  *c = temp;
+  return true;
+}
+
 inline bool lexer::peek_char( char *c ) {
-  *c = istream::traits_type::to_char_type( read_char( false ) );
-  return in_->good();
+  if ( cur_ == end_ && !fill( false ) )
+    return false;
+  *c = *cur_;
+  return true;
+}
+
+// The position of the character read last: on the line before if it was a newline.
+lexer::line_type lexer::prev_line() const {
+  return line_start_ == pos() ? line_ - 1 : line_;
+}
+
+lexer::column_type lexer::prev_col() const {
+  offset_type const start =
+    line_start_ == pos() ? prev_line_start_ : line_start_;
+  return static_cast<column_type>( pos() - start );
 }
 
 inline void lexer::set_cur_loc() {
-  cur_loc_.set( line_, col_, line_, col_ );
+  column_type const c = col();
+  cur_loc_.set( line_, c, line_, c );
 }
 
 inline location& set_loc_end( location *loc, location::line_type line_end,
@@ -246,33 +374,29 @@ inline location& set_loc_end( location *loc, location::line_type line_end,
   return *loc;
 }
 
-inline void lexer::set_loc_range( location *loc ) {
-  loc->set(
-    cur_loc_.file(), cur_loc_.line(), cur_loc_.column(), prev_line_, prev_col_
+inline void lexer::set_loc_range( token *t ) {
+  t->set_loc(
+    file_.c_str(), cur_loc_.line(), cur_loc_.column(), prev_line(), prev_col()
   );
 }
 
-lexer::lexer( istream &in ) : in_( &in ) {
-  line_ = prev_line_ = 1;
-  col_ = prev_col_ = 1;
-}
-
-bool lexer::get_char( char *c ) {
-  char const temp = istream::traits_type::to_char_type( read_char( true ) );
-  if ( in_->good() ) {
-    prev_line_ = line_;
-    prev_col_ = col_;
-    if ( temp == '\n' )
-      ++line_, col_ = 1;
-    else
-      ++col_;
-    *c = temp;
-    return true;
+// The value lexed since capture_: in the buffer if it is all there, else in value_.
+void lexer::end_capture( token *t ) {
+  size_t const n = static_cast<size_t>( cur_ - capture_ );
+  if ( value_.empty() ) {
+    t->view_ = capture_;
+    t->view_size_ = n;
+  } else {
+    value_.append( capture_, n );
+    t->value_ = value_;
+    t->view_ = nullptr;
+    t->view_size_ = 0;
   }
-  return false;
+  capture_ = nullptr;
 }
 
 bool lexer::next( token *t, bool throw_exceptions ) {
+  capture_ = nullptr;
   while ( true ) {
     set_cur_loc();
     char c;
@@ -289,14 +413,13 @@ bool lexer::next( token *t, bool throw_exceptions ) {
         // We need to remember the opening quote location here because
         // parse_string() calls set_cur_loc().
         //
-        location::line_type const quote_line = cur_loc_.line();
-        location::column_type const quote_col = cur_loc_.column();
-        if ( !parse_string( throw_exceptions ) )
+        line_type const quote_line = cur_loc_.line();
+        column_type const quote_col = cur_loc_.column();
+        if ( !parse_string( t, quote_line, quote_col, throw_exceptions ) )
           return false;
-        t->value_ = value_;
         t->type_ = token::string;
-        t->loc_.set(
-          cur_loc_.file(), quote_line, quote_col, prev_line_, prev_col_
+        t->set_loc(
+          file_.c_str(), quote_line, quote_col, prev_line(), prev_col()
         );
         return true;
       }
@@ -311,13 +434,15 @@ bool lexer::next( token *t, bool throw_exceptions ) {
       case '7':
       case '8':
       case '9': {
+        capture_ = cur_ - 1;
+        value_.clear();
         token::numeric_type nt;
         if ( !(nt = parse_number( c, throw_exceptions )) )
           return false;
-        t->value_ = value_;
+        end_capture( t );
         t->numeric_type_ = nt;
         t->type_ = token::number;
-        set_loc_range( &t->loc_ );
+        set_loc_range( t );
         return true;
       }
       case 'f':   // false
@@ -327,8 +452,10 @@ bool lexer::next( token *t, bool throw_exceptions ) {
         if ( !(tt = parse_literal( c, throw_exceptions )) )
           return false;
         t->value_ = value_;
+        t->view_ = nullptr;
+        t->view_size_ = 0;
         t->type_ = tt;
-        set_loc_range( &t->loc_ );
+        set_loc_range( t );
         return true;
       }
       case '[':
@@ -338,7 +465,10 @@ bool lexer::next( token *t, bool throw_exceptions ) {
       case ':':
       case ',':
         t->type_ = static_cast<token::type>( c );
-        t->loc_ = cur_loc_;
+        t->set_loc(
+          file_.c_str(), cur_loc_.line(), cur_loc_.column(),
+          cur_loc_.line_end(), cur_loc_.column_end()
+        );
         return true;
       default:
         if ( throw_exceptions )
@@ -451,14 +581,10 @@ error_set_cur_loc_end_false:
 
 token::numeric_type lexer::parse_number( char first_c, bool throw_exceptions ) {
   token::numeric_type numeric_type;
-  ztd::string_appender<token::value_type,64> value( &value_ );
-
-  value_.clear();
 
   // <number> ::= [-] <int> [<frac>] [<exp>]
   char c = first_c;
   if ( c == '-' ) {
-    value += c;
     if ( !get_char( &c ) )
       goto error_set_cur_loc_end_false;
   }
@@ -466,7 +592,6 @@ token::numeric_type lexer::parse_number( char first_c, bool throw_exceptions ) {
   // <int> := '0' | <1-9> <digit>*
   if ( !ascii::is_digit( c ) )
     goto error_set_cur_loc_end;
-  value += c;
   numeric_type = token::integer;
   if ( c == '0' ) {
     if ( !peek_char( &c ) )
@@ -482,19 +607,16 @@ token::numeric_type lexer::parse_number( char first_c, bool throw_exceptions ) {
       if ( !ascii::is_digit( c ) )
         break;
       get_char( &c );
-      value += c;
     }
   }
 
   // <frac> ::= '.' <digit>+
   if ( c == '.' ) {
     get_char( &c );
-    value += c;
     if ( !get_char( &c ) )
       goto error_set_cur_loc_end_false;
     if ( !ascii::is_digit( c ) )
       goto error_set_cur_loc_end;
-    value += c;
     numeric_type = token::decimal;
     while ( true ) {
       if ( !peek_char( &c ) )
@@ -504,7 +626,6 @@ token::numeric_type lexer::parse_number( char first_c, bool throw_exceptions ) {
       if ( !ascii::is_digit( c ) )
         break;
       get_char( &c );
-      value += c;
     }
   }
 
@@ -513,17 +634,14 @@ token::numeric_type lexer::parse_number( char first_c, bool throw_exceptions ) {
   // <sign> ::= '-' | '+'
   if ( c == 'e' || c == 'E' ) {
     get_char( &c );
-    value += c;
     if ( !get_char( &c ) )
       goto error_set_cur_loc_end_false;
     if ( c == '+' || c == '-' ) {
-      value += c;
       if ( !get_char( &c ) )
         goto error_set_cur_loc_end_false;
     }
     if ( !ascii::is_digit( c ) )
       goto error_set_cur_loc_end;
-    value += c;
     numeric_type = token::floating_point;
     while ( true ) {
       if ( !peek_char( &c ) )
@@ -533,7 +651,6 @@ token::numeric_type lexer::parse_number( char first_c, bool throw_exceptions ) {
       if ( !ascii::is_digit( c ) )
         break;
       get_char( &c );
-      value += c;
     }
   }
 
@@ -551,12 +668,52 @@ error_set_cur_loc_end_false:
   return token::non_numeric;
 }
 
-bool lexer::parse_string( bool throw_exceptions ) {
-  bool got_backslash = false;
-  location start_loc( cur_loc_ );
-  ztd::string_appender<token::value_type,1024> value( &value_ );
-
+/**
+ * Lexes a string up to its closing quote.  A string without escapes is found
+ * by scanning bytes and is not copied; one with escapes is built in value_.
+ */
+bool lexer::parse_string( token *t, line_type quote_line,
+                          column_type quote_col, bool throw_exceptions ) {
+  capture_ = cur_;
   value_.clear();
+  while ( true ) {
+    char const *p = cur_;
+    while ( p != end_ && *p != '"' && *p != '\\' && *p != '\n' )
+      ++p;
+    cur_ = p;
+    if ( p == end_ ) {
+      if ( fill( true ) )
+        continue;
+      capture_ = nullptr;
+      if ( throw_exceptions )
+        throw unterminated_string(
+          location( file_, quote_line, quote_col, line_, col() )
+        );
+      return false;
+    }
+    switch ( *p ) {
+      case '"':
+        end_capture( t );
+        ++cur_;
+        return true;
+      case '\n':
+        ++cur_;
+        newline();
+        continue;
+      default:                          // '\\'
+        value_.append( capture_, static_cast<size_t>( p - capture_ ) );
+        capture_ = nullptr;
+        return parse_string_escapes( t, quote_line, quote_col,
+                                     throw_exceptions );
+    }
+  }
+}
+
+bool lexer::parse_string_escapes( token *t, line_type quote_line,
+                                  column_type quote_col,
+                                  bool throw_exceptions ) {
+  bool got_backslash = false;
+  ztd::string_appender<token::value_type,1024> value( &value_ );
 
   while ( true ) {
     //
@@ -569,7 +726,9 @@ bool lexer::parse_string( bool throw_exceptions ) {
     char c;
     if ( !get_char( &c ) ) {
       if ( throw_exceptions )
-        throw unterminated_string( set_loc_end( &start_loc, line_, col_ ) );
+        throw unterminated_string(
+          location( file_, quote_line, quote_col, line_, col() )
+        );
       return false;
     }
     if ( got_backslash ) {
@@ -616,6 +775,10 @@ bool lexer::parse_string( bool throw_exceptions ) {
         got_backslash = true;
         break;
       case '"':
+        value.flush();
+        t->value_ = value_;
+        t->view_ = nullptr;
+        t->view_size_ = 0;
         return true;
       default:
         value += c;
@@ -625,18 +788,31 @@ bool lexer::parse_string( bool throw_exceptions ) {
 
 location& lexer::set_cur_loc_end( bool prev ) {
   return prev ?
-    set_loc_end( &cur_loc_, prev_line_, prev_col_ )
+    set_loc_end( &cur_loc_, prev_line(), prev_col() )
   :
-    set_loc_end( &cur_loc_, line_, col_ );
+    set_loc_end( &cur_loc_, line_, col() );
 }
 
 void lexer::set_loc( char const *file, line_type line, column_type col ) {
   line_ = line;
-  col_ = col;
+  line_start_ = pos() - (col - 1);
   if ( file ) {
     file_ = file;
-    cur_loc_.set( file, line_, col_, line_, col_ );
+    cur_loc_.set( file, line_, col, line_, col );
   }
+}
+
+void lexer::sync() {
+  if ( cur_ == end_ )
+    return;
+  std::streambuf *const sb = in_->rdbuf();
+  std::streampos const at = sb->pubseekoff( 0, ios::cur, ios::in );
+  if ( at == std::streampos( std::streamoff( -1 ) ) ||
+       sb->pubseekpos( at - std::streamoff( end_ - cur_ ), ios::in ) ==
+         std::streampos( std::streamoff( -1 ) ) )
+    return;                             // the stream cannot go back: keep the buffer
+  buf_offset_ = pos();
+  cur_ = end_ = buf_;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -704,13 +880,13 @@ void parser::require_token_debug( int line, token::type tt, token *t ) {
 
 # define PUSH_STATE(S)      \
     if (0) ; else {         \
-      state_stack_.push(S); \
+      state_stack_.push_back(S); \
       cout << __LINE__ << ':' << indent << "PUSH_STATE( " << (S) << " )" << endl << inc_indent;             \
     }
 
 # define POP_STATE()                            \
     if (0) ; else {                             \
-      state_ = ztd::pop_stack( state_stack_ );  \
+      state_ = pop_state();                     \
       cout << __LINE__ << ':' << indent << "POP_STATE() => " << state_ << endl << dec_indent;                                   \
     }
 
@@ -723,8 +899,8 @@ void parser::require_token_debug( int line, token::type tt, token *t ) {
 # define THROW_UNEXPECTED_TOKEN(T)  throw unexpected_token( T )
 
 # define GOTO_STATE(S)              { state_ = (S); continue; }
-# define PUSH_STATE(S)              state_stack_.push(S)
-# define POP_STATE()                state_ = ztd::pop_stack( state_stack_ )
+# define PUSH_STATE(S)              state_stack_.push_back(S)
+# define POP_STATE()                state_ = pop_state()
 
 #endif /* DEBUG_JSON_PARSER */
 
@@ -734,12 +910,13 @@ parser::parser( std::istream &in, bool allow_multiple ) :
   allow_multiple_( allow_multiple ),
   lexer_( in )
 {
+  state_stack_.reserve( 32 );
   init();
 }
 
 void parser::clear() {
   peeked_token_.clear();
-  ztd::clear_stack( state_stack_ );
+  state_stack_.clear();
   init();
 }
 
@@ -752,8 +929,7 @@ void parser::init() {
 
 bool parser::get_token( token *t ) {
   if ( peeked_token_ ) {
-    *t = peeked_token_;
-    peeked_token_.clear();
+    t->take( &peeked_token_ );
     return true;
   }
   t->clear();
@@ -763,7 +939,13 @@ bool parser::get_token( token *t ) {
 bool parser::matches_token( token::type tt, token *t ) {
   if ( peek_token() == tt )
     return get_token( t );
-  *t = peeked_token_;
+  // Before t is read, get_token() replaces it, but for the location when there is no token.
+  t->set_loc(
+    peeked_token_.file_, peeked_token_.line_, peeked_token_.column_,
+    peeked_token_.line_end_, peeked_token_.column_end_
+  );
+  t->type_ = peeked_token_.type_;
+  t->numeric_type_ = peeked_token_.numeric_type_;
   return false;
 }
 

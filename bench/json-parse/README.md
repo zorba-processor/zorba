@@ -121,11 +121,13 @@ Seconds per part are the part's share of the perf samples times the best wall ti
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | master `ab93bb29c6` | 5.72 | 37.2 | 3.02 | 1.01 | 0.55 | 0.50 | 0.17 | 0.08 | 0.02 | 0.22 | 0.07 | 0.09 | 415 | 12,744 |
 | PR 1 | 3.88 | 54.9 | 1.65 | 0.69 | 0.53 | 0.45 | 0.07 | 0.08 | 0.02 | 0.23 | 0.07 | 0.10 | 224 | 7,696 |
+| PR 2 | 2.38 | 89.5 | 0.51 | 0.36 | 0.47 | 0.48 | 0.09 | 0.08 | 0.04 | 0.19 | 0.08 | 0.09 | 128 | 5,458 |
 | jq 1.8.2 (same container) | 2.81 | 75.8 | | | | | | | | | | | | |
 | jq 1.7.1 (macOS on the host, same machine) | 3.68 | 57.9 | | | | | | | | | | | | |
 
 jq counts with `jq -n 'reduce inputs as $e (0; . + 1)'`; jq 1.7.1 is not packaged for
-the builder image, so it ran natively on the host.
+the builder image, so it ran natively on the host. jq 1.8.2 took 2.78 s again in the
+rounds of the PR 2 row.
 
 ### All four queries (best wall time, s)
 
@@ -133,3 +135,8 @@ the builder image, so it ran natively on the host.
 |---|---:|---:|---:|---:|
 | master `ab93bb29c6` | 5.72 | 8.07 | 8.85 | 6.00 |
 | PR 1 | 3.88 (-32%) | 5.93 (-27%) | 6.90 (-22%) | 4.07 (-32%) |
+| PR 2 | 2.38 (-58%) | 4.40 (-45%) | 5.50 (-38%) | 2.64 (-56%) |
+
+Percentages are against master `ab93bb29c6`. The PR 2 row was measured with the host
+otherwise nearly idle, alternating with the PR 1 head (`06261a9290`), which took 3.79,
+5.89, 6.94 and 4.05 s in those rounds: PR 2 alone is -37%, -25%, -21% and -35%.
