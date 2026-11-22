@@ -20,14 +20,16 @@
 namespace zorba { 
 
 
-Mutex::Mutex()
+Mutex::Mutex(Kind kind)
 {
 #ifdef ZORBA_HAVE_PTHREAD_H
   pthread_mutexattr_t attr;
   int ret = pthread_mutexattr_init(&attr);
   ZORBA_FATAL(!ret, "Failed to initialize mutex attributes. Error code = " << ret << " message = " << strerror(ret));
 
-  ret = pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_ERRORCHECK);
+  ret = pthread_mutexattr_settype(
+      &attr,
+      kind == RECURSIVE ? PTHREAD_MUTEX_RECURSIVE : PTHREAD_MUTEX_ERRORCHECK);
   ZORBA_FATAL(!ret, "Failed to set mutex type. Error code = " << ret << " message = " << strerror(ret));
 
 #ifndef NDEBUG

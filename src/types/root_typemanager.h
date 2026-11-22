@@ -42,7 +42,8 @@ class RootTypeManager : public TypeManagerImpl
   friend class AtomicXQType;
 
 public:
-  SYNC_CODE(Mutex theXercesMutex;)
+  // Recursive: holders such as validation call schema functions that lock it again.
+  SYNC_CODE(Mutex theXercesMutex{Mutex::RECURSIVE};)
 
   /**
    * Pre-allocated XQType object for the "none" type.

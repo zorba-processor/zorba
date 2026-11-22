@@ -381,7 +381,7 @@ Schema::Schema(TypeManager* tm)
 
 #ifndef ZORBA_NO_XMLSCHEMA
   {
-    SYNC_CODE(AutoMutex(GENV_TYPESYSTEM.getXercesMutex());)
+    SYNC_CODE(AutoMutex xercesLock(GENV_TYPESYSTEM.getXercesMutex());)
 
    theGrammarPool = new (&theGrammarPoolMemoryManager)
                     XMLGrammarPoolImpl(&theGrammarPoolMemoryManager);
@@ -400,7 +400,7 @@ Schema::Schema(TypeManager* tm)
 Schema::Schema(::zorba::serialization::Archiver& ar)
 {
 #ifndef ZORBA_NO_XMLSCHEMA
-  SYNC_CODE(AutoMutex(GENV_TYPESYSTEM.getXercesMutex());)
+  SYNC_CODE(AutoMutex xercesLock(GENV_TYPESYSTEM.getXercesMutex());)
 
   theGrammarPool = new (&theGrammarPoolMemoryManager)
                    XMLGrammarPoolImpl(&theGrammarPoolMemoryManager);
@@ -417,7 +417,7 @@ Schema::~Schema()
 {
 #ifndef ZORBA_NO_XMLSCHEMA
   {
-    SYNC_CODE(AutoMutex(GENV_TYPESYSTEM.getXercesMutex());)
+    SYNC_CODE(AutoMutex xercesLock(GENV_TYPESYSTEM.getXercesMutex());)
 
     theRejectedGrammarParsers.clear();
     delete theGrammarPool;
@@ -438,7 +438,7 @@ void Schema::serialize(::zorba::serialization::Archiver& ar)
 #ifndef ZORBA_NO_XMLSCHEMA
    ar & theUdTypesCache;
 
-   SYNC_CODE(AutoMutex(GENV_TYPESYSTEM.getXercesMutex());)
+   SYNC_CODE(AutoMutex xercesLock(GENV_TYPESYSTEM.getXercesMutex());)
 
    bool is_grammar_NULL = (theGrammarPool == NULL);
 
@@ -536,7 +536,7 @@ void Schema::printXSDInfo(bool excludeBuiltIn)
 *******************************************************************************/
 bool Schema::isNamespaceLoaded(const char* ns) const
 {
-  SYNC_CODE(AutoMutex(GENV_TYPESYSTEM.getXercesMutex());)
+  SYNC_CODE(AutoMutex xercesLock(GENV_TYPESYSTEM.getXercesMutex());)
 
   return isNamespaceInPool(ns);
 }
@@ -573,7 +573,7 @@ void Schema::registerXSD(
 
   TRACE("url=" << xsdURL << " loc=" << loc);
 
-  SYNC_CODE(AutoMutex(GENV_TYPESYSTEM.getXercesMutex());)
+  SYNC_CODE(AutoMutex xercesLock(GENV_TYPESYSTEM.getXercesMutex());)
 
   try
   {
@@ -697,7 +697,7 @@ void Schema::getInfoFromGlobalElementDecl(
     bool& nillable,
     const QueryLoc& loc)
 {
-  SYNC_CODE(AutoMutex(GENV_TYPESYSTEM.getXercesMutex());)
+  SYNC_CODE(AutoMutex xercesLock(GENV_TYPESYSTEM.getXercesMutex());)
 
   XSElementDeclaration* decl = getDeclForElement(qname);
 
@@ -737,7 +737,7 @@ xqtref_t Schema::createXQTypeFromGlobalElementDecl(
   TRACE("qn:" << qname->getLocalName() << " @ " <<
         qname->getNamespace() );
 
-  SYNC_CODE(AutoMutex(GENV_TYPESYSTEM.getXercesMutex());)
+  SYNC_CODE(AutoMutex xercesLock(GENV_TYPESYSTEM.getXercesMutex());)
 
   XSElementDeclaration* decl = getDeclForElement(qname);
 
@@ -772,7 +772,7 @@ void Schema::getInfoFromGlobalAttributeDecl(
     store::Item_t& typeName,
     const QueryLoc& loc)
 {
-  SYNC_CODE(AutoMutex(GENV_TYPESYSTEM.getXercesMutex());)
+  SYNC_CODE(AutoMutex xercesLock(GENV_TYPESYSTEM.getXercesMutex());)
 
   XSTypeDefinition* typeDef = getTypeDefForAttribute(qname);
 
@@ -802,7 +802,7 @@ xqtref_t Schema::createXQTypeFromGlobalAttributeDecl(
     const bool raiseErrors,
     const QueryLoc& loc)
 {
-  SYNC_CODE(AutoMutex(GENV_TYPESYSTEM.getXercesMutex());)
+  SYNC_CODE(AutoMutex xercesLock(GENV_TYPESYSTEM.getXercesMutex());)
 
   XSTypeDefinition* typeDef = getTypeDefForAttribute(qname);
 
@@ -834,7 +834,7 @@ xqtref_t Schema::createXQTypeFromTypeName(
         << qname->getLocalName() << "@"
         << qname->getNamespace());
 
-  SYNC_CODE(AutoMutex(GENV_TYPESYSTEM.getXercesMutex());)
+  SYNC_CODE(AutoMutex xercesLock(GENV_TYPESYSTEM.getXercesMutex());)
 
   if (theGrammarPool == NULL)
     return NULL;
@@ -907,7 +907,7 @@ void Schema::getSubstitutionHeadForElement(
 
   result = NULL;
 
-  SYNC_CODE(AutoMutex(GENV_TYPESYSTEM.getXercesMutex());)
+  SYNC_CODE(AutoMutex xercesLock(GENV_TYPESYSTEM.getXercesMutex());)
 
   if (theGrammarPool == NULL)
     return;
@@ -1883,7 +1883,7 @@ bool Schema::parseUserAtomicTypes(
 
   ZORBA_ASSERT(udXQType->isAtomicAny());
 
-  SYNC_CODE(AutoMutex(GENV_TYPESYSTEM.getXercesMutex());)
+  SYNC_CODE(AutoMutex xercesLock(GENV_TYPESYSTEM.getXercesMutex());)
 
 #ifndef ZORBA_NO_XMLSCHEMA
   const store::Item* typeQName = udXQType->getQName();
