@@ -767,17 +767,12 @@ void QNameItem::free()
   if (theIsInPool)
   {
     thePool.remove(this);
-
-    SYNC_CODE(getRCLock()->release());
-
     return;
   }
-  
+
   assert(!isNormalized());
 
   invalidate(false, NULL);
-  SYNC_CODE(getRCLock()->release());
-
   delete this;
 }
 
