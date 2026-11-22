@@ -4,9 +4,10 @@
 # Each failure comes from a race suppressed in test/sanitizers/tsan-mt.supp
 # (inventory ids of the thread-safety design); the PR that fixes it removes the
 # line. The multithread test preset (CMakePresets.json, no ThreadSanitizer)
-# excludes the tests here that also fail there: mt_independent, mt_clone and
-# mt_clone_cold.
+# excludes the tests here that also fail there: mt_independent, mt_schema,
+# mt_clone, mt_clone_cold and mt_store_rw.
 test/api/mt/mt_independent | flaky | S7: crash in ContentReader::copyContents in about 1 run in 10 (P7)
 test/api/mt/mt_clone | flaky | C9: a clone compares with another clone's implicit timezone; every run (P8)
 test/api/mt/mt_clone_cold | flaky | C1: user function plans generated concurrently (crash), plus mt_clone's failures (P8, P9)
 test/api/mt/mt_schema | flaky | S7: crash in ContentReader::copyContents in about 1 run in 25 (P7); crash in Xerces destroying a schema's grammar pool in about 1 run in 50 (unassigned)
+test/api/mt/mt_store_rw | flaky | S7: crash in ContentReader::copyContents in about 1 run in 5 (P7)

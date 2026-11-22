@@ -23,6 +23,7 @@
 
 #include <zorba/api_shared_types.h>
 
+#include "zorbautils/lock.h"
 #include "zorbautils/mutex.h"
 
 #include "common/shared_types.h"
@@ -363,6 +364,8 @@ protected:
         ulong& nextVarId);
 
   PlanWrapper_t generateWrapper();
+
+  Lock::Mode executionLockMode() const;
 
   // special serialize and applyUpdate function that is used by debugger
   // and by the public serialize and applyUpdate functions, respectively.
