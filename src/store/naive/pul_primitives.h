@@ -747,6 +747,9 @@ protected:
   bool                     theOldIsInSubstitutionGroup;
   bool                     theOldIsNilled;
 
+  // The text that the typed value replaced, for undo, which cannot allocate.
+  zstring                  theOldText;
+
 
   UpdSetElementType(
         PULImpl*        pul,

@@ -522,15 +522,33 @@ void UpdSetElementType::apply()
   theOldIsInSubstitutionGroup = target->isInSubstitutionGroup();
   theOldIsNilled = target->getNilled();
 
+  // What can fail comes first, so that a failure leaves the element as it is:
+  // the text of the old typed value and the copy that undo restores, the
+  // empty content's value, then the type.
+  zstring textValue;
+  if (theOldHaveTypedTypedValue)
+  {
+    theOldHaveListTypedValue = textChild->haveListValue();
+    textChild->getStringValue2(textValue);
+  }
+
+  if (theHaveTypedValue && theHaveTypedTypedValue)
+    theOldText = theOldHaveTypedTypedValue ?
+                 textValue :
+                 target->getUniqueTextChild()->getText();
+
+  // Without a text child, a single value is the typed value of the empty
+  // content (user-defined atomic types). Undo leaves it: it is used only
+  // while the element has the value's type.
+  if (theHaveTypedValue && !theHaveTypedTypedValue &&
+      theTypedValue != NULL && !theHaveListTypedValue)
+    target->setEmptyContentTypedValue(theTypedValue);
+
   target->setType(theTypeName);
 
   if (theOldHaveTypedTypedValue)
   {
-    theOldHaveListTypedValue = textChild->haveListValue();    
     theOldTypedValue = textChild->getValue();
-
-    zstring textValue;
-    textChild->getStringValue2(textValue);
 
     textChild->setValue(NULL);
 
@@ -557,13 +575,6 @@ void UpdSetElementType::apply()
         textChild->setHaveListValue();
       else
         textChild->resetHaveListValue();
-    }
-    // Without a text child, a single value is the typed value of the empty
-    // content (user-defined atomic types). Undo leaves it: it is used only
-    // while the element has the value's type.
-    else if (theTypedValue != NULL && !theHaveListTypedValue)
-    {
-      target->setEmptyContentTypedValue(theTypedValue);
     }
   }
   else
@@ -596,7 +607,9 @@ void UpdSetElementType::undo()
     if (theHaveTypedTypedValue)
     {
       TextNode* textChild = target->getUniqueTextChild();
-      textChild->revertToTextContent();
+      textChild->setValue(NULL);
+      textChild->theFlags &= ~XmlNode::IsTyped;
+      textChild->setText(theOldText);
     }
 
     if (theOldHaveTypedValue)
@@ -706,10 +719,12 @@ void UpdSetAttributeType::apply()
   AttributeNode* target = ATTR_NODE(theTarget);
 
   theOldTypeName = target->getType();
-  theOldTypedValue.transfer(target->theTypedValue);
   theOldHaveListValue = target->haveListValue();
 
+  // The only step that can fail, first.
   target->setType(theTypeName);
+
+  theOldTypedValue.transfer(target->theTypedValue);
   target->theTypedValue.transfer(theTypedValue);
 
   if (theHaveListValue)
@@ -756,14 +771,8 @@ void UpdRevalidate::apply()
 
   thePul->theValidator->validate(nodes, *theRevalidationPul.getp());
 
-  try
-  {
-    theRevalidationPul->applyUpdates(false);
-  }
-  catch (...)
-  {
-    ZORBA_FATAL(0, "Error during the in-place validation");
-  }
+  // A failure leaves the revalidation undone, and this primitive not applied.
+  theRevalidationPul->applyUpdates(false);
 
   theIsApplied = true;
 #endif
