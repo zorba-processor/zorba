@@ -95,6 +95,14 @@
       }
     },
     {
+      "name": "tsan-mt",
+      "displayName": "Full, multithreaded engine (ZORBA_FOR_ONE_THREAD_ONLY=OFF), ThreadSanitizer (Linux)",
+      "inherits": "tsan",
+      "cacheVariables": {
+        "ZORBA_FOR_ONE_THREAD_ONLY": "OFF"
+      }
+    },
+    {
       "name": "embedded",
       "displayName": "Embedded (no Full-Text, no XML Schema, no debugger, no thesaurus, no network, no unit tests), Release",
       "inherits": "base",
@@ -135,6 +143,14 @@
       "cacheVariables": {
         "ZORBA_WITH_BIG_INTEGER": "ON"
       }
+    },
+    {
+      "name": "multithread",
+      "displayName": "Full, multithreaded engine (ZORBA_FOR_ONE_THREAD_ONLY=OFF), Release",
+      "inherits": "full-release",
+      "cacheVariables": {
+        "ZORBA_FOR_ONE_THREAD_ONLY": "OFF"
+      }
     }
   ],
   "buildPresets": [
@@ -166,6 +182,10 @@
       "configurePreset": "tsan-bigint"
     },
     {
+      "name": "tsan-mt",
+      "configurePreset": "tsan-mt"
+    },
+    {
       "name": "glibcxx-debug",
       "configurePreset": "glibcxx-debug"
     },
@@ -184,6 +204,10 @@
     {
       "name": "bigint",
       "configurePreset": "bigint"
+    },
+    {
+      "name": "multithread",
+      "configurePreset": "multithread"
     }
   ],
   "testPresets": [
@@ -307,6 +331,25 @@
       }
     },
     {
+      "name": "tsan-mt",
+      "displayName": "Multithreaded API tests (label mt) under ThreadSanitizer; known races in test/sanitizers/tsan-mt.supp",
+      "configurePreset": "tsan-mt",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "timeout": 300
+      },
+      "filter": {
+        "include": {
+          "label": "^mt$"
+        }
+      },
+      "environment": {
+        "TSAN_OPTIONS": "halt_on_error=1:exitcode=66:second_deadlock_stack=1:history_size=7:print_suppressions=1:suppressions=${sourceDir}/test/sanitizers/tsan-mt.supp:log_path=${sourceDir}/build/tsan-mt/sanitizer-logs/tsan-mt"
+      }
+    },
+    {
       "name": "embedded",
       "displayName": "Tests that need no HTTP test server",
       "configurePreset": "embedded",
@@ -367,6 +410,22 @@
       "filter": {
         "exclude": {
           "name": "http-client|test/api/validate$|userdefined_uri_resolution|uri_resolvers|streaming-udf|store/example_[13]$|uris/disable-http-3|update/zorba/store/sc1|update/zorba/store/sc2_ex"
+        }
+      }
+    },
+    {
+      "name": "multithread",
+      "displayName": "Tests that need no HTTP test server, except the multithreaded tests that fail until their fix (test/baselines/sanitizers-tsan-mt.txt)",
+      "configurePreset": "multithread",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "timeout": 120
+      },
+      "filter": {
+        "exclude": {
+          "name": "http-client|test/api/validate$|userdefined_uri_resolution|uri_resolvers|streaming-udf|store/example_[13]$|uris/disable-http-3|update/zorba/store/sc1|update/zorba/store/sc2_ex|test/api/mt/mt_(independent|clone|clone_cold)$"
         }
       }
     }
