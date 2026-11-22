@@ -602,7 +602,7 @@ IF (ZORBA_WITH_FILE_ACCESS)
              exhaust_cached_call_body exhaust_group_by exhaust_first_dynamic_call
              exhaust_sweep_xml exhaust_sweep_xml_dtd exhaust_sweep_xml_dtd_nodes
              exhaust_sweep_fragment exhaust_sweep_descendant exhaust_sweep_insert
-             exhaust_sweep_delete
+             exhaust_sweep_delete exhaust_sweep_serialize
              exhaust_sweep_html exhaust_sweep_json exhaust_sweep_csv
              exhaust_sweep_casts exhaust_sweep_arithmetic exhaust_sweep_decimal_thread
              exhaust_sweep_cache exhaust_json_array_growth
