@@ -189,6 +189,13 @@ IF(CMAKE_COMPILER_IS_GNUCC)
   ENDIF ( ZORBA_GNUCOMPILER_MAJOR_VERSION GREATER 3 )
 ENDIF(CMAKE_COMPILER_IS_GNUCC)
 
+OPTION(ZORBA_WERROR "Treat compiler warnings as errors (GCC and Clang)" OFF)
+IF (ZORBA_WERROR)
+  # Compile options, not CMAKE_<LANG>_FLAGS, so that configure checks are not affected.
+  ADD_COMPILE_OPTIONS($<$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>:-Werror>
+                      $<$<COMPILE_LANG_AND_ID:C,GNU,Clang,AppleClang>:-Werror>)
+ENDIF (ZORBA_WERROR)
+
 IF (APPLE)
   # Needed for CFUUID*() functions in util/uuid.c.
   SET(CMAKE_SHARED_LINKER_FLAGS "-framework CoreFoundation ${CMAKE_SHARED_LINKER_FLAGS}")

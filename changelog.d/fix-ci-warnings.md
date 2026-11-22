@@ -1,3 +1,8 @@
+### Added
+
+- Add the CMake option `ZORBA_WERROR` (default `OFF`), which makes compiler
+  warnings errors with GCC and Clang; CI builds with it on.
+
 ### Fixed
 
 - Fix the process aborting (`std::terminate`) when an open result iterator is

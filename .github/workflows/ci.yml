@@ -247,7 +247,7 @@ jobs:
             -e CCACHE_DIR=/src/.ccache \
             -e CCACHE_SLOPPINESS=pch_defines,time_macros -e CCACHE_DEPEND=1 \
             -v "$PWD":/src -w /src zorba-builder:ci sh -ec '
-              cmake --preset full-release
+              cmake --preset full-release -DZORBA_WERROR=ON
               cmake --build --preset full-release
               ccache -s
               rc=0
@@ -352,7 +352,7 @@ jobs:
             -e CCACHE_DIR=/src/.ccache \
             -e CCACHE_SLOPPINESS=pch_defines,time_macros -e CCACHE_DEPEND=1 \
             -v "$PWD":/src -w /src zorba-builder:ci sh -ec '
-              cmake --preset ${{ matrix.preset }}
+              cmake --preset ${{ matrix.preset }} -DZORBA_WERROR=ON
               cmake --build --preset ${{ matrix.preset }} -- -k 0
               ccache -s
               scripts/profile-size.sh ${{ matrix.preset }} > build/size.md
@@ -421,6 +421,7 @@ jobs:
           cmake --preset full-release
           -DCMAKE_C_COMPILER_LAUNCHER=ccache
           -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+          -DZORBA_WERROR=ON
 
       - name: Build
         run: cmake --build --preset full-release

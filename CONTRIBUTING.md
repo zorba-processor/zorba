@@ -78,6 +78,15 @@ exit code does not fit the log (it must be 0 without failures and 8 with them).
 
 ## Coding rules
 
+### Warnings
+
+The build stays free of compiler warnings. CI configures every build job with
+`-DZORBA_WERROR=ON`, which makes a warning an error with GCC and Clang. Fix a
+warning at its cause, not with a pragma, a `-Wno-*` flag or a cast that hides
+it. A suppression is allowed only for a documented compiler false positive,
+at the narrowest scope, with a one-line reason and the link to the compiler
+bug.
+
 ### Owning memory
 
 New and changed code does not manage memory with raw owning `new` and
