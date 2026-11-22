@@ -73,10 +73,10 @@ struct FragmentInsertions
   bool version = false;     // " version=\"1.0\"" after "<?xml" on line 1
   int wrapper_line = 0;     // the wrapper start tag
   int wrapper_column = 0;
-  int end_line = 1;         // just past the text fed so far
+  int end_line = 1;         // just past the prolog
   int end_column = 1;
-  bool after_cr = false;    // the last byte fed is a carriage return
-  bool ended = false;       // the wrapper end tag follows end_line, end_column
+  bool after_cr = false;    // the prolog ends with a carriage return
+  bool ended = false;       // the wrapper end tag follows the input
 };
 
 class FragmentIStream : public std::istream
