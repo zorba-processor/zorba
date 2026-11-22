@@ -66,6 +66,8 @@ root_static_context::root_static_context()
   :
   static_context()
 {
+  // Every static context of the process descends from this one.
+  theRefCount.makeImmortal();
   theTypeManager = &GENV_TYPESYSTEM;
 }
 

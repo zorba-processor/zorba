@@ -38,7 +38,8 @@ class parsenode_visitor;
 **  base class: syntax-only nodes
 */
 // exported for unit testing only
-class ZORBA_DLL_PUBLIC parsenode : public SimpleRCObject
+// A parse tree lives on the thread that parses and translates it.
+class ZORBA_DLL_PUBLIC parsenode : public LocalRCObject
 {
 protected:
   QueryLoc loc;

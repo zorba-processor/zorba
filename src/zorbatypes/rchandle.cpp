@@ -51,7 +51,7 @@ void SyncedRCObject::serialize(::zorba::serialization::Archiver& ar)
   ZORBA_ASSERT(false);
 
   if (!ar.is_serializing_out())
-    theRefCount = 0;
+    theRefCount.reset();
 }
 
 
@@ -63,7 +63,7 @@ void SimpleRCObject::serialize(::zorba::serialization::Archiver& ar)
   ZORBA_ASSERT(false);
 
   if (!ar.is_serializing_out())
-    theRefCount = 0;
+    theRefCount.reset();
 }
 
 

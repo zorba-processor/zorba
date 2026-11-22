@@ -25,7 +25,8 @@ namespace zorba
 {
 
 
-class Rewriter : public SimpleRCObject 
+// Rewriters and rules are counted only by the rewrite of one compilation.
+class Rewriter : public LocalRCObject
 {
 public:
   Rewriter() {}

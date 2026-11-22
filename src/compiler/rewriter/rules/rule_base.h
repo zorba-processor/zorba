@@ -30,7 +30,8 @@ class RewriterContext;
 /*******************************************************************************
 
 ********************************************************************************/
-class RewriteRule : public SimpleRCObject
+// Rewriters and rules are counted only by the rewrite of one compilation.
+class RewriteRule : public LocalRCObject
 {
 public:
   typedef enum

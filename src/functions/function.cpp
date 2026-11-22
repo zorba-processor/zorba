@@ -54,9 +54,9 @@ function::function(
   if (isBuiltin)
   {
     setFlag(FunctionConsts::isBuiltin);
+    // The root static context and every compilation share builtin functions.
+    theRefCount.makeImmortal();
 #ifndef NDEBUG
-    theRefCount = 1000000;
-
     csize numTypes = sig.theTypes.size();
     for (csize i = 0; i < numTypes; ++i)
     {
