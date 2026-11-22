@@ -20,6 +20,8 @@
 // standard
 #include <istream>
 #include <new>
+#include <stack>
+#include <string_view>
 #include <utility>                          /* for pair */
 #include <vector>
 
@@ -120,6 +122,14 @@ public:
     parser_.set_loc( file, line, col );
   }
 
+  /**
+   * Gives back to the stream what was read from it but not parsed, so that
+   * its position is that of the next character to parse (see lexer::sync()).
+   */
+  void sync() {
+    parser_.sync();
+  }
+
 private:
   typedef std::vector<store::Item_t> json_array_type;
 
@@ -158,7 +168,8 @@ private:
   void add_value( store::Item_t const& );
   void check_duplicate_keys( std::vector<store::Item_t> const& ) const;
   void clear_stack();
-  void make_key( zstring const&, store::Item_t* );
+  void make_key( std::string_view, store::Item_t* );
+  static char const* number_of( token const&, char (&)[64] );
   void record_key( store::Item_t const& );
   void end_top_level_value();
 

@@ -21,8 +21,10 @@
 
 #include <exception>
 #include <iostream>
-#include <stack>
+#include <memory>
 #include <string>
+#include <string_view>
+#include <vector>
 
 #include <zorba/internal/cxx_util.h>
 #include <zorba/internal/diagnostic.h>
@@ -110,12 +112,21 @@ public:
   token();
 
   /**
-   * Clears this %token.
+   * Copies a %token.  The copy holds its own value even when \a that only
+   * refers to the lexer's buffer.
+   */
+  token( token const &that );
+  token& operator=( token const &that );
+
+  /**
+   * Clears this %token.  Its location stays.
    */
   void clear() {
     type_ = none;
     numeric_type_ = non_numeric;
     value_.clear();
+    view_ = nullptr;
+    view_size_ = 0;
   }
 
   /**
@@ -123,8 +134,9 @@ public:
    *
    * @return Returns said location.
    */
-  location const& get_loc() const {
-    return loc_;
+  location get_loc() const {
+    return location( file_ ? file_ : "", line_, column_, line_end_,
+                     column_end_ );
   }
 
   /**
@@ -147,12 +159,42 @@ public:
 
   /**
    * Gets the value of this %token, if any.  Only %token types string, number,
-   * false, null, and true have a value.
+   * false, null, and true have a value.  A value that still refers to the
+   * lexer's buffer (see text()) must be gotten before the lexer reads on.
    *
    * @return Returns said value or the empty string.
    */
   value_type const& get_value() const {
+    if ( view_ ) {
+      value_.assign( view_, view_size_ );
+      view_ = nullptr;
+      view_size_ = 0;
+    }
     return value_;
+  }
+
+  /**
+   * Gets the value of this %token without copying it: it can refer to the
+   * lexer's buffer, so it is valid only until the lexer reads the next token.
+   *
+   * @return Returns said value or the empty string.
+   */
+  std::string_view text() const {
+    return view_ ? std::string_view( view_, view_size_ ) :
+                   std::string_view( value_.data(), value_.size() );
+  }
+
+  /**
+   * Gets the value of this %token into a string, sharing it if it is held
+   * rather than referred to.
+   *
+   * @param result The string to receive the value.
+   */
+  void get_value( value_type *result ) const {
+    if ( view_ )
+      result->assign( view_, view_size_ );
+    else
+      *result = value_;
   }
 
   /**
@@ -165,12 +207,31 @@ public:
   }
 
 private:
-  location loc_;
+  typedef location::line_type line_type;
+  typedef location::column_type column_type;
+
+  void set_loc( char const *file, line_type line, column_type column,
+                line_type line_end, column_type column_end ) {
+    file_ = file;
+    line_ = line;
+    column_ = column;
+    line_end_ = line_end;
+    column_end_ = column_end;
+  }
+
+  void take( token *that );
+
+  char const *file_;                    // owned by the lexer
+  line_type line_, line_end_;
+  column_type column_, column_end_;
   type type_;
   numeric_type numeric_type_;
-  value_type value_;
+  mutable value_type value_;
+  mutable char const *view_;            // the value in the lexer's buffer
+  mutable size_t view_size_;
 
   friend class lexer;
+  friend class parser;
 };
 
 /**
@@ -500,26 +561,66 @@ public:
    */
   void set_loc( char const *file, line_type line, column_type col );
 
+  /**
+   * Gives back to the stream what the lexer has read from it but not lexed,
+   * so that the stream's position is that of the next character to lex.  Call
+   * it before using the stream's position or moving it.
+   */
+  void sync();
+
+  lexer( lexer const& ) = delete;
+  lexer& operator=( lexer const& ) = delete;
+
 private:
+  typedef long long offset_type;
+
+  bool fill( bool bump );
+  void set_badbit_and_rethrow_if_masked();
   bool get_char( char* );
   bool peek_char( char* );
-  int read_char( bool bump );
-  void set_badbit_and_rethrow_if_masked();
+  void newline();
   bool parse_codepoint( unicode::code_point *cp, bool throw_exceptions );
   token::type parse_literal( char, bool throw_exceptions );
   token::numeric_type parse_number( char, bool throw_exceptions );
-  bool parse_string( bool throw_exceptions );
+  bool parse_string( token*, line_type, column_type, bool throw_exceptions );
+  bool parse_string_escapes( token*, line_type, column_type,
+                             bool throw_exceptions );
+  void end_capture( token* );
+
+  offset_type pos() const {
+    return buf_offset_ + (cur_ - buf_);
+  }
+  column_type col() const {
+    return static_cast<column_type>( pos() - line_start_ + 1 );
+  }
+  line_type prev_line() const;
+  column_type prev_col() const;
   void set_cur_loc();
   location& set_cur_loc_end( bool prev = true );
-  void set_loc_range( location* );
+  void set_loc_range( token* );
 
   std::istream *in_;
   std::string file_;
-  line_type line_, prev_line_;
-  column_type col_, prev_col_;
+
+  // What was read from the stream: [cur_,end_) is not lexed yet.
+  static size_t const small_buf_size = 512;
+  static size_t const max_buf_size = 64 * 1024;
+  char small_buf_[ small_buf_size ];
+  std::unique_ptr<char[]> big_buf_;
+  char *buf_;
+  size_t buf_size_;
+  char const *cur_, *end_;
+  offset_type buf_offset_;              // of buf_[0] in what was lexed
+
+  // Columns are offsets from the start of the line, so that they are known
+  // without counting each character.
+  line_type line_;                      // of the next character
+  offset_type line_start_;              // offset whose column is 1
+  offset_type prev_line_start_;         // of the line before line_
+
   location cur_loc_;
-  bool throw_exceptions_;
   token::value_type value_;
+  char const *capture_;                 // start of the value being lexed
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -576,6 +677,14 @@ public:
     lexer_.set_loc( file, line, col );
   }
 
+  /**
+   * Gives back to the stream what was read from it but not lexed (see
+   * lexer::sync()).
+   */
+  void sync() {
+    lexer_.sync();
+  }
+
 private:
   enum state {
     A0, A1, A2, // Array
@@ -591,6 +700,11 @@ private:
 
   void init();
   bool get_token( token* );
+  state pop_state() {
+    state const s = state_stack_.back();
+    state_stack_.pop_back();
+    return s;
+  }
   bool get_token_debug( int, token* );
   bool matches_token( token::type, token* );
   bool matches_token_debug( int, token::type, token* );
@@ -602,7 +716,7 @@ private:
   bool allow_multiple_;
   lexer lexer_;
   token peeked_token_;
-  std::stack<state> state_stack_;
+  std::vector<state> state_stack_;
   state state_;
 };
 

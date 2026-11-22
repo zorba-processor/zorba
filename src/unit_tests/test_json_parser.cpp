@@ -14,11 +14,13 @@
  * limitations under the License.
  */
 
+#include <algorithm>
 #include <cstring>
 #include <sstream>
 #include <stdexcept>
 #include <streambuf>
 #include <string>
+#include <vector>
 
 #include "util/json_parser.h"
 
@@ -638,6 +640,53 @@ static char const* exception_name( json::exception const &e ) {
   return "exception";
 }
 
+// Gives its text in get areas of at most chunk characters.
+class chunked_streambuf : public std::streambuf {
+public:
+  chunked_streambuf( char const *s, size_t chunk ) : s_( s ), chunk_( chunk ) {
+    setg( s_.data(), s_.data(), s_.data() );
+  }
+protected:
+  int_type underflow() override {
+    char *const end = s_.data() + s_.size();
+    if ( egptr() == end )
+      return traits_type::eof();
+    setg( egptr(), egptr(), std::min( egptr() + chunk_, end ) );
+    return traits_type::to_int_type( *gptr() );
+  }
+private:
+  std::string s_;
+  size_t chunk_;
+};
+
+static void check_error_loc( error_loc_case const &c, istream &is,
+                             char const *how ) {
+  parser p( is, c.multiple );
+  if ( c.file )
+    p.set_loc( c.file, 1, 1 );
+  token t;
+  try {
+    while ( p.next( &t ) )
+      ;
+    cout << "FAILED (" << how << "): no error for " << c.source << endl;
+    ++failures;
+  }
+  catch ( json::exception const &e ) {
+    location const &loc = e.get_loc();
+    char const *const file = loc.file() ? loc.file() : "";
+    if ( strcmp( exception_name( e ), c.exception ) ||
+         strcmp( file, c.file ? c.file : "" ) ||
+         loc.line() != c.line || loc.column() != c.column ||
+         loc.line_end() != c.line_end || loc.column_end() != c.column_end ) {
+      cout << "FAILED (" << how << "): for " << c.source << ": got "
+           << exception_name( e ) << " at \"" << file << "\" " << loc.line()
+           << ',' << loc.column() << '-' << loc.line_end() << ','
+           << loc.column_end() << endl;
+      ++failures;
+    }
+  }
+}
+
 static void test_error_locations() {
   static error_loc_case const cases[] = {
     { "[\n  x ]", false, nullptr, "illegal_character", 2, 3, 2, 3 },
@@ -669,34 +718,38 @@ static void test_error_locations() {
     { "{\"a\":1}\n{\"b\":tru", true, nullptr, "illegal_literal", 2, 6, 2, 9 },
     { "{\"a\":1}\n{\"b\":tru", true, "events.jsonl", "illegal_literal", 2, 6, 2, 9 },
     { "{\"a\":1}\n{\"b\":\"x", true, "events.jsonl", "unterminated_string", 2, 6, 2, 8 },
+    { "[1", false, nullptr, "unexpected_token", 1, 2, 1, 2 },
+    { "[1,", false, nullptr, "unexpected_token", 1, 3, 1, 3 },
+    { "{", false, nullptr, "unexpected_token", 1, 1, 1, 1 },
+    { "{\"a\"", false, nullptr, "unexpected_token", 1, 2, 1, 4 },
+    { "{\"a\":", false, nullptr, "unexpected_token", 1, 2, 1, 4 },
+    { "[[1]", false, nullptr, "unexpected_token", 1, 4, 1, 4 },
+    { "[{\"a\":[1,{\"b\":2}],\n\"c\":}]", false, nullptr, "unexpected_token", 2, 5, 2, 5 },
+    { "[\"a\nb\\q\"]", false, nullptr, "illegal_escape", 2, 3, 2, 3 },
+    { "[\"\\n\nx", false, nullptr, "unterminated_string", 1, 2, 2, 2 },
+    { "[123456789012345678901234567890x]", false, nullptr, "illegal_number", 1, 2, 1, 32 },
+    { "[1]\n[2]\n[3,\n", true, nullptr, "unexpected_token", 3, 3, 3, 3 },
   };
 
   for ( error_loc_case const &c : cases ) {
-    istringstream iss( c.source );
-    parser p( iss, c.multiple );
-    if ( c.file )
-      p.set_loc( c.file, 1, 1 );
-    token t;
-    try {
-      while ( p.next( &t ) )
-        ;
-      cout << "FAILED: no error for " << c.source << endl;
-      ++failures;
+    {
+      istringstream iss( c.source );
+      check_error_loc( c, iss, "istringstream" );
     }
-    catch ( json::exception const &e ) {
-      location const &loc = e.get_loc();
-      char const *const file = loc.file() ? loc.file() : "";
-      if ( strcmp( exception_name( e ), c.exception ) ||
-           strcmp( file, c.file ? c.file : "" ) ||
-           loc.line() != c.line || loc.column() != c.column ||
-           loc.line_end() != c.line_end || loc.column_end() != c.column_end ) {
-        cout << "FAILED: for " << c.source << ": got " << exception_name( e )
-             << " at \"" << file << "\" " << loc.line() << ','
-             << loc.column() << '-' << loc.line_end() << ','
-             << loc.column_end() << endl;
-        ++failures;
-      }
+    for ( size_t chunk : { 1, 2, 3, 5 } ) {
+      chunked_streambuf buf( c.source, chunk );
+      istream is( &buf );
+      check_error_loc( c, is, "chunks" );
     }
+  }
+  {
+    // columns wrap as their type does on a line longer than it counts
+    std::string const source = "[" + std::string( 70000, ' ' ) + "x]";
+    error_loc_case const c = {
+      source.c_str(), false, nullptr, "illegal_character", 1, 4466, 1, 4466
+    };
+    istringstream iss( source );
+    check_error_loc( c, iss, "istringstream" );
   }
 }
 
@@ -765,6 +818,85 @@ static void test_stream_state_at_end() {
   }
 }
 
+// Each token as text: type, numeric type, value and location.
+static vector<std::string> tokens_of( istream &is, bool multiple ) {
+  vector<std::string> result;
+  parser p( is, multiple );
+  token t;
+  while ( p.next( &t ) ) {
+    location const loc( t.get_loc() );
+    ostringstream oss;
+    oss << t.get_type() << ' ' << t.get_numeric_type() << " [" << t.text()
+        << "] " << loc.line() << ',' << loc.column() << '-' << loc.line_end()
+        << ',' << loc.column_end();
+    result.push_back( oss.str() );
+  }
+  return result;
+}
+
+static void test_buffer_boundaries() {
+  static char const source[] =
+    "{\"key\":\"value\",\"n\":-12.5e+3,\"esc\":\"a\\\"b\\u00e9\\nc\",\n"
+    " \"multi\nline\":[true,false,null,0,1.25,\"\"],\"x\":{}}\r\n"
+    "{\"key\":\"value2\",\"n\":7}\n";
+  istringstream iss( source );
+  vector<std::string> const expected( tokens_of( iss, true ) );
+  ASSERT_TRUE( expected.size() == 43 );
+  for ( size_t chunk = 1; chunk <= 9; ++chunk ) {
+    chunked_streambuf buf( source, chunk );
+    istream is( &buf );
+    ASSERT_TRUE( tokens_of( is, true ) == expected );
+  }
+
+  // values across the end of the lexer's largest buffer (64 KiB)
+  std::string big( "[" );
+  while ( big.size() < 200000 )
+    big += "\"abcdefghijklmnopqrstuvwxyz\",1234567.890123,\"\\u0041x\",";
+  big += "0]";
+  istringstream big_iss( big );
+  vector<std::string> const big_tokens( tokens_of( big_iss, false ) );
+  chunked_streambuf big_buf( big.c_str(), 4093 );
+  istream big_is( &big_buf );
+  ASSERT_TRUE( tokens_of( big_is, false ) == big_tokens );
+  size_t values = 0;
+  for ( std::string const &t : big_tokens )
+    values += t.find( " [abcdefghijklmnopqrstuvwxyz] " ) != std::string::npos ||
+              t.find( " [1234567.890123] " ) != std::string::npos ||
+              t.find( " [Ax] " ) != std::string::npos;
+  ASSERT_TRUE( values == ( big_tokens.size() - 3 ) / 2 );
+}
+
+static void test_token_copy_holds_value() {
+  istringstream iss( "[\"first\",\"second\"]" );
+  lexer lex( iss );
+  token t;
+  ASSERT_TRUE_AND_NO_EXCEPTION( lex.next( &t ) );
+  ASSERT_TRUE_AND_NO_EXCEPTION( lex.next( &t ) );
+  token const copy( t );
+  ASSERT_TRUE_AND_NO_EXCEPTION( lex.next( &t ) );
+  ASSERT_TRUE_AND_NO_EXCEPTION( lex.next( &t ) );
+  ASSERT_TRUE( copy.get_value() == "first" );
+  ASSERT_TRUE( t.get_value() == "second" );
+}
+
+static void test_sync() {
+  istringstream iss( "[1] [22]  {}" );
+  parser p( iss, true );
+  token t;
+  ASSERT_TRUE_AND_NO_EXCEPTION( p.next( &t ) && t == token::begin_array );
+  ASSERT_TRUE_AND_NO_EXCEPTION( p.next( &t ) && t == token::number );
+  ASSERT_TRUE_AND_NO_EXCEPTION( p.next( &t ) && t == token::end_array );
+  p.sync();
+  ASSERT_TRUE( iss.tellg() == streampos( 3 ) );
+  ASSERT_TRUE_AND_NO_EXCEPTION( p.next( &t ) && t == token::begin_array );
+  ASSERT_TRUE_AND_NO_EXCEPTION( p.next( &t ) && t.get_value() == "22" );
+  ASSERT_TRUE_AND_NO_EXCEPTION( p.next( &t ) && t == token::end_array );
+  p.sync();
+  ASSERT_TRUE( iss.tellg() == streampos( 8 ) );
+  ASSERT_TRUE_AND_NO_EXCEPTION( p.next( &t ) && t == token::begin_object );
+  ASSERT_TRUE_AND_NO_EXCEPTION( p.next( &t ) && t == token::end_object );
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 
 namespace zorba {
@@ -791,6 +923,9 @@ int test_json_parser( int, char*[] ) {
   test_error_locations();
   test_throwing_streambuf();
   test_stream_state_at_end();
+  test_buffer_boundaries();
+  test_token_copy_holds_value();
+  test_sync();
 
   cout << failures << " test(s) failed\n";
   return failures ? 1 : 0;

@@ -990,6 +990,9 @@ static bool scanToNextTopLevelArray(
 
   while (true)
   {
+    // The loaders read ahead: the stream must be where the last one stopped.
+    state->theLoader->sync();
+    state->theScanner->sync();
     std::streampos const valueStart = state->theStream->tellg();
 
     while (true)
@@ -1015,6 +1018,7 @@ static bool scanToNextTopLevelArray(
 
     if (state->theScanner->last_value_was_array())
     {
+      state->theScanner->sync();
       state->theStream->clear();
       state->theStream->seekg(valueStart);
       return true;
