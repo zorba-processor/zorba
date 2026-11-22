@@ -2349,8 +2349,9 @@ bool BasicItemFactory::createJSONObject(
 {
   assert( names.size() == values.size() );
 
-  json::SimpleJSONObject *const obj = new json::SimpleJSONObject();
-  result = obj;
+  result = new json::SimpleJSONObject();
+  json::SimpleJSONObject *const obj =
+    static_cast<json::SimpleJSONObject*>( result.getp() );
   obj->reserve( names.size() );
 
   std::vector<store::Item_t>::const_iterator n_i( names.begin() );
