@@ -1,8 +1,8 @@
 # ThreadSanitizer suppressions for the multithreaded API tests (test/api/mt,
 # label "mt"; preset tsan-mt, workflow tsan-mt.yml).
 #
-# Each entry is a known race of the engine built with
-# ZORBA_FOR_ONE_THREAD_ONLY=OFF, under a "# <inventory ids> (P<n>): ..."
+# Each entry is a known race of the engine built for several threads (the
+# tsan-mt preset), under a "# <inventory ids> (P<n>): ..."
 # comment that names its ids in the inventory of the thread-safety design and
 # the PR of its plan that removes it (the workflow's summary reads that
 # comment). The PR that fixes a race deletes its entries, so the job then
