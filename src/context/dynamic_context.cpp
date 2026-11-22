@@ -328,38 +328,38 @@ void dynamic_context::set_environment_variables()
   if (!theEnvironmentVariables)
     theEnvironmentVariables = new EnvVarMap();
 
-    const char* invalid_char;
-    for (char **env = environ; *env; ++env)
-    {
-      zstring envVarZS(*env);
+  const char* invalid_char;
+  for (char **env = environ; *env; ++env)
+  {
+    zstring envVarZS(*env);
 
-      if ((invalid_char = utf8::validate(envVarZS.c_str())) != NULL)
-        throw XQUERY_EXCEPTION(err::FOCH0001,
-          ERROR_PARAMS(zstring("#x") +
-          BUILD_STRING(std::uppercase << std::hex
-            << (static_cast<unsigned int>(*invalid_char)&0xFF))));
-
-      if ((invalid_char = utf8::validate(envVarZS.c_str())) != NULL)
-      {
-        throw XQUERY_EXCEPTION(err::FOCH0001,
+    if ((invalid_char = utf8::validate(envVarZS.c_str())) != NULL)
+      throw XQUERY_EXCEPTION(err::FOCH0001,
         ERROR_PARAMS(zstring("#x") +
         BUILD_STRING(std::uppercase << std::hex
-                     << (static_cast<unsigned int>(*invalid_char) & 0xFF)) ));
-      }
+          << (static_cast<unsigned int>(*invalid_char)&0xFF))));
 
-      int size = envVarZS.size();
-
-      int eqPos = envVarZS.find_first_of("=");
-
-      if (eqPos > 0)
-      {
-        zstring varname(envVarZS.substr(0, eqPos));
-        zstring varvalue(envVarZS.substr(eqPos+1, size));
-
-        if (!varname.empty() || !varvalue.empty())
-          theEnvironmentVariables->insert(std::pair<zstring, zstring>(varname,varvalue));
-      }
+    if ((invalid_char = utf8::validate(envVarZS.c_str())) != NULL)
+    {
+      throw XQUERY_EXCEPTION(err::FOCH0001,
+      ERROR_PARAMS(zstring("#x") +
+      BUILD_STRING(std::uppercase << std::hex
+                   << (static_cast<unsigned int>(*invalid_char) & 0xFF)) ));
     }
+
+    int size = envVarZS.size();
+
+    int eqPos = envVarZS.find_first_of("=");
+
+    if (eqPos > 0)
+    {
+      zstring varname(envVarZS.substr(0, eqPos));
+      zstring varvalue(envVarZS.substr(eqPos+1, size));
+
+      if (!varname.empty() || !varvalue.empty())
+        theEnvironmentVariables->insert(std::pair<zstring, zstring>(varname,varvalue));
+    }
+  }
 
 
 }

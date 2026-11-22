@@ -290,8 +290,10 @@ std::string start_xquery_state(int);   /* forward declaration, used by YY_USER_A
   BEGIN MODE_SHEBANG;     \
 }
 
-// Fixed rather than flex's BUFSIZ-based default (1 KiB on macOS): every refill copies a token that spans the buffer.
+%}
+
+%top{
+// Ahead of flex's BUFSIZ-based defaults (1 KiB on macOS), which they replace: every refill copies a token that spans the buffer.
 #define YY_READ_BUF_SIZE 8192
 #define YY_BUF_SIZE 16384
-
-%}
+}

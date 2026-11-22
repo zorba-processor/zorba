@@ -104,25 +104,32 @@ ResultIteratorImpl::~ResultIteratorImpl()
 {
   try
   {
-    if (theIsOpen && thePlan)
+    try
     {
-      theQuery->dispose(thePlan);
-    }
+      if (theIsOpen && thePlan)
+      {
+        theQuery->dispose(thePlan);
+      }
 
-    SYNC_CODE(
-    if (theHaveLock)
-    {
-      GENV_STORE.getGlobalLock().unlock();
-      theHaveLock = false;
-    })
+      SYNC_CODE(
+      if (theHaveLock)
+      {
+        GENV_STORE.getGlobalLock().unlock();
+        theHaveLock = false;
+      })
 
-    if (theQuery)
-    {
-      theQuery->removeResultIterator(this);
-      theQuery = NULL;
+      if (theQuery)
+      {
+        theQuery->removeResultIterator(this);
+        theQuery = NULL;
+      }
     }
+    RESULT_ITER_CATCH
   }
-  RESULT_ITER_CATCH
+  catch (...)
+  {
+    // A destructor cannot propagate; the query's diagnostic handler has seen the error.
+  }
 }
 
 

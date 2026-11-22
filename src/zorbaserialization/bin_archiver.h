@@ -58,13 +58,13 @@ namespace serialization
 class BinArchiver : public Archiver
 {
 protected:
-  typedef struct
+  struct StringInfo
   {
     zstring      str;
     bool         binary = false;
     csize        count = 0;
     csize        theDiskPos = 0;//1 based
-  } StringInfo;
+  };
 
   ZSTRING_HASH_MAP(csize, StringPoolMap);
 

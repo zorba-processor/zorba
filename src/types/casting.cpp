@@ -2737,6 +2737,8 @@ bool GenericCast::castToSimple(
                    ERROR_TEXT( sourceType->toSchemaString() ),
                    ERROR_TEXT( udt->toSchemaString() )));
     } // union
+#else
+    ZORBA_ASSERT(false); // user-defined types exist only with XML Schema support
 #endif // ZORBA_NO_XMLSCHEMA
   } // list or union
   else

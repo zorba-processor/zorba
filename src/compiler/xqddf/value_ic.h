@@ -87,7 +87,15 @@ public:
   {}
 
 
+  // GCC 16's predictive devirtualization inlines this into frees of smaller objects, a path never taken: https://gcc.gnu.org/PR122197
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Warray-bounds"
+#endif
   virtual ~ValueIC() {}
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
 
   static_context* getSctx() const 
   { 

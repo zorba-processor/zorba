@@ -830,6 +830,28 @@ bool NormalizeSpaceIterator::nextImpl(
 
 
 /**
+ * Maps an fn:normalize-unicode form name to its normalization type.
+ * Throws FOCH0003 if \a form names none.
+ */
+static unicode::normalization::type normalization_type(
+    zstring const &form,
+    QueryLoc const &loc)
+{
+  if (form.empty())
+    return unicode::normalization::none;
+  if (ZSTREQ(form, "NFC"))
+    return unicode::normalization::NFC;
+  if (ZSTREQ(form, "NFKC"))
+    return unicode::normalization::NFKC;
+  if (ZSTREQ(form, "NFD"))
+    return unicode::normalization::NFD;
+  if (ZSTREQ(form, "NFKD"))
+    return unicode::normalization::NFKD;
+  throw XQUERY_EXCEPTION(err::FOCH0003, ERROR_PARAMS(form), ERROR_LOC(loc));
+}
+
+
+/**
   *______________________________________________________________________
   *
   *  7.4.6 fn:normalize-unicode
@@ -846,8 +868,8 @@ bool NormalizeUnicodeIterator::nextImpl(
   store::Item_t item1;
   zstring normForm;
   zstring resStr;
-  unicode::normalization::type normType;
 #ifndef ZORBA_NO_ICU
+  unicode::normalization::type normType;
   bool success;
 #endif /* ZORBA_NO_ICU */
 
@@ -871,32 +893,12 @@ bool NormalizeUnicodeIterator::nextImpl(
       normForm = "NFC";
     }
 
-    if(normForm.empty())
-    {
-      normType = unicode::normalization::none;
-    }
-    else if (ZSTREQ(normForm, "NFC"))
-    {
-      normType = unicode::normalization::NFC;
-    }
-    else if (ZSTREQ(normForm, "NFKC"))
-    {
-      normType = unicode::normalization::NFKC;
-    }
-    else if (ZSTREQ(normForm, "NFD"))
-    {
-      normType = unicode::normalization::NFD;
-    }
-    else if (ZSTREQ(normForm, "NFKD"))
-    {
-      normType = unicode::normalization::NFKD;
-    }
-    else
-    {
-      throw XQUERY_EXCEPTION(
-        err::FOCH0003, ERROR_PARAMS( normForm ), ERROR_LOC( loc )
-      );
-    }
+#ifndef ZORBA_NO_ICU
+    normType = normalization_type(normForm, loc);
+#else
+    // Without ICU the form is validated but the string is not normalized.
+    normalization_type(normForm, loc);
+#endif /* ZORBA_NO_ICU */
 
     item0->getStringValue2(resStr);
     planState.chargeBytes(resStr.size(), loc);
@@ -1633,8 +1635,10 @@ bool FnMatchesIterator::nextImpl(
   DEFAULT_STACK_INIT(PlanIteratorState, state, planState);
 
   if (consumeNext(item, theChildren[0].getp(), planState))
+  {
     item->getStringValue2(input);
     planState.chargeBytes(input.size(), loc);
+  }
 
   if (!consumeNext(item, theChildren[1].getp(), planState))
     ZORBA_ASSERT (false);
@@ -1697,8 +1701,10 @@ bool FnReplaceIterator::nextImpl(
   DEFAULT_STACK_INIT(PlanIteratorState, state, planState);
 
   if (consumeNext(item, theChildren[0].getp(), planState))
+  {
     item->getStringValue2(input);
     planState.chargeBytes(input.size(), loc);
+  }
 
   if (!consumeNext(item, theChildren[1].getp(), planState))
     ZORBA_ASSERT (false);

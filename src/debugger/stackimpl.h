@@ -42,16 +42,6 @@ class StackFrameImpl : public StackFrame
 
     const QueryLocation&
     getLocation() const { return theLocation; }
-
-    StackFrameImpl& operator=(StackFrameImpl const & frame)
-    {
-      if (&frame != this) {
-        theSignature = frame.theSignature;
-        theLocation = frame.theLocation;
-      }
-      return *this;
-    }
-
 };
 
 }//end of namespace

@@ -111,7 +111,6 @@ void GlobalEnvironment::init(store::Store* store)
 
 #ifdef ZORBA_XQUERYX
   //libxml2 and libxslt are needed
-  xmlInitMemory();
   xmlInitParser();
 
   LIBXML_TEST_VERSION

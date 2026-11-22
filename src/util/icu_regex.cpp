@@ -77,14 +77,6 @@ dec_limit( IntegralType *i, IntegralType limit = 0 ) {
   return *i > limit && --*i == limit;
 }
 
-static unsigned digits( long n ) {
-  unsigned d = 0;
-  do {
-    ++d;
-  } while ( n /= 10 );
-  return d;
-}
-
 namespace zorba {
 
 ///////////////////////////////////////////////////////////////////////////////
