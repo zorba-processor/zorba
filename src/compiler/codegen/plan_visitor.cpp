@@ -200,7 +200,8 @@ struct vector_destroyer
 /*******************************************************************************
 
 ********************************************************************************/
-class VarRebind : public SimpleRCObject
+// Code generation helpers live in one plan_visitor.
+class VarRebind : public LocalRCObject
 {
 public:
   PlanIter_t               theInputVar;
@@ -222,7 +223,7 @@ typedef rchandle<VarRebind> VarRebind_t;
   and theVarRebinds[i] contain an entry for Vi. theVarExprs[i] contains the
   var_expr representing the Vi definition.
 ********************************************************************************/
-class FlworClauseVarMap : public SimpleRCObject
+class FlworClauseVarMap : public LocalRCObject
 {
 public:
   bool                          theIsGeneral;

@@ -173,7 +173,6 @@ XQType::XQType(
     SequenceType::Quantifier quantifier,
     bool builtin)
   :
-  theRefCount(0),
   theManager((TypeManager*)manager),
   theKind(type_kind),
   theQuantifier(quantifier),
@@ -206,8 +205,7 @@ XQType::~XQType()
 {
   if (theIsBuiltin)
   {
-    assert(theRefCount == 0);
-    theRefCount = 0;
+    assert(getRefCount() == 0);
   }
 }
 

@@ -7,6 +7,6 @@
 # excludes the tests here that also fail there: mt_independent, mt_clone and
 # mt_clone_cold.
 test/api/mt/mt_independent | flaky | S7: crash in ContentReader::copyContents in about 1 run in 10 (P7)
-test/api/mt/mt_clone | flaky | C9: a clone compares with another clone's implicit timezone; R1: plan iterator counts (assertion); every run (P3, P8)
-test/api/mt/mt_clone_cold | flaky | C1: user function plans generated concurrently (crash), plus mt_clone's failures (P3, P8, P9)
-test/api/mt/mt_schema | flaky | R1: count assertion, crash in Xerces on a freed schema, in about 1 run in 10 (P3)
+test/api/mt/mt_clone | flaky | C9: a clone compares with another clone's implicit timezone; every run (P8)
+test/api/mt/mt_clone_cold | flaky | C1: user function plans generated concurrently (crash), plus mt_clone's failures (P8, P9)
+test/api/mt/mt_schema | flaky | S7: crash in ContentReader::copyContents in about 1 run in 25 (P7); crash in Xerces destroying a schema's grammar pool in about 1 run in 50 (unassigned)

@@ -16,16 +16,6 @@ mutex:zorba::simplestore::QNameItem::free
 # for the whole process.
 race:zorba::simplestore::ContentReader::
 
-# R1 (P3): SimpleRCObject counts are plain integers in every build (builtin
-# function objects, TypeManager, plan iterators shared by clones).
-race:zorba::SimpleRCObject::addReference
-race:zorba::SimpleRCObject::removeReference
-race:zorba::SimpleRCObject::getRefCount
-
-# R1, R2 (P3): a Schema freed while another thread uses it, after a count of
-# its TypeManager or of a user-defined XQType raced.
-race:zorba::Schema::
-
 # C1 (P9): user function plans are generated lazily by the first call, on the
 # user_function object that every clone shares.
 race:zorba::user_function::getPlan

@@ -339,7 +339,7 @@ public:
 protected:
   static const char         * KIND_STRINGS[XQType::MAX_TYPE_KIND];
 
-  mutable long                   theRefCount;
+  mutable RefCount               theRefCount;
 
   TypeManager                  * theManager;
   TypeKind                       theKind;
@@ -352,7 +352,6 @@ public:
   XQType(::zorba::serialization::Archiver& ar)
     :
     serialization::SerializeBaseClass(),
-    theRefCount(0),
     theIsBuiltin(false)
   {
   }
@@ -362,28 +361,31 @@ public:
 public:
   long getRefCount() const
   {
-    return theRefCount;
+    return theRefCount.load();
   }
 
   void addReference() const
   {
     if (!theIsBuiltin)
-      ++theRefCount;
+      theRefCount.increment();
   }
 
   void removeReference() 
   {
-    if (!theIsBuiltin)
-    {
-      assert(getRefCount() > 0);
-
-      if (--theRefCount == 0)
-        delete this;
-    }
+    if (!theIsBuiltin && theRefCount.decrement())
+      delete this;
   }
 
 public:
-  XQType(const XQType&) = default;
+  XQType(const XQType& other)
+    :
+    serialization::SerializeBaseClass(other),
+    theManager(other.theManager),
+    theKind(other.theKind),
+    theQuantifier(other.theQuantifier),
+    theIsBuiltin(other.theIsBuiltin)
+  {
+  }
 
   virtual ~XQType();
 

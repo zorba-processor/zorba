@@ -52,7 +52,8 @@ namespace intern
 /*******************************************************************************
 
 ********************************************************************************/
-class serializer : public SimpleRCObject
+// A serializer and its emitter serve one serialization, on one thread.
+class serializer : public LocalRCObject
 {
 protected:
   class emitter;
@@ -201,7 +202,7 @@ protected:
   //                                                       //
   ///////////////////////////////////////////////////////////
 
-  class emitter : public SimpleRCObject
+  class emitter : public LocalRCObject
   {
   protected:
     serializer                          * ser;

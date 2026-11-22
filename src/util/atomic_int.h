@@ -26,6 +26,9 @@ namespace zorba {
  * An %atomic_int behaves like an ordinary \c int except that all modifications
  * and accesses are guaranteed to be thread-safe.
  *
+ * It is a reference count: an increment orders nothing (a thread can only
+ * copy a reference it already holds); a decrement is acquire-release.
+ *
  * The API is a subset of the forthcoming C++ standard addition of atomic types;
  * see: http://www.open-std.org/JTC1/sc22/wg21/docs/papers/2007/n2427.html
  */
@@ -76,7 +79,7 @@ public:
    * @return Returns the new value.
    */
   value_type operator++() {
-    return value_.fetch_add( 1, std::memory_order_acq_rel ) + 1;
+    return value_.fetch_add( 1, std::memory_order_relaxed ) + 1;
   }
 
   /**
@@ -85,7 +88,7 @@ public:
    * @return Returns the old value.
    */
   value_type operator++(int) {
-    return value_.fetch_add( 1, std::memory_order_acq_rel );
+    return value_.fetch_add( 1, std::memory_order_relaxed );
   }
 
   /**

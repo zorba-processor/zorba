@@ -17,15 +17,16 @@
 #ifndef ZORBA_RCHANDLE_H
 #define ZORBA_RCHANDLE_H
 
+#include <atomic>
+#include <cassert>
 #include <errno.h>
+#include <limits>
 #include <string>
 #include <type_traits>
 
 #include <zorba/config.h>
 
 #include "common/common.h"
-
-#include "util/atomic_int.h"
 
 #include "zorbaserialization/class_serializer.h"
 
@@ -40,34 +41,97 @@ namespace serialization
 
 
 /*******************************************************************************
-  
-  Base class for reference counted objects
+  A reference count. Plain when Zorba is built for one thread only, atomic
+  otherwise.
+********************************************************************************/
+class RefCount
+{
+#ifdef ZORBA_FOR_ONE_THREAD_ONLY
+  long              theValue;
+#else
+  std::atomic<long> theValue;
+#endif
+
+  static constexpr long IMMORTAL = std::numeric_limits<long>::min();
+
+public:
+  RefCount() : theValue(0) { }
+
+  RefCount(const RefCount&) = delete;
+  RefCount& operator=(const RefCount&) = delete;
+
+#ifdef ZORBA_FOR_ONE_THREAD_ONLY
+  long load() const { return theValue; }
+
+  void reset() { theValue = 0; }
+
+  void makeImmortal() { theValue = IMMORTAL; }
+
+  void increment()
+  {
+    if (theValue != IMMORTAL)
+      ++theValue;
+  }
+
+  bool decrement()
+  {
+    if (theValue == IMMORTAL)
+      return false;
+    assert(theValue > 0);
+    return --theValue == 0;
+  }
+#else
+  long load() const { return theValue.load(std::memory_order_acquire); }
+
+  void reset() { theValue.store(0, std::memory_order_relaxed); }
+
+  void makeImmortal() { theValue.store(IMMORTAL, std::memory_order_relaxed); }
+
+  // A thread can only copy a reference it already holds, so an increment
+  // needs no ordering.
+  void increment()
+  {
+    if (theValue.load(std::memory_order_relaxed) != IMMORTAL)
+      theValue.fetch_add(1, std::memory_order_relaxed);
+  }
+
+  bool decrement()
+  {
+    if (theValue.load(std::memory_order_relaxed) == IMMORTAL)
+      return false;
+    long const before = theValue.fetch_sub(1, std::memory_order_acq_rel);
+    assert(before > 0);
+    return before == 1;
+  }
+#endif
+};
+
+
+/*******************************************************************************
+  Base classes for reference counted objects
 
   Any class wishing to take advantage of automatic reference counting
-  must inherit from this class.
+  must inherit from one of them.
 
-  rcobject encapsulates the reference count, as well as functions
-  for incrementing and decrementing the count. It also contains code
-  for destroying a value when it is no longer in use, i.e., when its
-  reference count becomes 0.
+  SyncedRCObject and SimpleRCObject count with a RefCount: atomic unless
+  Zorba is built for one thread only. An object shared process-wide calls
+  theRefCount.makeImmortal() before it is published; its count then never
+  changes and it is never freed by a release.
 
+  LocalRCObject counts with a plain integer in every build. Only a class whose
+  references are never copied or released concurrently may derive from it.
 ********************************************************************************/
 class SyncedRCObject : public serialization::SerializeBaseClass
 {
 protected:
-#ifdef ZORBA_FOR_ONE_THREAD_ONLY
-  mutable long       theRefCount;
-#else
-  mutable atomic_int theRefCount;
-#endif
+  mutable RefCount theRefCount;
 
 public:
   SERIALIZABLE_CLASS(SyncedRCObject);
 
   SyncedRCObject(::zorba::serialization::Archiver& ar)  
     :
-    ::zorba::serialization::SerializeBaseClass(),
-    theRefCount(0)
+    ::zorba::serialization::SerializeBaseClass()
   {
   }
 
@@ -76,15 +140,13 @@ public:
 public:
   SyncedRCObject()
     :
-    ::zorba::serialization::SerializeBaseClass(),
-    theRefCount(0)
+    ::zorba::serialization::SerializeBaseClass()
   {
   }
 
   SyncedRCObject(const SyncedRCObject&) 
     :
-    ::zorba::serialization::SerializeBaseClass(),
-    theRefCount(0) 
+    ::zorba::serialization::SerializeBaseClass()
   {
   }
 
@@ -94,19 +156,13 @@ public:
 
   virtual void free() { delete this; }
 
-#ifdef ZORBA_FOR_ONE_THREAD_ONLY
-  long getRefCount() const { return theRefCount; }
-#else
   long getRefCount() const { return theRefCount.load(); }
-#endif
 
-  void addReference() const { ++theRefCount; }
+  void addReference() const { theRefCount.increment(); }
 
   void removeReference() 
   {
-    assert(getRefCount() > 0);
-
-    if (--theRefCount == 0)
+    if (theRefCount.decrement())
       free();
   }
 };
@@ -118,15 +174,14 @@ public:
 class ZORBA_DLL_PUBLIC SimpleRCObject : public serialization::SerializeBaseClass
 {
 protected:
-  mutable long  theRefCount;
+  mutable RefCount theRefCount;
 
 public:
   SERIALIZABLE_CLASS(SimpleRCObject);
 
   SimpleRCObject(serialization::Archiver& ar)  
     :
-    serialization::SerializeBaseClass(),
-    theRefCount(0)
+    serialization::SerializeBaseClass()
   {
   }
 
@@ -135,15 +190,13 @@ public:
 public:
   SimpleRCObject()
     :
-    serialization::SerializeBaseClass(),
-    theRefCount(0)
+    serialization::SerializeBaseClass()
   {
   }
 
   SimpleRCObject(const SimpleRCObject&) 
     :
-    serialization::SerializeBaseClass(),
-    theRefCount(0) 
+    serialization::SerializeBaseClass()
   {
   }
 
@@ -156,11 +209,42 @@ public:
 
   virtual void free() { delete this; }
 
+  long getRefCount() const { return theRefCount.load(); }
+
+  void addReference() const { theRefCount.increment(); }
+
+  void removeReference() 
+  {
+    if (theRefCount.decrement())
+      free();
+  }
+};
+
+
+/*******************************************************************************
+
+********************************************************************************/
+class LocalRCObject
+{
+protected:
+  mutable long theRefCount;
+
+public:
+  LocalRCObject() : theRefCount(0) { }
+
+  LocalRCObject(const LocalRCObject&) : theRefCount(0) { }
+
+  virtual ~LocalRCObject() { }
+
+  LocalRCObject& operator=(const LocalRCObject&) { return *this; }
+
+  virtual void free() { delete this; }
+
   long getRefCount() const { return theRefCount; }
 
   void addReference() const { ++theRefCount; }
 
-  void removeReference() 
+  void removeReference()
   {
     assert(getRefCount() > 0);
 
