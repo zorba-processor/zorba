@@ -604,7 +604,7 @@ private:
 
   // What was read from the stream: [cur_,end_) is not lexed yet.
   static size_t const small_buf_size = 512;
-  static size_t const max_buf_size = 64 * 1024;
+  static constexpr size_t max_buf_size = 64 * 1024;
   char small_buf_[ small_buf_size ];
   std::unique_ptr<char[]> big_buf_;
   char *buf_;
