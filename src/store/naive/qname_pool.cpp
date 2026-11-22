@@ -155,7 +155,7 @@ void QNamePool::removeFromFreeList(QNameItem* qn)
   {
     assert(qn->getRefCount() == 0);
     assert(theFirstFree > 0 && theFirstFree < theCacheSize);
-    assert(theCache[qn->theNextFree].thePrevFree = qn->thePosition);
+    assert(theCache[qn->theNextFree].thePrevFree == qn->thePosition);
 
     theCache[qn->theNextFree].thePrevFree = qn->thePrevFree;
   }
@@ -164,7 +164,7 @@ void QNamePool::removeFromFreeList(QNameItem* qn)
   {
     assert(qn->getRefCount() == 0);
     assert(theFirstFree > 0 && theFirstFree < theCacheSize);
-    assert(theCache[qn->thePrevFree].theNextFree = qn->thePosition);
+    assert(theCache[qn->thePrevFree].theNextFree == qn->thePosition);
     
     theCache[qn->thePrevFree].theNextFree = qn->theNextFree;
   }

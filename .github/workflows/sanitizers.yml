@@ -148,7 +148,7 @@ jobs:
                 /usr/local/lib/cmake/XercesC /usr/local/lib/pkgconfig/xerces-c.pc
               cp -a .xerces-asan/include .xerces-asan/lib /usr/local/
               ldconfig
-              cmake --preset asan
+              cmake --preset asan -DZORBA_WERROR=ON
               cmake --build --preset asan
               mkdir -p build/asan/sanitizer-logs
               rc=0
@@ -262,7 +262,7 @@ jobs:
             -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" -e PRESET \
             -v "$PWD":/src -w /src zorba-builder:ci sh -c '
               set -e
-              cmake --preset "$PRESET"
+              cmake --preset "$PRESET" -DZORBA_WERROR=ON
               cmake --build --preset "$PRESET"
               mkdir -p "build/$PRESET/sanitizer-logs"
               rc=0
@@ -355,7 +355,7 @@ jobs:
             -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" \
             -v "$PWD":/src -w /src zorba-builder:ci sh -c '
               set -e
-              cmake --preset tsan
+              cmake --preset tsan -DZORBA_WERROR=ON
               cmake --build --preset tsan
               mkdir -p build/tsan/sanitizer-logs
               rc=0
@@ -449,7 +449,7 @@ jobs:
             -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" \
             -v "$PWD":/src -w /src zorba-builder:ci sh -c '
               set -e
-              cmake --preset glibcxx-debug
+              cmake --preset glibcxx-debug -DZORBA_WERROR=ON
               cmake --build --preset glibcxx-debug
               out=build/glibcxx-debug/abi.txt
               (

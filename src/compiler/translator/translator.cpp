@@ -846,7 +846,7 @@ expr* pop_nodestack(int n = 1)
 {
   ZORBA_ASSERT(n >= 0);
 
-  expr* e_h;
+  expr* e_h = nullptr;
 
   for (; n > 0; --n)
   {
