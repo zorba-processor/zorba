@@ -141,6 +141,7 @@ struct modifier {
       // localized in an implementation-dependent way.
       //
       ostringstream oss;
+      oss.exceptions( ios::badbit );  // not a shorter string
       // TODO: localize "Language"
       oss << "[Language: " << lang << ']';
       *s += oss.str();
@@ -206,6 +207,7 @@ static void append_number( int n, modifier const &mod, zstring *dest ) {
     case modifier::roman:
     case modifier::ROMAN: {
       ostringstream oss;
+      oss.exceptions( ios::badbit );
       if ( mod.first.type == modifier::ROMAN )
         oss << uppercase;
       oss << roman( n );
@@ -415,6 +417,7 @@ static void append_month( unsigned mon, modifier const &mod, zstring *dest ) {
         // to the requested language.
         //
         ostringstream oss;
+        oss.exceptions( ios::badbit );
         // TODO: localize "Calendar"
         oss << "[Calendar: "
             << (new_mon == -1 ? calendar::get_default() : mod.cal) << ']';
@@ -688,6 +691,7 @@ static void append_weekday( unsigned mday, unsigned mon, unsigned year,
         // to the requested language.
         //
         ostringstream oss;
+        oss.exceptions( ios::badbit );
         // TODO: localize "Calendar"
         oss << "[Calendar: "
             << (new_wday == -1 ? calendar::get_default() : mod.cal) << ']';
@@ -705,6 +709,7 @@ static void append_week_in_month( unsigned mday, unsigned mon, unsigned year,
   if ( week == -1 ) {
     week = calendar::calc_week_in_month( mday, mon, year, calendar::ISO );
     ostringstream oss;
+    oss.exceptions( ios::badbit );
     // TODO: localize "Calendar"
     oss << "[Calendar: " << calendar::string_of[ calendar::ISO ] << ']';
     *dest += oss.str();
@@ -718,6 +723,7 @@ static void append_week_in_year( unsigned mday, unsigned mon, unsigned year,
   if ( week == -1 ) {
     week = calendar::calc_week_in_year( mday, mon, year, calendar::ISO );
     ostringstream oss;
+    oss.exceptions( ios::badbit );
     // TODO: localize "Calendar"
     oss << "[Calendar: " << calendar::string_of[ calendar::ISO ] << ']';
     *dest += oss.str();

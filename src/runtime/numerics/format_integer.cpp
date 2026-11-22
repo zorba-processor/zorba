@@ -320,6 +320,7 @@ static void format_integer( xs_integer const &xs_n, picture const &pic,
             n = -n;
           }
           ostringstream oss;
+          oss.exceptions( ios::badbit );  // not a shorter string
           if ( pic.primary.type == picture::ROMAN )
             oss << uppercase;
           oss << roman( static_cast<unsigned>( n ) );

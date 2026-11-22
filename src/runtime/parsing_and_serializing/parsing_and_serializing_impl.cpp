@@ -295,6 +295,8 @@ FnSerializeIterator::nextImpl(store::Item_t& aResult, PlanState& aPlanState) con
     {
       // and now serialize
       std::unique_ptr<std::stringstream> lResultStream = std::make_unique<std::stringstream>();
+      // A write that cannot grow the string throws std::bad_alloc.
+      lResultStream->exceptions(std::ios::badbit);
       try
       {
         lSerializer.serialize(lIterWrapper, *lResultStream.get());
