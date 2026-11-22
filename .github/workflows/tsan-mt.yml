@@ -1,0 +1,155 @@
+name: TSan multithreaded
+
+# The multithreaded API tests (test/api/mt, label "mt") under ThreadSanitizer,
+# on the engine built for several threads (ZORBA_FOR_ONE_THREAD_ONLY=OFF,
+# preset tsan-mt).
+#
+# Known races are suppressed in test/sanitizers/tsan-mt.supp, one entry per
+# race under its inventory id; the PR that fixes a race deletes its entries.
+# The job fails when:
+#   - ThreadSanitizer reports a race (or other error) that the file does not
+#     suppress, in any test;
+#   - a test fails that test/baselines/sanitizers-tsan-mt.txt does not list.
+#     Tests that crash or compute wrong results because of a suppressed race
+#     are listed there until the PR that fixes it.
+# The summary counts the suppressed reports by inventory id.
+on:
+  pull_request:
+    paths:
+      - 'src/store/**'
+      - 'src/runtime/base/**'
+      - 'src/compiler/**'
+      - 'src/context/**'
+      - 'src/zorbatypes/**'
+      - 'src/api/**'
+      - 'test/api/mt/**'
+      - 'test/sanitizers/tsan-mt.supp'
+      - 'test/baselines/sanitizers-tsan-mt.txt'
+      - 'CMakePresets.json'
+      - '.github/workflows/tsan-mt.yml'
+  schedule:
+    - cron: '0 7 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  group: tsan-mt-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  tsan-mt:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Builder image
+        uses: ./.github/actions/builder-image
+        with:
+          context: docker/builder-latest
+          cache-scope: linux-amd64-latest
+
+      - uses: actions/cache@v6
+        with:
+          path: .ccache
+          key: ccache-v2-tsan-mt-${{ github.sha }}
+          restore-keys: ccache-v2-tsan-mt-
+
+      # TSan's shadow memory layout does not fit the runner kernel's default
+      # mmap ASLR entropy.
+      - name: Reduce ASLR entropy for TSan
+        run: sudo sysctl -w vm.mmap_rnd_bits=28
+
+      - name: Build
+        timeout-minutes: 75
+        run: |
+          docker run --rm \
+            -e CCACHE_DIR=/src/.ccache \
+            -e CCACHE_SLOPPINESS=pch_defines,time_macros -e CCACHE_DEPEND=1 \
+            -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" \
+            -v "$PWD":/src -w /src zorba-builder:ci sh -ec '
+              cmake --preset tsan-mt -DZORBA_WERROR=ON
+              cmake --build --preset tsan-mt --target MTTests
+              chown -R "$HOST_UID:$HOST_GID" .ccache build || true'
+
+      # ctest's timeout (300 s per test, also set on each test) kills a test
+      # that spins in ThreadSanitizer's signal handler after a crash.
+      - name: Test
+        id: test
+        timeout-minutes: 30
+        run: |
+          docker run --rm \
+            --security-opt seccomp=unconfined \
+            -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" \
+            -v "$PWD":/src -w /src zorba-builder:ci sh -c '
+              mkdir -p build/tsan-mt/sanitizer-logs
+              rc=0
+              ctest --preset tsan-mt --timeout 300 --output-junit junit.xml \
+                > build/tsan-mt/ctest.log 2>&1 || rc=$?
+              sed -n "/tests passed/,\$p" build/tsan-mt/ctest.log
+              echo "$rc" > build/tsan-mt/ctest.rc
+              chown -R "$HOST_UID:$HOST_GID" build/tsan-mt || true
+              # The judge steps below decide.
+              exit 0'
+
+      - name: Summarize
+        if: always()
+        run: |
+          logs=build/tsan-mt/sanitizer-logs
+          supp=test/sanitizers/tsan-mt.supp
+          # Inventory id of each suppression, from the "# <ids> (P<n>): ..."
+          # comment above it.
+          awk '/^# [A-Z][0-9].* \(P[0-9]+\):/ { id = $0; sub(/^# /, "", id); sub(/ \(P.*/, "", id); next }
+               /^[a-z]+:/ { print $0 "\t" id }' "$supp" > "$RUNNER_TEMP/ids.tsv"
+          {
+            echo "## ThreadSanitizer, multithreaded engine"
+            echo
+            echo "Unsuppressed reports: $(cat "$logs"/tsan-mt.* 2>/dev/null | grep -c '^WARNING: ThreadSanitizer' || true)"
+            echo
+            cat "$logs"/tsan-mt.* 2>/dev/null | grep '^SUMMARY: ThreadSanitizer' \
+              | sort | uniq -c | sort -rn | head -40 | sed 's/^/    /'
+            echo
+            echo "Crashes: $(cat "$logs"/tsan-mt.* 2>/dev/null | grep -c '^==[0-9]*==ERROR: ThreadSanitizer' || true)"
+            echo
+            echo "Suppressed reports by inventory id (all tests):"
+            echo
+            echo "| Reports | Inventory | Suppression |"
+            echo "|---:|---|---|"
+            cat "$logs"/tsan-mt.* 2>/dev/null \
+              | awk '/^ThreadSanitizer: Matched/ { m = 1; next } m && /^[0-9]+ [a-z]+:/ { n[$2] += $1; next } { m = 0 }
+                     END { for (s in n) print n[s] "\t" s }' \
+              | sort -t "$(printf '\t')" -k2,2 \
+              | join -t "$(printf '\t')" -1 2 -2 1 -a 1 -e '?' -o 1.1,2.2,1.2 - \
+                  <(sort -t "$(printf '\t')" -k1,1 "$RUNNER_TEMP/ids.tsv") \
+              | sort -rn | awk -F '\t' '{ print "| " $1 " | " $2 " | `" $3 "` |" }'
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: tsan-mt-logs
+          path: |
+            build/tsan-mt/sanitizer-logs
+            build/tsan-mt/ctest.log
+            build/tsan-mt/ctest.rc
+            build/tsan-mt/junit.xml
+
+      - name: Fail on unsuppressed reports
+        if: always() && steps.test.outcome == 'success'
+        run: |
+          n=$(cat build/tsan-mt/sanitizer-logs/tsan-mt.* 2>/dev/null | grep -c '^WARNING: ThreadSanitizer' || true)
+          if [ "$n" -ne 0 ]; then
+            echo "::error::ThreadSanitizer reported $n race(s) or error(s) that test/sanitizers/tsan-mt.supp does not suppress; see the Summarize step"
+            exit 1
+          fi
+
+      - name: Compare with the baseline
+        if: always() && steps.test.outcome == 'success'
+        run: |
+          python3 scripts/summarize_sanitizer_logs.py \
+            --baseline test/baselines/sanitizers-tsan-mt.txt \
+            --ctest-log build/tsan-mt/ctest.log \
+            --ctest-exit-code build/tsan-mt/ctest.rc \
+            --summary "$GITHUB_STEP_SUMMARY"

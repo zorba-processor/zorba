@@ -170,3 +170,17 @@ full-nopch:
   - 'test/rbkt/Scripts/**'
   - 'test/**/*.xqx'
   - 'test/**/*XQueryX*/**'
+
+# multithread: ZORBA_FOR_ONE_THREAD_ONLY=OFF (the locks that SYNC_CODE hides
+# from the default build, and the multithreaded tests in test/api/mt). The
+# OFF-only code is spread over src/, so every source change runs it.
+multithread:
+  - *build
+  - 'include/**'
+  - 'src/**'
+  - 'modules/**/*.cpp'
+  - 'modules/**/*.h'
+  - 'modules/**/*.hpp'
+  - 'bin/**'
+  - 'test/api/**'
+  - 'test/unit/**'

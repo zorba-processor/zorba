@@ -12,7 +12,8 @@ F=.github/ci-filters.yml
 MAP='embedded:ZORBA_NO_FULL_TEXT ZORBA_NO_XMLSCHEMA ZORBA_WITH_DEBUGGER ZORBA_WITH_THESAURUS ZORBA_SUPPRESS_CURL ZORBA_HAVE_CURL
 embedded-noicu:ZORBA_NO_FULL_TEXT ZORBA_NO_XMLSCHEMA ZORBA_WITH_DEBUGGER ZORBA_WITH_THESAURUS ZORBA_SUPPRESS_CURL ZORBA_HAVE_CURL ZORBA_NO_ICU ZORBA_NO_UNICODE
 bigint:ZORBA_WITH_BIG_INTEGER
-full-nopch:ZORBA_WITH_DEBUGGER ZORBA_XQUERYX ZORBA_TEST_XQUERYX ZORBA_USE_PCH'
+full-nopch:ZORBA_WITH_DEBUGGER ZORBA_XQUERYX ZORBA_TEST_XQUERYX ZORBA_USE_PCH
+multithread:ZORBA_FOR_ONE_THREAD_ONLY SYNC_CODE'
 
 # Expand the filter file into "profile<TAB>regex" lines (glob -> ERE,
 # YAML anchors/aliases of the form "key: &name" / "- *name" resolved).
@@ -55,7 +56,7 @@ echo "$MAP" | while IFS=: read -r profile macros; do
   [ -s "$tmp/pats" ] || { echo "no patterns for profile $profile" >> "$tmp/missing"; continue; }
   for m in $macros; do
     git grep -lw "$m" -- . ':!doc' ':!site' ':!.github' ':!.superpowers' \
-        ':!CHANGELOG.md' ':!README.md' ':!.clusterfuzzlite' ':!scripts/check-os-access.allow' ':!changelog.d' ':!scripts/check-profile-filters.sh' \
+        ':!*.md' ':!.clusterfuzzlite' ':!scripts/check-os-access.allow' ':!changelog.d' ':!scripts/check-profile-filters.sh' \
         ':!**/[Rr][Ee][Aa][Dd][Mm][Ee]*' ||:
   done | sort -u | while read -r f; do
     printf '%s\n' "$f" | grep -Eqf "$tmp/pats" ||

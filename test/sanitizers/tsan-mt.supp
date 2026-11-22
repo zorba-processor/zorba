@@ -1,0 +1,53 @@
+# ThreadSanitizer suppressions for the multithreaded API tests (test/api/mt,
+# label "mt"; preset tsan-mt, workflow tsan-mt.yml).
+#
+# Each entry is a known race of the engine built for several threads (the
+# tsan-mt preset), under a "# <inventory ids> (P<n>): ..."
+# comment that names its ids in the inventory of the thread-safety design and
+# the PR of its plan that removes it (the workflow's summary reads that
+# comment). The PR that fixes a race deletes its entries, so the job then
+# fails if the race is still there; a race not listed here fails its test.
+
+# S7 (P7): ContentReader keeps one unsynchronized table of open iterations
+# for the whole process.
+race:zorba::simplestore::ContentReader::
+
+# R1 (P3): SimpleRCObject counts are plain integers in every build (builtin
+# function objects, TypeManager, plan iterators shared by clones).
+race:zorba::SimpleRCObject::addReference
+race:zorba::SimpleRCObject::removeReference
+race:zorba::SimpleRCObject::getRefCount
+
+# R1, R2 (P3): a Schema freed while another thread uses it, after a count of
+# its TypeManager or of a user-defined XQType raced.
+race:zorba::Schema::
+
+# C1 (P9): user function plans are generated lazily by the first call, on the
+# user_function object that every clone shares.
+race:zorba::user_function::getPlan
+
+# C4 (P9): rewrites of one compilation annotate expressions that another
+# compilation owns (functions of a shared static context).
+race:zorba::MarkFreeVars::apply
+race:zorba::expr::set*(zorba::BoolAnnotationValue)
+
+# C8 (P8): every open() writes the iterator's state offset into the shared
+# plan.
+race:zorba::StateTraitsImpl<*>::createState
+
+# C9 (P8): openImpl writes static and dynamic context values into members of
+# the shared iterator.
+race:zorba::CompareIterator::openImpl
+race:zorba::ElementIterator::openImpl
+
+# C10 (P9): rewrites set flags on FLWOR expressions that clones share.
+race:zorba::flwor_expr::set_general
+
+# G2 (P10): dict::find initializes its begin and end pointers lazily.
+race:zorba::diagnostic::dict::find
+
+# L2 (P12): ICU UText clone inside RegexPattern compilation reads a block
+# another thread's compilation allocated (fn:tokenize folded at compile time;
+# each thread compiles its own regex). ICU is not built with TSan; P12 decides
+# whether this is ICU-internal sharing or a false positive.
+race:shallowTextClone

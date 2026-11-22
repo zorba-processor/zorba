@@ -118,3 +118,7 @@ DECLARE_ZORBA_SCHEMA(FILE import-hello.xsd
   URI http://www.zorba-xquery.com/import-hello TEST_ONLY)
 
 EXPECTED_FAILURE(test/api/test_static_context 3118348)
+
+IF (NOT ZORBA_FOR_ONE_THREAD_ONLY)
+  ADD_SUBDIRECTORY(mt)
+ENDIF (NOT ZORBA_FOR_ONE_THREAD_ONLY)
