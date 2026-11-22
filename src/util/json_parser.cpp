@@ -191,8 +191,48 @@ ostream& operator<<( ostream &o, token const &t ) {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+// As istream::get() (bump) or istream::peek(), stream state included, without a sentry per character.
+inline int lexer::read_char( bool bump ) {
+  typedef istream::traits_type traits;
+  if ( !in_->good() ) {
+    in_->setstate( ios::failbit );
+    return traits::eof();
+  }
+  int i;
+  try {
+    i = bump ? in_->rdbuf()->sbumpc() : in_->rdbuf()->sgetc();
+  }
+  catch ( ... ) {
+    set_badbit_and_rethrow_if_masked();
+    if ( bump )
+      in_->setstate( ios::failbit );
+    return traits::eof();
+  }
+  if ( traits::eq_int_type( i, traits::eof() ) )
+    in_->setstate( bump ? ios::eofbit | ios::failbit : ios::eofbit );
+  return i;
+}
+
+// As istream does when its buffer throws: rethrow only if badbit is in the exception mask.
+void lexer::set_badbit_and_rethrow_if_masked() {
+  ios::iostate const mask = in_->exceptions();
+  if ( !(mask & ios::badbit) ) {
+    in_->setstate( ios::badbit );
+    return;
+  }
+  in_->exceptions( ios::goodbit );
+  in_->setstate( ios::badbit );
+  try {
+    in_->exceptions( mask );
+  }
+  catch ( ios::failure const& ) {
+    // restoring the mask throws because badbit is set; the buffer's exception is the one to raise
+  }
+  throw;
+}
+
 inline bool lexer::peek_char( char *c ) {
-  *c = in_->peek();
+  *c = istream::traits_type::to_char_type( read_char( false ) );
   return in_->good();
 }
 
@@ -218,7 +258,7 @@ lexer::lexer( istream &in ) : in_( &in ) {
 }
 
 bool lexer::get_char( char *c ) {
-  char const temp = in_->get();
+  char const temp = istream::traits_type::to_char_type( read_char( true ) );
   if ( in_->good() ) {
     prev_line_ = line_;
     prev_col_ = col_;

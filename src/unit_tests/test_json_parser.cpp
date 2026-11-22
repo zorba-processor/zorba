@@ -14,7 +14,11 @@
  * limitations under the License.
  */
 
+#include <cstring>
 #include <sstream>
+#include <stdexcept>
+#include <streambuf>
+#include <string>
 
 #include "util/json_parser.h"
 
@@ -615,6 +619,152 @@ static void test_unterminated_string() {
   ASSERT_EXCEPTION( lex.next( &t ), unterminated_string );
 }
 
+struct error_loc_case {
+  char const *source;
+  bool multiple;                        // allow multiple top-level values
+  char const *file;                     // set by set_loc(), if any
+  char const *exception;                // json::exception subclass expected
+  unsigned line, column, line_end, column_end;
+};
+
+static char const* exception_name( json::exception const &e ) {
+  if ( dynamic_cast<illegal_character const*>( &e ) ) return "illegal_character";
+  if ( dynamic_cast<illegal_codepoint const*>( &e ) ) return "illegal_codepoint";
+  if ( dynamic_cast<illegal_escape const*>( &e ) ) return "illegal_escape";
+  if ( dynamic_cast<illegal_literal const*>( &e ) ) return "illegal_literal";
+  if ( dynamic_cast<illegal_number const*>( &e ) ) return "illegal_number";
+  if ( dynamic_cast<unexpected_token const*>( &e ) ) return "unexpected_token";
+  if ( dynamic_cast<unterminated_string const*>( &e ) ) return "unterminated_string";
+  return "exception";
+}
+
+static void test_error_locations() {
+  static error_loc_case const cases[] = {
+    { "[\n  x ]", false, nullptr, "illegal_character", 2, 3, 2, 3 },
+    { "[\t\tx]", false, nullptr, "illegal_character", 1, 4, 1, 4 },
+    { "\r\n[\r\n 1,\r\n x]", false, nullptr, "illegal_character", 4, 2, 4, 2 },
+    { "[\"ab\\x\"]", false, nullptr, "illegal_escape", 1, 6, 1, 6 },
+    { "[\"\\u00G0\"]", false, nullptr, "illegal_codepoint", 1, 4, 1, 7 },
+    { "[\"\\u12", false, nullptr, "illegal_codepoint", 1, 4, 1, 7 },
+    { "[\"\\uD800\\u0041\"]", false, nullptr, "illegal_codepoint", 1, 4, 1, 14 },
+    { "[\"\\uD800x\"]", false, nullptr, "illegal_codepoint", 1, 4, 1, 9 },
+    { "[\"abc", false, nullptr, "unterminated_string", 1, 2, 1, 6 },
+    { "[\n\"abc\ndef", false, nullptr, "unterminated_string", 2, 1, 3, 4 },
+    { "[tru", false, nullptr, "illegal_literal", 1, 2, 1, 5 },
+    { "[trux]", false, nullptr, "illegal_literal", 1, 2, 1, 5 },
+    { "[nulls]", false, nullptr, "illegal_literal", 1, 2, 1, 6 },
+    { "[-", false, nullptr, "illegal_number", 1, 2, 1, 3 },
+    { "[-x]", false, nullptr, "illegal_number", 1, 2, 1, 3 },
+    { "[01]", false, nullptr, "illegal_number", 1, 2, 1, 3 },
+    { "[1.]", false, nullptr, "illegal_number", 1, 2, 1, 4 },
+    { "[1.", false, nullptr, "illegal_number", 1, 2, 1, 4 },
+    { "[1e]", false, nullptr, "illegal_number", 1, 2, 1, 4 },
+    { "[1e+", false, nullptr, "illegal_number", 1, 2, 1, 5 },
+    { "[12a]", false, nullptr, "illegal_number", 1, 2, 1, 4 },
+    { "[1.5x]", false, nullptr, "illegal_number", 1, 2, 1, 5 },
+    { "[1e5x]", false, nullptr, "illegal_number", 1, 2, 1, 5 },
+    { "{\"a\" 1}", false, nullptr, "unexpected_token", 1, 6, 1, 6 },
+    { "[1 2]", false, nullptr, "unexpected_token", 1, 4, 1, 4 },
+    { "{\"a\":1,", false, nullptr, "unexpected_token", 1, 7, 1, 7 },
+    { "{\"a\":1}\n{\"b\":tru", true, nullptr, "illegal_literal", 2, 6, 2, 9 },
+    { "{\"a\":1}\n{\"b\":tru", true, "events.jsonl", "illegal_literal", 2, 6, 2, 9 },
+    { "{\"a\":1}\n{\"b\":\"x", true, "events.jsonl", "unterminated_string", 2, 6, 2, 8 },
+  };
+
+  for ( error_loc_case const &c : cases ) {
+    istringstream iss( c.source );
+    parser p( iss, c.multiple );
+    if ( c.file )
+      p.set_loc( c.file, 1, 1 );
+    token t;
+    try {
+      while ( p.next( &t ) )
+        ;
+      cout << "FAILED: no error for " << c.source << endl;
+      ++failures;
+    }
+    catch ( json::exception const &e ) {
+      location const &loc = e.get_loc();
+      char const *const file = loc.file() ? loc.file() : "";
+      if ( strcmp( exception_name( e ), c.exception ) ||
+           strcmp( file, c.file ? c.file : "" ) ||
+           loc.line() != c.line || loc.column() != c.column ||
+           loc.line_end() != c.line_end || loc.column_end() != c.column_end ) {
+        cout << "FAILED: for " << c.source << ": got " << exception_name( e )
+             << " at \"" << file << "\" " << loc.line() << ','
+             << loc.column() << '-' << loc.line_end() << ','
+             << loc.column_end() << endl;
+        ++failures;
+      }
+    }
+  }
+}
+
+// Gives its text, then throws instead of reporting the end.
+class throwing_streambuf : public std::streambuf {
+public:
+  explicit throwing_streambuf( char const *s ) : s_( s ) {
+    setg( s_.data(), s_.data(), s_.data() + s_.size() );
+  }
+protected:
+  int_type underflow() override {
+    throw std::runtime_error( "buffer failure" );
+  }
+private:
+  std::string s_;
+};
+
+static void test_throwing_streambuf() {
+  {
+    // as istream::get() does: the exception sets badbit and reads as the end
+    throwing_streambuf buf( "[1," );
+    istream is( &buf );
+    parser p( is );
+    token t;
+    ASSERT_TRUE_AND_NO_EXCEPTION( p.next( &t ) && t == token::begin_array );
+    ASSERT_TRUE_AND_NO_EXCEPTION( p.next( &t ) && t == token::number );
+    ASSERT_TRUE_AND_NO_EXCEPTION( p.next( &t ) && t == token::value_separator );
+    ASSERT_EXCEPTION( p.next( &t ), unexpected_token );
+    ASSERT_TRUE( is.bad() );
+  }
+  {
+    // with badbit in the exception mask, the buffer's exception propagates
+    throwing_streambuf buf( "[1," );
+    istream is( &buf );
+    is.exceptions( ios::badbit );
+    parser p( is );
+    token t;
+    ASSERT_TRUE_AND_NO_EXCEPTION( p.next( &t ) && t == token::begin_array );
+    ASSERT_TRUE_AND_NO_EXCEPTION( p.next( &t ) && t == token::number );
+    ASSERT_TRUE_AND_NO_EXCEPTION( p.next( &t ) && t == token::value_separator );
+    ASSERT_EXCEPTION( p.next( &t ), std::runtime_error );
+    ASSERT_TRUE( is.bad() );
+  }
+}
+
+static void test_stream_state_at_end() {
+  {
+    // reading past the end sets eofbit and failbit, as istream::get() does
+    istringstream iss( "[1]" );
+    parser p( iss, true );
+    token t;
+    while ( p.next( &t ) )
+      ;
+    ASSERT_TRUE( iss.eof() );
+    ASSERT_TRUE( iss.fail() );
+    ASSERT_TRUE( !iss.bad() );
+  }
+  {
+    // peeking at the end sets eofbit only, as istream::peek() does
+    istringstream iss( "12" );
+    lexer lex( iss );
+    token t;
+    ASSERT_TRUE_AND_NO_EXCEPTION( lex.next( &t ) && t == token::number );
+    ASSERT_TRUE( iss.eof() );
+    ASSERT_TRUE( !iss.fail() );
+  }
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 
 namespace zorba {
@@ -638,6 +788,9 @@ int test_json_parser( int, char*[] ) {
   test_parser_object();
   test_unexpected_token();
   test_json_org_example();
+  test_error_locations();
+  test_throwing_streambuf();
+  test_stream_state_at_end();
 
   cout << failures << " test(s) failed\n";
   return failures ? 1 : 0;

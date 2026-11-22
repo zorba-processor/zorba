@@ -387,11 +387,15 @@ rstring<Rep>::mutate( size_type pos, size_type n1, size_type n2 ) {
   size_type const new_size = old_size + n2 - n1;
   size_type const how_much = old_size - pos - n1;
 
+  if ( !new_size && rep().is_shared() ) {
+    // the other strings keep the shared buffer; an empty one needs none
+    rep().dispose( get_allocator() );
+    return;
+  }
+
   if ( new_size > capacity() || rep().is_shared() ) {
     // must reallocate
     allocator_type const a = get_allocator();
-    // TODO: if new_size == 0, use empty_rep()
-
     rep_proxy_type new_rep;
 
     // The call to construct will throw an error if the RepType is the buf_rep
