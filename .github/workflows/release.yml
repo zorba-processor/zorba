@@ -198,6 +198,7 @@ jobs:
               section="$(printf 'Prerelease of Zorba %s. The notes below list all changes in %s so far.\n\n%s' "$base" "$base" "$section")"
             fi
           fi
+          section="$(awk -f scripts/unwrap_paragraphs.awk <<< "$section")"
           write_notes() {
             echo "$1"
             echo
