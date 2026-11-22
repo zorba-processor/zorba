@@ -1883,11 +1883,10 @@ bool Schema::parseUserAtomicTypes(
 
   ZORBA_ASSERT(udXQType->isAtomicAny());
 
-  const store::Item* typeQName = udXQType->getQName();
-
   SYNC_CODE(AutoMutex(GENV_TYPESYSTEM.getXercesMutex());)
 
 #ifndef ZORBA_NO_XMLSCHEMA
+  const store::Item* typeQName = udXQType->getQName();
   XMLChArray localPart (typeQName->getLocalName());
   XMLChArray uriStr (typeQName->getNamespace());
 

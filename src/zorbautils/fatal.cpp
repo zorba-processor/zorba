@@ -26,8 +26,8 @@ namespace zorba {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void fatal( char const *condition, char const *file, int line,
-            char const *msg ) {
+[[noreturn]] void fatal( char const *condition, char const *file, int line,
+                         char const *msg ) {
   cerr << "Zorba Internal Fatal Error in " << file << ":" << line << ":\n";
   cerr << '"' << condition << "\": condition failed";
   if ( msg && *msg )

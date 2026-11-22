@@ -83,7 +83,8 @@ DebuggerCommand::DebuggerCommand(std::string& aCommand)
 
           theData = lArgs.substr(lDataBegin);
         }
-
+        // A '-' inside an argument name is part of the name.
+        [[fallthrough]];
       default:
         if (!lInArgName) {
           throw "error reading command";

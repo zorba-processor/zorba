@@ -1819,6 +1819,7 @@ bool CRegexXQuery_multicharOther::match_internal(const char *source, int *start_
   switch(multichar_type)
   {
     case 'S':value_true = false;//[^\s]
+      [[fallthrough]];
     case 's'://[#x20\t\n\r]
       switch(utf8c)
       {
@@ -1832,6 +1833,7 @@ bool CRegexXQuery_multicharOther::match_internal(const char *source, int *start_
       }
       break;
     case 'I':value_true = false;//[^\i]
+      [[fallthrough]];
     case 'i'://the set of initial name characters, those matched by Letter | '_' | ':'
       if((utf8c == '_') ||
         (utf8c == ':') ||
@@ -1841,6 +1843,7 @@ bool CRegexXQuery_multicharOther::match_internal(const char *source, int *start_
       }
       break;
     case 'C':value_true = false;//[^\c]
+      [[fallthrough]];
     case 'c'://the set of name characters, those matched by NameChar
       if(XQCharType::isNameChar(utf8c))
       {
@@ -1848,11 +1851,13 @@ bool CRegexXQuery_multicharOther::match_internal(const char *source, int *start_
       }
       break;
     case 'D':value_true = false;//[^\d]
+      [[fallthrough]];
     case 'd':
       if(unicode::is_category(utf8c, unicode::Nd))
         found = true;
       break;
     case 'W':value_true = false;//[^\w]
+      [[fallthrough]];
     case 'w':
       found = !(unicode::is_category(utf8c, unicode::Pc) ||
                 unicode::is_category(utf8c, unicode::Pd) ||

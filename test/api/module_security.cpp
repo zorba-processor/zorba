@@ -111,11 +111,13 @@ struct Files
   }
 };
 
+#ifdef ZORBA_HAVE_CURL
 std::string http_test_server()
 {
   const char* const env = std::getenv("ZORBA_HTTP_TEST_SERVER");
   return env && *env ? env : ZORBA_HTTP_TEST_SERVER_DEFAULT;
 }
+#endif
 
 struct Outcome
 {
@@ -200,6 +202,7 @@ bool denied(const Outcome& o, const char* aCode,
          failed_with(o, aCode, "access denied by security policy");
 }
 
+#ifndef ZORBA_NO_FULL_TEXT
 bool not_denied(const Outcome& o)
 {
   if (!o.ok && (o.code == "ZXQP0029" || o.code == "ZXQP0067" ||
@@ -211,6 +214,7 @@ bool not_denied(const Outcome& o)
   }
   return true;
 }
+#endif
 
 const char FILE_NS[] =
   "import module namespace file = \"http://expath.org/ns/file\";\n";

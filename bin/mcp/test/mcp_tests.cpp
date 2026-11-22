@@ -2593,10 +2593,6 @@ Known starting( std::string const &text, long cap, long length = 0,
                 std::string const &ends = "" ) {
   return Known{ text, true, cap, length, ends, false };
 }
-Known library_crash( std::string const &text, bool prefix, long cap,
-                     long length = 0 ) {
-  return Known{ text, prefix, cap, length, "", true };
-}
 
 struct Sweep {
   std::string query;
@@ -2657,8 +2653,11 @@ bool sweep_allowed( Sweep const &s, long length, std::string const &outcome ) {
     return true;
   if ( s.lenient && outcome.rfind( "error: ", 0 ) == 0 )
     return true;
-  return std::any_of( s.known.begin(), s.known.end(),
-    [&]( Known const &k ) { return known_matches( k, length, outcome ); } );
+  // Not std::any_of: clang cannot unroll this loop as libstdc++'s find_if asks.
+  for ( Known const &k : s.known )
+    if ( known_matches( k, length, outcome ) )
+      return true;
+  return false;
 }
 
 // The known limits seen more often than their cap allows, for one run length.
@@ -7464,7 +7463,6 @@ void test_cache_change_at_once( Fixture const &f ) {
   // A file read at once is left for later, if the read is quick enough to tell.
   TempTree quick;
   Server fresh( f.zorba, cache_config( quick.root, 16, 10 ), std::cerr );
-  int told = 0;
   for ( int attempt = 0; attempt < 30; ++attempt ) {
     wait_after_change();
     std::size_t const before = fresh.cache_stats().admissions;
@@ -7488,7 +7486,6 @@ void test_cache_change_at_once( Fixture const &f ) {
     if ( known &&
          ( now.tv_sec - ctime_of.tv_sec ) * 1000000000LL +
          ( now.tv_nsec - ctime_of.tv_nsec ) < 20000000LL ) {
-      ++told;
       check( fresh.cache_stats().admissions == before,
              "a file written less than 20 ms ago is not kept",
              stats_text( fresh.cache_stats() ) );
