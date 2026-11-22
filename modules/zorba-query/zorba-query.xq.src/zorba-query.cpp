@@ -470,6 +470,7 @@ Resource* ZorbaQueryURLResolver::resolveURL(
   lOpt.omit_xml_declaration = ZORBA_OMIT_XML_DECLARATION_YES;
   Serializer_t lSer = Serializer::createSerializer(lOpt);
   std::stringstream lSerResult;
+  lSerResult.exceptions(std::ios::badbit);  // not a shorter string
   lSer->serialize(lResult, lSerResult);
   
   //return resource
@@ -569,6 +570,7 @@ zorba::ItemSequence_t PrepareMainModuleFunction::evaluate(
   uuid::create(&lUUID);
   
   std::stringstream lStream;
+  lStream.exceptions(std::ios::badbit);
   lStream << lUUID;
   
   String lStrUUID = lStream.str();
@@ -1043,6 +1045,7 @@ zorba::ItemSequence_t QueryPlanFunction::evaluate(
 
   std::unique_ptr<std::stringstream> lExcPlan;
   lExcPlan = std::make_unique<std::stringstream>();
+  lExcPlan->exceptions(std::ios::badbit);
   if (!lQuery->saveExecutionPlan(*lExcPlan.get()))
   {
     throwError("NO_QUERY_PLAN", "FAILED getting query execution plan.");
@@ -1148,6 +1151,7 @@ zorba::ItemSequence_t LoadFromQueryPlanFunction::evaluate(
   uuid::create(&lUUID);
 
   std::stringstream lStream;
+  lStream.exceptions(std::ios::badbit);
   lStream << lUUID;
 
   String lStrUUID = lStream.str();

@@ -661,6 +661,8 @@ JSONEncodeForRoundtripIterator::encodeNode(
 
     // and now serialize
     std::unique_ptr<std::stringstream> lResultStream = std::make_unique<std::stringstream>();
+    // A write that cannot grow the string throws std::bad_alloc.
+    lResultStream->exceptions(std::ios::badbit);
     lItemIt->open();
     lSerializer.serialize(lItemIt, *lResultStream.get());
     lItemIt->close();

@@ -3588,6 +3588,29 @@ void test_sweep_validate( Fixture const &f ) {
   (void)f;
 #endif
 }
+// fn:serialize and jn:encode-for-roundtrip of a node write the serialized text
+// into a string stream: when it cannot grow, the memory error, not a shorter
+// string. The answer is a number, so that a shorter string cannot match it.
+void test_sweep_serialize( Fixture const &f ) {
+#if defined(__linux__)
+  auto const query = []( std::string const &name ) {
+    return caught(
+      "let $e := <" + name + ">{ for $i in 1 to 40 return <b>text</b> }</" +
+      name + ">\n"
+      "return string-length(serialize($e)) * 10000 +\n"
+      "       string-length(jn:encode-for-roundtrip($e, { \"prefix\" : \"\" })(\"value\"))" );
+  };
+  Sweep s;
+  s.query = query( "sweep" );
+  s.before.push_back( query( "warm" ) );
+  s.after_compile = true;
+  // 40 times "<b>text</b>" between "<sweep>" and "</sweep>", twice.
+  s.expected = "4550455";
+  exhaust_sweep( f, "serialize", s );
+#else
+  (void)f;
+#endif
+}
 // Revalidation after an insert into a validated document, and validation in
 // place: each applies a PUL of its own (types, and the default attribute of
 // the new element) once the updates are applied. A failed allocation there
@@ -8458,6 +8481,7 @@ Test const tests[] = {
   { "exhaust_sweep_insert", test_sweep_insert },
   { "exhaust_sweep_delete", test_sweep_delete },
   { "exhaust_sweep_validate", test_sweep_validate },
+  { "exhaust_sweep_serialize", test_sweep_serialize },
   { "exhaust_sweep_revalidate", test_sweep_revalidate },
   { "exhaust_sweep_schema_import", test_sweep_schema_import },
   { "exhaust_sweep_html", test_sweep_html },

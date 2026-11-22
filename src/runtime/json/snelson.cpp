@@ -662,6 +662,7 @@ static void x2j_string( store::Item_t const &parent, store::Item_t *string ) {
             ser.setParameter( "omit-xml-declaration", "yes" );
             store::Iterator_t j( new store::SingletonIterator( child ) );
             ostringstream oss;
+            oss.exceptions( ios::badbit );  // not a shorter string
             ser.serialize( j, oss, true );
             value += oss.str().c_str();
             break;

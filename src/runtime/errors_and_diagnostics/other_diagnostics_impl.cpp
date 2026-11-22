@@ -125,6 +125,7 @@ ReadLineIterator::nextImpl(store::Item_t& result, PlanState& planState) const
 bool PrintIterator::nextImpl (store::Item_t& result, PlanState& planState) const
 {
   std::ostringstream os;
+  os.exceptions(std::ios::badbit);  // not a shorter string
   serializer* lSerializer = NULL;
   store::Item_t item;
   zstring resString;

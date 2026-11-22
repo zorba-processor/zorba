@@ -160,6 +160,7 @@ UuidIterator::nextImpl(store::Item_t& result, PlanState& planState) const
   uuid u;
   zstring uuidStr;
   std::ostringstream oss;
+  oss.exceptions(std::ios::badbit);  // not a shorter string
 
   PlanIteratorState* state;
   DEFAULT_STACK_INIT(PlanIteratorState, state, planState);

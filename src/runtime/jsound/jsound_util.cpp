@@ -2052,6 +2052,7 @@ void type::to_json( store::Item_t *result ) const {
   store::Item_t item;
   vector<store::Item_t> keys, values;
   ostringstream oss;
+  oss.exceptions( ios::badbit );  // not a shorter string
   zstring s;
 
   push_back( &keys, "$name" );
