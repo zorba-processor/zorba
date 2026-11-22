@@ -1,0 +1,135 @@
+# Streaming parse-json of NDJSON logs
+
+How fast `parse-json` reads a log of one JSON object per line, streaming:
+
+```jsoniq
+parse-json(file:read-text($log), { "jsoniq-multiple-top-level-items" : true })
+```
+
+and where its time and allocations go. Each change that makes it faster adds a row to
+[Results](#results), measured the same way.
+
+## Files
+
+| File | What it is |
+|---|---|
+| `tools/gen.jq` | Writes the synthetic log: `zorba -f -q tools/gen.jq -e n:=200000 -e seed:=1 -e out:=events.jsonl`. The same `n` and `seed` give the same bytes. |
+| `tools/shape.jq` | Per-event averages of a log (objects, arrays, keys, strings, numbers, nulls, booleans, bytes). |
+| `count.jq` | The parse alone: the number of events. |
+| `latency.jq` | Group by service and route: count, average and maximum latency, server errors. |
+| `flatten.jq` | Each event as one flat object (JSON lines out). |
+| `filter_project.jq` | The server errors of one service, four fields each. |
+| `run.sh` | Best of 3 runs of the four queries: wall time, peak RSS, MB/s, SHA-256 of the output. |
+| `tools/profile.sh` | Samples per part (perf + `classify.awk`) and allocations per event (`malloc_count.c`) of one query. |
+| `tools/classify.awk` | Charges each `perf script` sample to a part of the parse or of the query. |
+| `tools/malloc_count.c` | LD_PRELOAD library that counts malloc, calloc and realloc calls and the bytes requested. |
+
+The queries take the log as `-e log:=FILE`.
+
+## The synthetic log
+
+The first profile was taken on a private log; its content stays private, and only its
+shape per event was kept. `gen.jq` writes events of that shape (application log
+records with a trace, an HTTP request, a client with a location, metrics and a user;
+optional cache, tags and sampled fields). `tools/shape.jq` on 20,000 events of seed 1:
+
+| per event | private log | synthetic |
+|---|---:|---:|
+| bytes | ~1,065 | 1,064.6 |
+| objects | 7.5 | 7.5 |
+| arrays | 0.24 | 0.24 |
+| keys | 36 | 36.3 |
+| strings | 21 | 20.9 |
+| numbers (non-integer) | 6.8 (4.0) | 6.8 (4.0) |
+| nulls | 2.1 | 2.07 |
+| booleans | 0.26 | 0.26 |
+
+200,000 events of seed 1 are 212,898,225 bytes (SHA-256 `56d4a3ad79c6ae50...`).
+Writing them takes about 4 minutes.
+
+## Running it
+
+In the CI builder image, from the repository root, with a `full-release` build:
+
+```sh
+c++ -std=c++23 -O2 -o /tmp/dirbench bench/directory/dirbench.cpp
+zorba -f -q bench/json-parse/tools/gen.jq -e n:=200000 -e seed:=1 -e out:=/tmp/events.jsonl
+timeout 3600 sh bench/json-parse/run.sh build/full-release/bin/zorba /tmp/dirbench /tmp/events.jsonl /tmp/out
+```
+
+`JQ=/path/to/jq` also times jq counting the events. Two commits are compared on
+GitHub Actions with the `Benchmarks` workflow (see [../README.md](../README.md)); the
+queries are the `*.jq` files of this directory, so the suite runs as it is:
+
+```sh
+gh workflow run bench.yml -R zorba-processor/zorba --ref master \
+  -f suite=json-parse -f ref_a=<base sha> -f ref_b=<head sha> -f runs=3 \
+  -f setup='$ZORBA -f -q $SUITE/tools/gen.jq -e n:=200000 -e seed:=1 -e out:=$DATA/events.jsonl' \
+  -f args='-e log:=$DATA/events.jsonl'
+```
+
+## How the profile is taken
+
+1. **Build** with frame pointers and symbols, otherwise as `full-release`:
+   `cmake --preset full-release -DCMAKE_CXX_FLAGS_RELEASE="-O3 -DNDEBUG -g -fno-omit-frame-pointer" -DCMAKE_C_FLAGS_RELEASE="-O3 -DNDEBUG -g -fno-omit-frame-pointer"`.
+2. **Sample** one query at a time with `perf record -g --call-graph fp`. Frame pointers
+   give whole call stacks at low cost; DWARF unwinding is not needed.
+3. **Classify** the samples with `classify.awk`: each sample goes to the innermost
+   frame that names a part (`read`, `tokenize`, `grammar`, `loader`, `containers`,
+   `keys`, `numbers`, `strings`, `free`, or a part of the query: `q_*`, `iterators`).
+   Generic helpers (string and reference-count code, hash tables, malloc/free, the C++
+   library) are charged to their first caller that names a part, so that malloc in
+   the lexer counts as tokenizing. A part's seconds are its share times the best wall
+   time of the query.
+4. **Count allocations** with `malloc_count.so` preloaded, over the log and over an
+   empty file; the difference divided by the events is the allocations and bytes per
+   event, net of startup.
+
+`tools/profile.sh ZORBA QUERY LOG OUTDIR` does steps 2 to 4 (perf must be allowed:
+`kernel.perf_event_paranoid` at most 1, or a container with `--cap-add SYS_ADMIN`).
+
+### Prototypes before the changes
+
+Before PR 1, each candidate change was tried as a throwaway patch behind an environment
+variable, in one binary, against the unpatched build (interleaved, best of 3): reading
+characters through the stream buffer instead of `istream::get()/peek()`, releasing a
+shared string on `clear()` instead of reallocating it, reserving the pairs of an
+object, building numbers as `xs:double`, and the loader's `check_only_` mode as the
+ceiling of parse-time projection. Their gains are lower bounds: a toggle tested at run
+time keeps the branch and the slower code in the binary, and the patches did only the
+minimum. The profile and the ranked list of changes that came out of them are the
+basis of the three pull requests (PR 1: items 1, 2, 3, 7; PR 2: 4, 5; PR 3: 6).
+
+## Results
+
+All rows are measured on the same machine and container class: a Mac Pro (Intel Xeon
+W-3245, 16 cores), Docker Desktop's Linux VM with 16 CPUs and 31 GiB, a container of
+the builder image (`docker/builder-latest`, built locally), the build of step 1 of the
+profile. The log is 200,000 events of seed 1 (212.9 MB). Unlike the other suites of
+`bench/`, these numbers come from that machine, not from GitHub Actions; the host ran
+other builds at the same time, so base and head were measured in alternating rounds,
+and each time is the best of 3 runs of every round. MB/s is 10^6 bytes of the log per
+second. Peak RSS is 35 MiB for every query but `latency` (885 MiB before PR 1, 866
+MiB after), and every query writes the same output on every row.
+
+### Parse (`count.jq`)
+
+Seconds per part are the part's share of the perf samples times the best wall time.
+`other` is the query's iterators and startup.
+
+| Build | Wall s | MB/s | tokenize | grammar | loader | containers | keys | numbers | strings | free | read | other | allocations / event | bytes / event |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| master `ab93bb29c6` | 5.72 | 37.2 | 3.02 | 1.01 | 0.55 | 0.50 | 0.17 | 0.08 | 0.02 | 0.22 | 0.07 | 0.09 | 415 | 12,744 |
+| PR 1 | 3.88 | 54.9 | 1.65 | 0.69 | 0.53 | 0.45 | 0.07 | 0.08 | 0.02 | 0.23 | 0.07 | 0.10 | 224 | 7,696 |
+| jq 1.8.2 (same container) | 2.81 | 75.8 | | | | | | | | | | | | |
+| jq 1.7.1 (macOS on the host, same machine) | 3.68 | 57.9 | | | | | | | | | | | | |
+
+jq counts with `jq -n 'reduce inputs as $e (0; . + 1)'`; jq 1.7.1 is not packaged for
+the builder image, so it ran natively on the host.
+
+### All four queries (best wall time, s)
+
+| Build | count | latency | flatten | filter_project |
+|---|---:|---:|---:|---:|
+| master `ab93bb29c6` | 5.72 | 8.07 | 8.85 | 6.00 |
+| PR 1 | 3.88 (-32%) | 5.93 (-27%) | 6.90 (-22%) | 4.07 (-32%) |

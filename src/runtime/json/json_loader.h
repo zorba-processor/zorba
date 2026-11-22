@@ -159,6 +159,8 @@ private:
   void check_duplicate_keys( std::vector<store::Item_t> const& ) const;
   void clear_stack();
   void make_key( zstring const&, store::Item_t* );
+  void record_key( store::Item_t const& );
+  void end_top_level_value();
 
   stack_element& push( stack_element::type t ) {
     //
@@ -189,6 +191,12 @@ private:
   static unsigned const max_shared_key_length = 256;
   typedef std::unordered_map<zstring,store::Item_t> keys_type;
   keys_type keys_;
+
+  // Values of one stream tend to repeat their keys in order: match against the previous value's before hashing.
+  static unsigned const key_lookahead = 4;
+  std::vector<store::Item_t> prev_keys_;
+  std::vector<store::Item_t> cur_keys_;
+  size_t prev_key_pos_;
 };
 
 ///////////////////////////////////////////////////////////////////////////////

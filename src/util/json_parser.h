@@ -503,6 +503,8 @@ public:
 private:
   bool get_char( char* );
   bool peek_char( char* );
+  int read_char( bool bump );
+  void set_badbit_and_rethrow_if_masked();
   bool parse_codepoint( unicode::code_point *cp, bool throw_exceptions );
   token::type parse_literal( char, bool throw_exceptions );
   token::numeric_type parse_number( char, bool throw_exceptions );

@@ -430,6 +430,26 @@ static void test_take() {
 }
 
 template<class StringType>
+static void test_clear_shared() {
+  StringType s1( "hello" );
+  StringType s2( s1 );
+  ASSERT_TRUE( s1.is_shared() );
+  s1.clear();
+  test_empty( s1 );
+  ASSERT_TRUE( s1.data() == StringType().data() );  // the empty representation: nothing allocated
+  ASSERT_TRUE( !s2.is_shared() );
+  ASSERT_TRUE( s2 == "hello" );
+  s1 += "world";
+  ASSERT_TRUE( s1 == "world" );
+  ASSERT_TRUE( s2 == "hello" );
+
+  StringType s3( s2 );
+  s3.erase( 0, 5 );
+  test_empty( s3 );
+  ASSERT_TRUE( s2 == "hello" );
+}
+
+template<class StringType>
 static void test_reverse( char const *s ) {
   StringType const s1( s );
   StringType s2;
@@ -861,6 +881,9 @@ int test_string( int, char*[] ) {
 
   test_take<zstring>();
   test_take<zstring_p>();
+
+  test_clear_shared<zstring>();
+  test_clear_shared<zstring_p>();
 
   test_utf8_string<string>();
   test_utf8_string<zstring>();
