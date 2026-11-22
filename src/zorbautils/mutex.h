@@ -39,7 +39,9 @@ protected:
 #endif
 
 public:
-  Mutex();
+  enum Kind { ERROR_CHECKING, RECURSIVE };
+
+  explicit Mutex(Kind kind = ERROR_CHECKING);
 
   ~Mutex();
     
