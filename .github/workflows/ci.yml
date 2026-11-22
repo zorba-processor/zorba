@@ -25,7 +25,7 @@ jobs:
   #   docs, changelog, site, scripts  skipped            skipped
   #   src/, include/, modules/, bin/, run                see the table below
   #   test/, schemas/, cmake/, ...
-  #   CMake files, cmake/, workflow,  run                all four
+  #   CMake files, cmake/, workflow,  run                all five
   #   docker/builder-latest
   #
   # Profile jobs (CMakePresets.json) run when a file in their area changes.
@@ -55,6 +55,11 @@ jobs:
   #                                                        expression|translator|codegen,
   #                                                        bin/debugger, bin/zorbacmd*, test/api|
   #                                                        unit|driver|update, .xqx tests
+  #   multithread     ZORBA_FOR_ONE_THREAD_ONLY=OFF        include/, src/, C++ in modules/,
+  #                   (SYNC_CODE locks, test/api/mt);      bin/, test/api|unit
+  #                   its test preset excludes the mt
+  #                   tests that fail until their fix
+  #                   (test/baselines/sanitizers-tsan-mt.txt)
   #
   # scripts/check-profile-filters.sh (job "profile filters") fails when a file
   # containing a profile's guard macro is not matched by that profile's
@@ -122,15 +127,17 @@ jobs:
           NOICU: ${{ steps.f.outputs.embedded-noicu }}
           NOPCH: ${{ steps.f.outputs.full-nopch }}
           BIGINT: ${{ steps.f.outputs.bigint }}
+          MULTITHREAD: ${{ steps.f.outputs.multithread }}
         run: |
           if [ "$EVENT" != pull_request ]; then
-            list='["embedded","embedded-noicu","full-nopch","bigint"]'
+            list='["embedded","embedded-noicu","full-nopch","bigint","multithread"]'
           else
             list=
             [ "$EMBEDDED" = true ] && list="$list\"embedded\","
             [ "$NOICU" = true ] && list="$list\"embedded-noicu\","
             [ "$NOPCH" = true ] && list="$list\"full-nopch\","
             [ "$BIGINT" = true ] && list="$list\"bigint\","
+            [ "$MULTITHREAD" = true ] && list="$list\"multithread\","
             list="[${list%,}]"
           fi
           echo "profiles: $list"
@@ -324,9 +331,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Subset of [embedded, embedded-noicu, full-nopch, bigint] chosen by
-        # the changes job. bigint: ZORBA_WITH_BIG_INTEGER=ON (arbitrary-
-        # precision xs:integer).
+        # Subset of [embedded, embedded-noicu, full-nopch, bigint,
+        # multithread] chosen by the changes job. bigint:
+        # ZORBA_WITH_BIG_INTEGER=ON (arbitrary-precision xs:integer).
+        # multithread: ZORBA_FOR_ONE_THREAD_ONLY=OFF.
         preset: ${{ fromJSON(needs.changes.outputs.profiles) }}
     steps:
       - uses: actions/checkout@v7
