@@ -108,6 +108,7 @@
 #endif
 
 #include "functions/function.h"
+#include "functions/func_jsoniq_functions_impl.h"
 #include "functions/udf.h"
 #include "functions/external_function.h"
 #include "functions/library.h"
@@ -1593,7 +1594,9 @@ PlanIter_t gflwor_codegen(flwor_expr& flworExpr, int currentClause)
 
     var_expr* var = fc->get_var();
 
-    PlanIter_t domainIter = binding_sequence_iter(fc, pop_itstack());
+    PlanIter_t domainIter = pop_itstack();
+    project_parse_json(theCCB, fc, domainIter);
+    domainIter = binding_sequence_iter(fc, domainIter);
 
     std::vector<PlanIter_t>& varRefs = clauseVarMap->theVarRebinds[0]->theOutputVarRefs;
     std::vector<PlanIter_t>* posVarRefs = &no_var_iters;
@@ -2019,7 +2022,9 @@ void flwor_codegen(const flwor_expr& flworExpr)
 
       var_expr* var = fc->get_var();
 
-      PlanIter_t domainIter = binding_sequence_iter(fc, pop_itstack());
+      PlanIter_t domainIter = pop_itstack();
+      project_parse_json(theCCB, fc, domainIter);
+      domainIter = binding_sequence_iter(fc, domainIter);
 
       std::vector<PlanIter_t>& varRefs =
       clauseVarMap->theVarRebinds[0]->theOutputVarRefs;

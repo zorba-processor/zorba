@@ -122,6 +122,7 @@ Seconds per part are the part's share of the perf samples times the best wall ti
 | master `ab93bb29c6` | 5.72 | 37.2 | 3.02 | 1.01 | 0.55 | 0.50 | 0.17 | 0.08 | 0.02 | 0.22 | 0.07 | 0.09 | 415 | 12,744 |
 | PR 1 | 3.88 | 54.9 | 1.65 | 0.69 | 0.53 | 0.45 | 0.07 | 0.08 | 0.02 | 0.23 | 0.07 | 0.10 | 224 | 7,696 |
 | PR 2 | 2.38 | 89.5 | 0.51 | 0.36 | 0.47 | 0.48 | 0.09 | 0.08 | 0.04 | 0.19 | 0.08 | 0.09 | 128 | 5,458 |
+| PR 3 | 1.66 | 128.3 | 0.44 | 0.36 | 0.46 | 0.20 | 0.06 | 0.03 | 0.00 | 0.00 | 0.07 | 0.05 | 43 | 1,839 |
 | jq 1.8.2 (same container) | 2.81 | 75.8 | | | | | | | | | | | | |
 | jq 1.7.1 (macOS on the host, same machine) | 3.68 | 57.9 | | | | | | | | | | | | |
 
@@ -136,7 +137,17 @@ rounds of the PR 2 row.
 | master `ab93bb29c6` | 5.72 | 8.07 | 8.85 | 6.00 |
 | PR 1 | 3.88 (-32%) | 5.93 (-27%) | 6.90 (-22%) | 4.07 (-32%) |
 | PR 2 | 2.38 (-58%) | 4.40 (-45%) | 5.50 (-38%) | 2.64 (-56%) |
+| PR 3 | 1.66 (-71%) | 4.33 (-46%) | 4.99 (-44%) | 2.09 (-65%) |
 
 Percentages are against master `ab93bb29c6`. The PR 2 row was measured with the host
 otherwise nearly idle, alternating with the PR 1 head (`06261a9290`), which took 3.79,
 5.89, 6.94 and 4.05 s in those rounds: PR 2 alone is -37%, -25%, -21% and -35%.
+
+From PR 3 on, at `-O1` and `-O2` (the queries run at the default, `-O1`), a parse
+builds only what the query reads of each value when that can be proven: `count.jq`
+builds no content of the events (hence no strings and nothing to free in its row),
+`flatten.jq` and `filter_project.jq` build the fields they look up. `latency.jq`
+still builds every event: after its `group by` it counts the events and filters
+them with a predicate, which the analysis does not follow. The PR 3 row alternated
+with the PR 2 head (`8611ea3260`), which took 2.33, 4.28, 5.40 and 2.58 s in those
+rounds: PR 3 alone is -29%, +1% (`latency`, not projected: noise), -8% and -19%.

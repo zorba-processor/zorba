@@ -8,10 +8,6 @@
 # comment). The PR that fixes a race deletes its entries, so the job then
 # fails if the race is still there; a race not listed here fails its test.
 
-# S3 (P2): QNameItem::free releases the item lock that removeReference
-# already released.
-mutex:zorba::simplestore::QNameItem::free
-
 # S7 (P7): ContentReader keeps one unsynchronized table of open iterations
 # for the whole process.
 race:zorba::simplestore::ContentReader::
@@ -39,3 +35,9 @@ race:zorba::flwor_expr::set_general
 
 # G2 (P10): dict::find initializes its begin and end pointers lazily.
 race:zorba::diagnostic::dict::find
+
+# L2 (P12): ICU UText clone inside RegexPattern compilation reads a block
+# another thread's compilation allocated (fn:tokenize folded at compile time;
+# each thread compiles its own regex). ICU is not built with TSan; P12 decides
+# whether this is ICU-internal sharing or a false positive.
+race:shallowTextClone

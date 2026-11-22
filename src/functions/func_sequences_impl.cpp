@@ -18,6 +18,7 @@
 
 #include "functions/func_sequences.h"
 #include "functions/func_sequences_impl.h"
+#include "functions/func_jsoniq_functions_impl.h"
 
 #include "runtime/sequences/sequences.h"
 #include "runtime/sequences/SequencesImpl.h"
@@ -716,12 +717,14 @@ PlanIter_t op_zorba_sequence_point_access::codegen(
 fn:count
 *******************************************************************************/
 PlanIter_t fn_count::codegen(
-  CompilerCB*,
+  CompilerCB* ccb,
   static_context* sctx,
   const QueryLoc& loc,
   std::vector<PlanIter_t>& argv,
   expr& ann) const
 {
+  project_counted_parse_json(
+    ccb, static_cast<const fo_expr&>(ann).get_arg(0), argv[0]);
   return new FnCountIterator(sctx, loc, argv);
 }
 
