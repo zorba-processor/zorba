@@ -135,6 +135,7 @@ void JSONParseIterator::serialize(::zorba::serialization::Archiver& ar)
   (NaryBaseIterator<JSONParseIterator, JSONParseIteratorState>*)this);
 
     ar & theRelativeLocation;
+    ar & theProjection;
 }
 
 

@@ -155,6 +155,7 @@ public:
   std::istream* theInputStream; //
   bool theGotOne; //
   json::loader* loader_; //
+  std::unique_ptr<json::projection> theReadParts; //theProjection, read
 
   JSONParseIteratorState();
 
@@ -168,6 +169,7 @@ class JSONParseIterator : public NaryBaseIterator<JSONParseIterator, JSONParseIt
 { 
 protected:
   QueryLoc theRelativeLocation; //
+  zstring theProjection; //what the query reads of each value (json::projection::str()); empty: all
 public:
   SERIALIZABLE_CLASS(JSONParseIterator);
 
@@ -183,7 +185,8 @@ public:
     QueryLoc aRelativeLocation)
     : 
     NaryBaseIterator<JSONParseIterator, JSONParseIteratorState>(sctx, loc, children),
-    theRelativeLocation(aRelativeLocation)
+    theRelativeLocation(aRelativeLocation),
+    theProjection()
   {}
 
   virtual ~JSONParseIterator();
@@ -191,6 +194,7 @@ public:
   zstring getNameAsString() const;
 
 public:
+  void setProjection(const zstring& projection);
   bool processBooleanOption(const store::Item_t& options, char const* option_name, bool* option_value) const;
   void accept(PlanIterVisitor& v) const;
 

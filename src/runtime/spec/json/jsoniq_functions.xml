@@ -181,6 +181,7 @@
     <zorba:member type="std::istream*" name="theInputStream" brief=""/>
     <zorba:member type="bool" name="theGotOne"/>
     <zorba:member type="json::loader*" name="loader_" brief=""/>
+    <zorba:member type="std::unique_ptr&lt;json::projection&gt;" name="theReadParts" brief="theProjection, read"/>
   </zorba:state>
 
   <zorba:constructor>
@@ -188,6 +189,13 @@
   </zorba:constructor>
 
   <zorba:member type="QueryLoc" name="theRelativeLocation" />
+
+  <zorba:member type="zstring" name="theProjection"
+                brief="what the query reads of each value (json::projection::str()); empty: all"/>
+
+  <zorba:method return="void" name="setProjection">
+    <zorba:param type="const zstring&amp;" name="projection"/>
+  </zorba:method>
 
   <zorba:method return="bool" name="processBooleanOption" const="true">
     <zorba:param type="const store::Item_t&amp;" name="options"/>

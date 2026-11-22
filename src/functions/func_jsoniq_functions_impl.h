@@ -27,6 +27,25 @@ namespace zorba
 
 void populate_context_jsoniq_functions_impl(static_context* sctx);
 
+/**
+ * Makes a parse that is the domain of fc build of each value only what the
+ * FLWOR reads of it, when the FLWOR reads its variable only through lookups of
+ * literal keys.  Not at -O0.
+ */
+void project_parse_json(
+    CompilerCB* ccb,
+    const for_clause* fc,
+    const PlanIter_t& domainIter);
+
+/**
+ * Makes a parse whose values are only counted build none of their content.
+ * Not at -O0.
+ */
+void project_counted_parse_json(
+    CompilerCB* ccb,
+    const expr* arg,
+    const PlanIter_t& argIter);
+
 
 /*******************************************************************************
   jn:object($objs as object()*) as object()
