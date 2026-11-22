@@ -14,7 +14,9 @@
  * limitations under the License.
  */
 
+#include <algorithm>
 #include <set>
+#include <string_view>
 
 #include "functions/func_jsoniq_functions.h"
 #include "functions/func_jsoniq_functions_impl.h"
@@ -31,6 +33,7 @@
 #include "compiler/expression/expr_iter.h"
 #include "compiler/expression/flwor_expr.h"
 #include "compiler/expression/fo_expr.h"
+#include "compiler/expression/function_item_expr.h"
 #include "compiler/expression/json_exprs.h"
 #include "compiler/expression/var_expr.h"
 
@@ -65,7 +68,8 @@ PlanIter_t fn_jsoniq_parse_json::codegen(
 
 /*******************************************************************************
   Parse-time projection: a parse whose values the query reads only through
-  lookups of literal keys builds only what is read (see json::projection).
+  lookups of literal keys, or only counts, builds only what is read (see
+  json::projection).
   At -O0 every value is built, so that the optimized levels have a reference.
 ********************************************************************************/
 static bool is_parse_json(const expr* e)
@@ -80,61 +84,281 @@ static bool is_parse_json(const expr* e)
 
 
 /**
- * Gets the keys of e if it is $var.k1.k2... with literal string keys.
+ * Whether casting s to xs:integer succeeds: such a key in a dynamic call
+ * selects a member of an array, and no member is built where keys are read.
  */
-static bool lookup_path(const expr* e, const var_expr* var,
-                        std::vector<zstring>* path)
+static bool is_integer_text(const zstring& s)
 {
-  if (e->get_expr_kind() == wrapper_expr_kind)
-    return static_cast<const wrapper_expr*>(e)->get_input() == var;
+  auto const space = [](char c) {
+    return c == ' ' || c == '\t' || c == '\n' || c == '\r';
+  };
+  std::string_view t(s.data(), s.size());
+  while (!t.empty() && space(t.front()))
+    t.remove_prefix(1);
+  while (!t.empty() && space(t.back()))
+    t.remove_suffix(1);
+  if (!t.empty() && (t.front() == '+' || t.front() == '-'))
+    t.remove_prefix(1);
+  return !t.empty() &&
+    std::all_of(t.begin(), t.end(), [](char c) { return c >= '0' && c <= '9'; });
+}
 
-  if (e->get_expr_kind() != fo_expr_kind)
-    return false;
 
-  const fo_expr* lookup = static_cast<const fo_expr*>(e);
-  FunctionConsts::FunctionKind const kind = lookup->get_func()->getKind();
-  if (kind != FunctionConsts::OP_ZORBA_SINGLE_OBJECT_LOOKUP_2 &&
-      kind != FunctionConsts::OP_ZORBA_MULTI_OBJECT_LOOKUP_2)
-    return false;
+/**
+ * Gets the key of a lookup of a literal key: $x.k, or $x("k") with a key that
+ * does not select a member of an array.
+ *
+ * @param e The expression.
+ * @param key Set to the key.
+ * @return Returns the expression the key is looked up in, or null.
+ */
+static expr* literal_key_lookup(expr* e, zstring* key)
+{
+  expr* input;
+  const expr* name;
+  if (e->get_expr_kind() == fo_expr_kind)
+  {
+    const fo_expr* lookup = static_cast<const fo_expr*>(e);
+    FunctionConsts::FunctionKind const kind = lookup->get_func()->getKind();
+    if (kind != FunctionConsts::OP_ZORBA_SINGLE_OBJECT_LOOKUP_2 &&
+        kind != FunctionConsts::OP_ZORBA_MULTI_OBJECT_LOOKUP_2)
+      return nullptr;
+    input = lookup->get_arg(0);
+    name = lookup->get_arg(1);
+  }
+  else if (e->get_expr_kind() == dynamic_function_invocation_expr_kind)
+  {
+    const dynamic_function_invocation_expr* call =
+      static_cast<const dynamic_function_invocation_expr*>(e);
+    if (call->get_args().size() != 1)
+      return nullptr;
+    input = call->get_input();
+    name = call->get_args()[0];
+  }
+  else
+    return nullptr;
 
-  const expr* name = lookup->get_arg(1);
   if (name->get_expr_kind() != const_expr_kind)
-    return false;
-  const store::Item* key = static_cast<const const_expr*>(name)->get_val();
-  if (!key->isAtomic() || key->getTypeCode() != store::XS_STRING)
-    return false;
+    return nullptr;
+  const store::Item* item = static_cast<const const_expr*>(name)->get_val();
+  if (!item->isAtomic() || item->getTypeCode() != store::XS_STRING)
+    return nullptr;
+  *key = item->getStringValue();
+  if (e->get_expr_kind() == dynamic_function_invocation_expr_kind &&
+      is_integer_text(*key))
+    return nullptr;
+  return input;
+}
 
-  if (!lookup_path(lookup->get_arg(0), var, path))
+
+namespace {
+
+/**
+ * What a FLWOR reads of the values of the variable of its for clause over a
+ * parse.  The values are also bound to the variables of a group by that
+ * collect them, and to those of for clauses over them, as in the translation
+ * of a predicate: the uses of all of these are checked.
+ */
+class read_analysis
+{
+public:
+  read_analysis(const var_expr* var, json::projection* read) :
+    theVars{ var }, theRead(read) { }
+
+  /**
+   * Adds what e reads of the values.
+   *
+   * @return false if e uses them other than through lookups of literal keys,
+   * counting them, or predicates over them that do so.
+   */
+  bool reads(expr* e);
+
+private:
+  std::vector<const var_expr*> theVars; // bound to values
+  std::vector<const expr*> theBindings; // what binds values to theVars
+  json::projection* theRead;
+
+  bool is_values(const expr* e) const;
+  bool only_values(expr* e);
+  bool counted(expr* e);
+  bool lookup_path(expr* e, std::vector<zstring>* path);
+  void bind(const flwor_expr* flwor);
+  bool reads_except(expr* e, const expr* skipped);
+};
+
+
+/**
+ * Whether e is a reference to a variable bound to values.
+ */
+bool read_analysis::is_values(const expr* e) const
+{
+  return e->get_expr_kind() == wrapper_expr_kind &&
+    std::find(theVars.begin(), theVars.end(),
+              static_cast<const wrapper_expr*>(e)->get_input()) != theVars.end();
+}
+
+
+/**
+ * Whether e gives only values, unchanged, as a predicate over them does.
+ * Adds what the rest of e reads of them.
+ */
+bool read_analysis::only_values(expr* e)
+{
+  if (is_values(e))
+    return true;
+
+  switch (e->get_expr_kind())
+  {
+  case fo_expr_kind:
+  {
+    const fo_expr* fo = static_cast<const fo_expr*>(e);
+    return fo->get_func()->getKind() == FunctionConsts::OP_CONCATENATE_N &&
+      fo->num_args() == 0;
+  }
+  case if_expr_kind:
+  {
+    const if_expr* ifExpr = static_cast<const if_expr*>(e);
+    return reads(ifExpr->get_cond_expr()) &&
+      only_values(ifExpr->get_then_expr()) &&
+      only_values(ifExpr->get_else_expr());
+  }
+  case flwor_expr_kind:
+  {
+    flwor_expr* flwor = static_cast<flwor_expr*>(e);
+    bind(flwor);
+    return only_values(flwor->get_return_expr()) &&
+      reads_except(flwor, flwor->get_return_expr());
+  }
+  default:
     return false;
-  path->push_back(key->getStringValue());
+  }
+}
+
+
+/**
+ * Whether the number of items of e does not depend on what is built of the
+ * values.  Adds what e reads of them.
+ */
+bool read_analysis::counted(expr* e)
+{
+  if (is_values(e))
+    return true;
+
+  if (e->get_expr_kind() == if_expr_kind)
+  {
+    const if_expr* ifExpr = static_cast<const if_expr*>(e);
+    return reads(ifExpr->get_cond_expr()) &&
+      counted(ifExpr->get_then_expr()) &&
+      counted(ifExpr->get_else_expr());
+  }
+
+  if (e->get_expr_kind() == flwor_expr_kind)
+  {
+    flwor_expr* flwor = static_cast<flwor_expr*>(e);
+    bind(flwor);
+    return counted(flwor->get_return_expr()) &&
+      reads_except(flwor, flwor->get_return_expr());
+  }
+
+  return reads(e);
+}
+
+
+/**
+ * Gets the keys of e if it is V.k1.k2... with literal keys, V giving only
+ * values.
+ */
+bool read_analysis::lookup_path(expr* e, std::vector<zstring>* path)
+{
+  zstring key;
+  expr* input = literal_key_lookup(e, &key);
+  if (!input)
+    return false;
+  if (!only_values(input) && !lookup_path(input, path))
+    return false;
+  path->push_back(key);
   return true;
 }
 
 
 /**
- * Adds to p what e reads of the values of var.
- *
- * @return false if e uses var other than through lookups of literal keys.
+ * Adds to theVars the variables of flwor bound to values: those of a for
+ * clause over values and those of a group by that collect values.
  */
-static bool read_parts(expr* e, const var_expr* var, json::projection* p)
+void read_analysis::bind(const flwor_expr* flwor)
 {
-  if (e == var)
-    return false;
-
-  std::vector<zstring> path;
-  if (e->get_expr_kind() == fo_expr_kind && lookup_path(e, var, &path))
+  for (csize i = 0; i < flwor->num_clauses(); ++i)
   {
-    p->add(path);
-    return true;
+    const flwor_clause* clause = flwor->get_clause(i);
+    if (clause->get_kind() == flwor_clause::for_clause)
+    {
+      const for_clause* fc = static_cast<const for_clause*>(clause);
+      if (only_values(fc->get_expr()))
+      {
+        theVars.push_back(fc->get_var());
+        theBindings.push_back(fc->get_expr());
+      }
+    }
+    else if (clause->get_kind() == flwor_clause::groupby_clause)
+    {
+      const groupby_clause* gc = static_cast<const groupby_clause*>(clause);
+      for (const auto& [input, var] : gc->get_nongrouping_vars())
+      {
+        if (is_values(input))
+        {
+          theVars.push_back(var);
+          theBindings.push_back(input);
+        }
+      }
+    }
   }
+}
 
+
+bool read_analysis::reads_except(expr* e, const expr* skipped)
+{
   for (ExprIterator i(e); !i.done(); i.next())
   {
-    if (!read_parts(**i, var, p))
+    if (**i != skipped && !reads(**i))
       return false;
   }
   return true;
 }
+
+
+bool read_analysis::reads(expr* e)
+{
+  if (std::find(theBindings.begin(), theBindings.end(), e) != theBindings.end())
+    return true;
+
+  if (is_values(e) ||
+      std::find(theVars.begin(), theVars.end(), e) != theVars.end())
+    return false;
+
+  std::vector<zstring> path;
+  if (lookup_path(e, &path))
+  {
+    theRead->add(path);
+    return true;
+  }
+
+  switch (e->get_function_kind())
+  {
+  case FunctionConsts::FN_COUNT_1:
+  case FunctionConsts::FN_EMPTY_1:
+  case FunctionConsts::FN_EXISTS_1:
+    return counted(static_cast<fo_expr*>(e)->get_arg(0));
+  default:
+    break;
+  }
+
+  if (e->get_expr_kind() == flwor_expr_kind)
+    bind(static_cast<const flwor_expr*>(e));
+
+  return reads_except(e, nullptr);
+}
+
+} // namespace
 
 
 void project_parse_json(
@@ -151,7 +375,8 @@ void project_parse_json(
     return;
 
   json::projection read;
-  if (read_parts(fc->get_flwor_expr(), fc->get_var(), &read) && !read.all)
+  if (read_analysis(fc->get_var(), &read).reads(fc->get_flwor_expr()) &&
+      !read.all)
     parse->setProjection(read.str());
 }
 

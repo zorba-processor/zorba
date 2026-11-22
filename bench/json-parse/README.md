@@ -110,7 +110,7 @@ profile. The log is 200,000 events of seed 1 (212.9 MB). Unlike the other suites
 other builds at the same time, so base and head were measured in alternating rounds,
 and each time is the best of 3 runs of every round. MB/s is 10^6 bytes of the log per
 second. Peak RSS is 35 MiB for every query but `latency` (885 MiB before PR 1, 866
-MiB after), and every query writes the same output on every row.
+MiB after, 148 MiB from PR 4), and every query writes the same output on every row.
 
 ### Parse (`count.jq`)
 
@@ -138,6 +138,7 @@ rounds of the PR 2 row.
 | PR 1 | 3.88 (-32%) | 5.93 (-27%) | 6.90 (-22%) | 4.07 (-32%) |
 | PR 2 | 2.38 (-58%) | 4.40 (-45%) | 5.50 (-38%) | 2.64 (-56%) |
 | PR 3 | 1.66 (-71%) | 4.33 (-46%) | 4.99 (-44%) | 2.09 (-65%) |
+| PR 4 | 1.75 (-69%) | 2.93 (-64%) | 3.46 (-61%) | 2.09 (-65%) |
 
 Percentages are against master `ab93bb29c6`. The PR 2 row was measured with the host
 otherwise nearly idle, alternating with the PR 1 head (`06261a9290`), which took 3.79,
@@ -151,3 +152,14 @@ still builds every event: after its `group by` it counts the events and filters
 them with a predicate, which the analysis does not follow. The PR 3 row alternated
 with the PR 2 head (`8611ea3260`), which took 2.33, 4.28, 5.40 and 2.58 s in those
 rounds: PR 3 alone is -29%, +1% (`latency`, not projected: noise), -8% and -19%.
+
+From PR 4 on, the analysis follows the `for` variable through `group by`, where it
+is bound to the events of each group, and accepts counting them (`count`, `empty`,
+`exists`), predicates whose `$$` is only looked up with literal keys, and lookups of
+literal keys in the group (also in aggregates, and as `$e("key")`). `latency.jq` now
+builds of each event only `service`, `http.route`, `http.duration_ms` and
+`http.status`, and its peak RSS drops from 866 to 148 MiB. The PR 4 row alternated
+with the PR 3 head (`d879336fc0`), which took 1.77, 4.60, 3.44 and 2.10 s in those
+rounds: PR 4 alone is -1%, -36% (`latency`), +1% and 0% (the other three are not
+changed: noise). `flatten` took 3.44 s on the PR 3 head in these rounds and 4.99 s
+in those of the PR 3 row: rows compare only within their own rounds.
