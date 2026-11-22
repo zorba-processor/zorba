@@ -3631,6 +3631,11 @@ void test_sweep_revalidate( Fixture const &f ) {
   s.before.push_back( query( "warm" ) );
   s.after_compile = true;
   s.expected = "\"15 true true true\"";
+  // Xerces-C releasing the imported schema. Caps: about 1.5 times the most seen
+  // locally (1 alone, 195 in runs of 8): it throws OutOfMemoryException from
+  // ~XMLGrammarPoolImpl (~SchemaGrammar).
+  s.known = { starting( "terminate N11xercesc_", 4, 1, "OutOfMemoryExceptionE" ),
+              starting( "terminate N11xercesc_", 300, 8, "OutOfMemoryExceptionE" ) };
   exhaust_sweep( f, "revalidate", s );
 #else
   (void)f;

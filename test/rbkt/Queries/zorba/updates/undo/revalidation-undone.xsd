@@ -1,0 +1,20 @@
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           targetNamespace="urn:revalidation-undone"
+           xmlns="urn:revalidation-undone"
+           elementFormDefault="qualified">
+  <xs:complexType name="A">
+    <xs:simpleContent>
+      <xs:extension base="xs:integer">
+        <xs:attribute name="d" type="xs:integer" default="5"/>
+      </xs:extension>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:element name="r">
+    <xs:complexType>
+      <xs:choice maxOccurs="unbounded">
+        <xs:element name="a" type="A"/>
+        <xs:element name="b" type="xs:string"/>
+      </xs:choice>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>
