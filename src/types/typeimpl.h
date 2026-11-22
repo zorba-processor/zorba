@@ -372,8 +372,11 @@ public:
 
   void removeReference() 
   {
-    if (!theIsBuiltin && theRefCount.decrement())
-      delete this;
+    if (!theIsBuiltin)
+    {
+      if (theRefCount.decrement())
+        delete this;
+    }
   }
 
 public:

@@ -80,6 +80,14 @@ public:
     assert(theValue > 0);
     return --theValue == 0;
   }
+
+  void incrementUnshared() { ++theValue; }
+
+  bool decrementUnshared()
+  {
+    assert(theValue > 0);
+    return --theValue == 0;
+  }
 #else
   long load() const { return theValue.load(std::memory_order_acquire); }
 
@@ -103,6 +111,21 @@ public:
     assert(before > 0);
     return before == 1;
   }
+
+  // For a count that only one thread changes: no read-modify-write.
+  void incrementUnshared()
+  {
+    theValue.store(theValue.load(std::memory_order_relaxed) + 1,
+                   std::memory_order_relaxed);
+  }
+
+  bool decrementUnshared()
+  {
+    long const after = theValue.load(std::memory_order_relaxed) - 1;
+    assert(after >= 0);
+    theValue.store(after, std::memory_order_relaxed);
+    return after == 0;
+  }
 #endif
 };
 
@@ -118,8 +141,9 @@ public:
   theRefCount.makeImmortal() before it is published; its count then never
   changes and it is never freed by a release.
 
-  LocalRCObject counts with a plain integer in every build. Only a class whose
-  references are never copied or released concurrently may derive from it.
+  LocalRCObject changes its count without read-modify-write operations. Only
+  a class whose references are never copied or released concurrently may
+  derive from it.
 ********************************************************************************/
 class SyncedRCObject : public serialization::SerializeBaseClass
 {
@@ -224,31 +248,14 @@ public:
 /*******************************************************************************
 
 ********************************************************************************/
-class LocalRCObject
+class LocalRCObject : public SimpleRCObject
 {
-protected:
-  mutable long theRefCount;
-
 public:
-  LocalRCObject() : theRefCount(0) { }
-
-  LocalRCObject(const LocalRCObject&) : theRefCount(0) { }
-
-  virtual ~LocalRCObject() { }
-
-  LocalRCObject& operator=(const LocalRCObject&) { return *this; }
-
-  virtual void free() { delete this; }
-
-  long getRefCount() const { return theRefCount; }
-
-  void addReference() const { ++theRefCount; }
+  void addReference() const { theRefCount.incrementUnshared(); }
 
   void removeReference()
   {
-    assert(getRefCount() > 0);
-
-    if (--theRefCount == 0)
+    if (theRefCount.decrementUnshared())
       free();
   }
 };
