@@ -20,6 +20,8 @@
 
 #include <cassert>
 #include <cstddef>
+#include <cstdint>
+#include <new>
 #include <stdlib.h>
 #include <vector>
 
@@ -57,6 +59,9 @@ public:
   void* allocate(size_t size)
   {
     assert(size > 0);
+    // Rounding up must not wrap, and new[] cannot serve more than PTRDIFF_MAX.
+    if (size > static_cast<size_t>(PTRDIFF_MAX) - theAlignment)
+      throw std::bad_alloc();
     size = (size + theAlignment - 1) & ~(theAlignment - 1);
 
     // Larger than a page: give it a block of its own instead of running past
