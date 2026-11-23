@@ -167,8 +167,10 @@ void UDFGraph::addCall(user_function* udf, std::vector<user_function*>& callChai
 
     // If this is the first time we see the current udf, do a recursive
     // call on its body expr. A udf of another compilation cannot call back
-    // into this one, so it closes no cycle.
-    if (!found && udf->getBody() && udf->getCCB() == theCCB)
+    // into this one, so it closes no cycle; nor can a sealed one, since every
+    // udf that its body reaches was sealed with it (XQueryCompiler::seal()).
+    if (!found && udf->getBody() && udf->getCCB() == theCCB &&
+        !udf->isSealed())
     {
       build(udf->getBody(), callChain);
     }

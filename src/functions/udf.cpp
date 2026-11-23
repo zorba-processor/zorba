@@ -303,7 +303,8 @@ void user_function::addMutuallyRecursiveUDFs(
     const std::vector<user_function*>::const_iterator& cycle)
 {
   assert(theBodyExpr != NULL);
-  assert(!theIsSealed);
+  // Checked in Release too: a sealed udf is read by queries on other threads.
+  ZORBA_ASSERT(!theIsSealed);
 
   theMutuallyRecursiveUDFs.insert(theMutuallyRecursiveUDFs.end(),
                                   cycle,

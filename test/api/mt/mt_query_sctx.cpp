@@ -36,7 +36,14 @@ const char QUERY[] =
   "declare function q:f($x) { $x * 3 };\n"
   "declare function q:g($x) { q:f($x) + 1 };\n"
   "declare function q:h($x) { for $i in 1 to $x return q:g($i) };\n"
-  "q:f(1)";
+  "declare function q:fact($n) { if ($n le 1) then 1 else $n * q:fact($n - 1) };\n"
+  "declare function q:k($x) { q:fact($x) + 1 };\n"
+  "q:f(1), q:fact(3)";
+
+unsigned long factorial(unsigned n)
+{
+  return n <= 1 ? 1 : n * factorial(n - 1);
+}
 
 } // namespace
 
@@ -51,7 +58,7 @@ mt_query_sctx(int, char*[])
   try
   {
     XQuery_t lQuery = lZorba->compileQuery(QUERY);
-    lChecker.expect("the query", 0, drain(lQuery), "3");
+    lChecker.expect("the query", 0, drain(lQuery), "3 6");
     StaticContext_t lShared = lQuery->getStaticContext()->createChildContext();
     // The first compilation against a context gives it its type manager:
     // part of setting the context up.
@@ -75,6 +82,16 @@ mt_query_sctx(int, char*[])
         lChecker.expect("calls one not called by the query", t,
             run(lZorba, lShared, "sum(q:h(" + lN + "))"),
             std::to_string(3 * n * (n + 1) / 2 + n));
+
+        // Sealed with the query; q:k is sealed after it, by
+        // getStaticContext().
+        lChecker.expect("recursive, called by the query", t,
+            run(lZorba, lShared, "q:fact(" + lN + ")"),
+            std::to_string(factorial(n)));
+
+        lChecker.expect("calls a recursive one called by the query", t,
+            run(lZorba, lShared, "q:k(" + lN + ")"),
+            std::to_string(factorial(n) + 1));
       }
     });
   }
