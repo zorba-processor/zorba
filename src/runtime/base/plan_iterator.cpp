@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <atomic>
 #include <cstdint>
 #include <typeinfo>
 
@@ -43,17 +44,15 @@ namespace zorba
 {
 
 /*******************************************************************************
-  Global iterator ID counter, used for debugging purposes. Not really thread safe.
+  Global iterator ID counter, used for debugging purposes.
 ********************************************************************************/
 #ifndef NDEBUG
-#ifdef ZORBA_FOR_ONE_THREAD_ONLY
-static int global_iterator_id_counter = 1000;
+static std::atomic<int> global_iterator_id_counter(1000);
 
 void reset_global_iterator_id_counter()
 {
-  global_iterator_id_counter = 1000;
+  global_iterator_id_counter.store(1000, std::memory_order_relaxed);
 }
-#endif
 #endif
 
 
@@ -223,9 +222,7 @@ PlanIterator::PlanIterator(static_context* sctx, const QueryLoc& aLoc)
 {
 // Used for debugging purposes
 #ifndef NDEBUG
-#ifdef ZORBA_FOR_ONE_THREAD_ONLY
-  theId = global_iterator_id_counter++;
-#endif
+  theId = global_iterator_id_counter.fetch_add(1, std::memory_order_relaxed);
 #endif
 }
 
@@ -237,9 +234,7 @@ PlanIterator::PlanIterator(const PlanIterator& it)
   loc(it.loc),
   theSctx(it.theSctx)
 #ifndef NDEBUG
-#ifdef ZORBA_FOR_ONE_THREAD_ONLY
   , theId(it.theId)
-#endif
 #endif
 {
 }
@@ -290,13 +285,17 @@ void PlanIterator::serialize(::zorba::serialization::Archiver& ar)
   ar & theStateOffset;
 // Used for debugging purposes
 #ifndef NDEBUG
-#ifdef ZORBA_FOR_ONE_THREAD_ONLY
   ar & theId;
   // Set the global counter to the highest id +1.
   if (!ar.is_serializing_out())
-    if (global_iterator_id_counter < theId + 1)
-      global_iterator_id_counter = theId + 1;
-#endif
+  {
+    int lNext = global_iterator_id_counter.load(std::memory_order_relaxed);
+    while (lNext < theId + 1 &&
+           !global_iterator_id_counter.compare_exchange_weak(
+             lNext, theId + 1, std::memory_order_relaxed))
+    {
+    }
+  }
 #endif
 }
 

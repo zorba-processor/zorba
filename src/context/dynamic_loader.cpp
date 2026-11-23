@@ -132,22 +132,25 @@ ExternalModule*
 DynamicLoader::loadModule(const zstring& aFile) const
 {
   handle_t handle;
-  std::map<const zstring, handle_t>::const_iterator lIter;
-
-  lIter = theLibraries.find(aFile);
-  if (lIter != theLibraries.end())
   {
-    handle = lIter->second;
-    return createModule(handle, aFile);
+    SYNC_CODE(AutoMutex lock(&theLibrariesMutex);)
+
+    LibraryMap_t::const_iterator const lIter = theLibraries.find(aFile);
+    if (lIter != theLibraries.end())
+    {
+      handle = lIter->second;
+    }
+    else
+    {
+      handle = dlopen(aFile.c_str(), RTLD_NOW);
+      if (!handle)
+        throw ZORBA_EXCEPTION(
+          zerr::ZOSE0005_DLL_LOAD_FAILED, ERROR_PARAMS( aFile, ERROR_TEXT( zstring(dlerror()) ) )
+        );
+
+      theLibraries[aFile] = handle;
+    }
   }
-
-  handle = dlopen(aFile.c_str(), RTLD_NOW);
-  if (!handle)
-    throw ZORBA_EXCEPTION(
-      zerr::ZOSE0005_DLL_LOAD_FAILED, ERROR_PARAMS( aFile, ERROR_TEXT( zstring(dlerror()) ) )
-    );
-
-  theLibraries[aFile] = handle;
   return createModule(handle, aFile);
 }
 
