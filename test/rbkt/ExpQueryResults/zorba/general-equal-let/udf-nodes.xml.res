@@ -1,0 +1,1 @@
+{ "nodes" : "true/true true/true false/false true/true FORG0001@18:21 true/true true/true", "object" : "JNTY0004@18:26 JNTY0004@18:26 JNTY0004@18:26", "array" : "JNTY0004@18:26 JNTY0004@18:26 JNTY0004@18:26 JNTY0004@18:26", "function" : "FOTY0013@18:26 FOTY0013@18:26 FOTY0013@18:26", "node probes" : "true/true false/false true/true" }

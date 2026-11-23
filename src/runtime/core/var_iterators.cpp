@@ -742,6 +742,8 @@ LetVarState::LetVarState()
   theWindowEnd = 0;
   theBindingId = 0;
   theBindsWholeTempSeq = false;
+  theArgIter = NULL;
+  theArgPlanState = NULL;
 }
 
 
@@ -857,6 +859,26 @@ void LetVarIterator::bind(store::Iterator_t& it, PlanState& planState)
   state->theSourceIter = it;
   state->theBindingId = dynamic_context::new_binding_id();
   state->theBindsWholeTempSeq = false;
+  state->theArgIter = NULL;
+}
+
+
+/*******************************************************************************
+
+********************************************************************************/
+void LetVarIterator::bindArg(
+    store::Iterator_t& it,
+    const PlanIterator* arg,
+    PlanState& argPlanState,
+    PlanState& planState)
+{
+  bind(it, planState);
+
+  LetVarState* state;
+  state = StateTraitsImpl<LetVarState>::getState(planState, theStateOffset);
+
+  state->theArgIter = arg;
+  state->theArgPlanState = &argPlanState;
 }
 
 
@@ -873,6 +895,7 @@ void LetVarIterator::bind(store::Item_t& value, PlanState& planState)
   state->theItem = value;
   state->theBindingId = dynamic_context::new_binding_id();
   state->theBindsWholeTempSeq = false;
+  state->theArgIter = NULL;
 }
 
 
@@ -881,12 +904,22 @@ void LetVarIterator::bind(store::Item_t& value, PlanState& planState)
 ********************************************************************************/
 void LetVarIterator::bind(const store::TempSeq_t& value, PlanState& planState)
 {
+  bind(value, dynamic_context::new_binding_id(), planState);
+}
+
+
+void LetVarIterator::bind(
+    const store::TempSeq_t& value,
+    uint64_t bindingId,
+    PlanState& planState)
+{
   LetVarState* state;
   state = StateTraitsImpl<LetVarState>::getState(planState, theStateOffset);
 
   state->theTempSeq = value;
-  state->theBindingId = dynamic_context::new_binding_id();
+  state->theBindingId = bindingId;
   state->theBindsWholeTempSeq = true;
+  state->theArgIter = NULL;
 
   if (theTargetPosIter == NULL)
   {
@@ -929,6 +962,7 @@ void LetVarIterator::bind(
   state->theTempSeq = value;
   state->theBindingId = dynamic_context::new_binding_id();
   state->theBindsWholeTempSeq = false;
+  state->theArgIter = NULL;
 
   if (theTargetPosIter == NULL)
   {
@@ -971,11 +1005,34 @@ store::TempSeq* LetVarIterator::getWholeTempSeq(
   LetVarState* state;
   state = StateTraitsImpl<LetVarState>::getState(planState, theStateOffset);
 
-  if (!state->theBindsWholeTempSeq)
-    return NULL;
+  if (state->theBindsWholeTempSeq)
+  {
+    bindingId = state->theBindingId;
+    return state->theTempSeq.getp();
+  }
 
-  bindingId = state->theBindingId;
-  return state->theTempSeq.getp();
+  if (state->theArgIter != NULL)
+    return getVarWholeTempSeq(state->theArgIter, *state->theArgPlanState, bindingId);
+
+  return NULL;
+}
+
+
+/*******************************************************************************
+
+********************************************************************************/
+store::TempSeq* getVarWholeTempSeq(
+    const PlanIterator* iter,
+    PlanState& planState,
+    uint64_t& bindingId)
+{
+  if (const LetVarIterator* letVar = dynamic_cast<const LetVarIterator*>(iter))
+    return letVar->getWholeTempSeq(planState, bindingId);
+
+  if (const CtxVarIterator* ctxVar = dynamic_cast<const CtxVarIterator*>(iter))
+    return ctxVar->getWholeTempSeq(planState, bindingId);
+
+  return NULL;
 }
 
 

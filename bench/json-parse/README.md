@@ -24,6 +24,8 @@ and where its time and allocations go. Each change that makes it faster adds a r
 | `clean_users.jq` | Requests per service of the users who never got a server error: a FLWOR gives the events of a group by to an enclosing group by. |
 | `unmatched.jq` | Per service, the server errors of users with no successful request: a general `=` against the distinct user ids of a second parse. |
 | `unmatched_global.jq` | `unmatched.jq` with the distinct user ids in a global variable (`declare variable`) instead of a `let`. |
+| `unmatched_udf.jq` | `unmatched.jq` with the comparison in a function that is not inlined, called for each error with the distinct user ids as argument. |
+| `unmatched_udf_let.jq` | `unmatched_udf.jq` with the ids parameter used twice in the function, which then binds it with a `let` of its own. |
 | `latency_let.jq` | `latency.jq` with the request of each event bound by a `let` clause, `let $http := $e.http`. |
 | `latency_calls.jq` | `latency.jq` with the keys looked up by chained calls, `$e("http")("route")`. |
 | `run.sh` | Best of 3 runs of the queries: wall time, peak RSS, MB/s, SHA-256 of the output. |
@@ -254,6 +256,28 @@ in a container limited to 4 CPUs with the host busy with other builds, built wit
 
 `unmatched` is not changed (noise). Master took 93.41, 93.55 and 92.04 s on
 `unmatched_global`, the head 3.72, 3.74 and 3.72 s. Both queries write the same
+output on both builds.
+
+### A general `=` against a function parameter (`unmatched_udf.jq`, `unmatched_udf_let.jq`)
+
+`unmatched_udf.jq` is `unmatched.jq` with the comparison in a function that is not
+inlined, called for each server error with the `let` variable of the distinct user
+ids as argument; in `unmatched_udf_let.jq` the function uses that parameter twice,
+so it binds it with a `let` of its own. On master each call bound the parameter
+anew, so the hash of the variable was never reused, and each error went over every
+id. Best wall time (s) and peak RSS (MiB) of three alternating rounds, master
+`fc0d11fd29` against the head, in a container limited to 5 CPUs, built with
+`CMAKE_BUILD_TYPE=Release`:
+
+| query | master s | head s | master MiB | head MiB |
+|---|---:|---:|---:|---:|
+| unmatched | 3.75 | 3.61 | 63 | 63 |
+| unmatched_udf | 129.71 | 4.10 (-97%) | 60 | 63 |
+| unmatched_udf_let | 168.29 | 4.42 (-97%) | 60 | 62 |
+
+`unmatched` is not changed (noise). Master took 129.71, 140.22 and 137.36 s on
+`unmatched_udf` and 176.92, 168.29 and 178.91 s on `unmatched_udf_let`; the head
+4.10, 4.32 and 4.36 s, and 4.42, 4.56 and 4.50 s. Every query writes the same
 output on both builds.
 
 ### Values bound by `let` (`latency_let.jq`)
