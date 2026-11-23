@@ -4996,7 +4996,8 @@ void test_sweep_matcher( Fixture const &f ) {
   check( sweep_over_cap( s, 1, outcomes ).empty(), "a known limit within its cap" );
 #endif
 }
-// MAPM keeps state per thread, set up by the first decimal of the thread.
+// MAPM keeps state per thread, set up by the first decimal of the thread. No
+// failed allocation of that setup ends the process: every one is tried.
 void test_sweep_decimal_thread( Fixture const &f ) {
 #if defined(__linux__)
   Sweep s;
@@ -5005,7 +5006,7 @@ void test_sweep_decimal_thread( Fixture const &f ) {
   s.before.push_back( s.query );
   s.expected = "true";
   s.new_thread = true;
-  s.points = 300;
+  s.points = 100000;                // all of them
   s.lenient = true;                 // the compilation is swept too
   s.compiles = true;
   exhaust_sweep( f, "first decimal of a thread", s );
