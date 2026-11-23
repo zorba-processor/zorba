@@ -7,4 +7,8 @@
   `for $e in $events ...` now uses the memory of the `let` form. Results and
   errors are those of `-O0`, except that when more than one error can be
   raised, an error of the variable can give way to one of a global declared
-  after it or of the query body.
+  after it or of the query body. Through the C++ and C APIs, reading such a
+  variable after execution (`DynamicContext::getVariable`, XQC
+  `get_variable`) raises `XQDY0054` instead of returning its value. A caller
+  that stops reading the results before their end can skip an error of the
+  variable that `-O0` raises before the first item.
