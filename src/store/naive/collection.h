@@ -16,6 +16,8 @@
 #ifndef ZORBA_SIMPLESTORE_COLLECTION
 #define ZORBA_SIMPLESTORE_COLLECTION
 
+#include <memory>
+
 #include "store/api/collection.h"
 #include "zorbatypes/integer.h"
 
@@ -23,6 +25,8 @@
 #include "tree_id.h"
 
 namespace zorba { namespace simplestore {
+
+class CollectionTreeInfo;
 
 /*******************************************************************************
   Interface for Collection used in the SimpleStore
@@ -73,19 +77,34 @@ public:
       store::Item* node,
       xs_integer position = xs_integer(-1)) = 0;
 
-  virtual zorba::xs_integer addNodes(
+  virtual csize addNodes(
       std::vector<store::Item_t>& nodes,
       const store::Item* targetNode,
       bool before) = 0;
 
-  virtual bool removeNode(store::Item* node, xs_integer& pos) = 0;
+  // Removes the tree of the given root, if in this collection, and returns its
+  // collection info, for restoreNode(), with its position; otherwise NULL.
+  virtual std::unique_ptr<CollectionTreeInfo> removeNode(
+      store::Item* node,
+      csize& position) = 0;
 
-  virtual bool removeNode(xs_integer position) = 0;
+  // Puts back at its position a tree that removeNode() removed, with no
+  // allocation: for an undo.
+  virtual void restoreNode(
+      store::Item* node,
+      csize position,
+      std::unique_ptr<CollectionTreeInfo> info) = 0;
 
-  virtual zorba::xs_integer removeNodes(xs_integer position, xs_integer num) = 0;
+  // Removes the num trees from the given position on, which must be nodes[0]
+  // to nodes[num - 1], with no allocation (an xs_integer allocates in bigint
+  // builds): for an undo.
+  virtual void removeNodes(
+      const std::vector<store::Item_t>& nodes,
+      csize position,
+      csize num) = 0;
 
   // Removes the last num trees, which must be nodes[0] to nodes[num - 1], with
-  // no allocation (an xs_integer allocates in bigint builds): for an undo.
+  // no allocation: for an undo.
   virtual void removeLastNodes(
       const std::vector<store::Item_t>& nodes,
       csize num) = 0;

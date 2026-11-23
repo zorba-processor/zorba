@@ -333,7 +333,7 @@ void XmlTree::setCollectionTreeInfo(CollectionTreeInfo* collectionInfo)
 void XmlTree::attachToCollection(
     simplestore::Collection* collection,
     const TreeId& treeId,
-    const xs_integer& pos)
+    csize pos)
 {
   assert(!theCollectionInfo);
 
@@ -343,19 +343,41 @@ void XmlTree::attachToCollection(
   theCollectionInfo->setRoot(getRoot());
   theTreeId = treeId;
 }
-  
+
 
 /*******************************************************************************
 
 ********************************************************************************/
 void XmlTree::detachFromCollection()
 {
+  detachKeepingInfo();
+}
+
+
+/*******************************************************************************
+
+********************************************************************************/
+std::unique_ptr<CollectionTreeInfo> XmlTree::detachKeepingInfo()
+{
   // The tree info must exist and this XML must be the overall root.
   assert(theCollectionInfo);
   assert(theCollectionInfo->getRoot() == static_cast<StructuredItem*>(getRoot()));
 
-  delete theCollectionInfo;
+  std::unique_ptr<CollectionTreeInfo> info(theCollectionInfo);
   theCollectionInfo = NULL;
+  return info;
+}
+
+
+/*******************************************************************************
+
+********************************************************************************/
+void XmlTree::reattachToCollection(std::unique_ptr<CollectionTreeInfo> info)
+{
+  assert(!theCollectionInfo);
+  assert(info->getRoot() == static_cast<StructuredItem*>(getRoot()));
+
+  theCollectionInfo = info.release();
 }
 
 
@@ -1094,7 +1116,7 @@ void XmlNode::unregisterReferencesToDeletedSubtree()
 void XmlNode::attachToCollection(
     simplestore::Collection* collection,
     const TreeId& treeId,
-    const xs_integer& position)
+    csize position)
 {
   getTree()->attachToCollection(collection, treeId, position);
 }
@@ -1106,6 +1128,24 @@ void XmlNode::attachToCollection(
 void XmlNode::detachFromCollection()
 {
   getTree()->detachFromCollection();
+}
+
+
+/*******************************************************************************
+
+********************************************************************************/
+std::unique_ptr<CollectionTreeInfo> XmlNode::detachKeepingInfo()
+{
+  return getTree()->detachKeepingInfo();
+}
+
+
+/*******************************************************************************
+
+********************************************************************************/
+void XmlNode::reattachToCollection(std::unique_ptr<CollectionTreeInfo> info)
+{
+  getTree()->reattachToCollection(std::move(info));
 }
 
 

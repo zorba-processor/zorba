@@ -173,7 +173,7 @@ long JSONItem::getCollectionTreeRefCount() const
 void JSONItem::attachToCollection(
     Collection* aCollection,
     const TreeId& aTreeId,
-    const xs_integer& aPosition)
+    csize aPosition)
 {
   ASSERT_INVARIANT();
 
@@ -196,14 +196,36 @@ void JSONItem::attachToCollection(
 ********************************************************************************/
 void JSONItem::detachFromCollection()
 {
+  detachKeepingInfo();
+}
+
+
+/*******************************************************************************
+
+********************************************************************************/
+std::unique_ptr<CollectionTreeInfo> JSONItem::detachKeepingInfo()
+{
   ASSERT_INVARIANT();
-  
-  
+
   CollectionTreeInfoWithTreeId* collectionInfo = theCollectionInfo;
-  // Detach
   assert(collectionInfo);
   setCollectionTreeInfo(NULL);
-  delete collectionInfo;
+
+  ASSERT_INVARIANT();
+  return std::unique_ptr<CollectionTreeInfo>(collectionInfo);
+}
+
+
+/*******************************************************************************
+
+********************************************************************************/
+void JSONItem::reattachToCollection(std::unique_ptr<CollectionTreeInfo> info)
+{
+  ASSERT_INVARIANT();
+
+  assert(!theCollectionInfo);
+  assert(info->getRoot() == this);
+  setCollectionTreeInfo(info.release());
 
   ASSERT_INVARIANT();
 }

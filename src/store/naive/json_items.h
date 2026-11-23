@@ -153,9 +153,13 @@ public:
   void attachToCollection(
       Collection* aCollection,
       const TreeId& aTreeId,
-      const xs_integer& aPosition);
+      csize aPosition);
 
   void detachFromCollection();
+
+  std::unique_ptr<CollectionTreeInfo> detachKeepingInfo();
+
+  void reattachToCollection(std::unique_ptr<CollectionTreeInfo> info);
   
   CollectionTreeInfo* getCollectionTreeInfo() const { return theCollectionInfo; }
 
