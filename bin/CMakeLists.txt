@@ -593,7 +593,7 @@ IF (ZORBA_WITH_FILE_ACCESS)
              entity_expansion case_paths html_edge_cases memory_limit
              exhaust_at_start exhaust_errno exhaust_bounds_retry
              exhaust_sweep_compile exhaust_sweep_builtins
-             exhaust_json_object_add
+             exhaust_json_object_add exhaust_update_primitive
              exhaust_sweep_matcher exhaust_sweep_query_text exhaust_sweep_long_token
              exhaust_sweep_streamable_text exhaust_base64_stream
              exhaust_seekable_stream exhaust_json_loader exhaust_serializer
@@ -634,6 +634,10 @@ IF (ZORBA_WITH_FILE_ACCESS)
         PASS_REGULAR_EXPRESSION "PASSED: ${_t}"
         FAIL_REGULAR_EXPRESSION "FAILED|TOP-SECRET|HIDDEN-SECRET")
     ENDFOREACH (_t)
+    # A failed update must not keep its target: the store reports the strings
+    # it keeps referenced at shutdown, after the test has passed.
+    SET_TESTS_PROPERTIES (bin/mcp/exhaust_update_primitive PROPERTIES
+      FAIL_REGULAR_EXPRESSION "FAILED|ZSTR0065")
 
     # The help states the order, and what --queries loads.
     ADD_TEST (NAME bin/mcp/language_help

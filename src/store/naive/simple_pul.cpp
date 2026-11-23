@@ -59,6 +59,57 @@ void cleanList(std::vector<UpdatePrimitive*>& aVector)
 
 
 /*******************************************************************************
+  Put a primitive just created in aList. If the list cannot grow, the primitive
+  is deleted: it holds its target, which would otherwise stay in memory.
+********************************************************************************/
+template <class Primitive>
+Primitive* addToList(
+    std::vector<UpdatePrimitive*>& aList,
+    Primitive* aPrimitive)
+{
+  std::unique_ptr<Primitive> owned(aPrimitive);
+  aList.push_back(aPrimitive);
+  return owned.release();
+}
+
+
+/*******************************************************************************
+  Put a primitive just created in aList and among the updates of aTarget in
+  aMap (aUpdates, or new ones if aUpdates is NULL). If either cannot grow, the
+  primitive is in neither and is deleted.
+********************************************************************************/
+template <class Primitive>
+Primitive* addToListAndMap(
+    std::vector<UpdatePrimitive*>& aList,
+    NodeToUpdatesMap& aMap,
+    store::Item* aTarget,
+    NodeUpdates* aUpdates,
+    Primitive* aPrimitive)
+{
+  std::unique_ptr<Primitive> owned(aPrimitive);
+  std::unique_ptr<NodeUpdates> newUpdates;
+  if (aUpdates == NULL)
+    newUpdates = std::make_unique<NodeUpdates>(1, aPrimitive);
+
+  aList.push_back(aPrimitive);
+  try
+  {
+    if (newUpdates)
+      aMap.insert(aTarget, newUpdates.get());
+    else
+      aUpdates->push_back(aPrimitive);
+  }
+  catch (...)
+  {
+    aList.pop_back();
+    throw;
+  }
+  (void)newUpdates.release(); // owned by aMap now
+  return owned.release();
+}
+
+
+/*******************************************************************************
 
 ********************************************************************************/
 void applyList(std::vector<UpdatePrimitive*>& list)
@@ -252,12 +303,8 @@ void PULImpl::addDelete(const QueryLoc* aQueryLoc, store::Item_t& target)
 
   if (!found)
   {
-    UpdDelete* upd = GET_PUL_FACTORY().createUpdDelete(pul, aQueryLoc, target);
-    pul->theDeleteList.push_back(upd);
-
-    updates = new NodeUpdates(1);
-    (*updates)[0] = upd;
-    pul->theNodeToUpdatesMap.insert(n, updates);
+    addToListAndMap(pul->theDeleteList, pul->theNodeToUpdatesMap, n, NULL,
+                    GET_PUL_FACTORY().createUpdDelete(pul, aQueryLoc, target));
   }
   else
   {
@@ -268,9 +315,8 @@ void PULImpl::addDelete(const QueryLoc* aQueryLoc, store::Item_t& target)
         return;
     }
 
-    UpdDelete* upd = GET_PUL_FACTORY().createUpdDelete(pul,  aQueryLoc,target);
-    pul->theDeleteList.push_back(upd);
-    updates->push_back(upd);
+    addToListAndMap(pul->theDeleteList, pul->theNodeToUpdatesMap, n, updates,
+                    GET_PUL_FACTORY().createUpdDelete(pul, aQueryLoc, target));
   }
 }
 
@@ -349,26 +395,13 @@ void PULImpl::addInsertChildren(
   XmlNode* n = BASE_NODE(target);
 
   NodeUpdates* updates = 0;
-  bool found = pul->theNodeToUpdatesMap.get(n, updates);
+  pul->theNodeToUpdatesMap.get(n, updates);
 
-  UpdInsertChildren* upd = GET_PUL_FACTORY().
-  createUpdInsertChildren(pul, aQueryLoc, kind, target, sibling, children);
-
-  if (kind == store::UpdateConsts::UP_INSERT_INTO)
-    pul->theDoFirstList.push_back(upd);
-  else
-    pul->theInsertList.push_back(upd);
-
-  if (!found)
-  {
-    updates = new NodeUpdates(1);
-    (*updates)[0] = upd;
-    pul->theNodeToUpdatesMap.insert(n, updates);
-  }
-  else
-  {
-    updates->push_back(upd);
-  }
+  addToListAndMap(kind == store::UpdateConsts::UP_INSERT_INTO ?
+                  pul->theDoFirstList : pul->theInsertList,
+                  pul->theNodeToUpdatesMap, n, updates,
+                  GET_PUL_FACTORY().createUpdInsertChildren(
+                    pul, aQueryLoc, kind, target, sibling, children));
 }
 
 
@@ -391,23 +424,11 @@ void PULImpl::addInsertAttributes(
   }
 
   NodeUpdates* updates = 0;
-  bool found = pul->theNodeToUpdatesMap.get(n, updates);
+  pul->theNodeToUpdatesMap.get(n, updates);
 
-  UpdInsertAttributes* upd = GET_PUL_FACTORY().
-  createUpdInsertAttributes(pul, loc, target, attrs);
-
-  pul->theDoFirstList.push_back(upd);
-
-  if (!found)
-  {
-    updates = new NodeUpdates(1);
-    (*updates)[0] = upd;
-    pul->theNodeToUpdatesMap.insert(n, updates);
-  }
-  else
-  {
-    updates->push_back(upd);
-  }
+  addToListAndMap(pul->theDoFirstList, pul->theNodeToUpdatesMap, n, updates,
+                  GET_PUL_FACTORY().createUpdInsertAttributes(
+                    pul, loc, target, attrs));
 }
 
 
@@ -457,13 +478,7 @@ void PULImpl::addReplaceNode(
     kind = store::UpdateConsts::UP_REPLACE_CHILD;
   }
 
-  if (!found)
-  {
-     updates = new NodeUpdates(1);
-    (*updates)[0] = upd;
-    pul->theNodeToUpdatesMap.insert(n, updates);
-  }
-  else
+  if (found)
   {
     csize numUpdates = updates->size();
     for (csize i = 0; i < numUpdates; ++i)
@@ -475,11 +490,10 @@ void PULImpl::addReplaceNode(
         throw XQUERY_EXCEPTION(err::XUDY0016, ERROR_LOC(*lLoc));
       }
     }
-
-    updates->push_back(upd);
   }
 
-   pul->theReplaceNodeList.push_back(upd);
+  addToListAndMap(pul->theReplaceNodeList, pul->theNodeToUpdatesMap, n,
+                  updates, upd);
 }
 
 
@@ -500,14 +514,9 @@ void PULImpl::addReplaceContent(
 
   if (!found)
   {
-    UpdatePrimitive* upd = GET_PUL_FACTORY().
-    createUpdReplaceElemContent(pul, aQueryLoc, target, newChild);
-
-    pul->theReplaceContentList.push_back(upd);
-
-    updates = new NodeUpdates(1);
-    (*updates)[0] = upd;
-    pul->theNodeToUpdatesMap.insert(n, updates);
+    addToListAndMap(pul->theReplaceContentList, pul->theNodeToUpdatesMap, n,
+                    NULL, GET_PUL_FACTORY().createUpdReplaceElemContent(
+                      pul, aQueryLoc, target, newChild));
   }
   else
   {
@@ -518,11 +527,9 @@ void PULImpl::addReplaceContent(
         throw XQUERY_EXCEPTION(err::XUDY0017);
     }
 
-    UpdatePrimitive* upd = GET_PUL_FACTORY().
-    createUpdReplaceElemContent(pul, aQueryLoc, target, newChild);
-
-    pul->theReplaceContentList.push_back(upd);
-    updates->push_back(upd);
+    addToListAndMap(pul->theReplaceContentList, pul->theNodeToUpdatesMap, n,
+                    updates, GET_PUL_FACTORY().createUpdReplaceElemContent(
+                      pul, aQueryLoc, target, newChild));
   }
 }
 
@@ -568,15 +575,7 @@ void PULImpl::addReplaceValue(
     ZORBA_FATAL(0, "");
   }
 
-  if (!found)
-  {
-    pul->theDoFirstList.push_back(upd);
-
-    updates = new NodeUpdates(1);
-    (*updates)[0] = upd;
-    pul->theNodeToUpdatesMap.insert(n, updates);
-  }
-  else
+  if (found)
   {
     csize numUpdates = updates->size();
     for (csize i = 0; i < numUpdates; i++)
@@ -587,10 +586,10 @@ void PULImpl::addReplaceValue(
         throw XQUERY_EXCEPTION(err::XUDY0017);
       }
     }
-
-    pul->theDoFirstList.push_back(upd);
-    updates->push_back(upd);
   }
+
+  addToListAndMap(pul->theDoFirstList, pul->theNodeToUpdatesMap, n, updates,
+                  upd);
 }
 
 
@@ -642,15 +641,7 @@ void PULImpl::addRename(
     ZORBA_FATAL(0, "");
   }
 
-  if (!found)
-  {
-    pul->theDoFirstList.push_back(upd);
-
-    updates = new NodeUpdates(1);
-    (*updates)[0] = upd;
-    pul->theNodeToUpdatesMap.insert(n, updates);
-  }
-  else
+  if (found)
   {
     csize numUpdates = updates->size();
     for (csize i = 0; i < numUpdates; ++i)
@@ -661,10 +652,10 @@ void PULImpl::addRename(
         throw XQUERY_EXCEPTION(err::XUDY0015);
       }
     }
-
-    pul->theDoFirstList.push_back(upd);
-    updates->push_back(upd);
   }
+
+  addToListAndMap(pul->theDoFirstList, pul->theNodeToUpdatesMap, n, updates,
+                  upd);
 }
 
 
@@ -690,7 +681,7 @@ void PULImpl::addPut(
 
   UpdatePrimitive* upd = GET_PUL_FACTORY().createUpdPut(this, aQueryLoc, target, uri);
 
-  thePutList.push_back(upd);
+  addToList(thePutList, upd);
 }
 
 
@@ -721,7 +712,7 @@ void PULImpl::addSetElementType(
                           isInSubstitutionGroup,
                           isNilled);
 
-  theValidationList.push_back(upd);
+  addToList(theValidationList, upd);
 }
 
 
@@ -751,7 +742,7 @@ void PULImpl::addSetElementType(
                           isInSubstitutionGroup,
                           isNilled);
 
-  theValidationList.push_back(upd);
+  addToList(theValidationList, upd);
 }
 
 
@@ -764,7 +755,7 @@ void PULImpl::addSetAttributeType(
   UpdatePrimitive* upd = GET_PUL_FACTORY().
   createUpdSetAttributeType(this, loc, target, typeName, typedValue, false);
 
-  theValidationList.push_back(upd);
+  addToList(theValidationList, upd);
 }
 
 
@@ -779,7 +770,7 @@ void PULImpl::addSetAttributeType(
   UpdatePrimitive* upd = GET_PUL_FACTORY().
   createUpdSetAttributeType(this, loc, target, typeName, typedValue, true);
 
-  theValidationList.push_back(upd);
+  addToList(theValidationList, upd);
 }
 
 
@@ -792,23 +783,13 @@ void PULImpl::addRevalidate(
   XmlNode* n = BASE_NODE(target);
 
   NodeUpdates* updates = 0;
-  bool found = pul->theNodeToUpdatesMap.get(n, updates);
+  pul->theNodeToUpdatesMap.get(n, updates);
 
   UpdRevalidate* upd = GET_PUL_FACTORY().
   createUpdRevalidate(this, aQueryLoc, target);
 
-  pul->theRevalidateList.push_back(upd);
-
-  if (!found)
-  {
-    updates = new NodeUpdates(1);
-    (*updates)[0] = upd;
-    pul->theNodeToUpdatesMap.insert(n, updates);
-  }
-  else
-  {
-    updates->push_back(upd);
-  }
+  addToListAndMap(pul->theRevalidateList, pul->theNodeToUpdatesMap, n,
+                  updates, upd);
 }
 
 
@@ -823,7 +804,7 @@ void PULImpl::addCreateCollection(
 {
   CollectionPul* pul = getCollectionPulByName(name.getp(), isDynamic);
 
-  pul->theCreateCollectionList.push_back(GET_PUL_FACTORY().
+  addToList(pul->theCreateCollectionList, GET_PUL_FACTORY().
   createUpdCreateCollection(pul, loc, name, annotations, isDynamic));
 }
 
@@ -835,7 +816,7 @@ void PULImpl::addDeleteCollection(
 {
   CollectionPul* pul = getCollectionPulByName(name.getp(), isDynamic);
 
-  pul->theDeleteCollectionList.push_back(GET_PUL_FACTORY().
+  addToList(pul->theDeleteCollectionList, GET_PUL_FACTORY().
   createUpdDeleteCollection(pul, loc, name, isDynamic));
 }
 
@@ -848,7 +829,7 @@ void PULImpl::addInsertIntoCollection(
 {
   CollectionPul* pul = getCollectionPulByName(name.getp(), isDynamic);
 
-  pul->theInsertIntoCollectionList.push_back(GET_PUL_FACTORY().
+  addToList(pul->theInsertIntoCollectionList, GET_PUL_FACTORY().
   createUpdInsertIntoCollection(pul, loc, name, nodes, isDynamic));
 } 
 
@@ -861,7 +842,7 @@ void PULImpl::addInsertFirstIntoCollection(
 {
   CollectionPul* pul = getCollectionPulByName(name.getp(), isDynamic);
 
-  pul->theInsertIntoCollectionList.push_back(GET_PUL_FACTORY().
+  addToList(pul->theInsertIntoCollectionList, GET_PUL_FACTORY().
   createUpdInsertFirstIntoCollection(pul, loc, name, nodes, isDynamic));
 }
 
@@ -874,7 +855,7 @@ void PULImpl::addInsertLastIntoCollection(
 {
   CollectionPul* pul = getCollectionPulByName(name.getp(), isDynamic);
 
-  pul->theInsertIntoCollectionList.push_back(GET_PUL_FACTORY().
+  addToList(pul->theInsertIntoCollectionList, GET_PUL_FACTORY().
   createUpdInsertLastIntoCollection(pul, loc, name, nodes, isDynamic));
 }
 
@@ -888,7 +869,7 @@ void PULImpl::addInsertBeforeIntoCollection(
 {
   CollectionPul* pul = getCollectionPulByName(name.getp(), isDynamic);
 
-  pul->theInsertIntoCollectionList.push_back(GET_PUL_FACTORY().
+  addToList(pul->theInsertIntoCollectionList, GET_PUL_FACTORY().
   createUpdInsertBeforeIntoCollection(pul, loc, name, target, nodes, isDynamic));
 }
 
@@ -902,7 +883,7 @@ void PULImpl::addInsertAfterIntoCollection(
 {
   CollectionPul* pul = getCollectionPulByName(name.getp(), isDynamic);
 
-  pul->theInsertIntoCollectionList.push_back(GET_PUL_FACTORY().
+  addToList(pul->theInsertIntoCollectionList, GET_PUL_FACTORY().
   createUpdInsertAfterIntoCollection(pul, loc, name, target, nodes, isDynamic));
 }
 
@@ -916,7 +897,7 @@ void PULImpl::addDeleteFromCollection(
 {
   CollectionPul* pul = getCollectionPulByName(name.getp(), isDynamic);
 
-  pul->theDeleteFromCollectionList.push_back(GET_PUL_FACTORY().
+  addToList(pul->theDeleteFromCollectionList, GET_PUL_FACTORY().
   createUpdDeleteNodesFromCollection(pul, loc, name, nodes, isLast, isDynamic));
 }
 
@@ -930,7 +911,7 @@ void PULImpl::addEditInCollection(
 {
   CollectionPul* pul = getCollectionPulByName(name.getp(), isDynamic);
 
-  pul->theEditInCollectionList.push_back(
+  addToList(pul->theEditInCollectionList,
       GET_PUL_FACTORY().createUpdEditInCollection(
           pul,
           loc,
@@ -947,7 +928,7 @@ void PULImpl::addTruncateCollection(
 {
   CollectionPul* pul = getCollectionPulByName(name.getp(), isDynamic);
 
-  pul->theTruncateCollectionList.push_back(GET_PUL_FACTORY().
+  addToList(pul->theTruncateCollectionList, GET_PUL_FACTORY().
   createUpdTruncateCollection(pul, aQueryLoc, name, isDynamic));
 }
 
@@ -964,7 +945,7 @@ void PULImpl::addCreateIndex(
   UpdatePrimitive* upd = GET_PUL_FACTORY().
   createUpdCreateIndex(this, loc,  qname, spec, sourceIter);
 
-  theCreateIndexList.push_back(upd);
+  addToList(theCreateIndexList, upd);
 }
 
 
@@ -975,7 +956,7 @@ void PULImpl::addDeleteIndex(
   UpdatePrimitive* upd = GET_PUL_FACTORY().
   createUpdDeleteIndex(this, loc, qname);
 
-  theDeleteIndexList.push_back(upd);
+  addToList(theDeleteIndexList, upd);
 }
 
 
@@ -987,7 +968,7 @@ void PULImpl::addRefreshIndex(
   UpdatePrimitive* upd = GET_PUL_FACTORY().
   createUpdRefreshIndex(this, loc,  qname, sourceIter);
 
-  theRefreshIndexList.push_back(upd);
+  addToList(theRefreshIndexList, upd);
 }
 
 
@@ -1002,7 +983,7 @@ void PULImpl::addActivateIC(
   UpdatePrimitive* upd = 
   GET_PUL_FACTORY().createUpdActivateIC(this, loc, qname, aCollectionName);
 
-  theICActivationList.push_back(upd);
+  addToList(theICActivationList, upd);
 }
 
 void PULImpl::addActivateForeignKeyIC(
@@ -1017,7 +998,7 @@ void PULImpl::addActivateForeignKeyIC(
       aFromCollectionName,
       aToCollectionName);
 
-  theICActivationList.push_back(upd);
+  addToList(theICActivationList, upd);
 }
 
 void PULImpl::addDeActivateIC(
@@ -1026,7 +1007,7 @@ void PULImpl::addDeActivateIC(
 {
   UpdatePrimitive* upd = GET_PUL_FACTORY().createUpdDeActivateIC(this, loc, qname);
 
-  theICActivationList.push_back(upd);
+  addToList(theICActivationList, upd);
 }
 
 
@@ -1040,7 +1021,7 @@ void PULImpl::addCreateDocument(
 {
   UpdatePrimitive* upd = GET_PUL_FACTORY().createUpdCreateDocument(
       this, loc, uri, doc);
-  theCreateDocumentList.push_back(upd);
+  addToList(theCreateDocumentList, upd);
 }
 
 
@@ -1050,7 +1031,7 @@ void PULImpl::addDeleteDocument(
 {
   UpdatePrimitive* upd = GET_PUL_FACTORY().createUpdDeleteDocument(
       this, loc, uri);
-  theDeleteDocumentList.push_back(upd);
+  addToList(theDeleteDocumentList, upd);
 }
 
 
@@ -1067,7 +1048,7 @@ void PULImpl::addCreateHashMap(
   UpdatePrimitive* upd = GET_PUL_FACTORY().createUpdCreateHashMap(
       this, loc, aQName, aKeyTypes, aCollations, aTimezone);
 
-  theCreateHashMapList.push_back(upd);
+  addToList(theCreateHashMapList, upd);
 }
 
 void PULImpl::addDestroyHashMap(
@@ -1077,7 +1058,7 @@ void PULImpl::addDestroyHashMap(
   UpdatePrimitive* upd = GET_PUL_FACTORY().createUpdDestroyHashMap(
       this, loc, aQName);
 
-  theDestroyHashMapList.push_back(upd);
+  addToList(theDestroyHashMapList, upd);
 }
 
 void PULImpl::addInsertIntoHashMap(
@@ -1089,7 +1070,7 @@ void PULImpl::addInsertIntoHashMap(
   UpdatePrimitive* upd = GET_PUL_FACTORY().createUpdInsertIntoHashMap(
       this, loc, aQName, aKey, aValue);
 
-  theInsertIntoHashMapList.push_back(upd);
+  addToList(theInsertIntoHashMapList, upd);
 }
 
 void PULImpl::addRemoveFromHashMap(
@@ -1100,7 +1081,7 @@ void PULImpl::addRemoveFromHashMap(
   UpdatePrimitive* upd = GET_PUL_FACTORY().createUpdRemoveFromHashMap(
       this, loc, aQName, aKey);
 
-  theRemoveFromHashMapList.push_back(upd);
+  addToList(theRemoveFromHashMapList, upd);
 }
 
 
@@ -1269,20 +1250,16 @@ void PULImpl::addJSONObjectDelete(
     UpdatePrimitive* upd = GET_PUL_FACTORY().
     createUpdJSONObjectDelete(pul, loc, target, name);
 
-    pul->theJSONObjectDeleteList.push_back(upd);
-
-    updates->push_back(upd);
+    addToListAndMap(pul->theJSONObjectDeleteList, pul->theNodeToUpdatesMap,
+                    obj, updates, upd);
   }
   else
   {
     UpdatePrimitive* upd = GET_PUL_FACTORY().
     createUpdJSONObjectDelete(pul, loc, target, name);
 
-    pul->theJSONObjectDeleteList.push_back(upd);
-
-    updates = new NodeUpdates(1);
-    (*updates)[0] = upd;
-    pul->theNodeToUpdatesMap.insert(obj, updates);
+    addToListAndMap(pul->theJSONObjectDeleteList, pul->theNodeToUpdatesMap,
+                    obj, NULL, upd);
   }
 }
 
@@ -1329,20 +1306,16 @@ void PULImpl::addJSONObjectReplaceValue(
     UpdatePrimitive* upd = GET_PUL_FACTORY().
     createUpdJSONObjectReplaceValue(pul, loc, target, name, newValue);
 
-    pul->theJSONObjectReplaceValueList.push_back(upd);
-
-    updates->push_back(upd);
+    addToListAndMap(pul->theJSONObjectReplaceValueList, pul->theNodeToUpdatesMap,
+                    obj, updates, upd);
   }
   else
   {
     UpdatePrimitive* upd = GET_PUL_FACTORY().
     createUpdJSONObjectReplaceValue(pul, loc, target, name, newValue);
 
-    pul->theJSONObjectReplaceValueList.push_back(upd);
-
-    updates = new NodeUpdates(1);
-    (*updates)[0] = upd;
-    pul->theNodeToUpdatesMap.insert(obj, updates);
+    addToListAndMap(pul->theJSONObjectReplaceValueList, pul->theNodeToUpdatesMap,
+                    obj, NULL, upd);
   }
 }
 
@@ -1394,20 +1367,16 @@ void PULImpl::addJSONObjectRename(
     UpdatePrimitive* upd = GET_PUL_FACTORY().
     createUpdJSONObjectRename(pul, loc, target, name, newName);
 
-    pul->theJSONObjectRenameList.push_back(upd);
-
-    updates->push_back(upd);
+    addToListAndMap(pul->theJSONObjectRenameList, pul->theNodeToUpdatesMap,
+                    obj, updates, upd);
   }
   else
   {
     UpdatePrimitive* upd = GET_PUL_FACTORY().
     createUpdJSONObjectRename(pul, loc, target, name, newName);
 
-    pul->theJSONObjectRenameList.push_back(upd);
-
-    updates = new NodeUpdates(1);
-    (*updates)[0] = upd;
-    pul->theNodeToUpdatesMap.insert(obj, updates);
+    addToListAndMap(pul->theJSONObjectRenameList, pul->theNodeToUpdatesMap,
+                    obj, NULL, upd);
   }
 }
 
@@ -1469,20 +1438,16 @@ void PULImpl::addJSONArrayInsert(
     UpdatePrimitive* upd = GET_PUL_FACTORY().
     createUpdJSONArrayInsert(pul, loc, target, pos, members);
 
-    pul->theJSONArrayInsertList.push_back(upd);
-
-    updates->push_back(upd);
+    addToListAndMap(pul->theJSONArrayInsertList, pul->theNodeToUpdatesMap,
+                    arr, updates, upd);
   }
   else
   {
     UpdatePrimitive* upd = GET_PUL_FACTORY().
     createUpdJSONArrayInsert(pul, loc, target, pos, members);
 
-    pul->theJSONArrayInsertList.push_back(upd);
-
-    updates = new NodeUpdates(1);
-    (*updates)[0] = upd;
-    pul->theNodeToUpdatesMap.insert(arr, updates);
+    addToListAndMap(pul->theJSONArrayInsertList, pul->theNodeToUpdatesMap,
+                    arr, NULL, upd);
   }
 }
 
@@ -1532,20 +1497,16 @@ void PULImpl::addJSONArrayAppend(
     UpdatePrimitive* upd = GET_PUL_FACTORY().
     createUpdJSONArrayAppend(pul, loc, target, members);
 
-    pul->theJSONArrayAppendList.push_back(upd);
-
-    updates->push_back(upd);
+    addToListAndMap(pul->theJSONArrayAppendList, pul->theNodeToUpdatesMap,
+                    arr, updates, upd);
   }
   else
   {
     UpdatePrimitive* upd = GET_PUL_FACTORY().
     createUpdJSONArrayAppend(pul, loc, target, members);
 
-    pul->theJSONArrayAppendList.push_back(upd);
-
-    updates = new NodeUpdates(1);
-    (*updates)[0] = upd;
-    pul->theNodeToUpdatesMap.insert(arr, updates);
+    addToListAndMap(pul->theJSONArrayAppendList, pul->theNodeToUpdatesMap,
+                    arr, NULL, upd);
   }
 }
 
@@ -1595,20 +1556,16 @@ void PULImpl::addJSONArrayDelete(
     UpdatePrimitive* upd = GET_PUL_FACTORY().
     createUpdJSONArrayDelete(pul, loc, target, pos);
 
-    pul->theJSONArrayDeleteList.push_back(upd);
-
-    updates->push_back(upd);
+    addToListAndMap(pul->theJSONArrayDeleteList, pul->theNodeToUpdatesMap,
+                    arr, updates, upd);
   }
   else
   {
     UpdatePrimitive* upd = GET_PUL_FACTORY().
     createUpdJSONArrayDelete(pul, loc, target, pos);
 
-    pul->theJSONArrayDeleteList.push_back(upd);
-
-    updates = new NodeUpdates(1);
-    (*updates)[0] = upd;
-    pul->theNodeToUpdatesMap.insert(arr, updates);
+    addToListAndMap(pul->theJSONArrayDeleteList, pul->theNodeToUpdatesMap,
+                    arr, NULL, upd);
   }
 }
 
@@ -1659,20 +1616,16 @@ void PULImpl::addJSONArrayReplaceValue(
     UpdatePrimitive* upd = GET_PUL_FACTORY().
     createUpdJSONArrayReplaceValue(pul, loc, target, pos, newValue);
 
-    pul->theJSONArrayReplaceValueList.push_back(upd);
-
-    updates->push_back(upd);
+    addToListAndMap(pul->theJSONArrayReplaceValueList, pul->theNodeToUpdatesMap,
+                    arr, updates, upd);
   }
   else
   {
     UpdatePrimitive* upd = GET_PUL_FACTORY().
     createUpdJSONArrayReplaceValue(pul, loc, target, pos, newValue);
 
-    pul->theJSONArrayReplaceValueList.push_back(upd);
-
-    updates = new NodeUpdates(1);
-    (*updates)[0] = upd;
-    pul->theNodeToUpdatesMap.insert(arr, updates);
+    addToListAndMap(pul->theJSONArrayReplaceValueList, pul->theNodeToUpdatesMap,
+                    arr, NULL, upd);
   }
 }
 
