@@ -124,6 +124,19 @@ void Item::removeReference()
   {
   case FUNCTION:
   {
+#ifndef ZORBA_FOR_ONE_THREAD_ONLY
+    // Another thread may free the item as soon as the reference is dropped:
+    // whether it refers to a closed query is decided before.
+    if (static_cast<FunctionItem*>(this)->refersToDetached())
+    {
+      static_cast<FunctionItem*>(this)->removeDetachedReference();
+      return;
+    }
+
+    if (theRefCount.decrement())
+      free();
+    return;
+#else
     long const remaining = theRefCount.decrementAndLoad();
 
     if (remaining == 0)
@@ -136,6 +149,7 @@ void Item::removeReference()
     // QueryResources in compiler/api/compilercb.h).
     static_cast<FunctionItem*>(this)->referenceDropped(remaining);
     return;
+#endif
   }
 #ifndef ZORBA_FOR_ONE_THREAD_ONLY
   case ATOMIC:
