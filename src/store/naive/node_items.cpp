@@ -80,10 +80,6 @@ XmlTree::XmlTree()
 #endif
   theIsValidated(false),
   theIsRecursive(false)
-#ifndef EMBEDED_TYPE
-  ,
-  theTypesMap(NULL)
-#endif
 {
 }
 
@@ -102,10 +98,6 @@ XmlTree::XmlTree(XmlNode* root, const TreeId& id)
 #endif
   theIsValidated(false),
   theIsRecursive(false)
-#ifndef EMBEDED_TYPE
-  ,
-  theTypesMap(NULL)
-#endif
 {
 }
 
@@ -135,10 +127,6 @@ void XmlTree::destroy() throw()
     theDataGuideRootNode->deleteTree();
     theDataGuideRootNode = NULL;
   }
-#endif
-
-#ifndef EMBEDED_TYPE
-  delete theTypesMap;
 #endif
 
   delete this;
@@ -180,7 +168,7 @@ void XmlTree::free()
 ********************************************************************************/
 store::Item* XmlTree::getType(const XmlNode* n) const
 {
-  if (theTypesMap == NULL)
+  if (!theTypesMap)
   {
     return NULL;
   }
@@ -201,9 +189,9 @@ store::Item* XmlTree::getType(const XmlNode* n) const
 ********************************************************************************/
 void XmlTree::addType(const XmlNode* n, store::Item_t& type)
 {
-  if (theTypesMap == NULL)
+  if (!theTypesMap)
   {
-    theTypesMap = new NodeTypeMap(32, false);
+    theTypesMap = std::make_unique<NodeTypeMap>(32, false);
   }
 
   if (! theTypesMap->insert(n, type))
@@ -218,9 +206,9 @@ void XmlTree::addType(const XmlNode* n, store::Item_t& type)
 ********************************************************************************/
 void XmlTree::setType(const XmlNode* n, store::Item_t& type)
 {
-  if (theTypesMap == NULL)
+  if (!theTypesMap)
   {
-    theTypesMap = new NodeTypeMap(32, false);
+    theTypesMap = std::make_unique<NodeTypeMap>(32, false);
   }
 
   NodeTypeMap::iterator ite = theTypesMap->find(n);
@@ -242,7 +230,7 @@ void XmlTree::setType(const XmlNode* n, store::Item_t& type)
 ********************************************************************************/
 void XmlTree::reserveTypes()
 {
-  if (theTypesMap != NULL)
+  if (theTypesMap)
     theTypesMap->reserve(theTypesMap->size());
 }
 
@@ -252,7 +240,7 @@ void XmlTree::reserveTypes()
 ********************************************************************************/
 void XmlTree::removeType(const XmlNode* n)
 {
-  assert(theTypesMap != NULL);
+  assert(theTypesMap);
 
   if (! theTypesMap->erase(n))
   {
@@ -301,12 +289,13 @@ void XmlTree::removeEmptyContentValue(const XmlNode* n)
 ********************************************************************************/
 void XmlTree::copyTypesMap(const XmlTree* source)
 {
-  if (source->theTypesMap == NULL || source->theTypesMap->empty())
+  if (!source->theTypesMap || source->theTypesMap->empty())
     return;
 
-  if (theTypesMap == NULL)
+  if (!theTypesMap)
   {
-    theTypesMap = new NodeTypeMap(source->theTypesMap->size(), false);
+    theTypesMap =
+      std::make_unique<NodeTypeMap>(source->theTypesMap->size(), false);
   }
 
   NodeTypeMap::iterator ite = source->theTypesMap->begin();

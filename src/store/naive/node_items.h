@@ -225,7 +225,7 @@ protected:
   bool                      theIsRecursive;
 
 #ifndef EMBEDED_TYPE
-  NodeTypeMap             * theTypesMap;
+  std::unique_ptr<NodeTypeMap> theTypesMap;
 #endif
 
   std::unique_ptr<NodePointerHashMap<store::Item_t>> theEmptyContentValues;
