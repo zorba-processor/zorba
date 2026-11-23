@@ -3,6 +3,4 @@
 # test name | failure kind (as ctest prints it, or "flaky") | reason.
 # Each failure comes from a race suppressed in test/sanitizers/tsan-mt.supp
 # (inventory ids of the thread-safety design); the PR that fixes it removes the
-# line. The multithread test preset (CMakePresets.json, no ThreadSanitizer)
-# excludes the tests here that also fail there: mt_schema.
-test/api/mt/mt_schema | flaky | crash in Xerces destroying a schema's grammar pool in about 1 run in 50 (unassigned)
+# line. Empty on purpose: no known failure.
