@@ -184,3 +184,4 @@ multithread:
   - 'bin/**'
   - 'test/api/**'
   - 'test/unit/**'
+  - 'bench/threads/**'

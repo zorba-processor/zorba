@@ -186,6 +186,8 @@ public:
 
 private:
   // What an open array or object has read: an array's members are values_.
+  // An object's key is added to keys_ when it is read, its value to values_
+  // when that is read.
   struct contents {
     std::vector<store::Item_t> keys_;
     std::vector<store::Item_t> values_;
@@ -199,10 +201,7 @@ private:
       key_type
     };
     type const type_;
-    union {
-      contents *contents_;              // of an array or object, in scratch_
-      store::Item *key_;
-    };
+    contents *contents_;                // of an array or object, in scratch_
     bool skipped_;                      // nothing of it is read
     projection const *read_;            // what is read of it; null: all
 
@@ -219,7 +218,7 @@ private:
   stack_type stack_;
 
   void check_depth( json::token const& );
-  void add_value( store::Item_t const& );
+  void add_value( store::Item_t&& );
   void check_duplicate_keys( std::vector<store::Item_t> const& ) const;
   void clear_stack();
   void make_key( std::string_view, store::Item_t* );

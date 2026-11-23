@@ -55,6 +55,39 @@ namespace zorba {
     throw ZORBA_EXCEPTION(zerr::ZXQP0003_INTERNAL_ERROR); \
   }
 
+#ifndef ZORBA_FOR_ONE_THREAD_ONLY
+namespace {
+
+/*******************************************************************************
+  Holds the store's READ lock while an item is read, so that no update changes
+  it meanwhile; except for an atomic item, which no update changes.
+********************************************************************************/
+class ItemReadLock
+{
+  Lock* const theLock;
+
+public:
+  explicit ItemReadLock(const store::Item* aItem)
+    :
+    theLock(aItem->isAtomicUnlocked() ? nullptr : &GENV_STORE.getGlobalLock())
+  {
+    if (theLock)
+      theLock->rlock();
+  }
+
+  ~ItemReadLock()
+  {
+    if (theLock)
+      theLock->unlock();
+  }
+
+  ItemReadLock(const ItemReadLock&) = delete;
+  ItemReadLock& operator=(const ItemReadLock&) = delete;
+};
+
+} // namespace
+#endif
+
 
 Item::Item(const store::Item* other)
   :
@@ -172,7 +205,7 @@ Item::getTypeCode() const
 {
   ITEM_TRY
 
-    SYNC_CODE(AutoLock lock(GENV_STORE.getGlobalLock(), Lock::READ);)
+    SYNC_CODE(ItemReadLock lock(m_item);)
 
     return m_item->getTypeCode();
 
@@ -185,7 +218,7 @@ Item Item::getType() const
 {
   ITEM_TRY
 
-    SYNC_CODE(AutoLock lock(GENV_STORE.getGlobalLock(), Lock::READ);)
+    SYNC_CODE(ItemReadLock lock(m_item);)
 
     return &*m_item->getType();
 
@@ -208,7 +241,7 @@ Iterator_t Item::getAtomizationValue() const
 {
   ITEM_TRY
 
-    SYNC_CODE(AutoLock lock(GENV_STORE.getGlobalLock(), Lock::READ);)
+    SYNC_CODE(ItemReadLock lock(m_item);)
 
     store::Item_t typedVal;
     store::Iterator_t typedIter;
@@ -233,7 +266,7 @@ String Item::getStringValue() const
 {
   ITEM_TRY
 
-    SYNC_CODE(AutoLock lock(GENV_STORE.getGlobalLock(), Lock::READ);)
+    SYNC_CODE(ItemReadLock lock(m_item);)
 
     return m_item->getStringValue().str();
 
@@ -246,7 +279,7 @@ int32_t Item::getIntValue() const
 {
   ITEM_TRY
 
-    SYNC_CODE(AutoLock lock(GENV_STORE.getGlobalLock(), Lock::READ);)
+    SYNC_CODE(ItemReadLock lock(m_item);)
 
     return m_item->getIntValue();
 
@@ -259,7 +292,7 @@ uint32_t Item::getUnsignedIntValue() const
 {
   ITEM_TRY
 
-    SYNC_CODE(AutoLock lock(GENV_STORE.getGlobalLock(), Lock::READ);)
+    SYNC_CODE(ItemReadLock lock(m_item);)
 
     return m_item->getUnsignedIntValue();
 
@@ -272,7 +305,7 @@ xs_long Item::getLongValue() const
 {
   ITEM_TRY
 
-    SYNC_CODE(AutoLock lock(GENV_STORE.getGlobalLock(), Lock::READ);)
+    SYNC_CODE(ItemReadLock lock(m_item);)
 
     return m_item->getLongValue();
 
@@ -286,7 +319,7 @@ double Item::getDoubleValue() const
 {
   ITEM_TRY
 
-    SYNC_CODE(AutoLock lock(GENV_STORE.getGlobalLock(), Lock::READ);)
+    SYNC_CODE(ItemReadLock lock(m_item);)
 
     return m_item->getDoubleValue().getNumber();
 
@@ -299,7 +332,7 @@ Item Item::getEBV() const
 {
   ITEM_TRY
 
-    SYNC_CODE(AutoLock lock(GENV_STORE.getGlobalLock(), Lock::READ);)
+    SYNC_CODE(ItemReadLock lock(m_item);)
 
     bool value = m_item->getEBV();
 
@@ -318,7 +351,7 @@ String Item::getPrefix() const
 {
   ITEM_TRY
 
-    SYNC_CODE(AutoLock lock(GENV_STORE.getGlobalLock(), Lock::READ);)
+    SYNC_CODE(ItemReadLock lock(m_item);)
 
     return m_item->getPrefix().str();
 
@@ -331,7 +364,7 @@ String Item::getLocalName() const
 {
   ITEM_TRY
 
-    SYNC_CODE(AutoLock lock(GENV_STORE.getGlobalLock(), Lock::READ);)
+    SYNC_CODE(ItemReadLock lock(m_item);)
 
     return m_item->getLocalName().str();
 
@@ -344,7 +377,7 @@ String Item::getNamespace() const
 {
   ITEM_TRY
 
-    SYNC_CODE(AutoLock lock(GENV_STORE.getGlobalLock(), Lock::READ);)
+    SYNC_CODE(ItemReadLock lock(m_item);)
 
     return m_item->getNamespace().str();
 
@@ -358,7 +391,7 @@ bool Item::isNaN() const
 {
   ITEM_TRY
 
-    SYNC_CODE(AutoLock lock(GENV_STORE.getGlobalLock(), Lock::READ);)
+    SYNC_CODE(ItemReadLock lock(m_item);)
 
     return m_item->isNaN();
 
@@ -372,7 +405,7 @@ bool Item::isPosOrNegInf() const
 {
   ITEM_TRY
 
-    SYNC_CODE(AutoLock lock(GENV_STORE.getGlobalLock(), Lock::READ);)
+    SYNC_CODE(ItemReadLock lock(m_item);)
 
     return m_item->isPosOrNegInf();
 
@@ -387,7 +420,7 @@ Item::getBooleanValue() const
 {
   ITEM_TRY
 
-    SYNC_CODE(AutoLock lock(GENV_STORE.getGlobalLock(), Lock::READ);)
+    SYNC_CODE(ItemReadLock lock(m_item);)
 
     return m_item->getBooleanValue();
 
@@ -400,7 +433,7 @@ Iterator_t
 Item::getChildren() const
 {
   ITEM_TRY
-    SYNC_CODE(AutoLock lock(GENV_STORE.getGlobalLock(), Lock::READ);)
+    SYNC_CODE(ItemReadLock lock(m_item);)
 
     // TODO, we should have an error handler here
     return new StoreIteratorImpl(m_item->getChildren(), 0);
@@ -413,7 +446,7 @@ Iterator_t
 Item::getAttributes() const
 {
   ITEM_TRY
-    SYNC_CODE(AutoLock lock(GENV_STORE.getGlobalLock(), Lock::READ);)
+    SYNC_CODE(ItemReadLock lock(m_item);)
 
     // TODO, we should have an error handler here
     return new StoreIteratorImpl(m_item->getAttributes(), 0);
@@ -427,7 +460,7 @@ Item::getNamespaceBindings(NsBindings& aBindings,
                            store::StoreConsts::NsScoping aNsScoping) const
 {
   ITEM_TRY
-      SYNC_CODE(AutoLock lock(GENV_STORE.getGlobalLock(), Lock::READ);)
+      SYNC_CODE(ItemReadLock lock(m_item);)
 
       store::NsBindings lStoreBindings;
       m_item->getNamespaceBindings(lStoreBindings, aNsScoping);
@@ -452,7 +485,7 @@ Item
 Item::getParent() const
 {
   ITEM_TRY
-    SYNC_CODE(AutoLock lock(GENV_STORE.getGlobalLock(), Lock::READ);)
+    SYNC_CODE(ItemReadLock lock(m_item);)
     return &*m_item->getParent();
   ITEM_CATCH
   return Item();
@@ -462,7 +495,7 @@ bool
 Item::getNodeName(Item& aNodeName) const
 {
   ITEM_TRY
-    SYNC_CODE(AutoLock lock(GENV_STORE.getGlobalLock(), Lock::READ);)
+    SYNC_CODE(ItemReadLock lock(m_item);)
 
     store::Item* lNodeName = m_item->getNodeName();
 
@@ -477,7 +510,7 @@ int
 Item::getNodeKind() const
 {
   ITEM_TRY
-    SYNC_CODE(AutoLock lock(GENV_STORE.getGlobalLock(), Lock::READ);)
+    SYNC_CODE(ItemReadLock lock(m_item);)
 
     return m_item->getNodeKind();
   ITEM_CATCH
@@ -488,7 +521,7 @@ store::StoreConsts::JSONItemKind
 Item::getJSONItemKind() const
 {
   ITEM_TRY
-    SYNC_CODE(AutoLock lock(GENV_STORE.getGlobalLock(), Lock::READ);)
+    SYNC_CODE(ItemReadLock lock(m_item);)
 
     return m_item->getJSONItemKind();
   ITEM_CATCH
@@ -500,7 +533,7 @@ uint64_t
 Item::getArraySize() const
 {
   ITEM_TRY
-    SYNC_CODE(AutoLock lock(GENV_STORE.getGlobalLock(), Lock::READ);)
+    SYNC_CODE(ItemReadLock lock(m_item);)
 
     return to_xs_long(m_item->getArraySize());
   ITEM_CATCH
@@ -512,7 +545,7 @@ Item
 Item::getArrayValue(uint32_t aIndex) const
 {
   ITEM_TRY
-    SYNC_CODE(AutoLock lock(GENV_STORE.getGlobalLock(), Lock::READ);)
+    SYNC_CODE(ItemReadLock lock(m_item);)
     xs_integer lIndex(aIndex);
     // getp(): the result is null when aIndex is out of bounds.
     return m_item->getArrayValue(lIndex).getp();
@@ -525,7 +558,7 @@ Iterator_t
 Item::getObjectKeys() const
 {
   ITEM_TRY
-    SYNC_CODE(AutoLock lock(GENV_STORE.getGlobalLock(), Lock::READ);)
+    SYNC_CODE(ItemReadLock lock(m_item);)
 
     return new StoreIteratorImpl(m_item->getObjectKeys(), nullptr);
 
@@ -539,7 +572,7 @@ Item::getObjectValue(String const &aName) const
 {
   String lName( aName ); // copy needed because createString() is destructive
   ITEM_TRY
-    SYNC_CODE(AutoLock lock(GENV_STORE.getGlobalLock(), Lock::READ);)
+    SYNC_CODE(ItemReadLock lock(m_item);)
     zstring& liName = Unmarshaller::getInternalString(lName);
     
     store::Item_t lStringItem;
@@ -556,7 +589,7 @@ bool
 Item::isStreamable() const
 {
   ITEM_TRY
-    SYNC_CODE(AutoLock lock(GENV_STORE.getGlobalLock(), Lock::READ);)
+    SYNC_CODE(ItemReadLock lock(m_item);)
 
     return m_item->isStreamable();
   ITEM_CATCH
@@ -567,7 +600,7 @@ bool
 Item::isSeekable() const
 {
   ITEM_TRY
-    SYNC_CODE(AutoLock lock(GENV_STORE.getGlobalLock(), Lock::READ);)
+    SYNC_CODE(ItemReadLock lock(m_item);)
 
     return m_item->isSeekable();
   ITEM_CATCH
@@ -578,7 +611,7 @@ void
 Item::ensureSeekable()
 {
   ITEM_TRY
-    SYNC_CODE(AutoLock lock(GENV_STORE.getGlobalLock(), Lock::READ);)
+    SYNC_CODE(ItemReadLock lock(m_item);)
 
     m_item->ensureSeekable();
   ITEM_CATCH
@@ -588,7 +621,7 @@ std::istream&
 Item::getStream()
 {
   ITEM_TRY
-    SYNC_CODE(AutoLock lock(GENV_STORE.getGlobalLock(), Lock::READ);)
+    SYNC_CODE(ItemReadLock lock(m_item);)
 
     return m_item->getStream();
   ITEM_CATCH
@@ -599,7 +632,7 @@ bool
 Item::isEncoded() const
 {
   ITEM_TRY
-    SYNC_CODE(AutoLock lock(GENV_STORE.getGlobalLock(), Lock::READ);)
+    SYNC_CODE(ItemReadLock lock(m_item);)
 
     return m_item->isEncoded();
   ITEM_CATCH
@@ -610,7 +643,7 @@ const char*
 Item::getBase64BinaryValue(size_t& s) const
 {
   ITEM_TRY
-    SYNC_CODE(AutoLock lock(GENV_STORE.getGlobalLock(), Lock::READ);)
+    SYNC_CODE(ItemReadLock lock(m_item);)
 
     return m_item->getBase64BinaryValue(s);
   ITEM_CATCH
@@ -622,7 +655,7 @@ Item
 Item::getCollectionName() const
 {
   ITEM_TRY
-    SYNC_CODE(AutoLock lock(GENV_STORE.getGlobalLock(), Lock::READ);)
+    SYNC_CODE(ItemReadLock lock(m_item);)
 
     if (!m_item->isNode()) {
       return 0;
@@ -641,7 +674,7 @@ const char*
 Item::getHexBinaryValue(size_t& s) const
 {
   ITEM_TRY
-    SYNC_CODE(AutoLock lock(GENV_STORE.getGlobalLock(), Lock::READ);)
+    SYNC_CODE(ItemReadLock lock(m_item);)
 
     return m_item->getHexBinaryValue(s);
   ITEM_CATCH
@@ -652,7 +685,7 @@ Item
 Item::copy() const
 {
   ITEM_TRY
-    SYNC_CODE(AutoLock lock(GENV_STORE.getGlobalLock(), Lock::READ);)
+    SYNC_CODE(ItemReadLock lock(m_item);)
 
     return m_item->copy(NULL, zorba::store::CopyMode());
   ITEM_CATCH
