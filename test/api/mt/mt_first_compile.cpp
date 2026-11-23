@@ -76,8 +76,12 @@ mt_first_compile(int, char*[])
 
       for (unsigned r = 0; r < ROUNDS; ++r)
       {
-        StaticContext_t const& lSctx =
-          r % 2 == 0 ? lShared : lShared->createChildContext();
+        // The smart pointer of the shared context is not copied: its count
+        // is not atomic.
+        StaticContext_t lChild;
+        if (r % 2 == 1)
+          lChild = lShared->createChildContext();
+        StaticContext_t const& lSctx = r % 2 == 0 ? lShared : lChild;
 
         lChecker.expect("namespace", t,
             run(lZorba, lSctx,

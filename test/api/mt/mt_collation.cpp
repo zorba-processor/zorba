@@ -102,8 +102,12 @@ mt_collation(int, char*[])
       std::string const lT = std::to_string(t);
       for (unsigned r = 0; r < ROUNDS; ++r)
       {
-        StaticContext_t lSctx =
-          t % 2 == 1 && r % 2 == 1 ? lContext() : lShared;
+        // The smart pointer of the shared context is not copied: its count
+        // is not atomic.
+        StaticContext_t lOwn;
+        if (t % 2 == 1 && r % 2 == 1)
+          lOwn = lContext();
+        StaticContext_t const& lSctx = lOwn.isNull() ? lShared : lOwn;
 
         for (Case const& c : CASES)
           lChecker.expect(c.query, t, run(lZorba, lSctx, lProlog + c.query),
