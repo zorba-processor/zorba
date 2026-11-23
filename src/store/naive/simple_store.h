@@ -41,6 +41,12 @@ namespace simplestore {
   theNodeToReferencesMap:
   -----------------------
   A hashmap that maps nodes into their references
+
+  theReferencesMutex:
+  -------------------
+  Protects the two reference maps and the HaveReference flag of the nodes,
+  which queries holding only the store's READ lock fill on first use (a leaf
+  lock: nothing outside these maps is called while it is held).
   
 ********************************************************************************/
 class SimpleStore : public Store
@@ -56,6 +62,7 @@ private:
 
   RefNodeMap                    theReferencesToNodeMap;
   ItemRefMap                    theNodeToReferencesMap;
+  SYNC_CODE(Mutex               theReferencesMutex;)
 
 public:
   ulong createCollectionId();
@@ -113,6 +120,12 @@ protected:
   bool assignReference(const store::Item* node, const zstring& reference);
 
   bool getNodeByReference(store::Item_t& result, const zstring& reference);
+
+private:
+  // The callers of these hold theReferencesMutex.
+  bool hasReferenceLocked(const store::Item* node);
+
+  void assignReferenceLocked(const store::Item* node, const zstring& reference);
 };
 
 } // namespace store
