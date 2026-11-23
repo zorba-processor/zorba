@@ -200,6 +200,9 @@ JSONDecodeFromRoundtripIterator::decodeNode(
 {
   store::LoadProperties lProperties;
   lProperties.setStoreDocument(false);
+  // A string is already decoded (F&O 3.1, 14.7.1): its encoding declaration
+  // does not apply.
+  lProperties.setIgnoreDeclaredEncoding(true);
   lProperties.setSecurityPolicy(theSctx->get_security_policy());
   store::Item_t lDoc;
   zstring lXmlString;
