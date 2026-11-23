@@ -620,6 +620,7 @@ IF (ZORBA_WITH_FILE_ACCESS)
              exhaust_json_object_add
              exhaust_collection_insert
              exhaust_collection_undo
+             exhaust_collection_map_undo
              exhaust_sweep_matcher exhaust_sweep_query_text exhaust_sweep_long_token
              exhaust_sweep_streamable_text exhaust_base64_stream
              exhaust_seekable_stream exhaust_json_loader exhaust_serializer

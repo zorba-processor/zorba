@@ -87,6 +87,12 @@ bool SimpleCollectionSet::remove(
 }
 
 
+void SimpleCollectionSet::reserve(csize n)
+{
+  theCollections.reserve(theCollections.size() + n);
+}
+
+
 // The collection set lists either its dynamic or its static collections.
 template<> bool
 NameIterator<SimpleCollectionSet::Set>::isListed(

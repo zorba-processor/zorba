@@ -48,6 +48,11 @@ public:
     
   virtual bool
   remove(const store::Item* name, bool isDynamic) = 0;
+
+  // Room for n more collections: inserts up to that many allocate nothing, and
+  // a remove does not shrink the set below it.
+  virtual void
+  reserve(csize n) = 0;
   
   virtual store::Iterator_t
   names(bool dynamic) = 0;

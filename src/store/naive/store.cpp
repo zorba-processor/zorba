@@ -433,6 +433,15 @@ void Store::addCollection(store::Collection_t& collection)
 
 
 /*******************************************************************************
+
+********************************************************************************/
+void Store::reserveCollections(csize n)
+{
+  theCollections->reserve(n);
+}
+
+
+/*******************************************************************************
   Delete the collection with the given QName. If there is no collection with
   that QName, this method is a NOOP.
 ********************************************************************************/
