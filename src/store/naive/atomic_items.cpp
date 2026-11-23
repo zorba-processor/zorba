@@ -1289,9 +1289,9 @@ StructuralAnyUriItem::StructuralAnyUriItem(
   theCollectionId(collectionId),
   theTreeId(treeId),
   theNodeKind(nodeKind),
-  theLabel(label),
-  theEncodedValue("")
+  theLabel(label)
 {
+  encode();
 }
 
 
@@ -1396,7 +1396,7 @@ uint32_t StructuralAnyUriItem::hash(long timezone, const XQPCollator* aCollation
 }
 
 
-void StructuralAnyUriItem::encode() const
+void StructuralAnyUriItem::encode()
 {
   ZORBA_FATAL(theNodeKind,"Unexpected node kind");
   std::ostringstream stream;

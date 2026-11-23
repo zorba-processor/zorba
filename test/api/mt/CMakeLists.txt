@@ -26,6 +26,8 @@ CREATE_TEST_SOURCELIST(MTTests
   mt_independent.cpp
   mt_clone.cpp
   mt_store_rw.cpp
+  mt_doc_cache.cpp
+  mt_lifecycle.cpp
   ${MTSchemaTests}
 )
 

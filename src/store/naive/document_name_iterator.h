@@ -16,80 +16,78 @@
 #ifndef ZORBA_SIMPLESTORE_DOCUMENT_NAME_ITERATOR_H
 #define ZORBA_SIMPLESTORE_DOCUMENT_NAME_ITERATOR_H
 
+#include <vector>
+
+#include "common/common.h"
 #include "store/api/iterator.h"
 #include "system/globalenv.h"
+#include "zorbautils/mutex.h"
 
 namespace zorba {
 
   namespace simplestore {
 
 /*******************************************************************************
-
+  The URIs of the documents in the store. open() and reset() copy them under
+  the map's mutex: fn:doc adds documents while other queries run.
 ********************************************************************************/
 template < typename T >
 class DocumentNameIterator : public store::Iterator
 {
 private:
-  T&                   theItems;
-  typename T::iterator theIterator;
-  bool                 theOpened;
-    
+  const T&             theItems;
+  std::vector<zstring> theUris;
+  csize                thePos;
+
+  void copyUris()
+  {
+    theUris.clear();
+    thePos = 0;
+    SYNC_CODE(AutoMutex lock(theItems.get_mutex());)
+    for (typename T::iterator it = theItems.begin(); it != theItems.end(); ++it)
+      theUris.push_back(it.getKey());
+  }
+
 public:
   DocumentNameIterator(const T& aItems)
     :
-    theItems(*const_cast<T*>(&aItems)),
-    theOpened(false)
+    theItems(aItems),
+    thePos(0)
   {
   }
-  
-  virtual ~DocumentNameIterator()
-  {
-    close();
-  }
-    
+
   virtual void open()
   {
-    theIterator = theItems.begin();
-    theOpened = true;
+    copyUris();
   }
-    
+
   virtual bool next(store::Item_t& aResult)
   {
-    if (theIterator == theItems.end())
+    if (thePos == theUris.size())
     {
       aResult = NULL;
       return false;
     }
-    else
-    {
-      zstring lUri = (*theIterator).first;
-      GENV_ITEMFACTORY->createString(aResult, lUri);
-      ++theIterator;
-      return true;
-    }
+    zstring lUri = theUris[thePos++];
+    GENV_ITEMFACTORY->createString(aResult, lUri);
+    return true;
   }
-  
+
   virtual void reset()
   {
-    theIterator = theItems.begin();
+    copyUris();
   }
-  
+
   virtual void close()
   {
-    if (!theOpened)
-    {
-      return;
-    }
-    
-    theOpened = false;
+    theUris.clear();
+    thePos = 0;
   }
 };
-    
+
 
 } // namespace store
 } // namespace zorba
 
 
 #endif
-
-/* vim:set et sw=2 ts=2: */

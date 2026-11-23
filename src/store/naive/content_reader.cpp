@@ -23,7 +23,11 @@ namespace zorba
 namespace simplestore
 {
 
+#ifdef ZORBA_FOR_ONE_THREAD_ONLY
 ContentReader* ContentReader::theReaders[ContentReader::BUCKETS] = {};
+#else
+thread_local ContentReader* ContentReader::theReaders[ContentReader::BUCKETS] = {};
+#endif
 
 
 void ContentReader::startReading(const void* key)
@@ -48,9 +52,15 @@ void ContentReader::startReading(const void* key)
 void ContentReader::unlink()
 {
   if (thePrev != nullptr)
+  {
     thePrev->theNext = theNext;
+  }
   else
+  {
+    // Fails if the iteration stops on another thread than it started on.
+    assert(theReaders[bucket(theKey)] == this);
     theReaders[bucket(theKey)] = theNext;
+  }
 
   if (theNext != nullptr)
     theNext->thePrev = thePrev;

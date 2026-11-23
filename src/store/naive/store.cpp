@@ -1008,6 +1008,8 @@ store::Item_t Store::loadDocument(
     lXQueryDiagnostics.errors().front()->polymorphic_throw();
   }
 
+  // If another thread stored the document first, insert() sets root to that
+  // document: every caller gets the same node.
   if (root != NULL && loadProperties.getStoreDocument())
     theDocuments.insert(docUri, root);
 

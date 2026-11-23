@@ -16,78 +16,86 @@
 #ifndef ZORBA_SIMPLESTORE_NAME_ITERATOR_H
 #define ZORBA_SIMPLESTORE_NAME_ITERATOR_H
 
+#include <vector>
+
+#include "common/common.h"
 #include "store/api/iterator.h"
+#include "zorbautils/mutex.h"
 
 namespace zorba {
 
 namespace simplestore {
 
 /*******************************************************************************
-  Iterator to return Index and Collection Names
+  Iterator to return Index and Collection Names.
+
+  open() and reset() copy the names under the map's mutex, so that the
+  iterator never walks the map while another thread changes it.
 ********************************************************************************/
 template < typename T >
 class NameIterator : public store::Iterator
 {
 private:
-  T&                   theItems;
-  typename T::iterator theIterator;
-  bool                 theOpened;
-  bool                 theDynamicCollections;
-  
+  T&                         theItems;
+  bool                       theDynamicCollections;
+  std::vector<store::Item_t> theNames;
+  csize                      thePos;
+
+  // Specialized for the collection set, which lists either its dynamic or its
+  // static collections.
+  bool isListed(const typename T::iterator&) const { return true; }
+
+  void copyNames()
+  {
+    theNames.clear();
+    thePos = 0;
+    SYNC_CODE(AutoMutex lock(theItems.get_mutex());)
+    for (typename T::iterator it = theItems.begin(); it != theItems.end(); ++it)
+    {
+      if (isListed(it))
+        theNames.push_back(it.getKey());
+    }
+  }
+
 public:
   NameIterator(T& aItems, bool dynamic)
     :
     theItems(aItems),
-    theOpened(false),
-    theDynamicCollections(dynamic)
+    theDynamicCollections(dynamic),
+    thePos(0)
   {
   }
-    
-  virtual ~NameIterator()
-  {
-    close();
-  }
-    
+
   virtual void open()
   {
-    theIterator = theItems.begin();
-    theOpened = true;
+    copyNames();
   }
-    
+
   virtual bool next(store::Item_t& aResult)
   {
-    if (theIterator == theItems.end())
+    if (thePos == theNames.size())
     {
       aResult = NULL;
       return false;
     }
-    else 
-    {
-      aResult = (*theIterator).first;
-      ++theIterator;
-      return true;
-    }
+    aResult = theNames[thePos++];
+    return true;
   }
-  
+
   virtual void reset()
   {
-    theIterator = theItems.begin();
+    copyNames();
   }
-  
+
   virtual void close()
   {
-    if (!theOpened) 
-    {
-      return;
-    }
-    
-    theOpened = false;
+    theNames.clear();
+    thePos = 0;
   }
 };
-  
+
 } // namespace store
 } // namespace zorba
 
 
 #endif
-/* vim:set et sw=2 ts=2: */

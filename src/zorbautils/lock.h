@@ -80,6 +80,9 @@ public:
   void wlock();
   void unlock();
 
+  // Whether the calling thread holds the lock in WRITE mode.
+  bool heldForWrite();
+
  private:
   Lock(const Lock &);
   void operator=(const Lock &);

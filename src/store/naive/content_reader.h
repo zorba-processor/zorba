@@ -18,6 +18,8 @@
 
 #include <cstdint>
 
+#include <zorba/config.h>
+
 namespace zorba
 {
 namespace simplestore
@@ -43,9 +45,14 @@ namespace simplestore
   and goes on with the copy. Nothing is copied while nothing changes.
 
   The open iterations are kept in lists hashed by key, so that a change pays
-  only a table lookup when nothing reads that storage. There is one table
-  for the process: the engine is used from one thread at a time
-  (doc/zorba/threading.dox).
+  only a table lookup when nothing reads that storage. Each thread has its
+  own table: an iteration starts, reads and stops on one thread, and an item
+  that other threads can read changes only while the changing thread holds
+  the store lock in WRITE mode, which excludes every other reader. So the
+  only open iterations a change can meet are those of the changing thread.
+  Items that only one thread can reach (nodes a query is constructing, the
+  copies of a transform expression) change without the WRITE lock. In the
+  single-threaded build there is one table for the process.
 
   copyContent() must leave the iteration unchanged if it throws, and must
   not read the key's storage after it returns. A subclass must call
@@ -83,7 +90,11 @@ protected:
 private:
   static constexpr unsigned BUCKETS = 256;
 
+#ifdef ZORBA_FOR_ONE_THREAD_ONLY
   static ContentReader* theReaders[BUCKETS];
+#else
+  static thread_local ContentReader* theReaders[BUCKETS];
+#endif
 
   static unsigned bucket(const void* key)
   {

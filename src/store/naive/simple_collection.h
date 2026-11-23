@@ -25,7 +25,6 @@
 #include "tree_id.h"
 #include "tree_id_generator.h"
 
-#include "zorbautils/latch.h"
 #include "zorbautils/checked_vector.h"
 
 
@@ -66,9 +65,8 @@ namespace zorba { namespace simplestore {
   properties are specified by the user in the collection declaration. Dynamic
   collections use pre-determined default values.
 
-  theLatch:
-  ---------
-  Synchronizes concurrent accesses to the collection.
+  The contents change only under the store lock in WRITE mode, which excludes
+  every reader: neither readers nor writers take a lock of the collection.
 ********************************************************************************/
 class SimpleCollection : public Collection
 {
@@ -82,14 +80,12 @@ public:
     rchandle<SimpleCollection>              theCollection;
     checked_vector<store::Item_t>::iterator theIterator;
     checked_vector<store::Item_t>::iterator theEnd;
-    bool                                    theHaveLock;
+    bool                                    theIsOpen;
     csize                                   theSkip;
     ulong                                   theVersion;
 
   public:
     CollectionIter(SimpleCollection* collection, const xs_integer& skip);
-
-    ~CollectionIter();
 
     void open();
     bool next(store::Item_t& result);
@@ -113,8 +109,6 @@ protected:
   const std::vector<store::Annotation_t> theAnnotations;
 
   ulong                                  theVersion;
-
-  SYNC_CODE(Latch                        theLatch;)
 
 protected:
   // default constructor added in order to allow subclasses to instantiate

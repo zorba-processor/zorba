@@ -752,9 +752,8 @@ protected:
   store::StoreConsts::NodeKind theNodeKind;
   NodeLabel                    theLabel;
    
-  // The value is computed lazily when needed.
-  // The empty string is used if it has not been computed yet.
-  mutable zstring              theEncodedValue;
+  // Computed at construction: items are shared between threads.
+  zstring                      theEncodedValue;
 
 public:
   size_t alloc_size() const;
@@ -782,14 +781,7 @@ public:
 
   void appendStringValue(zstring& buf) const;
 
-  const zstring& getString() const
-  {
-    if (theEncodedValue == "")
-    {
-      encode();
-    }
-    return theEncodedValue;
-  }
+  const zstring& getString() const { return theEncodedValue; }
 
   zstring show() const;
 
@@ -863,8 +855,7 @@ public:
   inSameCollection(const store::Item_t&) const;
   
 private:
-  // Forces computation of the value.
-  void encode() const;
+  void encode();
  
 protected:
   friend class BasicItemFactory;

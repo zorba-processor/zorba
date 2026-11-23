@@ -258,7 +258,7 @@ void SimpleCollection::addNode(store::Item* item, xs_integer position)
   try
   {
     xs_long pos = to_xs_long(position);
-    SYNC_CODE(AutoLatch lock(theLatch, Latch::WRITE););
+    ZORBA_ASSERT_STORE_WRITE();
 
     if (pos < 0 || to_xs_unsignedLong(position) >= theTrees.size())
     {
@@ -299,7 +299,7 @@ xs_integer SimpleCollection::addNodes(
     const store::Item* targetNode,
     bool before)
 {
-  SYNC_CODE(AutoLatch lock(theLatch, Latch::WRITE);)
+  ZORBA_ASSERT_STORE_WRITE();
 
   xs_integer pos;
   bool found = findNode(targetNode, pos);
@@ -405,7 +405,7 @@ bool SimpleCollection::removeNode(store::Item* item, xs_integer& position)
     ERROR_PARAMS(getName()->getStringValue()));
   }
 
-  SYNC_CODE(AutoLatch lock(theLatch, Latch::WRITE);)
+  ZORBA_ASSERT_STORE_WRITE();
 
   bool found = findNode(item, position);
 
@@ -446,7 +446,7 @@ bool SimpleCollection::removeNode(store::Item* item, xs_integer& position)
 ********************************************************************************/
 bool SimpleCollection::removeNode(xs_integer position)
 {
-  SYNC_CODE(AutoLatch lock(theLatch, Latch::WRITE);)
+  ZORBA_ASSERT_STORE_WRITE();
 
   std::size_t pos = 0;
   try {
@@ -489,7 +489,7 @@ bool SimpleCollection::removeNode(xs_integer position)
 ********************************************************************************/
 xs_integer SimpleCollection::removeNodes(xs_integer position, xs_integer numNodes)
 {
-  SYNC_CODE(AutoLatch lock(theLatch, Latch::WRITE);)
+  ZORBA_ASSERT_STORE_WRITE();
 
   csize pos, num;
   try
@@ -552,7 +552,7 @@ xs_integer SimpleCollection::removeNodes(xs_integer position, xs_integer numNode
 ********************************************************************************/
 void SimpleCollection::removeAll()
 {
-  SYNC_CODE(AutoLatch lock(theLatch, Latch::WRITE);)
+  ZORBA_ASSERT_STORE_WRITE();
 
   csize numTrees = theTrees.size();
 
@@ -593,19 +593,9 @@ SimpleCollection::CollectionIter::CollectionIter(
     const xs_integer& skip)
   :
   theCollection(collection),
-  theHaveLock(false),
+  theIsOpen(false),
   theSkip(static_cast<zorba::csize>(to_xs_unsignedLong(skip)))
 {
-}
-
-
-/*******************************************************************************
-
-********************************************************************************/
-SimpleCollection::CollectionIter::~CollectionIter() 
-{
-  SYNC_CODE(if (theHaveLock) \
-    theCollection->theLatch.unlock();)
 }
 
 
@@ -632,8 +622,7 @@ void SimpleCollection::CollectionIter::skip()
 ********************************************************************************/
 void SimpleCollection::CollectionIter::open()
 {
-  //SYNC_CODE(theCollection->theLatch.rlock();)
-  theHaveLock = true;
+  theIsOpen = true;
 
   theIterator = theCollection->theTrees.begin();
   theEnd = theCollection->theTrees.end();
@@ -655,7 +644,7 @@ bool SimpleCollection::CollectionIter::next(store::Item_t& result)
     ERROR_PARAMS(theCollection->getName()->getStringValue()));
   }
 
-  if (!theHaveLock) 
+  if (!theIsOpen)
   {
     throw ZORBA_EXCEPTION(zerr::ZDDY0019_COLLECTION_ITERATOR_NOT_OPEN,
     ERROR_PARAMS(theCollection->getName()->getStringValue()));
@@ -692,9 +681,8 @@ void SimpleCollection::CollectionIter::reset()
 ********************************************************************************/
 void SimpleCollection::CollectionIter::close() 
 {
-  assert(theHaveLock);
-  theHaveLock = false;
-  //SYNC_CODE(theCollection->theLatch.unlock();)
+  assert(theIsOpen);
+  theIsOpen = false;
 }
 
 } // namespace simplestore

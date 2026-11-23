@@ -8,10 +8,6 @@
 # comment). The PR that fixes a race deletes its entries, so the job then
 # fails if the race is still there; a race not listed here fails its test.
 
-# S7 (P7): ContentReader keeps one unsynchronized table of open iterations
-# for the whole process.
-race:zorba::simplestore::ContentReader::
-
 # C1 (P9): user function plans are generated lazily by the first call, on the
 # user_function object that every clone shares.
 race:zorba::user_function::getPlan
