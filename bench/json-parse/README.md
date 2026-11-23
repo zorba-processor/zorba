@@ -19,7 +19,10 @@ and where its time and allocations go. Each change that makes it faster adds a r
 | `latency.jq` | Group by service and route: count, average and maximum latency, server errors. |
 | `flatten.jq` | Each event as one flat object (JSON lines out). |
 | `filter_project.jq` | The server errors of one service, four fields each. |
-| `run.sh` | Best of 3 runs of the four queries: wall time, peak RSS, MB/s, SHA-256 of the output. |
+| `latency_fn.jq` | `latency.jq` with the parse in a `%an:nondeterministic` function, and the status of the slowest request of each group (by position). |
+| `windows.jq` | Requests, server errors and the slowest request per minute, with a tumbling window. |
+| `clean_users.jq` | Requests per service of the users who never got a server error: a FLWOR gives the events of a group by to an enclosing group by. |
+| `run.sh` | Best of 3 runs of the queries: wall time, peak RSS, MB/s, SHA-256 of the output. |
 | `tools/profile.sh` | Samples per part (perf + `classify.awk`) and allocations per event (`malloc_count.c`) of one query. |
 | `tools/classify.awk` | Charges each `perf script` sample to a part of the parse or of the query. |
 | `tools/malloc_count.c` | LD_PRELOAD library that counts malloc, calloc and realloc calls and the bytes requested. |

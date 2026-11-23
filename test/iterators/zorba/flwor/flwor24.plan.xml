@@ -3,15 +3,19 @@
     <CtxVarDeclareIterator varid="4" varname="file"/>
     <SequentialIterator>
       <CtxVarDeclareIterator varid="5" varname="xmlcontents">
-        <UDFunctionCallIterator function="fetch:content">
-          <UDFunctionArgs>
-            <PromoteIterator type="xs:string">
-              <FnDataIterator>
-                <CtxVarIterator varid="4" varname="file" varkind="global"/>
-              </FnDataIterator>
-            </PromoteIterator>
-          </UDFunctionArgs>
-        </UDFunctionCallIterator>
+        <FunctionTraceIterator>
+          <FunctionTraceIterator>
+            <FetchContentIterator>
+              <PromoteIterator type="xs:string">
+                <FnDataIterator>
+                  <CtxVarIterator varid="4" varname="file" varkind="global"/>
+                </FnDataIterator>
+              </PromoteIterator>
+              <SingletonIterator value="xs:string(SOME_CONTENT)"/>
+              <SingletonIterator value="xs:string(UTF-8)"/>
+            </FetchContentIterator>
+          </FunctionTraceIterator>
+        </FunctionTraceIterator>
       </CtxVarDeclareIterator>
       <FLWORIterator>
         <ForVariable name="w">
@@ -49,15 +53,6 @@
       </FLWORIterator>
     </SequentialIterator>
   </SequentialIterator>
-</iterator-tree>
-<iterator-tree description="fetch:content">
-  <FunctionTraceIterator>
-    <FetchContentIterator>
-      <LetVarIterator varname="uri"/>
-      <SingletonIterator value="xs:string(SOME_CONTENT)"/>
-      <SingletonIterator value="xs:string(UTF-8)"/>
-    </FetchContentIterator>
-  </FunctionTraceIterator>
 </iterator-tree>
 <iterator-tree description="local:test-sequential">
   <FnConcatIterator/>
