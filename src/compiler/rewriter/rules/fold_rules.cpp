@@ -1143,6 +1143,27 @@ static expr* bind_args_in_lets(RewriterContext& rCtx, fo_expr* fo)
 }
 
 
+/*******************************************************************************
+  Whether e may call a user-defined function: a body that calls none cannot
+  recurse, whatever it called before its own calls were inlined. A function item
+  counts as a call: its body is not among the children of e.
+********************************************************************************/
+static bool calls_udf(const expr* e)
+{
+  if ((e->get_expr_kind() == fo_expr_kind &&
+       static_cast<const fo_expr*>(e)->get_func()->isUdf()) ||
+      e->get_expr_kind() == function_item_expr_kind)
+    return true;
+
+  for (ExprConstIterator i(e); !i.done(); i.next())
+  {
+    if (calls_udf(i.get_expr()))
+      return true;
+  }
+  return false;
+}
+
+
 RULE_REWRITE_PRE(InlineFunctions)
 {
   return NULL;
@@ -1172,7 +1193,10 @@ RULE_REWRITE_POST(InlineFunctions)
       }
 
       // An inlined sequential body would leave its local variables bound in the caller.
+      // A body inlined without the nondeterministic annotation of its function must
+      // be nondeterministic itself, or the call could be hoisted or folded.
       if (!udf->isSequential() &&
+          (udf->isDeterministic() || body == NULL || body->is_nondeterministic()) &&
           (
             !udf->getAnnotationList() ||
             (!udf->getAnnotationList()->contains(AnnotationInternal::zann_cache) &&
@@ -1180,7 +1204,7 @@ RULE_REWRITE_POST(InlineFunctions)
           ) &&
           body != NULL &&
           !udf->isExiting() &&
-          udf->isLeaf())
+          (udf->isLeaf() || !calls_udf(body)))
       {
         const std::vector<var_expr*>& udfArgs = udf->getArgVars();
 

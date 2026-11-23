@@ -29,27 +29,22 @@
   <SingletonIterator value="xs:boolean(false)"/>
 </iterator-tree>
 <iterator-tree description="main query">
-  <UDFunctionCallIterator function="local:recursion">
-    <UDFunctionArgs>
-      <TreatIterator type="[NodeXQType elementNode content=[UserDefinedXQType  Content@http://foo.com/schemas/schema isComplex emptyContent base:[XQType ANY_TYPE_KIND*]]]" quant="?">
-        <ValidateIterator>
-          <ElementIterator>
-            <SingletonIterator value="xs:QName(http://foo.com/schemas/schema,d,Content)"/>
-            <AttributeIterator qname="xs:QName(,,id)">
-              <SingletonIterator value="xs:string(foo)"/>
-            </AttributeIterator>
-          </ElementIterator>
-        </ValidateIterator>
-      </TreatIterator>
-    </UDFunctionArgs>
-  </UDFunctionCallIterator>
-</iterator-tree>
-<iterator-tree description="local:recursion">
-  <IfThenElseIterator>
-    <FnBooleanIterator>
-      <LetVarIterator varname="param"/>
-    </FnBooleanIterator>
-    <SingletonIterator value="xs:boolean(false)"/>
-    <SingletonIterator value="xs:boolean(false)"/>
-  </IfThenElseIterator>
+  <FunctionTraceIterator>
+    <IfThenElseIterator>
+      <FnBooleanIterator>
+        <TreatIterator type="[NodeXQType elementNode content=[UserDefinedXQType  Content@http://foo.com/schemas/schema isComplex emptyContent base:[XQType ANY_TYPE_KIND*]]]" quant="?">
+          <ValidateIterator>
+            <ElementIterator>
+              <SingletonIterator value="xs:QName(http://foo.com/schemas/schema,d,Content)"/>
+              <AttributeIterator qname="xs:QName(,,id)">
+                <SingletonIterator value="xs:string(foo)"/>
+              </AttributeIterator>
+            </ElementIterator>
+          </ValidateIterator>
+        </TreatIterator>
+      </FnBooleanIterator>
+      <SingletonIterator value="xs:boolean(false)"/>
+      <SingletonIterator value="xs:boolean(false)"/>
+    </IfThenElseIterator>
+  </FunctionTraceIterator>
 </iterator-tree>

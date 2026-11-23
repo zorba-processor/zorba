@@ -28,14 +28,16 @@ namespace zorba
 void populate_context_jsoniq_functions_impl(static_context* sctx);
 
 /**
- * Makes a parse that is the domain of fc build of each value only what the
- * FLWOR reads of it, when the FLWOR reads its variable, and the group by
- * variables that collect its values, only through lookups of literal keys,
- * counting, and predicates that do so.  Not at -O0.
+ * Makes a parse that is the domain of a for or window clause build of each
+ * value only what is read of it, when the FLWOR reads the variables bound to
+ * its values, and the group by variables that collect them, only through
+ * lookups of literal keys, counting, and predicates that do so; or gives them
+ * to an enclosing expression of root that reads them so.  Not at -O0.
  */
 void project_parse_json(
     CompilerCB* ccb,
-    const for_clause* fc,
+    expr* root,
+    const forletwin_clause* clause,
     const PlanIter_t& domainIter);
 
 /**
