@@ -1537,6 +1537,9 @@ void ElementNode::replaceChildrenWithText(UpdReplaceElemContent& upd)
                                                       result);
     
     GENV_ITEMFACTORY->createTextNode(upd.theNewChild, this, result);
+
+    // restoreContent() destroys the new child.
+    upd.theNewChild = NULL;
   }
   else
 #endif
