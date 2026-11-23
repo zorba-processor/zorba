@@ -23,6 +23,7 @@ and where its time and allocations go. Each change that makes it faster adds a r
 | `windows.jq` | Requests, server errors and the slowest request per minute, with a tumbling window. |
 | `clean_users.jq` | Requests per service of the users who never got a server error: a FLWOR gives the events of a group by to an enclosing group by. |
 | `unmatched.jq` | Per service, the server errors of users with no successful request: a general `=` against the distinct user ids of a second parse. |
+| `unmatched_global.jq` | `unmatched.jq` with the distinct user ids in a global variable (`declare variable`) instead of a `let`. |
 | `run.sh` | Best of 3 runs of the queries: wall time, peak RSS, MB/s, SHA-256 of the output. |
 | `tools/profile.sh` | Samples per part (perf + `classify.awk`) and allocations per event (`malloc_count.c`) of one query. |
 | `tools/classify.awk` | Charges each `perf script` sample to a part of the parse or of the query. |
@@ -234,3 +235,21 @@ Peak RSS and the output of every query are the same on both builds. `count.jq` a
 (best of 6 runs in two alternating rounds), with 127.7 allocations and 5,458 bytes
 per event on master and 72.5 and 3,847 on the head; its `loader` and `containers`
 parts went from 0.82 and 0.92 s to 0.54 and 0.59 s of their perf runs.
+
+### A general `=` against a global variable (`unmatched_global.jq`)
+
+`unmatched_global.jq` is `unmatched.jq` with the distinct user ids bound by
+`declare variable` instead of a `let`. On master only a `let` variable was hashed,
+and each error went over every item of the global variable. Best wall time (s) and
+peak RSS (MiB) of three alternating rounds, master `25b1433435` against the head,
+in a container limited to 4 CPUs with the host busy with other builds, built with
+`CMAKE_BUILD_TYPE=Release` (not the profile build of step 1):
+
+| query | master s | head s | master MiB | head MiB |
+|---|---:|---:|---:|---:|
+| unmatched | 3.95 | 3.70 | 63 | 63 |
+| unmatched_global | 92.04 | 3.72 (-96%) | 60 | 62 |
+
+`unmatched` is not changed (noise). Master took 93.41, 93.55 and 92.04 s on
+`unmatched_global`, the head 3.72, 3.74 and 3.72 s. Both queries write the same
+output on both builds.
