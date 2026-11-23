@@ -810,7 +810,9 @@ ZORBA_SET_TEST_PROPERTY(bin/zorba_security_module_path_dotdot_secure
   FAIL_REGULAR_EXPRESSION "hello, v2")
 
 # test compilation of the perf script
-ZORBA_ADD_TEST(bin/zorba_compilechk4 zorbacmd 
+# Its process module is gone: --disable-http-resolution keeps the import from
+# reaching www.zorba-xquery.com, which on loaded runners took over 60 s.
+ZORBA_ADD_TEST(bin/zorba_compilechk4 zorbacmd --disable-http-resolution
   -q "${CMAKE_CURRENT_SOURCE_DIR}/../test/zperf/src/start.xq" -f --compile-only)
 ZORBA_SET_TEST_PROPERTY(bin/zorba_compilechk4
   PASS_REGULAR_EXPRESSION "[]|[XQST0059]")
