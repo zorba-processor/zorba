@@ -19,6 +19,9 @@ and where its time and allocations go. Each change that makes it faster adds a r
 | `latency.jq` | Group by service and route: count, average and maximum latency, server errors. |
 | `flatten.jq` | Each event as one flat object (JSON lines out). |
 | `filter_project.jq` | The server errors of one service, four fields each. |
+| `latency_fn.jq` | `latency.jq` with the parse in a `%an:nondeterministic` function, and the status of the slowest request of each group (by position). |
+| `windows.jq` | Requests, server errors and the slowest request per minute, with a tumbling window. |
+| `clean_users.jq` | Requests per service of the users who never got a server error: a FLWOR gives the events of a group by to an enclosing group by. |
 | `unmatched.jq` | Per service, the server errors of users with no successful request: a general `=` against the distinct user ids of a second parse. |
 | `run.sh` | Best of 3 runs of the queries: wall time, peak RSS, MB/s, SHA-256 of the output. |
 | `tools/profile.sh` | Samples per part (perf + `classify.awk`) and allocations per event (`malloc_count.c`) of one query. |
@@ -164,6 +167,29 @@ with the PR 3 head (`d879336fc0`), which took 1.77, 4.60, 3.44 and 2.10 s in tho
 rounds: PR 4 alone is -1%, -36% (`latency`), +1% and 0% (the other three are not
 changed: noise). `flatten` took 3.44 s on the PR 3 head in these rounds and 4.99 s
 in those of the PR 3 row: rows compare only within their own rounds.
+
+### Function calls, windows and enclosing uses (PR 5)
+
+`latency_fn`, `windows` and `clean_users` were added with PR 5. Best wall time (s) and
+peak RSS (MiB) of two alternating rounds, master `4fc51940ef` against the PR 5 head:
+
+| query | master s | PR 5 s | master MiB | PR 5 MiB |
+|---|---:|---:|---:|---:|
+| count | 1.66 | 1.67 | 35 | 35 |
+| latency | 2.72 | 2.71 | 148 | 148 |
+| flatten | 3.26 | 3.26 | 35 | 35 |
+| filter_project | 1.99 | 1.99 | 35 | 35 |
+| latency_fn | 4.99 | 3.21 (-36%) | 869 | 150 |
+| windows | 3.02 | 2.10 (-30%) | 35 | 35 |
+| clean_users | 4.75 | 3.00 (-37%) | 921 | 201 |
+
+On master, `latency_fn` builds every event: its parse is in a function that calls
+`file:read-text`, a user function itself, and only functions that called no user
+function were inlined. From PR 5 on, a function whose optimized body calls none is
+inlined too, and the analysis accepts window clauses over a parse, values taken by
+position, and values that a FLWOR gives to an enclosing lookup or `for` clause
+(`clean_users`). The four earlier queries are not changed (noise); every query writes
+the same output on both builds.
 
 ### A general `=` against a `let` variable (`unmatched.jq`)
 

@@ -272,38 +272,47 @@ store::Collection_t SimpleStore::createCollection(
 ********************************************************************************/
 bool SimpleStore::getNodeReference(store::Item_t& result, const store::Item* node)
 {
-  bool lHasReference = hasReference(node);
-
-  if (lHasReference)
+  zstring id;
   {
-    ItemRefMap::iterator resIt = theNodeToReferencesMap.find(node);
+    SYNC_CODE(AutoMutex lock(&theReferencesMutex);)
 
-    ZORBA_FATAL(resIt != theNodeToReferencesMap.end(),"Node reference cannot be found");
+    if (hasReferenceLocked(node))
+    {
+      ItemRefMap::iterator resIt = theNodeToReferencesMap.find(node);
 
-    zstring id = (*resIt).second;
-    return theItemFactory->createAnyURI(result, id);
+      ZORBA_FATAL(resIt != theNodeToReferencesMap.end(),"Node reference cannot be found");
+
+      id = (*resIt).second;
+    }
+    else
+    {
+      uuid u;
+      uuid::create(&u);
+      std::ostringstream oss;
+      oss << "urn:uuid:" << u;
+      id = oss.str();
+      assignReferenceLocked(node, id);
+    }
   }
-  else
-  {
-    uuid u;
-    uuid::create(&u);
-    std::ostringstream oss;
-    oss << "urn:uuid:" << u;
-    zstring uuidStr = oss.str();
-    assignReference(node, uuidStr);
 
-    return theItemFactory->createAnyURI(result, uuidStr);
-  }
+  return theItemFactory->createAnyURI(result, id);
 }
 
 
 /*******************************************************************************
   Returns whether a reference has already been generated for the given node.
- 
+
   @param item XDM node
   @return whether a reference has already been generated for the given node.
 ********************************************************************************/
 bool SimpleStore::hasReference(const store::Item* node)
+{
+  SYNC_CODE(AutoMutex lock(&theReferencesMutex);)
+  return hasReferenceLocked(node);
+}
+
+
+bool SimpleStore::hasReferenceLocked(const store::Item* node)
 {
   using namespace zorba::simplestore::json;
 
@@ -336,14 +345,23 @@ bool SimpleStore::hasReference(const store::Item* node)
 ********************************************************************************/
 bool SimpleStore::assignReference(const store::Item* node, const zstring& reference)
 {
-  using namespace zorba::simplestore::json;
+  SYNC_CODE(AutoMutex lock(&theReferencesMutex);)
 
-  bool lHasReference = hasReference(node);
-
-  if (lHasReference)
+  if (hasReferenceLocked(node))
   {
     return false;
   }
+
+  assignReferenceLocked(node, reference);
+  return true;
+}
+
+
+void SimpleStore::assignReferenceLocked(
+    const store::Item* node,
+    const zstring& reference)
+{
+  using namespace zorba::simplestore::json;
 
   if (node->isNode())
   {
@@ -362,8 +380,6 @@ bool SimpleStore::assignReference(const store::Item* node, const zstring& refere
   zstring uuidStr = reference;
   theNodeToReferencesMap.insert(node, uuidStr);
   theReferencesToNodeMap[uuidStr] = node;
-
-  return true;
 }
 
 
@@ -377,16 +393,20 @@ bool SimpleStore::assignReference(const store::Item* node, const zstring& refere
 ********************************************************************************/
 bool SimpleStore::getNodeByReference(store::Item_t& result, const zstring& reference)
 {
-  RefNodeMap::iterator resIt;
-
-  if ((resIt = theReferencesToNodeMap.find(reference)) != theReferencesToNodeMap.end())
+  // Assigned to result after the mutex is released: the item result held may
+  // be released, and a node's destruction unregisters its reference.
+  store::Item_t node;
   {
-    result = resIt->second;
-    return true;
+    SYNC_CODE(AutoMutex lock(&theReferencesMutex);)
+
+    RefNodeMap::iterator resIt = theReferencesToNodeMap.find(reference);
+
+    if (resIt != theReferencesToNodeMap.end())
+      node = resIt->second;
   }
 
-  result = NULL;
-  return false;
+  result.transfer(node);
+  return !result.isNull();
 }
 
 
@@ -398,9 +418,9 @@ bool SimpleStore::getNodeByReference(store::Item_t& result, const zstring& refer
 ********************************************************************************/
 bool SimpleStore::unregisterReferenceToUnusedNode(store::Item* node)
 {
-  bool lHasReference = hasReference(node);
+  SYNC_CODE(AutoMutex lock(&theReferencesMutex);)
 
-  if (!lHasReference)
+  if (!hasReferenceLocked(node))
   {
     return false;
   }
@@ -436,11 +456,9 @@ bool SimpleStore::unregisterReferenceToUnusedNode(store::Item* node)
 ********************************************************************************/
 bool SimpleStore::unregisterReferenceToDeletedNode(store::Item* node)
 {
-  using namespace zorba::simplestore::json;
-  
-  bool lHasReference = hasReference(node);
+  SYNC_CODE(AutoMutex lock(&theReferencesMutex);)
 
-  if (!lHasReference)
+  if (!hasReferenceLocked(node))
   {
     return false;
   }
