@@ -4394,6 +4394,125 @@ void test_json_loader_out_of_memory( Fixture const &f ) {
   (void)f;
 #endif
 }
+// Nodes inserted first and last into a collection and nodes deleted from it,
+// in one update, with each allocation failing in turn: a failed update leaves the
+// collection as it was, in its order, so the same update with no failure then
+// applies. The undo allocates nothing, also in bigint builds.
+void test_collection_undo_out_of_memory( Fixture const &f ) {
+#if defined(__linux__)
+  // Untyped nodes: a typed one leaks when its construction fails (another
+  // defect, outside this test).
+  std::string const prolog(
+    "declare construction strip;\n"
+    "declare namespace ext = 'http://zorba.io/extensions';\n"
+    "import module namespace ddl ="
+    " 'http://zorba.io/modules/store/dynamic/collections/ddl';\n"
+    "import module namespace dml ="
+    " 'http://zorba.io/modules/store/dynamic/collections/dml';\n" );
+  std::string const update(
+    "declare variable $p external;\n"
+    "declare variable $q external;\n"
+    "declare variable $r external;\n"
+    "(# ext:no-copy #) {\n"
+    "  dml:insert-first(xs:QName('ddl:undo'), ($p, $q)),\n"
+    "  dml:insert-last(xs:QName('ddl:undo'), $r),\n"
+    "  dml:delete(dml:collection(xs:QName('ddl:undo'))[position() = (2, 3)])\n"
+    "};\n"
+    "1" );
+  std::string const content(
+    "string-join(dml:collection(xs:QName('ddl:undo')) ! local-name(), ' ')" );
+  auto run = [&]( std::string const &query ) -> std::string {
+    XQuery_t const q( f.zorba->compileQuery( prolog + query ) );
+    Iterator_t const it( q->iterator() );
+    it->open();
+    Item item;
+    std::string out;
+    while ( it->next( item ) )
+      out += item.getStringValue().str();
+    it->close();
+    return out;
+  };
+  auto attempt = [&]( long n, long length, long *count ) -> std::string {
+    std::vector<Item> nodes;
+    {
+      XQuery_t const make( f.zorba->compileQuery( prolog +
+                                                  "(<p/>, <q/>, <r/>)" ) );
+      Iterator_t const it( make->iterator() );
+      it->open();
+      Item node;
+      while ( it->next( node ) )
+        nodes.push_back( node );
+      it->close();
+    }
+    run( "ddl:create(xs:QName('ddl:undo'), (<a/>, <b/>, <c/>, <d/>));\n1" );
+    auto prepare = [&]() {
+      XQuery_t const q( f.zorba->compileQuery( prolog + update ) );
+      DynamicContext *const dctx = q->getDynamicContext();
+      dctx->setVariable( "p", nodes[0] );
+      dctx->setVariable( "q", nodes[1] );
+      dctx->setVariable( "r", nodes[2] );
+      return q;
+    };
+    XQuery_t const first( prepare() );
+    Iterator_t const it( first->iterator() );
+    Item result;
+    bool failed = false;
+    inject_arm( n, length );
+    try {
+      it->open();
+      it->next( result );
+      it->close();
+    }
+    catch ( std::exception const& ) {
+      failed = true;
+    }
+    *count = inject_disarm();
+    std::string out( failed || result.isNull()
+                     ? "error" : result.getStringValue().str() );
+    if ( failed ) {
+      out += "|" + run( content ) + "|";
+      try {
+        XQuery_t const again( prepare() );
+        Iterator_t const it2( again->iterator() );
+        it2->open();
+        it2->next( result );
+        it2->close();
+        out += result.getStringValue().str();
+      }
+      catch ( std::exception const &e ) {
+        out += e.what();
+      }
+    }
+    out += "|" + run( content );
+    run( "dml:truncate(xs:QName('ddl:undo'));\n"
+         "ddl:delete(xs:QName('ddl:undo'));\n1" );
+    return out;
+  };
+  std::string const answer( "1|p q a d r" );
+  long total = 0;
+  std::string const whole( attempt( 0, 0, &total ) );
+  check( whole == answer, "an update of a collection", whole );
+  long wrong = 0;
+  for ( long const length : { 1L, 8L } )
+    for ( long n = 1; n <= total; ++n ) {
+      long count = 0;
+      std::string const got( attempt( n, length, &count ) );
+      if ( got != answer && got != "error|a b c d|1|p q a d r" &&
+           ++wrong <= 3 )
+        std::cout << "at " << n << " of a run of " << length << ": " << got
+                  << std::endl;
+    }
+  check( wrong == 0, "an update of a collection failing: the answer, or an "
+                     "error and the collection as it was",
+         std::to_string( wrong ) + " points" );
+# if defined(__SANITIZE_ADDRESS__)
+  check( __lsan_do_recoverable_leak_check() == 0,
+         "an update of a collection failing: nothing is left behind" );
+# endif
+#else
+  (void)f;
+#endif
+}
 // The serializer with each allocation failing in turn, over an element 12 deep:
 // past the 8 children iterators the emitter makes first, so its pool of them
 // grows. The whole text or an error; then, in an AddressSanitizer build,
@@ -8945,6 +9064,7 @@ Test const tests[] = {
   { "exhaust_replace_content", test_replace_content_out_of_memory },
   { "exhaust_json_object_add", test_json_object_add_out_of_memory },
   { "exhaust_collection_insert", test_collection_insert_out_of_memory },
+  { "exhaust_collection_undo", test_collection_undo_out_of_memory },
   { "exhaust_update_primitive", test_update_primitive_out_of_memory },
   { "exhaust_remove_type", test_remove_type_out_of_memory },
   { "exhaust_collection_insert_last", test_collection_insert_last_out_of_memory },
