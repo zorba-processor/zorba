@@ -1234,7 +1234,7 @@ extern entry const dict_en[] = {
   { "~libxml_79", "invalid XML encoding name" },
   { "~libxml_8", "${\"5\": }invalid value for character reference" },
   { "~libxml_80", "\"--\" forbidden within XML comment" },
-  { "~libxml_81", "document labelled UTF-16 but has UTF-8 content" },
+  { "~libxml_81", "input is not valid $5?5:{in its character encoding}" },
   { "~libxml_83", "'[' expected in XML condition section" },
   { "~libxml_84", "entity value expected" },
   { "~libxml_85", "XML chunk is not well-balanced" },

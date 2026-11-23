@@ -5267,7 +5267,7 @@
     </entry>
 
     <entry key="libxml_81"> <!-- XML_ERR_INVALID_ENCODING -->
-      <value>document labelled UTF-16 but has UTF-8 content</value>
+      <value>input is not valid $5?5:{in its character encoding}</value>
     </entry>
 
     <!-- 82: XML_ERR_EXT_ENTITY_STANDALONE not used -->

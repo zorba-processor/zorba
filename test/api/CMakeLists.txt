@@ -14,10 +14,11 @@
 
 ADD_DEFINITIONS(-DZORBA_HTTP_TEST_SERVER_DEFAULT="${ZORBA_HTTP_TEST_SERVER}")
 
-# schema_utf8 needs XML Schema support (Xerces-C)
+# schema_utf8 and xml_input_encoding (parse options) need XML Schema support
+# (Xerces-C)
 SET(SchemaTests)
 IF (NOT ZORBA_NO_XMLSCHEMA)
-  SET(SchemaTests schema_utf8.cpp)
+  SET(SchemaTests schema_utf8.cpp xml_input_encoding.cpp)
 ENDIF (NOT ZORBA_NO_XMLSCHEMA)
 
 CREATE_TEST_SOURCELIST(APITests

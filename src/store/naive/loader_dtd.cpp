@@ -46,6 +46,7 @@
 #include "diagnostics/xquery_diagnostics.h"
 #include "diagnostics/assert.h"
 #include "util/stream_util.h"
+#include "util/utf8_util.h"
 
 
 namespace zorba { namespace simplestore {
@@ -217,6 +218,77 @@ void scan_prolog(std::string const &s, bool eof, bool &complete,
   }
 }
 
+/**
+ * Recognizes UTF-16 and UTF-32 input by its byte order mark or by its first
+ * characters "<?" (UTF-16) or "<" (UTF-32), as libxml2 does for a document
+ * (XML 1.0 F.1); other input stays UTF-8.
+ */
+void detect_encoding(std::string const &s, FragmentEncoding &enc) {
+  struct signature {
+    char const *bytes;
+    std::string::size_type size;
+    unsigned unit;
+    bool big_endian;
+    char const *name;
+  };
+  static signature const signatures[] = {
+    { "\x00\x00\xFE\xFF", 4, 4, true,  "UTF-32BE" },
+    { "\xFF\xFE\x00\x00", 4, 4, false, "UTF-32LE" },
+    { "\x00\x00\x00\x3C", 4, 4, true,  "UTF-32BE" },
+    { "\x3C\x00\x00\x00", 4, 4, false, "UTF-32LE" },
+    { "\xFE\xFF",         2, 2, true,  "UTF-16BE" },
+    { "\xFF\xFE",         2, 2, false, "UTF-16LE" },
+    { "\x00\x3C\x00\x3F", 4, 2, true,  "UTF-16BE" },
+    { "\x3C\x00\x3F\x00", 4, 2, false, "UTF-16LE" },
+  };
+  for (signature const &sig : signatures) {
+    if (s.compare(0, sig.size, sig.bytes, sig.size) == 0) {
+      enc.unit = sig.unit;
+      enc.big_endian = sig.big_endian;
+      enc.name = sig.name;
+      return;
+    }
+  }
+}
+
+/**
+ * Appends to \a out in UTF-8 the code units of \a enc in [p, p + n), which
+ * end the input if \a eof. Bytes that do not make a character become the
+ * byte 0xFF, never valid in UTF-8, so libxml2 reports the error where it is.
+ */
+void append_utf8(FragmentEncoding &enc, char const *p, std::size_t n,
+                 bool eof, std::string &out) {
+  char const invalid = '\xFF';
+  for (char const *const end = p + n; p < end; ++p) {
+    enc.partial += *p;
+    if (enc.partial.size() < enc.unit)
+      continue;
+    uint32_t c = 0;
+    for (unsigned i = 0; i < enc.unit; ++i)
+      c = c << 8 | static_cast<unsigned char>(
+        enc.partial[enc.big_endian ? i : enc.unit - 1 - i]);
+    enc.partial.clear();
+    if (enc.high_surrogate) {
+      bool const low = c >= 0xDC00 && c <= 0xDFFF;
+      if (low)
+        c = 0x10000 + ((enc.high_surrogate - 0xD800) << 10) + (c - 0xDC00);
+      else
+        out += invalid;
+      enc.high_surrogate = 0;
+    } else if (enc.unit == 2 && c >= 0xD800 && c <= 0xDBFF) {
+      enc.high_surrogate = c;
+      continue;
+    }
+    if (utf8::encode(c, &out) == 0)
+      out += invalid;
+  }
+  if (eof && (!enc.partial.empty() || enc.high_surrogate)) {
+    out += invalid;
+    enc.partial.clear();
+    enc.high_surrogate = 0;
+  }
+}
+
 inline xmlChar const* xml_str(std::string const &s) {
   return reinterpret_cast<xmlChar const*>(s.c_str());
 }
@@ -384,6 +456,52 @@ FragmentXmlLoader::~FragmentXmlLoader()
 void FragmentXmlLoader::startParser()
 {
   FragmentIStream &fs = *theFragmentStream;
+  fs.parser_started = true;
+
+  // Buffer enough input to find the end of the prolog, in UTF-8.
+  std::string head;
+  bool encoding_known = false;
+  bool eof = false;
+  bool complete = false;
+  bool has_decl;
+  std::string::size_type decl_end, doctype_end;
+  std::vector<char> buf(FragmentIStream::DEFAULT_BUFFER_SIZE);
+  while (true)
+  {
+    if (encoding_known)
+    {
+      scan_prolog(head, eof, complete, has_decl, decl_end, doctype_end);
+      if (complete)
+        break;
+    }
+    std::streamsize const n = readPacket(*fs.theStream, &buf[0], buf.size());
+    if (n < 0)
+    {
+      theXQueryDiagnostics->add_error(NEW_ZORBA_EXCEPTION(zerr::ZSTR0020_LOADER_IO_ERROR));
+      throw 0;
+    }
+    eof = fs.theStream->eof() || n == 0;
+    std::size_t const size = static_cast<std::size_t>(n);
+    if (encoding_known)
+    {
+      if (fs.encoding.unit)
+        append_utf8(fs.encoding, &buf[0], size, eof, head);
+      else
+        head.append(&buf[0], size);
+      continue;
+    }
+    head.append(&buf[0], size);
+    if (head.size() < 4 && !eof)
+      continue;
+    encoding_known = true;
+    detect_encoding(head, fs.encoding);
+    if (fs.encoding.unit)
+    {
+      std::string const raw(std::move(head));
+      head.clear();
+      append_utf8(fs.encoding, raw.data(), raw.size(), eof, head);
+    }
+  }
 
   // Relative external entities resolve against this URI.
   char const *const input_uri =
@@ -399,31 +517,13 @@ void FragmentXmlLoader::startParser()
   }
   fs.ctxt->_private = &fs;
   // Entity substitution is what xmlSubstituteEntitiesDefault(1) used to do.
-  theParserSecurity.configure(fs.ctxt,
-                              theLoadProperties.toLibXmlOptions() | XML_PARSE_NOENT);
-  fs.parser_started = true;
-
-  // Buffer enough input to find the end of the prolog.
-  std::string head;
-  bool eof = false;
-  bool complete = false;
-  bool has_decl;
-  std::string::size_type decl_end, doctype_end;
-  std::vector<char> buf(FragmentIStream::DEFAULT_BUFFER_SIZE);
-  while (true)
-  {
-    scan_prolog(head, eof, complete, has_decl, decl_end, doctype_end);
-    if (complete)
-      break;
-    std::streamsize const n = readPacket(*fs.theStream, &buf[0], buf.size());
-    if (n < 0)
-    {
-      theXQueryDiagnostics->add_error(NEW_ZORBA_EXCEPTION(zerr::ZSTR0020_LOADER_IO_ERROR));
-      throw 0;
-    }
-    head.append(&buf[0], static_cast<std::string::size_type>(n));
-    eof = fs.theStream->eof() || n == 0;
-  }
+  int options = theLoadProperties.toLibXmlOptions() | XML_PARSE_NOENT;
+  // Transcoded input is UTF-8 whatever its declaration says.
+  if (fs.encoding.unit)
+    options |= XML_PARSE_IGNORE_ENC;
+  else if ((options & XML_PARSE_IGNORE_ENC) == 0)
+    fs.encoding.name = NULL;            // libxml2 follows the declaration
+  theParserSecurity.configure(fs.ctxt, options);
 
   if (doctype_end && theLoadProperties.getErrorOnDoctype())
   {
@@ -498,9 +598,19 @@ void FragmentXmlLoader::feedParser()
     theXQueryDiagnostics->add_error(NEW_ZORBA_EXCEPTION(zerr::ZSTR0020_LOADER_IO_ERROR));
     throw 0;
   }
-  if (n > 0)
+  bool const eof = fs.theStream->eof() || n == 0;
+  if (fs.encoding.unit)
+  {
+    std::string utf8;
+    append_utf8(fs.encoding, &buf[0], static_cast<std::size_t>(n), eof, utf8);
+    if (!utf8.empty())
+      xmlParseChunk(fs.ctxt, utf8.data(), static_cast<int>(utf8.size()), 0);
+  }
+  else if (n > 0)
+  {
     xmlParseChunk(fs.ctxt, &buf[0], static_cast<int>(n), 0);
-  if (fs.theStream->eof() || n == 0)
+  }
+  if (eof)
     finishParser();
 }
 
@@ -919,8 +1029,17 @@ try
     return;
   xmlError located = *error;
   std::string message;
+  std::string encoding;
   if (locates_in_input(static_cast<xmlParserCtxtPtr>(ctx)))
+  {
     locate_in_input(*fs, static_cast<xmlParserCtxtPtr>(ctx), located, message);
+    // The message of an encoding error names the encoding, if known.
+    if (located.code == XML_ERR_INVALID_ENCODING && fs->encoding.name)
+    {
+      encoding = fs->encoding.name;
+      located.str1 = &encoding[0];
+    }
+  }
   XmlLoader::error(fs->current_loader, &located);
 }
 catch (std::bad_alloc const&)
