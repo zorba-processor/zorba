@@ -1318,7 +1318,9 @@ declare function math:quartile($numbers as double*, $quart as integer) as double
     let $rint := integer($r)
     let $rrem := $r - $rint 
     let $sorted_numbers := math:sort-numbers( $numbers ) return
-      ($sorted_numbers[$rint + 1] - $sorted_numbers[$rint]) * $rrem + $sorted_numbers[$rint] 
+      (: with one value, there is no value after position $rint :)
+      if ($rrem eq 0) then $sorted_numbers[$rint]
+      else ($sorted_numbers[$rint + 1] - $sorted_numbers[$rint]) * $rrem + $sorted_numbers[$rint]
   else
   if ($quart eq 2) then
     math:median($numbers)
@@ -1328,7 +1330,9 @@ declare function math:quartile($numbers as double*, $quart as integer) as double
     let $rint := integer($r)
     let $rrem := $r - $rint 
     let $sorted_numbers := math:sort-numbers( $numbers ) return
-      ($sorted_numbers[$rint + 1] - $sorted_numbers[$rint]) * $rrem + $sorted_numbers[$rint] 
+      (: with one value, there is no value after position $rint :)
+      if ($rrem eq 0) then $sorted_numbers[$rint]
+      else ($sorted_numbers[$rint + 1] - $sorted_numbers[$rint]) * $rrem + $sorted_numbers[$rint]
   else
   if ($quart eq 4) then
     fn:max($numbers)
