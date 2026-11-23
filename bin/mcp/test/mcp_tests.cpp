@@ -2582,16 +2582,13 @@ struct Known {
   long cap = 0;         // at most this many points per run length
   long length = 0;      // only in runs of this length; 0: any
   std::string ends;     // with prefix: and the outcome ends with this
-  // A crash in a library: its stack has no frame of the engine between the
-  // signal and the faulting frame (for "unknown": none at all).
-  bool not_in_engine = false;
 };
 Known exact( std::string const &text, long cap, long length = 0 ) {
-  return Known{ text, false, cap, length, "", false };
+  return Known{ text, false, cap, length, "" };
 }
 Known starting( std::string const &text, long cap, long length = 0,
                 std::string const &ends = "" ) {
-  return Known{ text, true, cap, length, ends, false };
+  return Known{ text, true, cap, length, ends };
 }
 
 struct Sweep {
@@ -2837,36 +2834,6 @@ void sweep_show_frames( std::string const &title, std::string const &hex,
     else
       std::cout << fr.where << std::endl;
   }
-}
-
-
-// Whether a crash the child sent was in the engine (libzorba*): its faulting
-// frame, the first one after the handler and the signal trampoline, is; for
-// SIGABRT (abort), the first frame outside libc and libgcc. With whole (a crash
-// in no known library), any frame of the engine counts.
-bool sweep_engine_crash( std::string const &hex, bool aborted, bool whole ) {
-  std::istringstream is( hex );
-  std::string h;
-  int i = 0;
-  while ( is >> h ) {
-    if ( i++ < 2 )   // the handler and the trampoline
-      continue;
-    Dl_info info;
-    void *const addr = reinterpret_cast<void*>( std::stoull( h, nullptr, 16 ) );
-    if ( !dladdr( addr, &info ) || !info.dli_fname )
-      continue;
-    char const *const slash = std::strrchr( info.dli_fname, '/' );
-    std::string const base( slash ? slash + 1 : info.dli_fname );
-    if ( base.rfind( "libzorba", 0 ) == 0 )
-      return true;
-    if ( whole || ( aborted && ( base.rfind( "libc.", 0 ) == 0 ||
-                               base.rfind( "libgcc", 0 ) == 0 ||
-                               base.rfind( "linux-vdso", 0 ) == 0 ||
-                               base.rfind( "mcp_tests", 0 ) == 0 ) ) )
-      continue;
-    return false;
-  }
-  return false;
 }
 
 
@@ -3230,17 +3197,6 @@ void exhaust_sweep( Fixture const &f, std::string const &name, Sweep const &s ) 
                std::to_string( message_allocations ) );
     for ( std::string const &over : sweep_over_cap( s, length, outcomes ) )
       check( false, name + ": a known limit within its cap", over );
-    // A crash allowed as one of a library: not in the engine.
-    for ( auto const &o : outcomes )
-      for ( Known const &k : s.known )
-        if ( k.not_in_engine && known_matches( k, length, o.first ) ) {
-          std::string const &crash = stacks_of[o.first].crash;
-          check( !crash.empty() &&
-                 !sweep_engine_crash( crash,
-                   o.first.find( "signal 6 " ) != std::string::npos,
-                   o.first.find( "unknown" ) != std::string::npos ),
-                 name + ": a crash of a library, not in the engine", o.first );
-        }
     for ( auto const &o : outcomes ) {
       bool const allowed = sweep_allowed( s, length, o.first );
       std::cout << name << ", " << length << " failing: " << o.second.first
