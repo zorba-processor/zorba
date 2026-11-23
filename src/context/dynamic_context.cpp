@@ -15,6 +15,7 @@
  */
 
 #include <assert.h>
+#include <memory>
 
 #include "common/common.h"
 #include "store/api/iterator.h"
@@ -316,19 +317,14 @@ store::Item_t dynamic_context::get_current_date_time() const
 ********************************************************************************/
 void dynamic_context::set_environment_variables()
 {
-  if (!theEnvironmentVariables)
-    theEnvironmentVariables = new EnvVarMap();
+  // Filled completely or not at all: while a variable is invalid, every call
+  // raises the error.
+  std::unique_ptr<EnvVarMap> vars = std::make_unique<EnvVarMap>();
 
   const char* invalid_char;
   for (char **env = environ; *env; ++env)
   {
     zstring envVarZS(*env);
-
-    if ((invalid_char = utf8::validate(envVarZS.c_str())) != NULL)
-      throw XQUERY_EXCEPTION(err::FOCH0001,
-        ERROR_PARAMS(zstring("#x") +
-        BUILD_STRING(std::uppercase << std::hex
-          << (static_cast<unsigned int>(*invalid_char)&0xFF))));
 
     if ((invalid_char = utf8::validate(envVarZS.c_str())) != NULL)
     {
@@ -348,11 +344,11 @@ void dynamic_context::set_environment_variables()
       zstring varvalue(envVarZS.substr(eqPos+1, size));
 
       if (!varname.empty() || !varvalue.empty())
-        theEnvironmentVariables->insert(std::pair<zstring, zstring>(varname,varvalue));
+        vars->insert(std::pair<zstring, zstring>(varname,varvalue));
     }
   }
 
-
+  theEnvironmentVariables = vars.release();
 }
 /*******************************************************************************
 
