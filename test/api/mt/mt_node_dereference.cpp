@@ -14,16 +14,18 @@
  * limitations under the License.
  */
 
-// ref:dereference of nodes that other threads are freeing. Half of the
-// threads construct documents, take the reference of the last element of
-// each, publish it and drop the document; the other half dereference the
-// published references. A reference must give the live node or the empty
-// sequence, never a node whose tree is being destroyed.
+// ref:dereference of a node whose document another thread is freeing. One
+// thread constructs a document, publishes the reference of its last element,
+// waits until the other threads are dereferencing it, and drops the
+// document; the other threads dereference the published reference in a
+// loop. A reference must give the live node or the empty sequence, never a
+// node whose tree is being destroyed.
 
 #include <atomic>
+#include <chrono>
 #include <mutex>
 #include <string>
-#include <vector>
+#include <thread>
 
 #include <zorba/store_manager.h>
 
@@ -34,94 +36,107 @@ using namespace zorba::mt_test;
 
 namespace {
 
-const unsigned DOCUMENTS = 150;
-const unsigned SLOTS = 32;
+const unsigned DOCUMENTS = 60;
 
-// The document is freed when the query is: the last element is among the
-// last nodes its destruction unregisters.
+// The last element is among the last nodes the document's destruction
+// unregisters.
 const char* const PRODUCE =
   "import module namespace ref = 'http://zorba.io/modules/reference';\n"
-  "let $d := document { <doc>{ for $i in 1 to 200\n"
+  "let $d := document { <doc>{ for $i in 1 to 2000\n"
   "                            return <e n='{$i}'>text</e> }</doc> }\n"
-  "return string(ref:reference($d/doc/e[last()]))\n";
+  "return ($d, string(ref:reference($d/doc/e[last()])))\n";
 
 const char* const CONSUME =
   "import module namespace ref = 'http://zorba.io/modules/reference';\n"
-  "declare variable $refs external;\n"
-  "for $k in 1 to 20, $r in tokenize($refs, ' ')\n"
+  "declare variable $r external;\n"
+  "for $k in 1 to 200\n"
   "let $n := ref:dereference($r)\n"
   "return if (empty($n)) then 'gone' else string($n/@n)\n";
 
-class References
+class Published
 {
   std::mutex theMutex;
-  std::vector<std::string> theSlots;
-  unsigned theNext = 0;
+  std::string theReference;
 
 public:
-  References() : theSlots(SLOTS) { }
+  std::atomic<unsigned> theLiveDereferences{0};
+  std::atomic<bool> theDone{false};
 
-  void publish(std::string const& aReference)
+  void set(std::string const& aReference)
   {
     std::lock_guard<std::mutex> lGuard(theMutex);
-    theSlots[theNext++ % SLOTS] = aReference;
+    theReference = aReference;
   }
 
-  std::string all()
+  std::string get()
   {
     std::lock_guard<std::mutex> lGuard(theMutex);
-    std::string lAll;
-    for (std::string const& lSlot : theSlots)
-      if (!lSlot.empty())
-        lAll += lSlot + ' ';
-    return lAll;
+    return theReference;
   }
 };
 
-void produce(Zorba* aZorba, References& aReferences, Checker& aChecker,
-             unsigned aThread)
+void produce(Zorba* aZorba, Published& aPublished, Checker& aChecker)
 {
   for (unsigned d = 0; d < DOCUMENTS; ++d)
   {
+    Item lDoc;
     try
     {
-      std::string const lReference = drain(aZorba->compileQuery(PRODUCE));
-      if (lReference.rfind("urn:uuid:", 0) != 0)
+      XQuery_t lQuery = aZorba->compileQuery(PRODUCE);
+      Iterator_t lIter = lQuery->iterator();
+      lIter->open();
+      Item lReference;
+      if (!lIter->next(lDoc) || !lIter->next(lReference) ||
+          lReference.getStringValue().str().rfind("urn:uuid:", 0) != 0)
       {
-        aChecker.fail("thread " + std::to_string(aThread) +
-                      ": reference: " + lReference);
-        return;
+        aChecker.fail("document " + std::to_string(d) + ": no reference");
+        break;
       }
-      aReferences.publish(lReference);
+      lIter->close();
+      aPublished.set(lReference.getStringValue().str());
     }
     catch (ZorbaException const& e)
     {
-      aChecker.fail("thread " + std::to_string(aThread) + ": " + e.what());
-      return;
+      aChecker.fail("document " + std::to_string(d) + ": " + e.what());
+      break;
     }
+
+    // Dropped once the other threads have found the node live.
+    unsigned const lSeen = aPublished.theLiveDereferences.load();
+    auto const lDeadline =
+      std::chrono::steady_clock::now() + std::chrono::seconds(10);
+    while (aPublished.theLiveDereferences.load() < lSeen + THREADS &&
+           std::chrono::steady_clock::now() < lDeadline)
+      std::this_thread::yield();
   }
+  aPublished.theDone = true;
 }
 
-void consume(Zorba* aZorba, References& aReferences, Checker& aChecker,
-             unsigned aThread, std::atomic<unsigned> const& aProducing)
+void consume(Zorba* aZorba, Published& aPublished, Checker& aChecker,
+             unsigned aThread)
 {
-  while (aProducing.load() != 0)
+  while (!aPublished.theDone.load())
   {
-    std::string const lReferences = aReferences.all();
-    if (lReferences.empty())
+    std::string const lReference = aPublished.get();
+    if (lReference.empty())
+    {
+      std::this_thread::yield();
       continue;
+    }
     try
     {
       XQuery_t lQuery = aZorba->compileQuery(CONSUME);
       lQuery->getDynamicContext()->setVariable(
-        "refs", aZorba->getItemFactory()->createString(lReferences));
+        "r", aZorba->getItemFactory()->createString(lReference));
       Iterator_t lIter = lQuery->iterator();
       lIter->open();
       Item lItem;
       while (lIter->next(lItem))
       {
         std::string const lValue = lItem.getStringValue().str();
-        if (lValue != "gone" && lValue != "200")
+        if (lValue == "2000")
+          ++aPublished.theLiveDereferences;
+        else if (lValue != "gone")
           aChecker.fail("thread " + std::to_string(aThread) +
                         ": dereferenced: " + lValue);
       }
@@ -144,20 +159,14 @@ mt_node_dereference(int, char*[])
   void* lStore = StoreManager::getStore();
   Zorba* lZorba = Zorba::getInstance(lStore);
   Checker lChecker;
-  References lReferences;
-  std::atomic<unsigned> lProducing(THREADS / 2);
+  Published lPublished;
 
   run_threads([&](unsigned t)
   {
-    if (t < THREADS / 2)
-    {
-      produce(lZorba, lReferences, lChecker, t);
-      --lProducing;
-    }
+    if (t == 0)
+      produce(lZorba, lPublished, lChecker);
     else
-    {
-      consume(lZorba, lReferences, lChecker, t, lProducing);
-    }
+      consume(lZorba, lPublished, lChecker, t);
   });
 
   lZorba->shutdown();
