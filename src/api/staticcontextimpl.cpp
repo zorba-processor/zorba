@@ -71,6 +71,49 @@
 namespace zorba {
 
 /*******************************************************************************
+
+********************************************************************************/
+LoadedProlog::LoadedProlog(LoadedProlog* aParent)
+  :
+  theInitExpr(NULL),
+  theMaxVarId(dynamic_context::MAX_IDVARS_RESERVED),
+  theParent(aParent)
+{
+}
+
+
+LoadedProlog::~LoadedProlog()
+{
+  if (theResources)
+  {
+    static_context_t noSctx;
+    theResources->dispose(theCompilerCB.release(),
+                          noSctx,
+                          NULL,
+                          theXQueryDiagnostics.release(),
+                          false,
+                          NULL,
+                          NULL);
+    theResources = NULL;
+  }
+  else
+  {
+    theCompilerCB.reset();
+    theXQueryDiagnostics.reset();
+  }
+}
+
+
+LoadedProlog const* LoadedProlog::nearest() const
+{
+  LoadedProlog const* lProlog = this;
+  while (lProlog && !lProlog->theCompilerCB)
+    lProlog = lProlog->theParent.getp();
+  return lProlog;
+}
+
+
+/*******************************************************************************
   Create a StaticContextImpl obj as well as an internal static_context obj S.
   S is created as a child of the zorba root sctx. This constructor is used
   when the application wants to create its own static context to pass it as
@@ -78,9 +121,7 @@ namespace zorba {
 ********************************************************************************/
 StaticContextImpl::StaticContextImpl(DiagnosticHandler* aDiagnosticHandler)
   :
-  theCompilerCB(NULL),
-  theXQueryDiagnostics(NULL),
-  theMaxVarId(dynamic_context::MAX_IDVARS_RESERVED),
+  theProlog(new LoadedProlog(NULL)),
   theDiagnosticHandler(aDiagnosticHandler),
   theUserDiagnosticHandler(true),
   theCollectionMgr(0)
@@ -108,9 +149,7 @@ StaticContextImpl::StaticContextImpl(
     DiagnosticHandler* aDiagnosticHandler)
   :
   theCtx(aCtx),
-  theCompilerCB(NULL),
-  theXQueryDiagnostics(NULL),
-  theMaxVarId(dynamic_context::MAX_IDVARS_RESERVED),
+  theProlog(new LoadedProlog(NULL)),
   theDiagnosticHandler(aDiagnosticHandler),
   theUserDiagnosticHandler(true),
   theCollectionMgr(0)
@@ -132,9 +171,7 @@ StaticContextImpl::StaticContextImpl(
 StaticContextImpl::StaticContextImpl(const StaticContextImpl& aStaticContext)
   :
   StaticContext(),
-  theCompilerCB(NULL),
-  theXQueryDiagnostics(NULL),
-  theMaxVarId(dynamic_context::MAX_IDVARS_RESERVED),
+  theProlog(new LoadedProlog(aStaticContext.theProlog.getp())),
   theDiagnosticHandler(aStaticContext.theDiagnosticHandler),
   theUserDiagnosticHandler(aStaticContext.theUserDiagnosticHandler),
   theCollectionMgr(0)
@@ -164,25 +201,9 @@ StaticContextImpl::~StaticContextImpl()
 
   delete theCollectionMgr;
 
+  // The prolog's sctx goes before its ccb.
   theCtx = NULL;
-
-  if (theResources)
-  {
-    static_context_t noSctx;
-    theResources->dispose(theCompilerCB,
-                          noSctx,
-                          NULL,
-                          theXQueryDiagnostics,
-                          false,
-                          NULL,
-                          NULL);
-    theResources = NULL;
-  }
-  else
-  {
-    delete theCompilerCB;
-    delete theXQueryDiagnostics;
-  }
+  theProlog = NULL;
 }
 
 
@@ -1151,7 +1172,8 @@ void StaticContextImpl::loadProlog(
     const String& prolog,
     const Zorba_CompilerHints_t& hints)
 {
-  ZORBA_ASSERT(theCompilerCB == NULL);
+  LoadedProlog* lProlog = theProlog.getp();
+  ZORBA_ASSERT(lProlog->theCompilerCB == NULL);
 
   // Create and compile an internal query whose prolog is the given prolog and
   // its body is just the emtpy sequence expression: "()".
@@ -1162,19 +1184,20 @@ void StaticContextImpl::loadProlog(
   // as an input to a user query Q, theSctxMap of Q will be initialized as a copy
   // of this->theSctxMap.
   //theSctxMap = impl.theCompilerCB->theSctxMap;
-  theCompilerCB = impl.theCompilerCB;
+  lProlog->theCompilerCB.reset(impl.theCompilerCB);
   impl.theCompilerCB = NULL;
+  lProlog->theInitExpr = theCtx->get_query_expr();
 
   // The ccb reports to the diagnostics of impl. loadProlog() sealed the
   // functions of the prolog (XQueryCompiler::seal()): the queries compiled
   // against this context only read them.
-  theXQueryDiagnostics = impl.theXQueryDiagnostics;
+  lProlog->theXQueryDiagnostics.reset(impl.theXQueryDiagnostics);
   impl.theXQueryDiagnostics = NULL;
 
   // The ccb no longer belongs to impl (whose QueryResources goes away with
-  // it), but to "this".
-  theResources = new QueryResources();
-  theCompilerCB->theResources = theResources.getp();
+  // it), but to theProlog.
+  lProlog->theResources = new QueryResources();
+  lProlog->theCompilerCB->theResources = lProlog->theResources.getp();
 }
 
 
@@ -1608,13 +1631,7 @@ ItemSequence_t StaticContextImpl::invokeFunc(
     XQuery_t query(new XQueryImpl());
 
     // Compile without any hints, directly against "this" (compile() forks its
-    // own child sctx and does not modify "this"). Do not wrap "this" in an
-    // intermediate StaticContextImpl: that copy has no CompilerCB and resets
-    // the max var id, and its extra sctx level hides the init expr of a
-    // loadProlog() prolog (static_context::get_query_expr() is looked up on
-    // the parent of the query's root sctx only). The globals of modules
-    // imported by loadProlog() would then not be initialized, and the
-    // wrapper query's own vars could reuse their dynamic-context ids.
+    // own child sctx and does not modify "this").
     Zorba_CompilerHints_t lHints;
     StaticContext_t querySctx(const_cast<StaticContextImpl*>(this));
 

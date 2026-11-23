@@ -371,6 +371,15 @@ ZORBA_DLL_PUBLIC void query_resources_fail_walk(unsigned long edge);
   Whether this is a load-prolog query or not (load-prolog queries are created
   internally by the StaticContextImpl::loadProlog() method).
 
+  thePrologInitExpr :
+  -------------------
+  The expr that initializes the variables of the prolog loaded with
+  StaticContextImpl::loadProlog() into the static context the query is
+  compiled against, or into the nearest ancestor of it that has one (see
+  LoadedProlog in api/staticcontextimpl.h); NULL if none. The main module runs it
+  before its own prolog. Not copied by the copy constructor (an eval query
+  sees the values of the outer query). Compile time only: not serialized.
+
   theIsUpdating :
   ---------------
   Set to true if the root expr of the query or eval expr is an updating expr.
@@ -513,6 +522,8 @@ public:
   bool                      theIsEval;
 
   bool                      theIsLoadProlog;
+
+  expr                    * thePrologInitExpr = nullptr;
 
   bool                      theIsUpdating;
 
