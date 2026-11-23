@@ -10,7 +10,7 @@ declare %an:nondeterministic function local:events()
 for $e in local:events()
 group by $service := $e.service, $route := $e.http.route
 let $ms := $e.http.duration_ms
-let $slowest := for $v in $e order by $v.http.duration_ms descending return $v
+let $statuses := for $v in $e order by $v.http.duration_ms descending return $v.http.status
 order by avg($ms) descending, $service, $route
 return {
   "service" : $service,
@@ -18,6 +18,6 @@ return {
   "requests" : count($e),
   "avg_ms" : round(avg($ms), 3),
   "max_ms" : max($ms),
-  "slowest_status" : $slowest[1].http.status,
+  "slowest_status" : $statuses[1],
   "server_errors" : count($e[$$.http.status ge 500])
 }

@@ -166,3 +166,26 @@ with the PR 3 head (`d879336fc0`), which took 1.77, 4.60, 3.44 and 2.10 s in tho
 rounds: PR 4 alone is -1%, -36% (`latency`), +1% and 0% (the other three are not
 changed: noise). `flatten` took 3.44 s on the PR 3 head in these rounds and 4.99 s
 in those of the PR 3 row: rows compare only within their own rounds.
+
+### Function calls, windows and enclosing uses (PR 5)
+
+`latency_fn`, `windows` and `clean_users` were added with PR 5. Best wall time (s) and
+peak RSS (MiB) of two alternating rounds, master `4fc51940ef` against the PR 5 head:
+
+| query | master s | PR 5 s | master MiB | PR 5 MiB |
+|---|---:|---:|---:|---:|
+| count | 1.66 | 1.67 | 35 | 35 |
+| latency | 2.72 | 2.71 | 148 | 148 |
+| flatten | 3.26 | 3.26 | 35 | 35 |
+| filter_project | 1.99 | 1.99 | 35 | 35 |
+| latency_fn | 4.99 | 3.21 (-36%) | 869 | 150 |
+| windows | 3.02 | 2.10 (-30%) | 35 | 35 |
+| clean_users | 4.75 | 3.00 (-37%) | 921 | 201 |
+
+On master, `latency_fn` builds every event: its parse is in a function that calls
+`file:read-text`, a user function itself, and only functions that called no user
+function were inlined. From PR 5 on, a function whose optimized body calls none is
+inlined too, and the analysis accepts window clauses over a parse, values taken by
+position, and values that a FLWOR gives to an enclosing lookup or `for` clause
+(`clean_users`). The four earlier queries are not changed (noise); every query writes
+the same output on both builds.
