@@ -37,7 +37,6 @@
 #include "types/schema/LoadSchemaErrorHandler.h"
 #include "types/schema/PrintSchema.h"
 #include "types/schema/XercesParseUtils.h"
-#include "types/schema/XercSchemaValidator.h"
 #include "types/schema/xercesIncludes.h"
 
 #include "system/globalenv.h"
@@ -62,6 +61,7 @@
 # include <xercesc/util/Janitor.hpp>
 # include <xercesc/framework/XMLSchemaDescription.hpp>
 # include <zorbatypes/xerces_xmlcharray.h>
+# include "types/schema/XercSchemaValidator.h"
 #endif /* ZORBA_NO_XMLSCHEMA */
 
 
@@ -389,8 +389,7 @@ Schema::Schema(TypeManager* tm)
   }
 
   // Filled by queries on several threads, which hold the Xerces lock in READ.
-  theUdTypesCache = 
-  new HashMap<zstring, xqtref_t, HashMapZStringCmp>(64, true);
+  theUdTypesCache = std::make_unique<UdTypesCache>(64, true).release();
 
 #endif
 }
