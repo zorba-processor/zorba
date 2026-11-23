@@ -72,6 +72,16 @@ ZorbaImpl::~ZorbaImpl()
 ********************************************************************************/
 void ZorbaImpl::init(store::Store* store)
 {
+  // A user of the running engine registers without the users mutex: modules
+  // call getInstance while their query holds the store lock, and the first
+  // init takes the store lock while holding that mutex.
+  ulong lUsers = theNumUsers.load();
+  while (lUsers != 0)
+  {
+    if (theNumUsers.compare_exchange_weak(lUsers, lUsers + 1))
+      return;
+  }
+
   SYNC_CODE(AutoMutex lock(&theUsersMutex);)
 
   if (theNumUsers == 0)
@@ -101,9 +111,7 @@ void ZorbaImpl::shutdownInternal(bool soft)
   if (theNumUsers == 0)
     return;
 
-  --theNumUsers;
-
-  if (theNumUsers == 0 || soft == false)
+  if (--theNumUsers == 0 || soft == false)
   {
     // The API item factory wraps the store's item factory: destroy it before
     // the store. It is created again on demand after a new init().
