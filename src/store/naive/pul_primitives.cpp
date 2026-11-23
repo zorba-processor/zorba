@@ -524,7 +524,8 @@ void UpdSetElementType::apply()
 
   // What can fail comes first, so that a failure leaves the element as it is:
   // the text of the old typed value and the copy that undo restores, the
-  // empty content's value, then the type.
+  // empty content's value, room for undo to put back a type map entry that
+  // setType() takes out, then the type.
   zstring textValue;
   if (theOldHaveTypedTypedValue)
   {
@@ -544,6 +545,7 @@ void UpdSetElementType::apply()
       theTypedValue != NULL && !theHaveListTypedValue)
     target->setEmptyContentTypedValue(theTypedValue);
 
+  target->getTree()->reserveTypes();
   target->setType(theTypeName);
 
   if (theOldHaveTypedTypedValue)
@@ -721,7 +723,9 @@ void UpdSetAttributeType::apply()
   theOldTypeName = target->getType();
   theOldHaveListValue = target->haveListValue();
 
-  // The only step that can fail, first.
+  // The only steps that can fail, first: room for undo to put back a type map
+  // entry that setType() takes out, and the type.
+  target->getTree()->reserveTypes();
   target->setType(theTypeName);
 
   theOldTypedValue.transfer(target->theTypedValue);
@@ -1683,47 +1687,17 @@ UpdDeActivateIC::~UpdDeActivateIC()
 
 void UpdDeActivateIC::apply()
 {
-  Store* store = &GET_STORE();
-  store::IC_t ic = store->deactivateIC(theQName,theIsApplied);
-  if (theIsApplied)
-  {
-    theICKind = ic->getICKind();
-    switch (theICKind) {
-      case store::IC::ic_collection:
-        theFromCollectionName = ic->getCollectionName();
-        break;
-      case store::IC::ic_foreignkey:
-        theFromCollectionName = ic->getFromCollectionName();
-        theToCollectionName = ic->getToCollectionName();
-        break;
-      default:
-        ZORBA_ASSERT(false);
-    }
-  }
+  theIC = GET_STORE().deactivateIC(theQName, theIsApplied);
 }
 
 
+// Puts back the constraint that apply() took out, without allocating.
 void UpdDeActivateIC::undo()
 {
   if (theIsApplied)
   {
-    Store* store = &GET_STORE();
-    bool isApplied;
-    switch (theICKind) 
-    {
-      case store::IC::ic_collection:
-        store->activateIC(theQName, theFromCollectionName,isApplied);
-        break;
-      case store::IC::ic_foreignkey:
-        store->activateForeignKeyIC(
-            theQName,
-            theFromCollectionName,
-            theToCollectionName,isApplied);
-        break;
-      default:
-        ZORBA_ASSERT(false);
-      // TODO
-    }
+    GET_STORE().restoreIC(theIC);
+    theIsApplied = false;
   }
 }
 

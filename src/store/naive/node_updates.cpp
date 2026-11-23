@@ -904,6 +904,8 @@ void XmlNode::removeType(UpdatePrimitive& upd)
 #else
         assert(n->haveType());
         tinfo.theTypeName = n->getType();
+        // restoreType() puts back the type map entry that this takes out.
+        n->getTree()->reserveTypes();
         n->setType(GET_STORE().theSchemaTypeNames[store::XS_UNTYPED_ATOMIC]);
 #endif
 

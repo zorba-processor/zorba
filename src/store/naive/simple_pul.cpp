@@ -2615,6 +2615,15 @@ void PULImpl::applyUpdates(bool inheritNSBindings)
 
     // Apply validation primitives, if this is a revalidation pul.
     applyList(theValidationList);
+
+    // An activation allocates its constraint, so it can fail like the
+    // primitives above. With the room reserved, undoing a deactivation puts
+    // its constraint back without allocating.
+    if (!theICActivationList.empty())
+    {
+      GET_STORE().reserveICs(theICActivationList.size());
+      applyList(theICActivationList);
+    }
   }
   catch (...)
   {
@@ -2627,15 +2636,6 @@ void PULImpl::applyUpdates(bool inheritNSBindings)
   {
     CollectionPul* pul = *collIte;
     pul->finalizeUpdates();
-  }
-
-  try
-  {
-    applyList(theICActivationList);
-  }
-  catch (...)
-  {
-    ZORBA_FATAL(0, "Unexpected error during application of integrity constraint PUL");
   }
 }
 
