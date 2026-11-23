@@ -45,8 +45,12 @@ namespace simplestore {
   theReferencesMutex:
   -------------------
   Protects the two reference maps and the HaveReference flag of the nodes,
-  which queries holding only the store's READ lock fill on first use (a leaf
-  lock: nothing outside these maps is called while it is held).
+  which queries holding only the store's READ lock fill on first use. While it
+  is held, nothing outside these maps is called, except that
+  getNodeByReference() takes the lock of the found node's tree (to add a
+  reference unless the node is being freed). So it is taken before a tree
+  lock and never while one is held: a tree is freed with no tree lock held,
+  and its destruction unregisters its nodes under this mutex.
   
 ********************************************************************************/
 class SimpleStore : public Store

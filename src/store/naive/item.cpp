@@ -72,6 +72,32 @@ void Item::addReference() const
 }
 
 
+#ifndef ZORBA_FOR_ONE_THREAD_ONLY
+bool Item::addReferenceUnlessFreed() const
+{
+  long* const word = loadUnion();
+
+  if ((reinterpret_cast<uintptr_t>(word) & 0x1) == 0)
+  {
+    simplestore::XmlTree* tree =
+      static_cast<const simplestore::XmlNode*>(this)->lockTree();
+    bool const live = (tree->getRefCount() != 0);
+    if (live)
+    {
+      ++tree->getRefCount();
+      theRefCount.incrementUnshared();
+    }
+    tree->getRCLock()->release();
+    return live;
+  }
+
+  // An ATOMIC item's last reference is released without a decrement.
+  assert(isJSONItem());
+  return theRefCount.incrementUnlessZero();
+}
+#endif
+
+
 void Item::removeReference()
 {
   long* const word = loadUnion();
