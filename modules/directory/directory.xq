@@ -198,10 +198,13 @@ declare %an:nondeterministic function dir:documents(
  :)
 declare function dir:format( $path as xs:string ) as xs:string?
 {
-  let $name := tokenize( $path, "/" )[last()]
+  (: No regular expression: when an allocation fails, ICU can compile one that
+   : never matches, with no error, and the file would have no format. :)
+  let $cps := string-to-codepoints( $path )
+  let $dot := index-of( $cps, 46 )[last()]
   let $ext :=
-    if ( contains( $name, "." ) )
-    then lower-case( replace( $name, "^.*\.", "" ) )
+    if ( exists( $dot ) and empty( index-of( $cps, 47 )[. gt $dot] ) )
+    then lower-case( substring( $path, $dot + 1 ) )
     else ""
   return
     switch ( $ext )
