@@ -4423,6 +4423,86 @@ void test_serializer_out_of_memory( Fixture const &f ) {
   (void)f;
 #endif
 }
+// Replacing the content of an element with each allocation failing in turn: a
+// failed replacement leaves the element with its old children, and keeps none
+// of them aside. An element with children of several kinds, and one with none.
+void test_replace_content_out_of_memory( Fixture const &f ) {
+#if defined(__linux__)
+  for ( char const *const target : { "a", "e" } ) {
+    auto attempt = [&]( long n, long length, long *count ) -> std::string {
+      Item doc;
+      {
+        XQuery_t const make( f.zorba->compileQuery(
+          "document { <r><a k='1'>t<b/><!--c--><?p v?></a><e/></r> }" ) );
+        Iterator_t const it( make->iterator() );
+        it->open();
+        it->next( doc );
+        it->close();
+      }
+      XQuery_t const replace( f.zorba->compileQuery(
+        "declare revalidation skip;\n"
+        "declare variable $d external;\n"
+        "replace value of node $d/r/" + std::string( target ) + " with 'y';\n"
+        "1" ) );
+      replace->getDynamicContext()->setVariable( "d", doc );
+      Iterator_t const it( replace->iterator() );
+      Item result;
+      bool failed = false;
+      inject_arm( n, length );
+      try {
+        it->open();
+        it->next( result );
+        it->close();
+      }
+      catch ( std::exception const& ) {
+        failed = true;
+      }
+      *count = inject_disarm();
+      std::string out( failed || result.isNull()
+                       ? "error" : result.getStringValue().str() );
+      XQuery_t const inspect( f.zorba->compileQuery(
+        "declare variable $d external;\n"
+        "serialize($d/r)" ) );
+      inspect->getDynamicContext()->setVariable( "d", doc );
+      Iterator_t const seen( inspect->iterator() );
+      seen->open();
+      Item item;
+      out += "|";
+      while ( seen->next( item ) )
+        out += item.getStringValue().str();
+      seen->close();
+      return out;
+    };
+    std::string const what( std::string( "replacing the content of " ) +
+                            target );
+    std::string const before( "<r><a k=\"1\">t<b/><!--c--><?p v?></a><e/></r>" );
+    std::string const answer( *target == 'a'
+                              ? "1|<r><a k=\"1\">y</a><e/></r>"
+                              : "1|<r><a k=\"1\">t<b/><!--c--><?p v?></a><e>y</e></r>" );
+    long total = 0;
+    std::string const whole( attempt( 0, 0, &total ) );
+    check( whole == answer, what, whole );
+    long wrong = 0;
+    for ( long const length : { 1L, 8L } )
+      for ( long n = 1; n <= total; ++n ) {
+        long count = 0;
+        std::string const got( attempt( n, length, &count ) );
+        if ( got != answer && got != "error|" + before && ++wrong <= 3 )
+          std::cout << "at " << n << " of a run of " << length << ": " << got
+                    << std::endl;
+      }
+    check( wrong == 0, what + " failing: the answer, or an error and the "
+                       "element as before",
+           std::to_string( wrong ) + " points" );
+  }
+# if defined(__SANITIZE_ADDRESS__)
+  check( __lsan_do_recoverable_leak_check() == 0,
+         "replacing content failing: nothing is left behind" );
+# endif
+#else
+  (void)f;
+#endif
+}
 // An insert into an object with each allocation failing in turn: a failed
 // insert leaves the object as it was, so a later insert and a lookup by name
 // still find what they should. 16 members: the insert builds the object's index
@@ -8528,6 +8608,7 @@ Test const tests[] = {
   { "exhaust_seekable_stream", test_seekable_stream_out_of_memory },
   { "exhaust_json_loader", test_json_loader_out_of_memory },
   { "exhaust_serializer", test_serializer_out_of_memory },
+  { "exhaust_replace_content", test_replace_content_out_of_memory },
   { "exhaust_json_object_add", test_json_object_add_out_of_memory },
   { "exhaust_remove_type", test_remove_type_out_of_memory },
   { "exhaust_plan_wrapper", test_plan_wrapper_out_of_memory },

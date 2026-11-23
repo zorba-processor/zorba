@@ -1490,12 +1490,30 @@ void InternalNode::restoreChild(UpdReplaceChild& upd)
 ********************************************************************************/
 void ElementNode::replaceContent(UpdReplaceElemContent& upd)
 {
+  // The list of the old children, and room for the new child, are made before
+  // the old children are taken out. theNodes keeps its capacity, so a failure
+  // after that puts the old children back without allocating.
   upd.theOldChildren.insert(upd.theOldChildren.begin(),
                             childrenBegin(),
                             childrenEnd());
 
+  theNodes.reserve(theNumAttrs + 1);
   theNodes.resize(theNumAttrs);
 
+  try
+  {
+    replaceChildrenWithText(upd);
+  }
+  catch (...)
+  {
+    restoreContent(upd);
+    throw;
+  }
+}
+
+
+void ElementNode::replaceChildrenWithText(UpdReplaceElemContent& upd)
+{
   if (upd.theNewChild == NULL || upd.theNewChild->getStringValue().empty())
     return;
 

@@ -593,6 +593,7 @@ IF (ZORBA_WITH_FILE_ACCESS)
              entity_expansion case_paths html_edge_cases memory_limit
              exhaust_at_start exhaust_errno exhaust_bounds_retry
              exhaust_sweep_compile exhaust_sweep_builtins
+             exhaust_replace_content
              exhaust_json_object_add
              exhaust_sweep_matcher exhaust_sweep_query_text exhaust_sweep_long_token
              exhaust_sweep_streamable_text exhaust_base64_stream
