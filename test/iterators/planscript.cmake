@@ -90,5 +90,8 @@ IF (("${EXIT_CODE}" STREQUAL "0") OR (${APITEST_SPEC_CONTENTS} MATCHES "Error:")
               
   MESSAGE(STATUS ${out_var})
 ELSE (("${EXIT_CODE}" STREQUAL "0") OR (${APITEST_SPEC_CONTENTS} MATCHES "Error:"))
-  MESSAGE(STATUS "Profile generation failed. Exit code: ${EXIT_CODE}.")
+  INCLUDE ("${CMAKE_CURRENT_LIST_DIR}/report_failure.cmake")
+  REPORT_FAILURE ("Plan generation" "${EXIT_CODE}" "${APITEST_RESULT_FILEPATH}.err"
+    ${NATIVE_ZORBA_EXE} --iterator-tree ${FORMAT} --no-tree-ids --no-serializer
+    ${APITEST_ARGS_LIST} ${APITEST_QUERY})
 ENDIF (("${EXIT_CODE}" STREQUAL "0") OR (${APITEST_SPEC_CONTENTS} MATCHES "Error:"))
