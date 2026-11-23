@@ -576,7 +576,8 @@ IF (ZORBA_WITH_FILE_ACCESS)
     IF (NOT ZORBA_NO_XMLSCHEMA)
       SET (_mcp_xml_tests error_canonicalize_input exhaust_sweep_validate
                           exhaust_sweep_revalidate exhaust_remove_type
-                          exhaust_sweep_schema_import validate_type_error)
+                          exhaust_sweep_schema_import validate_type_error
+                          exhaust_update_primitive)
       SET (_mcp_schema_sweeps validate revalidate schema_import)
     ENDIF (NOT ZORBA_NO_XMLSCHEMA)
     FOREACH (_t json protocol legacy tools_list list_documents join
@@ -635,6 +636,12 @@ IF (ZORBA_WITH_FILE_ACCESS)
         PASS_REGULAR_EXPRESSION "PASSED: ${_t}"
         FAIL_REGULAR_EXPRESSION "FAILED|TOP-SECRET|HIDDEN-SECRET")
     ENDFOREACH (_t)
+    # A failed update must not keep its target: the store reports the strings
+    # it keeps referenced at shutdown, after the test has passed.
+    IF (NOT ZORBA_NO_XMLSCHEMA)
+      SET_TESTS_PROPERTIES (bin/mcp/exhaust_update_primitive PROPERTIES
+        FAIL_REGULAR_EXPRESSION "FAILED|ZSTR0065")
+    ENDIF (NOT ZORBA_NO_XMLSCHEMA)
 
     # The help states the order, and what --queries loads.
     ADD_TEST (NAME bin/mcp/language_help
