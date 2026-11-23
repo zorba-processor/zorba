@@ -35,6 +35,7 @@ CREATE_TEST_SOURCELIST(MTTests
   mt_node_dereference.cpp
   mt_lock_upgrade.cpp
   mt_module_instance.cpp
+  mt_function_items.cpp
   ${MTSchemaTests}
 )
 

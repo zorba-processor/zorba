@@ -70,6 +70,7 @@ void initializeTestList()
   libunittests["ordpath"] = test_ordpath;
 
   libunittests["json_array_pul"] = test_json_array_pul;
+  libunittests["json_object_pul"] = test_json_object_pul;
   libunittests["json_object"] = test_json_object;
   libunittests["json_parser"] = test_json_parser;
   libunittests["parameters"] = test_parameters;
