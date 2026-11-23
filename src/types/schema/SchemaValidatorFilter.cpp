@@ -67,6 +67,7 @@ static inline const XMLCh *nullToZero(const XMLCh *in)
 
 // "1", the other lexical form of the xs:boolean true
 static const XMLCh XSD_BOOLEAN_TRUE_DIGIT[] = { chDigit_1, chNull };
+static const XMLCh XSD_BOOLEAN_FALSE_DIGIT[] = { chDigit_0, chNull };
 
 
 const XMLCh SchemaValidatorFilter::DT_UNTYPED[] =
@@ -99,6 +100,8 @@ SchemaValidatorFilter::SchemaValidatorFilter(
   theContent(1023, mm),
   theXsiTypeValue(64, mm),
   theXsiType(0),
+  theInvalidXsiNilValue(16, mm),
+  theHasInvalidXsiNil(false),
   theAttrCount(0),
   theEventBuffer(eventBuffer),
   theErrorOccurred(false),
@@ -217,6 +220,7 @@ void SchemaValidatorFilter::startElementEvent(
   theElementToProcess = true;
   theAttrCount = 0;
   theXsiType = 0;
+  theHasInvalidXsiNil = false;
 
   if(fElemStack.isEmpty())
     theParentStack = 0;
@@ -381,6 +385,13 @@ void SchemaValidatorFilter::processStartElement()
       }
   }
   const bool isValidated = fValidate || theXsiType;
+  // As in error(), lax validation does not assess an element without a declaration
+  if (theHasInvalidXsiNil && isValidated && !isSkipped &&
+      (theStrictValidation || elemDecl->isDeclared()))
+  {
+    emitError(XMLErrs::InvalidAttValue, theInvalidXsiNilValue.getRawBuffer(),
+              SchemaSymbols::fgATT_NILL);
+  }
   theIsNilled = isValidated && ((XercSchemaValidator*)fValidator)->getIsNil();
   theOpenElements.push_back(
     {isValidated, isSkipped, theIsNilled,
@@ -909,6 +920,12 @@ void SchemaValidatorFilter::attributeEvent(
          XMLString::equals(nilValue.getRawBuffer(), XSD_BOOLEAN_TRUE_DIGIT))
       {
         ((XercSchemaValidator*)fValidator)->setNillable(true);
+      }
+      else if(!XMLString::equals(nilValue.getRawBuffer(), SchemaSymbols::fgATTVAL_FALSE) &&
+              !XMLString::equals(nilValue.getRawBuffer(), XSD_BOOLEAN_FALSE_DIGIT))
+      {
+        theInvalidXsiNilValue.set(value);
+        theHasInvalidXsiNil = true;
       }
     }
     --theAttrCount;  // remove att from the list but still needs to be reported
