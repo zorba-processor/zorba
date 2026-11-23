@@ -227,6 +227,8 @@ protected:
 
   UdfSet           theProcessedUDFs;
 
+  CompilerCB     * theCCB = nullptr;
+
 public:
   MarkNodeCopyProps()
     :

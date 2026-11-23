@@ -399,6 +399,11 @@ public:
 
 expr* SubstVars::apply(RewriterContext& rCtx, expr* node, bool& modified)
 {
+  // An expression of another compilation (the prolog of a static context
+  // shared by several queries) is shared by them: it is left as it is.
+  if (node->get_ccb() != rCtx.theCCB)
+    return NULL;
+
   //thePath.push_back(node);
 
   ExprIterator iter(node);
@@ -2001,6 +2006,11 @@ static bool is_positional_pred(
 *******************************************************************************/
 expr* MergeFLWOR::apply(RewriterContext& rCtx, expr* node, bool& modified)
 {
+  // An expression of another compilation (the prolog of a static context
+  // shared by several queries) is shared by them: it is left as it is.
+  if (node->get_ccb() != rCtx.theCCB)
+    return NULL;
+
   if (node->get_expr_kind() == flwor_expr_kind)
   {
     flwor_expr* flwor = static_cast<flwor_expr *>(node);

@@ -26,6 +26,7 @@ CREATE_TEST_SOURCELIST(MTTests
   mt_independent.cpp
   mt_globals.cpp
   mt_clone.cpp
+  mt_shared_sctx.cpp
   mt_shared_items.cpp
   mt_store_rw.cpp
   mt_doc_cache.cpp

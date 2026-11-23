@@ -17,6 +17,7 @@
 #include "compiler/rewriter/rules/rule_base.h"
 #include "compiler/expression/expr_base.h"
 #include "compiler/expression/expr_iter.h"
+#include "compiler/rewriter/framework/rewriter_context.h"
 
 
 namespace zorba
@@ -33,6 +34,11 @@ namespace zorba
 expr* PrePostRewriteRule::apply(RewriterContext& rCtx, expr* curExpr, bool& modified)
 {
   expr* result = NULL;
+
+  // An expression of another compilation (the prolog of a static context
+  // shared by several queries) is shared by them: it is left as it is.
+  if (curExpr->get_ccb() != rCtx.theCCB)
+    return NULL;
 
   expr* newExpr = rewritePre(&*curExpr, rCtx);
   if (newExpr != NULL)

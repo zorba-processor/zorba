@@ -806,7 +806,9 @@ wrapper_expr::wrapper_expr(
 {
   compute_scripting_kind();
 
-  if (theInput->get_expr_kind() == var_expr_kind)
+  // A variable of another compilation (a prolog of a shared static context) is
+  // shared by the queries that reference it; its references are not counted.
+  if (theInput->get_expr_kind() == var_expr_kind && theInput->get_ccb() == ccb)
     static_cast<var_expr*>(theInput)->add_ref();
 }
 

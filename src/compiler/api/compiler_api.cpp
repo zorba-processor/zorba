@@ -16,8 +16,10 @@
 
 #include <istream>
 #include <iterator>
+#include <set>
 #include <sstream>
 #include <string>
+#include <vector>
 
 #include "compiler/api/compiler_api.h"
 #include "diagnostics/xquery_diagnostics.h"
@@ -46,6 +48,10 @@
 #include "compiler/parsetree/parsenode_print_xqdoc_visitor.h"
 
 #include "compiler/expression/expr_base.h"
+#include "compiler/expression/expr_iter.h"
+#include "compiler/expression/fo_expr.h"
+#include "compiler/expression/function_item_expr.h"
+#include "compiler/expression/expr.h"
 
 #include "compiler/translator/translator.h"
 
@@ -60,6 +66,7 @@
 #endif
 
 #include "runtime/base/plan_iterator.h"
+#include "runtime/hof/function_item.h"
 #include "util/xml_util.h"
 #include "zorbatypes/URI.h"
 
@@ -380,7 +387,11 @@ PlanIter_t XQueryCompiler::compile(
     theCompilerCB->theMayRunSideEffects ||
     expr_tools::may_run_side_effects_or_updates(rootExpr);
 
-  return codegen(rootExpr, nextDynamicVarId, auditRecord);
+  PlanIter_t plan = codegen(rootExpr, nextDynamicVarId, auditRecord);
+
+  seal(rootExpr);
+
+  return plan;
 }
 
 
@@ -493,6 +504,280 @@ PlanIter_t XQueryCompiler::codegen(
   theCompilerCB->setPhase(CompilerCB::NONE);
 
   return plan;
+}
+
+
+namespace
+{
+
+/*******************************************************************************
+  The udfs of a compilation that seal() optimizes and generates the plans of,
+  in the order their plans were generated lazily before (by the first call that
+  opened): those that the main query names, each call after its arguments, then
+  those that their bodies name.
+********************************************************************************/
+class SealedFunctions
+{
+public:
+  struct Entry
+  {
+    user_function * theUDF;
+    ulong           theNextVarId;
+    // Named by the main query or by a body it reaches: the optimizer already
+    // saw it, or it was optimized when its plan was generated.
+    bool            theIsReached;
+  };
+
+  CompilerCB              * theCCB;
+  std::vector<Entry>        theEntries;
+  std::set<user_function*>  theSeen;
+
+  explicit SealedFunctions(CompilerCB* ccb) : theCCB(ccb) {}
+
+  // nextVarId is the one the calls of the function pass to getPlan().
+  void add(function* f, ulong nextVarId, bool isReached)
+  {
+    if (f == NULL || !f->isUdf())
+      return;
+
+    user_function* udf = static_cast<user_function*>(f);
+
+    // A udf of another compilation is sealed by it; one without a body is
+    // external or comes from a plan.
+    if (udf->getCCB() != theCCB ||
+        udf->getBody() == NULL ||
+        udf->isSealed() ||
+        !theSeen.insert(udf).second)
+      return;
+
+    theEntries.push_back(Entry{udf, nextVarId, isReached});
+  }
+
+  void addNamed(expr* e, bool isReached)
+  {
+    ExprIterator iter(e);
+    while (!iter.done())
+    {
+      if (**iter != NULL)
+        addNamed(**iter, isReached);
+
+      iter.next();
+    }
+
+    if (e->get_expr_kind() == fo_expr_kind)
+    {
+      add(static_cast<fo_expr*>(e)->get_func(), 1, isReached);
+    }
+    else if (e->get_expr_kind() == function_item_expr_kind)
+    {
+      function_item_expr* fi = static_cast<function_item_expr*>(e);
+      add(fi->get_function(), fi->get_fi_info()->firstLocalVarId(), isReached);
+    }
+  }
+};
+
+
+// Computes the cached type of every expression of e. One that cannot be typed
+// keeps raising its error where it is typed.
+void computeTypes(expr* e)
+{
+  ExprIterator iter(e);
+  while (!iter.done())
+  {
+    if (**iter != NULL)
+      computeTypes(**iter);
+
+    iter.next();
+  }
+
+  try
+  {
+    (void)e->get_return_type();
+  }
+  catch (ZorbaException const&)
+  {
+  }
+}
+
+
+// Makes every constructor in e copy its input nodes.
+void copyInputNodes(expr* e)
+{
+  ExprIterator iter(e);
+  while (!iter.done())
+  {
+    if (**iter != NULL)
+      copyInputNodes(**iter);
+
+    iter.next();
+  }
+
+  if (e->get_expr_kind() == doc_expr_kind)
+    static_cast<doc_expr*>(e)->setCopyInputNodes();
+  else if (e->get_expr_kind() == elem_expr_kind)
+    static_cast<elem_expr*>(e)->setCopyInputNodes();
+}
+
+} // namespace
+
+
+/*******************************************************************************
+  Sealed compilation: optimizes and generates the plan of every udf of this
+  compilation that its main query can reach, and computes the types of their
+  expressions, so that running the query, or compiling another query against a
+  static context it shares, changes nothing in them.
+
+  A prolog loaded with loadProlog, and a query with eval or fn:function-lookup,
+  can have any function they declare called by another compilation: then every
+  declared function is sealed. The functions that the compilation does not call
+  are optimized as the compilation of a query that calls them did before, and
+  their constructors copy their input nodes, since nothing here knows how a
+  caller uses the nodes they return.
+
+  Optimizing and generating a plan lazily raised their errors when a call
+  opened: they are kept in the udf and raised there (user_function::seal()).
+  An error that the compilation of a caller found in a function that this
+  compilation does not call (inferring its determinism, computing its cache
+  settings) is raised by the compilation of a query that calls it statically
+  (UDFGraph::inferDeterminism()).
+********************************************************************************/
+void XQueryCompiler::seal(expr* rootExpr)
+{
+  CompilerCB* ccb = theCompilerCB;
+
+  bool const allDeclared = (ccb->theIsLoadProlog ||
+                            ccb->theHasEval ||
+                            ccb->theHasFunctionLookup);
+
+  SealedFunctions sealed(ccb);
+  sealed.addNamed(rootExpr, true);
+
+  std::set<user_function*> declared;
+  bool declaredAdded = false;
+
+  for (csize i = 0; ; ++i)
+  {
+    if (i == sealed.theEntries.size())
+    {
+      if (!allDeclared || declaredAdded)
+        break;
+
+      declaredAdded = true;
+
+      std::vector<static_context*> sctxs;
+      sctxs.push_back(ccb->theRootSctx);
+
+      CompilerCB::SctxMap::const_iterator ite = ccb->theSctxMap.begin();
+      for (; ite != ccb->theSctxMap.end(); ++ite)
+        sctxs.push_back(ite->second.getp());
+
+      std::set<const static_context*> visitedSctxs;
+      std::vector<function*> functions;
+
+      for (csize j = 0; j < sctxs.size(); ++j)
+      {
+        if (sctxs[j] != NULL)
+          sctxs[j]->get_udfs(functions, visitedSctxs);
+      }
+
+      for (csize j = 0; j < functions.size(); ++j)
+      {
+        if (static_cast<user_function*>(functions[j])->getCCB() == ccb)
+          declared.insert(static_cast<user_function*>(functions[j]));
+
+        sealed.add(functions[j], 1, false);
+      }
+
+      if (i == sealed.theEntries.size())
+        break;
+    }
+
+    SealedFunctions::Entry entry = sealed.theEntries[i];
+    user_function* udf = entry.theUDF;
+
+    if (entry.theIsReached)
+    {
+      try
+      {
+        udf->optimize();
+      }
+      catch (ZorbaException const& e)
+      {
+        udf->setSealError(e);
+      }
+    }
+    else
+    {
+      UDFGraph graph(udf);
+
+      try
+      {
+        graph.inferDeterminism();
+      }
+      catch (ZorbaException const& e)
+      {
+        udf->setStaticError(e);
+      }
+
+      try
+      {
+        if (ccb->theConfig.opt_level > CompilerCB::config::O0)
+          graph.optimizeUDFs(ccb);
+      }
+      catch (ZorbaException const& e)
+      {
+        udf->setSealError(e);
+      }
+    }
+
+    sealed.addNamed(udf->getBody(), entry.theIsReached);
+  }
+
+  if (allDeclared)
+  {
+    for (csize i = 0; i < sealed.theEntries.size(); ++i)
+      copyInputNodes(sealed.theEntries[i].theUDF->getBody());
+  }
+
+  // The queries compiled against the static context of a prolog include its
+  // program, which initializes its variables (translator, end_visit of
+  // MainModule): they read it, they do not change it.
+  if (ccb->theIsLoadProlog)
+  {
+    expr* program = ccb->theRootSctx->get_query_expr();
+
+    copyInputNodes(rootExpr);
+    computeTypes(rootExpr);
+
+    if (program != NULL && program != rootExpr)
+    {
+      copyInputNodes(program);
+      computeTypes(program);
+    }
+  }
+
+  for (csize i = 0; i < sealed.theEntries.size(); ++i)
+  {
+    SealedFunctions::Entry const& entry = sealed.theEntries[i];
+    user_function* udf = entry.theUDF;
+
+    // The compilation of a caller computed them for the calls it generated.
+    if (declared.count(udf) != 0)
+    {
+      try
+      {
+        udf->computeCacheSettings(ccb->theXQueryDiagnostics);
+      }
+      catch (ZorbaException const& e)
+      {
+        udf->setStaticError(e);
+      }
+    }
+
+    computeTypes(udf->getBody());
+
+    udf->seal(entry.theNextVarId);
+  }
 }
 
 

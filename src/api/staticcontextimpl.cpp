@@ -1160,8 +1160,9 @@ void StaticContextImpl::loadProlog(
   theCompilerCB = impl.theCompilerCB;
   impl.theCompilerCB = NULL;
 
-  // The ccb reports to the diagnostics of impl (when the functions of the
-  // prolog are compiled, lazily, by the queries that call them).
+  // The ccb reports to the diagnostics of impl. loadProlog() sealed the
+  // functions of the prolog (XQueryCompiler::seal()): the queries compiled
+  // against this context only read them.
   theXQueryDiagnostics = impl.theXQueryDiagnostics;
   impl.theXQueryDiagnostics = NULL;
 

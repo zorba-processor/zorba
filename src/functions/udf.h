@@ -17,6 +17,8 @@
 #ifndef ZORBA_FUNCTIONS_UDF
 #define ZORBA_FUNCTIONS_UDF
 
+#include <memory>
+
 #include "functions/cacheable_function.h"
 #include "store/api/item_handle.h"
 
@@ -26,6 +28,7 @@
 namespace zorba
 {
   class expr;
+  class ZorbaException;
 
 /*******************************************************************************
   A udf with params $x1, $x2, ..., $xn and a body_expr is translated into a
@@ -80,6 +83,25 @@ namespace zorba
   at most one of the references will actually be reached during each particular
   execution of the body.
 
+  theIsSealed:
+  ------------
+  Set by seal(), when the compilation that owns this udf has optimized it and
+  generated its plan (sealed compilation). From then on nothing in the udf
+  changes, so queries on several threads can share it.
+
+  theSealError:
+  -------------
+  The error that optimizing or generating the plan raised when the owning
+  compilation sealed it. getPlan() raises a copy of it each time a call opens,
+  where optimizing and generating the plan lazily raised it before.
+
+  theStaticError:
+  ---------------
+  The error that the owning compilation found in a function it does not call
+  (a prolog loaded with loadProlog), where the compilation of a query that
+  calls the function found it before (inferring its determinism, computing its
+  cache settings): the compilation of such a query raises it (UDFGraph).
+
 ********************************************************************************/
 class user_function : public cacheable_function
 {
@@ -110,6 +132,10 @@ private:
   PlanIter_t                  thePlan;
   uint32_t                    thePlanStateSize;
   std::vector<ArgVarRefs>     theArgVarsRefs;
+
+  bool                        theIsSealed = false;
+  std::unique_ptr<ZorbaException> theSealError;
+  std::unique_ptr<ZorbaException> theStaticError;
 
 public:
   SERIALIZABLE_CLASS(user_function)
@@ -177,6 +203,16 @@ public:
   PlanIter_t const& getPlan() const { return thePlan; }
 
   void invalidatePlan();
+
+  void seal(ulong nextVarId);
+
+  bool isSealed() const { return theIsSealed; }
+
+  void setSealError(const ZorbaException& error);
+
+  void setStaticError(const ZorbaException& error);
+
+  void raiseStaticError() const;
 
   PlanIter_t codegen(
         CompilerCB* cb,

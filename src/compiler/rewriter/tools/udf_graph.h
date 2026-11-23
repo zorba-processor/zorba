@@ -80,7 +80,14 @@ public:
 
   theExpr:
   --------
-  The expr whose call graph is represented by "this".
+  The expr whose call graph is represented by "this" (NULL for the graph of a
+  udf that the compilation does not call).
+
+  theCCB:
+  -------
+  The compilation the graph belongs to. A udf of another compilation (a static
+  context shared by several queries, or the query that runs an eval) is a leaf
+  of the graph: its owner optimized it, and nothing here changes it.
 
   theNodes:
   ---------
@@ -106,13 +113,16 @@ class UDFGraph
   typedef HashMap<user_function*, UDFNode*, UDFHashMapCmp> UDFMap;
 
 protected:
-  expr     * theExpr;
-  UDFMap     theNodes;
-  UDFNode  * theRoot;
-  ulong      theVisitId;
+  expr       * theExpr;
+  CompilerCB * theCCB;
+  UDFMap       theNodes;
+  UDFNode    * theRoot;
+  ulong        theVisitId;
 
 public:
   UDFGraph(expr* e);
+
+  UDFGraph(user_function* udf);
 
   ~UDFGraph();
 
@@ -123,9 +133,13 @@ public:
   void display(std::ostream& o);
 
 protected:
-  void build(const expr* e);
+  void build(const expr* e, user_function* udf);
 
   void build(const expr* curExpr, std::vector<user_function*>& callChain);
+
+  void addCall(user_function* udf, std::vector<user_function*>& callChain);
+
+  bool isForeign(const UDFNode* node) const;
 
   void addEdge(user_function* caller, user_function* callee);
 

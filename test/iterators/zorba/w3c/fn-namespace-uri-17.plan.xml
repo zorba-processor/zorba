@@ -14,6 +14,41 @@
 <iterator-tree description="main query">
   <FnConcatIterator/>
 </iterator-tree>
+<iterator-tree description="x:canonicalize">
+  <FnZorbaCanonicalizeIterator>
+    <LetVarIterator varname="xml-string"/>
+    <TreatIterator type="[NodeXQType elementNode content=[XQType ANY_TYPE_KIND*]]" quant="">
+      <ValidateIterator>
+        <ElementIterator>
+          <SingletonIterator value="xs:QName(http://zorba.io/modules/xml-options,opt,options)"/>
+        </ElementIterator>
+      </ValidateIterator>
+    </TreatIterator>
+  </FnZorbaCanonicalizeIterator>
+</iterator-tree>
+<iterator-tree description="x:canonicalize">
+  <FLWORIterator>
+    <ForVariable name="options">
+      <LetVarIterator varname="options"/>
+    </ForVariable>
+    <ReturnClause>
+      <FnZorbaCanonicalizeIterator>
+        <LetVarIterator varname="xml-string"/>
+        <TreatIterator type="[NodeXQType elementNode content=[XQType ANY_TYPE_KIND*]]" quant="">
+          <IfThenElseIterator>
+            <ZorbaIsValidatedIterator>
+              <ForVarIterator varname="options"/>
+            </ZorbaIsValidatedIterator>
+            <ForVarIterator varname="options"/>
+            <ValidateIterator>
+              <ForVarIterator varname="options"/>
+            </ValidateIterator>
+          </IfThenElseIterator>
+        </TreatIterator>
+      </FnZorbaCanonicalizeIterator>
+    </ReturnClause>
+  </FLWORIterator>
+</iterator-tree>
 <iterator-tree description="main query">
   <SequentialIterator>
     <FnConcatIterator/>
