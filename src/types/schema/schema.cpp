@@ -37,6 +37,7 @@
 #include "types/schema/LoadSchemaErrorHandler.h"
 #include "types/schema/PrintSchema.h"
 #include "types/schema/XercesParseUtils.h"
+#include "types/schema/XercSchemaValidator.h"
 #include "types/schema/xercesIncludes.h"
 
 #include "system/globalenv.h"
@@ -381,14 +382,15 @@ Schema::Schema(TypeManager* tm)
 
 #ifndef ZORBA_NO_XMLSCHEMA
   {
-    SYNC_CODE(AutoMutex xercesLock(GENV_TYPESYSTEM.getXercesMutex());)
+    SYNC_CODE(AutoLock xercesLock(GENV_TYPESYSTEM.getXercesLock(), Lock::WRITE);)
 
    theGrammarPool = new (&theGrammarPoolMemoryManager)
                     XMLGrammarPoolImpl(&theGrammarPoolMemoryManager);
   }
 
+  // Filled by queries on several threads, which hold the Xerces lock in READ.
   theUdTypesCache = 
-  new HashMap<zstring, xqtref_t, HashMapZStringCmp>(64, false);
+  new HashMap<zstring, xqtref_t, HashMapZStringCmp>(64, true);
 
 #endif
 }
@@ -400,7 +402,7 @@ Schema::Schema(TypeManager* tm)
 Schema::Schema(::zorba::serialization::Archiver& ar)
 {
 #ifndef ZORBA_NO_XMLSCHEMA
-  SYNC_CODE(AutoMutex xercesLock(GENV_TYPESYSTEM.getXercesMutex());)
+  SYNC_CODE(AutoLock xercesLock(GENV_TYPESYSTEM.getXercesLock(), Lock::WRITE);)
 
   theGrammarPool = new (&theGrammarPoolMemoryManager)
                    XMLGrammarPoolImpl(&theGrammarPoolMemoryManager);
@@ -417,7 +419,7 @@ Schema::~Schema()
 {
 #ifndef ZORBA_NO_XMLSCHEMA
   {
-    SYNC_CODE(AutoMutex xercesLock(GENV_TYPESYSTEM.getXercesMutex());)
+    SYNC_CODE(AutoLock xercesLock(GENV_TYPESYSTEM.getXercesLock(), Lock::WRITE);)
 
     theRejectedGrammarParsers.clear();
     delete theGrammarPool;
@@ -438,7 +440,7 @@ void Schema::serialize(::zorba::serialization::Archiver& ar)
 #ifndef ZORBA_NO_XMLSCHEMA
    ar & theUdTypesCache;
 
-   SYNC_CODE(AutoMutex xercesLock(GENV_TYPESYSTEM.getXercesMutex());)
+   SYNC_CODE(AutoLock xercesLock(GENV_TYPESYSTEM.getXercesLock(), Lock::WRITE);)
 
    bool is_grammar_NULL = (theGrammarPool == NULL);
 
@@ -503,6 +505,9 @@ void Schema::serialize(::zorba::serialization::Archiver& ar)
        {
          BinMemInputStream binmeminputstream((XMLByte*)binstr.c_str(), binstr.size());
          theGrammarPool->deserializeGrammars(&binmeminputstream);
+         // The stream sets the pool's lock flag, without the thread-safe
+         // string pool that locking creates; the first use locks it.
+         theGrammarPool->unlockPool();
        }
      }
      else
@@ -536,14 +541,15 @@ void Schema::printXSDInfo(bool excludeBuiltIn)
 *******************************************************************************/
 bool Schema::isNamespaceLoaded(const char* ns) const
 {
-  SYNC_CODE(AutoMutex xercesLock(GENV_TYPESYSTEM.getXercesMutex());)
+  // Looking a grammar up changes no pool, locked or not.
+  SYNC_CODE(AutoLock xercesLock(GENV_TYPESYSTEM.getXercesLock(), Lock::READ);)
 
   return isNamespaceInPool(ns);
 }
 
 
 /*******************************************************************************
-  isNamespaceLoaded() for a caller that holds the Xerces mutex
+  isNamespaceLoaded() for a caller that holds the Xerces lock
 *******************************************************************************/
 bool Schema::isNamespaceInPool(const char* ns) const
 {
@@ -556,6 +562,67 @@ bool Schema::isNamespaceInPool(const char* ns) const
   Janitor<XMLSchemaDescription> descJanitor(desc);
   return theGrammarPool->retrieveGrammar(desc) != NULL;
 }
+
+
+#ifndef ZORBA_FOR_ONE_THREAD_ONLY
+/*******************************************************************************
+  Locks the grammar pool (lockPool), which makes it safe to use from several
+  threads, for a caller that holds the Xerces lock in WRITE. When an allocation
+  fails, the pool is left unlocked (which allocates nothing).
+*******************************************************************************/
+void Schema::lockGrammarPool() const
+{
+  try
+  {
+    theGrammarPool->lockPool();
+  }
+  catch (const OutOfMemoryException&)
+  {
+    theGrammarPool->unlockPool();
+    throw std::bad_alloc();
+  }
+  catch (...)
+  {
+    theGrammarPool->unlockPool();
+    throw;
+  }
+  theGrammarPoolLocked = true;
+}
+
+
+/*******************************************************************************
+  The first use after the pool was created or a schema imported locks it,
+  under WRITE, except within an import on this thread: a locked pool takes no
+  grammar.
+*******************************************************************************/
+Schema::PoolUse::PoolUse(const Schema& schema)
+{
+  Lock& xercesLock = GENV_TYPESYSTEM.getXercesLock();
+  xercesLock.rlock();
+  if (schema.theGrammarPoolLocked)
+    return;
+
+  xercesLock.unlock();
+  bool const importing = xercesLock.heldForWrite();
+  xercesLock.wlock();
+  try
+  {
+    if (!importing && !schema.theGrammarPoolLocked)
+      schema.lockGrammarPool();
+  }
+  catch (...)
+  {
+    xercesLock.unlock();
+    throw;
+  }
+}
+
+
+Schema::PoolUse::~PoolUse()
+{
+  GENV_TYPESYSTEM.getXercesLock().unlock();
+}
+#endif
 
 
 /*******************************************************************************
@@ -573,14 +640,19 @@ void Schema::registerXSD(
 
   TRACE("url=" << xsdURL << " loc=" << loc);
 
-  SYNC_CODE(AutoMutex xercesLock(GENV_TYPESYSTEM.getXercesMutex());)
+  SYNC_CODE(AutoLock xercesLock(GENV_TYPESYSTEM.getXercesLock(), Lock::WRITE);)
+
+  // A locked pool takes no grammar; the first use after the import locks it
+  // again (see PoolUse).
+  theGrammarPool->unlockPool();
+  SYNC_CODE(theGrammarPoolLocked = false;)
 
   try
   {
     // The location hint of an import of an already loaded namespace is
     // disregarded: the pool would reject the second grammar, and grammars
     // cached with it would point into it after the parser deletes it. Checked
-    // under the same hold of the mutex as the load.
+    // under the same hold of the lock as the load.
     if (isNamespaceInPool(xsdURL))
       return;
 
@@ -697,7 +769,7 @@ void Schema::getInfoFromGlobalElementDecl(
     bool& nillable,
     const QueryLoc& loc)
 {
-  SYNC_CODE(AutoMutex xercesLock(GENV_TYPESYSTEM.getXercesMutex());)
+  SYNC_CODE(PoolUse poolUse(*this);)
 
   XSElementDeclaration* decl = getDeclForElement(qname);
 
@@ -737,7 +809,7 @@ xqtref_t Schema::createXQTypeFromGlobalElementDecl(
   TRACE("qn:" << qname->getLocalName() << " @ " <<
         qname->getNamespace() );
 
-  SYNC_CODE(AutoMutex xercesLock(GENV_TYPESYSTEM.getXercesMutex());)
+  SYNC_CODE(PoolUse poolUse(*this);)
 
   XSElementDeclaration* decl = getDeclForElement(qname);
 
@@ -772,7 +844,7 @@ void Schema::getInfoFromGlobalAttributeDecl(
     store::Item_t& typeName,
     const QueryLoc& loc)
 {
-  SYNC_CODE(AutoMutex xercesLock(GENV_TYPESYSTEM.getXercesMutex());)
+  SYNC_CODE(PoolUse poolUse(*this);)
 
   XSTypeDefinition* typeDef = getTypeDefForAttribute(qname);
 
@@ -802,7 +874,7 @@ xqtref_t Schema::createXQTypeFromGlobalAttributeDecl(
     const bool raiseErrors,
     const QueryLoc& loc)
 {
-  SYNC_CODE(AutoMutex xercesLock(GENV_TYPESYSTEM.getXercesMutex());)
+  SYNC_CODE(PoolUse poolUse(*this);)
 
   XSTypeDefinition* typeDef = getTypeDefForAttribute(qname);
 
@@ -834,7 +906,7 @@ xqtref_t Schema::createXQTypeFromTypeName(
         << qname->getLocalName() << "@"
         << qname->getNamespace());
 
-  SYNC_CODE(AutoMutex xercesLock(GENV_TYPESYSTEM.getXercesMutex());)
+  SYNC_CODE(PoolUse poolUse(*this);)
 
   if (theGrammarPool == NULL)
     return NULL;
@@ -907,7 +979,7 @@ void Schema::getSubstitutionHeadForElement(
 
   result = NULL;
 
-  SYNC_CODE(AutoMutex xercesLock(GENV_TYPESYSTEM.getXercesMutex());)
+  SYNC_CODE(PoolUse poolUse(*this);)
 
   if (theGrammarPool == NULL)
     return;
@@ -1883,7 +1955,7 @@ bool Schema::parseUserAtomicTypes(
 
   ZORBA_ASSERT(udXQType->isAtomicAny());
 
-  SYNC_CODE(AutoMutex xercesLock(GENV_TYPESYSTEM.getXercesMutex());)
+  SYNC_CODE(PoolUse poolUse(*this);)
 
 #ifndef ZORBA_NO_XMLSCHEMA
   const store::Item* typeQName = udXQType->getQName();
@@ -1957,6 +2029,7 @@ bool Schema::parseUserAtomicTypes(
         {
           //std::cout << "parseUAT: uri:'" << uri << "'  local:'" << local << "'\n"; std::cout.flush();
           XMLChArray xchTextValue(uri.append(":").append(local).str());
+          SYNC_CODE(AutoMutex validatorLock(sharedValidatorMutex(xsiTypeDV));)
           xsiTypeDV->validate(xchTextValue.get());
         }
         else
@@ -1972,6 +2045,7 @@ bool Schema::parseUserAtomicTypes(
       else
       {
         XMLChArray xchTextValue(textValue.str());
+        SYNC_CODE(AutoMutex validatorLock(sharedValidatorMutex(xsiTypeDV));)
         if (isCasting)
         {
           /*

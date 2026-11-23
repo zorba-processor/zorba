@@ -24,6 +24,7 @@
 #include "types/typemanagerimpl.h"
 
 #include "zorbautils/hashmap.h"
+#include "zorbautils/lock.h"
 
 namespace zorba {
 
@@ -42,8 +43,9 @@ class RootTypeManager : public TypeManagerImpl
   friend class AtomicXQType;
 
 public:
-  // Recursive: holders such as validation call schema functions that lock it again.
-  SYNC_CODE(Mutex theXercesMutex{Mutex::RECURSIVE};)
+  // WRITE to change a grammar pool or create a schema, READ to use one: see
+  // Schema. Recursive: validation calls schema functions that lock it again.
+  SYNC_CODE(Lock theXercesLock;)
 
   /**
    * Pre-allocated XQType object for the "none" type.
@@ -325,7 +327,7 @@ private:
 public:
   ~RootTypeManager();
 
-  SYNC_CODE(Mutex* getXercesMutex() { return &theXercesMutex; })
+  SYNC_CODE(Lock& getXercesLock() { return theXercesLock; })
 
 private:
   RootTypeManager();

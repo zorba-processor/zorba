@@ -120,7 +120,7 @@ void TypeManagerImpl::initializeSchema()
 
   // Queries on several threads may validate or cast with a type manager
   // they share, and the first one creates its schema.
-  SYNC_CODE(AutoMutex xercesLock(GENV_TYPESYSTEM.getXercesMutex());)
+  SYNC_CODE(AutoLock xercesLock(GENV_TYPESYSTEM.getXercesLock(), Lock::WRITE);)
 
   if (m_schema == NULL)
   {

@@ -79,6 +79,10 @@ private:
   OwningMemoryManager                        theGrammarPoolMemoryManager;
   XERCES_CPP_NAMESPACE::XMLGrammarPool     * theGrammarPool;
 
+  // Whether theGrammarPool is locked (lockPool), which makes it safe to use
+  // from several threads; written under the Xerces lock in WRITE.
+  SYNC_CODE(mutable bool                     theGrammarPoolLocked = false;)
+
   // A parser of one schema import; the memory manager frees, after the parser,
   // what its constructors keep when an allocation fails.
   struct SchemaParser
@@ -95,6 +99,19 @@ private:
 #endif // ZORBA_NO_XMLSCHEMA
 
 public:
+#if !defined(ZORBA_NO_XMLSCHEMA) && !defined(ZORBA_FOR_ONE_THREAD_ONLY)
+  // Holds the Xerces lock for a use of the schema's grammar pool: READ while
+  // the pool is locked, WRITE while it is not.
+  class PoolUse
+  {
+  public:
+    explicit PoolUse(const Schema& schema);
+    ~PoolUse();
+    PoolUse(const PoolUse&) = delete;
+    PoolUse& operator=(const PoolUse&) = delete;
+  };
+#endif
+
   SERIALIZABLE_CLASS(Schema)
   Schema(::zorba::serialization::Archiver& ar);
   void serialize(::zorba::serialization::Archiver& ar);
@@ -193,6 +210,8 @@ private:
 
 #ifndef ZORBA_NO_XMLSCHEMA
   bool isNamespaceInPool(const char* ns) const;
+
+  SYNC_CODE(void lockGrammarPool() const;)
 
   XERCES_CPP_NAMESPACE::XSElementDeclaration* getDeclForElement(
       const store::Item* qname);
