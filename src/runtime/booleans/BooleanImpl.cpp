@@ -317,9 +317,8 @@ CompareIterator::CompareIterator(
   :
   BinaryBaseIterator<CompareIterator, PlanIteratorState> ( sctx, loc, aChild0, aChild1 ),
   theCompType(aCompType),
-  theTypeManager(NULL),
-  theTimezone(0),
-  theCollation(NULL)
+  theTypeManager(sctx->get_typemanager()),
+  theCollation(sctx->get_default_collator(loc))
 {
   switch(theCompType)
   {
@@ -342,7 +341,6 @@ CompareIterator::CompareIterator(::zorba::serialization::Archiver& ar)
   :
   BinaryBaseIterator<CompareIterator, PlanIteratorState>(ar),
   theTypeManager(NULL),
-  theTimezone(0),
   theCollation(NULL)
 {
 }
@@ -356,25 +354,11 @@ void CompareIterator::serialize(::zorba::serialization::Archiver& ar)
   SERIALIZE_ENUM(CompareConsts::CompareType, theCompType)
   ar & theIsGeneralComparison;
   SERIALIZE_TYPEMANAGER(TypeManager, theTypeManager);
-  ar & theTimezone;
   ar & theCollation;
 }
 
 
 BINARY_ACCEPT(CompareIterator);
-
-
-/*******************************************************************************
-
-********************************************************************************/
-void CompareIterator::openImpl(PlanState& planState, uint32_t& offset)
-{
-  BinaryBaseIterator<CompareIterator, PlanIteratorState>::openImpl(planState, offset);
-
-  theTypeManager = theSctx->get_typemanager();
-  theCollation = theSctx->get_default_collator(loc);
-  theTimezone = planState.theLocalDynCtx->get_implicit_timezone();
-}
 
 
 /*******************************************************************************
@@ -387,6 +371,7 @@ bool CompareIterator::nextImpl(store::Item_t& result, PlanState& planState) cons
   std::vector<store::Item_t> seq0;
   std::vector<store::Item_t> seq1;
   store::TempSeq_t tSeq0, tSeq1;
+  long const timezone = planState.theLocalDynCtx->get_implicit_timezone();
 
   PlanIteratorState* state;
   DEFAULT_STACK_INIT(PlanIteratorState, state, planState);
@@ -419,7 +404,7 @@ bool CompareIterator::nextImpl(store::Item_t& result, PlanState& planState) cons
                                       item1,
                                       theCompType,
                                       theTypeManager,
-                                      theTimezone,
+                                      timezone,
                                       theCollation);
             done = true;
           }
@@ -474,7 +459,7 @@ bool CompareIterator::nextImpl(store::Item_t& result, PlanState& planState) cons
                                 item1,
                                 theCompType,
                                 theTypeManager,
-                                theTimezone,
+                                timezone,
                                 theCollation))
           {
             found = true;
@@ -501,7 +486,7 @@ bool CompareIterator::nextImpl(store::Item_t& result, PlanState& planState) cons
                                                                 item1,
                                                                 theCompType,
                                                                 theTypeManager,
-                                                                theTimezone,
+                                                                timezone,
                                                                 theCollation)),
                  state);
 
@@ -1077,7 +1062,6 @@ void TypedValueCompareIterator<ATC>::serialize(::zorba::serialization::Archiver&
   (NaryBaseIterator<TypedValueCompareIterator<ATC>, PlanIteratorState>*)this);
 
   SERIALIZE_ENUM(CompareConsts::CompareType, theCompType);
-  ar & theTimezone;
   ar & theCollation;
 }
 
@@ -1102,17 +1086,6 @@ void TypedValueCompareIterator<ATC>::accept(PlanIterVisitor& v) const
 
 
 template<store::SchemaTypeCode ATC>
-void TypedValueCompareIterator<ATC>::openImpl(PlanState& planState, uint32_t& offset)
-{
-  NaryBaseIterator<TypedValueCompareIterator, PlanIteratorState>
-  ::openImpl(planState, offset);
-
-  theTimezone = planState.theLocalDynCtx->get_implicit_timezone();
-  theCollation = this->theSctx->get_default_collator(this->loc);
-}
-
-
-template<store::SchemaTypeCode ATC>
 bool TypedValueCompareIterator<ATC>::nextImpl(
     store::Item_t& result,
     PlanState& planState) const
@@ -1121,6 +1094,7 @@ bool TypedValueCompareIterator<ATC>::nextImpl(
   bool bRes;
   bool neq = false;
   long cmp;
+  long const timezone = planState.theLocalDynCtx->get_implicit_timezone();
 
   PlanIteratorState* state;
   DEFAULT_STACK_INIT(PlanIteratorState, state, planState);
@@ -1135,7 +1109,7 @@ bool TypedValueCompareIterator<ATC>::nextImpl(
 
     case CompareConsts::VALUE_EQUAL:
     {
-      bRes = lItem0->equals(lItem1, theTimezone, theCollation);
+      bRes = lItem0->equals(lItem1, timezone, theCollation);
       if (neq)
         bRes = ! bRes;
 
@@ -1146,7 +1120,7 @@ bool TypedValueCompareIterator<ATC>::nextImpl(
     {
       try
       {
-        cmp = lItem0->compare(lItem1, theTimezone, theCollation);
+        cmp = lItem0->compare(lItem1, timezone, theCollation);
 
         switch (theCompType)
         {
@@ -1208,9 +1182,8 @@ AtomicValuesEquivalenceIterator::AtomicValuesEquivalenceIterator(
     PlanIter_t aChild1)
   :
   BinaryBaseIterator<AtomicValuesEquivalenceIterator, PlanIteratorState>(sctx, loc, aChild0, aChild1),
-  theTypeManager(NULL),
-  theTimezone(0),
-  theCollation(NULL)
+  theTypeManager(sctx->get_typemanager()),
+  theCollation(sctx->get_default_collator(loc))
 {
 }
 
@@ -1220,7 +1193,6 @@ AtomicValuesEquivalenceIterator::AtomicValuesEquivalenceIterator(
   :
   BinaryBaseIterator<AtomicValuesEquivalenceIterator, PlanIteratorState>(ar),
   theTypeManager(NULL),
-  theTimezone(0),
   theCollation(NULL)
 {
 }
@@ -1232,23 +1204,11 @@ void AtomicValuesEquivalenceIterator::serialize(::zorba::serialization::Archiver
   (BinaryBaseIterator<AtomicValuesEquivalenceIterator, PlanIteratorState>*)this);
 
   SERIALIZE_TYPEMANAGER(TypeManager, theTypeManager);
-  ar & theTimezone;
   ar & theCollation;
 }
 
 
 BINARY_ACCEPT(AtomicValuesEquivalenceIterator);
-
-
-void AtomicValuesEquivalenceIterator::openImpl(PlanState& planState, uint32_t& offset)
-{
-  BinaryBaseIterator<AtomicValuesEquivalenceIterator, PlanIteratorState>::
-  openImpl(planState, offset);
-
-  theTypeManager = theSctx->get_typemanager();
-  theCollation = theSctx->get_default_collator(loc);
-  theTimezone = planState.theLocalDynCtx->get_implicit_timezone();
-}
 
 
 bool AtomicValuesEquivalenceIterator::nextImpl(
@@ -1259,6 +1219,7 @@ bool AtomicValuesEquivalenceIterator::nextImpl(
   store::SchemaTypeCode type0;
   store::SchemaTypeCode type1;
   bool are_equivalent;
+  long const timezone = planState.theLocalDynCtx->get_implicit_timezone();
 
   PlanIteratorState* state;
   DEFAULT_STACK_INIT(PlanIteratorState, state, planState);
@@ -1288,7 +1249,7 @@ bool AtomicValuesEquivalenceIterator::nextImpl(
                                                        lItem0,
                                                        lItem1,
                                                        theTypeManager,
-                                                       theTimezone,
+                                                       timezone,
                                                        theCollation,
                                                        true);
         }

@@ -78,7 +78,13 @@ public:
     return theChild->getStateSizeOfSubtree() + getStateSize();
   }
 
-  void openImpl(PlanState& planState, uint32_t& offset);
+  virtual void assignStateOffsets(uint32_t& offset)
+  {
+    this->template assignOwnStateOffset<StateType>(offset);
+    theChild->assignStateOffsets(offset);
+  }
+
+  void openImpl(PlanState& planState, uint32_t& offset) const;
 
   void resetImpl(PlanState& planState) const;
 
@@ -101,7 +107,7 @@ template <class IterType, class StateType>
 void
 UnaryBaseIterator<IterType, StateType>::openImpl(
     PlanState& planState,
-    uint32_t& offset)
+    uint32_t& offset) const
 {
   StateTraitsImpl<StateType>::createState(planState, this->theStateOffset, offset);
   StateTraitsImpl<StateType>::initState(planState, this->theStateOffset);

@@ -69,7 +69,15 @@ public:
 
   virtual uint32_t getStateSizeOfSubtree() const;
 
-  void openImpl(PlanState& planState, uint32_t& offset);
+  virtual void assignStateOffsets(uint32_t& offset)
+  {
+    this->template assignOwnStateOffset<StateType>(offset);
+
+    for (PlanIter_t& child : theChildren)
+      child->assignStateOffsets(offset);
+  }
+
+  void openImpl(PlanState& planState, uint32_t& offset) const;
 
   void resetImpl(PlanState& planState) const;
 
@@ -128,13 +136,13 @@ NaryBaseIterator<IterType, StateType>::getStateSizeOfSubtree() const
 template <class IterType, class StateType>
 void NaryBaseIterator<IterType, StateType>::openImpl(
     PlanState& planState,
-    uint32_t& offset)
+    uint32_t& offset) const
 {
   StateTraitsImpl<StateType>::createState(planState, this->theStateOffset, offset);
   StateTraitsImpl<StateType>::initState(planState, this->theStateOffset);
 
-  std::vector<PlanIter_t>::iterator ite = theChildren.begin();
-  std::vector<PlanIter_t>::iterator end = theChildren.end();
+  std::vector<PlanIter_t>::const_iterator ite = theChildren.begin();
+  std::vector<PlanIter_t>::const_iterator end = theChildren.end();
   for (; ite != end; ++ite)
 	{
     (*ite)->open(planState, offset);

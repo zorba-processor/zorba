@@ -921,14 +921,28 @@ TransformIterator::nextImpl(store::Item_t& result, PlanState& aPlanState) const
 }
 
 
+void TransformIterator::assignStateOffsets(uint32_t& offset)
+{
+  assignOwnStateOffset<PlanIteratorState>(offset);
+
+  for (CopyClause& clause : theCopyClauses)
+    clause.theInput->assignStateOffsets(offset);
+
+  // thePulHolderIter is a descendant of theApplyIter (see openImpl).
+  theModifyIter->assignStateOffsets(offset);
+  theApplyIter->assignStateOffsets(offset);
+  theReturnIter->assignStateOffsets(offset);
+}
+
+
 void 
-TransformIterator::openImpl(PlanState& planState, uint32_t& offset) 
+TransformIterator::openImpl(PlanState& planState, uint32_t& offset) const 
 {
   StateTraitsImpl<PlanIteratorState>::createState(planState, theStateOffset, offset);
   StateTraitsImpl<PlanIteratorState>::initState(planState, this->theStateOffset);
 
-  CopyClause::iter_t lIter = theCopyClauses.begin();
-  CopyClause::iter_t lEnd = theCopyClauses.end();
+  CopyClause::const_iter_t lIter = theCopyClauses.begin();
+  CopyClause::const_iter_t lEnd = theCopyClauses.end();
   for ( ; lIter != lEnd ; ++lIter )
   {
     lIter->theInput->open(planState, offset );

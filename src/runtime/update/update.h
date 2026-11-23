@@ -215,7 +215,9 @@ public:
       
   void accept(PlanIterVisitor&) const;
 
-  void openImpl(PlanState& planState, uint32_t& offset);
+  void assignStateOffsets(uint32_t& offset);
+
+  void openImpl(PlanState& planState, uint32_t& offset) const;
 
   bool nextImpl(store::Item_t&, PlanState& planState) const;
 

@@ -98,7 +98,7 @@ void JSONArrayIterator::serialize(::zorba::serialization::Archiver& ar)
 }
 
 
-void JSONArrayIterator::openImpl(PlanState& planState, uint32_t& offset)
+void JSONArrayIterator::openImpl(PlanState& planState, uint32_t& offset) const
 {
   NaryBaseIterator<JSONArrayIterator, JSONArrayIteratorState>::
   openImpl(planState, offset);
@@ -196,7 +196,7 @@ void JSONObjectIterator::serialize(::zorba::serialization::Archiver& ar)
 }
 
 
-void JSONObjectIterator::openImpl(PlanState& planState, uint32_t& offset)
+void JSONObjectIterator::openImpl(PlanState& planState, uint32_t& offset) const
 {
   NaryBaseIterator<JSONObjectIterator, JSONObjectIteratorState>::
   openImpl(planState, offset);

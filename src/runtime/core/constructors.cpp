@@ -87,9 +87,9 @@ DocumentIterator::DocumentIterator(
     bool copyInputNodes)
   :
   UnaryBaseIterator<DocumentIterator, PlanIteratorState>(sctx, loc, child),
-  theTypePreserve(false),
-  theNsPreserve(false),
-  theNsInherit(false),
+  theTypePreserve(sctx->construction_mode() == StaticContextConsts::cons_preserve),
+  theNsPreserve(sctx->preserve_ns()),
+  theNsInherit(sctx->inherit_ns()),
   theCopyInputNodes(copyInputNodes)
 {
 }
@@ -104,19 +104,6 @@ void DocumentIterator::serialize(::zorba::serialization::Archiver& ar)
   ar & theNsPreserve;
   ar & theNsInherit;
   ar & theCopyInputNodes;
-}
-
-
-void DocumentIterator::openImpl(PlanState& planState, uint32_t& offset)
-{
-  UnaryBaseIterator<DocumentIterator, PlanIteratorState>::openImpl(planState, offset);
-
-  theTypePreserve =
-    (theSctx->construction_mode() == StaticContextConsts::cons_preserve ? true : false);
-
-  theNsPreserve = theSctx->preserve_ns();
-
-  theNsInherit = theSctx->inherit_ns();
 }
 
 
@@ -217,9 +204,9 @@ ElementIterator::ElementIterator (
   theChildrenIter(childrenIter),
   theLocalBindings(const_cast<namespace_context*>(localBindings)),
   theIsRoot(isRoot),
-  theTypePreserve(false),
-  theNsPreserve(false),
-  theNsInherit(false),
+  theTypePreserve(sctx->construction_mode() == StaticContextConsts::cons_preserve),
+  theNsPreserve(sctx->preserve_ns()),
+  theNsInherit(sctx->inherit_ns()),
   theCopyInputNodes(copyInputNodes)
 {
 }
@@ -285,7 +272,25 @@ void ElementIterator::accept(PlanIterVisitor& v) const
 }
 
 
-void ElementIterator::openImpl(PlanState& planState, uint32_t& offset)
+void ElementIterator::assignStateOffsets(uint32_t& offset)
+{
+  assignOwnStateOffset<ElementIteratorState>(offset);
+
+  if (theQNameIter != 0)
+    theQNameIter->assignStateOffsets(offset);
+
+  if (theChildrenIter != 0)
+    theChildrenIter->assignStateOffsets(offset);
+
+  if (theAttributesIter != 0)
+    theAttributesIter->assignStateOffsets(offset);
+
+  if (theNamespacesIter != 0)
+    theNamespacesIter->assignStateOffsets(offset);
+}
+
+
+void ElementIterator::openImpl(PlanState& planState, uint32_t& offset) const
 {
   StateTraitsImpl<ElementIteratorState>::createState(planState,
                                                      theStateOffset,
@@ -304,13 +309,6 @@ void ElementIterator::openImpl(PlanState& planState, uint32_t& offset)
 
   if (theNamespacesIter != 0)
     theNamespacesIter->open(planState, offset);
-
-  theTypePreserve =
-    (theSctx->construction_mode() == StaticContextConsts::cons_preserve ? true : false);
-
-  theNsPreserve = theSctx->preserve_ns();
-
-  theNsInherit = theSctx->inherit_ns();
 }
 
 

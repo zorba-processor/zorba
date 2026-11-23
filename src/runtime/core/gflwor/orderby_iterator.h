@@ -59,7 +59,8 @@ class OrderValue;
   theCollation     : The collation to use when comparing values of this orderby
                      column (if the values are of type xs:string or subtype).
   theCollator      : Pointer to the collator obj corresponding to theCollation.
-                     The pointer is assigned by the OrderByClause::open() method.
+                     The pointer is assigned when the iterator that owns the
+                     spec is generated.
                      Note: no need to delete theCollator in ~OrderSpec() because
                      the obj is managed by the collation cache.
 ********************************************************************************/
@@ -95,6 +96,7 @@ public:
 
   uint32_t getStateSizeOfSubtree() const;
 
+  void assignStateOffsets(uint32_t& offset);
   void open(PlanState& aPlanState, uint32_t& offset) const;
   void reset(PlanState& aPlanState) const;
   void close(PlanState& aPlanState) const;
@@ -191,7 +193,7 @@ public:
 
   ~OrderByState();
 
-  void init(PlanState& planState, std::vector<OrderSpec>* orderSpecs);
+  void init(PlanState& planState, const std::vector<OrderSpec>* orderSpecs);
 
   void reset(PlanState&);
 
@@ -235,7 +237,9 @@ public:
   
   ~OrderByIterator();
 
-  void openImpl(PlanState& planState, uint32_t& offset);
+  void assignStateOffsets(uint32_t& offset);
+
+  void openImpl(PlanState& planState, uint32_t& offset) const;
   bool nextImpl(store::Item_t& result, PlanState& planState) const;
   void resetImpl(PlanState& planState) const;
   void closeImpl(PlanState& planState);

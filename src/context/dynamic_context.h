@@ -193,7 +193,7 @@ public:
 
   void set_implicit_timezone(long tzone_seconds);
 
-  long get_implicit_timezone() const;
+  long get_implicit_timezone() const { return theTimezone; }
 
   void set_locale(
       locale::iso639_1::type lang,

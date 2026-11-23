@@ -253,7 +253,7 @@ PlanIterator::~PlanIterator() {
   Out of line: the list takes 2 KiB of stack only while the plan opens, not in
   the frame of a call that opens its body and then runs the recursion.
 ********************************************************************************/
-void PlanIterator::openPlan(PlanState& planState, uint32_t& offset)
+void PlanIterator::openPlan(PlanState& planState, uint32_t& offset) const
 {
   PlanState::CreatedStates* outer = planState.theCreatedStates;
   PlanState::CreatedStates created;
@@ -287,6 +287,7 @@ void PlanIterator::serialize(::zorba::serialization::Archiver& ar)
     ar.dont_allow_delay();
 
   ar & theSctx;
+  ar & theStateOffset;
 // Used for debugging purposes
 #ifndef NDEBUG
 #ifdef ZORBA_FOR_ONE_THREAD_ONLY
@@ -313,6 +314,12 @@ std::string PlanIterator::toString() const
 TypeManager* PlanIterator::getTypeManager() const
 {
   return theSctx->get_typemanager();
+}
+
+
+XQPCollator* PlanIterator::getDefaultCollator() const
+{
+  return theSctx->get_default_collator(loc);
 }
 
 

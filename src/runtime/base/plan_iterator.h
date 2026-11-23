@@ -495,9 +495,12 @@ public:
     return reinterpret_cast<T*>(planState.theBlock + stateOffset);
   }
 
-  static void createState(PlanState& planState, uint32_t& stateOffset, uint32_t& offset)
+  // The plan's state offsets are assigned when the plan is generated
+  // (PlanIterator::assignStateOffsets); opening walks the plan in the same
+  // order, so offset must be the iterator's own.
+  static void createState(PlanState& planState, uint32_t stateOffset, uint32_t& offset)
   {
-    stateOffset = offset;
+    ZORBA_ASSERT(stateOffset == offset);
     offset += StateTraitsImpl<T>::getStateSize();
 
     // Listed before it is constructed, so that a failure to list it leaves no
@@ -520,7 +523,7 @@ public:
     }
   }
 
-  static void initState(PlanState& planState, uint32_t& stateOffset)
+  static void initState(PlanState& planState, uint32_t stateOffset)
   {
     getState(planState, stateOffset)->init(planState);
   }
@@ -599,6 +602,14 @@ class PlanIterator : public SimpleRCObject
 protected:
   uint32_t           theStateOffset;
 
+  // For assignStateOffsets(): StateType is the state its openImpl() creates.
+  template <class StateType>
+  void assignOwnStateOffset(uint32_t& offset)
+  {
+    theStateOffset = offset;
+    offset += StateTraitsImpl<StateType>::getStateSize();
+  }
+
 public:
   QueryLoc           loc;
   static_context   * theSctx;
@@ -640,6 +651,8 @@ public:
 
   TypeManager* getTypeManager() const;
 
+  XQPCollator* getDefaultCollator() const;
+
   virtual bool isConstructor() const { return false; }
 
   /**
@@ -661,10 +674,18 @@ public:
   virtual uint32_t getStateSizeOfSubtree() const = 0;
 
   /**
+   * Assigns the state offsets of this iterator and of the sub-iterators it
+   * opens, starting at offset, in the order its openImpl() opens them; offset
+   * is advanced past them. Called once when the plan is generated, so that
+   * executions of a shared plan only read the plan.
+   */
+  virtual void assignStateOffsets(uint32_t& offset) = 0;
+
+  /**
    * Begin the execution of the iterator. Initializes information required for
    * the plan state and constructs the state object.
    */
-  void open(PlanState& planState, uint32_t& offset)
+  void open(PlanState& planState, uint32_t& offset) const
   {
     TimerWrapper t(NULL, planState.theProfile, &mbr_fn::addCall);
 
@@ -687,9 +708,11 @@ public:
    * the call of a function item. If the open fails, destroys the states it
    * created (see PlanState::theCreatedStates) and rethrows.
    */
-  void openPlan(PlanState& planState, uint32_t& offset);
+  void openPlan(PlanState& planState, uint32_t& offset) const;
 
-  virtual void openImpl(PlanState& planState, uint32_t& offset) = 0;
+  // const: a plan may be executed by several threads at once (clones of a
+  // query), so opening writes only to the plan state, never to the iterator.
+  virtual void openImpl(PlanState& planState, uint32_t& offset) const = 0;
 
   /**
    * Restarts the iterator so that the next 'produceNext' call will start
