@@ -114,6 +114,10 @@ void JSONItem::destroy()
   static thread_local bool tActive = false;
   static thread_local JSONItem* tPending = nullptr;
 
+  // Before the count becomes a list link: getNodeByReference() reads the
+  // count of an item it finds registered.
+  GET_STORE().unregisterReferenceToUnusedNode(this);
+
   if (tActive)
   {
     theRefCount.setDeadLink(reinterpret_cast<long>(tPending));
@@ -125,7 +129,6 @@ void JSONItem::destroy()
   JSONItem* lItem = this;
   for (;;)
   {
-    GET_STORE().unregisterReferenceToUnusedNode(lItem);
     delete lItem;
     if (tPending == nullptr)
       break;

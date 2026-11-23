@@ -129,6 +129,13 @@ public:
 
   void addReference() const;
 
+#ifndef ZORBA_FOR_ONE_THREAD_ONLY
+  // For a node or JSON item reached through a raw pointer that its
+  // destruction clears under a lock the caller holds. Returns false, adding
+  // nothing, when the item's last reference is already gone.
+  bool addReferenceUnlessFreed() const;
+#endif
+
   void removeReference();
 
   void makeImmortal() const { theRefCount.makeImmortal(); }

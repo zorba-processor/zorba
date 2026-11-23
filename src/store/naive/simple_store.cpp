@@ -393,20 +393,40 @@ void SimpleStore::assignReferenceLocked(
 ********************************************************************************/
 bool SimpleStore::getNodeByReference(store::Item_t& result, const zstring& reference)
 {
-  // Assigned to result after the mutex is released: the item result held may
-  // be released, and a node's destruction unregisters its reference.
+#ifdef ZORBA_FOR_ONE_THREAD_ONLY
   store::Item_t node;
-  {
-    SYNC_CODE(AutoMutex lock(&theReferencesMutex);)
+  RefNodeMap::iterator resIt = theReferencesToNodeMap.find(reference);
 
-    RefNodeMap::iterator resIt = theReferencesToNodeMap.find(reference);
-
-    if (resIt != theReferencesToNodeMap.end())
-      node = resIt->second;
-  }
+  if (resIt != theReferencesToNodeMap.end())
+    node = resIt->second;
 
   result.transfer(node);
   return !result.isNull();
+#else
+  // A node whose last reference another thread has just released stays in
+  // the map until its destruction unregisters it, which waits for the mutex.
+  // Assigned to result after the mutex is released: the item result held may
+  // be released, and a node's destruction unregisters its reference.
+  const store::Item* pinned = NULL;
+  {
+    AutoMutex lock(&theReferencesMutex);
+
+    RefNodeMap::iterator resIt = theReferencesToNodeMap.find(reference);
+
+    if (resIt != theReferencesToNodeMap.end() &&
+        resIt->second->addReferenceUnlessFreed())
+      pinned = resIt->second;
+  }
+
+  result = pinned;
+
+  if (pinned == NULL)
+    return false;
+
+  // Drops the reference addReferenceUnlessFreed() added; result holds one.
+  result->removeReference();
+  return true;
+#endif
 }
 
 
