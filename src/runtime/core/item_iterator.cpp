@@ -149,7 +149,17 @@ bool IfThenElseIterator::nextImpl(store::Item_t& result, PlanState& planState) c
 }
 
 
-void IfThenElseIterator::openImpl(PlanState& planState, uint32_t& offset) 
+void IfThenElseIterator::assignStateOffsets(uint32_t& offset)
+{
+  assignOwnStateOffset<IfThenElseIteratorState>(offset);
+
+  theCondIter->assignStateOffsets(offset);
+  theThenIter->assignStateOffsets(offset);
+  theElseIter->assignStateOffsets(offset);
+}
+
+
+void IfThenElseIterator::openImpl(PlanState& planState, uint32_t& offset) const 
 {
   StateTraitsImpl<IfThenElseIteratorState>::
   createState(planState, theStateOffset, offset);

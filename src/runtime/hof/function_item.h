@@ -315,11 +315,13 @@ public:
 
   bool isArgumentApplied(csize pos) const;
 
+  // stateOffset: where the caller opens the call in its plan state.
   PlanIter_t getImplementation(
       const std::vector<PlanIter_t>& argValues,
-      CompilerCB* ccb);
+      CompilerCB* ccb,
+      uint32_t stateOffset);
   
-  PlanIter_t getImplementation(CompilerCB* ccb);
+  PlanIter_t getImplementation(CompilerCB* ccb, uint32_t stateOffset);
 
   zstring show() const;
 

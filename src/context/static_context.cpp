@@ -741,7 +741,7 @@ static_context::static_context()
   theDocumentMap(NULL),
   theCollationMap(NULL),
   theDefaultCollation(NULL),
-  theCachedDefaultCollator(NULL),
+  theDefaultCollator(NULL),
   theOptionMap(NULL),
   theAuditEvent(&zorba::audit::NOP_EVENT_IMPL),
 #ifndef ZORBA_NO_FULL_TEXT
@@ -793,7 +793,7 @@ static_context::static_context(static_context* parent)
   theDocumentMap(NULL),
   theCollationMap(NULL),
   theDefaultCollation(NULL),
-  theCachedDefaultCollator(NULL),
+  theDefaultCollator(NULL),
   theOptionMap(NULL),
   theAuditEvent(&zorba::audit::NOP_EVENT_IMPL),
 #ifndef ZORBA_NO_FULL_TEXT
@@ -852,7 +852,7 @@ static_context::static_context(::zorba::serialization::Archiver& ar)
   theDocumentMap(NULL),
   theCollationMap(NULL),
   theDefaultCollation(NULL),
-  theCachedDefaultCollator(NULL),
+  theDefaultCollator(NULL),
   theOptionMap(NULL),
   theAuditEvent(&zorba::audit::NOP_EVENT_IMPL),
 #ifndef ZORBA_NO_FULL_TEXT
@@ -3960,6 +3960,7 @@ void static_context::set_default_collation(
   zstring const resolvedUri( resolve_relative_uri(uri) );
 
   theDefaultCollation = new std::string(resolvedUri.c_str());
+  theDefaultCollator = get_collator(*theDefaultCollation, loc);
 }
 
 
@@ -3990,12 +3991,23 @@ const std::string& static_context::get_default_collation(const QueryLoc& loc) co
 ********************************************************************************/
 XQPCollator* static_context::get_default_collator(const QueryLoc& loc) const
 {
-  if (!theCachedDefaultCollator)
+  const static_context* sctx = this;
+
+  while (sctx != NULL)
   {
-    const std::string& default_collation = get_default_collation(loc);
-    theCachedDefaultCollator = get_collator(default_collation, loc);
+    if (sctx->theDefaultCollation != NULL)
+    {
+      if (sctx->theDefaultCollator != NULL)
+        return sctx->theDefaultCollator;
+
+      return sctx->get_collator(*sctx->theDefaultCollation, loc);
+    }
+
+    sctx = sctx->theParent;
   }
-  return theCachedDefaultCollator;
+
+  ZORBA_ASSERT(false);
+  return NULL;
 }
 
 

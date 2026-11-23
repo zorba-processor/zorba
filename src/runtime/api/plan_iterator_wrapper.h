@@ -96,7 +96,9 @@ public:
 
   virtual uint32_t getStateSizeOfSubtree() const { return 0; }
 
-  virtual void openImpl(PlanState& planState, uint32_t& offset); 
+  virtual void assignStateOffsets(uint32_t&) {}
+
+  virtual void openImpl(PlanState& planState, uint32_t& offset) const; 
 
   virtual void closeImpl(PlanState& planState) {}
 

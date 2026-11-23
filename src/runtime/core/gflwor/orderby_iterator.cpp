@@ -96,6 +96,12 @@ uint32_t OrderSpec::getStateSizeOfSubtree() const
 }
 
 
+void OrderSpec::assignStateOffsets(uint32_t& offset)
+{
+  theDomainIter->assignStateOffsets(offset);
+}
+
+
 void OrderSpec::open(PlanState& aPlanState, uint32_t& offset) const 
 {
   theDomainIter->open(aPlanState, offset);
@@ -136,7 +142,7 @@ OrderByState::~OrderByState()
 }
 
 
-void OrderByState::init(PlanState& planState, std::vector<OrderSpec>* orderSpecs) 
+void OrderByState::init(PlanState& planState, const std::vector<OrderSpec>* orderSpecs) 
 {
   PlanIteratorState::init(planState);
 
@@ -196,6 +202,11 @@ OrderByIterator::OrderByIterator (
   theOutputForVarsRefs(outputForVarsRefs),
   theOutputLetVarsRefs(outputLetVarsRefs) 
 {  
+  for (OrderSpec& spec : theOrderSpecs)
+  {
+    if (!spec.theCollation.empty())
+      spec.theCollator = sctx->get_collator(spec.theCollation, aLoc);
+  }
 }
   
   
@@ -269,25 +280,32 @@ void OrderByIterator::accept(PlanIterVisitor& v) const
 }
 
 
-void OrderByIterator::openImpl(PlanState& planState, uint32_t& aOffset) 
+void OrderByIterator::assignStateOffsets(uint32_t& offset)
+{
+  assignOwnStateOffset<OrderByState>(offset);
+
+  for (OrderSpec& spec : theOrderSpecs)
+    spec.assignStateOffsets(offset);
+
+  theTupleIter->assignStateOffsets(offset);
+
+  for (ForVarIter_t& var : theInputForVars)
+    var->assignStateOffsets(offset);
+
+  for (LetVarIter_t& var : theInputLetVars)
+    var->assignStateOffsets(offset);
+}
+
+
+void OrderByIterator::openImpl(PlanState& planState, uint32_t& aOffset) const
 {
   StateTraitsImpl<OrderByState>::createState(planState, theStateOffset, aOffset);
 
   OrderByState* iterState = StateTraitsImpl<OrderByState>::getState(planState,
                                                                     theStateOffset);
 
-  // Do a manual pass to set the Collator
-  ulong numSpecs = (ulong)theOrderSpecs.size();
-  for (ulong i = 0; i < numSpecs; ++i)
-  {
-    theOrderSpecs[i].open(planState, aOffset);
-
-    if (! theOrderSpecs[i].theCollation.empty())
-    {
-      theOrderSpecs[i].theCollator = 
-      theSctx->get_collator(theOrderSpecs[i].theCollation, loc);
-    }
-  }
+  for (const OrderSpec& spec : theOrderSpecs)
+    spec.open(planState, aOffset);
   
   iterState->init(planState, &theOrderSpecs);
   

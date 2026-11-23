@@ -124,7 +124,18 @@ TryCatchIterator::~TryCatchIterator()
 }
 
 
-void TryCatchIterator::openImpl(PlanState& planState, uint32_t& offset)
+void TryCatchIterator::assignStateOffsets(uint32_t& offset)
+{
+  assignOwnStateOffset<TryCatchIteratorState>(offset);
+
+  theChild->assignStateOffsets(offset);
+
+  for (CatchClause& clause : theCatchClauses)
+    clause.catch_expr->assignStateOffsets(offset);
+}
+
+
+void TryCatchIterator::openImpl(PlanState& planState, uint32_t& offset) const
 {
   StateTraitsImpl<TryCatchIteratorState>::createState(planState,
                                                       theStateOffset,

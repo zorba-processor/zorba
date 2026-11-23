@@ -57,7 +57,7 @@ void MaterializeIterator::serialize(::zorba::serialization::Archiver& ar)
 }
 
 
-void MaterializeIterator::openImpl(PlanState& planState, uint32_t& offset)
+void MaterializeIterator::openImpl(PlanState& planState, uint32_t& offset) const
 {
   UnaryBaseIterator<MaterializeIterator, MaterializeIteratorState>::
   openImpl(planState, offset);

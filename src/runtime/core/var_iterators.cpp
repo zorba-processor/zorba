@@ -382,9 +382,23 @@ uint32_t CtxVarIterator::getStateSizeOfSubtree() const
 /*******************************************************************************
 
 ********************************************************************************/
+void CtxVarIterator::assignStateOffsets(uint32_t& offset)
+{
+  assignOwnStateOffset<CtxVarState>(offset);
+
+  if (theTargetPosIter != NULL)
+  {
+    theTargetPosIter->assignStateOffsets(offset);
+
+    if (theTargetLenIter != NULL)
+      theTargetLenIter->assignStateOffsets(offset);
+  }
+}
+
+
 void CtxVarIterator::openImpl(
     PlanState& planState,
-    uint32_t& offset)
+    uint32_t& offset) const
 {
   NoaryBaseIterator<CtxVarIterator, CtxVarState>::openImpl(planState, offset);
 
@@ -919,9 +933,23 @@ void LetVarIterator::bind(
 /*******************************************************************************
 
 ********************************************************************************/
+void LetVarIterator::assignStateOffsets(uint32_t& offset)
+{
+  assignOwnStateOffset<LetVarState>(offset);
+
+  if (theTargetPosIter != NULL)
+  {
+    theTargetPosIter->assignStateOffsets(offset);
+
+    if (theTargetLenIter != NULL)
+      theTargetLenIter->assignStateOffsets(offset);
+  }
+}
+
+
 void LetVarIterator::openImpl(
     PlanState& planState,
-    uint32_t& offset)
+    uint32_t& offset) const
 {
   NoaryBaseIterator<LetVarIterator, LetVarState>::openImpl(planState, offset);
 

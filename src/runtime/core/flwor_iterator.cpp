@@ -268,27 +268,29 @@ uint32_t OrderByClause::getStateSizeOfSubtree() const
 /***************************************************************************//**
 
 ********************************************************************************/
-void OrderByClause::open(
-    const static_context* sctx, 
-    PlanState& planState, 
-    uint32_t& offset)
+void OrderByClause::setCollators(const static_context* sctx)
 {
-  std::vector<OrderSpec>::iterator ite = theOrderSpecs.begin();
-  std::vector<OrderSpec>::const_iterator end = theOrderSpecs.end();
-
-  for (; ite != end; ++ite)
+  for (OrderSpec& spec : theOrderSpecs)
   {
-    ite->open(planState, offset);
-
-    if (ite->theCollation.size() != 0) 
-    {
-      ite->theCollator = sctx->get_collator(ite->theCollation, theLocation);
-    }
+    if (spec.theCollation.size() != 0)
+      spec.theCollator = sctx->get_collator(spec.theCollation, theLocation);
     else
-    {
-      ite->theCollator = sctx->get_default_collator(theLocation);
-    }
+      spec.theCollator = sctx->get_default_collator(theLocation);
   }
+}
+
+
+void OrderByClause::assignStateOffsets(uint32_t& offset)
+{
+  for (OrderSpec& spec : theOrderSpecs)
+    spec.assignStateOffsets(offset);
+}
+
+
+void OrderByClause::open(PlanState& planState, uint32_t& offset) const
+{
+  for (const OrderSpec& spec : theOrderSpecs)
+    spec.open(planState, offset);
 }
 
 
@@ -457,43 +459,41 @@ uint32_t MaterializeClause::getStateSizeOfSubtree() const
 /***************************************************************************//**
 
 ********************************************************************************/
-void MaterializeClause::open(
-    const static_context* sctx, 
-    PlanState& planState, 
-    uint32_t& offset)
+void MaterializeClause::setCollators(const static_context* sctx)
 {
-  std::vector<ForVarIter_t>::iterator ite1 = theInputForVars.begin();
-  std::vector<ForVarIter_t>::iterator end1 = theInputForVars.end();
-
-  for (; ite1 != end1; ++ite1)
+  for (OrderSpec& spec : theOrderSpecs)
   {
-    (*ite1)->open(planState, offset);
-  }
-
-  std::vector<LetVarIter_t>::iterator ite2 = theInputLetVars.begin();
-  std::vector<LetVarIter_t>::iterator end2 = theInputLetVars.end();
-
-  for (; ite2 != end2; ++ite2)
-  {
-    (*ite2)->open(planState, offset);
-  }
-
-  std::vector<OrderSpec>::iterator ite3 = theOrderSpecs.begin();
-  std::vector<OrderSpec>::const_iterator end3 = theOrderSpecs.end();
-
-  for (; ite3 != end3; ++ite3)
-  {
-    ite3->open(planState, offset);
-
-    if (ite3->theCollation.size() != 0) 
-    {
-      ite3->theCollator = sctx->get_collator(ite3->theCollation, theLocation);
-    }
+    if (spec.theCollation.size() != 0)
+      spec.theCollator = sctx->get_collator(spec.theCollation, theLocation);
     else
-    {
-      ite3->theCollator = sctx->get_default_collator(theLocation);
-    }
+      spec.theCollator = sctx->get_default_collator(theLocation);
   }
+}
+
+
+void MaterializeClause::assignStateOffsets(uint32_t& offset)
+{
+  for (ForVarIter_t& var : theInputForVars)
+    var->assignStateOffsets(offset);
+
+  for (LetVarIter_t& var : theInputLetVars)
+    var->assignStateOffsets(offset);
+
+  for (OrderSpec& spec : theOrderSpecs)
+    spec.assignStateOffsets(offset);
+}
+
+
+void MaterializeClause::open(PlanState& planState, uint32_t& offset) const
+{
+  for (const ForVarIter_t& var : theInputForVars)
+    var->open(planState, offset);
+
+  for (const LetVarIter_t& var : theInputLetVars)
+    var->open(planState, offset);
+
+  for (const OrderSpec& spec : theOrderSpecs)
+    spec.open(planState, offset);
 }
 
 
@@ -620,30 +620,30 @@ uint32_t GroupByClause::getStateSizeOfSubtree() const
 /***************************************************************************//**
 
 ********************************************************************************/
-void GroupByClause::open(static_context* sctx, PlanState& planState, uint32_t& offset)
+void GroupByClause::setCollators(const static_context* sctx)
+{
+  for (GroupingSpec& spec : theGroupingSpecs)
+    spec.setCollator(sctx, theLocation);
+}
+
+
+void GroupByClause::assignStateOffsets(uint32_t& offset)
+{
+  for (GroupingSpec& spec : theGroupingSpecs)
+    spec.assignStateOffsets(offset);
+
+  for (NonGroupingSpec& spec : theNonGroupingSpecs)
+    spec.assignStateOffsets(offset);
+}
+
+
+void GroupByClause::open(PlanState& planState, uint32_t& offset) const
 { 
-  std::vector<GroupingSpec>::iterator groupIter = theGroupingSpecs.begin();
-  std::vector<GroupingSpec>::iterator groupEnd = theGroupingSpecs.end();
-  for (; groupIter != groupEnd; ++groupIter)
-  {
-    groupIter->open(planState, offset);
+  for (const GroupingSpec& spec : theGroupingSpecs)
+    spec.open(planState, offset);
 
-    if (groupIter->theCollation.size() != 0) 
-    {
-      groupIter->theCollator = sctx->get_collator(groupIter->theCollation, theLocation);
-    }
-    else
-    {
-      groupIter->theCollator = sctx->get_default_collator(theLocation);
-    }
-  }
-
-  std::vector<NonGroupingSpec>::iterator nongroupIter = theNonGroupingSpecs.begin();
-  std::vector<NonGroupingSpec>::iterator nongroupEnd = theNonGroupingSpecs.end();
-  for (; nongroupIter != nongroupEnd; ++nongroupIter)
-  {
-    nongroupIter->open(planState, offset);
-  }
+  for (const NonGroupingSpec& spec : theNonGroupingSpecs)
+    spec.open(planState, offset);
 }
 
 
@@ -903,6 +903,15 @@ FLWORIterator::FLWORIterator(
     delete theOrderByClause;
     theOrderByClause = NULL; 
   }
+
+  if (theGroupByClause)
+    theGroupByClause->setCollators(sctx);
+
+  if (theOrderByClause)
+    theOrderByClause->setCollators(sctx);
+
+  if (theMaterializeClause)
+    theMaterializeClause->setCollators(sctx);
 }
 
 
@@ -1686,7 +1695,30 @@ void FLWORIterator::rebindGroupTuple(
 /*******************************************************************************
 
 ********************************************************************************/
-void FLWORIterator::openImpl(PlanState& planState, uint32_t& offset)
+void FLWORIterator::assignStateOffsets(uint32_t& offset)
+{
+  assignOwnStateOffset<FlworState>(offset);
+
+  for (ForLetClause& clause : theForLetClauses)
+    clause.theInput->assignStateOffsets(offset);
+
+  theReturnClause->assignStateOffsets(offset);
+
+  if (theWhereClause != NULL)
+    theWhereClause->assignStateOffsets(offset);
+
+  if (theGroupByClause)
+    theGroupByClause->assignStateOffsets(offset);
+
+  if (theOrderByClause)
+    theOrderByClause->assignStateOffsets(offset);
+
+  if (theMaterializeClause)
+    theMaterializeClause->assignStateOffsets(offset);
+}
+
+
+void FLWORIterator::openImpl(PlanState& planState, uint32_t& offset) const
 {
   StateTraitsImpl<FlworState>::createState(planState, theStateOffset, offset);
 
@@ -1706,13 +1738,13 @@ void FLWORIterator::openImpl(PlanState& planState, uint32_t& offset)
     theWhereClause->open(planState, offset);
   
   if (theGroupByClause)
-    theGroupByClause->open(theSctx, planState, offset);
+    theGroupByClause->open(planState, offset);
   
   if (theOrderByClause)
-    theOrderByClause->open(theSctx, planState, offset);
+    theOrderByClause->open(planState, offset);
 
   if (theMaterializeClause)
-    theMaterializeClause->open(theSctx, planState, offset);
+    theMaterializeClause->open(planState, offset);
 
   if (theGroupByClause || theOrderByClause)
   {

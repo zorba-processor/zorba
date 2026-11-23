@@ -87,7 +87,7 @@ void GroupByState::init(
     PlanState& aState,
     const TypeManager* tm,
     const QueryLoc& loc,
-    std::vector<GroupingSpec>* gspecs) 
+    const std::vector<GroupingSpec>* gspecs) 
 {
   PlanIteratorState::init(aState);
 
@@ -138,6 +138,8 @@ GroupByIterator::GroupByIterator(
   theGroupingSpecs(aGroupingSpecs),
   theNonGroupingSpecs(aNonGroupingSpecs) 
 {
+  for (GroupingSpec& spec : theGroupingSpecs)
+    spec.setCollator(sctx, aLoc);
 }
   
 
@@ -233,7 +235,21 @@ void GroupByIterator::accept(PlanIterVisitor& v) const
 /***************************************************************************//**
 
 ********************************************************************************/
-void GroupByIterator::openImpl(PlanState& planState, uint32_t& aOffset) 
+void GroupByIterator::assignStateOffsets(uint32_t& offset)
+{
+  assignOwnStateOffset<GroupByState>(offset);
+
+  theTupleIter->assignStateOffsets(offset);
+
+  for (GroupingSpec& spec : theGroupingSpecs)
+    spec.assignStateOffsets(offset);
+
+  for (NonGroupingSpec& spec : theNonGroupingSpecs)
+    spec.assignStateOffsets(offset);
+}
+
+
+void GroupByIterator::openImpl(PlanState& planState, uint32_t& aOffset) const
 {
   StateTraitsImpl<GroupByState>::createState(planState, theStateOffset, aOffset);
 
@@ -248,18 +264,7 @@ void GroupByIterator::openImpl(PlanState& planState, uint32_t& aOffset)
 
   for (csize i = 0; i < numSpecs; ++i)
   {
-    GroupingSpec& spec = theGroupingSpecs[i];
-
-    spec.open(planState, aOffset);
-
-    if (spec.theCollation.size() != 0) 
-    {
-      spec.theCollator = theSctx->get_collator(spec.theCollation, loc);
-    }
-    else
-    {
-      spec.theCollator = theSctx->get_default_collator(loc);
-    }
+    theGroupingSpecs[i].open(planState, aOffset);
   }
 
   numSpecs = theNonGroupingSpecs.size();

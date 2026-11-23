@@ -293,7 +293,19 @@ uint32_t FnForEachPairIterator::getStateSizeOfSubtree() const
 }
 
 
-void FnForEachPairIterator::openImpl(PlanState& planState, uint32_t& offset)
+void FnForEachPairIterator::assignStateOffsets(uint32_t& offset)
+{
+  assignOwnStateOffset<FnForEachPairIteratorState>(offset);
+
+  // The space where openImpl() opens the calls of the function item.
+  offset += sizeof(UDFunctionCallIteratorState);
+
+  for (PlanIter_t& child : theChildren)
+    child->assignStateOffsets(offset);
+}
+
+
+void FnForEachPairIterator::openImpl(PlanState& planState, uint32_t& offset) const
 {
   StateTraitsImpl<FnForEachPairIteratorState>::createState(planState,
                                                 theStateOffset,
@@ -308,8 +320,8 @@ void FnForEachPairIterator::openImpl(PlanState& planState, uint32_t& offset)
 
   offset += sizeof(UDFunctionCallIteratorState);
 
-  std::vector<PlanIter_t>::iterator lIter = theChildren.begin();
-  std::vector<PlanIter_t>::iterator lEnd = theChildren.end();
+  std::vector<PlanIter_t>::const_iterator lIter = theChildren.begin();
+  std::vector<PlanIter_t>::const_iterator lEnd = theChildren.end();
   for ( ; lIter != lEnd; ++lIter )
         {
     (*lIter)->open(planState, offset);
@@ -354,7 +366,7 @@ bool FnForEachPairIterator::nextImpl(
         arguments.push_back(new PlanStateIteratorWrapper(seqIter2));
       }
 
-      state->thePlan = static_cast<FunctionItem*>(state->theFnItem.getp())->getImplementation(arguments, planState.theCompilerCB);
+      state->thePlan = static_cast<FunctionItem*>(state->theFnItem.getp())->getImplementation(arguments, planState.theCompilerCB, state->theUDFStateOffset);
       // must be opened after vars and params are set
       state->thePlan->openPlan(planState, state->theUDFStateOffset);
       state->theIsOpen = true;
@@ -421,7 +433,19 @@ uint32_t FnFoldLeftIterator::getStateSizeOfSubtree() const
 }
 
 
-void FnFoldLeftIterator::openImpl(PlanState& planState, uint32_t& offset)
+void FnFoldLeftIterator::assignStateOffsets(uint32_t& offset)
+{
+  assignOwnStateOffset<FnFoldLeftIteratorState>(offset);
+
+  // The space where openImpl() opens the calls of the function item.
+  offset += sizeof(UDFunctionCallIteratorState);
+
+  for (PlanIter_t& child : theChildren)
+    child->assignStateOffsets(offset);
+}
+
+
+void FnFoldLeftIterator::openImpl(PlanState& planState, uint32_t& offset) const
 {
   StateTraitsImpl<FnFoldLeftIteratorState>::createState(planState,
                                                 theStateOffset,
@@ -436,8 +460,8 @@ void FnFoldLeftIterator::openImpl(PlanState& planState, uint32_t& offset)
 
   offset += sizeof(UDFunctionCallIteratorState);
 
-  std::vector<PlanIter_t>::iterator lIter = theChildren.begin();
-  std::vector<PlanIter_t>::iterator lEnd = theChildren.end();
+  std::vector<PlanIter_t>::const_iterator lIter = theChildren.begin();
+  std::vector<PlanIter_t>::const_iterator lEnd = theChildren.end();
   for ( ; lIter != lEnd; ++lIter )
         {
     (*lIter)->open(planState, offset);
@@ -498,7 +522,7 @@ bool FnFoldLeftIterator::nextImpl(
         if (theIsFoldRight)
           std::reverse(++arguments.begin(), arguments.end());
 
-        state->thePlan = static_cast<FunctionItem*>(state->theFnItem.getp())->getImplementation(arguments, planState.theCompilerCB);
+        state->thePlan = static_cast<FunctionItem*>(state->theFnItem.getp())->getImplementation(arguments, planState.theCompilerCB, state->theUDFStateOffset);
         state->thePlan->openPlan(planState, state->theUDFStateOffset);
         state->theIsOpen = true; 
       }

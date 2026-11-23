@@ -101,8 +101,9 @@ public:
   theCollator:
   ------------
   Pointer to the collator obj corresponding to theCollation. The pointer is
-  assigned by the OrderByClause::open() method. Note: no need to delete
-  theCollator in ~OrderSpec() because the obj is managed by the collation cache.
+  assigned when the iterator that owns the spec is generated. Note: no need to
+  delete theCollator in ~OrderSpec() because the obj is managed by the
+  collation cache.
 ********************************************************************************/
 class GroupingSpec : public ::zorba::serialization::SerializeBaseClass
 {
@@ -139,7 +140,10 @@ public:
 
   uint32_t getStateSizeOfSubtree() const; 
 
-  void open(PlanState& planState, uint32_t& offset);
+  void setCollator(const static_context* sctx, const QueryLoc& loc);
+
+  void assignStateOffsets(uint32_t& offset);
+  void open(PlanState& planState, uint32_t& offset) const;
   void close(PlanState& planState);
   void reset(PlanState& planState) const;
 };
@@ -186,7 +190,8 @@ public:
 
   uint32_t getStateSizeOfSubtree() const; 
 
-  void open(PlanState& planState, uint32_t& offset);
+  void assignStateOffsets(uint32_t& offset);
+  void open(PlanState& planState, uint32_t& offset) const;
   void reset(PlanState& planState) const;
   void close(PlanState& planState);
 };
@@ -221,7 +226,7 @@ class GroupTupleCmp
 {
 private:
   const QueryLoc            & theLocation;
-  std::vector<GroupingSpec> * theGroupingSpecs;
+  const std::vector<GroupingSpec> * theGroupingSpecs;
   const TypeManager         * theTypeManager;
   long                        theTimezone;
   std::shared_ptr<NumericKeyHash> theNumericKeys;       // copies share it
@@ -233,7 +238,7 @@ public:
       const QueryLoc& loc,
       dynamic_context* dctx,
       const TypeManager* tm,
-      std::vector<GroupingSpec>* groupSpecs);
+      const std::vector<GroupingSpec>* groupSpecs);
 
   uint32_t hash(GroupTuple* t) const;
 
@@ -407,9 +412,9 @@ template <class T> void closeVectorPtr(std::vector<T >& aVector, PlanState& plan
 }
   
   
-template <class T> inline void openVectorPtr(std::vector<T >& aVector, PlanState& planState, uint32_t& aOffset)
+template <class T> inline void openVectorPtr(const std::vector<T >& aVector, PlanState& planState, uint32_t& aOffset)
 {
-  typename std::vector<T >::iterator lIter;
+  typename std::vector<T >::const_iterator lIter;
   for (lIter = aVector.begin();
        lIter != aVector.end();
        ++lIter )

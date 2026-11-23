@@ -101,9 +101,16 @@ bool FTContainsIterator::nextImpl( store::Item_t &result,
   STACK_END( state );
 }
 
-void FTContainsIterator::openImpl( PlanState &state, uint32_t &offset ) {
-  base_type::openImpl( state, offset );
+void FTContainsIterator::assignStateOffsets( uint32_t &offset ) {
+  base_type::assignStateOffsets( offset );
   MUTATE_EACH( sub_iter_list_t, i, sub_iters_ ) {
+    (*i)->assignStateOffsets( offset );
+  }
+}
+
+void FTContainsIterator::openImpl( PlanState &state, uint32_t &offset ) const {
+  base_type::openImpl( state, offset );
+  FOR_EACH( sub_iter_list_t, i, sub_iters_ ) {
     (*i)->open( state, offset );
   }
 }

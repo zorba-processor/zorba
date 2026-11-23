@@ -52,7 +52,7 @@ public:
         PlanState& aState,
         const TypeManager* tm,
         const QueryLoc& loc,
-        std::vector<GroupingSpec>* gspecs);
+        const std::vector<GroupingSpec>* gspecs);
 
   void reset(PlanState& state);
 };
@@ -91,7 +91,9 @@ public:
 
   void accept(PlanIterVisitor&) const;
 
-  void openImpl(PlanState& planState, uint32_t& offset);
+  void assignStateOffsets(uint32_t& offset);
+
+  void openImpl(PlanState& planState, uint32_t& offset) const;
 
   bool nextImpl(store::Item_t& result, PlanState& planState) const;
 

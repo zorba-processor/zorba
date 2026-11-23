@@ -204,7 +204,7 @@ void UDFunctionCallIteratorState::open(
     PlanState& planState,
     user_function* udf,
     bool isDynamic,
-    store::ItemHandle<FunctionItem>& functionItem)
+    const store::ItemHandle<FunctionItem>& functionItem)
 {
   thePlan = udf->getPlan(thePlanStateSize,
                          isDynamic && functionItem->getDctx() != NULL ?
@@ -223,7 +223,7 @@ void UDFunctionCallIteratorState::open(
 void UDFunctionCallIteratorState::createBodyState(
     PlanState& planState,
     bool isDynamic,
-    store::ItemHandle<FunctionItem>& functionItem)
+    const store::ItemHandle<FunctionItem>& functionItem)
 {
   // Must allocate new dctx because the udf may be a recursive udf with local
   // block vars, all of which have the same dynamic-context id, but they are
@@ -436,7 +436,7 @@ bool UDFunctionCallIterator::isCacheAcrossSnapshots() const
 ********************************************************************************/
 void UDFunctionCallIterator::initCache(
     PlanState& aPlanState,
-    UDFunctionCallIteratorState* aState)
+    UDFunctionCallIteratorState* aState) const
 {
   if (!aState->theCache && theUDF->hasCache())
   {
@@ -528,7 +528,7 @@ void UDFunctionCallIterator::insertCacheEntry(
 
 /*******************************************************************************
 ********************************************************************************/
-void UDFunctionCallIterator::openImpl(PlanState& planState, uint32_t& offset)
+void UDFunctionCallIterator::openImpl(PlanState& planState, uint32_t& offset) const
 {
   UDFunctionCallIteratorState* state;
 
@@ -701,7 +701,7 @@ bool UDFunctionCallIterator::nextImplCache(store::Item_t& aResult, PlanState& aP
   if (!lState->thePlanOpen)
   {
     if (lState->thePlanState == NULL)
-      lState->createBodyState(aPlanState, theIsDynamic, const_cast<store::ItemHandle<FunctionItem>&>(theFunctionItem));
+      lState->createBodyState(aPlanState, theIsDynamic, theFunctionItem);
 
     uint32_t planOffset = 0;
     lState->thePlan->openPlan(*lState->thePlanState, planOffset);
@@ -860,7 +860,7 @@ bool UDFunctionCallIterator::nextImplNoCache(store::Item_t& aResult, PlanState& 
   if (!lState->thePlanOpen)
   {
     if (lState->thePlanState == NULL)
-      lState->createBodyState(aPlanState, theIsDynamic, const_cast<store::ItemHandle<FunctionItem>&>(theFunctionItem));
+      lState->createBodyState(aPlanState, theIsDynamic, theFunctionItem);
 
     uint32_t planOffset = 0;
     lState->thePlan->openPlan(*lState->thePlanState, planOffset);
@@ -1070,7 +1070,7 @@ private:
   bool         theHasIterator;
 
 public:
-  ExtFuncArgItemSequence(PlanIter_t& child, PlanState& state)
+  ExtFuncArgItemSequence(const PlanIter_t& child, PlanState& state)
     :
     theChild(child),
     thePlanState(state),
@@ -1230,7 +1230,7 @@ void ExtFunctionCallIterator::serialize(serialization::Archiver& ar)
 
 /*******************************************************************************
 ********************************************************************************/
-void ExtFunctionCallIterator::openImpl(PlanState& planState, uint32_t& offset)
+void ExtFunctionCallIterator::openImpl(PlanState& planState, uint32_t& offset) const
 {
   NaryBaseIterator<ExtFunctionCallIterator,
                    ExtFunctionCallIteratorState>::openImpl(planState, offset);
@@ -1638,7 +1638,7 @@ bool ExtFunctionCallIterator::isCacheAcrossSnapshots() const
 ********************************************************************************/
 void ExtFunctionCallIterator::initCache(
     PlanState& aPlanState,
-    ExtFunctionCallIteratorState* aState)
+    ExtFunctionCallIteratorState* aState) const
 {
   if (!aState->theCache && isCached())
   {

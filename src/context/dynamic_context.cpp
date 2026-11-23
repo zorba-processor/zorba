@@ -265,15 +265,6 @@ void dynamic_context::set_implicit_timezone(long tzone_seconds)
 /*******************************************************************************
 
 ********************************************************************************/
-long dynamic_context::get_implicit_timezone() const
-{
-  return theTimezone;
-}
-
-
-/*******************************************************************************
-
-********************************************************************************/
 void dynamic_context::set_current_date_time(const store::Item_t& aDateTimeItem)
 {
   this->theCurrentDateTimeStamp = aDateTimeItem;

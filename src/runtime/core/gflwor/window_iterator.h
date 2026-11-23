@@ -153,6 +153,8 @@ protected:
 
   void accept(PlanIterVisitor&) const;
 
+  void assignStateOffsets(uint32_t& offset);
+
   void open(PlanState& planState, uint32_t& offset) const;
   void reset(PlanState& planState) const;
   void close(PlanState& planState) const;
@@ -226,6 +228,8 @@ protected:
   uint32_t getStateSizeOfSubtree() const;
 
   void accept(PlanIterVisitor&) const;
+
+  void assignStateOffsets(uint32_t& offset);
 
   void open(PlanState& planState, uint32_t& offset) const;
   void reset(PlanState& planState) const;
@@ -402,7 +406,9 @@ public:
 
   void accept(PlanIterVisitor&) const;
 
-  void openImpl(PlanState& planState, uint32_t& aOffset);
+  void assignStateOffsets(uint32_t& offset);
+
+  void openImpl(PlanState& planState, uint32_t& aOffset) const;
   bool nextImpl(store::Item_t& aResult, PlanState& planState) const;
   void resetImpl(PlanState& planState) const;
   void closeImpl(PlanState& planState);

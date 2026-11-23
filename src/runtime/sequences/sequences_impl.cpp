@@ -106,7 +106,14 @@ static XQPCollator* getCollator(
 /*******************************************************************************
   15.1.2 op:concatenate
 ********************************************************************************/
-void FnConcatIterator::openImpl(PlanState& planState, uint32_t& offset)
+void FnConcatIterator::assignStateOffsets(uint32_t& offset)
+{
+  NaryBaseIterator<FnConcatIterator, FnConcatIteratorState>::
+  assignStateOffsets(offset);
+}
+
+
+void FnConcatIterator::openImpl(PlanState& planState, uint32_t& offset) const
 {
   NaryBaseIterator<FnConcatIterator, FnConcatIteratorState>
   ::openImpl(planState, offset);

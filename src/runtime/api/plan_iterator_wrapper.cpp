@@ -92,7 +92,7 @@ PlanStateIteratorWrapper::~PlanStateIteratorWrapper()
 }
 
 
-void PlanStateIteratorWrapper::openImpl(PlanState& planState, uint32_t& offset) 
+void PlanStateIteratorWrapper::openImpl(PlanState& planState, uint32_t& offset) const 
 {
   theStoreIterator->open();
 }
