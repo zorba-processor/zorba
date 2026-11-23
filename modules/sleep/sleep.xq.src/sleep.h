@@ -16,6 +16,9 @@
 #ifndef ZORBA_MODULES_SLEEP_H
 #define ZORBA_MODULES_SLEEP_H
 
+#include <map>
+#include <memory>
+
 #include <zorba/zorba.h>
 #include <zorba/external_module.h>
 #include <zorba/function.h>
@@ -25,7 +28,7 @@ namespace zorba { namespace sleep {
 class SleepModule : public ExternalModule
 {
 public:
-  virtual ~SleepModule();
+  SleepModule();
 
   virtual void destroy();
 
@@ -44,7 +47,9 @@ protected:
     }
   };
 
-  typedef std::map<String, ExternalFunction*, ltstr> FuncMap_t;
+  // Filled by the constructor: compilations on several threads look the
+  // functions up.
+  typedef std::map<String, std::unique_ptr<ExternalFunction>, ltstr> FuncMap_t;
 
   FuncMap_t theFunctions;
 };

@@ -240,7 +240,7 @@ void UDFGraph::optimizeUDFs(CompilerCB* ccb, UDFNode* node, ulong visit)
     optimizeUDFs(ccb, node->theChildren[i], visit);
   }
 
-  if (node == theRoot || isForeign(node))
+  if (node == theRoot || isForeign(node) || node->theUDF->isSealed())
     return;
 
   user_function* udf = node->theUDF;
@@ -317,6 +317,11 @@ bool UDFGraph::inferDeterminism(UDFNode* node, ulong visit)
     node->theUDF->raiseStaticError();
     return node->theUDF->isDeterministic();
   }
+
+  // Sealed when its compilation was, before this graph of a function it did
+  // not seal (XQueryCompiler::sealDeclared()).
+  if (node != theRoot && node->theUDF->isSealed())
+    return node->theUDF->isDeterministic();
 
   bool deterministic = true;
 

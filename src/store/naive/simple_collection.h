@@ -161,6 +161,8 @@ public:
 
   xs_integer removeNodes(xs_integer position, xs_integer num);
 
+  void removeLastNodes(const std::vector<store::Item_t>& nodes, csize num);
+
   void removeAll();
 
   void adjustTreePositions();

@@ -397,6 +397,8 @@ protected:
 
   void checkCompiled() const;
 
+  void sealDeclaredFunctions() const;
+
   void checkNotCompiled() const;
 
   void checkNotExecuting() const;

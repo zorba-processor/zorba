@@ -356,6 +356,11 @@ ZORBA_DLL_PUBLIC void query_resources_fail_walk(unsigned long edge);
   function it declares, not only the ones it calls. Compile time only: not
   serialized.
 
+  theSealsDeclared :
+  ------------------
+  True once the compilation has sealed every function it declares after it
+  was compiled (XQueryCompiler::sealDeclared()). Not serialized.
+
   theIsEval :
   -----------
   True if this is the CCB for an eval query. This flag is needed to determine
@@ -503,6 +508,7 @@ public:
   bool                      theHasEval;
 
   bool                      theHasFunctionLookup = false;
+  bool                      theSealsDeclared = false;
 
   bool                      theIsEval;
 

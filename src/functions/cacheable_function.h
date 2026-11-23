@@ -20,6 +20,8 @@
 #include "functions/function.h"
 #include "zorbautils/hashmap_itemh_cache.h"
 #include "store/api/item_handle.h"
+#include <atomic>
+#include <mutex>
 #include <vector>
 
 namespace zorba
@@ -28,26 +30,30 @@ class expr;
 
 typedef zorba::ItemHandleCacheHashMap< std::vector<store::Item_t> > FunctionCacheBaseMap;
 
-class FunctionCache : public FunctionCacheBaseMap
+/*******************************************************************************
+  The function of a static context shared by several queries is called by all
+  of them, possibly on several threads: the cache is used under its mutex.
+********************************************************************************/
+class FunctionCache : private FunctionCacheBaseMap
 {
 public:
-  typedef FunctionCacheBaseMap::iterator iterator;
-
   FunctionCache(static_context* aSctx,
       std::vector<bool>& aExcludeFromCacheKey,
       std::vector<bool>& aCompareWithDeepEqual,
       bool aAcrossSnapshots);
 
-  FunctionCache::iterator find(const store::Item_t& aKey, PlanState& aPlanState);
+  // Copies the result cached for aKey into aValue; false if there is none.
+  bool find(const store::Item_t& aKey, PlanState& aPlanState, std::vector<store::Item_t>& aValue);
 
   bool insert(const store::Item_t& aKey, std::vector<store::Item_t>& aValue, PlanState& aPlanState);
 
-  bool insert(const store::Item_t& aKey, const store::Item_t& aValue, PlanState& aPlanState);
+  void clear();
 
 private:
   bool ensureCacheValidity(PlanState& aPlanState);
 
-public:
+  SYNC_CODE(std::mutex theMutex;)
+
   bool theAcrossSnapshots;
   uint64_t theSnapshotID;
 };
@@ -84,6 +90,9 @@ protected:
   // Cache settings
   //
   bool theHasCache;
+  // Set by disableAutomaticCaching(), at run time, by any of the queries that
+  // share the function.
+  std::atomic<bool> theIsAutomaticCacheDisabled{false};
   bool theCacheAcrossSnapshots;
   bool theIsCacheAutomatic;
   bool theAreCacheSettingsComputed;
