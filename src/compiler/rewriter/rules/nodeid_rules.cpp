@@ -46,10 +46,13 @@ namespace zorba
   If the ignore-sorted-nodes annotation of the target expr is not set to false
   already, set it to the value of the ignore-sorted-nodes annotations of the
   source expr.
+  Here and in the three functions below, a target of another compilation than
+  ccb (the prolog of a shared static context) is shared and left as it is.
 ********************************************************************************/
-static void pushdown_ignores_sorted_nodes(expr* src, expr* target)
+static void pushdown_ignores_sorted_nodes(CompilerCB* ccb, expr* src, expr* target)
 {
-  if (target->getIgnoresSortedNodes() != ANNOTATION_FALSE)
+  if (target->get_ccb() == ccb &&
+      target->getIgnoresSortedNodes() != ANNOTATION_FALSE)
     target->setIgnoresSortedNodes(src->getIgnoresSortedNodes());
 }
 
@@ -58,9 +61,10 @@ static void pushdown_ignores_sorted_nodes(expr* src, expr* target)
   If the ignore-sorted-nodes annotation of the target expr is not set to false
   already, set it to the given value.
 ********************************************************************************/
-static void set_ignores_sorted_nodes(expr* target, BoolAnnotationValue v)
+static void set_ignores_sorted_nodes(CompilerCB* ccb, expr* target, BoolAnnotationValue v)
 {
-  if (target->getIgnoresSortedNodes() != ANNOTATION_FALSE)
+  if (target->get_ccb() == ccb &&
+      target->getIgnoresSortedNodes() != ANNOTATION_FALSE)
     target->setIgnoresSortedNodes(v);
 }
 
@@ -70,9 +74,10 @@ static void set_ignores_sorted_nodes(expr* target, BoolAnnotationValue v)
   false already, set it to the value of the ignore-duplicate-nodes annotations
   of the source expr.
 ********************************************************************************/
-static void pushdown_ignores_duplicate_nodes(expr* src, expr* target)
+static void pushdown_ignores_duplicate_nodes(CompilerCB* ccb, expr* src, expr* target)
 {
-  if (target->getIgnoresDuplicateNodes() != ANNOTATION_FALSE)
+  if (target->get_ccb() == ccb &&
+      target->getIgnoresDuplicateNodes() != ANNOTATION_FALSE)
     target->setIgnoresDuplicateNodes(src->getIgnoresDuplicateNodes());
 }
 
@@ -81,9 +86,10 @@ static void pushdown_ignores_duplicate_nodes(expr* src, expr* target)
   If the ignore-duplicates-nodes annotation of the target expr is not set to
   false already, set it to the given value.
 ********************************************************************************/
-static void set_ignores_duplicate_nodes(expr* target, BoolAnnotationValue v)
+static void set_ignores_duplicate_nodes(CompilerCB* ccb, expr* target, BoolAnnotationValue v)
 {
-  if (target->getIgnoresDuplicateNodes() != ANNOTATION_FALSE)
+  if (target->get_ccb() == ccb &&
+      target->getIgnoresDuplicateNodes() != ANNOTATION_FALSE)
     target->setIgnoresDuplicateNodes(v);
 }
 
@@ -106,11 +112,16 @@ expr* MarkConsumerNodeProps::apply(
     expr* node,
     bool& modified)
 {
+  // An expression of another compilation (the prolog of a static context
+  // shared by several queries) is shared by them: it is left as it is.
+  if (node->get_ccb() != rCtx.theCCB)
+    return NULL;
+
   bool saveInOrderedMode = false;
 
   if (!rCtx.theIsInOrderedMode)
   {
-    set_ignores_sorted_nodes(node, ANNOTATION_TRUE);
+    set_ignores_sorted_nodes(rCtx.theCCB, node, ANNOTATION_TRUE);
   }
 
   switch (node->get_expr_kind())
@@ -134,13 +145,13 @@ expr* MarkConsumerNodeProps::apply(
     for (csize i = 0; i < numChildren-1; ++i)
     {
       expr* child = (*seqExpr)[i];
-      set_ignores_sorted_nodes(child, ANNOTATION_TRUE);
-      set_ignores_duplicate_nodes(child, ANNOTATION_TRUE);
+      set_ignores_sorted_nodes(rCtx.theCCB, child, ANNOTATION_TRUE);
+      set_ignores_duplicate_nodes(rCtx.theCCB, child, ANNOTATION_TRUE);
     }
 
     expr* child = (*seqExpr)[numChildren-1];
-    pushdown_ignores_sorted_nodes(node, child);
-    pushdown_ignores_duplicate_nodes(node, child);
+    pushdown_ignores_sorted_nodes(rCtx.theCCB, node, child);
+    pushdown_ignores_duplicate_nodes(rCtx.theCCB, node, child);
 
     // TODO: go through the children again, and for each child that is a
     // var_decl_expr, push down the annotation of the associated var_expr
@@ -155,13 +166,13 @@ expr* MarkConsumerNodeProps::apply(
 
     if (exp->discardsXDM())
     {
-      set_ignores_sorted_nodes(exp->get_expr(), ANNOTATION_TRUE);
-      set_ignores_duplicate_nodes(exp->get_expr(), ANNOTATION_TRUE);
+      set_ignores_sorted_nodes(rCtx.theCCB, exp->get_expr(), ANNOTATION_TRUE);
+      set_ignores_duplicate_nodes(rCtx.theCCB, exp->get_expr(), ANNOTATION_TRUE);
     }
     else
     {
-      pushdown_ignores_sorted_nodes(node, exp->get_expr());
-      pushdown_ignores_duplicate_nodes(node, exp->get_expr());
+      pushdown_ignores_sorted_nodes(rCtx.theCCB, node, exp->get_expr());
+      pushdown_ignores_duplicate_nodes(rCtx.theCCB, node, exp->get_expr());
     }
 
     break;
@@ -176,8 +187,8 @@ expr* MarkConsumerNodeProps::apply(
   case exit_catcher_expr_kind :
   {
     exit_catcher_expr* e = static_cast<exit_catcher_expr*>(node);
-    pushdown_ignores_sorted_nodes(node, e->get_expr());
-    pushdown_ignores_duplicate_nodes(node, e->get_expr());
+    pushdown_ignores_sorted_nodes(rCtx.theCCB, node, e->get_expr());
+    pushdown_ignores_duplicate_nodes(rCtx.theCCB, node, e->get_expr());
     break;
   }
 
@@ -189,8 +200,8 @@ expr* MarkConsumerNodeProps::apply(
 
     // The annotations for the return expr are the same as those of its
     // containing flwor expr.
-    pushdown_ignores_sorted_nodes(node, retExpr);
-    pushdown_ignores_duplicate_nodes(node, retExpr);
+    pushdown_ignores_sorted_nodes(rCtx.theCCB, node, retExpr);
+    pushdown_ignores_duplicate_nodes(rCtx.theCCB, node, retExpr);
 
     // apply the rule recursively on the return expr
     apply(rCtx, flwor->get_return_expr(), modified);
@@ -364,34 +375,34 @@ expr* MarkConsumerNodeProps::apply(
   case if_expr_kind:
   {
     if_expr* ite = static_cast<if_expr *>(node);
-    pushdown_ignores_sorted_nodes(node, ite->get_then_expr());
-    pushdown_ignores_sorted_nodes(node, ite->get_else_expr());
-    pushdown_ignores_duplicate_nodes(node, ite->get_then_expr());
-    pushdown_ignores_duplicate_nodes(node, ite->get_else_expr());
+    pushdown_ignores_sorted_nodes(rCtx.theCCB, node, ite->get_then_expr());
+    pushdown_ignores_sorted_nodes(rCtx.theCCB, node, ite->get_else_expr());
+    pushdown_ignores_duplicate_nodes(rCtx.theCCB, node, ite->get_then_expr());
+    pushdown_ignores_duplicate_nodes(rCtx.theCCB, node, ite->get_else_expr());
     break;
   }
 
   case wrapper_expr_kind :
   {
     wrapper_expr* e = static_cast<wrapper_expr *>(node);
-    pushdown_ignores_sorted_nodes(node, e->get_input());
-    pushdown_ignores_duplicate_nodes(node, e->get_input());
+    pushdown_ignores_sorted_nodes(rCtx.theCCB, node, e->get_input());
+    pushdown_ignores_duplicate_nodes(rCtx.theCCB, node, e->get_input());
     break;
   }
 
   case function_trace_expr_kind :
   {
     function_trace_expr* e = static_cast<function_trace_expr *>(node);
-    pushdown_ignores_sorted_nodes(node, e->get_input());
-    pushdown_ignores_duplicate_nodes(node, e->get_input());
+    pushdown_ignores_sorted_nodes(rCtx.theCCB, node, e->get_input());
+    pushdown_ignores_duplicate_nodes(rCtx.theCCB, node, e->get_input());
     break;
   }
 
   case relpath_expr_kind :
   {
     expr* arg = (*static_cast<relpath_expr *>(node))[0];
-    pushdown_ignores_sorted_nodes(node, arg);
-    pushdown_ignores_duplicate_nodes(node, arg);
+    pushdown_ignores_sorted_nodes(rCtx.theCCB, node, arg);
+    pushdown_ignores_duplicate_nodes(rCtx.theCCB, node, arg);
     break;
   }
 
@@ -404,8 +415,8 @@ expr* MarkConsumerNodeProps::apply(
     expr* arg = curExpr->get_input();
     xqtref_t targetType = curExpr->get_target_type();
 
-    set_ignores_sorted_nodes(arg, ANNOTATION_TRUE);
-    set_ignores_duplicate_nodes(arg, ANNOTATION_FALSE);
+    set_ignores_sorted_nodes(rCtx.theCCB, arg, ANNOTATION_TRUE);
+    set_ignores_duplicate_nodes(rCtx.theCCB, arg, ANNOTATION_FALSE);
 
     break;
   }
@@ -420,21 +431,21 @@ expr* MarkConsumerNodeProps::apply(
     xqtref_t targetType = curExpr->get_target_type();
     SequenceType::Quantifier q = targetType->get_quantifier();
 
-    set_ignores_sorted_nodes(arg, ANNOTATION_TRUE);
+    set_ignores_sorted_nodes(rCtx.theCCB, arg, ANNOTATION_TRUE);
 
     if (targetType->is_empty())
     {
-      set_ignores_duplicate_nodes(arg, ANNOTATION_TRUE);
+      set_ignores_duplicate_nodes(rCtx.theCCB, arg, ANNOTATION_TRUE);
     }
     else if (q == SequenceType::QUANT_STAR ||
              (q == SequenceType::QUANT_PLUS &&
               arg->get_return_type()->min_card() >= 1))
     {
-      set_ignores_duplicate_nodes(arg, ANNOTATION_TRUE);
+      set_ignores_duplicate_nodes(rCtx.theCCB, arg, ANNOTATION_TRUE);
     }
     else
     {
-      set_ignores_duplicate_nodes(arg, ANNOTATION_FALSE);
+      set_ignores_duplicate_nodes(rCtx.theCCB, arg, ANNOTATION_FALSE);
     }
 
     break;
@@ -452,18 +463,18 @@ expr* MarkConsumerNodeProps::apply(
 
     if (targetType->is_empty())
     {
-      set_ignores_sorted_nodes(arg, ANNOTATION_TRUE);
-      set_ignores_duplicate_nodes(arg, ANNOTATION_TRUE);
+      set_ignores_sorted_nodes(rCtx.theCCB, arg, ANNOTATION_TRUE);
+      set_ignores_duplicate_nodes(rCtx.theCCB, arg, ANNOTATION_TRUE);
     }
     else
     {
       if (q == SequenceType::QUANT_ONE || q == SequenceType::QUANT_QUESTION)
       {
-        set_ignores_sorted_nodes(arg, ANNOTATION_TRUE);
+        set_ignores_sorted_nodes(rCtx.theCCB, arg, ANNOTATION_TRUE);
       }
       else
       {
-        pushdown_ignores_sorted_nodes(curExpr, arg);
+        pushdown_ignores_sorted_nodes(rCtx.theCCB, curExpr, arg);
       }
 
       if (curExpr->getIgnoresDuplicateNodes() == ANNOTATION_TRUE &&
@@ -471,11 +482,11 @@ expr* MarkConsumerNodeProps::apply(
            (q == SequenceType::QUANT_PLUS &&
             arg->get_return_type()->min_card() >= 1)))
       {
-        set_ignores_duplicate_nodes(arg, ANNOTATION_TRUE);
+        set_ignores_duplicate_nodes(rCtx.theCCB, arg, ANNOTATION_TRUE);
       }
       else
       {
-        set_ignores_duplicate_nodes(arg, ANNOTATION_FALSE);
+        set_ignores_duplicate_nodes(rCtx.theCCB, arg, ANNOTATION_FALSE);
       }
     }
 
@@ -495,9 +506,9 @@ expr* MarkConsumerNodeProps::apply(
     {
       expr* arg = fo->get_arg(i);
 
-      set_ignores_sorted_nodes(arg, f->ignoresSortedNodes(node, i));
+      set_ignores_sorted_nodes(rCtx.theCCB, arg, f->ignoresSortedNodes(node, i));
 
-      set_ignores_duplicate_nodes(arg, f->ignoresDuplicateNodes(node, i));
+      set_ignores_duplicate_nodes(rCtx.theCCB, arg, f->ignoresDuplicateNodes(node, i));
     }
 
     if (fkind == FunctionConsts::FN_ZERO_OR_ONE_1 ||
@@ -515,7 +526,7 @@ expr* MarkConsumerNodeProps::apply(
 
         if (argFunc->isNodeDistinctFunction())
         {
-          set_ignores_duplicate_nodes(arg, ANNOTATION_TRUE);
+          set_ignores_duplicate_nodes(rCtx.theCCB, arg, ANNOTATION_TRUE);
           f->setFlag(FunctionConsts::DoDistinct);
         }
       }
@@ -537,8 +548,8 @@ expr* MarkConsumerNodeProps::apply(
     json_array_expr* e = static_cast<json_array_expr *>(node);
     if (e->get_expr())
     {
-      set_ignores_duplicate_nodes(e->get_expr(), ANNOTATION_FALSE);
-      set_ignores_sorted_nodes(e->get_expr(), ANNOTATION_FALSE);
+      set_ignores_duplicate_nodes(rCtx.theCCB, e->get_expr(), ANNOTATION_FALSE);
+      set_ignores_sorted_nodes(rCtx.theCCB, e->get_expr(), ANNOTATION_FALSE);
     }
     break;
   }
@@ -625,7 +636,7 @@ expr* MarkProducerNodeProps::apply(
     expr* node,
     bool& modified)
 {
-  DataflowAnnotationsComputer computer;
+  DataflowAnnotationsComputer computer(rCtx.theCCB);
   computer.compute(node);
   modified = false;
   return NULL;
@@ -689,6 +700,8 @@ expr* MarkNodeCopyProps::apply(
     bool& modified)
 {
   modified = false;
+
+  theCCB = rCtx.theCCB;
 
   theSourceFinder = new SourceFinder;
 
@@ -756,6 +769,11 @@ expr* MarkNodeCopyProps::apply(
 ********************************************************************************/
 void MarkNodeCopyProps::applyInternal(expr* node, bool deferred)
 {
+  // An expression of another compilation (the prolog of a shared static
+  // context) is shared by the queries compiled against it: it is left as it is.
+  if (node->get_ccb() != theCCB)
+    return;
+
   static_context* sctx = node->get_sctx();
 
   switch (node->get_expr_kind())
@@ -880,7 +898,21 @@ void MarkNodeCopyProps::applyInternal(expr* node, bool deferred)
 
       bool recursive = (callerUdf ? callerUdf->isMutuallyRecursiveWith(udf) : false);
 
-      if (recursive && !deferred)
+      if (udf->getCCB() != theCCB)
+      {
+        // The body of a udf of another compilation is not changed here (it
+        // copies the input nodes of its constructors): any argument may be
+        // consumed by an unsafe operation in it.
+        csize numArgs = e->num_args();
+
+        for (csize i = 0; i < numArgs; ++i)
+        {
+          std::vector<expr*> sources;
+          theSourceFinder->findNodeSources(e->get_arg(i), sources);
+          markSources(sources);
+        }
+      }
+      else if (recursive && !deferred)
       {
         callerUdf->addRecursiveCall(e);
       }
@@ -1145,7 +1177,8 @@ void MarkNodeCopyProps::applyInternal(expr* node, bool deferred)
 
     user_function* udf = static_cast<user_function*>(e->get_function());
 
-    applyInternal(udf->getBody(), deferred);
+    if (udf->getCCB() == theCCB)
+      applyInternal(udf->getBody(), deferred);
 
     return;
   }
@@ -1215,6 +1248,9 @@ void MarkNodeCopyProps::markSources(const std::vector<expr*>& sources)
 ********************************************************************************/
 void MarkNodeCopyProps::findSourcesForNodeExtractors(expr* node)
 {
+  if (node->get_ccb() != theCCB)
+    return;
+
   TypeManager* tm = node->get_type_manager();
   RootTypeManager& rtm = GENV_TYPESYSTEM;
 
@@ -1372,7 +1408,19 @@ void MarkNodeCopyProps::findSourcesForNodeExtractors(expr* node)
 
     e->setVisitId(1);
 
-    if (f->isUdf() && static_cast<user_function*>(f)->getBody() != NULL)
+    if (f->isUdf() &&
+        static_cast<user_function*>(f)->getBody() != NULL &&
+        static_cast<user_function*>(f)->getCCB() != theCCB)
+    {
+      // The body of a udf of another compilation is not visited: any argument
+      // may reach a node extractor in it.
+      csize numArgs = e->num_args();
+      for (csize i = 0; i < numArgs; ++i)
+      {
+        findSourcesForNodeExtractors(e->get_arg(i));
+      }
+    }
+    else if (f->isUdf() && static_cast<user_function*>(f)->getBody() != NULL)
     {
       user_function* udf = static_cast<user_function*>(f);
       expr* body = udf->getBody();
@@ -1494,7 +1542,8 @@ void MarkNodeCopyProps::findSourcesForNodeExtractors(expr* node)
 
     user_function* udf = static_cast<user_function*>(e->get_function());
 
-    findSourcesForNodeExtractors(udf->getBody());
+    if (udf->getCCB() == theCCB)
+      findSourcesForNodeExtractors(udf->getBody());
 
     return;
   }

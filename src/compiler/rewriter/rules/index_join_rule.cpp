@@ -239,6 +239,11 @@ expr* IndexJoinRule::apply(RewriterContext& rCtx, expr* node, bool& modified)
   assert(node != theRootExpr || theVarDefExprs.empty());
   assert(node != theRootExpr || theChildPositions.empty());
 
+  // An expression of another compilation (the prolog of a static context
+  // shared by several queries) is shared by them: it is left as it is.
+  if (node->get_ccb() != rCtx.theCCB)
+    return node;
+
   flwor_expr* flworExpr = NULL;
 
   expr_kind_t nodeKind = node->get_expr_kind();

@@ -94,6 +94,11 @@ expr* IndexMatchingRule::apply(RewriterContext& rCtx, expr* node, bool& modified
   expr* result = node;
   modified = false;
 
+  // An expression of another compilation (the prolog of a static context
+  // shared by several queries) is shared by them: it is left as it is.
+  if (node->get_ccb() != rCtx.theCCB)
+    return node;
+
   // TODO remove this
   if (theIndexDecl->isGeneral())
     return node;

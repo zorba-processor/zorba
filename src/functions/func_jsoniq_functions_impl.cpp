@@ -271,15 +271,18 @@ public:
 
 private:
   std::vector<const var_expr*> theVars; // bound to values
-  std::vector<const expr*> theBindings; // what binds values to theVars
+  // bound to the values at the end of a path of literal keys in values
+  std::vector<std::pair<const var_expr*, std::vector<zstring>>> thePaths;
+  std::vector<const expr*> theBindings; // what binds values to theVars and thePaths
   json::projection* theRead;
 
   bool is_values(const expr* e) const;
+  const std::vector<zstring>* values_path(const expr* e) const;
+  bool path_values(expr* e, std::vector<zstring>* path);
   bool only_values(expr* e);
   bool counted(expr* e);
   bool lookup_path(expr* e, std::vector<zstring>* path);
   bool call_path(expr* e, std::vector<zstring>* path);
-  bool values_at(expr* e, std::vector<zstring>* path);
   void bind(const flwor_expr* flwor);
   bool reads_except(expr* e, const expr* skipped);
 };
@@ -293,6 +296,43 @@ bool read_analysis::is_values(const expr* e) const
   return e->get_expr_kind() == wrapper_expr_kind &&
     std::find(theVars.begin(), theVars.end(),
               static_cast<const wrapper_expr*>(e)->get_input()) != theVars.end();
+}
+
+
+/**
+ * Gets the path of e if it is a reference to a variable of thePaths.
+ */
+const std::vector<zstring>* read_analysis::values_path(const expr* e) const
+{
+  if (e->get_expr_kind() != wrapper_expr_kind)
+    return nullptr;
+  const expr* var = static_cast<const wrapper_expr*>(e)->get_input();
+  for (const auto& [pathVar, path] : thePaths)
+  {
+    if (pathVar == var)
+      return &path;
+  }
+  return nullptr;
+}
+
+
+/**
+ * Gets the keys of e if it gives the values at the end of a path of literal
+ * keys in values: a lookup path, calls of literal keys, or a variable of
+ * thePaths.
+ */
+bool read_analysis::path_values(expr* e, std::vector<zstring>* path)
+{
+  // A wrapper of an expression, as of a for or let variable replaced by its domain.
+  while (e->get_expr_kind() == wrapper_expr_kind &&
+         static_cast<wrapper_expr*>(e)->get_input()->get_expr_kind() != var_expr_kind)
+    e = static_cast<wrapper_expr*>(e)->get_input();
+  if (const std::vector<zstring>* varPath = values_path(e))
+  {
+    path->insert(path->end(), varPath->begin(), varPath->end());
+    return true;
+  }
+  return lookup_path(e, path) || call_path(e, path);
 }
 
 
@@ -377,7 +417,9 @@ bool read_analysis::lookup_path(expr* e, std::vector<zstring>* path)
 {
   zstring key;
   expr* input = literal_key_lookup(e, &key);
-  if (!input || !values_at(input, path))
+  if (!input)
+    return false;
+  if (!only_values(input) && !path_values(input, path))
     return false;
   path->push_back(key);
   return true;
@@ -419,7 +461,7 @@ bool read_analysis::call_path(expr* e, std::vector<zstring>* path)
   }
   if (!item ||
       !is_reference(literal_key_lookup(flwor->get_return_expr(), &key), item) ||
-      !(rooted || values_at(domain, path)))
+      !(rooted || only_values(domain) || path_values(domain, path)))
     return false;
   keys.push_back(key);
   path->insert(path->end(), keys.begin(), keys.end());
@@ -428,34 +470,29 @@ bool read_analysis::call_path(expr* e, std::vector<zstring>* path)
 
 
 /**
- * Whether e gives only values (path unchanged) or the values at the end of a
- * path of literal keys in them (path set to the keys).
- */
-bool read_analysis::values_at(expr* e, std::vector<zstring>* path)
-{
-  // A wrapper of an expression, as of a for clause's domain that replaced its variable.
-  while (e->get_expr_kind() == wrapper_expr_kind &&
-         static_cast<wrapper_expr*>(e)->get_input()->get_expr_kind() != var_expr_kind)
-    e = static_cast<wrapper_expr*>(e)->get_input();
-  return only_values(e) || lookup_path(e, path) || call_path(e, path);
-}
-
-
-/**
- * Adds to theVars the variables of flwor bound to values: those of a for or
- * window clause over values and those of a group by that collect values.
+ * Adds to theVars the variables of flwor bound to values: those of a for, let
+ * or window clause over values and those of a group by that collect values.
+ * Adds to thePaths those of a for or let clause over the values at the end of
+ * a path, and those of a group by that collect them.
  */
 void read_analysis::bind(const flwor_expr* flwor)
 {
   for (csize i = 0; i < flwor->num_clauses(); ++i)
   {
     const flwor_clause* clause = flwor->get_clause(i);
-    if (clause->get_kind() == flwor_clause::for_clause)
+    if (clause->get_kind() == flwor_clause::for_clause ||
+        clause->get_kind() == flwor_clause::let_clause)
     {
-      const for_clause* fc = static_cast<const for_clause*>(clause);
+      const forlet_clause* fc = static_cast<const forlet_clause*>(clause);
+      std::vector<zstring> path;
       if (only_values(fc->get_expr()))
       {
         theVars.push_back(fc->get_var());
+        theBindings.push_back(fc->get_expr());
+      }
+      else if (path_values(fc->get_expr(), &path))
+      {
+        thePaths.emplace_back(fc->get_var(), std::move(path));
         theBindings.push_back(fc->get_expr());
       }
     }
@@ -473,9 +510,15 @@ void read_analysis::bind(const flwor_expr* flwor)
       const groupby_clause* gc = static_cast<const groupby_clause*>(clause);
       for (const auto& [input, var] : gc->get_nongrouping_vars())
       {
+        std::vector<zstring> path;
         if (is_values(input))
         {
           theVars.push_back(var);
+          theBindings.push_back(input);
+        }
+        else if (path_values(input, &path))
+        {
+          thePaths.emplace_back(var, std::move(path));
           theBindings.push_back(input);
         }
       }
@@ -505,7 +548,7 @@ bool read_analysis::reads(expr* e)
     return false;
 
   std::vector<zstring> path;
-  if (lookup_path(e, &path) || call_path(e, &path))
+  if (path_values(e, &path))
   {
     theRead->add(path);
     return true;

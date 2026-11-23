@@ -319,6 +319,13 @@ ZORBA_DLL_PUBLIC void query_resources_fail_walk(unsigned long edge);
   ------------
   True if there is an eval expr within the compilation unit covered by this CCB.
 
+  theHasFunctionLookup :
+  ----------------------
+  True if the compilation calls or references fn:function-lookup, which finds a
+  function by name at run time. Then, as with eval, the compilation seals every
+  function it declares, not only the ones it calls. Compile time only: not
+  serialized.
+
   theIsEval :
   -----------
   True if this is the CCB for an eval query. This flag is needed to determine
@@ -464,6 +471,8 @@ public:
   ProcessingPhase           thePhase;
 
   bool                      theHasEval;
+
+  bool                      theHasFunctionLookup = false;
 
   bool                      theIsEval;
 

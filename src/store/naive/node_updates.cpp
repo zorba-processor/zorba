@@ -839,7 +839,10 @@ void XmlNode::removeType(UpdatePrimitive& upd)
 
       if (n->getType()->equals(GET_STORE().XS_ANY_QNAME))
       {
-        // The type stays, but the nilled property is removed with it
+        // The type stays, but the nilled property is removed with it. The
+        // ancestors may still have other types (validation against a
+        // declaration of type xs:anyType), so the walk goes on; restoreType()
+        // skips the elements that have no undo entry.
         if (n->getNilled())
         {
           tinfo.theTypeName = n->getType();
@@ -850,7 +853,8 @@ void XmlNode::removeType(UpdatePrimitive& upd)
         }
 
         revalidationNode = currNode;
-        break;
+        currNode = currNode->theParent;
+        continue;
       }
 
       // What can fail comes first: a node changed is a node recorded for undo.
@@ -958,9 +962,16 @@ void XmlNode::restoreType(TypeUndoList& undoList)
 
   while(currNode != NULL && pos < numNodes)
   {
-    ZORBA_FATAL(currNode == undoList[pos].theNode, "");
- 
     store::StoreConsts::NodeKind nodeKind = currNode->getNodeKind();
+
+    if (currNode != undoList[pos].theNode)
+    {
+      // removeType() records nothing for an element of type xs:anyType that
+      // is not nilled
+      ZORBA_FATAL(nodeKind == store::StoreConsts::elementNode, "");
+      currNode = currNode->theParent;
+      continue;
+    }
 
     NodeTypeInfo& tinfo = undoList[pos];
 
@@ -1490,12 +1501,30 @@ void InternalNode::restoreChild(UpdReplaceChild& upd)
 ********************************************************************************/
 void ElementNode::replaceContent(UpdReplaceElemContent& upd)
 {
+  // The list of the old children, and room for the new child, are made before
+  // the old children are taken out. theNodes keeps its capacity, so a failure
+  // after that puts the old children back without allocating.
   upd.theOldChildren.insert(upd.theOldChildren.begin(),
                             childrenBegin(),
                             childrenEnd());
 
+  theNodes.reserve(theNumAttrs + 1);
   theNodes.resize(theNumAttrs);
 
+  try
+  {
+    replaceChildrenWithText(upd);
+  }
+  catch (...)
+  {
+    restoreContent(upd);
+    throw;
+  }
+}
+
+
+void ElementNode::replaceChildrenWithText(UpdReplaceElemContent& upd)
+{
   if (upd.theNewChild == NULL || upd.theNewChild->getStringValue().empty())
     return;
 

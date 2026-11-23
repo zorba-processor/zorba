@@ -51,12 +51,28 @@ namespace zorba
 UDFGraph::UDFGraph(expr* e)
   :
   theExpr(e),
+  theCCB(e != NULL ? e->get_ccb() : NULL),
   theNodes(32, false),
   theRoot(NULL),
   theVisitId(0)
 {
   if (e != NULL)
-    build(e);
+    build(e, NULL);
+}
+
+
+/*******************************************************************************
+  The call graph of a udf, as if the compilation that owns it called it.
+********************************************************************************/
+UDFGraph::UDFGraph(user_function* udf)
+  :
+  theExpr(NULL),
+  theCCB(udf->getCCB()),
+  theNodes(32, false),
+  theRoot(NULL),
+  theVisitId(0)
+{
+  build(NULL, udf);
 }
 
 
@@ -77,7 +93,7 @@ UDFGraph::~UDFGraph()
 /*******************************************************************************
 
 ********************************************************************************/
-void UDFGraph::build(const expr* e)
+void UDFGraph::build(const expr* e, user_function* udf)
 {
   user_function* dummy = NULL;
   theRoot = new UDFNode(NULL);
@@ -86,7 +102,11 @@ void UDFGraph::build(const expr* e)
   std::vector<user_function*> callChain;
   callChain.push_back(NULL);
 
-  build(e, callChain);
+  if (e != NULL)
+    build(e, callChain);
+
+  if (udf != NULL)
+    addCall(udf, callChain);
 }
 
 
@@ -117,37 +137,7 @@ void UDFGraph::build(const expr* curExpr, std::vector<user_function*>& callChain
     }
 
     if (udf != NULL)
-    {
-      std::vector<user_function*>::const_iterator cycle;
-
-      if ((cycle = std::find(callChain.begin(), callChain.end(), udf)) == callChain.end())
-      {
-        bool found = theNodes.exists(udf);
-
-        addEdge(callChain.back(), udf);
-
-        callChain.push_back(udf);
-
-        // If this is the first time we see the current udf, do a recursive
-        // call on its body expr.
-        if (!found && udf->getBody())
-        {
-          build(udf->getBody(), callChain);
-        }
-
-        callChain.pop_back();
-      }
-      else
-      {
-        // A recursive function call.
-        std::vector<user_function*>::const_iterator ite = cycle;
-        std::vector<user_function*>::const_iterator end = callChain.end();
-        for (; ite != end; ++ite)
-        {
-          (*ite)->addMutuallyRecursiveUDFs(callChain, cycle);
-        }
-      }
-    }
+      addCall(udf, callChain);
   }
 
   ExprConstIterator iter(curExpr);
@@ -157,6 +147,50 @@ void UDFGraph::build(const expr* curExpr, std::vector<user_function*>& callChain
 
     iter.next();
   }
+}
+
+
+/*******************************************************************************
+
+********************************************************************************/
+void UDFGraph::addCall(user_function* udf, std::vector<user_function*>& callChain)
+{
+  std::vector<user_function*>::const_iterator cycle;
+
+  if ((cycle = std::find(callChain.begin(), callChain.end(), udf)) == callChain.end())
+  {
+    bool found = theNodes.exists(udf);
+
+    addEdge(callChain.back(), udf);
+
+    callChain.push_back(udf);
+
+    // If this is the first time we see the current udf, do a recursive
+    // call on its body expr. A udf of another compilation cannot call back
+    // into this one, so it closes no cycle.
+    if (!found && udf->getBody() && udf->getCCB() == theCCB)
+    {
+      build(udf->getBody(), callChain);
+    }
+
+    callChain.pop_back();
+  }
+  else
+  {
+    // A recursive function call.
+    std::vector<user_function*>::const_iterator ite = cycle;
+    std::vector<user_function*>::const_iterator end = callChain.end();
+    for (; ite != end; ++ite)
+    {
+      (*ite)->addMutuallyRecursiveUDFs(callChain, cycle);
+    }
+  }
+}
+
+
+bool UDFGraph::isForeign(const UDFNode* node) const
+{
+  return node != theRoot && node->theUDF->getCCB() != theCCB;
 }
 
 
@@ -206,7 +240,7 @@ void UDFGraph::optimizeUDFs(CompilerCB* ccb, UDFNode* node, ulong visit)
     optimizeUDFs(ccb, node->theChildren[i], visit);
   }
 
-  if (node == theRoot)
+  if (node == theRoot || isForeign(node))
     return;
 
   user_function* udf = node->theUDF;
@@ -275,6 +309,14 @@ bool UDFGraph::inferDeterminism(UDFNode* node, ulong visit)
     return node->theUDF->isDeterministic();
 
   node->theVisitId = visit;
+
+  // Its owner inferred it; an error it found there is raised by the queries
+  // that call the function.
+  if (isForeign(node))
+  {
+    node->theUDF->raiseStaticError();
+    return node->theUDF->isDeterministic();
+  }
 
   bool deterministic = true;
 

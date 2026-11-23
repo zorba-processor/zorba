@@ -310,7 +310,9 @@ void expr::setFreeVars(FreeVars& s)
 ********************************************************************************/
 void expr::clear_annotations()
 {
-  theFreeVars.clear();
+  // The free variables of a variable are itself, from its construction.
+  if (get_expr_kind() != var_expr_kind)
+    theFreeVars.clear();
 
   if (getProducesSortedNodes() != ANNOTATION_TRUE_FIXED)
     setProducesSortedNodes(ANNOTATION_UNKNOWN);

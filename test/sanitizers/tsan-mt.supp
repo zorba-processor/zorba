@@ -8,18 +8,6 @@
 # comment). The PR that fixes a race deletes its entries, so the job then
 # fails if the race is still there; a race not listed here fails its test.
 
-# C1 (P9): user function plans are generated lazily by the first call, on the
-# user_function object that every clone shares.
-race:zorba::user_function::getPlan
-
-# C4 (P9): rewrites of one compilation annotate expressions that another
-# compilation owns (functions of a shared static context).
-race:zorba::MarkFreeVars::apply
-race:zorba::expr::set*(zorba::BoolAnnotationValue)
-
-# C10 (P9): rewrites set flags on FLWOR expressions that clones share.
-race:zorba::flwor_expr::set_general
-
 # L2 (P12): ICU UText clone inside RegexPattern compilation reads a block
 # another thread's compilation allocated (fn:tokenize folded at compile time;
 # each thread compiles its own regex). ICU is not built with TSan; P12 decides

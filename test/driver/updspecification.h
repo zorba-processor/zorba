@@ -18,6 +18,7 @@
 
 #include <vector>
 #include <string>
+#include <utility>
 #include <cassert>
 #include <iostream>
 #include "common/common.h"
@@ -47,6 +48,9 @@ public:
   Compare: parts-q1-results.xml Fragment
 
   Parsing this file will produce 2 State objects.
+
+  "Options: {namespace}local=value ..." declares static context options for the
+  query of its State, as in the .spec files of the rbkt tests.
 ********************************************************************************/
 class State 
 {
@@ -89,6 +93,8 @@ public:
   std::vector<CompareType> theCompareTypes;
   bool                     hasErrors;
   std::vector<std::string> theErrors;
+  // Static context options, as {namespace}local and value.
+  std::vector<std::pair<std::string, std::string> > theOptions;
 
   State() : hasDate(false), hasCompare(false), hasErrors(false)
   {}
@@ -331,6 +337,17 @@ public:
             } else {
               return false;
             }
+          }
+          break;
+        }
+        else if (*lIter == "Options:")
+        {
+          for (++lIter; lIter != tokens.end(); ++lIter)
+          {
+            std::string::size_type const lEquals = lIter->find('=');
+            if (lEquals == std::string::npos) { return false; }
+            theCurState->theOptions.emplace_back(lIter->substr(0, lEquals),
+                                                 lIter->substr(lEquals + 1));
           }
           break;
         }

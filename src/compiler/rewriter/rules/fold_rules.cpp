@@ -89,6 +89,11 @@ static bool maybe_needs_implicit_timezone(const fo_expr* fo);
 ********************************************************************************/
 expr* MarkExprs::apply(RewriterContext& rCtx, expr* node, bool& modified)
 {
+  // An expression of another compilation (the prolog of a static context
+  // shared by several queries) is shared by them: it is left as it is.
+  if (node->get_ccb() != rCtx.theCCB)
+    return NULL;
+
   BoolAnnotationValue saveNonDiscardable = node->getNonDiscardable();
   BoolAnnotationValue saveUnfoldable = node->getUnfoldable();
   BoolAnnotationValue saveContainsRecursiveCall = node->getContainsRecursiveCall();
@@ -115,7 +120,8 @@ expr* MarkExprs::apply(RewriterContext& rCtx, expr* node, bool& modified)
     {
       user_function* udf = static_cast<user_function*>(f);
 
-      if (!udf->isOptimized())
+      // A udf of another compilation was optimized by its owner, if at all.
+      if (!udf->isOptimized() && udf->getCCB() == rCtx.theCCB)
       {
         // we can be here in case of mutually recursive udfs or during plan
         // serialization and udf was not callable by the main program
@@ -336,19 +342,18 @@ static bool maybe_needs_implicit_timezone(const fo_expr* fo)
 ********************************************************************************/
 expr* MarkFreeVars::apply(RewriterContext& rCtx, expr* node, bool& modified)
 {
+  // The free variables of a variable are itself, from its construction. An
+  // expression of another compilation (the prolog of a static context shared
+  // by several queries) keeps those its owner computed.
+  if (node->get_expr_kind() == var_expr_kind || node->get_ccb() != rCtx.theCCB)
+    return NULL;
+
   expr::FreeVars& freevars = node->getFreeVars();
 
   freevars.clear();
 
   switch (node->get_expr_kind())
   {
-  case var_expr_kind:
-  {
-    var_expr* v = static_cast<var_expr *>(node);
-    freevars.insert(v);
-
-    break;
-  }
   // Get the free vars of each child expr and add them to the free vars of the
   // parent. But in case of a flwor expr, do not add any variables defined by
   // the flwor expr itself
@@ -414,6 +419,11 @@ expr* MarkFreeVars::apply(RewriterContext& rCtx, expr* node, bool& modified)
 ********************************************************************************/
 expr* FoldConst::apply(RewriterContext& rCtx, expr* node, bool& modified)
 {
+  // An expression of another compilation (the prolog of a static context
+  // shared by several queries) is shared by them: it is left as it is.
+  if (node->get_ccb() != rCtx.theCCB)
+    return NULL;
+
   expr_kind_t k = node->get_expr_kind();
   xqtref_t rtype = node->get_return_type(); // DO NOT MOVE THIS !!!!
 
@@ -1195,7 +1205,10 @@ RULE_REWRITE_POST(InlineFunctions)
       // An inlined sequential body would leave its local variables bound in the caller.
       // A body inlined without the nondeterministic annotation of its function must
       // be nondeterministic itself, or the call could be hoisted or folded.
+      // The body of a udf of another compilation is shared by every query that
+      // calls it: cloning it would allocate in its owner's expression arena.
       if (!udf->isSequential() &&
+          udf->getCCB() == rCtx.theCCB &&
           (udf->isDeterministic() || body == NULL || body->is_nondeterministic()) &&
           (
             !udf->getAnnotationList() ||

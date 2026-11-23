@@ -6905,7 +6905,8 @@ void end_visit(const AssignExpr& v, void* visit_state)
     ERROR_PARAMS(ve->get_name()->getStringValue()));
   }
 
-  ve->add_ref();
+  if (ve->get_ccb() == theCCB)
+    ve->add_ref();
 
   xqtref_t varType = ve->get_type();
 
@@ -12361,6 +12362,8 @@ expr* generate_fn_body(
   }
   case FunctionConsts::FN_FUNCTION_LOOKUP_2:
   {
+    theCCB->theHasFunctionLookup = true;
+
     // hof ???? What if focus is not defined ?
     arguments.push_back(dotRef(loc));
     arguments.push_back(dotPosRef(loc));
@@ -13226,6 +13229,8 @@ expr* generate_literal_function(
       }
       case FunctionConsts::FN_FUNCTION_LOOKUP_2:
       {
+        theCCB->theHasFunctionLookup = true;
+
         bool varAdded = false;
 
         var_expr* ctxItemVar = lookup_var(getDotItemVarName(), loc, false);

@@ -1,4 +1,5 @@
 State: sc3_ex1
+Options: {http://zorba.io/options/features}disable=http-uri-resolution
 Args: 
 -x
 input-context:=$UPDATE_SRC_DIR/Queries/zorba/store/meat_poultry.csv
