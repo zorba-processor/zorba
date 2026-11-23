@@ -74,8 +74,6 @@ namespace zorba {
 ********************************************************************************/
 LoadedProlog::LoadedProlog(LoadedProlog* aParent)
   :
-  theCompilerCB(NULL),
-  theXQueryDiagnostics(NULL),
   theInitExpr(NULL),
   theMaxVarId(dynamic_context::MAX_IDVARS_RESERVED),
   theParent(aParent)
@@ -88,10 +86,10 @@ LoadedProlog::~LoadedProlog()
   if (theResources)
   {
     static_context_t noSctx;
-    theResources->dispose(theCompilerCB,
+    theResources->dispose(theCompilerCB.release(),
                           noSctx,
                           NULL,
-                          theXQueryDiagnostics,
+                          theXQueryDiagnostics.release(),
                           false,
                           NULL,
                           NULL);
@@ -99,8 +97,8 @@ LoadedProlog::~LoadedProlog()
   }
   else
   {
-    delete theCompilerCB;
-    delete theXQueryDiagnostics;
+    theCompilerCB.reset();
+    theXQueryDiagnostics.reset();
   }
 }
 
@@ -1181,14 +1179,14 @@ void StaticContextImpl::loadProlog(
   // as an input to a user query Q, theSctxMap of Q will be initialized as a copy
   // of this->theSctxMap.
   //theSctxMap = impl.theCompilerCB->theSctxMap;
-  lProlog->theCompilerCB = impl.theCompilerCB;
+  lProlog->theCompilerCB.reset(impl.theCompilerCB);
   impl.theCompilerCB = NULL;
   lProlog->theInitExpr = theCtx->get_query_expr();
 
   // The ccb reports to the diagnostics of impl. loadProlog() sealed the
   // functions of the prolog (XQueryCompiler::seal()): the queries compiled
   // against this context only read them.
-  lProlog->theXQueryDiagnostics = impl.theXQueryDiagnostics;
+  lProlog->theXQueryDiagnostics.reset(impl.theXQueryDiagnostics);
   impl.theXQueryDiagnostics = NULL;
 
   // The ccb no longer belongs to impl (whose QueryResources goes away with

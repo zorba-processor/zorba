@@ -20,6 +20,7 @@
 #include <zorba/static_context.h>
 #include <zorba/api_shared_types.h>
 #include <map>
+#include <memory>
 
 #include "common/shared_types.h"
 
@@ -67,8 +68,8 @@ class QueryResources;
 class LoadedProlog : public SyncedRCObject
 {
 public:
-  CompilerCB                          * theCompilerCB;
-  XQueryDiagnostics                   * theXQueryDiagnostics;
+  std::unique_ptr<CompilerCB>           theCompilerCB;
+  std::unique_ptr<XQueryDiagnostics>    theXQueryDiagnostics;
   rchandle<QueryResources>              theResources;
   expr                                * theInitExpr;
   ulong                                 theMaxVarId;
