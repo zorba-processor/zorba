@@ -776,6 +776,24 @@ ZORBA_SET_TEST_PROPERTY(bin/zorba_output_method FAIL_REGULAR_EXPRESSION "<a>|err
 # ... unless the command line sets it
 ZORBA_ADD_TEST(bin/zorba_output_method_cli zorbacmd -q "${CMAKE_CURRENT_SOURCE_DIR}/test/output_method.xq" -f -z method=xml)
 ZORBA_SET_TEST_PROPERTY(bin/zorba_output_method_cli PASS_REGULAR_EXPRESSION "<a>x</a>")
+# JSON Lines: method=json with a newline item separator and a trailing newline
+# writes each item on its own line; a newline inside a string stays escaped.
+ZORBA_ADD_TEST(bin/zorba_json_lines zorbacmd -f -q "${CMAKE_CURRENT_SOURCE_DIR}/test/json_lines.jq"
+  -z method=json -z "item-separator=\n" --trailing-nl)
+ZORBA_SET_TEST_PROPERTY(bin/zorba_json_lines PASS_REGULAR_EXPRESSION
+  "^[{] \"a\" : 1 [}]\n[{] \"a\" : \\[ 1, 2 \\] [}]\n\"x\\\\ny\"\n$")
+ZORBA_ADD_TEST(bin/zorba_json_lines_help zorbacmd --help)
+ZORBA_SET_TEST_PROPERTY(bin/zorba_json_lines_help PASS_REGULAR_EXPRESSION
+  "A parameter given here overrides the same parameter declared in the query prolog [(]declare option output:[.][.][.][)]; --indent, --serialize-html and --serialize-text override the parameters given here[.] JSON Lines [(]one JSON item per line, each line ending with a newline[)]: -z method=json -z item-separator=<newline> --trailing-nl, where <newline> is a newline character, written [$]'[\\]n' in bash and zsh; each item stays on one line unless indentation is on [(]--indent or indent=yes[)][.] An empty result prints only the trailing newline[.]\n")
+
+# An import after a declaration of the prolog is XPST0003 with a message that
+# says so, located at the import, in XQuery and in JSONiq.
+FOREACH (_ext xq jq)
+  ZORBA_ADD_TEST(bin/zorba_import_after_declaration_${_ext} zorbacmd -f -q
+    "${CMAKE_CURRENT_SOURCE_DIR}/test/language/import_after_declaration.${_ext}")
+  ZORBA_SET_TEST_PROPERTY(bin/zorba_import_after_declaration_${_ext} PASS_REGULAR_EXPRESSION
+    "import_after_declaration[.]${_ext}>:2,1: static error \\[err:XPST0003\\]: invalid expression: syntax error, imports must come before variable, function, option and other declarations")
+ENDFOREACH ()
 
 # test the --uri-path, --lib-path, and --module-path args.
 # Use the versioning tests as they utilize test modules already.
