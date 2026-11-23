@@ -9,14 +9,9 @@
   </OrIterator>
 </iterator-tree>
 <iterator-tree description="const-folded expr">
-  <UDFunctionCallIterator function="testlib:searchUser">
-    <UDFunctionArgs>
-      <SingletonIterator value="xs:integer(0)"/>
-    </UDFunctionArgs>
-  </UDFunctionCallIterator>
-</iterator-tree>
-<iterator-tree description="testlib:searchUser">
-  <FnConcatIterator/>
+  <FunctionTraceIterator>
+    <FnConcatIterator/>
+  </FunctionTraceIterator>
 </iterator-tree>
 <iterator-tree description="main query">
   <SequentialIterator>

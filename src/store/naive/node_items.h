@@ -17,6 +17,7 @@
 #ifndef ZORBA_SIMPLE_STORE_NODE_ITEMS
 #define ZORBA_SIMPLE_STORE_NODE_ITEMS
 
+#include <atomic>
 #include <cassert>
 #include <deque>
 #include <memory>
@@ -407,6 +408,56 @@ public:
 
 
 /******************************************************************************
+  The type of XmlNode::theFlags. With several threads, fn:generate-id sets the
+  HaveReference flag of a node (under SimpleStore::theReferencesMutex, while
+  holding only the store's READ lock) that other threads read the flags of, so
+  the word is atomic; relaxed accesses compile to plain loads and stores.
+*******************************************************************************/
+#ifdef ZORBA_FOR_ONE_THREAD_ONLY
+
+typedef uint32_t NodeFlagWord;
+
+#else
+
+class NodeFlagWord
+{
+  std::atomic<uint32_t> theValue;
+
+public:
+  NodeFlagWord(uint32_t value = 0) : theValue(value) { }
+
+  NodeFlagWord(const NodeFlagWord& other) : theValue(uint32_t(other)) { }
+
+  NodeFlagWord& operator=(const NodeFlagWord& other)
+  {
+    return *this = uint32_t(other);
+  }
+
+  NodeFlagWord& operator=(uint32_t value)
+  {
+    theValue.store(value, std::memory_order_relaxed);
+    return *this;
+  }
+
+  operator uint32_t() const { return theValue.load(std::memory_order_relaxed); }
+
+  NodeFlagWord& operator|=(uint32_t bits)
+  {
+    theValue.fetch_or(bits, std::memory_order_relaxed);
+    return *this;
+  }
+
+  NodeFlagWord& operator&=(uint32_t bits)
+  {
+    theValue.fetch_and(bits, std::memory_order_relaxed);
+    return *this;
+  }
+};
+
+#endif
+
+
+/******************************************************************************
 
   Node identification: A node is uniquely and globally identified by a
   composite key consisting of: the id of the containing collection, the id of
@@ -513,7 +564,7 @@ public:
 
 protected:
   InternalNode    * theParent;
-  uint32_t          theFlags;
+  NodeFlagWord      theFlags;
 
   // The number of attributes of an InternalNode (element or document node);
   // 0 for other nodes. Declared here so that it occupies the padding after

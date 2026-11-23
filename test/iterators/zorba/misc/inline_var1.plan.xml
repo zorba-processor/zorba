@@ -1,67 +1,61 @@
 <iterator-tree description="main query">
-  <UDFunctionCallIterator function="local:foo">
-    <UDFunctionArgs>
-      <ElementIterator copyInputNodes="false">
-        <SingletonIterator value="xs:QName(,,a)"/>
-        <ElementIterator copyInputNodes="false">
-          <SingletonIterator value="xs:QName(,,b)"/>
-          <FnConcatIterator>
-            <AttributeIterator qname="xs:QName(,,att1)">
-              <SingletonIterator value="xs:string(1)"/>
-            </AttributeIterator>
-            <AttributeIterator qname="xs:QName(,,att2)">
-              <SingletonIterator value="xs:string(20)"/>
-            </AttributeIterator>
-          </FnConcatIterator>
-        </ElementIterator>
-      </ElementIterator>
-      <SingletonIterator value="xs:integer(10)"/>
-    </UDFunctionArgs>
-  </UDFunctionCallIterator>
-</iterator-tree>
-<iterator-tree description="local:foo">
-  <PromoteIterator type="xs:double">
-    <FLWORIterator>
-      <ForVariable name="x">
-        <LetVarIterator varname="x"/>
-      </ForVariable>
-      <ReturnClause>
-        <IfThenElseIterator>
-          <FnBooleanIterator>
-            <ChildAxisIterator test-kind="match_name_test" qname="xs:QName(,,c)" typename="*" nill-allowed="false">
-              <ForVarIterator varname="x"/>
-            </ChildAxisIterator>
-          </FnBooleanIterator>
-          <GenericArithIterator_AddOperation>
-            <PromoteIterator type="xs:anyAtomicType">
-              <FnDataIterator>
-                <AttributeAxisIterator test-kind="match_name_test" qname="xs:QName(,,att1)" typename="*" nill-allowed="false">
-                  <ChildAxisIterator test-kind="match_name_test" qname="xs:QName(,,b)" typename="*" nill-allowed="false">
-                    <ForVarIterator varname="x"/>
-                  </ChildAxisIterator>
-                </AttributeAxisIterator>
-              </FnDataIterator>
-            </PromoteIterator>
-            <LetVarIterator varname="z"/>
-          </GenericArithIterator_AddOperation>
-          <GenericArithIterator_AddOperation>
-            <PromoteIterator type="xs:anyAtomicType">
-              <FnDataIterator>
-                <AttributeAxisIterator test-kind="match_name_test" qname="xs:QName(,,att2)" typename="*" nill-allowed="false">
-                  <FunctionTraceIterator>
-                    <TreatIterator quant="">
-                      <ChildAxisIterator test-kind="match_name_test" qname="xs:QName(,,b)" typename="*" nill-allowed="false">
-                        <ForVarIterator varname="x"/>
-                      </ChildAxisIterator>
-                    </TreatIterator>
-                  </FunctionTraceIterator>
-                </AttributeAxisIterator>
-              </FnDataIterator>
-            </PromoteIterator>
-            <LetVarIterator varname="z"/>
-          </GenericArithIterator_AddOperation>
-        </IfThenElseIterator>
-      </ReturnClause>
-    </FLWORIterator>
-  </PromoteIterator>
+  <FunctionTraceIterator>
+    <PromoteIterator type="xs:double">
+      <FLWORIterator>
+        <ForVariable name="x">
+          <ElementIterator copyInputNodes="false">
+            <SingletonIterator value="xs:QName(,,a)"/>
+            <ElementIterator copyInputNodes="false">
+              <SingletonIterator value="xs:QName(,,b)"/>
+              <FnConcatIterator>
+                <AttributeIterator qname="xs:QName(,,att1)">
+                  <SingletonIterator value="xs:string(1)"/>
+                </AttributeIterator>
+                <AttributeIterator qname="xs:QName(,,att2)">
+                  <SingletonIterator value="xs:string(20)"/>
+                </AttributeIterator>
+              </FnConcatIterator>
+            </ElementIterator>
+          </ElementIterator>
+        </ForVariable>
+        <ReturnClause>
+          <IfThenElseIterator>
+            <FnBooleanIterator>
+              <ChildAxisIterator test-kind="match_name_test" qname="xs:QName(,,c)" typename="*" nill-allowed="false">
+                <ForVarIterator varname="x"/>
+              </ChildAxisIterator>
+            </FnBooleanIterator>
+            <GenericArithIterator_AddOperation>
+              <PromoteIterator type="xs:anyAtomicType">
+                <FnDataIterator>
+                  <AttributeAxisIterator test-kind="match_name_test" qname="xs:QName(,,att1)" typename="*" nill-allowed="false">
+                    <ChildAxisIterator test-kind="match_name_test" qname="xs:QName(,,b)" typename="*" nill-allowed="false">
+                      <ForVarIterator varname="x"/>
+                    </ChildAxisIterator>
+                  </AttributeAxisIterator>
+                </FnDataIterator>
+              </PromoteIterator>
+              <SingletonIterator value="xs:integer(10)"/>
+            </GenericArithIterator_AddOperation>
+            <GenericArithIterator_AddOperation>
+              <PromoteIterator type="xs:anyAtomicType">
+                <FnDataIterator>
+                  <AttributeAxisIterator test-kind="match_name_test" qname="xs:QName(,,att2)" typename="*" nill-allowed="false">
+                    <FunctionTraceIterator>
+                      <TreatIterator quant="">
+                        <ChildAxisIterator test-kind="match_name_test" qname="xs:QName(,,b)" typename="*" nill-allowed="false">
+                          <ForVarIterator varname="x"/>
+                        </ChildAxisIterator>
+                      </TreatIterator>
+                    </FunctionTraceIterator>
+                  </AttributeAxisIterator>
+                </FnDataIterator>
+              </PromoteIterator>
+              <SingletonIterator value="xs:integer(10)"/>
+            </GenericArithIterator_AddOperation>
+          </IfThenElseIterator>
+        </ReturnClause>
+      </FLWORIterator>
+    </PromoteIterator>
+  </FunctionTraceIterator>
 </iterator-tree>

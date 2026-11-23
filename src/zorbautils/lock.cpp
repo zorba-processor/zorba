@@ -257,26 +257,32 @@ retry:
       lAcquisition = Acquisition::UPGRADE;
 
       // If the current thread is the only holder of the lock, the upgrade
-      // request is granted immediatelly.
+      // request is granted, immediately or after the wait below.
       if (theHolders.size() == 1)
       {
         iter->theMode = WRITE;
         iter->theCount++;
+        iter->theUpgrade = false;
+        theHaveUpgradeReq = false;
         theMode = WRITE;
         break;
       }
 
-      // If another thread is waiting for an upgrade, allowing the current to
-      // wait as well will result in a deadlock. Instead, we throw an exception.
-      if (theHaveUpgradeReq)
+      if (!iter->theUpgrade)
       {
-        theMutex.unlock();
-        throw ZORBA_EXCEPTION( zerr::ZXQP0030_DEADLOCK );
-      }
+        // If another thread is waiting for an upgrade, allowing the current
+        // to wait as well will result in a deadlock. Instead, we throw an
+        // exception.
+        if (theHaveUpgradeReq)
+        {
+          theMutex.unlock();
+          throw ZORBA_EXCEPTION( zerr::ZXQP0030_DEADLOCK );
+        }
 
-      // Else, the thread is made to wait
-      iter->theUpgrade = true;
-      theHaveUpgradeReq = true;
+        // Else, the thread is made to wait
+        iter->theUpgrade = true;
+        theHaveUpgradeReq = true;
+      }
     }
 
     theNumWaiters++;

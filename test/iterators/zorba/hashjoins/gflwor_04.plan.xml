@@ -20,11 +20,17 @@
                   </FnConcatIterator>
                 </ForIterator>
                 <HoistIterator>
-                  <UDFunctionCallIterator function="local:foo">
-                    <UDFunctionArgs>
-                      <ForVarIterator varname="a"/>
-                    </UDFunctionArgs>
-                  </UDFunctionCallIterator>
+                  <FunctionTraceIterator>
+                    <FnConcatIterator>
+                      <SpecificNumArithIterator_MultiplyOperation_INTEGER>
+                        <ForVarIterator varname="a"/>
+                        <ForVarIterator varname="a"/>
+                      </SpecificNumArithIterator_MultiplyOperation_INTEGER>
+                      <FunctionTraceIterator>
+                        <ForVarIterator varname="a"/>
+                      </FunctionTraceIterator>
+                    </FnConcatIterator>
+                  </FunctionTraceIterator>
                 </HoistIterator>
               </LetIterator>
               <CreateInternalIndexIterator name="xs:QName(,,tempIndex0)">
@@ -124,22 +130,4 @@
       <SingletonIterator value="xs:string(&#xA;)"/>
     </FnConcatIterator>
   </TupleStreamIterator>
-</iterator-tree>
-<iterator-tree description="local:foo">
-  <FLWORIterator>
-    <ForVariable name="x">
-      <LetVarIterator varname="x"/>
-    </ForVariable>
-    <ReturnClause>
-      <FnConcatIterator>
-        <SpecificNumArithIterator_MultiplyOperation_INTEGER>
-          <ForVarIterator varname="x"/>
-          <ForVarIterator varname="x"/>
-        </SpecificNumArithIterator_MultiplyOperation_INTEGER>
-        <FunctionTraceIterator>
-          <ForVarIterator varname="x"/>
-        </FunctionTraceIterator>
-      </FnConcatIterator>
-    </ReturnClause>
-  </FLWORIterator>
 </iterator-tree>
