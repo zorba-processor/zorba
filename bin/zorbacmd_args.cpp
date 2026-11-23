@@ -49,9 +49,6 @@ static char const* check_args() {
           zc_props.construction_mode_ == "strip" ) )
     return "Only strip and preserve are allowed as values for the option construction-mode";
 
-  if ( zc_props.optimization_level_ > 2 )
-    return "only 0, 1 and 2 are allowed as values for the option --optimization-level";
-
   if ( !( zc_props.ordering_mode_.empty() ||
           zc_props.ordering_mode_ == "ordered" ||
           zc_props.ordering_mode_ == "unordered" ) )
