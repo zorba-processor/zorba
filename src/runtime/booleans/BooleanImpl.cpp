@@ -35,10 +35,18 @@
 #include "runtime/booleans/BooleanImpl.h"
 #include "runtime/api/plan_iterator_wrapper.h"
 #include "runtime/util/iterator_impl.h"
+#include "runtime/core/internal_operators.h"
+#include "runtime/core/var_iterators.h"
 
+#include "store/api/iterator_factory.h"
 #include "store/api/temp_seq.h"
 #include "store/api/item_factory.h"
 #include "store/api/store.h"
+
+#include <cmath>
+#include <limits>
+#include <string_view>
+#include <unordered_map>
 
 
 namespace zorba {
@@ -315,7 +323,7 @@ CompareIterator::CompareIterator(
      PlanIter_t aChild1,
      CompareConsts::CompareType aCompType)
   :
-  BinaryBaseIterator<CompareIterator, PlanIteratorState> ( sctx, loc, aChild0, aChild1 ),
+  BinaryBaseIterator<CompareIterator, CompareIteratorState> ( sctx, loc, aChild0, aChild1 ),
   theCompType(aCompType),
   theTypeManager(sctx->get_typemanager()),
   theCollation(sctx->get_default_collator(loc))
@@ -339,7 +347,7 @@ CompareIterator::CompareIterator(
 
 CompareIterator::CompareIterator(::zorba::serialization::Archiver& ar)
   :
-  BinaryBaseIterator<CompareIterator, PlanIteratorState>(ar),
+  BinaryBaseIterator<CompareIterator, CompareIteratorState>(ar),
   theTypeManager(NULL),
   theCollation(NULL)
 {
@@ -349,7 +357,7 @@ CompareIterator::CompareIterator(::zorba::serialization::Archiver& ar)
 void CompareIterator::serialize(::zorba::serialization::Archiver& ar)
 {
   serialize_baseclass(ar,
-  (BinaryBaseIterator<CompareIterator, PlanIteratorState>*)this);
+  (BinaryBaseIterator<CompareIterator, CompareIteratorState>*)this);
 
   SERIALIZE_ENUM(CompareConsts::CompareType, theCompType)
   ar & theIsGeneralComparison;
@@ -359,6 +367,459 @@ void CompareIterator::serialize(::zorba::serialization::Archiver& ar)
 
 
 BINARY_ACCEPT(CompareIterator);
+
+
+/*******************************************************************************
+  The items of one binding of a LET var, hashed by the value that general "="
+  compares, to find the items equal to a probe without comparing it with each.
+
+  Each item belongs to a category. A pair of items whose categories are "safe"
+  for each other compares without an error: as strings (xs:string and its
+  subtypes, xs:untypedAtomic; only under a codepoint collation), as numbers
+  (xs:integer, xs:decimal and xs:double; an xs:integer or xs:decimal only if
+  its xs:double value is below 2^53 in magnitude, so that the cast to
+  xs:double that a comparison with an xs:double does is exact for integers),
+  as booleans, or with a JSON null on either side (equal only to null). An
+  xs:untypedAtomic is not safe with a number (its cast may fail) nor with
+  null; anything else is OTHER, safe with nothing, and so is a streamable
+  string, whose stream reading it would consume. A probe is looked up only
+  if its category is safe for every category in the binding: then no pair
+  raises an error and "=" is true exactly when an equal item is found.
+********************************************************************************/
+class GeneralEqualityIndex
+{
+public:
+  enum Category : unsigned
+  {
+    STRING   = 1,
+    UNTYPED  = 2,
+    NUMBER   = 4,
+    BOOLEAN  = 8,
+    JSONNULL = 16,
+    OTHER    = 32
+  };
+
+  struct Key
+  {
+    Category          theCategory = OTHER;
+    double            theNumber = 0;
+    std::string_view  theString;
+    bool              theBoolean = false;
+  };
+
+private:
+  store::TempSeq_t                                 theSeq;
+  uint64_t                                         theBindingId;
+  bool                                             theMemCmp;
+  bool                                             theIsBuilt;
+  std::vector<store::Item_t>                       theItems;
+  unsigned                                         theCategories;
+  std::unordered_multimap<std::string_view, csize> theStrings;
+  std::unordered_multimap<double, csize>           theNumbers;
+  bool                                             theHasTrue;
+  bool                                             theHasFalse;
+  bool                                             theHasNull;
+
+public:
+  GeneralEqualityIndex(store::TempSeq* seq, uint64_t bindingId, bool memCmp)
+    :
+    theSeq(seq),
+    theBindingId(bindingId),
+    theMemCmp(memCmp),
+    theIsBuilt(false),
+    theCategories(0),
+    theHasTrue(false),
+    theHasFalse(false),
+    theHasNull(false)
+  {
+  }
+
+  uint64_t getBindingId() const { return theBindingId; }
+
+  const std::vector<store::Item_t>& getItems() const { return theItems; }
+
+  static unsigned safeCategories(Category c)
+  {
+    switch (c)
+    {
+    case STRING:   return STRING | UNTYPED | JSONNULL;
+    case UNTYPED:  return STRING | UNTYPED;
+    case NUMBER:   return NUMBER | JSONNULL;
+    case BOOLEAN:  return BOOLEAN | JSONNULL;
+    case JSONNULL: return STRING | NUMBER | BOOLEAN | JSONNULL;
+    default:       return 0;
+    }
+  }
+
+  // Whether no item of the binding raises an error when compared with an item of category c.
+  bool isSafeFor(Category c) const
+  {
+    return (theCategories & ~safeCategories(c)) == 0;
+  }
+
+  Key getKey(const store::Item_t& item, const QueryLoc& loc) const
+  {
+    Key key;
+
+    // Reading a streamable string consumes its stream, which can fail.
+    if (!item->isAtomic() || item->isStreamable())
+      return key;
+
+    store::SchemaTypeCode type = item->getTypeCode();
+
+    if (type == store::XS_UNTYPED_ATOMIC || TypeOps::is_subtype(type, store::XS_STRING))
+    {
+      if (theMemCmp)
+      {
+        const zstring& str = item->getString();
+        key.theCategory = (type == store::XS_UNTYPED_ATOMIC ? UNTYPED : STRING);
+        key.theString = std::string_view(str.data(), str.size());
+      }
+    }
+    else if (type == store::XS_DOUBLE)
+    {
+      key.theCategory = NUMBER;
+      // -0 and 0 are equal.
+      key.theNumber = item->getDoubleValue().getNumber() + 0.0;
+    }
+    else if (TypeOps::is_subtype(type, store::XS_DECIMAL))
+    {
+      // The cast that the comparison with an xs:double does; an item it fails on stays OTHER.
+      store::Item_t source = item;
+      store::Item_t asDouble;
+      try
+      {
+        GenericCast::castToBuiltinAtomic(asDouble, source, store::XS_DOUBLE, NULL, loc);
+      }
+      catch (const ZorbaException&)
+      {
+        return key;
+      }
+
+      double const value = asDouble->getDoubleValue().getNumber() + 0.0;
+      if (std::fabs(value) < 9007199254740992.0)
+      {
+        key.theCategory = NUMBER;
+        key.theNumber = value;
+      }
+    }
+    else if (type == store::XS_BOOLEAN)
+    {
+      key.theCategory = BOOLEAN;
+      key.theBoolean = item->getBooleanValue();
+    }
+    else if (type == store::JS_NULL)
+    {
+      key.theCategory = JSONNULL;
+    }
+
+    return key;
+  }
+
+  // Reads the whole binding, as the comparison without the index does before
+  // it compares; later calls do nothing.
+  void build(const QueryLoc& loc)
+  {
+    if (theIsBuilt)
+      return;
+
+    store::TempSeqIterator_t iter =
+      GENV_STORE.getIteratorFactory()->createTempSeqIterator(theSeq->isLazy());
+
+    if (theSeq->isLazy())
+      iter->init(theSeq, Integer(1), Integer(std::numeric_limits<xs_long>::max()));
+    else
+      iter->init(theSeq);
+
+    iter->open();
+
+    store::Item_t item;
+    while (iter->next(item))
+    {
+      // The error that op:hoist kept, raised as op:unhoist raises it.
+      if (item->isError())
+        item->getError()->polymorphic_throw();
+
+      Key key = getKey(item, loc);
+      csize const pos = theItems.size();
+      theItems.push_back(item);
+      theCategories |= key.theCategory;
+
+      switch (key.theCategory)
+      {
+      case STRING:
+      case UNTYPED:
+        theStrings.emplace(key.theString, pos);
+        break;
+      case NUMBER:
+        // NaN is equal to nothing.
+        if (!std::isnan(key.theNumber))
+          theNumbers.emplace(key.theNumber, pos);
+        break;
+      case BOOLEAN:
+        (key.theBoolean ? theHasTrue : theHasFalse) = true;
+        break;
+      case JSONNULL:
+        theHasNull = true;
+        break;
+      default:
+        break;
+      }
+    }
+
+    iter->close();
+    theSeq = NULL;
+    theIsBuilt = true;
+  }
+
+  // Whether "probe = s" ("s = probe" if !probeFirst) is true for an item s of
+  // the binding. Requires isSafeFor(key.theCategory).
+  bool contains(
+      const store::Item_t& probe,
+      const Key& key,
+      bool probeFirst,
+      const QueryLoc& loc,
+      const TypeManager* tm,
+      long timezone,
+      XQPCollator* collation) const
+  {
+    switch (key.theCategory)
+    {
+    case STRING:
+    case UNTYPED:
+      // Under a codepoint collation, strings are equal iff their bytes are.
+      return theStrings.find(key.theString) != theStrings.end();
+    case NUMBER:
+    {
+      // Equal xs:double values do not make equal xs:decimal values.
+      auto range = theNumbers.equal_range(key.theNumber);
+      for (auto ite = range.first; ite != range.second; ++ite)
+      {
+        store::Item_t item0 = (probeFirst ? probe : theItems[ite->second]);
+        store::Item_t item1 = (probeFirst ? theItems[ite->second] : probe);
+
+        if (CompareIterator::generalComparison(loc,
+                                               item0,
+                                               item1,
+                                               CompareConsts::GENERAL_EQUAL,
+                                               tm,
+                                               timezone,
+                                               collation))
+          return true;
+      }
+      return false;
+    }
+    case BOOLEAN:
+      return (key.theBoolean ? theHasTrue : theHasFalse);
+    case JSONNULL:
+      return theHasNull;
+    default:
+      ZORBA_ASSERT(false);
+      return false;
+    }
+  }
+};
+
+
+// A reference to a LET var, also under op:unhoist.
+static LetVarIterator* letVarOperand(PlanIterator* operand)
+{
+  if (UnhoistIterator* unhoist = dynamic_cast<UnhoistIterator*>(operand))
+  {
+    std::vector<PlanIter_t>& children = unhoist->getChildren();
+    if (children.size() != 1)
+      return NULL;
+
+    operand = children[0].getp();
+  }
+
+  return dynamic_cast<LetVarIterator*>(operand);
+}
+
+
+CompareIteratorState::CompareIteratorState()
+  :
+  theSeenBindingId(0)
+{
+}
+
+
+CompareIteratorState::~CompareIteratorState()
+{
+}
+
+
+/*******************************************************************************
+  General "=" with a LET var operand, when the same binding of the var is
+  compared again: the var is hashed once (GeneralEqualityIndex) and each item
+  of the other operand is looked up in it. Returns false if it does not apply,
+  and the caller then compares as usual.
+
+  The result and the errors are those of the nested loop of nextImpl(): the
+  operands are read in the same order and as far (the whole of both operands
+  before the first comparison, except that the var is not read if operand 0 is
+  empty, nor operand 1 if the var is an empty operand 0), and an item of the
+  other operand is looked up only if no pair it makes with an item of the var
+  can raise an error; otherwise its pairs are compared in the order of the
+  nested loop.
+********************************************************************************/
+bool CompareIterator::generalEqualByIndex(
+    PlanState& planState,
+    CompareIteratorState& state,
+    long timezone,
+    bool& found) const
+{
+  if (theCompType != CompareConsts::GENERAL_EQUAL)
+    return false;
+
+  // The nested loop takes the items of operand 0 in the outer loop.
+  bool varIsOperand1 = true;
+  LetVarIterator* var = letVarOperand(theChild1.getp());
+  if (var == NULL)
+  {
+    var = letVarOperand(theChild0.getp());
+    varIsOperand1 = false;
+  }
+
+  if (var == NULL)
+    return false;
+
+  uint64_t bindingId = 0;
+  store::TempSeq* seq = var->getWholeTempSeq(planState, bindingId);
+
+  if (seq == NULL)
+    return false;
+
+  if (!state.theIndex || state.theIndex->getBindingId() != bindingId)
+  {
+    if (state.theSeenBindingId != bindingId)
+    {
+      // Compared once: hashing would cost more than comparing.
+      state.theSeenBindingId = bindingId;
+      state.theIndex.reset();
+      return false;
+    }
+
+    state.theIndex = std::make_unique<GeneralEqualityIndex>(
+      seq, bindingId, theCollation == NULL || theCollation->doMemCmp());
+  }
+
+  GeneralEqualityIndex& index = *state.theIndex;
+  PlanIterator* other = (varIsOperand1 ? theChild0 : theChild1).getp();
+  std::vector<store::Item_t> others;
+  store::Item_t item;
+
+  // An error reading the var is raised again by the next evaluation, as without the index.
+  auto buildIndex = [&]()
+  {
+    try
+    {
+      index.build(loc);
+    }
+    catch (...)
+    {
+      state.theIndex.reset();
+      throw;
+    }
+  };
+
+  found = false;
+
+  if (varIsOperand1)
+  {
+    while (consumeNext(item, other, planState))
+      others.push_back(item);
+
+    if (others.empty())
+      return true;
+
+    buildIndex();
+  }
+  else
+  {
+    buildIndex();
+
+    if (index.getItems().empty())
+      return true;
+
+    while (consumeNext(item, other, planState))
+      others.push_back(item);
+  }
+
+  const std::vector<store::Item_t>& items = index.getItems();
+
+  if (items.empty() || others.empty())
+    return true;
+
+  // Operand 1 is the var: each item of operand 0 is compared with the whole var in turn.
+  if (varIsOperand1)
+  {
+    for (const store::Item_t& probe : others)
+    {
+      GeneralEqualityIndex::Key key = index.getKey(probe, loc);
+
+      if (index.isSafeFor(key.theCategory))
+      {
+        found = index.contains(probe, key, true, loc, theTypeManager, timezone, theCollation);
+      }
+      else
+      {
+        for (const store::Item_t& varItem : items)
+        {
+          store::Item_t item0 = probe;
+          store::Item_t item1 = varItem;
+
+          if (generalComparison(loc, item0, item1, theCompType, theTypeManager, timezone, theCollation))
+          {
+            found = true;
+            break;
+          }
+        }
+      }
+
+      if (found)
+        break;
+    }
+
+    return true;
+  }
+
+  // Operand 0 is the var: look up only if no pair at all can raise an error.
+  std::vector<GeneralEqualityIndex::Key> keys;
+  keys.reserve(others.size());
+  bool safe = true;
+
+  for (const store::Item_t& probe : others)
+  {
+    keys.push_back(index.getKey(probe, loc));
+    safe = safe && index.isSafeFor(keys.back().theCategory);
+  }
+
+  if (safe)
+  {
+    for (csize i = 0; i < others.size() && !found; ++i)
+      found = index.contains(others[i], keys[i], false, loc, theTypeManager, timezone, theCollation);
+
+    return true;
+  }
+
+  for (const store::Item_t& varItem : items)
+  {
+    for (const store::Item_t& probe : others)
+    {
+      store::Item_t item0 = varItem;
+      store::Item_t item1 = probe;
+
+      if (generalComparison(loc, item0, item1, theCompType, theTypeManager, timezone, theCollation))
+      {
+        found = true;
+        return true;
+      }
+    }
+  }
+
+  return true;
+}
 
 
 /*******************************************************************************
@@ -373,12 +834,16 @@ bool CompareIterator::nextImpl(store::Item_t& result, PlanState& planState) cons
   store::TempSeq_t tSeq0, tSeq1;
   long const timezone = planState.theLocalDynCtx->get_implicit_timezone();
 
-  PlanIteratorState* state;
-  DEFAULT_STACK_INIT(PlanIteratorState, state, planState);
+  CompareIteratorState* state;
+  DEFAULT_STACK_INIT(CompareIteratorState, state, planState);
 
   if (theIsGeneralComparison)
   {
-    if (consumeNext(item0, theChild0.getp(), planState))
+    if (generalEqualByIndex(planState, *state, timezone, found))
+    {
+      done = true;
+    }
+    else if (consumeNext(item0, theChild0.getp(), planState))
     {
       if (consumeNext(tItem0, theChild0.getp(), planState))
       {

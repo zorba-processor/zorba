@@ -385,6 +385,16 @@ public:
   ---------------
   A pre-allocated iterator over the temp seq.
 
+  theBindingId:
+  -------------
+  Unique in the process for each binding of V, so that a consumer can tell
+  whether V still has the value it saw before (see getWholeTempSeq()).
+
+  theBindsWholeTempSeq:
+  ---------------------
+  Whether V is bound to the whole of theTempSeq (not to a window of it, nor to
+  theSourceIter or a single item).
+
 ********************************************************************************/
 class LetVarState : public PlanIteratorState
 {
@@ -399,6 +409,9 @@ public:
 
   xs_integer               thePos;
   xs_integer               theLastPos;
+
+  uint64_t                 theBindingId;
+  bool                     theBindsWholeTempSeq;
 
 public:
   LetVarState();
@@ -464,6 +477,11 @@ public:
       xs_integer endPos);
 
   void bind(store::Iterator_t& it, PlanState& planState);
+
+  // The temp seq whose items this iterator returns, all of them, and the id of
+  // the binding; NULL if the var is bound otherwise or the reference selects
+  // positions.
+  store::TempSeq* getWholeTempSeq(PlanState& planState, uint64_t& bindingId) const;
 
   void accept(PlanIterVisitor& v) const;
 
