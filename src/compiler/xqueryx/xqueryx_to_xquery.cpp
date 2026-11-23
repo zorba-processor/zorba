@@ -37,7 +37,6 @@ namespace zorba {
 XQueryXConvertor::XQueryXConvertor()
 {
   xqueryx_xslt = NULL;
-  inited = false;
 }
 
 XQueryXConvertor::~XQueryXConvertor()
@@ -53,7 +52,7 @@ XQueryXConvertor::~XQueryXConvertor()
 
 void XQueryXConvertor::XQueryX_init()
 {
-  if(!inited)
+  std::call_once(init_once, [this]
   {
     xmlDocPtr doc;
     std::string xqueryx_full_xslt;
@@ -63,8 +62,7 @@ void XQueryXConvertor::XQueryX_init()
 
     xqueryx_xslt = (xsltStylesheet*)xsltParseStylesheetDoc(doc);
   //	xmlFreeDoc(doc);
-  }
-  inited = true;
+  });
 }
 
 void XQueryXConvertor::zorba_xslt_error_handler(void *ctx, const char *msg, ...)
@@ -115,9 +113,10 @@ char* XQueryXConvertor::XQueryX2XQuery( const char *xqueryx, const SecurityPolic
 
   xmlDocPtr doc, res;
 
-  errstr.clear();
+  // The libxml2 error handler is per thread (threaded libxml2); libxslt's
+  // generic one is process-wide, so its errors go to the transform context.
+  std::string errstr;
   xmlSetGenericErrorFunc(&errstr, zorba_xslt_error_handler);
-  xsltSetGenericErrorFunc(&errstr, zorba_xslt_error_handler);
 
   xml::ParserSecurity security(policy);
   doc = parse_xqueryx(xqueryx, security);
@@ -146,6 +145,7 @@ char* XQueryXConvertor::XQueryX2XQuery( const char *xqueryx, const SecurityPolic
   xsltSetSecurityPrefs(prefs, XSLT_SECPREF_READ_NETWORK, xsltSecurityForbid);
   xsltSetSecurityPrefs(prefs, XSLT_SECPREF_WRITE_NETWORK, xsltSecurityForbid);
   xsltSetCtxtSecurityPrefs(prefs, tctxt);
+  xsltSetTransformErrorFunc(tctxt, &errstr, zorba_xslt_error_handler);
 
   const char  *param[]= {NULL};
   res = xsltApplyStylesheetUser((xsltStylesheetPtr)xqueryx_xslt, doc, param,
@@ -179,17 +179,15 @@ char* XQueryXConvertor::XQueryX2XQuery( const char *xqueryx, const SecurityPolic
     throw ZORBA_EXCEPTION( zerr::ZXQP0032_ERROR_TRANSFORMING_XQUERYX_TO_XQUERY, ERROR_PARAMS(ZED(xqueryx_empty_content) ));
   }
 
-  //reset the error handlers for libxml2 and libxslt
+  //reset the error handler for libxml2
   xmlSetGenericErrorFunc(NULL, NULL);
-  xsltSetGenericErrorFunc(NULL, NULL);
 
   return xquery;
   }
   catch(...)
   {
-    //reset the error handlers for libxml2 and libxslt
+    //reset the error handler for libxml2
     xmlSetGenericErrorFunc(NULL, NULL);
-    xsltSetGenericErrorFunc(NULL, NULL);
     throw;
   }
 }

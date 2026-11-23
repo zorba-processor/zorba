@@ -71,22 +71,26 @@ static bool get_dict( iso639_1::type lang, entry const **begin,
 
 char const* find( char const *key ) {
   typedef pair<entry const*,entry const*> range_type;
-  //
-  // It's possible an exception was thrown after shutdown has already started
-  // in which case the GlobalEnvironment no longer exists.
-  //
-  GlobalEnvironment const *const genv = GENV_PTR;
-  iso639_1::type lang = genv ? genv->get_host_lang() : locale::get_host_lang();
 
-  static entry const *begin, *end;
-  if ( !begin && !get_dict( lang, &begin, &end ) )
-    SET_DICT( en, begin, end );
+  static range_type const dict = [] {
+    //
+    // It's possible an exception was thrown after shutdown has already started
+    // in which case the GlobalEnvironment no longer exists.
+    //
+    GlobalEnvironment const *const genv = GENV_PTR;
+    iso639_1::type const lang =
+      genv ? genv->get_host_lang() : locale::get_host_lang();
+    range_type range;
+    if ( !get_dict( lang, &range.first, &range.second ) )
+      SET_DICT( en, range.first, range.second );
+    return range;
+  }();
 
   entry entry_to_find;
   entry_to_find.key = key;
 
   range_type const result =
-    ::equal_range( begin, end, entry_to_find, less_entry() );
+    ::equal_range( dict.first, dict.second, entry_to_find, less_entry() );
 
   return result.first != result.second ? result.first->value : nullptr;
 }

@@ -223,14 +223,6 @@ void parsenode::DeferFree::forget(parsenode* node)
   node->theNextDeferred = nullptr;
 }
 
-int printdepth = 0;
-std::ostringstream __oss;
-
-#undef  INDENT
-#define INDENT      std::string(++printdepth, ' ')
-#define OUTDENT     std::string(printdepth--, ' ')
-#define UNDENT      printdepth--
-
 #define DEPTH_GUARD() parsenode_visitor::DepthGuard depth_guard(v, get_location())
 #define LIST_DEPTH_GUARD(n) parsenode_visitor::DepthGuard list_depth_guard(v, get_location(), (n))
 #define BEGIN_VISITOR() DEPTH_GUARD(); void* visitor_state; if (NULL == (visitor_state = v.begin_visit(*this))) return

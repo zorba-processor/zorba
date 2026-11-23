@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#include <array>
+
 #include <zorba/config.h>
 #include <zorba/internal/cxx_util.h>
 #include <zorba/internal/unique_ptr.h>
@@ -187,18 +189,23 @@ ft_stop_words_set::get_default( iso639_1::type lang ) {
 
 ft_stop_words_set::word_set_t*
 ft_stop_words_set::get_default_word_set_for( iso639_1::type lang ) {
-  static word_set_t *cached_word_sets[ iso639_1::NUM_ENTRIES ];
+  typedef std::array<std::unique_ptr<word_set_t>,iso639_1::NUM_ENTRIES>
+    word_sets_t;
+  static word_sets_t const word_sets = [] {
+    word_sets_t sets;
+    for ( int i = 0; i < iso639_1::NUM_ENTRIES; ++i ) {
+      if ( ft_stop_table const table =
+             get_table_for( static_cast<iso639_1::type>( i ) ) ) {
+        sets[i] = std::make_unique<word_set_t>();
+        for ( ft_stop_table word = table; *word; ++word )
+          sets[i]->insert( *word );
+      }
+    }
+    return sets;
+  }();
   if ( !lang )
     lang = GENV.get_host_lang();
-  word_set_t *&word_set = cached_word_sets[ lang ];
-  if ( !word_set ) {
-    if ( ft_stop_table const table = get_table_for( lang ) ) {
-      word_set = new word_set_t;
-      for ( ft_stop_table word = table; *word; ++word )
-        word_set->insert( *word );
-    }
-  }
-  return word_set;
+  return word_sets[ lang ].get();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
