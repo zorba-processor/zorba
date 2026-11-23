@@ -400,6 +400,13 @@ public:
   Whether V is bound to the whole of theTempSeq (not to a window of it, nor to
   theSourceIter or a single item).
 
+  theArgIter:
+  -----------
+  When V is a parameter of a udf bound by bindArg(), the subplan of the call's
+  argument, and theArgPlanState the plan state of the caller it runs in: V
+  returns the items of that argument, so a var reference argument gives V the
+  temp seq and the binding id of the caller's var (see getWholeTempSeq()).
+
 ********************************************************************************/
 class LetVarState : public PlanIteratorState
 {
@@ -417,6 +424,9 @@ public:
 
   uint64_t                 theBindingId;
   bool                     theBindsWholeTempSeq;
+
+  const PlanIterator*      theArgIter;
+  PlanState*               theArgPlanState;
 
 public:
   LetVarState();
@@ -475,6 +485,9 @@ public:
 
   void bind(const store::TempSeq_t& value, PlanState& planState);
 
+  // value is the whole temp seq of another binding, whose id it keeps.
+  void bind(const store::TempSeq_t& value, uint64_t bindingId, PlanState& planState);
+
   void bind(
       store::TempSeq_t& value,
       PlanState& planState,
@@ -483,9 +496,17 @@ public:
 
   void bind(store::Iterator_t& it, PlanState& planState);
 
+  // A udf parameter: it is the wrapper over arg, which runs in argPlanState.
+  void bindArg(
+      store::Iterator_t& it,
+      const PlanIterator* arg,
+      PlanState& argPlanState,
+      PlanState& planState);
+
   // The temp seq whose items this iterator returns, all of them, and the id of
   // the binding; NULL if the var is bound otherwise or the reference selects
-  // positions.
+  // positions. For a udf parameter bound to a var reference argument, those of
+  // the argument's var.
   store::TempSeq* getWholeTempSeq(PlanState& planState, uint64_t& bindingId) const;
 
   void accept(PlanIterVisitor& v) const;
@@ -504,6 +525,13 @@ public:
 
   bool nextImpl(store::Item_t& result, PlanState& planState) const;
 };
+
+
+// getWholeTempSeq() of a LetVarIterator or a CtxVarIterator; NULL for any other iterator.
+store::TempSeq* getVarWholeTempSeq(
+    const PlanIterator* iter,
+    PlanState& planState,
+    uint64_t& bindingId);
 
 
 }

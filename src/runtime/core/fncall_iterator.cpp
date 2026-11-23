@@ -723,7 +723,7 @@ bool UDFunctionCallIterator::nextImplCache(store::Item_t& aResult, PlanState& aP
     //Disable automatic caching
     //Try to evaluate the function as if no cache is present
     theUDF->disableAutomaticCaching();
-    bindArguments(lState, true);
+    bindArguments(aPlanState, lState, true);
 
     DEBUGGER_PUSH_FRAME;
 
@@ -865,7 +865,7 @@ bool UDFunctionCallIterator::nextImplNoCache(store::Item_t& aResult, PlanState& 
     lState->thePlanOpen = true;
   }
 
-  bindArguments(lState, false);
+  bindArguments(aPlanState, lState, false);
 
   DEBUGGER_PUSH_FRAME;
 
@@ -913,7 +913,10 @@ bool UDFunctionCallIterator::nextImplNoCache(store::Item_t& aResult, PlanState& 
 
 /*******************************************************************************
 ********************************************************************************/
-void UDFunctionCallIterator::bindArguments(UDFunctionCallIteratorState* aState, bool aReset) const
+void UDFunctionCallIterator::bindArguments(
+    PlanState& aPlanState,
+    UDFunctionCallIteratorState* aState,
+    bool aReset) const
 {
   const std::vector<ArgVarRefs>& lArgsRefs = theUDF->getArgVarsRefs();
   const std::vector<store::Iterator_t>& lArgWraps = aState->theArgWrappers;
@@ -947,7 +950,7 @@ void UDFunctionCallIterator::bindArguments(UDFunctionCallIteratorState* aState, 
 
         if (lArgRef != NULL)
         {
-          lArgRef->bind(lArgWrapper, *aState->thePlanState);
+          lArgRef->bindArg(lArgWrapper, theChildren[i].getp(), aPlanState, *aState->thePlanState);
         }
       }
     }

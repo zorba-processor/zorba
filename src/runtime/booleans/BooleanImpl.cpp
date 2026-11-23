@@ -33,6 +33,7 @@
 
 #include "runtime/visitors/planiter_visitor.h"
 #include "runtime/booleans/BooleanImpl.h"
+#include "runtime/accessors/accessors.h"
 #include "runtime/api/plan_iterator_wrapper.h"
 #include "runtime/util/iterator_impl.h"
 #include "runtime/core/internal_operators.h"
@@ -411,6 +412,8 @@ private:
   store::TempSeq_t                                 theSeq;
   uint64_t                                         theBindingId;
   bool                                             theMemCmp;
+  bool                                             theAtomicOnly;
+  bool                                             theHasNonAtomic;
   bool                                             theIsBuilt;
   std::vector<store::Item_t>                       theItems;
   unsigned                                         theCategories;
@@ -421,11 +424,13 @@ private:
   bool                                             theHasNull;
 
 public:
-  GeneralEqualityIndex(store::TempSeq* seq, uint64_t bindingId, bool memCmp)
+  GeneralEqualityIndex(store::TempSeq* seq, uint64_t bindingId, bool memCmp, bool atomicOnly)
     :
     theSeq(seq),
     theBindingId(bindingId),
     theMemCmp(memCmp),
+    theAtomicOnly(atomicOnly),
+    theHasNonAtomic(false),
     theIsBuilt(false),
     theCategories(0),
     theHasTrue(false),
@@ -435,6 +440,11 @@ public:
   }
 
   uint64_t getBindingId() const { return theBindingId; }
+
+  bool isAtomicOnly() const { return theAtomicOnly; }
+
+  // Whether build() stopped at an item that is not atomic, with theAtomicOnly.
+  bool hasNonAtomic() const { return theHasNonAtomic; }
 
   const std::vector<store::Item_t>& getItems() const { return theItems; }
 
@@ -517,7 +527,8 @@ public:
   }
 
   // Reads the whole binding, as the comparison without the index does before
-  // it compares; later calls do nothing.
+  // it compares; later calls do nothing. With theAtomicOnly, stops at the
+  // first item that is not atomic.
   void build(const QueryLoc& loc)
   {
     if (theIsBuilt)
@@ -539,6 +550,12 @@ public:
       // The error that op:hoist kept, raised as op:unhoist raises it.
       if (item->isError())
         item->getError()->polymorphic_throw();
+
+      if (theAtomicOnly && !item->isAtomic())
+      {
+        theHasNonAtomic = true;
+        break;
+      }
 
       Key key = getKey(item, loc);
       csize const pos = theItems.size();
@@ -622,10 +639,21 @@ public:
 
 
 // A reference to a LET var or to a var of the dynamic context (a global or
-// local var), also under op:unhoist.
-static PlanIterator* varOperand(PlanIterator* operand)
+// local var), also under op:unhoist or under fn:data() (then atomized is set).
+static PlanIterator* varOperand(PlanIterator* operand, bool& atomized)
 {
-  if (UnhoistIterator* unhoist = dynamic_cast<UnhoistIterator*>(operand))
+  atomized = false;
+
+  if (FnDataIterator* data = dynamic_cast<FnDataIterator*>(operand))
+  {
+    std::vector<PlanIter_t>& children = data->getChildren();
+    if (children.size() != 1)
+      return NULL;
+
+    operand = children[0].getp();
+    atomized = true;
+  }
+  else if (UnhoistIterator* unhoist = dynamic_cast<UnhoistIterator*>(operand))
   {
     std::vector<PlanIter_t>& children = unhoist->getChildren();
     if (children.size() != 1)
@@ -638,19 +666,6 @@ static PlanIterator* varOperand(PlanIterator* operand)
     return operand;
 
   return NULL;
-}
-
-
-// The temp seq that is the whole value of a varOperand(), and the id of its binding.
-static store::TempSeq* wholeTempSeq(
-    PlanIterator* var,
-    PlanState& planState,
-    uint64_t& bindingId)
-{
-  if (LetVarIterator* letVar = dynamic_cast<LetVarIterator*>(var))
-    return letVar->getWholeTempSeq(planState, bindingId);
-
-  return static_cast<CtxVarIterator*>(var)->getWholeTempSeq(planState, bindingId);
 }
 
 
@@ -670,6 +685,10 @@ CompareIteratorState::~CompareIteratorState()
   General "=" with a LET var or dynamic context var operand, when the same
   binding of the var is compared again: the var is hashed once
   (GeneralEqualityIndex) and each item of the other operand is looked up in it.
+  A udf parameter whose argument is such a var has the binding of that var
+  (LetVarIterator::bindArg()), so calls with the same value share the hash.
+  Under fn:data(), the hash applies to a binding of atomic items only, which
+  fn:data() returns unchanged.
   Returns false if it does not apply, and the caller then compares as usual.
 
   The result and the errors are those of the nested loop of nextImpl(): the
@@ -689,25 +708,31 @@ bool CompareIterator::generalEqualByIndex(
   if (theCompType != CompareConsts::GENERAL_EQUAL)
     return false;
 
+  // The var is operand 1 if it is bound to a whole temp seq, else operand 0.
   // The nested loop takes the items of operand 0 in the outer loop.
   bool varIsOperand1 = true;
-  PlanIterator* var = varOperand(theChild1.getp());
-  if (var == NULL)
-  {
-    var = varOperand(theChild0.getp());
-    varIsOperand1 = false;
-  }
-
-  if (var == NULL)
-    return false;
-
+  bool atomized = false;
   uint64_t bindingId = 0;
-  store::TempSeq* seq = wholeTempSeq(var, planState, bindingId);
+  store::TempSeq* seq = NULL;
+
+  if (PlanIterator* var = varOperand(theChild1.getp(), atomized))
+    seq = getVarWholeTempSeq(var, planState, bindingId);
+
+  if (seq == NULL)
+  {
+    varIsOperand1 = false;
+
+    if (PlanIterator* var = varOperand(theChild0.getp(), atomized))
+      seq = getVarWholeTempSeq(var, planState, bindingId);
+  }
 
   if (seq == NULL)
     return false;
 
-  if (!state.theIndex || state.theIndex->getBindingId() != bindingId)
+  // Both operands may be the same binding, one of them under fn:data().
+  if (!state.theIndex ||
+      state.theIndex->getBindingId() != bindingId ||
+      state.theIndex->isAtomicOnly() != atomized)
   {
     if (state.theSeenBindingId != bindingId)
     {
@@ -718,12 +743,18 @@ bool CompareIterator::generalEqualByIndex(
     }
 
     state.theIndex = std::make_unique<GeneralEqualityIndex>(
-      seq, bindingId, theCollation == NULL || theCollation->doMemCmp());
+      seq, bindingId, theCollation == NULL || theCollation->doMemCmp(), atomized);
+  }
+  else if (state.theIndex->hasNonAtomic())
+  {
+    return false;
   }
 
   GeneralEqualityIndex& index = *state.theIndex;
   PlanIterator* other = (varIsOperand1 ? theChild0 : theChild1).getp();
+  PlanIterator* varOperandIter = (varIsOperand1 ? theChild1 : theChild0).getp();
   std::vector<store::Item_t> others;
+  std::vector<store::Item_t> atomizedItems;
   store::Item_t item;
 
   // An error reading the var is raised again by the next evaluation, as without the index.
@@ -740,6 +771,17 @@ bool CompareIterator::generalEqualByIndex(
     }
   };
 
+  // fn:data() of a node, object, array or function is not the item: the var
+  // operand is read as without the index, and compared pair by pair.
+  auto readAtomized = [&]()
+  {
+    if (index.hasNonAtomic())
+    {
+      while (consumeNext(item, varOperandIter, planState))
+        atomizedItems.push_back(item);
+    }
+  };
+
   found = false;
 
   if (varIsOperand1)
@@ -751,19 +793,22 @@ bool CompareIterator::generalEqualByIndex(
       return true;
 
     buildIndex();
+    readAtomized();
   }
   else
   {
     buildIndex();
+    readAtomized();
 
-    if (index.getItems().empty())
+    if ((index.hasNonAtomic() ? atomizedItems : index.getItems()).empty())
       return true;
 
     while (consumeNext(item, other, planState))
       others.push_back(item);
   }
 
-  const std::vector<store::Item_t>& items = index.getItems();
+  bool const lookups = !index.hasNonAtomic();
+  const std::vector<store::Item_t>& items = (lookups ? index.getItems() : atomizedItems);
 
   if (items.empty() || others.empty())
     return true;
@@ -775,7 +820,7 @@ bool CompareIterator::generalEqualByIndex(
     {
       GeneralEqualityIndex::Key key = index.getKey(probe, loc);
 
-      if (index.isSafeFor(key.theCategory))
+      if (lookups && index.isSafeFor(key.theCategory))
       {
         found = index.contains(probe, key, true, loc, theTypeManager, timezone, theCollation);
       }
@@ -804,7 +849,7 @@ bool CompareIterator::generalEqualByIndex(
   // Operand 0 is the var: look up only if no pair at all can raise an error.
   std::vector<GeneralEqualityIndex::Key> keys;
   keys.reserve(others.size());
-  bool safe = true;
+  bool safe = lookups;
 
   for (const store::Item_t& probe : others)
   {

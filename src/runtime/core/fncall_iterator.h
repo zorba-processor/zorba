@@ -272,7 +272,10 @@ private:
 
   bool nextImplNoCache(store::Item_t& aResult, PlanState& aPlanState) const;
 
-  void bindArguments(UDFunctionCallIteratorState* aState, bool aReset) const;
+  void bindArguments(
+      PlanState& aPlanState,
+      UDFunctionCallIteratorState* aState,
+      bool aReset) const;
 
 protected:
   void initCache(

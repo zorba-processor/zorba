@@ -1268,14 +1268,34 @@ bool FLWORIterator::bindVariable(
 
     if (!flc.theSingleItemLETVar)
     {
-      store::TempSeq_t tmpSeq = iterState->theTempSeqs[varNo].getp();
-      tmpSeq->init(iterState->theTempSeqIters[varNo]);
+      // An eager let of a var (a udf parameter of its var argument) that is a
+      // materialized temp seq would copy its items: it shares the temp seq and
+      // its binding, so that a general "=" sees the same binding.
+      uint64_t sourceBindingId = 0;
+      store::TempSeq* source = (flc.lazyEval() ?
+                                NULL :
+                                getVarWholeTempSeq(flc.theInput.getp(), planState, sourceBindingId));
 
       std::vector<PlanIter_t>::const_iterator ite = flc.theVarRefs.begin();
       std::vector<PlanIter_t>::const_iterator end = flc.theVarRefs.end();
-      for (; ite != end; ++ite)
+
+      if (source != NULL && !source->isLazy())
       {
-        static_cast<LetVarIterator*>((*ite).getp())->bind(tmpSeq, planState);
+        store::TempSeq_t sourceSeq = source;
+        for (; ite != end; ++ite)
+        {
+          static_cast<LetVarIterator*>((*ite).getp())->bind(sourceSeq, sourceBindingId, planState);
+        }
+      }
+      else
+      {
+        store::TempSeq_t tmpSeq = iterState->theTempSeqs[varNo].getp();
+        tmpSeq->init(iterState->theTempSeqIters[varNo]);
+
+        for (; ite != end; ++ite)
+        {
+          static_cast<LetVarIterator*>((*ite).getp())->bind(tmpSeq, planState);
+        }
       }
     }
     else
