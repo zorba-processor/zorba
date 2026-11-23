@@ -2447,9 +2447,21 @@ void* import_schema(
 
     // If we got this far, we have a valid StreamResource.
 
+    // A query whose type manager comes from the context it is compiled
+    // against, and has no schema loaded, imports into a type manager of its
+    // own: the context may be shared by other queries.
+    TypeManager* tm = theSctx->get_typemanager();
+    static_context* queryRootSctx = theCCB->theRootSctx;
+    if (queryRootSctx->get_local_typemanager() == NULL &&
+        tm == queryRootSctx->get_typemanager() &&
+        (tm->getSchema() == NULL || !tm->getSchema()->hasXSD()))
+    {
+      queryRootSctx->set_typemanager(new TypeManagerImpl(&GENV_TYPESYSTEM));
+      tm = queryRootSctx->get_typemanager();
+    }
+
     // Create a Schema obj and register it in the typemanger, if the typemanager
     // does not have a schema obj already
-    TypeManager* tm = theSctx->get_typemanager();
     tm->initializeSchema();
     Schema* schema_p = tm->getSchema();
 

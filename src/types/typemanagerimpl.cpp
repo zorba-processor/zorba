@@ -15,6 +15,8 @@
  */
 
 #include <assert.h>
+#include <atomic>
+#include <memory>
 
 #include <zorba/typeident.h>
 
@@ -23,6 +25,7 @@
 
 #include "system/globalenv.h"
 #include "zorbamisc/ns_consts.h"
+#include "zorbautils/mutex.h"
 
 #include "types/node_test.h"
 #include "types/typemanagerimpl.h"
@@ -112,8 +115,19 @@ void TypeManagerImpl::initializeSchema()
 {
   ZORBA_ASSERT(this != &GENV_TYPESYSTEM);
 
-  if ( m_schema == NULL )
-    m_schema = new Schema(this);
+  if (getSchema() != NULL)
+    return;
+
+  // Queries on several threads may validate or cast with a type manager
+  // they share, and the first one creates its schema.
+  SYNC_CODE(AutoMutex xercesLock(GENV_TYPESYSTEM.getXercesMutex());)
+
+  if (m_schema == NULL)
+  {
+    std::unique_ptr<Schema> schema = std::make_unique<Schema>(this);
+    std::atomic_ref<Schema*>(m_schema).store(schema.release(),
+                                             std::memory_order_release);
+  }
 }
 
 
@@ -274,9 +288,9 @@ xqtref_t TypeManagerImpl::create_named_atomic_type(
 #ifndef ZORBA_NO_XMLSCHEMA
   // See if there is a type declaration for this type name in the in-scope
   // schema, if any.
-  if (m_schema != NULL)
+  if (getSchema() != NULL)
   {
-    xqtref_t namedType = m_schema->createXQTypeFromTypeName(this, qname);
+    xqtref_t namedType = getSchema()->createXQTypeFromTypeName(this, qname);
 
     if (namedType == NULL)
     {
@@ -354,9 +368,9 @@ xqtref_t TypeManagerImpl::create_named_simple_type(store::Item* qname) const
 #ifndef ZORBA_NO_XMLSCHEMA
   // See if there is a type declaration for this type name in the in-scope
   // schema, if any.
-  if (m_schema != NULL)
+  if (getSchema() != NULL)
   {
-    xqtref_t namedType = m_schema->createXQTypeFromTypeName(this, qname);
+    xqtref_t namedType = getSchema()->createXQTypeFromTypeName(this, qname);
 
     if (namedType == NULL)
     {
@@ -425,9 +439,9 @@ xqtref_t TypeManagerImpl::create_named_type(
 #ifndef ZORBA_NO_XMLSCHEMA
     // See if there is a type declaration for this type name in the in-scope
     // schemas, if any.
-    if (m_schema != NULL)
+    if (getSchema() != NULL)
     {
-      xqtref_t namedType = m_schema->createXQTypeFromTypeName(this, qname);
+      xqtref_t namedType = getSchema()->createXQTypeFromTypeName(this, qname);
 
       if (namedType == NULL)
       {
@@ -758,7 +772,7 @@ xqtref_t TypeManagerImpl::create_schema_element_type(
     SequenceType::Quantifier quant,
     const QueryLoc& loc) const
 {
-  if (m_schema == NULL)
+  if (getSchema() == NULL)
   {
     RAISE_ERROR(err::XPST0008, loc,
     ERROR_PARAMS(ZED(XPST0008_SchemaElementName_2), elemName->getStringValue()));
@@ -767,7 +781,7 @@ xqtref_t TypeManagerImpl::create_schema_element_type(
   bool nillable;
 
   xqtref_t contentType =
-  m_schema->createXQTypeFromGlobalElementDecl(this, elemName, true, nillable, loc);
+  getSchema()->createXQTypeFromGlobalElementDecl(this, elemName, true, nillable, loc);
 
   return create_node_type(store::StoreConsts::elementNode,
                           elemName,
@@ -787,13 +801,13 @@ void TypeManagerImpl::get_schema_element_typeinfo(
     bool& nillable,
     const QueryLoc& loc) const
 {
-  if (m_schema == NULL)
+  if (getSchema() == NULL)
   {
     RAISE_ERROR(err::XPST0008, loc,
     ERROR_PARAMS(ZED(XPST0008_SchemaElementName_2), elemName->getStringValue()));
   }
 
-  m_schema->getInfoFromGlobalElementDecl(elemName, typeName, nillable, loc);
+  getSchema()->getInfoFromGlobalElementDecl(elemName, typeName, nillable, loc);
 }
 
 
@@ -808,14 +822,14 @@ xqtref_t TypeManagerImpl::create_schema_attribute_type(
     SequenceType::Quantifier quant,
     const QueryLoc& loc) const
 {
-  if (m_schema == NULL)
+  if (getSchema() == NULL)
   {
     RAISE_ERROR(err::XPST0008, loc,
     ERROR_PARAMS(ZED(XPST0008_SchemaAttributeName_2), attrName->getStringValue()));
   }
 
   xqtref_t contentType =
-  m_schema->createXQTypeFromGlobalAttributeDecl(this, attrName, true, loc);
+  getSchema()->createXQTypeFromGlobalAttributeDecl(this, attrName, true, loc);
 
   return create_node_type(store::StoreConsts::attributeNode,
                           attrName,
@@ -835,13 +849,13 @@ void TypeManagerImpl::get_schema_attribute_typeinfo(
     store::Item_t& typeName,
     const QueryLoc& loc)
 {
-  if (m_schema == NULL)
+  if (getSchema() == NULL)
   {
     RAISE_ERROR(err::XPST0008, loc,
     ERROR_PARAMS(ZED(XPST0008_SchemaAttributeName_2), attrName->getStringValue()));
   }
 
-  m_schema->getInfoFromGlobalAttributeDecl(attrName, typeName, loc);
+  getSchema()->getInfoFromGlobalAttributeDecl(attrName, typeName, loc);
 }
 
 

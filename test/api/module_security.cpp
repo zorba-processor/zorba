@@ -582,6 +582,10 @@ void test_http_uri_resolution(Zorba* z)
   CHECK(p.allows(Capability::Network));
   CHECK(p.allows(Capability::FileRead));
 
+  // Enabling the option cannot widen the policy.
+  sctx->declareOption(lEnable, "http-uri-resolution");
+  CHECK(!sctx->getSecurityPolicy().allows(Capability::RemoteImport));
+
   std::string const lRemote =
     "import module namespace r = \"http://example.test/r\" at "
     "\"http://8.8.8.8/r.xq\";\n1";
@@ -590,10 +594,6 @@ void test_http_uri_resolution(Zorba* z)
   // A child context (and so every query compiled with it) inherits it.
   CHECK(denied(run(z, sctx->createChildContext(), lRemote), "XQST0059",
                "requires capability RemoteImport"));
-
-  // Enabling the option cannot widen the policy.
-  sctx->declareOption(lEnable, "http-uri-resolution");
-  CHECK(!sctx->getSecurityPolicy().allows(Capability::RemoteImport));
 
   // Other contexts are not affected (the option used to switch the feature
   // off for the whole process).
