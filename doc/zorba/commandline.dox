@@ -78,7 +78,7 @@ Provide the value for a variable given a file (name=file) or a value (name:=valu
 Set the context item to the XML document in a given file.
 
 --optimization-level
-Optimization level for the query compiler: 0, 1 or 2, also written O0, O1 or O2 (default: 1). Any other value is an error.
+Optimization level for the query compiler: 0, 1 or 2, also written O0, O1 or O2 (default: 1). Any other value is an error. Level 2 is the same as level 1: it adds no optimization.
 
 --lib-module, -l
 Query compiler option to treat the query as a library module. If this is set --compile-only option is also set to true.
