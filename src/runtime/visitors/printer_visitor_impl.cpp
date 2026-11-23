@@ -64,6 +64,7 @@
 #include "runtime/update/update.h"
 #include "runtime/visitors/iterprinter.h"
 #include "runtime/visitors/printer_visitor.h"
+#include "runtime/visitors/printer_visitor_api.h"
 #include "types/typeops.h"
 #include "util/ascii_util.h"
 
@@ -602,7 +603,7 @@ DEF_END_VISIT( FTContainsIterator )
 void PrinterVisitor::beginVisit( FunctionItemIterator const &i ) {
   thePrinter.startBeginVisit( "FunctionItemIterator", ++theId );
   if ( i.getFunctionItemInfo()->theQName.getp() )
-    thePrinter.addAttribute( "function", i.getFunctionItemInfo()->theQName->getStringValue().str() );
+    thePrinter.addAttribute( "function", plan_function_name( i.getFunctionItemInfo()->theQName.getp() ) );
   printCommons( &i, theId );
   thePrinter.endBeginVisit( theId );
 }
@@ -673,7 +674,7 @@ DEF_END_VISIT( TreatIterator )
 void PrinterVisitor::beginVisit( UDFunctionCallIterator const &i ) {
   thePrinter.startBeginVisit( "UDFunctionCallIterator", ++theId );
   if ( i.theUDF->getSignature().getName() )
-    thePrinter.addAttribute( "function", i.theUDF->getSignature().getName()->getStringValue().str() );
+    thePrinter.addAttribute( "function", plan_function_name( i.theUDF->getSignature().getName() ) );
   else
     thePrinter.addAttribute( "function", "inline function" );
 

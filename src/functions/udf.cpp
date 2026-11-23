@@ -28,6 +28,8 @@
 #include "functions/udf.h"
 #include "functions/function_impl.h"
 
+#include "runtime/visitors/printer_visitor_api.h"
+
 #include "annotations/annotations.h"
 
 #include "diagnostics/xquery_warning.h"
@@ -581,9 +583,9 @@ PlanIter_t user_function::getPlan(uint32_t& planStateSize,  ulong nextVarId)
 
     const store::Item* lName = getName();
     //lName may be null of inlined functions
-    thePlan = zorba::codegen((lName == 0 ?
-                              "inline-function" :
-                              lName->getStringValue().c_str()),
+    std::string const lPlanName =
+      lName == 0 ? "inline-function" : plan_function_name(lName);
+    thePlan = zorba::codegen(lPlanName.c_str(),
                              &*theBodyExpr,
                              theCCB,
                              nextVarId,

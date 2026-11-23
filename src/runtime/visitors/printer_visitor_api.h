@@ -17,7 +17,13 @@
 #ifndef ZORBA_RUNTIME_PRINTER_VISITOR_API_H
 #define ZORBA_RUNTIME_PRINTER_VISITOR_API_H
 
+#include <string>
+
 namespace zorba {
+
+namespace store {
+class Item;
+}
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -26,6 +32,13 @@ class PlanState;
 class IterPrinter;
 
 void print_iter_plan( IterPrinter&, PlanIterator*, PlanState* = 0 );
+
+/**
+ * The name of a function as a plan prints it: an inline function, named after
+ * its location, keeps only the file name of its query, so that the plan does
+ * not depend on the directory of the query.
+ */
+std::string plan_function_name( store::Item const *name );
 
 ///////////////////////////////////////////////////////////////////////////////
 
