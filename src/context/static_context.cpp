@@ -16,7 +16,9 @@
 
 #include <assert.h>
 #include <algorithm>
+#include <atomic>
 #include <optional>
+#include <sstream>
 
 #include <zorba/external_module.h>
 #include <zorba/serialization_callback.h>
@@ -1222,6 +1224,22 @@ static_context* static_context::create_child_context()
 }
 
 
+#ifndef ZORBA_FOR_ONE_THREAD_ONLY
+/***************************************************************************//**
+  A sctx that queries were compiled against may be read by queries on other
+  threads: changing it is a bug, which debug builds report.
+********************************************************************************/
+void static_context::check_not_shared() const
+{
+#ifndef NDEBUG
+  ZORBA_ASSERT_WITH_MSG(!theIsShared.load(std::memory_order_relaxed),
+                        "a static context was changed after a query was "
+                        "compiled against it");
+#endif
+}
+#endif
+
+
 /***************************************************************************//**
 
 ********************************************************************************/
@@ -1254,6 +1272,7 @@ expr* static_context::get_query_expr() const
 ********************************************************************************/
 void static_context::set_query_expr(expr* expr)
 {
+  check_not_shared();
   theQueryExpr = expr;
 }
 
@@ -1263,6 +1282,7 @@ void static_context::set_query_expr(expr* expr)
 ********************************************************************************/
 void static_context::set_trace_stream(std::ostream& os)
 {
+  check_not_shared();
   theTraceStream = &os;
 }
 
@@ -1286,6 +1306,7 @@ std::ostream* static_context::get_trace_stream() const
 ********************************************************************************/
 void static_context::add_imported_builtin_module(const zstring& ns)
 {
+  check_not_shared();
   theImportedBuiltinModules.push_back(ns);
 }
 
@@ -1361,6 +1382,7 @@ bool static_context::get_encapsulating_entity_uri(zstring& res) const
 ********************************************************************************/
 void static_context::set_encapsulating_entity_uri(const zstring& uri)
 {
+  check_not_shared();
   if (theBaseUriInfo == NULL)
   {
     theBaseUriInfo = new BaseUriInfo;
@@ -1400,6 +1422,7 @@ bool static_context::get_entity_retrieval_uri(zstring& res) const
 ********************************************************************************/
 void static_context::set_entity_retrieval_uri(const zstring& uri)
 {
+  check_not_shared();
   if (theBaseUriInfo == NULL)
   {
     theBaseUriInfo = new BaseUriInfo;
@@ -1437,6 +1460,7 @@ zstring static_context::get_base_uri() const
 ********************************************************************************/
 void static_context::set_base_uri(const zstring& uri, bool from_prolog)
 {
+  check_not_shared();
   if (theBaseUriInfo == NULL)
   {
     theBaseUriInfo = new BaseUriInfo;
@@ -1636,6 +1660,7 @@ zstring static_context::resolve_relative_uri(
 ********************************************************************************/
 void static_context::add_uri_mapper(internal::URIMapper* aMapper)
 {
+  check_not_shared();
   theURIMappers.push_back(aMapper);
 }
 
@@ -1645,6 +1670,7 @@ void static_context::add_uri_mapper(internal::URIMapper* aMapper)
 ********************************************************************************/
 void static_context::add_url_resolver(internal::URLResolver* aResolver)
 {
+  check_not_shared();
   theURLResolvers.push_back(aResolver);
 }
 
@@ -2134,6 +2160,7 @@ void static_context::serialize_security_policy(serialization::Archiver& ar)
 ********************************************************************************/
 void static_context::set_security_policy(const SecurityPolicy& aPolicy)
 {
+  check_not_shared();
   theSecurityPolicy = std::make_unique<SecurityPolicy>(aPolicy);
   theSecurityPolicyNarrows = false;
 }
@@ -2144,6 +2171,7 @@ void static_context::set_security_policy(const SecurityPolicy& aPolicy)
 ********************************************************************************/
 void static_context::narrow_security_policy(const SecurityPolicy& aPolicy)
 {
+  check_not_shared();
   // If a policy is already attached, narrow it in place and keep its kind:
   // an explicit policy stays the base, so ancestors still do not apply.
   if (theSecurityPolicy)
@@ -2229,6 +2257,7 @@ bool static_context::allows_capability(Capability aCap) const
 ********************************************************************************/
 void static_context::set_uri_path(const std::vector<zstring>& path)
 {
+  check_not_shared();
   theURIPath = path;
 }
 
@@ -2271,6 +2300,7 @@ void static_context::collect_uri_path(
 ********************************************************************************/
 void static_context::set_lib_path(const std::vector<zstring>& path)
 {
+  check_not_shared();
   theLibPath = path;
 }
 
@@ -2316,6 +2346,7 @@ void static_context::set_env_paths(
     const std::vector<zstring>& aURIPath,
     const std::vector<zstring>& aLibPath)
 {
+  check_not_shared();
   theEnvURIPath = aURIPath;
   theEnvLibPath = aLibPath;
 }
@@ -2458,6 +2489,7 @@ bool static_context::validateSimpleContent(
 ********************************************************************************/
 void static_context::set_typemanager(rchandle<TypeManager> typemgr)
 {
+  check_not_shared();
   theTypeManager = typemgr;
 }
 
@@ -2510,6 +2542,7 @@ void static_context::set_default_elem_type_ns(
     bool raiseError,
     const QueryLoc& loc)
 {
+  check_not_shared();
   if (!theHaveDefaultElementNamespace)
   {
     theDefaultElementNamespace = ns;
@@ -2550,6 +2583,7 @@ void static_context::set_default_function_ns(
    bool raiseError,
    const QueryLoc& loc)
 {
+  check_not_shared();
   if (theDefaultFunctionNamespaces.empty())
   {
     theDefaultFunctionNamespaces.push_back(ns);
@@ -2574,6 +2608,7 @@ void static_context::bind_ns(
     const zstring& ns,
     const QueryLoc& loc)
 {
+  check_not_shared();
   if (theNamespaceBindings == NULL)
   {
     theNamespaceBindings = new NamespaceBindings(16, false);
@@ -2714,6 +2749,7 @@ void static_context::get_namespace_bindings(store::NsBindings& bindings) const
 ********************************************************************************/
 void static_context::bind_var(var_expr* varExpr, const QueryLoc& loc)
 {
+  check_not_shared();
   if (theVariablesMap == NULL)
   {
     theVariablesMap = new VariableMap(HashMapItemPointerCmp(0, NULL), 16, false);
@@ -2885,6 +2921,7 @@ void static_context::getVariables(
 ********************************************************************************/
 void static_context::set_context_item_type(const xqtref_t& t, const QueryLoc& loc)
 {
+  check_not_shared();
   if (theContextItemType != NULL)
   {
     RAISE_ERROR_NO_PARAMS(err::XQST0099, loc);
@@ -2927,6 +2964,7 @@ void static_context::bind_fn(
     csize arity,
     const QueryLoc& loc)
 {
+  check_not_shared();
   store::Item* qname = f->getName();
 
   if (!is_global_root_sctx() && lookup_local_fn(qname, arity) != NULL)
@@ -3001,6 +3039,7 @@ void static_context::unbind_fn(
     const store::Item* qname,
     csize arity)
 {
+  check_not_shared();
   ZORBA_ASSERT(!is_global_root_sctx());
 
   function* f = lookup_fn(qname, arity);
@@ -3458,6 +3497,7 @@ void static_context::bind_external_module(
     ExternalModule* aModule,
     bool aDynamicallyLoaded)
 {
+  check_not_shared();
   if (theExternalModulesMap == NULL)
   {
     theExternalModulesMap = new ExternalModuleMap(8, false);
@@ -3541,6 +3581,7 @@ ExternalFunction* static_context::lookup_external_function(
 ********************************************************************************/
 void static_context::bind_document(const zstring& uri, xqtref_t& type)
 {
+  check_not_shared();
   if (theDocumentMap == NULL)
   {
     theDocumentMap = new DocumentMap(16, false);
@@ -3604,6 +3645,7 @@ void static_context::get_all_documents(std::vector<zstring>& documents)
 ********************************************************************************/
 void static_context::bind_w3c_collection(zstring& uri, xqtref_t& type)
 {
+  check_not_shared();
   if (theW3CCollectionMap == NULL)
   {
     theW3CCollectionMap = new W3CCollectionMap(16, false);
@@ -3635,6 +3677,7 @@ const XQType* static_context::lookup_w3c_collection(const zstring& uri)
 ********************************************************************************/
 void static_context::set_default_w3c_collection_type(xqtref_t& t)
 {
+  check_not_shared();
   theDefaultW3CCollectionType = t;
 }
 
@@ -3671,6 +3714,7 @@ void static_context::bind_collection(
     StaticallyKnownCollection_t& aCollection,
     const QueryLoc& aLoc)
 {
+  check_not_shared();
   if (lookup_collection(aCollection->getName()) != NULL)
   {
     throw XQUERY_EXCEPTION(
@@ -3727,6 +3771,7 @@ store::Iterator_t static_context::collection_names() const
 ********************************************************************************/
 void static_context::bind_index(IndexDecl_t& index, const QueryLoc& loc)
 {
+  check_not_shared();
   store::Item* qname = const_cast<store::Item*>(index->getName());
 
   if (lookup_index(qname) != NULL)
@@ -3806,6 +3851,7 @@ void static_context::bind_ic(
     ValueIC_t& vic,
     const QueryLoc& loc)
 {
+  check_not_shared();
   store::Item* qname = vic->getICName();
 
   if (lookup_ic(qname) != NULL)
@@ -3861,6 +3907,7 @@ store::Iterator_t static_context::ic_names() const
 ********************************************************************************/
 void static_context::add_collation(const std::string& uri, const QueryLoc& loc)
 {
+  check_not_shared();
   if (is_known_collation(uri))
     return;
 
@@ -3945,6 +3992,7 @@ void static_context::set_default_collation(
     const std::string& uri,
     const QueryLoc& loc)
 {
+  check_not_shared();
   if (theDefaultCollation != NULL)
     throw XQUERY_EXCEPTION(
       err::XQST0038,
@@ -4049,6 +4097,7 @@ void static_context::bind_option(
     const zstring& value,
     const QueryLoc& loc)
 {
+  check_not_shared();
   if (theOptionMap == NULL)
   {
     theOptionMap = new OptionMap(HashMapItemPointerCmp(0, NULL), 8, false);
@@ -4376,6 +4425,7 @@ bool static_context::lookup_option(
 ********************************************************************************/
 void static_context::set_audit_event(audit::Event* ae)
 {
+  check_not_shared();
   theAuditEvent = ae;
 }
 
@@ -4430,6 +4480,7 @@ StaticContextConsts::language_kind_t static_context::language_kind() const
 ********************************************************************************/
 void static_context::set_language_kind(StaticContextConsts::language_kind_t k)
 {
+  check_not_shared();
   theLanguageKind = k;
 }
 
@@ -4458,6 +4509,7 @@ StaticContextConsts::xquery_version_t static_context::xquery_version() const
 ********************************************************************************/
 void static_context::set_xquery_version(StaticContextConsts::xquery_version_t v)
 {
+  check_not_shared();
   theXQueryVersion = v;
 }
 
@@ -4487,6 +4539,7 @@ StaticContextConsts::jsoniq_version_t static_context::jsoniq_version() const
 ********************************************************************************/
 void static_context::set_jsoniq_version(StaticContextConsts::jsoniq_version_t v)
 {
+  check_not_shared();
   theJSONiqVersion = v;
 }
 
@@ -4516,6 +4569,7 @@ StaticContextConsts::xpath_compatibility_t static_context::xpath_compatibility()
 ********************************************************************************/
 void static_context::set_xpath_compatibility(StaticContextConsts::xpath_compatibility_t v)
 {
+  check_not_shared();
   theXPathCompatibility = v;
 }
 
@@ -4545,6 +4599,7 @@ StaticContextConsts::construction_mode_t static_context::construction_mode() con
 ********************************************************************************/
 void static_context::set_construction_mode(StaticContextConsts::construction_mode_t v)
 {
+  check_not_shared();
   theConstructionMode = v;
 }
 
@@ -4563,6 +4618,7 @@ bool static_context::inherit_ns() const
 ********************************************************************************/
 void static_context::set_inherit_ns(bool v)
 {
+  check_not_shared();
   theInheritNamespaces = v;
 }
 
@@ -4581,6 +4637,7 @@ bool static_context::preserve_ns() const
 ********************************************************************************/
 void static_context::set_preserve_ns(bool v)
 {
+  check_not_shared();
   thePreserveNamespaces = v;
 }
 
@@ -4619,6 +4676,7 @@ bool static_context::is_in_ordered_mode() const
 ********************************************************************************/
 void static_context::set_ordering_mode(StaticContextConsts::ordering_mode_t v)
 {
+  check_not_shared();
   theOrderingMode = v;
 }
 
@@ -4648,6 +4706,7 @@ StaticContextConsts::empty_order_mode_t static_context::empty_order_mode() const
 ********************************************************************************/
 void static_context::set_empty_order_mode(StaticContextConsts::empty_order_mode_t v)
 {
+  check_not_shared();
   theEmptyOrderMode = v;
 }
 
@@ -4677,6 +4736,7 @@ StaticContextConsts::boundary_space_mode_t static_context::boundary_space_mode()
 ********************************************************************************/
 void static_context::set_boundary_space_mode(StaticContextConsts::boundary_space_mode_t v)
 {
+  check_not_shared();
   theBoundarySpaceMode = v;
 }
 
@@ -4706,6 +4766,7 @@ StaticContextConsts::validation_mode_t static_context::validation_mode() const
 ********************************************************************************/
 void static_context::set_validation_mode(StaticContextConsts::validation_mode_t v)
 {
+  check_not_shared();
   theValidationMode = v;
 }
 
@@ -4717,6 +4778,7 @@ void static_context::add_decimal_format(
     const DecimalFormat_t& decimalFormat,
     const QueryLoc& loc)
 {
+  check_not_shared();
   if (!theDecimalFormats.empty())
   {
     csize num = theDecimalFormats.size();
@@ -4779,7 +4841,9 @@ uint32_t static_context::create_temporary_index_id()
   while (lSctx->theParent)
     lSctx = lSctx->theParent;
 
-  return lSctx->theTempIndexCounter++;
+  // Queries compiled on several threads take ids from the same root sctx.
+  return std::atomic_ref<uint32_t>(lSctx->theTempIndexCounter)
+    .fetch_add(1, std::memory_order_relaxed);
 }
 
 
@@ -4794,6 +4858,7 @@ uint32_t static_context::create_temporary_index_id()
 ********************************************************************************/
 void static_context::disableWarning(store::Item_t qname)
 {
+  check_not_shared();
   for (unsigned int i=0; i<theDisabledWarnings.size(); i++)
     if (qname->equals(theDisabledWarnings[i]))
       return;
@@ -4806,6 +4871,7 @@ void static_context::disableWarning(store::Item_t qname)
 ********************************************************************************/
 void static_context::disableAllWarnings()
 {
+  check_not_shared();
   theAllWarningsDisabled = true;
 }
 
@@ -4814,6 +4880,7 @@ void static_context::disableAllWarnings()
 ********************************************************************************/
 void static_context::setWarningAsError(store::Item_t qname)
 {
+  check_not_shared();
   for (unsigned int i=0; i<theWarningsAreErrors.size(); i++)
     if (theWarningsAreErrors[i] )
       return;
@@ -4874,6 +4941,7 @@ bool static_context::isWarningAnError(const char* ns, const char* localname)
 ********************************************************************************/
 void static_context::import_module(const static_context* module, const QueryLoc& loc)
 {
+  check_not_shared();
   if (module->theVariablesMap)
   {
     if (theVariablesMap == NULL)
@@ -5028,6 +5096,7 @@ void static_context::import_module(const static_context* module, const QueryLoc&
 ********************************************************************************/
 void static_context::clear_base_uri()
 {
+  check_not_shared();
   delete theBaseUriInfo;
 
   theBaseUriInfo = new BaseUriInfo;

@@ -18,7 +18,8 @@
 #define ZORBA_STORE_COLLECTION_TREE_INFO_H
 
 #include <zorba/config.h>
-#include "zorbatypes/integer.h"
+#include "store/api/shared_types.h"
+#include "tree_id.h"
 
 namespace zorba
 {
@@ -85,7 +86,7 @@ class CollectionTreeInfo
 {
 protected:
   Collection*     theCollection;
-  xs_integer      thePosition;
+  csize           thePosition;
   StructuredItem* theRoot;
 
 public:
@@ -96,6 +97,11 @@ public:
     theRoot(NULL)
   {
   }
+
+  // A JSON tree's info, a CollectionTreeInfoWithTreeId, is owned by a
+  // std::unique_ptr<CollectionTreeInfo> while its tree is out of the collection
+  // for a pending undo.
+  virtual ~CollectionTreeInfo() {}
 
   simplestore::Collection* getCollection() const
   {
@@ -117,12 +123,12 @@ public:
     theRoot = aRoot;
   }
   
-  const xs_integer& getPosition() const
+  csize getPosition() const
   {
     return thePosition;
   }
 
-  void setPosition(const xs_integer& aPosition)
+  void setPosition(csize aPosition)
   {
     thePosition = aPosition;
   }
@@ -170,12 +176,12 @@ public:
     theRoot = aRoot;
   }
   
-  const xs_integer& getPosition() const
+  csize getPosition() const
   {
     return thePosition;
   }
 
-  void setPosition(const xs_integer& aPosition)
+  void setPosition(csize aPosition)
   {
     thePosition = aPosition;
   }

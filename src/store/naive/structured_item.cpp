@@ -89,7 +89,7 @@ StructuredItem* StructuredItem::getCollectionRoot() const
   Assuming the tree T this node belongs to is in a collection, return the
   position of T within its containing collection. 
 ********************************************************************************/
-const xs_integer& StructuredItem::getPosition() const
+csize StructuredItem::getPosition() const
 {
   CollectionTreeInfo* info = getCollectionTreeInfo();
   ZORBA_ASSERT(info);
@@ -102,7 +102,7 @@ const xs_integer& StructuredItem::getPosition() const
   position of T within its containing collection. The position is stored
   inside the CollectionTreeInfo object associated with the node.
 ********************************************************************************/
-void StructuredItem::setPosition(const xs_integer& pos)
+void StructuredItem::setPosition(csize pos)
 {
   CollectionTreeInfo* info = getCollectionTreeInfo();
   ZORBA_ASSERT(info);

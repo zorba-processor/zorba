@@ -139,6 +139,8 @@ public:
 
   bool findNode(const store::Item* node, xs_integer& position) const;
 
+  bool findTree(const store::Item* node, csize& position) const;
+
   store::Item_t nodeAt(xs_integer position);
 
   //
@@ -150,16 +152,24 @@ public:
 
   void addNode(store::Item* node, xs_integer position = xs_integer(-1));
 
-  xs_integer addNodes(
+  csize addNodes(
       std::vector<store::Item_t>& nodes,
       const store::Item* targetNode,
       bool before);
 
-  bool removeNode(store::Item* node, xs_integer& pos);
+  std::unique_ptr<CollectionTreeInfo> removeNode(
+      store::Item* node,
+      csize& position);
 
-  bool removeNode(xs_integer position);
+  void restoreNode(
+      store::Item* node,
+      csize position,
+      std::unique_ptr<CollectionTreeInfo> info);
 
-  xs_integer removeNodes(xs_integer position, xs_integer num);
+  void removeNodes(
+      const std::vector<store::Item_t>& nodes,
+      csize position,
+      csize num);
 
   void removeLastNodes(const std::vector<store::Item_t>& nodes, csize num);
 

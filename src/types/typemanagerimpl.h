@@ -17,6 +17,8 @@
 #ifndef ZORBA_TYPEMANAGERIMPL_H
 #define ZORBA_TYPEMANAGERIMPL_H
 
+#include <atomic>
+
 #include "types/typemanager.h"
 
 #include "store/api/item.h"
@@ -61,7 +63,8 @@ class TypeManagerImpl : public TypeManager
 {
 protected:
   TypeManager * m_parent;
-  Schema      * m_schema;
+  // Read and set through std::atomic_ref: see initializeSchema().
+  mutable Schema * m_schema;
 
 public:
   SERIALIZABLE_CLASS(TypeManagerImpl)
@@ -75,7 +78,10 @@ public:
 
   TypeManager* get_parent_type_manager() const { return m_parent; }
 
-  Schema* getSchema() const { return m_schema; }
+  Schema* getSchema() const
+  {
+    return std::atomic_ref<Schema*>(m_schema).load(std::memory_order_acquire);
+  }
 
   void initializeSchema();
 
