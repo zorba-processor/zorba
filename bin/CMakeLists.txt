@@ -603,6 +603,7 @@ IF (ZORBA_WITH_FILE_ACCESS)
              exhaust_plan_open exhaust_call_body exhaust_dynamic_call
              exhaust_for_each_pair exhaust_fold_left exhaust_json_copy
              exhaust_cached_call_body exhaust_group_by exhaust_first_dynamic_call
+             exhaust_collection_insert_after
              exhaust_sweep_xml exhaust_sweep_xml_dtd exhaust_sweep_xml_dtd_nodes
              exhaust_sweep_fragment exhaust_sweep_descendant exhaust_sweep_insert
              exhaust_sweep_delete exhaust_sweep_serialize exhaust_sweep_ic_activation

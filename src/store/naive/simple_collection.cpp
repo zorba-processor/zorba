@@ -359,13 +359,31 @@ xs_integer SimpleCollection::addNodes(
         ERROR_PARAMS(getName()->getStringValue()));
       }
     }
-
-    pos = targetPos + i;
-
-    structuredItem->attachToCollection(this, createTreeId(), pos);
   } // for each new node
 
+  // Room for the new nodes before any is attached: a node that cannot be
+  // attached detaches the ones before it, and the collection is as it was.
   theTrees.resize(numNodes + numNewNodes);
+
+  csize numAttached = 0;
+  try
+  {
+    for (; numAttached < numNewNodes; ++numAttached)
+    {
+      pos = targetPos + numAttached;
+
+      static_cast<StructuredItem*>(items[numAttached].getp())->
+        attachToCollection(this, createTreeId(), pos);
+    }
+  }
+  catch (...)
+  {
+    for (csize i = 0; i < numAttached; ++i)
+      static_cast<StructuredItem*>(items[i].getp())->detachFromCollection();
+
+    theTrees.resize(numNodes);
+    throw;
+  }
 
   if (targetPos < numNodes)
   {
