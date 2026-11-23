@@ -132,11 +132,37 @@ protected:
            static_cast<const JSONItem*>(aMember)->theHeight + 1 == theHeight;
   }
 
-  // Adds the JSON items among the members to aJSONMembers and propagates
-  // the collection info to the other structured ones.
-  virtual void setCollectionInfoOfMembers(
-      CollectionTreeInfo* collectionInfo,
-      std::vector<JSONItem*>& aJSONMembers) = 0;
+  // A walk of setCollectionTreeInfo() over the JSON items of a tree, from the
+  // collection info they share to another. It allocates nothing and does not
+  // recurse, so it cannot fail: the items waiting to be visited form a list
+  // linked through their theCollectionInfo. An item not reached yet holds the
+  // old info, a waiting one the next item of the list (itself for the last),
+  // and a visited one the new info.
+  class TreeWalk
+  {
+    CollectionTreeInfoWithTreeId* const theOld;
+    CollectionTreeInfoWithTreeId* const theNew;
+    JSONItem*                           theTop;
+
+  public:
+    TreeWalk(
+        CollectionTreeInfoWithTreeId* aOld,
+        CollectionTreeInfoWithTreeId* aNew)
+      : theOld(aOld), theNew(aNew), theTop(NULL) {}
+
+    // Puts a JSON item not reached yet on the list; gives any other structured
+    // item the new info.
+    void reach(store::Item* aMember);
+
+    // Gives the next waiting item the new info and returns it; NULL at the end.
+    JSONItem* visitNext();
+  };
+
+  // Calls aWalk.reach() for each member.
+  virtual void reachMembers(TreeWalk& aWalk) = 0;
+
+  // For swap(): the members of each item get its collection info.
+  void giveCollectionInfoToSwappedMembers(JSONItem* aOther);
 
 public:
   JSONItem(store::Item::ItemKind k)
@@ -347,9 +373,7 @@ public:
   virtual void swap(store::Item* anotherItem);
 
 protected:
-  void setCollectionInfoOfMembers(
-      CollectionTreeInfo* collectionInfo,
-      std::vector<JSONItem*>& aJSONMembers);
+  void reachMembers(TreeWalk& aWalk);
 
 private:
   void recomputeHeight();
@@ -525,9 +549,7 @@ public:
   bool isInSubtree(const StructuredItem* aJSONItem) const;
 
 protected:
-  void setCollectionInfoOfMembers(
-      CollectionTreeInfo* collectionInfo,
-      std::vector<JSONItem*>& aJSONMembers);
+  void reachMembers(TreeWalk& aWalk);
 
   void recomputeHeight();
 

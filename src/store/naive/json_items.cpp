@@ -141,21 +141,76 @@ void JSONItem::destroy()
 
 
 /*******************************************************************************
+
+********************************************************************************/
+void JSONItem::TreeWalk::reach(store::Item* aMember)
+{
+  if (aMember->isJSONItem())
+  {
+    JSONItem* const lItem = static_cast<JSONItem*>(aMember);
+    if (lItem->theCollectionInfo != theOld)
+      return;
+
+    lItem->theCollectionInfo = reinterpret_cast<CollectionTreeInfoWithTreeId*>(
+      theTop != NULL ? theTop : lItem);
+    theTop = lItem;
+  }
+  else if (aMember->isStructuredItem())
+  {
+    static_cast<StructuredItem*>(aMember)->setCollectionTreeInfo(theNew);
+  }
+}
+
+
+/*******************************************************************************
+
+********************************************************************************/
+JSONItem* JSONItem::TreeWalk::visitNext()
+{
+  JSONItem* const lItem = theTop;
+  if (lItem == NULL)
+    return NULL;
+
+  JSONItem* const lNext = reinterpret_cast<JSONItem*>(lItem->theCollectionInfo);
+  theTop = (lNext == lItem ? NULL : lNext);
+  lItem->theCollectionInfo = theNew;
+  return lItem;
+}
+
+
+/*******************************************************************************
   An item's members can be nested deeper than the limit (see
-  runtime/json/nesting.h), and the destructor of a value in a collection calls
-  this, so this does not recurse.
+  runtime/json/nesting.h), the destructor of a value in a collection calls
+  this, and so does the undo of an update, so this neither recurses nor
+  allocates. The items of the tree share the item's current info.
 ********************************************************************************/
 void JSONItem::setCollectionTreeInfo(CollectionTreeInfo* collectionInfo)
 {
-  std::vector<JSONItem*> lPending(1, this);
-  while (!lPending.empty())
-  {
-    JSONItem* const lItem = lPending.back();
-    lPending.pop_back();
-    lItem->theCollectionInfo =
-      static_cast<CollectionTreeInfoWithTreeId*>(collectionInfo);
-    lItem->setCollectionInfoOfMembers(collectionInfo, lPending);
-  }
+  CollectionTreeInfoWithTreeId* const lInfo =
+    static_cast<CollectionTreeInfoWithTreeId*>(collectionInfo);
+  if (lInfo == theCollectionInfo)
+    return;
+
+  TreeWalk lWalk(theCollectionInfo, lInfo);
+  lWalk.reach(this);
+  while (JSONItem* const lItem = lWalk.visitNext())
+    lItem->reachMembers(lWalk);
+}
+
+
+/*******************************************************************************
+  After this item and aOther swapped their members: the members of each, which
+  still have the collection info of the other, get the info of the item, by a
+  walk from the other's.
+********************************************************************************/
+void JSONItem::giveCollectionInfoToSwappedMembers(JSONItem* aOther)
+{
+  CollectionTreeInfoWithTreeId* const lInfo = theCollectionInfo;
+  CollectionTreeInfoWithTreeId* const lOtherInfo = aOther->theCollectionInfo;
+  theCollectionInfo = lOtherInfo;
+  aOther->theCollectionInfo = lInfo;
+  setCollectionTreeInfo(lInfo);
+  aOther->setCollectionTreeInfo(lOtherInfo);
 }
 
 
@@ -179,14 +234,15 @@ void JSONItem::attachToCollection(
 
   assert(aCollection);
 
-  // Attach
+  // Only the info can fail: the walk of setCollectionTreeInfo() cannot.
   assert(theCollectionInfo == NULL);
-  CollectionTreeInfoWithTreeId* collectionInfo = new CollectionTreeInfoWithTreeId();
+  std::unique_ptr<CollectionTreeInfoWithTreeId> collectionInfo =
+    std::make_unique<CollectionTreeInfoWithTreeId>();
   collectionInfo->setCollection(aCollection);
   collectionInfo->setTreeId(aTreeId);
   collectionInfo->setPosition(aPosition);
   collectionInfo->setRoot(this);
-  setCollectionTreeInfo(collectionInfo);
+  setCollectionTreeInfo(collectionInfo.release());
   
   ASSERT_INVARIANT();
 }
@@ -415,15 +471,8 @@ bool SimpleJSONObject::add(
 
     addHeightOf(lValue);
 
-    if (getCollection() != NULL && (aValue->isStructuredItem()))
-    {
-      assert( dynamic_cast<StructuredItem*>(lValue) );
-      StructuredItem* lStructuredItem = static_cast<StructuredItem*>(aValue.getp());
-      lStructuredItem->setCollectionTreeInfo(theCollectionInfo);
-    }
-    
-    // The index of names records only stored pairs: a failure leaves the
-    // object as it was.
+    // The index of names records only stored pairs, and the value gets the
+    // collection info once stored: a failure leaves the object as it was.
     thePairs.push_back(std::make_pair(aName.getp(), lValue));
     try
     {
@@ -437,6 +486,14 @@ bool SimpleJSONObject::add(
       thePairs.pop_back();
       throw;
     }
+
+    if (getCollection() != NULL && (aValue->isStructuredItem()))
+    {
+      assert( dynamic_cast<StructuredItem*>(lValue) );
+      StructuredItem* lStructuredItem = static_cast<StructuredItem*>(aValue.getp());
+      lStructuredItem->setCollectionTreeInfo(theCollectionInfo);
+    }
+
     aName->addReference();
     lValue->addReference();
 
@@ -659,17 +716,14 @@ void SimpleJSONObject::swap(store::Item* anotherItem)
   std::swap(theKeys, lOther->theKeys);
   std::swap(thePairs, lOther->thePairs);
   std::swap(theHeight, lOther->theHeight);
-  setCollectionTreeInfo(theCollectionInfo);
-  lOther->setCollectionTreeInfo(lOther->theCollectionInfo);
+  giveCollectionInfoToSwappedMembers(lOther);
 }
 
 
 /******************************************************************************
 
 *******************************************************************************/
-void SimpleJSONObject::setCollectionInfoOfMembers(
-    CollectionTreeInfo* collectionInfo,
-    std::vector<JSONItem*>& aJSONMembers)
+void SimpleJSONObject::reachMembers(TreeWalk& aWalk)
 {
   for (Pairs::iterator ite = thePairs.begin();
        ite != thePairs.end();
@@ -677,15 +731,7 @@ void SimpleJSONObject::setCollectionInfoOfMembers(
   {
     store::Item* value = ite->second;
 
-    if (value->isJSONItem())
-    {
-      aJSONMembers.push_back(static_cast<JSONItem*>(value));
-    }
-    else if (value->isStructuredItem())
-    {
-      StructuredItem* structuredItem = static_cast<StructuredItem*>(value);
-      structuredItem->setCollectionTreeInfo(collectionInfo);
-    }
+    aWalk.reach(value);
   }
 }
 
@@ -1034,6 +1080,10 @@ void SimpleJSONArray::push_back(const store::Item_t& aValue)
 
   addHeightOf(aValue.getp());
 
+  // Stored first: the member gets the collection info only if it is in.
+  theContent.push_back(aValue.getp());
+  aValue->addReference();
+
   if (getCollection() != NULL && (aValue->isStructuredItem()))
   {
     assert(dynamic_cast<StructuredItem*>(aValue.getp()));
@@ -1041,9 +1091,6 @@ void SimpleJSONArray::push_back(const store::Item_t& aValue)
         static_cast<StructuredItem*>(aValue.getp());
     lStructuredItem->setCollectionTreeInfo(theCollectionInfo);
   }
-
-  theContent.push_back(aValue.getp());
-  aValue->addReference();
 
   ASSERT_INVARIANT();
 }
@@ -1087,6 +1134,11 @@ void SimpleJSONArray::insert_before(
 
   addHeightOf(member.getp());
 
+  // Stored first: the member gets the collection info only if it is in.
+  Members::size_type sPos = static_cast<Members::size_type>(cast(pos) - 1);
+  theContent.insert(theContent.begin() + sPos, member.getp());
+  member->addReference();
+
   if (getCollection() != NULL &&
       (member->isStructuredItem()))
   {
@@ -1095,10 +1147,6 @@ void SimpleJSONArray::insert_before(
         static_cast<StructuredItem*>(member.getp());
     lStructuredItem->setCollectionTreeInfo(theCollectionInfo);
   }
-
-  Members::size_type sPos = static_cast<Members::size_type>(cast(pos) - 1);
-  theContent.insert(theContent.begin() + sPos, member.getp());
-  member->addReference();
 
   ASSERT_INVARIANT();
 }
@@ -1219,8 +1267,7 @@ void SimpleJSONArray::swap(store::Item* anotherItem)
   ContentReader::contentWillChange(&lOther->theContent);
   std::swap(theContent, lOther->theContent);
   std::swap(theHeight, lOther->theHeight);
-  setCollectionTreeInfo(theCollectionInfo);
-  lOther->setCollectionTreeInfo(lOther->theCollectionInfo);
+  giveCollectionInfoToSwappedMembers(lOther);
 }
 
 /******************************************************************************
@@ -1271,9 +1318,7 @@ store::Item_t SimpleJSONArray::replace(
 /******************************************************************************
 
 *******************************************************************************/
-void SimpleJSONArray::setCollectionInfoOfMembers(
-    CollectionTreeInfo* collectionInfo,
-    std::vector<JSONItem*>& aJSONMembers)
+void SimpleJSONArray::reachMembers(TreeWalk& aWalk)
 {
   for (Members::const_iterator ite = theContent.begin();
        ite != theContent.end();
@@ -1281,15 +1326,7 @@ void SimpleJSONArray::setCollectionInfoOfMembers(
   {
     store::Item* value = *ite;
 
-    if (value->isJSONItem())
-    {
-      aJSONMembers.push_back(static_cast<JSONItem*>(value));
-    }
-    else if (value->isStructuredItem())
-    {
-      StructuredItem* structuredItem = static_cast<StructuredItem*>(value);
-      structuredItem->setCollectionTreeInfo(collectionInfo);
-    }
+    aWalk.reach(value);
   }
 }
 
