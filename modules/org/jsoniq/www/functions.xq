@@ -50,6 +50,8 @@ declare option ver:module-version "1.0";
  :   <code>{ "prefix" : "Q{http://jsoniq.org/roundtrip}" }</code>
  :
  : @param $items the items to be decoded.
+ : @error jerr:JNTY0023 if the value of a type key is neither a node kind nor
+ :        the name of a type in scope
  : @return the decoded items.
  :)
 declare function jn:decode-from-roundtrip($items as item()*) as item()* external;
@@ -84,7 +86,9 @@ declare function jn:decode-from-roundtrip($items as item()*) as item()* external
  : @param $items the items to be decoded.
  : @param $options the decoding options.
  :
- : @error jerr:JNTY0023 if $options("prefix") is not a string
+ : @error jerr:JNTY0023 if $options("prefix") is not a string, or if the
+ :        value of a type key is neither a node kind nor the name of a type in
+ :        scope
  :
  : @return the decoded items.
  :)
