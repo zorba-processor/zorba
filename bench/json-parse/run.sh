@@ -48,7 +48,7 @@ measure() {
   echo "|---|---:|---:|---:|---|"
 } > "$MD"
 
-for q in count latency flatten filter_project; do
+for q in count latency flatten filter_project unmatched; do
   measure "$q" "$ZORBA" -f -q "$HERE/$q.jq" -e "log:=$LOG"
 done
 if [ -n "${JQ:-}" ]; then

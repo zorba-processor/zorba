@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <atomic>
 #include <limits>
 
 #include "diagnostics/assert.h"
@@ -722,6 +723,15 @@ LetVarState::LetVarState()
 {
   theWindowStart = 0;
   theWindowEnd = 0;
+  theBindingId = 0;
+  theBindsWholeTempSeq = false;
+}
+
+
+static uint64_t newLetBindingId()
+{
+  static std::atomic<uint64_t> lastId{0};
+  return lastId.fetch_add(1, std::memory_order_relaxed) + 1;
 }
 
 
@@ -835,6 +845,8 @@ void LetVarIterator::bind(store::Iterator_t& it, PlanState& planState)
   state = StateTraitsImpl<LetVarState>::getState(planState, theStateOffset);
 
   state->theSourceIter = it;
+  state->theBindingId = newLetBindingId();
+  state->theBindsWholeTempSeq = false;
 }
 
 
@@ -849,6 +861,8 @@ void LetVarIterator::bind(store::Item_t& value, PlanState& planState)
   state = StateTraitsImpl<LetVarState>::getState(planState, theStateOffset);
 
   state->theItem = value;
+  state->theBindingId = newLetBindingId();
+  state->theBindsWholeTempSeq = false;
 }
 
 
@@ -861,6 +875,8 @@ void LetVarIterator::bind(const store::TempSeq_t& value, PlanState& planState)
   state = StateTraitsImpl<LetVarState>::getState(planState, theStateOffset);
 
   state->theTempSeq = value;
+  state->theBindingId = newLetBindingId();
+  state->theBindsWholeTempSeq = true;
 
   if (theTargetPosIter == NULL)
   {
@@ -901,6 +917,8 @@ void LetVarIterator::bind(
   state = StateTraitsImpl<LetVarState>::getState(planState, theStateOffset);
 
   state->theTempSeq = value;
+  state->theBindingId = newLetBindingId();
+  state->theBindsWholeTempSeq = false;
 
   if (theTargetPosIter == NULL)
   {
@@ -927,6 +945,27 @@ void LetVarIterator::bind(
     state->theWindowStart = startPos - 1;
     state->theWindowEnd = endPos;
   }
+}
+
+
+/*******************************************************************************
+
+********************************************************************************/
+store::TempSeq* LetVarIterator::getWholeTempSeq(
+    PlanState& planState,
+    uint64_t& bindingId) const
+{
+  if (theSingleItem || theTargetPos > Integer(0) || theTargetPosIter != NULL)
+    return NULL;
+
+  LetVarState* state;
+  state = StateTraitsImpl<LetVarState>::getState(planState, theStateOffset);
+
+  if (!state->theBindsWholeTempSeq)
+    return NULL;
+
+  bindingId = state->theBindingId;
+  return state->theTempSeq.getp();
 }
 
 
