@@ -19,7 +19,8 @@ and where its time and allocations go. Each change that makes it faster adds a r
 | `latency.jq` | Group by service and route: count, average and maximum latency, server errors. |
 | `flatten.jq` | Each event as one flat object (JSON lines out). |
 | `filter_project.jq` | The server errors of one service, four fields each. |
-| `run.sh` | Best of 3 runs of the four queries: wall time, peak RSS, MB/s, SHA-256 of the output. |
+| `unmatched.jq` | Per service, the server errors of users with no successful request: a general `=` against the distinct user ids of a second parse. |
+| `run.sh` | Best of 3 runs of the queries: wall time, peak RSS, MB/s, SHA-256 of the output. |
 | `tools/profile.sh` | Samples per part (perf + `classify.awk`) and allocations per event (`malloc_count.c`) of one query. |
 | `tools/classify.awk` | Charges each `perf script` sample to a part of the parse or of the query. |
 | `tools/malloc_count.c` | LD_PRELOAD library that counts malloc, calloc and realloc calls and the bytes requested. |
@@ -163,3 +164,19 @@ with the PR 3 head (`d879336fc0`), which took 1.77, 4.60, 3.44 and 2.10 s in tho
 rounds: PR 4 alone is -1%, -36% (`latency`), +1% and 0% (the other three are not
 changed: noise). `flatten` took 3.44 s on the PR 3 head in these rounds and 4.99 s
 in those of the PR 3 row: rows compare only within their own rounds.
+
+### A general `=` against a `let` variable (`unmatched.jq`)
+
+`unmatched.jq` parses the log twice: once for the distinct ids of the users with a
+successful request, bound by a `let`, and once for the server errors, each compared
+with that variable by `not($e.user.id = $succeeded)`. Until it was hashed, the
+comparison went over every item of the variable for each error.
+
+| Build | Wall s | MB/s | Peak RSS MiB |
+|---|---:|---:|---:|
+| master `5fe30a45e6` | 118.86 | 1.8 | 150 |
+| hashed `let` operand | 6.25 (-95%) | 34.1 | 153 |
+
+Measured in alternating rounds with that master, in a container limited to 6 CPUs
+with the host busy with other builds: master took 118.86, 174.85 and 157.07 s, the
+head 6.66, 6.32 and 6.25 s. The output is the same.
