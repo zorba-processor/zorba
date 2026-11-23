@@ -23,6 +23,7 @@ and where its time and allocations go. Each change that makes it faster adds a r
 | `windows.jq` | Requests, server errors and the slowest request per minute, with a tumbling window. |
 | `clean_users.jq` | Requests per service of the users who never got a server error: a FLWOR gives the events of a group by to an enclosing group by. |
 | `unmatched.jq` | Per service, the server errors of users with no successful request: a general `=` against the distinct user ids of a second parse. |
+| `latency_calls.jq` | `latency.jq` with the keys looked up by chained calls, `$e("http")("route")`. |
 | `run.sh` | Best of 3 runs of the queries: wall time, peak RSS, MB/s, SHA-256 of the output. |
 | `tools/profile.sh` | Samples per part (perf + `classify.awk`) and allocations per event (`malloc_count.c`) of one query. |
 | `tools/classify.awk` | Charges each `perf script` sample to a part of the parse or of the query. |
@@ -206,3 +207,19 @@ comparison went over every item of the variable for each error.
 Measured in alternating rounds with that master, in a container limited to 6 CPUs
 with the host busy with other builds: master took 118.86, 174.85 and 157.07 s, the
 head 6.66, 6.32 and 6.25 s. The output is the same.
+
+### Chained calls (`latency_calls.jq`)
+
+`latency_calls.jq` is `latency.jq` with each key looked up by a call,
+`$e("http")("route")`. On master the analysis stopped at the first call, the second
+call getting a FLWOR as its input, and every event kept all of `http`. Best wall
+time (s) and peak RSS (MiB) of three alternating rounds, master `25b1433435` against
+the head, in a container limited to 4 CPUs with the host busy with other builds,
+built with `CMAKE_BUILD_TYPE=Release` (not the profile build of step 1):
+
+| query | master s | head s | master MiB | head MiB |
+|---|---:|---:|---:|---:|
+| latency | 2.98 | 2.99 | 148 | 148 |
+| latency_calls | 3.24 | 3.00 (-7%) | 205 | 148 |
+
+`latency_calls` now builds what `latency` builds, and writes the same output.
