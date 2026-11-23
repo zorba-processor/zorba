@@ -395,6 +395,71 @@ static void test_object_sizes()
   }
 }
 
+// The rvalue overloads of the factory take the references of the items they
+// are given: counts do not change, the given handles are left null.
+static void test_move_in()
+{
+  for (int n : { 3, 40 }) {
+    int const before = failures;
+    vector<store::Item_t> names, values;
+    for (int i = 0; i < n; ++i) {
+      names.push_back(sharable_string(key_name(i).c_str()));
+      values.push_back(integer(i));
+    }
+    store::Item *const first_value = values[0].getp();
+    long const count = first_value->getRefCount();
+
+    store::Item_t obj;
+    GENV_ITEMFACTORY->createJSONObject(obj, std::move(names), std::move(values));
+    CHECK(names.size() == size_t(n) && values.size() == size_t(n));
+    CHECK(!names[0] && !names[n - 1] && !values[0] && !values[n - 1]);
+    CHECK(first_value->getRefCount() == count);
+    CHECK(std::string(keys_of(obj).c_str()) == expected_keys(0, n));
+    for (int i = 0; i < n; ++i)
+      CHECK(value_of(obj, key_name(i).c_str()) == i);
+
+    // On a duplicate, the pairs from the duplicate on stay with the caller.
+    vector<store::Item_t> dnames, dvalues;
+    for (int i = 0; i < n; ++i) {
+      dnames.push_back(sharable_string(key_name(i).c_str()));
+      dvalues.push_back(integer(i));
+    }
+    dnames.push_back(unsharable_string(key_name(n / 2).c_str()));
+    dvalues.push_back(integer(-1));
+    dnames.push_back(sharable_string("after"));
+    dvalues.push_back(integer(-2));
+    std::string err;
+    try {
+      store::Item_t dobj;
+      GENV_ITEMFACTORY->createJSONObject(dobj, std::move(dnames),
+                                         std::move(dvalues));
+    }
+    catch (ZorbaException const &e) {
+      err = e.diagnostic().qname().localname();
+    }
+    CHECK(err == "JNDY0003");
+    CHECK(!dnames[n - 1] && !dvalues[n - 1]);
+    CHECK(dnames[n] && dvalues[n] && dnames[n + 1] && dvalues[n + 1]);
+
+    vector<store::Item_t> members;
+    for (int i = 0; i < n; ++i)
+      members.push_back(integer(i));
+    store::Item *const first_member = members[0].getp();
+    long const member_count = first_member->getRefCount();
+    store::Item_t array;
+    GENV_ITEMFACTORY->createJSONArray(array, std::move(members));
+    CHECK(members.size() == size_t(n) && !members[0] && !members[n - 1]);
+    CHECK(first_member->getRefCount() == member_count);
+    CHECK(array->getArraySize() == xs_integer(n));
+    for (int i = 0; i < n; ++i)
+      CHECK(array->getArrayValue(xs_integer(i + 1))->getStringValue() ==
+            zstring(std::to_string(i)));
+
+    if (failures != before)
+      cerr << "  (move-in of " << n << " items)" << endl;
+  }
+}
+
 // A small object carries no hash map of its own: at most one pointer beyond
 // its pair vector.
 static void test_object_footprint()
@@ -414,6 +479,7 @@ int test_json_object(int, char*[])
   test_parse_duplicate_keys();
   test_object_sizes();
   test_object_footprint();
+  test_move_in();
   if (failures)
     cerr << failures << " check(s) failed" << endl;
   return failures ? 1 : 0;
