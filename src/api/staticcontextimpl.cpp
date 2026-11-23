@@ -18,6 +18,8 @@
 #include "api/staticcontextimpl.h"
 
 #include <algorithm>
+#include <set>
+#include <vector>
 
 #include <zorba/error.h>
 #include <zorba/external_module.h>
@@ -55,6 +57,7 @@
 #include "compiler/expression/var_expr.h"
 
 #include "functions/function.h"
+#include "functions/udf.h"
 
 #include "system/globalenv.h"
 
@@ -1178,26 +1181,55 @@ void StaticContextImpl::loadProlog(
   // Create and compile an internal query whose prolog is the given prolog and
   // its body is just the emtpy sequence expression: "()".
   XQueryImpl impl;
-  impl.loadProlog(prolog, this, hints);
+  try
+  {
+    impl.loadProlog(prolog, this, hints);
+  }
+  catch (...)
+  {
+    // The declarations bound before the error stay in theCtx: their exprs
+    // must outlive impl.
+    rchandle<LoadedProlog> lFailed = new LoadedProlog(NULL);
+    adoptCompilation(*lFailed, impl);
+    lProlog->theFailedPrologs.push_back(lFailed);
 
-  // Copy theSctxMap of the internal query into "this". When "this" is then passed
-  // as an input to a user query Q, theSctxMap of Q will be initialized as a copy
-  // of this->theSctxMap.
-  //theSctxMap = impl.theCompilerCB->theSctxMap;
-  lProlog->theCompilerCB.reset(impl.theCompilerCB);
-  impl.theCompilerCB = NULL;
+    // Except the functions: they were neither optimized nor generated
+    // (XQueryCompiler::seal()), so no query may call them.
+    std::vector<function*> lUdfs;
+    std::set<const static_context*> lVisited;
+    theCtx->get_udfs(lUdfs, lVisited);
+    for (function* lUdf : lUdfs)
+    {
+      if (static_cast<user_function*>(lUdf)->getCCB() ==
+          lFailed->theCompilerCB.get())
+        theCtx->unbind_fn(lUdf->getName(), lUdf->getArity());
+    }
+    throw;
+  }
+
+  adoptCompilation(*lProlog, impl);
   lProlog->theInitExpr = theCtx->get_query_expr();
+}
 
-  // The ccb reports to the diagnostics of impl. loadProlog() sealed the
-  // functions of the prolog (XQueryCompiler::seal()): the queries compiled
-  // against this context only read them.
-  lProlog->theXQueryDiagnostics.reset(impl.theXQueryDiagnostics);
-  impl.theXQueryDiagnostics = NULL;
 
-  // The ccb no longer belongs to impl (whose QueryResources goes away with
-  // it), but to theProlog.
-  lProlog->theResources = new QueryResources();
-  lProlog->theCompilerCB->theResources = lProlog->theResources.getp();
+void StaticContextImpl::adoptCompilation(
+    LoadedProlog& aProlog,
+    XQueryImpl& aQuery)
+{
+  // The queries compiled against this context copy the sctx map of the ccb.
+  aProlog.theCompilerCB.reset(aQuery.theCompilerCB);
+  aQuery.theCompilerCB = NULL;
+
+  // The ccb reports to the diagnostics of aQuery. A loadProlog() that
+  // succeeded sealed the functions of the prolog (XQueryCompiler::seal()):
+  // the queries compiled against this context only read them.
+  aProlog.theXQueryDiagnostics.reset(aQuery.theXQueryDiagnostics);
+  aQuery.theXQueryDiagnostics = NULL;
+
+  // The ccb no longer belongs to aQuery (whose QueryResources goes away with
+  // it), but to aProlog.
+  aProlog.theResources = new QueryResources();
+  aProlog.theCompilerCB->theResources = aProlog.theResources.getp();
 }
 
 
