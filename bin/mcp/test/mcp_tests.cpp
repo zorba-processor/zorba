@@ -4605,6 +4605,83 @@ void test_json_object_add_out_of_memory( Fixture const &f ) {
   (void)f;
 #endif
 }
+// A collection made with three nodes, with each allocation failing in turn: a
+// node the collection could not take is not left in it, so the undo of the
+// nodes taken before finds them last and removes them, and the collection is
+// gone again.
+void test_collection_insert_out_of_memory( Fixture const &f ) {
+#if defined(__linux__)
+  // Untyped nodes: a typed one leaks when its construction fails (another
+  // defect, outside these tests).
+  std::string const prolog(
+    "declare construction strip;\n"
+    "import module namespace ddl ="
+    " 'http://zorba.io/modules/store/dynamic/collections/ddl';\n"
+    "import module namespace dml ="
+    " 'http://zorba.io/modules/store/dynamic/collections/dml';\n" );
+  auto run = [&]( std::string const &query ) -> std::string {
+    XQuery_t const q( f.zorba->compileQuery( prolog + query ) );
+    Iterator_t const it( q->iterator() );
+    it->open();
+    Item item;
+    std::string out;
+    while ( it->next( item ) )
+      out += item.getStringValue().str();
+    it->close();
+    return out;
+  };
+  auto attempt = [&]( long n, long length, long *count ) -> std::string {
+    XQuery_t const insert( f.zorba->compileQuery( prolog +
+      "ddl:create(xs:QName('ddl:sweep'), (<a/>, <b/>, <c/>));\n1" ) );
+    Iterator_t const it( insert->iterator() );
+    Item result;
+    bool failed = false;
+    inject_arm( n, length );
+    try {
+      it->open();
+      it->next( result );
+      it->close();
+    }
+    catch ( std::exception const& ) {
+      failed = true;
+    }
+    *count = inject_disarm();
+    std::string out( failed || result.isNull()
+                     ? "error" : result.getStringValue().str() );
+    std::string const nodes( run(
+      "if (ddl:is-available-collection(xs:QName('ddl:sweep')))\n"
+      "then string-join(dml:collection(xs:QName('ddl:sweep')) ! local-name(),"
+      " ' ')\n"
+      "else 'none'" ) );
+    if ( nodes != "none" )
+      run( "dml:truncate(xs:QName('ddl:sweep'));\n"
+           "ddl:delete(xs:QName('ddl:sweep'));\n1" );
+    return out + "|" + nodes;
+  };
+  std::string const answer( "1|a b c" );
+  long total = 0;
+  std::string const whole( attempt( 0, 0, &total ) );
+  check( whole == answer, "a collection made with nodes", whole );
+  long wrong = 0;
+  for ( long const length : { 1L, 8L } )
+    for ( long n = 1; n <= total; ++n ) {
+      long count = 0;
+      std::string const got( attempt( n, length, &count ) );
+      if ( got != answer && got != "error|none" && ++wrong <= 3 )
+        std::cout << "at " << n << " of a run of " << length << ": " << got
+                  << std::endl;
+    }
+  check( wrong == 0, "a collection made with nodes failing: the answer, or an "
+                     "error and no collection",
+         std::to_string( wrong ) + " points" );
+# if defined(__SANITIZE_ADDRESS__)
+  check( __lsan_do_recoverable_leak_check() == 0,
+         "a collection made with nodes failing: nothing is left behind" );
+# endif
+#else
+  (void)f;
+#endif
+}
 // Each kind of node update with each allocation failing in turn: a primitive
 // that could not be added to the update list does not keep its target. A kept
 // target keeps the namespace of the xsi:type in its tree in the string pool,
@@ -8703,6 +8780,7 @@ Test const tests[] = {
   { "exhaust_serializer", test_serializer_out_of_memory },
   { "exhaust_replace_content", test_replace_content_out_of_memory },
   { "exhaust_json_object_add", test_json_object_add_out_of_memory },
+  { "exhaust_collection_insert", test_collection_insert_out_of_memory },
   { "exhaust_update_primitive", test_update_primitive_out_of_memory },
   { "exhaust_remove_type", test_remove_type_out_of_memory },
   { "exhaust_plan_wrapper", test_plan_wrapper_out_of_memory },
