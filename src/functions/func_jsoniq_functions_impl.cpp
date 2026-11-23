@@ -15,6 +15,7 @@
  */
 
 #include <algorithm>
+#include <optional>
 #include <set>
 #include <string_view>
 
@@ -25,6 +26,7 @@
 #include "runtime/json/jsoniq_functions.h"
 #include "runtime/json/json_loader.h"
 #include "runtime/core/item_iterator.h"
+#include "runtime/errors_and_diagnostics/other_diagnostics.h"
 
 #include "compiler/parser/query_loc.h"
 #include "compiler/expression/expr_consts.h"
@@ -74,12 +76,71 @@ PlanIter_t fn_jsoniq_parse_json::codegen(
 ********************************************************************************/
 static bool is_parse_json(const expr* e)
 {
+  // An inlined function body is traced for the call stack of its errors.
+  while (e->get_expr_kind() == function_trace_expr_kind ||
+         e->get_expr_kind() == wrapper_expr_kind)
+  {
+    e = e->get_expr_kind() == function_trace_expr_kind ?
+      static_cast<const function_trace_expr*>(e)->get_input() :
+      static_cast<const wrapper_expr*>(e)->get_input();
+  }
   if (e->get_expr_kind() != fo_expr_kind)
     return false;
   FunctionConsts::FunctionKind const kind =
     static_cast<const fo_expr*>(e)->get_func()->getKind();
   return kind == FunctionConsts::FN_JSONIQ_PARSE_JSON_1 ||
          kind == FunctionConsts::FN_JSONIQ_PARSE_JSON_2;
+}
+
+
+/**
+ * Gets the parse that iter is, also as an inlined function body.
+ */
+static JSONParseIterator* parse_iterator(PlanIterator* iter)
+{
+  while (FunctionTraceIterator* trace = dynamic_cast<FunctionTraceIterator*>(iter))
+    iter = trace->getChildren()[0].getp();
+  return dynamic_cast<JSONParseIterator*>(iter);
+}
+
+
+/**
+ * Gets the expressions from root down to target.
+ *
+ * @return false if target is not in root.
+ */
+static bool path_to(expr* root, const expr* target, std::vector<expr*>* path)
+{
+  path->push_back(root);
+  if (root == target)
+    return true;
+  for (ExprIterator i(root); !i.done(); i.next())
+  {
+    if (path_to(**i, target, path))
+      return true;
+  }
+  path->pop_back();
+  return false;
+}
+
+
+/**
+ * Whether the values of a child of e can reach a use of e that reads only
+ * keys of them: a lookup, a count, a FLWOR over them, a choice between them.
+ */
+static bool passes_values(const expr* e)
+{
+  switch (e->get_expr_kind())
+  {
+  case flwor_expr_kind:
+  case if_expr_kind:
+  case fo_expr_kind:
+  case dynamic_function_invocation_expr_kind:
+  case function_trace_expr_kind:
+    return true;
+  default:
+    return false;
+  }
 }
 
 
@@ -154,16 +215,41 @@ static expr* literal_key_lookup(expr* e, zstring* key)
 namespace {
 
 /**
- * What a FLWOR reads of the values of the variable of its for clause over a
- * parse.  The values are also bound to the variables of a group by that
- * collect them, and to those of for clauses over them, as in the translation
- * of a predicate: the uses of all of these are checked.
+ * Adds to vars the variables of a window clause bound to the items of its
+ * domain: the window and the items of its conditions.
+ */
+void add_window_vars(const window_clause* wc, std::vector<const var_expr*>* vars)
+{
+  vars->push_back(wc->get_var());
+  for (const flwor_wincond* cond : { wc->get_win_start(), wc->get_win_stop() })
+  {
+    if (!cond)
+      continue;
+    for (const flwor_wincond_vars* condVars : { &cond->get_in_vars(), &cond->get_out_vars() })
+    {
+      for (const var_expr* var : { condVars->curr, condVars->prev, condVars->next })
+      {
+        if (var)
+          vars->push_back(var);
+      }
+    }
+  }
+}
+
+
+/**
+ * What an expression reads of the values of the variables of a for or window
+ * clause over a parse.  The values are also bound to the variables of a group
+ * by that collect them, and to those of for and window clauses over them, as
+ * in the translation of a predicate: the uses of all of these are checked.
+ * The FLWOR of the clause may also give the values to an enclosing use that
+ * reads only keys of them, which is checked as well.
  */
 class read_analysis
 {
 public:
-  read_analysis(const var_expr* var, json::projection* read) :
-    theVars{ var }, theRead(read) { }
+  read_analysis(std::vector<const var_expr*> vars, json::projection* read) :
+    theVars(std::move(vars)), theRead(read) { }
 
   /**
    * Adds what e reads of the values.
@@ -211,9 +297,16 @@ bool read_analysis::only_values(expr* e)
   {
   case fo_expr_kind:
   {
-    const fo_expr* fo = static_cast<const fo_expr*>(e);
-    return fo->get_func()->getKind() == FunctionConsts::OP_CONCATENATE_N &&
-      fo->num_args() == 0;
+    fo_expr* fo = static_cast<fo_expr*>(e);
+    switch (fo->get_func()->getKind())
+    {
+    case FunctionConsts::OP_CONCATENATE_N:
+      return fo->num_args() == 0;
+    case FunctionConsts::OP_ZORBA_SEQUENCE_POINT_ACCESS_2:
+      return only_values(fo->get_arg(0)) && reads(fo->get_arg(1));
+    default:
+      return false;
+    }
   }
   case if_expr_kind:
   {
@@ -282,8 +375,8 @@ bool read_analysis::lookup_path(expr* e, std::vector<zstring>* path)
 
 
 /**
- * Adds to theVars the variables of flwor bound to values: those of a for
- * clause over values and those of a group by that collect values.
+ * Adds to theVars the variables of flwor bound to values: those of a for or
+ * window clause over values and those of a group by that collect values.
  */
 void read_analysis::bind(const flwor_expr* flwor)
 {
@@ -297,6 +390,15 @@ void read_analysis::bind(const flwor_expr* flwor)
       {
         theVars.push_back(fc->get_var());
         theBindings.push_back(fc->get_expr());
+      }
+    }
+    else if (clause->get_kind() == flwor_clause::window_clause)
+    {
+      const window_clause* wc = static_cast<const window_clause*>(clause);
+      if (only_values(wc->get_expr()))
+      {
+        add_window_vars(wc, &theVars);
+        theBindings.push_back(wc->get_expr());
       }
     }
     else if (clause->get_kind() == flwor_clause::groupby_clause)
@@ -363,21 +465,46 @@ bool read_analysis::reads(expr* e)
 
 void project_parse_json(
     CompilerCB* ccb,
-    const for_clause* fc,
+    expr* root,
+    const forletwin_clause* clause,
     const PlanIter_t& domainIter)
 {
   if (ccb->theConfig.opt_level == CompilerCB::config::O0 ||
-      !is_parse_json(fc->get_expr()))
+      !is_parse_json(clause->get_expr()))
     return;
 
-  JSONParseIterator* parse = dynamic_cast<JSONParseIterator*>(domainIter.getp());
+  JSONParseIterator* parse = parse_iterator(domainIter.getp());
   if (!parse)
     return;
 
-  json::projection read;
-  if (read_analysis(fc->get_var(), &read).reads(fc->get_flwor_expr()) &&
-      !read.all)
-    parse->setProjection(read.str());
+  std::vector<const var_expr*> vars;
+  if (clause->get_kind() == flwor_clause::for_clause)
+    vars.push_back(clause->get_var());
+  else if (clause->get_kind() == flwor_clause::window_clause)
+    add_window_vars(static_cast<const window_clause*>(clause), &vars);
+  else
+    return;
+
+  // The FLWOR, or the nearest enclosing expression that reads only keys of
+  // the values the FLWOR gives; a lookup in that one may read fewer of them.
+  flwor_expr* flwor = clause->get_flwor_expr();
+  std::vector<expr*> path;
+  if (!root || !path_to(root, flwor, &path))
+    path.assign(1, flwor);
+  std::optional<json::projection> found;
+  for (auto e = path.rbegin(); e != path.rend(); ++e)
+  {
+    json::projection read;
+    if (read_analysis(vars, &read).reads(*e))
+      found = std::move(read);
+    auto const parent = std::next(e);
+    zstring key;
+    if (parent == path.rend() ||
+        (found ? literal_key_lookup(*parent, &key) != *e : !passes_values(*parent)))
+      break;
+  }
+  if (found && !found->all)
+    parse->setProjection(found->str());
 }
 
 
@@ -389,8 +516,32 @@ void project_counted_parse_json(
   if (ccb->theConfig.opt_level == CompilerCB::config::O0 || !is_parse_json(arg))
     return;
 
-  if (JSONParseIterator* parse = dynamic_cast<JSONParseIterator*>(argIter.getp()))
+  if (JSONParseIterator* parse = parse_iterator(argIter.getp()))
     parse->setProjection(json::projection().str());
+}
+
+
+/**
+ * Makes a parse whose values lookup only looks up a literal key in build only
+ * that key's value.  Not at -O0.
+ */
+static void project_looked_up_parse_json(
+    CompilerCB* ccb,
+    expr* lookup,
+    const PlanIter_t& inputIter)
+{
+  zstring key;
+  const expr* input = literal_key_lookup(lookup, &key);
+  if (ccb->theConfig.opt_level == CompilerCB::config::O0 || !input ||
+      !is_parse_json(input))
+    return;
+
+  if (JSONParseIterator* parse = parse_iterator(inputIter.getp()))
+  {
+    json::projection read;
+    read.add({ key });
+    parse->setProjection(read.str());
+  }
 }
 
 
@@ -424,12 +575,14 @@ xqtref_t op_zorba_multi_object_lookup::getReturnType(const fo_expr* caller) cons
 
 
 PlanIter_t op_zorba_multi_object_lookup::codegen(
-  CompilerCB*,
+  CompilerCB* ccb,
   static_context* sctx,
   const QueryLoc& loc,
   std::vector<PlanIter_t>& argv,
   expr& arg) const
 {
+  project_looked_up_parse_json(ccb, &arg, argv[0]);
+
   if (arg.get_return_type()->max_card() <= 1)
     return new SingleArrayLookupIterator(sctx, loc, argv[0], argv[1]);
 

@@ -357,6 +357,8 @@ protected:
 
   CompilerCB                               * theCCB;
 
+  expr                                     * theRoot;
+
 #ifdef ZORBA_WITH_DEBUGGER
   std::stack<DebugIterator*>                 theDebuggerStack;
 #endif
@@ -369,13 +371,15 @@ public:
 
 plan_visitor(
     CompilerCB* ccb,
+    expr* root,
     ulong nextDynamicVarId,
     hash64map<std::vector<LetVarIter_t>*>* arg_var_map = NULL)
   :
   theDepth(0),
   theNextDynamicVarId(nextDynamicVarId),
   arg_var_iter_map(arg_var_map),
-  theCCB(ccb)
+  theCCB(ccb),
+  theRoot(root)
 {
 #ifndef ZORBA_NO_FULL_TEXT
   plan_ftnode_visitor_ = new plan_ftnode_visitor( this );
@@ -1595,7 +1599,7 @@ PlanIter_t gflwor_codegen(flwor_expr& flworExpr, int currentClause)
     var_expr* var = fc->get_var();
 
     PlanIter_t domainIter = pop_itstack();
-    project_parse_json(theCCB, fc, domainIter);
+    project_parse_json(theCCB, theRoot, fc, domainIter);
     domainIter = binding_sequence_iter(fc, domainIter);
 
     std::vector<PlanIter_t>& varRefs = clauseVarMap->theVarRebinds[0]->theOutputVarRefs;
@@ -1707,6 +1711,7 @@ PlanIter_t gflwor_codegen(flwor_expr& flworExpr, int currentClause)
     std::vector<PlanIter_t>& varRefs = clauseVarMap->theVarRebinds[0]->theOutputVarRefs;
 
     PlanIter_t domainIter = pop_itstack();
+    project_parse_json(theCCB, theRoot, wc, domainIter);
 
     std::unique_ptr<flwor::StartClause> start_clause;
     std::unique_ptr<flwor::EndClause> end_clause;
@@ -2023,7 +2028,7 @@ void flwor_codegen(const flwor_expr& flworExpr)
       var_expr* var = fc->get_var();
 
       PlanIter_t domainIter = pop_itstack();
-      project_parse_json(theCCB, fc, domainIter);
+      project_parse_json(theCCB, theRoot, fc, domainIter);
       domainIter = binding_sequence_iter(fc, domainIter);
 
       std::vector<PlanIter_t>& varRefs =
@@ -3924,7 +3929,7 @@ PlanIter_t codegen(
     ulong& nextDynamicVarId,
     hash64map<std::vector<LetVarIter_t> *>* arg_var_map)
 {
-  plan_visitor c(ccb, nextDynamicVarId, arg_var_map);
+  plan_visitor c(ccb, root, nextDynamicVarId, arg_var_map);
 
   root->accept(c);
   PlanIter_t result = c.result();
