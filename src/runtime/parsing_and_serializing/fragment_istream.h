@@ -17,6 +17,7 @@
 #ifndef ZORBA_RUNTIME_PARSING_AND_SERIALIZING_FRAGMENT_ISTREAM_H
 #define ZORBA_RUNTIME_PARSING_AND_SERIALIZING_FRAGMENT_ISTREAM_H
 
+#include <cstdint>
 #include <deque>
 #include <iostream>
 #include <string>
@@ -79,6 +80,20 @@ struct FragmentInsertions
   bool ended = false;       // the wrapper end tag follows the input
 };
 
+/**
+ * How the fragment parser reads input that is not UTF-8. The parser inserts
+ * its wrapper tags as UTF-8 bytes, so UTF-16 and UTF-32 input is transcoded
+ * to UTF-8 before libxml2 reads it.
+ */
+struct FragmentEncoding
+{
+  unsigned unit = 0;            // bytes per code unit; 0: the input is UTF-8
+  bool big_endian = false;
+  char const* name = "UTF-8";    // what libxml2 reads; null: as declared
+  std::string partial;          // the bytes of an incomplete code unit
+  uint32_t high_surrogate = 0;  // a UTF-16 high surrogate awaiting its pair
+};
+
 class FragmentIStream : public std::istream
 {
 public:
@@ -115,6 +130,7 @@ public:
   void* current_loader;             // the FragmentXmlLoader replaying events
   std::vector<std::vector<std::pair<std::string,std::string> > > ns_scopes;
   FragmentInsertions insertions;
+  FragmentEncoding encoding;
 
   bool only_one_doc_node;           // If set to true, all parsed fragments will be added to one
                                     // single document node, instead of having one for each fragment.
@@ -197,6 +213,7 @@ public:
     current_loader = NULL;
     ns_scopes.clear();
     insertions = FragmentInsertions();
+    encoding = FragmentEncoding();
     only_one_doc_node = false;
   }
   
