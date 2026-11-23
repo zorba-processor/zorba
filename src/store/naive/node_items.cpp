@@ -3197,6 +3197,12 @@ void ElementNode::getTypedValue(store::Item_t& val, store::Iterator_t& iter) con
       GET_FACTORY().createUntypedAtomic(val, rch);
     }
   }
+  else if (getNilled())
+  {
+    // The typed value of a nilled element is empty, whatever its content type
+    val = NULL;
+    iter = NULL;
+  }
   else
   {
     throw XQUERY_EXCEPTION(err::FOTY0012,
