@@ -315,6 +315,8 @@ public:
   void removeType(const XmlNode* n);
 
   void copyTypesMap(const XmlTree* source);
+
+  void reserveTypes();
 #endif
 
   store::Item* getEmptyContentValue(const XmlNode* n) const;

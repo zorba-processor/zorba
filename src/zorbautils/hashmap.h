@@ -16,6 +16,7 @@
 #ifndef ZORBA_UTILS_HASHMAP_H
 #define ZORBA_UTILS_HASHMAP_H
 
+#include <algorithm>
 #include <cassert>
 #include <cstddef>
 #include <new>
@@ -430,6 +431,8 @@ protected:
 
   csize                          theNumCollisions;
 
+  csize                          theReserved;  // see reserve()
+
 public:
 
 /***************************************************************************//**
@@ -448,7 +451,8 @@ HashMap(const C& compFunction, csize size, bool sync)
   theNumEntries(0),
   theLoadFactor(DEFAULT_LOAD_FACTOR),
   theCompareFunction(compFunction),
-  theNumCollisions(0)
+  theNumCollisions(0),
+  theReserved(0)
 {
   theHashTab.resize(computeCapacity(size));
 
@@ -475,7 +479,8 @@ HashMap(csize size, bool sync)
   theNumBuckets(size),
   theNumEntries(0),
   theLoadFactor(DEFAULT_LOAD_FACTOR),
-  theNumCollisions(0)
+  theNumCollisions(0),
+  theReserved(0)
 {
   theHashTab.resize(computeCapacity(size));
 
@@ -512,6 +517,40 @@ Mutex* get_mutex() const   \
 void set_load_factor(double v)
 {
   theLoadFactor = v;
+}
+
+
+/*******************************************************************************
+  Makes room for n entries: while the map holds fewer than n, an insert neither
+  grows the table nor its collision area, and no erase shrinks it below that.
+  An undo that puts back an entry it erased then cannot fail. The room is kept
+  for good.
+********************************************************************************/
+void reserve(csize n)
+{
+  SYNC_CODE(AutoMutex lock(theMutexp);)
+
+  if (n <= theReserved)
+    return;
+
+  csize buckets = (theNumBuckets == 0 ? 3 : theNumBuckets);
+  while (buckets * theLoadFactor < n)
+    buckets *= 2;
+
+  csize const oldReserved = theReserved;
+  theReserved = n;
+  try
+  {
+    if (buckets > theNumBuckets)
+      resizeHashTab(buckets);
+    else
+      reserveCollisionArea();
+  }
+  catch (...)
+  {
+    theReserved = oldReserved;
+    throw;
+  }
 }
 
 
@@ -1048,7 +1087,8 @@ void setNewEntry(HashEntry<K, V>* entry, ulong hval, const K& key, Value& value)
 ********************************************************************************/
 void shrinkHashTab()
 {
-  if (theNumEntries < theMaxLoad / 2)
+  if (theNumEntries < theMaxLoad / 2 &&
+      (theNumBuckets / 2) * theLoadFactor >= theReserved)
   {
     try
     {
@@ -1172,6 +1212,31 @@ void extendCollisionArea()
 
 
 /*******************************************************************************
+  Gives the collision area (after the head of the free list) theReserved
+  entries: as many as the map may hold, so that one is free for every insert.
+  The new entries go first in the free list.
+********************************************************************************/
+void reserveCollisionArea()
+{
+  csize const oldSize = theHashTab.size();
+
+  if (oldSize - theNumBuckets - 1 >= theReserved)
+    return;
+
+  theHashTab.resize(theNumBuckets + 1 + theReserved);
+
+  HashEntry<K, V>* firstentry = &theHashTab[oldSize];
+  HashEntry<K, V>* lastentry = &theHashTab[theHashTab.size() - 1];
+
+  for (HashEntry<K, V>* entry = firstentry; entry < lastentry; ++entry)
+    entry->theNext = 1;
+
+  lastentry->setNext(freelist()->getNext());
+  freelist()->setNext(firstentry);
+}
+
+
+/*******************************************************************************
 
 ********************************************************************************/
 void formatCollisionArea(HashEntry<K, V>* firstentry = NULL)
@@ -1197,7 +1262,7 @@ void resizeHashTab(csize newSize)
     newSize = 3;
 
   csize oldcap = theHashTab.size();
-  csize newcap = computeCapacity(newSize);
+  csize newcap = std::max(computeCapacity(newSize), newSize + 1 + theReserved);
 
   // Create a new vector of new size and swap theHashTab with this new vector
   hash_tab_type oldTab(newcap);

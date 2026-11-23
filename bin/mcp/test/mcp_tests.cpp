@@ -3664,6 +3664,41 @@ void test_sweep_revalidate( Fixture const &f ) {
   (void)f;
 #endif
 }
+// Activating and deactivating an integrity constraint: a failed allocation while
+// the activation is applied is the memory error, with the statement undone.
+void test_sweep_ic_activation( Fixture const &f ) {
+#if defined(__linux__)
+  auto const library = []( std::string const &name ) {
+    return "module namespace m = 'urn:" + name + "';\n"
+           "declare collection m:c as node()*;\n"
+           "declare integrity constraint m:ic on collection m:c $c check true();\n";
+  };
+  auto const query = []( std::string const &name ) {
+    std::string const call = caught( "local:run()" );
+    std::size_t const prolog = call.find( '\n' ) + 1;
+    return call.substr( 0, prolog ) +
+      "import module namespace m = 'urn:" + name + "' at '" + name + ".xqlib';\n"
+      "import module namespace ic_ddl = "
+      "'http://zorba.io/modules/store/static/integrity-constraints/ddl';\n"
+      "declare namespace an = 'http://zorba.io/annotations';\n"
+      "declare %an:sequential function local:run() {\n"
+      "  ic_ddl:activate(xs:QName('m:ic'));\n"
+      "  ic_ddl:deactivate(xs:QName('m:ic'));\n"
+      "  'done'\n"
+      "};\n" + call.substr( prolog );
+  };
+  Sweep s;
+  s.files = { { "sweep.xqlib", library( "sweep" ) },
+              { "warm.xqlib", library( "warm" ) } };
+  s.query = query( "sweep" );
+  s.before.push_back( query( "warm" ) );
+  s.after_compile = true;
+  s.expected = "\"done\"";
+  exhaust_sweep( f, "ic_activation", s );
+#else
+  (void)f;
+#endif
+}
 std::string sweep_schema( std::string const &ns ) {
   return "<xs:schema xmlns:xs='http://www.w3.org/2001/XMLSchema'"
          " targetNamespace='" + ns + "' xmlns='" + ns + "'"
@@ -8483,6 +8518,7 @@ Test const tests[] = {
   { "exhaust_sweep_validate", test_sweep_validate },
   { "exhaust_sweep_serialize", test_sweep_serialize },
   { "exhaust_sweep_revalidate", test_sweep_revalidate },
+  { "exhaust_sweep_ic_activation", test_sweep_ic_activation },
   { "exhaust_sweep_schema_import", test_sweep_schema_import },
   { "exhaust_sweep_html", test_sweep_html },
   { "exhaust_sweep_json", test_sweep_json },

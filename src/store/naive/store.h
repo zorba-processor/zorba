@@ -327,6 +327,12 @@ public:
       const store::Item_t& icQName,
       bool& isApplied);
 
+  // Room for n more active constraints (see HashMap::reserve).
+  void reserveICs(csize n);
+
+  // Puts back a constraint that deactivateIC() took out.
+  void restoreIC(store::IC_t& ic);
+
   virtual store::Iterator_t listActiveICNames();
 
   virtual store::IC* getIC(const store::Item* icQName);

@@ -237,6 +237,17 @@ void XmlTree::setType(const XmlNode* n, store::Item_t& type)
 
 
 /*******************************************************************************
+  Room in the type map for as many entries as it holds now: an entry taken out
+  after this can be put back without allocating.
+********************************************************************************/
+void XmlTree::reserveTypes()
+{
+  if (theTypesMap != NULL)
+    theTypesMap->reserve(theTypesMap->size());
+}
+
+
+/*******************************************************************************
 
 ********************************************************************************/
 void XmlTree::removeType(const XmlNode* n)

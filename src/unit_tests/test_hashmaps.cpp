@@ -349,6 +349,84 @@ int test_hashmap_insert_rollback(int, char*[])
 }
 
 
+// One bucket for all keys: every key but the first is a collision entry.
+class OneBucketCompFunc
+{
+public:
+  static bool equal(int k1, int k2)
+  {
+    return k1 == k2;
+  }
+
+  static uint32_t hash(int)
+  {
+    return 0;
+  }
+};
+
+
+typedef HashMap<int, int, OneBucketCompFunc> OneBucketMap;
+
+
+// Erases all keys, then inserts them again, as undo puts back what was taken
+// out; returns whether the inserts kept the table's capacity: no allocation.
+static bool restore_keeps_capacity(OneBucketMap& map, int num)
+{
+  for (int key = 0; key < num; ++key)
+    (void)map.erase(key);
+  csize const capacity = map.capacity();
+  bool same = true;
+  for (int key = num - 1; key >= 0; --key)
+  {
+    int value = key;
+    (void)map.insert(key, value);
+    same = same && map.capacity() == capacity;
+  }
+  return same && map.size() == static_cast<csize>(num);
+}
+
+
+// After reserve(n), an insert into a map of fewer than n entries does not
+// allocate, also after erases: an entry erased can be put back.
+int test_hashmap_reserve(int, char*[])
+{
+  int const num = 100;
+  bool ok = true;
+
+  // Without the reservation, the erases shrink the table, and the inserts
+  // grow it again.
+  OneBucketMap plain(8, false);
+  for (int key = 0; key < num; ++key)
+  {
+    int value = key;
+    (void)plain.insert(key, value);
+  }
+  if (restore_keeps_capacity(plain, num))
+  {
+    std::cerr << "without reserve(), the capacity did not change" << std::endl;
+    ok = false;
+  }
+
+  for (int reserved : { num, 2 * num })
+  {
+    OneBucketMap map(8, false);
+    for (int key = 0; key < num; ++key)
+    {
+      int value = key;
+      (void)map.insert(key, value);
+    }
+    map.reserve(static_cast<csize>(reserved));
+    if (!restore_keeps_capacity(map, num))
+    {
+      std::cerr << "after reserve(" << reserved << "), an insert grew the table"
+                << std::endl;
+      ok = false;
+    }
+  }
+  return ok ? 0 : 1;
+}
+
+
 typedef HashSet<FailingKey, FailingKeyCompFunc> FailingKeySet;
 
 enum SetInsertOverload { SET_INSERT, SET_INSERT_OUT, SET_INSERT_CONST_OUT };
