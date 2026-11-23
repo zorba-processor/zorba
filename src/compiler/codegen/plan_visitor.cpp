@@ -503,12 +503,14 @@ void end_visit(function_item_expr& v)
   // copy of the info, with its own iterators.
   bool const isForeign = (v.get_ccb() != theCCB);
 
-  FunctionItemInfo_t fnInfo = v.get_fi_info();
+  FunctionItemInfo_t foreignCopy;
   if (isForeign)
   {
-    fnInfo = new FunctionItemInfo(*fnInfo);
-    fnInfo->theInScopeVarIterators.clear();
+    foreignCopy = new FunctionItemInfo(*v.get_fi_info());
+    foreignCopy->theInScopeVarIterators.clear();
   }
+
+  FunctionItemInfo* fnInfo = (isForeign ? foreignCopy.getp() : v.get_fi_info());
 
   fnInfo->theCCB = theCCB;
   fnInfo->theLoc = qloc;
@@ -551,7 +553,7 @@ void end_visit(function_item_expr& v)
       fnInfo->theQName = coerced->getFunctionItemInfo()->theQName;
   }
 
-  push_itstack(new FunctionItemIterator(sctx, qloc, fnInfo.getp()));
+  push_itstack(new FunctionItemIterator(sctx, qloc, fnInfo));
 }
 
 

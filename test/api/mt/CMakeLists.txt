@@ -45,6 +45,9 @@ CREATE_TEST_SOURCELIST(MTTests
 )
 
 ZORBA_GENERATE_EXE(MTTests "${MTTests}" "" "" "")
+# mt_external_module loads a module shipped with Zorba (the file module):
+# zorbacmd depends on the core module libraries and their URI files.
+ADD_DEPENDENCIES(MTTests zorbacmd)
 
 SET (TestsToRun ${MTTests})
 LIST (FILTER TestsToRun EXCLUDE REGEX "(^|/)MTTests\\.cpp$")

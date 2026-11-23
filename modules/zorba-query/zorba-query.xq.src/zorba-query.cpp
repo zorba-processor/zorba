@@ -23,6 +23,26 @@ namespace zorba { namespace zorbaquery {
 /*******************************************************************************
 
 ********************************************************************************/
+zorba::ExternalFunction* ZorbaQueryModule::getExternalFunction(
+    const zorba::String& localName)
+{
+  FuncMap_t::const_iterator lIte = theFunctions.find(localName);
+  return lIte == theFunctions.end() ? nullptr : lIte->second.get();
+}
+    
+
+/*******************************************************************************
+  Invoked from static_context::~static_context()
+********************************************************************************/
+void ZorbaQueryModule::destroy() 
+{
+  delete this;
+}
+
+
+/*******************************************************************************
+
+********************************************************************************/
 ZorbaQueryModule::ZorbaQueryModule()
 {
   theFunctions["prepare-main-module"] = std::make_unique<PrepareMainModuleFunction>(this);
@@ -41,26 +61,6 @@ ZorbaQueryModule::ZorbaQueryModule()
   theFunctions["variable-value"] = std::make_unique<VariableValueFunction>(this);
   theFunctions["query-plan"] = std::make_unique<QueryPlanFunction>(this);
   theFunctions["load-from-query-plan"] = std::make_unique<LoadFromQueryPlanFunction>(this);
-}
-
-
-/*******************************************************************************
-
-********************************************************************************/
-zorba::ExternalFunction* ZorbaQueryModule::getExternalFunction(
-    const zorba::String& localName)
-{
-  FuncMap_t::const_iterator lIte = theFunctions.find(localName);
-  return lIte == theFunctions.end() ? nullptr : lIte->second.get();
-}
-    
-
-/*******************************************************************************
-  Invoked from static_context::~static_context()
-********************************************************************************/
-void ZorbaQueryModule::destroy() 
-{
-  delete this;
 }
 
 

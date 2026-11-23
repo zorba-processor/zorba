@@ -59,7 +59,8 @@ bool FunctionCache::ensureCacheValidity(PlanState& aPlanState)
     if (theSnapshotID != lCurrentSnapshot)
     {
       theSnapshotID = lCurrentSnapshot;
-      clear();
+      // The caller holds theMutex, which FunctionCache::clear() would lock again.
+      FunctionCacheBaseMap::clear();
       return false;
     }
   }
