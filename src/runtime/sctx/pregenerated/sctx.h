@@ -482,8 +482,8 @@ public:
 class SctxInScopeAttributeDeclarationsIteratorState : public PlanIteratorState
 {
 public:
-  unsigned ns_pos; //
-  unsigned elem_pos; //
+  std::vector<store::Item_t> theNames; //
+  csize thePosition; //
 
   SctxInScopeAttributeDeclarationsIteratorState();
 
@@ -528,8 +528,8 @@ public:
 class SctxInScopeAttributeGroupsIteratorState : public PlanIteratorState
 {
 public:
-  unsigned ns_pos; //
-  unsigned elem_pos; //
+  std::vector<store::Item_t> theNames; //
+  csize thePosition; //
 
   SctxInScopeAttributeGroupsIteratorState();
 
@@ -574,8 +574,8 @@ public:
 class SctxInScopeElementDeclarationsIteratorState : public PlanIteratorState
 {
 public:
-  unsigned ns_pos; //
-  unsigned elem_pos; //
+  std::vector<store::Item_t> theNames; //
+  csize thePosition; //
 
   SctxInScopeElementDeclarationsIteratorState();
 
@@ -620,8 +620,8 @@ public:
 class SctxInScopeElementGroupsIteratorState : public PlanIteratorState
 {
 public:
-  unsigned ns_pos; //
-  unsigned elem_pos; //
+  std::vector<store::Item_t> theNames; //
+  csize thePosition; //
 
   SctxInScopeElementGroupsIteratorState();
 
@@ -666,8 +666,8 @@ public:
 class SctxInScopeSchemaTypesIteratorState : public PlanIteratorState
 {
 public:
-  unsigned ns_pos; //
-  unsigned elem_pos; //
+  std::vector<store::Item_t> theNames; //
+  csize thePosition; //
 
   SctxInScopeSchemaTypesIteratorState();
 

@@ -174,8 +174,8 @@
     </zorba:signature>
   </zorba:function>
   <zorba:state generateReset="false">
-    <zorba:member type="unsigned" name="ns_pos"/>
-    <zorba:member type="unsigned" name="elem_pos"/>
+    <zorba:member type="std::vector&lt;store::Item_t&gt;" name="theNames"/>
+    <zorba:member type="csize" name="thePosition"/>
   </zorba:state>
 </zorba:iterator>
 
@@ -189,8 +189,8 @@
     </zorba:signature>
   </zorba:function>
   <zorba:state generateReset="false">
-    <zorba:member type="unsigned" name="ns_pos"/>
-    <zorba:member type="unsigned" name="elem_pos"/>
+    <zorba:member type="std::vector&lt;store::Item_t&gt;" name="theNames"/>
+    <zorba:member type="csize" name="thePosition"/>
   </zorba:state>
 </zorba:iterator>
 
@@ -204,8 +204,8 @@
     </zorba:signature>
   </zorba:function>
   <zorba:state generateReset="false">
-    <zorba:member type="unsigned" name="ns_pos"/>
-    <zorba:member type="unsigned" name="elem_pos"/>
+    <zorba:member type="std::vector&lt;store::Item_t&gt;" name="theNames"/>
+    <zorba:member type="csize" name="thePosition"/>
   </zorba:state>
 </zorba:iterator>
 
@@ -219,8 +219,8 @@
     </zorba:signature>
   </zorba:function>
   <zorba:state generateReset="false">
-    <zorba:member type="unsigned" name="ns_pos"/>
-    <zorba:member type="unsigned" name="elem_pos"/>
+    <zorba:member type="std::vector&lt;store::Item_t&gt;" name="theNames"/>
+    <zorba:member type="csize" name="thePosition"/>
   </zorba:state>
 </zorba:iterator>
 
@@ -234,8 +234,8 @@
     </zorba:signature>
   </zorba:function>
   <zorba:state generateReset="false">
-    <zorba:member type="unsigned" name="ns_pos"/>
-    <zorba:member type="unsigned" name="elem_pos"/>
+    <zorba:member type="std::vector&lt;store::Item_t&gt;" name="theNames"/>
+    <zorba:member type="csize" name="thePosition"/>
   </zorba:state>
 </zorba:iterator>
 
