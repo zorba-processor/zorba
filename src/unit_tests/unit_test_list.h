@@ -63,6 +63,7 @@ namespace UnitTests {
   int test_ordpath( int, char*[] );
   int test_parameters( int, char*[] );
   int test_profile_data( int, char*[] );
+  int test_root_type_names( int, char*[] );
   int test_security_policy( int, char*[] );
   int test_small_integers( int, char*[] );
   int test_string( int, char*[] );
