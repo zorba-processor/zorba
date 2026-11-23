@@ -50,20 +50,17 @@ namespace json {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-loader::stack_element::stack_element( type t ) :
-  type_( t ), skipped_( false ), read_( nullptr )
+loader::stack_element::stack_element( type t, contents *c ) :
+  type_( t ), contents_( c ), skipped_( false ), read_( nullptr )
 {
-  switch ( type_ ) {
-    case array_type:
-      array_ = new json_array_type;
-      break;
-    case object_type:
-      object_ = new json_object_type;
-      break;
-    default:
-      key_ = nullptr;
-      break;
-  }
+}
+
+// Empties v for reuse; a large one gives its memory back rather than keep it for the rest of the parse.
+static void release( vector<store::Item_t> &v ) {
+  if ( v.capacity() > 4096 )
+    vector<store::Item_t>().swap( v );
+  else
+    v.clear();
 }
 
 /**
@@ -75,10 +72,9 @@ loader::stack_element::stack_element( type t ) :
 void loader::stack_element::destroy() {
   switch ( type_ ) {
     case array_type:
-      delete array_;
-      break;
     case object_type:
-      delete object_;
+      release( contents_->keys_ );
+      release( contents_->values_ );
       break;
     case key_type:
       key_->removeReference();
@@ -118,7 +114,7 @@ void loader::add_value( store::Item_t const &value ) {
   switch ( top.type_ ) {
     case stack_element::array_type:
       if ( !check_only_ && !top.skipped_ && !top.read_ )
-        top.array_->push_back( value );
+        top.contents_->values_.push_back( value );
       break;
     case stack_element::object_type: {
       //
@@ -153,10 +149,10 @@ void loader::add_value( store::Item_t const &value ) {
       destroyer const destroy_top{ top };
       stack_element &top2 = stack_.top();
       assert( top2.type_ == stack_element::object_type );
-      top2.object_->keys_.push_back( top.key_ );
+      top2.contents_->keys_.push_back( top.key_ );
       // A value that is not read holds its key's place, for the duplicate check.
       if ( !check_only_ && !top2.skipped_ )
-        top2.object_->values_.push_back( top.skipped_ ? nullptr : value );
+        top2.contents_->values_.push_back( top.skipped_ ? nullptr : value );
       break;
     }
     default:
@@ -286,7 +282,7 @@ bool loader::building_value() const {
  * Removes the pairs whose value is not read, once the keys of all of them are
  * checked for duplicates as createJSONObject() checks them.
  */
-void loader::keep_read_pairs( json_object_type *o ) const {
+void loader::keep_read_pairs( contents *o ) const {
   check_duplicate_keys( o->keys_ );
   size_t n = 0;
   for ( size_t i = 0; i < o->values_.size(); ++i ) {
@@ -388,6 +384,20 @@ void loader::clear_stack() {
   }
 }
 
+loader::stack_element& loader::push( stack_element::type t ) {
+  contents *c = nullptr;
+  if ( t != stack_element::key_type ) {
+    size_t const i = stack_.size();
+    if ( scratch_.size() <= i )
+      scratch_.resize( i + 1 );
+    if ( !scratch_[i] )
+      scratch_[i] = std::make_unique<contents>();
+    c = scratch_[i].get();
+  }
+  stack_.push( stack_element( t, c ) );
+  return stack_.top();
+}
+
 bool loader::next( store::Item_t *result ) {
   store::Item_t item;
   zstring s;
@@ -449,16 +459,16 @@ bool loader::next( store::Item_t *result ) {
           switch ( top.type_ ) {
             case stack_element::array_type:
               if ( !check_only_ && !top.skipped_ )
-                GENV_ITEMFACTORY->createJSONArray( item, *top.array_ );
+                GENV_ITEMFACTORY->createJSONArray( item, top.contents_->values_ );
               break;
             case stack_element::object_type:
               if ( check_only_ || top.skipped_ )
-                check_duplicate_keys( top.object_->keys_ );
+                check_duplicate_keys( top.contents_->keys_ );
               else {
                 if ( top.read_ )
-                  keep_read_pairs( top.object_ );
+                  keep_read_pairs( top.contents_ );
                 GENV_ITEMFACTORY->createJSONObject(
-                  item, top.object_->keys_, top.object_->values_
+                  item, top.contents_->keys_, top.contents_->values_
                 );
               }
               break;
