@@ -564,6 +564,36 @@ xs_integer SimpleCollection::removeNodes(xs_integer position, xs_integer numNode
 
 
 /*******************************************************************************
+  Remove the last num trees, which must be nodes[0] to nodes[num - 1], with no
+  allocation: the undo of an insert at the end of the collection.
+********************************************************************************/
+void SimpleCollection::removeLastNodes(
+    const std::vector<store::Item_t>& nodes,
+    csize num)
+{
+  ZORBA_ASSERT_STORE_WRITE();
+  ZORBA_ASSERT(num <= theTrees.size() && num <= nodes.size());
+
+  csize first = theTrees.size() - num;
+
+  for (csize i = 0; i < num; ++i)
+  {
+    store::Item* item = theTrees[first + i].getp();
+
+    ZORBA_ASSERT(item == nodes[i].getp());
+    ZORBA_ASSERT(item->getCollection() == this);
+
+    static_cast<StructuredItem*>(item)->detachFromCollection();
+  }
+
+  theTrees.resize(first);
+
+  if (num > 0)
+    ++theVersion;
+}
+
+
+/*******************************************************************************
   Remove all the nodes from the collection
 ********************************************************************************/
 void SimpleCollection::removeAll()

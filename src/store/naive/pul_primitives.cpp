@@ -1119,30 +1119,7 @@ void UpdInsertIntoCollection::undo()
 
   assert(lColl);
 
-  uint64_t lastPos;
-  try 
-  {
-    lastPos = to_xs_unsignedLong(lColl->size()) - 1;
-  }
-  catch (std::range_error const&)
-  {
-    RAISE_ERROR(zerr::ZSTR0060_RANGE_EXCEPTION, theLoc,
-      ERROR_PARAMS(
-        lColl->size(),
-        ZED( ZSTR0060_ForCollection_3 ),
-        theName
-      )
-    );
-  }
-
-  for (long i = theNumApplied-1; i >= 0; --i)
-  {
-    xs_integer xs_lastPos( lastPos );
-    ZORBA_ASSERT(theNodes[i] == lColl->nodeAt(xs_lastPos));
-
-    lColl->removeNode(xs_lastPos);
-    --lastPos;
-  }
+  lColl->removeLastNodes(theNodes, theNumApplied);
 }
 
 
@@ -1215,30 +1192,7 @@ void UpdInsertLastIntoCollection::undo()
 
   assert(lColl);
 
-  uint64_t lastPos;
-  try 
-  {
-    lastPos = to_xs_unsignedLong(lColl->size()) - 1;
-  }
-  catch (std::range_error const&)
-  {
-    RAISE_ERROR(zerr::ZSTR0060_RANGE_EXCEPTION, theLoc,
-      ERROR_PARAMS(
-        lColl->size(),
-        ZED( ZSTR0060_ForCollection_3 ),
-        theName
-      )
-    );
-  }
-
-  for (long i = theNumApplied-1; i >= 0; --i)
-  {
-    xs_integer const xs_lastPos( lastPos );
-    ZORBA_ASSERT(theNodes[i] == lColl->nodeAt(xs_lastPos));
-
-    lColl->removeNode(xs_lastPos);
-    --lastPos;
-  }
+  lColl->removeLastNodes(theNodes, theNumApplied);
 }
 
 
