@@ -149,7 +149,7 @@ void ResultIteratorImpl::open()
     SYNC_CODE(
     if (!theHaveLock)
     {
-      GENV_STORE.getGlobalLock().rlock();
+      GENV_STORE.getGlobalLock().lock(theQuery->executionLockMode());
       theHaveLock = true;
     })
 
@@ -179,7 +179,7 @@ bool ResultIteratorImpl::next(Item& aItem)
     SYNC_CODE(
     if (!theHaveLock)
     {
-      GENV_STORE.getGlobalLock().rlock();
+      GENV_STORE.getGlobalLock().lock(theQuery->executionLockMode());
       theHaveLock = true;
     })
 
