@@ -1872,7 +1872,8 @@ static bool is_sequential_flwor_with_binding_sequences(flwor_expr* flwor)
   Whether the call needs only a prefix of its first argument and that argument is
   a loop: it may then stop early over a sequential loop, as over a loop with a call
   through a function item. A call of a sequential function as the argument still
-  runs to its end.
+  runs to its end. fn:boolean and fn:not (the effective boolean value) and
+  fn:zero-or-one read up to the second item, the one that makes them raise.
 ********************************************************************************/
 static bool stops_early_over_loop(const fo_expr* fo)
 {
@@ -1880,6 +1881,10 @@ static bool stops_early_over_loop(const fo_expr* fo)
   {
   case FunctionConsts::FN_HEAD_1:
   case FunctionConsts::FN_EXISTS_1:
+  case FunctionConsts::FN_EMPTY_1:
+  case FunctionConsts::FN_BOOLEAN_1:
+  case FunctionConsts::FN_NOT_1:
+  case FunctionConsts::FN_ZERO_OR_ONE_1:
   case FunctionConsts::FN_SUBSEQUENCE_2:
   case FunctionConsts::FN_SUBSEQUENCE_3:
   case FunctionConsts::OP_ZORBA_SEQUENCE_POINT_ACCESS_2:
