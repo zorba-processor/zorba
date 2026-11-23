@@ -91,6 +91,14 @@ var_expr::var_expr(
   theHasInitializer(false)
 {
   compute_scripting_kind();
+
+  theFreeVars.insert(this);
+
+  // A variable that can be set at any time, so that its value is never known
+  // at compile time (see MarkExprs). Set here, since a prolog variable is
+  // shared by the queries compiled against a static context that declares it.
+  if (k == prolog_var || k == local_var)
+    setUnfoldable(ANNOTATION_TRUE_FIXED);
 }
 
 
@@ -115,6 +123,9 @@ var_expr::var_expr(user_function* udf, const var_expr& source)
   theHasInitializer(source.theHasInitializer)
 {
   theUDF = udf;
+
+  theFreeVars.clear();
+  theFreeVars.insert(this);
 }
 
 

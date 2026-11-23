@@ -28,8 +28,12 @@ namespace zorba
 ********************************************************************************/
 class DataflowAnnotationsComputer 
 {
+  // The compilation whose expressions are annotated: a variable of another one
+  // is shared by every query that references it, and is left as it is.
+  CompilerCB * theCCB;
+
 public:
-  DataflowAnnotationsComputer() { }
+  explicit DataflowAnnotationsComputer(CompilerCB* ccb) : theCCB(ccb) { }
 
   ~DataflowAnnotationsComputer() { }
   
@@ -75,6 +79,10 @@ class SourceFinder
 protected:
   VarSourcesMap   theVarSourcesMap;
   UdfSourcesMap   theUdfSourcesMap;
+
+  // The compilation whose expressions are analyzed (of the first expression
+  // given to findNodeSources()).
+  CompilerCB    * theCCB = nullptr;
 
 protected:
   void findNodeSourcesRec(

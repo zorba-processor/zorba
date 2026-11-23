@@ -57,6 +57,9 @@ tgt->setProducesDistinctNodes(src->getProducesDistinctNodes())
 ********************************************************************************/
 void DataflowAnnotationsComputer::compute(expr* e)
 {
+  if (e->get_ccb() != theCCB)
+    return;
+
   switch(e->get_expr_kind())
   {
   case var_decl_expr_kind:
@@ -700,6 +703,9 @@ SourceFinder::~SourceFinder()
 ********************************************************************************/
 void SourceFinder::findNodeSources(expr* node, std::vector<expr*>& sources)
 {
+  if (theCCB == NULL)
+    theCCB = node->get_ccb();
+
   user_function* startingUdf = node->get_udf();
 
   findNodeSourcesRec(node, sources, startingUdf);
@@ -727,6 +733,12 @@ void SourceFinder::findNodeSourcesRec(
     std::vector<expr*>& sources,
     user_function* currentUdf)
 {
+  // An expression of another compilation (the prolog of a shared static
+  // context, its variables) copies the input nodes of its constructors (see
+  // XQueryCompiler::seal()).
+  if (node->get_ccb() != theCCB)
+    return;
+
   TypeManager* tm = node->get_type_manager();
   RootTypeManager& rtm = GENV_TYPESYSTEM;
 
@@ -877,7 +889,18 @@ void SourceFinder::findNodeSourcesRec(
 
       bool recursive = (currentUdf ? currentUdf->isMutuallyRecursiveWith(udf) : false);
 
-      if (recursive)
+      if (udf->getCCB() != theCCB)
+      {
+        // A udf of another compilation copies the input nodes of its
+        // constructors (see XQueryCompiler::seal()), but it may return nodes of
+        // its arguments.
+        csize numArgs = e->num_args();
+        for (csize i = 0; i < numArgs; ++i)
+        {
+          findNodeSourcesRec(e->get_arg(i), sources, currentUdf);
+        }
+      }
+      else if (recursive)
       {
         currentUdf->addRecursiveCall(e);
       }

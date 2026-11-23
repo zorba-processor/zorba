@@ -32,6 +32,7 @@
 
 #include "diagnostics/xquery_warning.h"
 #include "diagnostics/assert.h"
+#include "diagnostics/zorba_exception.h"
 
 #include "types/typeops.h"
 #include "zorbatypes/integer.h"
@@ -253,6 +254,7 @@ void user_function::setScriptingKind(unsigned short k)
 ********************************************************************************/
 void user_function::setBody(expr* body)
 {
+  assert(!theIsSealed);
   theBodyExpr = body;
   if (body)
     theTypeManager = body->get_sctx()->get_typemanager();
@@ -299,6 +301,7 @@ void user_function::addMutuallyRecursiveUDFs(
     const std::vector<user_function*>::const_iterator& cycle)
 {
   assert(theBodyExpr != NULL);
+  assert(!theIsSealed);
 
   theMutuallyRecursiveUDFs.insert(theMutuallyRecursiveUDFs.end(),
                                   cycle,
@@ -312,6 +315,7 @@ void user_function::addMutuallyRecursiveUDFs(
 void user_function::addRecursiveCall(fo_expr* call)
 {
   assert(theBodyExpr != NULL);
+  assert(!theIsSealed);
 
   if (std::find(theRecursiveCalls.begin(), theRecursiveCalls.end(), call) ==
       theRecursiveCalls.end())
@@ -481,6 +485,8 @@ void user_function::optimize()
   if (!theIsOptimized &&
       theCCB->theConfig.opt_level > CompilerCB::config::O0)
   {
+    assert(!theIsSealed);
+
     // Set the Optimized flag in advance to prevent an infinte loop (for
     // recursive functions, an optimization could be attempted again). A failed
     // optimization clears it, so that the next getPlan() optimizes again.
@@ -563,6 +569,12 @@ void user_function::invalidatePlan()
 ********************************************************************************/
 PlanIter_t user_function::getPlan(uint32_t& planStateSize,  ulong nextVarId)
 {
+  if (theSealError)
+    theSealError->polymorphic_throw();
+
+  // After its compilation is sealed, only a function that the compilation did
+  // not seal is generated here (one that fn:function-lookup creates at run
+  // time).
   if (thePlan == NULL)
   {
     ZORBA_ASSERT(theCCB);
@@ -593,6 +605,54 @@ PlanIter_t user_function::getPlan(uint32_t& planStateSize,  ulong nextVarId)
   planStateSize = thePlanStateSize;
 
   return thePlan;
+}
+
+
+/*******************************************************************************
+  Called by the compilation that owns this udf, after optimizing it: generates
+  its plan, or keeps the error that generating it raised for the calls to raise.
+  nextVarId is the one its calls pass to getPlan().
+********************************************************************************/
+void user_function::seal(ulong nextVarId)
+{
+  if (theIsSealed)
+    return;
+
+  if (!theSealError)
+  {
+    try
+    {
+      uint32_t planStateSize;
+      (void)getPlan(planStateSize, nextVarId);
+    }
+    catch (ZorbaException const& e)
+    {
+      setSealError(e);
+    }
+  }
+
+  theIsSealed = true;
+}
+
+
+void user_function::setSealError(const ZorbaException& error)
+{
+  assert(!theIsSealed);
+  theSealError = zorba::clone(error);
+}
+
+
+void user_function::setStaticError(const ZorbaException& error)
+{
+  assert(!theIsSealed);
+  theStaticError = zorba::clone(error);
+}
+
+
+void user_function::raiseStaticError() const
+{
+  if (theStaticError)
+    theStaticError->polymorphic_throw();
 }
 
 

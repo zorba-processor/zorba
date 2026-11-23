@@ -312,6 +312,9 @@ void expr::clear_annotations()
 {
   theFreeVars.clear();
 
+  if (get_expr_kind() == var_expr_kind)
+    theFreeVars.insert(static_cast<var_expr*>(this));
+
   if (getProducesSortedNodes() != ANNOTATION_TRUE_FIXED)
     setProducesSortedNodes(ANNOTATION_UNKNOWN);
 

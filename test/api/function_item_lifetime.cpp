@@ -442,10 +442,10 @@ void test_clone(Zorba* z)
   CHECK_EQ(to_string(lItems), "16");
 }
 
-// The functions declared by StaticContext::loadProlog() are compiled lazily,
-// by the queries that call them, with the ccb of the internal query that
-// loaded the prolog; compiling local:f here reports a warning (caching a
-// non-deterministic function) to that ccb's diagnostics.
+// The functions declared by StaticContext::loadProlog() are compiled by it,
+// with the ccb of the internal query that loaded the prolog; compiling local:g
+// reports a warning (caching a non-deterministic function) to that ccb's
+// diagnostics.
 void test_load_prolog_diagnostics(Zorba* z)
 {
   StaticContext_t lSctx = z->createStaticContext();

@@ -73,6 +73,8 @@ public:
 
   PlanIter_t codegen(expr* e, ulong& nextDynamicVarId, audit::ScopedRecord& ar);
 
+  void seal(expr* rootExpr);
+
 private:
   bool getLanguageMode(std::stringstream& s) const;
 

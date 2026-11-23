@@ -2150,6 +2150,46 @@
     </ReturnClause>
   </FLWORIterator>
 </iterator-tree>
+<iterator-tree description="raytracer:test-ray">
+  <FLWORIterator>
+    <LetVariable name="source" materialize="true">
+      <LetVarIterator varname="source"/>
+    </LetVariable>
+    <LetVariable name="direction" materialize="true">
+      <LetVarIterator varname="direction"/>
+    </LetVariable>
+    <ForVariable name="ignore">
+      <LetVarIterator varname="ignore"/>
+    </ForVariable>
+    <ForVariable name="$$context-item">
+      <ChildAxisIterator test-kind="match_name_test" qname="xs:QName(,,shapes)" typename="*" nill-allowed="false">
+        <LetVarIterator varname="scene"/>
+      </ChildAxisIterator>
+    </ForVariable>
+    <ForVariable name="$$context-item">
+      <ChildAxisIterator test-kind="match_name_test" qname="*" typename="*" nill-allowed="false">
+        <ForVarIterator varname="$$context-item"/>
+      </ChildAxisIterator>
+    </ForVariable>
+    <WhereClause>
+      <FnBooleanIterator>
+        <IsSameNodeIterator>
+          <ForVarIterator varname="$$context-item"/>
+          <ForVarIterator varname="ignore"/>
+        </IsSameNodeIterator>
+      </FnBooleanIterator>
+    </WhereClause>
+    <ReturnClause>
+      <UDFunctionCallIterator function="shapes:intersect">
+        <UDFunctionArgs>
+          <LetVarIterator varname="source"/>
+          <LetVarIterator varname="direction"/>
+          <ForVarIterator varname="$$context-item"/>
+        </UDFunctionArgs>
+      </UDFunctionCallIterator>
+    </ReturnClause>
+  </FLWORIterator>
+</iterator-tree>
 <iterator-tree description="vector:sum-internal">
   <FLWORIterator>
     <LetVariable name="v" materialize="true">
@@ -2206,46 +2246,6 @@
           </ReturnClause>
         </FLWORIterator>
       </IfThenElseIterator>
-    </ReturnClause>
-  </FLWORIterator>
-</iterator-tree>
-<iterator-tree description="raytracer:test-ray">
-  <FLWORIterator>
-    <LetVariable name="source" materialize="true">
-      <LetVarIterator varname="source"/>
-    </LetVariable>
-    <LetVariable name="direction" materialize="true">
-      <LetVarIterator varname="direction"/>
-    </LetVariable>
-    <ForVariable name="ignore">
-      <LetVarIterator varname="ignore"/>
-    </ForVariable>
-    <ForVariable name="$$context-item">
-      <ChildAxisIterator test-kind="match_name_test" qname="xs:QName(,,shapes)" typename="*" nill-allowed="false">
-        <LetVarIterator varname="scene"/>
-      </ChildAxisIterator>
-    </ForVariable>
-    <ForVariable name="$$context-item">
-      <ChildAxisIterator test-kind="match_name_test" qname="*" typename="*" nill-allowed="false">
-        <ForVarIterator varname="$$context-item"/>
-      </ChildAxisIterator>
-    </ForVariable>
-    <WhereClause>
-      <FnBooleanIterator>
-        <IsSameNodeIterator>
-          <ForVarIterator varname="$$context-item"/>
-          <ForVarIterator varname="ignore"/>
-        </IsSameNodeIterator>
-      </FnBooleanIterator>
-    </WhereClause>
-    <ReturnClause>
-      <UDFunctionCallIterator function="shapes:intersect">
-        <UDFunctionArgs>
-          <LetVarIterator varname="source"/>
-          <LetVarIterator varname="direction"/>
-          <ForVarIterator varname="$$context-item"/>
-        </UDFunctionArgs>
-      </UDFunctionCallIterator>
     </ReturnClause>
   </FLWORIterator>
 </iterator-tree>
