@@ -66,7 +66,9 @@ FOREACH (_var APITEST_QUERY APITEST_EXPECTED_FILEPATH)
     IF (_content MATCHES "\\$HTTP_TEST_SERVER")
       STRING (REPLACE "$HTTP_TEST_SERVER" "${ZORBA_HTTP_TEST_SERVER}" _content "${_content}")
       GET_FILENAME_COMPONENT (_name "${${_var}}" NAME)
-      SET (_expanded "${APITEST_OUT_DIRPATH}/expanded-${_name}")
+      # Named after the test: the .json and .xml tests of a query run in
+      # parallel, and must not rewrite the file the other one is reading.
+      SET (_expanded "${APITEST_RESULT_FILEPATH}.expanded-${_name}")
       FILE (WRITE "${_expanded}" "${_content}")
       SET (${_var} "${_expanded}")
     ENDIF ()
@@ -108,5 +110,8 @@ IF (("${EXIT_CODE}" STREQUAL "0") OR (${APITEST_SPEC_CONTENTS} MATCHES "Error:")
               
   MESSAGE(STATUS ${out_var})
 ELSE (("${EXIT_CODE}" STREQUAL "0") OR (${APITEST_SPEC_CONTENTS} MATCHES "Error:"))
-  MESSAGE(STATUS "Profile generation failed. Exit code: ${EXIT_CODE}.")
+  INCLUDE ("${CMAKE_CURRENT_LIST_DIR}/report_failure.cmake")
+  REPORT_FAILURE ("Profile generation" "${EXIT_CODE}" "${APITEST_RESULT_FILEPATH}.err"
+    ${NATIVE_ZORBA_EXE} --profile ${FORMAT} --no-tree-ids --no-serializer
+    ${APITEST_ARGS_LIST} ${APITEST_QUERY})
 ENDIF (("${EXIT_CODE}" STREQUAL "0") OR (${APITEST_SPEC_CONTENTS} MATCHES "Error:"))
