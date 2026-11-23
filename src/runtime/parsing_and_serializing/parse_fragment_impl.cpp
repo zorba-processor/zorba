@@ -233,6 +233,8 @@ bool FnZorbaParseXmlFragmentIterator::nextImpl(
     state->theProperties.setUseCachedDocument(false);
     processOptions(tempItem, state->theProperties, theSctx, loc);
     state->theProperties.setCreateDocParentLink(false);
+    // A string is already decoded: its encoding declaration does not apply.
+    state->theProperties.setIgnoreDeclaredEncoding(true);
     state->theProperties.setSecurityPolicy(theSctx->get_security_policy());
 
     // baseURI serves both as the base URI used by the XML parser
@@ -581,6 +583,9 @@ bool FnParseXmlFragmentIterator::nextImpl(
     state->theProperties.setBaseUri(theSctx->get_base_uri());
     state->theProperties.setParseExternalParsedEntity(true);
     state->theProperties.setStoreDocument(false);
+    // A string is already decoded (F&O 3.1, 14.7.2): its encoding
+    // declaration does not apply.
+    state->theProperties.setIgnoreDeclaredEncoding(true);
     state->theProperties.setSecurityPolicy(theSctx->get_security_policy());
 
     state->baseUri = state->theProperties.getBaseUri();    

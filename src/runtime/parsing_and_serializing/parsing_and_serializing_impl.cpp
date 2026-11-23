@@ -90,6 +90,9 @@ bool FnParseXmlIterator::nextImpl(store::Item_t& result, PlanState& planState) c
       store::LoadProperties loadProps;
       loadProps.setStoreDocument(false);
       loadProps.setUseCachedDocument(false);
+      // A string is already decoded (F&O 3.1, 14.7.1): its encoding
+      // declaration does not apply.
+      loadProps.setIgnoreDeclaredEncoding(true);
       loadProps.setSecurityPolicy(theSctx->get_security_policy());
       result = lStore.loadDocument(baseUri, docUri, *is, loadProps);
     }

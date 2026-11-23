@@ -1,7 +1,7 @@
 (: An end tag at the top level of a fragment is not well balanced, whatever its
    name; the error is at the end of that tag, not where the input ends. An
    element left open is reported where the input ends, counted in the
-   characters that the declared encoding makes of the input. :)
+   characters of the string: its encoding declaration does not apply. :)
 declare namespace zerr = "http://zorba.io/errors";
 declare namespace err = "http://www.w3.org/2005/xqt-errors";
 
