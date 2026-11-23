@@ -362,6 +362,54 @@ static bool flwor_evaluates_var(const flwor_expr* flwor, csize first, const var_
 }
 
 
+/******************************************************************************
+  True if e has a dynamic function call with arguments whose function depends
+  on var.
+*******************************************************************************/
+static bool calls_function_of_var(const expr* e, const var_expr* var)
+{
+  if (e->get_expr_kind() == dynamic_function_invocation_expr_kind)
+  {
+    const dynamic_function_invocation_expr* call =
+    static_cast<const dynamic_function_invocation_expr*>(e);
+
+    if (!call->get_args().empty() && call->get_input()->contains_expr(var))
+      return true;
+  }
+
+  ExprConstIterator iter(e);
+
+  while (!iter.done())
+  {
+    if (calls_function_of_var(iter.get_expr(), var))
+      return true;
+
+    iter.next();
+  }
+
+  return false;
+}
+
+
+/******************************************************************************
+  True if e gives the empty sequence when var is the empty sequence. A dynamic
+  call with arguments raises XPTY0004 for an empty function, though its type
+  is then the empty sequence.
+*******************************************************************************/
+static bool is_empty_for_empty_var(const expr* e, const var_expr* var)
+{
+  if (calls_function_of_var(e, var))
+    return false;
+
+  xqtref_t type = e->get_return_type_with_empty_input(var);
+
+  return TypeOps::is_equal(e->get_type_manager(),
+                           *type,
+                           *GENV_TYPESYSTEM.EMPTY_TYPE,
+                           e->get_loc());
+}
+
+
 ////////////////////////////////////////////////////////////////////////////////
 //                                                                            //
 //  SubstVars                                                                 //
@@ -932,13 +980,7 @@ bool EliminateUnusedLetVars::safe_to_fold_var(csize varPos, int& numRefs)
     }
     else
     {
-      expr* retExpr = theFlwor->get_return_expr();
-      xqtref_t type = retExpr->get_return_type_with_empty_input(var);
-        
-      return TypeOps::is_equal(theFlwor->get_type_manager(),
-                               *type,
-                               *GENV_TYPESYSTEM.EMPTY_TYPE,
-                               retExpr->get_loc());
+      return is_empty_for_empty_var(theFlwor->get_return_expr(), var);
     }
   }
 
@@ -1002,8 +1044,6 @@ bool EliminateUnusedLetVars::safe_to_fold_var_rec(
     bool isSafeVar,
     int& numRefs)
 {
-  TypeManager* tm = theFlwor->get_type_manager();
-
   switch (node->get_expr_kind())
   {
   case flwor_expr_kind:
@@ -1228,12 +1268,8 @@ bool EliminateUnusedLetVars::safe_to_fold_var_rec(
         // empty sequence. We can fold only if doing so will cause the result
         // of the flwor expr to be the empty sequence in the case where the
         // domain expr will indeed be equal to the empty sequence.
-        xqtref_t type = retExpr->get_return_type_with_empty_input(var);
-        
-        if (!TypeOps::is_equal(tm, *type, *GENV_TYPESYSTEM.EMPTY_TYPE, retExpr->get_loc()))
-        {
+        if (!is_empty_for_empty_var(retExpr, var))
           return false;
-        }
       }
     }
 

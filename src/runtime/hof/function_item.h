@@ -288,6 +288,13 @@ public:
   // dropped to remaining (> 0).
   void referenceDropped(long remaining);
 
+  bool refersToDetached() const;
+
+#ifndef ZORBA_FOR_ONE_THREAD_ONLY
+  // Called by store::Item::removeReference() instead, if refersToDetached().
+  void removeDetachedReference();
+#endif
+
   bool isInline() const { return theFunctionItemInfo->theIsInline; }
   
   bool isCoercion() const { return theFunctionItemInfo->theIsCoercion; }
@@ -326,8 +333,6 @@ public:
   zstring show() const;
 
 private:
-  bool refersToDetached() const;
-
   void collectCycles();
 };
 

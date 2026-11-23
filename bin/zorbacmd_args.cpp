@@ -254,8 +254,8 @@ char const* get_help_msg() {
     HELP_OPT( "--omit-xml-declaration, -r" )
       "Omit the XML declaration from the result.\n\n"
 
-    HELP_OPT( "--optimization-level, -O {0|1|2}>" )
-      "Optimization level for the query compiler, default: 1.\n\n"
+    HELP_OPT( "--optimization-level, -O {0|1|2|O0|O1|O2}" )
+      "Optimization level for the query compiler, default: 1. O0, O1 and O2 are the same as 0, 1 and 2. Any other value is an error.\n\n"
 
     HELP_OPT( "--option <option>=<value>" )
       "Set an XQuery option in the static context. The QName of the option is passed as a string in the notation by James Clark (i.e. {namespace}localname). For example, --option {http://zorba.io/}option=value\n\n"
@@ -438,6 +438,16 @@ static bool bool_of( char const *s ) {
     return false;
   cerr << '"' << s << "\": invalid boolean value" << endl;
   exit( 1 );
+}
+
+// Parses an optimization level: 0, 1 or 2, optionally preceded by "O".
+static bool parse_optimization_level( char const *s, unsigned *result ) {
+  if ( *s == 'O' )
+    ++s;
+  if ( s[0] < '0' || s[0] > '2' || s[1] )
+    return false;
+  *result = static_cast<unsigned>( s[0] - '0' );
+  return true;
 }
 
 // Parses a comma-separated list of capability names (see --secure) into
@@ -789,10 +799,9 @@ int parse_args( int argc, char const *argv[] ) {
       zc_props.omit_xml_declaration_ = true;
     else if ( IS_OPT( "--optimization-level", "-O" ) ) {
       PARSE_ARG( "--optimization-level" );
-      unsigned opt_level = 0;
-      atoi( ARG_VAL, &opt_level );
-      if ( opt_level > 2 ) {
-        error = "Only 0, 1 and 2 are allowed as values for --optimization-level";
+      unsigned opt_level;
+      if ( !parse_optimization_level( ARG_VAL, &opt_level ) ) {
+        error = "Only 0, 1, 2, O0, O1 and O2 are allowed as values for --optimization-level";
         break;
       }
       z_props.setOptimizationLevel( opt_level );
