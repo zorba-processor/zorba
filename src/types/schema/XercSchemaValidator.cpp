@@ -49,6 +49,7 @@
 
 
 #include "diagnostics/assert.h"
+#include "zorbautils/mutex.h"
 #include "StrX.h"
 #include "XercSchemaValidator.h"
 
@@ -59,6 +60,50 @@
 
 namespace zorba
 {
+
+#ifndef ZORBA_FOR_ONE_THREAD_ONLY
+namespace
+{
+
+// Whether validating with dv writes into the grammar: a ListDatatypeValidator
+// keeps the value it validates (setContent) in itself and compares it with its
+// enumeration from there, and a pattern facet's regular expression builds the
+// map of each character range (RangeToken::createMap) when it first matches.
+bool writesSharedState(const DatatypeValidator* dv)
+{
+  for (; dv != NULL; dv = dv->getBaseValidator())
+  {
+    if (dv->getType() == DatatypeValidator::List)
+      return true;
+
+    const RefHashTableOf<KVStringPair>* facets = dv->getFacets();
+    if (facets != NULL && facets->containsKey(SchemaSymbols::fgELT_PATTERN))
+      return true;
+
+    if (dv->getType() == DatatypeValidator::Union)
+    {
+      const RefVectorOf<DatatypeValidator>* members =
+        static_cast<const UnionDatatypeValidator*>(dv)->getMemberTypeValidators();
+
+      for (XMLSize_t i = 0; members != NULL && i < members->size(); ++i)
+      {
+        if (writesSharedState(members->elementAt(i)))
+          return true;
+      }
+    }
+  }
+  return false;
+}
+
+} // namespace
+
+
+Mutex* sharedValidatorMutex(const DatatypeValidator* dv)
+{
+  static Mutex theMutex;
+  return writesSharedState(dv) ? &theMutex : NULL;
+}
+#endif
 
 #if _XERCES_VERSION >= 30000
 // Too many changes split it in two
@@ -291,6 +336,7 @@ bool XercSchemaValidator::checkContent (XMLElementDecl* const elemDecl
                     if ((!fErrorOccurred) && value)
                     {
                         try {
+                            SYNC_CODE(AutoMutex validatorLock(sharedValidatorMutex(fCurrentDatatypeValidator));)
                             fCurrentDatatypeValidator->validate(value, getScanner()->getValidationContext(), fMemoryManager);
                             if (validateCanonical) {
                                 XMLCh* canonical = (XMLCh*) fCurrentDatatypeValidator->getCanonicalRepresentation(value, fMemoryManager);
@@ -444,6 +490,7 @@ void XercSchemaValidator::validateAttrValue (const XMLAttDef*      attDef
         DatatypeValidator::ValidatorType attDefDVType = attDefDV->getType();
         ValidationContext *context = getScanner()->getValidationContext();
         try {
+            SYNC_CODE(AutoMutex validatorLock(sharedValidatorMutex(attDefDV));)
 
             // first, if notation, need to bind URI to notation first
             if (attDefDVType == DatatypeValidator::NOTATION)

@@ -24,6 +24,9 @@
 #include <xercesc/validators/schema/SchemaGrammar.hpp>
 #include <xercesc/validators/schema/XSDErrorReporter.hpp>
 
+#include "common/common.h"
+#include "zorbautils/mutex.h"
+
 // TODO remove
 using namespace XERCES_CPP_NAMESPACE;
 
@@ -44,6 +47,12 @@ class ContentSpecNode;
 
 namespace zorba
 {
+
+#ifndef ZORBA_FOR_ONE_THREAD_ONLY
+// The mutex a validation with dv holds, null if validating with dv writes
+// nothing into the grammar, which validations on several threads share.
+Mutex* sharedValidatorMutex(const XERCES_CPP_NAMESPACE::DatatypeValidator* dv);
+#endif
 
 //
 //  This is a derivative of the abstract validator interface. This class

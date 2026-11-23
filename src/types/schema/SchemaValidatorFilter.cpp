@@ -36,6 +36,7 @@
 #include "diagnostics/xquery_diagnostics.h"
 #include "zorbatypes/xerces_xmlcharray.h"
 #include "util/string_util.h"
+#include "zorbautils/mutex.h"
 
 #include "types/schema/XercSchemaValidator.h"
 
@@ -816,21 +817,28 @@ void SchemaValidatorFilter::endElementEvent(
 
     if(res >= 0)
     {
+      // Xerces formats the content model on first use into the grammar, which
+      // validations on several threads share.
+      const XMLCh* contentModel;
+      {
+        SYNC_CODE(static Mutex theFormatMutex;)
+        SYNC_CODE(AutoMutex formatLock(&theFormatMutex);)
+        contentModel = topElem->fThisElement->getFormattedContentModel();
+      }
+
       if(!topElem->fChildCount)
       {
-        fValidator->emitError(XMLValid::EmptyNotValidForContent,
-                              topElem->fThisElement->getFormattedContentModel());
+        fValidator->emitError(XMLValid::EmptyNotValidForContent, contentModel);
       }
       else if((unsigned int)res >= topElem->fChildCount)
       {
-        fValidator->emitError(XMLValid::NotEnoughElemsForCM,
-                              topElem->fThisElement->getFormattedContentModel());
+        fValidator->emitError(XMLValid::NotEnoughElemsForCM, contentModel);
       }
       else
       {
         fValidator->emitError(XMLValid::ElementNotValidForContent,
                               topElem->fChildren[res]->getRawName(),
-                              topElem->fThisElement->getFormattedContentModel());
+                              contentModel);
       }
     }
 
