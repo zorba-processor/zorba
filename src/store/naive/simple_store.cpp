@@ -272,6 +272,12 @@ store::Collection_t SimpleStore::createCollection(
 ********************************************************************************/
 bool SimpleStore::getNodeReference(store::Item_t& result, const store::Item* node)
 {
+  using namespace zorba::simplestore::json;
+
+  if (node->isJSONItem() &&
+      !static_cast<const JSONItem*>(node)->isCollectionRoot())
+    throw ZORBA_EXCEPTION(zerr::ZAPI0080_CANNOT_RETRIEVE_REFERENCE);
+
   zstring id;
   {
     SYNC_CODE(AutoMutex lock(&theReferencesMutex);)
@@ -314,29 +320,14 @@ bool SimpleStore::hasReference(const store::Item* node)
 
 bool SimpleStore::hasReferenceLocked(const store::Item* node)
 {
-  using namespace zorba::simplestore::json;
-
-  bool hasReference = false;
   if (node->isNode())
-  {
-    const XmlNode* x = static_cast<const XmlNode*>(node);
-    hasReference = x->haveReference();
-  }
-  else
-  {
-    assert(node->isJSONItem());
-    JSONItem* j = const_cast<JSONItem*>(static_cast<const JSONItem*>(node));
+    return static_cast<const XmlNode*>(node)->haveReference();
 
-    // only root nodes in a collection can have a reference
-    if (j->isCollectionRoot())
-    {
-      ItemRefMap::iterator iter = theNodeToReferencesMap.find(node);
+  assert(node->isJSONItem());
 
-      hasReference = (iter != theNodeToReferencesMap.end());
-    }
-  }
-
-  return hasReference;
+  // Also once the item has left its collection, so that freeing it
+  // unregisters the reference.
+  return theNodeToReferencesMap.find(node) != theNodeToReferencesMap.end();
 }
 
 
