@@ -33,6 +33,7 @@
 #include <zorba/zorba.h>
 #include <zorba/security.h>
 #include "test_security_policy.h"
+#include "test_optimization_level.h"
 #include <zorba/diagnostic_handler.h>
 #include <zorba/zorba_exception.h>
 #include <zorba/zorba_string.h>
@@ -77,15 +78,9 @@ Zorba_CompilerHints getCompilerHints()
 {
   Zorba_CompilerHints lHints;
 
-  // ZORBA_OPTLEVEL=O0 | O1
-  char* lOptLevel = getenv("ZORBA_OPTLEVEL");
-  if ( lOptLevel != NULL && strcmp(lOptLevel, "O0") == 0 ) {
-    lHints.opt_level = ZORBA_OPT_LEVEL_O0;
-    std::cout << "testdriver is using optimization level O0" << std::endl;
-  } else {
-    lHints.opt_level = ZORBA_OPT_LEVEL_O1;
-    std::cout << "testdriver is using optimization level O1" << std::endl;
-  }
+  lHints.opt_level = zorba_test::testOptimizationLevel();
+  std::cout << "testdriver is using optimization level "
+            << zorba_test::optimizationLevelName(lHints.opt_level) << std::endl;
   return lHints; 
 }
 
@@ -227,6 +222,9 @@ main(int argc, char** argv)
     std::cout << "\nusage:   testdriver [testfile]" << std::endl;
     return 1;
   }
+
+  // An invalid ZORBA_OPTLEVEL fails before any file is written.
+  zorba_test::testOptimizationLevel();
 
   zorba::Zorba* engine = zorba::Zorba::getInstance(zorba::StoreManager::getStore());
 

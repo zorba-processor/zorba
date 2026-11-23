@@ -37,7 +37,6 @@ ZorbaCmdProperties::ZorbaCmdProperties() {
   no_logo_ = false;
   no_serializer_ = false;
   omit_xml_declaration_ = false;
-  optimization_level_ = 1;
   parse_only_ = false;
   print_errors_as_xml_ = false;
   print_query_ = false;
