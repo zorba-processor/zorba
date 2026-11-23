@@ -4203,10 +4203,13 @@ void test_fold_left_out_of_memory( Fixture const &f ) {
     "fold-left((1, 2, 3), 0, function($a, $b) { $a + $b })",
     "6", "fold-left" );
 }
-// The first dynamic call of local:g optimizes its body, with each allocation
-// failing in turn; when that optimization fails, the next run of the same
-// compiled query must optimize the body again (seen in the trees printed after
-// optimization) and give the answer.
+// local:g has no static call. The compilation optimizes its body and generates
+// its plan (sealed compilation: the run only reads them), so each allocation of
+// the compilation fails in turn: compileQuery() either fails, and leaves nothing
+// behind that a new compilation of the same query would see, or succeeds with a
+// query that gives the answer. A new compilation after a failure optimizes
+// local:g again (seen in the trees printed after optimization) and gives the
+// answer; no run optimizes it.
 void test_optimize_after_failure( Fixture const &f ) {
 #if defined(__linux__)
   std::ostringstream trees;
@@ -4214,59 +4217,75 @@ void test_optimize_after_failure( Fixture const &f ) {
   props.setPrintOptimized( true );
   props.setDebugStream( trees );
   std::string const optimized( "after optimization for local:g" );
-  auto run = [&]( XQuery_t const &query, long n ) -> std::string {
-    Iterator_t const it( query->iterator() );
-    it->open();
-    inject_arm( n, 1 );
+  std::string const text(
+    "declare function local:g($x) { $x * 2 };\n"
+    "let $fs := (local:g#1, local:g#1)\n"
+    "for $i in 1 to 2 return $fs[$i]($i)" );
+  auto run = [&]( XQuery_t const &query ) -> std::string {
     std::string out;
     try {
+      Iterator_t const it( query->iterator() );
+      it->open();
       Item item;
       while ( it->next( item ) )
         out += ( out.empty() ? "" : " " ) + item.getStringValue().str();
+      it->close();
     }
     catch ( std::exception const& ) {
       out = "error";
     }
-    inject_disarm();
-    it->close();
     return out;
   };
-  auto compile = [&]() {
-    XQuery_t query( f.zorba->compileQuery(
-      "declare function local:g($x) { $x * 2 };\n"
-      "let $fs := (local:g#1, local:g#1)\n"
-      "for $i in 1 to 2 return $fs[$i]($i)" ) );
+  // The compilation with allocation n failing (0: none); NULL if it failed.
+  auto compile = [&]( long n ) -> XQuery_t {
     trees.str( "" );
+    inject_arm( n, 1 );
+    XQuery_t query;
+    try {
+      query = f.zorba->compileQuery( text );
+    }
+    catch ( std::exception const& ) {
+    }
+    inject_disarm();
     return query;
   };
   long total = 0;
   {
-    XQuery_t const query( compile() );
-    check( run( query, 0 ) == "2 4", "the query: the answer" );
+    XQuery_t const query( compile( 0 ) );
     total = inject_count.load();
-    check( trees.str().find( optimized ) != std::string::npos,
-           "the first dynamic call optimizes local:g", trees.str() );
+    check( query && trees.str().find( optimized ) != std::string::npos,
+           "the compilation optimizes local:g", trees.str() );
+    trees.str( "" );
+    check( query && run( query ) == "2 4", "the query: the answer" );
+    check( trees.str().find( optimized ) == std::string::npos,
+           "the run does not optimize local:g", trees.str() );
   }
   long failed = 0, wrong = 0;
   for ( long n = 1; n <= total; ++n ) {
-    XQuery_t const query( compile() );
-    if ( run( query, n ) != "error" ||
-         trees.str().find( optimized ) != std::string::npos )
-      continue;
-    ++failed;
-    std::string const got( run( query, 0 ) );
-    if ( ( got != "2 4" || trees.str().find( optimized ) == std::string::npos )
-         && ++wrong <= 3 )
-      std::cout << "after a failure at " << n << ": " << got
-                << ( trees.str().find( optimized ) == std::string::npos
-                     ? ", local:g not optimized" : "" ) << std::endl;
+    std::string got;
+    XQuery_t const failing( compile( n ) );
+    if ( failing ) {
+      got = run( failing );
+      if ( got == "2 4" )
+        continue;
+    } else {
+      ++failed;
+      XQuery_t const query( compile( 0 ) );
+      bool const reoptimized = trees.str().find( optimized ) != std::string::npos;
+      got = query ? run( query ) : "compilation failed";
+      if ( got == "2 4" && reoptimized )
+        continue;
+      if ( !reoptimized )
+        got += ", local:g not optimized";
+    }
+    if ( ++wrong <= 3 )
+      std::cout << "after a failure at " << n << ": " << got << std::endl;
   }
   props.setDebugStream( std::cout );
   props.setPrintOptimized( false );
-  check( failed > 0, "runs that fail before local:g is optimized",
-         std::to_string( failed ) );
-  check( wrong == 0, "the run after a failure optimizes local:g",
-         std::to_string( wrong ) + " points" );
+  check( failed > 0, "compilations that fail", std::to_string( failed ) );
+  check( wrong == 0, "after a failure, the compiled or the next compiled query "
+         "gives the answer", std::to_string( wrong ) + " points" );
 #else
   (void)f;
 #endif
