@@ -853,6 +853,15 @@ void XmlNode::removeType(UpdatePrimitive& upd)
         break;
       }
 
+      // What can fail comes first: a node changed is a node recorded for undo.
+      TextNode* textChild;
+      bool const typedText = n->haveTypedTypedValue(textChild);
+      zstring textValue;
+      if (typedText)
+        textChild->getStringValue2(textValue);
+
+      undoList.resize(++undoSize);
+
 #ifdef EMBEDED_TYPE
       tinfo.theTypeName.transfer(n->theTypeName);
       n->theTypeName = GET_STORE().XS_ANY_QNAME;
@@ -863,13 +872,8 @@ void XmlNode::removeType(UpdatePrimitive& upd)
 #endif
       tinfo.theFlags = n->theFlags;
 
-      TextNode* textChild;
-
-      if (n->haveTypedTypedValue(textChild))
+      if (typedText)
       {
-        zstring textValue;
-        textChild->getStringValue2(textValue);
-
         tinfo.theChildFlags = textChild->theFlags;
         tinfo.theTextContent.setValue(textChild->theContent.releaseValue());
 
@@ -877,7 +881,6 @@ void XmlNode::removeType(UpdatePrimitive& upd)
         textChild->setText(textValue);
       }
 
-      undoList.resize(++undoSize);
       undoList[undoSize - 1].transfer(tinfo);
 
       n->setHaveTypedValue();
@@ -898,6 +901,8 @@ void XmlNode::removeType(UpdatePrimitive& upd)
       }
       else
       {
+        undoList.resize(++undoSize);
+
 #ifdef EMBEDED_TYPE
         tinfo.theTypeName.transfer(n->theTypeName);
         n->theTypeName = GET_STORE().theSchemaTypeNames[store::XS_UNTYPED_ATOMIC];
@@ -911,7 +916,6 @@ void XmlNode::removeType(UpdatePrimitive& upd)
 
         tinfo.theFlags = n->theFlags;
 
-        undoList.resize(++undoSize);
         undoList[undoSize - 1].transfer(tinfo);
 
         n->resetHaveListValue();
@@ -1171,15 +1175,16 @@ void XmlNode::insertSiblingsAfter(UpdInsertChildren& upd)
 ********************************************************************************/
 void InternalNode::undoInsertChildren(UpdInsertChildren& upd)
 {
-  if (upd.theNumApplied == 0)
-    return;
+  if (upd.theNumApplied > 0)
+  {
+    csize pos = findChild(BASE_NODE(upd.theNewChildren[0]));
 
-  csize pos = findChild(BASE_NODE(upd.theNewChildren[0]));
+    ZORBA_FATAL(pos < numChildren(), "");
 
-  ZORBA_FATAL(pos < numChildren(), "");
+    undoAttaches(upd, upd.theNumApplied);
+  }
 
-  undoAttaches(upd, upd.theNumApplied);
-
+  // The type is removed before the first child is attached.
   restoreType(upd.theTypeUndoList);
 }
 
@@ -1240,15 +1245,17 @@ void ElementNode::insertAttributes(UpdInsertAttributes& upd)
 
 void ElementNode::undoInsertAttributes(UpdInsertAttributes& upd)
 {
-  if (upd.theNumApplied == 0)
-    return;
+  if (upd.theNumApplied > 0)
+  {
+    csize pos = findAttr(BASE_NODE(upd.theNewAttrs[0]));
 
-  csize pos = findAttr(BASE_NODE(upd.theNewAttrs[0]));
+    ZORBA_FATAL(pos < numAttrs(), "");
 
-  ZORBA_FATAL(pos < numAttrs(), "");
+    undoAttaches(upd, upd.theNumApplied);
+  }
 
-  undoAttaches(upd, upd.theNumApplied);
-
+  // The type is removed, and a binding can be added, before the first
+  // attribute is attached.
   csize numBindings = upd.theNewBindings.size();
   for (csize i = 0; i < numBindings; ++i)
   {
@@ -1483,12 +1490,30 @@ void InternalNode::restoreChild(UpdReplaceChild& upd)
 ********************************************************************************/
 void ElementNode::replaceContent(UpdReplaceElemContent& upd)
 {
+  // The list of the old children, and room for the new child, are made before
+  // the old children are taken out. theNodes keeps its capacity, so a failure
+  // after that puts the old children back without allocating.
   upd.theOldChildren.insert(upd.theOldChildren.begin(),
                             childrenBegin(),
                             childrenEnd());
 
+  theNodes.reserve(theNumAttrs + 1);
   theNodes.resize(theNumAttrs);
 
+  try
+  {
+    replaceChildrenWithText(upd);
+  }
+  catch (...)
+  {
+    restoreContent(upd);
+    throw;
+  }
+}
+
+
+void ElementNode::replaceChildrenWithText(UpdReplaceElemContent& upd)
+{
   if (upd.theNewChild == NULL || upd.theNewChild->getStringValue().empty())
     return;
 

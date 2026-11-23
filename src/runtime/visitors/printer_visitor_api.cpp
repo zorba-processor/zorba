@@ -16,6 +16,7 @@
 
 #include "runtime/visitors/printer_visitor_api.h"
 #include "runtime/visitors/printer_visitor.h"
+#include "store/api/item.h"
 
 namespace zorba {
 
@@ -27,6 +28,20 @@ void print_iter_plan( IterPrinter &p, PlanIterator *i, PlanState *s ) {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+
+std::string plan_function_name( store::Item const *name ) {
+  static std::string const lInlinePrefix( "inline-function(" );
+  std::string lName( name->getStringValue().str() );
+
+  if ( name->getNamespace().empty() &&
+       name->getLocalName().str().compare( 0, lInlinePrefix.size(), lInlinePrefix ) == 0 ) {
+    std::string::size_type const lSeparator = lName.find_last_of( "/\\" );
+    if ( lSeparator != std::string::npos )
+      lName = lInlinePrefix + lName.substr( lSeparator + 1 );
+  }
+  return lName;
+}
+
 
 } // namespace zorba
 /* vim:set et sw=2 ts=2: */

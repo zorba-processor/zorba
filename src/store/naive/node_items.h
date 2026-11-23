@@ -1394,6 +1394,8 @@ public:
 
   void replaceContent(UpdReplaceElemContent& upd);
 
+  void replaceChildrenWithText(UpdReplaceElemContent& upd);
+
   void restoreContent(UpdReplaceElemContent& upd);
 
   void replaceName(UpdRenameElem& upd);

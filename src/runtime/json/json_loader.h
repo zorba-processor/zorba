@@ -19,7 +19,7 @@
 
 // standard
 #include <istream>
-#include <new>
+#include <memory>
 #include <stack>
 #include <string_view>
 #include <utility>                          /* for pair */
@@ -185,9 +185,8 @@ public:
   }
 
 private:
-  typedef std::vector<store::Item_t> json_array_type;
-
-  struct json_object_type {
+  // What an open array or object has read: an array's members are values_.
+  struct contents {
     std::vector<store::Item_t> keys_;
     std::vector<store::Item_t> values_;
   };
@@ -201,14 +200,13 @@ private:
     };
     type const type_;
     union {
-      json_array_type *array_;
-      json_object_type *object_;
+      contents *contents_;              // of an array or object, in scratch_
       store::Item *key_;
     };
     bool skipped_;                      // nothing of it is read
     projection const *read_;            // what is read of it; null: all
 
-    stack_element( type = no_type );
+    stack_element( type = no_type, contents* = nullptr );
     void destroy();
   };
 
@@ -230,16 +228,8 @@ private:
   void end_top_level_value();
   void read_of_value( bool *skipped, projection const **read ) const;
   bool building_value() const;
-  void keep_read_pairs( json_object_type* ) const;
-
-  stack_element& push( stack_element::type t ) {
-    //
-    // We push in this convoluted manner since we can't use C++11 rvalue
-    // references.
-    //
-    stack_.push( stack_element() );
-    return *new( &stack_.top() ) stack_element( t );
-  }
+  void keep_read_pairs( contents* ) const;
+  stack_element& push( stack_element::type );
 
   parser parser_;
   bool const strip_top_level_array_;
@@ -250,6 +240,10 @@ private:
   bool last_value_was_array_;
   projection const *projection_;
   uint32_t depth_;                      // arrays and objects on stack_
+
+  // The contents of the arrays and objects on stack_, by position: an element
+  // reuses the vectors of the last one at its position, already grown.
+  std::vector<std::unique_ptr<contents>> scratch_;
 
   //
   // Object keys of this parse: objects with the same key share one key item

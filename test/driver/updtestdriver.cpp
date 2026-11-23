@@ -327,6 +327,10 @@ main(int argc, char** argv)
       zorba::StaticContext_t lContext = engine->createStaticContext();
       std::string path = lQueryFile;
 
+      for (auto const& lOption : lState->theOptions)
+        lContext->declareOption(
+          engine->getItemFactory()->createQName(lOption.first), lOption.second);
+
       if (path.find("w3c_update_testsuite") != std::string::npos) 
       {
         lContext->setXQueryVersion(zorba::xquery_version_1_0);
