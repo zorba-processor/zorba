@@ -125,6 +125,11 @@ private:
 
   const XMLCh                                 * theXsiType;
 
+  // A value of xsi:nil that is not an xs:boolean, reported once the element
+  // is known to be assessed
+  XERCES_CPP_NAMESPACE_QUALIFIER XMLBuffer      theInvalidXsiNilValue;
+  bool                                          theHasInvalidXsiNil;
+
   struct OpenElement
   {
     // whether it took an entry of the type stack of theSchemaValidator,
