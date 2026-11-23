@@ -1161,17 +1161,23 @@ void PULImpl::addJSONObjectInsert(
       csize numPairs2 = names.size();
       csize numPairs = numPairs1;
 
-      upd->theNames.resize(numPairs1 + numPairs2);
-      upd->theValues.resize(numPairs1 + numPairs2);
-
-      for (csize i = 0; i < numPairs2; ++i, ++numPairs)
+      for (csize i = 0; i < numPairs2; ++i)
       {
         for (csize j = 0; j < numPairs1; ++j)
         {
           if (names[i]->equals(upd->theNames[j]))
             RAISE_ERROR(jerr::JNUP0005, loc, ERROR_PARAMS(names[i]->getStringValue()));
         }
-        
+      }
+
+      // Both reserved before either grows: an error leaves both unchanged.
+      upd->theNames.reserve(numPairs1 + numPairs2);
+      upd->theValues.reserve(numPairs1 + numPairs2);
+      upd->theNames.resize(numPairs1 + numPairs2);
+      upd->theValues.resize(numPairs1 + numPairs2);
+
+      for (csize i = 0; i < numPairs2; ++i, ++numPairs)
+      {
         upd->theNames[numPairs].transfer(names[i]);
         upd->theValues[numPairs].transfer(values[i]);
       }
@@ -1981,10 +1987,7 @@ void PULImpl::mergeTargetedUpdateLists(
           csize numOtherPairs = otherUpd2->theNames.size();
           csize numPairs = numMyPairs;
 
-          myUpd->theNames.resize(numMyPairs + numOtherPairs);
-          myUpd->theValues.resize(numMyPairs + numOtherPairs);
-
-          for (csize i = 0; i < numOtherPairs; ++i, ++numPairs)
+          for (csize i = 0; i < numOtherPairs; ++i)
           {
             for (csize j = 0; j < numMyPairs; ++j)
             {
@@ -1992,7 +1995,16 @@ void PULImpl::mergeTargetedUpdateLists(
                 RAISE_ERROR(jerr::JNUP0005, otherUpd->theLoc,
                 ERROR_PARAMS(myUpd->theNames[j]->getStringValue()));
             }
-        
+          }
+
+          // Both reserved before either grows: an error leaves both unchanged.
+          myUpd->theNames.reserve(numMyPairs + numOtherPairs);
+          myUpd->theValues.reserve(numMyPairs + numOtherPairs);
+          myUpd->theNames.resize(numMyPairs + numOtherPairs);
+          myUpd->theValues.resize(numMyPairs + numOtherPairs);
+
+          for (csize i = 0; i < numOtherPairs; ++i, ++numPairs)
+          {
             myUpd->theNames[numPairs].transfer(otherUpd2->theNames[i]);
             myUpd->theValues[numPairs].transfer(otherUpd2->theValues[i]);
           }
