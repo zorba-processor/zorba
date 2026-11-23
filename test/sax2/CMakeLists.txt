@@ -47,3 +47,12 @@ FOREACH(TESTFILE ${TESTFILES})
  ENDIF (${TESTMOD})
                 
 ENDFOREACH(TESTFILE)
+
+# ZORBA_OPTLEVEL=O2 compiles at O2. The run writes the same result file as the
+# run at the default level, so the two do not run at the same time.
+ZORBA_ADD_TEST(test/sax2/sax2_test1-O2 sax2testdriver sax2_test1.xq)
+SET_TESTS_PROPERTIES(test/sax2/sax2_test1-O2 PROPERTIES
+  ENVIRONMENT "ZORBA_OPTLEVEL=O2"
+  FAIL_REGULAR_EXPRESSION "optimization level O[01]"
+  RESOURCE_LOCK sax2_test1 TIMEOUT 10)
+SET_TESTS_PROPERTIES(test/sax2/sax2_test1 PROPERTIES RESOURCE_LOCK sax2_test1)

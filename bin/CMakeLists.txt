@@ -154,6 +154,28 @@ FOREACH (_opt 0 1 2)
   ZORBA_PLAN_TEST (bin/zorba_plan_parity_O${_opt} "JSONParseMembersIterator"
     "--optimization-level|${_opt}|--print-iterator-tree|-f|-q|${CMAKE_SOURCE_DIR}/test/rbkt/Queries/zorba/jsoniq-array-members/p01-error-parity.jq")
 ENDFOREACH ()
+# --optimization-level and -O take 0, 1 or 2, also written O0, O1 or O2: only
+# at level 0 is 1 + 2 left unfolded. Any other value is an error.
+FOREACH (_opt 0 O0)
+  ZORBA_PLAN_TEST (bin/zorba_optimization_level_${_opt} "main query.>[^<]*<GenericArithIterator_AddOperation"
+    "--optimization-level|${_opt}|--compile-only|--print-iterator-tree|-q|1 + 2")
+ENDFOREACH ()
+FOREACH (_opt 1 2 O1 O2)
+  ZORBA_PLAN_TEST (bin/zorba_optimization_level_${_opt} "main query.>[^<]*<SingletonIterator value=.xs:integer.3.."
+    "--optimization-level|${_opt}|--compile-only|--print-iterator-tree|-q|1 + 2")
+ENDFOREACH ()
+ZORBA_PLAN_TEST (bin/zorba_optimization_level_short_O0 "main query.>[^<]*<GenericArithIterator_AddOperation"
+  "-OO0|--compile-only|--print-iterator-tree|-q|1 + 2")
+FOREACH (_opt 3 O3 o1 1x)
+  ZORBA_ADD_TEST(bin/zorba_optimization_level_invalid_${_opt} zorbacmd --optimization-level ${_opt} -q "1")
+  ZORBA_SET_TEST_PROPERTY(bin/zorba_optimization_level_invalid_${_opt} WILL_FAIL TRUE)
+  ZORBA_ADD_TEST(bin/zorba_optimization_level_invalid_${_opt}_message zorbacmd --optimization-level ${_opt} -q "1")
+  ZORBA_SET_TEST_PROPERTY(bin/zorba_optimization_level_invalid_${_opt}_message PASS_REGULAR_EXPRESSION
+    "^Error: Only 0, 1, 2, O0, O1 and O2 are allowed as values for --optimization-level\n")
+ENDFOREACH ()
+ZORBA_ADD_TEST(bin/zorba_optimization_level_help zorbacmd --help)
+ZORBA_SET_TEST_PROPERTY(bin/zorba_optimization_level_help PASS_REGULAR_EXPRESSION
+  "--optimization-level, -O {0[|]1[|]2[|]O0[|]O1[|]O2}\nOptimization level for the query compiler, default: 1[.] O0, O1 and O2 are the same as 0, 1 and 2[.] Any other value is an error[.]")
 ZORBA_ADD_TEST(bin/zorba_timeout_parse_members zorbacmd --timeout 1 -f -q "${_plandir}/timeout_parse_members.jq")
 ZORBA_SET_TEST_PROPERTY(bin/zorba_timeout_parse_members PASS_REGULAR_EXPRESSION ".*ZXQP0068.*")
 # --max-expr-depth sets the policy's expression nesting limit.
@@ -596,9 +618,11 @@ IF (ZORBA_WITH_FILE_ACCESS)
              exhaust_sweep_compile exhaust_sweep_builtins
              exhaust_replace_content
              exhaust_json_object_add
+             exhaust_collection_insert
              exhaust_sweep_matcher exhaust_sweep_query_text exhaust_sweep_long_token
              exhaust_sweep_streamable_text exhaust_base64_stream
              exhaust_seekable_stream exhaust_json_loader exhaust_serializer
+             exhaust_collection_puls
              exhaust_plan_wrapper
              exhaust_plan_open exhaust_call_body exhaust_dynamic_call
              exhaust_for_each_pair exhaust_fold_left exhaust_json_copy
@@ -611,6 +635,7 @@ IF (ZORBA_WITH_FILE_ACCESS)
              exhaust_sweep_cache exhaust_json_array_growth
              exhaust_sweep_kept_malloc exhaust_cache_after_failure exhaust_user_error exhaust_long_line
              exhaust_optimize_after_failure
+             exhaust_typed_element
              exhaust_notification exhaust_request_id
              exhaust_stack_limit exhaust_generated exhaust_json exhaust_json_array exhaust_csv
              exhaust_xml exhaust_strings exhaust_numbers exhaust_try

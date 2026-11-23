@@ -19,6 +19,7 @@
 
 // standard
 #include <map>
+#include <memory>
 
 // Zorba
 #include <zorba/external_module.h>
@@ -31,7 +32,6 @@ namespace ftp_client {
 class module : public ExternalModule {
 public:
   module();
-  ~module();
 
   ItemFactory* getItemFactory() const;
 
@@ -41,10 +41,11 @@ public:
   virtual String getURI() const;
 
 private:
-  // map function names -> ExternalFunction*
-  typedef std::map<String,ExternalFunction*> func_map_type;
-  mutable func_map_type func_map_;
-  mutable ItemFactory *item_factory_;
+  // map function names -> ExternalFunction*, filled by the constructor:
+  // compilations on several threads look the functions up
+  typedef std::map<String,std::unique_ptr<ExternalFunction>> func_map_type;
+  func_map_type func_map_;
+  ItemFactory *const item_factory_;
 };
 
 ///////////////////////////////////////////////////////////////////////////////

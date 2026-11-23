@@ -496,15 +496,13 @@ bool UDFunctionCallIterator::probeCache(
   if (!isCacheAcrossSnapshots())
     aState->theCacheKeySnapshot = aPlanState.theGlobalDynCtx->getSnapshotID();
 
-  FunctionCache::iterator lIt = aState->theCache->find(aState->theCacheKey, aPlanState);
-  if (lIt == aState->theCache->end())
+  if (!aState->theCache->find(aState->theCacheKey, aPlanState, aState->theCachedResult))
   {
     aState->theCachedResult.clear();
     ++aState->theCacheMisses;
     return false;
   }
 
-  aState->theCachedResult = lIt.getValue();
   ++aState->theCacheHits;
   return true;
 }
@@ -1696,15 +1694,13 @@ bool ExtFunctionCallIterator::probeCache(
   if (!isCacheAcrossSnapshots())
     aState->theCacheKeySnapshot = aPlanState.theGlobalDynCtx->getSnapshotID();
 
-  FunctionCache::iterator lIt = aState->theCache->find(aState->theCacheKey, aPlanState);
-  if (lIt == aState->theCache->end())
+  if (!aState->theCache->find(aState->theCacheKey, aPlanState, aState->theCachedResult))
   {
     aState->theCachedResult.clear();
     ++aState->theCacheMisses;
     return false;
   }
 
-  aState->theCachedResult = lIt.getValue();
   ++aState->theCacheHits;
   return true;
 }

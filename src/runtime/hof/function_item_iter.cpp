@@ -85,15 +85,6 @@ bool FunctionItemIterator::nextImpl(store::Item_t& result, PlanState& planState)
       evalDctx->add_variable(theFunctionItemInfo->theInScopeVarIds[i], iter);
     }
 
-    if (theFunctionItemInfo->theIsCoercion)
-    {
-      FunctionItemIterator* child = 
-      dynamic_cast<FunctionItemIterator*>(theChildren[0].getp());
-
-      if (child != NULL)
-        theFunctionItemInfo->theQName = child->theFunctionItemInfo->theQName;
-    }
-
     result = new FunctionItem(theFunctionItemInfo, evalDctx.get(), planState);
     (void)evalDctx.release(); // owned by the function item now
   }

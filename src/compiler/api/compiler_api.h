@@ -75,6 +75,8 @@ public:
 
   void seal(expr* rootExpr);
 
+  void sealDeclared();
+
 private:
   bool getLanguageMode(std::stringstream& s) const;
 

@@ -264,16 +264,32 @@ void SimpleCollection::addNode(store::Item* item, xs_integer position)
     {
       theTrees.push_back(item);
 
-      structuredItem->attachToCollection(this,
-                                         createTreeId(),
-                                         xs_integer(theTrees.size()));
+      try
+      {
+        structuredItem->attachToCollection(this,
+                                           createTreeId(),
+                                           xs_integer(theTrees.size()));
+      }
+      catch (...)
+      {
+        theTrees.pop_back();
+        throw;
+      }
     }
     else
     {
       zorba::checked_vector<store::Item_t>::size_type sPos = static_cast<zorba::checked_vector<store::Item_t>::size_type>(pos);
       theTrees.insert(theTrees.begin() + sPos, item);
 
-      structuredItem->attachToCollection(this, createTreeId(), position);
+      try
+      {
+        structuredItem->attachToCollection(this, createTreeId(), position);
+      }
+      catch (...)
+      {
+        theTrees.erase(theTrees.begin() + sPos);
+        throw;
+      }
     }
   }
   catch (const std::range_error&)
@@ -544,6 +560,36 @@ xs_integer SimpleCollection::removeNodes(xs_integer position, xs_integer numNode
     ++theVersion;
     return xs_integer(last - pos);
   }
+}
+
+
+/*******************************************************************************
+  Remove the last num trees, which must be nodes[0] to nodes[num - 1], with no
+  allocation: the undo of an insert at the end of the collection.
+********************************************************************************/
+void SimpleCollection::removeLastNodes(
+    const std::vector<store::Item_t>& nodes,
+    csize num)
+{
+  ZORBA_ASSERT_STORE_WRITE();
+  ZORBA_ASSERT(num <= theTrees.size() && num <= nodes.size());
+
+  csize first = theTrees.size() - num;
+
+  for (csize i = 0; i < num; ++i)
+  {
+    store::Item* item = theTrees[first + i].getp();
+
+    ZORBA_ASSERT(item == nodes[i].getp());
+    ZORBA_ASSERT(item->getCollection() == this);
+
+    static_cast<StructuredItem*>(item)->detachFromCollection();
+  }
+
+  theTrees.resize(first);
+
+  if (num > 0)
+    ++theVersion;
 }
 
 

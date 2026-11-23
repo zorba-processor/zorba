@@ -18,12 +18,15 @@
 #define ZORBA_COMPILER_API_COMPILERCB
 
 #include <atomic>
+#include <mutex>
 #include <vector>
 #include <map>
 
 #include <zorba/config.h>
 
 #include "common/shared_types.h"
+
+#include "zorbautils/lock.h"
 
 
 #include "compiler/expression/pragma.h"
@@ -119,9 +122,16 @@ class XQueryDiagnostics;
   For an eval query: the QueryResources of the query that owns the parent of
   the eval dctx, if different from theParent.
 
-  Reference counting is atomic unless ZORBA_FOR_ONE_THREAD_ONLY is set; the
-  state itself, and the cycle collection, are used by one thread at a time, as
-  everything else in a query.
+  Threads: the function items of a query can be used, copied and released on
+  other threads than the one that runs it, also after it is closed. Unless
+  ZORBA_FOR_ONE_THREAD_ONLY is set, reference counting is atomic, theIsDetached
+  is published with the state it hands over, and every collection runs under a
+  CollectorLock, as does every release of a reference to a function item that
+  refers to a detached obj (FunctionItem::removeDetachedReference()), so that
+  no graph is walked while another thread frees a part of it. The reference
+  counts of a graph can still change during a walk (copies are not locked): a
+  walk that finds garbage reads them again and releases nothing if any of them
+  changed.
 ********************************************************************************/
 class QueryResources : public SyncedRCObject
 {
@@ -137,7 +147,7 @@ protected:
 #endif
   rchandle<QueryResources>       theParent;
   rchandle<QueryResources>       theDctxParent;
-  bool                           theIsDetached;
+  std::atomic<bool>              theIsDetached;
 
   // See "Cost" in the class comment.
   struct Witness
@@ -186,7 +196,27 @@ public:
       QueryResources* parent,
       QueryResources* dctxParent);
 
-  bool isDetached() const { return theIsDetached; }
+  bool isDetached() const { return theIsDetached.load(std::memory_order_acquire); }
+
+  /*
+    See "Threads" in the class comment: the store lock in READ (the JSON items of
+    a graph change only under WRITE), then a process-wide recursive mutex (a
+    collection releases garbage, which may start nested collections). Nothing
+    in ZORBA_FOR_ONE_THREAD_ONLY builds.
+  */
+  class CollectorLock
+  {
+#ifndef ZORBA_FOR_ONE_THREAD_ONLY
+    AutoLock                                theStoreLock;
+    std::lock_guard<std::recursive_mutex>   theGuard;
+#endif
+
+  public:
+    CollectorLock();
+
+    CollectorLock(const CollectorLock&) = delete;
+    CollectorLock& operator=(const CollectorLock&) = delete;
+  };
 
   /*
     Releases the given reference; if it was to a detached obj that survives,
@@ -325,6 +355,11 @@ ZORBA_DLL_PUBLIC void query_resources_fail_walk(unsigned long edge);
   function by name at run time. Then, as with eval, the compilation seals every
   function it declares, not only the ones it calls. Compile time only: not
   serialized.
+
+  theSealsDeclared :
+  ------------------
+  True once the compilation has sealed every function it declares after it
+  was compiled (XQueryCompiler::sealDeclared()). Not serialized.
 
   theIsEval :
   -----------
@@ -482,6 +517,7 @@ public:
   bool                      theHasEval;
 
   bool                      theHasFunctionLookup = false;
+  bool                      theSealsDeclared = false;
 
   bool                      theIsEval;
 

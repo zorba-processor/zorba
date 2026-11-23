@@ -730,6 +730,8 @@ XQuery_t XQueryImpl::clone() const
     checkNotClosed();
     checkCompiled();
 
+    sealDeclaredFunctions();
+
     XQuery_t lXQuery(new XQueryImpl());
 
     XQueryImpl* clone = static_cast<XQueryImpl*>(lXQuery.get());
@@ -936,13 +938,31 @@ const StaticContext* XQueryImpl::getStaticContext() const
     checkCompiled();
 
     if (!theStaticContextWrapper)
+    {
+      sealDeclaredFunctions();
       theStaticContextWrapper = new StaticContextImpl(theStaticContext.getp(),
                                                       theDiagnosticHandler);
+    }
 
     return theStaticContextWrapper;
   }
   QUERY_CATCH
   return 0;
+}
+
+
+/*******************************************************************************
+  The application can compile queries against the static context of this query,
+  or of a clone, that call any function the query declares, on several
+  threads: they are all sealed (XQueryCompiler::sealDeclared()), under the
+  store lock as a compilation.
+********************************************************************************/
+void XQueryImpl::sealDeclaredFunctions() const
+{
+  SYNC_CODE(AutoLock lock(GENV_STORE.getGlobalLock(), Lock::READ);)
+
+  XQueryCompiler compiler(theCompilerCB);
+  compiler.sealDeclared();
 }
 
 

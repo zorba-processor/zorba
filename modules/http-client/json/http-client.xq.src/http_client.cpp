@@ -37,26 +37,25 @@ namespace zorba {
 namespace http_client {
 
 
+HttpClientModule::HttpClientModule() : theModuleUri("http://zorba.io/modules/http-client")
+{
+  theFunctions["http-sequential-impl"] = std::make_unique<HttpSendFunction>(this);
+  theFunctions["http-nondeterministic-impl"] = std::make_unique<HttpNondeterministicFunction>(this);
+  theFunctions["http-deterministic-impl"] = std::make_unique<HttpDeterministicFunction>(this);
+}
+
 ExternalFunction*
 HttpClientModule::getExternalFunction(const String& aLocalname)
 {
-  ExternalFunction*& lFunc = theFunctions[aLocalname];
-  if (!lFunc) {
-    if (aLocalname == "http-sequential-impl") {
-      lFunc = new HttpSendFunction(this);
-    } else if (aLocalname == "http-nondeterministic-impl") {
-      lFunc = new HttpNondeterministicFunction(this);
-    } else if (aLocalname == "http-deterministic-impl") {
-      lFunc = new HttpDeterministicFunction(this);
-    }
-  }
-  return lFunc;
+  FuncMap_t::const_iterator const lIter = theFunctions.find(aLocalname);
+  return lIter == theFunctions.end() ? nullptr : lIter->second.get();
 }
 
 int HttpSendFunction::doRequest(Request& aRequest, ItemSequence_t& aResult,
                                 const SecurityPolicy& aPolicy) const
 {
-  ProfileWrapper lProfileWrapper(aRequest, theJSONProfileData, theXMLProfileData);
+  ProfileWrapper lProfileWrapper(aRequest, theJSONProfileData, theXMLProfileData,
+                                 theProfileMutex);
   CURL* lCURL = curl::create();
 
   std::unique_ptr<HttpRequestHandler> lHandler;

@@ -497,7 +497,21 @@ void end_visit(function_item_expr& v)
 {
   CODEGEN_TRACE_OUT("");
 
-  FunctionItemInfo* fnInfo = v.get_fi_info();
+  // An expr of another compilation is one of the program of a prolog loaded
+  // with loadProlog, which every query compiled against its static context
+  // generates (that compilation generated it first): each query gets its own
+  // copy of the info, with its own iterators.
+  bool const isForeign = (v.get_ccb() != theCCB);
+
+  FunctionItemInfo_t foreignCopy;
+  if (isForeign)
+  {
+    foreignCopy = new FunctionItemInfo(*v.get_fi_info());
+    foreignCopy->theInScopeVarIterators.clear();
+  }
+
+  FunctionItemInfo* fnInfo = (isForeign ? foreignCopy.getp() : v.get_fi_info());
+
   fnInfo->theCCB = theCCB;
   fnInfo->theLoc = qloc;
 
@@ -514,7 +528,8 @@ void end_visit(function_item_expr& v)
   
   for (csize i = 0; i < numOuterVars; ++i)
   {
-    fnInfo->theInScopeVars[i]->set_var_info(NULL);
+    if (!isForeign)
+      fnInfo->theInScopeVars[i]->set_var_info(NULL);
 
     if (fnInfo->theInScopeVars[i]->get_unique_id() != 0)
     {
@@ -526,6 +541,16 @@ void end_visit(function_item_expr& v)
     }
 
     fnInfo->theInScopeVarIds[i] = fnInfo->theInScopeVars[i]->get_unique_id();
+  }
+
+  // A coercion takes the name of the function item it coerces.
+  if (fnInfo->theIsCoercion && numOuterVars > 0)
+  {
+    FunctionItemIterator* coerced =
+      dynamic_cast<FunctionItemIterator*>(fnInfo->theInScopeVarIterators[0].getp());
+
+    if (coerced != NULL)
+      fnInfo->theQName = coerced->getFunctionItemInfo()->theQName;
   }
 
   push_itstack(new FunctionItemIterator(sctx, qloc, fnInfo));
@@ -970,7 +995,10 @@ bool begin_visit(flwor_expr& v)
 
   bool isGeneral = v.compute_is_general();
 
-  v.set_general(isGeneral);
+  // The compilation that owns a flwor of another compilation (see
+  // end_visit(function_item_expr&)) generated it first and set the flag.
+  if (v.get_ccb() == theCCB)
+    v.set_general(isGeneral);
 
   // Without a materialize clause, the flwor iterator evaluates the return clause of
   // each tuple before the tuples are sorted. A sequential return clause must run in

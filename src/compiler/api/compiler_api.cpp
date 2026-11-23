@@ -647,10 +647,12 @@ void XQueryCompiler::seal(expr* rootExpr)
 
   bool const allDeclared = (ccb->theIsLoadProlog ||
                             ccb->theHasEval ||
-                            ccb->theHasFunctionLookup);
+                            ccb->theHasFunctionLookup ||
+                            ccb->theSealsDeclared);
 
   SealedFunctions sealed(ccb);
-  sealed.addNamed(rootExpr, true);
+  if (rootExpr != NULL)
+    sealed.addNamed(rootExpr, true);
 
   std::set<user_function*> declared;
   bool declaredAdded = false;
@@ -778,6 +780,24 @@ void XQueryCompiler::seal(expr* rootExpr)
 
     udf->seal(entry.theNextVarId);
   }
+}
+
+
+/*******************************************************************************
+  Seals, after the compilation, every function it declares that it did not seal
+  (see seal()): the application can compile other queries, on several threads,
+  against the static context of the query, which can call any of them.
+********************************************************************************/
+void XQueryCompiler::sealDeclared()
+{
+  CompilerCB* ccb = theCompilerCB;
+
+  if (ccb->theIsLoadProlog || ccb->theHasEval || ccb->theHasFunctionLookup ||
+      ccb->theSealsDeclared)
+    return;
+
+  ccb->theSealsDeclared = true;
+  seal(NULL);
 }
 
 

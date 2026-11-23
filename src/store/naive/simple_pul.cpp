@@ -243,9 +243,8 @@ CollectionPul* PULImpl::getCollectionPul(const store::Item* target)
   else
   {
     auto pul = std::make_unique<CollectionPul>(this, nullptr);
-    theCollectionPuls.push_back(pul.get());
+    addCollectionPul(NULL, pul.get());
     theNoCollectionPul = pul.release();
-    theCollectionPulsMap[NULL] = theCollectionPuls.size() - 1;
     return theNoCollectionPul;
   }
 }
@@ -275,15 +274,33 @@ CollectionPul* PULImpl::getCollectionPulByName(
     (GET_STORE().getCollection(collName, isDynamic).getp());
 
     auto pul = std::make_unique<CollectionPul>(this, collection);
-    theCollectionPuls.push_back(pul.get());
+    addCollectionPul(collName, pul.get());
     theLastPul = pul.release();
-
-    theCollectionPulsMap[collName] = theCollectionPuls.size() - 1;
   }
 
   theLastCollection = collName;
 
   return theLastPul;
+}
+
+
+/*******************************************************************************
+  Put aPul in theCollectionPuls and under aName in theCollectionPulsMap, which
+  has no entry for aName. If either cannot grow, aPul is in neither.
+********************************************************************************/
+void PULImpl::addCollectionPul(const QNameItem* aName, CollectionPul* aPul)
+{
+  CollectionPulMap::iterator ite = theCollectionPulsMap.insert(
+    CollectionPulMap::value_type(aName, theCollectionPuls.size())).first;
+  try
+  {
+    theCollectionPuls.push_back(aPul);
+  }
+  catch (...)
+  {
+    theCollectionPulsMap.erase(ite);
+    throw;
+  }
 }
 
 
@@ -1161,17 +1178,23 @@ void PULImpl::addJSONObjectInsert(
       csize numPairs2 = names.size();
       csize numPairs = numPairs1;
 
-      upd->theNames.resize(numPairs1 + numPairs2);
-      upd->theValues.resize(numPairs1 + numPairs2);
-
-      for (csize i = 0; i < numPairs2; ++i, ++numPairs)
+      for (csize i = 0; i < numPairs2; ++i)
       {
         for (csize j = 0; j < numPairs1; ++j)
         {
           if (names[i]->equals(upd->theNames[j]))
             RAISE_ERROR(jerr::JNUP0005, loc, ERROR_PARAMS(names[i]->getStringValue()));
         }
-        
+      }
+
+      // Both reserved before either grows: an error leaves both unchanged.
+      upd->theNames.reserve(numPairs1 + numPairs2);
+      upd->theValues.reserve(numPairs1 + numPairs2);
+      upd->theNames.resize(numPairs1 + numPairs2);
+      upd->theValues.resize(numPairs1 + numPairs2);
+
+      for (csize i = 0; i < numPairs2; ++i, ++numPairs)
+      {
         upd->theNames[numPairs].transfer(names[i]);
         upd->theValues[numPairs].transfer(values[i]);
       }
@@ -1744,10 +1767,8 @@ void PULImpl::mergeUpdates(store::Item* other)
     else
     {
       CollectionPul* otherPul = otherp->theCollectionPuls[otherIte->second];
+      addCollectionPul(otherIte->first, otherPul);
       otherp->theCollectionPuls[otherIte->second] = NULL;
-
-      theCollectionPuls.push_back(otherPul);
-      theCollectionPulsMap[otherIte->first] = theCollectionPuls.size() - 1;
 
       otherPul->switchPul(this);
       ++otherIte;
@@ -1757,10 +1778,8 @@ void PULImpl::mergeUpdates(store::Item* other)
   while (otherIte != otherEnd)
   {
     CollectionPul* otherPul = otherp->theCollectionPuls[otherIte->second];
+    addCollectionPul(otherIte->first, otherPul);
     otherp->theCollectionPuls[otherIte->second] = NULL;
-
-    theCollectionPuls.push_back(otherPul);
-    theCollectionPulsMap[otherIte->first] = theCollectionPuls.size() - 1;
 
     otherPul->switchPul(this);
 
@@ -1981,10 +2000,7 @@ void PULImpl::mergeTargetedUpdateLists(
           csize numOtherPairs = otherUpd2->theNames.size();
           csize numPairs = numMyPairs;
 
-          myUpd->theNames.resize(numMyPairs + numOtherPairs);
-          myUpd->theValues.resize(numMyPairs + numOtherPairs);
-
-          for (csize i = 0; i < numOtherPairs; ++i, ++numPairs)
+          for (csize i = 0; i < numOtherPairs; ++i)
           {
             for (csize j = 0; j < numMyPairs; ++j)
             {
@@ -1992,7 +2008,16 @@ void PULImpl::mergeTargetedUpdateLists(
                 RAISE_ERROR(jerr::JNUP0005, otherUpd->theLoc,
                 ERROR_PARAMS(myUpd->theNames[j]->getStringValue()));
             }
-        
+          }
+
+          // Both reserved before either grows: an error leaves both unchanged.
+          myUpd->theNames.reserve(numMyPairs + numOtherPairs);
+          myUpd->theValues.reserve(numMyPairs + numOtherPairs);
+          myUpd->theNames.resize(numMyPairs + numOtherPairs);
+          myUpd->theValues.resize(numMyPairs + numOtherPairs);
+
+          for (csize i = 0; i < numOtherPairs; ++i, ++numPairs)
+          {
             myUpd->theNames[numPairs].transfer(otherUpd2->theNames[i]);
             myUpd->theValues[numPairs].transfer(otherUpd2->theValues[i]);
           }

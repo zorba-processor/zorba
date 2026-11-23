@@ -49,6 +49,7 @@ namespace UnitTests {
 
   int test_decimal_storage( int, char*[] );
   int test_json_array_pul( int, char*[] );
+  int test_json_object_pul( int, char*[] );
   int test_json_object( int, char*[] );
   int test_json_parser( int, char*[] );
   int test_mem_sizeof( int, char*[] );
