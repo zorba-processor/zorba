@@ -1,0 +1,39 @@
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           targetNamespace="http://zorba.io/test/revalidation-simple-content"
+           xmlns="http://zorba.io/test/revalidation-simple-content"
+           elementFormDefault="qualified">
+  <xs:simpleType name="small">
+    <xs:restriction base="xs:integer">
+      <xs:maxInclusive value="99"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:complexType name="I">
+    <xs:simpleContent>
+      <xs:extension base="xs:integer">
+        <xs:attribute name="d" type="xs:integer"/>
+      </xs:extension>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:complexType name="J">
+    <xs:simpleContent>
+      <xs:restriction base="I"/>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:complexType name="S">
+    <xs:simpleContent>
+      <xs:extension base="small">
+        <xs:attribute name="d" type="xs:integer"/>
+      </xs:extension>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:element name="r">
+    <xs:complexType>
+      <xs:choice maxOccurs="unbounded">
+        <xs:element name="i" type="I"/>
+        <xs:element name="j" type="J"/>
+        <xs:element name="s" type="S"/>
+        <xs:element name="b" type="xs:string"/>
+      </xs:choice>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>

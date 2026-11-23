@@ -511,6 +511,24 @@ void SchemaValidatorImpl::processTextValue (
 {
   xqtref_t type = typeManager->create_named_simple_type(typeQName);
 
+  // The text of a complex type with simple content is a value of the simple
+  // type it is derived from, as validation parses it.
+  if (type == NULL)
+  {
+    xqtref_t namedType = typeManager->create_named_type(typeQName.getp(),
+                                                        SequenceType::QUANT_ONE,
+                                                        loc);
+    if (namedType != NULL &&
+        namedType->type_kind() == XQType::USER_DEFINED_KIND &&
+        namedType->contentKind() == XQType::SIMPLE_CONTENT_KIND)
+    {
+      type = namedType;
+      while (type->type_kind() == XQType::USER_DEFINED_KIND &&
+             static_cast<const UserDefinedXQType&>(*type).isComplex())
+        type = static_cast<const UserDefinedXQType&>(*type).getBaseType();
+    }
+  }
+
   //cout << " vup        - processTextValue: '" << textValue->c_str() << "'\n";
   //cout << " vup        - processTextValue: " << typeQName->getPrefix()->str()
   // << ":" << typeQName->getLocalName()->str() << "@"
