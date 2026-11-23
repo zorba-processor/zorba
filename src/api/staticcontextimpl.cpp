@@ -59,6 +59,7 @@
 #include "system/globalenv.h"
 
 #include "types/casting.h"
+#include "types/typemanagerimpl.h"
 #include "types/typeops.h"
 
 #include "diagnostics/xquery_diagnostics.h"
@@ -126,6 +127,9 @@ StaticContextImpl::StaticContextImpl(DiagnosticHandler* aDiagnosticHandler)
   theCollectionMgr(0)
 {
   theCtx = GENV.getRootStaticContext().create_child_context();
+  // Set up now: queries compiled against this context on several threads
+  // use its type manager and must not race to create it.
+  theCtx->set_typemanager(new TypeManagerImpl(&GENV_TYPESYSTEM));
 
   if ( ! theDiagnosticHandler )
   {
@@ -174,6 +178,7 @@ StaticContextImpl::StaticContextImpl(const StaticContextImpl& aStaticContext)
 {
   // hierarchy of contexts
   theCtx = aStaticContext.theCtx->create_child_context();
+  theCtx->set_typemanager(new TypeManagerImpl(&GENV_TYPESYSTEM));
 
   // bugfix
   // if it's a default error handler, we need to create a new

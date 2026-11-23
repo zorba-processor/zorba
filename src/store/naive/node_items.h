@@ -261,9 +261,13 @@ public:
   void attachToCollection(
       simplestore::Collection* collection,
       const TreeId& treeId,
-      const xs_integer& pos);
+      csize pos);
 
   void detachFromCollection();
+
+  std::unique_ptr<CollectionTreeInfo> detachKeepingInfo();
+
+  void reattachToCollection(std::unique_ptr<CollectionTreeInfo> info);
 
   ulong getCollectionId() const
   {
@@ -275,13 +279,13 @@ public:
     return (theCollectionInfo ? theCollectionInfo->getCollection() : NULL);
   }
 
-  const xs_integer& getPosition() const
+  csize getPosition() const
   {
     ZORBA_ASSERT(theCollectionInfo);
     return theCollectionInfo->getPosition();
   }
 
-  void setPosition(const xs_integer& pos) const
+  void setPosition(csize pos) const
   {
     ZORBA_ASSERT(theCollectionInfo);
     return theCollectionInfo->setPosition(pos);
@@ -803,9 +807,13 @@ public:
   virtual void attachToCollection(
       simplestore::Collection* aCollection,
       const TreeId& aTreeId,
-      const xs_integer& aPosition);
+      csize aPosition);
 
   virtual void detachFromCollection();
+
+  virtual std::unique_ptr<CollectionTreeInfo> detachKeepingInfo();
+
+  virtual void reattachToCollection(std::unique_ptr<CollectionTreeInfo> info);
 
   virtual void setCollectionTreeInfo(CollectionTreeInfo* collectionInfo);
 
@@ -1932,8 +1940,8 @@ inline long XmlNode::compare2(const XmlNode* other) const
     }
     else
     {
-      xs_integer pos1 = this->getTree()->getPosition();
-      xs_integer pos2 = other->getTree()->getPosition();
+      csize pos1 = this->getTree()->getPosition();
+      csize pos2 = other->getTree()->getPosition();
 
       if (pos1 < pos2)
         return -1;
@@ -1979,8 +1987,8 @@ inline long XmlNode::compare2(const XmlNode* other) const
     }
     else
     {
-      xs_integer pos1 = this->getTree()->getPosition();
-      xs_integer pos2 = other->getTree()->getPosition();
+      csize pos1 = this->getTree()->getPosition();
+      csize pos2 = other->getTree()->getPosition();
 
       if (pos1 < pos2)
         return -1;

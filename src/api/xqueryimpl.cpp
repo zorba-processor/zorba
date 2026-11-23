@@ -586,17 +586,22 @@ void XQueryImpl::doCompile(
 
     theStaticContext->set_typemanager(new TypeManagerImpl(&GENV_TYPESYSTEM));
   }
-  else
+  else if (fork_sctx)
   {
-    if (theStaticContext->get_local_typemanager() == NULL)
+    // Compile in a child we own. The given context may be shared by queries
+    // on other threads, so it is not changed: a query whose context has no
+    // type manager of its own gets one in its child.
+    theStaticContext->set_shared();
+    bool const lOwnTypeManager =
+      theStaticContext->get_local_typemanager() == NULL;
+    theStaticContext = theStaticContext->create_child_context();
+    if (lOwnTypeManager)
       theStaticContext->set_typemanager(new TypeManagerImpl(&GENV_TYPESYSTEM));
-
-    // otherwise, unless this is a load-prolog query, create a child and we have
-    // ownership over that one
-    if (fork_sctx)
-    {
-      theStaticContext = theStaticContext->create_child_context();
-    }
+  }
+  else if (theStaticContext->get_local_typemanager() == NULL)
+  {
+    // A load-prolog query compiles in the context it sets up.
+    theStaticContext->set_typemanager(new TypeManagerImpl(&GENV_TYPESYSTEM));
   }
 
   //std::cout << "sctx     : " << theStaticContext << std::endl << std::endl;

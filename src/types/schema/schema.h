@@ -17,6 +17,8 @@
 #ifndef ZORBA_SCHEMA_H_
 #define ZORBA_SCHEMA_H_
 
+#include <atomic>
+
 #include "common/common.h"
 
 #ifndef ZORBA_NO_XMLSCHEMA
@@ -71,7 +73,8 @@ public:
 private:
   TypeManager                              * theTypeManager;
 
-  bool                                       theHasXSD;
+  // Set by registerXSD() while queries on other threads may read it.
+  std::atomic<bool>                          theHasXSD;
 #ifndef ZORBA_NO_XMLSCHEMA
   OwningMemoryManager                        theGrammarPoolMemoryManager;
   XERCES_CPP_NAMESPACE::XMLGrammarPool     * theGrammarPool;

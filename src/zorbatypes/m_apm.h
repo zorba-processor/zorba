@@ -280,23 +280,28 @@ class MAPM
 {
 protected:
   /**
-   * Per-thread MAPM state. MAPM's internal work buffers and constants are
-   * thread_local (see M_APM_TLS); constructing this object initializes them
-   * for the current thread, and destroying it (at thread exit) frees them.
+   * Whether MAPM's internal work buffers and constants, which are thread_local
+   * (see M_APM_TLS), are initialized in the current thread. A thread_local
+   * with a destructor would register it at its first use, and glibc aborts
+   * the process when that registration runs out of memory: this one is
+   * trivially destructible, and initThread() frees the state at thread exit
+   * another way.
    */
-  struct ThreadState
-  {
-    ThreadState() { m_apm_free(m_apm_init()); }
-    ~ThreadState() { m_apm_free_all_mem(); }
-  };
+  static inline constinit thread_local bool theThreadReady = false;
+
+  /**
+   * Initializes MAPM in the current thread, and arranges for its state to be
+   * freed when the thread exits. Throws std::bad_alloc when out of memory.
+   */
+  static void initThread();
 
   /**
    * Must be called before MAPM C functions are used in the current thread.
    */
   static void threadInit()
   {
-    thread_local ThreadState theThreadState;
-    (void)theThreadState;
+    if (!theThreadReady)
+      initThread();
   }
 
   static_assert(std::atomic_ref<int>::required_alignment <= alignof(int),
