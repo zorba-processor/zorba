@@ -46,6 +46,7 @@ CREATE_TEST_SOURCELIST(APITests
   xml_depth_limit.cpp
   module_security.cpp
   invoke_module_globals.cpp
+  load_prolog_child_context.cpp
   function_item_lifetime.cpp
   json_parse_members.cpp
   window_running_query.cpp
