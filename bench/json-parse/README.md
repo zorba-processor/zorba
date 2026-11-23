@@ -288,3 +288,27 @@ built with `CMAKE_BUILD_TYPE=Release` (not the profile build of step 1):
 | latency_calls | 3.24 | 3.00 (-7%) | 205 | 148 |
 
 `latency_calls` now builds what `latency` builds, and writes the same output.
+
+### Items handed over to the factory
+
+The loader gives the keys and values it parsed to the store factory by rvalue
+(`createJSONObject(names, values)`, `createJSONArray(items)`), and the object or
+array takes their references instead of counting new ones and the loader dropping
+its own. Best wall time (s) of three alternating rounds, the base (`60a1dde003`,
+the branch of #442) against the head, in a container limited to 4 CPUs, both
+built as `full-release` with the profile flags of step 1; OFF is
+`ZORBA_FOR_ONE_THREAD_ONLY=OFF`:
+
+| query | base ON | head ON | base OFF | head OFF |
+|---|---:|---:|---:|---:|
+| count | 1.48 | 1.50 | 1.57 | 1.57 |
+| latency | 2.38 | 2.41 | 2.62 | 2.57 |
+| flatten | 2.99 | 3.01 | 3.30 | 3.20 |
+
+`count` and `latency` read few or no values (parse-time projection), so they
+build almost no objects and do not change beyond noise. On `flatten`, which
+builds every event, `tools/profile.sh` on the OFF builds charges 2,040 samples
+of 15,085 to `containers` on the base and 1,801 of 14,720 on the head (-12% of
+that part, -2.4% of all samples); allocations per event do not change (42.7).
+The wall-time differences are within the noise of the host. All builds write the
+same output.
