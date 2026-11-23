@@ -55,6 +55,17 @@ FOREACH(TESTFILE ${TESTFILES})
                 
 ENDFOREACH(TESTFILE)
 
+# ZORBA_OPTLEVEL=O2 compiles at O2. The run writes the same result file as the
+# run at the default level, so the two do not run at the same time.
+ZORBA_ADD_TEST(test/update/comandline_doc_example_2-O2 updtestdriver
+  comandline_doc_example_2.spec)
+SET_TESTS_PROPERTIES(test/update/comandline_doc_example_2-O2 PROPERTIES
+  ENVIRONMENT "ZORBA_OPTLEVEL=O2"
+  FAIL_REGULAR_EXPRESSION "optimization level O[01]"
+  RESOURCE_LOCK comandline_doc_example_2)
+SET_TESTS_PROPERTIES(test/update/comandline_doc_example_2 PROPERTIES
+  RESOURCE_LOCK comandline_doc_example_2)
+
 IF(ZORBA_NO_FULL_TEXT)
   SET_TESTS_PROPERTIES(
                       test/update/zorba/store/sc1

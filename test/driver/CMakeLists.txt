@@ -104,3 +104,19 @@ SET (SAX2_TESTDRIVER_SRCS
   )
 
 ZORBA_GENERATE_EXE(sax2testdriver "${SAX2_TESTDRIVER_SRCS}" "" "" "")
+
+# ZORBA_OPTLEVEL takes O0, O1 or O2 (O1 when unset); any other value stops the
+# driver before it runs a test (see test_optimization_level.h).
+SET (_optlevel_drivers testdriver updtestdriver sax2testdriver)
+IF (TARGET testdriver_mt)
+  LIST (APPEND _optlevel_drivers testdriver_mt)
+ENDIF (TARGET testdriver_mt)
+FOREACH (_driver ${_optlevel_drivers})
+  FOREACH (_value O3 o1 1)
+    SET (_test "test/driver/${_driver}_optlevel_invalid_${_value}")
+    ZORBA_ADD_TEST ("${_test}" ${_driver} unused.xq)
+    SET_TESTS_PROPERTIES ("${_test}" PROPERTIES
+      ENVIRONMENT "ZORBA_OPTLEVEL=${_value}"
+      PASS_REGULAR_EXPRESSION "ZORBA_OPTLEVEL: unknown value \"${_value}\" [(]expected \"O0\", \"O1\" or \"O2\"[)]")
+  ENDFOREACH (_value)
+ENDFOREACH (_driver)

@@ -29,6 +29,9 @@
 
 #include <zorba/properties.h>
 
+#include "store/api/store.h"
+#include "system/globalenv.h"
+
 #include "zorbaserialization/serialize_template_types.h"
 #include "zorbaserialization/serialize_zorba_types.h"
 
@@ -223,6 +226,25 @@ void CompilerCB::addAnonymousUDF(user_function* udf)
 ********************************************************************************/
 std::atomic<unsigned long> QueryResources::theGraphGeneration(1);
 
+#ifndef ZORBA_FOR_ONE_THREAD_ONLY
+namespace
+{
+// See QueryResources::CollectorLock.
+std::recursive_mutex theCollectorMutex;
+}
+
+QueryResources::CollectorLock::CollectorLock()
+  :
+  theStoreLock(GENV_STORE.getGlobalLock(), Lock::READ),
+  theGuard(theCollectorMutex)
+{
+}
+#else
+QueryResources::CollectorLock::CollectorLock()
+{
+}
+#endif
+
 std::atomic<long> QueryResources::theNumAlive(0);
 
 std::atomic<unsigned long> QueryResources::theNumWalks(0);
@@ -310,7 +332,10 @@ void QueryResources::dispose(
     // until the last of them is destroyed, unless only cycles keep it.
     theParent = parent;
     theDctxParent = (dctxParent != parent ? dctxParent : NULL);
-    theIsDetached = true;
+
+    // From here on the collections on other threads walk the state handed
+    // over above.
+    theIsDetached.store(true, std::memory_order_release);
 
     // From now on the dctx variables are edges of a graph.
     if (theDctx)
@@ -324,7 +349,7 @@ void QueryResources::dispose(
 
   if (getRefCount() == 1)
   {
-    theIsDetached = false;
+    theIsDetached.store(false, std::memory_order_relaxed);
     theParent = NULL;
     theDctxParent = NULL;
     destroy();
@@ -337,7 +362,7 @@ void QueryResources::release(rchandle<QueryResources>& resources)
   if (resources == NULL)
     return;
 
-  if (resources->theIsDetached && resources->getRefCount() > 1)
+  if (resources->isDetached() && resources->getRefCount() > 1)
   {
     rchandle<QueryResources> hold;
     hold.transfer(resources);

@@ -82,10 +82,13 @@ void expr::compute_return_type(bool deep, bool* modified)
 {
   if (deep)
   {
+    // An expr of another compilation (the program of a prolog loaded with
+    // loadProlog) was typed when that compilation was sealed.
     ExprIterator iter(this);
     while (!iter.done())
     {
-      (**iter)->compute_return_type(deep, modified);
+      if ((**iter)->get_ccb() == theCCB)
+        (**iter)->compute_return_type(deep, modified);
       iter.next();
     }
   }

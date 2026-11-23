@@ -17,6 +17,7 @@
 #ifndef XQP_ZORBA_IMPL_H
 #define XQP_ZORBA_IMPL_H
 
+#include <atomic>
 #include <exception>
 #include <istream>
 
@@ -57,7 +58,7 @@ protected:
   friend class Zorba;
 
   SYNC_CODE(Mutex theUsersMutex);
-  ulong           theNumUsers;
+  std::atomic<ulong> theNumUsers;
 
 public:
 
