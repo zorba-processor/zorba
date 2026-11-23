@@ -4522,6 +4522,86 @@ void test_replace_content_out_of_memory( Fixture const &f ) {
   (void)f;
 #endif
 }
+// Two collections made with a node each, with each allocation failing in turn:
+// merging the update list of the second into that of the first moves its part
+// for the second collection over, which is then in the first list or still in
+// its own, and freed with one of them.
+void test_collection_puls_out_of_memory( Fixture const &f ) {
+#if defined(__linux__)
+  // Untyped nodes: a typed one leaks when its construction fails (another
+  // defect, outside these tests).
+  std::string const prolog(
+    "declare construction strip;\n"
+    "import module namespace ddl ="
+    " 'http://zorba.io/modules/store/dynamic/collections/ddl';\n"
+    "import module namespace dml ="
+    " 'http://zorba.io/modules/store/dynamic/collections/dml';\n" );
+  auto run = [&]( std::string const &query ) -> std::string {
+    XQuery_t const q( f.zorba->compileQuery( prolog + query ) );
+    Iterator_t const it( q->iterator() );
+    it->open();
+    Item item;
+    std::string out;
+    while ( it->next( item ) )
+      out += item.getStringValue().str();
+    it->close();
+    return out;
+  };
+  auto attempt = [&]( long n, long length, long *count ) -> std::string {
+    XQuery_t const insert( f.zorba->compileQuery( prolog +
+      "(ddl:create(xs:QName('ddl:sweep1'), <a/>),\n"
+      " ddl:create(xs:QName('ddl:sweep2'), <b/>));\n1" ) );
+    Iterator_t const it( insert->iterator() );
+    Item result;
+    bool failed = false;
+    inject_arm( n, length );
+    try {
+      it->open();
+      it->next( result );
+      it->close();
+    }
+    catch ( std::exception const& ) {
+      failed = true;
+    }
+    *count = inject_disarm();
+    std::string out( failed || result.isNull()
+                     ? "error" : result.getStringValue().str() );
+    for ( char const *const name : { "ddl:sweep1", "ddl:sweep2" } ) {
+      std::string const q( "xs:QName('" + std::string( name ) + "')" );
+      std::string const nodes( run(
+        "if (ddl:is-available-collection(" + q + "))\n"
+        "then string-join(dml:collection(" + q + ") ! local-name(), ' ')\n"
+        "else 'none'" ) );
+      if ( nodes != "none" )
+        run( "dml:truncate(" + q + ");\nddl:delete(" + q + ");\n1" );
+      out += "|" + nodes;
+    }
+    return out;
+  };
+  std::string const answer( "1|a|b" );
+  long total = 0;
+  std::string const whole( attempt( 0, 0, &total ) );
+  check( whole == answer, "two collections made with nodes", whole );
+  long wrong = 0;
+  for ( long const length : { 1L, 8L } )
+    for ( long n = 1; n <= total; ++n ) {
+      long count = 0;
+      std::string const got( attempt( n, length, &count ) );
+      if ( got != answer && got != "error|none|none" && ++wrong <= 3 )
+        std::cout << "at " << n << " of a run of " << length << ": " << got
+                  << std::endl;
+    }
+  check( wrong == 0, "two collections made with nodes failing: the answer, or "
+                     "an error and neither collection",
+         std::to_string( wrong ) + " points" );
+# if defined(__SANITIZE_ADDRESS__)
+  check( __lsan_do_recoverable_leak_check() == 0,
+         "two collections made with nodes failing: nothing is left behind" );
+# endif
+#else
+  (void)f;
+#endif
+}
 // An insert into an object with each allocation failing in turn: a failed
 // insert leaves the object as it was, so a later insert and a lookup by name
 // still find what they should. 16 members: the insert builds the object's index
@@ -8701,6 +8781,7 @@ Test const tests[] = {
   { "exhaust_seekable_stream", test_seekable_stream_out_of_memory },
   { "exhaust_json_loader", test_json_loader_out_of_memory },
   { "exhaust_serializer", test_serializer_out_of_memory },
+  { "exhaust_collection_puls", test_collection_puls_out_of_memory },
   { "exhaust_replace_content", test_replace_content_out_of_memory },
   { "exhaust_json_object_add", test_json_object_add_out_of_memory },
   { "exhaust_update_primitive", test_update_primitive_out_of_memory },
