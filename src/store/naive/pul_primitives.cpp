@@ -1203,6 +1203,7 @@ void UpdInsertLastIntoCollection::apply()
   for (std::size_t i = 0; i < numNodes; ++i)
   {
     lColl->addNode(theNodes[i], neg_1);
+    ++theNumApplied;
   }
 }
 
@@ -1230,12 +1231,13 @@ void UpdInsertLastIntoCollection::undo()
     );
   }
 
-  xs_integer const xs_lastPos( lastPos );
   for (long i = theNumApplied-1; i >= 0; --i)
   {
+    xs_integer const xs_lastPos( lastPos );
     ZORBA_ASSERT(theNodes[i] == lColl->nodeAt(xs_lastPos));
 
     lColl->removeNode(xs_lastPos);
+    --lastPos;
   }
 }
 
