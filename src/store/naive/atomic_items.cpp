@@ -760,6 +760,11 @@ void QNameItem::initializeAsQNameNotInPool(
 }
 
 
+/*******************************************************************************
+  Called for the last reference: with the count still 1 in the multithreaded
+  build (QNamePool::remove() releases it under the pool's lock, where lookups
+  add references to names that have none), with the count 0 otherwise.
+********************************************************************************/
 void QNameItem::free()
 {
   QNamePool& thePool = GET_STORE().getQNamePool();

@@ -264,8 +264,6 @@ protected:
 
   unsigned long                   theInternalRefsGeneration;
 
-  SYNC_CODE(mutable RCLock        theRCLock;)
-
 
 public:
   SERIALIZABLE_CLASS(FunctionItem)
@@ -285,8 +283,6 @@ public:
       const PlanState& planState);
 
   ~FunctionItem();
-
-  SYNC_CODE(RCLock* getRCLock() const { return &theRCLock; })
 
   // Called by store::Item::removeReference() when the reference count has
   // dropped to remaining (> 0).

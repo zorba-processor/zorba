@@ -25,6 +25,7 @@
 #include "zorbatypes/integer.h"
 #include "zorbatypes/schema_types.h"
 
+#include "immortal_item.h"
 #include "tree_id.h"
 
 namespace zorba
@@ -55,17 +56,15 @@ protected:
   // we don't need to create more than two, hence
   // they are cached here. createBoolean always
   // returns one of them
-  store::Item_t theTrueItem;
-  store::Item_t theFalseItem;
-  store::Item_t theNullItem;
+  ImmortalItem theTrueItem;
+  ImmortalItem theFalseItem;
+  ImmortalItem theNullItem;
 
   // xs:integer items for the values in [SMALL_INTEGER_MIN, SMALL_INTEGER_MAX]
   // are created once, here, and createInteger() returns them, the way
   // createBoolean() returns theTrueItem or theFalseItem. Atomic items are
-  // immutable, so one item can be shared by any number of trees. Like the
-  // boolean items, these items make any use of the engine from concurrent
-  // threads race on their reference counts (doc/zorba/threading.dox). Only
-  // xs:integer is cached: the derived types (xs:long ... xs:byte,
+  // immutable, so one item can be shared by any number of trees; like the
+  // boolean items, these items are immortal. Only xs:integer is cached: the derived types (xs:long ... xs:byte,
   // xs:nonNegativeInteger, ...) have their own type codes and always get a
   // new item, so a shared xs:integer is never returned for them.
   //
@@ -77,7 +76,7 @@ protected:
   static constexpr int SMALL_INTEGER_MAX = 1023;
   xs_integer const theSmallIntegerMin;
   xs_integer const theSmallIntegerMax;
-  store::Item_t theSmallIntegers[SMALL_INTEGER_MAX - SMALL_INTEGER_MIN + 1];
+  ImmortalItem theSmallIntegers[SMALL_INTEGER_MAX - SMALL_INTEGER_MIN + 1];
 
 public:
   BasicItemFactory(UriPool* uriPool, QNamePool* qnPool);

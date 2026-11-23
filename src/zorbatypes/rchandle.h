@@ -43,6 +43,14 @@ namespace serialization
 /*******************************************************************************
   A reference count. Plain when Zorba is built for one thread only, atomic
   otherwise.
+
+  decrement() returns true when it released the last reference.
+  decrementUnlessLast() decrements only a count above 1 and returns false,
+  leaving it at 1, for the last reference: its holder then decides alone
+  (or under a lock where the object can gain references) how to release it.
+  decrementAndLoad() returns the count it left; it is for counts that are
+  never immortal. A count that reached 0 belongs to its object's owner, which
+  may keep a link in it (setDeadLink(), deadLink()) until reset().
 ********************************************************************************/
 class RefCount
 {
@@ -67,6 +75,8 @@ public:
 
   void makeImmortal() { theValue = IMMORTAL; }
 
+  bool isImmortal() const { return theValue == IMMORTAL; }
+
   void increment()
   {
     if (theValue != IMMORTAL)
@@ -81,6 +91,27 @@ public:
     return --theValue == 0;
   }
 
+  bool decrementUnlessLast()
+  {
+    if (theValue == IMMORTAL)
+      return true;
+    assert(theValue > 0);
+    if (theValue == 1)
+      return false;
+    --theValue;
+    return true;
+  }
+
+  long decrementAndLoad()
+  {
+    assert(theValue > 0);
+    return --theValue;
+  }
+
+  void setDeadLink(long aLink) { theValue = aLink; }
+
+  long deadLink() const { return theValue; }
+
   void incrementUnshared() { ++theValue; }
 
   bool decrementUnshared()
@@ -94,6 +125,11 @@ public:
   void reset() { theValue.store(0, std::memory_order_relaxed); }
 
   void makeImmortal() { theValue.store(IMMORTAL, std::memory_order_relaxed); }
+
+  bool isImmortal() const
+  {
+    return theValue.load(std::memory_order_relaxed) == IMMORTAL;
+  }
 
   // A thread can only copy a reference it already holds, so an increment
   // needs no ordering.
@@ -111,6 +147,39 @@ public:
     assert(before > 0);
     return before == 1;
   }
+
+  // The acquiring load of the last reference sees every other thread's
+  // releasing decrement, so its holder may free the object without one.
+  bool decrementUnlessLast()
+  {
+    long value = theValue.load(std::memory_order_acquire);
+    do
+    {
+      if (value == IMMORTAL)
+        return true;
+      assert(value > 0);
+      if (value == 1)
+        return false;
+    }
+    while (!theValue.compare_exchange_weak(value, value - 1,
+                                           std::memory_order_acq_rel,
+                                           std::memory_order_acquire));
+    return true;
+  }
+
+  long decrementAndLoad()
+  {
+    long const before = theValue.fetch_sub(1, std::memory_order_acq_rel);
+    assert(before > 0);
+    return before - 1;
+  }
+
+  void setDeadLink(long aLink)
+  {
+    theValue.store(aLink, std::memory_order_relaxed);
+  }
+
+  long deadLink() const { return theValue.load(std::memory_order_relaxed); }
 
   // For a count that only one thread changes: no read-modify-write.
   void incrementUnshared()

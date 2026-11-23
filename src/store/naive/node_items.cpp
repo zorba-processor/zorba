@@ -594,7 +594,14 @@ uint32_t XmlNode::hash(long, const XQPCollator*) const
 ********************************************************************************/
 void XmlNode::setTreeInternal(const XmlTree* newTree)
 {
+#ifdef ZORBA_FOR_ONE_THREAD_ONLY
   theUnion.treeRCPtr = (long*)newTree;
+#else
+  // A node with references moves under the locks of both trees (see
+  // lockTree()).
+  std::atomic_ref<long*>(theUnion.treeRCPtr).store(
+      (long*)newTree, std::memory_order_relaxed);
+#endif
 }
 
 

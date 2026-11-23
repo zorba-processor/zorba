@@ -57,15 +57,13 @@ BasicItemFactory::BasicItemFactory(UriPool* uriPool, QNamePool* qnPool)
   theSmallIntegerMax(SMALL_INTEGER_MAX)
 {
   for (int i = SMALL_INTEGER_MIN; i <= SMALL_INTEGER_MAX; ++i)
-    theSmallIntegers[i - SMALL_INTEGER_MIN] =
-        new IntegerItem(store::XS_INTEGER, xs_integer(i));
+    theSmallIntegers[i - SMALL_INTEGER_MIN].set(
+        new IntegerItem(store::XS_INTEGER, xs_integer(i)));
 }
 
 
 BasicItemFactory::~BasicItemFactory()
 {
-  theFalseItem = NULL;
-  theTrueItem  = NULL;
   theQNamePool = NULL;
   theUriPool   = NULL;
 }
@@ -348,7 +346,7 @@ bool BasicItemFactory::createInteger(store::Item_t& result, const xs_integer& va
 {
   if (value >= theSmallIntegerMin && value <= theSmallIntegerMax)
   {
-    result = theSmallIntegers[to_xs_int(value) - SMALL_INTEGER_MIN];
+    result = theSmallIntegers[to_xs_int(value) - SMALL_INTEGER_MIN].get();
     return true;
   }
   result = new IntegerItem(store::XS_INTEGER, value);
@@ -462,7 +460,7 @@ bool BasicItemFactory::createUnsignedByte(
 
 bool BasicItemFactory::createBoolean(store::Item_t& result, xs_boolean value)
 {
-  result = (value ? theTrueItem : theFalseItem);
+  result = (value ? theTrueItem.get() : theFalseItem.get());
   return true;
 }
 
@@ -2205,7 +2203,7 @@ void BasicItemFactory::splitToAtomicTextValues(
 ********************************************************************************/
 bool BasicItemFactory::createJSONNull(store::Item_t& result)
 {
-  result = theNullItem;
+  result = theNullItem.get();
   return true;
 }
 
