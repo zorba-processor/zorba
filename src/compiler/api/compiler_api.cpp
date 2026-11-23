@@ -220,9 +220,6 @@ parsenode_t XQueryCompiler::parse(std::istream& aXQuery, const zstring& aFileNam
           theCompilerCB->theRootSctx->get_security_policy() :
           GENV_ROOT_STATIC_CONTEXT.get_security_policy());
 
-#ifndef NDEBUG
-    printf ("\n\n%s", converted_xquery_str);  // debug
-#endif
     // Freed right after the copy, also when the copy fails.
     try
     {

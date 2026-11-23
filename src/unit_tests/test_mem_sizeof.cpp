@@ -41,7 +41,7 @@ static bool assert_true( char const *expr, int line, bool result ) {
 ///////////////////////////////////////////////////////////////////////////////
 
 static void test_int() {
-  int i;
+  int const i = 0;
   ASSERT_TRUE( ztd::mem_sizeof( i ) == sizeof( i ) );
 }
 
@@ -67,7 +67,7 @@ struct point {
 };
 
 static void test_pod() {
-  point p;
+  point const p = {};
   ASSERT_TRUE( ztd::mem_sizeof( p ) == sizeof( p ) );
 }
 

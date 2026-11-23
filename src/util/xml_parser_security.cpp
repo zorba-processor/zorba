@@ -15,6 +15,7 @@
  */
 
 #include <atomic>
+#include <mutex>
 
 #include <libxml/HTMLparser.h>
 #include <libxml/parserInternals.h>
@@ -90,8 +91,12 @@ xmlParserInputPtr entity_loader(
   return lInput;
 }
 
+// Concurrent parses configure their contexts at the same time; the swap of the
+// process-wide loader (get, remember, set) must not interleave.
 void install_entity_loader()
 {
+  static std::mutex theInstallMutex;
+  std::lock_guard<std::mutex> const lLock(theInstallMutex);
   xmlExternalEntityLoader const lCurrent = xmlGetExternalEntityLoader();
   if (lCurrent != &entity_loader)
   {
