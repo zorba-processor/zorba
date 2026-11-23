@@ -103,7 +103,6 @@ struct ZorbaCmdProperties {
   bool          no_logo_;
   bool          no_serializer_;
   bool          omit_xml_declaration_;
-  unsigned      optimization_level_;
   std::string   ordering_mode_;
 #ifdef ZORBA_WITH_FILE_ACCESS
   std::string   output_file_;
