@@ -575,7 +575,7 @@ IF (ZORBA_WITH_FILE_ACCESS)
     SET (_mcp_schema_sweeps)
     IF (NOT ZORBA_NO_XMLSCHEMA)
       SET (_mcp_xml_tests error_canonicalize_input exhaust_sweep_validate
-                          exhaust_sweep_revalidate
+                          exhaust_sweep_revalidate exhaust_remove_type
                           exhaust_sweep_schema_import validate_type_error)
       SET (_mcp_schema_sweeps validate revalidate schema_import)
     ENDIF (NOT ZORBA_NO_XMLSCHEMA)

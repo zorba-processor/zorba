@@ -4515,6 +4515,82 @@ void test_json_object_add_out_of_memory( Fixture const &f ) {
   (void)f;
 #endif
 }
+// An insert into a typed element with each allocation failing in turn: the
+// insert takes the type away, and a failed insert gives it back, also when it
+// fails before the first node is attached.
+void test_remove_type_out_of_memory( Fixture const &f ) {
+#if defined(__linux__)
+  for ( char const *const node : { "attribute c { 'x' }", "<c/>" } ) {
+    auto attempt = [&]( long n, long length, long *count ) -> std::string {
+      Item doc;
+      {
+        XQuery_t const make( f.zorba->compileQuery(
+          "declare namespace xsi = 'http://www.w3.org/2001/XMLSchema-instance';\n"
+          "validate lax { document {\n"
+          "  <a xmlns:xs='http://www.w3.org/2001/XMLSchema'"
+          " xsi:type='xs:integer'>1</a> } }" ) );
+        Iterator_t const it( make->iterator() );
+        it->open();
+        it->next( doc );
+        it->close();
+      }
+      XQuery_t const insert( f.zorba->compileQuery(
+        "declare revalidation skip;\n"
+        "declare variable $d external;\n"
+        "insert node " + std::string( node ) + " into $d/a;\n"
+        "1" ) );
+      insert->getDynamicContext()->setVariable( "d", doc );
+      Iterator_t const it( insert->iterator() );
+      Item result;
+      bool failed = false;
+      inject_arm( n, length );
+      try {
+        it->open();
+        it->next( result );
+        it->close();
+      }
+      catch ( std::exception const& ) {
+        failed = true;
+      }
+      *count = inject_disarm();
+      std::string out( failed || result.isNull()
+                       ? "error" : result.getStringValue().str() );
+      XQuery_t const inspect( f.zorba->compileQuery(
+        "declare variable $d external;\n"
+        "string-join(($d/a instance of element(a, xs:integer),\n"
+        "             string($d/a), count($d/a/(@c, c))) ! string(), ' ')" ) );
+      inspect->getDynamicContext()->setVariable( "d", doc );
+      Iterator_t const seen( inspect->iterator() );
+      seen->open();
+      Item item;
+      out += "|";
+      while ( seen->next( item ) )
+        out += item.getStringValue().str();
+      seen->close();
+      return out;
+    };
+    std::string const what( std::string( "inserting " ) + node +
+                            " into a typed element" );
+    std::string const answer( "1|false 1 1" );
+    long total = 0;
+    check( attempt( 0, 0, &total ) == answer, what );
+    long wrong = 0;
+    for ( long const length : { 1L, 8L } )
+      for ( long n = 1; n <= total; ++n ) {
+        long count = 0;
+        std::string const got( attempt( n, length, &count ) );
+        if ( got != answer && got != "error|true 1 0" && ++wrong <= 3 )
+          std::cout << "at " << n << " of a run of " << length << ": " << got
+                    << std::endl;
+      }
+    check( wrong == 0, what + " failing: the answer, or an error and the "
+                       "element typed as before",
+           std::to_string( wrong ) + " points" );
+  }
+#else
+  (void)f;
+#endif
+}
 // Every allocation of a compilation fails in turn; after each, the same server
 // finds the built-in functions and the variables of a catch clause, as a fresh
 // one does.
@@ -8462,6 +8538,7 @@ Test const tests[] = {
   { "exhaust_json_loader", test_json_loader_out_of_memory },
   { "exhaust_serializer", test_serializer_out_of_memory },
   { "exhaust_json_object_add", test_json_object_add_out_of_memory },
+  { "exhaust_remove_type", test_remove_type_out_of_memory },
   { "exhaust_plan_wrapper", test_plan_wrapper_out_of_memory },
   { "exhaust_plan_open", test_plan_open_out_of_memory },
   { "exhaust_call_body", test_call_body_out_of_memory },
