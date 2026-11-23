@@ -39,11 +39,8 @@ typedef enum {
   ZORBA_OPT_LEVEL_O1,  /**< Use basic optimizations
                            (e.g.\ removing sorting, removing duplicate elimination,
                            or constant folding). */
-  ZORBA_OPT_LEVEL_O2  /** Use basic optimizations (like O1) and some
-                        * more optimizations (like not to generate an iterator
-                        * for inlined functions) - call stacks in case of
-                        * an exception are not generated.
-                        */
+  ZORBA_OPT_LEVEL_O2  /**< The same as O1: the compiler applies exactly the
+                           optimizations of O1 and no other. */
 } Zorba_opt_level_t;
 
 /** \brief Set of hints that can be passed to the query compiler.

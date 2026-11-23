@@ -175,7 +175,7 @@ FOREACH (_opt 3 O3 o1 1x)
 ENDFOREACH ()
 ZORBA_ADD_TEST(bin/zorba_optimization_level_help zorbacmd --help)
 ZORBA_SET_TEST_PROPERTY(bin/zorba_optimization_level_help PASS_REGULAR_EXPRESSION
-  "--optimization-level, -O {0[|]1[|]2[|]O0[|]O1[|]O2}\nOptimization level for the query compiler, default: 1[.] O0, O1 and O2 are the same as 0, 1 and 2[.] Any other value is an error[.]")
+  "--optimization-level, -O {0[|]1[|]2[|]O0[|]O1[|]O2}\nOptimization level for the query compiler, default: 1[.] O0, O1 and O2 are the same as 0, 1 and 2[.] Any other value is an error[.] Level 2 is the same as level 1: it adds no optimization[.]\n")
 ZORBA_ADD_TEST(bin/zorba_timeout_parse_members zorbacmd --timeout 1 -f -q "${_plandir}/timeout_parse_members.jq")
 ZORBA_SET_TEST_PROPERTY(bin/zorba_timeout_parse_members PASS_REGULAR_EXPRESSION ".*ZXQP0068.*")
 # --max-expr-depth sets the policy's expression nesting limit.
