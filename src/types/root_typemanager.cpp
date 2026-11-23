@@ -289,6 +289,14 @@ RootTypeManager::RootTypeManager()
                                            "",
                                            "null");
 
+  // Shared by every query, like the store's type names (which include the
+  // atomic ones above): immortal; the store's QName pool frees them.
+  for (store::Item* name : { XS_ANY_TYPE_QNAME.getp(), XS_UNTYPED_QNAME.getp(),
+                             XS_ANY_SIMPLE_TYPE_QNAME.getp(),
+                             XS_NMTOKENS_QNAME.getp(), XS_IDREFS_QNAME.getp(),
+                             XS_ENTITIES_QNAME.getp(), JS_NULL_QNAME.getp() })
+    name->makeImmortal();
+
   store::Item* tempQN = NULL;
   store::SchemaTypeCode tempCode;
 
