@@ -1644,6 +1644,16 @@ VFO_DeclList :
       release_hack( $3 );
       YYERROR;
     }
+  |
+    VFO_DeclList SEMI Import
+    {
+      $$ = $1; $$ = $3; // to prevent the Bison warning
+      error(@3, "syntax error, imports must come before variable, function, option and other declarations");
+      // YYERROR does not run %destructors on this rule's RHS values: release them.
+      release_hack( $1 );
+      release_hack( $3 );
+      YYERROR;
+    }
 ;
 
 

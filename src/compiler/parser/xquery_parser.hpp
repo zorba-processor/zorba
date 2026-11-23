@@ -1818,7 +1818,7 @@ namespace zorba {
     /// Constants.
     enum
     {
-      yylast_ = 18075,     ///< Last index in yytable_.
+      yylast_ = 18029,     ///< Last index in yytable_.
       yynnts_ = 326,  ///< Number of nonterminal symbols.
       yyfinal_ = 618 ///< Termination state number.
     };
