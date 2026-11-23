@@ -212,6 +212,16 @@ static expr* literal_key_lookup(expr* e, zstring* key)
 }
 
 
+/**
+ * Whether e is a reference to var.
+ */
+static bool is_reference(const expr* e, const var_expr* var)
+{
+  return e && e->get_expr_kind() == wrapper_expr_kind &&
+    static_cast<const wrapper_expr*>(e)->get_input() == var;
+}
+
+
 namespace {
 
 /**
@@ -272,6 +282,7 @@ private:
   bool only_values(expr* e);
   bool counted(expr* e);
   bool lookup_path(expr* e, std::vector<zstring>* path);
+  bool call_path(expr* e, std::vector<zstring>* path);
   void bind(const flwor_expr* flwor);
   bool reads_except(expr* e, const expr* skipped);
 };
@@ -307,11 +318,12 @@ const std::vector<zstring>* read_analysis::values_path(const expr* e) const
 
 /**
  * Gets the keys of e if it gives the values at the end of a path of literal
- * keys in values: a lookup path, or a variable of thePaths.
+ * keys in values: a lookup path, calls of literal keys, or a variable of
+ * thePaths.
  */
 bool read_analysis::path_values(expr* e, std::vector<zstring>* path)
 {
-  // A wrapper of an expression, as of a let variable replaced by its domain.
+  // A wrapper of an expression, as of a for or let variable replaced by its domain.
   while (e->get_expr_kind() == wrapper_expr_kind &&
          static_cast<wrapper_expr*>(e)->get_input()->get_expr_kind() != var_expr_kind)
     e = static_cast<wrapper_expr*>(e)->get_input();
@@ -320,7 +332,7 @@ bool read_analysis::path_values(expr* e, std::vector<zstring>* path)
     path->insert(path->end(), varPath->begin(), varPath->end());
     return true;
   }
-  return lookup_path(e, path);
+  return lookup_path(e, path) || call_path(e, path);
 }
 
 
@@ -410,6 +422,49 @@ bool read_analysis::lookup_path(expr* e, std::vector<zstring>* path)
   if (!only_values(input) && !path_values(input, path))
     return false;
   path->push_back(key);
+  return true;
+}
+
+
+/**
+ * Gets the keys of e if it is the translation of calls of literal keys,
+ * $v("k1")("k2"): for $f1 in V for $f2 in $f1("k1") return $f2("k2"), a
+ * lookup of the keys in each item of V, as V.k1.k2 is.
+ */
+bool read_analysis::call_path(expr* e, std::vector<zstring>* path)
+{
+  if (e->get_expr_kind() != flwor_expr_kind)
+    return false;
+  flwor_expr* flwor = static_cast<flwor_expr*>(e);
+  expr* domain = nullptr;
+  bool rooted = false;
+  const var_expr* item = nullptr;
+  std::vector<zstring> keys;
+  zstring key;
+  for (csize i = 0; i < flwor->num_clauses(); ++i)
+  {
+    if (flwor->get_clause(i)->get_kind() != flwor_clause::for_clause)
+      return false;
+    const for_clause* fc = static_cast<const for_clause*>(flwor->get_clause(i));
+    if (fc->is_allowing_empty())
+      return false;
+    if (i == 0)
+    {
+      domain = fc->get_expr();
+      rooted = std::find(theVars.begin(), theVars.end(), fc->get_var()) != theVars.end();
+    }
+    else if (is_reference(literal_key_lookup(fc->get_expr(), &key), item))
+      keys.push_back(key);
+    else
+      return false;
+    item = fc->get_var();
+  }
+  if (!item ||
+      !is_reference(literal_key_lookup(flwor->get_return_expr(), &key), item) ||
+      !(rooted || only_values(domain) || path_values(domain, path)))
+    return false;
+  keys.push_back(key);
+  path->insert(path->end(), keys.begin(), keys.end());
   return true;
 }
 
