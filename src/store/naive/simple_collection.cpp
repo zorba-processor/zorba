@@ -264,16 +264,32 @@ void SimpleCollection::addNode(store::Item* item, xs_integer position)
     {
       theTrees.push_back(item);
 
-      structuredItem->attachToCollection(this,
-                                         createTreeId(),
-                                         xs_integer(theTrees.size()));
+      try
+      {
+        structuredItem->attachToCollection(this,
+                                           createTreeId(),
+                                           xs_integer(theTrees.size()));
+      }
+      catch (...)
+      {
+        theTrees.pop_back();
+        throw;
+      }
     }
     else
     {
       zorba::checked_vector<store::Item_t>::size_type sPos = static_cast<zorba::checked_vector<store::Item_t>::size_type>(pos);
       theTrees.insert(theTrees.begin() + sPos, item);
 
-      structuredItem->attachToCollection(this, createTreeId(), position);
+      try
+      {
+        structuredItem->attachToCollection(this, createTreeId(), position);
+      }
+      catch (...)
+      {
+        theTrees.erase(theTrees.begin() + sPos);
+        throw;
+      }
     }
   }
   catch (const std::range_error&)
