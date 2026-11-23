@@ -84,10 +84,10 @@ private:
   // ExprManager point to VarInfo objects owned by sctx_ and access them in
   // their destructors, so sctx_ must outlive ccb_.
   static_context_t sctx_;
+  // diagnostics_ must be declared before ccb_, which points to it.
+  XQueryDiagnostics diagnostics_;
   CompilerCB ccb_;
   PlanIter_t plan_;
-
-  static XQueryDiagnostics* get_shared_diagnostics();
 
   // forbid these
   constraint( constraint const& );
@@ -782,7 +782,8 @@ inline void assert_type_matches( store::Item_t const &item, type const *t,
 static type const* find_builtin_atomic_type( zstring const &type_name,
                                              bool not_found_error = true ) {
   typedef map<char const*,atomic_type const*,::zorba::internal::ztd::less<char const*> > map_type;
-  static map_type m;
+  static map_type const types = [] {
+    map_type m;
 
 #define INIT_ATOMIC_TYPE(TYPE,CODE)               \
   static atomic_type instance_##TYPE;             \
@@ -790,7 +791,6 @@ static type const* find_builtin_atomic_type( zstring const &type_name,
   instance_##TYPE.schemaTypeCode_ = store::CODE;  \
   m[ #TYPE ] = &instance_##TYPE
 
-  if ( m.empty() ) {
     INIT_ATOMIC_TYPE( anyURI, XS_ANY_URI );
     INIT_ATOMIC_TYPE( base64Binary, XS_BASE64BINARY );
     INIT_ATOMIC_TYPE( boolean, XS_BOOLEAN );
@@ -860,10 +860,11 @@ static type const* find_builtin_atomic_type( zstring const &type_name,
 
     // TODO: add facets to other types
 #endif
-  }
+    return m;
+  }();
 
-  map_type::const_iterator const i( m.find( type_name.c_str() ) );
-  if ( i != m.end() )
+  map_type::const_iterator const i( types.find( type_name.c_str() ) );
+  if ( i != types.end() )
     return i->second;
   if ( not_found_error )
     throw XQUERY_EXCEPTION( jse::UNKNOWN_TYPE, ERROR_PARAMS( type_name ) );
@@ -974,7 +975,7 @@ constraint::constraint( zstring const &query,
                         static_context const &caller_sctx ) :
   query_( query ),
   sctx_( GENV_ROOT_STATIC_CONTEXT.create_child_context() ),
-  ccb_( get_shared_diagnostics() )
+  ccb_( &diagnostics_ )
 {
   // The constraint comes from the caller's data, so it runs under the
   // caller's security policy, not under the instance policy of the root.
@@ -991,11 +992,6 @@ constraint::constraint( zstring const &query,
 
   XQueryCompiler xc( &ccb_ );
   plan_ = xc.compile( iss, no_filename, next_dynamic_var_id );
-}
-
-XQueryDiagnostics* constraint::get_shared_diagnostics() {
-  static XQueryDiagnostics diagnostics;
-  return &diagnostics;
 }
 
 bool constraint::validate( dynamic_context &dctx ) const {

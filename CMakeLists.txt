@@ -300,6 +300,19 @@ LIST(APPEND requiredlibs ${requiredlibs-store})
 INCLUDE(cmake/CMakeConfiguration.txt)
 INCLUDE(cmake/CMakeCompiler.txt)
 
+# A multithreaded engine needs libxml2's per-thread error handlers and global
+# state.
+IF(NOT ZORBA_FOR_ONE_THREAD_ONLY)
+  INCLUDE(CheckSymbolExists)
+  SET(CMAKE_REQUIRED_INCLUDES ${LIBXML2_INCLUDE_DIR})
+  CHECK_SYMBOL_EXISTS(LIBXML_THREAD_ENABLED "libxml/xmlversion.h"
+                      ZORBA_LIBXML2_THREAD_ENABLED)
+  UNSET(CMAKE_REQUIRED_INCLUDES)
+  IF(NOT ZORBA_LIBXML2_THREAD_ENABLED)
+    MESSAGE(FATAL_ERROR "ZORBA_FOR_ONE_THREAD_ONLY=OFF requires a libxml2 built with thread support (LIBXML_THREAD_ENABLED).")
+  ENDIF(NOT ZORBA_LIBXML2_THREAD_ENABLED)
+ENDIF(NOT ZORBA_FOR_ONE_THREAD_ONLY)
+
 ###############################################################################
 
 #

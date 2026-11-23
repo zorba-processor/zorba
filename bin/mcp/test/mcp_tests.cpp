@@ -2582,16 +2582,13 @@ struct Known {
   long cap = 0;         // at most this many points per run length
   long length = 0;      // only in runs of this length; 0: any
   std::string ends;     // with prefix: and the outcome ends with this
-  // A crash in a library: its stack has no frame of the engine between the
-  // signal and the faulting frame (for "unknown": none at all).
-  bool not_in_engine = false;
 };
 Known exact( std::string const &text, long cap, long length = 0 ) {
-  return Known{ text, false, cap, length, "", false };
+  return Known{ text, false, cap, length, "" };
 }
 Known starting( std::string const &text, long cap, long length = 0,
                 std::string const &ends = "" ) {
-  return Known{ text, true, cap, length, ends, false };
+  return Known{ text, true, cap, length, ends };
 }
 
 struct Sweep {
@@ -2837,36 +2834,6 @@ void sweep_show_frames( std::string const &title, std::string const &hex,
     else
       std::cout << fr.where << std::endl;
   }
-}
-
-
-// Whether a crash the child sent was in the engine (libzorba*): its faulting
-// frame, the first one after the handler and the signal trampoline, is; for
-// SIGABRT (abort), the first frame outside libc and libgcc. With whole (a crash
-// in no known library), any frame of the engine counts.
-bool sweep_engine_crash( std::string const &hex, bool aborted, bool whole ) {
-  std::istringstream is( hex );
-  std::string h;
-  int i = 0;
-  while ( is >> h ) {
-    if ( i++ < 2 )   // the handler and the trampoline
-      continue;
-    Dl_info info;
-    void *const addr = reinterpret_cast<void*>( std::stoull( h, nullptr, 16 ) );
-    if ( !dladdr( addr, &info ) || !info.dli_fname )
-      continue;
-    char const *const slash = std::strrchr( info.dli_fname, '/' );
-    std::string const base( slash ? slash + 1 : info.dli_fname );
-    if ( base.rfind( "libzorba", 0 ) == 0 )
-      return true;
-    if ( whole || ( aborted && ( base.rfind( "libc.", 0 ) == 0 ||
-                               base.rfind( "libgcc", 0 ) == 0 ||
-                               base.rfind( "linux-vdso", 0 ) == 0 ||
-                               base.rfind( "mcp_tests", 0 ) == 0 ) ) )
-      continue;
-    return false;
-  }
-  return false;
 }
 
 
@@ -3230,17 +3197,6 @@ void exhaust_sweep( Fixture const &f, std::string const &name, Sweep const &s ) 
                std::to_string( message_allocations ) );
     for ( std::string const &over : sweep_over_cap( s, length, outcomes ) )
       check( false, name + ": a known limit within its cap", over );
-    // A crash allowed as one of a library: not in the engine.
-    for ( auto const &o : outcomes )
-      for ( Known const &k : s.known )
-        if ( k.not_in_engine && known_matches( k, length, o.first ) ) {
-          std::string const &crash = stacks_of[o.first].crash;
-          check( !crash.empty() &&
-                 !sweep_engine_crash( crash,
-                   o.first.find( "signal 6 " ) != std::string::npos,
-                   o.first.find( "unknown" ) != std::string::npos ),
-                 name + ": a crash of a library, not in the engine", o.first );
-        }
     for ( auto const &o : outcomes ) {
       bool const allowed = sweep_allowed( s, length, o.first );
       std::cout << name << ", " << length << " failing: " << o.second.first
@@ -4620,6 +4576,82 @@ void test_update_primitive_out_of_memory( Fixture const &f ) {
   check( __lsan_do_recoverable_leak_check() == 0,
          "node updates failing: nothing is left behind" );
 # endif
+#else
+  (void)f;
+#endif
+}
+// An insert into a typed element with each allocation failing in turn: the
+// insert takes the type away, and a failed insert gives it back, also when it
+// fails before the first node is attached.
+void test_remove_type_out_of_memory( Fixture const &f ) {
+#if defined(__linux__)
+  for ( char const *const node : { "attribute c { 'x' }", "<c/>" } ) {
+    auto attempt = [&]( long n, long length, long *count ) -> std::string {
+      Item doc;
+      {
+        XQuery_t const make( f.zorba->compileQuery(
+          "declare namespace xsi = 'http://www.w3.org/2001/XMLSchema-instance';\n"
+          "validate lax { document {\n"
+          "  <a xmlns:xs='http://www.w3.org/2001/XMLSchema'"
+          " xsi:type='xs:integer'>1</a> } }" ) );
+        Iterator_t const it( make->iterator() );
+        it->open();
+        it->next( doc );
+        it->close();
+      }
+      XQuery_t const insert( f.zorba->compileQuery(
+        "declare revalidation skip;\n"
+        "declare variable $d external;\n"
+        "insert node " + std::string( node ) + " into $d/a;\n"
+        "1" ) );
+      insert->getDynamicContext()->setVariable( "d", doc );
+      Iterator_t const it( insert->iterator() );
+      Item result;
+      bool failed = false;
+      inject_arm( n, length );
+      try {
+        it->open();
+        it->next( result );
+        it->close();
+      }
+      catch ( std::exception const& ) {
+        failed = true;
+      }
+      *count = inject_disarm();
+      std::string out( failed || result.isNull()
+                       ? "error" : result.getStringValue().str() );
+      XQuery_t const inspect( f.zorba->compileQuery(
+        "declare variable $d external;\n"
+        "string-join(($d/a instance of element(a, xs:integer),\n"
+        "             string($d/a), count($d/a/(@c, c))) ! string(), ' ')" ) );
+      inspect->getDynamicContext()->setVariable( "d", doc );
+      Iterator_t const seen( inspect->iterator() );
+      seen->open();
+      Item item;
+      out += "|";
+      while ( seen->next( item ) )
+        out += item.getStringValue().str();
+      seen->close();
+      return out;
+    };
+    std::string const what( std::string( "inserting " ) + node +
+                            " into a typed element" );
+    std::string const answer( "1|false 1 1" );
+    long total = 0;
+    check( attempt( 0, 0, &total ) == answer, what );
+    long wrong = 0;
+    for ( long const length : { 1L, 8L } )
+      for ( long n = 1; n <= total; ++n ) {
+        long count = 0;
+        std::string const got( attempt( n, length, &count ) );
+        if ( got != answer && got != "error|true 1 0" && ++wrong <= 3 )
+          std::cout << "at " << n << " of a run of " << length << ": " << got
+                    << std::endl;
+      }
+    check( wrong == 0, what + " failing: the answer, or an error and the "
+                       "element typed as before",
+           std::to_string( wrong ) + " points" );
+  }
 #else
   (void)f;
 #endif
@@ -8572,6 +8604,7 @@ Test const tests[] = {
   { "exhaust_serializer", test_serializer_out_of_memory },
   { "exhaust_json_object_add", test_json_object_add_out_of_memory },
   { "exhaust_update_primitive", test_update_primitive_out_of_memory },
+  { "exhaust_remove_type", test_remove_type_out_of_memory },
   { "exhaust_plan_wrapper", test_plan_wrapper_out_of_memory },
   { "exhaust_plan_open", test_plan_open_out_of_memory },
   { "exhaust_call_body", test_call_body_out_of_memory },

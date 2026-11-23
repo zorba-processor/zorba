@@ -64,11 +64,10 @@ namespace thesaurus_impl {
    */
   static type find( zstring const &name ) {
     typedef map<char const*,type,::zorba::internal::ztd::less<char const*> > impl_map_t;
-    static impl_map_t impl_map;
-    if ( impl_map.empty() ) {
-      impl_map[ "wordnet" ] = wordnet;
-      impl_map[ "xqftts"  ] = xqftts;
-    }
+    static impl_map_t const impl_map = {
+      { "wordnet", wordnet },
+      { "xqftts" , xqftts  },
+    };
     impl_map_t::const_iterator const result = impl_map.find( name.c_str() );
     return result != impl_map.end() ? result->second : unknown;
   }

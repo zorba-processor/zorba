@@ -84,7 +84,7 @@ private:
   internal::ThesaurusURLResolver  * m_thesaurus_resolver;
 #endif /* ZORBA_NO_FULL_TEXT */
 
-  mutable DynamicLoader           * theDynamicLoader;
+  std::unique_ptr<DynamicLoader>    theDynamicLoader;
 
   locale::iso3166_1::type           theHostCountry;
 

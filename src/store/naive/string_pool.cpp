@@ -61,10 +61,13 @@ bool StringPool::insertc(const char* str, zstring& outStr)
 
   zstring::size_type len = strlen(str);
 
-  ulong hval = hashfun::h32(str, len, FNV_32_INIT) % bucket_count();
+  uint32_t const hash = hashfun::h32(str, len, FNV_32_INIT);
 
   {
     SYNC_CODE(AutoMutex lock(&theMutex);)
+
+    // Under the mutex: an insert on another thread can resize the table.
+    ulong hval = hash % bucket_count();
 
     HashEntry<zstring, DummyHashValue>* entry = &theHashTab[hval];
 

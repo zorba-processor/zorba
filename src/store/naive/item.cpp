@@ -1429,7 +1429,12 @@ void Item::swap(Item* anotherItem)
     simplestore::XmlTree* tree2 = node2->getTree();
 #else
     simplestore::XmlTree* tree1 = node1->lockTree();
-    simplestore::XmlTree* tree2 = node2->lockTree();
+    // While tree1 is locked, node2 can neither join nor leave it; its lock is
+    // not recursive, so it is taken once when both nodes are in it.
+    simplestore::XmlTree* tree2 =
+      reinterpret_cast<simplestore::XmlTree*>(anotherItem->loadUnion());
+    if (tree2 != tree1)
+      tree2 = node2->lockTree();
 #endif
     assert(tree1);
     assert(tree2);
@@ -1443,7 +1448,7 @@ void Item::swap(Item* anotherItem)
     tree1->getRefCount() += count2 - count1;
 
     SYNC_CODE(tree1->getRCLock()->release();)
-    SYNC_CODE(tree2->getRCLock()->release();)
+    SYNC_CODE(if (tree2 != tree1) tree2->getRCLock()->release();)
     return;
   }
 

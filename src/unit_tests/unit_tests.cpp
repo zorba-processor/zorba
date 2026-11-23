@@ -64,6 +64,7 @@ void initializeTestList()
   libunittests["mmap_file"] = test_mmap_file;
   libunittests["node_edit_iterator"] = test_node_edit_iterator;
   libunittests["node_packing"] = test_node_packing;
+  libunittests["node_swap"] = test_node_swap;
   libunittests["float_equality"] = test_float_equality;
   libunittests["numeric_hash"] = test_numeric_hash;
   libunittests["ordpath"] = test_ordpath;
@@ -73,6 +74,7 @@ void initializeTestList()
   libunittests["json_parser"] = test_json_parser;
   libunittests["parameters"] = test_parameters;
   libunittests["profile_data"] = test_profile_data;
+  libunittests["root_type_names"] = test_root_type_names;
   libunittests["security_policy"] = test_security_policy;
   libunittests["numeric_items"] = test_numeric_items;
   libunittests["small_integers"] = test_small_integers;

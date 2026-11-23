@@ -57,12 +57,14 @@ namespace UnitTests {
   int test_mmap_file( int, char*[] );
   int test_node_edit_iterator( int, char*[] );
   int test_node_packing( int, char*[] );
+  int test_node_swap( int, char*[] );
   int test_float_equality( int, char*[] );
   int test_numeric_hash( int, char*[] );
   int test_numeric_items( int, char*[] );
   int test_ordpath( int, char*[] );
   int test_parameters( int, char*[] );
   int test_profile_data( int, char*[] );
+  int test_root_type_names( int, char*[] );
   int test_security_policy( int, char*[] );
   int test_small_integers( int, char*[] );
   int test_string( int, char*[] );
