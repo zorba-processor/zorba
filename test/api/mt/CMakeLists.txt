@@ -18,7 +18,7 @@
 
 SET(MTSchemaTests)
 IF (NOT ZORBA_NO_XMLSCHEMA)
-  SET(MTSchemaTests mt_schema.cpp)
+  SET(MTSchemaTests mt_schema.cpp mt_lock_order.cpp)
 ENDIF (NOT ZORBA_NO_XMLSCHEMA)
 
 CREATE_TEST_SOURCELIST(MTTests
@@ -26,6 +26,7 @@ CREATE_TEST_SOURCELIST(MTTests
   mt_independent.cpp
   mt_clone.cpp
   mt_shared_items.cpp
+  mt_store_rw.cpp
   ${MTSchemaTests}
 )
 

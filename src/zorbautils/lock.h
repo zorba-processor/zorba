@@ -67,10 +67,15 @@ protected:
   ulong                     theNumWaiters;
   std::vector<LockRequest>  theHolders;
 
+  // The address ThreadSanitizer's annotations name the lock by: theMutex is at
+  // the lock's own address.
+  char                      theTsanId;
+
 public:
   Lock();
   ~Lock();
 
+  void lock(Mode aMode);
   void rlock();
   void wlock();
   void unlock();
@@ -93,10 +98,7 @@ private:
 public:
   AutoLock(Lock& l, Lock::Mode m) : theLock(l)
   {
-    if (m == Lock::READ)
-      theLock.rlock();
-    else
-      theLock.wlock();
+    theLock.lock(m);
   }
     
   ~AutoLock()

@@ -550,7 +550,12 @@ void XQueryImpl::compile(
 
 
 /*******************************************************************************
-  Always called while holding theMutex
+  Always called while holding theMutex.
+
+  Compilation (compile() and loadProlog()) holds the store lock in READ: it
+  runs expressions (constant folding), and the queries that URL resolvers run
+  for its imports while holding the Xerces mutex then take the store lock
+  recursively, so they never wait for it while holding that mutex.
 ********************************************************************************/
 void XQueryImpl::doCompile(
     std::istream& aQuery,
@@ -558,6 +563,8 @@ void XQueryImpl::doCompile(
     bool fork_sctx,
     ulong& nextDynamicVarId)
 {
+  SYNC_CODE(AutoLock lock(GENV_STORE.getGlobalLock(), Lock::READ);)
+
   if ( ! theStaticContext )
   {
     // no context given => use the default one (i.e. a child of the root static context)
@@ -1114,7 +1121,7 @@ void XQueryImpl::executeSAX()
     Zorba_SerializerOptions_t opt;
     SerializerImpl::setSerializationParameters(lSerializer, opt);
 
-    SYNC_CODE(AutoLock lock(GENV_STORE.getGlobalLock(), Lock::READ);)
+    SYNC_CODE(AutoLock lock(GENV_STORE.getGlobalLock(), executionLockMode());)
 
     PlanWrapper_t lPlan = generateWrapper();
 
@@ -1165,7 +1172,7 @@ void XQueryImpl::execute(
 
     theExecuting = true;
 
-    SYNC_CODE(AutoLock lock(GENV_STORE.getGlobalLock(), Lock::READ);)
+    SYNC_CODE(AutoLock lock(GENV_STORE.getGlobalLock(), executionLockMode());)
 
     PlanWrapper_t lPlan = generateWrapper();
 
@@ -1209,7 +1216,7 @@ void XQueryImpl::execute(
 
     theExecuting = true;
 
-    SYNC_CODE(AutoLock lock(GENV_STORE.getGlobalLock(), Lock::READ);)
+    SYNC_CODE(AutoLock lock(GENV_STORE.getGlobalLock(), executionLockMode());)
 
     PlanWrapper_t lPlan = generateWrapper();
 
@@ -1385,6 +1392,18 @@ PlanWrapper_t XQueryImpl::generateWrapper()
 }
 
 
+/*******************************************************************************
+  The store lock mode of an execution: updating and sequential queries change
+  the store while they run, so they exclude every other query for their whole
+  run.
+********************************************************************************/
+Lock::Mode XQueryImpl::executionLockMode() const
+{
+  return theCompilerCB->isUpdating() || theCompilerCB->isSequential() ?
+         Lock::WRITE : Lock::READ;
+}
+
+
 #ifdef ZORBA_WITH_DEBUGGER
 /*******************************************************************************
 
@@ -1433,7 +1452,7 @@ void XQueryImpl::debug(
     //check if the debug mode is enabled
     checkIsDebugMode();
 
-    SYNC_CODE(AutoLock lock(GENV_STORE.getGlobalLock(), Lock::READ);)
+    SYNC_CODE(AutoLock lock(GENV_STORE.getGlobalLock(), executionLockMode());)
 
     theExecuting = true;
 
