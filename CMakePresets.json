@@ -425,7 +425,7 @@
       },
       "filter": {
         "exclude": {
-          "name": "http-client|test/api/validate$|userdefined_uri_resolution|uri_resolvers|streaming-udf|store/example_[13]$|uris/disable-http-3|update/zorba/store/sc1|update/zorba/store/sc2_ex|test/api/mt/mt_(schema|clone|clone_cold)$"
+          "name": "http-client|test/api/validate$|userdefined_uri_resolution|uri_resolvers|streaming-udf|store/example_[13]$|uris/disable-http-3|update/zorba/store/sc1|update/zorba/store/sc2_ex|test/api/mt/mt_(schema|clone_cold)$"
         }
       }
     }

@@ -80,7 +80,7 @@ void NodeDistinctIterator::serialize(::zorba::serialization::Archiver& ar)
 }
 
 
-void NodeDistinctIterator::openImpl(PlanState& planState, uint32_t& offset)
+void NodeDistinctIterator::openImpl(PlanState& planState, uint32_t& offset) const
 {
   UnaryBaseIterator<NodeDistinctIterator, NodeDistinctState>::
   openImpl(planState, offset);
@@ -139,7 +139,7 @@ void NodeSortIterator::serialize(::zorba::serialization::Archiver& ar)
 }
 
 
-void NodeSortIterator::openImpl(PlanState& planState, uint32_t& offset)
+void NodeSortIterator::openImpl(PlanState& planState, uint32_t& offset) const
 {
   UnaryBaseIterator<NodeSortIterator, NodeSortState>::
   openImpl(planState, offset);

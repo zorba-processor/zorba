@@ -17,15 +17,6 @@ race:zorba::user_function::getPlan
 race:zorba::MarkFreeVars::apply
 race:zorba::expr::set*(zorba::BoolAnnotationValue)
 
-# C8 (P8): every open() writes the iterator's state offset into the shared
-# plan.
-race:zorba::StateTraitsImpl<*>::createState
-
-# C9 (P8): openImpl writes static and dynamic context values into members of
-# the shared iterator.
-race:zorba::CompareIterator::openImpl
-race:zorba::ElementIterator::openImpl
-
 # C10 (P9): rewrites set flags on FLWOR expressions that clones share.
 race:zorba::flwor_expr::set_general
 

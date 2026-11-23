@@ -343,6 +343,12 @@ void StartClause::accept(PlanIterVisitor& v) const
 /***************************************************************************//**
 
 ********************************************************************************/
+void StartClause::assignStateOffsets(uint32_t& offset)
+{
+  theStartClauseIter->assignStateOffsets(offset);
+}
+
+
 void StartClause::open(PlanState& planState, uint32_t& aOffset) const
 {
   theStartClauseIter->open(planState, aOffset);
@@ -494,6 +500,13 @@ void EndClause::accept(PlanIterVisitor& v) const
 /***************************************************************************//**
 
 ********************************************************************************/
+void EndClause::assignStateOffsets(uint32_t& offset)
+{
+  if (theHasEndClause)
+    theEndClauseIter->assignStateOffsets(offset);
+}
+
+
 void EndClause::open(PlanState& planState, uint32_t& aOffset) const
 {
   if (theHasEndClause)
@@ -748,7 +761,22 @@ void WindowIterator::accept(PlanIterVisitor& v) const
 /***************************************************************************//**
 
 ********************************************************************************/
-void WindowIterator::openImpl(PlanState& planState, uint32_t& offset)
+void WindowIterator::assignStateOffsets(uint32_t& offset)
+{
+  assignOwnStateOffset<WindowState>(offset);
+
+  theTupleIter->assignStateOffsets(offset);
+  theInputIter->assignStateOffsets(offset);
+
+  if (theTreatIter)
+    theTreatIter->assignStateOffsets(offset);
+
+  theStartClause.assignStateOffsets(offset);
+  theEndClause.assignStateOffsets(offset);
+}
+
+
+void WindowIterator::openImpl(PlanState& planState, uint32_t& offset) const
 {
   StateTraitsImpl<WindowState>::createState(planState, theStateOffset, offset);
   StateTraitsImpl<WindowState>::initState(planState, theStateOffset);

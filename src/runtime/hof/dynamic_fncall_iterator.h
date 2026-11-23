@@ -119,7 +119,9 @@ public:
 
   uint32_t getStateSizeOfSubtree() const;
 
-  void openImpl(PlanState& planState, uint32_t& offset);
+  void assignStateOffsets(uint32_t& offset);
+
+  void openImpl(PlanState& planState, uint32_t& offset) const;
 
   zstring getNameAsString() const;
 
@@ -184,7 +186,9 @@ public:
 
   uint32_t getStateSizeOfSubtree() const;
 
-  void openImpl(PlanState& planState, uint32_t& offset);
+  void assignStateOffsets(uint32_t& offset);
+
+  void openImpl(PlanState& planState, uint32_t& offset) const;
 
   bool nextImpl(store::Item_t& result, PlanState& aPlanState) const;
 

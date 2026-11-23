@@ -55,7 +55,8 @@ public:
   // inherited
   void accept( PlanIterVisitor& ) const;
   uint32_t getStateSizeOfSubtree() const;
-  void openImpl( PlanState&, uint32_t& );
+  void assignStateOffsets( uint32_t& );
+  void openImpl( PlanState&, uint32_t& ) const;
   bool nextImpl( store::Item_t&, PlanState& ) const;
   void resetImpl( PlanState& ) const;
   void closeImpl( PlanState& );

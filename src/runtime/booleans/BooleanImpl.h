@@ -148,7 +148,6 @@ private:
   CompareConsts::CompareType  theCompType;
   bool                        theIsGeneralComparison;
   TypeManager               * theTypeManager;
-  long                        theTimezone;
   XQPCollator               * theCollation;
 
 public:
@@ -165,8 +164,6 @@ public:
       CompareConsts::CompareType aCompType);
 
   void accept(PlanIterVisitor& v) const;
-
-  void openImpl(PlanState& planState, uint32_t& offset);
 
   zstring getNameAsString() const;
 
@@ -269,7 +266,6 @@ class TypedValueCompareIterator : public NaryBaseIterator<TypedValueCompareItera
                                                           PlanIteratorState>
 {
   CompareConsts::CompareType  theCompType;
-  long                        theTimezone;
   XQPCollator               * theCollation;
 
 public:
@@ -288,16 +284,13 @@ public:
     :
     NaryBaseIterator<TypedValueCompareIterator<ATC>, PlanIteratorState>(sctx, loc, children),
     theCompType(aCompType),
-    theTimezone(0),
-    theCollation(NULL)
+    theCollation(this->getDefaultCollator())
   {
   }
 
   ~TypedValueCompareIterator () {}
 
   void accept(PlanIterVisitor& v) const;
-
-  void openImpl(PlanState& planState, uint32_t& offset);
 
   zstring getNameAsString() const;
 
@@ -328,7 +321,6 @@ public BinaryBaseIterator<AtomicValuesEquivalenceIterator, PlanIteratorState>
 {
 private:
   TypeManager               * theTypeManager;
-  long                        theTimezone;
   XQPCollator               * theCollation;
 
 public:
@@ -344,8 +336,6 @@ public:
       PlanIter_t theChild1);
 
   void accept(PlanIterVisitor& v) const;
-
-  void openImpl(PlanState& planState, uint32_t& offset);
 
   zstring getNameAsString() const;
 

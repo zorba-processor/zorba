@@ -84,7 +84,18 @@ public:
            this->getStateSize();
   }
 
-  void openImpl(PlanState& planState, uint32_t& offset);
+  virtual void assignStateOffsets(uint32_t& offset)
+  {
+    this->template assignOwnStateOffset<StateType>(offset);
+
+    if (theChild0)
+      theChild0->assignStateOffsets(offset);
+
+    if (theChild1)
+      theChild1->assignStateOffsets(offset);
+  }
+
+  void openImpl(PlanState& planState, uint32_t& offset) const;
 
   void resetImpl(PlanState& planState) const;
 
@@ -107,7 +118,7 @@ template <class IterType, class StateType>
 void
 BinaryBaseIterator<IterType, StateType>::openImpl(
     PlanState& planState,
-    uint32_t& offset)
+    uint32_t& offset) const
 {
   StateTraitsImpl<StateType>::createState(planState, this->theStateOffset, offset);
   StateTraitsImpl<StateType>::initState(planState, this->theStateOffset);

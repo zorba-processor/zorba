@@ -135,7 +135,9 @@ public:
 
   virtual ~TryCatchIterator();
   
-  void openImpl(PlanState& planState, uint32_t& offset);
+  void assignStateOffsets(uint32_t& offset);
+
+  void openImpl(PlanState& planState, uint32_t& offset) const;
   bool nextImpl(store::Item_t& result, PlanState& aPlanState) const;
   void resetImpl(PlanState& planState) const;
   void closeImpl(PlanState& planState);

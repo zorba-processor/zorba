@@ -184,7 +184,11 @@ public:
 
   uint32_t getStateSizeOfSubtree() const;
 
-  void open(const static_context* sctx, PlanState& planState, uint32_t& offset);
+  void setCollators(const static_context* sctx);
+
+  void assignStateOffsets(uint32_t& offset);
+
+  void open(PlanState& planState, uint32_t& offset) const;
 
   void close(PlanState& planState);
 
@@ -234,7 +238,11 @@ public:
 
   uint32_t getStateSizeOfSubtree() const;
 
-  void open(const static_context* sctx, PlanState& planState, uint32_t& offset);
+  void setCollators(const static_context* sctx);
+
+  void assignStateOffsets(uint32_t& offset);
+
+  void open(PlanState& planState, uint32_t& offset) const;
 
   void close(PlanState& planState);
 
@@ -285,7 +293,9 @@ public:
 
   uint32_t getStateSizeOfSubtree() const;
 
-  void open(static_context* sctx, PlanState& planState, uint32_t& offset);
+  void setCollators(const static_context* sctx);
+  void assignStateOffsets(uint32_t& offset);
+  void open(PlanState& planState, uint32_t& offset) const;
   void reset(PlanState& planState);
   void close(PlanState& planState);
 };
@@ -466,7 +476,8 @@ public:
 
   ~FLWORIterator();
 
-  void openImpl(PlanState& planState, uint32_t& offset);
+  void assignStateOffsets(uint32_t& offset);
+  void openImpl(PlanState& planState, uint32_t& offset) const;
   bool nextImpl(store::Item_t& result, PlanState& planState) const;
   void resetImpl(PlanState& planState) const;
   void closeImpl(PlanState& planState);

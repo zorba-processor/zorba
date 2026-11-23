@@ -130,7 +130,19 @@ uint32_t SingleDynamicFnCallIterator::getStateSizeOfSubtree() const
 /*******************************************************************************
 
 ********************************************************************************/
-void SingleDynamicFnCallIterator::openImpl(PlanState& planState, uint32_t& offset)
+void SingleDynamicFnCallIterator::assignStateOffsets(uint32_t& offset)
+{
+  assignOwnStateOffset<SingleDynamicFnCallIteratorState>(offset);
+
+  // The space where openImpl() opens the calls of the function items.
+  offset += sizeof(UDFunctionCallIteratorState);
+
+  for (PlanIter_t& child : theChildren)
+    child->assignStateOffsets(offset);
+}
+
+
+void SingleDynamicFnCallIterator::openImpl(PlanState& planState, uint32_t& offset) const
 {
   StateTraitsImpl<SingleDynamicFnCallIteratorState>::
   createState(planState, theStateOffset, offset);
@@ -146,8 +158,8 @@ void SingleDynamicFnCallIterator::openImpl(PlanState& planState, uint32_t& offse
 
   offset += sizeof(UDFunctionCallIteratorState);
 
-  std::vector<PlanIter_t>::iterator lIter = theChildren.begin();
-  std::vector<PlanIter_t>::iterator lEnd = theChildren.end();
+  std::vector<PlanIter_t>::const_iterator lIter = theChildren.begin();
+  std::vector<PlanIter_t>::const_iterator lEnd = theChildren.end();
   for ( ; lIter != lEnd; ++lIter )
   {
     (*lIter)->open(planState, offset);
@@ -234,7 +246,9 @@ bool SingleDynamicFnCallIterator::nextImpl(
     }
     else
     {
-      state->thePlan = fnItem->getImplementation(theChildren, planState.theCompilerCB);
+      state->thePlan = fnItem->getImplementation(theChildren,
+                                                 planState.theCompilerCB,
+                                                 state->theUDFStateOffset);
       
       // must be opened after vars and params are set
       state->thePlan->openPlan(planState, state->theUDFStateOffset);
@@ -474,7 +488,18 @@ uint32_t MultiDynamicFnCallIterator::getStateSizeOfSubtree() const
 /*******************************************************************************
 
 ********************************************************************************/
-void MultiDynamicFnCallIterator::openImpl(PlanState& planState, uint32_t& offset)
+void MultiDynamicFnCallIterator::assignStateOffsets(uint32_t& offset)
+{
+  assignOwnStateOffset<MultiDynamicFnCallIteratorState>(offset);
+
+  // The space where openImpl() opens the calls of the function items.
+  offset += sizeof(UDFunctionCallIteratorState);
+
+  theChild->assignStateOffsets(offset);
+}
+
+
+void MultiDynamicFnCallIterator::openImpl(PlanState& planState, uint32_t& offset) const
 {
   StateTraitsImpl<MultiDynamicFnCallIteratorState>::
   createState(planState, theStateOffset, offset);
@@ -542,7 +567,8 @@ bool MultiDynamicFnCallIterator::nextImpl(
         ERROR_PARAMS("dynamic function invoked with incorrect number of arguments"));
       }
 
-      state->thePlan = fnItem->getImplementation(planState.theCompilerCB);
+      state->thePlan = fnItem->getImplementation(planState.theCompilerCB,
+                                                 state->theUDFStateOffset);
       
       // must be opened after vars and params are set
       state->thePlan->openPlan(planState, state->theUDFStateOffset);

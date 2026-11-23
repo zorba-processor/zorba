@@ -62,7 +62,12 @@ public:
     return getStateSize(); 
   }
 
-  virtual void openImpl(PlanState&, uint32_t& offset);
+  virtual void assignStateOffsets(uint32_t& offset)
+  {
+    this->template assignOwnStateOffset<StateType>(offset);
+  }
+
+  virtual void openImpl(PlanState&, uint32_t& offset) const;
 
   virtual void resetImpl(PlanState& planState) const;
 
@@ -75,22 +80,10 @@ template <class IterType, class StateType>
 void
 NoaryBaseIterator<IterType, StateType>::openImpl(
     PlanState& planState,
-    uint32_t& offset)
+    uint32_t& offset) const
 {
-#ifndef NDEBUG
-  uint32_t saveOffset = this->theStateOffset;
-#endif
   StateTraitsImpl<StateType>::createState(planState, this->theStateOffset, offset);
   StateTraitsImpl<StateType>::initState(planState, this->theStateOffset);
-
-#ifndef NDEBUG
-  if (saveOffset != 0 && saveOffset != this->theStateOffset)
-  {
-    std::cout << "saved offset = " << saveOffset
-              << " current offset = " << this->theStateOffset << std::endl;
-    ZORBA_ASSERT(false);
-  }
-#endif
 }
 
 

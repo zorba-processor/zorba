@@ -1077,7 +1077,8 @@ static expr* dynamicCallExpr(CompilerCB* ccb, const QueryLoc& loc)
 ********************************************************************************/
 PlanIter_t FunctionItem::getImplementation(
     const std::vector<PlanIter_t>& dynChildren,
-    CompilerCB* ccb)
+    CompilerCB* ccb,
+    uint32_t stateOffset)
 {
   std::vector<PlanIter_t> args;
   args.resize(theArgValues.size());
@@ -1115,7 +1116,7 @@ PlanIter_t FunctionItem::getImplementation(
   UDFunctionCallIterator* udfIter =
   static_cast<UDFunctionCallIterator*>(udfCallIterator.getp());
 
-  udfIter->setDynamic();
+  udfIter->setDynamic(stateOffset);
   udfIter->setFunctionItem(this);
 
   return udfCallIterator;
@@ -1125,7 +1126,7 @@ PlanIter_t FunctionItem::getImplementation(
 /*******************************************************************************
 
 ********************************************************************************/
-PlanIter_t FunctionItem::getImplementation(CompilerCB* ccb)
+PlanIter_t FunctionItem::getImplementation(CompilerCB* ccb, uint32_t stateOffset)
 {
   std::vector<PlanIter_t> args;
 
@@ -1141,7 +1142,7 @@ PlanIter_t FunctionItem::getImplementation(CompilerCB* ccb)
   UDFunctionCallIterator* udfIter =
   static_cast<UDFunctionCallIterator*>(udfCallIterator.getp());
 
-  udfIter->setDynamic();
+  udfIter->setDynamic(stateOffset);
   udfIter->setFunctionItem(this);
 
   return udfCallIterator;

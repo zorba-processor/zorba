@@ -440,6 +440,12 @@ public:
   theDefaultCollation :
   ---------------------
 
+  theDefaultCollator :
+  --------------------
+  The collator of theDefaultCollation, looked up when the default collation is
+  set, so that concurrent queries only read it. NULL in a context loaded from
+  a saved plan (it is not serialized); get_default_collator() then looks it up.
+
   theDecimalFormats :
   -------------------
   Set of decimal formats. Each decimal format is identified by a qname.
@@ -679,7 +685,7 @@ protected:
 
   CollationMap                          * theCollationMap;
   std::string                           * theDefaultCollation;
-  mutable XQPCollator                   * theCachedDefaultCollator;
+  XQPCollator                           * theDefaultCollator;
 
   OptionMap                             * theOptionMap;
 

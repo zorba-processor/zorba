@@ -301,7 +301,9 @@ public:
 
   void accept(PlanIterVisitor& v) const;
 
-  void openImpl(PlanState& planState, uint32_t& offset);
+  void assignStateOffsets(uint32_t& offset);
+
+  void openImpl(PlanState& planState, uint32_t& offset) const;
 
   void resetImpl(PlanState& planState) const;
 
@@ -467,7 +469,9 @@ public:
 
   uint32_t getStateSizeOfSubtree() const;
 
-  void openImpl(PlanState& planState, uint32_t& offset);
+  void assignStateOffsets(uint32_t& offset);
+
+  void openImpl(PlanState& planState, uint32_t& offset) const;
 
   void resetImpl(PlanState& planState) const;
 

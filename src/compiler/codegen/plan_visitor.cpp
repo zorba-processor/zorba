@@ -3934,6 +3934,12 @@ PlanIter_t codegen(
   root->accept(c);
   PlanIter_t result = c.result();
 
+  if (result)
+  {
+    uint32_t stateOffset = 0;
+    result->assignStateOffsets(stateOffset);
+  }
+
   nextDynamicVarId = c.getNextDynamicVarId();
 
   Zorba_plan_format_t const format = Properties::instance().getPlanFormat();

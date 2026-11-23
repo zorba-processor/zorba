@@ -155,12 +155,12 @@ public:
       PlanState& planState,
       user_function* udf,
       bool theIsDynamic,
-      store::ItemHandle<FunctionItem>& theFunctionItem);
+      const store::ItemHandle<FunctionItem>& theFunctionItem);
 
   void createBodyState(
       PlanState& planState,
       bool isDynamic,
-      store::ItemHandle<FunctionItem>& functionItem);
+      const store::ItemHandle<FunctionItem>& functionItem);
 
   void reset(PlanState& planState);
 
@@ -243,7 +243,13 @@ public:
 
   bool isUpdating() const;
 
-  void setDynamic() { theIsDynamic = true; }
+  // A dynamic call is generated for one call of a function item and opened at
+  // stateOffset in the plan state of its caller.
+  void setDynamic(uint32_t stateOffset)
+  {
+    theIsDynamic = true;
+    theStateOffset = stateOffset;
+  }
 
   void setFunctionItem(const FunctionItem* fnItem) { theFunctionItem = fnItem; }
 
@@ -253,7 +259,7 @@ public:
 
   void accept(PlanIterVisitor& v) const;
 
-  void openImpl(PlanState& planState, uint32_t& offset);
+  void openImpl(PlanState& planState, uint32_t& offset) const;
 
   void resetImpl(PlanState& planState) const;
 
@@ -271,7 +277,7 @@ private:
 protected:
   void initCache(
     PlanState& aPlanState,
-    UDFunctionCallIteratorState* aState);
+    UDFunctionCallIteratorState* aState) const;
 
   bool probeCache(
     PlanState& aPlanState,
@@ -351,7 +357,7 @@ public:
 
   void accept(PlanIterVisitor& v) const;
 
-  void openImpl(PlanState& planState, uint32_t& offset);
+  void openImpl(PlanState& planState, uint32_t& offset) const;
 
   bool countImpl(store::Item_t& result, PlanState& planState) const;
 
@@ -372,7 +378,7 @@ public:
 protected:
   void initCache(
     PlanState& aPlanState,
-    ExtFunctionCallIteratorState* aState);
+    ExtFunctionCallIteratorState* aState) const;
 
   bool probeCache(
     PlanState& aPlanState,

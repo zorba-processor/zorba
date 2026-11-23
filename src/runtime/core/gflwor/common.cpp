@@ -15,6 +15,7 @@
  */
 
 #include "context/dynamic_context.h"
+#include "context/static_context.h"
 
 #include "runtime/visitors/planiter_visitor.h"
 #include "runtime/booleans/BooleanImpl.h"
@@ -81,7 +82,22 @@ uint32_t GroupingSpec::getStateSizeOfSubtree() const
 }
 
 
-void GroupingSpec::open(PlanState& planState, uint32_t& offset)
+void GroupingSpec::setCollator(const static_context* sctx, const QueryLoc& loc)
+{
+  if (theCollation.size() != 0)
+    theCollator = sctx->get_collator(theCollation, loc);
+  else
+    theCollator = sctx->get_default_collator(loc);
+}
+
+
+void GroupingSpec::assignStateOffsets(uint32_t& offset)
+{
+  theInput->assignStateOffsets(offset);
+}
+
+
+void GroupingSpec::open(PlanState& planState, uint32_t& offset) const
 {
   theInput->open(planState, offset);
 }
@@ -141,7 +157,13 @@ uint32_t NonGroupingSpec::getStateSizeOfSubtree() const
 }
 
 
-void NonGroupingSpec::open(PlanState& planState, uint32_t& offset)
+void NonGroupingSpec::assignStateOffsets(uint32_t& offset)
+{
+  theInput->assignStateOffsets(offset);
+}
+
+
+void NonGroupingSpec::open(PlanState& planState, uint32_t& offset) const
 {
   theInput->open(planState, offset);
 }
@@ -170,7 +192,7 @@ GroupTupleCmp::GroupTupleCmp(
     const QueryLoc& loc,
     dynamic_context* dctx,
     const TypeManager* tm,
-    std::vector<GroupingSpec>* groupingSpecs)
+    const std::vector<GroupingSpec>* groupingSpecs)
   :
   theLocation(loc),
   theGroupingSpecs(groupingSpecs),

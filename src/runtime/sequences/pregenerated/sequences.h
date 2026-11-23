@@ -83,7 +83,9 @@ public:
 
   bool nextImpl(store::Item_t& result, PlanState& aPlanState) const;
 
-  void openImpl(PlanState&, uint32_t&);
+  void assignStateOffsets(uint32_t&);
+
+  void openImpl(PlanState&, uint32_t&) const;
 
   void resetImpl(PlanState&) const;
 };

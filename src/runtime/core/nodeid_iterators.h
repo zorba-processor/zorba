@@ -79,7 +79,7 @@ public:
 
   void accept(PlanIterVisitor& v) const;
 
-  void openImpl(PlanState& planState, uint32_t& offset);
+  void openImpl(PlanState& planState, uint32_t& offset) const;
 
   zstring getNameAsString() const;
 
@@ -142,7 +142,7 @@ public:
 
   void accept(PlanIterVisitor& v) const;
 
-  void openImpl(PlanState& planState, uint32_t& offset);
+  void openImpl(PlanState& planState, uint32_t& offset) const;
 
   zstring getNameAsString() const;
 
