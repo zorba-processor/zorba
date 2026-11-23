@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-#include <atomic>
 #include <limits>
 
 #include "diagnostics/assert.h"
@@ -450,6 +449,24 @@ void CtxVarIterator::closeImpl(PlanState& planState)
 /*******************************************************************************
 
 ********************************************************************************/
+store::TempSeq* CtxVarIterator::getWholeTempSeq(
+    PlanState& planState,
+    uint64_t& bindingId) const
+{
+  if (theTargetPos > Integer(0) || theTargetPosIter != NULL)
+    return NULL;
+
+  dynamic_context* dctx = (theIsLocal ?
+                           planState.theLocalDynCtx :
+                           planState.theGlobalDynCtx);
+
+  return dctx->get_temp_seq_value(theVarId, bindingId);
+}
+
+
+/*******************************************************************************
+
+********************************************************************************/
 bool CtxVarIterator::nextImpl(store::Item_t& result, PlanState& planState) const
 {
   store::Item_t varSingleItem;
@@ -728,13 +745,6 @@ LetVarState::LetVarState()
 }
 
 
-static uint64_t newLetBindingId()
-{
-  static std::atomic<uint64_t> lastId{0};
-  return lastId.fetch_add(1, std::memory_order_relaxed) + 1;
-}
-
-
 LetVarState::~LetVarState()
 {
   if (theSourceIter != NULL)
@@ -845,7 +855,7 @@ void LetVarIterator::bind(store::Iterator_t& it, PlanState& planState)
   state = StateTraitsImpl<LetVarState>::getState(planState, theStateOffset);
 
   state->theSourceIter = it;
-  state->theBindingId = newLetBindingId();
+  state->theBindingId = dynamic_context::new_binding_id();
   state->theBindsWholeTempSeq = false;
 }
 
@@ -861,7 +871,7 @@ void LetVarIterator::bind(store::Item_t& value, PlanState& planState)
   state = StateTraitsImpl<LetVarState>::getState(planState, theStateOffset);
 
   state->theItem = value;
-  state->theBindingId = newLetBindingId();
+  state->theBindingId = dynamic_context::new_binding_id();
   state->theBindsWholeTempSeq = false;
 }
 
@@ -875,7 +885,7 @@ void LetVarIterator::bind(const store::TempSeq_t& value, PlanState& planState)
   state = StateTraitsImpl<LetVarState>::getState(planState, theStateOffset);
 
   state->theTempSeq = value;
-  state->theBindingId = newLetBindingId();
+  state->theBindingId = dynamic_context::new_binding_id();
   state->theBindsWholeTempSeq = true;
 
   if (theTargetPosIter == NULL)
@@ -917,7 +927,7 @@ void LetVarIterator::bind(
   state = StateTraitsImpl<LetVarState>::getState(planState, theStateOffset);
 
   state->theTempSeq = value;
-  state->theBindingId = newLetBindingId();
+  state->theBindingId = dynamic_context::new_binding_id();
   state->theBindsWholeTempSeq = false;
 
   if (theTargetPosIter == NULL)

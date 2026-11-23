@@ -40,6 +40,7 @@ CREATE_TEST_SOURCELIST(MTTests
   mt_function_lookup.cpp
   mt_external_module.cpp
   mt_query_sctx.cpp
+  mt_function_items.cpp
   ${MTSchemaTests}
 )
 

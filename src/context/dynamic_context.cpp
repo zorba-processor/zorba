@@ -15,6 +15,7 @@
  */
 
 #include <assert.h>
+#include <atomic>
 #include <memory>
 
 #include "common/common.h"
@@ -116,6 +117,7 @@ dynamic_context::VarValue::VarValue(const VarValue& other)
 
   theState = other.theState;
   theIsExternalOrLocal = other.theIsExternalOrLocal;
+  theBindingId = other.theBindingId;
 }
 
 
@@ -479,6 +481,7 @@ void dynamic_context::set_variable(
 
   var.theState = VarValue::temp_seq;
   var.theValue.temp_seq = seq.release();
+  var.theBindingId = new_binding_id();
 
   release_old_value(old);
 }
@@ -510,6 +513,7 @@ void dynamic_context::set_variable(
 
   var.theState = VarValue::item;
   var.theValue.item = valueItem.release();
+  var.theBindingId = new_binding_id();
 
   release_old_value(old);
 }
@@ -632,6 +636,32 @@ void dynamic_context::get_variable(
     itemValue = var.theValue.item;
   else
     seqValue = var.theValue.temp_seq;
+}
+
+
+/*******************************************************************************
+
+********************************************************************************/
+store::TempSeq* dynamic_context::get_temp_seq_value(
+    ulong varid,
+    uint64_t& bindingId) const
+{
+  if (varid >= theVarValues.size() ||
+      theVarValues[varid].theState != VarValue::temp_seq)
+    return NULL;
+
+  bindingId = theVarValues[varid].theBindingId;
+  return theVarValues[varid].theValue.temp_seq;
+}
+
+
+/*******************************************************************************
+
+********************************************************************************/
+uint64_t dynamic_context::new_binding_id()
+{
+  static std::atomic<uint64_t> lastId{0};
+  return lastId.fetch_add(1, std::memory_order_relaxed) + 1;
 }
 
 

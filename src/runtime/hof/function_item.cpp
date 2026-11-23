@@ -349,6 +349,52 @@ void FunctionItem::referenceDropped(long remaining)
 }
 
 
+#ifndef ZORBA_FOR_ONE_THREAD_ONLY
+/*******************************************************************************
+  Releases a reference, under the lock of the collector (see "Threads" in the
+  class comment of QueryResources): no other thread walks a graph meanwhile,
+  or drops the last reference to this item through this function. Another
+  thread can still drop the last one through store::Item::removeReference(),
+  if it found that this item referred to no detached QueryResources just
+  before its query was closed: so nothing of "this" is used after the
+  decrement, only copies taken before (the destructor of this item then waits
+  for the lock before it releases the QueryResources).
+********************************************************************************/
+void FunctionItem::removeDetachedReference()
+{
+  QueryResources::CollectorLock lock;
+
+  rchandle<QueryResources> held[3];
+  held[0] = theResources;
+  held[1] = theFunctionResources;
+  held[2] = theGlobalResources;
+
+  unsigned long const generation = theInternalRefsGeneration;
+  long const internalRefs = theInternalRefs;
+
+  long const remaining = theRefCount.decrementAndLoad();
+
+  if (remaining == 0)
+  {
+    // The destructor collects; the copies must not count as references from
+    // outside the graph then.
+    for (csize i = 0; i < 3; ++i)
+      held[i] = NULL;
+
+    free();
+    return;
+  }
+
+  // See referenceDropped().
+  if (generation == QueryResources::graphGeneration() && remaining > internalRefs)
+    return;
+
+  QueryResources* heldPtrs[3] = { held[0].getp(), held[1].getp(), held[2].getp() };
+  QueryResources::collectCycles(heldPtrs, 3);
+}
+#endif
+
+
 /*******************************************************************************
   See theInternalRefs.
 ********************************************************************************/
@@ -614,6 +660,18 @@ public:
 
     root->theWitnessGeneration = 0;
 
+#ifndef ZORBA_FOR_ONE_THREAD_ONLY
+    // Other threads copy and release references to the nodes during the walk
+    // (see "Threads" in the class comment of QueryResources): the counts read
+    // one by one are a consistent picture only if none of them has changed.
+    for (ite = theNodes.begin(); ite != theNodes.end(); ++ite)
+    {
+      Node* node = ite->second;
+      if (refCount(node->theKind, node->thePtr, theHeld, theNumHeld) != node->theRefs)
+        return false;
+    }
+#endif
+
     for (ite = theNodes.begin(); ite != theNodes.end(); ++ite)
     {
       Node* node = ite->second;
@@ -854,6 +912,8 @@ bool QueryResources::mayCollect(QueryResources* const* roots, csize numRoots)
   if (QueryResourcesCollector::theIsBuilding)
     return false;
 
+  CollectorLock lock;
+
   for (csize i = 0; i < numRoots; ++i)
   {
     QueryResources* root = roots[i];
@@ -870,6 +930,8 @@ void QueryResources::collectCycles(QueryResources* const* held, csize numHeld)
 {
   if (QueryResourcesCollector::theIsBuilding)
     return;
+
+  CollectorLock lock;
 
   if (QueryResourcesCollector::thePending != NULL)
   {

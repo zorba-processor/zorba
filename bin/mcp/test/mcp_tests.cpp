@@ -4605,6 +4605,80 @@ void test_json_object_add_out_of_memory( Fixture const &f ) {
   (void)f;
 #endif
 }
+// Each kind of node update with each allocation failing in turn: a primitive
+// that could not be added to the update list does not keep its target. A kept
+// target keeps the namespace of the xsi:type in its tree in the string pool,
+// which the store reports at shutdown (ZSTR0065, a failure of this test in
+// bin/CMakeLists.txt).
+void test_update_primitive_out_of_memory( Fixture const &f ) {
+#if defined(__linux__)
+  for ( char const *const update : {
+          "insert node attribute c { 'x' } into $d/p:a",
+          "insert node <c/> into $d/p:a",
+          "insert node <c/> before $d/p:a/p:b",
+          "delete node $d/p:a/p:b",
+          "replace node $d/p:a/p:b with <c/>",
+          "replace value of node $d/p:a/@p:k with 'y'",
+          "rename node $d/p:a/p:b as 'c'" } ) {
+    auto attempt = [&]( long n, long length, long *count ) -> std::string {
+      Item doc;
+      {
+        XQuery_t const make( f.zorba->compileQuery(
+          "declare namespace xsi = 'http://www.w3.org/2001/XMLSchema-instance';\n"
+          "validate lax { document {\n"
+          "  <p:a xmlns:p='urn:update-primitive' p:k='1'>t<p:b"
+          " xmlns:xs='http://www.w3.org/2001/XMLSchema'"
+          " xsi:type='xs:integer'>1</p:b></p:a> } }" ) );
+        Iterator_t const it( make->iterator() );
+        it->open();
+        it->next( doc );
+        it->close();
+      }
+      XQuery_t const run( f.zorba->compileQuery(
+        "declare revalidation skip;\n"
+        "declare namespace p = 'urn:update-primitive';\n"
+        "declare variable $d external;\n" + std::string( update ) + ";\n"
+        "1" ) );
+      run->getDynamicContext()->setVariable( "d", doc );
+      Iterator_t const it( run->iterator() );
+      Item result;
+      bool failed = false;
+      inject_arm( n, length );
+      try {
+        it->open();
+        it->next( result );
+        it->close();
+      }
+      catch ( std::exception const& ) {
+        failed = true;
+      }
+      *count = inject_disarm();
+      return failed || result.isNull() ? "error"
+                                       : result.getStringValue().str();
+    };
+    std::string const what( update );
+    long total = 0;
+    check( attempt( 0, 0, &total ) == "1", what + ": the answer" );
+    long wrong = 0;
+    for ( long const length : { 1L, 8L } )
+      for ( long n = 1; n <= total; ++n ) {
+        long count = 0;
+        std::string const got( attempt( n, length, &count ) );
+        if ( got != "1" && got != "error" && ++wrong <= 3 )
+          std::cout << "at " << n << " of a run of " << length << ": " << got
+                    << std::endl;
+      }
+    check( wrong == 0, what + " failing: the answer or an error",
+           std::to_string( wrong ) + " points" );
+  }
+# if defined(__SANITIZE_ADDRESS__)
+  check( __lsan_do_recoverable_leak_check() == 0,
+         "node updates failing: nothing is left behind" );
+# endif
+#else
+  (void)f;
+#endif
+}
 // An insert into a typed element with each allocation failing in turn: the
 // insert takes the type away, and a failed insert gives it back, also when it
 // fails before the first node is attached.
@@ -8629,6 +8703,7 @@ Test const tests[] = {
   { "exhaust_serializer", test_serializer_out_of_memory },
   { "exhaust_replace_content", test_replace_content_out_of_memory },
   { "exhaust_json_object_add", test_json_object_add_out_of_memory },
+  { "exhaust_update_primitive", test_update_primitive_out_of_memory },
   { "exhaust_remove_type", test_remove_type_out_of_memory },
   { "exhaust_plan_wrapper", test_plan_wrapper_out_of_memory },
   { "exhaust_plan_open", test_plan_open_out_of_memory },

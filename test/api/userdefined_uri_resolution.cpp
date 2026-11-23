@@ -37,6 +37,15 @@ static std::string http_test_server_url(char const *path)
 
 using namespace zorba;
 
+// Only test_schema_uri needs the network: the HTTP test server.
+static void disable_http_resolution(Zorba* aZorba, StaticContext_t const& aContext)
+{
+  aContext->declareOption(
+      aZorba->getItemFactory()->createQName(
+          "http://zorba.io/options/features", "disable"),
+      "http-uri-resolution");
+}
+
 static void streamReleaser(std::istream* aStream)
 {
   delete aStream;
@@ -165,6 +174,7 @@ class FoobarModuleURLResolver : public URLResolver
 bool test_module_uri(Zorba* aZorba)
 {
   StaticContext_t lContext = aZorba->createStaticContext();
+  disable_http_resolution(aZorba, lContext);
 
   FoobarModuleURLResolver lResolver;
 
@@ -185,6 +195,7 @@ bool test_module_uri(Zorba* aZorba)
 bool test_unresolved_module_uri(Zorba* aZorba)
 {
   StaticContext_t lContext = aZorba->createStaticContext();
+  disable_http_resolution(aZorba, lContext);
 
   FoobarModuleURLResolver lResolver;
 
@@ -207,6 +218,7 @@ bool test_unresolved_module_uri(Zorba* aZorba)
 bool test_component_module_uri(Zorba* aZorba)
 {
   StaticContext_t lContext = aZorba->createStaticContext();
+  disable_http_resolution(aZorba, lContext);
 
   MyModuleURIMapper lMapper;
   MyModuleURLResolver lResolver;
@@ -251,6 +263,7 @@ bool test_schema_uri(Zorba* aZorba)
 bool test_unresolved_schema_uri(Zorba* aZorba)
 {
   StaticContext_t lContext = aZorba->createStaticContext();
+  disable_http_resolution(aZorba, lContext);
 
   MySchemaURIMapper lMapper;
 
