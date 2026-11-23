@@ -24,6 +24,7 @@ and where its time and allocations go. Each change that makes it faster adds a r
 | `clean_users.jq` | Requests per service of the users who never got a server error: a FLWOR gives the events of a group by to an enclosing group by. |
 | `unmatched.jq` | Per service, the server errors of users with no successful request: a general `=` against the distinct user ids of a second parse. |
 | `unmatched_global.jq` | `unmatched.jq` with the distinct user ids in a global variable (`declare variable`) instead of a `let`. |
+| `latency_let.jq` | `latency.jq` with the request of each event bound by a `let` clause, `let $http := $e.http`. |
 | `run.sh` | Best of 3 runs of the queries: wall time, peak RSS, MB/s, SHA-256 of the output. |
 | `tools/profile.sh` | Samples per part (perf + `classify.awk`) and allocations per event (`malloc_count.c`) of one query. |
 | `tools/classify.awk` | Charges each `perf script` sample to a part of the parse or of the query. |
@@ -253,3 +254,20 @@ in a container limited to 4 CPUs with the host busy with other builds, built wit
 `unmatched` is not changed (noise). Master took 93.41, 93.55 and 92.04 s on
 `unmatched_global`, the head 3.72, 3.74 and 3.72 s. Both queries write the same
 output on both builds.
+
+### Values bound by `let` (`latency_let.jq`)
+
+`latency_let.jq` is `latency.jq` with `let $http := $e.http` before the `group by`
+and the keys looked up in `$http`. On master the analysis did not follow `let`
+clauses, and every event kept all of `http`. Best wall time (s) and peak RSS (MiB)
+of three alternating rounds, master `25b1433435` against the head, in a container
+limited to 4 CPUs with the host busy with other builds, built with
+`CMAKE_BUILD_TYPE=Release` (not the profile build of step 1):
+
+| query | master s | head s | master MiB | head MiB |
+|---|---:|---:|---:|---:|
+| latency | 2.65 | 2.50 | 148 | 148 |
+| latency_let | 2.82 | 2.51 (-11%) | 209 | 152 |
+
+`latency` builds the same on both (the difference is noise); `latency_let` now
+builds what `latency` builds, and writes the same output.
