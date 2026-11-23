@@ -243,9 +243,8 @@ CollectionPul* PULImpl::getCollectionPul(const store::Item* target)
   else
   {
     auto pul = std::make_unique<CollectionPul>(this, nullptr);
-    theCollectionPuls.push_back(pul.get());
+    addCollectionPul(NULL, pul.get());
     theNoCollectionPul = pul.release();
-    theCollectionPulsMap[NULL] = theCollectionPuls.size() - 1;
     return theNoCollectionPul;
   }
 }
@@ -275,15 +274,33 @@ CollectionPul* PULImpl::getCollectionPulByName(
     (GET_STORE().getCollection(collName, isDynamic).getp());
 
     auto pul = std::make_unique<CollectionPul>(this, collection);
-    theCollectionPuls.push_back(pul.get());
+    addCollectionPul(collName, pul.get());
     theLastPul = pul.release();
-
-    theCollectionPulsMap[collName] = theCollectionPuls.size() - 1;
   }
 
   theLastCollection = collName;
 
   return theLastPul;
+}
+
+
+/*******************************************************************************
+  Put aPul in theCollectionPuls and under aName in theCollectionPulsMap, which
+  has no entry for aName. If either cannot grow, aPul is in neither.
+********************************************************************************/
+void PULImpl::addCollectionPul(const QNameItem* aName, CollectionPul* aPul)
+{
+  CollectionPulMap::iterator ite = theCollectionPulsMap.insert(
+    CollectionPulMap::value_type(aName, theCollectionPuls.size())).first;
+  try
+  {
+    theCollectionPuls.push_back(aPul);
+  }
+  catch (...)
+  {
+    theCollectionPulsMap.erase(ite);
+    throw;
+  }
 }
 
 
@@ -1750,10 +1767,8 @@ void PULImpl::mergeUpdates(store::Item* other)
     else
     {
       CollectionPul* otherPul = otherp->theCollectionPuls[otherIte->second];
+      addCollectionPul(otherIte->first, otherPul);
       otherp->theCollectionPuls[otherIte->second] = NULL;
-
-      theCollectionPuls.push_back(otherPul);
-      theCollectionPulsMap[otherIte->first] = theCollectionPuls.size() - 1;
 
       otherPul->switchPul(this);
       ++otherIte;
@@ -1763,10 +1778,8 @@ void PULImpl::mergeUpdates(store::Item* other)
   while (otherIte != otherEnd)
   {
     CollectionPul* otherPul = otherp->theCollectionPuls[otherIte->second];
+    addCollectionPul(otherIte->first, otherPul);
     otherp->theCollectionPuls[otherIte->second] = NULL;
-
-    theCollectionPuls.push_back(otherPul);
-    theCollectionPulsMap[otherIte->first] = theCollectionPuls.size() - 1;
 
     otherPul->switchPul(this);
 

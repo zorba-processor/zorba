@@ -709,6 +709,8 @@ protected:
 
   CollectionPul* getCollectionPulByName(const store::Item* name, bool isDynamic);
 
+  void addCollectionPul(const QNameItem* name, CollectionPul* pul);
+
   void undoUpdates();
 };
 

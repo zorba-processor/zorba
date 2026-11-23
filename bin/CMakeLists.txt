@@ -622,6 +622,7 @@ IF (ZORBA_WITH_FILE_ACCESS)
              exhaust_sweep_matcher exhaust_sweep_query_text exhaust_sweep_long_token
              exhaust_sweep_streamable_text exhaust_base64_stream
              exhaust_seekable_stream exhaust_json_loader exhaust_serializer
+             exhaust_collection_puls
              exhaust_plan_wrapper
              exhaust_plan_open exhaust_call_body exhaust_dynamic_call
              exhaust_for_each_pair exhaust_fold_left exhaust_json_copy
