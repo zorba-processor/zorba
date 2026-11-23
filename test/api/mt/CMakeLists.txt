@@ -42,6 +42,7 @@ CREATE_TEST_SOURCELIST(MTTests
   mt_query_sctx.cpp
   mt_module_instance.cpp
   mt_function_items.cpp
+  mt_shared_handles.cpp
   ${MTSchemaTests}
 )
 
