@@ -1,0 +1,27 @@
+<iterator-tree description="main query">
+  <SingleDynamicFnCallIterator>
+    <FunctionItemIterator function="inline-function(inline-function-plan.xq:1.12-1.35)"/>
+    <SingletonIterator value="xs:integer(2)"/>
+  </SingleDynamicFnCallIterator>
+</iterator-tree>
+<iterator-tree description="inline-function(inline-function-plan.xq:1.12-1.35)">
+  <FLWORIterator>
+    <LetVariable name="x" materialize="true">
+      <LetVarIterator varname="x"/>
+    </LetVariable>
+    <ReturnClause>
+      <GenericArithIterator_AddOperation>
+        <PromoteIterator type="xs:anyAtomicType">
+          <FnDataIterator>
+            <LetVarIterator varname="x"/>
+          </FnDataIterator>
+        </PromoteIterator>
+        <PromoteIterator type="xs:anyAtomicType">
+          <FnDataIterator>
+            <SingletonIterator value="xs:integer(1)"/>
+          </FnDataIterator>
+        </PromoteIterator>
+      </GenericArithIterator_AddOperation>
+    </ReturnClause>
+  </FLWORIterator>
+</iterator-tree>
