@@ -17,6 +17,9 @@
 #ifndef EXTERNAL_MODULE_UTIL_TESTS_H
 #define EXTERNAL_MODULE_UTIL_TESTS_H
 
+#include <map>
+#include <memory>
+
 #include <zorba/zorba.h>
 #include <zorba/item_factory.h>
 #include <zorba/external_module.h>
@@ -42,11 +45,13 @@ protected:
     }
   };
 
-  typedef std::map<String, ExternalFunction*, ltstr> FuncMap_t;
+  // Filled by the constructor: compilations on several threads look the
+  // functions up.
+  typedef std::map<String, std::unique_ptr<ExternalFunction>, ltstr> FuncMap_t;
 
   FuncMap_t theFunctions;
 public:
-  virtual ~UtilTestsModule();
+  UtilTestsModule();
 
   virtual void destroy();
 

@@ -34,6 +34,12 @@ CREATE_TEST_SOURCELIST(MTTests
   mt_node_reference.cpp
   mt_node_dereference.cpp
   mt_lock_upgrade.cpp
+  mt_prolog_program.cpp
+  mt_function_coercion.cpp
+  mt_function_cache.cpp
+  mt_function_lookup.cpp
+  mt_external_module.cpp
+  mt_query_sctx.cpp
   ${MTSchemaTests}
 )
 

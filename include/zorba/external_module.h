@@ -39,7 +39,14 @@ class ExternalFunction;
   storage for the implementations of the external functions. The instances must
   be registered in the static context in order for the functions to be accessible
   by a query (see <a href="../../zorba/html/external_functions.html">
-  here</a> for more details.). 
+  here</a> for more details.).
+
+  In an engine built for several threads (ZORBA_FOR_ONE_THREAD_ONLY=OFF), the
+  queries compiled against a static context on several threads call
+  getExternalFunction() of the modules registered in it, and evaluate() of
+  their functions, concurrently: both must be safe to call from several threads
+  (for example, create the functions in the constructor of the module and
+  keep no state in them between calls). The modules shipped with Zorba are.
 ********************************************************************************/
 class ZORBA_DLL_PUBLIC ExternalModule 
 {

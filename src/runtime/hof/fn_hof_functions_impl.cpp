@@ -166,6 +166,13 @@ bool FunctionLookupIterator::nextImpl(
 
     fiInfo->theCCB = ccb;
 
+    // The function item may be called on other threads: its function (a udf
+    // made here for a builtin function) is generated now, as a sealed
+    // compilation would have.
+    user_function* udf = static_cast<user_function*>(fiInfo->theFunction);
+    if (udf->getCCB() == ccb)
+      udf->seal(fiInfo->firstLocalVarId());
+
     if (fiInfo->numInScopeVars() > 0)
     {
       result = new FunctionItem(fiInfo, fiDctx.get(), planState);

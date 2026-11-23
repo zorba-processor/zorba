@@ -15,6 +15,7 @@
  */
 #include <map>
 #include <memory>
+#include <mutex>
 #include "zorba/zorba.h"
 #include "zorba/external_module.h"
 #include "zorba/function.h"
@@ -42,30 +43,14 @@ protected:
     }
   };
 
-  typedef std::map<String, ExternalFunction*, ltstr> FuncMap_t;
+  // Filled by the constructor: compilations on several threads look the
+  // functions up.
+  typedef std::map<String, std::unique_ptr<ExternalFunction>, ltstr> FuncMap_t;
 
   FuncMap_t theFunctions;
 
 public:
-  virtual ~HttpClientModule()
-  {
-    for (FuncMap_t::const_iterator lIter = theFunctions.begin();
-        lIter != theFunctions.end(); ++lIter)
-    {
-      delete lIter->second;
-    }
-    theFunctions.clear();
-  }
-
-  HttpClientModule() : theModuleUri("http://zorba.io/modules/http-client")
-  {
-    for (FuncMap_t::const_iterator lIter = theFunctions.begin();
-        lIter != theFunctions.end(); ++lIter)
-    {
-      delete lIter->second;
-    }
-    theFunctions.clear();
-  }
+  HttpClientModule();
 
   virtual String
   getURI() const { return theModuleUri; }
@@ -92,14 +77,17 @@ class ProfileWrapper
   Request&                           theRequest;
   std::unique_ptr<std::vector<Item> >& theJSONProfileData;
   zorba::Item&                       theXMLProfileData;
+  std::mutex&                        theProfileMutex;
 
 public:
-  ProfileWrapper(Request& aRequest, std::unique_ptr<std::vector<Item> >& aProfileData, zorba::Item& aXMLProfileData):
+  ProfileWrapper(Request& aRequest, std::unique_ptr<std::vector<Item> >& aProfileData, zorba::Item& aXMLProfileData,
+                 std::mutex& aProfileMutex):
     theProfilingEnabled(zorba::Properties::instance().getCollectProfile()),
     theProfileFormat(zorba::Properties::instance().getProfileFormat()),
     theRequest(aRequest),
     theJSONProfileData(aProfileData),
-    theXMLProfileData(aXMLProfileData)
+    theXMLProfileData(aXMLProfileData),
+    theProfileMutex(aProfileMutex)
   {
     if (theProfilingEnabled)
     {
@@ -190,6 +178,7 @@ public:
   {
     if (theProfilingEnabled)
     {
+      std::lock_guard<std::mutex> lLock(theProfileMutex);
       switch (theProfileFormat)
       {
         case PROFILE_FORMAT_DOT:
@@ -211,9 +200,11 @@ protected:
   const ExternalModule*                        theModule;
   ItemFactory*                                 theFactory;
 
+  // Profiling data of the requests of every query that calls the function.
   mutable std::unique_ptr<std::vector<Item> >    theJSONProfileData;
   mutable Item                                 theXMLProfileData;
   mutable std::unique_ptr<ProfileDataMap>        theProfileMap;
+  mutable std::mutex                           theProfileMutex;
 
 public:
   HttpSendFunction(const ExternalModule* aModule)
@@ -258,6 +249,7 @@ private:
   zorba::ProfileDataMap*
   getJSONProfilingData() const
   {
+    std::lock_guard<std::mutex> lLock(theProfileMutex);
     if (!theJSONProfileData.get())
       theJSONProfileData = std::make_unique<std::vector<Item>>();
 
@@ -269,6 +261,7 @@ private:
   zorba::ProfileDataMap*
   getXMLProfilingData() const
   {
+    std::lock_guard<std::mutex> lLock(theProfileMutex);
     if (theXMLProfileData.isNull())
     {
       zorba::Item lNullItem;

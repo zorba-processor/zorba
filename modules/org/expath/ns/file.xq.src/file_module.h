@@ -18,6 +18,7 @@
 #define ZORBA_FILEMODULE_FILEMODULE_H
 
 #include <map>
+#include <memory>
 
 #include <zorba/zorba.h>
 #include <zorba/external_module.h>
@@ -33,25 +34,24 @@ public:
     delete stream;
   }
 
-  FileModule() : theFactory(0) { }
-  virtual ~FileModule();
+  FileModule();
 
   virtual void destroy();
   virtual ExternalFunction* getExternalFunction( String const &aLocalname );
   virtual String getURI() const;
 
   ItemFactory* getItemFactory() const {
-    if ( !theFactory )
-      theFactory = Zorba::getInstance(0)->getItemFactory();
     return theFactory;
   }
 
 protected:
-  typedef std::map<String,ExternalFunction*> FuncMap_t;
+  // Filled by the constructor: compilations on several threads look the
+  // functions up.
+  typedef std::map<String,std::unique_ptr<ExternalFunction>> FuncMap_t;
   FuncMap_t theFunctions;
 
 private:
-  mutable ItemFactory *theFactory;
+  ItemFactory *const theFactory;
 };
 
 ///////////////////////////////////////////////////////////////////////////////
