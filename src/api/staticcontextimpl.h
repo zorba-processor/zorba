@@ -21,6 +21,7 @@
 #include <zorba/api_shared_types.h>
 #include <map>
 #include <memory>
+#include <vector>
 
 #include "common/shared_types.h"
 
@@ -32,6 +33,7 @@ class StaticCollectionManagerImpl;
 class static_context;
 class function;
 class QueryResources;
+class XQueryImpl;
 
 
 /*******************************************************************************
@@ -64,6 +66,13 @@ class QueryResources;
   createChildContext(), if any. S sees the prolog loaded into the nearest of
   S and its ancestors that has one (see nearest()), as S sees the declarations
   of the ancestors' static contexts; a prolog loaded into S extends it.
+
+  theFailedPrologs :
+  ------------------
+  The compilations of the prologs whose S.loadProlog() failed, each with its
+  ccb, diagnostics and QueryResources. The declarations such a prolog bound
+  into S before the error, except its functions, stay in S, and their exprs
+  belong to its ccb.
 ********************************************************************************/
 class LoadedProlog : public SyncedRCObject
 {
@@ -74,6 +83,7 @@ public:
   expr                                * theInitExpr;
   ulong                                 theMaxVarId;
   rchandle<LoadedProlog> const          theParent;
+  std::vector<rchandle<LoadedProlog> >  theFailedPrologs;
 
 public:
   explicit LoadedProlog(LoadedProlog* aParent);
@@ -127,6 +137,10 @@ protected:
   mutable StaticCollectionManagerImpl * theCollectionMgr;
 
 protected:
+  // aProlog takes over the ccb, the diagnostics and the QueryResources of
+  // aQuery, the internal query that compiled a prolog.
+  static void adoptCompilation(LoadedProlog& aProlog, XQueryImpl& aQuery);
+
   static std::string createInvokeQuery(const function*, size_t aArity);
 
   static std::string createHOFQuery(size_t aArity);
