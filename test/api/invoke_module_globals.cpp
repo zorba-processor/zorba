@@ -211,6 +211,16 @@ void test_invoke_repeated(Zorba* z, ModuleFile const& aModule)
   CHECK_EQ(invoke(z, lSctx, "base", {}), "hello");
 }
 
+// A child of the static context (createChildContext()) sees the module's
+// globals too, through a query and through invoke().
+void test_child_context(Zorba* z, ModuleFile const& aModule)
+{
+  StaticContext_t lChild = load(z, aModule)->createChildContext();
+  CHECK_EQ(query(z, lChild, "m:derived(), $m:count"), "hello-world 3");
+  CHECK_EQ(invoke(z, lChild, "with-arg", {"c"}), "hello-world:c");
+  CHECK_EQ(invoke(z, lChild, "count", {}), "3");
+}
+
 } // namespace
 
 
@@ -231,6 +241,8 @@ invoke_module_globals(int argc, char* argv[])
     test_invoke(lZorba, lModule);
     std::cout << "test_invoke_repeated" << std::endl;
     test_invoke_repeated(lZorba, lModule);
+    std::cout << "test_child_context" << std::endl;
+    test_child_context(lZorba, lModule);
   }
   catch (ZorbaException const& e)
   {

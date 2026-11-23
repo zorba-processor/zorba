@@ -4394,6 +4394,102 @@ void test_json_loader_out_of_memory( Fixture const &f ) {
   (void)f;
 #endif
 }
+// A JSON value inserted into an object of a collection and a new collection
+// made with another, in one update, with each allocation failing in turn. Both
+// are nested, so that giving them a collection, or taking it back, walks each.
+// A failed update leaves the collections as they were, and the same update
+// with no failure then applies; in an AddressSanitizer build, nothing is left
+// behind.
+void test_collection_json_out_of_memory( Fixture const &f ) {
+#if defined(__linux__)
+  std::string const prolog(
+    "import module namespace j = 'http://jsoniq.org/functions';\n"
+    "import module namespace ddl ="
+    " 'http://zorba.io/modules/store/dynamic/collections/ddl';\n"
+    "import module namespace dml ="
+    " 'http://zorba.io/modules/store/dynamic/collections/dml';\n" );
+  std::string const update(
+    "(insert json { 'b' : { 'c' : [ { 'd' : [ 1 ] }, [ { 'e' : 2 } ] ] } }\n"
+    "   into dml:collection(xs:QName('ddl:json'))[1],\n"
+    " ddl:create(xs:QName('ddl:json2'),\n"
+    "            { 'v' : { 'w' : [ { 'x' : [ 3 ] }, [ { 'y' : 4 } ] ] } }));\n"
+    "1" );
+  std::string const content(
+    "string-join(for $n in (xs:QName('ddl:json'), xs:QName('ddl:json2'))\n"
+    "            where ddl:is-available-collection($n)\n"
+    "            for $i in dml:collection($n)\n"
+    "            return string-join(j:keys($i), ','), ' ')" );
+  auto run = [&]( std::string const &query ) -> std::string {
+    XQuery_t const q( f.zorba->compileQuery( prolog + query ) );
+    Iterator_t const it( q->iterator() );
+    it->open();
+    Item item;
+    std::string out;
+    while ( it->next( item ) )
+      out += item.getStringValue().str();
+    it->close();
+    return out;
+  };
+  auto attempt = [&]( long n, long length, long *count ) -> std::string {
+    run( "ddl:create(xs:QName('ddl:json'), { 'a' : { 'z' : [ 0 ] } });\n1" );
+    XQuery_t const first( f.zorba->compileQuery( prolog + update ) );
+    Iterator_t const it( first->iterator() );
+    Item result;
+    bool failed = false;
+    inject_arm( n, length );
+    try {
+      it->open();
+      it->next( result );
+      it->close();
+    }
+    catch ( std::exception const& ) {
+      failed = true;
+    }
+    *count = inject_disarm();
+    std::string out( failed || result.isNull()
+                     ? "error" : result.getStringValue().str() );
+    if ( failed ) {
+      out += "|" + run( content ) + "|";
+      try {
+        out += run( update );
+      }
+      catch ( std::exception const &e ) {
+        out += e.what();
+      }
+    }
+    out += "|" + run( content );
+    for ( char const *const name : { "ddl:json", "ddl:json2" } ) {
+      std::string const qname( "xs:QName('" + std::string( name ) + "')" );
+      if ( run( "ddl:is-available-collection(" + qname + ")" ) == "true" )
+        run( "dml:truncate(" + qname + ");\n"
+             "ddl:delete(" + qname + ");\n1" );
+    }
+    return out;
+  };
+  std::string const answer( "1|a,b v" );
+  long total = 0;
+  std::string const whole( attempt( 0, 0, &total ) );
+  check( whole == answer, "JSON values into collections", whole );
+  long wrong = 0;
+  for ( long const length : { 1L, 8L } )
+    for ( long n = 1; n <= total; ++n ) {
+      long count = 0;
+      std::string const got( attempt( n, length, &count ) );
+      if ( got != answer && got != "error|a|1|a,b v" && ++wrong <= 3 )
+        std::cout << "at " << n << " of a run of " << length << ": " << got
+                  << std::endl;
+    }
+  check( wrong == 0, "JSON values into collections failing: the answer, or an "
+                     "error and the collections as they were",
+         std::to_string( wrong ) + " points" );
+# if defined(__SANITIZE_ADDRESS__)
+  check( __lsan_do_recoverable_leak_check() == 0,
+         "JSON values into collections failing: nothing is left behind" );
+# endif
+#else
+  (void)f;
+#endif
+}
 // Nodes inserted first and last into a collection and nodes deleted from it,
 // in one update, with each allocation failing in turn: a failed update leaves the
 // collection as it was, in its order, so the same update with no failure then
@@ -4657,6 +4753,122 @@ void test_serializer_out_of_memory( Fixture const &f ) {
 # if defined(__SANITIZE_ADDRESS__)
   check( __lsan_do_recoverable_leak_check() == 0,
          "the serializer failing: nothing is left behind" );
+# endif
+#else
+  (void)f;
+#endif
+}
+// Three nodes inserted after a node of a collection, without a copy, with each
+// allocation failing in turn: a failed insert leaves none of them attached to
+// the collection, so the same insert with no failure takes them.
+void test_collection_insert_after_out_of_memory( Fixture const &f ) {
+#if defined(__linux__)
+  // Untyped nodes: a typed one leaks when its construction fails (another
+  // defect, outside this test).
+  std::string const prolog(
+    "declare construction strip;\n"
+    "declare namespace ext = 'http://zorba.io/extensions';\n"
+    "import module namespace ddl ="
+    " 'http://zorba.io/modules/store/dynamic/collections/ddl';\n"
+    "import module namespace dml ="
+    " 'http://zorba.io/modules/store/dynamic/collections/dml';\n" );
+  std::string const insert_after(
+    "declare variable $a external;\n"
+    "declare variable $b external;\n"
+    "declare variable $c external;\n"
+    "(# ext:no-copy #) {\n"
+    "  dml:insert-after(xs:QName('ddl:after'),\n"
+    "                   dml:collection(xs:QName('ddl:after'))[1], ($a, $b, $c))\n"
+    "};\n"
+    "1" );
+  auto run = [&]( std::string const &query ) -> std::string {
+    XQuery_t const q( f.zorba->compileQuery( prolog + query ) );
+    Iterator_t const it( q->iterator() );
+    it->open();
+    Item item;
+    std::string out;
+    while ( it->next( item ) )
+      out += item.getStringValue().str();
+    it->close();
+    return out;
+  };
+  auto attempt = [&]( long n, long length, long *count ) -> std::string {
+    std::vector<Item> nodes;
+    {
+      XQuery_t const make( f.zorba->compileQuery( prolog +
+                                                  "(<a/>, <b/>, <c/>)" ) );
+      Iterator_t const it( make->iterator() );
+      it->open();
+      Item node;
+      while ( it->next( node ) )
+        nodes.push_back( node );
+      it->close();
+    }
+    run( "ddl:create(xs:QName('ddl:after'), <x/>);\n1" );
+    auto insert = [&]() {
+      XQuery_t const q( f.zorba->compileQuery( prolog + insert_after ) );
+      DynamicContext *const dctx = q->getDynamicContext();
+      dctx->setVariable( "a", nodes[0] );
+      dctx->setVariable( "b", nodes[1] );
+      dctx->setVariable( "c", nodes[2] );
+      return q;
+    };
+    XQuery_t const first( insert() );
+    Iterator_t const it( first->iterator() );
+    Item result;
+    bool failed = false;
+    inject_arm( n, length );
+    try {
+      it->open();
+      it->next( result );
+      it->close();
+    }
+    catch ( std::exception const& ) {
+      failed = true;
+    }
+    *count = inject_disarm();
+    std::string out( failed || result.isNull()
+                     ? "error" : result.getStringValue().str() );
+    if ( failed ) {
+      out += "|";
+      try {
+        XQuery_t const again( insert() );
+        Iterator_t const it2( again->iterator() );
+        it2->open();
+        it2->next( result );
+        it2->close();
+        out += result.getStringValue().str();
+      }
+      catch ( std::exception const &e ) {
+        out += e.what();
+      }
+    }
+    out += "|" + run( "string-join(dml:collection(xs:QName('ddl:after'))"
+                      " ! local-name(), ' ')" );
+    run( "dml:truncate(xs:QName('ddl:after'));\n"
+         "ddl:delete(xs:QName('ddl:after'));\n1" );
+    return out;
+  };
+  std::string const answer( "1|x a b c" );
+  long total = 0;
+  std::string const whole( attempt( 0, 0, &total ) );
+  check( whole == answer, "nodes inserted after a node of a collection", whole );
+  long wrong = 0;
+  for ( long const length : { 1L, 8L } )
+    for ( long n = 1; n <= total; ++n ) {
+      long count = 0;
+      std::string const got( attempt( n, length, &count ) );
+      if ( got != answer && got != "error|1|x a b c" && ++wrong <= 3 )
+        std::cout << "at " << n << " of a run of " << length << ": " << got
+                  << std::endl;
+    }
+  check( wrong == 0, "nodes inserted after a node of a collection failing: the "
+                     "answer, or an error and none of them attached",
+         std::to_string( wrong ) + " points" );
+# if defined(__SANITIZE_ADDRESS__)
+  check( __lsan_do_recoverable_leak_check() == 0,
+         "nodes inserted after a node of a collection failing: nothing is left "
+         "behind" );
 # endif
 #else
   (void)f;
@@ -5281,7 +5493,8 @@ void test_sweep_matcher( Fixture const &f ) {
   check( sweep_over_cap( s, 1, outcomes ).empty(), "a known limit within its cap" );
 #endif
 }
-// MAPM keeps state per thread, set up by the first decimal of the thread.
+// MAPM keeps state per thread, set up by the first decimal of the thread. No
+// failed allocation of that setup ends the process: every one is tried.
 void test_sweep_decimal_thread( Fixture const &f ) {
 #if defined(__linux__)
   Sweep s;
@@ -5290,7 +5503,7 @@ void test_sweep_decimal_thread( Fixture const &f ) {
   s.before.push_back( s.query );
   s.expected = "true";
   s.new_thread = true;
-  s.points = 300;
+  s.points = 100000;                // all of them
   s.lenient = true;                 // the compilation is swept too
   s.compiles = true;
   exhaust_sweep( f, "first decimal of a thread", s );
@@ -9157,12 +9370,14 @@ Test const tests[] = {
   { "exhaust_json_object_add", test_json_object_add_out_of_memory },
   { "exhaust_collection_insert", test_collection_insert_out_of_memory },
   { "exhaust_collection_undo", test_collection_undo_out_of_memory },
+  { "exhaust_collection_json", test_collection_json_out_of_memory },
   { "exhaust_collection_map_undo", test_collection_map_undo_out_of_memory },
   { "exhaust_update_primitive", test_update_primitive_out_of_memory },
   { "exhaust_remove_type", test_remove_type_out_of_memory },
   { "exhaust_collection_insert_last", test_collection_insert_last_out_of_memory },
   { "exhaust_plan_wrapper", test_plan_wrapper_out_of_memory },
   { "exhaust_plan_open", test_plan_open_out_of_memory },
+  { "exhaust_collection_insert_after", test_collection_insert_after_out_of_memory },
   { "exhaust_call_body", test_call_body_out_of_memory },
   { "exhaust_dynamic_call", test_dynamic_call_out_of_memory },
   { "exhaust_cached_call_body", test_cached_call_body_out_of_memory },

@@ -357,6 +357,8 @@ public:
 
 protected:
 
+  ulong usePrologOf(StaticContextImpl const* aSctx);
+
   void doCompile(
         std::istream&,
         const Zorba_CompilerHints_t& aHints,

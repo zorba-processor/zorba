@@ -19,7 +19,9 @@
 // static context, their own collection and an index on it, fill and probe
 // them, drop them and release the context. The other half read a collection
 // and an index created before the threads start, and list the available
-// collections and indexes while the first half adds and removes entries.
+// collections and indexes while the first half adds and removes entries; they
+// also read through child contexts, created in every round, of the context
+// that set up that collection and index.
 
 #include <memory>
 #include <sstream>
@@ -172,8 +174,13 @@ mt_lifecycle(int, char*[])
         {
           StaticContext_t lOwn = lContext();
           for (unsigned r = 0; r < 2 * ROUNDS; ++r)
+          {
             lChecker.expect("reader", t, run(lZorba, lOwn, READ_QUERY),
                             READ_EXPECTED);
+            lChecker.expect("reader in a child context", t,
+                            run(lZorba, lSetup->createChildContext(), READ_QUERY),
+                            READ_EXPECTED);
+          }
         }
       }
       catch (ZorbaException const& e)

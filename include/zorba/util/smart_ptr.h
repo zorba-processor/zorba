@@ -21,12 +21,21 @@
 
 #include <zorba/config.h>
 
+#ifndef ZORBA_FOR_ONE_THREAD_ONLY
+#include <atomic>
+#endif
+
 namespace zorba {
 
 class ZORBA_DLL_PUBLIC SmartObject
 {
 protected:
-  mutable unsigned int  theRefCount;
+#ifdef ZORBA_FOR_ONE_THREAD_ONLY
+  mutable unsigned int               theRefCount;
+#else
+  // Handles to one object can be copied and released on several threads.
+  mutable std::atomic<unsigned int>  theRefCount;
+#endif
 
 public:
   SmartObject() : theRefCount(0) { }
@@ -37,6 +46,7 @@ public:
 
   virtual void free();
 
+#ifdef ZORBA_FOR_ONE_THREAD_ONLY
   long getRefCount() const { return theRefCount; }
 
   void addReference() const { ++theRefCount; }
@@ -45,6 +55,27 @@ public:
     if (--theRefCount == 0) 
       free();
   }
+#else
+  long getRefCount() const
+  {
+    return theRefCount.load(std::memory_order_acquire);
+  }
+
+  // A thread can only copy a reference it already holds, so an increment
+  // needs no ordering.
+  void addReference() const
+  {
+    theRefCount.fetch_add(1, std::memory_order_relaxed);
+  }
+
+  // The thread that drops the last reference sees every other thread's uses
+  // of the object before it frees it.
+  void removeReference ()
+  {
+    if (theRefCount.fetch_sub(1, std::memory_order_acq_rel) == 1)
+      free();
+  }
+#endif
 
   SmartObject& operator=(const SmartObject&) { return *this; }
 }; /* class SmartObject */

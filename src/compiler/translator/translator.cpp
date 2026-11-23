@@ -2872,8 +2872,7 @@ void end_visit(const MainModule& v, void* /*visit_state*/)
     enforceDotItemTypes(loc);
 
   // Put everything together under a single root expr.
-  expr* preloadedInitExpr = static_cast<static_context*>(theSctx->get_parent())->
-                             get_query_expr();
+  expr* preloadedInitExpr = theCCB->thePrologInitExpr;
 
   if (!theModulesInfo->theInitExprs.empty() || preloadedInitExpr != NULL)
   {

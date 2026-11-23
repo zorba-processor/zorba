@@ -490,15 +490,13 @@ void XQueryImpl::compile(
     // Note: unless this is a load-prolog query, the doCompile method invoked
     // below will create a child sctx and set theStaticContext to that child.
 
-    // If the static context results from loadProlog, we need all the contexts
-    // that were created when compiling the load-prolog query
+    // If the static context, or an ancestor of it, results from loadProlog,
+    // we need all the contexts that were created when compiling the
+    // load-prolog query, and its init expr.
     StaticContextImpl* externalSctx =
     static_cast<StaticContextImpl*>(aStaticContext.get());
 
-    if (externalSctx->theCompilerCB)
-      theCompilerCB->theSctxMap = externalSctx->theCompilerCB->theSctxMap;
-
-    ulong nextVarId = externalSctx->getMaxVarId();
+    ulong nextVarId = usePrologOf(externalSctx);
 
     std::istringstream lQueryStream(aQuery.c_str());
 
@@ -533,19 +531,35 @@ void XQueryImpl::compile(
 
     theStaticContext = Unmarshaller::getInternalStaticContext(aStaticContext);
 
-    // if the static context results from loadProlog, we need all the context
-    // that were created when compiling the load-prolog query
+    // If the static context, or an ancestor of it, results from loadProlog,
+    // we need all the contexts that were created when compiling the
+    // load-prolog query, and its init expr.
     StaticContextImpl* externalSctx =
     static_cast<StaticContextImpl*>(aStaticContext.get());
 
-    if (externalSctx->theCompilerCB)
-      theCompilerCB->theSctxMap = externalSctx->theCompilerCB->theSctxMap;
-
-    ulong nextVarId = externalSctx->getMaxVarId();
+    ulong nextVarId = usePrologOf(externalSctx);
 
     doCompile(aQuery, aHints, true, nextVarId);
   }
   QUERY_CATCH
+}
+
+
+/*******************************************************************************
+  Makes the query being compiled against aSctx see the prolog loaded into
+  aSctx, or else into the nearest ancestor of it that has one (if any): the
+  sctxs created when compiling that prolog, and the expr that initializes its
+  variables. Returns the id above which the query numbers its variables.
+********************************************************************************/
+ulong XQueryImpl::usePrologOf(StaticContextImpl const* aSctx)
+{
+  LoadedProlog const* lProlog = aSctx->theProlog->nearest();
+  if (!lProlog)
+    return dynamic_context::MAX_IDVARS_RESERVED;
+
+  theCompilerCB->theSctxMap = lProlog->theCompilerCB->theSctxMap;
+  theCompilerCB->thePrologInitExpr = lProlog->theInitExpr;
+  return lProlog->theMaxVarId;
 }
 
 
@@ -572,17 +586,22 @@ void XQueryImpl::doCompile(
 
     theStaticContext->set_typemanager(new TypeManagerImpl(&GENV_TYPESYSTEM));
   }
-  else
+  else if (fork_sctx)
   {
-    if (theStaticContext->get_local_typemanager() == NULL)
+    // Compile in a child we own. The given context may be shared by queries
+    // on other threads, so it is not changed: a query whose context has no
+    // type manager of its own gets one in its child.
+    theStaticContext->set_shared();
+    bool const lOwnTypeManager =
+      theStaticContext->get_local_typemanager() == NULL;
+    theStaticContext = theStaticContext->create_child_context();
+    if (lOwnTypeManager)
       theStaticContext->set_typemanager(new TypeManagerImpl(&GENV_TYPESYSTEM));
-
-    // otherwise, unless this is a load-prolog query, create a child and we have
-    // ownership over that one
-    if (fork_sctx)
-    {
-      theStaticContext = theStaticContext->create_child_context();
-    }
+  }
+  else if (theStaticContext->get_local_typemanager() == NULL)
+  {
+    // A load-prolog query compiles in the context it sets up.
+    theStaticContext->set_typemanager(new TypeManagerImpl(&GENV_TYPESYSTEM));
   }
 
   //std::cout << "sctx     : " << theStaticContext << std::endl << std::endl;
@@ -655,11 +674,12 @@ void XQueryImpl::loadProlog(
 
     StaticContextImpl* sctx = static_cast<StaticContextImpl*>(aStaticContext.get());
 
-    ulong nextVarId = sctx->getMaxVarId();
+    // The prolog extends the one an ancestor of sctx loaded, if any.
+    ulong nextVarId = usePrologOf(sctx);
 
     doCompile(lQueryStream, aHints, false, nextVarId);
 
-    sctx->setMaxVarId(nextVarId);
+    sctx->theProlog->theMaxVarId = nextVarId;
   }
   QUERY_CATCH
 }
