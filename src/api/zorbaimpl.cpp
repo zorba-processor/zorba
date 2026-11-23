@@ -72,9 +72,21 @@ ZorbaImpl::~ZorbaImpl()
 ********************************************************************************/
 void ZorbaImpl::init(store::Store* store)
 {
+  // A running engine only counts the new user, without the mutex: external
+  // functions call Zorba::getInstance() while their query holds the store
+  // lock, which starting the engine takes under the mutex.
+  ulong users = theNumUsers.load(std::memory_order_acquire);
+  while (users != 0)
+  {
+    if (theNumUsers.compare_exchange_weak(users, users + 1,
+                                          std::memory_order_acq_rel,
+                                          std::memory_order_acquire))
+      return;
+  }
+
   SYNC_CODE(AutoMutex lock(&theUsersMutex);)
 
-  if (theNumUsers == 0)
+  if (theNumUsers.load(std::memory_order_relaxed) == 0)
   {
     void* store2 = StoreManager::getStore();
     (void)store2;
@@ -98,12 +110,12 @@ void ZorbaImpl::shutdownInternal(bool soft)
 {
   SYNC_CODE(AutoMutex lock(&theUsersMutex);)
 
-  if (theNumUsers == 0)
+  if (theNumUsers.load(std::memory_order_relaxed) == 0)
     return;
 
-  --theNumUsers;
+  ulong const remaining = theNumUsers.fetch_sub(1, std::memory_order_acq_rel) - 1;
 
-  if (theNumUsers == 0 || soft == false)
+  if (remaining == 0 || soft == false)
   {
     // The API item factory wraps the store's item factory: destroy it before
     // the store. It is created again on demand after a new init().

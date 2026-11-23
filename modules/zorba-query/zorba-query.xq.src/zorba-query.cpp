@@ -26,79 +26,8 @@ namespace zorba { namespace zorbaquery {
 zorba::ExternalFunction* ZorbaQueryModule::getExternalFunction(
     const zorba::String& localName)
 {
-  FuncMap_t::iterator lIte = theFunctions.find(localName);
-    
-  ExternalFunction*& lFunc = theFunctions[localName];
-
-  if (lIte == theFunctions.end())
-  {
-    if (localName == "prepare-main-module")
-    {
-      lFunc = new PrepareMainModuleFunction(this);
-    }
-    if (localName == "prepare-library-module")
-    {
-      lFunc = new PrepareLibraryModuleFunction(this);
-    }
-    else if (localName == "is-bound-context-item")
-    {
-      lFunc = new IsBoundContextItemFunction(this);
-    }
-    else if (localName == "is-bound-variable")
-    {
-      lFunc = new IsBoundVariableFunction(this);
-    }
-    else if (localName == "external-variables")
-    {
-      lFunc = new GetExternalVariablesFunction(this);
-    }
-    else if (localName == "is-updating")
-    {
-      lFunc = new IsUpdatingFunction(this);        
-    }
-    else if (localName == "is-sequential")
-    {
-      lFunc = new IsSequentialFunction(this);
-    }      
-    else if (localName == "bind-context-item")
-    {
-      lFunc = new BindContextItemFunction(this);
-    }
-    else if (localName == "bind-variable")
-    {
-      lFunc = new BindVariableFunction(this);
-    }
-    else if (localName == "evaluate")
-    {
-      lFunc = new EvaluateFunction(this);
-    }
-    else if (localName == "evaluate-updating")
-    {
-      lFunc = new EvaluateUpdatingFunction(this);
-    }
-    else if (localName == "evaluate-sequential")
-    {
-      lFunc = new EvaluateSequentialFunction(this);
-    }
-    else if (localName == "delete-query")
-    {
-      lFunc = new DeleteQueryFunction(this);
-    }
-    else if (localName == "variable-value")
-    {
-      lFunc = new VariableValueFunction(this);
-    }
-    else if (localName == "query-plan")
-    {
-      lFunc = new QueryPlanFunction(this);
-    }
-    else if (localName == "load-from-query-plan")
-    {
-      lFunc = new LoadFromQueryPlanFunction(this);
-    }
-  }
-  
-  return lFunc;
+  FuncMap_t::const_iterator lIte = theFunctions.find(localName);
+  return lIte == theFunctions.end() ? nullptr : lIte->second.get();
 }
     
 
@@ -114,14 +43,24 @@ void ZorbaQueryModule::destroy()
 /*******************************************************************************
 
 ********************************************************************************/
-ZorbaQueryModule::~ZorbaQueryModule()
+ZorbaQueryModule::ZorbaQueryModule()
 {
-  for (FuncMap_t::const_iterator lIter = theFunctions.begin();
-       lIter != theFunctions.end(); ++lIter) 
-  {
-    delete lIter->second;
-  }
-  theFunctions.clear();
+  theFunctions["prepare-main-module"] = std::make_unique<PrepareMainModuleFunction>(this);
+  theFunctions["prepare-library-module"] = std::make_unique<PrepareLibraryModuleFunction>(this);
+  theFunctions["is-bound-context-item"] = std::make_unique<IsBoundContextItemFunction>(this);
+  theFunctions["is-bound-variable"] = std::make_unique<IsBoundVariableFunction>(this);
+  theFunctions["external-variables"] = std::make_unique<GetExternalVariablesFunction>(this);
+  theFunctions["is-updating"] = std::make_unique<IsUpdatingFunction>(this);
+  theFunctions["is-sequential"] = std::make_unique<IsSequentialFunction>(this);
+  theFunctions["bind-context-item"] = std::make_unique<BindContextItemFunction>(this);
+  theFunctions["bind-variable"] = std::make_unique<BindVariableFunction>(this);
+  theFunctions["evaluate"] = std::make_unique<EvaluateFunction>(this);
+  theFunctions["evaluate-updating"] = std::make_unique<EvaluateUpdatingFunction>(this);
+  theFunctions["evaluate-sequential"] = std::make_unique<EvaluateSequentialFunction>(this);
+  theFunctions["delete-query"] = std::make_unique<DeleteQueryFunction>(this);
+  theFunctions["variable-value"] = std::make_unique<VariableValueFunction>(this);
+  theFunctions["query-plan"] = std::make_unique<QueryPlanFunction>(this);
+  theFunctions["load-from-query-plan"] = std::make_unique<LoadFromQueryPlanFunction>(this);
 }
 
 

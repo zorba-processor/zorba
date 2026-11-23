@@ -376,14 +376,24 @@ UUIDFunction::evaluate(
 
 /******************************************************************************
  *****************************************************************************/
-UtilTestsModule::~UtilTestsModule()
+UtilTestsModule::UtilTestsModule()
 {
-  for (FuncMap_t::const_iterator lIter = theFunctions.begin();
-       lIter != theFunctions.end(); ++lIter)
-  {
-    delete lIter->second;
-  }
-  theFunctions.clear();
+  theFunctions["test-01-cache"] = std::make_unique<Test01CacheFunction>(this);
+  theFunctions["test-01-sd"] = std::make_unique<Test01SDFunction>(this);
+  theFunctions["test-02-cache"] = std::make_unique<Test02CacheFunction>(this);
+  theFunctions["test-02-sd"] = std::make_unique<Test02SDFunction>(this);
+  theFunctions["test-03-cache"] = std::make_unique<Test03CacheFunction>(this);
+  theFunctions["test-03-sd"] = std::make_unique<Test03SDFunction>(this);
+  theFunctions["test-04-cache"] = std::make_unique<Test04CacheFunction>(this);
+  theFunctions["test-04-sd"] = std::make_unique<Test04SDFunction>(this);
+  theFunctions["test-05-cache"] = std::make_unique<Test05CacheFunction>(this);
+  theFunctions["test-05-sd"] = std::make_unique<Test05SDFunction>(this);
+  theFunctions["test-06-cache"] = std::make_unique<Test06CacheFunction>(this);
+  theFunctions["test-06-sd"] = std::make_unique<Test06SDFunction>(this);
+  theFunctions["test-07-cache"] = std::make_unique<Test07CacheFunction>(this);
+  theFunctions["test-07-sd"] = std::make_unique<Test07SDFunction>(this);
+  theFunctions["non-seeakable-streamable-string"] = std::make_unique<NonSeeakableStreamableStringFunction>(this);
+  theFunctions["uuid"] = std::make_unique<UUIDFunction>(this);
 }
 
 void UtilTestsModule::destroy()
@@ -395,42 +405,7 @@ zorba::ExternalFunction*
 UtilTestsModule::getExternalFunction(const zorba::String& aLocalname)
 {
   FuncMap_t::const_iterator lFind = theFunctions.find(aLocalname);
-  zorba::ExternalFunction*& lFunc = theFunctions[aLocalname];
-  if (lFind == theFunctions.end()) {
-    if       (aLocalname.compare("test-01-cache") == 0)
-      lFunc = new Test01CacheFunction(this);
-    else if (aLocalname.compare("test-01-sd") == 0)
-      lFunc = new Test01SDFunction(this);
-    else if (aLocalname.compare("test-02-cache") == 0)
-      lFunc = new Test02CacheFunction(this);
-    else if (aLocalname.compare("test-02-sd") == 0)
-      lFunc = new Test02SDFunction(this);
-    else if (aLocalname.compare("test-03-cache") == 0)
-       lFunc = new Test03CacheFunction(this);
-    else if (aLocalname.compare("test-03-sd") == 0)
-       lFunc = new Test03SDFunction(this);
-    else if (aLocalname.compare("test-04-cache") == 0)
-       lFunc = new Test04CacheFunction(this);
-    else if (aLocalname.compare("test-04-sd") == 0)
-       lFunc = new Test04SDFunction(this);
-    else if (aLocalname.compare("test-05-cache") == 0)
-       lFunc = new Test05CacheFunction(this);
-    else if (aLocalname.compare("test-05-sd") == 0)
-       lFunc = new Test05SDFunction(this);
-    else if (aLocalname.compare("test-06-cache") == 0)
-       lFunc = new Test06CacheFunction(this);
-    else if (aLocalname.compare("test-06-sd") == 0)
-       lFunc = new Test06SDFunction(this);
-    else if (aLocalname.compare("test-07-cache") == 0)
-       lFunc = new Test07CacheFunction(this);
-    else if (aLocalname.compare("test-07-sd") == 0)
-       lFunc = new Test07SDFunction(this);
-    else if (aLocalname.compare("non-seeakable-streamable-string") == 0)
-      lFunc = new NonSeeakableStreamableStringFunction(this);
-    else if (aLocalname.compare("uuid") == 0)
-      lFunc = new UUIDFunction(this);
-  }
-  return lFunc;
+  return lFind == theFunctions.end() ? nullptr : lFind->second.get();
 }
 
 } /* namespace debugmodule */ } /* namespace zorba */

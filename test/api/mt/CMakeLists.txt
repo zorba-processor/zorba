@@ -34,11 +34,20 @@ CREATE_TEST_SOURCELIST(MTTests
   mt_node_reference.cpp
   mt_node_dereference.cpp
   mt_lock_upgrade.cpp
+  mt_prolog_program.cpp
+  mt_function_coercion.cpp
+  mt_function_cache.cpp
+  mt_function_lookup.cpp
+  mt_external_module.cpp
+  mt_query_sctx.cpp
   mt_function_items.cpp
   ${MTSchemaTests}
 )
 
 ZORBA_GENERATE_EXE(MTTests "${MTTests}" "" "" "")
+# mt_external_module loads a module shipped with Zorba (the file module):
+# zorbacmd depends on the core module libraries and their URI files.
+ADD_DEPENDENCIES(MTTests zorbacmd)
 
 SET (TestsToRun ${MTTests})
 LIST (FILTER TestsToRun EXCLUDE REGEX "(^|/)MTTests\\.cpp$")

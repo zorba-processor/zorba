@@ -2,6 +2,7 @@
 #define __COM_ZORBA_WWW_MODULES_ZORBA_QUERY_H__
 
 #include <map>
+#include <memory>
 #include <vector>
 
 #include <zorba/zorba.h>
@@ -30,14 +31,15 @@ protected:
     }
   };
 
-  typedef std::map<String, ExternalFunction*, ltstr> FuncMap_t;
+  // Filled by the constructor: compilations on several threads look the
+  // functions up.
+  typedef std::map<String, std::unique_ptr<ExternalFunction>, ltstr> FuncMap_t;
 
 protected:
   FuncMap_t theFunctions;
 
 public:
-
-  virtual ~ZorbaQueryModule();
+  ZorbaQueryModule();
 
   virtual zorba::String getURI() const {return ZORBA_QUERY_MODULE_NAMESPACE;}
 

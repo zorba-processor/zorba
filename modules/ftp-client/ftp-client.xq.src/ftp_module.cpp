@@ -26,15 +26,19 @@ namespace ftp_client {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-module::module() {
-  item_factory_ = 0;
-}
-
-module::~module() {
-  for ( func_map_type::const_iterator i = func_map_.begin();
-        i != func_map_.end(); ++i ) {
-    delete i->second;
-  }
+module::module() :
+  item_factory_( Zorba::getInstance(0)->getItemFactory() )
+{
+  func_map_[ "connect" ] = std::make_unique<connect_function>( this );
+  func_map_[ "delete" ] = std::make_unique<delete_function>( this );
+  func_map_[ "get-binary" ] = std::make_unique<get_binary_function>( this );
+  func_map_[ "get-text" ] = std::make_unique<get_text_function>( this );
+  func_map_[ "list" ] = std::make_unique<list_function>( this );
+  func_map_[ "mkdir" ] = std::make_unique<mkdir_function>( this );
+  func_map_[ "put-binary" ] = std::make_unique<put_binary_function>( this );
+  func_map_[ "put-text" ] = std::make_unique<put_text_function>( this );
+  func_map_[ "rename" ] = std::make_unique<rename_function>( this );
+  func_map_[ "rmdir" ] = std::make_unique<rmdir_function>( this );
 }
 
 void module::destroy() {
@@ -42,39 +46,11 @@ void module::destroy() {
 }
 
 ExternalFunction* module::getExternalFunction( String const &local_name ) {
-  ExternalFunction *&f = func_map_[ local_name ];
-  if ( !f ) {
-    if ( local_name == "connect" )
-      f = new connect_function( this );
-    else if ( local_name == "delete" )
-      f = new delete_function( this );
-#if 0
-    else if ( local_name == "disconnect" )
-      f = new disconnect_function( this );
-#endif
-    else if ( local_name == "get-binary" )
-      f = new get_binary_function( this );
-    else if ( local_name == "get-text" )
-      f = new get_text_function( this );
-    else if ( local_name == "list" )
-      f = new list_function( this );
-    else if ( local_name == "mkdir" )
-      f = new mkdir_function( this );
-    else if ( local_name == "put-binary" )
-      f = new put_binary_function( this );
-    else if ( local_name == "put-text" )
-      f = new put_text_function( this );
-    else if ( local_name == "rename" )
-      f = new rename_function( this );
-    else if ( local_name == "rmdir" )
-      f = new rmdir_function( this );
-  }
-  return f;
+  func_map_type::const_iterator const i = func_map_.find( local_name );
+  return i == func_map_.end() ? nullptr : i->second.get();
 }
 
 ItemFactory* module::getItemFactory() const {
-  if ( !item_factory_ )
-    item_factory_ = Zorba::getInstance(0)->getItemFactory();
   return item_factory_;
 }
 
