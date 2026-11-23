@@ -357,384 +357,190 @@ bool SctxFunctionsIterator::nextImpl(
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void SctxInScopeAttributeDeclarationsIteratorState::
-reset( PlanState &plan_state ) {
-  PlanIteratorState::reset( plan_state );
-  ns_pos = 0;
-  elem_pos = 0;
+#ifndef ZORBA_NO_XMLSCHEMA
+namespace {
+
+// The names of the schema's global components of one kind, read in one hold
+// of the Xerces lock: an import on another thread deletes the XSModel.
+void getSchemaComponentNames(
+    const static_context* sctx,
+    XERCES_CPP_NAMESPACE::XSConstants::COMPONENT_TYPE kind,
+    std::vector<store::Item_t>& names)
+{
+  XERCES_CPP_NAMESPACE_USE;
+  Schema* schema = sctx->get_typemanager()->getSchema();
+  if (!schema)
+    return;
+
+  SYNC_CODE(Schema::PoolUse poolUse(*schema);)
+  bool modelHasChanged;
+  XSModel* model = schema->getGrammarPool()->getXSModel(modelHasChanged);
+  StringList* namespaces = model->getNamespaces();
+  for (XMLSize_t i = 0; i < namespaces->size(); ++i)
+  {
+    const XMLCh* nameSpace = namespaces->elementAt(i);
+    if (!nameSpace || XMLString::stringLen(nameSpace) == 0)
+      continue;
+
+    XSNamedMap<XSObject>* components =
+    model->getComponentsByNamespace(kind, nameSpace);
+    if (!components)
+      continue;
+
+    StrX const ns(nameSpace);
+    for (XMLSize_t j = 0; j < components->getLength(); ++j)
+    {
+      store::Item_t name;
+      GENV_ITEMFACTORY->createQName(name,
+                                    ns.localForm(),
+                                    "",
+                                    StrX(components->item(j)->getName()).localForm());
+      names.push_back(name);
+    }
+  }
 }
 
-bool SctxInScopeAttributeDeclarationsIterator::
-nextImpl( store::Item_t &result, PlanState &plan_state ) const {
-  SctxInScopeAttributeDeclarationsIteratorState *state;
+} // namespace
+#endif /* ZORBA_NO_XMLSCHEMA */
+
+///////////////////////////////////////////////////////////////////////////////
+
+void SctxInScopeAttributeDeclarationsIteratorState::reset(PlanState& plan_state) {
+  PlanIteratorState::reset(plan_state);
+  theNames.clear();
+  thePosition = 0;
+}
+
+bool SctxInScopeAttributeDeclarationsIterator::nextImpl(store::Item_t& result,
+    PlanState& plan_state) const {
+  SctxInScopeAttributeDeclarationsIteratorState* state;
+  DEFAULT_STACK_INIT(SctxInScopeAttributeDeclarationsIteratorState, state, plan_state);
 
 #ifndef ZORBA_NO_XMLSCHEMA
-  XERCES_CPP_NAMESPACE_USE;
-  zstring qname_ns;
-  bool modelHasChanged;
-  Schema* schema;
-  XMLGrammarPool* grammarPool;
-  XSModel* xsModel = nullptr;
-  StringList* namespaces = nullptr;
-  const XMLCh* nameSpace;
-  XSNamedMap<XSObject>* xsElements;
-  XSObject* xsElement;
-  const XMLCh* elemNameSpace;
-
-  schema = theSctx->get_typemanager()->getSchema();
-  if ( schema )
+  getSchemaComponentNames(theSctx,
+                          XERCES_CPP_NAMESPACE::XSConstants::ATTRIBUTE_DECLARATION,
+                          state->theNames);
+#endif
+  state->thePosition = 0;
+  while (state->thePosition < state->theNames.size())
   {
-    grammarPool = schema->getGrammarPool();
-    xsModel = grammarPool->getXSModel(modelHasChanged);
-    namespaces = xsModel->getNamespaces();
+    result = state->theNames[state->thePosition++];
+    STACK_PUSH(true, state);
   }
 
-  DEFAULT_STACK_INIT(SctxInScopeAttributeDeclarationsIteratorState, state, plan_state);
-  state->ns_pos = 0;
-  state->elem_pos = 0;
-
-  while (schema && state->ns_pos < namespaces->size())
-  {
-    nameSpace = namespaces->elementAt(state->ns_pos);
-    if (!nameSpace || XMLString::stringLen(nameSpace) <= 0)
-    {
-      state->ns_pos++;
-      state->elem_pos = 0;
-      continue;
-    }
-
-    xsElements = xsModel->getComponentsByNamespace(XSConstants::ATTRIBUTE_DECLARATION, nameSpace);
-    if (!xsElements || xsElements->getLength() <= 0 || state->elem_pos >= xsElements->getLength())
-    {
-      state->ns_pos++;
-      state->elem_pos = 0;
-      continue;
-    }
-
-    xsElement = xsElements->item(state->elem_pos);
-    elemNameSpace = xsElement->getNamespace();
-    if (elemNameSpace && (XMLString::stringLen(elemNameSpace )>0))
-      qname_ns = StrX(elemNameSpace).localForm();
-
-    state->elem_pos++;
-    STACK_PUSH(GENV_ITEMFACTORY->createQName(result, qname_ns.c_str(), "", StrX(xsElement->getName()).localForm()), state);
-  }
-
-#else /* ZORBA_NO_XMLSCHEMA */
-
-  // In case Zorba is compiled without schema, the function will return an empty sequence
-  DEFAULT_STACK_INIT(SctxInScopeAttributeDeclarationsIteratorState, state, plan_state);
-
-#endif /* ZORBA_NO_XMLSCHEMA */
-  STACK_END( state );
+  STACK_END(state);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void SctxInScopeAttributeGroupsIteratorState::reset( PlanState &plan_state ) {
-  PlanIteratorState::reset( plan_state );
-  ns_pos = 0;
-  elem_pos = 0;
+void SctxInScopeAttributeGroupsIteratorState::reset(PlanState& plan_state) {
+  PlanIteratorState::reset(plan_state);
+  theNames.clear();
+  thePosition = 0;
 }
 
-bool SctxInScopeAttributeGroupsIterator::
-nextImpl( store::Item_t &result, PlanState &plan_state) const {
-  SctxInScopeAttributeGroupsIteratorState *state;
-
-#ifndef ZORBA_NO_XMLSCHEMA
-  XERCES_CPP_NAMESPACE_USE;
-  zstring qname_ns;
-  bool modelHasChanged;
-  Schema* schema;
-  XMLGrammarPool* grammarPool;
-  XSModel* xsModel = nullptr;
-  StringList* namespaces = nullptr;
-  const XMLCh* nameSpace;
-  XSNamedMap<XSObject>* xsElements;
-  XSObject* xsElement;
-  const XMLCh* elemNameSpace;
-
-  schema = theSctx->get_typemanager()->getSchema();
-  if ( schema )
-  {
-    grammarPool = schema->getGrammarPool();
-    xsModel = grammarPool->getXSModel(modelHasChanged);
-    namespaces = xsModel->getNamespaces();
-  }
-
+bool SctxInScopeAttributeGroupsIterator::nextImpl(store::Item_t& result,
+    PlanState& plan_state) const {
+  SctxInScopeAttributeGroupsIteratorState* state;
   DEFAULT_STACK_INIT(SctxInScopeAttributeGroupsIteratorState, state, plan_state);
 
-  state->ns_pos = 0;
-  state->elem_pos = 0;
-  while (schema && state->ns_pos < namespaces->size())
+#ifndef ZORBA_NO_XMLSCHEMA
+  getSchemaComponentNames(theSctx,
+                          XERCES_CPP_NAMESPACE::XSConstants::ATTRIBUTE_GROUP_DEFINITION,
+                          state->theNames);
+#endif
+  state->thePosition = 0;
+  while (state->thePosition < state->theNames.size())
   {
-    nameSpace = namespaces->elementAt(state->ns_pos);
-    if (!nameSpace || XMLString::stringLen(nameSpace) <= 0)
-    {
-      state->ns_pos++;
-      state->elem_pos = 0;
-      continue;
-    }
-
-    xsElements = xsModel->getComponentsByNamespace(XSConstants::ATTRIBUTE_GROUP_DEFINITION, nameSpace);
-    if (!xsElements || xsElements->getLength() <= 0 || state->elem_pos >= xsElements->getLength())
-    {
-      state->ns_pos++;
-      state->elem_pos = 0;
-      continue;
-    }
-
-    xsElement = xsElements->item(state->elem_pos);
-    elemNameSpace = xsElement->getNamespace();
-    if (elemNameSpace && (XMLString::stringLen(elemNameSpace )>0))
-      qname_ns = StrX(elemNameSpace).localForm();
-
-    state->elem_pos++;
-    STACK_PUSH(GENV_ITEMFACTORY->createQName(result, qname_ns.c_str(), "", StrX(xsElement->getName()).localForm()), state);
+    result = state->theNames[state->thePosition++];
+    STACK_PUSH(true, state);
   }
 
-#else /* ZORBA_NO_XMLSCHEMA */
-
-  // In case Zorba is compiled without schema, the function will return an empty sequence
-  DEFAULT_STACK_INIT( SctxInScopeAttributeGroupsIteratorState, state, plan_state );
-
-#endif /* ZORBA_NO_XMLSCHEMA */
-  STACK_END( state );
+  STACK_END(state);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void SctxInScopeElementDeclarationsIteratorState::
-reset( PlanState &plan_state ) {
-  PlanIteratorState::reset( plan_state );
-  ns_pos = 0;
-  elem_pos = 0;
+void SctxInScopeElementDeclarationsIteratorState::reset(PlanState& plan_state) {
+  PlanIteratorState::reset(plan_state);
+  theNames.clear();
+  thePosition = 0;
 }
 
-bool SctxInScopeElementDeclarationsIterator::
-nextImpl( store::Item_t &result, PlanState &plan_state ) const {
-#ifndef ZORBA_NO_XMLSCHEMA
-  XERCES_CPP_NAMESPACE_USE;
-  zstring qname_ns;
-  bool modelHasChanged;
-  Schema* schema;
-  XMLGrammarPool* grammarPool;
-  XSModel* xsModel = nullptr;
-  StringList* namespaces = nullptr;
-  const XMLCh* nameSpace;
-  XSNamedMap<XSObject>* xsElements;
-  XSElementDeclaration* xsElement;
-  const XMLCh* elemNameSpace;
-
-  schema = theSctx->get_typemanager()->getSchema();
-  if ( schema ) {
-    grammarPool = schema->getGrammarPool();
-    xsModel = grammarPool->getXSModel(modelHasChanged);
-    namespaces = xsModel->getNamespaces();
-  }
-
-  SctxInScopeElementDeclarationsIteratorState *state;
-  DEFAULT_STACK_INIT(SctxInScopeElementDeclarationsIteratorState, state, plan_state);
-
-  state->ns_pos = 0;
-  state->elem_pos = 0;
-  while (schema && state->ns_pos < namespaces->size())
-  {
-    nameSpace = namespaces->elementAt(state->ns_pos);
-    if (!nameSpace || XMLString::stringLen(nameSpace) <= 0)
-    {
-      state->ns_pos++;
-      state->elem_pos = 0;
-      continue;
-    }
-
-    xsElements = xsModel->getComponentsByNamespace(XSConstants::ELEMENT_DECLARATION, nameSpace);
-    if (!xsElements || xsElements->getLength() <= 0 || state->elem_pos >= xsElements->getLength())
-    {
-      state->ns_pos++;
-      state->elem_pos = 0;
-      continue;
-    }
-
-    xsElement = (XSElementDeclaration*)xsElements->item(state->elem_pos);
-    elemNameSpace = xsElement->getNamespace();
-    if (elemNameSpace && (XMLString::stringLen(elemNameSpace )>0))
-      qname_ns = StrX(elemNameSpace).localForm();
-
-    state->elem_pos++;
-    STACK_PUSH(GENV_ITEMFACTORY->createQName(result,
-                                             qname_ns.c_str(),
-                                             "",
-                                             StrX(xsElement->getName()).localForm()),
-                                             state);
-  }
-
-#else /* ZORBA_NO_XMLSCHEMA */
-
-  // In case Zorba is compiled without schema, the function will return an empty sequence
+bool SctxInScopeElementDeclarationsIterator::nextImpl(store::Item_t& result,
+    PlanState& plan_state) const {
   SctxInScopeElementDeclarationsIteratorState* state;
   DEFAULT_STACK_INIT(SctxInScopeElementDeclarationsIteratorState, state, plan_state);
 
-#endif /* ZORBA_NO_XMLSCHEMA */
-  STACK_END( state );
+#ifndef ZORBA_NO_XMLSCHEMA
+  getSchemaComponentNames(theSctx,
+                          XERCES_CPP_NAMESPACE::XSConstants::ELEMENT_DECLARATION,
+                          state->theNames);
+#endif
+  state->thePosition = 0;
+  while (state->thePosition < state->theNames.size())
+  {
+    result = state->theNames[state->thePosition++];
+    STACK_PUSH(true, state);
+  }
+
+  STACK_END(state);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void SctxInScopeElementGroupsIteratorState::reset( PlanState &plan_state ) {
+void SctxInScopeElementGroupsIteratorState::reset(PlanState& plan_state) {
   PlanIteratorState::reset(plan_state);
-  ns_pos = 0;
-  elem_pos = 0;
+  theNames.clear();
+  thePosition = 0;
 }
 
-bool SctxInScopeElementGroupsIterator::nextImpl(
-    store::Item_t& result,
-    PlanState &plan_state) const
-{
+bool SctxInScopeElementGroupsIterator::nextImpl(store::Item_t& result,
+    PlanState& plan_state) const {
   SctxInScopeElementGroupsIteratorState* state;
+  DEFAULT_STACK_INIT(SctxInScopeElementGroupsIteratorState, state, plan_state);
 
 #ifndef ZORBA_NO_XMLSCHEMA
-  XERCES_CPP_NAMESPACE_USE;
-  zstring qname_ns;
-  bool modelHasChanged;
-  Schema* schema;
-  XMLGrammarPool* grammarPool;
-  XSModel* xsModel = nullptr;
-  StringList* namespaces = nullptr;
-  const XMLCh* nameSpace;
-  XSNamedMap<XSObject>* xsElements;
-  XSObject* xsElement;
-  const XMLCh* elemNameSpace;
-
-  schema = theSctx->get_typemanager()->getSchema();
-  if ( schema )
+  getSchemaComponentNames(theSctx,
+                          XERCES_CPP_NAMESPACE::XSConstants::MODEL_GROUP_DEFINITION,
+                          state->theNames);
+#endif
+  state->thePosition = 0;
+  while (state->thePosition < state->theNames.size())
   {
-    grammarPool = schema->getGrammarPool();
-    xsModel = grammarPool->getXSModel(modelHasChanged);
-    namespaces = xsModel->getNamespaces();
+    result = state->theNames[state->thePosition++];
+    STACK_PUSH(true, state);
   }
 
-  DEFAULT_STACK_INIT(SctxInScopeElementGroupsIteratorState, state, plan_state);
-
-  state->ns_pos = 0;
-  state->elem_pos = 0;
-  while (schema && state->ns_pos < namespaces->size())
-  {
-    nameSpace = namespaces->elementAt(state->ns_pos);
-    if (!nameSpace || XMLString::stringLen(nameSpace) <= 0)
-    {
-      state->ns_pos++;
-      state->elem_pos = 0;
-      continue;
-    }
-
-    xsElements = xsModel->getComponentsByNamespace(XSConstants::MODEL_GROUP_DEFINITION, nameSpace);
-    if (!xsElements || xsElements->getLength() <= 0 || state->elem_pos >= xsElements->getLength())
-    {
-      state->ns_pos++;
-      state->elem_pos = 0;
-      continue;
-    }
-
-    xsElement = xsElements->item(state->elem_pos);
-    elemNameSpace = xsElement->getNamespace();
-    if (elemNameSpace && (XMLString::stringLen(elemNameSpace )>0))
-      qname_ns = StrX(elemNameSpace).localForm();
-
-    state->elem_pos++;
-    STACK_PUSH(GENV_ITEMFACTORY->createQName(result, qname_ns.c_str(), "", StrX(xsElement->getName()).localForm()), state);
-  }
-
-#else // #ifndef ZORBA_NO_XMLSCHEMA
-
-  // In case Zorba is compiled without schema, the function will return an empty sequence
-  DEFAULT_STACK_INIT(SctxInScopeElementGroupsIteratorState, state, plan_state);
-
-#endif // #ifndef ZORBA_NO_XMLSCHEMA
-  STACK_END( state );
+  STACK_END(state);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void SctxInScopeSchemaTypesIteratorState::reset( PlanState &plan_state ) {
+void SctxInScopeSchemaTypesIteratorState::reset(PlanState& plan_state) {
   PlanIteratorState::reset(plan_state);
-  ns_pos = 0;
-  elem_pos = 0;
+  theNames.clear();
+  thePosition = 0;
 }
 
-bool SctxInScopeSchemaTypesIterator::nextImpl( store::Item_t &result,
-                                               PlanState &plan_state ) const {
+bool SctxInScopeSchemaTypesIterator::nextImpl(store::Item_t& result,
+    PlanState& plan_state) const {
+  SctxInScopeSchemaTypesIteratorState* state;
+  DEFAULT_STACK_INIT(SctxInScopeSchemaTypesIteratorState, state, plan_state);
+
 #ifndef ZORBA_NO_XMLSCHEMA
-  XERCES_CPP_NAMESPACE_USE;
-  zstring qname_ns;
-  bool modelHasChanged;
-  Schema* schema;
-  XMLGrammarPool* grammarPool;
-  XSModel* xsModel = nullptr;
-  StringList* namespaces = nullptr;
-  const XMLCh* nameSpace;
-  XSNamedMap<XSObject>* xsElements;
-  XSObject* xsElement;
-  const XMLCh* elemNameSpace;
-
-  schema = theSctx->get_typemanager()->getSchema();
-  if ( schema )
+  getSchemaComponentNames(theSctx,
+                          XERCES_CPP_NAMESPACE::XSConstants::TYPE_DEFINITION,
+                          state->theNames);
+#endif
+  state->thePosition = 0;
+  while (state->thePosition < state->theNames.size())
   {
-    grammarPool = schema->getGrammarPool();
-    xsModel = grammarPool->getXSModel(modelHasChanged);
-    namespaces = xsModel->getNamespaces();
+    result = state->theNames[state->thePosition++];
+    STACK_PUSH(true, state);
   }
 
-  SctxInScopeSchemaTypesIteratorState* state;
-  DEFAULT_STACK_INIT(SctxInScopeSchemaTypesIteratorState, state, plan_state);
-
-  state->ns_pos = 0;
-  state->elem_pos = 0;
-  while (schema && state->ns_pos < namespaces->size())
-  {
-    nameSpace = namespaces->elementAt(state->ns_pos);
-    if ( !nameSpace || XMLString::stringLen(nameSpace) <= 0)
-    {
-      state->ns_pos++;
-      state->elem_pos = 0;
-      continue;
-    }
-
-    xsElements = xsModel->getComponentsByNamespace(XSConstants::TYPE_DEFINITION,
-                                                   nameSpace);
-
-    if (!xsElements ||
-        xsElements->getLength() <= 0 ||
-        state->elem_pos >= xsElements->getLength())
-    {
-      state->ns_pos++;
-      state->elem_pos = 0;
-      continue;
-    }
-
-    xsElement = xsElements->item(state->elem_pos);
-    elemNameSpace = xsElement->getNamespace();
-    if (elemNameSpace && (XMLString::stringLen(elemNameSpace ) > 0))
-      qname_ns = StrX(elemNameSpace).localForm();
-
-    state->elem_pos++;
-
-    STACK_PUSH(GENV_ITEMFACTORY->createQName(result,
-                                             qname_ns.c_str(),
-                                             "",
-                                             StrX(xsElement->getName()).localForm()),
-                                             state);
-  }
-
-#else /* ZORBA_NO_XMLSCHEMA */
-
-  // In case Zorba is compiled without schema, the function will return an empty sequence
-  // TODO: the function should return the predefined xs: types even without schema
-  SctxInScopeSchemaTypesIteratorState* state;
-  DEFAULT_STACK_INIT(SctxInScopeSchemaTypesIteratorState, state, plan_state);
-
-#endif /* ZORBA_NO_XMLSCHEMA */
-  STACK_END( state );
+  STACK_END(state);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
