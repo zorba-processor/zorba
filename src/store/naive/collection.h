@@ -84,6 +84,12 @@ public:
 
   virtual zorba::xs_integer removeNodes(xs_integer position, xs_integer num) = 0;
 
+  // Removes the last num trees, which must be nodes[0] to nodes[num - 1], with
+  // no allocation (an xs_integer allocates in bigint builds): for an undo.
+  virtual void removeLastNodes(
+      const std::vector<store::Item_t>& nodes,
+      csize num) = 0;
+
   virtual void removeAll() = 0;
   
   virtual void adjustTreePositions() = 0;

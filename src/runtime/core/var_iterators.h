@@ -297,6 +297,11 @@ public:
 
   PlanIterator* getTargetLenIter() const { return theTargetLenIter.getp(); }
 
+  // The temp seq that is the value of the var, all of it, and the id of its
+  // binding; NULL if the var has another value or the reference selects
+  // positions.
+  store::TempSeq* getWholeTempSeq(PlanState& planState, uint64_t& bindingId) const;
+
   uint32_t getStateSizeOfSubtree() const;
 
   void accept(PlanIterVisitor& v) const;

@@ -245,8 +245,9 @@ jobs:
 
       - name: Build and test
         if: needs.changes.outputs.code == 'true'
+        # --internal: the tests reach the HTTP test server and no other host.
         run: |
-          docker network create zorba-test
+          docker network create --internal zorba-test
           docker run -d --name zorba-http-test --network zorba-test zorba-http-test:ci
           docker run --rm --network zorba-test \
             -e ZORBA_HTTP_TEST_SERVER=zorba-http-test:8080 \
@@ -369,7 +370,7 @@ jobs:
       - name: Test
         timeout-minutes: 20
         run: |
-          docker run --rm \
+          docker run --rm --network none \
             -v "$PWD":/src -w /src zorba-builder:ci sh -c '
               ulimit -c 0
               ctest --preset ${{ matrix.preset }} -j"$(nproc)" --timeout 60 \

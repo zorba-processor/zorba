@@ -147,8 +147,9 @@ class GeneralEqualityIndex;
 /*******************************************************************************
   theSeenBindingId:
   -----------------
-  The binding of the LET var operand of a general "=" at the last evaluation
-  (see LetVarIterator::getWholeTempSeq()).
+  The binding of the LET var or dynamic context var operand of a general "="
+  at the last evaluation (see LetVarIterator::getWholeTempSeq() and
+  CtxVarIterator::getWholeTempSeq()).
 
   theIndex:
   ---------

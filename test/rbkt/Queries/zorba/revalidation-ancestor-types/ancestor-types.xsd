@@ -1,0 +1,13 @@
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           targetNamespace="http://zorba.io/test/revalidation-ancestor-types"
+           xmlns="http://zorba.io/test/revalidation-ancestor-types"
+           elementFormDefault="qualified">
+  <!-- r has element-only content: a typed r has no typed value -->
+  <xs:element name="r">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="w" type="xs:anyType"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>
