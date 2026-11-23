@@ -1180,6 +1180,7 @@ void UpdInsertLastIntoCollection::apply()
   for (std::size_t i = 0; i < numNodes; ++i)
   {
     lColl->addNode(theNodes[i], neg_1);
+    ++theNumApplied;
   }
 }
 

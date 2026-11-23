@@ -4921,6 +4921,80 @@ void test_remove_type_out_of_memory( Fixture const &f ) {
   (void)f;
 #endif
 }
+// Nodes inserted last into a collection, with each allocation failing in turn:
+// a failed insert leaves the collection as it was, the undo taking out the
+// nodes inserted before the failure.
+void test_collection_insert_last_out_of_memory( Fixture const &f ) {
+#if defined(__linux__)
+  // Untyped nodes: a typed one leaks when its construction fails (another
+  // defect, outside this test).
+  std::string const prolog(
+    "declare construction strip;\n"
+    "import module namespace ddl ="
+    " 'http://zorba.io/modules/store/dynamic/collections/ddl';\n"
+    "import module namespace dml ="
+    " 'http://zorba.io/modules/store/dynamic/collections/dml';\n" );
+  auto run = [&]( std::string const &query ) -> std::string {
+    XQuery_t const q( f.zorba->compileQuery( prolog + query ) );
+    Iterator_t const it( q->iterator() );
+    it->open();
+    Item item;
+    std::string out;
+    while ( it->next( item ) )
+      out += item.getStringValue().str();
+    it->close();
+    return out;
+  };
+  auto attempt = [&]( long n, long length, long *count ) -> std::string {
+    run( "ddl:create(xs:QName('ddl:last'), <x/>);\n1" );
+    XQuery_t const insert( f.zorba->compileQuery( prolog +
+      "dml:insert-last(xs:QName('ddl:last'), (<a/>, <b/>, <c/>));\n1" ) );
+    Iterator_t const it( insert->iterator() );
+    Item result;
+    bool failed = false;
+    inject_arm( n, length );
+    try {
+      it->open();
+      it->next( result );
+      it->close();
+    }
+    catch ( std::exception const& ) {
+      failed = true;
+    }
+    *count = inject_disarm();
+    std::string const out( failed || result.isNull()
+                           ? "error" : result.getStringValue().str() );
+    std::string const nodes( run(
+      "string-join(dml:collection(xs:QName('ddl:last')) ! local-name(), ' ')" ) );
+    run( "dml:truncate(xs:QName('ddl:last'));\n"
+         "ddl:delete(xs:QName('ddl:last'));\n1" );
+    return out + "|" + nodes;
+  };
+  std::string const answer( "1|x a b c" );
+  long total = 0;
+  std::string const whole( attempt( 0, 0, &total ) );
+  check( whole == answer, "nodes inserted last into a collection", whole );
+  long wrong = 0;
+  for ( long const length : { 1L, 8L } )
+    for ( long n = 1; n <= total; ++n ) {
+      long count = 0;
+      std::string const got( attempt( n, length, &count ) );
+      if ( got != answer && got != "error|x" && ++wrong <= 3 )
+        std::cout << "at " << n << " of a run of " << length << ": " << got
+                  << std::endl;
+    }
+  check( wrong == 0, "nodes inserted last into a collection failing: the "
+                     "answer, or an error and the collection as before",
+         std::to_string( wrong ) + " points" );
+# if defined(__SANITIZE_ADDRESS__)
+  check( __lsan_do_recoverable_leak_check() == 0,
+         "nodes inserted last into a collection failing: nothing is left "
+         "behind" );
+# endif
+#else
+  (void)f;
+#endif
+}
 // Every allocation of a compilation fails in turn; after each, the same server
 // finds the built-in functions and the variables of a catch clause, as a fresh
 // one does.
@@ -8873,6 +8947,7 @@ Test const tests[] = {
   { "exhaust_collection_insert", test_collection_insert_out_of_memory },
   { "exhaust_update_primitive", test_update_primitive_out_of_memory },
   { "exhaust_remove_type", test_remove_type_out_of_memory },
+  { "exhaust_collection_insert_last", test_collection_insert_last_out_of_memory },
   { "exhaust_plan_wrapper", test_plan_wrapper_out_of_memory },
   { "exhaust_plan_open", test_plan_open_out_of_memory },
   { "exhaust_call_body", test_call_body_out_of_memory },
