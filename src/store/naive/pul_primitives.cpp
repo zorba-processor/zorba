@@ -999,6 +999,9 @@ UpdCollection::UpdCollection(
 ********************************************************************************/
 void UpdCreateCollection::apply()
 {
+  // With room for the new collection, undo takes it out without allocating.
+  GET_STORE().reserveCollections(1);
+
   // Error is raised if collection exists already.
   GET_STORE().createCollection(theName, theAnnotations, theIsDynamic);
   theIsApplied = true;
@@ -1080,6 +1083,9 @@ void UpdDeleteCollection::apply()
     }
   }
 
+  // With room for the collections there are now, undo puts this one back
+  // without allocating.
+  GET_STORE().reserveCollections(0);
   GET_STORE().deleteCollection(theName, theIsDynamic);
   theIsApplied = true;
 }

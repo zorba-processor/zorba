@@ -271,6 +271,9 @@ public:
 
   virtual void addCollection(store::Collection_t& collection);
 
+  // Room for n more collections (see CollectionSet::reserve).
+  void reserveCollections(csize n);
+
   virtual void deleteCollection(const store::Item* name, bool isDynamic);
 
   virtual store::Collection_t getCollection(const store::Item* name, bool isDynamic);

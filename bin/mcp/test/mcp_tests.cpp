@@ -4609,6 +4609,98 @@ void test_collection_undo_out_of_memory( Fixture const &f ) {
   (void)f;
 #endif
 }
+// One update that creates a collection and deletes seven, with each allocation
+// failing in turn: a failed update leaves the collections as they were, so the
+// same update with no failure then applies. Putting back the deleted collections
+// and taking out the created one allocates nothing, though the deletes shrank
+// the store's map of collections.
+void test_collection_map_undo_out_of_memory( Fixture const &f ) {
+#if defined(__linux__)
+  std::string const prolog(
+    "import module namespace ddl ="
+    " 'http://zorba.io/modules/store/dynamic/collections/ddl';\n" );
+  std::string update( "(ddl:create(xs:QName('ddl:cunew'))" );
+  for ( int i = 1; i <= 7; ++i )
+    update += ", ddl:delete(xs:QName('ddl:cu" + std::to_string( i ) + "'))";
+  update += ");\n1";
+  std::string const names(
+    "string-join(for $n in ddl:available-collections()\n"
+    "            let $l := local-name-from-QName($n)\n"
+    "            where starts-with($l, 'cu')\n"
+    "            order by $l\n"
+    "            return $l, ' ')" );
+  auto run = [&]( std::string const &query ) -> std::string {
+    XQuery_t const q( f.zorba->compileQuery( prolog + query ) );
+    Iterator_t const it( q->iterator() );
+    it->open();
+    Item item;
+    std::string out;
+    while ( it->next( item ) )
+      out += item.getStringValue().str();
+    it->close();
+    return out;
+  };
+  std::string const before( "cu1 cu2 cu3 cu4 cu5 cu6 cu7 cu8" );
+  auto attempt = [&]( long n, long length, long *count ) -> std::string {
+    for ( int i = 1; i <= 8; ++i )
+      run( "ddl:create(xs:QName('ddl:cu" + std::to_string( i ) + "'));\n1" );
+    XQuery_t const q( f.zorba->compileQuery( prolog + update ) );
+    Iterator_t const it( q->iterator() );
+    Item result;
+    bool failed = false;
+    inject_arm( n, length );
+    try {
+      it->open();
+      it->next( result );
+      it->close();
+    }
+    catch ( std::exception const& ) {
+      failed = true;
+    }
+    *count = inject_disarm();
+    std::string out( failed || result.isNull()
+                     ? "error" : result.getStringValue().str() );
+    if ( failed ) {
+      out += "|" + run( names ) + "|";
+      try {
+        out += run( update );
+      }
+      catch ( std::exception const &e ) {
+        out += e.what();
+      }
+    }
+    out += "|" + run( names );
+    run( "(ddl:delete(xs:QName('ddl:cu8')), ddl:delete(xs:QName('ddl:cunew')));"
+         "\n1" );
+    return out;
+  };
+  std::string const answer( "1|cu8 cunew" );
+  long total = 0;
+  std::string const whole( attempt( 0, 0, &total ) );
+  check( whole == answer, "an update creating and deleting collections",
+         whole );
+  long wrong = 0;
+  for ( long const length : { 1L, 8L } )
+    for ( long n = 1; n <= total; ++n ) {
+      long count = 0;
+      std::string const got( attempt( n, length, &count ) );
+      if ( got != answer && got != "error|" + before + "|1|cu8 cunew" &&
+           ++wrong <= 3 )
+        std::cout << "at " << n << " of a run of " << length << ": " << got
+                  << std::endl;
+    }
+  check( wrong == 0, "an update creating and deleting collections failing: "
+                     "the answer, or an error and the collections as they were",
+         std::to_string( wrong ) + " points" );
+# if defined(__SANITIZE_ADDRESS__)
+  check( __lsan_do_recoverable_leak_check() == 0,
+         "an update creating and deleting collections failing: nothing is "
+         "left behind" );
+# endif
+#else
+  (void)f;
+#endif
+}
 // The serializer with each allocation failing in turn, over an element 12 deep:
 // past the 8 children iterators the emitter makes first, so its pool of them
 // grows. The whole text or an error; then, in an AddressSanitizer build,
@@ -9279,6 +9371,7 @@ Test const tests[] = {
   { "exhaust_collection_insert", test_collection_insert_out_of_memory },
   { "exhaust_collection_undo", test_collection_undo_out_of_memory },
   { "exhaust_collection_json", test_collection_json_out_of_memory },
+  { "exhaust_collection_map_undo", test_collection_map_undo_out_of_memory },
   { "exhaust_update_primitive", test_update_primitive_out_of_memory },
   { "exhaust_remove_type", test_remove_type_out_of_memory },
   { "exhaust_collection_insert_last", test_collection_insert_last_out_of_memory },

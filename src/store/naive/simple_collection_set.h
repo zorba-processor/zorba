@@ -55,6 +55,8 @@ public:
       bool isDynamic);
   
   virtual bool remove(const store::Item* name, bool isDynamic);
+
+  virtual void reserve(csize n);
     
   virtual zorba::store::Iterator_t names(bool isDynamic);
 };
