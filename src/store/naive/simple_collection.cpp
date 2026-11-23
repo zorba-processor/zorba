@@ -123,6 +123,20 @@ store::Iterator_t SimpleCollection::getIterator(
 ********************************************************************************/
 bool SimpleCollection::findNode(const store::Item* item, xs_integer& position) const
 {
+  csize pos;
+  if (!findTree(item, pos))
+    return false;
+
+  position = xs_integer(pos);
+  return true;
+}
+
+
+/*******************************************************************************
+  findNode() with the position as a csize, which allocates nothing.
+********************************************************************************/
+bool SimpleCollection::findTree(const store::Item* item, csize& position) const
+{
   if (!(item->isStructuredItem()))
   {
     throw ZORBA_EXCEPTION(zerr::ZSTR0013_COLLECTION_ITEM_MUST_BE_STRUCTURED,
@@ -149,21 +163,10 @@ bool SimpleCollection::findNode(const store::Item* item, xs_integer& position) c
 
   position = structuredItem->getPosition();
 
-  csize pos = 0;
-  try
-  {
-    pos = to_xs_unsignedInt(position);
-  }
-  catch (const std::range_error&)
-  {
-    throw ZORBA_EXCEPTION(zerr::ZXQD0004_INVALID_PARAMETER,
-    ERROR_PARAMS(ZED(ZXQD0004_NOT_WITHIN_RANGE), position));
-  }
-
-  if (pos < theTrees.size())
+  if (position < theTrees.size())
   {
     StructuredItem* collectionItem =
-    static_cast<StructuredItem*>(theTrees[pos].getp());
+    static_cast<StructuredItem*>(theTrees[position].getp());
 
     if (collectionItem->getTreeId() == structuredItem->getTreeId())
     {
@@ -260,20 +263,21 @@ void SimpleCollection::addNode(store::Item* item, xs_integer position)
     xs_long pos = to_xs_long(position);
     ZORBA_ASSERT_STORE_WRITE();
 
-    if (pos < 0 || to_xs_unsignedLong(position) >= theTrees.size())
-    {
-      theTrees.push_back(item);
+    csize treePos = theTrees.size();
+    if (pos >= 0 && to_xs_unsignedLong(position) < treePos)
+      treePos = static_cast<csize>(pos);
 
-      structuredItem->attachToCollection(this,
-                                         createTreeId(),
-                                         xs_integer(theTrees.size()));
+    // Attached first: a failed insertion detaches it, and the collection is
+    // as it was.
+    structuredItem->attachToCollection(this, createTreeId(), treePos);
+    try
+    {
+      theTrees.insert(theTrees.begin() + treePos, item);
     }
-    else
+    catch (...)
     {
-      zorba::checked_vector<store::Item_t>::size_type sPos = static_cast<zorba::checked_vector<store::Item_t>::size_type>(pos);
-      theTrees.insert(theTrees.begin() + sPos, item);
-
-      structuredItem->attachToCollection(this, createTreeId(), position);
+      structuredItem->detachFromCollection();
+      throw;
     }
   }
   catch (const std::range_error&)
@@ -294,32 +298,20 @@ void SimpleCollection::addNode(store::Item* item, xs_integer position)
   this method raises an error. The moethod returns the position occupied by the
   first new node after the insertion is done.
 ********************************************************************************/
-xs_integer SimpleCollection::addNodes(
+csize SimpleCollection::addNodes(
     std::vector<store::Item_t>& items,
     const store::Item* targetNode,
     bool before)
 {
   ZORBA_ASSERT_STORE_WRITE();
 
-  xs_integer pos;
-  bool found = findNode(targetNode, pos);
+  csize targetPos;
+  bool found = findTree(targetNode, targetPos);
 
   if (!found)
   {
     throw ZORBA_EXCEPTION(zerr::ZDDY0011_COLLECTION_NODE_NOT_FOUND,
     ERROR_PARAMS(theName->getStringValue()));
-  }
-
-  csize targetPos = 0;
-  try {
-    targetPos = to_xs_unsignedInt(pos);
-  }
-  catch (const std::range_error&)
-  {
-    throw ZORBA_EXCEPTION(
-        zerr::ZXQD0004_INVALID_PARAMETER,
-        ERROR_PARAMS(ZED(ZXQD0004_NOT_WITHIN_RANGE), pos)
-      );
   }
 
   if (!before)
@@ -370,10 +362,8 @@ xs_integer SimpleCollection::addNodes(
   {
     for (; numAttached < numNewNodes; ++numAttached)
     {
-      pos = targetPos + numAttached;
-
       static_cast<StructuredItem*>(items[numAttached].getp())->
-        attachToCollection(this, createTreeId(), pos);
+        attachToCollection(this, createTreeId(), targetPos + numAttached);
     }
   }
   catch (...)
@@ -399,169 +389,91 @@ xs_integer SimpleCollection::addNodes(
     theTrees[i].setNull();
   }
 
+  // Copies, not transfers: the undo checks the trees it removes against them.
   for (csize i = 0; i < numNewNodes; ++i)
   {
-    theTrees[targetPos + i].transfer(items[i]);
+    theTrees[targetPos + i] = items[i];
   }
 
   ++theVersion;
 
-  return xs_integer(targetPos);
+  return targetPos;
 }
 
 
 /*******************************************************************************
   Remove the tree rooted at the given node, if the tree actually belongs to the
-  collection. If the tree was found return true and the position of the tree;
-  otherwise, return false.
+  collection. If the tree was found, return its collection info, for
+  restoreNode(), and its position; otherwise, return NULL.
 ********************************************************************************/
-bool SimpleCollection::removeNode(store::Item* item, xs_integer& position)
+std::unique_ptr<CollectionTreeInfo> SimpleCollection::removeNode(
+    store::Item* item,
+    csize& position)
 {
-  if (!(item->isStructuredItem()))
-  {
-    throw ZORBA_EXCEPTION(zerr::ZSTR0013_COLLECTION_ITEM_MUST_BE_STRUCTURED,
-    ERROR_PARAMS(getName()->getStringValue()));
-  }
-
   ZORBA_ASSERT_STORE_WRITE();
 
-  bool found = findNode(item, position);
+  if (!findTree(item, position))
+    return NULL;
 
-  if (found)
-  {
-    ZORBA_ASSERT(item->getCollection() == this);
+  ZORBA_ASSERT(item->getCollection() == this);
 
-    StructuredItem* structuredItem = static_cast<StructuredItem*>(item);
+  std::unique_ptr<CollectionTreeInfo> info =
+    static_cast<StructuredItem*>(item)->detachKeepingInfo();
 
-    structuredItem->detachFromCollection();
-    
-    try
-    {
-      csize pos = to_xs_unsignedInt(position);
-      theTrees.erase(theTrees.begin() + pos);
-      ++theVersion;
-      return true;
-    }
-    catch (const std::range_error&)
-    {
-      throw ZORBA_EXCEPTION(
-          zerr::ZXQD0004_INVALID_PARAMETER,
-          ERROR_PARAMS(ZED(ZXQD0004_NOT_WITHIN_RANGE), position)
-        );
-    }
-  }
-  else
-  {
-    return false;
-  }
+  theTrees.erase(theTrees.begin() + position);
+  ++theVersion;
+  return info;
 }
 
 
 /*******************************************************************************
-  Remove the tree at the given position. If the position is >= than the number
-  of trees in the collection, this mothod is a noop. The method returns true if
-  a tree is actually deleted, otherwise it returns false.
+  Put back at its position a tree that removeNode() removed, with no
+  allocation: the vector of trees has not shrunk since.
 ********************************************************************************/
-bool SimpleCollection::removeNode(xs_integer position)
+void SimpleCollection::restoreNode(
+    store::Item* item,
+    csize position,
+    std::unique_ptr<CollectionTreeInfo> info)
 {
   ZORBA_ASSERT_STORE_WRITE();
+  ZORBA_ASSERT(position <= theTrees.size() &&
+               theTrees.size() < theTrees.capacity());
 
-  std::size_t pos = 0;
-  try {
-    pos = to_xs_unsignedInt(position);
-  }
-  catch (const std::range_error&)
-  {
-    throw ZORBA_EXCEPTION(
-        zerr::ZXQD0004_INVALID_PARAMETER,
-        ERROR_PARAMS(ZED(ZXQD0004_NOT_WITHIN_RANGE), position)
-      );
-  }
-
-  if (pos >= theTrees.size())
-  {
-    return false;
-  }
-  else
-  {
-    store::Item* item = theTrees[pos].getp();
-
-    ZORBA_ASSERT(item->getCollection() == this);
-    ZORBA_ASSERT(item->isStructuredItem());
-
-    StructuredItem* structuredItem = static_cast<StructuredItem*>(item);
-    structuredItem->detachFromCollection();
-
-    theTrees.erase(theTrees.begin() + pos);
-    ++theVersion;
-    return true;
-  }
+  theTrees.insert(theTrees.begin() + position, item);
+  static_cast<StructuredItem*>(item)->reattachToCollection(std::move(info));
+  ++theVersion;
 }
 
 
 /*******************************************************************************
-  Remove a given number of trees starting with the tree at the given position.
-  If the given number is 0 or the given position is >= than the number of trees
-  in the collection, this method is a noop. The method returns the number of 
-  trees that are actually deleted.
+  Remove the num trees from the given position on, which must be nodes[0] to
+  nodes[num - 1], with no allocation: the undo of an insert.
 ********************************************************************************/
-xs_integer SimpleCollection::removeNodes(xs_integer position, xs_integer numNodes)
+void SimpleCollection::removeNodes(
+    const std::vector<store::Item_t>& nodes,
+    csize position,
+    csize num)
 {
   ZORBA_ASSERT_STORE_WRITE();
+  ZORBA_ASSERT(position <= theTrees.size() &&
+               num <= theTrees.size() - position &&
+               num <= nodes.size());
 
-  csize pos, num;
-  try
+  for (csize i = 0; i < num; ++i)
   {
-    pos = to_xs_unsignedInt(position);
-  }
-  catch (const std::range_error&)
-  {
-    throw ZORBA_EXCEPTION(
-        zerr::ZXQD0004_INVALID_PARAMETER,
-        ERROR_PARAMS(ZED(ZXQD0004_NOT_WITHIN_RANGE), position)
-      );
-  }
-  try
-  {
-    num = to_xs_unsignedInt(numNodes);
-  }
-  catch (const std::range_error&)
-  {
-    throw ZORBA_EXCEPTION(
-        zerr::ZXQD0004_INVALID_PARAMETER,
-        ERROR_PARAMS(ZED(ZXQD0004_NOT_WITHIN_RANGE), numNodes)
-      );
+    store::Item* item = theTrees[position + i].getp();
+
+    ZORBA_ASSERT(item == nodes[i].getp());
+    ZORBA_ASSERT(item->getCollection() == this);
+
+    static_cast<StructuredItem*>(item)->detachFromCollection();
   }
 
-  if (num == 0 || pos >= theTrees.size())
-  {
-    return numeric_consts<xs_integer>::zero();
-  }
-  else
-  {
-    csize last = pos + num;
+  theTrees.erase(theTrees.begin() + position,
+                 theTrees.begin() + position + num);
 
-    if (last > theTrees.size())
-    {
-      last = theTrees.size();
-    }
-
-    for (csize i = pos; i < last; ++i)
-    {
-      store::Item* item = theTrees[pos].getp();
-
-      ZORBA_ASSERT(item->getCollection() == this);
-      ZORBA_ASSERT(item->isStructuredItem());
-
-      StructuredItem* structuredItem = static_cast<StructuredItem*>(item);
-      structuredItem->detachFromCollection();
-
-      theTrees.erase(theTrees.begin() + pos);
-    }
-
+  if (num > 0)
     ++theVersion;
-    return xs_integer(last - pos);
-  }
 }
 
 
@@ -573,25 +485,9 @@ void SimpleCollection::removeLastNodes(
     const std::vector<store::Item_t>& nodes,
     csize num)
 {
-  ZORBA_ASSERT_STORE_WRITE();
-  ZORBA_ASSERT(num <= theTrees.size() && num <= nodes.size());
+  ZORBA_ASSERT(num <= theTrees.size());
 
-  csize first = theTrees.size() - num;
-
-  for (csize i = 0; i < num; ++i)
-  {
-    store::Item* item = theTrees[first + i].getp();
-
-    ZORBA_ASSERT(item == nodes[i].getp());
-    ZORBA_ASSERT(item->getCollection() == this);
-
-    static_cast<StructuredItem*>(item)->detachFromCollection();
-  }
-
-  theTrees.resize(first);
-
-  if (num > 0)
-    ++theVersion;
+  removeNodes(nodes, theTrees.size() - num, num);
 }
 
 
@@ -628,7 +524,7 @@ void SimpleCollection::adjustTreePositions()
 
   for (csize i = 0; i < numTrees; ++i)
   {
-    static_cast<StructuredItem*>(theTrees[i].getp())->setPosition(xs_integer(i));
+    static_cast<StructuredItem*>(theTrees[i].getp())->setPosition(i);
   }
 }
 

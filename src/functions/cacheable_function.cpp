@@ -59,7 +59,8 @@ bool FunctionCache::ensureCacheValidity(PlanState& aPlanState)
     if (theSnapshotID != lCurrentSnapshot)
     {
       theSnapshotID = lCurrentSnapshot;
-      clear();
+      // The caller holds theMutex, which FunctionCache::clear() would lock again.
+      FunctionCacheBaseMap::clear();
       return false;
     }
   }
@@ -68,12 +69,22 @@ bool FunctionCache::ensureCacheValidity(PlanState& aPlanState)
 
 /*******************************************************************************
 ********************************************************************************/
-FunctionCache::iterator FunctionCache::find(const store::Item_t& item, PlanState& aPlanState)
+bool FunctionCache::find(
+    const store::Item_t& item,
+    PlanState& aPlanState,
+    std::vector<store::Item_t>& aValue)
 {
+  SYNC_CODE(std::lock_guard<std::mutex> lock(theMutex);)
+
   if (!ensureCacheValidity(aPlanState) || empty())
-    return end();
-  else
-    return FunctionCacheBaseMap::find(item);
+    return false;
+
+  FunctionCacheBaseMap::iterator ite = FunctionCacheBaseMap::find(item);
+  if (ite == end())
+    return false;
+
+  aValue = ite.getValue();
+  return true;
 }
 
 
@@ -81,6 +92,8 @@ FunctionCache::iterator FunctionCache::find(const store::Item_t& item, PlanState
 ********************************************************************************/
 bool FunctionCache::insert(const store::Item_t& item, std::vector<store::Item_t>& value, PlanState& aPlanState)
 {
+  SYNC_CODE(std::lock_guard<std::mutex> lock(theMutex);)
+
   ensureCacheValidity(aPlanState);
   return FunctionCacheBaseMap::insert(item, value);
 }
@@ -88,11 +101,11 @@ bool FunctionCache::insert(const store::Item_t& item, std::vector<store::Item_t>
 
 /*******************************************************************************
 ********************************************************************************/
-bool FunctionCache::insert(const store::Item_t& item, const store::Item_t& value, PlanState& aPlanState)
+void FunctionCache::clear()
 {
-  std::vector<store::Item_t> lVector;
-  lVector.push_back(value);
-  return insert(item, lVector, aPlanState);
+  SYNC_CODE(std::lock_guard<std::mutex> lock(theMutex);)
+
+  FunctionCacheBaseMap::clear();
 }
 
 SERIALIZABLE_CLASS_VERSIONS(cacheable_function)
@@ -146,7 +159,8 @@ FunctionCache* cacheable_function::getCache()
 ********************************************************************************/
 bool cacheable_function::hasCache() const
 {
-  return theHasCache;
+  return theHasCache &&
+         !theIsAutomaticCacheDisabled.load(std::memory_order_relaxed);
 }
 
 /*******************************************************************************
@@ -340,7 +354,7 @@ bool cacheable_function::disableAutomaticCaching()
 {
   if (theIsCacheAutomatic)
   {
-    theHasCache = false;
+    theIsAutomaticCacheDisabled.store(true, std::memory_order_relaxed);
     theCache->clear();
     return true;
   }

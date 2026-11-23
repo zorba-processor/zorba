@@ -1096,13 +1096,17 @@ static bool builtin_returns_existing_items(const function* f, TypeManager* tm)
 class ImpurityWalk
 {
   CompilerCB                    * theCCB;
+  // Remembers the answers: theCCB, or the compilation that walks an expr of
+  // another one (which other queries may be compiling against).
+  CompilerCB                    * theMemoCCB;
   TypeManager                   * theTM;
   std::set<const function*>       theVisited[2];
 
 public:
-  explicit ImpurityWalk(const expr* e)
+  explicit ImpurityWalk(const expr* e, CompilerCB* memoCCB = NULL)
     :
     theCCB(const_cast<expr*>(e)->get_ccb()),
+    theMemoCCB(memoCCB != NULL ? memoCCB : theCCB),
     theTM(e->get_type_manager())
   {
   }
@@ -1122,7 +1126,7 @@ public:
     {
       std::set<const function*>::const_iterator ite = theVisited[i].begin();
       for (; ite != theVisited[i].end(); ++ite)
-        theCCB->theFunctionPurity[i][*ite] = false;
+        theMemoCCB->theFunctionPurity[i][*ite] = false;
     }
   }
 
@@ -1417,7 +1421,8 @@ bool ImpurityWalk::functionHasImpurity(const function* f, bool strict)
   if (!f->isUdf())
     return strict && builtinHasImpurity(f);
 
-  const CompilerCB::FunctionPurityMap& cache = theCCB->theFunctionPurity[strict ? 1 : 0];
+  const CompilerCB::FunctionPurityMap& cache =
+    theMemoCCB->theFunctionPurity[strict ? 1 : 0];
   CompilerCB::FunctionPurityMap::const_iterator cached = cache.find(f);
 
   if (cached != cache.end())
@@ -1439,7 +1444,7 @@ bool ImpurityWalk::functionAnswer(const function* f, bool strict)
   if (!answer)
     remember();
 
-  theCCB->theFunctionPurity[strict ? 1 : 0][f] = answer;
+  theMemoCCB->theFunctionPurity[strict ? 1 : 0][f] = answer;
 
   return answer;
 }
@@ -1527,9 +1532,9 @@ static CompilerCB::CallEffects call_effects(const expr* e)
 }
 
 
-static bool has_unproven_call(const expr* root)
+static bool has_unproven_call(const expr* root, CompilerCB* memoCCB = NULL)
 {
-  ImpurityWalk w(root);
+  ImpurityWalk w(root, memoCCB);
 
   bool const answer = w.walk(root, false);
 
@@ -1983,6 +1988,16 @@ void BindingSequenceWalk::walkVar(const var_expr* var)
 
 bool BindingSequenceWalk::walk(expr* e)
 {
+  // An expr of another compilation (the program of a prolog loaded with
+  // loadProlog) was marked by it, and other queries may be reading it.
+  if (e->get_ccb() != theCCB)
+  {
+    bool const found = call_effects(e) == CompilerCB::CALLS_HAVE_EFFECTS &&
+                       has_unproven_call(e, theCCB);
+    theFoundCall = theFoundCall || found;
+    return found;
+  }
+
   bool found = false;
 
   switch (e->get_expr_kind())

@@ -23,70 +23,40 @@ namespace filemodule {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-FileModule::~FileModule() {
-  for ( FuncMap_t::const_iterator i = theFunctions.begin();
-        i != theFunctions.end(); ++i ) {
-    delete i->second;
-  }
+FileModule::FileModule() :
+  theFactory( Zorba::getInstance(0)->getItemFactory() )
+{
+  theFunctions["append-text"] = std::make_unique<AppendTextFunction>( this );
+  theFunctions["append-text-lines"] = std::make_unique<AppendTextLinesFunction>( this );
+  theFunctions["append-binary"] = std::make_unique<AppendBinaryFunction>( this );
+  theFunctions["base-name"] = std::make_unique<BaseNameFunction>( this );
+  theFunctions["copy-file-impl"] = std::make_unique<CopyFileImplFunction>( this );
+  theFunctions["create-directory"] = std::make_unique<CreateDirectoryFunction>( this );
+  theFunctions["delete-file-impl"] = std::make_unique<DeleteFileImplFunction>( this );
+  theFunctions["dir-name"] = std::make_unique<DirNameFunction>( this );
+  theFunctions["directory-separator"] = std::make_unique<DirectorySeparator>( this );
+  theFunctions["exists"] = std::make_unique<ExistsFunction>( this );
+  theFunctions["is-directory"] = std::make_unique<IsDirectoryFunction>( this );
+  theFunctions["is-file"] = std::make_unique<IsFileFunction>( this );
+  theFunctions["is-symlink"] = std::make_unique<IsSymlinkFunction>( this );
+  theFunctions["last-modified"] = std::make_unique<LastModifiedFunction>( this );
+  theFunctions["list"] = std::make_unique<ListFunction>( this );
+  theFunctions["path-separator"] = std::make_unique<PathSeparator>( this );
+  theFunctions["path-to-native"] = std::make_unique<PathToNativeFunction>( this );
+  theFunctions["path-to-uri"] = std::make_unique<PathToUriFunction>( this );
+  theFunctions["read-binary"] = std::make_unique<ReadBinaryFunction>( this );
+  theFunctions["read-text"] = std::make_unique<ReadTextFunction>( this );
+  theFunctions["read-text-lines"] = std::make_unique<ReadTextLinesFunction>( this );
+  theFunctions["resolve-path"] = std::make_unique<ResolvePathFunction>( this );
+  theFunctions["write-text"] = std::make_unique<WriteTextFunction>( this );
+  theFunctions["write-text-lines"] = std::make_unique<WriteTextLinesFunction>( this );
+  theFunctions["write-binary"] = std::make_unique<WriteBinaryFunction>( this );
+  theFunctions["size"] = std::make_unique<SizeFunction>( this );
 }
-  
+
 ExternalFunction* FileModule::getExternalFunction( String const &aLocalname ) {
-  ExternalFunction *&lFunc = theFunctions[ aLocalname ];
-  if ( !lFunc ) {
-    if ( aLocalname == "append-text" )
-      lFunc = new AppendTextFunction( this );
-    else if ( aLocalname == "append-text-lines" )
-      lFunc = new AppendTextLinesFunction( this );
-    else if ( aLocalname == "append-binary" )
-      lFunc = new AppendBinaryFunction( this );
-    else if ( aLocalname == "base-name" )
-      lFunc = new BaseNameFunction( this );
-    else if ( aLocalname == "copy-file-impl" )
-      lFunc = new CopyFileImplFunction( this );
-    else if ( aLocalname == "create-directory" )
-      lFunc = new CreateDirectoryFunction( this );
-    else if ( aLocalname == "delete-file-impl" )
-      lFunc = new DeleteFileImplFunction( this );
-    else if ( aLocalname == "dir-name" )
-      lFunc = new DirNameFunction( this );
-    else if ( aLocalname == "directory-separator" )
-      lFunc = new DirectorySeparator( this );
-    else if ( aLocalname == "exists" )
-      lFunc = new ExistsFunction( this );
-    else if ( aLocalname == "is-directory" )
-      lFunc = new IsDirectoryFunction( this );
-    else if ( aLocalname == "is-file" )
-      lFunc = new IsFileFunction( this );
-    else if ( aLocalname == "is-symlink" )
-      lFunc = new IsSymlinkFunction( this );
-    else if ( aLocalname == "last-modified" )
-      lFunc = new LastModifiedFunction( this );
-    else if ( aLocalname == "list" )
-      lFunc = new ListFunction( this );
-    else if ( aLocalname == "path-separator" )
-      lFunc = new PathSeparator( this );
-    else if ( aLocalname == "path-to-native" )
-      lFunc = new PathToNativeFunction( this );
-    else if ( aLocalname == "path-to-uri" )
-      lFunc = new PathToUriFunction( this );
-    else if ( aLocalname == "read-binary" )
-      lFunc = new ReadBinaryFunction( this );
-    else if ( aLocalname == "read-text" )
-      lFunc = new ReadTextFunction( this );
-    else if ( aLocalname == "read-text-lines" )
-      lFunc = new ReadTextLinesFunction( this );
-    else if ( aLocalname == "resolve-path" )
-      lFunc = new ResolvePathFunction( this );
-    else if ( aLocalname == "write-text" )
-      lFunc = new WriteTextFunction( this );
-    else if ( aLocalname == "write-text-lines" )
-      lFunc = new WriteTextLinesFunction( this );
-    else if ( aLocalname == "write-binary" )
-      lFunc = new WriteBinaryFunction( this );
-    else if ( aLocalname == "size" )
-      lFunc = new SizeFunction( this );
-  }
-  return lFunc;
+  FuncMap_t::const_iterator const i = theFunctions.find( aLocalname );
+  return i == theFunctions.end() ? nullptr : i->second.get();
 }
 
 void FileModule::destroy() {

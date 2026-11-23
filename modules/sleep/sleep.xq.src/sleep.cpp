@@ -74,27 +74,16 @@ MillisFunction::evaluate(
   return zorba::ItemSequence_t(new zorba::EmptySequence());
 }
 
+SleepModule::SleepModule()
+{
+  theFunctions["millis"] = std::make_unique<MillisFunction>(this);
+}
+
 zorba::ExternalFunction*
 SleepModule::getExternalFunction(const zorba::String& aLocalname)
 {
   FuncMap_t::const_iterator lFind = theFunctions.find(aLocalname);
-  zorba::ExternalFunction*& lFunc = theFunctions[aLocalname];
-  if (lFind == theFunctions.end()) {
-    if (aLocalname.find("millis") != zorba::String::npos) {
-      lFunc = new MillisFunction(this);
-    }
-  }
-  return lFunc;
-}
-
-SleepModule::~SleepModule()
-{
-  for (FuncMap_t::const_iterator lIter = theFunctions.begin();
-      lIter != theFunctions.end(); ++lIter)
-  {
-    delete lIter->second;
-  }
-  theFunctions.clear();
+  return lFind == theFunctions.end() ? nullptr : lFind->second.get();
 }
 
 void

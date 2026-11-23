@@ -49,9 +49,6 @@ static char const* check_args() {
           zc_props.construction_mode_ == "strip" ) )
     return "Only strip and preserve are allowed as values for the option construction-mode";
 
-  if ( zc_props.optimization_level_ > 2 )
-    return "only 0, 1 and 2 are allowed as values for the option --optimization-level";
-
   if ( !( zc_props.ordering_mode_.empty() ||
           zc_props.ordering_mode_ == "ordered" ||
           zc_props.ordering_mode_ == "unordered" ) )
@@ -255,7 +252,7 @@ char const* get_help_msg() {
       "Omit the XML declaration from the result.\n\n"
 
     HELP_OPT( "--optimization-level, -O {0|1|2|O0|O1|O2}" )
-      "Optimization level for the query compiler, default: 1. O0, O1 and O2 are the same as 0, 1 and 2. Any other value is an error.\n\n"
+      "Optimization level for the query compiler, default: 1. O0, O1 and O2 are the same as 0, 1 and 2. Any other value is an error. Level 2 is the same as level 1: it adds no optimization.\n\n"
 
     HELP_OPT( "--option <option>=<value>" )
       "Set an XQuery option in the static context. The QName of the option is passed as a string in the notation by James Clark (i.e. {namespace}localname). For example, --option {http://zorba.io/}option=value\n\n"

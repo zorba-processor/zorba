@@ -16,8 +16,10 @@
 #ifndef ZORBA_SIMPLE_STORE_PUL_PRIMITIVES
 #define ZORBA_SIMPLE_STORE_PUL_PRIMITIVES
 
+#include <memory>
 #include <vector>
 
+#include "collection_tree_info.h"
 #include "shared_types.h"
 #include "text_node_content.h"
 #include "store/api/update_consts.h"
@@ -1127,8 +1129,7 @@ class UpdInsertBeforeIntoCollection : public  UpdCollection
   friend class PULPrimitiveFactory;
 
 protected:
-  store::Item_t theFirstNode;
-  xs_integer    theFirstPos;
+  csize theFirstPos;
 
   UpdInsertBeforeIntoCollection(
         CollectionPul* pul,
@@ -1161,8 +1162,7 @@ class UpdInsertAfterIntoCollection : public  UpdCollection
   friend class PULPrimitiveFactory;
 
 protected:
-  store::Item_t theFirstNode;
-  xs_integer    theFirstPos;
+  csize theFirstPos;
 
   UpdInsertAfterIntoCollection(
         CollectionPul* pul,
@@ -1198,8 +1198,10 @@ protected:
   bool                    theIsLast;
 
   ulong                   theNumApplied;
-  std::vector<bool>       theFound;
-  std::vector<xs_integer> thePositions;
+  // The collection info of each tree removed (NULL if not in the collection),
+  // kept for the undo, and the position it was removed from.
+  std::vector<std::unique_ptr<CollectionTreeInfo>> theInfos;
+  std::vector<csize>      thePositions;
 
   UpdDeleteNodesFromCollection(
         CollectionPul* pul,

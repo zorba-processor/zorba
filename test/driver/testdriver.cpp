@@ -33,6 +33,7 @@
 #include <zorba/static_context.h>
 #include <zorba/security.h>
 #include "test_security_policy.h"
+#include "test_optimization_level.h"
 #include <zorba/util/fs_util.h>
 #include <zorba/internal/unique_ptr.h>
 
@@ -83,6 +84,9 @@ main(int argc, char** argv)
     std::cout << "\nusage:   testdriver [testfile_1] [testfile_2] ..." << std::endl;
     return 1;
   }
+
+  // An invalid ZORBA_OPTLEVEL fails before any file is written.
+  zorba_test::testOptimizationLevel();
 
   int errors;
   Specification lSpec;
