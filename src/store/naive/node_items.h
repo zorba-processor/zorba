@@ -140,7 +140,9 @@ class XmlNodeTokenizerCallback;
 
   theRCLock:
   ----------
-  Protects theRefCount
+  Protects theRefCount and the counts of the tree's nodes. A node moves to
+  another tree under the locks of both trees, old tree first (see
+  XmlNode::lockTree()).
 
   theTreeId:
   ----------
@@ -414,6 +416,7 @@ public:
 
 class XmlNode : public StructuredItem
 {
+  friend class store::Item;
   friend class AttachRecord;
   friend class DetachRecord;
   friend class XmlTree;
@@ -585,7 +588,24 @@ public:
 
   virtual ~XmlNode();
 
-  SYNC_CODE(RCLock* getRCLock() const { return getTree()->getRCLock(); })
+#ifndef ZORBA_FOR_ONE_THREAD_ONLY
+  // Locks the tree this node belongs to and returns it. The node moves to
+  // another tree only under the locks of both trees, so the tree locked is
+  // the node's tree once the node is seen in it under its lock.
+  XmlTree* lockTree() const
+  {
+    XmlTree* tree = reinterpret_cast<XmlTree*>(loadUnion());
+    for (;;)
+    {
+      tree->getRCLock()->acquire();
+      XmlTree* const now = reinterpret_cast<XmlTree*>(loadUnion());
+      if (now == tree)
+        return tree;
+      tree->getRCLock()->release();
+      tree = now;
+    }
+  }
+#endif
 
   void free();
 

@@ -16,6 +16,7 @@
 #ifndef ZORBA_STORE_ITEM_H
 #define ZORBA_STORE_ITEM_H
 
+#include <atomic>
 #include <iostream>
 #include <vector>
 
@@ -56,6 +57,13 @@ typedef StoreConsts::NodeKind NodeKind;
   It stores either a pointer to an XmlTree or an ItemKind enum value. The 
   low-order bit is used to distinguish between these 2 cases: a 0 bit indicates
   an XmlTree pointer, and a 1 bit indicated an ItemKind. 
+
+  theRefCount:
+  ------------
+  Atomic unless Zorba is built for one thread only. A node's count changes
+  under the lock of its tree, together with the tree's count (see XmlTree in
+  store/naive/node_items.h). An item shared process-wide is made immortal
+  before it is published: its count never changes and no release frees it.
 ********************************************************************************/
 class Item
 {
@@ -82,19 +90,31 @@ protected:
 
 
 protected:
-  mutable long      theRefCount;
+  mutable RefCount  theRefCount;
   mutable ItemUnion theUnion;
 
 protected:
 
-  Item() : theRefCount(0)
+  Item()
   {
     theUnion.treeRCPtr = 0;
   }
 
-  Item(ItemKind k) : theRefCount(0)
+  Item(ItemKind k)
   {
     theUnion.itemKind = k;
+  }
+
+  // theUnion as one word. A node's changes when the node moves to another
+  // tree, which a reference count change on another thread may meet.
+  long* loadUnion() const
+  {
+#ifdef ZORBA_FOR_ONE_THREAD_ONLY
+    return theUnion.treeRCPtr;
+#else
+    return std::atomic_ref<long*>(theUnion.treeRCPtr).load(
+        std::memory_order_relaxed);
+#endif
   }
 
 public:
@@ -110,6 +130,10 @@ public:
   void addReference() const;
 
   void removeReference();
+
+  void makeImmortal() const { theRefCount.makeImmortal(); }
+
+  bool isImmortal() const { return theRefCount.isImmortal(); }
 
   virtual size_t alloc_size() const;
 

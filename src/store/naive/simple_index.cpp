@@ -116,8 +116,8 @@ store::IndexCondition_t IndexImpl::createCondition(store::IndexCondition::Kind k
 /*******************************************************************************
   TODO: proper initialization order is not guaranteed => use factory instead
 ********************************************************************************/
-store::Item_t IndexConditionImpl::theNegInf(new DecimalItem(store::XS_DECIMAL));
-store::Item_t IndexConditionImpl::thePosInf(new DecimalItem(store::XS_DECIMAL));
+ImmortalItem IndexConditionImpl::theNegInf(new DecimalItem(store::XS_DECIMAL));
+ImmortalItem IndexConditionImpl::thePosInf(new DecimalItem(store::XS_DECIMAL));
 
 
 /*******************************************************************************

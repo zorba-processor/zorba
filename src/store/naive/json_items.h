@@ -60,13 +60,8 @@ namespace json
 
 class JSONNull : public AtomicItem
 {
-protected:
-  SYNC_CODE(mutable RCLock  theRCLock;)
-
 public:
   JSONNull() : AtomicItem(store::JS_NULL) { }
-
-  SYNC_CODE(RCLock* getRCLock() const { return &theRCLock; })
 
   zstring getStringValue() const { return "null"; }
 
@@ -109,8 +104,6 @@ class JSONItem : public StructuredItem
   friend class zorba::simplestore::CollectionTreeInfoGetters;
 
 protected:
-  SYNC_CODE(mutable RCLock  theRCLock;)
-
   CollectionTreeInfoWithTreeId * theCollectionInfo;
 
   // The levels of arrays and objects in this value, as seen when its own
@@ -146,8 +139,6 @@ protected:
       std::vector<JSONItem*>& aJSONMembers) = 0;
 
 public:
-  SYNC_CODE(RCLock* getRCLock() const { return &theRCLock; })
-
   JSONItem(store::Item::ItemKind k)
     : StructuredItem(k), theCollectionInfo(NULL), theHeight(1) {}
 

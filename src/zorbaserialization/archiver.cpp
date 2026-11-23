@@ -997,7 +997,7 @@ void Archiver::finalize_input_serialization()
     }
     else
     {
-      assert((*item_it)->getRefCount() > 1);
+      assert((*item_it)->isImmortal() || (*item_it)->getRefCount() > 1);
     }
 
     (*item_it)->removeReference();

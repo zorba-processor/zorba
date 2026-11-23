@@ -90,9 +90,6 @@ typedef store::ItemHandle<QNameItem> QNameItem_t;
 
 class AtomicItem : public store::Item
 {
-protected:
-  SYNC_CODE(mutable RCLock  theRCLock;)
-
 public:
   AtomicItem(store::SchemaTypeCode t) : store::Item(ATOMIC)
   {
@@ -100,8 +97,6 @@ public:
   }
 
   virtual ~AtomicItem() {}
-
-  SYNC_CODE(RCLock* getRCLock() const { return &theRCLock; })
 
   void getTypedValue(store::Item_t& val, store::Iterator_t& iter) const;
 

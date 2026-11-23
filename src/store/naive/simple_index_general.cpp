@@ -111,19 +111,19 @@ long GeneralIndexCompareFunction::compare(
     if (key1 != NULL)
       return +1;
   }
-  else if (key1 == IndexConditionImpl::theNegInf)
+  else if (key1 == IndexConditionImpl::theNegInf.get())
   {
     return -1;
   }
-  else if (key1 == IndexConditionImpl::thePosInf)
+  else if (key1 == IndexConditionImpl::thePosInf.get())
   {
     return +1;
   }
-  else if (key2 == IndexConditionImpl::theNegInf)
+  else if (key2 == IndexConditionImpl::theNegInf.get())
   {
     return +1;
   }
-  else if (key2 == IndexConditionImpl::thePosInf)
+  else if (key2 == IndexConditionImpl::thePosInf.get())
   {
     return -1;
   }

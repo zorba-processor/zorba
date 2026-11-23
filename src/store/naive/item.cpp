@@ -51,135 +51,54 @@ void Item::free()
 
 void Item::addReference() const
 {
-  switch (getKind())
+  long* const word = loadUnion();
+
+  if ((reinterpret_cast<uintptr_t>(word) & 0x1) == 0)
   {
-  case NODE:
-  {
-    SYNC_CODE(static_cast<const simplestore::XmlNode*>(this)->getRCLock()->acquire());
-    ++(*theUnion.treeRCPtr);
-    ++theRefCount;
-    SYNC_CODE(static_cast<const simplestore::XmlNode*>(this)->getRCLock()->release());
+#ifdef ZORBA_FOR_ONE_THREAD_ONLY
+    ++(*word);
+    theRefCount.incrementUnshared();
+#else
+    simplestore::XmlTree* tree =
+      static_cast<const simplestore::XmlNode*>(this)->lockTree();
+    ++tree->getRefCount();
+    theRefCount.incrementUnshared();
+    tree->getRCLock()->release();
+#endif
     return;
   }
-  case OBJECT:
-  case ARRAY:
-  {
-    SYNC_CODE(static_cast<const simplestore::json::JSONItem*>(this)->getRCLock()->acquire());
-    ++theRefCount;
-    SYNC_CODE(static_cast<const simplestore::json::JSONItem*>(this)->getRCLock()->release());
-    return;
-  }
-  case ATOMIC:
-  case ERROR_:
-  {
-    SYNC_CODE(static_cast<const simplestore::AtomicItem*>(this)->getRCLock()->acquire());
-    ++theRefCount;
-    SYNC_CODE(static_cast<const simplestore::AtomicItem*>(this)->getRCLock()->release());
-    return;
-  }
-  case LIST:
-  {
-    SYNC_CODE(static_cast<const simplestore::ItemVector*>(this)->getRCLock()->acquire());
-    ++theRefCount;
-    SYNC_CODE(static_cast<const simplestore::ItemVector*>(this)->getRCLock()->release());
-    return;
-  }
-  case FUNCTION:
-  {
-    SYNC_CODE(static_cast<const FunctionItem*>(this)->getRCLock()->acquire());
-    ++theRefCount;
-    SYNC_CODE(static_cast<const FunctionItem*>(this)->getRCLock()->release());
-    return;
-  }
-  case PUL:
-  {
-    ++theRefCount;
-    return;
-  }
-  default:
-  {
-    ZORBA_ASSERT(false);
-  }  
-  }
+
+  theRefCount.increment();
 }
 
 
 void Item::removeReference()
 {
+  long* const word = loadUnion();
 
-  switch (getKind())
+  if ((reinterpret_cast<uintptr_t>(word) & 0x1) == 0)
   {
-  case NODE:
-  {
-    SYNC_CODE(static_cast<const simplestore::XmlNode*>(this)->getRCLock()->acquire());
-
-    assert(theRefCount > 0);
-
-    --theRefCount;
-    if (--(*theUnion.treeRCPtr) == 0)
-    {
-      SYNC_CODE(static_cast<const simplestore::XmlNode*>(this)->getRCLock()->release());
+#ifdef ZORBA_FOR_ONE_THREAD_ONLY
+    theRefCount.decrementUnshared();
+    if (--(*word) == 0)
       free();
-      return;
-    }
-
-    SYNC_CODE(static_cast<const simplestore::XmlNode*>(this)->getRCLock()->release());
+#else
+    simplestore::XmlTree* tree =
+      static_cast<simplestore::XmlNode*>(this)->lockTree();
+    theRefCount.decrementUnshared();
+    bool const last = (--tree->getRefCount() == 0);
+    tree->getRCLock()->release();
+    if (last)
+      free();
+#endif
     return;
   }
-  case OBJECT:
-  case ARRAY:
+
+  switch (static_cast<ItemKind>(reinterpret_cast<uintptr_t>(word) & 0xF))
   {
-    SYNC_CODE(static_cast<const simplestore::json::JSONItem*>(this)->getRCLock()->acquire());
-    assert(theRefCount > 0);
-
-    if (--theRefCount == 0)
-    {
-      SYNC_CODE(static_cast<const simplestore::json::JSONItem*>(this)->getRCLock()->release());
-      free();
-      return;
-    }
-
-    SYNC_CODE(static_cast<const simplestore::json::JSONItem*>(this)->getRCLock()->release());
-    return;
-  }
-  case ATOMIC:
-  case ERROR_:
-  {
-    SYNC_CODE(static_cast<const simplestore::AtomicItem*>(this)->getRCLock()->acquire());
-
-    assert(theRefCount > 0);
-
-    if (--theRefCount == 0)
-    {
-      SYNC_CODE(static_cast<const simplestore::AtomicItem*>(this)->getRCLock()->release());
-      free();
-      return;
-    }
-
-    SYNC_CODE(static_cast<const simplestore::AtomicItem*>(this)->getRCLock()->release());
-    return;
-  }
-  case LIST:
-  {
-    SYNC_CODE(static_cast<const simplestore::ItemVector*>(this)->getRCLock()->acquire());
-
-    if (--theRefCount == 0)
-    {
-      SYNC_CODE(static_cast<const simplestore::ItemVector*>(this)->getRCLock()->release());
-      free();
-      return;
-    }
-
-    SYNC_CODE(static_cast<const simplestore::ItemVector*>(this)->getRCLock()->release());
-    return;
-  }
   case FUNCTION:
   {
-    SYNC_CODE(static_cast<const FunctionItem*>(this)->getRCLock()->acquire());
-
-    long remaining = --theRefCount;
-
-    SYNC_CODE(static_cast<const FunctionItem*>(this)->getRCLock()->release());
+    long const remaining = theRefCount.decrementAndLoad();
 
     if (remaining == 0)
     {
@@ -192,16 +111,23 @@ void Item::removeReference()
     static_cast<FunctionItem*>(this)->referenceDropped(remaining);
     return;
   }
-  case  PUL:
+#ifndef ZORBA_FOR_ONE_THREAD_ONLY
+  case ATOMIC:
   {
-    if (--theRefCount == 0)
+    // A QName in the pool can gain a reference from a lookup when it has none
+    // left, so its last reference is released under the pool's lock (see
+    // QNameItem::free()). Any other item with one reference left has no other
+    // holder: it is freed without a decrement.
+    if (!theRefCount.decrementUnlessLast())
       free();
-
     return;
   }
+#endif
   default:
   {
-    ZORBA_ASSERT(false);
+    if (theRefCount.decrement())
+      free();
+    return;
   }
   }
 }
@@ -209,59 +135,7 @@ void Item::removeReference()
 
 long Item::getRefCount() const
 {
-  long refCount = 0;
-
-  switch (getKind())
-  {
-    case NODE:
-    {
-      SYNC_CODE(static_cast<const simplestore::XmlNode*>(this)->getRCLock()->acquire());
-      refCount = theRefCount;
-      SYNC_CODE(static_cast<const simplestore::XmlNode*>(this)->getRCLock()->release());
-      break;
-    }
-    case OBJECT:
-    case ARRAY:
-    {
-      SYNC_CODE(static_cast<const simplestore::json::JSONItem*>(this)->getRCLock()->acquire());
-      refCount = theRefCount;
-      SYNC_CODE(static_cast<const simplestore::json::JSONItem*>(this)->getRCLock()->release());
-      break;
-    }
-    case ATOMIC:
-    case ERROR_:
-    {
-      SYNC_CODE(static_cast<const simplestore::AtomicItem*>(this)->getRCLock()->acquire());
-      refCount = theRefCount;
-      SYNC_CODE(static_cast<const simplestore::AtomicItem*>(this)->getRCLock()->release());
-      break;
-    }
-    case LIST:
-    {
-      SYNC_CODE(static_cast<const simplestore::ItemVector*>(this)->getRCLock()->acquire());
-      refCount = theRefCount;
-      SYNC_CODE(static_cast<const simplestore::ItemVector*>(this)->getRCLock()->release());
-      break;
-    }
-    case FUNCTION:
-    {
-      SYNC_CODE(static_cast<const FunctionItem*>(this)->getRCLock()->acquire());
-      refCount = theRefCount;
-      SYNC_CODE(static_cast<const FunctionItem*>(this)->getRCLock()->release());
-      break;
-    }
-    case PUL:
-    {
-      refCount = theRefCount;
-      break;
-    }
-    default:
-    {
-      ZORBA_ASSERT(false);
-    }
-  }
-
-  return refCount;
+  return theRefCount.load();
 }
 
 
@@ -1522,20 +1396,28 @@ void Item::swap(Item* anotherItem)
   if(isNode())
   {
     assert(anotherItem->isNode());
-    SYNC_CODE(static_cast<const simplestore::XmlNode*>(this)->getRCLock()->acquire());
-    SYNC_CODE(static_cast<const simplestore::XmlNode*>(anotherItem)->getRCLock()->acquire());
-    // Swap trees.
-    assert(theUnion.treeRCPtr);
-    assert(anotherItem->theUnion.treeRCPtr);
-    std::swap(theUnion.treeRCPtr, anotherItem->theUnion.treeRCPtr);
+    simplestore::XmlNode* node1 = static_cast<simplestore::XmlNode*>(this);
+    simplestore::XmlNode* node2 = static_cast<simplestore::XmlNode*>(anotherItem);
+#ifdef ZORBA_FOR_ONE_THREAD_ONLY
+    simplestore::XmlTree* tree1 = node1->getTree();
+    simplestore::XmlTree* tree2 = node2->getTree();
+#else
+    simplestore::XmlTree* tree1 = node1->lockTree();
+    simplestore::XmlTree* tree2 = node2->lockTree();
+#endif
+    assert(tree1);
+    assert(tree2);
 
-    // Adjust counters.
-    *theUnion.treeRCPtr += theRefCount;
-    *theUnion.treeRCPtr -= anotherItem->theRefCount;
-    *anotherItem->theUnion.treeRCPtr -= theRefCount;
-    *anotherItem->theUnion.treeRCPtr += anotherItem->theRefCount;
-    SYNC_CODE(static_cast<const simplestore::XmlNode*>(this)->getRCLock()->release());
-    SYNC_CODE(static_cast<const simplestore::XmlNode*>(anotherItem)->getRCLock()->release());
+    // Swap trees; each node's references move with it.
+    node1->setTreeInternal(tree2);
+    node2->setTreeInternal(tree1);
+    long const count1 = theRefCount.load();
+    long const count2 = anotherItem->theRefCount.load();
+    tree2->getRefCount() += count1 - count2;
+    tree1->getRefCount() += count2 - count1;
+
+    SYNC_CODE(tree1->getRCLock()->release();)
+    SYNC_CODE(tree2->getRCLock()->release();)
     return;
   }
 
