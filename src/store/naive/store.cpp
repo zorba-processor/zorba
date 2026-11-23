@@ -867,6 +867,24 @@ Store::deactivateIC(const store::Item_t& icQName, bool& isApplied)
 /*******************************************************************************
 
 ********************************************************************************/
+void Store::reserveICs(csize n)
+{
+  theICs.reserve(theICs.size() + n);
+}
+
+
+/*******************************************************************************
+  With the room of reserveICs(), the insert does not allocate.
+********************************************************************************/
+void Store::restoreIC(store::IC_t& ic)
+{
+  theICs.insert(const_cast<store::Item*>(ic->getICName()), ic);
+}
+
+
+/*******************************************************************************
+
+********************************************************************************/
 store::Iterator_t Store::listActiveICNames()
 {
   return new NameIterator<ICSet>(theICs, false);

@@ -1485,9 +1485,7 @@ class UpdDeActivateIC : public  UpdatePrimitive
 
 protected:
   const store::Item_t  theQName;
-  store::Item_t        theFromCollectionName;
-  store::Item_t        theToCollectionName;
-  store::IC::ICKind    theICKind;
+  store::IC_t          theIC;  // what undo puts back
 
   UpdDeActivateIC(
         PULImpl* pul,

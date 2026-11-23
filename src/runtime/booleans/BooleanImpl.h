@@ -17,6 +17,8 @@
 #ifndef ZORBA_RUNTIME_BOOLEAN
 #define ZORBA_RUNTIME_BOOLEAN
 
+#include <memory>
+
 #include "common/shared_types.h"
 
 #include "types/typeconstants.h"
@@ -139,10 +141,36 @@ public:
 };
 
 
+class GeneralEqualityIndex;
+
+
+/*******************************************************************************
+  theSeenBindingId:
+  -----------------
+  The binding of the LET var operand of a general "=" at the last evaluation
+  (see LetVarIterator::getWholeTempSeq()).
+
+  theIndex:
+  ---------
+  The items of that binding, hashed, built when the same binding is compared
+  again. It survives reset(), which starts a new evaluation.
+********************************************************************************/
+class CompareIteratorState : public PlanIteratorState
+{
+public:
+  uint64_t                              theSeenBindingId;
+  std::unique_ptr<GeneralEqualityIndex> theIndex;
+
+  CompareIteratorState();
+
+  ~CompareIteratorState();
+};
+
+
 /*******************************************************************************
   Iterator for general and value comparisons
 ********************************************************************************/
-class CompareIterator : public BinaryBaseIterator<CompareIterator, PlanIteratorState>
+class CompareIterator : public BinaryBaseIterator<CompareIterator, CompareIteratorState>
 {
 private:
   CompareConsts::CompareType  theCompType;
@@ -168,6 +196,13 @@ public:
   zstring getNameAsString() const;
 
   bool nextImpl(store::Item_t& result, PlanState& planState) const;
+
+private:
+  bool generalEqualByIndex(
+      PlanState& planState,
+      CompareIteratorState& state,
+      long timezone,
+      bool& found) const;
 
 public:
   static bool valueComparison(

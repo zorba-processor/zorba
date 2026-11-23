@@ -71,7 +71,8 @@ private:
   bool theParseHtml;            // Parse the input as HTML (libxml2's HTML
                                 // parser in recovery mode) instead of XML.
   bool theIgnoreDeclaredEncoding; // The input is UTF-8 whatever encoding it
-                                // declares (HTML: a meta charset).
+                                // declares (XML: the encoding declaration;
+                                // HTML: a meta charset).
 
   // The security policy the parser runs under. NULL: the policy of the Zorba
   // instance (root static context). Callers that have a static context set
@@ -448,6 +449,9 @@ public:
 
     if (theNoNetworkAccess)
       options |= XML_PARSE_NONET; 
+
+    if (theIgnoreDeclaredEncoding)
+      options |= XML_PARSE_IGNORE_ENC;
 
     return options;
   }

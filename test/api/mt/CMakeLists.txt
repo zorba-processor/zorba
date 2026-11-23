@@ -31,6 +31,7 @@ CREATE_TEST_SOURCELIST(MTTests
   mt_doc_cache.cpp
   mt_lifecycle.cpp
   mt_node_reference.cpp
+  mt_node_dereference.cpp
   mt_lock_upgrade.cpp
   ${MTSchemaTests}
 )

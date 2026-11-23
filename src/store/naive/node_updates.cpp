@@ -734,26 +734,18 @@ void XmlNode::finishDetach(DetachRecord& record)
   theParent = NULL;
 
   newTree->getRefCount() += refcount;
-  if (newTree->getRefCount() == 0)
-  {
-    SYNC_CODE(newTree->getRCLock()->release());
-    newTree->free();
-  }
-  else
-  {
-    SYNC_CODE(newTree->getRCLock()->release());
-  }
-
   oldTree->getRefCount() -= refcount;
-  if (oldTree->getRefCount() == 0)
-  {
-    SYNC_CODE(oldTree->getRCLock()->release());
+  bool const newUnused = (newTree->getRefCount() == 0);
+  bool const oldUnused = (oldTree->getRefCount() == 0);
+  SYNC_CODE(newTree->getRCLock()->release());
+  SYNC_CODE(oldTree->getRCLock()->release());
+
+  // Freed with no tree lock held: a tree's destruction takes the store's
+  // references mutex, which is taken before a tree lock (getNodeByReference).
+  if (newUnused)
+    newTree->free();
+  if (oldUnused)
     oldTree->free();
-  }
-  else
-  {
-    SYNC_CODE(oldTree->getRCLock()->release());
-  }
 }
 
 
@@ -912,6 +904,8 @@ void XmlNode::removeType(UpdatePrimitive& upd)
 #else
         assert(n->haveType());
         tinfo.theTypeName = n->getType();
+        // restoreType() puts back the type map entry that this takes out.
+        n->getTree()->reserveTypes();
         n->setType(GET_STORE().theSchemaTypeNames[store::XS_UNTYPED_ATOMIC]);
 #endif
 

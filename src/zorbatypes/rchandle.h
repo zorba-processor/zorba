@@ -139,6 +139,23 @@ public:
       theValue.fetch_add(1, std::memory_order_relaxed);
   }
 
+  // For a holder of a raw pointer that the object's destruction clears under
+  // a lock the caller holds: a count of 0 means the object is being freed.
+  bool incrementUnlessZero()
+  {
+    long value = theValue.load(std::memory_order_relaxed);
+    do
+    {
+      if (value == IMMORTAL)
+        return true;
+      if (value == 0)
+        return false;
+    }
+    while (!theValue.compare_exchange_weak(value, value + 1,
+                                           std::memory_order_relaxed));
+    return true;
+  }
+
   bool decrement()
   {
     if (theValue.load(std::memory_order_relaxed) == IMMORTAL)
