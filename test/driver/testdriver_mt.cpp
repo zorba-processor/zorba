@@ -27,6 +27,7 @@
 #include <zorba/zorba.h>
 #include <zorba/security.h>
 #include "test_security_policy.h"
+#include "test_optimization_level.h"
 #include <zorba/diagnostic_handler.h>
 #include <zorba/zorba_exception.h>
 #include <zorba/internal/unique_ptr.h>
@@ -873,6 +874,9 @@ int
   long numRunsPerQuery = 1;
 
   signal(SIGSEGV, sigHandler);
+
+  // An invalid ZORBA_OPTLEVEL fails before any file is written.
+  zorba_test::testOptimizationLevel();
 
   // Parse the arg list
   long arg = 1;
