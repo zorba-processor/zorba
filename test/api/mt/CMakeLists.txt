@@ -44,6 +44,7 @@ CREATE_TEST_SOURCELIST(MTTests
   mt_function_items.cpp
   mt_first_compile.cpp
   mt_collation.cpp
+  mt_shared_handles.cpp
   ${MTSchemaTests}
 )
 
