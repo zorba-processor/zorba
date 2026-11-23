@@ -17,6 +17,7 @@
 #ifndef ZORBA_CONTEXT_STATIC_CONTEXT_H
 #define ZORBA_CONTEXT_STATIC_CONTEXT_H
 
+#include <atomic>
 #include <deque>
 #include <map>
 #include <memory>
@@ -482,6 +483,12 @@ public:
   The policy in effect (get_security_policy()) is the nearest explicit policy
   up the chain, intersected with every narrowing policy below it. A sctx with
   neither inherits its parent's policy in effect. Queries cannot change it.
+
+  theIsShared:
+  ------------
+  Set (in builds for several threads) when a query is compiled against "this"
+  sctx: from then on queries on other threads may read it, so in debug builds
+  its setters raise ZXQP0002 (see check_not_shared()).
 ********************************************************************************/
 
 class static_context : public SyncedRCObject
@@ -735,6 +742,10 @@ protected:
 
   bool                                       theSecurityPolicyNarrows = false;
 
+#ifndef ZORBA_FOR_ONE_THREAD_ONLY
+  std::atomic<bool>                          theIsShared{false};
+#endif
+
 public:
   static bool is_builtin_module(const zstring& ns);
 
@@ -768,6 +779,16 @@ public:
 
   static_context* create_child_context();
 
+#ifdef ZORBA_FOR_ONE_THREAD_ONLY
+  void set_shared() {}
+
+  void check_not_shared() const {}
+#else
+  void set_shared() { theIsShared.store(true, std::memory_order_relaxed); }
+
+  void check_not_shared() const;
+#endif
+
   bool is_global_root_sctx() const;
 
   expr* get_query_expr() const;
@@ -778,7 +799,11 @@ public:
 
   std::ostream* get_trace_stream() const;
 
-  void set_module_namespace(const zstring& ns) { theModuleNamespace = ns.str(); }
+  void set_module_namespace(const zstring& ns)
+  {
+    check_not_shared();
+    theModuleNamespace = ns.str();
+  }
 
   const std::string& get_module_namespace() const { return theModuleNamespace; }
 
@@ -1181,9 +1206,17 @@ protected:
       const char* default_ns,
       const QueryLoc& loc) const;
 
-  void set_feature(feature::kind k) { theFeatures |= k; }
+  void set_feature(feature::kind k)
+  {
+    check_not_shared();
+    theFeatures |= k;
+  }
 
-  void unset_feature(feature::kind k) { theFeatures &= ~k; }
+  void unset_feature(feature::kind k)
+  {
+    check_not_shared();
+    theFeatures &= ~k;
+  }
 
 public:
 
