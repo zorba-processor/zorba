@@ -721,7 +721,8 @@ void convert_xquery_re( zstring const &xq_re, zstring *icu_re,
           if ( q_flag )
             *icu_re += '\\';
           else
-          break;
+            break;
+          [[fallthrough]];
         default:
           if ( x_flag && c == '#' ) {
             //
