@@ -46,6 +46,7 @@ CREATE_TEST_SOURCELIST(MTTests
   mt_first_compile.cpp
   mt_collation.cpp
   mt_shared_handles.cpp
+  mt_dynamic_loader.cpp
   ${MTSchemaTests}
 )
 
@@ -56,6 +57,7 @@ ADD_DEPENDENCIES(MTTests zorbacmd)
 
 SET (TestsToRun ${MTTests})
 LIST (FILTER TestsToRun EXCLUDE REGEX "(^|/)MTTests\\.cpp$")
+LIST (FILTER TestsToRun EXCLUDE REGEX "(^|/)mt_dynamic_loader\\.cpp$")
 
 FOREACH (test ${TestsToRun})
   GET_FILENAME_COMPONENT(TName ${test} NAME_WE)
@@ -70,3 +72,12 @@ ENDFOREACH(test)
 # the user functions concurrently.
 ZORBA_ADD_TEST(test/api/mt/mt_clone_cold MTTests mt_clone cold)
 SET_TESTS_PROPERTIES(test/api/mt/mt_clone_cold PROPERTIES LABELS mt TIMEOUT 300)
+
+# mt_dynamic_loader loads this module's library, from TEST_LIB_PATH under the
+# build directory.
+DECLARE_ZORBA_MODULE(URI "http://zorba-tests.example.org/modules/mt-loader"
+  VERSION 1.0 FILE "mt-loader.xq" TEST_ONLY)
+ZORBA_ADD_TEST(test/api/mt/mt_dynamic_loader MTTests mt_dynamic_loader
+  "${CMAKE_BINARY_DIR}")
+SET_TESTS_PROPERTIES(test/api/mt/mt_dynamic_loader PROPERTIES
+  LABELS mt TIMEOUT 300)
