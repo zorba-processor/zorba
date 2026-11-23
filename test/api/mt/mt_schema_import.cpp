@@ -18,10 +18,13 @@
 // static contexts. Each thread imports a schema of its own (a namespace per
 // thread, served by a URL resolver) in queries compiled against:
 // - a context with no schema, on which no query was compiled before the
-//   threads start: each query imports into a type manager of its own, so the
-//   other threads' schemas stay out of the context;
+//   threads start: the first imports create the schema of the context's type
+//   manager at once;
 // - a context whose loaded prolog imported a schema: the queries import
 //   their schema next to it and use both.
+// The imports of a query are added to the schema of the context it is
+// compiled against (StaticContext::validate() relies on it), so the threads'
+// schemas end up side by side in both contexts.
 
 #include <memory>
 #include <sstream>
@@ -144,8 +147,6 @@ mt_schema_import(int, char*[])
         "string-join((" + own_checks(t) + ",\n"
         "string('1000' castable as b:Small),\n"
         "string('1001' castable as b:Small)), ' ')";
-      // Another thread's namespace, which only that thread's queries import.
-      std::string const lOther = ns("t" + std::to_string((t + 1) % THREADS));
 
       for (unsigned r = 0; r < ROUNDS; ++r)
       {
@@ -155,12 +156,6 @@ mt_schema_import(int, char*[])
         lChecker.expect("context with a schema", t,
                         run(lZorba, lWithSchema, lWithSchemaQuery),
                         "true false true true false");
-
-        std::string const lLeak =
-          run(lZorba, lPlain, "'1' castable as Q{" + lOther + "}Small");
-        if (lLeak.find("not defined as simple type") == std::string::npos)
-          lChecker.expect("other thread's schema", t, lLeak,
-                          "error: ... not defined as simple type");
       }
     });
   }
