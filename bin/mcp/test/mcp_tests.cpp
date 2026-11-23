@@ -4570,6 +4570,122 @@ void test_serializer_out_of_memory( Fixture const &f ) {
   (void)f;
 #endif
 }
+// Three nodes inserted after a node of a collection, without a copy, with each
+// allocation failing in turn: a failed insert leaves none of them attached to
+// the collection, so the same insert with no failure takes them.
+void test_collection_insert_after_out_of_memory( Fixture const &f ) {
+#if defined(__linux__)
+  // Untyped nodes: a typed one leaks when its construction fails (another
+  // defect, outside this test).
+  std::string const prolog(
+    "declare construction strip;\n"
+    "declare namespace ext = 'http://zorba.io/extensions';\n"
+    "import module namespace ddl ="
+    " 'http://zorba.io/modules/store/dynamic/collections/ddl';\n"
+    "import module namespace dml ="
+    " 'http://zorba.io/modules/store/dynamic/collections/dml';\n" );
+  std::string const insert_after(
+    "declare variable $a external;\n"
+    "declare variable $b external;\n"
+    "declare variable $c external;\n"
+    "(# ext:no-copy #) {\n"
+    "  dml:insert-after(xs:QName('ddl:after'),\n"
+    "                   dml:collection(xs:QName('ddl:after'))[1], ($a, $b, $c))\n"
+    "};\n"
+    "1" );
+  auto run = [&]( std::string const &query ) -> std::string {
+    XQuery_t const q( f.zorba->compileQuery( prolog + query ) );
+    Iterator_t const it( q->iterator() );
+    it->open();
+    Item item;
+    std::string out;
+    while ( it->next( item ) )
+      out += item.getStringValue().str();
+    it->close();
+    return out;
+  };
+  auto attempt = [&]( long n, long length, long *count ) -> std::string {
+    std::vector<Item> nodes;
+    {
+      XQuery_t const make( f.zorba->compileQuery( prolog +
+                                                  "(<a/>, <b/>, <c/>)" ) );
+      Iterator_t const it( make->iterator() );
+      it->open();
+      Item node;
+      while ( it->next( node ) )
+        nodes.push_back( node );
+      it->close();
+    }
+    run( "ddl:create(xs:QName('ddl:after'), <x/>);\n1" );
+    auto insert = [&]() {
+      XQuery_t const q( f.zorba->compileQuery( prolog + insert_after ) );
+      DynamicContext *const dctx = q->getDynamicContext();
+      dctx->setVariable( "a", nodes[0] );
+      dctx->setVariable( "b", nodes[1] );
+      dctx->setVariable( "c", nodes[2] );
+      return q;
+    };
+    XQuery_t const first( insert() );
+    Iterator_t const it( first->iterator() );
+    Item result;
+    bool failed = false;
+    inject_arm( n, length );
+    try {
+      it->open();
+      it->next( result );
+      it->close();
+    }
+    catch ( std::exception const& ) {
+      failed = true;
+    }
+    *count = inject_disarm();
+    std::string out( failed || result.isNull()
+                     ? "error" : result.getStringValue().str() );
+    if ( failed ) {
+      out += "|";
+      try {
+        XQuery_t const again( insert() );
+        Iterator_t const it2( again->iterator() );
+        it2->open();
+        it2->next( result );
+        it2->close();
+        out += result.getStringValue().str();
+      }
+      catch ( std::exception const &e ) {
+        out += e.what();
+      }
+    }
+    out += "|" + run( "string-join(dml:collection(xs:QName('ddl:after'))"
+                      " ! local-name(), ' ')" );
+    run( "dml:truncate(xs:QName('ddl:after'));\n"
+         "ddl:delete(xs:QName('ddl:after'));\n1" );
+    return out;
+  };
+  std::string const answer( "1|x a b c" );
+  long total = 0;
+  std::string const whole( attempt( 0, 0, &total ) );
+  check( whole == answer, "nodes inserted after a node of a collection", whole );
+  long wrong = 0;
+  for ( long const length : { 1L, 8L } )
+    for ( long n = 1; n <= total; ++n ) {
+      long count = 0;
+      std::string const got( attempt( n, length, &count ) );
+      if ( got != answer && got != "error|1|x a b c" && ++wrong <= 3 )
+        std::cout << "at " << n << " of a run of " << length << ": " << got
+                  << std::endl;
+    }
+  check( wrong == 0, "nodes inserted after a node of a collection failing: the "
+                     "answer, or an error and none of them attached",
+         std::to_string( wrong ) + " points" );
+# if defined(__SANITIZE_ADDRESS__)
+  check( __lsan_do_recoverable_leak_check() == 0,
+         "nodes inserted after a node of a collection failing: nothing is left "
+         "behind" );
+# endif
+#else
+  (void)f;
+#endif
+}
 // Replacing the content of an element with each allocation failing in turn: a
 // failed replacement leaves the element with its old children, and keeps none
 // of them aside. An element with children of several kinds, and one with none.
@@ -9070,6 +9186,7 @@ Test const tests[] = {
   { "exhaust_collection_insert_last", test_collection_insert_last_out_of_memory },
   { "exhaust_plan_wrapper", test_plan_wrapper_out_of_memory },
   { "exhaust_plan_open", test_plan_open_out_of_memory },
+  { "exhaust_collection_insert_after", test_collection_insert_after_out_of_memory },
   { "exhaust_call_body", test_call_body_out_of_memory },
   { "exhaust_dynamic_call", test_dynamic_call_out_of_memory },
   { "exhaust_cached_call_body", test_cached_call_body_out_of_memory },

@@ -351,11 +351,29 @@ csize SimpleCollection::addNodes(
         ERROR_PARAMS(getName()->getStringValue()));
       }
     }
-
-    structuredItem->attachToCollection(this, createTreeId(), targetPos + i);
   } // for each new node
 
+  // Room for the new nodes before any is attached: a node that cannot be
+  // attached detaches the ones before it, and the collection is as it was.
   theTrees.resize(numNodes + numNewNodes);
+
+  csize numAttached = 0;
+  try
+  {
+    for (; numAttached < numNewNodes; ++numAttached)
+    {
+      static_cast<StructuredItem*>(items[numAttached].getp())->
+        attachToCollection(this, createTreeId(), targetPos + numAttached);
+    }
+  }
+  catch (...)
+  {
+    for (csize i = 0; i < numAttached; ++i)
+      static_cast<StructuredItem*>(items[i].getp())->detachFromCollection();
+
+    theTrees.resize(numNodes);
+    throw;
+  }
 
   if (targetPos < numNodes)
   {
