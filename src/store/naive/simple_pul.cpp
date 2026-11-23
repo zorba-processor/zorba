@@ -3448,6 +3448,9 @@ void CollectionPul::truncateIndexes()
 ********************************************************************************/
 void CollectionPul::applyUpdates()
 {
+  if (theCollection != NULL)
+    ZORBA_ASSERT_STORE_WRITE();
+
   csize numIncrementalIndices = theIncrementalIndices.size();
 
 #if 0

@@ -392,5 +392,15 @@ void Lock::unlock()
   theMutex.unlock();
 }
 
+
+/*******************************************************************************
+
+********************************************************************************/
+bool Lock::heldForWrite()
+{
+  AutoMutex lGuard(&theMutex);
+  return theMode == WRITE && theHolders[0].theThread == Runnable::self();
+}
+
 }
 /* vim:set et sw=2 ts=2: */

@@ -40,6 +40,15 @@ namespace simplestore {
 #define GET_PUL_FACTORY() \
   (GET_STORE().getPULFactory())
 
+// Shared store contents change only while the calling thread holds the store
+// lock in WRITE mode: the store has a single writer and many readers.
+#if defined(ZORBA_FOR_ONE_THREAD_ONLY) || defined(NDEBUG)
+#define ZORBA_ASSERT_STORE_WRITE() ((void)0)
+#else
+#define ZORBA_ASSERT_STORE_WRITE() \
+  assert(GET_STORE().getGlobalLock().heldForWrite())
+#endif
+
 #define STRUCT_NODE(item) (static_cast<StructuredItem*>((item).getp()))
 
 #define BASE_NODE(item) (static_cast<XmlNode*>((item).getp()))

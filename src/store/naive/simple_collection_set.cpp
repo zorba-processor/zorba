@@ -87,33 +87,23 @@ bool SimpleCollectionSet::remove(
 }
 
 
+// The collection set lists either its dynamic or its static collections.
+template<> bool
+NameIterator<SimpleCollectionSet::Set>::isListed(
+    const SimpleCollectionSet::Set::iterator& aEntry) const;
+
+
 store::Iterator_t SimpleCollectionSet::names(bool dynamic)
 {
   return new NameIterator<Set>(theCollections, dynamic);
 }
 
 
-// specialize the next function of the NameIterator for
-// the SimpleCollectionSet in order to be able to handle dynamic collections
 template<> bool
-NameIterator<SimpleCollectionSet::Set>::next(zorba::store::Item_t& aResult)
+NameIterator<SimpleCollectionSet::Set>::isListed(
+    const SimpleCollectionSet::Set::iterator& aEntry) const
 {
-  while (theIterator != theItems.end())
-  {
-    if ((*theIterator).second->isDynamic() != theDynamicCollections)
-    {
-      ++theIterator;
-      continue;
-    } 
-    else
-    {
-      aResult = (*theIterator).first;
-      ++theIterator;
-      return true;
-    }
-  }
-  aResult = NULL;
-  return false;
+  return aEntry.getValue()->isDynamic() == theDynamicCollections;
 }
 
 
