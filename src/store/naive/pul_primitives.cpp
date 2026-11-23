@@ -1153,13 +1153,7 @@ void UpdInsertFirstIntoCollection::undo()
 
   assert(lColl);
 
-  xs_integer const zero( numeric_consts<xs_integer>::zero() );
-  for (std::size_t i = 0; i < theNumApplied; ++i)
-  {
-    ZORBA_ASSERT(theNodes[i] == lColl->nodeAt(zero));
-
-    lColl->removeNode(zero);
-  }
+  lColl->removeNodes(theNodes, 0, theNumApplied);
 }
 
 
@@ -1180,6 +1174,7 @@ void UpdInsertLastIntoCollection::apply()
   for (std::size_t i = 0; i < numNodes; ++i)
   {
     lColl->addNode(theNodes[i], neg_1);
+    ++theNumApplied;
   }
 }
 
@@ -1205,9 +1200,6 @@ void UpdInsertBeforeIntoCollection::apply()
 
   assert(lColl);
 
-  if (!theNodes.empty())
-    theFirstNode = theNodes[0];
-
   theCollectionPul->setAdjustTreePositions();
 
   theFirstPos = lColl->addNodes(theNodes, theTarget, true);
@@ -1221,9 +1213,8 @@ void UpdInsertBeforeIntoCollection::undo()
   (GET_STORE().getCollection(theName, theIsDynamic).getp());
 
   assert(lColl);
-  ZORBA_ASSERT(theFirstNode == lColl->nodeAt(theFirstPos));
 
-  lColl->removeNodes(theFirstPos, xs_integer(theNodes.size()));
+  lColl->removeNodes(theNodes, theFirstPos, theNodes.size());
 }
 
 
@@ -1236,9 +1227,6 @@ void UpdInsertAfterIntoCollection::apply()
   (GET_STORE().getCollection(theName, theIsDynamic).getp());
 
   assert(lColl);
-
-  if (!theNodes.empty())
-    theFirstNode = theNodes[0];
 
   theCollectionPul->setAdjustTreePositions();
 
@@ -1254,9 +1242,8 @@ void UpdInsertAfterIntoCollection::undo()
   (GET_STORE().getCollection(theName, theIsDynamic).getp());
 
   assert(lColl);
-  ZORBA_ASSERT(theFirstNode == lColl->nodeAt(theFirstPos));
 
-  lColl->removeNodes(theFirstPos, xs_integer(theNodes.size()));
+  lColl->removeNodes(theNodes, theFirstPos, theNodes.size());
 }
 
 
@@ -1309,12 +1296,12 @@ void UpdDeleteNodesFromCollection::apply()
     theCollectionPul->setAdjustTreePositions();
   }
 
-  theFound.resize(numNodes);
+  theInfos.resize(numNodes);
   thePositions.resize(numNodes);
 
   for (csize i = 0; i < numNodes; ++i)
   {
-    theFound[i] = coll->removeNode(theNodes[i], thePositions[i]);
+    theInfos[i] = coll->removeNode(theNodes[i], thePositions[i]);
     ++theNumApplied;
   }
 }
@@ -1326,11 +1313,13 @@ void UpdDeleteNodesFromCollection::undo()
 
   assert(coll);
 
-  for (csize i = 0; i < theNumApplied; ++i)
+  // In the reverse order of the removals: each position is the one its tree
+  // had once the trees removed before it were out.
+  for (csize i = theNumApplied; i-- > 0; )
   {
-    if (theFound[i])
+    if (theInfos[i])
     {
-      coll->addNode(theNodes[i], thePositions[i]);
+      coll->restoreNode(theNodes[i], thePositions[i], std::move(theInfos[i]));
     }
   }
 }

@@ -175,7 +175,7 @@ FOREACH (_opt 3 O3 o1 1x)
 ENDFOREACH ()
 ZORBA_ADD_TEST(bin/zorba_optimization_level_help zorbacmd --help)
 ZORBA_SET_TEST_PROPERTY(bin/zorba_optimization_level_help PASS_REGULAR_EXPRESSION
-  "--optimization-level, -O {0[|]1[|]2[|]O0[|]O1[|]O2}\nOptimization level for the query compiler, default: 1[.] O0, O1 and O2 are the same as 0, 1 and 2[.] Any other value is an error[.]")
+  "--optimization-level, -O {0[|]1[|]2[|]O0[|]O1[|]O2}\nOptimization level for the query compiler, default: 1[.] O0, O1 and O2 are the same as 0, 1 and 2[.] Any other value is an error[.] Level 2 is the same as level 1: it adds no optimization[.]\n")
 ZORBA_ADD_TEST(bin/zorba_timeout_parse_members zorbacmd --timeout 1 -f -q "${_plandir}/timeout_parse_members.jq")
 ZORBA_SET_TEST_PROPERTY(bin/zorba_timeout_parse_members PASS_REGULAR_EXPRESSION ".*ZXQP0068.*")
 # --max-expr-depth sets the policy's expression nesting limit.
@@ -620,11 +620,13 @@ IF (ZORBA_WITH_FILE_ACCESS)
              exhaust_json_object_add
              exhaust_collection_json
              exhaust_collection_insert
+             exhaust_collection_undo
              exhaust_sweep_matcher exhaust_sweep_query_text exhaust_sweep_long_token
              exhaust_sweep_streamable_text exhaust_base64_stream
              exhaust_seekable_stream exhaust_json_loader exhaust_serializer
              exhaust_collection_puls
              exhaust_plan_wrapper
+             exhaust_collection_insert_last
              exhaust_plan_open exhaust_call_body exhaust_dynamic_call
              exhaust_for_each_pair exhaust_fold_left exhaust_json_copy
              exhaust_cached_call_body exhaust_group_by exhaust_first_dynamic_call

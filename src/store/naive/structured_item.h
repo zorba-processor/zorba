@@ -17,7 +17,10 @@
 #ifndef ZORBA_SIMPLE_STORE_STRUCTURED_ITEMS
 #define ZORBA_SIMPLE_STORE_STRUCTURED_ITEMS
 
+#include <memory>
+
 #include "store/api/item.h"
+#include "store/api/shared_types.h"
 #include "tree_id.h"
 
 namespace zorba
@@ -56,18 +59,26 @@ public:
 
   StructuredItem* getCollectionRoot() const;
 
-  const xs_integer& getPosition() const;
+  csize getPosition() const;
 
-  void setPosition(const xs_integer& pos);
+  void setPosition(csize pos);
 
   // Attaches a root node to a collection (populates collection info).
   virtual void attachToCollection(
       Collection* collection,
       const TreeId& treeId,
-      const xs_integer& position) = 0;
+      csize position) = 0;
 
   // Detaches a root node from a collection (populates collection info).
   virtual void detachFromCollection() = 0;
+
+  // Detaches a root node from its collection as detachFromCollection() does,
+  // but hands over its collection info, for reattachToCollection().
+  virtual std::unique_ptr<CollectionTreeInfo> detachKeepingInfo() = 0;
+
+  // Attaches again a root node that detachKeepingInfo() detached, with the
+  // info it handed over (tree id and position included): for an undo.
+  virtual void reattachToCollection(std::unique_ptr<CollectionTreeInfo> info) = 0;
   
   // Propagates collection tree info to descendants
   // (not to be called on a root - use functions above if root).
