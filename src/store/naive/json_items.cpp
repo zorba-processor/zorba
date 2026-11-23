@@ -417,6 +417,63 @@ store::Item* SimpleJSONObject::copy(
 
 
 /******************************************************************************
+  Stores the pair of a key not in the object, whose string is aNameStr. The
+  object takes a reference of aName and aValue only if this returns.
+*******************************************************************************/
+void SimpleJSONObject::addPair(
+    store::Item* aName,
+    store::Item* aValue,
+    zstring const &aNameStr)
+{
+  addHeightOf(aValue);
+
+  if (getCollection() != NULL && aValue->isStructuredItem())
+  {
+    assert( dynamic_cast<StructuredItem*>(aValue) );
+    static_cast<StructuredItem*>(aValue)->setCollectionTreeInfo(theCollectionInfo);
+  }
+
+  // The index of names records only stored pairs: a failure leaves the
+  // object as it was.
+  thePairs.push_back(std::make_pair(aName, aValue));
+  try
+  {
+    if (theKeys)
+      theKeys->insert( std::make_pair( aNameStr, thePairs.size() - 1 ) );
+    else if (thePairs.size() > KEY_INDEX_THRESHOLD)
+      buildKeyIndex();
+  }
+  catch (...)
+  {
+    thePairs.pop_back();
+    throw;
+  }
+}
+
+
+/******************************************************************************
+
+*******************************************************************************/
+bool SimpleJSONObject::add(store::Item_t&& aName, store::Item_t&& aValue)
+{
+  ContentReader::contentWillChange(&thePairs);
+  ASSERT_INVARIANT();
+  zstring lBuf;
+  zstring const &lName = keyString(aName.getp(), lBuf);
+
+  if (findKey(aName.getp(), lName) != thePairs.size())
+    return false;
+
+  addPair(aName.getp(), aValue.getp(), lName);
+  aName.release();
+  aValue.release();
+
+  ASSERT_INVARIANT();
+  return true;
+}
+
+
+/******************************************************************************
 
 *******************************************************************************/
 bool SimpleJSONObject::add(
@@ -433,34 +490,9 @@ bool SimpleJSONObject::add(
 
   if (lFound == thePairs.size())
   {
-    store::Item* lValue = aValue.getp();
-
-    addHeightOf(lValue);
-
-    if (getCollection() != NULL && (aValue->isStructuredItem()))
-    {
-      assert( dynamic_cast<StructuredItem*>(lValue) );
-      StructuredItem* lStructuredItem = static_cast<StructuredItem*>(aValue.getp());
-      lStructuredItem->setCollectionTreeInfo(theCollectionInfo);
-    }
-    
-    // The index of names records only stored pairs: a failure leaves the
-    // object as it was.
-    thePairs.push_back(std::make_pair(aName.getp(), lValue));
-    try
-    {
-      if (theKeys)
-        theKeys->insert( std::make_pair( lName, thePairs.size() - 1 ) );
-      else if (thePairs.size() > KEY_INDEX_THRESHOLD)
-        buildKeyIndex();
-    }
-    catch (...)
-    {
-      thePairs.pop_back();
-      throw;
-    }
+    addPair(aName.getp(), aValue.getp(), lName);
     aName->addReference();
-    lValue->addReference();
+    aValue->addReference();
 
     ASSERT_INVARIANT();
     return true;
@@ -1080,6 +1112,30 @@ void SimpleJSONArray::push_back(const std::vector<store::Item_t>& members)
   ASSERT_INVARIANT();
   theContent.reserve(theContent.size() + members.size());
   add(theContent.size(), members);
+  ASSERT_INVARIANT();
+}
+
+
+void SimpleJSONArray::push_back(std::vector<store::Item_t>&& members)
+{
+  ContentReader::contentWillChange(&theContent);
+  ASSERT_INVARIANT();
+  theContent.reserve(theContent.size() + members.size());
+
+  for (size_t i = 0; i < members.size(); ++i)
+    addHeightOf(members[i].getp());
+
+  for (size_t i = 0; i < members.size(); ++i)
+  {
+    store::Item* lItem = members[i].release();
+    if (getCollection() != NULL && lItem->isStructuredItem())
+    {
+      assert(dynamic_cast<StructuredItem*>(lItem));
+      static_cast<StructuredItem*>(lItem)->setCollectionTreeInfo(theCollectionInfo);
+    }
+    theContent.push_back(lItem);
+  }
+
   ASSERT_INVARIANT();
 }
 

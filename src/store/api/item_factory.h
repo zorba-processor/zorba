@@ -826,6 +826,14 @@ public:
       const std::vector<Item_t>& items) = 0;
 
   /**
+   * As above, but the array takes the references of the items: each is moved
+   * from, and items keeps its size and capacity, its handles null.
+   */
+  virtual bool createJSONArray(
+      Item_t& result,
+      std::vector<Item_t>&& items) = 0;
+
+  /**
    *
    */
   virtual bool createJSONObject(
@@ -841,6 +849,17 @@ public:
       Item_t& result,
       const std::vector<Item_t>& names,
       const std::vector<Item_t>& values) = 0;
+
+  /**
+   * As above, but the object takes the references of the names and values:
+   * each pair is moved from when added, and the vectors keep their sizes and
+   * capacities. On JNDY0003, the pairs from the duplicate key on are left as
+   * they were.
+   */
+  virtual bool createJSONObject(
+      Item_t& result,
+      std::vector<Item_t>&& names,
+      std::vector<Item_t>&& values) = 0;
 };
 
 } // namespace store

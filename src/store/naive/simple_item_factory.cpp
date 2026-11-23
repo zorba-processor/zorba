@@ -16,6 +16,9 @@
 
 #include "zorbamisc/config/platform.h"
 
+#include <type_traits>
+#include <utility>
+
 #include "diagnostics/xquery_diagnostics.h"
 #include "diagnostics/assert.h"
 #include "diagnostics/util_macros.h"
@@ -2269,16 +2272,33 @@ bool BasicItemFactory::createJSONArray(
 }
 
 
+// Items is moved from when it is an rvalue: the array takes its references.
+template<class Items>
+static void createArray(store::Item_t& result, Items&& items)
+{
+  result = new json::SimpleJSONArray();
+
+  json::SimpleJSONArray* array =
+      static_cast<json::SimpleJSONArray*>(result.getp());
+
+  array->push_back(std::forward<Items>(items));
+}
+
+
 bool BasicItemFactory::createJSONArray(
     store::Item_t& result,
     const std::vector<store::Item_t>& items)
 {
-  result = new json::SimpleJSONArray();
+  createArray(result, items);
+  return true;
+}
 
-  json::JSONArray* array = static_cast<json::JSONArray*>(result.getp());
 
-  array->push_back(items);
-
+bool BasicItemFactory::createJSONArray(
+    store::Item_t& result,
+    std::vector<store::Item_t>&& items)
+{
+  createArray(result, std::move(items));
   return true;
 }
 
@@ -2340,10 +2360,13 @@ bool BasicItemFactory::createJSONObject(
 }
 
 
-bool BasicItemFactory::createJSONObject(
+// Items is a const vector, whose pairs are copied, or a vector whose pairs
+// are moved from: the object takes their references.
+template<class Items>
+static void createObject(
     store::Item_t& result,
-    const std::vector<store::Item_t>& names,
-    const std::vector<store::Item_t>& values)
+    Items& names,
+    Items& values)
 {
   assert( names.size() == values.size() );
 
@@ -2352,17 +2375,36 @@ bool BasicItemFactory::createJSONObject(
     static_cast<json::SimpleJSONObject*>( result.getp() );
   obj->reserve( names.size() );
 
-  std::vector<store::Item_t>::const_iterator n_i( names.begin() );
-  std::vector<store::Item_t>::const_iterator v_i( values.begin() );
-  std::vector<store::Item_t>::const_iterator const n_end( names.end() );
-
-  for ( ; n_i != n_end; ++n_i, ++v_i ) {
-    if ( !obj->add( *n_i, *v_i, false ) )
+  for ( size_t i = 0; i < names.size(); ++i ) {
+    bool added;
+    if constexpr ( std::is_const_v<Items> )
+      added = obj->add( names[i], values[i], false );
+    else
+      added = obj->add( std::move( names[i] ), std::move( values[i] ) );
+    if ( !added )
       throw XQUERY_EXCEPTION(
-        jerr::JNDY0003, ERROR_PARAMS( (*n_i)->getStringValue() )
+        jerr::JNDY0003, ERROR_PARAMS( names[i]->getStringValue() )
       );
   }
+}
 
+
+bool BasicItemFactory::createJSONObject(
+    store::Item_t& result,
+    const std::vector<store::Item_t>& names,
+    const std::vector<store::Item_t>& values)
+{
+  createObject( result, names, values );
+  return true;
+}
+
+
+bool BasicItemFactory::createJSONObject(
+    store::Item_t& result,
+    std::vector<store::Item_t>&& names,
+    std::vector<store::Item_t>&& values)
+{
+  createObject( result, names, values );
   return true;
 }
 

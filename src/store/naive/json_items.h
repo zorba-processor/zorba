@@ -294,6 +294,8 @@ private:
 
   size_type findKey(store::Item const *aName, zstring const &aNameStr) const;
   void      buildKeyIndex();
+  void      addPair(store::Item* aName, store::Item* aValue,
+                    zstring const &aNameStr);
 
 public:
   SimpleJSONObject() : JSONObject() {}
@@ -333,6 +335,11 @@ public:
       const store::Item_t& aName,
       const store::Item_t& aValue,
       bool accumulate);
+
+  // Adds the pair, taking the references of aName and aValue (left null),
+  // unless the key is in the object: then returns false, leaving them as
+  // they were.
+  bool add(store::Item_t&& aName, store::Item_t&& aValue);
 
   virtual store::Item_t remove(const store::Item_t& aName);
 
@@ -503,6 +510,9 @@ public:
 
   virtual void
   push_back(const std::vector<store::Item_t>& members);
+
+  // Takes the references of the members (left null).
+  void push_back(std::vector<store::Item_t>&& members);
 
   virtual void
   push_front(const std::vector<store::Item_t>& members);

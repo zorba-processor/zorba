@@ -454,7 +454,9 @@ bool loader::next( store::Item_t *result ) {
           switch ( top.type_ ) {
             case stack_element::array_type:
               if ( !check_only_ && !top.skipped_ )
-                GENV_ITEMFACTORY->createJSONArray( item, top.contents_->values_ );
+                GENV_ITEMFACTORY->createJSONArray(
+                  item, std::move( top.contents_->values_ )
+                );
               break;
             case stack_element::object_type:
               if ( check_only_ || top.skipped_ )
@@ -463,7 +465,8 @@ bool loader::next( store::Item_t *result ) {
                 if ( top.read_ )
                   keep_read_pairs( top.contents_ );
                 GENV_ITEMFACTORY->createJSONObject(
-                  item, top.contents_->keys_, top.contents_->values_
+                  item, std::move( top.contents_->keys_ ),
+                  std::move( top.contents_->values_ )
                 );
               }
               break;

@@ -451,6 +451,10 @@ public:
       store::Item_t& result,
       const std::vector<store::Item_t>& items);
 
+  bool createJSONArray(
+      store::Item_t& result,
+      std::vector<store::Item_t>&& items);
+
   bool createJSONObject(
       store::Item_t& result,
       const std::vector<store::Iterator_t>& sources,
@@ -461,6 +465,11 @@ public:
       store::Item_t& result,
       const std::vector<store::Item_t>& names,
       const std::vector<store::Item_t>& values);
+
+  bool createJSONObject(
+      store::Item_t& result,
+      std::vector<store::Item_t>&& names,
+      std::vector<store::Item_t>&& values);
 
 private:
   void splitToAtomicTextValues(
