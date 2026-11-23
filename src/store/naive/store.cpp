@@ -253,8 +253,22 @@ void Store::initTypeNames()
 
   for (csize i = 0; i < store::XS_LAST; ++i)
   {
-    theSchemaTypeCodes[theSchemaTypeNames[i].getp()] = 
+    theSchemaTypeCodes[theSchemaTypeNames[i].getp()] =
     static_cast<store::SchemaTypeCode>(i);
+  }
+
+  // Shared by every query: immortal (the pool frees them when it is destroyed).
+  for (store::Item_t const& name : theSchemaTypeNames)
+  {
+    if (name != NULL)
+      name->makeImmortal();
+  }
+  for (store::Item* name : { XS_UNTYPED_QNAME.getp(), XS_ANY_QNAME.getp(),
+                             XS_ANY_SIMPLE_QNAME.getp(), JS_OBJECT_QNAME.getp(),
+                             JS_ARRAY_QNAME.getp(), JS_NULL_QNAME.getp() })
+  {
+    if (name != NULL)
+      name->makeImmortal();
   }
 }
 

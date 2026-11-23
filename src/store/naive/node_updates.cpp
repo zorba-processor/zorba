@@ -223,9 +223,17 @@ void XmlNode::attach(InternalNode* parent, csize pos, AttachRecord& record)
 
   oldTree->setRoot(NULL);
 
-  // The old tree keeps its type entries, for undoAttach().
+  // The nodes and their references move together, under the locks of both
+  // trees (see XmlNode::lockTree()). The old tree keeps its type entries, for
+  // undoAttach().
+  SYNC_CODE(oldTree->getRCLock()->acquire());
+  SYNC_CODE(newTree->getRCLock()->acquire());
   for (csize i = 0; i < moved.size(); ++i)
     moved[i]->setTreeInternal(newTree);
+  newTree->getRefCount() += oldTree->getRefCount();
+  oldTree->getRefCount() = 0;
+  SYNC_CODE(newTree->getRCLock()->release());
+  SYNC_CODE(oldTree->getRCLock()->release());
 
   theParent = parent;
 
@@ -279,15 +287,9 @@ void XmlNode::attach(InternalNode* parent, csize pos, AttachRecord& record)
     }
   }
 
-  ulong refcount = oldTree->getRefCount();
-  oldTree->getRefCount() = 0;
   record.theOldTree = oldTree;
   record.theMoved.swap(moved);
   record.theBaseUris.swap(baseUris);
-
-  SYNC_CODE(newTree->getRCLock()->acquire());
-  newTree->getRefCount() += refcount;
-  SYNC_CODE(newTree->getRCLock()->release());
 }
 
 
@@ -311,7 +313,7 @@ void XmlNode::undoAttach(AttachRecord& record)
   for (csize i = 0; i < record.theMoved.size(); ++i)
   {
     XmlNode* node = record.theMoved[i];
-    refcount += node->theRefCount;
+    refcount += node->theRefCount.load();
     if (node != record.theRemovedBaseUri && node->typeToMove() != NULL)
       newTree->removeType(node);
     node->setTreeInternal(oldTree);
@@ -519,6 +521,7 @@ void XmlNode::detachText(XmlTree* tree)
   XmlTree* oldTree = getTree();
 
   SYNC_CODE(oldTree->getRCLock()->acquire());
+  SYNC_CODE(tree->getRCLock()->acquire());
 
   setTreeInternal(tree);
   tree->setRoot(this);
@@ -526,11 +529,14 @@ void XmlNode::detachText(XmlTree* tree)
   theParent->removeChild(this);
   theParent = NULL;
 
-  oldTree->getRefCount() -= theRefCount;
+  long const refcount = theRefCount.load();
+  oldTree->getRefCount() -= refcount;
+  tree->getRefCount() += refcount;
+  bool const unused = (tree->getRefCount() == 0);
+  SYNC_CODE(tree->getRCLock()->release());
   SYNC_CODE(oldTree->getRCLock()->release());
 
-  tree->getRefCount() += theRefCount;
-  if (tree->getRefCount() == 0)
+  if (unused)
     tree->free();
 }
 
@@ -683,7 +689,7 @@ void XmlNode::finishDetach(DetachRecord& record)
       continue;
     }
 
-    refcount += node->theRefCount;
+    refcount += node->theRefCount.load();
     if (node->typeToMove() != NULL)
       node->getTree()->removeType(node);
     node->setTreeInternal(newTree);

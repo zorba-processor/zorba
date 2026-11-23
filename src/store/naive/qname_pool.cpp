@@ -231,7 +231,11 @@ QNameItem* QNamePool::popFreeList()
 
 
 /*******************************************************************************
-
+  Releases the last reference to qn (see QNameItem::free()). In the
+  multithreaded build the count goes from 1 to 0 here, under the lock that
+  lookups hold when they add a reference to a name that has none: a name is
+  removed once for each time its count reaches 0, never while a lookup
+  revives it.
 ********************************************************************************/
 void QNamePool::remove(QNameItem* qn)
 {
@@ -241,11 +245,16 @@ void QNamePool::remove(QNameItem* qn)
 
   try 
   {
+#ifdef ZORBA_FOR_ONE_THREAD_ONLY
     if (qn->getRefCount() > 0)
+      return;
+#else
+    if (!qn->theRefCount.decrement())
     {
-      SYNC_CODE(theHashSet.theMutex.unlock();)
+      theHashSet.theMutex.unlock();
       return;
     }
+#endif
 
     if (qn->isInCache())
     {

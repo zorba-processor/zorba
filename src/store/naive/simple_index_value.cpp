@@ -150,19 +150,19 @@ long ValueIndexCompareFunction::compare(
       if (i1 != NULL)
         return +1;
     }
-    else if (i1 == IndexConditionImpl::theNegInf)
+    else if (i1 == IndexConditionImpl::theNegInf.get())
     {
       return -1;
     }
-    else if (i1 == IndexConditionImpl::thePosInf)
+    else if (i1 == IndexConditionImpl::thePosInf.get())
     {
       return +1;
     }
-    else if (i2 == IndexConditionImpl::theNegInf)
+    else if (i2 == IndexConditionImpl::theNegInf.get())
     {
       return +1;
     }
-    else if (i2 == IndexConditionImpl::thePosInf)
+    else if (i2 == IndexConditionImpl::thePosInf.get())
     {
       return -1;
     }
@@ -1003,9 +1003,9 @@ void ProbeValueTreeIndexIterator::initBox()
       if (!flags[i].theHaveLowerBound)
       {
         if (lowIncl)
-          lowerBounds[i] = IndexConditionImpl::theNegInf;
+          lowerBounds[i] = IndexConditionImpl::theNegInf.get();
         else
-          lowerBounds[i] = IndexConditionImpl::thePosInf;
+          lowerBounds[i] = IndexConditionImpl::thePosInf.get();
       }
     }
 
@@ -1014,9 +1014,9 @@ void ProbeValueTreeIndexIterator::initBox()
       if (!flags[i].theHaveUpperBound)
       {
         if (highIncl)
-          upperBounds[i] = IndexConditionImpl::thePosInf;
+          upperBounds[i] = IndexConditionImpl::thePosInf.get();
         else
-          upperBounds[i] = IndexConditionImpl::theNegInf;
+          upperBounds[i] = IndexConditionImpl::theNegInf.get();
       }
     }
 

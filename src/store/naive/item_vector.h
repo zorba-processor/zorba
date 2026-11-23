@@ -29,8 +29,6 @@ namespace zorba { namespace simplestore {
 class ItemVector : public store::Item
 {
 private:
-  SYNC_CODE(mutable RCLock   theRCLock;)
-
   std::vector<store::Item_t> theItems;
 
 public:
@@ -39,8 +37,6 @@ public:
   ItemVector(std::vector<store::Item_t>& items);
 
   ~ItemVector() {}
-
-  SYNC_CODE(RCLock* getRCLock() const { return &theRCLock; })
 
   zstring getStringValue() const;
 

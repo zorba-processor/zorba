@@ -21,6 +21,7 @@
 #include "store/api/iterator.h"
 #include <zorba/store_consts.h>
 
+#include "immortal_item.h"
 #include "shared_types.h"
 
 #include "zorbautils/hashmap.h"
@@ -120,8 +121,8 @@ protected:
   };
 
 public:
-  static store::Item_t         theNegInf;
-  static store::Item_t         thePosInf;
+  static ImmortalItem          theNegInf;
+  static ImmortalItem          thePosInf;
 
 protected:
   rchandle<IndexImpl>          theIndex;

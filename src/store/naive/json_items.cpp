@@ -110,13 +110,13 @@ void JSONItem::destroy()
   // destructors, also while an exception unwinds the stack when memory has run
   // out, so it must not allocate: the items waiting form a list, linked through
   // their reference counts, which are 0 and which nothing reads any more.
-  static_assert(sizeof(theRefCount) >= sizeof(JSONItem*));
+  static_assert(sizeof(long) >= sizeof(JSONItem*));
   static thread_local bool tActive = false;
   static thread_local JSONItem* tPending = nullptr;
 
   if (tActive)
   {
-    theRefCount = reinterpret_cast<long>(tPending);
+    theRefCount.setDeadLink(reinterpret_cast<long>(tPending));
     tPending = this;
     return;
   }
@@ -130,8 +130,8 @@ void JSONItem::destroy()
     if (tPending == nullptr)
       break;
     lItem = tPending;
-    tPending = reinterpret_cast<JSONItem*>(lItem->theRefCount);
-    lItem->theRefCount = 0;
+    tPending = reinterpret_cast<JSONItem*>(lItem->theRefCount.deadLink());
+    lItem->theRefCount.reset();
   }
   tActive = false;
 }
