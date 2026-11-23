@@ -57,6 +57,7 @@ namespace UnitTests {
   int test_mmap_file( int, char*[] );
   int test_node_edit_iterator( int, char*[] );
   int test_node_packing( int, char*[] );
+  int test_node_swap( int, char*[] );
   int test_float_equality( int, char*[] );
   int test_numeric_hash( int, char*[] );
   int test_numeric_items( int, char*[] );
