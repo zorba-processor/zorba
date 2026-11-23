@@ -237,7 +237,60 @@ public:
 class SimpleJSONObject : public JSONObject
 {
 protected:
-  typedef std::vector<std::pair<store::Item*, store::Item*> > Pairs;
+  typedef std::pair<store::Item*, store::Item*> Pair;
+
+  // The pairs of an object, in order. They are in room allocated with the
+  // object (see create()) while they fit there, and in an array of their own
+  // once they outgrow it.
+  class Pairs
+  {
+  public:
+    typedef std::size_t size_type;
+    typedef Pair* iterator;
+    typedef const Pair* const_iterator;
+
+    // In aRoom, room for aCapacity pairs that the object owns.
+    Pairs(Pair* aRoom, size_type aCapacity) noexcept
+      : theData(aRoom),
+        theSize(0),
+        theCapacity(static_cast<uint32_t>(aCapacity)) {}
+
+    size_type size() const { return theSize; }
+
+    Pair& operator[](size_type i) { return theData[i]; }
+    const Pair& operator[](size_type i) const { return theData[i]; }
+
+    iterator begin() { return theData; }
+    iterator end() { return theData + theSize; }
+    const_iterator begin() const { return theData; }
+    const_iterator end() const { return theData + theSize; }
+
+    // Throws, changing nothing, when the pairs must move and cannot.
+    void push_back(const Pair& aPair);
+
+    void pop_back() { --theSize; }
+
+    void erase(iterator aPos);
+
+    void clear() { theSize = 0; }
+
+    // The bytes of the array of their own, if they have one.
+    size_t alloc_size() const;
+
+    // Throws, changing no pairs, when either set must move out of its
+    // object's room and cannot. Two sets that have arrays of their own are
+    // exchanged without allocating, as an undo exchanges them back.
+    void swap(Pairs& aOther);
+
+  private:
+    void moveToArray(size_type aCapacity);
+
+    Pair*                   theData;
+    std::unique_ptr<Pair[]> theArray;  // null while the pairs are in the room
+    uint32_t                theSize;
+    uint32_t                theCapacity;
+  };
+
   typedef Pairs::size_type size_type;
 
   // Index from key string to position in thePairs. The map owns its keys: a
@@ -285,18 +338,28 @@ protected:
   };
 
 private:
+  uint32_t              theRoom;  // pairs that fit in the object's allocation
   Pairs                 thePairs;
   std::unique_ptr<Keys> theKeys;  // null while thePairs is small
+
+  explicit SimpleJSONObject(size_type aRoom) noexcept;
 
   size_type findKey(store::Item const *aName, zstring const &aNameStr) const;
   void      buildKeyIndex();
 
 public:
-  SimpleJSONObject() : JSONObject() {}
+  SimpleJSONObject() noexcept : SimpleJSONObject(0) {}
+
+  // An empty object allocated with room for aPairs pairs: adding that many
+  // allocates nothing more.
+  static SimpleJSONObject_t create(size_type aPairs);
+
+  // Deleting an object frees its room too: the global sized delete would be
+  // given sizeof(SimpleJSONObject) only.
+  static void* operator new(std::size_t aSize) { return ::operator new(aSize); }
+  static void operator delete(void* aObject) { ::operator delete(aObject); }
 
   virtual ~SimpleJSONObject();
-
-  void reserve(size_type aPairs) { thePairs.reserve(aPairs); }
 
   // store API
 

@@ -331,6 +331,9 @@ static void test_object_sizes()
     GENV_ITEMFACTORY->createJSONObject(obj, names, values);
     JSONObject *const o = static_cast<JSONObject*>(obj.getp());
 
+    // The pairs are in the object's own allocation.
+    CHECK(obj->dynamic_size() == sizeof(SimpleJSONObject) +
+          n * sizeof(std::pair<store::Item*, store::Item*>));
     CHECK(obj->getNumObjectPairs() == xs_integer(n));
     CHECK(std::string(keys_of(obj).c_str()) == expected_keys(0, n));
     for (int i = 0; i < n; ++i) {
@@ -395,8 +398,69 @@ static void test_object_sizes()
   }
 }
 
+static store::Item_t object_of(int from, int to)
+{
+  vector<store::Item_t> names, values;
+  for (int i = from; i < to; ++i) {
+    names.push_back(sharable_string(key_name(i).c_str()));
+    values.push_back(integer(i));
+  }
+  store::Item_t obj;
+  GENV_ITEMFACTORY->createJSONObject(obj, names, values);
+  return obj;
+}
+
+// swap() exchanges the pairs of objects whose pairs are in their own
+// allocations, in arrays of their own, or one of each, and swaps them back;
+// an open key iterator keeps the keys it started with.
+static void test_object_swap()
+{
+  int const sizes[] = { 0, 1, 3, 17 };
+  for (int n : sizes) {
+    for (int m : sizes) {
+      int const before = failures;
+      store::Item_t a = object_of(0, n);
+      store::Item_t b = object_of(100, 100 + m);
+      // b outgrows its allocation.
+      CHECK(static_cast<JSONObject*>(b.getp())->add(
+              sharable_string("extra"), integer(-3), false));
+      std::string const keysA = expected_keys(0, n);
+      std::string const keysB =
+        expected_keys(100, 100 + m) + (m ? "," : "") + "extra";
+
+      store::Iterator_t it = a->getObjectKeys();
+      it->open();
+      a->swap(b.getp());
+      CHECK(std::string(keys_of(a).c_str()) == keysB);
+      CHECK(std::string(keys_of(b).c_str()) == keysA);
+      CHECK(value_of(a, "extra") == -3);
+      CHECK(value_of(b, "extra") == -1);
+      std::string iterated;
+      store::Item_t key;
+      while (it->next(key)) {
+        if (!iterated.empty())
+          iterated += ',';
+        iterated += key->getStringValue().c_str();
+      }
+      it->close();
+      CHECK(iterated == keysA);
+
+      b->swap(a.getp());
+      CHECK(std::string(keys_of(a).c_str()) == keysA);
+      CHECK(std::string(keys_of(b).c_str()) == keysB);
+      for (int i = 0; i < n; ++i)
+        CHECK(value_of(a, key_name(i).c_str()) == i);
+      for (int i = 100; i < 100 + m; ++i)
+        CHECK(value_of(b, key_name(i).c_str()) == i);
+
+      if (failures != before)
+        cerr << "  (swap of " << n << " and " << m << " pairs)" << endl;
+    }
+  }
+}
+
 // A small object carries no hash map of its own: at most one pointer beyond
-// its pair vector.
+// its pairs.
 static void test_object_footprint()
 {
   CHECK(sizeof(SimpleJSONObject) <=
@@ -413,6 +477,7 @@ int test_json_object(int, char*[])
   test_shared_keys_mutation();
   test_parse_duplicate_keys();
   test_object_sizes();
+  test_object_swap();
   test_object_footprint();
   if (failures)
     cerr << failures << " check(s) failed" << endl;

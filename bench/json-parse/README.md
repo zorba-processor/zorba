@@ -206,3 +206,34 @@ comparison went over every item of the variable for each error.
 Measured in alternating rounds with that master, in a container limited to 6 CPUs
 with the host busy with other builds: master took 118.86, 174.85 and 157.07 s, the
 head 6.66, 6.32 and 6.25 s. The output is the same.
+
+### One allocation per object
+
+An object built from a known number of pairs (the loader's objects among them) stores
+its pairs in its own allocation instead of a separate vector. Master `25b1433435`
+against the head, in a container limited to 4 CPUs with the host busy with other
+builds; allocations from `tools/profile.sh`, times the best of 5 runs (6 for
+`flatten`) alternating master and head run by run, peak RSS from `run.sh` (two
+rounds; equal in both).
+
+| query | level | master allocations / event | head | master bytes / event | head |
+|---|---|---:|---:|---:|---:|
+| count | -O0 | 127.7 | 120.2 | 5,458 | 5,458 |
+| count | -O1 | 42.7 | 42.7 | 1,839 | 1,839 |
+| latency | -O1 | 65.7 | 63.7 | 2,888 | 2,888 |
+
+At `-O0` the parse builds all 7.5 objects of an event, and each now takes one
+allocation instead of two; the bytes requested are the same (the object and its pairs,
+now in one block). At `-O1`, `count.jq` builds no content and `latency.jq` builds two
+objects per event.
+
+| query | level | master s | head s | master MiB | head MiB |
+|---|---|---:|---:|---:|---:|
+| count | -O0 | 2.56 | 2.55 | 36 | 36 |
+| latency | -O0 | 5.23 | 5.12 (-2%) | 867 | 844 |
+| flatten | -O0 | 4.60 | 4.45 (-3%) | 36 | 36 |
+| clean_users | -O0 | 5.39 | 5.38 | 921 | 898 |
+| latency | -O1 | 3.01 | 2.88 (-4%) | 148 | 142 |
+
+Every query writes the same output on both builds (`unmatched.jq` at `-O0` takes over
+the 600 s limit on both).

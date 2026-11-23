@@ -14,6 +14,12 @@
  * limitations under the License.
  */
 
+#include <algorithm>
+#include <limits>
+#include <memory>
+#include <new>
+#include <stdexcept>
+
 #include "json_items.h"
 #include "simple_item_factory.h"
 #include "simple_store.h"
@@ -297,6 +303,82 @@ void SimpleJSONObject::buildKeyIndex()
 /******************************************************************************
 
 *******************************************************************************/
+void SimpleJSONObject::Pairs::push_back(const Pair& aPair)
+{
+  if (theSize == theCapacity)
+  {
+    if (theSize == std::numeric_limits<uint32_t>::max())
+      throw std::length_error("JSON object of too many pairs");
+    moveToArray(theSize == 0 ? 1 :
+                std::min<size_type>(size_type(theSize) * 2,
+                                    std::numeric_limits<uint32_t>::max()));
+  }
+  std::construct_at(theData + theSize, aPair);
+  ++theSize;
+}
+
+
+void SimpleJSONObject::Pairs::erase(iterator aPos)
+{
+  std::copy(aPos + 1, end(), aPos);
+  --theSize;
+}
+
+
+size_t SimpleJSONObject::Pairs::alloc_size() const
+{
+  return theArray ? theCapacity * sizeof(Pair) : 0;
+}
+
+
+void SimpleJSONObject::Pairs::swap(Pairs& aOther)
+{
+  if (!theArray)
+    moveToArray(theSize);
+  if (!aOther.theArray)
+    aOther.moveToArray(aOther.theSize);
+  std::swap(theData, aOther.theData);
+  theArray.swap(aOther.theArray);
+  std::swap(theSize, aOther.theSize);
+  std::swap(theCapacity, aOther.theCapacity);
+}
+
+
+void SimpleJSONObject::Pairs::moveToArray(size_type aCapacity)
+{
+  std::unique_ptr<Pair[]> lArray = std::make_unique<Pair[]>(aCapacity);
+  std::copy(begin(), end(), lArray.get());
+  theData = lArray.get();
+  theArray = std::move(lArray);
+  theCapacity = static_cast<uint32_t>(aCapacity);
+}
+
+
+/******************************************************************************
+  The room for the pairs follows the object in its allocation (see create()).
+*******************************************************************************/
+SimpleJSONObject::SimpleJSONObject(size_type aRoom) noexcept
+  : JSONObject(),
+    theRoom(static_cast<uint32_t>(aRoom)),
+    thePairs(reinterpret_cast<Pair*>(this + 1), aRoom)
+{
+}
+
+
+SimpleJSONObject_t SimpleJSONObject::create(size_type aPairs)
+{
+  static_assert(sizeof(SimpleJSONObject) % alignof(Pair) == 0);
+  if (aPairs > std::numeric_limits<uint32_t>::max())
+    throw std::length_error("JSON object of too many pairs");
+  // The constructor cannot throw: the handle owns the memory from here on.
+  void* lMemory = ::operator new(sizeof(SimpleJSONObject) + aPairs * sizeof(Pair));
+  return ::new (lMemory) SimpleJSONObject(aPairs);
+}
+
+
+/******************************************************************************
+
+*******************************************************************************/
 SimpleJSONObject::~SimpleJSONObject()
 {
   ASSERT_INVARIANT();
@@ -330,12 +412,12 @@ size_t SimpleJSONObject::alloc_size() const
   // Goes down into the members.
   json_nesting::check_stack();
   return  ztd::alloc_sizeof( theKeys )
-        + ztd::alloc_sizeof( thePairs );
+        + thePairs.alloc_size();
 }
 
 size_t SimpleJSONObject::dynamic_size() const
 {
-  return sizeof( *this );
+  return sizeof( *this ) + theRoom * sizeof( Pair );
 }
 
 /******************************************************************************
@@ -656,8 +738,8 @@ void SimpleJSONObject::swap(store::Item* anotherItem)
   SimpleJSONObject* lOther = dynamic_cast<SimpleJSONObject*>(anotherItem);
   assert(lOther);
   ContentReader::contentWillChange(&lOther->thePairs);
+  thePairs.swap(lOther->thePairs);
   std::swap(theKeys, lOther->theKeys);
-  std::swap(thePairs, lOther->thePairs);
   std::swap(theHeight, lOther->theHeight);
   setCollectionTreeInfo(theCollectionInfo);
   lOther->setCollectionTreeInfo(lOther->theCollectionInfo);
