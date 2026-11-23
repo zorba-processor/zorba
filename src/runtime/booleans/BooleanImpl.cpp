@@ -621,8 +621,9 @@ public:
 };
 
 
-// A reference to a LET var, also under op:unhoist.
-static LetVarIterator* letVarOperand(PlanIterator* operand)
+// A reference to a LET var or to a var of the dynamic context (a global or
+// local var), also under op:unhoist.
+static PlanIterator* varOperand(PlanIterator* operand)
 {
   if (UnhoistIterator* unhoist = dynamic_cast<UnhoistIterator*>(operand))
   {
@@ -633,7 +634,23 @@ static LetVarIterator* letVarOperand(PlanIterator* operand)
     operand = children[0].getp();
   }
 
-  return dynamic_cast<LetVarIterator*>(operand);
+  if (dynamic_cast<LetVarIterator*>(operand) || dynamic_cast<CtxVarIterator*>(operand))
+    return operand;
+
+  return NULL;
+}
+
+
+// The temp seq that is the whole value of a varOperand(), and the id of its binding.
+static store::TempSeq* wholeTempSeq(
+    PlanIterator* var,
+    PlanState& planState,
+    uint64_t& bindingId)
+{
+  if (LetVarIterator* letVar = dynamic_cast<LetVarIterator*>(var))
+    return letVar->getWholeTempSeq(planState, bindingId);
+
+  return static_cast<CtxVarIterator*>(var)->getWholeTempSeq(planState, bindingId);
 }
 
 
@@ -650,10 +667,10 @@ CompareIteratorState::~CompareIteratorState()
 
 
 /*******************************************************************************
-  General "=" with a LET var operand, when the same binding of the var is
-  compared again: the var is hashed once (GeneralEqualityIndex) and each item
-  of the other operand is looked up in it. Returns false if it does not apply,
-  and the caller then compares as usual.
+  General "=" with a LET var or dynamic context var operand, when the same
+  binding of the var is compared again: the var is hashed once
+  (GeneralEqualityIndex) and each item of the other operand is looked up in it.
+  Returns false if it does not apply, and the caller then compares as usual.
 
   The result and the errors are those of the nested loop of nextImpl(): the
   operands are read in the same order and as far (the whole of both operands
@@ -674,10 +691,10 @@ bool CompareIterator::generalEqualByIndex(
 
   // The nested loop takes the items of operand 0 in the outer loop.
   bool varIsOperand1 = true;
-  LetVarIterator* var = letVarOperand(theChild1.getp());
+  PlanIterator* var = varOperand(theChild1.getp());
   if (var == NULL)
   {
-    var = letVarOperand(theChild0.getp());
+    var = varOperand(theChild0.getp());
     varIsOperand1 = false;
   }
 
@@ -685,7 +702,7 @@ bool CompareIterator::generalEqualByIndex(
     return false;
 
   uint64_t bindingId = 0;
-  store::TempSeq* seq = var->getWholeTempSeq(planState, bindingId);
+  store::TempSeq* seq = wholeTempSeq(var, planState, bindingId);
 
   if (seq == NULL)
     return false;

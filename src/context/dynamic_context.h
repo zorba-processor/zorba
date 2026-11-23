@@ -83,8 +83,9 @@ public:
 
     ValueState  theState;
     bool        theIsExternalOrLocal;
+    uint64_t    theBindingId; // unique in the process for each value set
 
-    VarValue() : theState(undeclared), theIsExternalOrLocal(false)
+    VarValue() : theState(undeclared), theIsExternalOrLocal(false), theBindingId(0)
     {
       theValue.item = NULL;
     }
@@ -262,6 +263,13 @@ public:
         const QueryLoc& loc,
         store::Item_t& itemValue,
         store::TempSeq_t& seqValue) const;
+
+  // The temp seq that is the value of the variable, and the id of the binding
+  // of that value; NULL if the variable has no such value.
+  store::TempSeq* get_temp_seq_value(ulong varid, uint64_t& bindingId) const;
+
+  // A new id, unique in the process, for a binding of a variable to a value.
+  static uint64_t new_binding_id();
 
   bool is_set_variable(ulong varid) const;
 
