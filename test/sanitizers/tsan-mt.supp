@@ -8,9 +8,6 @@
 # comment). The PR that fixes a race deletes its entries, so the job then
 # fails if the race is still there; a race not listed here fails its test.
 
-# G2 (P10): dict::find initializes its begin and end pointers lazily.
-race:zorba::diagnostic::dict::find
-
 # L2 (P12): ICU UText clone inside RegexPattern compilation reads a block
 # another thread's compilation allocated (fn:tokenize folded at compile time;
 # each thread compiles its own regex). ICU is not built with TSan; P12 decides

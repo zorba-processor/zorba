@@ -24,6 +24,7 @@ ENDIF (NOT ZORBA_NO_XMLSCHEMA)
 CREATE_TEST_SOURCELIST(MTTests
   MTTests.cpp
   mt_independent.cpp
+  mt_globals.cpp
   mt_clone.cpp
   mt_shared_sctx.cpp
   mt_shared_items.cpp

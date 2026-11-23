@@ -17,6 +17,7 @@
 #ifndef ZORBA_XQUERYX_TO_XQUERY_CONVERTOR
 #define ZORBA_XQUERYX_TO_XQUERY_CONVERTOR
 
+#include <mutex>
 #include <string>
 
 namespace zorba {
@@ -28,8 +29,7 @@ struct xsltStylesheet;
 class XQueryXConvertor
 {
   xsltStylesheet*     xqueryx_xslt;
-  bool                inited;
-  std::string         errstr;
+  std::once_flag      init_once;
 public:
   XQueryXConvertor();
   ~XQueryXConvertor();

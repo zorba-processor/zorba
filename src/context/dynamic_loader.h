@@ -20,6 +20,7 @@
 #include "common/common.h"
 #include <map>
 #include "common/shared_types.h"
+#include "zorbautils/mutex.h"
 
 namespace zorba {
 
@@ -33,13 +34,11 @@ public:
       zstring const& aNsURI,
       static_context& aSctx);
 
-private:
-
-  friend class GlobalEnvironment;
   DynamicLoader();
 
   ~DynamicLoader();
 
+private:
 
   typedef void *  handle_t;
 
@@ -49,6 +48,9 @@ private:
 
   typedef std::map<const zstring, handle_t> LibraryMap_t;
 
+  // Held across dlopen: a module's static constructors must not call the
+  // engine.
+  SYNC_CODE(mutable Mutex theLibrariesMutex;)
   mutable LibraryMap_t theLibraries;
 };
 

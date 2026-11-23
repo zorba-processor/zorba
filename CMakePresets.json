@@ -99,7 +99,8 @@
       "displayName": "Full, multithreaded engine (ZORBA_FOR_ONE_THREAD_ONLY=OFF), ThreadSanitizer (Linux)",
       "inherits": "tsan",
       "cacheVariables": {
-        "ZORBA_FOR_ONE_THREAD_ONLY": "OFF"
+        "ZORBA_FOR_ONE_THREAD_ONLY": "OFF",
+        "ZORBA_XQUERYX": "ON"
       }
     },
     {

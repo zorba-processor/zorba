@@ -31,12 +31,14 @@ SET(UNIT_TEST_SRCS
   test_mmap_file.cpp
   test_node_edit_iterator.cpp
   test_node_packing.cpp
+  test_node_swap.cpp
   test_float_equality.cpp
   test_numeric_hash.cpp
   test_numeric_items.cpp
   test_ordpath.cpp
   test_parameters.cpp
   test_profile_data.cpp
+  test_root_type_names.cpp
   test_security_policy.cpp
   test_small_integers.cpp
   test_string.cpp

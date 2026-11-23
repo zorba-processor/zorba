@@ -103,7 +103,10 @@ const char * kind2str(const store::NodeKind& aKind)
 
 bool str2kind(const zstring& aString, store::NodeKind& aKind)
 {
-  switch(aString.at(0))
+  if (aString.empty())
+    return false;
+
+  switch(aString[0])
   {
   case 'c':
     if (aString == SEQTYPE_COMMENT)
@@ -200,6 +203,9 @@ JSONDecodeFromRoundtripIterator::decodeNode(
 {
   store::LoadProperties lProperties;
   lProperties.setStoreDocument(false);
+  // A string is already decoded (F&O 3.1, 14.7.1): its encoding declaration
+  // does not apply.
+  lProperties.setIgnoreDeclaredEncoding(true);
   lProperties.setSecurityPolicy(theSctx->get_security_policy());
   store::Item_t lDoc;
   zstring lXmlString;
@@ -310,6 +316,13 @@ JSONDecodeFromRoundtripIterator::decodeXDM(
       TypeManager* lTypeMgr = theSctx->get_typemanager();
       xqtref_t lTargetType = lTypeMgr->create_named_type(
             lTypeQName.getp(), SequenceType::QUANT_ONE, loc);
+      if (lTargetType == NULL)
+      {
+        RAISE_ERROR(jerr::JNTY0023, loc,
+                    ERROR_PARAMS("\"" + lTypeNameString + "\"",
+                                 aState->thePrefix + TYPE_KEY,
+                                 "node kind or type name"));
+      }
       namespace_context lTmpNsCtx(theSctx);
       GenericCast::castToAtomic(aResult,
                                 lValueValueItem,

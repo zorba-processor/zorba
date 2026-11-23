@@ -127,7 +127,7 @@ void GlobalEnvironment::init(store::Store* store)
 
   m_globalEnv->m_http_resolver = new internal::HTTPURLResolver();
 
-  m_globalEnv->theDynamicLoader = 0;
+  m_globalEnv->theDynamicLoader = std::make_unique<DynamicLoader>();
 
   m_globalEnv->theHostCountry = locale::get_host_country();
 
@@ -141,7 +141,7 @@ void GlobalEnvironment::init(store::Store* store)
 ********************************************************************************/
 void GlobalEnvironment::destroy()
 {
-  delete m_globalEnv->theDynamicLoader;
+  m_globalEnv->theDynamicLoader.reset();
 
   delete m_globalEnv->m_http_resolver;
 
@@ -153,9 +153,10 @@ void GlobalEnvironment::destroy()
 #ifdef ZORBA_XQUERYX
     //free libxml2 and libxslt
 
+  // The stylesheet is freed before the cleanup destroys libxml2's dictionaries.
+  delete m_globalEnv->xqueryx_convertor;
   xsltCleanupGlobals();
   xmlCleanupParser();
-  delete m_globalEnv->xqueryx_convertor;
 #endif
 
   delete m_globalEnv->theRootStaticContext;
@@ -298,11 +299,7 @@ XQueryCompilerSubsystem& GlobalEnvironment::getCompilerSubsystem()
 
 DynamicLoader* GlobalEnvironment::getDynamicLoader() const
 {
-  if (!theDynamicLoader)
-  {
-    theDynamicLoader = new DynamicLoader();
-  }
-  return theDynamicLoader;
+  return theDynamicLoader.get();
 }
 
 #ifdef ZORBA_XQUERYX
