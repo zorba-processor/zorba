@@ -15,6 +15,7 @@
  */
 #include <zorba/config.h>
 
+#include <cassert>
 #include <new>
 
 #ifdef ZORBA_HAVE_PTHREAD_H
@@ -51,7 +52,9 @@ public:
   {
     if (pthread_getspecific(theKey))
       m_apm_free_all_mem();
-    pthread_key_delete(theKey);
+    // Fails only for an invalid key, which theKey never is once constructed.
+    [[maybe_unused]] int const deleted = pthread_key_delete(theKey);
+    assert(deleted == 0);
   }
 
   ThreadStateKey(ThreadStateKey const&) = delete;
