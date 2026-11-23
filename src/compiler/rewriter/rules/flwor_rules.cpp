@@ -2221,5 +2221,118 @@ expr* MergeFLWOR::apply(RewriterContext& rCtx, expr* node, bool& modified)
 }
 
 
+////////////////////////////////////////////////////////////////////////////////
+//                                                                            //
+//  StreamSingleUseGlobals                                                    //
+//                                                                            //
+////////////////////////////////////////////////////////////////////////////////
+
+
+/******************************************************************************
+  O0 materializes the value of a global variable before the query body runs.
+  When the only reference to the variable is the domain of the first for or
+  window clause of a FLWOR that is the query body, after let clauses only, its
+  initializer becomes that domain, which reads it once and to its end,
+  streaming. Only the order of an error of the initializer among those of the
+  globals declared after it and of that FLWOR changes, so no error is added or
+  dropped.
+*******************************************************************************/
+expr* StreamSingleUseGlobals::apply(RewriterContext& rCtx, expr* node, bool& modified)
+{
+  CompilerCB* ccb = rCtx.getCompilerCB();
+
+  // eval can read a global by name, and the globals of a load-prolog query are
+  // read by the queries compiled with its static context.
+  if (node->get_expr_kind() != block_expr_kind ||
+      ccb->theHasEval ||
+      ccb->isLoadPrologQuery())
+    return NULL;
+
+  block_expr* block = static_cast<block_expr*>(node);
+  csize bodyPos = block->size() - 1;
+  expr* body = (*block)[bodyPos];
+
+  if (body->get_expr_kind() != flwor_expr_kind ||
+      body->is_sequential() ||
+      expr_tools::calls_unproven_function(body))
+    return NULL;
+
+  flwor_expr* flwor = static_cast<flwor_expr*>(body);
+  csize numClauses = flwor->num_clauses();
+  csize first = 0;
+
+  // Each let clause gives one tuple, so the clause after them is evaluated once.
+  while (first < numClauses &&
+         flwor->get_clause(first)->get_kind() == flwor_clause::let_clause)
+    ++first;
+
+  if (first == numClauses ||
+      (flwor->get_clause(first)->get_kind() != flwor_clause::for_clause &&
+       flwor->get_clause(first)->get_kind() != flwor_clause::window_clause))
+    return NULL;
+
+  forletwin_clause* domClause = static_cast<forletwin_clause*>(flwor->get_clause(first));
+  expr* domExpr = domClause->get_expr()->skip_wrappers();
+
+  if (domExpr->get_expr_kind() != var_expr_kind)
+    return NULL;
+
+  var_expr* var = static_cast<var_expr*>(domExpr);
+
+  // References are counted when they are created, in udf bodies too.
+  if (var->get_kind() != var_expr::prolog_var ||
+      var->get_ccb() != ccb ||
+      var->is_external() ||
+      var->num_set_exprs() != 1 ||
+      var->get_num_refs() != 1 ||
+      var->get_set_expr(0)->get_expr_kind() != var_decl_expr_kind)
+    return NULL;
+
+  var_decl_expr* decl = static_cast<var_decl_expr*>(var->get_set_expr(0));
+  expr* initExpr = decl->get_init_expr();
+  csize declPos;
+
+  if (initExpr == NULL ||
+      initExpr->is_sequential() ||
+      expr_tools::calls_unproven_function(initExpr) ||
+      !block->get_var_pos(var, declPos) ||
+      (*block)[declPos] != decl ||
+      expr_tools::count_variable_uses(block, var, 2, NULL) != 1)
+    return NULL;
+
+  // The initializers that O0 evaluates after this one must have no effects.
+  for (csize i = declPos + 1; i < bodyPos; ++i)
+  {
+    expr* stmt = (*block)[i];
+
+    if (stmt->get_expr_kind() == var_decl_expr_kind)
+      stmt = static_cast<var_decl_expr*>(stmt)->get_init_expr();
+
+    if (stmt != NULL &&
+        (stmt->is_sequential() || expr_tools::calls_unproven_function(stmt)))
+      return NULL;
+  }
+
+  domClause->set_expr(initExpr);
+
+  // The declaration stays, without its initializer: it gives the variable its id.
+  var->remove_set_expr(decl);
+
+  ExprIterator iter(block);
+
+  for (csize i = 0; i < declPos; ++i)
+    iter.next();
+
+  **iter = rCtx.theEM->create_var_decl_expr(decl->get_sctx(),
+                                             decl->get_udf(),
+                                             decl->get_loc(),
+                                             var,
+                                             NULL);
+  modified = true;
+
+  return NULL;
+}
+
+
 }
 /* vim:set et sw=2 ts=2: */

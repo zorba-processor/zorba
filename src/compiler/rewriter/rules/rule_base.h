@@ -46,6 +46,7 @@ public:
     EliminateUnusedLetVars,
     RefactorPredFLWOR,
     MergeFLWOR,
+    StreamSingleUseGlobals,
     FoldConst,
     MarkExprs,
     SubstVars,

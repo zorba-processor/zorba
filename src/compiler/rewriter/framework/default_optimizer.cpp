@@ -266,6 +266,18 @@ bool DefaultOptimizer::rewrite(RewriterContext& rCtx)
     while (local_modified);
   }
 
+  // Last, so that no other rule drops a part of the initializer it moves.
+  if (rCtx.theUDF == NULL)
+  {
+    StreamSingleUseGlobals rule;
+    bool local_modified = false;
+
+    rule.apply(rCtx, rCtx.getRoot(), local_modified);
+
+    if (local_modified)
+      modified = true;
+  }
+
   // Mark node copy property
   if (Properties::instance().getNoCopyOptim())
   {
