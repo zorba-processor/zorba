@@ -50,8 +50,9 @@ gh workflow run bench.yml -R zorba-processor/zorba --ref master \
 ```
 
 Suites that are driven by their own script and server (`scale`, `directory`, `store`,
-`limits`, `agents`) are not run by this workflow; `directory-scaling.yml` and
-`agent-benchmark.yml` run them.
+`limits`, `agents`, `threads`) are not run by this workflow; `directory-scaling.yml` and
+`agent-benchmark.yml` run them, except `threads` (multithreaded throughput), which
+has no workflow yet: see [threads/README.md](threads/README.md).
 
 ### How a comparison runs
 

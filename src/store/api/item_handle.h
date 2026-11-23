@@ -52,6 +52,13 @@ public:
       p->addReference();
   }
 
+  // A move hands the reference over: no count changes (an atomic
+  // read-modify-write each in a multithreaded build). rhs is left null.
+  ItemHandle(ItemHandle&& rhs) noexcept : p(rhs.p)
+  {
+    rhs.p = NULL;
+  }
+
   ~ItemHandle()
   {
     if (p)
@@ -153,9 +160,14 @@ public:
 		return *this;
   }
 
-  ItemHandle& operator=(const ItemHandle& rhs) 
+  ItemHandle& operator=(const ItemHandle& rhs)
   {
     return assign(rhs);
+  }
+
+  ItemHandle& operator=(ItemHandle&& rhs) noexcept
+  {
+    return transfer(rhs);
   }
 
   template <class otherT,

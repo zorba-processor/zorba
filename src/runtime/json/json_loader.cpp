@@ -76,9 +76,6 @@ void loader::stack_element::destroy() {
       release( contents_->keys_ );
       release( contents_->values_ );
       break;
-    case key_type:
-      key_->removeReference();
-      break;
     default:
       break;
   }
@@ -109,12 +106,12 @@ loader::~loader() {
   clear_stack();
 }
 
-void loader::add_value( store::Item_t const &value ) {
+void loader::add_value( store::Item_t &&value ) {
   stack_element top( stack_.top() );
   switch ( top.type_ ) {
     case stack_element::array_type:
       if ( !check_only_ && !top.skipped_ && !top.read_ )
-        top.contents_->values_.push_back( value );
+        top.contents_->values_.push_back( std::move( value ) );
       break;
     case stack_element::object_type: {
       //
@@ -130,29 +127,27 @@ void loader::add_value( store::Item_t const &value ) {
         if ( read && read->all )
           read = nullptr;
       }
+      top.contents_->keys_.push_back( std::move( value ) );
       stack_element &key = push( stack_element::key_type );
-      key.key_ = value.getp();
-      value->addReference();
       key.skipped_ = skipped;
       key.read_ = read;
       break;
     }
     case stack_element::key_type: {
       //
-      // Otherwise, the top of the stack must be a string which means that the
-      // second-to-top must be an object awaiting a value associated with this
-      // name.
+      // Otherwise, the top of the stack is the key just added to the object
+      // below it, which awaits the value associated with the key.
       //
       stack_.pop();
-      // top is off the stack, so clear_stack() will not free it: free it also
-      // when push_back() throws std::bad_alloc.
-      destroyer const destroy_top{ top };
       stack_element &top2 = stack_.top();
       assert( top2.type_ == stack_element::object_type );
-      top2.contents_->keys_.push_back( top.key_ );
       // A value that is not read holds its key's place, for the duplicate check.
-      if ( !check_only_ && !top2.skipped_ )
-        top2.contents_->values_.push_back( top.skipped_ ? nullptr : value );
+      if ( !check_only_ && !top2.skipped_ ) {
+        if ( top.skipped_ )
+          top2.contents_->values_.push_back( nullptr );
+        else
+          top2.contents_->values_.push_back( std::move( value ) );
+      }
       break;
     }
     default:
@@ -288,8 +283,8 @@ void loader::keep_read_pairs( contents *o ) const {
   for ( size_t i = 0; i < o->values_.size(); ++i ) {
     if ( o->values_[i] ) {
       if ( n != i ) {
-        o->keys_[n] = o->keys_[i];
-        o->values_[n] = o->values_[i];
+        o->keys_[n] = std::move( o->keys_[i] );
+        o->values_[n] = std::move( o->values_[i] );
       }
       ++n;
     }
@@ -562,7 +557,7 @@ bool loader::next( store::Item_t *result ) {
         *result = item;
         return true;
       }
-      add_value( item );
+      add_value( std::move( item ) );
     } // while
     return false;
   } // try

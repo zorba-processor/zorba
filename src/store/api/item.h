@@ -193,6 +193,16 @@ public:
   }
 
   /**
+   *  @return  isAtomic(), for a caller that holds no store lock: a node's
+   *           word may change on another thread (the node moves to another
+   *           tree).
+   */
+  bool isAtomicUnlocked() const
+  {
+    return ((reinterpret_cast<uintptr_t>(loadUnion()) & 0xF) == ATOMIC);
+  }
+
+  /**
    * @return  "true" if the item is an list of atomic values
    */
   bool isList() const
