@@ -91,9 +91,20 @@ loads from outside the system baseline and makes the search paths relative:
   downloaded with a browser is quarantined until
   `xattr -dr com.apple.quarantine <dir>` is run.
 
+`scripts/bundle-licenses.sh` puts Zorba's `LICENSE.txt` and `NOTICE.txt` at
+the root of the tarball and the licence files of every bundled library in
+`share/doc/zorba/third-party/<component>/`: for ICU, libxml2 and Xerces-C
+those of the fork at the commit pinned in `docker/builder/Dockerfile`
+(`LICENSE`; `Copyright`; `LICENSE` and `NOTICE`), for any other library on
+Linux `/usr/share/doc/<package>/copyright` of the Ubuntu package that owns it
+(`dpkg -S`). The job fails when a bundled library has no licence file; a
+library that is neither a fork nor owned by a package needs a mapping in the
+script first.
+
 `scripts/smoke-binary.sh` tests each tarball where none of the bundled
 libraries is installed (a plain `ubuntu:24.04` container; on macOS after the
-build tree and the dependencies are moved away): `zorba` runs an XQuery and a
+build tree and the dependencies are moved away): the licence files are there,
+`zorba` runs an XQuery and a
 JSONiq query and a query importing the EXPath file module (a module file
 and a module library found relative to `lib/`), `zorba-mcp` answers
 `initialize`, and a C++ program compiled against `include/` and linked

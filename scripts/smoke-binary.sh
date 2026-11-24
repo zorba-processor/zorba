@@ -1,9 +1,9 @@
 #!/bin/sh
 # Smoke test of an unpacked release binary tarball, run where none of its
 # libraries are installed and away from the prefix it was built for: the
-# zorba CLI (XQuery, JSONiq, and a module with its external functions, found
-# relative to lib/), zorba-mcp, and a C++ program compiled against include/
-# and linked against lib/.
+# licence files, the zorba CLI (XQuery, JSONiq, and a module with its external
+# functions, found relative to lib/), zorba-mcp, and a C++ program compiled
+# against include/ and linked against lib/.
 # Needs a C++ compiler as $CXX (default c++).
 # Usage: smoke-binary.sh <unpacked-dir>
 set -eu
@@ -22,6 +22,11 @@ expect() { # description, expected output, command...
     exit 1
   fi
 }
+
+[ -f "$dir/LICENSE.txt" ] || { echo "FAIL  no LICENSE.txt"; exit 1; }
+[ -n "$(ls -A "$dir/share/doc/zorba/third-party" 2>/dev/null)" ] \
+  || { echo "FAIL  share/doc/zorba/third-party is missing or empty"; exit 1; }
+echo "ok    licence files"
 
 expect "XQuery" 2 "$dir/bin/zorba" -r -q '1+1'
 expect "JSONiq" '{ "sum" : 6 }' "$dir/bin/zorba" -j -r -q '{ "sum" : sum(parse-json("[1, 2, 3]")[]) }'

@@ -369,8 +369,10 @@ jobs:
 
   # Binary tarballs: the cmake --install tree (no test programs) with the
   # shared libraries it loads from outside the system baseline copied into
-  # lib/ and relative library search paths (scripts/bundle-binary.sh), smoke
-  # tested where none of those libraries is installed. Linux builds on Ubuntu
+  # lib/ and relative library search paths (scripts/bundle-binary.sh), the
+  # licence files of Zorba and of every bundled library
+  # (scripts/bundle-licenses.sh), smoke tested where none of those libraries
+  # is installed. Linux builds on Ubuntu
   # 24.04 (docker/builder, glibc 2.39); macOS builds ICU, libxml2 and
   # Xerces-C from the patched forks, as the Linux images do.
   binaries:
@@ -438,7 +440,9 @@ jobs:
               cd /src
               apt-get update -qq
               apt-get install -y -qq --no-install-recommends patchelf > /dev/null
-              scripts/bundle-binary.sh "stage/$NAME"'
+              scripts/bundle-binary.sh "stage/$NAME" > bundle.log || { cat bundle.log; exit 1; }
+              cat bundle.log
+              scripts/bundle-licenses.sh "stage/$NAME" bundle.log'
 
       - name: Install the build tools (macOS)
         if: runner.os == 'macOS'
@@ -473,6 +477,7 @@ jobs:
           scripts/bundle-binary.sh "stage/$NAME" | tee bundle.log
           # Only the patched builds may be bundled, never Homebrew's.
           if grep -F /opt/homebrew bundle.log; then exit 1; fi
+          scripts/bundle-licenses.sh "stage/$NAME" bundle.log
 
       - name: Create the tarball
         run: |
