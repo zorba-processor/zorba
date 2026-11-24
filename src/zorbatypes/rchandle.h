@@ -120,7 +120,11 @@ public:
     return --theValue == 0;
   }
 #else
-  long load() const { return theValue.load(std::memory_order_acquire); }
+  // load(), decrement() and decrementAndLoad() are sequentially consistent:
+  // a release that drops a reference and then reads another atomic relies on
+  // it (see "Threads" in the class comment of QueryResources). On x86-64 and
+  // AArch64 they compile to the same instructions as acquire / acq_rel.
+  long load() const { return theValue.load(std::memory_order_seq_cst); }
 
   void reset() { theValue.store(0, std::memory_order_relaxed); }
 
@@ -160,7 +164,7 @@ public:
   {
     if (theValue.load(std::memory_order_relaxed) == IMMORTAL)
       return false;
-    long const before = theValue.fetch_sub(1, std::memory_order_acq_rel);
+    long const before = theValue.fetch_sub(1, std::memory_order_seq_cst);
     assert(before > 0);
     return before == 1;
   }
@@ -186,7 +190,7 @@ public:
 
   long decrementAndLoad()
   {
-    long const before = theValue.fetch_sub(1, std::memory_order_acq_rel);
+    long const before = theValue.fetch_sub(1, std::memory_order_seq_cst);
     assert(before > 0);
     return before - 1;
   }

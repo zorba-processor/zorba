@@ -127,7 +127,15 @@ bool insert(T& item, T& outItem)
   {
     DummyHashValue value;
     this->setNewEntry(entry, hval, item, value);
-    outItem = entry->key();
+    try
+    {
+      outItem = entry->key();
+    }
+    catch (...)
+    {
+      this->eraseNewEntry(entry, hval);
+      throw;
+    }
     return true;
   }
   else
@@ -157,7 +165,15 @@ bool insert(const T& item, T& outItem)
   {
     DummyHashValue value;
     this->setNewEntry(entry, hval, item, value);
-    outItem = entry->key();
+    try
+    {
+      outItem = entry->key();
+    }
+    catch (...)
+    {
+      this->eraseNewEntry(entry, hval);
+      throw;
+    }
     return true;
   }
   else

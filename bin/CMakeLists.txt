@@ -627,6 +627,7 @@ IF (ZORBA_WITH_FILE_ACCESS)
              exhaust_sweep_matcher exhaust_sweep_query_text exhaust_sweep_long_token
              exhaust_sweep_streamable_text exhaust_base64_stream
              exhaust_seekable_stream exhaust_json_loader exhaust_serializer
+             exhaust_hybrid_serializer
              exhaust_collection_puls
              exhaust_plan_wrapper
              exhaust_collection_insert_last
@@ -642,7 +643,7 @@ IF (ZORBA_WITH_FILE_ACCESS)
              exhaust_sweep_cache exhaust_json_array_growth
              exhaust_sweep_kept_malloc exhaust_cache_after_failure exhaust_user_error exhaust_long_line
              exhaust_optimize_after_failure
-             exhaust_typed_element
+             exhaust_typed_element exhaust_parentless_nodes
              exhaust_notification exhaust_request_id
              exhaust_stack_limit exhaust_generated exhaust_json exhaust_json_array exhaust_csv
              exhaust_xml exhaust_strings exhaust_numbers exhaust_try

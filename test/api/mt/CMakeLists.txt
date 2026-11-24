@@ -43,6 +43,8 @@ CREATE_TEST_SOURCELIST(MTTests
   mt_query_sctx.cpp
   mt_module_instance.cpp
   mt_function_items.cpp
+  mt_function_item_close.cpp
+  mt_function_item_walk.cpp
   mt_first_compile.cpp
   mt_collation.cpp
   mt_shared_handles.cpp

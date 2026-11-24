@@ -16,6 +16,8 @@
 #ifndef ZORBA_RUNTIME_FUNCTION_ITEM_H
 #define ZORBA_RUNTIME_FUNCTION_ITEM_H
 
+#include <algorithm>
+
 #include "common/shared_types.h"
 
 #include "compiler/parser/query_loc.h"
@@ -160,9 +162,17 @@ public:
 
   void remove_variable(csize pos);
 
-  // The captured variables have the ids 1 to N in the closure dctx, which
-  // the local variables of the body share.
-  ulong firstLocalVarId() const { return theInScopeVarIds.size() + 1; }
+  // The local variables of the body follow the captured variables in the
+  // closure dctx. Those have the ids 1 to N, except for fn:function-lookup of
+  // a contextual function, which captures the context item, position or size
+  // with their own ids (dynamic_context::IDVAR_CONTEXT_ITEM...).
+  ulong firstLocalVarId() const
+  {
+    ulong last = theInScopeVarIds.size();
+    for (ulong id : theInScopeVarIds)
+      last = std::max(last, id);
+    return last + 1;
+  }
 };
 
 

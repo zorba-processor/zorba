@@ -2162,6 +2162,7 @@ DocumentNode::DocumentNode(
     XmlTree* tree,
     const zstring& baseUri,
     const zstring& docUri)
+try
   :
   InternalNode(tree, NULL, false, 0, store::StoreConsts::documentNode),
   theBaseUri(baseUri),
@@ -2170,6 +2171,11 @@ DocumentNode::DocumentNode(
   STORE_TRACE1("{\nConstructing doc node " << this << " tree = "
               << getTreeId() << ":" << getTree()
               << " doc uri = " << docUri);
+}
+catch (...)
+{
+  // The tree outlives this node, which is freed when its constructor throws.
+  tree->setRoot(NULL);
 }
 
 
@@ -4699,6 +4705,7 @@ TextNode::TextNode(
     bool append,
     csize pos,
     zstring& content)
+try
   :
 #ifdef TEXT_ORDPATH
   LabeledNode(tree, parent, append, pos, store::StoreConsts::textNode)
@@ -4738,6 +4745,12 @@ TextNode::TextNode(
               << " tree = " << getTreeId() << ":" << getTree()
               << " content = " << getText());
 #endif
+}
+catch (...)
+{
+  // The tree outlives this node, which is freed when its constructor throws.
+  if (parent == NULL)
+    tree->setRoot(NULL);
 }
 
 
@@ -5438,6 +5451,7 @@ PiNode::PiNode(
     csize pos,
     zstring& target,
     zstring& content)
+try
   :
   LabeledNode(tree, parent, append, pos, store::StoreConsts::piNode)
 {
@@ -5460,6 +5474,12 @@ PiNode::PiNode(
               << std::hex << (parent ? (ulong)parent : 0) << " pos = " << pos
               << " tree = " << getTreeId() << ":" << getTree()
               << " ordpath = " << theLabel.show() << " target = " << theTarget);
+}
+catch (...)
+{
+  // The tree outlives this node, which is freed when its constructor throws.
+  if (parent == NULL)
+    tree->setRoot(NULL);
 }
 
 
@@ -5603,6 +5623,7 @@ CommentNode::CommentNode(
     bool          append,
     csize         pos,
     zstring&      content)
+try
   :
   LabeledNode(tree, parent, append, pos, store::StoreConsts::commentNode)
 {
@@ -5621,6 +5642,12 @@ CommentNode::CommentNode(
               << " tree = " << getTreeId() << ":" << getTree()
               << " ordpath = " << theLabel.show() << " content = "
               << theContent);
+}
+catch (...)
+{
+  // The tree outlives this node, which is freed when its constructor throws.
+  if (parent == NULL)
+    tree->setRoot(NULL);
 }
 
 
