@@ -414,12 +414,9 @@ void QueryResources::detach()
 
   theIsDetached.store(true, std::memory_order_release);
 
+  // The collection that follows reads the reference counts after this.
   theDetachedAt = theDetachEpoch.fetch_add(1, std::memory_order_seq_cst) + 1;
   theDetachedObjs.push_back(this);
-
-  // Pairs with the fence of endRelease(): the collection that follows reads
-  // the reference counts after it.
-  std::atomic_thread_fence(std::memory_order_seq_cst);
 }
 
 

@@ -138,8 +138,9 @@ class XQueryDiagnostics;
   is listed until the obj is destroyed; such a release reads the epoch before
   it checks (beginRelease()) and again after it has dropped its reference
   (endRelease()), and collects the objs detached in between. Either the
-  release sees the new epoch or the collection sees the dropped reference
-  (sequentially consistent fences on both sides).
+  release sees the new epoch or the collection sees the dropped reference:
+  the epoch and the reference counts are changed and read with sequentially
+  consistent operations on both sides.
 
   The reference counts of a graph can still change during a walk (copies are
   not locked). A walk that finds garbage reads the counts of the nodes it found
@@ -284,8 +285,7 @@ public:
 
   static void endRelease(unsigned long epoch)
   {
-    std::atomic_thread_fence(std::memory_order_seq_cst);
-    if (theDetachEpoch.load(std::memory_order_relaxed) != epoch)
+    if (theDetachEpoch.load(std::memory_order_seq_cst) != epoch)
       collectDetachedSince(epoch);
   }
 #else
