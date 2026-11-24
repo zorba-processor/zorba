@@ -773,7 +773,7 @@ static expr* partial_eval_fo(RewriterContext& rCtx, fo_expr* fo)
   {
     expr* arg = fo->get_arg(0);
 
-    if (!arg->isNonDiscardable())
+    if (expr_tools::cannot_raise_error(arg))
     {
       xqtref_t argType = arg->get_return_type();
       SequenceType::Quantifier argQuant = argType->get_quantifier();
@@ -829,7 +829,7 @@ static expr* partial_eval_fo(RewriterContext& rCtx, fo_expr* fo)
   else if (fkind == FunctionConsts::FN_BOOLEAN_1)
   {
     expr* arg = fo->get_arg(0);
-    if (!arg->isNonDiscardable())
+    if (expr_tools::cannot_raise_error(arg))
     {
       xqtref_t argType = arg->get_return_type();
       if (TypeOps::is_subtype(tm,

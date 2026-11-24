@@ -1,0 +1,36 @@
+<iterator-tree description="const-folded expr">
+  <OrIterator>
+    <SingletonIterator value="xs:boolean(false)"/>
+    <SingletonIterator value="xs:boolean(false)"/>
+    <SingletonIterator value="xs:boolean(false)"/>
+  </OrIterator>
+</iterator-tree>
+<iterator-tree description="main query">
+  <SequentialIterator>
+    <CtxVarDeclareIterator varid="4" varname="n">
+      <SingletonIterator value="xs:integer(2)"/>
+    </CtxVarDeclareIterator>
+    <TreatIterator type="xs:integer" quant="">
+      <CtxVarIterator varid="4" varname="n" varkind="global"/>
+    </TreatIterator>
+    <FLWORIterator>
+      <ForVariable name="x">
+        <SubsequenceIntIterator>
+          <FnConcatIterator>
+            <ElementIterator copyInputNodes="false">
+              <SingletonIterator value="xs:QName(,,a)"/>
+            </ElementIterator>
+            <ElementIterator copyInputNodes="false">
+              <SingletonIterator value="xs:QName(,,b)"/>
+            </ElementIterator>
+          </FnConcatIterator>
+          <SingletonIterator value="xs:integer(1)"/>
+          <CtxVarIterator varid="4" varname="n" varkind="global"/>
+        </SubsequenceIntIterator>
+      </ForVariable>
+      <ReturnClause>
+        <SingletonIterator value="xs:boolean(true)"/>
+      </ReturnClause>
+    </FLWORIterator>
+  </SequentialIterator>
+</iterator-tree>
