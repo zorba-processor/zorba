@@ -4149,6 +4149,7 @@ fn-for-each/for-each-007
 fn-for-each/for-each-008
 fn-for-each/for-each-009
 fn-for-each/for-each-010
+fn-for-each/for-each-011
 fn-for-each/for-each-012
 fn-for-each/for-each-901
 fn-for-each/for-each-902
@@ -10384,12 +10385,19 @@ fn-unparsed-text-lines/fn-unparsed-text-lines-034
 fn-unparsed-text-lines/fn-unparsed-text-lines-035
 fn-unparsed-text-lines/fn-unparsed-text-lines-036
 fn-unparsed-text-lines/fn-unparsed-text-lines-041
+fn-unparsed-text-lines/fn-unparsed-text-lines-042
 fn-unparsed-text-lines/fn-unparsed-text-lines-043
 fn-unparsed-text-lines/fn-unparsed-text-lines-044
 fn-unparsed-text-lines/fn-unparsed-text-lines-045
 fn-unparsed-text-lines/fn-unparsed-text-lines-046
 fn-unparsed-text-lines/fn-unparsed-text-lines-047
 fn-unparsed-text-lines/fn-unparsed-text-lines-048
+fn-unparsed-text-lines/fn-unparsed-text-lines-049
+fn-unparsed-text-lines/fn-unparsed-text-lines-050
+fn-unparsed-text-lines/fn-unparsed-text-lines-051
+fn-unparsed-text-lines/fn-unparsed-text-lines-052
+fn-unparsed-text-lines/fn-unparsed-text-lines-053
+fn-unparsed-text-lines/fn-unparsed-text-lines-054
 fn-unparsed-text-lines/fn-unparsed-text-lines-055
 fn-unparsed-text/fn-unparsed-text-001
 fn-unparsed-text/fn-unparsed-text-002
@@ -10426,6 +10434,7 @@ fn-unparsed-text/fn-unparsed-text-035
 fn-unparsed-text/fn-unparsed-text-036
 fn-unparsed-text/fn-unparsed-text-040
 fn-unparsed-text/fn-unparsed-text-041
+fn-unparsed-text/fn-unparsed-text-042
 fn-unparsed-text/fn-unparsed-text-043
 fn-unparsed-text/fn-unparsed-text-044
 fn-unparsed-text/fn-unparsed-text-045
@@ -10433,6 +10442,7 @@ fn-unparsed-text/fn-unparsed-text-046
 fn-unparsed-text/fn-unparsed-text-047
 fn-unparsed-text/fn-unparsed-text-048
 fn-unparsed-text/fn-unparsed-text-049
+fn-unparsed-text/fn-unparsed-text-050
 fn-unparsed-text/fn-unparsed-text-051
 fn-unparsed-text/fn-unparsed-text-052
 fn-unparsed-text/fn-unparsed-text-053
@@ -11141,6 +11151,7 @@ misc-HigherOrderFunctions/inline-function-8
 misc-HigherOrderFunctions/inline-function-9
 misc-HigherOrderFunctions/xqhof1
 misc-HigherOrderFunctions/xqhof10
+misc-HigherOrderFunctions/xqhof11
 misc-HigherOrderFunctions/xqhof13
 misc-HigherOrderFunctions/xqhof14
 misc-HigherOrderFunctions/xqhof15
@@ -13691,6 +13702,8 @@ op-numeric-greater-than/K-NumericGT-6
 op-numeric-greater-than/K-NumericGT-7
 op-numeric-greater-than/K-NumericGT-8
 op-numeric-greater-than/K-NumericGT-9
+op-numeric-greater-than/K2-NumericGT-1
+op-numeric-greater-than/K2-NumericGT-2
 op-numeric-greater-than/K2-NumericGT-3
 op-numeric-greater-than/K2-NumericGT-4
 op-numeric-greater-than/cbcl-numeric-greater-than-001
@@ -13942,6 +13955,8 @@ op-numeric-less-than/K-NumericLT-6
 op-numeric-less-than/K-NumericLT-7
 op-numeric-less-than/K-NumericLT-8
 op-numeric-less-than/K-NumericLT-9
+op-numeric-less-than/K2-NumericLT-1
+op-numeric-less-than/K2-NumericLT-2
 op-numeric-less-than/cbcl-numeric-less-than-001
 op-numeric-less-than/cbcl-numeric-less-than-002
 op-numeric-less-than/cbcl-numeric-less-than-003
@@ -26485,6 +26500,7 @@ prod-WhereClause/cbcl-group-by-key-002
 prod-WhereClause/cbcl-group-by-key-003
 prod-WhereClause/cbcl-group-by-key-004
 prod-WhereClause/cbcl-hash-join-005
+prod-WhereClause/cbcl-hash-join-006
 prod-WhereClause/cbcl-hash-join-007
 prod-WhereClause/cbcl-hash-join-008
 prod-WhereClause/cbcl-hash-join-009
@@ -26551,6 +26567,8 @@ prod-WindowClause/SlidingWindowExpr558
 prod-WindowClause/SlidingWindowExpr559
 prod-WindowClause/SlidingWindowExpr561
 prod-WindowClause/SlidingWindowExpr562
+prod-WindowClause/SlidingWindowExpr563
+prod-WindowClause/SlidingWindowExpr563a
 prod-WindowClause/TumblingWindowExpr503
 prod-WindowClause/TumblingWindowExpr504
 prod-WindowClause/TumblingWindowExpr505
