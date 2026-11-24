@@ -15,6 +15,9 @@
  */
 
 #include <new>
+#include <cstdint>
+#include <functional>
+#include <thread>
 #include <vector>
 #include "diagnostics/assert.h"
 #include "system/globalenv.h"
@@ -201,13 +204,11 @@ void QNamePool::removeFromFreeList(QNameItem* qn)
 ********************************************************************************/
 QNameItem* QNamePool::popFreeList()
 {
-  if (theFirstFree != 0)
+  while (theFirstFree != 0)
   {
     assert(theNumFree > 0);
 
     QNameItem* qn = &theCache[theFirstFree];
-
-    assert(qn->getRefCount() == 0);
 
     theFirstFree = qn->theNextFree;
 
@@ -220,28 +221,32 @@ QNameItem* QNamePool::popFreeList()
 
     --theNumFree;
 
+#ifndef ZORBA_FOR_ONE_THREAD_ONLY
+    // Revived by findShared(): remove() puts it back when it is released.
+    if (qn->getRefCount() != 0)
+      continue;
+#endif
+
+    assert(qn->getRefCount() == 0);
     return qn;
   }
-  else
-  {
-    assert(theNumFree == 0);
-    return NULL;
-  }
+
+  assert(theNumFree == 0);
+  return NULL;
 }
 
 
 /*******************************************************************************
   Releases the last reference to qn (see QNameItem::free()). In the
-  multithreaded build the count goes from 1 to 0 here, under the lock that
-  lookups hold when they add a reference to a name that has none: a name is
-  removed once for each time its count reaches 0, never while a lookup
-  revives it.
+  multithreaded build the count goes from 1 to 0 here, under the exclusive lock,
+  while no lookup can add a reference: a name is removed once for each time its
+  count reaches 0, never while a lookup revives it.
 ********************************************************************************/
 void QNamePool::remove(QNameItem* qn)
 {
   QNameItem* normVictim = NULL;
 
-  SYNC_CODE(theHashSet.theMutex.lock();)
+  SYNC_CODE(theLock.lock();)
 
   try 
   {
@@ -251,7 +256,7 @@ void QNamePool::remove(QNameItem* qn)
 #else
     if (!qn->theRefCount.decrement())
     {
-      theHashSet.theMutex.unlock();
+      theLock.unlock();
       return;
     }
 #endif
@@ -273,11 +278,11 @@ void QNamePool::remove(QNameItem* qn)
 
     // Releasing the lock here to avoid deadlock, because decrementing the 
     // normVictim counter might reenter QNamePool::remove.
-    SYNC_CODE(theHashSet.theMutex.unlock();)
+    SYNC_CODE(theLock.unlock();)
   }
   catch(...)
   {
-    SYNC_CODE(theHashSet.theMutex.unlock();)
+    SYNC_CODE(theLock.unlock();)
               
     ZORBA_FATAL(0, "Unexpected exception");
   }
@@ -320,24 +325,41 @@ void QNamePool::insert(
   if (pre == NULL) pre = "";
   ZORBA_FATAL(ln != NULL && *ln != '\0', "");
 
-  zstring pooledNs;
-  theNamespacePool->insertc(ns, pooledNs);
+  csize const nslen = strlen(ns);
+  csize const prelen = strlen(pre);
+  csize const lnlen = strlen(ln);
 
   ulong hval = hashfun::h32(pre, hashfun::h32(ln, hashfun::h32(ns)));
+
+#ifndef ZORBA_FOR_ONE_THREAD_ONLY
+  if (findShared(res, ns, pre, ln, nslen, prelen, lnlen, hval))
+    return;
+#endif
+
+  zstring pooledNs;
+  bool nsPooled = false;
 
   try
   {
 retry:
-    SYNC_CODE(theHashSet.theMutex.lock();\
+    SYNC_CODE(theLock.lock();\
     haveLock = true;)
 
-    QNHashEntry* entry = 
-    hashFind(ns, pre, ln, pooledNs.size(), strlen(pre), strlen(ln), hval);
+    QNHashEntry* entry = hashFind(ns, pre, ln, nslen, prelen, lnlen, hval);
 
     if (entry == 0)
     {
       if (normalized)
       {
+        if (!nsPooled)
+        {
+          SYNC_CODE(theLock.unlock();\
+          haveLock = false;)
+
+          theNamespacePool->insertc(ns, pooledNs);
+          nsPooled = true;
+          goto retry;
+        }
         // Build a new QName (either new object or in cache).
         fresh = qn = cacheInsert(normVictim);
         qn->initializeAsNormalizedQName(pooledNs, ln);
@@ -346,7 +368,7 @@ retry:
       {
         if (normQName == NULL)
         {
-          SYNC_CODE(theHashSet.theMutex.unlock();\
+          SYNC_CODE(theLock.unlock();\
           haveLock = false;)
 
           insert(normItem, ns, NULL, ln);
@@ -367,13 +389,17 @@ retry:
     else
     {
       qn = entry->key();
+#ifdef ZORBA_FOR_ONE_THREAD_ONLY
       cachePin(qn);
+#endif
     }
 
+#ifdef ZORBA_FOR_ONE_THREAD_ONLY
     assert(qn->theNextFree == 0);
+#endif
     res = qn;
 
-    SYNC_CODE(theHashSet.theMutex.unlock();\
+    SYNC_CODE(theLock.unlock();\
     haveLock = false;)
   }
   catch (std::bad_alloc const&)
@@ -382,7 +408,7 @@ retry:
     undoCacheInsert(fresh, &freshVictim);
 
     SYNC_CODE(if (haveLock) \
-      theHashSet.theMutex.unlock();)
+      theLock.unlock();)
 
     if (normVictim != NULL)
       normVictim->removeReference();
@@ -393,7 +419,7 @@ retry:
   catch (...)
   {
     SYNC_CODE(if (haveLock) \
-      theHashSet.theMutex.unlock();)
+      theLock.unlock();)
 
     ZORBA_FATAL(0, "Unexpected exception");
   }
@@ -428,16 +454,23 @@ void QNamePool::insert(
 
   bool normalized = pre.empty();
 
-  zstring pooledNs;
-  theNamespacePool->insert(ns, pooledNs);
-
   ulong hval = hashfun::h32(pre.c_str(),
                             hashfun::h32(ln.c_str(),
                                          hashfun::h32(ns.c_str())));
+
+#ifndef ZORBA_FOR_ONE_THREAD_ONLY
+  if (findShared(res, ns.c_str(), pre.c_str(), ln.c_str(),
+                 ns.size(), pre.size(), ln.size(), hval))
+    return;
+#endif
+
+  zstring pooledNs;
+  bool nsPooled = false;
+
   try
   {
 retry:
-    SYNC_CODE(theHashSet.theMutex.lock();\
+    SYNC_CODE(theLock.lock();\
     haveLock = true;)
 
     QNHashEntry* entry =
@@ -449,6 +482,15 @@ retry:
     {
       if (normalized)
       {
+        if (!nsPooled)
+        {
+          SYNC_CODE(theLock.unlock();\
+          haveLock = false;)
+
+          theNamespacePool->insert(ns, pooledNs);
+          nsPooled = true;
+          goto retry;
+        }
         // Build a new QName (either new object or in cache).
         fresh = qn = cacheInsert(normVictim);
         qn->initializeAsNormalizedQName(pooledNs, ln);
@@ -457,11 +499,11 @@ retry:
       {
         if (normQName == NULL)
         {
-          SYNC_CODE(theHashSet.theMutex.unlock();\
+          SYNC_CODE(theLock.unlock();\
           haveLock = false;)
 
           // This call will need the lock.
-          insert(normItem, pooledNs, zstring(), ln);
+          insert(normItem, ns, zstring(), ln);
           normQName = static_cast<QNameItem*>(normItem.getp());
 
           goto retry;
@@ -480,13 +522,17 @@ retry:
     else
     {
       qn = entry->key();
+#ifdef ZORBA_FOR_ONE_THREAD_ONLY
       cachePin(qn);
+#endif
     }
 
+#ifdef ZORBA_FOR_ONE_THREAD_ONLY
     assert(qn->theNextFree == 0);
+#endif
     res = qn;
 
-    SYNC_CODE(theHashSet.theMutex.unlock();\
+    SYNC_CODE(theLock.unlock();\
     haveLock = false;)
   }
   catch (std::bad_alloc const&)
@@ -494,7 +540,7 @@ retry:
     QNameItem* freshVictim = NULL;
     undoCacheInsert(fresh, &freshVictim);
 
-    SYNC_CODE(if (haveLock) theHashSet.theMutex.unlock();)
+    SYNC_CODE(if (haveLock) theLock.unlock();)
 
     if (normVictim != NULL)
       normVictim->removeReference();
@@ -504,7 +550,7 @@ retry:
   }
   catch (...)
   {
-    SYNC_CODE(if (haveLock) theHashSet.theMutex.unlock();)
+    SYNC_CODE(if (haveLock) theLock.unlock();)
 
     ZORBA_FATAL(0, "Unexpected exception");
   }
@@ -579,6 +625,75 @@ void QNamePool::cachePin(QNameItem* qn)
 }
 
 
+#ifndef ZORBA_FOR_ONE_THREAD_ONLY
+/*******************************************************************************
+  The lookup of a name under the shared lock (see theLock). Returns false for a
+  missing name: the caller then inserts it under the exclusive lock.
+********************************************************************************/
+bool QNamePool::findShared(
+    store::Item_t& res,
+    const char* ns,
+    const char* pre,
+    const char* ln,
+    csize       nslen,
+    csize       prelen,
+    csize       lnlen,
+    csize       hval)
+{
+  // Assigning res must not release a name: remove() would wait for this lock.
+  assert(res.isNull());
+
+  unsigned const slot = theLock.lockShared();
+
+  QNHashEntry* entry = hashFind(ns, pre, ln, nslen, prelen, lnlen, hval);
+
+  bool const found = (entry != NULL);
+  if (found)
+    res = entry->key();
+
+  theLock.unlockShared(slot);
+  return found;
+}
+
+
+unsigned ShardedSharedLock::threadSlot()
+{
+  std::uint64_t const id =
+    std::hash<std::thread::id>()(std::this_thread::get_id());
+  // Fibonacci hashing: thread ids can share their low bits.
+  return static_cast<unsigned>(
+    (id * 0x9E3779B97F4A7C15ull) >> (64 - SLOT_BITS));
+}
+
+
+void ShardedSharedLock::waitForWriter() const
+{
+  for (unsigned spins = 0; theWriter.load(std::memory_order_acquire); ++spins)
+  {
+    if (spins >= 64)
+      std::this_thread::yield();
+  }
+}
+
+
+void ShardedSharedLock::lock()
+{
+  theWriterMutex.lock();
+  theWriter.store(true, std::memory_order_seq_cst);
+  for (Slot& s : theSlots)
+  {
+    for (unsigned spins = 0;
+         s.theReaders.load(std::memory_order_acquire) != 0;
+         ++spins)
+    {
+      if (spins >= 64)
+        std::this_thread::yield();
+    }
+  }
+}
+#endif
+
+
 /*******************************************************************************
 
 ********************************************************************************/
@@ -635,7 +750,7 @@ void QNamePool::flushUnused()
   {
     dropped = false;
     victims.clear();
-    SYNC_CODE(theHashSet.theMutex.lock();)
+    SYNC_CODE(theLock.lock();)
     for (csize i = 1; i < theCacheSize; ++i)
     {
       QNameItem* qn = &theCache[i];
@@ -648,7 +763,7 @@ void QNamePool::flushUnused()
         victims.push_back(victim);
       dropped = true;
     }
-    SYNC_CODE(theHashSet.theMutex.unlock();)
+    SYNC_CODE(theLock.unlock();)
     for (QNameItem* victim : victims)
       victim->removeReference();
   }
