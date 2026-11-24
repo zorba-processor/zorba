@@ -1,0 +1,32 @@
+<iterator-tree description="main query">
+  <SequentialIterator>
+    <CtxVarDeclareIterator varid="4" varname="n">
+      <SingletonIterator value="xs:integer(2)"/>
+    </CtxVarDeclareIterator>
+    <TreatIterator type="xs:integer" quant="">
+      <CtxVarIterator varid="4" varname="n" varkind="global"/>
+    </TreatIterator>
+    <FLWORIterator>
+      <LetVariable name="$$opt_temp_0" materialize="true">
+        <HoistIterator>
+          <FnConcatIterator>
+            <SingletonIterator value="xs:integer(1)"/>
+            <SingletonIterator value="xs:boolean(false)"/>
+            <SingletonIterator value="xs:boolean(true)"/>
+          </FnConcatIterator>
+        </HoistIterator>
+      </LetVariable>
+      <ForVariable name="x">
+        <OpToIterator>
+          <SingletonIterator value="xs:integer(1)"/>
+          <CtxVarIterator varid="4" varname="n" varkind="global"/>
+        </OpToIterator>
+      </ForVariable>
+      <ReturnClause>
+        <UnhoistIterator>
+          <LetVarIterator varname="$$opt_temp_0"/>
+        </UnhoistIterator>
+      </ReturnClause>
+    </FLWORIterator>
+  </SequentialIterator>
+</iterator-tree>
