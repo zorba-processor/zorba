@@ -30,11 +30,46 @@
 
 #include "store/api/item_factory.h"
 
+#include <algorithm>
+#include <string>
+
+#include <dlfcn.h>
+
 
 
 // DEFINE ENVIRONMENT VARIABLES
 namespace zorba 
 {
+
+
+// The installation prefix this library was loaded from (the parent of its
+// directory) followed by '/', or empty if it cannot be determined.
+static zstring loaded_install_prefix()
+{
+  static const char anchor = 0;
+  Dl_info info;
+  if (dladdr(&anchor, &info) == 0 || info.dli_fname == nullptr)
+    return zstring();
+  std::string path(info.dli_fname);
+  for (int i = 0; i < 2; ++i)
+  {
+    std::string::size_type const slash = path.rfind('/');
+    if (slash == std::string::npos)
+      return zstring();
+    path.erase(slash);
+  }
+  return zstring(path + '/');
+}
+
+
+static void append_install_dirs(
+    zstring const& prefix,
+    const char** dirs,
+    std::vector<zstring>& paths)
+{
+  for (; *dirs != 0; ++dirs)
+    paths.push_back(prefix + *dirs);
+}
 
 
 static void append_env_var(
@@ -146,17 +181,28 @@ void root_static_context::init()
   std::vector<zstring> lRootURIPath;
   std::vector<zstring> lRootLibPath;
 
+  // An installation that was moved or unpacked elsewhere than its configured
+  // prefix finds its modules relative to this library first.
+  zstring const lPrefix = loaded_install_prefix();
+  if (!lPrefix.empty())
+  {
+    append_install_dirs(lPrefix, theInstallURIDirs, lRootURIPath);
+    append_install_dirs(lPrefix, theInstallLibDirs, lRootLibPath);
+  }
+
   const char ** lURIPathIter = get_builtin_uri_path();
   for (; *lURIPathIter != 0; ++lURIPathIter)
   {
-    lRootURIPath.push_back(*lURIPathIter);
+    if (std::find(lRootURIPath.begin(), lRootURIPath.end(), *lURIPathIter) == lRootURIPath.end())
+      lRootURIPath.push_back(*lURIPathIter);
   }
   set_uri_path(lRootURIPath);
 
   const char ** lLibPathIter = get_builtin_lib_path();
   for (; *lLibPathIter != 0; ++lLibPathIter)
   {
-    lRootLibPath.push_back(*lLibPathIter);
+    if (std::find(lRootLibPath.begin(), lRootLibPath.end(), *lLibPathIter) == lRootLibPath.end())
+      lRootLibPath.push_back(*lLibPathIter);
   }
   set_lib_path(lRootLibPath);
 

@@ -109,6 +109,57 @@ static bool clauses_cannot_raise_error(const flwor_expr* flwor, csize first, csi
 
 
 /******************************************************************************
+  True if e reads var before anything else, and gives the empty sequence
+  without evaluating anything else when var is the empty sequence. A value
+  comparison is left out: SpecializeOperations may swap its operands.
+*******************************************************************************/
+static bool stops_at_empty_var(const expr* e, const var_expr* var)
+{
+  switch (e->get_expr_kind())
+  {
+  case var_expr_kind:
+    return e == var;
+
+  case wrapper_expr_kind:
+    return stops_at_empty_var(static_cast<const wrapper_expr*>(e)->get_input(), var);
+
+  case treat_expr_kind:
+  case promote_expr_kind:
+  {
+    const cast_base_expr* ce = static_cast<const cast_base_expr*>(e);
+    SequenceType::Quantifier q = ce->get_target_type()->get_quantifier();
+
+    return ((q == SequenceType::QUANT_QUESTION || q == SequenceType::QUANT_STAR) &&
+            stops_at_empty_var(ce->get_input(), var));
+  }
+
+  case cast_expr_kind:
+  {
+    const cast_expr* ce = static_cast<const cast_expr*>(e);
+
+    return (ce->allows_empty_input() && stops_at_empty_var(ce->get_input(), var));
+  }
+
+  case relpath_expr_kind:
+    return stops_at_empty_var((*static_cast<const relpath_expr*>(e))[0], var);
+
+  case fo_expr_kind:
+  {
+    const fo_expr* fo = static_cast<const fo_expr*>(e);
+    const function* f = fo->get_func();
+
+    return ((f->getKind() == FunctionConsts::FN_DATA_1 || f->isArithmeticFunction()) &&
+            fo->num_args() > 0 &&
+            stops_at_empty_var(fo->get_arg(0), var));
+  }
+
+  default:
+    return false;
+  }
+}
+
+
+/******************************************************************************
   True if each clause in [first, last) gives at least one tuple for every tuple
   it receives, so that none of them can skip the evaluation of what follows it.
 *******************************************************************************/
@@ -612,12 +663,15 @@ RULE_REWRITE_PRE(EliminateUnusedLetVars)
 
         // O0 evaluates this domain once for each tuple it receives; folded, it is
         // evaluated only where its variable is referenced. An empty domain gives
-        // no tuples at O0; folded, the clauses after it are evaluated.
+        // no tuples at O0; folded, the clauses after it and the return clause are
+        // evaluated, unless the return clause stops at the empty variable.
         // A positional variable left above is 0 or 1 by whether the domain is empty.
         if (fc->get_pos_var() == NULL &&
             safe_to_fold_var(i, numRefs) &&
             (outerFor || domQuant == SequenceType::QUANT_ONE ||
-             clauses_cannot_raise_error(theFlwor, i + 1, theFlwor->num_clauses())) &&
+             (clauses_cannot_raise_error(theFlwor, i + 1, theFlwor->num_clauses()) &&
+              (expr_tools::cannot_raise_error(theFlwor->get_return_expr()) ||
+               stops_at_empty_var(theFlwor->get_return_expr(), var)))) &&
             (expr_tools::cannot_raise_error(domExpr) ||
              flwor_evaluates_var(theFlwor, i + 1, var)))
         {
