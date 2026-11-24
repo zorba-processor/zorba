@@ -452,8 +452,9 @@ protected:
 
     serializer::xml_emitter * theXMLEmitter;
 
+    // Declared first: the emitter writes to the stream until it is destroyed.
+    std::unique_ptr<std::stringstream> theNestedXMLStringStream;
     rchandle<emitter>         theNestedXMLEmitter;
-    std::stringstream       * theNestedXMLStringStream;
   };
 
 

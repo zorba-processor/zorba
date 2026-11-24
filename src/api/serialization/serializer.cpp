@@ -1198,14 +1198,12 @@ serializer::hybrid_emitter::hybrid_emitter(
   bool aEmitAttributes)
   : json_emitter(the_serializer, the_stream),
     theEmitterState(JESTATE_UNDETERMINED),
-    theXMLEmitter(new xml_emitter(the_serializer, the_stream, aEmitAttributes)),
-    theNestedXMLStringStream(nullptr)
+    theXMLEmitter(new xml_emitter(the_serializer, the_stream, aEmitAttributes))
 {
 }
 
 serializer::hybrid_emitter::~hybrid_emitter()
 {
-  delete theNestedXMLStringStream;
   delete theXMLEmitter;
 }
 
@@ -1252,10 +1250,11 @@ void serializer::hybrid_emitter::emit_jsoniq_xdm_node(
 {
   if (! theNestedXMLEmitter)
   {
-    theNestedXMLStringStream = new std::stringstream();
-    ser->attach_transcoder(*theNestedXMLStringStream);
-    theNestedXMLEmitter
-        = new serializer::xml_emitter(ser, *theNestedXMLStringStream);
+    // The stream is kept only with its emitter, so that a failure keeps neither.
+    auto stream = std::make_unique<std::stringstream>();
+    ser->attach_transcoder(*stream);
+    theNestedXMLEmitter = new serializer::xml_emitter(ser, *stream);
+    theNestedXMLStringStream = std::move(stream);
   }
   theNestedXMLEmitter->emit_item(item);
   zstring xml(theNestedXMLStringStream->str());
