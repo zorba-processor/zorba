@@ -231,18 +231,24 @@ void CompilerCB::addAnonymousUDF(user_function* udf)
 ********************************************************************************/
 std::atomic<unsigned long> QueryResources::theGraphGeneration(1);
 
-#ifndef ZORBA_FOR_ONE_THREAD_ONLY
 namespace
 {
+#ifndef ZORBA_FOR_ONE_THREAD_ONLY
 // See QueryResources::CollectorLock.
 std::recursive_mutex theCollectorMutex;
+#endif
 
 // The detached QueryResources objs alive, under the collector lock (see
-// "Threads" in the class comment of QueryResources).
+// "Threads" and "JSON items" in the class comment of QueryResources).
 std::vector<QueryResources*> theDetachedObjs;
 }
 
 std::atomic<unsigned long> QueryResources::theDetachEpoch(0);
+
+std::atomic<long> QueryResources::theNumDetached(0);
+
+#ifndef ZORBA_FOR_ONE_THREAD_ONLY
+std::atomic<unsigned long> QueryResources::theMarkEpoch(0);
 
 QueryResources::CollectorLock::CollectorLock()
   :
@@ -290,9 +296,7 @@ QueryResources::QueryResources()
   theDebuggerCommons(NULL),
 #endif
   theIsDetached(false),
-#ifndef ZORBA_FOR_ONE_THREAD_ONLY
   theDetachedAt(0),
-#endif
   theWitnessGeneration(0),
   theNumWitnesses(0)
 {
@@ -308,14 +312,13 @@ QueryResources::~QueryResources()
   release(theParent);
   release(theDctxParent);
 
-#ifndef ZORBA_FOR_ONE_THREAD_ONLY
   if (theDetachedAt != 0)
   {
     CollectorLock lock;
     theDetachedObjs.erase(
         std::find(theDetachedObjs.begin(), theDetachedObjs.end(), this));
+    --theNumDetached;
   }
-#endif
 
   --theNumAlive;
 }
@@ -358,11 +361,7 @@ void QueryResources::dispose(
 
     // From here on the collections on other threads walk the state handed
     // over above.
-#ifndef ZORBA_FOR_ONE_THREAD_ONLY
     detach();
-#else
-    theIsDetached.store(true, std::memory_order_release);
-#endif
 
     // From now on the dctx variables are edges of a graph.
     if (theDctx)
@@ -406,7 +405,6 @@ void QueryResources::release(rchandle<QueryResources>& resources)
 }
 
 
-#ifndef ZORBA_FOR_ONE_THREAD_ONLY
 /*******************************************************************************
   See "Threads" in the class comment. Under the lock, so that a release that
   sees the new epoch finds this obj listed once it gets the lock.
@@ -420,6 +418,7 @@ void QueryResources::detach()
   // The collection that follows reads the reference counts after this.
   theDetachedAt = theDetachEpoch.fetch_add(1, std::memory_order_seq_cst) + 1;
   theDetachedObjs.push_back(this);
+  ++theNumDetached;
 }
 
 
@@ -458,7 +457,6 @@ void QueryResources::collectDetachedSince(unsigned long epoch)
   if (!held.empty())
     collectCycles(&held[0], held.size());
 }
-#endif
 
 
 void QueryResources::destroy()

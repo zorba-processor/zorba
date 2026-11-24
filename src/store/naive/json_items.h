@@ -17,6 +17,7 @@
 #ifndef ZORBA_STORE_JSON_ITEMS_H
 #define ZORBA_STORE_JSON_ITEMS_H
 
+#include <atomic>
 #include <memory>
 #include <vector>
 
@@ -111,6 +112,13 @@ protected:
   // not reach this item (see runtime/json/nesting.h).
   uint32_t                       theHeight;
 
+  // See store::Item::setMayHoldCycle().
+#ifdef ZORBA_FOR_ONE_THREAD_ONLY
+  mutable bool                   theMayHoldCycle;
+#else
+  mutable std::atomic<bool>      theMayHoldCycle;
+#endif
+
   // Raises the limit error if aMember would make this value too deep, and
   // takes it into account otherwise. To be called before aMember is added.
   void addHeightOf(const store::Item* aMember)
@@ -166,13 +174,32 @@ protected:
 
 public:
   JSONItem(store::Item::ItemKind k)
-    : StructuredItem(k), theCollectionInfo(NULL), theHeight(1) {}
+    : StructuredItem(k), theCollectionInfo(NULL), theHeight(1),
+      theMayHoldCycle(false) {}
 
   virtual ~JSONItem();
   
   virtual void free();
 
   virtual void destroy();
+
+  bool mayHoldCycle() const
+  {
+#ifdef ZORBA_FOR_ONE_THREAD_ONLY
+    return theMayHoldCycle;
+#else
+    return theMayHoldCycle.load(std::memory_order_relaxed);
+#endif
+  }
+
+  void setMayHoldCycle() const
+  {
+#ifdef ZORBA_FOR_ONE_THREAD_ONLY
+    theMayHoldCycle = true;
+#else
+    theMayHoldCycle.store(true, std::memory_order_relaxed);
+#endif
+  }
 
   // StructuredItem API
 

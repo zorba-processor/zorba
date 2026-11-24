@@ -46,6 +46,7 @@ CREATE_TEST_SOURCELIST(MTTests
   mt_function_item_thread.cpp
   mt_function_item_close.cpp
   mt_function_item_walk.cpp
+  mt_json_item_close.cpp
   mt_first_compile.cpp
   mt_collation.cpp
   mt_shared_handles.cpp

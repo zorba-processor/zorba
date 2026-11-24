@@ -689,7 +689,12 @@ public:
 
     if (rootNode->theIsLive)
     {
-      recordWitnesses(root, rootNode, generation);
+      findNodesReachingRoot(rootNode);
+
+      if (!markJSONItems())
+        return CHANGED;
+
+      recordWitnesses(root, generation);
 
       for (ite = theNodes.begin(); ite != theNodes.end(); ++ite)
       {
@@ -744,12 +749,9 @@ public:
 
 private:
   /*
-    Records in root up to MAX_WITNESSES nodes referenced from outside the
-    graph from which root is reachable, preferring other nodes to
-    QueryResources objs: the references to those come and go with every
-    function item created by the query.
+    Sets theReachesRoot of the nodes from which root is reachable.
   */
-  void recordWitnesses(QueryResources* root, Node* rootNode, unsigned long generation)
+  static void findNodesReachingRoot(Node* rootNode)
   {
     std::vector<Node*> work;
     rootNode->theReachesRoot = true;
@@ -770,7 +772,58 @@ private:
         }
       }
     }
+  }
 
+  /*
+    Marks the JSON items referenced from outside the graph from which root is
+    reachable (see "JSON items" in the class comment of QueryResources).
+    Returns false if one marked now is no longer referenced from outside: the
+    caller walks again (see "Threads" there).
+  */
+  bool markJSONItems()
+  {
+    std::vector<Node*> marked;
+
+    std::map<const void*, Node*>::iterator ite = theNodes.begin();
+    for (; ite != theNodes.end(); ++ite)
+    {
+      Node* node = ite->second;
+      if (node->theKind != JSON ||
+          !node->theReachesRoot ||
+          node->theRefs <= node->theInternalRefs)
+        continue;
+
+      const store::Item* item = static_cast<const store::Item*>(node->thePtr);
+      if (!item->mayHoldCycle())
+      {
+        item->setMayHoldCycle();
+        marked.push_back(node);
+      }
+    }
+
+    if (marked.empty())
+      return true;
+
+    QueryResources::itemsMarked();
+
+    std::vector<Node*>::iterator markedIte = marked.begin();
+    for (; markedIte != marked.end(); ++markedIte)
+    {
+      if (refCount(JSON, (*markedIte)->thePtr, theHeld, theNumHeld) <=
+          (*markedIte)->theInternalRefs)
+        return false;
+    }
+    return true;
+  }
+
+  /*
+    Records in root up to MAX_WITNESSES nodes referenced from outside the
+    graph from which root is reachable (after findNodesReachingRoot()),
+    preferring other nodes to QueryResources objs: the references to those
+    come and go with every function item created by the query.
+  */
+  void recordWitnesses(QueryResources* root, unsigned long generation)
+  {
     root->theNumWitnesses = 0;
 
     for (int pass = 0; pass < 2; ++pass)
@@ -961,6 +1014,16 @@ private:
 thread_local bool QueryResourcesCollector::theIsBuilding = false;
 
 thread_local std::vector<QueryResources_t>* QueryResourcesCollector::thePending = NULL;
+
+
+void QueryResources::markedReferenceDropped()
+{
+  if (QueryResourcesCollector::theIsBuilding ||
+      theNumDetached.load(std::memory_order_seq_cst) == 0)
+    return;
+
+  collectDetachedSince(0);
+}
 
 
 bool QueryResources::mayCollect(QueryResources* const* roots, csize numRoots)
