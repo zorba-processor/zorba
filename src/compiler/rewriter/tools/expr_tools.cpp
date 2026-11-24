@@ -1615,6 +1615,68 @@ bool reads_changeable_state(const expr* root)
 
 
 /*******************************************************************************
+
+********************************************************************************/
+bool cannot_raise_error(const expr* e)
+{
+  switch (e->get_expr_kind())
+  {
+  case const_expr_kind:
+    return true;
+
+  case function_item_expr_kind:
+  {
+    const std::vector<expr*>& values =
+    static_cast<const function_item_expr*>(e)->get_in_scope_var_values();
+
+    for (csize i = 0; i < values.size(); ++i)
+    {
+      if (values[i] != NULL && !cannot_raise_error(values[i]))
+        return false;
+    }
+
+    return true;
+  }
+
+  case wrapper_expr_kind:
+    return cannot_raise_error(static_cast<const wrapper_expr*>(e)->get_input());
+
+  case var_expr_kind:
+  {
+    const var_expr* ve = static_cast<const var_expr*>(e);
+    var_expr::var_kind k = ve->get_kind();
+
+    // A prolog variable without an initializer (an external variable without a
+    // default, or the context item) raises XPDY0002 when referenced unbound.
+    return (k == var_expr::for_var ||
+            k == var_expr::pos_var ||
+            k == var_expr::count_var ||
+            (k == var_expr::prolog_var && ve->has_initializer()));
+  }
+
+  case fo_expr_kind:
+  {
+    const fo_expr* fo = static_cast<const fo_expr*>(e);
+
+    if (fo->get_func()->getKind() != FunctionConsts::OP_CONCATENATE_N)
+      return false;
+
+    for (csize i = 0; i < fo->num_args(); ++i)
+    {
+      if (!cannot_raise_error(fo->get_arg(i)))
+        return false;
+    }
+
+    return true;
+  }
+
+  default:
+    return false;
+  }
+}
+
+
+/*******************************************************************************
   The closed world of a query: the walk covers the query body, what its prolog
   variables are initialized with, and every function that it names in a call or a
   function item. A dynamic function call can only reach what this walk reaches,

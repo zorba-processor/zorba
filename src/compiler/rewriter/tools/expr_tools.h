@@ -112,6 +112,13 @@ bool depends_on_call_effects(const expr* root);
 // node, or has a call that can have a side effect.
 bool reads_changeable_state(const expr* root);
 
+// Whether the evaluation of "e" cannot raise an error: a constant, a function item
+// whose captured values cannot raise (they are computed when it is created), a
+// sequence of such exprs, or a reference to a variable whose value is already
+// computed. A let or argument variable may be evaluated lazily, when it is
+// referenced, so a reference to it can raise the error of its binding.
+bool cannot_raise_error(const expr* e);
+
 
 /*******************************************************************************
 
