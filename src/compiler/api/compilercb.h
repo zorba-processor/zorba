@@ -85,8 +85,22 @@ class XQueryDiagnostics;
   the whole cycle. It runs when the obj is detached, and afterwards when a
   reference that may have been the last outside one goes away: a reference to
   a function item of the graph (FunctionItem::referenceDropped()), a function
-  item that refers to a detached obj, or a reference to a detached obj held
-  by another QueryResources or by an owner (release()).
+  item that refers to a detached obj, a reference to a detached obj held
+  by another QueryResources or by an owner (release()), or a reference to a
+  JSON object or array that a collection found referenced from outside a
+  graph it keeps alive (see "JSON items" below).
+
+  JSON items: a JSON object or array of a graph can be the only node
+  referenced from outside, e.g. a prolog variable value that holds a
+  function item of the cycle and that the application kept from the query
+  result. A collection that finds the root referenced from outside marks each
+  such JSON item from which the root is reachable
+  (store::Item::setMayHoldCycle()); dropping a reference to a marked item
+  that does not free it collects the cycles through every detached obj
+  (markedReferenceDropped()). The mark stays: a later drop costs a lock and
+  the check of the witnesses while a detached obj is alive, and nothing
+  otherwise. Releases of unmarked JSON items only read the mark (and, unless
+  ZORBA_FOR_ONE_THREAD_ONLY, a mark epoch, see "Threads").
 
   Cost: a collection walks the whole graph, including the members of the
   eager temp sequences and JSON items held by the dctx variables. So that the
@@ -142,6 +156,16 @@ class XQueryDiagnostics;
   the epoch and the reference counts are changed and read with sequentially
   consistent operations on both sides.
 
+  A release of a JSON item reads the mark before it drops its reference (the
+  item may be freed by another thread right after), so a collection on
+  another thread may mark it in between: each collection that marks items
+  takes a new mark epoch after marking them and then reads their counts
+  again, and walks again if one of them is no longer referenced from
+  outside; the release reads the epoch before it reads the mark and again
+  after the decrement, and collects if the epoch changed. Either the release
+  sees the mark or the new epoch, or the collection sees the dropped
+  reference.
+
   The reference counts of a graph can still change during a walk (copies are
   not locked). A walk that finds garbage reads the counts of the nodes it found
   unreachable again: no node it found referenced from outside refers to them,
@@ -164,11 +188,15 @@ protected:
   rchandle<QueryResources>       theParent;
   rchandle<QueryResources>       theDctxParent;
   std::atomic<bool>              theIsDetached;
-#ifndef ZORBA_FOR_ONE_THREAD_ONLY
   // See "Threads" in the class comment: the epoch of the last detach, and the
   // epoch at which this obj was detached (0 if it never was).
   static std::atomic<unsigned long> theDetachEpoch;
   unsigned long                  theDetachedAt;
+  // The number of objs that were detached and are alive.
+  static std::atomic<long>       theNumDetached;
+#ifndef ZORBA_FOR_ONE_THREAD_ONLY
+  // See "Threads" in the class comment.
+  static std::atomic<unsigned long> theMarkEpoch;
 #endif
 
   // See "Cost" in the class comment.
@@ -294,14 +322,51 @@ public:
   static void endRelease(unsigned long) { }
 #endif
 
+  /*
+    See "JSON items" and "Threads" in the class comment. A release of a
+    reference to a JSON object or array reads the epoch with
+    beginJSONRelease() before it reads the item's mark, and calls
+    endJSONRelease() with both after the reference is dropped, if that did
+    not free the item.
+  */
+#ifndef ZORBA_FOR_ONE_THREAD_ONLY
+  static unsigned long beginJSONRelease()
+  {
+    return theMarkEpoch.load(std::memory_order_acquire);
+  }
+
+  static void endJSONRelease(unsigned long epoch, bool marked)
+  {
+    if (marked || theMarkEpoch.load(std::memory_order_seq_cst) != epoch)
+      markedReferenceDropped();
+  }
+#else
+  static unsigned long beginJSONRelease() { return 0; }
+
+  static void endJSONRelease(unsigned long, bool marked)
+  {
+    if (marked)
+      markedReferenceDropped();
+  }
+#endif
+
+  // For collectCycles(): see "Threads" in the class comment.
+  static void itemsMarked()
+  {
+#ifndef ZORBA_FOR_ONE_THREAD_ONLY
+    theMarkEpoch.fetch_add(1, std::memory_order_seq_cst);
+#endif
+  }
+
 private:
   void destroy();
 
-#ifndef ZORBA_FOR_ONE_THREAD_ONLY
   void detach();
 
   static void collectDetachedSince(unsigned long epoch);
-#endif
+
+  // See "JSON items" in the class comment (in runtime/hof/function_item.cpp).
+  static void markedReferenceDropped();
 
   QueryResources(const QueryResources&);
   QueryResources& operator=(const QueryResources&);

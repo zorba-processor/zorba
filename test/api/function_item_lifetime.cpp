@@ -504,6 +504,33 @@ void test_cycle_through_json(Zorba* z)
   CHECK_EQ(std::to_string(query_resources_alive()), std::to_string(lAlive));
 }
 
+// A cycle referenced from outside only through a JSON object of a prolog
+// variable that holds one of its function items, dropped after the query is
+// closed: dropping the object frees the cycle.
+void test_cycle_held_by_json(Zorba* z)
+{
+  long const lAlive = query_resources_alive();
+  {
+    std::vector<Item> lItems = run(z,
+        "declare variable $m := { \"f\": function($x) { $x + 1 } };\n"
+        "$m");
+    CHECK(lItems.size() == 1 && lItems[0].isJSONItem());
+    CHECK(query_resources_alive() > lAlive);
+  }
+  CHECK_EQ(std::to_string(query_resources_alive()), std::to_string(lAlive));
+
+  // The same through an array that holds the object.
+  {
+    std::vector<Item> lItems = run(z,
+        "declare variable $m := { \"f\": function($x) { $x + 1 } };\n"
+        "declare variable $a := [ $m ];\n"
+        "$a");
+    CHECK(lItems.size() == 1);
+    CHECK(query_resources_alive() > lAlive);
+  }
+  CHECK_EQ(std::to_string(query_resources_alive()), std::to_string(lAlive));
+}
+
 // An escaped function item that creates a function item on each call (which
 // refers to the closed query's state and is dropped right away) must not
 // make the collector walk the closed query's graph, with its large prolog
@@ -657,6 +684,7 @@ function_item_lifetime(int argc, char* argv[])
     { "test_load_prolog_diagnostics", test_load_prolog_diagnostics },
     { "test_cycle_freed", test_cycle_freed },
     { "test_cycle_through_json", test_cycle_through_json },
+    { "test_cycle_held_by_json", test_cycle_held_by_json },
     { "test_walks_creating_items", test_walks_creating_items },
     { "test_walks_reading_global", test_walks_reading_global },
     { "test_walks_releasing_garbage", test_walks_releasing_garbage },

@@ -168,14 +168,50 @@ void Item::removeReference()
       free();
     return;
   }
+  case OBJECT:
+  case ARRAY:
+  {
+    // See "JSON items" in the class comment of QueryResources. Another thread
+    // may free the item as soon as the reference is dropped: the mark is read
+    // before.
+    unsigned long const epoch = QueryResources::beginJSONRelease();
+    bool const marked =
+      static_cast<simplestore::json::JSONItem*>(this)->mayHoldCycle();
+
+    if (theRefCount.decrement())
+      free();
+    else
+      QueryResources::endJSONRelease(epoch, marked);
+    return;
+  }
 #endif
   default:
   {
     if (theRefCount.decrement())
       free();
+#ifdef ZORBA_FOR_ONE_THREAD_ONLY
+    // See "JSON items" in the class comment of QueryResources.
+    else if (isJSONItem() &&
+             static_cast<simplestore::json::JSONItem*>(this)->mayHoldCycle())
+      QueryResources::endJSONRelease(0, true);
+#endif
     return;
   }
   }
+}
+
+
+void Item::setMayHoldCycle() const
+{
+  assert(isJSONItem());
+  static_cast<const simplestore::json::JSONItem*>(this)->setMayHoldCycle();
+}
+
+
+bool Item::mayHoldCycle() const
+{
+  assert(isJSONItem());
+  return static_cast<const simplestore::json::JSONItem*>(this)->mayHoldCycle();
 }
 
 

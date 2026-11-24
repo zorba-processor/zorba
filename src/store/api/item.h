@@ -955,6 +955,16 @@ public:
   /* -------------------- Methods for JSON items --------------------- */
 
   /**
+   * Defined on JSON objects and arrays. Marks the item as referenced from
+   * outside a graph of cycles through the state of a closed query, which it
+   * keeps alive: dropping a reference to it then starts a collection (see
+   * QueryResources in compiler/api/compilercb.h).
+   */
+  void setMayHoldCycle() const;
+
+  bool mayHoldCycle() const;
+
+  /**
    * @return the kind of the json item
    */
   virtual store::StoreConsts::JSONItemKind 

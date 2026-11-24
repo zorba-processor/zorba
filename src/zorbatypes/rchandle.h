@@ -83,6 +83,17 @@ public:
       ++theValue;
   }
 
+  // See the multithreaded version.
+  bool incrementUnlessZero()
+  {
+    if (theValue == IMMORTAL)
+      return true;
+    if (theValue == 0)
+      return false;
+    ++theValue;
+    return true;
+  }
+
   bool decrement()
   {
     if (theValue == IMMORTAL)
