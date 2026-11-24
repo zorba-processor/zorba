@@ -36,6 +36,8 @@
 #include "store/api/temp_seq.h"
 #include "store/api/iterator.h"
 
+#include "zorbatypes/integer.h"
+
 #include "diagnostics/assert.h"
 
 #include <exception>
@@ -1084,6 +1086,35 @@ void FunctionItem::serialize(::zorba::serialization::Archiver& ar)
 const store::Item_t FunctionItem::getFunctionName() const
 {
   return theFunctionItemInfo->theQName;
+}
+
+
+/*******************************************************************************
+  The coerced function item is the value of the first outer variable of a
+  coercion (see translator::wrap_in_coercion).
+********************************************************************************/
+const FunctionItem* FunctionItem::getCoercedFunction() const
+{
+  if (!isCoercion() ||
+      theClosureDctx == NULL ||
+      theFunctionItemInfo->theInScopeVarIds.empty())
+    return NULL;
+
+  store::Item_t item;
+  store::TempSeq_t seq;
+  theClosureDctx->get_variable(theFunctionItemInfo->theInScopeVarIds[0],
+                               theFunctionItemInfo->theInScopeVarNames[0],
+                               theFunctionItemInfo->theLoc,
+                               item,
+                               seq);
+
+  if (seq != NULL && seq->containsItem(xs_integer(1)))
+    seq->getItem(xs_integer(1), item);
+
+  if (item == NULL || !item->isFunction())
+    return NULL;
+
+  return static_cast<const FunctionItem*>(item.getp());
 }
 
 

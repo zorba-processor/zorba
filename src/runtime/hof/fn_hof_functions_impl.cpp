@@ -204,7 +204,8 @@ bool FunctionNameIterator::nextImpl(
     PlanState& planState) const
 {
   store::Item_t lFItem;
-  FunctionItem* lFunctionItem = 0;
+  const FunctionItem* lFunctionItem = 0;
+  bool lHasName;
 
   PlanIteratorState* state;
   DEFAULT_STACK_INIT(PlanIteratorState, state, planState);
@@ -216,13 +217,27 @@ bool FunctionNameIterator::nextImpl(
 
   lFunctionItem = static_cast<FunctionItem*>(lFItem.getp());
 
-  if ((!lFunctionItem->isInline() || lFunctionItem->isCoercion())
-      &&
-      lFunctionItem->getFunctionName()
-      &&
-      (lFunctionItem->getArity() == lFunctionItem->getStartArity()))
+  // A partial application has no name; a coercion has the name of the
+  // function it coerces.
+  lHasName = (lFunctionItem->getArity() == lFunctionItem->getStartArity());
+
+  while (lHasName && lFunctionItem->isCoercion())
   {
-    // non-inline function
+    const FunctionItem* lCoerced = lFunctionItem->getCoercedFunction();
+
+    if (lCoerced == NULL)
+      break;
+
+    lFunctionItem = lCoerced;
+    lHasName = (lFunctionItem->getArity() == lFunctionItem->getStartArity());
+  }
+
+  if (lHasName
+      &&
+      (!lFunctionItem->isInline() || lFunctionItem->isCoercion())
+      &&
+      lFunctionItem->getFunctionName())
+  {
     r = lFunctionItem->getFunctionName();
     STACK_PUSH(true, state);
   }

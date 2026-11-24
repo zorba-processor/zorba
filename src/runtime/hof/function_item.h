@@ -309,6 +309,9 @@ public:
   
   bool isCoercion() const { return theFunctionItemInfo->theIsCoercion; }
 
+  // The function item a coercion wraps; NULL if this is not a coercion.
+  const FunctionItem* getCoercedFunction() const;
+
   const store::Item_t getFunctionName() const;
 
   csize getArity() const { return theArity; }
