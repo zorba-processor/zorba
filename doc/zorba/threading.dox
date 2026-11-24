@@ -40,6 +40,11 @@ Configuring with -DZORBA_FOR_ONE_THREAD_ONLY=OFF compiles the engine locks
 in. That build is <b>unsupported</b>: it is not ThreadSanitizer-clean, and the
 rule above still applies.
 
+In that build, a function item created by a query that declares or assigns
+variables (scripting) can only be called on the thread that created it: its
+calls write variables that calls on other threads would share. A call on
+another thread raises zerr:ZXQD0007.
+
 \section threading_other Anything else
 
 Treat any use beyond the rule above as undefined behavior.

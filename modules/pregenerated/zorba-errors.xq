@@ -319,6 +319,15 @@ declare variable $zerr:ZXQD0005 as xs:QName := fn:QName($zerr:NS, "zerr:ZXQD0005
 declare variable $zerr:ZXQD0006 as xs:QName := fn:QName($zerr:NS, "zerr:ZXQD0006");
 
 (:~
+ :
+ : A function item created by a query that declares or assigns variables
+ : is called on a thread other than the one that created it (builds for
+ : several threads only).
+ : 
+:)
+declare variable $zerr:ZXQD0007 as xs:QName := fn:QName($zerr:NS, "zerr:ZXQD0007");
+
+(:~
 :)
 declare variable $zerr:ZAPI0002 as xs:QName := fn:QName($zerr:NS, "zerr:ZAPI0002");
 

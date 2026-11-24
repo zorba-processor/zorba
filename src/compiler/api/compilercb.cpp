@@ -123,6 +123,7 @@ CompilerCB::CompilerCB(XQueryDiagnostics* errmgr, long timeout)
   theIsLoadProlog(false),
   theIsUpdating(false),
   theIsSequential(false),
+  theWritesVariables(false),
   theOuterMayRunSideEffects(false),
   theMayRunSideEffects(true),
   theMayRunSideEffectsOrUpdates(true),
@@ -158,6 +159,7 @@ CompilerCB::CompilerCB(const CompilerCB& cb)
   theIsLoadProlog(false),
   theIsUpdating(false),
   theIsSequential(false),
+  theWritesVariables(cb.theWritesVariables),
   theOuterMayRunSideEffects(cb.theMayRunSideEffects),
   theMayRunSideEffects(true),
   theMayRunSideEffectsOrUpdates(true),
@@ -189,6 +191,7 @@ CompilerCB::CompilerCB(::zorba::serialization::Archiver& ar)
   thePhase(RUNTIME),
   theHasEval(false),
   theIsEval(false),
+  theWritesVariables(false),
   theOuterMayRunSideEffects(true),
   theMayRunSideEffects(true),
   theMayRunSideEffectsOrUpdates(true),
@@ -408,6 +411,7 @@ void CompilerCB::serialize(::zorba::serialization::Archiver& ar)
   ar & theIsLoadProlog;
   ar & theIsUpdating;
   ar & theIsSequential;
+  ar & theWritesVariables;
   ar & theSctxMap;
   ar & theRootSctx;
 #ifdef ZORBA_WITH_DEBUGGER

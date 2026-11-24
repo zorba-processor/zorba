@@ -25,6 +25,10 @@
 #include "context/dynamic_context.h"
 #include <zorba/internal/unique_ptr.h>
 
+#ifndef ZORBA_FOR_ONE_THREAD_ONLY
+#include <thread>
+#endif
+
 namespace zorba
 {
 
@@ -236,6 +240,20 @@ public:
   collection. Otherwise (stale generation) any dropped reference does, if the
   item refers to a detached QueryResources.
 
+  theCreatorThread:
+  -----------------
+  Unless ZORBA_FOR_ONE_THREAD_ONLY is set: if the query that created this item
+  (or the one that owns its function) declares or assigns variables
+  (CompilerCB::theWritesVariables), the thread that created it; a
+  default-constructed id otherwise. The calls of such an item write variables
+  that calls on several threads would share: its closure dctx (the local
+  variables of its body, the captured variables it assigns) and the prolog
+  variables of its query, which the other function items of that query read.
+  So it can only be called on that thread (checkCallThread() raises ZXQD0007
+  elsewhere), and the writes to those dctxs take the collector lock (see
+  dynamic_context::lock_writes()), so that no collection on another thread
+  walks them meanwhile.
+
 ********************************************************************************/
 class FunctionItem : public store::Item, public zorba::serialization::SerializeBaseClass
 {
@@ -264,6 +282,10 @@ protected:
 
   unsigned long                   theInternalRefsGeneration;
 
+#ifndef ZORBA_FOR_ONE_THREAD_ONLY
+  std::thread::id                 theCreatorThread;
+#endif
+
 
 public:
   SERIALIZABLE_CLASS(FunctionItem)
@@ -289,6 +311,13 @@ public:
   void referenceDropped(long remaining);
 
   bool refersToDetached() const;
+
+  // See theCreatorThread.
+#ifndef ZORBA_FOR_ONE_THREAD_ONLY
+  void checkCallThread(const QueryLoc& loc) const;
+#else
+  void checkCallThread(const QueryLoc&) const { }
+#endif
 
 #ifndef ZORBA_FOR_ONE_THREAD_ONLY
   // Called by store::Item::removeReference() instead, if refersToDetached().
