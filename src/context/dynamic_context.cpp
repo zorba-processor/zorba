@@ -17,6 +17,7 @@
 #include <assert.h>
 #include <atomic>
 #include <memory>
+#include <optional>
 
 #include "common/common.h"
 #include "store/api/iterator.h"
@@ -135,6 +136,7 @@ dynamic_context::dynamic_context(dynamic_context* parent)
   theEnvironmentVariables(NULL),
   theSnapshotID(0),
   theTracksWrites(false),
+  theLocksWrites(false),
   theDocLoadingUserTime(0.0),
   theDocLoadingTime(0)
 {
@@ -200,6 +202,31 @@ void dynamic_context::destroy_keymap()
 }
 
 
+namespace
+{
+/*******************************************************************************
+  See dynamic_context::lock_writes().
+********************************************************************************/
+class WriteLock
+{
+#ifndef ZORBA_FOR_ONE_THREAD_ONLY
+  std::optional<QueryResources::CollectorLock> theLock;
+#endif
+
+public:
+  explicit WriteLock(bool locks)
+  {
+#ifndef ZORBA_FOR_ONE_THREAD_ONLY
+    if (locks)
+      theLock.emplace();
+#else
+    (void)locks;
+#endif
+  }
+};
+}
+
+
 /*******************************************************************************
   See QueryResources. The values are released after they have been detached
   from "this", so a value whose release reaches back into this dctx does not
@@ -207,6 +234,8 @@ void dynamic_context::destroy_keymap()
 ********************************************************************************/
 void dynamic_context::release_variables()
 {
+  WriteLock lock(theLocksWrites);
+
   std::vector<VarValue> values;
   values.swap(theVarValues);
 }
@@ -214,6 +243,8 @@ void dynamic_context::release_variables()
 
 void dynamic_context::release_variables_from(ulong aFirstVarId)
 {
+  WriteLock lock(theLocksWrites);
+
   if (aFirstVarId >= theVarValues.size())
     return;
 
@@ -435,6 +466,8 @@ void dynamic_context::declare_variable(ulong varid, bool external)
 {
   assert(varid > 0);
 
+  WriteLock lock(theLocksWrites);
+
   if (varid >= theVarValues.size())
     theVarValues.resize(varid+1);
 
@@ -471,6 +504,8 @@ void dynamic_context::set_variable(
 
   valueIter->close();
 
+  WriteLock lock(theLocksWrites);
+
   VarValue& var = theVarValues[varid];
 
   // variables can be set multiple times, so we need to make sure to remove
@@ -503,6 +538,8 @@ void dynamic_context::set_variable(
     ERROR_PARAMS(ZED(XPDY0002_VariableUndeclared_2), varname->getStringValue()));
   }
 
+  WriteLock lock(theLocksWrites);
+
   VarValue& var = theVarValues[varid];
 
   // variables can be set multiple times, so we need to make sure to remove
@@ -533,6 +570,8 @@ void dynamic_context::unset_variable(
     RAISE_ERROR(err::XPDY0002, loc,
     ERROR_PARAMS(ZED(XPDY0002_VariableUndeclared_2), varname->getStringValue()));
   }
+
+  WriteLock lock(theLocksWrites);
 
   VarValue& var = theVarValues[varid];
 

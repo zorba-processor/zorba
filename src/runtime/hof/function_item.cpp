@@ -39,6 +39,8 @@
 #include "zorbatypes/integer.h"
 
 #include "diagnostics/assert.h"
+#include "diagnostics/util_macros.h"
+#include "diagnostics/xquery_diagnostics.h"
 
 #include <exception>
 #include <map>
@@ -198,6 +200,9 @@ FunctionItem::FunctionItem(const FunctionItem& aFunctionItem)
   theClosureDctxOwned(false),
   theInternalRefs(0),
   theInternalRefsGeneration(0)
+#ifndef ZORBA_FOR_ONE_THREAD_ONLY
+  , theCreatorThread(aFunctionItem.theCreatorThread)
+#endif
 {
   theArgValues.insert(theArgValues.begin(), aFunctionItem.theArgValues.begin(), aFunctionItem.theArgValues.end());
 
@@ -255,6 +260,20 @@ FunctionItem::FunctionItem(
 
   if (theGlobalResources != NULL && !planState.theGlobalDynCtxIsTemporary)
     theGlobalDctx = planState.theGlobalDynCtx;
+
+#ifndef ZORBA_FOR_ONE_THREAD_ONLY
+  if ((ccb != NULL && ccb->theWritesVariables) ||
+      (udfCCB != NULL && udfCCB->theWritesVariables))
+  {
+    theCreatorThread = std::this_thread::get_id();
+
+    if (theClosureDctx != NULL)
+      theClosureDctx->lock_writes();
+
+    if (theGlobalDctx != NULL)
+      theGlobalDctx->lock_writes();
+  }
+#endif
 
 #if 0
   if (theFunctionItemInfo->theFunction->getName() != NULL)
@@ -342,6 +361,21 @@ bool FunctionItem::refersToDetached() const
     (theFunctionResources != NULL && theFunctionResources->isDetached()) ||
     (theGlobalResources != NULL && theGlobalResources->isDetached());
 }
+
+
+#ifndef ZORBA_FOR_ONE_THREAD_ONLY
+/*******************************************************************************
+
+********************************************************************************/
+void FunctionItem::checkCallThread(const QueryLoc& loc) const
+{
+  if (theCreatorThread != std::thread::id() &&
+      theCreatorThread != std::this_thread::get_id())
+  {
+    RAISE_ERROR_NO_PARAMS(zerr::ZXQD0007_FUNCTION_ITEM_OTHER_THREAD, loc);
+  }
+}
+#endif
 
 
 /*******************************************************************************

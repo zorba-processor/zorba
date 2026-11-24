@@ -155,6 +155,9 @@ protected:
   // See track_writes().
   bool                         theTracksWrites;
 
+  // See lock_writes().
+  bool                         theLocksWrites;
+
 public:
   double                       theDocLoadingUserTime;
   double                       theDocLoadingTime;
@@ -233,6 +236,14 @@ public:
   // QueryResources): the variables of this dctx are edges of the graph that
   // QueryResources::collectCycles() examines.
   void track_writes() { theTracksWrites = true; }
+
+  // From now on, the variables of this dctx are set, declared and released
+  // under the collector lock of QueryResources (nothing in builds for one
+  // thread): a function item of a query that writes variables refers to it,
+  // and the collections on other threads walk its variables (see
+  // FunctionItem::theCreatorThread). Called by the thread that writes them,
+  // before the item is passed to another thread.
+  void lock_writes() { theLocksWrites = true; }
 
   void add_variable(ulong varid, store::Item_t& value);
 

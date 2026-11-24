@@ -691,6 +691,10 @@ bool UDFunctionCallIterator::nextImplCache(store::Item_t& aResult, PlanState& aP
   // does little per call would never reach the check in consumeNext.
   aPlanState.checkDeadlineNow(loc);
 
+  // See FunctionItem::theCreatorThread.
+  if (theIsDynamic)
+    theFunctionItem->checkCallThread(loc);
+
   lState->callStarting(aPlanState);
 
   // Open the plan, if not done already. This cannot be done in the openImpl
@@ -849,6 +853,10 @@ bool UDFunctionCallIterator::nextImplNoCache(store::Item_t& aResult, PlanState& 
   // Each call: the body runs with its own plan state, so a recursion that
   // does little per call would never reach the check in consumeNext.
   aPlanState.checkDeadlineNow(loc);
+
+  // See FunctionItem::theCreatorThread.
+  if (theIsDynamic)
+    theFunctionItem->checkCallThread(loc);
 
   lState->callStarting(aPlanState);
 

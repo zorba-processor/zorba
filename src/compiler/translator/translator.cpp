@@ -6853,6 +6853,8 @@ void end_visit(const LocalVarDecl& v, void* /*visit_state*/)
   // Raise error if var name exists already in local sctx obj.
   bind_var(ve, theSctx);
 
+  theCCB->theWritesVariables = true;
+
   // The ve and its associated intExpr will be put into var_decl_expr that
   // will be created by the translation of the parent block expr, immediately
   // after returning from this method.
@@ -6920,6 +6922,8 @@ void end_visit(const AssignExpr& v, void* visit_state)
   push_nodestack(CREATE(var_set)(theRootSctx, theUDF, loc, ve, valueExpr));
 
   theAssignedVars.back().push_back(ve);
+
+  theCCB->theWritesVariables = true;
 }
 
 

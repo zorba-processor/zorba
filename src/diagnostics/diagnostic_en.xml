@@ -2682,6 +2682,15 @@
       <value>"$1": invalid UTF-8 byte sequence</value>
     </diagnostic>
 
+    <diagnostic code="ZXQD0007" name="FUNCTION_ITEM_OTHER_THREAD">
+      <comment>
+        A function item created by a query that declares or assigns variables
+        is called on a thread other than the one that created it (builds for
+        several threads only).
+      </comment>
+      <value>function item of a query that declares or assigns variables called on a thread other than the one that created it</value>
+    </diagnostic>
+
     <!--////////// Zorba API Errors ////////////////////////////////////////-->
 
     <diagnostic code="ZAPI0002" name="XQUERY_COMPILATION_FAILED">

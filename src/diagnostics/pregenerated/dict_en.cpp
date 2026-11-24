@@ -486,6 +486,7 @@ extern entry const dict_en[] = {
   { "zerr:ZXQD0004", "invalid parameter: $1" },
   { "zerr:ZXQD0005", "key with type $1 not subtype or castable to target type $2 of map ($3)" },
   { "zerr:ZXQD0006", "\"$1\": invalid UTF-8 byte sequence" },
+  { "zerr:ZXQD0007", "function item of a query that declares or assigns variables called on a thread other than the one that created it" },
   { "zerr:ZXQP0000", "no error" },
   { "zerr:ZXQP0001", "dynamic runtime error${: 1}" },
   { "zerr:ZXQP0002", "\"$1\": assertion failed${ with the message: 2}" },

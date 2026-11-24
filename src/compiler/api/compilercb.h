@@ -434,6 +434,13 @@ ZORBA_DLL_PUBLIC void query_resources_fail_walk(unsigned long edge);
   ---------------
   Set to true if the root expr of the query or eval expr is an updating expr.
 
+  theWritesVariables :
+  --------------------
+  Set to true if the query declares a block variable or assigns a variable
+  anywhere (scripting): its function items then write variables that calls
+  on several threads would share (see FunctionItem::theCreatorThread). An
+  eval query starts with the value of the outer query.
+
   theHaveTimeout, theTimeout :
   ----------------------------
   Set by XQuery::setTimeout(): if theHaveTimeout, theTimeout (seconds, 0 = none)
@@ -578,6 +585,8 @@ public:
   bool                      theIsUpdating;
 
   bool                      theIsSequential;
+
+  bool                      theWritesVariables;
 
   bool                      theOuterMayRunSideEffects;
 
