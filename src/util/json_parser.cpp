@@ -26,6 +26,8 @@
 # include "indent.h"
 #endif /* DEBUG_JSON_PARSER */
 
+#include <utility>
+
 #include "json_parser.h"
 
 using namespace std;
@@ -276,6 +278,17 @@ bool lexer::fill( bool bump ) {
   if ( capture_ )
     capture_ = buf_;
 
+  if ( buffer_error_ ) {
+    try {
+      std::rethrow_exception( std::exchange( buffer_error_, nullptr ) );
+    }
+    catch ( ... ) {
+      set_badbit_and_rethrow_if_masked();
+    }
+    if ( bump )
+      in_->setstate( ios::failbit );
+    return false;
+  }
   if ( !in_->good() ) {
     in_->setstate( ios::failbit );
     return false;
@@ -310,18 +323,33 @@ bool lexer::fill( bool bump ) {
       capture_ = buf_;
   }
 
-  streamsize got;
+  // One character at a time, not sgetn(): a buffer without a get area that
+  // throws mid-copy would lose the characters already copied.
+  char *const buf = buf_;
+  size_t got = 0;
   try {
-    got = sb->sgetn( buf_, static_cast<streamsize>( want ) );
+    while ( got < want ) {
+      traits::int_type const c = sb->sgetc();
+      if ( traits::eq_int_type( c, traits::eof() ) )
+        break;
+      buf[ got++ ] = traits::to_char_type( c );
+      sb->sbumpc();
+    }
   }
   catch ( ... ) {
+    if ( got > 0 ) {
+      // lex what was read first; the next fill() reports the failure
+      buffer_error_ = std::current_exception();
+      end_ = buf_ + got;
+      return true;
+    }
     set_badbit_and_rethrow_if_masked();
     if ( bump )
       in_->setstate( ios::failbit );
     return false;
   }
   if ( got < 1 ) {
-    // sgetc() saw a character that sgetn() does not give: the end after all
+    // sgetc() saw a character that the loop does not give: the end after all
     in_->setstate( bump ? ios::eofbit | ios::failbit : ios::eofbit );
     return false;
   }

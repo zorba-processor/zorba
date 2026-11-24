@@ -611,6 +611,7 @@ private:
   size_t buf_size_;
   char const *cur_, *end_;
   offset_type buf_offset_;              // of buf_[0] in what was lexed
+  std::exception_ptr buffer_error_;     // thrown by the stream's buffer after the characters in buf_
 
   // Columns are offsets from the start of the line, so that they are known
   // without counting each character.

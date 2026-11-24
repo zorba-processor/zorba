@@ -767,6 +767,60 @@ private:
   std::string s_;
 };
 
+// Has no get area and reports how many characters it holds, so that the lexer
+// reads several in one go; throws after giving `given` of them.
+class failing_after_streambuf : public std::streambuf {
+public:
+  failing_after_streambuf( char const *s, size_t given ) :
+    s_( s ), given_( given ) {}
+protected:
+  std::streamsize showmanyc() override {
+    return static_cast<std::streamsize>( s_.size() - pos_ );
+  }
+  int_type underflow() override {
+    if ( pos_ == given_ )
+      throw std::runtime_error( "buffer failure" );
+    return traits_type::to_int_type( s_[ pos_ ] );
+  }
+  int_type uflow() override {
+    int_type const c = underflow();
+    ++pos_;
+    return c;
+  }
+private:
+  std::string s_;
+  size_t given_;
+  size_t pos_ = 0;
+};
+
+static void test_throwing_streambuf_mid_read() {
+  {
+    // the characters given before the failure are lexed, then badbit is set
+    failing_after_streambuf buf( "[1,2]", 3 );
+    istream is( &buf );
+    parser p( is );
+    token t;
+    ASSERT_TRUE_AND_NO_EXCEPTION( p.next( &t ) && t == token::begin_array );
+    ASSERT_TRUE_AND_NO_EXCEPTION( p.next( &t ) && t == token::number );
+    ASSERT_TRUE_AND_NO_EXCEPTION( p.next( &t ) && t == token::value_separator );
+    ASSERT_EXCEPTION( p.next( &t ), unexpected_token );
+    ASSERT_TRUE( is.bad() );
+  }
+  {
+    // with badbit in the exception mask, the exception propagates after them
+    failing_after_streambuf buf( "[1,2]", 3 );
+    istream is( &buf );
+    is.exceptions( ios::badbit );
+    parser p( is );
+    token t;
+    ASSERT_TRUE_AND_NO_EXCEPTION( p.next( &t ) && t == token::begin_array );
+    ASSERT_TRUE_AND_NO_EXCEPTION( p.next( &t ) && t == token::number );
+    ASSERT_TRUE_AND_NO_EXCEPTION( p.next( &t ) && t == token::value_separator );
+    ASSERT_EXCEPTION( p.next( &t ), std::runtime_error );
+    ASSERT_TRUE( is.bad() );
+  }
+}
+
 static void test_throwing_streambuf() {
   {
     // as istream::get() does: the exception sets badbit and reads as the end
@@ -922,6 +976,7 @@ int test_json_parser( int, char*[] ) {
   test_json_org_example();
   test_error_locations();
   test_throwing_streambuf();
+  test_throwing_streambuf_mid_read();
   test_stream_state_at_end();
   test_buffer_boundaries();
   test_token_copy_holds_value();
