@@ -16,7 +16,10 @@ Print timing information. In case of multiple queries the timing information is 
 Write the result to the given file.
 
 --serialization-parameter, -z
-Set serialization parameter in the form of a parameter=value pair (see http://www.w3.org/TR/xslt-xquery-serialization/#serparam, e.g.: -z method=xhtml -z doctype-system=DTD/xhtml1-strict.dtd -z indent=yes).
+Set serialization parameter in the form of a parameter=value pair (see http://www.w3.org/TR/xslt-xquery-serialization/#serparam, e.g.: -z method=xhtml -z doctype-system=DTD/xhtml1-strict.dtd -z indent=yes). A parameter given here overrides the same parameter declared in the query prolog (declare option output:...); --indent, --serialize-html and --serialize-text override the parameters given here. JSON Lines (one JSON item per line, each line ending with a newline): -z method=json -z item-separator=<newline> --trailing-nl, where <newline> is a newline character, written $'\n' in bash and zsh; each item stays on one line unless indentation is on (--indent or indent=yes). An empty result prints only the trailing newline. For example:
+<pre>
+zorba -j -q '({ "a" : 1 }, { "a" : 2 })' -z method=json -z item-separator=$'\n' --trailing-nl
+</pre>
 
 --serialize-html
 Serialize the result as HTML.

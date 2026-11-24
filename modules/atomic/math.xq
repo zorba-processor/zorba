@@ -1080,16 +1080,23 @@ declare function math:mode( $numbers as double* ) as double
 
 (:~
  : Returns the k-th percentile of values in a sequence.<p/>
- : If k is not a multiple of 1/(n - 1), 
- :   PERCENTILE interpolates to determine the value at the k-th percentile.  
- : The function is computed by (max-min)*k + min<p/>
+ : The numbers are sorted ascending and the percentile is read at the
+ : 0-based rank h = (n - 1) * k, where n is the count of numbers: when h is
+ : not an integer, the result interpolates linearly between the numbers at
+ : ranks floor(h) and floor(h) + 1. This is Excel's PERCENTILE (PERCENTILE.INC)
+ : and the method numpy and most SQL engines call "linear"
+ : (PERCENTILE_CONT in SQL); the p-th percentile, with p between 0 and 100,
+ : is math:percentile($numbers, $p div 100).<p/>
+ : If any number is NaN, the result is NaN.<p/>
  : Borrowed from excel module.
  : 
  : @see http://office.microsoft.com/en-us/excel/HP052092111033.aspx
- : @param $numbers the sequence of numbers, of any length
+ : @param $numbers the sequence of numbers, of any length from 1 up
  : @param $k_at the percentile, with value between 0 .. 1 inclusive
  : @return The computed percentile
  : @error math:INVALID_ARGUMENT if percentile is not between 0 .. 1
+ : @error math:INVALID_ARGUMENT if the sequence is empty
+ : @error err:XPTY0004 if an item of the sequence is not a number
  : @example test/rbkt/Queries/zorba/math/from_excel/excel_percentile1.xq
  : @example test/rbkt/Queries/zorba/math/from_excel/excel_percentile2.xq
  : @example test/rbkt/Queries/zorba/math/from_excel/excel_percentile3.xq
@@ -1097,12 +1104,22 @@ declare function math:mode( $numbers as double* ) as double
 declare function math:percentile( $numbers as double*, $k_at as double) as double
 {
   let $k := $k_at return
-  if ($k lt 0 or $k gt 1) then
+  if (fn:not($k ge 0 and $k le 1)) then
     fn:error($math:INVALID_ARGUMENT, "Percentile function: k must be a value between 0 and 1 inclusive")
+  else if (fn:empty($numbers)) then
+    fn:error($math:INVALID_ARGUMENT, "Percentile function: value list must not be empty")
+  else if (some $number in $numbers satisfies $number ne $number) then
+    double("NaN")
   else
-    let $max := fn:max($numbers)
-    let $min := fn:min($numbers) return
-    ($max - $min) * $k + $min
+    let $sorted_numbers := math:sort-numbers( $numbers )
+    let $rank := (fn:count($sorted_numbers) - 1) * $k
+    let $lower_rank := fn:floor($rank)
+    let $lower := $sorted_numbers[$lower_rank + 1]
+    return
+      if ($rank eq $lower_rank) then
+        $lower
+      else
+        $lower + ($rank - $lower_rank) * ($sorted_numbers[$lower_rank + 2] - $lower)
 };
 
 
