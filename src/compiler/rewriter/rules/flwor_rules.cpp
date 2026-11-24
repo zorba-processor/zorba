@@ -82,72 +82,6 @@ static void fix_if_annotations(if_expr* ifExpr)
 
 
 /******************************************************************************
-  True for an expression whose evaluation cannot raise an error: a constant, a
-  function item whose captured values cannot raise (they are computed when it is
-  created), a sequence of such expressions, or a reference to a variable whose
-  value is already computed. A let or argument variable may be evaluated lazily, when it
-  is referenced, so a reference to it can raise the error of its binding.
-*******************************************************************************/
-static bool cannot_raise_error(const expr* e)
-{
-  switch (e->get_expr_kind())
-  {
-  case const_expr_kind:
-    return true;
-
-  case function_item_expr_kind:
-  {
-    const std::vector<expr*>& values =
-    static_cast<const function_item_expr*>(e)->get_in_scope_var_values();
-
-    for (csize i = 0; i < values.size(); ++i)
-    {
-      if (values[i] != NULL && !cannot_raise_error(values[i]))
-        return false;
-    }
-
-    return true;
-  }
-
-  case wrapper_expr_kind:
-    return cannot_raise_error(static_cast<const wrapper_expr*>(e)->get_input());
-
-  case var_expr_kind:
-  {
-    const var_expr* ve = static_cast<const var_expr*>(e);
-    var_expr::var_kind k = ve->get_kind();
-
-    // A prolog variable without an initializer (an external variable without a
-    // default, or the context item) raises XPDY0002 when referenced unbound.
-    return (k == var_expr::for_var ||
-            k == var_expr::pos_var ||
-            k == var_expr::count_var ||
-            (k == var_expr::prolog_var && ve->has_initializer()));
-  }
-
-  case fo_expr_kind:
-  {
-    const fo_expr* fo = static_cast<const fo_expr*>(e);
-
-    if (fo->get_func()->getKind() != FunctionConsts::OP_CONCATENATE_N)
-      return false;
-
-    for (csize i = 0; i < fo->num_args(); ++i)
-    {
-      if (!cannot_raise_error(fo->get_arg(i)))
-        return false;
-    }
-
-    return true;
-  }
-
-  default:
-    return false;
-  }
-}
-
-
-/******************************************************************************
   True if the clauses in [first, last) are for, let or where clauses whose
   expressions cannot raise an error.
 *******************************************************************************/
@@ -166,7 +100,7 @@ static bool clauses_cannot_raise_error(const flwor_expr* flwor, csize first, csi
     else
       return false;
 
-    if (!cannot_raise_error(e))
+    if (!expr_tools::cannot_raise_error(e))
       return false;
   }
 
@@ -689,7 +623,7 @@ RULE_REWRITE_PRE(EliminateUnusedLetVars)
         // Without tuples the clauses after this one and the return clause are not
         // evaluated at any level; this domain, and without allowing empty the
         // clauses before it, are evaluated at O0 and may raise an error.
-        if (!cannot_raise_error(domExpr) ||
+        if (!expr_tools::cannot_raise_error(domExpr) ||
             (!outerFor && !clauses_cannot_raise_error(theFlwor, 0, i)))
           continue;
 
@@ -736,9 +670,9 @@ RULE_REWRITE_PRE(EliminateUnusedLetVars)
             safe_to_fold_var(i, numRefs) &&
             (outerFor || domQuant == SequenceType::QUANT_ONE ||
              (clauses_cannot_raise_error(theFlwor, i + 1, theFlwor->num_clauses()) &&
-              (cannot_raise_error(theFlwor->get_return_expr()) ||
+              (expr_tools::cannot_raise_error(theFlwor->get_return_expr()) ||
                stops_at_empty_var(theFlwor->get_return_expr(), var)))) &&
-            (cannot_raise_error(domExpr) ||
+            (expr_tools::cannot_raise_error(domExpr) ||
              flwor_evaluates_var(theFlwor, i + 1, var)))
         {
           if (numRefs != 0)
@@ -1544,7 +1478,7 @@ RULE_REWRITE_PRE(RefactorPredFLWOR)
         (elseExpr->is_simple() || elseExpr->is_vacuous()) &&
         !elseExpr->isNonDiscardable() &&
         elseExpr->get_return_type()->is_empty() &&
-        cannot_raise_error(elseExpr))
+        expr_tools::cannot_raise_error(elseExpr))
     {
       flwor_clause* lastClause = flwor->get_clause(flwor->num_clauses() - 1);
 
@@ -1718,7 +1652,7 @@ RULE_REWRITE_PRE(RefactorPredFLWOR)
         // O0 evaluates E only for the tuples that reach the where clause, and
         // evaluates the clauses before it even when E is false.
         if (k == whereVars.size() &&
-            (cannot_raise_error(whereExpr) || clauses_keep_every_tuple(flwor, 0, i)) &&
+            (expr_tools::cannot_raise_error(whereExpr) || clauses_keep_every_tuple(flwor, 0, i)) &&
             clauses_cannot_raise_error(flwor, 0, i))
         {
           flwor->remove_clause(i);
