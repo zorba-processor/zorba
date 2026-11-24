@@ -1095,7 +1095,7 @@ uint64_t dynamic_context::getSnapshotID() const
   if (theParent)
     return theParent->getSnapshotID();
   else
-    return theSnapshotID;
+    return theSnapshotID.load(std::memory_order_relaxed);
 }
 
 void dynamic_context::changeSnapshot()
@@ -1103,8 +1103,7 @@ void dynamic_context::changeSnapshot()
   if (theParent)
     theParent->changeSnapshot();
   else
-    ++theSnapshotID;
-
+    theSnapshotID.fetch_add(1, std::memory_order_relaxed);
 }
 
 } // namespace zorba

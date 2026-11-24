@@ -17,6 +17,8 @@
 #ifndef ZORBA_DYNAMIC_CONTEXT_H
 #define ZORBA_DYNAMIC_CONTEXT_H
 
+#include <atomic>
+
 #include <zorba/external_function_parameter.h>
 #include <zorba/util/calendar.h>
 
@@ -150,7 +152,9 @@ protected:
   locale::iso3166_1::type      theCountry;
   time::calendar::type         theCalendar;
 
-  uint64_t                     theSnapshotID;
+  // Atomic: the calls of a function item on several threads can change the
+  // snapshot of the query that created it (see changeSnapshot()).
+  std::atomic<uint64_t>        theSnapshotID;
 
   // See track_writes().
   bool                         theTracksWrites;
