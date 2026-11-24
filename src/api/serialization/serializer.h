@@ -450,7 +450,7 @@ protected:
       JESTATE_XDM
     }                         theEmitterState;
 
-    serializer::xml_emitter * theXMLEmitter;
+    std::unique_ptr<serializer::xml_emitter> theXMLEmitter;
 
     // Declared first: the emitter writes to the stream until it is destroyed.
     std::unique_ptr<std::stringstream> theNestedXMLStringStream;

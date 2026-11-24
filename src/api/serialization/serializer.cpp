@@ -1198,13 +1198,13 @@ serializer::hybrid_emitter::hybrid_emitter(
   bool aEmitAttributes)
   : json_emitter(the_serializer, the_stream),
     theEmitterState(JESTATE_UNDETERMINED),
-    theXMLEmitter(new xml_emitter(the_serializer, the_stream, aEmitAttributes))
+    theXMLEmitter(std::make_unique<xml_emitter>(the_serializer, the_stream,
+                                                aEmitAttributes))
 {
 }
 
 serializer::hybrid_emitter::~hybrid_emitter()
 {
-  delete theXMLEmitter;
 }
 
 void serializer::hybrid_emitter::emit_declaration()
