@@ -27,9 +27,68 @@
 
 #include "atomic_items.h"
 
+#ifndef ZORBA_FOR_ONE_THREAD_ONLY
+#include <atomic>
+#include <mutex>
+#endif
+
 namespace zorba { namespace simplestore {
 
 class StringPool;
+
+#ifndef ZORBA_FOR_ONE_THREAD_ONLY
+/*******************************************************************************
+  A reader/writer lock whose readers count in one of several cache lines,
+  chosen by thread, so that readers on different threads mostly write to
+  different lines. Not recursive. A reader that finds a writer waits until it
+  is done; a writer waits for the readers that came before it.
+********************************************************************************/
+class ShardedSharedLock
+{
+  static constexpr unsigned SLOT_BITS = 4;
+  static constexpr unsigned NUM_SLOTS = 1u << SLOT_BITS;
+
+  struct alignas(64) Slot
+  {
+    std::atomic<unsigned long> theReaders{0};
+  };
+
+  Slot               theSlots[NUM_SLOTS];
+  std::atomic<bool>  theWriter{false};
+  std::mutex         theWriterMutex;
+
+  static unsigned threadSlot();
+
+  void waitForWriter() const;
+
+public:
+  unsigned lockShared()
+  {
+    unsigned const slot = threadSlot();
+    for (;;)
+    {
+      theSlots[slot].theReaders.fetch_add(1, std::memory_order_seq_cst);
+      if (!theWriter.load(std::memory_order_seq_cst))
+        return slot;
+      theSlots[slot].theReaders.fetch_sub(1, std::memory_order_release);
+      waitForWriter();
+    }
+  }
+
+  void unlockShared(unsigned slot)
+  {
+    theSlots[slot].theReaders.fetch_sub(1, std::memory_order_release);
+  }
+
+  void lock();
+
+  void unlock()
+  {
+    theWriter.store(false, std::memory_order_release);
+    theWriterMutex.unlock();
+  }
+};
+#endif
 
 /*******************************************************************************
 
@@ -58,6 +117,14 @@ class StringPool;
   theHashSet :
   ------------
   A hash set mapping qnames (i.e. triplets of strings) to QName slots.
+
+  theLock :
+  ---------
+  Guards the hash set and the cache. In the multithreaded build a lookup takes
+  it shared, and adds the reference to the name it finds even if the name had
+  none: such a name stays in the free list, and popFreeList() skips it while it
+  has references. Everything else takes it exclusive, including remove(), where
+  a count goes from 1 to 0.
 
 ********************************************************************************/
 class QNamePool
@@ -90,7 +157,7 @@ protected:
   public:
     QNamePoolHashSet(ulong size) 
       :
-      HashSet<QNameItem*, CompareFunction>(size, true)
+      HashSet<QNameItem*, CompareFunction>(size, false)
     {
     }
   };
@@ -110,6 +177,8 @@ protected:
   QNamePoolHashSet    theHashSet;
 
   StringPool        * theNamespacePool;
+
+  SYNC_CODE(ShardedSharedLock theLock;)
 
 public:
   QNamePool(ulong size, StringPool* nspool);
@@ -146,6 +215,18 @@ protected:
   void undoCacheInsert(QNameItem* qn, QNameItem** normVictim);
 
   void cachePin(QNameItem* qn);
+
+#ifndef ZORBA_FOR_ONE_THREAD_ONLY
+  bool findShared(
+      store::Item_t& res,
+      const char* ns,
+      const char* pre,
+      const char* ln,
+      csize       nslen,
+      csize       prelen,
+      csize       lnlen,
+      csize       hval);
+#endif
 
   QNHashEntry* hashFind(
       const char* ns,
