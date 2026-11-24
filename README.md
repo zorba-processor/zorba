@@ -64,6 +64,24 @@ are not trusted. To report a security problem, see [SECURITY.md](SECURITY.md).
 See [Querying a folder from an AI agent (MCP)](https://zorba-processor.github.io/zorba/mcp.html)
 for registering it with Claude Code or another MCP client.
 
+## Binaries
+
+Each release on the [Releases page](https://github.com/zorba-processor/zorba/releases)
+has a tarball for Linux x86_64 and arm64 (glibc 2.39 and the libstdc++ of
+GCC 13 or later, as in Ubuntu 24.04) and for macOS arm64 (macOS 15 or later):
+`bin/zorba`, `bin/zorba-mcp`, the headers in `include/`, and the Zorba library
+with the libraries it needs in `lib/`. It runs from wherever it is unpacked
+(replace VERSION with the release, for example `5.0.0-alpha.2`):
+
+```bash
+tar -xJf zorba-VERSION-linux-amd64.tar.xz
+zorba-VERSION-linux-amd64/bin/zorba -r -q '1 + 1'
+```
+
+The macOS binaries are signed ad hoc, so a tarball downloaded with a browser
+needs `xattr -dr com.apple.quarantine <dir>` after unpacking. The release
+notes say how to verify a tarball.
+
 ## Building
 
 Requirements: a C++23 compiler (GCC 13+, Clang 17+ or Apple Clang 16+),

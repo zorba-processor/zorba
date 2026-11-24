@@ -1,8 +1,8 @@
 # Releasing Zorba
 
 Releases are built by `.github/workflows/release.yml` when a `v*` tag is
-pushed. The workflow tests on linux-amd64, builds the source tarball, SBOMs,
-checksums and the multi-arch image, attests them, pushes the image tags
+pushed. The workflow tests on linux-amd64, builds the source tarball, the
+binary tarballs, SBOMs, checksums and the multi-arch image, attests them, pushes the image tags
 described in `docker/README.md`, and creates a **draft** GitHub Release. Nothing
 is public on the Releases page until you publish the draft.
 
@@ -43,7 +43,7 @@ tags.
    gh workflow run release.yml -R zorba-processor/zorba --ref master -f version=X.Y.Z-pre -f dry_run=true
    ```
 
-   The dry run uploads the would-be release (tarball, SBOMs, `SHA256SUMS`,
+   The dry run uploads the would-be release (tarballs, SBOMs, `SHA256SUMS`,
    notes) as the `release-assets` artifact of the run. Pull requests that
    change `release.yml` run the same dry run automatically. A dry run
    assembles any remaining fragments in the runner only, so the notes preview
@@ -59,9 +59,45 @@ tags.
 
 6. Watch the run: `gh run list -R zorba-processor/zorba --workflow release.yml --limit 1`.
 7. Review the draft at https://github.com/zorba-processor/zorba/releases:
-   notes, assets (`zorba-X.Y.Z-pre.tar.gz`, SBOMs, `SHA256SUMS`) and the image
+   notes, assets (`zorba-X.Y.Z-pre.tar.gz`, the binary tarballs
+   `zorba-X.Y.Z-pre-{linux-amd64,linux-arm64,macos-arm64}.tar.xz`, SBOMs,
+   `SHA256SUMS`) and the image
    (`docker run --rm ghcr.io/zorba-processor/zorba:X.Y.Z-pre --version`).
 8. Publish the draft.
+
+## Binary tarballs
+
+Each binary tarball is the `cmake --install` tree of the `full-release`
+preset without the test programs and modules (unit tests, `testdriver`, the
+FOTS driver, the util-tests module): `bin/zorba`, `bin/zorba-mcp`,
+`include/`, `lib/` and `share/`. The engine is the default build
+(single-threaded, `ZORBA_FOR_ONE_THREAD_ONLY=ON`). Zorba looks for its
+modules relative to the directory of its library first, so the tree works
+wherever it is unpacked.
+`scripts/bundle-binary.sh` copies into `lib/` every shared library the tree
+loads from outside the system baseline and makes the search paths relative:
+
+- Linux (built in `docker/builder`, Ubuntu 24.04): everything except glibc,
+  libstdc++ and libgcc_s is bundled (the patched ICU, libxml2 and Xerces-C,
+  libcurl and its libraries, zlib, libuuid); every ELF file gets the RUNPATH
+  `$ORIGIN/<path to lib>`. The tarball needs glibc 2.39 and the libstdc++ of
+  GCC 13 or later.
+- macOS (`macos-15` runner, arm64): ICU, libxml2 and Xerces-C are built from
+  the patched forks by `scripts/build-macos-deps.sh` and bundled; libraries in
+  `/usr/lib` and `/System` (libcurl, zlib, libiconv) are not. Every library is
+  referenced as `@rpath/<name>`, every Mach-O file has the single LC_RPATH
+  `@loader_path/<path to lib>`, and every file is signed ad hoc
+  (`codesign -s -`): the repository has no signing identity, so a tarball
+  downloaded with a browser is quarantined until
+  `xattr -dr com.apple.quarantine <dir>` is run.
+
+`scripts/smoke-binary.sh` tests each tarball where none of the bundled
+libraries is installed (a plain `ubuntu:24.04` container; on macOS after the
+build tree and the dependencies are moved away): `zorba` runs an XQuery and a
+JSONiq query and a query importing the EXPath file module (a module file
+and a module library found relative to `lib/`), `zorba-mcp` answers
+`initialize`, and a C++ program compiled against `include/` and linked
+against `lib/` runs a query.
 
 ## If something fails
 
