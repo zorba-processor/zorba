@@ -298,22 +298,34 @@ FunctionItem::~FunctionItem()
   if (theClosureDctxOwned)
     delete theClosureDctx;
 
-  if (refersToDetached())
+  // See "Threads" in the class comment of QueryResources.
+  unsigned long const epoch = QueryResources::beginRelease();
+
+  bool const detached = refersToDetached();
+
+  // This item may have held the last reference from outside a cycle (see
+  // QueryResources::collectCycles()). Release everything else first: it may
+  // point into the state the QueryResources keep.
+  theArgValues.clear();
+  theFunctionItemInfo = NULL;
+  theClosureDctxOwner = NULL;
+
+  rchandle<QueryResources> held[3];
+  held[0].transfer(theResources);
+  held[1].transfer(theFunctionResources);
+  held[2].transfer(theGlobalResources);
+
+  if (detached)
   {
-    // This item may have held the last reference from outside a cycle (see
-    // QueryResources::collectCycles()). Release everything else first: it
-    // may point into the state the QueryResources keep.
-    theArgValues.clear();
-    theFunctionItemInfo = NULL;
-    theClosureDctxOwner = NULL;
-
-    rchandle<QueryResources> held[3];
-    held[0].transfer(theResources);
-    held[1].transfer(theFunctionResources);
-    held[2].transfer(theGlobalResources);
-
     QueryResources* heldPtrs[3] = { held[0].getp(), held[1].getp(), held[2].getp() };
     QueryResources::collectCycles(heldPtrs, 3);
+  }
+  else
+  {
+    for (csize i = 0; i < 3; ++i)
+      held[i] = NULL;
+
+    QueryResources::endRelease(epoch);
   }
 }
 
@@ -468,6 +480,9 @@ public:
 
   enum Kind { RESOURCES, ITEM, JSON, SEQ };
 
+  // The result of run().
+  enum Verdict { LIVE, GARBAGE, CHANGED };
+
 private:
   struct Node
   {
@@ -579,12 +594,15 @@ public:
   }
 
   /*
-    Returns true if root is unreachable from outside its graph, after adding
-    to garbage the QueryResources objs of the graph whose dctx variables must
-    be released. Otherwise records in root the witnesses, and in the function
-    items of the graph how many references the graph has to them.
+    Returns GARBAGE if root is unreachable from outside its graph, after
+    adding to garbage the QueryResources objs of the graph whose dctx
+    variables must be released. Returns LIVE otherwise, after recording in
+    root the witnesses, and in the function items of the graph how many
+    references the graph has to them. Returns CHANGED if the reference count
+    of a node found unreachable changed during the walk: the caller walks
+    again (see "Threads" in the class comment of QueryResources).
   */
-  bool run(QueryResources* root, std::vector<QueryResources_t>& garbage)
+  Verdict run(QueryResources* root, std::vector<QueryResources_t>& garbage)
   {
     unsigned long generation = QueryResources::graphGeneration();
 
@@ -655,20 +673,22 @@ public:
           item->theInternalRefsGeneration = generation;
         }
       }
-      return false;
+      return LIVE;
     }
 
     root->theWitnessGeneration = 0;
 
 #ifndef ZORBA_FOR_ONE_THREAD_ONLY
     // Other threads copy and release references to the nodes during the walk
-    // (see "Threads" in the class comment of QueryResources): the counts read
-    // one by one are a consistent picture only if none of them has changed.
+    // (see "Threads" in the class comment of QueryResources): the nodes found
+    // unreachable are garbage only if none of their counts has changed (an
+    // edge to or from one of them that changed changes a count too).
     for (ite = theNodes.begin(); ite != theNodes.end(); ++ite)
     {
       Node* node = ite->second;
-      if (refCount(node->theKind, node->thePtr, theHeld, theNumHeld) != node->theRefs)
-        return false;
+      if (!node->theIsLive &&
+          refCount(node->theKind, node->thePtr, theHeld, theNumHeld) != node->theRefs)
+        return CHANGED;
     }
 #endif
 
@@ -683,7 +703,7 @@ public:
           garbage.push_back(res);
       }
     }
-    return true;
+    return GARBAGE;
   }
 
 private:
@@ -974,8 +994,15 @@ void QueryResources::collectCycles(QueryResources* const* held, csize numHeld)
     std::vector<QueryResources_t> garbage;
     try
     {
-      QueryResourcesCollector collector(held, numHeld);
-      if (!collector.run(root, garbage))
+      QueryResourcesCollector::Verdict verdict;
+      do
+      {
+        QueryResourcesCollector collector(held, numHeld);
+        verdict = collector.run(root, garbage);
+      }
+      while (verdict == QueryResourcesCollector::CHANGED);
+
+      if (verdict == QueryResourcesCollector::LIVE)
         continue;
     }
     catch (const std::exception&)
