@@ -27,6 +27,8 @@
 #include "diagnostics/xquery_diagnostics.h"
 #include "functions/udf.h"
 
+#include <algorithm>
+
 #include <zorba/properties.h>
 
 #include "store/api/store.h"
@@ -234,7 +236,13 @@ namespace
 {
 // See QueryResources::CollectorLock.
 std::recursive_mutex theCollectorMutex;
+
+// The detached QueryResources objs alive, under the collector lock (see
+// "Threads" in the class comment of QueryResources).
+std::vector<QueryResources*> theDetachedObjs;
 }
+
+std::atomic<unsigned long> QueryResources::theDetachEpoch(0);
 
 QueryResources::CollectorLock::CollectorLock()
   :
@@ -282,6 +290,9 @@ QueryResources::QueryResources()
   theDebuggerCommons(NULL),
 #endif
   theIsDetached(false),
+#ifndef ZORBA_FOR_ONE_THREAD_ONLY
+  theDetachedAt(0),
+#endif
   theWitnessGeneration(0),
   theNumWitnesses(0)
 {
@@ -296,6 +307,15 @@ QueryResources::~QueryResources()
   // The parents may now be reachable only through cycles.
   release(theParent);
   release(theDctxParent);
+
+#ifndef ZORBA_FOR_ONE_THREAD_ONLY
+  if (theDetachedAt != 0)
+  {
+    CollectorLock lock;
+    theDetachedObjs.erase(
+        std::find(theDetachedObjs.begin(), theDetachedObjs.end(), this));
+  }
+#endif
 
   --theNumAlive;
 }
@@ -338,7 +358,11 @@ void QueryResources::dispose(
 
     // From here on the collections on other threads walk the state handed
     // over above.
+#ifndef ZORBA_FOR_ONE_THREAD_ONLY
+    detach();
+#else
     theIsDetached.store(true, std::memory_order_release);
+#endif
 
     // From now on the dctx variables are edges of a graph.
     if (theDctx)
@@ -365,6 +389,8 @@ void QueryResources::release(rchandle<QueryResources>& resources)
   if (resources == NULL)
     return;
 
+  unsigned long const epoch = beginRelease();
+
   if (resources->isDetached() && resources->getRefCount() > 1)
   {
     rchandle<QueryResources> hold;
@@ -375,8 +401,64 @@ void QueryResources::release(rchandle<QueryResources>& resources)
   else
   {
     resources = NULL;
+    endRelease(epoch);
   }
 }
+
+
+#ifndef ZORBA_FOR_ONE_THREAD_ONLY
+/*******************************************************************************
+  See "Threads" in the class comment. Under the lock, so that a release that
+  sees the new epoch finds this obj listed once it gets the lock.
+********************************************************************************/
+void QueryResources::detach()
+{
+  CollectorLock lock;
+
+  theIsDetached.store(true, std::memory_order_release);
+
+  // The collection that follows reads the reference counts after this.
+  theDetachedAt = theDetachEpoch.fetch_add(1, std::memory_order_seq_cst) + 1;
+  theDetachedObjs.push_back(this);
+}
+
+
+/*******************************************************************************
+  See "Threads" in the class comment: collects the cycles through the objs
+  detached after epoch. Runs in releases, so a failure (std::bad_alloc) must
+  not escape: the cycles are then kept, as when a walk fails.
+********************************************************************************/
+void QueryResources::collectDetachedSince(unsigned long epoch)
+{
+  CollectorLock lock;
+
+  std::vector<QueryResources_t> roots;
+  std::vector<QueryResources*> held;
+
+  try
+  {
+    for (QueryResources* res : theDetachedObjs)
+    {
+      // A count of 0: the obj is being destroyed and waits for the lock to
+      // leave the list.
+      if (res->theDetachedAt > epoch && res->theRefCount.incrementUnlessZero())
+      {
+        QueryResources_t root(res);
+        res->removeReference();
+        roots.push_back(root);
+        held.push_back(res);
+      }
+    }
+  }
+  catch (const std::exception&)
+  {
+    return;
+  }
+
+  if (!held.empty())
+    collectCycles(&held[0], held.size());
+}
+#endif
 
 
 void QueryResources::destroy()

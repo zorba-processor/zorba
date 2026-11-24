@@ -29,6 +29,7 @@
 #include "node_items.h"
 #include "json_items.h"
 
+#include "compiler/api/compilercb.h"
 #include "runtime/hof/function_item.h"
 
 
@@ -126,7 +127,10 @@ void Item::removeReference()
   {
 #ifndef ZORBA_FOR_ONE_THREAD_ONLY
     // Another thread may free the item as soon as the reference is dropped:
-    // whether it refers to a closed query is decided before.
+    // whether it refers to a closed query is decided before (see "Threads" in
+    // the class comment of QueryResources for a query closed meanwhile).
+    unsigned long const epoch = QueryResources::beginRelease();
+
     if (static_cast<FunctionItem*>(this)->refersToDetached())
     {
       static_cast<FunctionItem*>(this)->removeDetachedReference();
@@ -135,6 +139,8 @@ void Item::removeReference()
 
     if (theRefCount.decrement())
       free();
+    else
+      QueryResources::endRelease(epoch);
     return;
 #else
     long const remaining = theRefCount.decrementAndLoad();
