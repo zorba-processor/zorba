@@ -4292,6 +4292,17 @@ void test_json_copy_out_of_memory( Fixture const &f ) {
     "return $o.x[[2]].b[[1]] + size($o.y[[1]])",
     "3 4", "copying an array" );
 }
+// Nodes made with no parent, and their copies, which are made in a tree of
+// their own: a failure while one is made leaves the tree without a root.
+void test_parentless_nodes_out_of_memory( Fixture const &f ) {
+  sweep_next_out_of_memory( f,
+    "for $i in 1 to 2\n"
+    "let $nodes := (document { <a>{$i}</a> }, text { $i },\n"
+    "               processing-instruction p { $i }, comment { $i })\n"
+    "return string-join(for $n in $nodes\n"
+    "                   return string(copy $c := $n modify () return $c))",
+    "1111 2222", "parentless nodes" );
+}
 // Elements constructed with construction preserve, so typed xs:anyType: a
 // failure while one is made frees the type its tree recorded for it.
 void test_typed_element_out_of_memory( Fixture const &f ) {
@@ -4701,26 +4712,20 @@ void test_collection_map_undo_out_of_memory( Fixture const &f ) {
   (void)f;
 #endif
 }
-// The serializer with each allocation failing in turn, over an element 12 deep:
-// past the 8 children iterators the emitter makes first, so its pool of them
-// grows. The whole text or an error; then, in an AddressSanitizer build,
-// nothing is left unreachable.
-void test_serializer_out_of_memory( Fixture const &f ) {
 #if defined(__linux__)
-  std::string open, close;
-  for ( int i = 0; i < 12; ++i ) {
-    open += "<e" + std::to_string( i ) + ">t";
-    close = "</e" + std::to_string( i ) + ">" + close;
-  }
-  XQuery_t const query( f.zorba->compileQuery( open + close ) );
+// The serializer with each allocation failing in turn, over the item the query
+// returns: the whole text or an error; then, in an AddressSanitizer build,
+// nothing is left unreachable. Returns the whole text.
+std::string sweep_serializer_out_of_memory(
+    Fixture const &f, std::string const &text,
+    Zorba_SerializerOptions_t const &options, std::string const &what ) {
+  XQuery_t const query( f.zorba->compileQuery( text ) );
   Iterator_t const it( query->iterator() );
-  Item element;
+  Item item;
   it->open();
-  check( it->next( element ), "the element" );
+  check( it->next( item ), what + ": the item" );
   it->close();
-  ItemSequence_t const sequence( new SingletonItemSequence( element ) );
-  Zorba_SerializerOptions_t options;
-  options.omit_xml_declaration = ZORBA_OMIT_XML_DECLARATION_YES;
+  ItemSequence_t const sequence( new SingletonItemSequence( item ) );
   auto attempt = [&]( long n, long length, long *count ) -> std::string {
     std::ostringstream out;
     // As the server's stream: a write that cannot grow the text throws.
@@ -4738,7 +4743,6 @@ void test_serializer_out_of_memory( Fixture const &f ) {
   };
   long total = 0;
   std::string const whole( attempt( 0, 0, &total ) );
-  check( whole == open + close, "the serializer: the whole text", whole );
   long wrong = 0;
   for ( long const length : { 1L, 8L } )
     for ( long n = 1; n <= total; ++n ) {
@@ -4748,12 +4752,44 @@ void test_serializer_out_of_memory( Fixture const &f ) {
         std::cout << "at " << n << " of a run of " << length << ": " << got
                   << std::endl;
     }
-  check( wrong == 0, "the serializer: the whole text or an error",
+  check( wrong == 0, what + ": the whole text or an error",
          std::to_string( wrong ) + " points" );
 # if defined(__SANITIZE_ADDRESS__)
   check( __lsan_do_recoverable_leak_check() == 0,
-         "the serializer failing: nothing is left behind" );
+         what + " failing: nothing is left behind" );
 # endif
+  return whole;
+}
+#endif
+// An element 12 deep: past the 8 children iterators the emitter makes first,
+// so its pool of them grows.
+void test_serializer_out_of_memory( Fixture const &f ) {
+#if defined(__linux__)
+  std::string open, close;
+  for ( int i = 0; i < 12; ++i ) {
+    open += "<e" + std::to_string( i ) + ">t";
+    close = "</e" + std::to_string( i ) + ">" + close;
+  }
+  Zorba_SerializerOptions_t options;
+  options.omit_xml_declaration = ZORBA_OMIT_XML_DECLARATION_YES;
+  std::string const whole( sweep_serializer_out_of_memory(
+    f, open + close, options, "the serializer" ) );
+  check( whole == open + close, "the serializer: the whole text", whole );
+#else
+  (void)f;
+#endif
+}
+// The JSON-XML hybrid method writes each node of an array as a string, with an
+// XML emitter and its stream that the first node makes.
+void test_hybrid_serializer_out_of_memory( Fixture const &f ) {
+#if defined(__linux__)
+  Zorba_SerializerOptions_t options;
+  options.ser_method = ZORBA_SERIALIZATION_METHOD_JSON_XML_HYBRID;
+  std::string const whole( sweep_serializer_out_of_memory(
+    f, "[ <a>t</a>, <b/> ]", options, "the hybrid serializer" ) );
+  check( whole.find( "<a>t</a>" ) != std::string::npos &&
+         whole.find( "<b/>" ) != std::string::npos,
+         "the hybrid serializer: the whole text", whole );
 #else
   (void)f;
 #endif
@@ -9365,6 +9401,7 @@ Test const tests[] = {
   { "exhaust_seekable_stream", test_seekable_stream_out_of_memory },
   { "exhaust_json_loader", test_json_loader_out_of_memory },
   { "exhaust_serializer", test_serializer_out_of_memory },
+  { "exhaust_hybrid_serializer", test_hybrid_serializer_out_of_memory },
   { "exhaust_collection_puls", test_collection_puls_out_of_memory },
   { "exhaust_replace_content", test_replace_content_out_of_memory },
   { "exhaust_json_object_add", test_json_object_add_out_of_memory },
@@ -9387,6 +9424,7 @@ Test const tests[] = {
   { "exhaust_fold_left", test_fold_left_out_of_memory },
   { "exhaust_json_copy", test_json_copy_out_of_memory },
   { "exhaust_typed_element", test_typed_element_out_of_memory },
+  { "exhaust_parentless_nodes", test_parentless_nodes_out_of_memory },
   { "exhaust_sweep_matcher", test_sweep_matcher },
   { "exhaust_sweep_xml", test_sweep_xml },
   { "exhaust_sweep_xml_dtd", test_sweep_xml_dtd },

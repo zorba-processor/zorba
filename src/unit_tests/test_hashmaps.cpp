@@ -251,11 +251,11 @@ int test_hashmaps(int argc, char* argv[])
 }
 
 
-// A key whose next copy assignment fails, as a zstring copy can when it
-// allocates.
+// A key whose copy assignment can fail, as a zstring copy can when it
+// allocates: the copy theFailingCopy counts down to fails (0: none).
 struct FailingKey
 {
-  static bool theFailNextCopy;
+  static int theFailingCopy;
 
   int theId;
 
@@ -265,17 +265,14 @@ struct FailingKey
 
   FailingKey& operator=(const FailingKey& other)
   {
-    if (theFailNextCopy)
-    {
-      theFailNextCopy = false;
+    if (theFailingCopy > 0 && --theFailingCopy == 0)
       throw std::bad_alloc();
-    }
     theId = other.theId;
     return *this;
   }
 };
 
-bool FailingKey::theFailNextCopy = false;
+int FailingKey::theFailingCopy = 0;
 
 
 // One bucket for all keys: the second key inserted is a collision entry.
@@ -303,7 +300,7 @@ static bool insert_fails_cleanly(FailingKeyMap& map, int key, bool pairOverload)
 {
   csize const sizeBefore = map.size();
   int value = key;
-  FailingKey::theFailNextCopy = true;
+  FailingKey::theFailingCopy = 1;
   try
   {
     if (pairOverload)
@@ -316,7 +313,7 @@ static bool insert_fails_cleanly(FailingKeyMap& map, int key, bool pairOverload)
   catch (std::bad_alloc const&)
   {
   }
-  FailingKey::theFailNextCopy = false;
+  FailingKey::theFailingCopy = 0;
 
   if (map.size() != sizeBefore)
   {
@@ -432,18 +429,20 @@ typedef HashSet<FailingKey, FailingKeyCompFunc> FailingKeySet;
 enum SetInsertOverload { SET_INSERT, SET_INSERT_OUT, SET_INSERT_CONST_OUT };
 
 
-// Insert key with a failing key copy through the given overload; the set
-// must be left as it was: no entry counted, the key insertable afterwards.
+// Insert key through the given overload with its failingCopy-th key copy
+// failing (1: into the set, 2: into the out item); the set must be left as it
+// was: no entry counted, the key insertable afterwards.
 static bool set_insert_fails_cleanly(
     FailingKeySet& set,
     int key,
-    SetInsertOverload overload)
+    SetInsertOverload overload,
+    int failingCopy)
 {
   csize const sizeBefore = set.size();
   FailingKey item(key);
   FailingKey const constItem(key);
   FailingKey outItem;
-  FailingKey::theFailNextCopy = true;
+  FailingKey::theFailingCopy = failingCopy;
   try
   {
     switch (overload)
@@ -458,13 +457,14 @@ static bool set_insert_fails_cleanly(
       (void)set.insert(constItem, outItem);
       break;
     }
-    std::cerr << "set insert of key " << key << " did not fail" << std::endl;
+    std::cerr << "set insert of key " << key << " did not fail at copy "
+              << failingCopy << std::endl;
     return false;
   }
   catch (std::bad_alloc const&)
   {
   }
-  FailingKey::theFailNextCopy = false;
+  FailingKey::theFailingCopy = 0;
 
   if (set.size() != sizeBefore)
   {
@@ -490,10 +490,14 @@ int test_hashset_insert_rollback(int, char*[])
     { SET_INSERT, SET_INSERT_OUT, SET_INSERT_CONST_OUT };
   for (SetInsertOverload overload : overloads)
   {
-    FailingKeySet set(8, false);
-    // An empty bucket, then a collision entry in the same bucket.
-    ok = set_insert_fails_cleanly(set, 1, overload) && ok;
-    ok = set_insert_fails_cleanly(set, 2, overload) && ok;
+    int const lastCopy = overload == SET_INSERT ? 1 : 2;
+    for (int failingCopy = 1; failingCopy <= lastCopy; ++failingCopy)
+    {
+      FailingKeySet set(8, false);
+      // An empty bucket, then a collision entry in the same bucket.
+      ok = set_insert_fails_cleanly(set, 1, overload, failingCopy) && ok;
+      ok = set_insert_fails_cleanly(set, 2, overload, failingCopy) && ok;
+    }
   }
   return ok ? 0 : 1;
 }

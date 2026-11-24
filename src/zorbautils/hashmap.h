@@ -1072,11 +1072,20 @@ void setNewEntry(HashEntry<K, V>* entry, ulong hval, const K& key, Value& value)
   }
   catch (...)
   {
-    // hashInsert() put the new entry first in its bucket or right after it.
-    HashEntry<K, V>* headEntry = bucket(hval);
-    eraseEntry(entry, entry == headEntry ? NULL : headEntry);
+    eraseNewEntry(entry, hval);
     throw;
   }
+}
+
+
+/*******************************************************************************
+  Erase the entry that hashInsert() just made for a key that hashes to hval.
+********************************************************************************/
+void eraseNewEntry(HashEntry<K, V>* entry, ulong hval)
+{
+  // hashInsert() put the new entry first in its bucket or right after it.
+  HashEntry<K, V>* headEntry = bucket(hval);
+  eraseEntry(entry, entry == headEntry ? NULL : headEntry);
 }
 
 
