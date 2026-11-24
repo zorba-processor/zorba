@@ -45,6 +45,11 @@ variables (scripting) can only be called on the thread that created it: its
 calls write variables that calls on other threads would share. A call on
 another thread raises zerr:ZXQD0007.
 
+An eval query (reflection:eval and its variants) does not make the query
+that runs it such a query: the eval query works on its own copy of the
+variables of the outer query, so an assignment in it changes that copy, never
+a variable of the outer query that its function items read on other threads.
+
 \section threading_other Anything else
 
 Treat any use beyond the rule above as undefined behavior.
