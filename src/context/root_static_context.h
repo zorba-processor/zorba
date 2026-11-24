@@ -29,6 +29,8 @@ class root_static_context : public static_context
 private:
   static const char* theBuiltinURIPath[];
   static const char* theBuiltinLibPath[];
+  static const char* theInstallURIDirs[];
+  static const char* theInstallLibDirs[];
 
 protected:
   zstring theImplementationBaseUri;
