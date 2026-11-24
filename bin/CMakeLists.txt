@@ -122,11 +122,11 @@ ENDFOREACH ()
 # query that crashes or fails after printing its plan fails the test. Arguments
 # are separated by "|".
 ZORBA_TARGET_LOCATION (_zorbacmd zorbacmd)
-MACRO (ZORBA_PLAN_TEST NAME PATTERN ARGS)
+FUNCTION (ZORBA_PLAN_TEST NAME PATTERN ARGS)
   ADD_TEST ("${NAME}" "${CMAKE_COMMAND}" "-DZORBACMD=${_zorbacmd}" "-DARGS=${ARGS}"
     "-DPATTERN=${PATTERN}" -P "${_plandir}/plan_check.cmake")
   ZORBA_SET_TEST_DEFAULTS ("${NAME}")
-ENDMACRO (ZORBA_PLAN_TEST)
+ENDFUNCTION (ZORBA_PLAN_TEST)
 SET (_planfile "|-e|f:=${_plandir}/plan_members.json")
 # At O0 the argument of parse-json keeps the fn:data that the translator wraps
 # around it and that only the optimizer removes, so the call of file:read-text is
@@ -241,7 +241,7 @@ ZORBA_SET_TEST_PROPERTY(bin/zorba_jnse0012 PASS_REGULAR_EXPRESSION
 SET (_langdir "${CMAKE_CURRENT_SOURCE_DIR}/test/language")
 # Sets what the output of a test must match: jsoniq (the program ran),
 # xquery (it is a syntax error), or a regular expression.
-MACRO (ZORBA_LANGUAGE_EXPECT NAME EXPECT)
+FUNCTION (ZORBA_LANGUAGE_EXPECT NAME EXPECT)
   IF ("${EXPECT}" STREQUAL "jsoniq")
     ZORBA_SET_TEST_PROPERTY(bin/zorba_language_${NAME}
       PASS_REGULAR_EXPRESSION "1 2")
@@ -254,7 +254,7 @@ MACRO (ZORBA_LANGUAGE_EXPECT NAME EXPECT)
     ZORBA_SET_TEST_PROPERTY(bin/zorba_language_${NAME}
       PASS_REGULAR_EXPRESSION "${EXPECT}")
   ENDIF ()
-ENDMACRO (ZORBA_LANGUAGE_EXPECT)
+ENDFUNCTION (ZORBA_LANGUAGE_EXPECT)
 
 
 # No declaration: the extension.
