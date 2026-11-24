@@ -1,11 +1,13 @@
 name: Release
 
 # Builds a tagged release: tests on linux-amd64, then publishes
-#   - a source tarball, SBOMs and SHA256SUMS on a DRAFT GitHub Release
+#   - a source tarball, binary tarballs for linux-amd64, linux-arm64 and
+#     macos-arm64, SBOMs and SHA256SUMS on a DRAFT GitHub Release
 #     (the owner reviews and publishes it; see RELEASING.md),
 #   - the multi-arch ghcr.io/<owner>/zorba image with the release tags
 #     (see docker/README.md),
-#   - build provenance and SBOM attestations for the tarball and the image.
+#   - build provenance attestations for the tarballs and the image, SBOM
+#     attestations for the source tarball and the image.
 #
 # workflow_dispatch runs the same pipeline without a tag. With dry_run (the
 # default) nothing is pushed and no release is created; the would-be release
@@ -208,11 +210,25 @@ jobs:
             echo "docker run --rm ${IMAGE}:${VERSION} -q '1 + 1'"
             echo '```'
             echo
+            echo "### Binaries"
+            echo
+            echo "\`zorba-${VERSION}-<platform>.tar.xz\` for \`linux-amd64\` and \`linux-arm64\` (glibc 2.39 and libstdc++ of GCC 13 or later, as in Ubuntu 24.04) and \`macos-arm64\` (macOS 15 or later, ad-hoc signed). Each holds \`bin/zorba\`, \`bin/zorba-mcp\`, the C and C++ headers in \`include/\`, and \`libzorba_simplestore\` with the ICU, libxml2, Xerces-C and other libraries it loads in \`lib/\` (on Linux also libcurl and its libraries; macOS uses the system libcurl). It runs from any directory. The engine is built single-threaded, as the default build: one engine per process, used from one thread at a time."
+            echo
+            echo '```bash'
+            echo "tar -xJf zorba-${VERSION}-linux-amd64.tar.xz"
+            echo "zorba-${VERSION}-linux-amd64/bin/zorba -q '1 + 1'"
+            echo '```'
+            echo
+            echo "On macOS, a tarball downloaded with a browser is quarantined: run \`xattr -dr com.apple.quarantine zorba-${VERSION}-macos-arm64\` after unpacking it."
+            echo
             echo "### Verifying"
             echo
             echo '```bash'
             echo "sha256sum -c SHA256SUMS"
             echo "gh attestation verify zorba-${VERSION}.tar.gz -R ${GITHUB_REPOSITORY}"
+            for p in linux-amd64 linux-arm64 macos-arm64; do
+              echo "gh attestation verify zorba-${VERSION}-$p.tar.xz -R ${GITHUB_REPOSITORY}"
+            done
             echo "gh attestation verify oci://${IMAGE}:${VERSION} -R ${GITHUB_REPOSITORY}"
             echo '```'
           }
@@ -348,6 +364,169 @@ jobs:
       - uses: actions/upload-artifact@v7
         with:
           name: dist-source
+          path: dist/*
+          retention-days: 7
+
+  # Binary tarballs: the cmake --install tree (no test programs) with the
+  # shared libraries it loads from outside the system baseline copied into
+  # lib/ and relative library search paths (scripts/bundle-binary.sh), the
+  # licence files of Zorba and of every bundled library
+  # (scripts/bundle-licenses.sh), smoke tested where none of those libraries
+  # is installed. Linux builds on Ubuntu
+  # 24.04 (docker/builder, glibc 2.39); macOS builds ICU, libxml2 and
+  # Xerces-C from the patched forks, as the Linux images do.
+  binaries:
+    needs: prepare
+    name: binary ${{ matrix.platform }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux-amd64
+            runner: ubuntu-24.04
+            suffix: ''
+            cache: linux-amd64-ubuntu
+          - platform: linux-arm64
+            runner: ubuntu-24.04-arm
+            suffix: -arm64
+            cache: linux-arm64-ubuntu
+          - platform: macos-arm64
+            runner: macos-15
+            suffix: ''
+            cache: macos-arm64
+    env:
+      NAME: zorba-${{ needs.prepare.outputs.version }}-${{ matrix.platform }}
+      CCACHE_SLOPPINESS: pch_defines,time_macros
+      CCACHE_DEPEND: "1"
+    steps:
+      - uses: actions/checkout@v7
+
+      # Restore only: release builds must not evict the CI caches.
+      - uses: actions/cache/restore@v6
+        with:
+          path: .ccache
+          key: ccache-v2-${{ matrix.cache }}-${{ github.sha }}
+          restore-keys: ccache-v2-${{ matrix.cache }}-
+
+      - name: Builder image
+        if: runner.os == 'Linux'
+        uses: ./.github/actions/builder-image
+        with:
+          context: docker/builder
+          suffix: ${{ matrix.suffix }}
+          cache-scope: ${{ matrix.cache }}
+
+      - name: Build, install and bundle (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          docker run --rm -e NAME -e CCACHE_DIR=/src/.ccache \
+            -e CCACHE_SLOPPINESS -e CCACHE_DEPEND \
+            -v "$PWD":/src -w /src zorba-builder:ci sh -ec '
+              cmake --preset full-release -DZORBA_WERROR=ON \
+                -DZORBA_WITH_UNIT_TESTS=OFF -DCMAKE_INSTALL_PREFIX="/src/stage/$NAME"
+              cmake --build --preset full-release
+              ccache -s
+              cmake --install build/full-release
+              cd "stage/$NAME"
+              rm -rf bin/testdriver* share/zorba-*/fots_driver \
+                share/zorba/uris/io/zorba/modules/util-tests* lib/zorba/io/zorba/modules/libutil-tests*
+              cd /src
+              apt-get update -qq
+              apt-get install -y -qq --no-install-recommends patchelf > /dev/null
+              scripts/bundle-binary.sh "stage/$NAME" > bundle.log || { cat bundle.log; exit 1; }
+              cat bundle.log
+              scripts/bundle-licenses.sh "stage/$NAME" bundle.log'
+
+      - name: Install the build tools (macOS)
+        if: runner.os == 'macOS'
+        run: brew install ninja ccache meson pkgconf
+
+      - uses: actions/cache@v6
+        if: runner.os == 'macOS'
+        id: deps
+        with:
+          path: ~/zorba-deps
+          key: release-macos-deps-${{ hashFiles('scripts/build-macos-deps.sh') }}
+
+      - name: Build ICU, libxml2 and Xerces-C (macOS)
+        if: runner.os == 'macOS' && steps.deps.outputs.cache-hit != 'true'
+        run: scripts/build-macos-deps.sh ~/zorba-deps
+
+      - name: Build, install and bundle (macOS)
+        if: runner.os == 'macOS'
+        env:
+          CCACHE_DIR: ${{ github.workspace }}/.ccache
+        run: |
+          set -euo pipefail
+          cmake --preset full-release -DZORBA_WERROR=ON -DZORBA_WITH_UNIT_TESTS=OFF \
+            -DCMAKE_PREFIX_PATH="$HOME/zorba-deps" \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_INSTALL_PREFIX="$PWD/stage/$NAME"
+          cmake --build --preset full-release
+          ccache -s
+          cmake --install build/full-release
+          (cd "stage/$NAME" && rm -rf bin/testdriver* share/zorba-*/fots_driver \
+            share/zorba/uris/io/zorba/modules/util-tests* lib/zorba/io/zorba/modules/libutil-tests*)
+          scripts/bundle-binary.sh "stage/$NAME" | tee bundle.log
+          # Only the patched builds may be bundled, never Homebrew's.
+          if grep -F /opt/homebrew bundle.log; then exit 1; fi
+          scripts/bundle-licenses.sh "stage/$NAME" bundle.log
+
+      - name: Create the tarball
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          tar -C stage -cJf "dist/$NAME.tar.xz" "$NAME"
+          ls -l dist
+          du -sh "stage/$NAME"/*
+
+      # Unpacked on the runner: the container has no xz. Its only addition
+      # is g++, for the C++ program of the smoke test.
+      - name: Smoke test in a clean container (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          mkdir "$RUNNER_TEMP/smoke"
+          tar -C "$RUNNER_TEMP/smoke" -xJf "dist/$NAME.tar.xz"
+          docker run --rm -v "$RUNNER_TEMP/smoke:/smoke:ro" -v "$PWD/scripts:/scripts:ro" -e NAME \
+            ubuntu:24.04 sh -ec '
+              export DEBIAN_FRONTEND=noninteractive
+              apt-get update -qq
+              apt-get install -y -qq --no-install-recommends g++ > /dev/null
+              if ldconfig -p | grep -E "libicu|libxml2|libxerces|libcurl|libxslt"; then
+                echo "the clean container has a bundled library installed"; exit 1
+              fi
+              CXX=g++ /scripts/smoke-binary.sh "/smoke/$NAME"'
+
+      # The build tree and the dependencies are moved away first, so the
+      # tarball must find everything in its own lib/.
+      - name: Smoke test with the build removed (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          mv build "$RUNNER_TEMP/build.off"
+          mv stage "$RUNNER_TEMP/stage.off"
+          mv ~/zorba-deps "$RUNNER_TEMP/deps.off"
+          mkdir "$RUNNER_TEMP/smoke"
+          tar -C "$RUNNER_TEMP/smoke" -xJf "dist/$NAME.tar.xz"
+          CXX=clang++ scripts/smoke-binary.sh "$RUNNER_TEMP/smoke/$NAME"
+          mv "$RUNNER_TEMP/deps.off" ~/zorba-deps
+
+      # Pull requests from forks get no OIDC token.
+      - name: Attest build provenance (${{ matrix.platform }})
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/attest@v4
+        with:
+          subject-path: dist/${{ env.NAME }}.tar.xz
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist-binary-${{ matrix.platform }}
           path: dist/*
           retention-days: 7
 
@@ -521,7 +700,7 @@ jobs:
           push-to-registry: true
 
   release:
-    needs: [prepare, test, source, image, image-manifest]
+    needs: [prepare, test, source, binaries, image, image-manifest]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -541,6 +720,11 @@ jobs:
         with:
           name: dist-source
           path: dist
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: dist-binary-*
+          path: dist
+          merge-multiple: true
       - uses: actions/download-artifact@v8
         with:
           pattern: sbom-image-*
