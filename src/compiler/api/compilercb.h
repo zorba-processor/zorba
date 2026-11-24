@@ -128,10 +128,25 @@ class XQueryDiagnostics;
   is published with the state it hands over, and every collection runs under a
   CollectorLock, as does every release of a reference to a function item that
   refers to a detached obj (FunctionItem::removeDetachedReference()), so that
-  no graph is walked while another thread frees a part of it. The reference
-  counts of a graph can still change during a walk (copies are not locked): a
-  walk that finds garbage reads them again and releases nothing if any of them
-  changed.
+  no graph is walked while another thread frees a part of it.
+
+  A release that found no detached obj (a function item, a function item
+  destroyed, or release()) may have read that just before an obj was detached
+  on another thread, and drop its reference after the collection of dispose()
+  counted it: if that was the last reference from outside a cycle, nothing
+  would collect it. Each detach takes a new detach epoch, under the lock, and
+  is listed until the obj is destroyed; such a release reads the epoch before
+  it checks (beginRelease()) and again after it has dropped its reference
+  (endRelease()), and collects the objs detached in between. Either the
+  release sees the new epoch or the collection sees the dropped reference
+  (sequentially consistent fences on both sides).
+
+  The reference counts of a graph can still change during a walk (copies are
+  not locked). A walk that finds garbage reads the counts of the nodes it found
+  unreachable again: no node it found referenced from outside refers to them,
+  so another thread can hold one only if the walk read its count before that
+  thread got it. If one of them changed, it walks again; changes to the counts
+  of the other nodes do not matter.
 ********************************************************************************/
 class QueryResources : public SyncedRCObject
 {
@@ -148,6 +163,12 @@ protected:
   rchandle<QueryResources>       theParent;
   rchandle<QueryResources>       theDctxParent;
   std::atomic<bool>              theIsDetached;
+#ifndef ZORBA_FOR_ONE_THREAD_ONLY
+  // See "Threads" in the class comment: the epoch of the last detach, and the
+  // epoch at which this obj was detached (0 if it never was).
+  static std::atomic<unsigned long> theDetachEpoch;
+  unsigned long                  theDetachedAt;
+#endif
 
   // See "Cost" in the class comment.
   struct Witness
@@ -250,8 +271,37 @@ public:
     return theGraphGeneration.load(std::memory_order_relaxed);
   }
 
+  /*
+    See "Threads" in the class comment. beginRelease() is called before a
+    release checks whether it refers to a detached obj; if it does not,
+    endRelease() is called with the result after the reference is dropped.
+  */
+#ifndef ZORBA_FOR_ONE_THREAD_ONLY
+  static unsigned long beginRelease()
+  {
+    return theDetachEpoch.load(std::memory_order_acquire);
+  }
+
+  static void endRelease(unsigned long epoch)
+  {
+    std::atomic_thread_fence(std::memory_order_seq_cst);
+    if (theDetachEpoch.load(std::memory_order_relaxed) != epoch)
+      collectDetachedSince(epoch);
+  }
+#else
+  static unsigned long beginRelease() { return 0; }
+
+  static void endRelease(unsigned long) { }
+#endif
+
 private:
   void destroy();
+
+#ifndef ZORBA_FOR_ONE_THREAD_ONLY
+  void detach();
+
+  static void collectDetachedSince(unsigned long epoch);
+#endif
 
   QueryResources(const QueryResources&);
   QueryResources& operator=(const QueryResources&);
