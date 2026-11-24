@@ -487,19 +487,22 @@ jobs:
           ls -l dist
           du -sh "stage/$NAME"/*
 
+      # Unpacked on the runner: the container has no xz. Its only addition
+      # is g++, for the C++ program of the smoke test.
       - name: Smoke test in a clean container (Linux)
         if: runner.os == 'Linux'
         run: |
-          docker run --rm -v "$PWD/dist:/dist:ro" -v "$PWD/scripts:/scripts:ro" -e NAME \
+          mkdir "$RUNNER_TEMP/smoke"
+          tar -C "$RUNNER_TEMP/smoke" -xJf "dist/$NAME.tar.xz"
+          docker run --rm -v "$RUNNER_TEMP/smoke:/smoke:ro" -v "$PWD/scripts:/scripts:ro" -e NAME \
             ubuntu:24.04 sh -ec '
-              tar -C /tmp -xJf "/dist/$NAME.tar.xz"
               export DEBIAN_FRONTEND=noninteractive
               apt-get update -qq
               apt-get install -y -qq --no-install-recommends g++ > /dev/null
               if ldconfig -p | grep -E "libicu|libxml2|libxerces|libcurl|libxslt"; then
                 echo "the clean container has a bundled library installed"; exit 1
               fi
-              CXX=g++ /scripts/smoke-binary.sh "/tmp/$NAME"'
+              CXX=g++ /scripts/smoke-binary.sh "/smoke/$NAME"'
 
       # The build tree and the dependencies are moved away first, so the
       # tarball must find everything in its own lib/.
