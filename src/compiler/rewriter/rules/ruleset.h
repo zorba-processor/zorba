@@ -130,6 +130,24 @@ public:
 
 
 /*******************************************************************************
+  Computes a global variable of the main query that only the domain of the first
+  for or window clause of the query body reads (after let clauses only) in that
+  domain, streamed.
+********************************************************************************/
+class StreamSingleUseGlobals : public RewriteRule
+{
+public:
+  StreamSingleUseGlobals()
+    :
+    RewriteRule(RewriteRule::StreamSingleUseGlobals, "StreamSingleUseGlobals")
+  {
+  }
+
+  expr* apply(RewriterContext& rCtx, expr* node, bool& modified);
+};
+
+
+/*******************************************************************************
 
 ********************************************************************************/
 class FoldConst : public RewriteRule

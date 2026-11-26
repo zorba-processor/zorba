@@ -1,0 +1,35 @@
+<iterator-tree description="main query">
+  <SequentialIterator>
+    <CtxVarDeclareIterator varid="4" varname="g"/>
+    <CtxVarDeclareIterator varid="5" varname="h">
+      <FnConcatIterator>
+        <SingletonIterator value="xs:integer(10)"/>
+        <SingletonIterator value="xs:integer(20)"/>
+      </FnConcatIterator>
+    </CtxVarDeclareIterator>
+    <FLWORIterator>
+      <LetVariable name="$$opt_temp_0" materialize="true">
+        <HoistIterator>
+          <FnCountIterator>
+            <CtxVarIterator varid="5" varname="h" varkind="global"/>
+          </FnCountIterator>
+        </HoistIterator>
+      </LetVariable>
+      <ForVariable name="x">
+        <FnConcatIterator>
+          <SingletonIterator value="xs:integer(1)"/>
+          <SingletonIterator value="xs:integer(2)"/>
+          <SingletonIterator value="xs:integer(3)"/>
+        </FnConcatIterator>
+      </ForVariable>
+      <ReturnClause>
+        <SpecificNumArithIterator_AddOperation_INTEGER>
+          <ForVarIterator varname="x"/>
+          <UnhoistIterator>
+            <LetVarIterator varname="$$opt_temp_0"/>
+          </UnhoistIterator>
+        </SpecificNumArithIterator_AddOperation_INTEGER>
+      </ReturnClause>
+    </FLWORIterator>
+  </SequentialIterator>
+</iterator-tree>

@@ -28,6 +28,9 @@ and where its time and allocations go. Each change that makes it faster adds a r
 | `unmatched_udf_let.jq` | `unmatched_udf.jq` with the ids parameter used twice in the function, which then binds it with a `let` of its own. |
 | `latency_let.jq` | `latency.jq` with the request of each event bound by a `let` clause, `let $http := $e.http`. |
 | `latency_calls.jq` | `latency.jq` with the keys looked up by chained calls, `$e("http")("route")`. |
+| `filter_project_global.jq` | `filter_project.jq` with the events in a global variable (`declare variable`). |
+| `filter_project_let.jq` | `filter_project.jq` with the events bound by a `let` clause. |
+| `latency_global.jq` | `latency.jq` with the events in a global variable (`declare variable`). |
 | `run.sh` | Best of 3 runs of the queries: wall time, peak RSS, MB/s, SHA-256 of the output. |
 | `tools/profile.sh` | Samples per part (perf + `classify.awk`) and allocations per event (`malloc_count.c`) of one query. |
 | `tools/classify.awk` | Charges each `perf script` sample to a part of the parse or of the query. |
@@ -312,3 +315,28 @@ built with `CMAKE_BUILD_TYPE=Release` (not the profile build of step 1):
 | latency_calls | 3.24 | 3.00 (-7%) | 205 | 148 |
 
 `latency_calls` now builds what `latency` builds, and writes the same output.
+
+### Events in a global variable (`filter_project_global.jq`, `latency_global.jq`)
+
+`filter_project_global.jq` and `latency_global.jq` bind the parse with
+`declare variable $events := parse-json(...)` and iterate `$events` in the query
+body; `filter_project_let.jq` binds it with a `let` clause. On master the global
+variable was materialized before the body ran, so memory grew with the log. At
+`-O1` and `-O2` a global variable whose only reference is the domain of the first
+`for` or window clause of the query body (after `let` clauses only) is now computed
+in that domain, streamed, as the `let` form is. Best wall time (s) and largest peak
+RSS (MiB) of three runs, master `ec95d86412` and then the head, in a container
+limited to 5 CPUs with the host busy with other builds, built with
+`CMAKE_BUILD_TYPE=Release` (not the profile build of step 1):
+
+| query | master s | head s | master MiB | head MiB |
+|---|---:|---:|---:|---:|
+| filter_project | 1.95 | 2.12 | 35 | 35 |
+| filter_project_let | 1.96 | 2.12 | 35 | 35 |
+| filter_project_global | 3.31 | 2.07 (-37%) | 863 | 35 |
+| latency | 2.90 | 2.74 | 148 | 148 |
+| latency_global | 4.27 | 2.76 (-35%) | 869 | 148 |
+
+The forms without a global variable are not changed (noise). Every query writes
+the same output on both builds. A global variable that is referenced more than
+once, or anywhere else, is still materialized (`unmatched_global.jq`).
